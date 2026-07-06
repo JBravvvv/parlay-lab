@@ -299,7 +299,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 21 · 2026-07-05</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 22 · 2026-07-06</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -346,12 +346,12 @@ var FB_COLS={
 };
 var FB_MARKETS=[["player_anytime_td","Anytime TD"],["player_pass_yds","Pass Yds O/U"],["player_pass_tds","Pass TDs O/U"],["player_rush_yds","Rush Yds O/U"],["player_receptions","Receptions O/U"],["player_reception_yds","Rec Yds O/U"]];
 var SPORTS={
-  mlb:{label:"MLB",oddsKey:"baseball_mlb",groups:[["hitting","HITTING"],["pitching","PITCHING"]],seasons:[2026,2025,2024],
+  mlb:{label:"MLB",oddsKey:"baseball_mlb",groups:[["hitting","HITTING"],["pitching","PITCHING"]],seasons:[2026,2025,2024],defSeason:2026,
        markets:[["batter_home_runs","Anytime HR"],["batter_hits","Hits O/U"],["batter_total_bases","Total Bases O/U"],["batter_hits_runs_rbis","H+R+RBIs O/U"],["pitcher_strikeouts","Pitcher K's O/U"]],
        modes:[["ml","MLB ML"],["props","MLB PROPS"]]},
-  nfl:{label:"NFL",oddsKey:"americanfootball_nfl",groups:[["passing","PASSING"],["rushing","RUSHING"],["receiving","RECEIVING"]],seasons:[2025,2024,2023],
+  nfl:{label:"NFL",oddsKey:"americanfootball_nfl",groups:[["passing","PASSING"],["rushing","RUSHING"],["receiving","RECEIVING"]],seasons:[2026,2025,2024,2023],defSeason:2025,
        markets:FB_MARKETS,modes:[["ml","NFL ML"],["spread","SPREADS"],["props","PROPS"]]},
-  cfb:{label:"NCAAF",oddsKey:"americanfootball_ncaaf",groups:[["passing","PASSING"],["rushing","RUSHING"],["receiving","RECEIVING"]],seasons:[2025,2024,2023],
+  cfb:{label:"NCAAF",oddsKey:"americanfootball_ncaaf",groups:[["passing","PASSING"],["rushing","RUSHING"],["receiving","RECEIVING"]],seasons:[2026,2025,2024,2023],defSeason:2025,
        markets:FB_MARKETS,modes:[["ml","NCAAF ML"],["spread","SPREADS"],["props","PROPS"]]}
 };
 var SPORT="mlb"; /* restored from localStorage after LS is defined (see state section) */
@@ -434,7 +434,7 @@ var S={group:"hitting",scope:"ind",season:SEASON_DEFAULT,team:"ALL",timeframe:"s
   legs:LS.get("pl_legs",[]),stake:LS.get("pl_stake",10),books:LS.get("pl_books",DEFAULT_BOOKS)};
 if(!S.books||!S.books.length)S.books=DEFAULT_BOOKS;
 /* apply restored sport's defaults */
-if(SPORT!=="mlb"){S.group=SPORTS[SPORT].groups[0][0];S.season=SPORTS[SPORT].seasons[0];S.sort={key:"YDS",dir:"desc"};}
+if(SPORT!=="mlb"){S.group=SPORTS[SPORT].groups[0][0];S.season=SPORTS[SPORT].defSeason;S.sort={key:"YDS",dir:"desc"};}
 
 var $=function(id){return document.getElementById(id);};
 var cols=function(){if(SPORT!=="mlb")return FB_COLS[S.group]||[];return S.group==="hitting"?HIT_COLS:PIT_COLS;};
@@ -499,7 +499,9 @@ function applyLive(key,rows){
 function mlbSnapKey(){return SPORT==="mlb"&&S.scope==="ind"&&S.season===2026;}
 function fallbackSnap(key){
   S.mode="snapshot";S.loading=false;
-  if(!S.cache[key]||!S.cache[key].length){if(mlbSnapKey()){S.cache[key]=(S.group==="hitting"?SNAP_HIT:SNAP_PIT);}else{S.error=(S.scope==="team"?"Couldn't load team stats — tap Refresh.":"Live data unavailable for "+S.season+".");}}
+  if(!S.cache[key]||!S.cache[key].length){if(mlbSnapKey()){S.cache[key]=(S.group==="hitting"?SNAP_HIT:SNAP_PIT);}
+    else if(SPORT!=="mlb"&&S.season>SPORTS[SPORT].defSeason){S.error="The "+S.season+" "+SPORTS[SPORT].label+" season hasn't kicked off yet — stats will appear here once games are played.";}
+    else{S.error=(S.scope==="team"?"Couldn't load team stats — tap Refresh.":"Live data unavailable for "+S.season+".");}}
   renderStatus();renderTable();
 }
 function fetchSeq(urls,i,key,parseFn){
@@ -526,9 +528,10 @@ function fetchStats(force){
 /* ===== renders ===== */
 function renderStatus(){
   var dot=$("dot"),t=$("statusText");
-  dot.className="dot "+(S.loading?"load":S.mode==="live"?"live":"snap");
+  dot.className="dot "+(S.loading?"load":S.mode==="live"?"live":(S.error?"err":"snap"));
   t.textContent=S.loading?"Loading live data…":
     S.mode==="live"?("Live · "+(S.updated?S.updated.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"")+" · every player"):
+    S.error?"No data for this season yet":
     "Snapshot · top players shown (tap ↻ to load all live)";
   $("sub").textContent=SPORTS[SPORT].label+" · "+S.season+(SPORT==="mlb"?"":" season")+" · live stat desk + parlay math";
 }
@@ -564,7 +567,7 @@ function renderTable(){
 
   var body="";
   if(!S.loading&&!rows.length){
-    body="<tr><td class='empty' colspan='"+(c.length+4)+"'>"+(S.error?"Couldn't load — tap Refresh.":"No players match.")+"</td></tr>";
+    body="<tr><td class='empty' colspan='"+(c.length+4)+"'>"+(S.error?esc(S.error):"No players match.")+"</td></tr>";
   }else{
     var CAP=400; var shown=rows.slice(0,CAP);
     shown.forEach(function(p,i){
@@ -700,7 +703,7 @@ $("blist").addEventListener("click",function(e){
 });
 
 /* season select (options depend on sport) */
-function populateSeasons(){var sel=$("season");if(!sel)return;sel.innerHTML="";SPORTS[SPORT].seasons.forEach(function(y){var o=document.createElement("option");o.value=y;o.textContent=y;sel.appendChild(o);});if(SPORTS[SPORT].seasons.indexOf(S.season)<0)S.season=SPORTS[SPORT].seasons[0];sel.value=S.season;}
+function populateSeasons(){var sel=$("season");if(!sel)return;sel.innerHTML="";var cfg=SPORTS[SPORT];cfg.seasons.forEach(function(y){var o=document.createElement("option");o.value=y;o.textContent=y+(y>cfg.defSeason?" · upcoming":"");sel.appendChild(o);});if(cfg.seasons.indexOf(S.season)<0)S.season=cfg.defSeason;sel.value=S.season;}
 $("season").addEventListener("change",function(){S.season=Number(this.value);renderStatus();fetchStats();});
 
 /* team filter — MLB static; football rebuilt from the loaded rows */
@@ -881,7 +884,7 @@ function switchSport(sp){
   SPORT=sp;LS.set("pl_sport",sp);
   var cfg=SPORTS[sp];
   /* stat desk: reset sport-specific state (bet slip + scope persist) */
-  S.group=cfg.groups[0][0];S.season=cfg.seasons[0];S.timeframe="season";S.position="ALL";S.minVal=0;S.team="ALL";S.query="";S.picked=[];S.sort=defaultSort();
+  S.group=cfg.groups[0][0];S.season=cfg.defSeason;S.timeframe="season";S.position="ALL";S.minVal=0;S.team="ALL";S.query="";S.picked=[];S.sort=defaultSort();
   var sr=$("search");if(sr)sr.value="";var cs=$("clrSearch");if(cs)cs.style.display="none";
   renderSportBar();renderGrpToggle();populateSeasons();populateTeamFilter();populatePos();populateMin();toggleTimeframeVis();
   renderStatus();renderPicks();fetchStats();
