@@ -362,7 +362,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 27 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 28 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1286,12 +1286,16 @@ function shAnalyzeLocal(slate){
      reuse solo picks; HR-only tickets never mix in a non-HR leg and vice-versa. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob};}
-  /* greedy least-used picker: spreads picks evenly across the whole board so
-     tickets barely overlap (take several without re-betting the same play).
-     Each parlay grabs the least-used players first (prob breaks ties), never
-     repeats a player within a ticket, and prefers one leg per game. */
-  function makePicker(pool){
-    var uPlayer={},uKey={};
+  /* diversity-capped picker: HARD guarantee that no player appears in more
+     than `cap` tickets across the whole board, so multiple parlays can be
+     played as-is without re-betting the same play. Each parlay takes the
+     least-used players first (prob breaks ties), never repeats a player
+     within a ticket, and prefers one leg per game. If a ticket can't be
+     filled without breaking the cap, it is NOT built — a thin slate yields
+     fewer parlays instead of recycled picks. */
+  var shUse={uPlayer:{},uKey:{}}; /* one usage ledger for the WHOLE board (HR + mixed) */
+  function makePicker(pool,cap){
+    var uPlayer=shUse.uPlayer,uKey=shUse.uKey;
     return function(n,preferDistinctGame){
       var ranked=pool.slice().sort(function(a,b){
         var pa=uPlayer[a.r.label]||0,pb=uPlayer[b.r.label]||0;if(pa!==pb)return pa-pb;
@@ -1300,9 +1304,11 @@ function shAnalyzeLocal(slate){
       var out=[],seenP={},seenG={};
       function pass(enforceGame){for(var i=0;i<ranked.length&&out.length<n;i++){var x=ranked[i];
         var gm=(x.r.game||"").split(" · ")[0];
+        if((uPlayer[x.r.label]||0)>=cap)continue;
         if(seenP[x.r.label])continue;if(enforceGame&&seenG[gm])continue;
         seenP[x.r.label]=1;seenG[gm]=1;out.push(x);}}
       pass(!!preferDistinctGame);if(out.length<n&&preferDistinctGame)pass(false);
+      if(out.length<n)return null; /* can't fill within the cap — skip this ticket */
       out.forEach(function(x){uPlayer[x.r.label]=(uPlayer[x.r.label]||0)+1;uKey[x.r.label+"|"+x.r.sub]=(uKey[x.r.label+"|"+x.r.sub]||0)+1;});
       return out;
     };
@@ -1330,12 +1336,13 @@ function shAnalyzeLocal(slate){
     .forEach(function(k){cats[k].forEach(function(r){nonHRpool.push({cat:k,r:r});});});
   nonHRpool.sort(function(a,b){return b.r.prob-a.r.prob;});
   var parlays=[];
-  /* 10 HR-only parlays, 3-6 legs (capped to what the HR board supports) */
-  var pickHR=makePicker(hrPool);
+  /* 10 HR-only parlays, 3-6 legs — no HR hitter on more than 2 tickets */
+  var pickHR=makePicker(hrPool,2);
   [3,3,4,4,5,3,4,5,6,4].forEach(function(want){var n=Math.min(want,hrPool.length);if(n<2)return;
     var p=build("HR-only · "+n+" legs","HR",pickHR(n,false));if(p)parlays.push(p);});
-  /* 40 non-HR parlays, 2-10 legs, weighted toward safe/mid with a longshot tail */
-  var pickMix=makePicker(nonHRpool);
+  /* 40 non-HR parlays, 2-10 legs, weighted toward safe/mid with a longshot tail —
+     no player/team on more than 2 tickets */
+  var pickMix=makePicker(nonHRpool,2);
   var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,3],[7,2],[8,1],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
   mixPat.forEach(function(want){var n=Math.min(want,nonHRpool.length);if(n<2)return;
     var p=build("Mixed · "+n+" legs","MIX",pickMix(n,true));if(p)parlays.push(p);});
@@ -1494,7 +1501,7 @@ function shRun(engine){
         :(data&&data.categories?SH_NAMED_CATS.reduce(function(a,k){return a+((data.categories[k]||[]).length);},0):0);
       var parlayCount=(data&&data.parlays&&data.parlays.length)||0;
       if(!pickCount)throw new Error("No lines posted for today's remaining games — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:2,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:3,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
       shRender();
@@ -1521,7 +1528,7 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current categorized + 50-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===2){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===3){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
 })();
 
