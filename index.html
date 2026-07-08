@@ -207,6 +207,44 @@ body{padding:0!important;min-height:100dvh}
 .sportbtn{flex:1;background:transparent;border:none;color:var(--muted);padding:10px 4px;font-family:'Saira Condensed',sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap}
 .sportbtn.on{background:var(--amber);color:#08090b;box-shadow:0 0 14px rgba(255,184,56,.35)}
 .ncaateam b{font-family:'JetBrains Mono',monospace;font-weight:700}
+/* The Sharp — AI prop board (build 23) */
+.shgear{background:none;border:1px solid var(--line);color:var(--muted);border-radius:7px;padding:2px 9px;cursor:pointer;font-size:13px}
+.shkey{padding:12px 13px 0}
+.shctrls{padding:13px}
+.shrun{width:100%;background:rgba(182,255,61,.14);border:1px solid var(--green);color:var(--green);border-radius:10px;padding:13px;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase}
+.shrun:active{background:var(--green);color:#0a0c07}
+.shrun:disabled{opacity:.45;cursor:default}
+.shstatus{padding:0 13px 10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);min-height:14px;line-height:1.5}
+.shstatus .err{color:var(--red)}
+.shboard{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+.shover{background:rgba(255,184,56,.07);border:1px solid rgba(255,184,56,.4);border-radius:10px;padding:11px 12px;font-size:13px;line-height:1.55}
+.shover b{color:var(--amber);font-family:'Saira Condensed',sans-serif;letter-spacing:.6px;font-size:13px;display:block;margin-bottom:4px}
+.shpick{background:var(--bg);border:1px solid rgba(182,255,61,.32);border-radius:11px;padding:11px 12px}
+.shpick-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.shrank{font-family:'JetBrains Mono',monospace;color:var(--amber);font-weight:700;font-size:13px}
+.shname{font-weight:700;font-size:14.5px}
+.shprop{color:var(--green);font-family:'JetBrains Mono',monospace;font-size:12.5px;font-weight:700}
+.shconv{margin-left:auto;font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:12px;border-radius:6px;padding:2px 8px;letter-spacing:.5px}
+.shconv.A{background:rgba(182,255,61,.16);color:var(--green);border:1px solid rgba(182,255,61,.5)}
+.shconv.B{background:rgba(255,184,56,.14);color:var(--amber);border:1px solid rgba(255,184,56,.5)}
+.shconv.C{background:rgba(92,200,255,.12);color:var(--blue);border:1px solid rgba(92,200,255,.45)}
+.shgame{font-size:10.5px;color:var(--muted);margin-top:2px}
+.shnums{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.shchip{font-family:'JetBrains Mono',monospace;font-size:10.5px;background:#0c0e12;border:1px solid var(--line);border-radius:14px;padding:4px 9px;color:var(--text)}
+.shchip b{color:var(--green)}
+.shchip.edgeplus b{color:var(--green)}.shchip.edgeminus b{color:var(--red)}
+.shcase{font-size:12.5px;line-height:1.55;color:var(--text)}
+.shrisk{font-size:11.5px;line-height:1.5;color:var(--muted);margin-top:6px}
+.shrisk b{color:var(--red);font-weight:700}
+.shaddrow{margin-top:9px}
+.shadd{width:100%;background:#0c0e12;border:1px solid var(--line);color:var(--green);border-radius:7px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;font-weight:700}
+.shadd:active{background:var(--green);color:#0a0c07}
+.shsec{background:rgba(92,200,255,.06);border:1px solid rgba(92,200,255,.35);border-radius:10px;padding:11px 12px;font-size:12.5px;line-height:1.55}
+.shsec b{color:var(--blue);font-family:'Saira Condensed',sans-serif;letter-spacing:.6px;display:block;margin-bottom:5px}
+.shsec ul{margin:0;padding-left:18px}
+.shtrap{background:rgba(255,91,106,.07);border:1px solid rgba(255,91,106,.4);border-radius:10px;padding:11px 12px;font-size:12.5px;line-height:1.55}
+.shtrap b{color:var(--red);font-family:'Saira Condensed',sans-serif;letter-spacing:.6px;display:block;margin-bottom:4px}
+.shmeta{font-size:10px;color:var(--muted);text-align:center;font-family:'JetBrains Mono',monospace}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
   .tab-panel{max-width:760px;margin:0 auto}
@@ -299,11 +337,29 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 22 · 2026-07-06</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 23 · 2026-07-07</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
   </section><!-- /panel-slip -->
+
+  <!-- ===== SHARP TAB (AI prop board · MLB) ===== -->
+  <section class="tab-panel" id="panel-sharp">
+    <div class="panel">
+      <div class="ptitle"><span>THE SHARP · MLB PROP BOARD</span><button class="shgear" id="shKeyBtn" title="Claude API key">&#9881;</button></div>
+      <div class="obkey shkey" id="shKeyWrap" style="display:none">
+        <input id="shKey" type="password" placeholder="Claude API key (sk-ant-…)" autocomplete="off" />
+        <button id="shSaveKey">Save</button>
+        <div class="obnote">Runs on your own Claude API key from console.anthropic.com — saved only on this device, never in the site code. Each board costs roughly $0.30–0.60 of API usage plus ~80 Odds API credits.</div>
+      </div>
+      <div class="shctrls">
+        <button class="shrun" id="shRun">Generate today's board</button>
+      </div>
+      <div class="shstatus" id="shStatus"></div>
+      <div class="shboard" id="shBoard"></div>
+      <div class="note">AI-generated analysis of live slate data (stats, lines, lineups, weather) — probabilities are model opinions, not guarantees. Data gaps are disclosed, never papered over. Informational only.</div>
+    </div>
+  </section><!-- /panel-sharp -->
 </main>
 
 <nav class="tabbar" id="tabbar">
@@ -319,6 +375,10 @@ body{padding:0!important;min-height:100dvh}
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9.5 8h5M9.5 12h5"/></svg>
     <span class="tabbtn-l">Slip</span>
     <span class="tabbadge" id="slipBadge" style="display:none">0</span>
+  </button>
+  <button class="tabbtn" data-tab="sharp" aria-label="The Sharp AI picks">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+    <span class="tabbtn-l">Sharp</span>
   </button>
 </nav>
 
@@ -899,12 +959,209 @@ function switchSport(sp){
 renderSportBar();renderGrpToggle();populateSeasons();populateTeamFilter();toggleTimeframeVis();
 renderStatus();renderLegs();renderResults();renderBooks();fetchStats();
 
+/* ===== THE SHARP — AI MLB prop board via the Claude API (build 23) =====
+   System prompt lives in prompts/mlb_prop_handicapper_prompt.md (edit it there).
+   Slate data (odds, lines, stats, lineups, weather) is collected live from the
+   same APIs the rest of the app uses and sent as the user message. The user's
+   Claude API key is stored only in localStorage (pl_claudekey) — never in source. */
+var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),timer:null,t0:0};
+var SH_MODEL="claude-opus-4-8";
+var SH_PROP_MARKETS="batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts";
+var SH_SCHEMA={type:"object",additionalProperties:false,required:["overview","picks","parlays","trap"],properties:{
+  overview:{type:"string"},
+  picks:{type:"array",items:{type:"object",additionalProperties:false,
+    required:["rank","player","prop","line","odds","game","prob","implied","edge","conviction","case","risk"],
+    properties:{rank:{type:"integer"},player:{type:"string"},prop:{type:"string"},line:{type:"string"},odds:{type:"string"},
+      game:{type:"string"},prob:{type:"number"},implied:{type:"number"},edge:{type:"number"},
+      conviction:{type:"string",enum:["A","B","C"]},"case":{type:"string"},risk:{type:"string"}}}},
+  parlays:{type:"array",items:{type:"object",additionalProperties:false,required:["legs","note"],
+    properties:{legs:{type:"array",items:{type:"string"}},note:{type:"string"}}}},
+  trap:{type:"object",additionalProperties:false,required:["prop","reason"],properties:{prop:{type:"string"},reason:{type:"string"}}}}};
+
+function shToday(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function shDaysAgo(n){var d=new Date();d.setDate(d.getDate()-n+1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function shStatus(msg,isErr){var el=$("shStatus");if(el)el.innerHTML=isErr?("<span class='err'>"+esc(msg)+"</span>"):esc(msg);}
+function shTick(phase){clearInterval(SH.timer);SH.t0=Date.now();SH.timer=setInterval(function(){shStatus(phase+" · "+Math.round((Date.now()-SH.t0)/1000)+"s");},1000);shStatus(phase+" · 0s");}
+function shStop(){clearInterval(SH.timer);SH.timer=null;}
+
+/* --- slate collection (all real, all live) --- */
+function shHitRow(p){var s=p.stat||{};return {ab:s.atBats,h:s.hits,"2b":s.doubles,hr:s.homeRuns,tb:s.totalBases,rbi:s.rbi,r:s.runs,bb:s.baseOnBalls,k:s.strikeOuts,sb:s.stolenBases,avg:s.avg,obp:s.obp,slg:s.slg};}
+function shPitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ip:s.inningsPitched,era:s.era,whip:s.whip,k:s.strikeOuts,bb:s.baseOnBalls,k9:s.strikeoutsPer9Inn,h:s.hits,er:s.earnedRuns};}
+function shStatsUrl(group,days){var end=shToday();return days
+  ?"https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&group="+group+"&startDate="+shDaysAgo(days)+"&endDate="+end+"&sportId=1&playerPool=All&limit=2500"
+  :"https://statsapi.mlb.com/api/v1/stats?stats=season&group="+group+"&season="+new Date().getFullYear()+"&sportId=1&playerPool=All&limit=2500";}
+
+function shCollectSlate(){
+  var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — use outcome stats with sample-size discipline.","BvP history unavailable.","No line-movement history — current lines only."];
+  var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{}};
+  /* 1) schedule: matchups, weather, probables, lineups */
+  return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+shToday()+"&hydrate=probablePitcher,weather,lineups,venue").then(function(res){
+    var dates=(res.ok&&res.body&&res.body.dates)||[];var games=(dates[0]&&dates[0].games)||[];
+    var idToName={};
+    games.forEach(function(g){
+      var aw=g.teams.away,hm=g.teams.home;
+      var lu=g.lineups||{};
+      function names(arr){return (arr||[]).map(function(x){idToName[x.id]=x.fullName;return x.fullName;});}
+      slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,venue:(g.venue||{}).name,
+        weather:g.weather||null,
+        probable_away:(aw.probablePitcher||{}).fullName||null,probable_home:(hm.probablePitcher||{}).fullName||null,
+        lineup_away:names(lu.awayPlayers),lineup_home:names(lu.homePlayers)});
+    });
+    if(!slate.games.length)throw new Error("No MLB games scheduled today.");
+    if(!slate.games.some(function(g){return g.lineup_away.length;}))gaps.push("Lineups not posted yet — weight lineup-spot factors accordingly.");
+    shTick("Pulling game lines (ML + totals)");
+    /* 2) game odds: moneylines + Vegas totals (game-script sanity check) */
+    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions=us&markets=h2h,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
+  }).then(function(res){
+    (Array.isArray(res.body)?res.body:[]).forEach(function(g){
+      var bk=(g.bookmakers||[]).filter(function(b){return b.key===CAESARS_KEY;})[0]||(g.bookmakers||[])[0];if(!bk)return;
+      var o={game:g.away_team+" @ "+g.home_team};
+      (bk.markets||[]).forEach(function(m){if(m.key==="h2h"){m.outcomes.forEach(function(x){o[x.name===g.home_team?"home_ml":"away_ml"]=x.price;});}
+        if(m.key==="totals"&&m.outcomes[0]){o.total=m.outcomes[0].point;}});
+      slate.game_odds.push(o);
+    });
+    /* 3) props: today's not-started events, 5 markets per event */
+    shTick("Pulling prop lines");
+    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events?apiKey="+encodeURIComponent(OB.key)).then(function(ev){
+      var evs=(Array.isArray(ev.body)?ev.body:[]).filter(function(e){return obSameDay(e.commence_time)&&new Date(e.commence_time).getTime()>Date.now();}).slice(0,16);
+      if(!evs.length)gaps.push("No un-started games with prop markets remain today.");
+      var chain=Promise.resolve();
+      evs.forEach(function(e,idx){chain=chain.then(function(){
+        shTick("Pulling props · game "+(idx+1)+"/"+evs.length);
+        return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events/"+e.id+"/odds?regions=us&oddsFormat=american&markets="+SH_PROP_MARKETS+"&apiKey="+encodeURIComponent(OB.key)).then(function(pr){
+          var bks=(pr.body&&pr.body.bookmakers)||[];var bk=bks.filter(function(b){return b.key===CAESARS_KEY;})[0]||bks[0];if(!bk)return;
+          var g={};
+          (bk.markets||[]).forEach(function(mk){var rows={},order=[];
+            (mk.outcomes||[]).forEach(function(o){var side=(o.name||"").toLowerCase().indexOf("over")>=0||o.name==="Yes"?"over":"under";
+              var who=o.description||o.name;var kk=who+"|"+(o.point!=null?o.point:"");
+              if(!rows[kk]){rows[kk]={p:who,ln:(o.point!=null?o.point:null)};order.push(kk);}
+              rows[kk][side==="over"?"o":"u"]=o.price;});
+            g[mk.key]=order.map(function(k){return rows[k];});});
+          if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:bk.title||bk.key,markets:g};
+        });
+      });});
+      return chain;
+    });
+  }).then(function(){
+    /* 4) player stats — last 7/15/30 hitting + season/last-30 pitching, filtered to slate players */
+    shTick("Pulling player form (7/15/30 day)");
+    var propNames={};
+    Object.keys(slate.props).forEach(function(k){var mks=slate.props[k].markets;Object.keys(mks).forEach(function(m){mks[m].forEach(function(r){propNames[pnorm(r.p)]=1;});});});
+    slate.games.forEach(function(g){if(g.probable_away)propNames[pnorm(g.probable_away)]=1;if(g.probable_home)propNames[pnorm(g.probable_home)]=1;
+      (g.lineup_away||[]).concat(g.lineup_home||[]).forEach(function(n){propNames[pnorm(n)]=1;});});
+    function pull(group,days,tag,into,rowFn){
+      return obFetchJson(shStatsUrl(group,days)).then(function(res){
+        var rows=parseSplits(res.ok?res.body:{});
+        rows.forEach(function(p){if(!propNames[pnorm(p.name)])return;
+          var key=p.name+" ("+p.team+")";if(!into[key])into[key]={};into[key][tag]=rowFn(p);});
+      });
+    }
+    return pull("hitting",7,"last7",slate.player_stats,shHitRow)
+      .then(function(){return pull("hitting",15,"last15",slate.player_stats,shHitRow);})
+      .then(function(){shTick("Pulling 30-day + season form");return pull("hitting",30,"last30",slate.player_stats,shHitRow);})
+      .then(function(){return pull("pitching",30,"last30",slate.pitcher_stats,shPitRow);})
+      .then(function(){return pull("pitching",null,"season",slate.pitcher_stats,shPitRow);})
+      .then(function(){return slate;});
+  });
+}
+
+/* --- the Claude API call --- */
+function shCallClaude(systemPrompt,slate){
+  shTick("The Sharp is working the numbers");
+  var userMsg="Here is today's full MLB slate data as JSON. Every number is live from MLB Stats API and The Odds API; the data_gaps array lists what is unavailable today. Analyze per your instructions and return the board.\n\n"+JSON.stringify(slate);
+  return fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{"content-type":"application/json","x-api-key":SH.key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:SH_MODEL,max_tokens:16000,thinking:{type:"adaptive"},
+      output_config:{format:{type:"json_schema",schema:SH_SCHEMA}},
+      system:systemPrompt,messages:[{role:"user",content:userMsg}]})
+  }).then(function(r){return r.json().then(function(j){return {ok:r.ok,status:r.status,body:j};});})
+  .then(function(res){
+    if(!res.ok){var m=(res.body&&res.body.error&&res.body.error.message)||("Claude API error "+res.status);
+      if(res.status===401)m="Invalid Claude API key — tap ⚙ to update it.";
+      if(res.status===429)m="Claude API rate limit hit — wait a minute and retry.";
+      throw new Error(m);}
+    if(res.body.stop_reason==="refusal")throw new Error("The model declined this request.");
+    if(res.body.stop_reason==="max_tokens")throw new Error("Response ran past the output limit — try again.");
+    var txt="";(res.body.content||[]).forEach(function(b){if(b.type==="text")txt+=b.text;});
+    return JSON.parse(txt);
+  });
+}
+
+/* --- render --- */
+function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
+function shRender(){
+  var el=$("shBoard");if(!el)return;
+  var saved=SH.board;
+  if(!saved||!saved.data){el.innerHTML="";return;}
+  var d=saved.data,h="";
+  h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
+  (d.picks||[]).forEach(function(p,i){
+    var edge=Number(p.edge)||0;
+    h+="<div class='shpick'>"+
+      "<div class='shpick-head'><span class='shrank'>#"+esc(String(p.rank))+"</span><span class='shname'>"+esc(p.player)+"</span>"+
+      "<span class='shprop'>"+esc(p.prop)+" "+esc(p.line)+" ("+esc(p.odds)+")</span>"+
+      "<span class='shconv "+(["A","B","C"].indexOf(p.conviction)>=0?p.conviction:"C")+"'>"+esc(p.conviction)+"</span></div>"+
+      "<div class='shgame'>"+esc(p.game)+"</div>"+
+      "<div class='shnums'>"+
+        "<span class='shchip'>win <b>"+esc(String(p.prob))+"%</b></span>"+
+        "<span class='shchip'>book implies <b>"+esc(String(p.implied))+"%</b></span>"+
+        "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>"+
+      "</div>"+
+      "<div class='shcase'>"+esc(p["case"])+"</div>"+
+      "<div class='shrisk'><b>Risk:</b> "+esc(p.risk)+"</div>"+
+      "<div class='shaddrow'><button class='shadd' data-shadd='"+i+"'>＋ Add to slip · "+esc(p.odds)+"</button></div>"+
+    "</div>";
+  });
+  if(d.parlays&&d.parlays.length){h+="<div class='shsec'><b>PARLAY BUILDS</b><ul>"+d.parlays.map(function(pl){
+    return "<li>"+esc((pl.legs||[]).join(" + "))+" — "+esc(pl.note)+"</li>";}).join("")+"</ul></div>";}
+  if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
+  h+="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(SH_MODEL)+" · data: MLB Stats API + The Odds API</div>";
+  el.innerHTML=h;
+}
+function shAddPick(i){
+  var d=SH.board&&SH.board.data;if(!d||!d.picks[i])return;var p=d.picks[i];
+  S.legs.push({id:uid(),label:p.player,prop:p.prop+" "+p.line,odds:shOddsClean(p.odds),est:String(p.prob)});
+  saveLegs();renderLegs();renderResults();
+}
+
+/* --- run --- */
+function shRun(){
+  if(SH.busy)return;
+  if(!SH.key){shStatus("Add your Claude API key first — tap ⚙ above.",true);var w=$("shKeyWrap");if(w)w.style.display="";return;}
+  SH.busy=true;var btn=$("shRun");if(btn)btn.disabled=true;
+  shTick("Loading system prompt");
+  fetch("prompts/mlb_prop_handicapper_prompt.md?d="+shToday(),{cache:"no-store"})
+    .then(function(r){if(!r.ok)throw new Error("Couldn't load prompts/mlb_prop_handicapper_prompt.md ("+r.status+")");return r.text();})
+    .then(function(sys){shTick("Collecting today's slate");return shCollectSlate().then(function(slate){return shCallClaude(sys,slate);});})
+    .then(function(data){
+      if(!data||!data.picks||!data.picks.length)throw new Error("Model returned no picks — try again.");
+      SH.board={date:shToday(),at:Date.now(),data:data};LS.set("pl_sharp",SH.board);
+      shStop();shStatus("Board ready — "+data.picks.length+" picks · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
+      shRender();
+    })
+    .catch(function(e){shStop();shStatus((e&&e.message)||"Something went wrong — try again.",true);})
+    .then(function(){SH.busy=false;if(btn)btn.disabled=false;});
+}
+
+/* --- wiring --- */
+(function(){
+  var kb=$("shKeyBtn");if(kb)kb.addEventListener("click",function(){var w=$("shKeyWrap");if(w)w.style.display=(w.style.display==="none"?"":"none");});
+  var kw=$("shKey");if(kw)kw.value=SH.key;
+  var sk=$("shSaveKey");if(sk)sk.addEventListener("click",function(){SH.key=($("shKey").value||"").trim();LS.set("pl_claudekey",SH.key);$("shKeyWrap").style.display="none";shStatus(SH.key?"Key saved on this device.":"Key cleared.");});
+  var rb=$("shRun");if(rb)rb.addEventListener("click",shRun);
+  var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
+  /* restore today's board; stale boards are discarded (prompt rule: recalc daily) */
+  if(SH.board&&SH.board.date===shToday()){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
+  else if(SH.board){SH.board=null;LS.set("pl_sharp",null);}
+})();
+
 /* ===== app tab navigation + slip badge (build 20) ===== */
 function updateSlipBadge(){var b=$("slipBadge");if(!b)return;var n=(S.legs&&S.legs.length)||0;b.textContent=n;b.style.display=n?"flex":"none";}
 (function(){
   var bar=$("tabbar");if(!bar)return;
   function show(name){
-    ["stats","odds","slip"].forEach(function(k){var p=$("panel-"+k);if(p)p.classList.toggle("on",k===name);});
+    ["stats","odds","slip","sharp"].forEach(function(k){var p=$("panel-"+k);if(p)p.classList.toggle("on",k===name);});
     Array.prototype.forEach.call(bar.querySelectorAll(".tabbtn"),function(btn){btn.classList.toggle("on",btn.getAttribute("data-tab")===name);});
     try{window.scrollTo(0,0);}catch(e){}
   }
