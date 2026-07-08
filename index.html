@@ -216,6 +216,22 @@ body{padding:0!important;min-height:100dvh}
 .shrun:disabled{opacity:.45;cursor:default}
 .shai{margin-top:8px;background:rgba(92,200,255,.10);border-color:rgba(92,200,255,.55);color:var(--blue)}
 .shai:active{background:var(--blue);color:#0a0c07}
+/* sub-views: picks vs parlays */
+.shsubnav{display:flex;gap:5px;margin:0 13px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px}
+.shsub{flex:1;background:transparent;border:none;color:var(--muted);padding:9px 4px;font-family:'Saira Condensed',sans-serif;font-size:13.5px;font-weight:700;letter-spacing:.8px;border-radius:7px;cursor:pointer}
+.shsub.on{background:var(--green);color:#0a0c07}
+/* category chips (horizontal scroll) */
+.shcats{display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 1px 6px;scrollbar-width:none}
+.shcats::-webkit-scrollbar{display:none}
+.shcat{flex:0 0 auto;background:#0c0e12;border:1px solid var(--line);color:var(--muted);border-radius:16px;padding:7px 12px;font-family:'Saira Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.6px;cursor:pointer;white-space:nowrap}
+.shcat b{color:var(--amber);font-family:'JetBrains Mono',monospace;font-size:10.5px}
+.shcat.on{background:rgba(255,184,56,.16);border-color:var(--amber);color:var(--amber)}
+.shcat.on b{color:var(--amber)}
+.shcat:disabled{opacity:.35;cursor:default}
+/* parlay cards */
+.shparlay{background:var(--bg);border:1px solid rgba(92,200,255,.4);border-radius:11px;padding:11px 12px}
+.shparlay-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.shlegs{margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6}
 .shstatus{padding:0 13px 10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);min-height:14px;line-height:1.5}
 .shstatus .err{color:var(--red)}
 .shboard{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
@@ -339,7 +355,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 24 · 2026-07-07</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 25 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -359,8 +375,12 @@ body{padding:0!important;min-height:100dvh}
         <button class="shrun shai" id="shRunAI" style="display:none">Deep analysis with Claude</button>
       </div>
       <div class="shstatus" id="shStatus"></div>
+      <div class="shsubnav" id="shSubNav" style="display:none">
+        <button class="shsub on" data-shview="picks">SUGGESTED PICKS</button>
+        <button class="shsub" data-shview="parlays">SUGGESTED PARLAYS</button>
+      </div>
       <div class="shboard" id="shBoard"></div>
-      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), opposing starter quality, lineup spot → expected ABs, park &amp; wind, and vig-removed odds for the edge calc. Data gaps are disclosed, never papered over. Probabilities are estimates, not guarantees. Informational only.</div>
+      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), opposing starter quality, lineup spot → expected ABs, park &amp; wind, vig-removed odds for edges; ML/RL from lineup offense + starter ERA blended with the market. Each category ranks its own top 50 by win probability — categories never overlap; parlays may reuse solo picks. Probabilities are estimates, not guarantees. Informational only.</div>
     </div>
   </section><!-- /panel-sharp -->
 </main>
@@ -1012,15 +1032,17 @@ function shCollectSlate(){
     });
     if(!slate.games.length)throw new Error("No MLB games scheduled today.");
     if(!slate.games.some(function(g){return g.lineup_away.length;}))gaps.push("Lineups not posted yet — weight lineup-spot factors accordingly.");
-    shTick("Pulling game lines (ML + totals)");
-    /* 2) game odds: moneylines + Vegas totals (game-script sanity check) */
-    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions=us&markets=h2h,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
+    shTick("Pulling game lines (ML + RL + totals)");
+    /* 2) game odds: moneylines, run lines (spreads), and Vegas totals */
+    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
   }).then(function(res){
     (Array.isArray(res.body)?res.body:[]).forEach(function(g){
+      if(!obSameDay(g.commence_time)||new Date(g.commence_time).getTime()<=Date.now())return;
       var bk=(g.bookmakers||[]).filter(function(b){return b.key===CAESARS_KEY;})[0]||(g.bookmakers||[])[0];if(!bk)return;
       var o={game:g.away_team+" @ "+g.home_team};
       (bk.markets||[]).forEach(function(m){if(m.key==="h2h"){m.outcomes.forEach(function(x){o[x.name===g.home_team?"home_ml":"away_ml"]=x.price;});}
-        if(m.key==="totals"&&m.outcomes[0]){o.total=m.outcomes[0].point;}});
+        if(m.key==="totals"&&m.outcomes[0]){o.total=m.outcomes[0].point;}
+        if(m.key==="spreads"){m.outcomes.forEach(function(x){if(x.name===g.home_team){o.home_rl=x.price;o.home_rl_pt=x.point;}else{o.away_rl=x.price;o.away_rl_pt=x.point;}});}});
       slate.game_odds.push(o);
     });
     /* 3) props: today's not-started events, 5 markets per event */
@@ -1099,6 +1121,8 @@ function shPitchBlend(pst,key){ /* pitcher metric: 60% last-30, 40% season */
   if(isFinite(a)&&isFinite(b))return a*.6+b*.4;return isFinite(a)?a:(isFinite(b)?b:null);
 }
 var SH_MKT_LABEL={batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR (anytime)",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"Pitcher K's"};
+var SH_CATS=[["ml","ML"],["rl","RL"],["batter_hits","HITS"],["batter_total_bases","TB"],["batter_home_runs","HR"],["batter_hits_runs_rbis","H+R+RBI"],["pitcher_strikeouts","K'S"]];
+function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
 function shAnalyzeLocal(slate){
   var lookupStats={},lookupPit={};
   Object.keys(slate.player_stats).forEach(function(k){lookupStats[pnorm(k.split(" (")[0])]=slate.player_stats[k];});
@@ -1108,8 +1132,7 @@ function shAnalyzeLocal(slate){
   function lineupSpot(g,name){if(!g)return null;var n=pnorm(name);
     var a=(g.lineup_away||[]).findIndex(function(x){return pnorm(x)===n;});if(a>=0)return a+1;
     var h=(g.lineup_home||[]).findIndex(function(x){return pnorm(x)===n;});return h>=0?h+1:null;}
-  function oppStarter(g,name){if(!g)return null; /* batter in away lineup faces home probable & vice versa */
-    var n=pnorm(name);
+  function oppStarter(g,name){if(!g)return null;var n=pnorm(name);
     if((g.lineup_away||[]).some(function(x){return pnorm(x)===n;}))return g.probable_home;
     if((g.lineup_home||[]).some(function(x){return pnorm(x)===n;}))return g.probable_away;
     return null;}
@@ -1117,11 +1140,53 @@ function shAnalyzeLocal(slate){
     if(/out/i.test(w)&&mph>=10)return {f:1.10,txt:w+" (out)"};
     if(/in\b/i.test(w)&&mph>=10)return {f:0.90,txt:w+" (in)"};
     return {f:1,txt:null};}
-  var cands=[],traps=[];
+  function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
+  var cats={ml:[],rl:[],batter_hits:[],batter_total_bases:[],batter_home_runs:[],batter_hits_runs_rbis:[],pitcher_strikeouts:[]};
+  var traps=[];
+
+  /* ----- ML & RL: light game model (lineup offense + starter ERA), blended 50/50
+     with the vig-removed market price. One row per game — the more likely side. ----- */
+  function offense(lineup){var c=0,acc=0;(lineup||[]).forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.tb);},"ab",10);if(r!=null){acc+=r;c++;}});return c>=5?acc/c:null;}
+  function eraOf(name){var ps=name?lookupPit[pnorm(name)]:null;return ps?shPitchBlend(ps,"era"):null;}
+  function mapCover(F){return shClamp(F*0.72-0.015,0.18,0.62);} /* P(win) -> P(win by 2+) */
+  slate.game_odds.forEach(function(go){
+    var g=findGame(go.game);if(!g)return;
+    var iH=shImp(go.home_ml),iA=shImp(go.away_ml);if(iH==null||iA==null)return;
+    var novH=iH/(iH+iA);
+    var oH=offense(g.lineup_home),oA=offense(g.lineup_away);
+    var eH=eraOf(g.probable_home),eA=eraOf(g.probable_away);
+    var model=novH,bits=[],risk=[];
+    if(oH!=null&&oA!=null&&eH!=null&&eA!=null){
+      model=shClamp(0.52+(oH-oA)*1.5+(eA-eH)*0.045,0.30,0.72);
+      bits.push("lineup TB/AB "+oH.toFixed(2)+" (home) vs "+oA.toFixed(2));
+      bits.push(g.probable_home+" "+eH.toFixed(2)+" ERA vs "+g.probable_away+" "+eA.toFixed(2)+" ERA");
+    }else risk.push("lineups/probables incomplete — leaning on the market price");
+    if(go.total!=null)bits.push("Vegas total "+go.total);
+    var pH=0.5*model+0.5*novH;
+    var homeSide=pH>=0.5;
+    cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
+      p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:go.game+" · "+tLoc(g.start),bits:bits.slice(),
+      risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
+    if(go.home_rl_pt!=null&&go.home_rl!=null&&go.away_rl!=null){
+      var iHr=shImp(go.home_rl),iAr=shImp(go.away_rl);
+      if(iHr!=null&&iAr!=null){
+        var novHr=iHr/(iHr+iAr);
+        var pHomeCover=(go.home_rl_pt<0)?mapCover(pH):1-mapCover(1-pH);
+        var pHC=0.5*pHomeCover+0.5*novHr;
+        var side=pHC>=0.5;
+        cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
+          odds:obSign(side?go.home_rl:go.away_rl),p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
+          game:go.game+" · "+tLoc(g.start),bits:bits.slice(),
+          risk:((side?go.home_rl_pt:go.away_rl_pt)<0)?"Favorites win one-run games constantly — this needs a 2+ run margin.":"A blowout either way beats the +1.5 cushion."});
+      }
+    }
+  });
+
+  /* ----- props: one row per listed prop — the more likely side ----- */
   Object.keys(slate.props).forEach(function(matchup){
     var g=findGame(matchup),mks=slate.props[matchup].markets,wind=windNote(g);
     var coors=/coors/i.test((g&&g.venue)||"");
-    Object.keys(mks).forEach(function(mkt){mks[mkt].forEach(function(row){
+    Object.keys(mks).forEach(function(mkt){if(!cats[mkt])return;mks[mkt].forEach(function(row){
       if(row.ln==null)return;
       var isK=(mkt==="pitcher_strikeouts");
       var st=isK?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
@@ -1133,7 +1198,6 @@ function shAnalyzeLocal(slate){
         if(isFinite(g30)&&g30>=3&&isFinite(k30))kps=k30/g30;
         else if(st.season&&Number(st.season.g)>=8)kps=Number(st.season.k)/Number(st.season.g);
         if(kps==null)return;
-        /* opposing lineup contact profile */
         var oppLineup=null;if(g){var n=pnorm(row.p);
           if(pnorm(g.probable_away||"")===n)oppLineup=g.lineup_home;else if(pnorm(g.probable_home||"")===n)oppLineup=g.lineup_away;}
         var f=1;
@@ -1177,68 +1241,73 @@ function shAnalyzeLocal(slate){
       }
       var pO=(lam&&lam.tb)?shTbOver(row.ln,lam.lamH,lam.s1,lam.s2):shPOver(row.ln,lam);
       var iO=shImp(row.o),iU=shImp(row.u);
-      var sides=[];
-      /* shrink the model 45% toward the vig-removed market — the book prices in
-         injuries/rest/pitch-mix info this model can't see; raw edges lie */
+      var sd=null;
+      /* shrink the model 45% toward the vig-removed market, then keep the more likely side */
       if(iO!=null&&iU!=null){var nv=iO/(iO+iU);var pAdj=0.55*pO+0.45*nv;
-        sides.push({side:"O",p:pAdj,imp:nv,odds:row.o});sides.push({side:"U",p:1-pAdj,imp:1-nv,odds:row.u});}
-      else if(iO!=null){var fair=iO/1.06;sides.push({side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o});}
-      else return;
-      sides.forEach(function(sd){
-        var edge=sd.p-sd.imp;
-        /* -300 trap rule: heavy juice needs a genuine edge */
-        if(sd.imp>=0.75&&edge<0.04){if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});return;}
-        if(sd.p<0.45&&edge<0.07)return;
-        if(edge<0.02)return;
-        cands.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,p:sd.p,imp:sd.imp,edge:edge,
-          matchup:matchup,start:g?g.start:null,bits:bits.slice(),riskBits:riskBits.slice(),
-          score:sd.p*0.55+edge*2.8*0.45});
-      });
+        sd=(pAdj>=0.5)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
+      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o};}
+      if(!sd)return;
+      var edge=sd.p-sd.imp;
+      if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});
+      cats[mkt].push({label:row.p,sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
+        p:sd.p,imp:sd.imp,game:matchup+(g?" · "+tLoc(g.start):""),bits:bits.slice(),
+        risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
   });
-  cands.sort(function(a,b){return b.score-a.score;});
-  /* diversity: max 3 per game, max 5 per market type, max 1 per player+market
-     (a systematic model lean can't be allowed to fill the whole board) */
-  var perGame={},perMkt={},seen={},picks=[];
-  cands.forEach(function(c){if(picks.length>=15)return;
-    var pk=pnorm(c.player)+"|"+c.mkt;if(seen[pk])return;
-    perGame[c.matchup]=perGame[c.matchup]||0;if(perGame[c.matchup]>=3)return;
-    var mk=c.mkt+"|"+c.side;perMkt[mk]=perMkt[mk]||0;if(perMkt[mk]>=5)return;
-    seen[pk]=1;perGame[c.matchup]++;perMkt[mk]++;picks.push(c);});
-  if(!picks.length)throw new Error("No positive-edge props found right now — lines may not be fully posted yet. Try closer to game time.");
-  function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
-  var out={overview:"",picks:[],parlays:[],trap:null};
-  picks.forEach(function(c,i){
-    var conv=(c.edge>=0.045&&c.p>=0.58)?"A":(c.edge>=0.03||c.p>=0.64)?"B":"C";
-    out.picks.push({rank:i+1,player:c.player,prop:SH_MKT_LABEL[c.mkt]||c.mkt,line:c.side+" "+c.ln,odds:obSign(c.odds),
-      game:c.matchup+(c.start?" · "+tLoc(c.start):""),
-      prob:Math.round(c.p*1000)/10,implied:Math.round(c.imp*1000)/10,edge:Math.round(c.edge*1000)/10,
-      conviction:conv,"case":c.bits.join("; ")+".",
-      risk:(c.riskBits[0]||(c.side==="U"?"A blow-up start or extra innings pushes the count over.":"An early exit, walk-heavy day, or bullpen game cuts the chances."))});
+
+  /* ----- rank each category by win probability, top 50 per day, no cross-category overlap ----- */
+  var anyRows=false;
+  Object.keys(cats).forEach(function(k){
+    cats[k].sort(function(a,b){return b.p-a.p;});
+    cats[k]=cats[k].slice(0,50).map(function(r,i){
+      anyRows=true;var edge=r.p-r.imp;
+      return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,
+        prob:Math.round(r.p*1000)/10,implied:Math.round(r.imp*1000)/10,edge:Math.round(edge*1000)/10,
+        conviction:shConv(r.p,edge),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};
+    });
   });
-  /* parlays from top A/B picks in different games */
-  var pool=out.picks.filter(function(p){return p.conviction!=="C";}),used={},legs=[];
-  pool.forEach(function(p){var gm=p.game.split(" · ")[0];if(used[gm]||legs.length>=3)return;used[gm]=1;legs.push(p);});
-  function parlay(sel){var dec=sel.reduce(function(a,p){var d=amToDec(String(p.odds).replace(/[^\d+-]/g,""));return d?a*d:a;},1);
-    return {legs:sel.map(function(p){return p.player+" "+p.prop+" "+p.line;}),
-      note:"combined "+(decToAm(dec)!=null?obSign(decToAm(dec)):"—")+" · different games, uncorrelated"};}
-  if(legs.length>=2)out.parlays.push(parlay(legs.slice(0,2)));
-  if(legs.length>=3)out.parlays.push(parlay(legs.slice(0,3)));
-  /* trap: the juiciest big-favorite prop whose numbers don't back the price */
-  traps.sort(function(a,b){return a.edge-b.edge;});
-  var tr=traps[0];
-  out.trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
+  if(!anyRows)throw new Error("No lines posted for today's remaining games — try again closer to game time.");
+
+  /* ----- suggested parlays (these may reuse solo picks — that's the point) ----- */
+  function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
+    txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob};}
+  function build(name,sel,extraNote){
+    if(sel.length<2)return null;
+    var legs=sel.map(legOf);
+    var dec=legs.reduce(function(a,l){var d=amToDec(l.odds);return d?a*d:a;},1);
+    var prob=legs.reduce(function(a,l){return a*(Number(l.prob)/100);},1);
+    var gamesSeen={},sameGame=false;legs.forEach(function(l){if(gamesSeen[l.game])sameGame=true;gamesSeen[l.game]=1;});
+    return {name:name,legs:legs,odds:(decToAm(dec)!=null?obSign(decToAm(dec)):"—"),prob:Math.round(prob*1000)/10,
+      note:(sameGame?"⚠ legs share a game — correlated; one bad game can sink several legs. ":"Different games — uncorrelated. ")+(extraNote||"")};
+  }
+  function distinct(pool,n){var out=[],g={},seen={};pool.some(function(x){var gm=(x.r.game||"").split(" · ")[0];var key=x.r.label+"|"+x.r.sub;
+    if(g[gm]||seen[key])return false;g[gm]=1;seen[key]=1;out.push(x);return out.length>=n;});return out;}
+  var pool=[];Object.keys(cats).forEach(function(k){cats[k].forEach(function(r){pool.push({cat:k,r:r});});});
+  var byP=pool.slice().sort(function(a,b){return b.r.prob-a.r.prob;});
+  var byEdge=pool.filter(function(x){return x.r.edge>=2&&x.r.prob>=52;}).sort(function(a,b){return b.r.edge-a.r.edge;});
+  var plus=pool.filter(function(x){return /^\+/.test(String(x.r.odds));}).sort(function(a,b){return b.r.prob-a.r.prob;});
+  var parlays=[];
+  var p1=build("High-floor 2-leg",distinct(byP,2),"The two most probable plays on the board.");if(p1)parlays.push(p1);
+  var p2=build("High-floor 3-leg",distinct(byP,3),"Adds a third leg — floor stays the priority.");if(p2)parlays.push(p2);
+  var p3=build("Value 3-leg",distinct(byEdge,3),"Built from the biggest model-vs-market edges, not raw probability.");if(p3)parlays.push(p3);
+  var seenCat={},cross=[];byP.forEach(function(x){if(cross.length>=3||seenCat[x.cat])return;var gm=(x.r.game||"").split(" · ")[0];
+    if(cross.some(function(y){return (y.r.game||"").split(" · ")[0]===gm;}))return;seenCat[x.cat]=1;cross.push(x);});
+  var p4=build("Cross-category 3-leg",cross,"One leg each from three different bet types.");if(p4)parlays.push(p4);
+  var p5=build("Plus-money 3-leg",distinct(plus,3),"Every leg at plus odds — low probability, big payout. Small stakes only.");if(p5)parlays.push(p5);
+
+  var tr=traps.sort(function(a,b){return a.edge-b.edge;})[0];
+  var trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
     reason:"The book is charging "+Math.round(tr.imp*100)+"% implied; the model makes it "+Math.round((tr.imp+tr.edge)*100)+"% — you're paying more juice than the numbers justify."}
     :{prop:"None flagged",reason:"No heavily juiced prop stood out as mispriced against the model today."};
-  /* overview */
-  var nGames=slate.games.length,windSpot=null;
-  slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&(!windSpot))windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
-  out.overview=nGames+"-game slate. "
-    +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play — hit/TB props get an altitude bump. ":"")
+
+  var windSpot=null;slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&!windSpot)windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
+  var counts=SH_CATS.map(function(c){return cats[c[0]].length?cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
+  var overview=slate.games.length+"-game slate. "
+    +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +out.picks.length+" positive-edge props survived the vig-removed screen; K props and short hit lines dominate the top of the board, sized off 30-day form and starter quality."
-    +(slate.data_gaps&&slate.data_gaps.length?" Gaps today: "+slate.data_gaps.length+" inputs unavailable (disclosed in-app).":"");
-  return out;
+    +"Ranked by win probability within each category — "+counts+". Edges vs vig-removed prices; model shrunk 45% toward the market."
+    +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
+  return {overview:overview,categories:cats,parlays:parlays,trap:trap};
 }
 
 /* --- the Claude API call --- */
@@ -1264,40 +1333,81 @@ function shCallClaude(systemPrompt,slate){
   });
 }
 
-/* --- render --- */
+/* --- render: two sub-views — Suggested Picks (per category) & Suggested Parlays --- */
 function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
+SH.view="picks";SH.cat="ml";
+function shPickCard(p,addAttr,name,propTxt){
+  var edge=Number(p.edge)||0;
+  return "<div class='shpick'>"+
+    "<div class='shpick-head'><span class='shrank'>#"+esc(String(p.rank))+"</span><span class='shname'>"+esc(name)+"</span>"+
+    "<span class='shprop'>"+esc(propTxt)+" ("+esc(p.odds)+")</span>"+
+    "<span class='shconv "+(["A","B","C"].indexOf(p.conviction)>=0?p.conviction:"C")+"'>"+esc(p.conviction)+"</span></div>"+
+    "<div class='shgame'>"+esc(p.game)+"</div>"+
+    "<div class='shnums'>"+
+      "<span class='shchip'>win <b>"+esc(String(p.prob))+"%</b></span>"+
+      "<span class='shchip'>book implies <b>"+esc(String(p.implied))+"%</b></span>"+
+      "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>"+
+    "</div>"+
+    (p["case"]?"<div class='shcase'>"+esc(p["case"])+"</div>":"")+
+    "<div class='shrisk'><b>Risk:</b> "+esc(p.risk)+"</div>"+
+    "<div class='shaddrow'><button class='shadd' "+addAttr+">＋ Add to slip · "+esc(p.odds)+"</button></div>"+
+  "</div>";
+}
 function shRender(){
   var el=$("shBoard");if(!el)return;
   var saved=SH.board;
-  if(!saved||!saved.data){el.innerHTML="";return;}
+  if(!saved||!saved.data){el.innerHTML="";var sn=$("shSubNav");if(sn)sn.style.display="none";return;}
   var d=saved.data,h="";
-  h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
-  (d.picks||[]).forEach(function(p,i){
-    var edge=Number(p.edge)||0;
-    h+="<div class='shpick'>"+
-      "<div class='shpick-head'><span class='shrank'>#"+esc(String(p.rank))+"</span><span class='shname'>"+esc(p.player)+"</span>"+
-      "<span class='shprop'>"+esc(p.prop)+" "+esc(p.line)+" ("+esc(p.odds)+")</span>"+
-      "<span class='shconv "+(["A","B","C"].indexOf(p.conviction)>=0?p.conviction:"C")+"'>"+esc(p.conviction)+"</span></div>"+
-      "<div class='shgame'>"+esc(p.game)+"</div>"+
-      "<div class='shnums'>"+
-        "<span class='shchip'>win <b>"+esc(String(p.prob))+"%</b></span>"+
-        "<span class='shchip'>book implies <b>"+esc(String(p.implied))+"%</b></span>"+
-        "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>"+
-      "</div>"+
-      "<div class='shcase'>"+esc(p["case"])+"</div>"+
-      "<div class='shrisk'><b>Risk:</b> "+esc(p.risk)+"</div>"+
-      "<div class='shaddrow'><button class='shadd' data-shadd='"+i+"'>＋ Add to slip · "+esc(p.odds)+"</button></div>"+
-    "</div>";
-  });
-  if(d.parlays&&d.parlays.length){h+="<div class='shsec'><b>PARLAY BUILDS</b><ul>"+d.parlays.map(function(pl){
-    return "<li>"+esc((pl.legs||[]).join(" + "))+" — "+esc(pl.note)+"</li>";}).join("")+"</ul></div>";}
-  if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
-  h+="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(saved.engine==="claude"?SH_MODEL:"built-in stats model (free)")+" · data: MLB Stats API + The Odds API</div>";
-  el.innerHTML=h;
+  var sn=$("shSubNav");if(sn){sn.style.display="";Array.prototype.forEach.call(sn.querySelectorAll("[data-shview]"),function(b){b.classList.toggle("on",b.getAttribute("data-shview")===SH.view);});}
+  var meta="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(saved.engine==="claude"?SH_MODEL:"built-in stats model (free)")+" · data: MLB Stats API + The Odds API</div>";
+  /* legacy 15-pick shape (Claude mode) */
+  if(d.picks){
+    if(SH.view==="picks"){
+      h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
+      d.picks.forEach(function(p,i){h+=shPickCard(p,"data-shadd='"+i+"'",p.player,p.prop+" "+p.line);});
+    }else{
+      if(d.parlays&&d.parlays.length){h+="<div class='shsec'><b>PARLAY BUILDS</b><ul>"+d.parlays.map(function(pl){
+        return "<li>"+esc((pl.legs||[]).join(" + "))+" — "+esc(pl.note)+"</li>";}).join("")+"</ul></div>";}
+      if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
+    }
+    el.innerHTML=h+meta;return;
+  }
+  /* v2 categorized shape */
+  if(SH.view==="picks"){
+    h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
+    if(!d.categories[SH.cat]||!d.categories[SH.cat].length){var first=SH_CATS.filter(function(c){return d.categories[c[0]]&&d.categories[c[0]].length;})[0];if(first)SH.cat=first[0];}
+    h+="<div class='shcats'>"+SH_CATS.map(function(c){var n=(d.categories[c[0]]||[]).length;
+      return "<button class='shcat"+(SH.cat===c[0]?" on":"")+"' data-shcat='"+c[0]+"'"+(n?"":" disabled")+">"+c[1]+(n?" <b>"+n+"</b>":"")+"</button>";}).join("")+"</div>";
+    var rows=d.categories[SH.cat]||[];
+    if(!rows.length)h+="<div class='shover'>No "+esc(SH.cat)+" lines available right now.</div>";
+    rows.forEach(function(p,i){h+=shPickCard(p,"data-shadd2='"+SH.cat+"|"+i+"'",p.label,p.sub);});
+  }else{
+    (d.parlays||[]).forEach(function(pl,pi){
+      h+="<div class='shparlay'><div class='shparlay-head'><span class='shname'>"+esc(pl.name)+"</span>"+
+        "<span class='shprop'>"+esc(pl.odds)+"</span></div>"+
+        "<div class='shnums'><span class='shchip'>combined win <b>"+esc(String(pl.prob))+"%</b></span><span class='shchip'>legs <b>"+pl.legs.length+"</b></span></div>"+
+        "<ul class='shlegs'>"+pl.legs.map(function(l){return "<li>"+esc(l.txt)+"</li>";}).join("")+"</ul>"+
+        "<div class='shrisk'>"+esc(pl.note)+"</div>"+
+        "<div class='shaddrow'><button class='shadd' data-shparlay='"+pi+"'>＋ Add all "+pl.legs.length+" legs to slip</button></div></div>";
+    });
+    if(!d.parlays||!d.parlays.length)h+="<div class='shover'>Not enough qualifying picks to build parlays today.</div>";
+    if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
+  }
+  el.innerHTML=h+meta;
 }
-function shAddPick(i){
-  var d=SH.board&&SH.board.data;if(!d||!d.picks[i])return;var p=d.picks[i];
+function shAddPick(i){ /* legacy shape */
+  var d=SH.board&&SH.board.data;if(!d||!d.picks||!d.picks[i])return;var p=d.picks[i];
   S.legs.push({id:uid(),label:p.player,prop:p.prop+" "+p.line,odds:shOddsClean(p.odds),est:String(p.prob)});
+  saveLegs();renderLegs();renderResults();
+}
+function shAddCatPick(cat,i){
+  var d=SH.board&&SH.board.data;if(!d||!d.categories||!d.categories[cat]||!d.categories[cat][i])return;var p=d.categories[cat][i];
+  S.legs.push({id:uid(),label:p.label,prop:p.sub,odds:shOddsClean(p.odds),est:String(p.prob)});
+  saveLegs();renderLegs();renderResults();
+}
+function shAddParlay(pi){
+  var d=SH.board&&SH.board.data;if(!d||!d.parlays||!d.parlays[pi])return;
+  d.parlays[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
   saveLegs();renderLegs();renderResults();
 }
 
@@ -1336,7 +1446,12 @@ function shRun(engine){
   var rb=$("shRun");if(rb)rb.addEventListener("click",function(){shRun("local");});
   var ra=$("shRunAI");if(ra)ra.addEventListener("click",function(){shRun("claude");});
   aiBtnVis();
-  var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
+  var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
+  var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
+    var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
+    var b2=e.target.closest?e.target.closest("[data-shadd2]"):null;if(b2){var kv=b2.getAttribute("data-shadd2").split("|");shAddCatPick(kv[0],Number(kv[1]));return;}
+    var pl=e.target.closest?e.target.closest("[data-shparlay]"):null;if(pl){shAddParlay(Number(pl.getAttribute("data-shparlay")));return;}
+    var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; stale boards are discarded (recalc daily) */
   if(SH.board&&SH.board.date===shToday()){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);}
