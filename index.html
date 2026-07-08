@@ -214,6 +214,8 @@ body{padding:0!important;min-height:100dvh}
 .shrun{width:100%;background:rgba(182,255,61,.14);border:1px solid var(--green);color:var(--green);border-radius:10px;padding:13px;font-family:'Saira Condensed',sans-serif;font-size:17px;font-weight:700;letter-spacing:1px;cursor:pointer;text-transform:uppercase}
 .shrun:active{background:var(--green);color:#0a0c07}
 .shrun:disabled{opacity:.45;cursor:default}
+.shai{margin-top:8px;background:rgba(92,200,255,.10);border-color:rgba(92,200,255,.55);color:var(--blue)}
+.shai:active{background:var(--blue);color:#0a0c07}
 .shstatus{padding:0 13px 10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);min-height:14px;line-height:1.5}
 .shstatus .err{color:var(--red)}
 .shboard{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
@@ -337,7 +339,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 23 · 2026-07-07</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 24 · 2026-07-07</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -348,16 +350,17 @@ body{padding:0!important;min-height:100dvh}
     <div class="panel">
       <div class="ptitle"><span>THE SHARP · MLB PROP BOARD</span><button class="shgear" id="shKeyBtn" title="Claude API key">&#9881;</button></div>
       <div class="obkey shkey" id="shKeyWrap" style="display:none">
-        <input id="shKey" type="password" placeholder="Claude API key (sk-ant-…)" autocomplete="off" />
+        <input id="shKey" type="password" placeholder="Claude API key (sk-ant-…) — optional" autocomplete="off" />
         <button id="shSaveKey">Save</button>
-        <div class="obnote">Runs on your own Claude API key from console.anthropic.com — saved only on this device, never in the site code. Each board costs roughly $0.30–0.60 of API usage plus ~80 Odds API credits.</div>
+        <div class="obnote">Optional: add your own Claude API key (console.anthropic.com) to unlock the deeper AI analysis mode (~$0.30–0.60 per board). The built-in model needs no key and is free. Keys are saved only on this device — never in the site code.</div>
       </div>
       <div class="shctrls">
-        <button class="shrun" id="shRun">Generate today's board</button>
+        <button class="shrun" id="shRun">Generate today's board · free</button>
+        <button class="shrun shai" id="shRunAI" style="display:none">Deep analysis with Claude</button>
       </div>
       <div class="shstatus" id="shStatus"></div>
       <div class="shboard" id="shBoard"></div>
-      <div class="note">AI-generated analysis of live slate data (stats, lines, lineups, weather) — probabilities are model opinions, not guarantees. Data gaps are disclosed, never papered over. Informational only.</div>
+      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), opposing starter quality, lineup spot → expected ABs, park &amp; wind, and vig-removed odds for the edge calc. Data gaps are disclosed, never papered over. Probabilities are estimates, not guarantees. Informational only.</div>
     </div>
   </section><!-- /panel-sharp -->
 </main>
@@ -985,7 +988,7 @@ function shTick(phase){clearInterval(SH.timer);SH.t0=Date.now();SH.timer=setInte
 function shStop(){clearInterval(SH.timer);SH.timer=null;}
 
 /* --- slate collection (all real, all live) --- */
-function shHitRow(p){var s=p.stat||{};return {ab:s.atBats,h:s.hits,"2b":s.doubles,hr:s.homeRuns,tb:s.totalBases,rbi:s.rbi,r:s.runs,bb:s.baseOnBalls,k:s.strikeOuts,sb:s.stolenBases,avg:s.avg,obp:s.obp,slg:s.slg};}
+function shHitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ab:s.atBats,h:s.hits,"2b":s.doubles,"3b":s.triples,hr:s.homeRuns,tb:s.totalBases,rbi:s.rbi,r:s.runs,bb:s.baseOnBalls,k:s.strikeOuts,sb:s.stolenBases,avg:s.avg,obp:s.obp,slg:s.slg};}
 function shPitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ip:s.inningsPitched,era:s.era,whip:s.whip,k:s.strikeOuts,bb:s.baseOnBalls,k9:s.strikeoutsPer9Inn,h:s.hits,er:s.earnedRuns};}
 function shStatsUrl(group,days){var end=shToday();return days
   ?"https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&group="+group+"&startDate="+shDaysAgo(days)+"&endDate="+end+"&sportId=1&playerPool=All&limit=2500"
@@ -1065,6 +1068,179 @@ function shCollectSlate(){
   });
 }
 
+/* --- built-in house model: free, transparent, no API key ---
+   Same inputs as the Claude path (the live slate), same output shape (renders
+   through shRender unchanged). Probabilities are Poisson estimates from
+   recency-weighted per-AB/per-game rates, adjusted for opposing starter
+   quality, lineup spot (expected ABs), park, and wind; edges are measured
+   against vig-removed odds. All numbers real; nothing invented. */
+function shClamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+function shPoisCdf(k,lam){if(lam<=0)return 1;var s=0,t=Math.exp(-lam);for(var i=0;i<=k;i++){s+=t;t=t*lam/(i+1);}return Math.min(1,s);}
+function shPoisPmf(k,lam){var t=Math.exp(-lam);for(var i=1;i<=k;i++)t=t*lam/i;return t;}
+function shPOver(line,lam){return 1-shPoisCdf(Math.floor(line),lam);}
+/* total bases: compound distribution — Poisson hits × observed single/XBH mix
+   (a lone double clears 1.5 TB; plain Poisson on TB understates that variance) */
+function shTbOver(line,lamH,s1,s2){
+  var P0=shPoisPmf(0,lamH),P1=shPoisPmf(1,lamH),P2=shPoisPmf(2,lamH);
+  if(line<2)return 1-(P0+P1*s1);                     /* 1.5: ≤1 TB = 0 hits, or 1 single */
+  if(line<3)return 1-(P0+P1*(s1+s2)+P2*s1*s1);       /* 2.5: adds 1 double, or 2 singles */
+  return 1-(P0+P1+P2*(s1+s2)*(s1+s2));               /* 3.5+: rough — 0–1 hits, or 2 non-HR light hits */
+}
+function shImp(am){var n=Number(am);if(!isFinite(n)||!n)return null;return n>0?100/(n+100):-n/(-n+100);}
+/* recency-weighted rate across 7/15/30-day windows; numFn(stats)→count, denKey "ab"|"g" */
+function shBlend(st,numFn,denKey,minDen){
+  var ws=[["last7",.25],["last15",.35],["last30",.40]],tw=0,acc=0;
+  ws.forEach(function(w){var s=st&&st[w[0]];if(!s)return;var d=Number(s[denKey]),n=numFn(s);
+    if(!isFinite(d)||d<minDen||!isFinite(n))return;acc+=w[1]*(n/d);tw+=w[1];});
+  return tw>0?acc/tw:null;
+}
+function shPitchBlend(pst,key){ /* pitcher metric: 60% last-30, 40% season */
+  var a=pst&&pst.last30&&Number(pst.last30[key]),b=pst&&pst.season&&Number(pst.season[key]);
+  if(isFinite(a)&&isFinite(b))return a*.6+b*.4;return isFinite(a)?a:(isFinite(b)?b:null);
+}
+var SH_MKT_LABEL={batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR (anytime)",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"Pitcher K's"};
+function shAnalyzeLocal(slate){
+  var lookupStats={},lookupPit={};
+  Object.keys(slate.player_stats).forEach(function(k){lookupStats[pnorm(k.split(" (")[0])]=slate.player_stats[k];});
+  Object.keys(slate.pitcher_stats).forEach(function(k){lookupPit[pnorm(k.split(" (")[0])]=slate.pitcher_stats[k];});
+  var gameByKey={};slate.games.forEach(function(g){gameByKey[pnorm(g.away)+"@"+pnorm(g.home)]=g;});
+  function findGame(matchup){var p=matchup.split(" @ ");return gameByKey[pnorm(p[0])+"@"+pnorm(p[1])]||null;}
+  function lineupSpot(g,name){if(!g)return null;var n=pnorm(name);
+    var a=(g.lineup_away||[]).findIndex(function(x){return pnorm(x)===n;});if(a>=0)return a+1;
+    var h=(g.lineup_home||[]).findIndex(function(x){return pnorm(x)===n;});return h>=0?h+1:null;}
+  function oppStarter(g,name){if(!g)return null; /* batter in away lineup faces home probable & vice versa */
+    var n=pnorm(name);
+    if((g.lineup_away||[]).some(function(x){return pnorm(x)===n;}))return g.probable_home;
+    if((g.lineup_home||[]).some(function(x){return pnorm(x)===n;}))return g.probable_away;
+    return null;}
+  function windNote(g){var w=(g&&g.weather&&g.weather.wind)||"";var mph=parseFloat(w)||0;
+    if(/out/i.test(w)&&mph>=10)return {f:1.10,txt:w+" (out)"};
+    if(/in\b/i.test(w)&&mph>=10)return {f:0.90,txt:w+" (in)"};
+    return {f:1,txt:null};}
+  var cands=[],traps=[];
+  Object.keys(slate.props).forEach(function(matchup){
+    var g=findGame(matchup),mks=slate.props[matchup].markets,wind=windNote(g);
+    var coors=/coors/i.test((g&&g.venue)||"");
+    Object.keys(mks).forEach(function(mkt){mks[mkt].forEach(function(row){
+      if(row.ln==null)return;
+      var isK=(mkt==="pitcher_strikeouts");
+      var st=isK?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
+      if(!st)return;
+      var lam=null,bits=[],riskBits=[];
+      if(isK){
+        var g30=st.last30&&Number(st.last30.g),k30=st.last30&&Number(st.last30.k);
+        var kps=null;
+        if(isFinite(g30)&&g30>=3&&isFinite(k30))kps=k30/g30;
+        else if(st.season&&Number(st.season.g)>=8)kps=Number(st.season.k)/Number(st.season.g);
+        if(kps==null)return;
+        /* opposing lineup contact profile */
+        var oppLineup=null;if(g){var n=pnorm(row.p);
+          if(pnorm(g.probable_away||"")===n)oppLineup=g.lineup_home;else if(pnorm(g.probable_home||"")===n)oppLineup=g.lineup_away;}
+        var f=1;
+        if(oppLineup&&oppLineup.length){var kr=0,c=0;oppLineup.forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.k);},"ab",10);if(r!=null){kr+=r;c++;}});
+          if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2);bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");}}
+        else riskBits.push("opposing lineup unconfirmed");
+        lam=kps*f;
+        bits.unshift((k30&&g30?k30+" K in "+g30+" starts last 30 days":"season "+st.season.k+" K / "+st.season.g+" starts")+" → "+lam.toFixed(1)+" expected");
+        var era=shPitchBlend(st,"era");if(era!=null)bits.push(era.toFixed(2)+" blended ERA");
+      }else{
+        var ab30=st.last30&&Number(st.last30.ab);
+        if(!isFinite(ab30)||ab30<25)return; /* sample-size discipline */
+        var spot=lineupSpot(g,row.p);
+        var pa=spot?4.68-0.11*(spot-1):4.2;if(!spot)riskBits.push("lineup spot unconfirmed (assumed mid-order)");
+        var bbr=shBlend(st,function(s){return Number(s.bb);},"ab",10)||0.09;
+        var expAB=pa*(1-shClamp(bbr,0,.25)*0.9);
+        var opp=oppStarter(g,row.p),pst=opp?lookupPit[pnorm(opp)]:null;
+        var contact=1,power=1;
+        if(pst){var whip=shPitchBlend(pst,"whip"),era2=shPitchBlend(pst,"era");
+          if(whip!=null)contact=shClamp(whip/1.30,.85,1.15);
+          if(era2!=null)power=shClamp((era2/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);
+          bits.push("vs "+opp+(era2!=null?" ("+era2.toFixed(2)+" ERA":"")+(whip!=null?", "+whip.toFixed(2)+" WHIP)":")"));}
+        else riskBits.push("no probable-starter data for the matchup");
+        var hrF=power*wind.f*(coors?1.08:1),tbF=power*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*(coors?1.07:1);
+        var rate=null;
+        if(mkt==="batter_hits")rate=shBlend(st,function(s){return Number(s.h);},"ab",10),lam=rate!=null?rate*expAB*hF:null;
+        if(mkt==="batter_total_bases"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);
+          if(rate!=null){var l3=st.last30,H=Number(l3.h)||0;
+            var xb=(Number(l3["2b"])||0)+(Number(l3["3b"])||0),hrs=Number(l3.hr)||0;
+            var s1=H>0?Math.max(0,(H-xb-hrs)/H):0.72,s2=H>0?Math.min(1,xb/H):0.2;
+            lam={tb:1,lamH:rate*expAB*hF*(tbF>1?1.03:tbF<1?0.98:1),s1:s1,s2:s2};}}
+        if(mkt==="batter_home_runs")rate=shBlend(st,function(s){return Number(s.hr);},"ab",25),lam=rate!=null?rate*expAB*hrF:null;
+        if(mkt==="batter_hits_runs_rbis")rate=shBlend(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3),lam=rate!=null?rate*(coors?1.08:1)*power:null;
+        if(lam==null)return;
+        var l30=st.last30;
+        bits.unshift(l30.h+"-for-"+l30.ab+" ("+l30.avg+") with "+l30.hr+" HR / "+l30.tb+" TB last 30");
+        if(st.last7&&Number(st.last7.ab)>=12)bits.push("last 7: "+st.last7.h+"-for-"+st.last7.ab);
+        if(spot)bits.push("#"+spot+" spot → ~"+expAB.toFixed(1)+" ABs");
+        if(wind.txt)bits.push("wind "+wind.txt);
+        if(coors)bits.push("Coors altitude");
+      }
+      var pO=(lam&&lam.tb)?shTbOver(row.ln,lam.lamH,lam.s1,lam.s2):shPOver(row.ln,lam);
+      var iO=shImp(row.o),iU=shImp(row.u);
+      var sides=[];
+      /* shrink the model 45% toward the vig-removed market — the book prices in
+         injuries/rest/pitch-mix info this model can't see; raw edges lie */
+      if(iO!=null&&iU!=null){var nv=iO/(iO+iU);var pAdj=0.55*pO+0.45*nv;
+        sides.push({side:"O",p:pAdj,imp:nv,odds:row.o});sides.push({side:"U",p:1-pAdj,imp:1-nv,odds:row.u});}
+      else if(iO!=null){var fair=iO/1.06;sides.push({side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o});}
+      else return;
+      sides.forEach(function(sd){
+        var edge=sd.p-sd.imp;
+        /* -300 trap rule: heavy juice needs a genuine edge */
+        if(sd.imp>=0.75&&edge<0.04){if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});return;}
+        if(sd.p<0.45&&edge<0.07)return;
+        if(edge<0.02)return;
+        cands.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,p:sd.p,imp:sd.imp,edge:edge,
+          matchup:matchup,start:g?g.start:null,bits:bits.slice(),riskBits:riskBits.slice(),
+          score:sd.p*0.55+edge*2.8*0.45});
+      });
+    });});
+  });
+  cands.sort(function(a,b){return b.score-a.score;});
+  /* diversity: max 3 per game, max 5 per market type, max 1 per player+market
+     (a systematic model lean can't be allowed to fill the whole board) */
+  var perGame={},perMkt={},seen={},picks=[];
+  cands.forEach(function(c){if(picks.length>=15)return;
+    var pk=pnorm(c.player)+"|"+c.mkt;if(seen[pk])return;
+    perGame[c.matchup]=perGame[c.matchup]||0;if(perGame[c.matchup]>=3)return;
+    var mk=c.mkt+"|"+c.side;perMkt[mk]=perMkt[mk]||0;if(perMkt[mk]>=5)return;
+    seen[pk]=1;perGame[c.matchup]++;perMkt[mk]++;picks.push(c);});
+  if(!picks.length)throw new Error("No positive-edge props found right now — lines may not be fully posted yet. Try closer to game time.");
+  function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
+  var out={overview:"",picks:[],parlays:[],trap:null};
+  picks.forEach(function(c,i){
+    var conv=(c.edge>=0.045&&c.p>=0.58)?"A":(c.edge>=0.03||c.p>=0.64)?"B":"C";
+    out.picks.push({rank:i+1,player:c.player,prop:SH_MKT_LABEL[c.mkt]||c.mkt,line:c.side+" "+c.ln,odds:obSign(c.odds),
+      game:c.matchup+(c.start?" · "+tLoc(c.start):""),
+      prob:Math.round(c.p*1000)/10,implied:Math.round(c.imp*1000)/10,edge:Math.round(c.edge*1000)/10,
+      conviction:conv,"case":c.bits.join("; ")+".",
+      risk:(c.riskBits[0]||(c.side==="U"?"A blow-up start or extra innings pushes the count over.":"An early exit, walk-heavy day, or bullpen game cuts the chances."))});
+  });
+  /* parlays from top A/B picks in different games */
+  var pool=out.picks.filter(function(p){return p.conviction!=="C";}),used={},legs=[];
+  pool.forEach(function(p){var gm=p.game.split(" · ")[0];if(used[gm]||legs.length>=3)return;used[gm]=1;legs.push(p);});
+  function parlay(sel){var dec=sel.reduce(function(a,p){var d=amToDec(String(p.odds).replace(/[^\d+-]/g,""));return d?a*d:a;},1);
+    return {legs:sel.map(function(p){return p.player+" "+p.prop+" "+p.line;}),
+      note:"combined "+(decToAm(dec)!=null?obSign(decToAm(dec)):"—")+" · different games, uncorrelated"};}
+  if(legs.length>=2)out.parlays.push(parlay(legs.slice(0,2)));
+  if(legs.length>=3)out.parlays.push(parlay(legs.slice(0,3)));
+  /* trap: the juiciest big-favorite prop whose numbers don't back the price */
+  traps.sort(function(a,b){return a.edge-b.edge;});
+  var tr=traps[0];
+  out.trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
+    reason:"The book is charging "+Math.round(tr.imp*100)+"% implied; the model makes it "+Math.round((tr.imp+tr.edge)*100)+"% — you're paying more juice than the numbers justify."}
+    :{prop:"None flagged",reason:"No heavily juiced prop stood out as mispriced against the model today."};
+  /* overview */
+  var nGames=slate.games.length,windSpot=null;
+  slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&(!windSpot))windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
+  out.overview=nGames+"-game slate. "
+    +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play — hit/TB props get an altitude bump. ":"")
+    +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
+    +out.picks.length+" positive-edge props survived the vig-removed screen; K props and short hit lines dominate the top of the board, sized off 30-day form and starter quality."
+    +(slate.data_gaps&&slate.data_gaps.length?" Gaps today: "+slate.data_gaps.length+" inputs unavailable (disclosed in-app).":"");
+  return out;
+}
+
 /* --- the Claude API call --- */
 function shCallClaude(systemPrompt,slate){
   shTick("The Sharp is working the numbers");
@@ -1116,7 +1292,7 @@ function shRender(){
   if(d.parlays&&d.parlays.length){h+="<div class='shsec'><b>PARLAY BUILDS</b><ul>"+d.parlays.map(function(pl){
     return "<li>"+esc((pl.legs||[]).join(" + "))+" — "+esc(pl.note)+"</li>";}).join("")+"</ul></div>";}
   if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
-  h+="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(SH_MODEL)+" · data: MLB Stats API + The Odds API</div>";
+  h+="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(saved.engine==="claude"?SH_MODEL:"built-in stats model (free)")+" · data: MLB Stats API + The Odds API</div>";
   el.innerHTML=h;
 }
 function shAddPick(i){
@@ -1125,33 +1301,43 @@ function shAddPick(i){
   saveLegs();renderLegs();renderResults();
 }
 
-/* --- run --- */
-function shRun(){
+/* --- run: engine "local" (free, default) or "claude" (needs a key) --- */
+function shRun(engine){
   if(SH.busy)return;
-  if(!SH.key){shStatus("Add your Claude API key first — tap ⚙ above.",true);var w=$("shKeyWrap");if(w)w.style.display="";return;}
-  SH.busy=true;var btn=$("shRun");if(btn)btn.disabled=true;
-  shTick("Loading system prompt");
-  fetch("prompts/mlb_prop_handicapper_prompt.md?d="+shToday(),{cache:"no-store"})
-    .then(function(r){if(!r.ok)throw new Error("Couldn't load prompts/mlb_prop_handicapper_prompt.md ("+r.status+")");return r.text();})
-    .then(function(sys){shTick("Collecting today's slate");return shCollectSlate().then(function(slate){return shCallClaude(sys,slate);});})
-    .then(function(data){
-      if(!data||!data.picks||!data.picks.length)throw new Error("Model returned no picks — try again.");
-      SH.board={date:shToday(),at:Date.now(),data:data};LS.set("pl_sharp",SH.board);
-      shStop();shStatus("Board ready — "+data.picks.length+" picks · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
+  engine=engine==="claude"?"claude":"local";
+  if(engine==="claude"&&!SH.key){shStatus("Claude mode needs an API key — tap ⚙ above (the free board doesn't).",true);var w=$("shKeyWrap");if(w)w.style.display="";return;}
+  SH.busy=true;var b1=$("shRun"),b2=$("shRunAI");if(b1)b1.disabled=true;if(b2)b2.disabled=true;
+  var work;
+  if(engine==="claude"){
+    shTick("Loading system prompt");
+    work=fetch("prompts/mlb_prop_handicapper_prompt.md?d="+shToday(),{cache:"no-store"})
+      .then(function(r){if(!r.ok)throw new Error("Couldn't load prompts/mlb_prop_handicapper_prompt.md ("+r.status+")");return r.text();})
+      .then(function(sys){shTick("Collecting today's slate");return shCollectSlate().then(function(slate){return shCallClaude(sys,slate);});});
+  }else{
+    shTick("Collecting today's slate");
+    work=shCollectSlate().then(function(slate){shTick("Running the numbers");return shAnalyzeLocal(slate);});
+  }
+  work.then(function(data){
+      if(!data||!data.picks||!data.picks.length)throw new Error("No picks produced — try again closer to game time.");
+      SH.board={date:shToday(),at:Date.now(),engine:engine,data:data};LS.set("pl_sharp",SH.board);
+      shStop();shStatus("Board ready — "+data.picks.length+" picks · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
       shRender();
     })
     .catch(function(e){shStop();shStatus((e&&e.message)||"Something went wrong — try again.",true);})
-    .then(function(){SH.busy=false;if(btn)btn.disabled=false;});
+    .then(function(){SH.busy=false;if(b1)b1.disabled=false;if(b2)b2.disabled=false;});
 }
 
 /* --- wiring --- */
 (function(){
+  function aiBtnVis(){var b=$("shRunAI");if(b)b.style.display=SH.key?"":"none";}
   var kb=$("shKeyBtn");if(kb)kb.addEventListener("click",function(){var w=$("shKeyWrap");if(w)w.style.display=(w.style.display==="none"?"":"none");});
   var kw=$("shKey");if(kw)kw.value=SH.key;
-  var sk=$("shSaveKey");if(sk)sk.addEventListener("click",function(){SH.key=($("shKey").value||"").trim();LS.set("pl_claudekey",SH.key);$("shKeyWrap").style.display="none";shStatus(SH.key?"Key saved on this device.":"Key cleared.");});
-  var rb=$("shRun");if(rb)rb.addEventListener("click",shRun);
+  var sk=$("shSaveKey");if(sk)sk.addEventListener("click",function(){SH.key=($("shKey").value||"").trim();LS.set("pl_claudekey",SH.key);$("shKeyWrap").style.display="none";shStatus(SH.key?"Key saved — Claude mode unlocked.":"Key cleared — free built-in model still works.");aiBtnVis();});
+  var rb=$("shRun");if(rb)rb.addEventListener("click",function(){shRun("local");});
+  var ra=$("shRunAI");if(ra)ra.addEventListener("click",function(){shRun("claude");});
+  aiBtnVis();
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
-  /* restore today's board; stale boards are discarded (prompt rule: recalc daily) */
+  /* restore today's board; stale boards are discarded (recalc daily) */
   if(SH.board&&SH.board.date===shToday()){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);}
 })();
