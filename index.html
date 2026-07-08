@@ -232,6 +232,13 @@ body{padding:0!important;min-height:100dvh}
 .shparlay{background:var(--bg);border:1px solid rgba(92,200,255,.4);border-radius:11px;padding:11px 12px}
 .shparlay-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .shlegs{margin:8px 0 0;padding-left:18px;font-size:12.5px;line-height:1.6}
+.shtags{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.shtag{font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.6px;border-radius:6px;padding:2px 8px}
+.shtag.safe{background:rgba(182,255,61,.16);color:var(--green);border:1px solid rgba(182,255,61,.5)}
+.shtag.bal{background:rgba(255,184,56,.14);color:var(--amber);border:1px solid rgba(255,184,56,.5)}
+.shtag.long{background:rgba(255,91,106,.14);color:var(--red);border:1px solid rgba(255,91,106,.5)}
+.shtag.hr{background:rgba(92,200,255,.14);color:var(--blue);border:1px solid rgba(92,200,255,.5)}
+.shtag.mix{background:#0c0e12;color:var(--muted);border:1px solid var(--line)}
 .shstatus{padding:0 13px 10px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);min-height:14px;line-height:1.5}
 .shstatus .err{color:var(--red)}
 .shboard{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
@@ -355,7 +362,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 25 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 26 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1121,7 +1128,8 @@ function shPitchBlend(pst,key){ /* pitcher metric: 60% last-30, 40% season */
   if(isFinite(a)&&isFinite(b))return a*.6+b*.4;return isFinite(a)?a:(isFinite(b)?b:null);
 }
 var SH_MKT_LABEL={batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR (anytime)",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"Pitcher K's"};
-var SH_CATS=[["ml","ML"],["rl","RL"],["batter_hits","HITS"],["batter_total_bases","TB"],["batter_home_runs","HR"],["batter_hits_runs_rbis","H+R+RBI"],["pitcher_strikeouts","K'S"]];
+var SH_CATS=[["all","TOP 50"],["ml","ML"],["rl","RL"],["batter_hits","HITS"],["batter_total_bases","TB"],["batter_home_runs","HR"],["batter_hits_runs_rbis","H+R+RBI"],["pitcher_strikeouts","K'S"]];
+var SH_NAMED_CATS=["ml","rl","batter_hits","batter_total_bases","batter_home_runs","batter_hits_runs_rbis","pitcher_strikeouts"];
 function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
 function shAnalyzeLocal(slate){
   var lookupStats={},lookupPit={};
@@ -1268,32 +1276,59 @@ function shAnalyzeLocal(slate){
   });
   if(!anyRows)throw new Error("No lines posted for today's remaining games — try again closer to game time.");
 
-  /* ----- suggested parlays (these may reuse solo picks — that's the point) ----- */
+  /* ----- combined TOP 50: every category merged, re-ranked by win probability ----- */
+  var allRows=[];SH_NAMED_CATS.forEach(function(k){cats[k].forEach(function(r){allRows.push(r);});});
+  allRows.sort(function(a,b){return b.prob-a.prob;});
+  cats.all=allRows.slice(0,50).map(function(r,i){var c={};for(var kk in r)c[kk]=r[kk];c.rank=i+1;return c;});
+
+  /* ----- suggested parlays: 50/day — 10 HR-only (3-6 legs) + 40 non-HR (2-10 legs),
+     spanning safe small-money tickets down to $5-$10 longshots. These intentionally
+     reuse solo picks; HR-only tickets never mix in a non-HR leg and vice-versa. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob};}
-  function build(name,sel,extraNote){
-    if(sel.length<2)return null;
+  /* pick n distinct legs from a prob-sorted pool starting at offset (wraps);
+     prefers one leg per game, then fills allowing same-game if the pool is thin */
+  function pickLegs(pool,n,offset,preferDistinctGame){
+    var out=[],seenKey={},seenGame={},L=pool.length;if(!L)return out;
+    function pass(enforceGame){for(var i=0;i<L&&out.length<n;i++){var x=pool[(offset+i)%L];
+      var key=x.r.label+"|"+x.r.sub,gm=(x.r.game||"").split(" · ")[0];
+      if(seenKey[key])continue;if(enforceGame&&seenGame[gm])continue;
+      seenKey[key]=1;seenGame[gm]=1;out.push(x);}}
+    pass(!!preferDistinctGame);if(out.length<n&&preferDistinctGame)pass(false);
+    return out;
+  }
+  function build(name,type,sel){
+    if(!sel||sel.length<2)return null;
     var legs=sel.map(legOf);
     var dec=legs.reduce(function(a,l){var d=amToDec(l.odds);return d?a*d:a;},1);
     var prob=legs.reduce(function(a,l){return a*(Number(l.prob)/100);},1);
     var gamesSeen={},sameGame=false;legs.forEach(function(l){if(gamesSeen[l.game])sameGame=true;gamesSeen[l.game]=1;});
-    return {name:name,legs:legs,odds:(decToAm(dec)!=null?obSign(decToAm(dec)):"—"),prob:Math.round(prob*1000)/10,
-      note:(sameGame?"⚠ legs share a game — correlated; one bad game can sink several legs. ":"Different games — uncorrelated. ")+(extraNote||"")};
+    /* stake band scales with the odds: fat tickets get small stakes, safe ones size up */
+    var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
+    var toWin=Math.round(stake*(dec-1));
+    var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
+    var am=decToAm(dec);
+    return {name:name,type:type,tier:tier,legs:legs,odds:(am!=null?obSign(am):"—"),
+      prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
+      note:(sameGame?"⚠ Some legs share a game (correlated). ":"")+
+        (tier==="SAFER"?"Higher-floor ticket — meant to size up: $"+stake+" to win ~$"+toWin+".":
+         tier==="LONGSHOT"?"Lottery ticket — keep it small: $"+stake+" to win ~$"+toWin+".":
+         "Mid-risk build: $"+stake+" to win ~$"+toWin+".")};
   }
-  function distinct(pool,n){var out=[],g={},seen={};pool.some(function(x){var gm=(x.r.game||"").split(" · ")[0];var key=x.r.label+"|"+x.r.sub;
-    if(g[gm]||seen[key])return false;g[gm]=1;seen[key]=1;out.push(x);return out.length>=n;});return out;}
-  var pool=[];Object.keys(cats).forEach(function(k){cats[k].forEach(function(r){pool.push({cat:k,r:r});});});
-  var byP=pool.slice().sort(function(a,b){return b.r.prob-a.r.prob;});
-  var byEdge=pool.filter(function(x){return x.r.edge>=2&&x.r.prob>=52;}).sort(function(a,b){return b.r.edge-a.r.edge;});
-  var plus=pool.filter(function(x){return /^\+/.test(String(x.r.odds));}).sort(function(a,b){return b.r.prob-a.r.prob;});
+  var hrPool=cats.batter_home_runs.map(function(r){return {cat:"batter_home_runs",r:r};});
+  var nonHRpool=[];["ml","rl","batter_hits","batter_total_bases","batter_hits_runs_rbis","pitcher_strikeouts"]
+    .forEach(function(k){cats[k].forEach(function(r){nonHRpool.push({cat:k,r:r});});});
+  nonHRpool.sort(function(a,b){return b.r.prob-a.r.prob;});
   var parlays=[];
-  var p1=build("High-floor 2-leg",distinct(byP,2),"The two most probable plays on the board.");if(p1)parlays.push(p1);
-  var p2=build("High-floor 3-leg",distinct(byP,3),"Adds a third leg — floor stays the priority.");if(p2)parlays.push(p2);
-  var p3=build("Value 3-leg",distinct(byEdge,3),"Built from the biggest model-vs-market edges, not raw probability.");if(p3)parlays.push(p3);
-  var seenCat={},cross=[];byP.forEach(function(x){if(cross.length>=3||seenCat[x.cat])return;var gm=(x.r.game||"").split(" · ")[0];
-    if(cross.some(function(y){return (y.r.game||"").split(" · ")[0]===gm;}))return;seenCat[x.cat]=1;cross.push(x);});
-  var p4=build("Cross-category 3-leg",cross,"One leg each from three different bet types.");if(p4)parlays.push(p4);
-  var p5=build("Plus-money 3-leg",distinct(plus,3),"Every leg at plus odds — low probability, big payout. Small stakes only.");if(p5)parlays.push(p5);
+  /* 10 HR-only parlays, 3-6 legs (capped to what the HR board supports) */
+  [3,3,4,4,5,3,4,5,6,4].forEach(function(want,i){var n=Math.min(want,hrPool.length);if(n<2)return;
+    var p=build("HR-only · "+n+" legs","HR",pickLegs(hrPool,n,i,false));if(p)parlays.push(p);});
+  /* 40 non-HR parlays, 2-10 legs, weighted toward safe/mid with a longshot tail */
+  var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,3],[7,2],[8,1],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
+  var off=0;mixPat.forEach(function(want){var n=Math.min(want,nonHRpool.length);if(n<2)return;
+    var p=build("Mixed · "+n+" legs","MIX",pickLegs(nonHRpool,n,off,true));off++;if(p)parlays.push(p);});
+  /* order safest (highest combined win %) first; filters split HR-only / longshots out */
+  parlays.sort(function(a,b){return b.prob-a.prob;});
 
   var tr=traps.sort(function(a,b){return a.edge-b.edge;})[0];
   var trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
@@ -1301,11 +1336,12 @@ function shAnalyzeLocal(slate){
     :{prop:"None flagged",reason:"No heavily juiced prop stood out as mispriced against the model today."};
 
   var windSpot=null;slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&!windSpot)windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
-  var counts=SH_CATS.map(function(c){return cats[c[0]].length?cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
+  var counts=SH_CATS.filter(function(c){return c[0]!=="all";}).map(function(c){return cats[c[0]].length?cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
   var overview=slate.games.length+"-game slate. "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +"Ranked by win probability within each category — "+counts+". Edges vs vig-removed prices; model shrunk 45% toward the market."
+    +"Ranked by win probability within each category — "+counts+". Edges vs vig-removed prices; model shrunk 45% toward the market. "
+    +parlays.length+" parlays built (HR-only + mixed, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
   return {overview:overview,categories:cats,parlays:parlays,trap:trap};
 }
@@ -1335,7 +1371,7 @@ function shCallClaude(systemPrompt,slate){
 
 /* --- render: two sub-views — Suggested Picks (per category) & Suggested Parlays --- */
 function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
-SH.view="picks";SH.cat="ml";
+SH.view="picks";SH.cat="all";SH.pfilter="all";
 function shPickCard(p,addAttr,name,propTxt){
   var edge=Number(p.edge)||0;
   return "<div class='shpick'>"+
@@ -1382,15 +1418,28 @@ function shRender(){
     if(!rows.length)h+="<div class='shover'>No "+esc(SH.cat)+" lines available right now.</div>";
     rows.forEach(function(p,i){h+=shPickCard(p,"data-shadd2='"+SH.cat+"|"+i+"'",p.label,p.sub);});
   }else{
-    (d.parlays||[]).forEach(function(pl,pi){
+    var all=d.parlays||[];
+    var PF=[["all","ALL"],["SAFER","SAFER"],["LONGSHOT","LONGSHOTS"],["HR","HR-ONLY"]];
+    function pfMatch(pl,f){return f==="all"?true:f==="HR"?pl.type==="HR":pl.tier===f;}
+    if(!PF.some(function(f){return f[0]===SH.pfilter;}))SH.pfilter="all";
+    h+="<div class='shcats'>"+PF.map(function(f){var n=all.filter(function(pl){return pfMatch(pl,f[0]);}).length;
+      return "<button class='shcat"+(SH.pfilter===f[0]?" on":"")+"' data-pfilter='"+f[0]+"'"+(n?"":" disabled")+">"+f[1]+(n?" <b>"+n+"</b>":"")+"</button>";}).join("")+"</div>";
+    var show=all.filter(function(pl){return pfMatch(pl,SH.pfilter);});
+    show.forEach(function(pl){var pi=all.indexOf(pl);
+      var badge=pl.type==="HR"?"<span class='shtag hr'>HR-ONLY</span>":"<span class='shtag mix'>MIXED</span>";
+      var tb=pl.tier==="SAFER"?"<span class='shtag safe'>SAFER</span>":pl.tier==="LONGSHOT"?"<span class='shtag long'>LONGSHOT</span>":"<span class='shtag bal'>BALANCED</span>";
       h+="<div class='shparlay'><div class='shparlay-head'><span class='shname'>"+esc(pl.name)+"</span>"+
         "<span class='shprop'>"+esc(pl.odds)+"</span></div>"+
-        "<div class='shnums'><span class='shchip'>combined win <b>"+esc(String(pl.prob))+"%</b></span><span class='shchip'>legs <b>"+pl.legs.length+"</b></span></div>"+
+        "<div class='shtags'>"+tb+badge+"</div>"+
+        "<div class='shnums'><span class='shchip'>combined win <b>"+esc(String(pl.prob))+"%</b></span>"+
+          "<span class='shchip'>legs <b>"+pl.legs.length+"</b></span>"+
+          "<span class='shchip'>$"+pl.stake+" → <b>$"+pl.toWin+"</b></span></div>"+
         "<ul class='shlegs'>"+pl.legs.map(function(l){return "<li>"+esc(l.txt)+"</li>";}).join("")+"</ul>"+
         "<div class='shrisk'>"+esc(pl.note)+"</div>"+
         "<div class='shaddrow'><button class='shadd' data-shparlay='"+pi+"'>＋ Add all "+pl.legs.length+" legs to slip</button></div></div>";
     });
-    if(!d.parlays||!d.parlays.length)h+="<div class='shover'>Not enough qualifying picks to build parlays today.</div>";
+    if(!all.length)h+="<div class='shover'>Not enough qualifying picks to build parlays today — try again closer to game time.</div>";
+    else if(!show.length)h+="<div class='shover'>No "+esc(SH.pfilter)+" parlays in today's set.</div>";
     if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
   }
   el.innerHTML=h+meta;
@@ -1428,9 +1477,14 @@ function shRun(engine){
     work=shCollectSlate().then(function(slate){shTick("Running the numbers");return shAnalyzeLocal(slate);});
   }
   work.then(function(data){
-      if(!data||!data.picks||!data.picks.length)throw new Error("No picks produced — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,data:data};LS.set("pl_sharp",SH.board);
-      shStop();shStatus("Board ready — "+data.picks.length+" picks · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
+      /* Claude mode returns data.picks; the free model returns data.categories */
+      var pickCount=(data&&data.picks)?data.picks.length
+        :(data&&data.categories?SH_NAMED_CATS.reduce(function(a,k){return a+((data.categories[k]||[]).length);},0):0);
+      var parlayCount=(data&&data.parlays&&data.parlays.length)||0;
+      if(!pickCount)throw new Error("No lines posted for today's remaining games — try again closer to game time.");
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:2,data:data};LS.set("pl_sharp",SH.board);
+      SH.view="picks";SH.cat="all";SH.pfilter="all";
+      shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
       shRender();
     })
     .catch(function(e){shStop();shStatus((e&&e.message)||"Something went wrong — try again.",true);})
@@ -1449,12 +1503,14 @@ function shRun(engine){
   var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
     var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
+    var pf=e.target.closest?e.target.closest("[data-pfilter]"):null;if(pf&&!pf.disabled){SH.pfilter=pf.getAttribute("data-pfilter");shRender();return;}
     var b2=e.target.closest?e.target.closest("[data-shadd2]"):null;if(b2){var kv=b2.getAttribute("data-shadd2").split("|");shAddCatPick(kv[0],Number(kv[1]));return;}
     var pl=e.target.closest?e.target.closest("[data-shparlay]"):null;if(pl){shAddParlay(Number(pl.getAttribute("data-shparlay")));return;}
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
-  /* restore today's board; stale boards are discarded (recalc daily) */
-  if(SH.board&&SH.board.date===shToday()){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
-  else if(SH.board){SH.board=null;LS.set("pl_sharp",null);}
+  /* restore today's board; discard stale (prior-day) or old-schema boards so a
+     regenerate always lands in the current categorized + 50-parlay shape */
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===2){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
+  else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
 })();
 
 /* ===== app tab navigation + slip badge (build 20) ===== */
