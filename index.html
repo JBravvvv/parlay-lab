@@ -362,7 +362,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 26 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 27 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1286,16 +1286,26 @@ function shAnalyzeLocal(slate){
      reuse solo picks; HR-only tickets never mix in a non-HR leg and vice-versa. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob};}
-  /* pick n distinct legs from a prob-sorted pool starting at offset (wraps);
-     prefers one leg per game, then fills allowing same-game if the pool is thin */
-  function pickLegs(pool,n,offset,preferDistinctGame){
-    var out=[],seenKey={},seenGame={},L=pool.length;if(!L)return out;
-    function pass(enforceGame){for(var i=0;i<L&&out.length<n;i++){var x=pool[(offset+i)%L];
-      var key=x.r.label+"|"+x.r.sub,gm=(x.r.game||"").split(" · ")[0];
-      if(seenKey[key])continue;if(enforceGame&&seenGame[gm])continue;
-      seenKey[key]=1;seenGame[gm]=1;out.push(x);}}
-    pass(!!preferDistinctGame);if(out.length<n&&preferDistinctGame)pass(false);
-    return out;
+  /* greedy least-used picker: spreads picks evenly across the whole board so
+     tickets barely overlap (take several without re-betting the same play).
+     Each parlay grabs the least-used players first (prob breaks ties), never
+     repeats a player within a ticket, and prefers one leg per game. */
+  function makePicker(pool){
+    var uPlayer={},uKey={};
+    return function(n,preferDistinctGame){
+      var ranked=pool.slice().sort(function(a,b){
+        var pa=uPlayer[a.r.label]||0,pb=uPlayer[b.r.label]||0;if(pa!==pb)return pa-pb;
+        var ka=uKey[a.r.label+"|"+a.r.sub]||0,kb=uKey[b.r.label+"|"+b.r.sub]||0;if(ka!==kb)return ka-kb;
+        return b.r.prob-a.r.prob;});
+      var out=[],seenP={},seenG={};
+      function pass(enforceGame){for(var i=0;i<ranked.length&&out.length<n;i++){var x=ranked[i];
+        var gm=(x.r.game||"").split(" · ")[0];
+        if(seenP[x.r.label])continue;if(enforceGame&&seenG[gm])continue;
+        seenP[x.r.label]=1;seenG[gm]=1;out.push(x);}}
+      pass(!!preferDistinctGame);if(out.length<n&&preferDistinctGame)pass(false);
+      out.forEach(function(x){uPlayer[x.r.label]=(uPlayer[x.r.label]||0)+1;uKey[x.r.label+"|"+x.r.sub]=(uKey[x.r.label+"|"+x.r.sub]||0)+1;});
+      return out;
+    };
   }
   function build(name,type,sel){
     if(!sel||sel.length<2)return null;
@@ -1321,12 +1331,14 @@ function shAnalyzeLocal(slate){
   nonHRpool.sort(function(a,b){return b.r.prob-a.r.prob;});
   var parlays=[];
   /* 10 HR-only parlays, 3-6 legs (capped to what the HR board supports) */
-  [3,3,4,4,5,3,4,5,6,4].forEach(function(want,i){var n=Math.min(want,hrPool.length);if(n<2)return;
-    var p=build("HR-only · "+n+" legs","HR",pickLegs(hrPool,n,i,false));if(p)parlays.push(p);});
+  var pickHR=makePicker(hrPool);
+  [3,3,4,4,5,3,4,5,6,4].forEach(function(want){var n=Math.min(want,hrPool.length);if(n<2)return;
+    var p=build("HR-only · "+n+" legs","HR",pickHR(n,false));if(p)parlays.push(p);});
   /* 40 non-HR parlays, 2-10 legs, weighted toward safe/mid with a longshot tail */
+  var pickMix=makePicker(nonHRpool);
   var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,3],[7,2],[8,1],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
-  var off=0;mixPat.forEach(function(want){var n=Math.min(want,nonHRpool.length);if(n<2)return;
-    var p=build("Mixed · "+n+" legs","MIX",pickLegs(nonHRpool,n,off,true));off++;if(p)parlays.push(p);});
+  mixPat.forEach(function(want){var n=Math.min(want,nonHRpool.length);if(n<2)return;
+    var p=build("Mixed · "+n+" legs","MIX",pickMix(n,true));if(p)parlays.push(p);});
   /* order safest (highest combined win %) first; filters split HR-only / longshots out */
   parlays.sort(function(a,b){return b.prob-a.prob;});
 

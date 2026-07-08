@@ -7,7 +7,7 @@ A self-contained web app and installable PWA. A top sport bar switches between *
 
 ## Golden rules
 1. **`index.html` is the entire app and the only source of truth.** All HTML, CSS, JS, and the baked-in MLB snapshot live inside it. No framework, no build step. Keep it that way.
-2. **Bump the build number on every change.** Footer reads `build N · YYYY-MM-DD` (current: **build 22**). After deploying, confirm the footer number in the live app — stale cache is always the first suspect, not a code bug. **Also bump `CACHE` in `sw.js`** (current `parlay-lab-v3`) whenever `index.html` or any shell asset changes, or installed apps keep serving the old build.
+2. **Bump the build number on every change.** Footer reads `build N · YYYY-MM-DD` (current: **build 27**). After deploying, confirm the footer number in the live app — stale cache is always the first suspect, not a code bug. **Also bump `CACHE` in `sw.js`** (current `parlay-lab-v8`) whenever `index.html` or any shell asset changes, or installed apps keep serving the old build.
 3. **Validate before handing off.** Extract the inline script and parse-check it. **Node is not installed on this machine** — use JavaScriptCore instead:
    `jsc -e "try{new Function(readFile('script.js'));print('OK')}catch(e){print(e)}"` where `jsc` = `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc`.
 4. **Preserve live data.** Must be served over http(s) — `file://` breaks all fetches. Local dev: run `serve.command` (or `python3 -m http.server 8790`) → http://localhost:8790.
