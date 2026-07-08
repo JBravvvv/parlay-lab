@@ -367,7 +367,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 29 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 30 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1047,20 +1047,21 @@ function shCollectSlate(){
       var pre=/scheduled|pre-?game|warmup|delayed start/i.test(st)||inning<1;
       var live=!done&&!pre&&inning>=1;
       var phase=done?"done":(live?"live":"pre");
-      var eligible=phase==="pre"||(phase==="live"&&inning<=2);
+      /* fetch every non-final game; inning gating is applied per-board in the engine
+         (general board: pregame + pre-7th; in-game board: any live game to the final out) */
+      var eligible=phase!=="done";
       var key=pnorm(aw.team.name)+"@"+pnorm(hm.team.name);
       slate.eligible[key]=eligible;
-      if(phase==="live"){var info={inning:inning,inningState:inSt,away:aSc,home:hSc,state:st,eligible:eligible};
-        slate.liveInfo[key]=info;
-        if(eligible)slate.liveGames.push({game:aw.team.name+" @ "+hm.team.name,inning:inning,inningState:inSt,away:(aSc==null?0:aSc),home:(hSc==null?0:hSc)});}
+      if(phase==="live"){slate.liveInfo[key]={inning:inning,inningState:inSt,away:aSc,home:hSc,state:st};
+        slate.liveGames.push({game:aw.team.name+" @ "+hm.team.name,inning:inning,inningState:inSt,away:(aSc==null?0:aSc),home:(hSc==null?0:hSc)});}
       slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,venue:(g.venue||{}).name,
         weather:g.weather||null,phase:phase,eligible:eligible,inning:inning,inningState:inSt,awayScore:aSc,homeScore:hSc,
         probable_away:(aw.probablePitcher||{}).fullName||null,probable_home:(hm.probablePitcher||{}).fullName||null,
         lineup_away:names(lu.awayPlayers),lineup_home:names(lu.homePlayers)});
     });
     if(!slate.games.length)throw new Error("No MLB games scheduled today.");
-    if(!slate.games.some(function(g){return g.eligible;}))throw new Error("Every game today is already past the 2nd inning or final — nothing left to play.");
-    if(slate.liveGames.length)gaps.push(slate.liveGames.length+" game(s) already in progress (pre-3rd) — using live in-game odds/props for those.");
+    if(!slate.games.some(function(g){return g.eligible;}))throw new Error("Every game today is already final — nothing left to play.");
+    if(slate.liveGames.length)gaps.push(slate.liveGames.length+" game(s) in progress — using live in-game odds/props for those.");
     if(!slate.games.some(function(g){return g.lineup_away.length;}))gaps.push("Lineups not posted yet — weight lineup-spot factors accordingly.");
     shTick("Pulling game lines (ML + RL + totals)");
     /* 2) game odds: moneylines, run lines (spreads), and Vegas totals */
@@ -1212,9 +1213,9 @@ function shAnalyzeLocal(slate){
     if(go.total!=null)bits.push("Vegas total "+go.total);
     var pH=0.5*model+0.5*novH;
     var homeSide=pH>=0.5;
-    var live=shIsLive(g),glabel=shGameLabel(g,go.game);
+    var live=shIsLive(g),glabel=shGameLabel(g,go.game),ginn=(g&&g.inning)||0;
     cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
-      p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,bits:bits.slice(),
+      p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),
       risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
     if(go.home_rl_pt!=null&&go.home_rl!=null&&go.away_rl!=null){
       var iHr=shImp(go.home_rl),iAr=shImp(go.away_rl);
@@ -1225,7 +1226,7 @@ function shAnalyzeLocal(slate){
         var side=pHC>=0.5;
         cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
           odds:obSign(side?go.home_rl:go.away_rl),p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
-          game:glabel,live:live,bits:bits.slice(),
+          game:glabel,live:live,inning:ginn,bits:bits.slice(),
           risk:((side?go.home_rl_pt:go.away_rl_pt)<0)?"Favorites win one-run games constantly — this needs a 2+ run margin.":"A blowout either way beats the +1.5 cushion."});
       }
     }
@@ -1314,7 +1315,7 @@ function shAnalyzeLocal(slate){
       var edge=sd.p-sd.imp;
       if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});
       cats[mkt].push({label:row.p,sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
-        p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),bits:bits.slice(),
+        p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
   });
@@ -1335,8 +1336,10 @@ function shAnalyzeLocal(slate){
     out.all=allRows.slice(0,50).map(function(r,i){var c={};for(var kk in r)c[kk]=r[kk];c.rank=i+1;return c;});
     return {cats:out,any:any};
   }
-  var preF=finalizeCats(function(r){return !r.live;});
-  var liveF=finalizeCats(function(r){return r.live;});
+  /* general board: pregame + any live game before the 7th (through the end of the 6th).
+     in-game board: every live game, all the way to the final out. */
+  var preF=finalizeCats(function(r){return !r.live||(r.inning||0)<=6;});
+  var liveF=finalizeCats(function(r){return !!r.live;});
   if(!preF.any&&!liveF.any)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
 
   /* ----- parlay builder: per-prop-type single-category tickets (ML/RL/Hits/TB/HR/H+R+RBI/K's/Outs)
@@ -1417,7 +1420,7 @@ function shAnalyzeLocal(slate){
   var windSpot=null;slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&!windSpot)windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
   var counts=SH_CATS.filter(function(c){return c[0]!=="all";}).map(function(c){return preF.cats[c[0]].length?preF.cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
   var lg=slate.liveGames||[];
-  var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live (pre-3rd)":"")+". "
+  var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. "
@@ -1493,10 +1496,10 @@ function shRender(){
     h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
     h+=shPicksView(d.categories,"shadd2");
   }else if(SH.view==="live"){
-    if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME</b>No games are in the 1st or 2nd inning right now. In-game picks show up here the moment a game starts (through the 2nd) using live odds.</div>";
+    if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME</b>No games are in progress right now. In-game picks show up here the moment a game starts and stay through the final out, using live odds.</div>";
     else{h+=shLiveBanner(d);h+=shPicksView(d.categoriesLive,"shaddlive2");}
   }else if(SH.view==="liveparlays"){
-    if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME PARLAYS</b>No live (pre-3rd) games right now — in-game parlays appear here once a game starts.</div>";
+    if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME PARLAYS</b>No games in progress right now — in-game parlays appear here once a game starts and run to the final out.</div>";
     else{h+=shLiveBanner(d);h+=shParlaysView(d.parlaysLive,"shparlaylive");}
   }else{
     h+=shParlaysView(d.parlays,"shparlay");
@@ -1594,7 +1597,7 @@ function shRun(engine){
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
       var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:4,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:5,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -1624,7 +1627,7 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===4){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===5){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
 })();
 
