@@ -1,6 +1,6 @@
 /* Parlay Lab service worker — caches the app shell so it opens instantly and
    works offline once installed. Bump CACHE when you change any shell asset. */
-const CACHE = 'parlay-lab-v11';
+const CACHE = 'parlay-lab-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -34,20 +34,25 @@ self.addEventListener('fetch', (event) => {
   // fail gracefully offline.
   if (url.origin !== location.origin) return;
 
-  // The Sharp's system prompt must never be served stale: network-first,
-  // fall back to the last cached copy offline.
-  if (url.pathname.indexOf('/prompts/') !== -1) {
+  // The app shell (the page itself + the prompt files) is served NETWORK-FIRST so an
+  // online open always gets the newest build; the cache is only an offline fallback.
+  // This is what stops installed apps from getting stuck on a stale build.
+  const isShell = req.mode === 'navigate'
+    || url.pathname.endsWith('/index.html')
+    || url.pathname.endsWith('/')
+    || url.pathname.indexOf('/prompts/') !== -1;
+  if (isShell) {
     event.respondWith(
       fetch(req).then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() => caches.match(req))
+      }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
     );
     return;
   }
 
-  // App shell: cache-first, then network; fall back to index.html for navigations.
+  // Other assets (icons, manifest): cache-first, then network.
   event.respondWith(
     caches.match(req).then((hit) => {
       if (hit) return hit;
@@ -57,7 +62,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
           return res;
         })
-        .catch(() => (req.mode === 'navigate' ? caches.match('./index.html') : Promise.reject('offline')));
+        .catch(() => Promise.reject('offline'));
     })
   );
 });

@@ -367,7 +367,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 30 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 31 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1627,7 +1627,9 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===5){shRender();shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}));}
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===5){shRender();
+    var shAge=Math.round((Date.now()-SH.board.at)/60000);
+    shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
 })();
 
@@ -1653,8 +1655,21 @@ function updateSlipBadge(){var b=$("slipBadge");if(!b)return;var n=(S.legs&&S.le
   var _rs=renderStatus;renderStatus=function(){var r=_rs.apply(this,arguments);btn.classList.toggle("spinning",!!S.loading);return r;};
 })();
 
-/* register the service worker for offline use + instant launch (HTTPS/localhost only) */
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+/* register the service worker for offline use + instant launch (HTTPS/localhost only).
+   Auto-update: check for a new build on load + whenever the app is re-shown, and
+   reload once the new service worker takes over so installed apps never get stuck
+   on a stale build. (The shell is served network-first in sw.js, so an online open
+   already pulls the latest index.html.) */
+if('serviceWorker' in navigator){
+  var shReloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){if(shReloading)return;shReloading=true;location.reload();});
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      try{reg.update();}catch(e){}
+      document.addEventListener('visibilitychange',function(){if(!document.hidden){try{reg.update();}catch(e){}}});
+    }).catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
