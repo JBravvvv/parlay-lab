@@ -367,7 +367,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 31 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 32 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1163,6 +1163,12 @@ function shPitchBlend(pst,key){ /* pitcher metric: 60% last-30, 40% season */
 var SH_MKT_LABEL={batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR (anytime)",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"Pitcher K's",pitcher_outs:"Pitcher Outs"};
 var SH_CATS=[["all","TOP 50"],["ml","ML"],["rl","RL"],["batter_hits","HITS"],["batter_total_bases","TB"],["batter_home_runs","HR"],["batter_hits_runs_rbis","H+R+RBI"],["pitcher_strikeouts","K'S"],["pitcher_outs","OUTS"]];
 var SH_NAMED_CATS=["ml","rl","batter_hits","batter_total_bases","batter_home_runs","batter_hits_runs_rbis","pitcher_strikeouts","pitcher_outs"];
+/* over-lean: minimum model P(over) to still surface the over instead of the under.
+   0.35 => the under only shows when the model makes it ~65%+, so the board runs a
+   strong majority of overs (~80% on a typical slate) with the occasional strong
+   under. Probability-ranked, so any low-prob forced overs sink to the bottom and
+   the top picks / parlays stay quality. Tuned on the live 2026-07-08 slate. */
+var SH_OVER_LEAN=0.35;
 function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
 function shAnalyzeLocal(slate){
   var lookupStats={},lookupPit={};
@@ -1307,9 +1313,12 @@ function shAnalyzeLocal(slate){
       var pO=(lam&&lam.tb)?shTbOver(row.ln,lam.lamH,lam.s1,lam.s2):shPOver(row.ln,lam);
       var iO=shImp(row.o),iU=shImp(row.u);
       var sd=null;
-      /* shrink the model 45% toward the vig-removed market, then keep the more likely side */
+      /* shrink the model 45% toward the vig-removed market, then choose a side.
+         Over-lean: surface the OVER unless the under is the clearly stronger side
+         (P(over) below SH_OVER_LEAN, i.e. P(under) >= ~60%). Keeps the board mostly
+         overs with the occasional strong under; probabilities shown stay honest. */
       if(iO!=null&&iU!=null){var nv=iO/(iO+iU);var pAdj=0.55*pO+0.45*nv;
-        sd=(pAdj>=0.5)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
+        sd=(pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
       else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o};}
       if(!sd)return;
       var edge=sd.p-sd.imp;
@@ -1423,7 +1432,7 @@ function shAnalyzeLocal(slate){
   var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. "
+    +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. Over-leaning — unders only surface when strongly favored. "
     +parlays.length+" pregame + "+parlaysLive.length+" in-game parlays (per-type + mixed, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
   return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysLive:parlaysLive,liveGames:lg,trap:trap};
