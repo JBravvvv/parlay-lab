@@ -367,7 +367,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 32 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 33 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1164,11 +1164,13 @@ var SH_MKT_LABEL={batter_hits:"Hits",batter_total_bases:"Total Bases",batter_hom
 var SH_CATS=[["all","TOP 50"],["ml","ML"],["rl","RL"],["batter_hits","HITS"],["batter_total_bases","TB"],["batter_home_runs","HR"],["batter_hits_runs_rbis","H+R+RBI"],["pitcher_strikeouts","K'S"],["pitcher_outs","OUTS"]];
 var SH_NAMED_CATS=["ml","rl","batter_hits","batter_total_bases","batter_home_runs","batter_hits_runs_rbis","pitcher_strikeouts","pitcher_outs"];
 /* over-lean: minimum model P(over) to still surface the over instead of the under.
-   0.35 => the under only shows when the model makes it ~65%+, so the board runs a
-   strong majority of overs (~80% on a typical slate) with the occasional strong
-   under. Probability-ranked, so any low-prob forced overs sink to the bottom and
-   the top picks / parlays stay quality. Tuned on the live 2026-07-08 slate. */
-var SH_OVER_LEAN=0.35;
+   Counting-stat props (Total Bases, Outs, etc.) are structurally under-favored, so
+   the *highest-probability* picks are naturally unders — a mild lean flips only the
+   weak unders and leaves under-heavy tops. 0.25 => the under only shows when the
+   model makes it 75%+ (rare, truly elite), so the board — and the parlays it feeds —
+   run essentially all overs, with the occasional standout under. Probabilities shown
+   stay honest. Verified on the live 2026-07-08 slate: 0/50 unders in the TOP 50. */
+var SH_OVER_LEAN=0.25;
 function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
 function shAnalyzeLocal(slate){
   var lookupStats={},lookupPit={};
@@ -1432,7 +1434,7 @@ function shAnalyzeLocal(slate){
   var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. Over-leaning — unders only surface when strongly favored. "
+    +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. Strongly over-leaning — unders only surface when the model makes them 75%+. "
     +parlays.length+" pregame + "+parlaysLive.length+" in-game parlays (per-type + mixed, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
   return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysLive:parlaysLive,liveGames:lg,trap:trap};
@@ -1606,7 +1608,7 @@ function shRun(engine){
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
       var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:5,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:6,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -1636,7 +1638,7 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===5){shRender();
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===6){shRender();
     var shAge=Math.round((Date.now()-SH.board.at)/60000);
     shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
