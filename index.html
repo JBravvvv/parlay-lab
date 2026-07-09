@@ -368,7 +368,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 37 · 2026-07-09</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 38 · 2026-07-09</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -396,7 +396,7 @@ body{padding:0!important;min-height:100dvh}
         <button class="shsub" data-shview="liveparlays">LIVE PARLAYS</button>
       </div>
       <div class="shboard" id="shBoard"></div>
-      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), opposing starter quality, lineup spot → expected ABs, park &amp; wind, vig-removed odds for edges; ML/RL from lineup offense + starter ERA blended with the market. Each category ranks its own top 50 by win probability — categories never overlap; parlays may reuse solo picks. Probabilities are estimates, not guarantees. Informational only.</div>
+      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), batter-vs-pitcher career history (regressed for sample size), opposing starter quality, lineup spot → expected ABs, park &amp; wind, vig-removed odds for edges; ML/RL from lineup offense + starter ERA blended with the market. Each category ranks its own top 50 by win probability — categories never overlap; parlays may reuse solo picks. Probabilities are estimates, not guarantees. Informational only.</div>
     </div>
   </section><!-- /panel-sharp -->
 </main>
@@ -1032,7 +1032,7 @@ function shStatsUrl(group,days){var end=shToday();return days
 
 function shCollectSlate(){
   var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — use outcome stats with sample-size discipline.","BvP history unavailable.","No line-movement history — current lines only."];
-  var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[]};
+  var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{}};
   /* 1) schedule: matchups, weather, probables, lineups, and live inning state */
   return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+shToday()+"&hydrate=probablePitcher,weather,lineups,venue,linescore").then(function(res){
     var dates=(res.ok&&res.body&&res.body.dates)||[];var games=(dates[0]&&dates[0].games)||[];
@@ -1059,8 +1059,11 @@ function shCollectSlate(){
       slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,venue:(g.venue||{}).name,
         weather:g.weather||null,phase:phase,eligible:eligible,inning:inning,inningState:inSt,awayScore:aSc,homeScore:hSc,
         probable_away:(aw.probablePitcher||{}).fullName||null,probable_home:(hm.probablePitcher||{}).fullName||null,
-        lineup_away:names(lu.awayPlayers),lineup_home:names(lu.homePlayers)});
+        probable_away_id:(aw.probablePitcher||{}).id||null,probable_home_id:(hm.probablePitcher||{}).id||null,
+        lineup_away:names(lu.awayPlayers),lineup_home:names(lu.homePlayers),
+        lineup_away_ids:(lu.awayPlayers||[]).map(function(x){return x.id;}),lineup_home_ids:(lu.homePlayers||[]).map(function(x){return x.id;})});
     });
+    slate.idName=idToName;
     if(!slate.games.length)throw new Error("No MLB games scheduled today.");
     if(!slate.games.some(function(g){return g.eligible;}))throw new Error("Every game today is already final — nothing left to play.");
     if(slate.liveGames.length)gaps.push(slate.liveGames.length+" game(s) in progress — using live in-game odds/props for those.");
@@ -1128,8 +1131,38 @@ function shCollectSlate(){
       .then(function(){shTick("Pulling 30-day + season form");return pull("hitting",30,"last30",slate.player_stats,shHitRow);})
       .then(function(){return pull("pitching",30,"last30",slate.pitcher_stats,shPitRow);})
       .then(function(){return pull("pitching",null,"season",slate.pitcher_stats,shPitRow);})
+      .then(function(){return pullBvp(slate);})
       .then(function(){return slate;});
   });
+}
+
+/* batter-vs-pitcher career matchup history: for each game, every listed hitter's
+   career line against the OPPOSING probable starter. MLB Stats API batches a whole
+   lineup vs one pitcher in a single call (2 calls/game). Tiny samples by nature, so
+   the engine regresses them hard toward form — here we just collect the raw totals. */
+function pullBvp(slate){
+  shTick("Pulling batter-vs-pitcher matchup history");
+  var jobs=[];
+  slate.games.forEach(function(g){
+    if(g.phase==="done")return;
+    [[g.lineup_away_ids,g.probable_home_id,g.probable_home],
+     [g.lineup_home_ids,g.probable_away_id,g.probable_away]].forEach(function(pair){
+      var ids=(pair[0]||[]).filter(Boolean),sp=pair[1],spName=pair[2];
+      if(!ids.length||!sp)return;
+      var url="https://statsapi.mlb.com/api/v1/people?personIds="+ids.join(",")+
+        "&hydrate=stats(type=vsPlayer,opposingPlayerId="+sp+",group=hitting)";
+      jobs.push(obFetchJson(url).then(function(res){
+        var ppl=(res.ok&&res.body&&res.body.people)||[];
+        ppl.forEach(function(p){
+          var tot=null;(p.stats||[]).forEach(function(b){if((b.type||{}).displayName==="vsPlayerTotal"&&b.splits&&b.splits[0])tot=b.splits[0].stat;});
+          if(!tot)return;var ab=Number(tot.atBats)||0;if(ab<1)return;
+          slate.bvp[pnorm(p.fullName)]={ab:ab,h:Number(tot.hits)||0,hr:Number(tot.homeRuns)||0,tb:Number(tot.totalBases)||0,
+            bb:Number(tot.baseOnBalls)||0,pa:Number(tot.plateAppearances)||0,vs:spName||""};
+        });
+      }).catch(function(){}));
+    });
+  });
+  return jobs.length?Promise.all(jobs).catch(function(){}):Promise.resolve();
 }
 
 /* --- built-in house model: free, transparent, no API key ---
@@ -1299,19 +1332,32 @@ function shAnalyzeLocal(slate){
           bits.push("vs "+opp+(era2!=null?" ("+era2.toFixed(2)+" ERA":"")+(whip!=null?", "+whip.toFixed(2)+" WHIP)":")"));}
         else riskBits.push("no probable-starter data for the matchup");
         var hrF=power*wind.f*(coors?1.08:1),tbF=power*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*(coors?1.07:1);
+        /* batter-vs-pitcher career history — tiny samples, so regress hard toward form:
+           blend the head-to-head per-AB rate in with weight ab/(ab+pseudo) and clamp
+           the swing. It nudges, never dictates. Only applied when it's the right matchup. */
+        var bvp=slate.bvp&&slate.bvp[pnorm(row.p)];
+        if(bvp&&opp&&pnorm(bvp.vs||"")!==pnorm(opp))bvp=null;
+        function bvpRate(base,cnt,pseudo,band){
+          if(base==null||cnt==null||!bvp||!(bvp.ab>=3))return base;
+          var w=bvp.ab/(bvp.ab+(pseudo||22)),adj=base*(1-w)+(cnt/bvp.ab)*w;
+          return shClamp(adj,base*(1-(band||0.35)),base*(1+(band||0.35)));
+        }
         var rate=null;
-        if(mkt==="batter_hits")rate=shBlend(st,function(s){return Number(s.h);},"ab",10),lam=rate!=null?rate*expAB*hF:null;
-        if(mkt==="batter_total_bases"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);
+        if(mkt==="batter_hits"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);rate=bvpRate(rate,bvp&&bvp.h,22,0.30);lam=rate!=null?rate*expAB*hF:null;}
+        if(mkt==="batter_total_bases"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);rate=bvpRate(rate,bvp&&bvp.h,22,0.30);
           if(rate!=null){var l3=st.last30,H=Number(l3.h)||0;
             var xb=(Number(l3["2b"])||0)+(Number(l3["3b"])||0),hrs=Number(l3.hr)||0;
             var s1=H>0?Math.max(0,(H-xb-hrs)/H):0.72,s2=H>0?Math.min(1,xb/H):0.2;
             lam={tb:1,lamH:rate*expAB*hF*(tbF>1?1.03:tbF<1?0.98:1),s1:s1,s2:s2};}}
-        if(mkt==="batter_home_runs")rate=shBlend(st,function(s){return Number(s.hr);},"ab",25),lam=rate!=null?rate*expAB*hrF:null;
-        if(mkt==="batter_hits_runs_rbis")rate=shBlend(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3),lam=rate!=null?rate*(coors?1.08:1)*power:null;
+        if(mkt==="batter_home_runs"){rate=shBlend(st,function(s){return Number(s.hr);},"ab",25);rate=bvpRate(rate,bvp&&bvp.hr,40,0.50);lam=rate!=null?rate*expAB*hrF:null;}
+        if(mkt==="batter_hits_runs_rbis"){rate=shBlend(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);lam=rate!=null?rate*(coors?1.08:1)*power:null;
+          if(lam!=null&&bvp&&bvp.ab>=4){var w=bvp.ab/(bvp.ab+22);lam*=shClamp(1+(((bvp.tb/bvp.ab)/0.40)-1)*w,0.85,1.18);}}
         if(lam==null)return;
         var l30=st.last30;
         bits.unshift(l30.h+"-for-"+l30.ab+" ("+l30.avg+") with "+l30.hr+" HR / "+l30.tb+" TB last 30");
-        if(st.last7&&Number(st.last7.ab)>=12)bits.push("last 7: "+st.last7.h+"-for-"+st.last7.ab);
+        if(st.last15&&Number(st.last15.ab)>=20)bits.push("last 15: "+st.last15.h+"-for-"+st.last15.ab+" ("+st.last15.avg+")");
+        if(st.last7&&Number(st.last7.ab)>=12)bits.push("last 7: "+st.last7.h+"-for-"+st.last7.ab+(st.last7.hr>0?" ("+st.last7.hr+" HR)":""));
+        if(bvp&&bvp.ab>=1)bits.push("career "+bvp.h+"-for-"+bvp.ab+(bvp.hr>0?" with "+bvp.hr+" HR":"")+" vs "+(bvp.vs||opp||"this SP")+(bvp.ab<10?" (small sample)":""));
         if(spot)bits.push("#"+spot+" spot → ~"+expAB.toFixed(1)+" ABs");
         if(wind.txt)bits.push("wind "+wind.txt);
         if(coors)bits.push("Coors altitude");
