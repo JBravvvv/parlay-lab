@@ -217,8 +217,9 @@ body{padding:0!important;min-height:100dvh}
 .shai{margin-top:8px;background:rgba(92,200,255,.10);border-color:rgba(92,200,255,.55);color:var(--blue)}
 .shai:active{background:var(--blue);color:#0a0c07}
 /* sub-views: picks vs parlays */
-.shsubnav{display:flex;flex-wrap:wrap;gap:5px;margin:0 13px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px}
-.shsub{flex:1 1 40%;background:transparent;border:none;color:var(--muted);padding:9px 4px;font-family:'Saira Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.6px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.shsubnav{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;gap:5px;margin:0 13px 10px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:4px}
+.shsubnav::-webkit-scrollbar{display:none}
+.shsub{flex:0 0 auto;background:transparent;border:none;color:var(--muted);padding:9px 12px;font-family:'Saira Condensed',sans-serif;font-size:12.5px;font-weight:700;letter-spacing:.6px;border-radius:7px;cursor:pointer;white-space:nowrap}
 .shsub.on{background:var(--green);color:#0a0c07}
 .shlive{background:rgba(255,91,106,.08);border:1px solid rgba(255,91,106,.45);border-radius:10px;padding:10px 12px;font-size:12px}
 .shlive b{color:var(--red);font-family:'Saira Condensed',sans-serif;letter-spacing:.6px;display:block;margin-bottom:6px;font-size:12px}
@@ -367,7 +368,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 34 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 35 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -390,6 +391,7 @@ body{padding:0!important;min-height:100dvh}
       <div class="shsubnav" id="shSubNav" style="display:none">
         <button class="shsub on" data-shview="picks">PICKS</button>
         <button class="shsub" data-shview="parlays">PARLAYS</button>
+        <button class="shsub" data-shview="mixedparlays">MIXED PARLAYS</button>
         <button class="shsub" data-shview="live">IN-GAME</button>
         <button class="shsub" data-shview="liveparlays">LIVE PARLAYS</button>
       </div>
@@ -1349,8 +1351,11 @@ function shAnalyzeLocal(slate){
     out.all=allRows.slice(0,50).map(function(r,i){var c={};for(var kk in r)c[kk]=r[kk];c.rank=i+1;return c;});
     return {cats:out,any:any};
   }
-  /* general board: pregame + any live game before the 7th (through the end of the 6th).
-     in-game board: every live game, all the way to the final out. */
+  /* three category sets:
+     - pregameF: only games that HAVEN'T STARTED (feeds the PARLAYS tab)
+     - preF (general/mixed): pregame + any live game before the 7th (feeds PICKS + MIXED PARLAYS)
+     - liveF (in-game): every live game to the final out (feeds IN-GAME + LIVE PARLAYS) */
+  var pregameF=finalizeCats(function(r){return !r.live;});
   var preF=finalizeCats(function(r){return !r.live||(r.inning||0)<=6;});
   var liveF=finalizeCats(function(r){return !!r.live;});
   if(!preF.any&&!liveF.any)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
@@ -1422,8 +1427,9 @@ function shAnalyzeLocal(slate){
     out.sort(function(a,b){return b.prob-a.prob;});
     return out;
   }
-  var parlays=buildParlaySet(preF.cats,3);
-  var parlaysLive=buildParlaySet(liveF.cats,3);
+  var parlays=buildParlaySet(pregameF.cats,3);   /* PARLAYS tab: not-started games only */
+  var parlaysMixed=buildParlaySet(preF.cats,3);  /* MIXED PARLAYS tab: not-started + live pre-7th */
+  var parlaysLive=buildParlaySet(liveF.cats,3);  /* LIVE PARLAYS tab: every live game */
 
   var tr=traps.sort(function(a,b){return a.edge-b.edge;})[0];
   var trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
@@ -1437,9 +1443,9 @@ function shAnalyzeLocal(slate){
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. Strongly over-leaning — unders only surface when the model makes them 75%+. "
-    +parlays.length+" pregame + "+parlaysLive.length+" in-game parlays (per-type + mixed, safe→longshot)."
+    +parlays.length+" not-started + "+parlaysMixed.length+" mixed + "+parlaysLive.length+" in-game parlays (per-type + cross-type, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
-  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysLive:parlaysLive,liveGames:lg,trap:trap};
+  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap};
 }
 
 /* --- the Claude API call --- */
@@ -1504,10 +1510,14 @@ function shRender(){
     }
     el.innerHTML=h+meta;return;
   }
-  /* v2 categorized shape — four sub-views: pregame picks/parlays + in-game picks/parlays */
+  /* v2 categorized shape — five sub-views: picks, (not-started) parlays, mixed parlays,
+     in-game picks, live parlays */
   if(SH.view==="picks"){
     h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
     h+=shPicksView(d.categories,"shadd2");
+  }else if(SH.view==="mixedparlays"){
+    h+="<div class='shover'><b>MIXED PARLAYS</b>Cross-game tickets from both not-started games and live games before the 7th inning.</div>";
+    h+=shParlaysView(d.parlaysMixed||[],"shparlaymixed");
   }else if(SH.view==="live"){
     if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME</b>No games are in progress right now. In-game picks show up here the moment a game starts and stay through the final out, using live odds.</div>";
     else{h+=shLiveBanner(d);h+=shPicksView(d.categoriesLive,"shaddlive2");}
@@ -1515,6 +1525,7 @@ function shRender(){
     if(!(d.liveGames&&d.liveGames.length))h+="<div class='shover'><b>IN-GAME PARLAYS</b>No games in progress right now — in-game parlays appear here once a game starts and run to the final out.</div>";
     else{h+=shLiveBanner(d);h+=shParlaysView(d.parlaysLive,"shparlaylive");}
   }else{
+    h+="<div class='shover'><b>PARLAYS</b>Tickets built only from games that haven't started yet.</div>";
     h+=shParlaysView(d.parlays,"shparlay");
     if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
   }
@@ -1582,6 +1593,11 @@ function shAddParlay(pi){
   d.parlays[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
   saveLegs();renderLegs();renderResults();
 }
+function shAddParlayMixed(pi){
+  var d=SH.board&&SH.board.data;if(!d||!d.parlaysMixed||!d.parlaysMixed[pi])return;
+  d.parlaysMixed[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
+  saveLegs();renderLegs();renderResults();
+}
 function shAddParlayLive(pi){
   var d=SH.board&&SH.board.data;if(!d||!d.parlaysLive||!d.parlaysLive[pi])return;
   d.parlaysLive[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
@@ -1608,9 +1624,9 @@ function shRun(engine){
       /* Claude mode returns data.picks; the free model returns data.categories (+ live) */
       function catCount(c){return c?SH_NAMED_CATS.reduce(function(a,k){return a+((c[k]||[]).length);},0):0;}
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
-      var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
+      var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysMixed&&data.parlaysMixed.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:7,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:8,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -1636,11 +1652,12 @@ function shRun(engine){
     var bl2=e.target.closest?e.target.closest("[data-shaddlive2]"):null;if(bl2){var kl=bl2.getAttribute("data-shaddlive2").split("|");shAddCatPickLive(kl[0],Number(kl[1]));return;}
     var b2=e.target.closest?e.target.closest("[data-shadd2]"):null;if(b2){var kv=b2.getAttribute("data-shadd2").split("|");shAddCatPick(kv[0],Number(kv[1]));return;}
     var pll=e.target.closest?e.target.closest("[data-shparlaylive]"):null;if(pll){shAddParlayLive(Number(pll.getAttribute("data-shparlaylive")));return;}
+    var plm=e.target.closest?e.target.closest("[data-shparlaymixed]"):null;if(plm){shAddParlayMixed(Number(plm.getAttribute("data-shparlaymixed")));return;}
     var pl=e.target.closest?e.target.closest("[data-shparlay]"):null;if(pl){shAddParlay(Number(pl.getAttribute("data-shparlay")));return;}
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===7){shRender();
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===8){shRender();
     var shAge=Math.round((Date.now()-SH.board.at)/60000);
     shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
