@@ -367,7 +367,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 33 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 34 · 2026-07-08</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1173,9 +1173,10 @@ var SH_NAMED_CATS=["ml","rl","batter_hits","batter_total_bases","batter_home_run
 var SH_OVER_LEAN=0.25;
 function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
 function shAnalyzeLocal(slate){
-  var lookupStats={},lookupPit={};
-  Object.keys(slate.player_stats).forEach(function(k){lookupStats[pnorm(k.split(" (")[0])]=slate.player_stats[k];});
-  Object.keys(slate.pitcher_stats).forEach(function(k){lookupPit[pnorm(k.split(" (")[0])]=slate.pitcher_stats[k];});
+  var lookupStats={},lookupPit={},lookupTeam={};
+  function shTeamOf(k){var m=k.match(/\(([^)]+)\)\s*$/);return (m&&m[1]&&m[1]!=="—")?m[1]:null;}
+  Object.keys(slate.player_stats).forEach(function(k){var n=pnorm(k.split(" (")[0]);lookupStats[n]=slate.player_stats[k];var t=shTeamOf(k);if(t)lookupTeam[n]=t;});
+  Object.keys(slate.pitcher_stats).forEach(function(k){var n=pnorm(k.split(" (")[0]);lookupPit[n]=slate.pitcher_stats[k];var t=shTeamOf(k);if(t)lookupTeam[n]=t;});
   var gameByKey={};slate.games.forEach(function(g){gameByKey[pnorm(g.away)+"@"+pnorm(g.home)]=g;});
   function findGame(matchup){var p=matchup.split(" @ ");return gameByKey[pnorm(p[0])+"@"+pnorm(p[1])]||null;}
   function lineupSpot(g,name){if(!g)return null;var n=pnorm(name);
@@ -1325,7 +1326,8 @@ function shAnalyzeLocal(slate){
       if(!sd)return;
       var edge=sd.p-sd.imp;
       if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});
-      cats[mkt].push({label:row.p,sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
+      var tmAb=lookupTeam[pnorm(row.p)];
+      cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
@@ -1608,7 +1610,7 @@ function shRun(engine){
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
       var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:6,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:7,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -1638,7 +1640,7 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===6){shRender();
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===7){shRender();
     var shAge=Math.round((Date.now()-SH.board.at)/60000);
     shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
