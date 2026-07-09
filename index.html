@@ -368,7 +368,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 35 · 2026-07-08</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 37 · 2026-07-09</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1249,6 +1249,7 @@ function shAnalyzeLocal(slate){
     var coors=/coors/i.test((g&&g.venue)||"");
     Object.keys(mks).forEach(function(mkt){if(!cats[mkt])return;mks[mkt].forEach(function(row){
       if(row.ln==null)return;
+      if(mkt==="batter_home_runs"&&row.ln!==0.5)return; /* HR: only the 0.5 (anytime) line — never 1.5+ */
       var isK=(mkt==="pitcher_strikeouts"),isOuts=(mkt==="pitcher_outs"),isPitcher=isK||isOuts;
       var st=isPitcher?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
       if(!st)return;
@@ -1322,8 +1323,9 @@ function shAnalyzeLocal(slate){
          Over-lean: surface the OVER unless the under is the clearly stronger side
          (P(over) below SH_OVER_LEAN, i.e. P(under) >= ~60%). Keeps the board mostly
          overs with the occasional strong under; probabilities shown stay honest. */
+      var isHitter=(mkt.indexOf("batter_")===0); /* hitter props: overs only (no unders, ever) */
       if(iO!=null&&iU!=null){var nv=iO/(iO+iU);var pAdj=0.55*pO+0.45*nv;
-        sd=(pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
+        sd=(isHitter||pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
       else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o};}
       if(!sd)return;
       var edge=sd.p-sd.imp;
@@ -1427,8 +1429,11 @@ function shAnalyzeLocal(slate){
     out.sort(function(a,b){return b.prob-a.prob;});
     return out;
   }
+  /* MIXED PARLAYS excludes HR (too volatile) and ML/RL (game-outcome bets) — those live
+     only in the dedicated PARLAYS / LIVE PARLAYS tabs. Blank those pools before building. */
+  function omitCats(C,drop){var o={};SH_NAMED_CATS.forEach(function(k){o[k]=drop[k]?[]:(C[k]||[]);});o.all=C.all;return o;}
   var parlays=buildParlaySet(pregameF.cats,3);   /* PARLAYS tab: not-started games only */
-  var parlaysMixed=buildParlaySet(preF.cats,3);  /* MIXED PARLAYS tab: not-started + live pre-7th */
+  var parlaysMixed=buildParlaySet(omitCats(preF.cats,{ml:1,rl:1,batter_home_runs:1}),3);  /* MIXED: no HR/ML/RL */
   var parlaysLive=buildParlaySet(liveF.cats,3);  /* LIVE PARLAYS tab: every live game */
 
   var tr=traps.sort(function(a,b){return a.edge-b.edge;})[0];
