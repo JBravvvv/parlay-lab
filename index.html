@@ -286,6 +286,13 @@ body{padding:0!important;min-height:100dvh}
 .shbankrow input{width:80px;background:#0c0e12;border:1px solid rgba(255,184,56,.35);border-radius:7px;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:13px;padding:6px 8px;outline:none}
 .shbanknote{font-size:10px;color:var(--muted)}
 .shmeta{font-size:10px;color:var(--muted);text-align:center;font-family:'JetBrains Mono',monospace}
+/* Caesars-only layer (build 40) */
+.shunav{border:1px dashed var(--line);border-radius:10px;padding:9px 12px;margin:10px 0;font-size:12px;color:var(--muted)}
+.shunav summary{cursor:pointer;font-family:'Saira Condensed',sans-serif;letter-spacing:.5px;font-size:12px;color:var(--muted)}
+.shunavrow{margin-top:6px;line-height:1.45}
+.shunavrow .num{font-family:'JetBrains Mono',monospace;font-size:10px}
+.shczno{background:rgba(120,180,255,.06);border:1px solid rgba(120,180,255,.3);border-radius:10px;padding:9px 12px;margin:10px 0;font-size:12px;line-height:1.5;color:var(--muted)}
+.shczok{background:none;border:1px solid var(--line);border-radius:7px;color:var(--fg);font-size:11px;padding:3px 10px;margin-left:6px;cursor:pointer}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
   .tab-panel{max-width:760px;margin:0 auto}
@@ -407,7 +414,7 @@ body{padding:0!important;min-height:100dvh}
         <button class="shsub" data-shview="liveparlays">LIVE PARLAYS</button>
       </div>
       <div class="shboard" id="shBoard"></div>
-      <div class="note">Built-in quant engine, transparent math on live data: every price de-vigged across all posted books (median = consensus prior); the model — Monte Carlo game sims (4,000/game) for ML/RL/H+R+RBI, Poisson projections from 7/15/30-day form shrunk to league means for other props, BvP capped by sample size, starter quality, lineup spot → expected ABs, park &amp; wind — is blended in at a minority weight (the market is the smartest baseline). EV and ¼-Kelly stakes are computed at the best available price across books. TOP 50 ranks by EV; category tabs rank by win probability and feed the parlays. Probabilities are estimates, not guarantees. Informational only.</div>
+      <div class="note">Built-in quant engine, transparent math on live data: every price de-vigged across all posted books (median = consensus prior); the model — Monte Carlo game sims (4,000/game) for ML/RL/H+R+RBI, Poisson projections from 7/15/30-day form shrunk to league means for other props, BvP capped by sample size, starter quality, lineup spot → expected ABs, park &amp; wind — is blended in at a minority weight (the market is the smartest baseline). The playable card is Caesars-only — displayed odds, EV and ¼-Kelly stakes use Caesars' price (probabilities stay anchored to the full multi-book consensus); anything Caesars doesn't offer is listed separately. TOP 50 ranks by EV; category tabs rank by win probability and feed the parlays. Probabilities are estimates, not guarantees. Informational only.</div>
     </div>
   </section><!-- /panel-sharp -->
 </main>
@@ -1100,12 +1107,12 @@ function shCollectSlate(){
       /* market layer: de-vig EVERY book (multiplicative), consensus = median fair prob,
          line-shop the best price per side. The consensus is the model's prior. */
       var mls=[],rls=[],tots=[];
-      (g.bookmakers||[]).forEach(function(bk){var bn=bk.title||bk.key;
+      (g.bookmakers||[]).forEach(function(bk){var bn=bk.title||bk.key,cz=bk.key===CAESARS_KEY;
         (bk.markets||[]).forEach(function(m){
           if(m.key==="h2h"){var hp=null,ap=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team)hp=x.price;else if(x.name===g.away_team)ap=x.price;});
-            if(hp!=null&&ap!=null)mls.push({h:hp,a:ap,book:bn});}
+            if(hp!=null&&ap!=null)mls.push({h:hp,a:ap,book:bn,cz:cz});}
           else if(m.key==="spreads"){var hr=null,ar=null,hpt=null,apt=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team){hr=x.price;hpt=x.point;}else if(x.name===g.away_team){ar=x.price;apt=x.point;}});
-            if(hr!=null&&ar!=null&&hpt!=null&&apt!=null)rls.push({h:hr,a:ar,hpt:hpt,apt:apt,book:bn});}
+            if(hr!=null&&ar!=null&&hpt!=null&&apt!=null)rls.push({h:hr,a:ar,hpt:hpt,apt:apt,book:bn,cz:cz});}
           else if(m.key==="totals"&&m.outcomes&&m.outcomes[0]&&m.outcomes[0].point!=null)tots.push(m.outcomes[0].point);
         });
       });
@@ -1116,6 +1123,9 @@ function shCollectSlate(){
           if(!bh||amToDec(x.h)>amToDec(bh.price))bh={price:x.h,book:x.book};
           if(!ba||amToDec(x.a)>amToDec(ba.price))ba={price:x.a,book:x.book};});
         o.home_ml=bh.price;o.home_ml_book=bh.book;o.away_ml=ba.price;o.away_ml_book=ba.book;
+        /* Caesars-only playable layer: the user's book. Captured additively — consensus/best-price above untouched. */
+        var czm=mls.filter(function(x){return x.cz;})[0];
+        if(czm){o.home_ml_cz=czm.h;o.away_ml_cz=czm.a;}
       }
       if(rls.length){
         /* consensus at the modal (most-quoted) home run-line point */
@@ -1128,6 +1138,9 @@ function shCollectSlate(){
           if(!rh||amToDec(x.h)>amToDec(rh.price))rh={price:x.h,book:x.book};
           if(!ra||amToDec(x.a)>amToDec(ra.price))ra={price:x.a,book:x.book};});
         o.home_rl=rh.price;o.home_rl_book=rh.book;o.away_rl=ra.price;o.away_rl_book=ra.book;
+        /* Caesars RL only counts when Caesars quotes the same modal ±1.5 point the engine prices */
+        var czr=use.filter(function(x){return x.cz;})[0];
+        if(czr){o.home_rl_cz=czr.h;o.away_rl_cz=czr.a;}
       }
       if(tots.length)o.total=shMedian(tots);
       if(o.ml_books||o.rl_books)slate.game_odds.push(o);
@@ -1149,7 +1162,7 @@ function shCollectSlate(){
           /* market layer: merge EVERY book per player|line — per-book de-vig of each O/U pair,
              consensus fair P(over) = median across books, prices kept = best per side (line shopping). */
           var acc={},bookNames={};
-          bks.forEach(function(bk){var bn=bk.title||bk.key;bookNames[bn]=1;
+          bks.forEach(function(bk){var bn=bk.title||bk.key,czb=bk.key===CAESARS_KEY;bookNames[bn]=1;
             (bk.markets||[]).forEach(function(mk){
               var m=acc[mk.key]=acc[mk.key]||{rows:{},order:[]};
               var tmp={};
@@ -1157,7 +1170,7 @@ function shCollectSlate(){
                 var who=o.description||o.name;var kk=who+"|"+(o.point!=null?o.point:"");
                 if(!m.rows[kk]){m.rows[kk]={p:who,ln:(o.point!=null?o.point:null),list:[]};m.order.push(kk);}
                 if(!tmp[kk])tmp[kk]={};tmp[kk][side]=o.price;});
-              Object.keys(tmp).forEach(function(kk){m.rows[kk].list.push({o:tmp[kk].o,u:tmp[kk].u,book:bn});});
+              Object.keys(tmp).forEach(function(kk){m.rows[kk].list.push({o:tmp[kk].o,u:tmp[kk].u,book:bn,cz:czb});});
             });
           });
           var g={};
@@ -1167,8 +1180,10 @@ function shCollectSlate(){
               var bo=null,bu=null;r.list.forEach(function(x){
                 if(x.o!=null&&(bo==null||amToDec(x.o)>amToDec(bo.price)))bo={price:x.o,book:x.book};
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
+              var czx=r.list.filter(function(x){return x.cz;})[0];
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
-                fair:fairs.length?shMedian(fairs):null,books:fairs.length};
+                fair:fairs.length?shMedian(fairs):null,books:fairs.length,
+                cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:null};
             });
           });
           if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[pnorm(e.away_team)+"@"+pnorm(e.home_team)]};
@@ -1585,6 +1600,7 @@ function shAnalyzeLocal(slate){
     var gkeyML=pnorm(g.away)+"@"+pnorm(g.home);
     cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
       oddsN:homeSide?go.home_ml:go.away_ml,book:homeSide?go.home_ml_book:go.away_ml_book,
+      czN:(homeSide?go.home_ml_cz:go.away_ml_cz)!=null?(homeSide?go.home_ml_cz:go.away_ml_cz):null,
       p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
       lkey:homeSide?"ml_home":"ml_away",gkey:gkeyML,
       risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
@@ -1601,6 +1617,7 @@ function shAnalyzeLocal(slate){
         var side=pHC>=0.5;
         cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
           odds:obSign(side?go.home_rl:go.away_rl),oddsN:side?go.home_rl:go.away_rl,book:side?go.home_rl_book:go.away_rl_book,
+          czN:(side?go.home_rl_cz:go.away_rl_cz)!=null?(side?go.home_rl_cz:go.away_rl_cz):null,
           p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
           game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
           lkey:side?"rl_home":"rl_away",gkey:gkeyML,
@@ -1751,6 +1768,7 @@ function shAnalyzeLocal(slate){
       var tmAb=lookupTeam[pnorm(row.p)];
       cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
         oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,
+        czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
         lkey:shLegKey(row.p,mkt,row.ln),gkey:g?(pnorm(g.away)+"@"+pnorm(g.home)):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
@@ -1768,9 +1786,20 @@ function shAnalyzeLocal(slate){
         /* EV at the best available price; ¼-Kelly fraction capped at 2% of bankroll (doc Phase 7) */
         var dec=amToDec(r.oddsN),ev=shEV(r.p,dec),band=shBand(r.nEff);
         var kellyF=Math.min(0.25*shKelly(r.p,dec),0.02);
+        /* Caesars playable layer (additive): EV/Kelly at the price the user can actually get,
+           and the price edge vs the de-vigged market consensus (fair prob − Caesars implied) */
+        var czN=(r.czN!=null)?r.czN:null,czDec=czN!=null?amToDec(czN):null;
+        var czEv=czDec!=null?shEV(r.p,czDec):null;
+        var czImp=czN!=null?shImp(czN):null;
+        var czKellyF=czDec!=null?Math.min(0.25*shKelly(r.p,czDec),0.02):null;
         return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,live:!!r.live,book:r.book||null,
           prob:Math.round(r.p*1000)/10,implied:Math.round(r.imp*1000)/10,edge:Math.round(edge*1000)/10,
           ev:ev!=null?Math.round(ev*1000)/10:null,kellyF:Math.round(kellyF*10000)/10000,
+          cz:czN,czOdds:czN!=null?obSign(czN):null,
+          czEv:czEv!=null?Math.round(czEv*1000)/10:null,
+          czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
+          czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
+          czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),
           edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band),tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
           conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });
@@ -1794,7 +1823,8 @@ function shAnalyzeLocal(slate){
      PLUS mixed cross-type tickets — 100+ on a full board. One shared usage ledger per set caps
      any player at `cap` tickets total, so you can play many without re-betting the same play. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
-    txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null};}
+    txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
+    cz:(x.r.cz!=null?x.r.cz:null)};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
     var use={uPlayer:{},uKey:{}};
@@ -1833,12 +1863,21 @@ function shAnalyzeLocal(slate){
          a parlay adds variance, not edge: it's only +EV if the legs are) */
       var evT=(dec>1&&prob>0)?prob*dec-1:null;
       var fairAm=(prob>0)?decToAm(1/prob):null;
+      /* Caesars re-pricing (additive display fields — selection/legs above are untouched):
+         the playable ticket price is the product of Caesars leg decimals; any leg Caesars
+         doesn't offer makes the whole ticket unavailable_at_book. */
+      var czDec=1,czAll=true;
+      legs.forEach(function(l){var d2=l.cz!=null?amToDec(l.cz):null;if(d2)czDec*=d2;else czAll=false;});
+      var czOddsT=czAll?decToAm(czDec):null;
+      var czEvT=(czAll&&prob>0)?prob*czDec-1:null;
       var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
       var am=decToAm(dec);
       return {name:name,type:type,typeLabel:(type==="MIX"?"Mixed":SH_TYPE_NAME[type]),tier:tier,legs:legs,
         odds:(am!=null?obSign(am):"—"),prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
+        czOdds:(czOddsT!=null?obSign(czOddsT):null),czDec:czAll?Math.round(czDec*10000)/10000:null,
+        czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
         ev:evT!=null?Math.round(evT*1000)/10:null,fair:(fairAm!=null?obSign(fairAm):null),
         note:(negCorr?"⛔ Sim says these legs work AGAINST each other (negatively correlated) — EV is worse than it looks. ":
               posCorr?"✳ Sim-confirmed positive correlation between same-game legs. ":
@@ -1899,7 +1938,8 @@ function shAnalyzeLocal(slate){
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
-    +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL, EV computed at the best available price (line-shopped). "
+    +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL. "
+    +"Playable card is Caesars-only (your book): displayed odds, EV and stakes use Caesars' price; picks Caesars doesn't offer are listed separately, never hidden. "
     +"TOP 50 ranks by EV; category tabs rank by win probability (the high-floor parlay pool) — "+(counts||"no pregame lines yet")+". "
     +"Rates are recency-blended (7/15/30d), shrunk to league means, BvP capped by sample size. "
     +parlays.length+" not-started + "+parlaysMixed.length+" mixed + "+parlaysLive.length+" in-game parlays (per-type + cross-type, safe→longshot)."
@@ -1935,25 +1975,34 @@ function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
 SH.view="picks";SH.cat="all";SH.pfilter="all";
 function shPickCard(p,addAttr,name,propTxt){
   var edge=Number(p.edge)||0;
-  var ev=(p.ev==null)?null:Number(p.ev);
-  var stake=(p.kellyF&&p.kellyF>0)?Math.max(1,Math.round(SH.bankroll*p.kellyF)):0;
+  /* Caesars-only playable card: quant rows carry cz* fields — everything the user sees and
+     stakes is Caesars' price. Legacy Claude-mode picks (no cz fields) keep the old display. */
+  var czMode=(p.cz!==undefined&&p.cz!==null);
+  var ev=czMode?((p.czEv==null)?null:Number(p.czEv)):((p.ev==null)?null:Number(p.ev));
+  var kf=czMode?p.czKellyF:p.kellyF;
+  var stake=(kf&&kf>0)?Math.max(1,Math.round(SH.bankroll*kf)):0;
+  var badge=czMode?p.czBadge:p.edgeBadge;
+  var priceTxt=czMode?(p.czOdds+" @ Caesars"):(p.odds+(p.book?" @ "+p.book:""));
+  var oddsForSlip=czMode?p.czOdds:p.odds;
+  var czChip=(czMode&&p.czEdge!=null)?"<span class='shchip "+(p.czEdge>=0?"edgeplus":"edgeminus")+"'>CZ vs fair <b>"+(p.czEdge>=0?"+":"")+esc(String(p.czEdge))+"%</b></span>":"";
   var tagsH=(p.tags&&p.tags.length)?"<div class='shtags'>"+p.tags.map(function(t){return "<span class='shtagc'>"+esc(t)+"</span>";}).join("")+"</div>":"";
-  return "<div class='shpick"+(p.edgeBadge?" shedge":"")+"'>"+
+  return "<div class='shpick"+(badge?" shedge":"")+"'>"+
     "<div class='shpick-head'><span class='shrank'>#"+esc(String(p.rank))+"</span><span class='shname'>"+esc(name)+"</span>"+
-    "<span class='shprop'>"+esc(propTxt)+" ("+esc(p.odds)+(p.book?" @ "+esc(p.book):"")+")</span>"+
-    (p.edgeBadge?"<span class='shconv A' title='EV clears the threshold + uncertainty band'>EDGE</span>":"")+
+    "<span class='shprop'>"+esc(propTxt)+" ("+esc(priceTxt)+")</span>"+
+    (badge?"<span class='shconv A' title='EV at Caesars clears the threshold + uncertainty band'>EDGE</span>":"")+
     "<span class='shconv "+(["A","B","C"].indexOf(p.conviction)>=0?p.conviction:"C")+"'>"+esc(p.conviction)+"</span></div>"+
     "<div class='shgame'>"+esc(p.game)+"</div>"+
     "<div class='shnums'>"+
       "<span class='shchip'>win <b>"+esc(String(p.prob))+"%</b></span>"+
       "<span class='shchip'>market <b>"+esc(String(p.implied))+"%</b></span>"+
-      (ev!=null?"<span class='shchip "+(ev>=0?"edgeplus":"edgeminus")+"'>EV <b>"+(ev>=0?"+":"")+esc(String(p.ev))+"%</b></span>":
+      (ev!=null?"<span class='shchip "+(ev>=0?"edgeplus":"edgeminus")+"'>EV <b>"+(ev>=0?"+":"")+esc(String(ev))+"%</b></span>":
         "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>")+
+      czChip+
       "<span class='shchip'>¼-Kelly <b>"+(stake>0?"$"+stake:"pass")+"</b></span>"+
     "</div>"+tagsH+
     (p["case"]?"<div class='shcase'>"+esc(p["case"])+"</div>":"")+
     "<div class='shrisk'><b>Risk:</b> "+esc(p.risk)+"</div>"+
-    "<div class='shaddrow'><button class='shadd' "+addAttr+">＋ Add to slip · "+esc(p.odds)+"</button></div>"+
+    "<div class='shaddrow'><button class='shadd' "+addAttr+">＋ Add to slip · "+esc(oddsForSlip)+"</button></div>"+
   "</div>";
 }
 function shRender(){
@@ -1979,6 +2028,7 @@ function shRender(){
      in-game picks, live parlays */
   if(SH.view==="picks"){
     h+="<div class='shover'><b>SLATE OVERVIEW · "+esc(saved.date)+"</b>"+esc(d.overview)+"</div>";
+    if(!LS.get("pl_czNote",""))h+="<div class='shczno'>ℹ️ Playable prices are Caesars' national feed — the Nevada app can differ a touch. The ledger records the prices you confirm at lock. <button class='shczok' data-czdismiss>Got it</button></div>";
     h+=shPicksView(d.categories,"shadd2");
   }else if(SH.view==="mixedparlays"){
     h+="<div class='shover'><b>MIXED PARLAYS</b>Cross-game tickets from both not-started games and live games before the 7th inning.</div>";
@@ -2011,7 +2061,14 @@ function shPicksView(catsObj,addName){
     return "<button class='shcat"+(SH.cat===c[0]?" on":"")+"' data-shcat='"+c[0]+"'"+(n?"":" disabled")+">"+c[1]+(n?" <b>"+n+"</b>":"")+"</button>";}).join("")+"</div>";
   var rows=catsObj[SH.cat]||[];
   if(!rows.length)return h+"<div class='shover'>No lines available in this view right now.</div>";
-  rows.forEach(function(p,i){h+=shPickCard(p,"data-"+addName+"='"+SH.cat+"|"+i+"'",p.label,p.sub);});
+  /* Caesars-only board: quant rows without a Caesars price drop to a collapsed strip
+     (unavailable_at_book) — original indexes preserved for the add-to-slip handlers. */
+  var unav=[];
+  rows.forEach(function(p,i){
+    if(p.cz===null){unav.push(p);return;}
+    h+=shPickCard(p,"data-"+addName+"='"+SH.cat+"|"+i+"'",p.label,p.sub);});
+  if(unav.length)h+="<details class='shunav'><summary>Not at Caesars — "+unav.length+" pick"+(unav.length===1?"":"s")+" (can't play these there)</summary>"+
+    unav.map(function(p){return "<div class='shunavrow'>"+esc(p.label)+" · "+esc(p.sub)+" <span class='num'>("+esc(p.odds)+(p.book?" @ "+esc(p.book):"")+")</span></div>";}).join("")+"</details>";
   return h;
 }
 function shParlaysView(list,addName){
@@ -2023,19 +2080,32 @@ function shParlaysView(list,addName){
   var h="<div class='shcats'>"+PF.map(function(f){var n=all.filter(function(pl){return pfMatch(pl,f[0]);}).length;
     return "<button class='shcat"+(SH.pfilter===f[0]?" on":"")+"' data-pfilter='"+f[0]+"'"+(n?"":" disabled")+">"+f[1]+(n?" <b>"+n+"</b>":"")+"</button>";}).join("")+"</div>";
   var show=all.filter(function(pl){return pfMatch(pl,SH.pfilter);});
+  /* Caesars-only: tickets with any leg Caesars doesn't price are unplayable there —
+     collapsed strip below (unavailable_at_book), never silently dropped. */
+  var unav=[];
   show.forEach(function(pl){var pi=all.indexOf(pl);
+    var czOk=(pl.czOdds!==undefined)?(pl.czOdds!=null):true; /* legacy tickets: no cz concept */
+    if(!czOk){unav.push(pl);return;}
+    var czMode=(pl.czOdds!=null);
+    var oddsTxt=czMode?pl.czOdds+" @ Caesars":pl.odds;
+    var toWin=czMode&&pl.czDec?Math.round(pl.stake*(pl.czDec-1)):pl.toWin;
     var badge="<span class='shtag "+(pl.type==="MIX"?"mix":pl.type==="batter_home_runs"?"hr":"typ")+"'>"+esc((pl.typeLabel||"").toUpperCase())+"</span>";
     var tb=pl.tier==="SAFER"?"<span class='shtag safe'>SAFER</span>":pl.tier==="LONGSHOT"?"<span class='shtag long'>LONGSHOT</span>":"<span class='shtag bal'>BALANCED</span>";
     h+="<div class='shparlay'><div class='shparlay-head'><span class='shname'>"+esc(pl.name)+"</span>"+
-      "<span class='shprop'>"+esc(pl.odds)+"</span></div>"+
+      "<span class='shprop'>"+esc(oddsTxt)+"</span></div>"+
       "<div class='shtags'>"+tb+badge+"</div>"+
       "<div class='shnums'><span class='shchip'>combined win <b>"+esc(String(pl.prob))+"%</b></span>"+
         "<span class='shchip'>legs <b>"+pl.legs.length+"</b></span>"+
-        "<span class='shchip'>$"+pl.stake+" → <b>$"+pl.toWin+"</b></span></div>"+
-      "<ul class='shlegs'>"+pl.legs.map(function(l){return "<li>"+esc(l.txt)+"</li>";}).join("")+"</ul>"+
+        (czMode&&pl.czEv!=null?"<span class='shchip "+(pl.czEv>=0?"edgeplus":"edgeminus")+"'>EV @ CZ <b>"+(pl.czEv>=0?"+":"")+esc(String(pl.czEv))+"%</b></span>":"")+
+        "<span class='shchip'>$"+pl.stake+" → <b>$"+toWin+"</b></span></div>"+
+      "<ul class='shlegs'>"+pl.legs.map(function(l){
+        return "<li>"+esc(l.cz!=null?(l.label+" · "+l.prop+" ("+obSign(l.cz)+")"):l.txt)+"</li>";}).join("")+"</ul>"+
       "<div class='shrisk'>"+esc(pl.note)+"</div>"+
       "<div class='shaddrow'><button class='shadd' data-"+addName+"='"+pi+"'>＋ Add all "+pl.legs.length+" legs to slip</button></div></div>";
   });
+  if(unav.length)h+="<details class='shunav'><summary>Not at Caesars — "+unav.length+" ticket"+(unav.length===1?"":"s")+" with a leg Caesars doesn't price</summary>"+
+    unav.map(function(pl){var miss=pl.legs.filter(function(l){return l.cz==null;}).map(function(l){return l.label+" "+l.prop;}).join(", ");
+      return "<div class='shunavrow'>"+esc(pl.name)+" ("+esc(pl.odds)+" best-price) <span class='num'>missing: "+esc(miss)+"</span></div>";}).join("")+"</details>";
   if(!all.length)h+="<div class='shover'>Not enough qualifying picks to build parlays in this view — try again closer to game time.</div>";
   else if(!show.length)h+="<div class='shover'>No parlays match this filter.</div>";
   return h;
@@ -2045,29 +2115,31 @@ function shAddPick(i){ /* legacy shape */
   S.legs.push({id:uid(),label:p.player,prop:p.prop+" "+p.line,odds:shOddsClean(p.odds),est:String(p.prob)});
   saveLegs();renderLegs();renderResults();
 }
+/* slip adds carry the Caesars price when the pick is playable there (the price the user actually gets) */
 function shAddCatPick(cat,i){
   var d=SH.board&&SH.board.data;if(!d||!d.categories||!d.categories[cat]||!d.categories[cat][i])return;var p=d.categories[cat][i];
-  S.legs.push({id:uid(),label:p.label,prop:p.sub,odds:shOddsClean(p.odds),est:String(p.prob)});
+  S.legs.push({id:uid(),label:p.label,prop:p.sub,odds:shOddsClean(p.czOdds!=null?p.czOdds:p.odds),est:String(p.prob)});
   saveLegs();renderLegs();renderResults();
 }
 function shAddCatPickLive(cat,i){
   var d=SH.board&&SH.board.data;if(!d||!d.categoriesLive||!d.categoriesLive[cat]||!d.categoriesLive[cat][i])return;var p=d.categoriesLive[cat][i];
-  S.legs.push({id:uid(),label:p.label,prop:p.sub,odds:shOddsClean(p.odds),est:String(p.prob)});
+  S.legs.push({id:uid(),label:p.label,prop:p.sub,odds:shOddsClean(p.czOdds!=null?p.czOdds:p.odds),est:String(p.prob)});
   saveLegs();renderLegs();renderResults();
 }
+function shLegSlipOdds(l){return l.cz!=null?shOddsClean(obSign(l.cz)):l.odds;}
 function shAddParlay(pi){
   var d=SH.board&&SH.board.data;if(!d||!d.parlays||!d.parlays[pi])return;
-  d.parlays[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
+  d.parlays[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:shLegSlipOdds(l),est:l.est});});
   saveLegs();renderLegs();renderResults();
 }
 function shAddParlayMixed(pi){
   var d=SH.board&&SH.board.data;if(!d||!d.parlaysMixed||!d.parlaysMixed[pi])return;
-  d.parlaysMixed[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
+  d.parlaysMixed[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:shLegSlipOdds(l),est:l.est});});
   saveLegs();renderLegs();renderResults();
 }
 function shAddParlayLive(pi){
   var d=SH.board&&SH.board.data;if(!d||!d.parlaysLive||!d.parlaysLive[pi])return;
-  d.parlaysLive[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:l.odds,est:l.est});});
+  d.parlaysLive[pi].legs.forEach(function(l){S.legs.push({id:uid(),label:l.label,prop:l.prop,odds:shLegSlipOdds(l),est:l.est});});
   saveLegs();renderLegs();renderResults();
 }
 
@@ -2119,6 +2191,7 @@ function shRun(engine){
   aiBtnVis();
   var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
+    var cz=e.target.closest?e.target.closest("[data-czdismiss]"):null;if(cz){LS.set("pl_czNote","1");shRender();return;}
     var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
     var pf=e.target.closest?e.target.closest("[data-pfilter]"):null;if(pf&&!pf.disabled){SH.pfilter=pf.getAttribute("data-pfilter");shRender();return;}
     var bl2=e.target.closest?e.target.closest("[data-shaddlive2]"):null;if(bl2){var kl=bl2.getAttribute("data-shaddlive2").split("|");shAddCatPickLive(kl[0],Number(kl[1]));return;}
