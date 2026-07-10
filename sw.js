@@ -1,6 +1,6 @@
 /* Parlay Lab service worker — caches the app shell so it opens instantly and
    works offline once installed. Bump CACHE when you change any shell asset. */
-const CACHE = 'parlay-lab-v19';
+const CACHE = 'parlay-lab-v20';
 const ASSETS = [
   './',
   './index.html',

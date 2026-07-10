@@ -275,6 +275,16 @@ body{padding:0!important;min-height:100dvh}
 .shsec ul{margin:0;padding-left:18px}
 .shtrap{background:rgba(255,91,106,.07);border:1px solid rgba(255,91,106,.4);border-radius:10px;padding:11px 12px;font-size:12.5px;line-height:1.55}
 .shtrap b{color:var(--red);font-family:'Saira Condensed',sans-serif;letter-spacing:.6px;display:block;margin-bottom:4px}
+.shpass{background:rgba(255,184,56,.06);border-color:rgba(255,184,56,.4);margin-top:10px}
+.shpass b{color:var(--amber)}
+.shpassrow{margin-top:5px;line-height:1.5}
+.shtags{display:flex;flex-wrap:wrap;gap:4px;margin:7px 0 0}
+.shtagc{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.4px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:10px;padding:2px 7px;text-transform:uppercase}
+.shpick.shedge{border-color:rgba(182,255,61,.65);box-shadow:0 0 14px rgba(182,255,61,.10)}
+.shbankrow{display:flex;align-items:center;gap:7px;margin:8px 0 2px;flex-wrap:wrap}
+.shbanklbl{font-family:'Saira Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;color:var(--amber)}
+.shbankrow input{width:80px;background:#0c0e12;border:1px solid rgba(255,184,56,.35);border-radius:7px;color:var(--green);font-family:'JetBrains Mono',monospace;font-size:13px;padding:6px 8px;outline:none}
+.shbanknote{font-size:10px;color:var(--muted)}
 .shmeta{font-size:10px;color:var(--muted);text-align:center;font-family:'JetBrains Mono',monospace}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
@@ -368,7 +378,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 38 · 2026-07-09</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 39 · 2026-07-09</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -387,6 +397,7 @@ body{padding:0!important;min-height:100dvh}
         <button class="shrun" id="shRun">Generate today's board · free</button>
         <button class="shrun shai" id="shRunAI" style="display:none">Deep analysis with Claude</button>
       </div>
+      <div class="shbankrow"><span class="shbanklbl">BANKROLL $</span><input id="shBank" type="number" inputmode="decimal" min="10" step="10" /><span class="shbanknote">sets the ¼-Kelly stake suggestions (capped at 2%/bet)</span></div>
       <div class="shstatus" id="shStatus"></div>
       <div class="shsubnav" id="shSubNav" style="display:none">
         <button class="shsub on" data-shview="picks">PICKS</button>
@@ -396,7 +407,7 @@ body{padding:0!important;min-height:100dvh}
         <button class="shsub" data-shview="liveparlays">LIVE PARLAYS</button>
       </div>
       <div class="shboard" id="shBoard"></div>
-      <div class="note">Built-in model: transparent math on live data — recent form (7/15/30-day, recency-weighted), batter-vs-pitcher career history (regressed for sample size), opposing starter quality, lineup spot → expected ABs, park &amp; wind, vig-removed odds for edges; ML/RL from lineup offense + starter ERA blended with the market. Each category ranks its own top 50 by win probability — categories never overlap; parlays may reuse solo picks. Probabilities are estimates, not guarantees. Informational only.</div>
+      <div class="note">Built-in quant engine, transparent math on live data: every price de-vigged across all posted books (median = consensus prior); the model — Monte Carlo game sims (4,000/game) for ML/RL/H+R+RBI, Poisson projections from 7/15/30-day form shrunk to league means for other props, BvP capped by sample size, starter quality, lineup spot → expected ABs, park &amp; wind — is blended in at a minority weight (the market is the smartest baseline). EV and ¼-Kelly stakes are computed at the best available price across books. TOP 50 ranks by EV; category tabs rank by win probability and feed the parlays. Probabilities are estimates, not guarantees. Informational only.</div>
     </div>
   </section><!-- /panel-sharp -->
 </main>
@@ -1003,7 +1014,8 @@ renderStatus();renderLegs();renderResults();renderBooks();fetchStats();
    Slate data (odds, lines, stats, lineups, weather) is collected live from the
    same APIs the rest of the app uses and sent as the user message. The user's
    Claude API key is stored only in localStorage (pl_claudekey) — never in source. */
-var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),timer:null,t0:0};
+var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),timer:null,t0:0,
+  bankroll:(function(){var b=Number(LS.get("pl_bankroll",750));return (isFinite(b)&&b>=10)?b:750;})()};
 var SH_MODEL="claude-opus-4-8";
 var SH_PROP_MARKETS="batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs";
 var SH_SCHEMA={type:"object",additionalProperties:false,required:["overview","picks","parlays","trap"],properties:{
@@ -1025,14 +1037,19 @@ function shStop(){clearInterval(SH.timer);SH.timer=null;}
 
 /* --- slate collection (all real, all live) --- */
 function shHitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ab:s.atBats,h:s.hits,"2b":s.doubles,"3b":s.triples,hr:s.homeRuns,tb:s.totalBases,rbi:s.rbi,r:s.runs,bb:s.baseOnBalls,k:s.strikeOuts,sb:s.stolenBases,avg:s.avg,obp:s.obp,slg:s.slg};}
+/* baseball IP notation → real innings (.1 = 1/3, .2 = 2/3) — global (used at collect + analyze time) */
+function shIpNum(v){v=Number(v);if(!isFinite(v))return null;var w=Math.floor(v),f=Math.round((v-w)*10);return w+(f===1?1/3:f===2?2/3:0);}
+/* empirical-Bayes shrinkage (doc 3A): pull a small-sample rate toward the league mean.
+   n = real sample size, k = pseudo-observations of the prior. No hot-streak chasing. */
+function shShrink(rate,n,k,prior){if(rate==null)return null;if(prior==null||!isFinite(n)||n<=0)return rate;return (n*rate+k*prior)/(n+k);}
 function shPitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ip:s.inningsPitched,era:s.era,whip:s.whip,k:s.strikeOuts,bb:s.baseOnBalls,k9:s.strikeoutsPer9Inn,h:s.hits,er:s.earnedRuns};}
 function shStatsUrl(group,days){var end=shToday();return days
   ?"https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&group="+group+"&startDate="+shDaysAgo(days)+"&endDate="+end+"&sportId=1&playerPool=All&limit=2500"
   :"https://statsapi.mlb.com/api/v1/stats?stats=season&group="+group+"&season="+new Date().getFullYear()+"&sportId=1&playerPool=All&limit=2500";}
 
 function shCollectSlate(){
-  var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — use outcome stats with sample-size discipline.","BvP history unavailable.","No line-movement history — current lines only."];
-  var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{}};
+  var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — outcome stats shrunk to league means instead.","No odds history — single-session prices only (no closing-line/CLV tracking)."];
+  var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{},league:{}};
   /* 1) schedule: matchups, weather, probables, lineups, and live inning state */
   return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+shToday()+"&hydrate=probablePitcher,weather,lineups,venue,linescore").then(function(res){
     var dates=(res.ok&&res.body&&res.body.dates)||[];var games=(dates[0]&&dates[0].games)||[];
@@ -1078,13 +1095,42 @@ function shCollectSlate(){
       /* keep pregame + live pre-3rd games; drop anything the schedule marked ineligible */
       if(slate.eligible[gkey]===false)return;
       if(slate.eligible[gkey]===undefined&&new Date(g.commence_time).getTime()<=Date.now())return;
-      var bk=(g.bookmakers||[]).filter(function(b){return b.key===CAESARS_KEY;})[0]||(g.bookmakers||[])[0];if(!bk)return;
       var live=!!slate.liveInfo[gkey];
       var o={game:g.away_team+" @ "+g.home_team,live:live};
-      (bk.markets||[]).forEach(function(m){if(m.key==="h2h"){m.outcomes.forEach(function(x){o[x.name===g.home_team?"home_ml":"away_ml"]=x.price;});}
-        if(m.key==="totals"&&m.outcomes[0]){o.total=m.outcomes[0].point;}
-        if(m.key==="spreads"){m.outcomes.forEach(function(x){if(x.name===g.home_team){o.home_rl=x.price;o.home_rl_pt=x.point;}else{o.away_rl=x.price;o.away_rl_pt=x.point;}});}});
-      slate.game_odds.push(o);
+      /* market layer: de-vig EVERY book (multiplicative), consensus = median fair prob,
+         line-shop the best price per side. The consensus is the model's prior. */
+      var mls=[],rls=[],tots=[];
+      (g.bookmakers||[]).forEach(function(bk){var bn=bk.title||bk.key;
+        (bk.markets||[]).forEach(function(m){
+          if(m.key==="h2h"){var hp=null,ap=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team)hp=x.price;else if(x.name===g.away_team)ap=x.price;});
+            if(hp!=null&&ap!=null)mls.push({h:hp,a:ap,book:bn});}
+          else if(m.key==="spreads"){var hr=null,ar=null,hpt=null,apt=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team){hr=x.price;hpt=x.point;}else if(x.name===g.away_team){ar=x.price;apt=x.point;}});
+            if(hr!=null&&ar!=null&&hpt!=null&&apt!=null)rls.push({h:hr,a:ar,hpt:hpt,apt:apt,book:bn});}
+          else if(m.key==="totals"&&m.outcomes&&m.outcomes[0]&&m.outcomes[0].point!=null)tots.push(m.outcomes[0].point);
+        });
+      });
+      if(mls.length){
+        o.ml_books=mls.length;
+        o.home_fair=shMedian(mls.map(function(x){return shDevig2(shImp(x.h),shImp(x.a));}).filter(function(v){return v!=null;}));
+        var bh=null,ba=null;mls.forEach(function(x){
+          if(!bh||amToDec(x.h)>amToDec(bh.price))bh={price:x.h,book:x.book};
+          if(!ba||amToDec(x.a)>amToDec(ba.price))ba={price:x.a,book:x.book};});
+        o.home_ml=bh.price;o.home_ml_book=bh.book;o.away_ml=ba.price;o.away_ml_book=ba.book;
+      }
+      if(rls.length){
+        /* consensus at the modal (most-quoted) home run-line point */
+        var cnt={};rls.forEach(function(x){cnt[x.hpt]=(cnt[x.hpt]||0)+1;});
+        var modal=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0];
+        var use=rls.filter(function(x){return String(x.hpt)===modal;});
+        o.rl_books=use.length;o.home_rl_pt=Number(modal);o.away_rl_pt=use[0].apt;
+        o.home_rl_fair=shMedian(use.map(function(x){return shDevig2(shImp(x.h),shImp(x.a));}).filter(function(v){return v!=null;}));
+        var rh=null,ra=null;use.forEach(function(x){
+          if(!rh||amToDec(x.h)>amToDec(rh.price))rh={price:x.h,book:x.book};
+          if(!ra||amToDec(x.a)>amToDec(ra.price))ra={price:x.a,book:x.book};});
+        o.home_rl=rh.price;o.home_rl_book=rh.book;o.away_rl=ra.price;o.away_rl_book=ra.book;
+      }
+      if(tots.length)o.total=shMedian(tots);
+      if(o.ml_books||o.rl_books)slate.game_odds.push(o);
     });
     /* 3) props: eligible events (pregame + live pre-3rd), 6 markets per event */
     shTick("Pulling prop lines");
@@ -1099,15 +1145,33 @@ function shCollectSlate(){
       evs.forEach(function(e,idx){chain=chain.then(function(){
         shTick("Pulling props · game "+(idx+1)+"/"+evs.length);
         return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events/"+e.id+"/odds?regions=us&oddsFormat=american&markets="+SH_PROP_MARKETS+"&apiKey="+encodeURIComponent(OB.key)).then(function(pr){
-          var bks=(pr.body&&pr.body.bookmakers)||[];var bk=bks.filter(function(b){return b.key===CAESARS_KEY;})[0]||bks[0];if(!bk)return;
+          var bks=(pr.body&&pr.body.bookmakers)||[];if(!bks.length)return;
+          /* market layer: merge EVERY book per player|line — per-book de-vig of each O/U pair,
+             consensus fair P(over) = median across books, prices kept = best per side (line shopping). */
+          var acc={},bookNames={};
+          bks.forEach(function(bk){var bn=bk.title||bk.key;bookNames[bn]=1;
+            (bk.markets||[]).forEach(function(mk){
+              var m=acc[mk.key]=acc[mk.key]||{rows:{},order:[]};
+              var tmp={};
+              (mk.outcomes||[]).forEach(function(o){var side=(o.name||"").toLowerCase().indexOf("over")>=0||o.name==="Yes"?"o":"u";
+                var who=o.description||o.name;var kk=who+"|"+(o.point!=null?o.point:"");
+                if(!m.rows[kk]){m.rows[kk]={p:who,ln:(o.point!=null?o.point:null),list:[]};m.order.push(kk);}
+                if(!tmp[kk])tmp[kk]={};tmp[kk][side]=o.price;});
+              Object.keys(tmp).forEach(function(kk){m.rows[kk].list.push({o:tmp[kk].o,u:tmp[kk].u,book:bn});});
+            });
+          });
           var g={};
-          (bk.markets||[]).forEach(function(mk){var rows={},order=[];
-            (mk.outcomes||[]).forEach(function(o){var side=(o.name||"").toLowerCase().indexOf("over")>=0||o.name==="Yes"?"over":"under";
-              var who=o.description||o.name;var kk=who+"|"+(o.point!=null?o.point:"");
-              if(!rows[kk]){rows[kk]={p:who,ln:(o.point!=null?o.point:null)};order.push(kk);}
-              rows[kk][side==="over"?"o":"u"]=o.price;});
-            g[mk.key]=order.map(function(k){return rows[k];});});
-          if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:bk.title||bk.key,markets:g,live:!!slate.liveInfo[pnorm(e.away_team)+"@"+pnorm(e.home_team)]};
+          Object.keys(acc).forEach(function(mkey){
+            g[mkey]=acc[mkey].order.map(function(kk){var r=acc[mkey].rows[kk];
+              var fairs=r.list.map(function(x){return shDevig2(shImp(x.o),shImp(x.u));}).filter(function(v){return v!=null;});
+              var bo=null,bu=null;r.list.forEach(function(x){
+                if(x.o!=null&&(bo==null||amToDec(x.o)>amToDec(bo.price)))bo={price:x.o,book:x.book};
+                if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
+              return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
+                fair:fairs.length?shMedian(fairs):null,books:fairs.length};
+            });
+          });
+          if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[pnorm(e.away_team)+"@"+pnorm(e.home_team)]};
         });
       });});
       return chain;
@@ -1122,6 +1186,20 @@ function shCollectSlate(){
     function pull(group,days,tag,into,rowFn){
       return obFetchJson(shStatsUrl(group,days)).then(function(res){
         var rows=parseSplits(res.ok?res.body:{});
+        /* league aggregates (empirical-Bayes priors + sim bullpen tail) — summed from the
+           SAME league-wide pull before it's filtered down to slate players. Real data, free. */
+        var L={n:0};
+        rows.forEach(function(p){var s=p.stat||{};
+          if(group==="hitting"){var ab=Number(s.atBats);if(!isFinite(ab)||ab<1)return;
+            L.n++;L.ab=(L.ab||0)+ab;L.h=(L.h||0)+(Number(s.hits)||0);L.hr=(L.hr||0)+(Number(s.homeRuns)||0);
+            L.tb=(L.tb||0)+(Number(s.totalBases)||0);L.bb=(L.bb||0)+(Number(s.baseOnBalls)||0);
+            L.k=(L.k||0)+(Number(s.strikeOuts)||0);L.d2=(L.d2||0)+(Number(s.doubles)||0);L.d3=(L.d3||0)+(Number(s.triples)||0);
+            L.r=(L.r||0)+(Number(s.runs)||0);L.rbi=(L.rbi||0)+(Number(s.rbi)||0);L.g=(L.g||0)+(Number(s.gamesPlayed)||0);}
+          else{var gs=Number(p.gs);if(!isFinite(gs)||gs<1)return;
+            L.n++;L.gs=(L.gs||0)+gs;L.k=(L.k||0)+(Number(s.strikeOuts)||0);
+            var ip=shIpNum(s.inningsPitched);if(ip!=null)L.ip=(L.ip||0)+ip;}
+        });
+        slate.league[group+"_"+tag]=L;
         rows.forEach(function(p){if(!propNames[pnorm(p.name)])return;
           var key=p.name+" ("+p.team+")";if(!into[key])into[key]={};into[key][tag]=rowFn(p);});
       });
@@ -1184,12 +1262,27 @@ function shTbOver(line,lamH,s1,s2){
   return 1-(P0+P1+P2*(s1+s2)*(s1+s2));               /* 3.5+: rough — 0–1 hits, or 2 non-HR light hits */
 }
 function shImp(am){var n=Number(am);if(!isFinite(n)||!n)return null;return n>0?100/(n+100):-n/(-n+100);}
+/* ---- market layer (doc Phase 2): exact odds math ----
+   shDevig2: multiplicative de-vig of a two-way market — fair P(side1).
+   shMedian: consensus aggregator across books (median is robust to one stale book). */
+function shDevig2(i1,i2){if(i1==null||i2==null||!((i1+i2)>0))return null;return i1/(i1+i2);}
+function shMedian(a){if(!a||!a.length)return null;var s=a.slice().sort(function(x,y){return x-y;});var n=s.length;return n%2?s[(n-1)/2]:(s[n/2-1]+s[n/2])/2;}
+/* fractional Kelly (doc Phase 7): f* = (b·p − q)/b at decimal odds; we stake ¼ of it, capped at 2% bankroll */
+function shKelly(p,dec){if(p==null||dec==null||!(dec>1))return 0;var b=dec-1;return Math.max(0,(b*p-(1-p))/b);}
+function shEV(p,dec){if(p==null||dec==null||!(dec>1))return null;return p*(dec-1)-(1-p);}
 /* recency-weighted rate across 7/15/30-day windows; numFn(stats)→count, denKey "ab"|"g" */
 function shBlend(st,numFn,denKey,minDen){
   var ws=[["last7",.25],["last15",.35],["last30",.40]],tw=0,acc=0;
   ws.forEach(function(w){var s=st&&st[w[0]];if(!s)return;var d=Number(s[denKey]),n=numFn(s);
     if(!isFinite(d)||d<minDen||!isFinite(n))return;acc+=w[1]*(n/d);tw+=w[1];});
   return tw>0?acc/tw:null;
+}
+/* shBlend + the effective sample size (largest window's denominator) — feeds shShrink */
+function shBlendN(st,numFn,denKey,minDen){
+  var ws=[["last7",.25],["last15",.35],["last30",.40]],tw=0,acc=0,n=0;
+  ws.forEach(function(w){var s=st&&st[w[0]];if(!s)return;var d=Number(s[denKey]),v=numFn(s);
+    if(!isFinite(d)||d<minDen||!isFinite(v))return;acc+=w[1]*(v/d);tw+=w[1];if(d>n)n=d;});
+  return tw>0?{r:acc/tw,n:n}:null;
 }
 function shPitchBlend(pst,key){ /* pitcher metric: 60% last-30, 40% season */
   var a=pst&&pst.last30&&Number(pst.last30[key]),b=pst&&pst.season&&Number(pst.season[key]);
@@ -1206,12 +1299,153 @@ var SH_NAMED_CATS=["ml","rl","batter_hits","batter_total_bases","batter_home_run
    run essentially all overs, with the occasional standout under. Probabilities shown
    stay honest. Verified on the live 2026-07-08 slate: 0/50 unders in the TOP 50. */
 var SH_OVER_LEAN=0.25;
-function shConv(p,edge){return (edge>=0.045&&p>=0.58)?"A":(edge>=0.03||p>=0.64)?"B":"C";}
+/* edge-engine config (doc Phase 4). The market consensus is the prior: final = w·model + (1−w)·consensus.
+   w values are the doc's recommended ranges — we can't fit them out-of-sample without a
+   backtest pipeline, so they stay conservative and configurable here. */
+var SH_W={props:0.35,ml:0.15,rl:0.15};
+var SH_EDGE_MIN={props:0.04,ml:0.02,rl:0.02}; /* minimum EV before a pick earns the EDGE badge */
+/* conviction from EV + sample-size uncertainty band: A = clears threshold AND band; B = positive EV; C = rest */
+function shBand(nEff){return shClamp(0.6/Math.sqrt((nEff||80)+10),0.02,0.10);}
+function shConv2(ev,thresh,band){if(ev==null)return "C";return (ev>=thresh&&ev>=band)?"A":(ev>0)?"B":"C";}
+/* ================= Monte Carlo game simulator (doc 3D — the heart) =================
+   Simulates full games PA-by-PA from each batter's shrunk per-PA outcome vector
+   {BB,1B,2B,3B,HR,OUT} vs the current pitcher. Base-out state machine with league-
+   constant runner advancement; starter leash → league-average bullpen tail; home team
+   skips the bottom 9th when leading; walk-offs end the inning; extras use the placed
+   runner. Deterministic (seeded) so tests reproduce exactly. Powers ML/RL win
+   probabilities, joint H+R+RBI props, and same-game leg correlations. */
+var SH_SIM_N=4000;
+function shHash32(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function shMulberry(seed){var t=seed>>>0;return function(){t=(t+0x6D2B79F5)>>>0;var r=Math.imul(t^(t>>>15),1|t);r=(r+Math.imul(r^(r>>>7),61|r))^r;return ((r^(r>>>14))>>>0)/4294967296;};}
+/* league-constant advancement rates (long-run MLB base-running averages) */
+var SH_ADV={scoreFrom2ndOn1B:0.60,firstTo3rdOn1B:0.28,scoreFrom1stOn2B:0.42,sacFly:0.28,gidp:0.11,roe:0.018};
+/* ctx: {away:{bat:[{vSP:[bb,1b,2b,3b,hr],vBP:[...]}×9]}, home:{...},
+         awayLeash,homeLeash (outs the away/home STARTER records before the bullpen),
+         legs:[{team:'away'|'home'|null,bat:idx|null,stat:'h'|'tb'|'hr'|'hrr'|null,ln,type:'ml_home'|'ml_away'|'rl'|null,pt}] }
+   Vectors are cumulative-friendly plain probabilities; OUT is the remainder. */
+function shSimGames(ctx,nSims,seed){
+  var rng=shMulberry(seed);
+  var L=ctx.legs.length;
+  var legHit=new Int32Array(L),pair=new Int32Array(L*L);
+  var homeWins=0,sumH=0,sumA=0,mHome15=0,mAway15p=0,mAway15=0,mHome15p=0;
+  var NB=9;
+  var bh=new Int32Array(NB),bt=new Int32Array(NB),bhr=new Int32Array(NB),br=new Int32Array(NB),brbi=new Int32Array(NB);
+  var ah=new Int32Array(NB),at=new Int32Array(NB),ahr=new Int32Array(NB),ar=new Int32Array(NB),arbi=new Int32Array(NB);
+  function resetArr(a){for(var i=0;i<NB;i++)a[i]=0;}
+  for(var s=0;s<nSims;s++){
+    resetArr(bh);resetArr(bt);resetArr(bhr);resetArr(br);resetArr(brbi);
+    resetArr(ah);resetArr(at);resetArr(ahr);resetArr(ar);resetArr(arbi);
+    var runsA=0,runsH=0,idxA=0,idxH=0,outsBySPHome=0,outsBySPAway=0,inn=1,over=false;
+    while(!over){
+      /* ---- top: away bats vs home pitching ---- */
+      var res=halfInning(ctx.away.bat,idxA,inn,runsA-runsH,false,outsBySPHome,ctx.homeLeash,ah,at,ahr,ar,arbi);
+      runsA+=res.runs;idxA=res.next;outsBySPHome=res.spOuts;
+      /* ---- bottom: home bats vs away pitching (skipped in 9th+ if home leads) ---- */
+      if(inn<9||runsH<=runsA){
+        var need=(inn>=9)?(runsA-runsH+1):Infinity; /* walk-off: stop once home leads */
+        var res2=halfInning(ctx.home.bat,idxH,inn,runsH-runsA,need,outsBySPAway,ctx.awayLeash,bh,bt,bhr,br,brbi);
+        runsH+=res2.runs;idxH=res2.next;outsBySPAway=res2.spOuts;
+      }
+      if(inn>=9&&runsA!==runsH)over=true;
+      inn++;
+      if(inn>20){if(rng()<0.5)runsH++;else runsA++;over=true;} /* unreachable safety valve */
+    }
+    var margin=runsH-runsA;
+    if(margin>0)homeWins++;
+    sumH+=runsH;sumA+=runsA;
+    if(margin>=2)mHome15++;      /* home -1.5 covers */
+    if(margin<=1)mAway15p++;     /* away +1.5 covers */
+    if(margin<=-2)mAway15++;     /* away -1.5 covers */
+    if(margin>=-1)mHome15p++;    /* home +1.5 covers */
+    /* ---- evaluate legs on this sim ---- */
+    var t=[];
+    for(var li=0;li<L;li++){
+      var lg=ctx.legs[li],v=false;
+      if(lg.type==="ml_home")v=margin>0;
+      else if(lg.type==="ml_away")v=margin<0;
+      else if(lg.type==="rl")v=(lg.team==="home")?((lg.pt<0)?margin>=2:margin>=-1):((lg.pt<0)?margin<=-2:margin<=1);
+      else{
+        var hArr=lg.team==="home",bi=lg.bat;
+        var val=lg.stat==="h"?(hArr?bh:ah)[bi]:lg.stat==="tb"?(hArr?bt:at)[bi]:lg.stat==="hr"?(hArr?bhr:ahr)[bi]:
+                (hArr?bh:ah)[bi]+(hArr?br:ar)[bi]+(hArr?brbi:arbi)[bi]; /* hrr */
+        v=val>=Math.floor(lg.ln)+1;
+      }
+      if(v){legHit[li]++;t.push(li);}
+    }
+    for(var x=0;x<t.length;x++)for(var y=x+1;y<t.length;y++)pair[t[x]*L+t[y]]++;
+  }
+  function halfInning(bat,idx,inn,diff,need,spOuts,leash,hA,tA,hrA,rA,rbiA){
+    var outs=0,runs=0;
+    var b1=-1,b2=-1,b3=-1; /* batter index occupying each base, -1 empty */
+    if(inn>=10){b2=(idx+NB-1)%NB;} /* extra-innings placed runner (10th on) */
+    while(outs<3){
+      if(need!==false&&need!==Infinity&&runs>=need)break; /* walk-off */
+      var vsBP=spOuts>=leash;
+      var v=vsBP?bat[idx%NB].vBP:bat[idx%NB].vSP;
+      var u=rng(),bi=idx%NB,scored=0;
+      if(u<v[0]){ /* BB: force advance */
+        if(b1>=0){if(b2>=0){if(b3>=0){rA[b3]++;runs++;scored++;rbiA[bi]++;}b3=b2;}b2=b1;}b1=bi;
+      }else if(u<v[0]+v[1]){ /* 1B */
+        hA[bi]++;tA[bi]+=1;
+        if(b3>=0){rA[b3]++;runs++;scored++;b3=-1;}
+        if(b2>=0){if(rng()<SH_ADV.scoreFrom2ndOn1B){rA[b2]++;runs++;scored++;}else b3=b2;b2=-1;}
+        if(b1>=0){if(b3<0&&rng()<SH_ADV.firstTo3rdOn1B){b3=b1;}else b2=b1;b1=-1;}
+        b1=bi;rbiA[bi]+=scored;
+      }else if(u<v[0]+v[1]+v[2]){ /* 2B */
+        hA[bi]++;tA[bi]+=2;
+        if(b3>=0){rA[b3]++;runs++;scored++;b3=-1;}
+        if(b2>=0){rA[b2]++;runs++;scored++;b2=-1;}
+        if(b1>=0){if(rng()<SH_ADV.scoreFrom1stOn2B){rA[b1]++;runs++;scored++;}else b3=b1;b1=-1;}
+        b2=bi;rbiA[bi]+=scored;
+      }else if(u<v[0]+v[1]+v[2]+v[3]){ /* 3B */
+        hA[bi]++;tA[bi]+=3;
+        if(b3>=0){rA[b3]++;runs++;scored++;b3=-1;}
+        if(b2>=0){rA[b2]++;runs++;scored++;b2=-1;}
+        if(b1>=0){rA[b1]++;runs++;scored++;b1=-1;}
+        b3=bi;rbiA[bi]+=scored;
+      }else if(u<v[0]+v[1]+v[2]+v[3]+v[4]){ /* HR */
+        hA[bi]++;tA[bi]+=4;hrA[bi]++;
+        if(b3>=0){rA[b3]++;runs++;scored++;b3=-1;}
+        if(b2>=0){rA[b2]++;runs++;scored++;b2=-1;}
+        if(b1>=0){rA[b1]++;runs++;scored++;b1=-1;}
+        rA[bi]++;runs++;scored++;rbiA[bi]+=scored;
+      }else if(rng()<SH_ADV.roe){ /* reached on error (~1% of PA): advances like a single, no H/RBI credit */
+        if(b3>=0){rA[b3]++;runs++;b3=-1;}
+        if(b2>=0){if(rng()<SH_ADV.scoreFrom2ndOn1B){rA[b2]++;runs++;}else b3=b2;b2=-1;}
+        if(b1>=0){if(b3<0&&rng()<SH_ADV.firstTo3rdOn1B)b3=b1;else b2=b1;b1=-1;}
+        b1=bi;
+      }else{ /* out in play: sac fly scores R3 (<2 outs); GIDP with R1 (<2 outs) */
+        if(b3>=0&&outs<2&&rng()<SH_ADV.sacFly){rA[b3]++;runs++;rbiA[bi]++;b3=-1;}
+        else if(b1>=0&&outs<2&&rng()<SH_ADV.gidp){outs++;b1=-1;if(!vsBP)spOuts++;}
+        outs++;if(!vsBP)spOuts++;
+      }
+      idx++;
+    }
+    return {runs:runs,next:idx%NB,spOuts:spOuts};
+  }
+  var out={n:nSims,pHome:homeWins/nSims,avgHome:sumH/nSims,avgAway:sumA/nSims,
+    pHomeM15:mHome15/nSims,pAwayP15:mAway15p/nSims,pAwayM15:mAway15/nSims,pHomeP15:mHome15p/nSims,
+    legP:{},legIdx:{},pairP:pair,L:L};
+  ctx.legs.forEach(function(lg,i){out.legP[lg.key]=legHit[i]/nSims;out.legIdx[lg.key]=i;});
+  out.jointP=function(kA,kB){var a=out.legIdx[kA],b=out.legIdx[kB];if(a==null||b==null)return null;
+    var lo=Math.min(a,b),hi=Math.max(a,b);return pair[lo*L+hi]/nSims;};
+  out.corr=function(kA,kB){var a=out.legP[kA],b=out.legP[kB],j=out.jointP(kA,kB);
+    if(a==null||b==null||j==null)return null;var d=Math.sqrt(a*(1-a)*b*(1-b));if(!(d>0))return null;
+    return (j-a*b)/d;};
+  return out;
+}
+
 function shAnalyzeLocal(slate){
   var lookupStats={},lookupPit={},lookupTeam={};
   function shTeamOf(k){var m=k.match(/\(([^)]+)\)\s*$/);return (m&&m[1]&&m[1]!=="—")?m[1]:null;}
   Object.keys(slate.player_stats).forEach(function(k){var n=pnorm(k.split(" (")[0]);lookupStats[n]=slate.player_stats[k];var t=shTeamOf(k);if(t)lookupTeam[n]=t;});
   Object.keys(slate.pitcher_stats).forEach(function(k){var n=pnorm(k.split(" (")[0]);lookupPit[n]=slate.pitcher_stats[k];var t=shTeamOf(k);if(t)lookupTeam[n]=t;});
+  /* league priors (from the same league-wide pulls) — empirical-Bayes anchors + sim bullpen tail */
+  var LG=slate.league||{},LH=LG.hitting_last30||{},LP=LG.pitching_last30||{},LPs=LG.pitching_season||{};
+  var Lh=(LH.ab>0)?LH.h/LH.ab:null,Lhr=(LH.ab>0)?LH.hr/LH.ab:null,Ltb=(LH.ab>0)?LH.tb/LH.ab:null;
+  var Lhrr=(LH.g>0)?((LH.h+LH.r+LH.rbi)/LH.g):null;
+  var Lkg=(LP.gs>0)?LP.k/LP.gs:((LPs.gs>0)?LPs.k/LPs.gs:null);
+  var Lipg=(LP.gs>0&&LP.ip!=null)?LP.ip/LP.gs:((LPs.gs>0&&LPs.ip!=null)?LPs.ip/LPs.gs:null);
   var gameByKey={};slate.games.forEach(function(g){gameByKey[pnorm(g.away)+"@"+pnorm(g.home)]=g;});
   function findGame(matchup){var p=matchup.split(" @ ");return gameByKey[pnorm(p[0])+"@"+pnorm(p[1])]||null;}
   function lineupSpot(g,name){if(!g)return null;var n=pnorm(name);
@@ -1237,6 +1471,86 @@ function shAnalyzeLocal(slate){
   var cats={ml:[],rl:[],batter_hits:[],batter_total_bases:[],batter_home_runs:[],batter_hits_runs_rbis:[],pitcher_strikeouts:[],pitcher_outs:[]};
   var traps=[];
 
+  /* ---- Monte Carlo sims: every PREGAME game with a confirmed 9-man lineup + probables.
+     Live games are skipped (we don't model mid-game base-out state) and fall back to
+     the closed-form path — stated on the card, never faked. ---- */
+  var propsByKey={};Object.keys(slate.props).forEach(function(m){var pp=m.split(" @ ");propsByKey[pnorm(pp[0])+"@"+pnorm(pp[1])]={label:m,entry:slate.props[m]};});
+  var oddsByKey={};slate.game_odds.forEach(function(o){var pp=o.game.split(" @ ");oddsByKey[pnorm(pp[0])+"@"+pnorm(pp[1])]=o;});
+  var SIM_STAT={batter_hits:"h",batter_total_bases:"tb",batter_home_runs:"hr",batter_hits_runs_rbis:"hrr"};
+  var SIMS={};
+  function shLegKey(player,mkt,ln){return pnorm(player)+"|"+mkt+"|"+ln;}
+  (function(){
+    var LbbPA=(LH.ab>0)?LH.bb/(LH.ab+LH.bb):null;
+    function batVec(name,pst,wind,coors,useStarter){
+      var st=lookupStats[pnorm(name)];
+      var contact=1,power=1;
+      if(useStarter&&pst){var whip=shPitchBlend(pst,"whip"),era2=shPitchBlend(pst,"era");
+        if(whip!=null)contact=shClamp(whip/1.30,.85,1.15);
+        if(era2!=null)power=shClamp((era2/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);}
+      var hF=contact*(coors?1.07:1),hrF=power*wind.f*(coors?1.08:1);
+      var hitR=null,hrR=null,bbAB=null,s2=0.20,s3=0.015;
+      if(st){
+        var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,Lh);
+        var hrb=shBlendN(st,function(s){return Number(s.hr);},"ab",25);if(hrb)hrR=shShrink(hrb.r,hrb.n,150,Lhr);
+        bbAB=shBlend(st,function(s){return Number(s.bb);},"ab",10);
+        var l3=st.last30||{};var H=Number(l3.h)||0;
+        if(H>=8){s2=shClamp((Number(l3["2b"])||0)/H,0.05,0.40);s3=shClamp((Number(l3["3b"])||0)/H,0,0.06);}
+      }
+      /* league-average stand-in when a lineup batter has no usable sample */
+      if(hitR==null)hitR=Lh;
+      if(hrR==null)hrR=Lhr;
+      if(bbAB==null)bbAB=(LbbPA!=null)?LbbPA/(1-LbbPA):null;
+      if(hitR==null||hrR==null||bbAB==null)return null; /* no league data either — cannot sim */
+      var pBB=shClamp(bbAB/(1+bbAB)+0.010,0.04,0.21),abFrac=1-pBB; /* +1% HBP (league constant) */
+      var hit=shClamp(hitR*hF,0.12,0.42),hr=shClamp(hrR*hrF,0.004,0.10);
+      var nonHR=Math.max(0,hit-hr);
+      var p2=Math.min(nonHR,hit*s2),p3=Math.min(nonHR-p2,hit*s3),p1=Math.max(0,nonHR-p2-p3);
+      return [pBB,p1*abFrac,p2*abFrac,p3*abFrac,hr*abFrac];
+    }
+    function leashOf(name){
+      var pst=name?lookupPit[pnorm(name)]:null,ipg=null,n=0;
+      if(pst){var g30=pst.last30&&Number(pst.last30.g),ip30=pst.last30&&shIp(pst.last30.ip);
+        if(isFinite(g30)&&g30>=3&&ip30!=null){ipg=ip30/g30;n=g30;}
+        else if(pst.season&&Number(pst.season.g)>=8&&shIp(pst.season.ip)!=null){ipg=shIp(pst.season.ip)/Number(pst.season.g);n=Number(pst.season.g);}}
+      ipg=(ipg!=null)?shShrink(ipg,n,4,Lipg):Lipg;
+      return Math.max(6,Math.round((ipg!=null?ipg:5.4)*3));
+    }
+    slate.games.forEach(function(g){
+      if(g.phase!=="pre")return;
+      if(!(g.lineup_away&&g.lineup_away.length>=9&&g.lineup_home&&g.lineup_home.length>=9))return;
+      if(!g.probable_away||!g.probable_home)return;
+      var gkey=pnorm(g.away)+"@"+pnorm(g.home);
+      var wind=windNote(g),coors=/coors/i.test(g.venue||"");
+      var pstHome=lookupPit[pnorm(g.probable_home)]||null,pstAway=lookupPit[pnorm(g.probable_away)]||null;
+      var awayBat=[],homeBat=[],ok=true;
+      for(var i=0;i<9;i++){
+        var av=batVec(g.lineup_away[i],pstHome,wind,coors,true),avB=batVec(g.lineup_away[i],null,wind,coors,false);
+        var hv=batVec(g.lineup_home[i],pstAway,wind,coors,true),hvB=batVec(g.lineup_home[i],null,wind,coors,false);
+        if(!av||!hv||!avB||!hvB){ok=false;break;}
+        awayBat.push({vSP:av,vBP:avB});homeBat.push({vSP:hv,vBP:hvB});
+      }
+      if(!ok)return;
+      /* legs: game markets + every listed batter prop the sim can grade */
+      var legs=[{key:"ml_home",type:"ml_home"},{key:"ml_away",type:"ml_away"}];
+      var go=oddsByKey[gkey];
+      if(go&&go.home_rl_pt!=null){legs.push({key:"rl_home",type:"rl",team:"home",pt:go.home_rl_pt});
+        legs.push({key:"rl_away",type:"rl",team:"away",pt:go.away_rl_pt});}
+      var pk=propsByKey[gkey];
+      if(pk){Object.keys(pk.entry.markets).forEach(function(mkt){var stat=SIM_STAT[mkt];if(!stat)return;
+        pk.entry.markets[mkt].forEach(function(row){if(row.ln==null)return;
+          var n=pnorm(row.p),bi=-1,team=null;
+          for(var j=0;j<9;j++){if(pnorm(g.lineup_away[j])===n){bi=j;team="away";break;}if(pnorm(g.lineup_home[j])===n){bi=j;team="home";break;}}
+          if(bi<0)return;
+          legs.push({key:shLegKey(row.p,mkt,row.ln),team:team,bat:bi,stat:stat,ln:row.ln});
+        });});}
+      var seed=shHash32(slate.date+"|"+g.away+"@"+g.home);
+      SIMS[gkey]=shSimGames({away:{bat:awayBat},home:{bat:homeBat},
+        awayLeash:leashOf(g.probable_away),homeLeash:leashOf(g.probable_home),legs:legs},SH_SIM_N,seed);
+      SIMS[gkey].gkey=gkey;
+    });
+  })();
+  function simOf(g){return g?SIMS[pnorm(g.away)+"@"+pnorm(g.home)]||null:null;}
+
   /* ----- ML & RL: light game model (lineup offense + starter ERA), blended 50/50
      with the vig-removed market price. One row per game — the more likely side. ----- */
   function offense(lineup){var c=0,acc=0;(lineup||[]).forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.tb);},"ab",10);if(r!=null){acc+=r;c++;}});return c>=5?acc/c:null;}
@@ -1245,32 +1559,51 @@ function shAnalyzeLocal(slate){
   slate.game_odds.forEach(function(go){
     var g=findGame(go.game);if(!g)return;
     var iH=shImp(go.home_ml),iA=shImp(go.away_ml);if(iH==null||iA==null)return;
-    var novH=iH/(iH+iA);
-    var oH=offense(g.lineup_home),oA=offense(g.lineup_away);
-    var eH=eraOf(g.probable_home),eA=eraOf(g.probable_away);
-    var model=novH,bits=[],risk=[];
-    if(oH!=null&&oA!=null&&eH!=null&&eA!=null){
-      model=shClamp(0.52+(oH-oA)*1.5+(eA-eH)*0.045,0.30,0.72);
-      bits.push("lineup TB/AB "+oH.toFixed(2)+" (home) vs "+oA.toFixed(2));
-      bits.push(g.probable_home+" "+eH.toFixed(2)+" ERA vs "+g.probable_away+" "+eA.toFixed(2)+" ERA");
-    }else risk.push("lineups/probables incomplete — leaning on the market price");
+    /* consensus prior: median de-vigged fair prob across every book (fallback: de-vig best prices) */
+    var novH=(go.home_fair!=null)?go.home_fair:shDevig2(iH,iA);if(novH==null)return;
+    var sim=simOf(g),bits=[],risk=[],tags=[],nEffG=null;
+    var model=novH;
+    if(sim){
+      model=sim.pHome;nEffG=1500;tags.push("sim");
+      bits.push(sim.n+" simulated games: home wins "+(sim.pHome*100).toFixed(1)+"% · avg score "+sim.avgAway.toFixed(1)+"-"+sim.avgHome.toFixed(1)+" (away-home)");
+    }else{
+      var oH=offense(g.lineup_home),oA=offense(g.lineup_away);
+      var eH=eraOf(g.probable_home),eA=eraOf(g.probable_away);
+      if(oH!=null&&oA!=null&&eH!=null&&eA!=null){
+        model=shClamp(0.52+(oH-oA)*1.5+(eA-eH)*0.045,0.30,0.72);
+        bits.push("lineup TB/AB "+oH.toFixed(2)+" (home) vs "+oA.toFixed(2));
+        bits.push(g.probable_home+" "+eH.toFixed(2)+" ERA vs "+g.probable_away+" "+eA.toFixed(2)+" ERA");
+        if(shIsLive(g))bits.push("in progress — closed-form model (sims cover pregame only)");
+      }else risk.push("lineups/probables incomplete — leaning on the market price");
+    }
+    if(go.ml_books>=2){bits.push("consensus of "+go.ml_books+" books, de-vigged");tags.push("consensus");}
     if(go.total!=null)bits.push("Vegas total "+go.total);
-    var pH=0.5*model+0.5*novH;
+    /* market-anchored blend: the consensus is the prior; the model must earn its deviation */
+    var pH=SH_W.ml*model+(1-SH_W.ml)*novH;
     var homeSide=pH>=0.5;
     var live=shIsLive(g),glabel=shGameLabel(g,go.game),ginn=(g&&g.inning)||0;
+    var gkeyML=pnorm(g.away)+"@"+pnorm(g.home);
     cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
-      p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),
+      oddsN:homeSide?go.home_ml:go.away_ml,book:homeSide?go.home_ml_book:go.away_ml_book,
+      p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
+      lkey:homeSide?"ml_home":"ml_away",gkey:gkeyML,
       risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
     if(go.home_rl_pt!=null&&go.home_rl!=null&&go.away_rl!=null){
       var iHr=shImp(go.home_rl),iAr=shImp(go.away_rl);
       if(iHr!=null&&iAr!=null){
-        var novHr=iHr/(iHr+iAr);
-        var pHomeCover=(go.home_rl_pt<0)?mapCover(pH):1-mapCover(1-pH);
-        var pHC=0.5*pHomeCover+0.5*novHr;
+        var novHr=(go.home_rl_fair!=null)?go.home_rl_fair:shDevig2(iHr,iAr);
+        var pHomeCover,rlBits=bits.slice(),rlTags=tags.slice();
+        if(sim){
+          pHomeCover=(go.home_rl_pt<0)?sim.pHomeM15:sim.pHomeP15;
+          rlBits.unshift("sim run-line: home "+sPt(go.home_rl_pt)+" covers "+(pHomeCover*100).toFixed(1)+"% (bottom-9th truncation modeled)");
+        }else pHomeCover=(go.home_rl_pt<0)?mapCover(pH):1-mapCover(1-pH);
+        var pHC=SH_W.rl*pHomeCover+(1-SH_W.rl)*novHr;
         var side=pHC>=0.5;
         cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
-          odds:obSign(side?go.home_rl:go.away_rl),p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
-          game:glabel,live:live,inning:ginn,bits:bits.slice(),
+          odds:obSign(side?go.home_rl:go.away_rl),oddsN:side?go.home_rl:go.away_rl,book:side?go.home_rl_book:go.away_rl_book,
+          p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
+          game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
+          lkey:side?"rl_home":"rl_away",gkey:gkeyML,
           risk:((side?go.home_rl_pt:go.away_rl_pt)<0)?"Favorites win one-run games constantly — this needs a 2+ run margin.":"A blowout either way beats the +1.5 cushion."});
       }
     }
@@ -1286,33 +1619,37 @@ function shAnalyzeLocal(slate){
       var isK=(mkt==="pitcher_strikeouts"),isOuts=(mkt==="pitcher_outs"),isPitcher=isK||isOuts;
       var st=isPitcher?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
       if(!st)return;
-      var lam=null,bits=[],riskBits=[];
+      var lam=null,bits=[],riskBits=[],tags=[],nEff=null;
       if(isOuts){
         /* expected outs = expected IP × 3; strong opposing offense trims the start short */
         var g30x=st.last30&&Number(st.last30.g),ip30x=st.last30&&shIp(st.last30.ip);
-        var ipg=null;
-        if(isFinite(g30x)&&g30x>=3&&ip30x!=null)ipg=ip30x/g30x;
-        else if(st.season&&Number(st.season.g)>=8&&shIp(st.season.ip)!=null)ipg=shIp(st.season.ip)/Number(st.season.g);
+        var ipg=null,nOut=null;
+        if(isFinite(g30x)&&g30x>=3&&ip30x!=null){ipg=ip30x/g30x;nOut=g30x;}
+        else if(st.season&&Number(st.season.g)>=8&&shIp(st.season.ip)!=null){ipg=shIp(st.season.ip)/Number(st.season.g);nOut=Number(st.season.g);}
         if(ipg==null)return;
+        var ipgRaw=ipg;ipg=shShrink(ipg,nOut,4,Lipg);if(Lipg!=null&&Math.abs(ipg-ipgRaw)>ipgRaw*0.03)tags.push("shrunk-to-mean");
+        nEff=nOut*20; /* ~starts × PA-scale for the uncertainty band */
         var oppL=null;if(g){var nn=pnorm(row.p);
           if(pnorm(g.probable_away||"")===nn)oppL=g.lineup_home;else if(pnorm(g.probable_home||"")===nn)oppL=g.lineup_away;}
         var of=1,oo=offense(oppL);
-        if(oo!=null){of=shClamp(0.140/oo,0.86,1.12);bits.push("opposing lineup "+oo.toFixed(3)+" TB/AB ("+(of<1?"trims the start":"lets him go deeper")+")");}
+        if(oo!=null){of=shClamp(0.140/oo,0.86,1.12);bits.push("opposing lineup "+oo.toFixed(3)+" TB/AB ("+(of<1?"trims the start":"lets him go deeper")+")");if(of!==1)tags.push("opp-offense");}
         else riskBits.push("opposing lineup unconfirmed");
         lam=ipg*3*of;
         bits.unshift((ip30x&&g30x?ip30x.toFixed(1)+" IP over "+g30x+" starts last 30 days":"season "+shIp(st.season.ip).toFixed(1)+" IP / "+st.season.g+" starts")+" → ~"+lam.toFixed(1)+" outs (Poisson est.)");
         var eraO=shPitchBlend(st,"era");if(eraO!=null)bits.push(eraO.toFixed(2)+" blended ERA");
       }else if(isK){
         var g30=st.last30&&Number(st.last30.g),k30=st.last30&&Number(st.last30.k);
-        var kps=null;
-        if(isFinite(g30)&&g30>=3&&isFinite(k30))kps=k30/g30;
-        else if(st.season&&Number(st.season.g)>=8)kps=Number(st.season.k)/Number(st.season.g);
+        var kps=null,nK=null;
+        if(isFinite(g30)&&g30>=3&&isFinite(k30)){kps=k30/g30;nK=g30;}
+        else if(st.season&&Number(st.season.g)>=8){kps=Number(st.season.k)/Number(st.season.g);nK=Number(st.season.g);}
         if(kps==null)return;
+        var kpsRaw=kps;kps=shShrink(kps,nK,4,Lkg);if(Lkg!=null&&Math.abs(kps-kpsRaw)>kpsRaw*0.03)tags.push("shrunk-to-mean");
+        nEff=nK*20;
         var oppLineup=null;if(g){var n=pnorm(row.p);
           if(pnorm(g.probable_away||"")===n)oppLineup=g.lineup_home;else if(pnorm(g.probable_home||"")===n)oppLineup=g.lineup_away;}
         var f=1;
         if(oppLineup&&oppLineup.length){var kr=0,c=0;oppLineup.forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.k);},"ab",10);if(r!=null){kr+=r;c++;}});
-          if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2);bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");}}
+          if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2);bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");if(f!==1)tags.push("opp-offense");}}
         else riskBits.push("opposing lineup unconfirmed");
         lam=kps*f;
         bits.unshift((k30&&g30?k30+" K in "+g30+" starts last 30 days":"season "+st.season.k+" K / "+st.season.g+" starts")+" → "+lam.toFixed(1)+" expected");
@@ -1332,52 +1669,89 @@ function shAnalyzeLocal(slate){
           bits.push("vs "+opp+(era2!=null?" ("+era2.toFixed(2)+" ERA":"")+(whip!=null?", "+whip.toFixed(2)+" WHIP)":")"));}
         else riskBits.push("no probable-starter data for the matchup");
         var hrF=power*wind.f*(coors?1.08:1),tbF=power*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*(coors?1.07:1);
-        /* batter-vs-pitcher career history — tiny samples, so regress hard toward form:
-           blend the head-to-head per-AB rate in with weight ab/(ab+pseudo) and clamp
-           the swing. It nudges, never dictates. Only applied when it's the right matchup. */
+        /* batter-vs-pitcher career history — doc discipline, hard-coded caps:
+           under 15 PA = ignored in the math (context only on the card);
+           15–30 PA = tiny nudge; 30+ = modest weight; total effect capped ±10%. */
         var bvp=slate.bvp&&slate.bvp[pnorm(row.p)];
         if(bvp&&opp&&pnorm(bvp.vs||"")!==pnorm(opp))bvp=null;
-        function bvpRate(base,cnt,pseudo,band){
-          if(base==null||cnt==null||!bvp||!(bvp.ab>=3))return base;
-          var w=bvp.ab/(bvp.ab+(pseudo||22)),adj=base*(1-w)+(cnt/bvp.ab)*w;
-          return shClamp(adj,base*(1-(band||0.35)),base*(1+(band||0.35)));
+        var bvpUsed=false;
+        function bvpRate(base,cnt){
+          if(base==null||cnt==null||!bvp)return base;
+          var pa=Number(bvp.pa)||Number(bvp.ab)||0;
+          if(pa<15)return base;
+          var w=pa/(pa+(pa<30?300:150));
+          var adj=base*(1-w)+(cnt/Math.max(1,bvp.ab))*w;
+          adj=shClamp(adj,base*0.90,base*1.10);
+          if(adj!==base)bvpUsed=true;
+          return adj;
         }
-        var rate=null;
-        if(mkt==="batter_hits"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);rate=bvpRate(rate,bvp&&bvp.h,22,0.30);lam=rate!=null?rate*expAB*hF:null;}
-        if(mkt==="batter_total_bases"){rate=shBlend(st,function(s){return Number(s.h);},"ab",10);rate=bvpRate(rate,bvp&&bvp.h,22,0.30);
+        /* rate = 7/15/30 recency blend, empirical-Bayes shrunk toward the league mean
+           (n real ABs vs k pseudo-ABs of prior; HR shrunk hardest — rarest event) */
+        var shrunk=false;
+        function shrinkTag(raw,sh){if(raw!=null&&sh!=null&&Math.abs(sh-raw)>raw*0.03)shrunk=true;return sh;}
+        var rate=null,bn=null;
+        if(mkt==="batter_hits"){bn=shBlendN(st,function(s){return Number(s.h);},"ab",10);
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,Lh)):null;rate=bvpRate(rate,bvp&&bvp.h);lam=rate!=null?rate*expAB*hF:null;}
+        if(mkt==="batter_total_bases"){bn=shBlendN(st,function(s){return Number(s.h);},"ab",10);
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,Lh)):null;rate=bvpRate(rate,bvp&&bvp.h);
           if(rate!=null){var l3=st.last30,H=Number(l3.h)||0;
             var xb=(Number(l3["2b"])||0)+(Number(l3["3b"])||0),hrs=Number(l3.hr)||0;
             var s1=H>0?Math.max(0,(H-xb-hrs)/H):0.72,s2=H>0?Math.min(1,xb/H):0.2;
             lam={tb:1,lamH:rate*expAB*hF*(tbF>1?1.03:tbF<1?0.98:1),s1:s1,s2:s2};}}
-        if(mkt==="batter_home_runs"){rate=shBlend(st,function(s){return Number(s.hr);},"ab",25);rate=bvpRate(rate,bvp&&bvp.hr,40,0.50);lam=rate!=null?rate*expAB*hrF:null;}
-        if(mkt==="batter_hits_runs_rbis"){rate=shBlend(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);lam=rate!=null?rate*(coors?1.08:1)*power:null;
-          if(lam!=null&&bvp&&bvp.ab>=4){var w=bvp.ab/(bvp.ab+22);lam*=shClamp(1+(((bvp.tb/bvp.ab)/0.40)-1)*w,0.85,1.18);}}
+        if(mkt==="batter_home_runs"){bn=shBlendN(st,function(s){return Number(s.hr);},"ab",25);
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,150,Lhr)):null;rate=bvpRate(rate,bvp&&bvp.hr);lam=rate!=null?rate*expAB*hrF:null;}
+        if(mkt==="batter_hits_runs_rbis"){bn=shBlendN(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,10,Lhrr)):null;lam=rate!=null?rate*(coors?1.08:1)*power:null;
+          if(lam!=null&&bvp){var bpa=Number(bvp.pa)||Number(bvp.ab)||0;
+            if(bpa>=15){var w2=bpa/(bpa+(bpa<30?300:150));lam*=shClamp(1+(((bvp.tb/Math.max(1,bvp.ab))/0.40)-1)*w2,0.90,1.10);bvpUsed=true;}}}
         if(lam==null)return;
+        if(bvpUsed)tags.push("BvP");
+        if(shrunk)tags.push("shrunk-to-mean");
+        if(wind.f!==1||coors)tags.push("park+wind");
+        if(expAB>=4.3)tags.push("PA-volume");
+        if(contact!==1||power!==1)tags.push("starter-quality");
+        nEff=bn?bn.n:null;
         var l30=st.last30;
         bits.unshift(l30.h+"-for-"+l30.ab+" ("+l30.avg+") with "+l30.hr+" HR / "+l30.tb+" TB last 30");
         if(st.last15&&Number(st.last15.ab)>=20)bits.push("last 15: "+st.last15.h+"-for-"+st.last15.ab+" ("+st.last15.avg+")");
         if(st.last7&&Number(st.last7.ab)>=12)bits.push("last 7: "+st.last7.h+"-for-"+st.last7.ab+(st.last7.hr>0?" ("+st.last7.hr+" HR)":""));
-        if(bvp&&bvp.ab>=1)bits.push("career "+bvp.h+"-for-"+bvp.ab+(bvp.hr>0?" with "+bvp.hr+" HR":"")+" vs "+(bvp.vs||opp||"this SP")+(bvp.ab<10?" (small sample)":""));
+        if(bvp&&bvp.ab>=1){var bpa2=Number(bvp.pa)||Number(bvp.ab)||0;
+          bits.push("career "+bvp.h+"-for-"+bvp.ab+(bvp.hr>0?" with "+bvp.hr+" HR":"")+" vs "+(bvp.vs||opp||"this SP")+(bpa2<15?" (context only — under 15 PA)":bpa2<30?" (lightly weighted)":""));}
         if(spot)bits.push("#"+spot+" spot → ~"+expAB.toFixed(1)+" ABs");
         if(wind.txt)bits.push("wind "+wind.txt);
         if(coors)bits.push("Coors altitude");
       }
       var pO=(lam&&lam.tb)?shTbOver(row.ln,lam.lamH,lam.s1,lam.s2):shPOver(row.ln,lam);
+      /* H+R+RBI has joint dependence on teammates (runs/RBI) — the doc mandates it comes
+         from the game sims, not a closed-form guess. Sim marginal replaces Poisson here. */
+      var simP=simOf(g);
+      if(simP&&mkt==="batter_hits_runs_rbis"){
+        var sp=simP.legP[shLegKey(row.p,mkt,row.ln)];
+        if(sp!=null){pO=sp;tags.push("sim");bits.push(simP.n+" sims → over hits "+(sp*100).toFixed(1)+"% (teammate-dependent, jointly simulated)");}
+      }
       var iO=shImp(row.o),iU=shImp(row.u);
       var sd=null;
-      /* shrink the model 45% toward the vig-removed market, then choose a side.
-         Over-lean: surface the OVER unless the under is the clearly stronger side
-         (P(over) below SH_OVER_LEAN, i.e. P(under) >= ~60%). Keeps the board mostly
-         overs with the occasional strong under; probabilities shown stay honest. */
+      /* consensus prior (median de-vig across books) + market-anchored blend.
+         Over-lean stands: hitter props are OVERS ONLY; pitcher unders only when truly elite. */
       var isHitter=(mkt.indexOf("batter_")===0); /* hitter props: overs only (no unders, ever) */
-      if(iO!=null&&iU!=null){var nv=iO/(iO+iU);var pAdj=0.55*pO+0.45*nv;
-        sd=(isHitter||pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u};}
-      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:0.55*pO+0.45*fair,imp:fair,odds:row.o};}
-      if(!sd)return;
+      var nv=(row.fair!=null)?row.fair:((iO!=null&&iU!=null)?shDevig2(iO,iU):null);
+      if(row.books>=2)tags.push("consensus");
+      if(nv!=null){var pAdj=SH_W.props*pO+(1-SH_W.props)*nv;
+        if(Math.abs(pO-nv)>=0.10)tags.push("market-gap");
+        sd=(isHitter||pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o,bk:row.oBook}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u,bk:row.uBook};
+        /* pass list: hitter props where model+market agree the UNDER is the strong side */
+        if(isHitter&&pAdj<0.35)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:"O",odds:row.o,imp:nv,edge:pAdj-nv,
+          why:"model + market both favor the under — overs-only rule keeps it off the board"});
+      }
+      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:SH_W.props*pO+(1-SH_W.props)*fair,imp:fair,odds:row.o,bk:row.oBook};}
+      if(!sd||sd.odds==null)return;
       var edge=sd.p-sd.imp;
-      if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge});
+      if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge,
+        why:"heavy favorite priced above its fair probability — negative EV at any book"});
       var tmAb=lookupTeam[pnorm(row.p)];
       cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
+        oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,
+        lkey:shLegKey(row.p,mkt,row.ln),gkey:g?(pnorm(g.away)+"@"+pnorm(g.home)):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
@@ -1388,14 +1762,22 @@ function shAnalyzeLocal(slate){
   function finalizeCats(pred){
     var out={},any=false;
     SH_NAMED_CATS.forEach(function(k){
+      var thresh=SH_EDGE_MIN[k==="ml"?"ml":k==="rl"?"rl":"props"];
       var rows=cats[k].filter(pred).slice().sort(function(a,b){return b.p-a.p;});
       out[k]=rows.slice(0,50).map(function(r,i){var edge=r.p-r.imp;any=true;
-        return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,live:!!r.live,
+        /* EV at the best available price; ¼-Kelly fraction capped at 2% of bankroll (doc Phase 7) */
+        var dec=amToDec(r.oddsN),ev=shEV(r.p,dec),band=shBand(r.nEff);
+        var kellyF=Math.min(0.25*shKelly(r.p,dec),0.02);
+        return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,live:!!r.live,book:r.book||null,
           prob:Math.round(r.p*1000)/10,implied:Math.round(r.imp*1000)/10,edge:Math.round(edge*1000)/10,
-          conviction:shConv(r.p,edge),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
+          ev:ev!=null?Math.round(ev*1000)/10:null,kellyF:Math.round(kellyF*10000)/10000,
+          edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band),tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
+          conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });
     var allRows=[];SH_NAMED_CATS.forEach(function(k){out[k].forEach(function(r){allRows.push(r);});});
-    allRows.sort(function(a,b){return b.prob-a.prob;});
+    /* TOP 50 = the daily card, ranked by EV (doc Phase 4); category tabs stay probability-ranked
+       (they are the high-floor pool the parlays draw from) */
+    allRows.sort(function(a,b){return (b.ev==null?-99:b.ev)-(a.ev==null?-99:a.ev);});
     out.all=allRows.slice(0,50).map(function(r,i){var c={};for(var kk in r)c[kk]=r[kk];c.rank=i+1;return c;});
     return {cats:out,any:any};
   }
@@ -1412,7 +1794,7 @@ function shAnalyzeLocal(slate){
      PLUS mixed cross-type tickets — 100+ on a full board. One shared usage ledger per set caps
      any player at `cap` tickets total, so you can play many without re-betting the same play. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
-    txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob};}
+    txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
     var use={uPlayer:{},uKey:{}};
@@ -1438,13 +1820,30 @@ function shAnalyzeLocal(slate){
       var dec=legs.reduce(function(a,l){var d=amToDec(l.odds);return d?a*d:a;},1);
       var prob=legs.reduce(function(a,l){return a*(Number(l.prob)/100);},1);
       var gs={},sg=false;legs.forEach(function(l){if(gs[l.game])sg=true;gs[l.game]=1;});
+      /* same-game correlation measured from the sims (doc Phase 5): joint outcomes, not a guess */
+      var posCorr=false,negCorr=false;
+      for(var a=0;a<legs.length;a++)for(var b2=a+1;b2<legs.length;b2++){
+        var A=legs[a],B=legs[b2];
+        if(!A.gkey||A.gkey!==B.gkey||!A.lkey||!B.lkey)continue;
+        var sm=SIMS[A.gkey];if(!sm)continue;
+        var c=sm.corr(A.lkey,B.lkey);if(c==null)continue;
+        if(c<=-0.08)negCorr=true;else if(c>=0.08)posCorr=true;
+      }
+      /* fair combined odds + ticket EV from blended leg probs (cross-game legs multiply —
+         a parlay adds variance, not edge: it's only +EV if the legs are) */
+      var evT=(dec>1&&prob>0)?prob*dec-1:null;
+      var fairAm=(prob>0)?decToAm(1/prob):null;
       var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
       var am=decToAm(dec);
       return {name:name,type:type,typeLabel:(type==="MIX"?"Mixed":SH_TYPE_NAME[type]),tier:tier,legs:legs,
         odds:(am!=null?obSign(am):"—"),prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
-        note:(sg?"⚠ Some legs share a game (correlated). ":"")+
+        ev:evT!=null?Math.round(evT*1000)/10:null,fair:(fairAm!=null?obSign(fairAm):null),
+        note:(negCorr?"⛔ Sim says these legs work AGAINST each other (negatively correlated) — EV is worse than it looks. ":
+              posCorr?"✳ Sim-confirmed positive correlation between same-game legs. ":
+              sg?"⚠ Some legs share a game (correlated). ":"")+
+          (fairAm!=null?("Fair odds "+obSign(fairAm)+(evT!=null?" · EV "+(evT>=0?"+":"")+(evT*100).toFixed(0)+"%":"")+". "):"")+
           (tier==="SAFER"?"Higher-floor ticket — size up: $"+stake+" to win ~$"+toWin+".":
            tier==="LONGSHOT"?"Lottery ticket — keep it small: $"+stake+" to win ~$"+toWin+".":
            "Mid-risk build: $"+stake+" to win ~$"+toWin+".")};
@@ -1482,21 +1881,30 @@ function shAnalyzeLocal(slate){
   var parlaysMixed=buildParlaySet(omitCats(preF.cats,{ml:1,rl:1,batter_home_runs:1}),3);  /* MIXED: no HR/ML/RL */
   var parlaysLive=buildParlaySet(liveF.cats,3);  /* LIVE PARLAYS tab: every live game */
 
-  var tr=traps.sort(function(a,b){return a.edge-b.edge;})[0];
+  /* pass list (doc: "passes are logged too") — worst mispricings with the reason we're off them */
+  traps.sort(function(a,b){return a.edge-b.edge;});
+  var tr=traps[0];
   var trap=tr?{prop:tr.player+" "+(SH_MKT_LABEL[tr.mkt]||tr.mkt)+" "+tr.side+" "+tr.ln+" ("+obSign(tr.odds)+")",
-    reason:"The book is charging "+Math.round(tr.imp*100)+"% implied; the model makes it "+Math.round((tr.imp+tr.edge)*100)+"% — you're paying more juice than the numbers justify."}
+    reason:tr.why||("The book is charging "+Math.round(tr.imp*100)+"% implied; the model makes it "+Math.round((tr.imp+tr.edge)*100)+"% — you're paying more juice than the numbers justify.")}
     :{prop:"None flagged",reason:"No heavily juiced prop stood out as mispriced against the model today."};
+  var passes=traps.slice(1,5).map(function(t){
+    return {prop:t.player+" "+(SH_MKT_LABEL[t.mkt]||t.mkt)+" "+t.side+" "+t.ln+" ("+obSign(t.odds)+")",reason:t.why||"priced above fair probability"};});
 
+  var simCount=Object.keys(SIMS).length;
   var windSpot=null;slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&!windSpot)windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
   var counts=SH_CATS.filter(function(c){return c[0]!=="all";}).map(function(c){return preF.cats[c[0]].length?preF.cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
   var lg=slate.liveGames||[];
-  var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")+". "
+  var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")
+    +(simCount?" · "+simCount+" games Monte-Carlo simmed ("+SH_SIM_N+"× each)":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +"Ranked by win probability within each category — "+(counts||"no pregame lines yet")+". Edges vs vig-removed prices; model shrunk 45% toward the market. Strongly over-leaning — unders only surface when the model makes them 75%+. "
+    +"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
+    +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL, EV computed at the best available price (line-shopped). "
+    +"TOP 50 ranks by EV; category tabs rank by win probability (the high-floor parlay pool) — "+(counts||"no pregame lines yet")+". "
+    +"Rates are recency-blended (7/15/30d), shrunk to league means, BvP capped by sample size. "
     +parlays.length+" not-started + "+parlaysMixed.length+" mixed + "+parlaysLive.length+" in-game parlays (per-type + cross-type, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
-  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap};
+  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes};
 }
 
 /* --- the Claude API call --- */
@@ -1527,16 +1935,22 @@ function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
 SH.view="picks";SH.cat="all";SH.pfilter="all";
 function shPickCard(p,addAttr,name,propTxt){
   var edge=Number(p.edge)||0;
-  return "<div class='shpick'>"+
+  var ev=(p.ev==null)?null:Number(p.ev);
+  var stake=(p.kellyF&&p.kellyF>0)?Math.max(1,Math.round(SH.bankroll*p.kellyF)):0;
+  var tagsH=(p.tags&&p.tags.length)?"<div class='shtags'>"+p.tags.map(function(t){return "<span class='shtagc'>"+esc(t)+"</span>";}).join("")+"</div>":"";
+  return "<div class='shpick"+(p.edgeBadge?" shedge":"")+"'>"+
     "<div class='shpick-head'><span class='shrank'>#"+esc(String(p.rank))+"</span><span class='shname'>"+esc(name)+"</span>"+
-    "<span class='shprop'>"+esc(propTxt)+" ("+esc(p.odds)+")</span>"+
+    "<span class='shprop'>"+esc(propTxt)+" ("+esc(p.odds)+(p.book?" @ "+esc(p.book):"")+")</span>"+
+    (p.edgeBadge?"<span class='shconv A' title='EV clears the threshold + uncertainty band'>EDGE</span>":"")+
     "<span class='shconv "+(["A","B","C"].indexOf(p.conviction)>=0?p.conviction:"C")+"'>"+esc(p.conviction)+"</span></div>"+
     "<div class='shgame'>"+esc(p.game)+"</div>"+
     "<div class='shnums'>"+
       "<span class='shchip'>win <b>"+esc(String(p.prob))+"%</b></span>"+
-      "<span class='shchip'>book implies <b>"+esc(String(p.implied))+"%</b></span>"+
-      "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>"+
-    "</div>"+
+      "<span class='shchip'>market <b>"+esc(String(p.implied))+"%</b></span>"+
+      (ev!=null?"<span class='shchip "+(ev>=0?"edgeplus":"edgeminus")+"'>EV <b>"+(ev>=0?"+":"")+esc(String(p.ev))+"%</b></span>":
+        "<span class='shchip "+(edge>=0?"edgeplus":"edgeminus")+"'>edge <b>"+(edge>=0?"+":"")+esc(String(p.edge))+"%</b></span>")+
+      "<span class='shchip'>¼-Kelly <b>"+(stake>0?"$"+stake:"pass")+"</b></span>"+
+    "</div>"+tagsH+
     (p["case"]?"<div class='shcase'>"+esc(p["case"])+"</div>":"")+
     "<div class='shrisk'><b>Risk:</b> "+esc(p.risk)+"</div>"+
     "<div class='shaddrow'><button class='shadd' "+addAttr+">＋ Add to slip · "+esc(p.odds)+"</button></div>"+
@@ -1579,6 +1993,8 @@ function shRender(){
     h+="<div class='shover'><b>PARLAYS</b>Tickets built only from games that haven't started yet.</div>";
     h+=shParlaysView(d.parlays,"shparlay");
     if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
+    if(d.passes&&d.passes.length){h+="<div class='shtrap shpass'><b>PASSES — WHY THEY'RE OFF THE BOARD</b>"+
+      d.passes.map(function(t){return "<div class='shpassrow'><u>"+esc(t.prop)+"</u> — "+esc(t.reason)+"</div>";}).join("")+"</div>";}
   }
   el.innerHTML=h+meta;
 }
@@ -1677,7 +2093,7 @@ function shRun(engine){
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
       var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysMixed&&data.parlaysMixed.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:8,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:9,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -1695,6 +2111,11 @@ function shRun(engine){
   var sk=$("shSaveKey");if(sk)sk.addEventListener("click",function(){SH.key=($("shKey").value||"").trim();LS.set("pl_claudekey",SH.key);$("shKeyWrap").style.display="none";shStatus(SH.key?"Key saved — Claude mode unlocked.":"Key cleared — free built-in model still works.");aiBtnVis();});
   var rb=$("shRun");if(rb)rb.addEventListener("click",function(){shRun("local");});
   var ra=$("shRunAI");if(ra)ra.addEventListener("click",function(){shRun("claude");});
+  /* bankroll drives the ¼-Kelly stake suggestions; stakes re-render live on change */
+  var bk=$("shBank");if(bk){bk.value=SH.bankroll;
+    bk.addEventListener("change",function(){var v=Number(bk.value);
+      if(isFinite(v)&&v>=10){SH.bankroll=v;LS.set("pl_bankroll",v);shRender();}
+      else bk.value=SH.bankroll;});}
   aiBtnVis();
   var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
@@ -1708,7 +2129,7 @@ function shRun(engine){
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===8){shRender();
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===9){shRender();
     var shAge=Math.round((Date.now()-SH.board.at)/60000);
     shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
