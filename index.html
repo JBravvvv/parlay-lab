@@ -293,6 +293,21 @@ body{padding:0!important;min-height:100dvh}
 .shunavrow .num{font-family:'JetBrains Mono',monospace;font-size:10px}
 .shczno{background:rgba(120,180,255,.06);border:1px solid rgba(120,180,255,.3);border-radius:10px;padding:9px 12px;margin:10px 0;font-size:12px;line-height:1.5;color:var(--muted)}
 .shczok{background:none;border:1px solid var(--line);border-radius:7px;color:var(--fg);font-size:11px;padding:3px 10px;margin-left:6px;cursor:pointer}
+/* daily card + allocator (build 40) */
+.shmoney input{width:64px}
+.shfunlbl{color:var(--red)}
+.shmoneynote{margin:2px 0 6px}
+.shlock{background:rgba(255,184,56,.12);border:1px solid rgba(255,184,56,.5);border-radius:8px;color:var(--amber);font-family:'Saira Condensed',sans-serif;font-weight:700;letter-spacing:.8px;font-size:12px;padding:7px 12px;cursor:pointer}
+.shlock:disabled{opacity:.45;cursor:default}
+.shcard{border:1px solid rgba(255,184,56,.45);border-radius:12px;padding:11px 12px;margin:0 0 12px;background:rgba(255,184,56,.04)}
+.shcardhead{font-family:'Saira Condensed',sans-serif;font-weight:700;letter-spacing:1px;font-size:13px;color:var(--amber);margin-bottom:6px}
+.shcardnote{font-size:12px;color:var(--muted);line-height:1.5}
+.shcardev{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);margin-bottom:8px}
+.shthin{background:rgba(255,91,106,.08);border:1px solid rgba(255,91,106,.45);border-radius:9px;padding:8px 10px;font-size:12px;line-height:1.5;margin-bottom:8px}
+.shcardtk{margin-bottom:9px}
+.shstake b{color:var(--amber)}
+.shfunhead{font-family:'Saira Condensed',sans-serif;font-weight:700;letter-spacing:1px;font-size:12px;color:var(--red);margin:10px 0 6px}
+.shtag.fun{background:rgba(255,91,106,.14);color:var(--red)}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
   .tab-panel{max-width:760px;margin:0 auto}
@@ -404,6 +419,10 @@ body{padding:0!important;min-height:100dvh}
         <button class="shrun" id="shRun">Generate today's board · free</button>
         <button class="shrun shai" id="shRunAI" style="display:none">Deep analysis with Claude</button>
       </div>
+      <div class="shbankrow shmoney"><span class="shbanklbl">DAILY $</span><input id="shDaily" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+        <span class="shbanklbl shfunlbl">FUN $</span><input id="shFun" type="number" inputmode="decimal" min="0" step="1" placeholder="0" />
+        <button class="shlock" id="shLock" style="display:none">🔒 LOCK CARD</button></div>
+      <div class="shbanknote shmoneynote">DAILY spreads exact stakes across the day's best card · FUN buys longshots you're fine losing · lock freezes the day into the ledger</div>
       <div class="shbankrow"><span class="shbanklbl">BANKROLL $</span><input id="shBank" type="number" inputmode="decimal" min="10" step="10" /><span class="shbanknote">sets the ¼-Kelly stake suggestions (capped at 2%/bet)</span></div>
       <div class="shstatus" id="shStatus"></div>
       <div class="shsubnav" id="shSubNav" style="display:none">
@@ -1022,7 +1041,15 @@ renderStatus();renderLegs();renderResults();renderBooks();fetchStats();
    same APIs the rest of the app uses and sent as the user message. The user's
    Claude API key is stored only in localStorage (pl_claudekey) — never in source. */
 var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),timer:null,t0:0,
-  bankroll:(function(){var b=Number(LS.get("pl_bankroll",750));return (isFinite(b)&&b>=10)?b:750;})()};
+  bankroll:(function(){var b=Number(LS.get("pl_bankroll",750));return (isFinite(b)&&b>=10)?b:750;})(),
+  daily:(function(){var b=Number(LS.get("pl_daily",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})(),
+  fun:(function(){var b=Number(LS.get("pl_fun",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})()};
+/* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
+var SH_CFG={perParlayCap:0.40,roundTo:1,maxCoreTickets:6,thinSlateEV:0,
+  funTiers:[[800,2500],[2500,10000],[10000,1/0]],funTierNames:["BIG","MASSIVE","MOONSHOT"],
+  funAmt2:15,funAmt3:50,funSplit2:[0.6,0.4],funSplit3:[0.5,0.3,0.2],
+  funMinProb:0.1, /* FUN floor: below a 0.1% true hit rate (worse than 1-in-1000 slates) a "longshot" is a donation, not a lottery ticket */
+  seasonEnd:"2026-09-27",projPaths:2000};
 var SH_MODEL="claude-opus-4-8";
 var SH_PROP_MARKETS="batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs";
 var SH_SCHEMA={type:"object",additionalProperties:false,required:["overview","picks","parlays","trap"],properties:{
@@ -1080,7 +1107,7 @@ function shCollectSlate(){
       slate.eligible[key]=eligible;
       if(phase==="live"){slate.liveInfo[key]={inning:inning,inningState:inSt,away:aSc,home:hSc,state:st};
         slate.liveGames.push({game:aw.team.name+" @ "+hm.team.name,inning:inning,inningState:inSt,away:(aSc==null?0:aSc),home:(hSc==null?0:hSc)});}
-      slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,venue:(g.venue||{}).name,
+      slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,pk:g.gamePk||null,venue:(g.venue||{}).name,
         weather:g.weather||null,phase:phase,eligible:eligible,inning:inning,inningState:inSt,awayScore:aSc,homeScore:hSc,
         probable_away:(aw.probablePitcher||{}).fullName||null,probable_home:(hm.probablePitcher||{}).fullName||null,
         probable_away_id:(aw.probablePitcher||{}).id||null,probable_home_id:(hm.probablePitcher||{}).id||null,
@@ -1824,7 +1851,7 @@ function shAnalyzeLocal(slate){
      any player at `cap` tickets total, so you can play many without re-betting the same play. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
-    cz:(x.r.cz!=null?x.r.cz:null)};}
+    cz:(x.r.cz!=null?x.r.cz:null),live:!!x.r.live};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
     var use={uPlayer:{},uKey:{}};
@@ -1944,7 +1971,10 @@ function shAnalyzeLocal(slate){
     +"Rates are recency-blended (7/15/30d), shrunk to league means, BvP capped by sample size. "
     +parlays.length+" not-started + "+parlaysMixed.length+" mixed + "+parlaysLive.length+" in-game parlays (per-type + cross-type, safe→longshot)."
     +(slate.data_gaps&&slate.data_gaps.length?" "+slate.data_gaps.length+" inputs unavailable today (disclosed).":"");
-  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes};
+  /* game metadata for the card/ledger layer (additive): first-pitch time + gamePk per matchup —
+     the lock step stores pks for boxscore grading; the freeze rule compares start vs now */
+  var gameInfo={};slate.games.forEach(function(gg){gameInfo[pnorm(gg.away)+"@"+pnorm(gg.home)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home};});
+  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo};
 }
 
 /* --- the Claude API call --- */
@@ -1973,6 +2003,178 @@ function shCallClaude(systemPrompt,slate){
 /* --- render: two sub-views — Suggested Picks (per category) & Suggested Parlays --- */
 function shOddsClean(o){return String(o||"").replace(/[^\d+-]/g,"");}
 SH.view="picks";SH.cat="all";SH.pfilter="all";
+/* ===== build 40: daily bankroll allocator (post-generation sizing layer) =====
+   HARD CONSTRAINT (spec): parlay generation is untouched — this layer only selects
+   from and sizes what buildParlaySet already produced. */
+function shTicketId(pl){
+  return (pl.type||"T")+"_"+shHash32(pl.legs.map(function(l){return l.label+"|"+l.prop;}).sort().join("+")).toString(36);
+}
+/* the day's stakeable pool: pregame tickets playable at Caesars (PARLAYS + MIXED sets);
+   mixed tickets with a live leg are excluded — a lockable card is pregame by definition */
+function shCardPool(d){
+  var pool=[];
+  (d.parlays||[]).forEach(function(pl,idx){if(pl.czDec!=null)pool.push({pl:pl,src:"p",idx:idx});});
+  (d.parlaysMixed||[]).forEach(function(pl,idx){
+    if(pl.czDec!=null&&!pl.legs.some(function(l){return l.live;}))pool.push({pl:pl,src:"m",idx:idx});});
+  return pool;
+}
+/* EV·√floor weighted, correlation-dampened, capped, whole-dollar EXACT-SUM allocation.
+   Pure + deterministic: same pool/amount/cfg -> identical stakes (re-allocation is idempotent). */
+function shAllocate(pool,amount,cfg){
+  amount=Math.max(0,Math.round(Number(amount)||0));
+  if(!pool.length||amount<=0)return {picks:[],sum:0,ev:null};
+  var scored=pool.map(function(w,i){
+    var ev=((w.pl.czEv!=null?w.pl.czEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
+    return {w:w,i:i,ev:ev,prob:prob,base:Math.max(ev,0)*Math.sqrt(Math.max(prob,0.001))};
+  });
+  /* negative-EV slate: still allocate the full amount (spec) weighted by hit floor — the
+     thin-slate banner discloses it; never block, never hide */
+  if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
+  /* greedy selection with correlated-exposure dampening: every already-picked ticket sharing
+     a game (0.5) or an exact leg (1.0) shrinks a candidate's effective weight */
+  var picked=[],gUse={},lUse={};
+  var wantN=Math.min(cfg.maxCoreTickets,scored.length);
+  while(picked.length<wantN){
+    var best=null,bw=-1;
+    for(var si=0;si<scored.length;si++){var s=scored[si];
+      if(s.done)continue;
+      var shared=0;s.w.pl.legs.forEach(function(l){shared+=(gUse[l.game]||0)*0.5+(lUse[l.label+"|"+l.prop]||0)*1;});
+      var eff=s.base/(1+shared);
+      if(eff>bw+1e-12){bw=eff;best=s;} /* index order breaks ties -> deterministic */
+    }
+    if(!best)break;
+    best.done=true;best.eff=bw;picked.push(best);
+    best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=(lUse[l.label+"|"+l.prop]||0)+1;});
+  }
+  /* proportional stakes with the per-ticket cap (relaxed to 1/n when the pool is tiny,
+     otherwise an exact sum would be impossible); water-fill redistribution */
+  var n=picked.length,cap=Math.max(cfg.perParlayCap,1/n)*amount;
+  var tw=0;picked.forEach(function(s){tw+=s.eff;});
+  var raw=picked.map(function(s){return tw>0?amount*s.eff/tw:amount/n;});
+  for(var it=0;it<12;it++){
+    var over=0,freeW=0;
+    picked.forEach(function(s,i){
+      if(s.capped)return;
+      if(raw[i]>=cap-1e-9){over+=raw[i]-cap;raw[i]=cap;s.capped=true;}else freeW+=s.eff;});
+    if(over<=1e-9||freeW<=0)break;
+    picked.forEach(function(s,i){if(!s.capped)raw[i]+=over*s.eff/freeW;});
+  }
+  /* round to whole increments; push the remainder onto the highest-EV ticket(s), cap-respecting
+     where possible — the sum always equals the entered amount exactly */
+  var inc=cfg.roundTo||1;
+  var st=raw.map(function(r){return Math.floor(r/inc+1e-9)*inc;});
+  var left=amount-st.reduce(function(a,b){return a+b;},0);
+  var order=picked.map(function(s,i){return i;}).sort(function(a,b){return picked[b].ev-picked[a].ev||a-b;});
+  var guard=0;
+  while(left>=inc&&guard++<2000){
+    var placed=false;
+    for(var oi=0;oi<order.length;oi++){var ix=order[oi];
+      if(st[ix]+inc<=cap+1e-9){st[ix]+=inc;left-=inc;placed=true;break;}}
+    if(!placed){st[order[0]]+=left;left=0;}
+  }
+  if(left>0){st[order[0]]+=left;left=0;}
+  var sum=0,evAcc=0;
+  var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
+    out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
+  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null};
+}
+/* one stakeable ticket card (core or FUN) */
+function shCardTicket(w,stake,extra){
+  var pl=w.pl;
+  var toWin=pl.czDec?Math.round(stake*(pl.czDec-1)):null;
+  return "<div class='shparlay shcardtk'><div class='shparlay-head'><span class='shname'>"+esc(pl.name)+"</span>"+
+    "<span class='shprop'>"+esc(pl.czOdds)+" @ Caesars</span></div>"+
+    (extra||"")+
+    "<div class='shnums'><span class='shchip shstake'>stake <b>$"+stake+"</b></span>"+
+      (toWin!=null?"<span class='shchip'>to win <b>$"+toWin+"</b></span>":"")+
+      "<span class='shchip'>hit <b>"+esc(String(pl.prob))+"%</b></span>"+
+      (pl.czEv!=null?"<span class='shchip "+(pl.czEv>=0?"edgeplus":"edgeminus")+"'>EV <b>"+(pl.czEv>=0?"+":"")+esc(String(pl.czEv))+"%</b></span>":"")+
+      (pl.fair?"<span class='shchip'>fair <b>"+esc(pl.fair)+"</b></span>":"")+
+    "</div>"+
+    "<ul class='shlegs'>"+pl.legs.map(function(l){return "<li>"+esc(l.label+" · "+l.prop+" ("+(l.cz!=null?obSign(l.cz):l.odds)+")")+"</li>";}).join("")+"</ul>"+
+    "<div class='shaddrow'><button class='shadd' data-"+(w.src==="m"?"shparlaymixed":"shparlay")+"='"+w.idx+"'>＋ Add all "+pl.legs.length+" legs to slip</button></div></div>";
+}
+/* ===== build 40: FUN money bucket — tiered longshot SELECTION from the already-generated
+   pool (no new generation logic, per spec). Positively-correlated same-game stacks first:
+   sim-measured correlation is what makes a longshot's true probability beat its price. ===== */
+function shFunPick(pool,amount,cfg,excludeIds){
+  amount=Math.max(0,Math.round(Number(amount)||0));
+  if(!pool.length||amount<=0)return {picks:[],sum:0};
+  var ex=excludeIds||{};
+  /* bucket playable tickets into odds tiers at the CAESARS price */
+  var tiers=cfg.funTiers.map(function(){return [];});
+  pool.forEach(function(w,i){
+    if(ex[shTicketId(w.pl)])return;
+    if((Number(w.pl.prob)||0)<cfg.funMinProb)return; /* honest-longshot floor */
+    var am=w.pl.czDec!=null?decToAm(w.pl.czDec):null;if(am==null)return;
+    for(var t=0;t<cfg.funTiers.length;t++)
+      if(am>=cfg.funTiers[t][0]&&am<cfg.funTiers[t][1]){tiers[t].push({w:w,i:i});break;}
+  });
+  tiers.forEach(function(list){list.sort(function(a,b){
+    var pc=(b.w.pl.posCorr?1:0)-(a.w.pl.posCorr?1:0);if(pc)return pc;      /* sim-confirmed stacks first */
+    var nc=(a.w.pl.negCorr?1:0)-(b.w.pl.negCorr?1:0);if(nc)return nc;      /* anti-correlated last */
+    var ev=(b.w.pl.czEv||0)-(a.w.pl.czEv||0);if(Math.abs(ev)>1e-9)return ev;
+    return a.i-b.i;});});                                                   /* deterministic */
+  /* 1–3 tickets by amount; tier split from config; fall through to the nearest tier with stock */
+  var wantTiers=amount<cfg.funAmt2?[0]:amount<=cfg.funAmt3?[0,1]:[0,1,2];
+  var split=wantTiers.length===1?[1]:wantTiers.length===2?cfg.funSplit2:cfg.funSplit3;
+  var used={},picks=[];
+  wantTiers.forEach(function(t,k){
+    var pick=null;
+    [t,t+1,t+2,t-1,t-2].forEach(function(tt){
+      if(pick||tt<0||tt>=tiers.length)return;
+      tiers[tt].forEach(function(c){if(!pick&&!used[shTicketId(c.w.pl)])pick=c;});
+    });
+    if(pick){used[shTicketId(pick.w.pl)]=1;picks.push({w:pick.w,share:split[k],tier:t});}
+  });
+  if(!picks.length)return {picks:[],sum:0};
+  /* exact-dollar split, remainder on the first (biggest-share) ticket */
+  var st=picks.map(function(p){return Math.floor(amount*p.share);});
+  var left=amount-st.reduce(function(a,b){return a+b;},0);
+  st[0]+=left;
+  var out=[],sum=0;
+  picks.forEach(function(p,i){if(st[i]<=0)return;sum+=st[i];
+    out.push({w:p.w,stake:st[i],tier:p.tier,id:shTicketId(p.w.pl)});});
+  return {picks:out,sum:sum};
+}
+/* TODAY'S CARD: daily-bankroll allocation + FUN longshots over the playable pool */
+function shCardView(d){
+  var pool=shCardPool(d);
+  var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
+  if(!pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
+  if(!(SH.daily>0)&&!(SH.fun>0))
+    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, EV-weighted, max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket. FUN $ buys tiered longshots from the same board.</div></div>";
+  var coreIds={};
+  if(SH.daily>0){
+    var alloc=shAllocate(pool,SH.daily,SH_CFG);
+    var evPct=(alloc.ev!=null)?alloc.ev*100:null;
+    if(evPct!=null){
+      h+=(evPct<=SH_CFG.thinSlateEV)
+        ?"<div class='shthin'>Model suggests reduced action today: card EV ≈ "+evPct.toFixed(1)+"%. Allocating $"+alloc.sum+" as requested.</div>"
+        :"<div class='shcardev'>$"+alloc.sum+" across "+alloc.picks.length+" tickets · card EV ≈ +"+evPct.toFixed(1)+"%</div>";
+    }
+    alloc.picks.forEach(function(a){coreIds[a.id]=1;h+=shCardTicket(a.w,a.stake);});
+  }
+  if(SH.fun>0){
+    var fp=shFunPick(pool,SH.fun,SH_CFG,coreIds);
+    h+="<div class='shfunhead'>FUN MONEY · LONGSHOTS"+(fp.sum?" · $"+fp.sum:"")+"</div>";
+    if(!fp.picks.length)h+="<div class='shcardnote'>No Caesars-playable tickets in the longshot tiers (+800 and up) right now.</div>";
+    else{
+      h+="<div class='shcardnote'>High variance — most days this money is gone; that's the deal. Tracked separately in the ledger.</div>";
+      fp.picks.forEach(function(p){
+        var prob=Number(p.w.pl.prob)||0;
+        var every=prob>0?Math.max(1,Math.round(100/prob)):null;
+        var extra="<div class='shtags'><span class='shtag fun'>"+esc(SH_CFG.funTierNames[p.tier]||"LONGSHOT")+"</span>"+
+          (p.w.pl.posCorr?"<span class='shtag safe'>SIM-CORRELATED STACK</span>":"")+"</div>"+
+          (every?"<div class='shcardnote'>true hit ~"+prob+"% → ≈ 1 hit every "+every+" slates at this probability</div>":"");
+        h+=shCardTicket(p.w,p.stake,extra);
+      });
+    }
+  }
+  h+="</div>";
+  return h;
+}
+
 function shPickCard(p,addAttr,name,propTxt){
   var edge=Number(p.edge)||0;
   /* Caesars-only playable card: quant rows carry cz* fields — everything the user sees and
@@ -2041,6 +2243,7 @@ function shRender(){
     else{h+=shLiveBanner(d);h+=shParlaysView(d.parlaysLive,"shparlaylive");}
   }else{
     h+="<div class='shover'><b>PARLAYS</b>Tickets built only from games that haven't started yet.</div>";
+    h+=shCardView(d);
     h+=shParlaysView(d.parlays,"shparlay");
     if(d.trap)h+="<div class='shtrap'><b>TRAP OF THE DAY</b><u>"+esc(d.trap.prop)+"</u> — "+esc(d.trap.reason)+"</div>";
     if(d.passes&&d.passes.length){h+="<div class='shtrap shpass'><b>PASSES — WHY THEY'RE OFF THE BOARD</b>"+
@@ -2188,6 +2391,20 @@ function shRun(engine){
     bk.addEventListener("change",function(){var v=Number(bk.value);
       if(isFinite(v)&&v>=10){SH.bankroll=v;LS.set("pl_bankroll",v);shRender();}
       else bk.value=SH.bankroll;});}
+  /* DAILY/FUN amounts: reactive re-sizing (debounced) — the SAME tickets keep their picks and
+     prices, only stakes rescale (allocation is a pure function of board+amount) */
+  var moneyT=null;
+  function moneyWire(id,key,setter){
+    var inp=$(id);if(!inp)return;
+    inp.value=SH[key]||"";
+    function apply(){var v=Math.round(Number(inp.value)||0);
+      if(v<0)v=0;
+      SH[key]=v;LS.set(setter,v);shRender();}
+    inp.addEventListener("input",function(){clearTimeout(moneyT);moneyT=setTimeout(apply,300);});
+    inp.addEventListener("change",apply);
+  }
+  moneyWire("shDaily","daily","pl_daily");
+  moneyWire("shFun","fun","pl_fun");
   aiBtnVis();
   var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
