@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 41 · 2026-07-10</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 42 · 2026-07-10</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1067,6 +1067,8 @@ var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),t
   fun:(function(){var b=Number(LS.get("pl_fun",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})()};
 /* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
 var SH_CFG={perParlayCap:0.40,roundTo:1,maxCoreTickets:6,thinSlateEV:0,
+  coreNoHR:true,   /* DAILY money never touches HR props — HR volatility lives in the FUN bucket only (user rule) */
+  coreMaxDec:15,   /* core odds ceiling ~+1400: longshot ticket "EV" is compounded model error, not edge */
   funTiers:[[800,2500],[2500,10000],[10000,1/0]],funTierNames:["BIG","MASSIVE","MOONSHOT"],
   funAmt2:15,funAmt3:50,funSplit2:[0.6,0.4],funSplit3:[0.5,0.3,0.2],
   funMinProb:0.1, /* FUN floor: below a 0.1% true hit rate (worse than 1-in-1000 slates) a "longshot" is a donation, not a lottery ticket */
@@ -2041,13 +2043,31 @@ function shCardPool(d){
 }
 /* EV·√floor weighted, correlation-dampened, capped, whole-dollar EXACT-SUM allocation.
    Pure + deterministic: same pool/amount/cfg -> identical stakes (re-allocation is idempotent). */
+/* core-card discipline (user rules): DAILY money never rides an HR prop, and never a ticket
+   longer than cfg.coreMaxDec — a 5-leg HR "monster EV" is compounded model error and loses
+   nearly every day. Those tickets stay browsable and FUN-eligible; they just can't take
+   the daily bankroll. */
+function shCoreEligible(w,cfg){
+  var pl=w.pl;
+  if(cfg.coreNoHR&&(pl.type==="batter_home_runs"||
+    pl.legs.some(function(l){return (l.lkey||"").indexOf("|batter_home_runs|")>=0;})))return false;
+  if(cfg.coreMaxDec&&pl.czDec!=null&&pl.czDec>cfg.coreMaxDec)return false;
+  return true;
+}
 function shAllocate(pool,amount,cfg){
   amount=Math.max(0,Math.round(Number(amount)||0));
   if(!pool.length||amount<=0)return {picks:[],sum:0,ev:null};
-  var scored=pool.map(function(w,i){
+  /* stake weight = ¼-Kelly-proportional fraction: edge ÷ odds. Kelly is what maximizes
+     bankroll growth — it naturally starves long odds (huge denominator) and feeds
+     high-floor edges, instead of chasing compounded parlay "EV". */
+  var scored=[];
+  pool.forEach(function(w,i){
+    if(!shCoreEligible(w,cfg))return;
     var ev=((w.pl.czEv!=null?w.pl.czEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
-    return {w:w,i:i,ev:ev,prob:prob,base:Math.max(ev,0)*Math.sqrt(Math.max(prob,0.001))};
+    var dec=w.pl.czDec||2;
+    scored.push({w:w,i:i,ev:ev,prob:prob,base:(dec>1)?Math.max(ev,0)/(dec-1):0});
   });
+  if(!scored.length)return {picks:[],sum:0,ev:null};
   /* negative-EV slate: still allocate the full amount (spec) weighted by hit floor — the
      thin-slate banner discloses it; never block, never hide */
   if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
@@ -2180,7 +2200,7 @@ function shCardView(d){
   var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
   if(!cc||!cc.pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
   if(!(SH.daily>0)&&!(SH.fun>0))
-    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, EV-weighted, max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, and no pick ever repeats across card tickets (one bad prop can't sink multiple bets). FUN $ buys tiered longshots from the same board.</div></div>";
+    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, ¼-Kelly-weighted (edge ÷ odds, the bankroll-growth math), max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, no pick ever repeated across tickets, <b>never an HR prop</b>, nothing longer than "+esc(obSign(decToAm(SH_CFG.coreMaxDec)))+". HR bombs and longshots live in FUN $ only — money you're fine losing.</div></div>";
   if(shCardStarted(d,cc))h+="<div class='shthin'>First pitch has passed on a card game — amounts are frozen for today. Lock the card to record it, or it goes untracked.</div>";
   if(SH.daily>0){
     var alloc=cc.alloc;
