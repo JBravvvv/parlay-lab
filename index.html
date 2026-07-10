@@ -308,6 +308,15 @@ body{padding:0!important;min-height:100dvh}
 .shstake b{color:var(--amber)}
 .shfunhead{font-family:'Saira Condensed',sans-serif;font-weight:700;letter-spacing:1px;font-size:12px;color:var(--red);margin:10px 0 6px}
 .shtag.fun{background:rgba(255,91,106,.14);color:var(--red)}
+/* locked card + grading (build 40) */
+.shlocked{border-color:rgba(255,184,56,.4)}
+.shgr-won,.shgr-won b{color:var(--green)}
+.shgr-lost,.shgr-lost b{color:var(--red)}
+.shgr-void,.shgr-void b,.shgr-push,.shgr-push b{color:var(--muted)}
+.shchip.shgr-won{border-color:rgba(182,255,61,.5)}
+.shchip.shgr-lost{border-color:rgba(255,91,106,.5)}
+.shconfrow{margin-top:7px;font-size:11px;color:var(--muted)}
+.shconf{width:80px;background:#0c0e12;border:1px solid var(--line);border-radius:7px;color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:12px;padding:4px 7px;margin-left:6px;outline:none}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
   .tab-panel{max-width:760px;margin:0 auto}
@@ -2137,26 +2146,29 @@ function shFunPick(pool,amount,cfg,excludeIds){
     out.push({w:p.w,stake:st[i],tier:p.tier,id:shTicketId(p.w.pl)});});
   return {picks:out,sum:sum};
 }
-/* TODAY'S CARD: daily-bankroll allocation + FUN longshots over the playable pool */
+/* TODAY'S CARD: daily-bankroll allocation + FUN longshots over the playable pool.
+   Once locked, the view renders the immutable ledger snapshot instead. */
 function shCardView(d){
-  var pool=shCardPool(d);
+  var lk=shLedgerFind(shToday());
+  if(lk&&lk.locked)return shLockedCardView(lk);
+  var cc=shCardCalc(d);
   var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
-  if(!pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
+  if(!cc||!cc.pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
   if(!(SH.daily>0)&&!(SH.fun>0))
     return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, EV-weighted, max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket. FUN $ buys tiered longshots from the same board.</div></div>";
-  var coreIds={};
+  if(shCardStarted(d,cc))h+="<div class='shthin'>First pitch has passed on a card game — amounts are frozen for today. Lock the card to record it, or it goes untracked.</div>";
   if(SH.daily>0){
-    var alloc=shAllocate(pool,SH.daily,SH_CFG);
+    var alloc=cc.alloc;
     var evPct=(alloc.ev!=null)?alloc.ev*100:null;
     if(evPct!=null){
       h+=(evPct<=SH_CFG.thinSlateEV)
         ?"<div class='shthin'>Model suggests reduced action today: card EV ≈ "+evPct.toFixed(1)+"%. Allocating $"+alloc.sum+" as requested.</div>"
         :"<div class='shcardev'>$"+alloc.sum+" across "+alloc.picks.length+" tickets · card EV ≈ +"+evPct.toFixed(1)+"%</div>";
     }
-    alloc.picks.forEach(function(a){coreIds[a.id]=1;h+=shCardTicket(a.w,a.stake);});
+    alloc.picks.forEach(function(a){h+=shCardTicket(a.w,a.stake);});
   }
   if(SH.fun>0){
-    var fp=shFunPick(pool,SH.fun,SH_CFG,coreIds);
+    var fp=cc.fun;
     h+="<div class='shfunhead'>FUN MONEY · LONGSHOTS"+(fp.sum?" · $"+fp.sum:"")+"</div>";
     if(!fp.picks.length)h+="<div class='shcardnote'>No Caesars-playable tickets in the longshot tiers (+800 and up) right now.</div>";
     else{
@@ -2171,7 +2183,150 @@ function shCardView(d){
       });
     }
   }
+  h+="<div class='shaddrow'><button class='shlock' data-shlockbtn>🔒 LOCK CARD — freeze prices &amp; stakes into the ledger</button></div>";
   h+="</div>";
+  return h;
+}
+/* input freeze state: disabled once locked, or once a card game has started */
+function shMoneyState(){
+  var d=SH.board&&SH.board.data;
+  var lk=shLedgerFind(shToday());
+  var locked=!!(lk&&lk.locked);
+  var frozen=locked;
+  if(!frozen&&d&&!d.picks&&(SH.daily>0||SH.fun>0))frozen=shCardStarted(d,shCardCalc(d));
+  var di=$("shDaily"),fi=$("shFun"),lb=$("shLock");
+  if(di)di.disabled=frozen;
+  if(fi)fi.disabled=frozen;
+  if(lb){
+    lb.style.display=(d&&!d.picks)?"":"none";
+    lb.disabled=SH.busy||locked||!(SH.daily>0||SH.fun>0);
+    lb.textContent=locked?"LOCKED ✓":"🔒 LOCK CARD";
+  }
+}
+
+/* ===== build 40: season ROI ledger store (seeded 2026-07-10) =====
+   pl_ledger is APPEND-ONLY after lock: the only fields a locked entry may ever change are
+   grading results, closing-price sightings (CLV) and the optional NV price confirms — the
+   ledger is only trustworthy if it can't be rewritten. */
+var SH_LEDGER_SEED="2026-07-10";
+function shLedger(){var L=LS.get("pl_ledger",[]);return Array.isArray(L)?L:[];}
+function shLedgerFind(date){return shLedger().filter(function(e){return e.date===date;})[0]||null;}
+function shLedgerSave(entry){
+  var L=shLedger(),ix=-1;
+  L.forEach(function(e,i){if(e.date===entry.date)ix=i;});
+  if(ix>=0&&L[ix].locked){
+    /* immutability guard: merge ONLY the allowed subfields onto the locked snapshot */
+    var cur=L[ix],next={};for(var k in cur)next[k]=cur[k];
+    if(entry.grading!==undefined)next.grading=entry.grading;
+    if(entry.gradedAt!==undefined)next.gradedAt=entry.gradedAt;
+    if(entry.clv!==undefined)next.clv=entry.clv;
+    L[ix]=next;
+  }else if(ix>=0)L[ix]=entry;
+  else L.push(entry);
+  L.sort(function(a,b){return a.date<b.date?-1:1;});
+  LS.set("pl_ledger",L);
+  return shLedgerFind(entry.date);
+}
+/* the day's would-be card (pure recompute from the persisted board + amounts) */
+function shCardCalc(d){
+  if(!d||d.picks)return null;
+  var pool=shCardPool(d);
+  var alloc=shAllocate(pool,SH.daily,SH_CFG);
+  var ids={};alloc.picks.forEach(function(p){ids[p.id]=1;});
+  var fun=shFunPick(pool,SH.fun,SH_CFG,ids);
+  return {pool:pool,alloc:alloc,fun:fun};
+}
+/* freeze rule: once any card leg's game has thrown a first pitch, amounts are immutable */
+function shCardStarted(d,cc){
+  if(!d||!d.gameInfo||!cc)return false;
+  var now=Date.now(),started=false;
+  function chkT(p){p.w.pl.legs.forEach(function(l){var gi=l.gkey&&d.gameInfo[l.gkey];
+    if(gi&&gi.start&&new Date(gi.start).getTime()<=now)started=true;});}
+  cc.alloc.picks.forEach(chkT);cc.fun.picks.forEach(chkT);
+  return started;
+}
+/* LOCK CARD: freeze today's parlays, Caesars prices and exact stakes into the ledger */
+function shLockCard(){
+  var d=SH.board&&SH.board.data;
+  if(!d||d.picks){shStatus("Lock needs a generated quant board.",true);return;}
+  if(SH.board.date!==shToday()){shStatus("Board is from another day — regenerate before locking.",true);return;}
+  var ex=shLedgerFind(shToday());
+  if(ex&&ex.locked){shStatus("Today's card is already locked — no retroactive edits, ever.");return;}
+  var cc=shCardCalc(d);
+  if(!cc.alloc.picks.length&&!cc.fun.picks.length){shStatus("Nothing to lock — enter a DAILY $ or FUN $ amount first.",true);return;}
+  var late=shCardStarted(d,cc);
+  var games={};
+  function tkt(p,bucket,tierName){var pl=p.w.pl;
+    pl.legs.forEach(function(l){if(l.gkey&&d.gameInfo&&d.gameInfo[l.gkey])games[l.gkey]=d.gameInfo[l.gkey];});
+    return {id:p.id,bucket:bucket,name:pl.name,type:pl.type,tier:tierName,
+      stake:p.stake,czOdds:pl.czOdds,czDec:pl.czDec,prob:pl.prob,czEv:(pl.czEv!=null?pl.czEv:null),fair:pl.fair||null,
+      confirmed:null,
+      legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,est:l.est};})};}
+  var entry={date:shToday(),lockedAt:Date.now(),locked:true,lateLock:late,
+    daily:SH.daily,fun:SH.fun,bankroll:SH.bankroll,cardEv:cc.alloc.ev,
+    core:cc.alloc.picks.map(function(p){return tkt(p,"core",p.w.pl.tier);}),
+    funT:cc.fun.picks.map(function(p){return tkt(p,"fun",SH_CFG.funTierNames[p.tier]||"LONGSHOT");}),
+    games:games,grading:null,gradedAt:null,clv:{}};
+  shLedgerSave(entry);
+  shStatus("Card locked · $"+(cc.alloc.sum+cc.fun.sum)+" recorded"+(late?" (after first pitch — flagged)":"")+". Grades post automatically as games go final.");
+  shRender();
+}
+/* optional NV price confirm — allowed on a locked ticket only until its first pitch */
+function shConfirmPrice(tid,val){
+  var L=shLedger(),e=null;L.forEach(function(x){if(x.date===shToday())e=x;});
+  if(!e||!e.locked)return;
+  var t=e.core.concat(e.funT).filter(function(x){return x.id===tid;})[0];if(!t)return;
+  var started=t.legs.some(function(l){var gi=l.gkey&&e.games[l.gkey];
+    return gi&&gi.start&&new Date(gi.start).getTime()<=Date.now();});
+  if(started){shStatus("First pitch has passed — the locked price stands.",true);shRender();return;}
+  var s=String(val||"").trim();
+  if(!s){t.confirmed=null;LS.set("pl_ledger",L);shRender();return;}
+  var am=Number(s.replace(/[^\d+-]/g,""));
+  if(!isFinite(am)||Math.abs(am)<100){shStatus("Odds look off — use American format like +450 or -115.",true);return;}
+  t.confirmed=am;LS.set("pl_ledger",L);
+  shStatus("NV price confirmed for that ticket — grading will pay at "+obSign(am)+".");
+  shRender();
+}
+/* a locked (frozen) ticket card, with grade chip once results post */
+function shLockedTicket(t,entry){
+  var dec=(t.confirmed!=null)?amToDec(t.confirmed):t.czDec;
+  var toWin=dec?Math.round(t.stake*(dec-1)):null;
+  var gr=entry.grading&&entry.grading.tickets&&entry.grading.tickets[t.id];
+  var started=t.legs.some(function(l){var gi=l.gkey&&entry.games[l.gkey];
+    return gi&&gi.start&&new Date(gi.start).getTime()<=Date.now();});
+  var grChip=gr?("<span class='shchip shgr-"+gr.result+"'><b>"+gr.result.toUpperCase()+(gr.result==="won"?" $"+gr.payout:"")+"</b></span>")
+    :"<span class='shchip'>pending</span>";
+  var legRes=(entry.grading&&entry.grading.legs)||{};
+  return "<div class='shparlay shcardtk shlocked'><div class='shparlay-head'><span class='shname'>"+esc(t.name)+"</span>"+
+    "<span class='shprop'>"+esc(t.confirmed!=null?obSign(t.confirmed)+" (NV)":t.czOdds+" @ Caesars")+"</span></div>"+
+    "<div class='shtags'><span class='shtag "+(t.bucket==="fun"?"fun":"typ")+"'>"+esc(t.bucket==="fun"?("FUN · "+t.tier):t.tier||"CORE")+"</span></div>"+
+    "<div class='shnums'><span class='shchip shstake'>stake <b>$"+t.stake+"</b></span>"+
+      (toWin!=null?"<span class='shchip'>to win <b>$"+toWin+"</b></span>":"")+
+      "<span class='shchip'>hit <b>"+esc(String(t.prob))+"%</b></span>"+grChip+"</div>"+
+    "<ul class='shlegs'>"+t.legs.map(function(l){
+      var lid=l.label+"|"+l.prop,r=legRes[lid];
+      return "<li>"+esc(l.label+" · "+l.prop+" ("+(l.cz!=null?obSign(l.cz):"—")+")")+
+        (r?" <b class='shgr-"+r.result+"'>"+esc(r.result.toUpperCase()+(r.detail?" · "+r.detail:""))+"</b>":"")+"</li>";}).join("")+"</ul>"+
+    (!started&&!gr?"<div class='shconfrow'>NV price differs? <input class='shconf' data-czconfirm='"+esc(t.id)+"' placeholder='e.g. +450' value='"+(t.confirmed!=null?esc(obSign(t.confirmed)):"")+"' /></div>":"")+
+  "</div>";
+}
+/* the locked card view — rendered from the ledger snapshot, never recomputed */
+function shLockedCardView(entry){
+  var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · LOCKED "+
+    esc(new Date(entry.lockedAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+
+    (entry.lateLock?" · after first pitch":"")+"</div>";
+  var staked=0;entry.core.forEach(function(t){staked+=t.stake;});
+  var funStaked=0;entry.funT.forEach(function(t){funStaked+=t.stake;});
+  if(entry.cardEv!=null){var evPct=entry.cardEv*100;
+    h+=(evPct<=SH_CFG.thinSlateEV&&entry.core.length)
+      ?"<div class='shthin'>Locked on a thin slate: card EV ≈ "+evPct.toFixed(1)+"% at lock.</div>"
+      :(entry.core.length?"<div class='shcardev'>$"+staked+" core · card EV ≈ "+(evPct>=0?"+":"")+evPct.toFixed(1)+"% at lock</div>":"");}
+  entry.core.forEach(function(t){h+=shLockedTicket(t,entry);});
+  if(entry.funT.length){
+    h+="<div class='shfunhead'>FUN MONEY · LONGSHOTS · $"+funStaked+"</div>";
+    entry.funT.forEach(function(t){h+=shLockedTicket(t,entry);});
+  }
+  h+="<div class='shcardnote'>Locked cards are immutable — results post to the LEDGER as games go final.</div></div>";
   return h;
 }
 
@@ -2250,6 +2405,7 @@ function shRender(){
       d.passes.map(function(t){return "<div class='shpassrow'><u>"+esc(t.prop)+"</u> — "+esc(t.reason)+"</div>";}).join("")+"</div>";}
   }
   el.innerHTML=h+meta;
+  shMoneyState();
 }
 function shOrdN(n){return n+(n===1?"st":n===2?"nd":n===3?"rd":"th");}
 function shLiveBanner(d){
@@ -2405,10 +2561,14 @@ function shRun(engine){
   }
   moneyWire("shDaily","daily","pl_daily");
   moneyWire("shFun","fun","pl_fun");
+  /* lock card: header button + in-card button share one handler */
+  var lkb=$("shLock");if(lkb)lkb.addEventListener("click",shLockCard);
+  shMoneyState();
   aiBtnVis();
   var sn=$("shSubNav");if(sn)sn.addEventListener("click",function(e){var b=e.target.closest?e.target.closest("[data-shview]"):null;if(b){SH.view=b.getAttribute("data-shview");shRender();}});
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
     var cz=e.target.closest?e.target.closest("[data-czdismiss]"):null;if(cz){LS.set("pl_czNote","1");shRender();return;}
+    var lkc=e.target.closest?e.target.closest("[data-shlockbtn]"):null;if(lkc){shLockCard();return;}
     var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
     var pf=e.target.closest?e.target.closest("[data-pfilter]"):null;if(pf&&!pf.disabled){SH.pfilter=pf.getAttribute("data-pfilter");shRender();return;}
     var bl2=e.target.closest?e.target.closest("[data-shaddlive2]"):null;if(bl2){var kl=bl2.getAttribute("data-shaddlive2").split("|");shAddCatPickLive(kl[0],Number(kl[1]));return;}
@@ -2417,6 +2577,10 @@ function shRun(engine){
     var plm=e.target.closest?e.target.closest("[data-shparlaymixed]"):null;if(plm){shAddParlayMixed(Number(plm.getAttribute("data-shparlaymixed")));return;}
     var pl=e.target.closest?e.target.closest("[data-shparlay]"):null;if(pl){shAddParlay(Number(pl.getAttribute("data-shparlay")));return;}
     var b=e.target.closest?e.target.closest("[data-shadd]"):null;if(b)shAddPick(Number(b.getAttribute("data-shadd")));});
+  /* NV price-confirm inputs on locked tickets (change events don't bubble as clicks) */
+  if(bd)bd.addEventListener("change",function(e){
+    var ci=e.target&&e.target.getAttribute&&e.target.getAttribute("data-czconfirm");
+    if(ci)shConfirmPrice(ci,e.target.value);});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
   if(SH.board&&SH.board.date===shToday()&&SH.board.v===9){shRender();
