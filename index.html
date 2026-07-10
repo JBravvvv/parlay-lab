@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 42 · 2026-07-10</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 43 · 2026-07-10</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1954,8 +1954,12 @@ function shAnalyzeLocal(slate){
       (plan[k]||[3,4,5]).forEach(function(want){var n=Math.min(want,pool.length);if(n<2)return;
         var p=build(SH_TYPE_NAME[k]+" parlay · "+n+" legs",k,pick(pool,n,pdg));if(p)out.push(p);});
     });
-    /* mixed cross-type tickets, 2-10 legs, safe→longshot */
-    var mixPool=[];SH_NAMED_CATS.forEach(function(k){(C[k]||[]).forEach(function(r){mixPool.push({cat:k,r:r});});});
+    /* mixed cross-type tickets, 2-10 legs, safe→longshot.
+       HR props NEVER mix with any other prop type (user rule, build 43): an HR leg only
+       ever rides with other HR legs, so HR appears solely in the dedicated per-type
+       HR parlays above — in every set (PARLAYS, MIXED, LIVE) and everything built
+       from them (card, FUN). */
+    var mixPool=[];SH_NAMED_CATS.forEach(function(k){if(k==="batter_home_runs")return;(C[k]||[]).forEach(function(r){mixPool.push({cat:k,r:r});});});
     mixPool.sort(function(a,b){return b.r.prob-a.r.prob;});
     var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
     mixPat.forEach(function(want){var n=Math.min(want,mixPool.length);if(n<2)return;
