@@ -317,6 +317,17 @@ body{padding:0!important;min-height:100dvh}
 .shchip.shgr-lost{border-color:rgba(255,91,106,.5)}
 .shconfrow{margin-top:7px;font-size:11px;color:var(--muted)}
 .shconf{width:80px;background:#0c0e12;border:1px solid var(--line);border-radius:7px;color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:12px;padding:4px 7px;margin-left:6px;outline:none}
+/* ledger view (build 40) */
+.shledbtns{gap:8px;display:flex;flex-wrap:wrap}
+.shledsum{margin:8px 0}
+.shledchart{margin:12px 0}
+.shledlbl{font-family:'Saira Condensed',sans-serif;font-weight:700;letter-spacing:1px;font-size:11px;color:var(--muted);margin:10px 0 4px}
+.shsvg{width:100%;height:auto;display:block;background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:8px}
+.shledtab{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:10.5px;margin:10px 0}
+.shledtab th{color:var(--muted);text-align:right;font-weight:400;border-bottom:1px solid var(--line);padding:4px 5px}
+.shledtab td{text-align:right;padding:4px 5px;border-bottom:1px solid rgba(255,255,255,.04)}
+.shledtab th:first-child,.shledtab td:first-child{text-align:left}
+.shledio{width:100%;background:#0c0e12;border:1px solid var(--line);border-radius:8px;color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:10px;padding:7px;margin-top:7px;outline:none}
 @media(min-width:760px){
   .app-main{padding-left:16px;padding-right:16px}
   .tab-panel{max-width:760px;margin:0 auto}
@@ -440,6 +451,7 @@ body{padding:0!important;min-height:100dvh}
         <button class="shsub" data-shview="mixedparlays">MIXED PARLAYS</button>
         <button class="shsub" data-shview="live">IN-GAME</button>
         <button class="shsub" data-shview="liveparlays">LIVE PARLAYS</button>
+        <button class="shsub" data-shview="ledger">LEDGER</button>
       </div>
       <div class="shboard" id="shBoard"></div>
       <div class="note">Built-in quant engine, transparent math on live data: every price de-vigged across all posted books (median = consensus prior); the model — Monte Carlo game sims (4,000/game) for ML/RL/H+R+RBI, Poisson projections from 7/15/30-day form shrunk to league means for other props, BvP capped by sample size, starter quality, lineup spot → expected ABs, park &amp; wind — is blended in at a minority weight (the market is the smartest baseline). The playable card is Caesars-only — displayed odds, EV and ¼-Kelly stakes use Caesars' price (probabilities stay anchored to the full multi-book consensus); anything Caesars doesn't offer is listed separately. TOP 50 ranks by EV; category tabs rank by win probability and feed the parlays. Probabilities are estimates, not guarantees. Informational only.</div>
@@ -1091,7 +1103,7 @@ function shStatsUrl(group,days){var end=shToday();return days
   :"https://statsapi.mlb.com/api/v1/stats?stats=season&group="+group+"&season="+new Date().getFullYear()+"&sportId=1&playerPool=All&limit=2500";}
 
 function shCollectSlate(){
-  var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — outcome stats shrunk to league means instead.","No odds history — single-session prices only (no closing-line/CLV tracking)."];
+  var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — outcome stats shrunk to league means instead.","No odds history — CLV uses the last Caesars price seen before first pitch, not the true closing line (coverage disclosed in the ledger)."];
   var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{},league:{}};
   /* 1) schedule: matchups, weather, probables, lineups, and live inning state */
   return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+shToday()+"&hydrate=probablePitcher,weather,lineups,venue,linescore").then(function(res){
@@ -2261,7 +2273,7 @@ function shLockCard(){
     return {id:p.id,bucket:bucket,name:pl.name,type:pl.type,tier:tierName,
       stake:p.stake,czOdds:pl.czOdds,czDec:pl.czDec,prob:pl.prob,czEv:(pl.czEv!=null?pl.czEv:null),fair:pl.fair||null,
       confirmed:null,
-      legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,est:l.est};})};}
+      legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est};})};}
   var entry={date:shToday(),lockedAt:Date.now(),locked:true,lateLock:late,
     daily:SH.daily,fun:SH.fun,bankroll:SH.bankroll,cardEv:cc.alloc.ev,
     core:cc.alloc.picks.map(function(p){return tkt(p,"core",p.w.pl.tier);}),
@@ -2330,6 +2342,156 @@ function shLockedCardView(entry){
   return h;
 }
 
+/* ===== build 40: auto-grading from official box scores, Caesars void rules =====
+   Rules encoded (the only grading ruleset):
+   - batter props: player must be in the STARTING lineup (battingOrder ends in 00, not a
+     substitute) or the leg is VOID; pitcher props: listed pitcher must start or VOID
+   - postponed/suspended/cancelled games: legs VOID
+   - a voided leg is divided out of the ticket's decimal odds (reprice); all legs void = PUSH
+   - never fabricate a grade: missing data marks the leg/ticket ungradable with the reason */
+function shGradeLeg(leg,entry,boxes,statusMap){
+  var gi=leg.gkey&&entry.games[leg.gkey];
+  if(!gi||!gi.pk)return {result:"ungradable",detail:"no game id stored"};
+  var stt=statusMap[gi.pk];
+  if(!stt)return {result:"pending",detail:""};
+  if(/postpon|suspend|cancel|forfeit/i.test(stt.state))return {result:"void",detail:stt.state.toLowerCase()};
+  if(!/final|game over|completed/i.test(stt.state))return {result:"pending",detail:""};
+  var lk=leg.lkey||"";
+  /* ML / RL from the final score */
+  if(lk==="ml_home"||lk==="ml_away"||lk==="rl_home"||lk==="rl_away"){
+    var hR=stt.home,aR=stt.away;
+    if(hR==null||aR==null)return {result:"ungradable",detail:"no final score"};
+    var sc=aR+"-"+hR;
+    if(lk==="ml_home")return {result:hR>aR?"won":"lost",detail:sc};
+    if(lk==="ml_away")return {result:aR>hR?"won":"lost",detail:sc};
+    var mPt=(leg.prop||"").match(/RL ([+-][\d.]+)/),pt=mPt?Number(mPt[1]):null;
+    if(pt==null)return {result:"ungradable",detail:"no run-line point"};
+    var margin=(lk==="rl_home")?(hR-aR):(aR-hR);
+    return {result:(margin+pt>0)?"won":"lost",detail:sc};
+  }
+  /* player props from the boxscore */
+  var parts=lk.split("|");
+  if(parts.length!==3)return {result:"ungradable",detail:"unrecognized leg"};
+  var pn=parts[0],mkt=parts[1],ln=Number(parts[2]);
+  var side=/ U /.test(leg.prop||"")?"U":"O";
+  var bx=boxes[gi.pk];
+  if(!bx)return {result:"pending",detail:"boxscore unavailable"};
+  var pl=null;
+  ["away","home"].forEach(function(sd2){
+    var ps=(bx.teams&&bx.teams[sd2]&&bx.teams[sd2].players)||{};
+    Object.keys(ps).forEach(function(k){if(!pl&&pnorm((ps[k].person||{}).fullName)===pn)pl=ps[k];});
+  });
+  var isPitcher=(mkt==="pitcher_strikeouts"||mkt==="pitcher_outs");
+  if(!pl)return {result:"void",detail:isPitcher?"did not pitch":"not in starting lineup"};
+  if(isPitcher){
+    var pit=(pl.stats&&pl.stats.pitching)||{};
+    if(!Number(pit.gamesStarted))return {result:"void",detail:"did not start"};
+    var pv=(mkt==="pitcher_strikeouts")?Number(pit.strikeOuts):Number(pit.outs);
+    if(!isFinite(pv))return {result:"ungradable",detail:"stat missing"};
+    var pw=(side==="O")?pv>ln:pv<ln;
+    if(pv===ln)return {result:"push",detail:pv+(mkt==="pitcher_strikeouts"?" K":" outs")};
+    return {result:pw?"won":"lost",detail:pv+(mkt==="pitcher_strikeouts"?" K":" outs")};
+  }
+  var bo=String(pl.battingOrder||"");
+  var isSub=!!(pl.gameStatus&&pl.gameStatus.isSubstitute);
+  if(!bo||Number(bo)%100!==0||isSub)return {result:"void",detail:"not in starting lineup"};
+  var bat=(pl.stats&&pl.stats.batting)||{};
+  var H=Number(bat.hits)||0,R=Number(bat.runs)||0,BI=Number(bat.rbi)||0,HR=Number(bat.homeRuns)||0,
+      D2=Number(bat.doubles)||0,T3=Number(bat.triples)||0;
+  var val=null,unit="";
+  if(mkt==="batter_hits"){val=H;unit=" H";}
+  else if(mkt==="batter_total_bases"){val=H+D2+2*T3+3*HR;unit=" TB";}
+  else if(mkt==="batter_home_runs"){val=HR;unit=" HR";}
+  else if(mkt==="batter_hits_runs_rbis"){val=H+R+BI;unit=" H+R+RBI";}
+  else return {result:"ungradable",detail:"unknown market"};
+  if(val===ln)return {result:"push",detail:val+unit};
+  return {result:((side==="O")?val>ln:val<ln)?"won":"lost",detail:val+unit};
+}
+function shGradeTicket(t,legRes){
+  var res=t.legs.map(function(l){return legRes[l.label+"|"+l.prop]||{result:"pending"};});
+  if(res.some(function(r){return r.result==="pending";}))return {result:"pending",payout:0};
+  if(res.some(function(r){return r.result==="ungradable";}))return {result:"ungradable",payout:0,
+    detail:res.filter(function(r){return r.result==="ungradable";})[0].detail};
+  if(res.some(function(r){return r.result==="lost";}))return {result:"lost",payout:0};
+  /* voids + pushes divide out of the ticket price (Caesars reprice) */
+  var baseDec=(t.confirmed!=null)?amToDec(t.confirmed):t.czDec;
+  if(!baseDec)return {result:"ungradable",payout:0,detail:"no locked price"};
+  var eff=baseDec,liveLegs=0;
+  t.legs.forEach(function(l,i){
+    if(res[i].result==="void"||res[i].result==="push"){var d2=l.cz!=null?amToDec(l.cz):null;
+      if(d2)eff=eff/d2;}
+    else liveLegs++;
+  });
+  if(!liveLegs)return {result:"push",payout:t.stake};
+  return {result:"won",payout:Math.round(t.stake*eff*100)/100,dec:Math.round(eff*10000)/10000};
+}
+/* grade every locked, unfinished ledger entry from live box scores. Re-runnable + idempotent:
+   boxscores are immutable once final, and only grading/clv subfields ever merge. */
+function shGrade(){
+  var pend=shLedger().filter(function(e){return e.locked&&(!e.grading||!e.grading.done);});
+  if(!pend.length)return Promise.resolve(0);
+  var pks={},dates={};
+  pend.forEach(function(e){dates[e.date]=1;Object.keys(e.games).forEach(function(k){if(e.games[k].pk)pks[e.games[k].pk]=1;});});
+  var boxes={},statusMap={},chain=Promise.resolve();
+  Object.keys(dates).forEach(function(dt){chain=chain.then(function(){
+    return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+dt+"&hydrate=linescore").then(function(r){
+      var gs=(r.ok&&r.body&&r.body.dates&&r.body.dates[0]&&r.body.dates[0].games)||[];
+      gs.forEach(function(g){var ls=g.linescore||{};
+        statusMap[g.gamePk]={state:(g.status||{}).detailedState||"",
+          away:(ls.teams&&ls.teams.away&&ls.teams.away.runs!=null)?ls.teams.away.runs:null,
+          home:(ls.teams&&ls.teams.home&&ls.teams.home.runs!=null)?ls.teams.home.runs:null};});
+    });});});
+  Object.keys(pks).forEach(function(pk){chain=chain.then(function(){
+    if(statusMap[pk]&&!/final|game over|completed/i.test(statusMap[pk].state))return; /* skip boxscores we can't grade yet */
+    return obFetchJson("https://statsapi.mlb.com/api/v1/game/"+pk+"/boxscore").then(function(r){if(r.ok)boxes[pk]=r.body;});});});
+  return chain.then(function(){
+    var changed=0;
+    pend.forEach(function(e){
+      var legRes={},tickets={};
+      e.core.concat(e.funT).forEach(function(t){t.legs.forEach(function(l){
+        var lid=l.label+"|"+l.prop;
+        if(!legRes[lid])legRes[lid]=shGradeLeg(l,e,boxes,statusMap);});});
+      var done=true;
+      e.core.concat(e.funT).forEach(function(t){
+        var g=shGradeTicket(t,legRes);tickets[t.id]=g;
+        if(g.result==="pending"||g.result==="ungradable")done=false;});
+      var next={date:e.date,grading:{legs:legRes,tickets:tickets,done:done},gradedAt:Date.now()};
+      var prev=JSON.stringify(e.grading&&e.grading.tickets);
+      shLedgerSave(next);
+      if(JSON.stringify(tickets)!==prev)changed++;
+    });
+    return changed;
+  });
+}
+/* CLV, the honest version: no paid odds history, so "closing" = the LAST Caesars price seen
+   before first pitch. Every slate pull that happens pre-start refreshes it for free; legs
+   never re-sighted show CLV n/a with coverage disclosed. */
+function shClvSight(slate){
+  try{
+    var e=shLedgerFind(shToday());if(!e||!e.locked)return;
+    var now=Date.now(),clv={},k;for(k in (e.clv||{}))clv[k]=e.clv[k];
+    var odds={};(slate.game_odds||[]).forEach(function(o){odds[o.game]=o;});
+    var hit=0;
+    e.core.concat(e.funT).forEach(function(t){t.legs.forEach(function(l){
+      var gi=l.gkey&&e.games[l.gkey];if(!gi)return;
+      if(gi.start&&new Date(gi.start).getTime()<=now)return;
+      var mu=gi.away+" @ "+gi.home,lid=l.label+"|"+l.prop,am=null,lk=l.lkey||"";
+      if(lk==="ml_home"||lk==="ml_away"){var o=odds[mu];if(o)am=(lk==="ml_home")?o.home_ml_cz:o.away_ml_cz;}
+      else if(lk==="rl_home"||lk==="rl_away"){var o2=odds[mu];if(o2)am=(lk==="rl_home")?o2.home_rl_cz:o2.away_rl_cz;}
+      else{
+        var parts=lk.split("|");if(parts.length!==3)return;
+        var mks=slate.props[mu]&&slate.props[mu].markets&&slate.props[mu].markets[parts[1]];
+        if(!mks)return;
+        var side=/ U /.test(l.prop||"")?"u":"o";
+        mks.forEach(function(row){
+          if(am==null&&pnorm(row.p)===parts[0]&&String(row.ln)===parts[2]&&row.cz&&row.cz[side]!=null)am=row.cz[side];});
+      }
+      if(am!=null){clv[lid]={am:am,at:now};hit++;}
+    });});
+    if(hit)shLedgerSave({date:e.date,clv:clv});
+  }catch(err){}
+}
+
 function shPickCard(p,addAttr,name,propTxt){
   var edge=Number(p.edge)||0;
   /* Caesars-only playable card: quant rows carry cz* fields — everything the user sees and
@@ -2365,9 +2527,17 @@ function shPickCard(p,addAttr,name,propTxt){
 function shRender(){
   var el=$("shBoard");if(!el)return;
   var saved=SH.board;
-  if(!saved||!saved.data){el.innerHTML="";var sn=$("shSubNav");if(sn)sn.style.display="none";return;}
+  var sn=$("shSubNav");
+  function chips(){if(sn){sn.style.display="";Array.prototype.forEach.call(sn.querySelectorAll("[data-shview]"),function(b){b.classList.toggle("on",b.getAttribute("data-shview")===SH.view);});}}
+  /* LEDGER is board-independent: history stays reachable even before today's board exists */
+  if(SH.view==="ledger"){chips();el.innerHTML=shLedgerView();shMoneyState();return;}
+  if(!saved||!saved.data){
+    if(shLedger().length){chips();el.innerHTML="<div class='shover'>No board yet today — tap Generate for picks, or LEDGER for your season record.</div>";}
+    else{el.innerHTML="";if(sn)sn.style.display="none";}
+    shMoneyState();return;
+  }
   var d=saved.data,h="";
-  var sn=$("shSubNav");if(sn){sn.style.display="";Array.prototype.forEach.call(sn.querySelectorAll("[data-shview]"),function(b){b.classList.toggle("on",b.getAttribute("data-shview")===SH.view);});}
+  chips();
   var meta="<div class='shmeta'>generated "+esc(new Date(saved.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}))+" · "+esc(saved.engine==="claude"?SH_MODEL:"built-in stats model (free)")+" · data: MLB Stats API + The Odds API</div>";
   /* legacy 15-pick shape (Claude mode) */
   if(d.picks){
@@ -2469,6 +2639,221 @@ function shParlaysView(list,addName){
   else if(!show.length)h+="<div class='shover'>No parlays match this filter.</div>";
   return h;
 }
+/* ===== build 40: LEDGER view — season record, curves, CLV, projection ===== */
+function shLedgerStats(scope){
+  var L=shLedger().filter(function(e){return e.locked;});
+  var days=[],w=0,l=0,p=0,pendT=0,ungrT=0;
+  L.forEach(function(e){
+    var tix=(scope==="core")?e.core:(scope==="fun")?e.funT:e.core.concat(e.funT);
+    if(!tix.length)return;
+    var g=(e.grading&&e.grading.tickets)||{};
+    var d={date:e.date,staked:0,ret:0,pending:0,ungradable:0,w:0,l:0,p:0,n:tix.length};
+    tix.forEach(function(t){
+      var r=g[t.id];
+      if(!r||r.result==="pending"){d.pending++;pendT++;return;}
+      if(r.result==="ungradable"){d.ungradable++;ungrT++;return;}
+      d.staked+=t.stake;
+      if(r.result==="won"){d.ret+=r.payout;d.w++;w++;}
+      else if(r.result==="lost"){d.l++;l++;}
+      else{d.ret+=t.stake;d.p++;p++;}
+    });
+    d.pl=Math.round((d.ret-d.staked)*100)/100;
+    days.push(d);
+  });
+  var cs=0,cr=0,peak=0,dd=0;
+  days.forEach(function(d){cs+=d.staked;cr+=d.ret;
+    d.cumPl=Math.round((cr-cs)*100)/100;
+    d.cumRoi=cs>0?(cr-cs)/cs:null;
+    if(d.cumPl>peak)peak=d.cumPl;
+    if(peak-d.cumPl>dd)dd=peak-d.cumPl;});
+  /* biggest FUN hit (always tracked — the cost of the lottery hunt stays visible) */
+  var bigHit=null;
+  L.forEach(function(e){var g=(e.grading&&e.grading.tickets)||{};
+    e.funT.forEach(function(t){var r=g[t.id];
+      if(r&&r.result==="won"&&(!bigHit||r.payout>bigHit.payout))bigHit={payout:r.payout,name:t.name,date:e.date};});});
+  return {days:days,staked:Math.round(cs*100)/100,ret:Math.round(cr*100)/100,
+    pl:Math.round((cr-cs)*100)/100,roi:cs>0?(cr-cs)/cs:null,dd:Math.round(dd*100)/100,
+    w:w,l:l,push:p,pending:pendT,ungradable:ungrT,bigHit:bigHit};
+}
+function shClvStats(){
+  var L=shLedger().filter(function(e){return e.locked;});
+  var tot=0,sighted=0,sum=0;
+  L.forEach(function(e){
+    e.core.concat(e.funT).forEach(function(t){t.legs.forEach(function(lg){
+      tot++;
+      var s=e.clv&&e.clv[lg.label+"|"+lg.prop];
+      if(s&&s.am!=null&&lg.cz!=null){sighted++;sum+=(shImp(s.am)-shImp(lg.cz));}
+    });});
+  });
+  return {tot:tot,sighted:sighted,avg:sighted?sum/sighted:null};
+}
+/* tiny inline SVG line + fan (no libs) */
+function shSvgLine(vals,color){
+  if(!vals.length)return "";
+  var w=300,h=64,pad=4;
+  var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals);
+  if(mn===mx){mn-=1;mx+=1;}
+  function X(i){return pad+(w-2*pad)*(vals.length===1?0.5:i/(vals.length-1));}
+  function Y(v){return h-pad-(h-2*pad)*((v-mn)/(mx-mn));}
+  var pts=vals.map(function(v,i){return X(i).toFixed(1)+","+Y(v).toFixed(1);}).join(" ");
+  var zero=(0>=mn&&0<=mx)?"<line x1='"+pad+"' y1='"+Y(0).toFixed(1)+"' x2='"+(w-pad)+"' y2='"+Y(0).toFixed(1)+"' stroke='rgba(255,255,255,.15)' stroke-dasharray='3 3'/>":"";
+  return "<svg viewBox='0 0 "+w+" "+h+"' class='shsvg'>"+zero+
+    "<polyline points='"+pts+"' fill='none' stroke='"+color+"' stroke-width='1.6'/>"+
+    (vals.length===1?"<circle cx='"+X(0)+"' cy='"+Y(vals[0])+"' r='2.5' fill='"+color+"'/>":"")+"</svg>";
+}
+function shSvgFan(lo,mid,hi){
+  if(!mid.length)return "";
+  var w=300,h=90,pad=4;
+  var mn=Math.min.apply(null,lo),mx=Math.max.apply(null,hi);
+  if(mn===mx){mn-=1;mx+=1;}
+  function X(i){return pad+(w-2*pad)*(mid.length===1?0.5:i/(mid.length-1));}
+  function Y(v){return h-pad-(h-2*pad)*((v-mn)/(mx-mn));}
+  var band="";
+  lo.forEach(function(v,i){band+=(i?" L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1);});
+  for(var i=hi.length-1;i>=0;i--)band+=" L"+X(i).toFixed(1)+" "+Y(hi[i]).toFixed(1);
+  band+=" Z";
+  var pts=mid.map(function(v,i){return X(i).toFixed(1)+","+Y(v).toFixed(1);}).join(" ");
+  return "<svg viewBox='0 0 "+w+" "+h+"' class='shsvg'>"+
+    "<path d='"+band+"' fill='rgba(182,255,61,.10)' stroke='none'/>"+
+    "<polyline points='"+pts+"' fill='none' stroke='var(--green)' stroke-width='1.6'/></svg>";
+}
+/* seeded Monte Carlo of the remaining season: replays the empirical ticket profile at the
+   current DAILY+FUN amounts. A distribution, never a single number. */
+function shProjection(){
+  var L=shLedger().filter(function(e){return e.locked;});
+  if(!L.length)return null;
+  var prof=[],shareSum=0,stakedTot=0,daysLocked=L.length;
+  L.forEach(function(e){e.core.concat(e.funT).forEach(function(t){
+    var dec=(t.confirmed!=null)?amToDec(t.confirmed):t.czDec;if(!dec)return;
+    prof.push({p:(Number(t.prob)||0)/100,dec:dec,share:t.stake});shareSum+=t.stake;stakedTot+=t.stake;});});
+  if(!prof.length||!shareSum)return null;
+  var dayAmt=(SH.daily||0)+(SH.fun||0);
+  if(!(dayAmt>0))dayAmt=stakedTot/daysLocked; /* fall back to the historical average day */
+  var end=new Date(SH_CFG.seasonEnd+"T23:59:59");
+  var days=Math.max(0,Math.floor((end.getTime()-Date.now())/86400000));
+  if(!days)return null;
+  var comb=shLedgerStats("all");
+  var base=SH.bankroll+(comb.pl||0);
+  var N=SH_CFG.projPaths;
+  var rng=shMulberry(shHash32("proj|"+shToday()+"|"+daysLocked));
+  /* absolute equity per path; a path that hits $0 stops betting — ruin is ruin, and a
+     negative-bankroll projection would be a lie */
+  var paths=[],i;for(i=0;i<N;i++)paths.push(base);
+  var step=Math.max(1,Math.ceil(days/50));
+  var lo=[],mid=[],hi=[];
+  for(var d2=1;d2<=days;d2++){
+    for(i=0;i<N;i++){
+      if(paths[i]<=0)continue;
+      var bet=Math.min(dayAmt,paths[i]);
+      var pl=0;
+      for(var t=0;t<prof.length;t++){var tk=prof[t];
+        var stake=bet*tk.share/shareSum;
+        pl+=(rng()<tk.p)?stake*(tk.dec-1):-stake;}
+      paths[i]+=pl;if(paths[i]<0)paths[i]=0;
+    }
+    if(d2%step===0||d2===days){
+      var srt=paths.slice().sort(function(a,b){return a-b;});
+      lo.push(srt[Math.floor(N*0.1)]);mid.push(srt[Math.floor(N*0.5)]);hi.push(srt[Math.floor(N*0.9)]);
+    }
+  }
+  return {days:days,dayAmt:Math.round(dayAmt),base:Math.round(base),lo:lo,mid:mid,hi:hi,
+    endLo:Math.round(lo[lo.length-1]),endMid:Math.round(mid[mid.length-1]),endHi:Math.round(hi[hi.length-1])};
+}
+function shLedgerView(){
+  var h="<div class='shover'><b>SEASON LEDGER · SINCE "+esc(SH_LEDGER_SEED)+"</b>"+
+    "Locked cards only — append-only, auto-graded from official MLB box scores under Caesars void rules (batter must start, pitcher must start; voids reprice the ticket). CLV compares your locked price to the last Caesars price seen before first pitch — a static app can't see the true closing line, so coverage is disclosed.</div>";
+  h+="<div class='shaddrow shledbtns'><button class='shadd' data-shgrade>GRADE NOW</button>"+
+     "<button class='shadd' data-shsnap>📸 SNAPSHOT CLOSING</button></div>";
+  var Lall=shLedger().filter(function(e){return e.locked;});
+  if(!Lall.length){
+    h+="<div class='shover'>Nothing here yet. Set DAILY $ / FUN $, generate a board, and tap 🔒 LOCK CARD — every locked day lands here with its results, ROI and closing-line record.</div>";
+    return h+shLedgerBackup();
+  }
+  var scope=SH.ledgerScope||"all";
+  h+="<div class='shcats'>"+[["all","ALL"],["core","CORE"],["fun","FUN"]].map(function(c){
+    return "<button class='shcat"+(scope===c[0]?" on":"")+"' data-shledscope='"+c[0]+"'>"+c[1]+"</button>";}).join("")+"</div>";
+  var st=shLedgerStats(scope);
+  var clv=shClvStats();
+  var roiTxt=(st.roi==null)?"—":((st.roi>=0?"+":"")+(st.roi*100).toFixed(1)+"%");
+  h+="<div class='shnums shledsum'>"+
+    "<span class='shchip'>net P/L <b class='"+(st.pl>=0?"shgr-won":"shgr-lost")+"'>"+(st.pl>=0?"+$":"-$")+Math.abs(st.pl)+"</b></span>"+
+    "<span class='shchip'>ROI <b>"+roiTxt+"</b></span>"+
+    "<span class='shchip'>record <b>"+st.w+"-"+st.l+(st.push?"-"+st.push:"")+"</b></span>"+
+    "<span class='shchip'>max drawdown <b>$"+st.dd+"</b></span>"+
+    (st.pending?"<span class='shchip'>pending <b>"+st.pending+"</b></span>":"")+
+    (st.ungradable?"<span class='shchip shgr-lost'>ungradable <b>"+st.ungradable+"</b></span>":"")+
+    "<span class='shchip'>CLV <b>"+(clv.avg==null?"n/a":((clv.avg>=0?"+":"")+(clv.avg*100).toFixed(1)+"%"))+"</b> · "+clv.sighted+"/"+clv.tot+" legs sighted</span>"+
+  "</div>";
+  if(scope!=="core"&&st.bigHit)h+="<div class='shcardnote'>biggest FUN hit: $"+st.bigHit.payout+" ("+esc(st.bigHit.name)+", "+esc(st.bigHit.date)+")</div>";
+  var settled=st.days.filter(function(d){return d.staked>0;});
+  if(settled.length){
+    var base=Lall[0].bankroll||SH.bankroll;
+    h+="<div class='shledchart'><div class='shledlbl'>EQUITY (bankroll $"+base+" + cumulative P/L)</div>"+
+      shSvgLine(settled.map(function(d){return base+d.cumPl;}),"var(--green)")+"</div>";
+    h+="<div class='shledchart'><div class='shledlbl'>CUMULATIVE ROI</div>"+
+      shSvgLine(settled.map(function(d){return (d.cumRoi||0)*100;}),"var(--amber)")+"</div>";
+  }
+  /* daily table */
+  h+="<table class='shledtab'><tr><th>date</th><th>staked</th><th>ret</th><th>P/L</th><th>day ROI</th><th>cum ROI</th></tr>"+
+    st.days.map(function(d){
+      var dayRoi=d.staked>0?((d.ret-d.staked)/d.staked*100):null;
+      var mark=d.pending?" ·"+d.pending+"p":"";
+      return "<tr><td>"+esc(d.date.slice(5))+mark+"</td><td>$"+d.staked+"</td><td>$"+Math.round(d.ret*100)/100+"</td>"+
+        "<td class='"+(d.pl>=0?"shgr-won":"shgr-lost")+"'>"+(d.pl>=0?"+":"")+d.pl+"</td>"+
+        "<td>"+(dayRoi==null?"—":dayRoi.toFixed(0)+"%")+"</td>"+
+        "<td>"+(d.cumRoi==null?"—":(d.cumRoi*100).toFixed(1)+"%")+"</td></tr>";}).join("")+"</table>";
+  /* hit rate by ticket size */
+  var buckets={};
+  Lall.forEach(function(e){var g=(e.grading&&e.grading.tickets)||{};
+    var tix=(scope==="core")?e.core:(scope==="fun")?e.funT:e.core.concat(e.funT);
+    tix.forEach(function(t){var r=g[t.id];if(!r||r.result==="pending"||r.result==="ungradable")return;
+      var k=t.legs.length>=5?"5+":String(t.legs.length);
+      buckets[k]=buckets[k]||{w:0,n:0};buckets[k].n++;if(r.result==="won")buckets[k].w++;});});
+  var bk=Object.keys(buckets).sort();
+  if(bk.length)h+="<div class='shledlbl'>HIT RATE BY TICKET SIZE</div><div class='shnums'>"+
+    bk.map(function(k){var b=buckets[k];return "<span class='shchip'>"+k+" legs <b>"+b.w+"/"+b.n+"</b></span>";}).join("")+"</div>";
+  /* rest-of-season projection */
+  var pj=shProjection();
+  if(pj){
+    h+="<div class='shledchart'><div class='shledlbl'>REST-OF-SEASON PROJECTION · "+pj.days+" days at ~$"+pj.dayAmt+"/day</div>"+
+      shSvgFan(pj.lo,pj.mid,pj.hi)+
+      "<div class='shcardnote'>end-of-season equity, 10th / 50th / 90th percentile: <b>$"+pj.endLo+" / $"+pj.endMid+" / $"+pj.endHi+"</b> — "+
+      SH_CFG.projPaths+" simulated seasons replaying your locked-ticket profile at current amounts (paths that hit $0 stop betting). A distribution, not a promise: parlay variance is enormous, and a single projected number would be a lie of precision. Recomputes as real results replace simulated days.</div></div>";
+  }
+  return h+shLedgerBackup();
+}
+function shLedgerBackup(){
+  return "<details class='shunav'><summary>Backup — export / import the ledger</summary>"+
+    "<div class='shcardnote'>iOS can evict site storage if the app goes unused — copy an export into Notes now and then. Import only adds days missing on this device; locked days here are never overwritten.</div>"+
+    "<textarea id='shLedgerIO' rows='4' class='shledio' placeholder='Export fills this box — or paste a backup here and tap Import.'></textarea>"+
+    "<div class='shaddrow shledbtns'><button class='shadd' data-shledexp>EXPORT</button><button class='shadd' data-shledimp>IMPORT</button></div></details>";
+}
+function shGradeNow(){
+  shStatus("Grading from official box scores…");
+  shGrade().then(function(n){shStatus(n?("Grades updated ("+n+" day"+(n===1?"":"s")+" touched).") :"No new results yet — games still going.");shRender();})
+    .catch(function(e){shStatus((e&&e.message)||"Grading failed — try again.",true);});
+}
+function shSnapshotClosing(){
+  if(SH.busy)return;
+  var e=shLedgerFind(shToday());
+  if(!e||!e.locked){shStatus("Snapshot needs today's locked card.",true);return;}
+  SH.busy=true;shStatus("Snapshotting Caesars prices (uses API credits)…");
+  shCollectSlate().then(function(slate){shClvSight(slate);shStatus("Closing snapshot recorded for legs still pregame.");shRender();})
+    .catch(function(err){shStatus((err&&err.message)||"Snapshot failed.",true);})
+    .then(function(){SH.busy=false;});
+}
+function shLedgerImport(txt){
+  var arr;try{arr=JSON.parse(txt);}catch(e){shStatus("That doesn't parse as a ledger export.",true);return;}
+  if(!Array.isArray(arr)){shStatus("That doesn't look like a ledger export.",true);return;}
+  var added=0,skipped=0;
+  arr.forEach(function(e){
+    if(!e||!e.date||!e.locked||!Array.isArray(e.core))return;
+    if(shLedgerFind(e.date)){skipped++;return;}
+    shLedgerSave(e);added++;
+  });
+  shStatus("Import: "+added+" day(s) restored"+(skipped?", "+skipped+" already here (kept local — no overwrites)":"")+".");
+  shRender();
+}
 function shAddPick(i){ /* legacy shape */
   var d=SH.board&&SH.board.data;if(!d||!d.picks||!d.picks[i])return;var p=d.picks[i];
   S.legs.push({id:uid(),label:p.player,prop:p.prop+" "+p.line,odds:shOddsClean(p.odds),est:String(p.prob)});
@@ -2513,10 +2898,12 @@ function shRun(engine){
     shTick("Loading system prompt");
     work=fetch("prompts/mlb_prop_handicapper_prompt.md?d="+shToday(),{cache:"no-store"})
       .then(function(r){if(!r.ok)throw new Error("Couldn't load prompts/mlb_prop_handicapper_prompt.md ("+r.status+")");return r.text();})
-      .then(function(sys){shTick("Collecting today's slate");return shCollectSlate().then(function(slate){return shCallClaude(sys,slate);});});
+      .then(function(sys){shTick("Collecting today's slate");return shCollectSlate().then(function(slate){shClvSight(slate);return shCallClaude(sys,slate);});});
   }else{
     shTick("Collecting today's slate");
-    work=shCollectSlate().then(function(slate){shTick("Running the numbers");return shAnalyzeLocal(slate);});
+    /* free CLV sighting: any slate pull before first pitch refreshes the locked card's
+       last-seen Caesars prices (the honest stand-in for a closing line) */
+    work=shCollectSlate().then(function(slate){shClvSight(slate);shTick("Running the numbers");return shAnalyzeLocal(slate);});
   }
   work.then(function(data){
       /* Claude mode returns data.picks; the free model returns data.categories (+ live) */
@@ -2524,7 +2911,7 @@ function shRun(engine){
       var pickCount=(data&&data.picks)?data.picks.length:(catCount(data&&data.categories)+catCount(data&&data.categoriesLive));
       var parlayCount=((data&&data.parlays&&data.parlays.length)||0)+((data&&data.parlaysMixed&&data.parlaysMixed.length)||0)+((data&&data.parlaysLive&&data.parlaysLive.length)||0);
       if(!pickCount)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
-      SH.board={date:shToday(),at:Date.now(),engine:engine,v:9,data:data};LS.set("pl_sharp",SH.board);
+      SH.board={date:shToday(),at:Date.now(),engine:engine,v:10,data:data};LS.set("pl_sharp",SH.board);
       SH.view="picks";SH.cat="all";SH.pfilter="all";
       var liveN=(data&&data.liveGames&&data.liveGames.length)||0;
       shStop();shStatus("Board ready — "+pickCount+" picks · "+parlayCount+" parlays"+(liveN?" · "+liveN+" live":"")+" · "+(engine==="claude"?"Claude":"built-in model")+" · took "+Math.round((Date.now()-SH.t0)/1000)+"s");
@@ -2569,6 +2956,11 @@ function shRun(engine){
   var bd=$("shBoard");if(bd)bd.addEventListener("click",function(e){
     var cz=e.target.closest?e.target.closest("[data-czdismiss]"):null;if(cz){LS.set("pl_czNote","1");shRender();return;}
     var lkc=e.target.closest?e.target.closest("[data-shlockbtn]"):null;if(lkc){shLockCard();return;}
+    var ls=e.target.closest?e.target.closest("[data-shledscope]"):null;if(ls){SH.ledgerScope=ls.getAttribute("data-shledscope");shRender();return;}
+    var gr=e.target.closest?e.target.closest("[data-shgrade]"):null;if(gr){shGradeNow();return;}
+    var sp=e.target.closest?e.target.closest("[data-shsnap]"):null;if(sp){shSnapshotClosing();return;}
+    var ex=e.target.closest?e.target.closest("[data-shledexp]"):null;if(ex){var io=$("shLedgerIO");if(io){io.value=JSON.stringify(shLedger());io.focus();try{io.select();}catch(err){}shStatus("Ledger exported below — copy it somewhere safe (Notes works).");}return;}
+    var im=e.target.closest?e.target.closest("[data-shledimp]"):null;if(im){var io2=$("shLedgerIO");if(io2&&io2.value.trim())shLedgerImport(io2.value.trim());else shStatus("Paste a ledger export into the box first.",true);return;}
     var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
     var pf=e.target.closest?e.target.closest("[data-pfilter]"):null;if(pf&&!pf.disabled){SH.pfilter=pf.getAttribute("data-pfilter");shRender();return;}
     var bl2=e.target.closest?e.target.closest("[data-shaddlive2]"):null;if(bl2){var kl=bl2.getAttribute("data-shaddlive2").split("|");shAddCatPickLive(kl[0],Number(kl[1]));return;}
@@ -2583,10 +2975,15 @@ function shRun(engine){
     if(ci)shConfirmPrice(ci,e.target.value);});
   /* restore today's board; discard stale (prior-day) or old-schema boards so a
      regenerate always lands in the current pregame+in-game / 100+-parlay shape */
-  if(SH.board&&SH.board.date===shToday()&&SH.board.v===9){shRender();
+  if(SH.board&&SH.board.date===shToday()&&SH.board.v===10){shRender();
     var shAge=Math.round((Date.now()-SH.board.at)/60000);
     shStatus("Today's board · generated "+new Date(SH.board.at).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"})+(shAge>=12?" · "+shAge+"m old — tap Generate to pull current innings/lines":""));}
   else if(SH.board){SH.board=null;LS.set("pl_sharp",null);shRender();}
+  else shRender(); /* no board: still surfaces the LEDGER entry point when history exists */
+  /* auto-grade on open: locked days settle themselves as box scores go final */
+  setTimeout(function(){
+    try{shGrade().then(function(n){if(n){shRender();shStatus("Ledger updated — new results are in.");}}).catch(function(){});}catch(e){}
+  },1200);
 })();
 
 /* ===== app tab navigation + slip badge (build 20) ===== */
