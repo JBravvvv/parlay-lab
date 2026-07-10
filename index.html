@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 40 · 2026-07-10</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 41 · 2026-07-10</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -2051,21 +2051,27 @@ function shAllocate(pool,amount,cfg){
   /* negative-EV slate: still allocate the full amount (spec) weighted by hit floor — the
      thin-slate banner discloses it; never block, never hide */
   if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
-  /* greedy selection with correlated-exposure dampening: every already-picked ticket sharing
-     a game (0.5) or an exact leg (1.0) shrinks a candidate's effective weight */
+  /* greedy selection. HARD RULE (user): no pick may appear on two card tickets — one prop
+     going wrong must never sink multiple tickets, and a repeated leg adds hidden leverage,
+     not diversification. Tickets sharing an exact leg with anything already picked are
+     skipped outright; sharing just a game is allowed but dampens the weight (0.5/leg). */
   var picked=[],gUse={},lUse={};
   var wantN=Math.min(cfg.maxCoreTickets,scored.length);
   while(picked.length<wantN){
     var best=null,bw=-1;
     for(var si=0;si<scored.length;si++){var s=scored[si];
       if(s.done)continue;
-      var shared=0;s.w.pl.legs.forEach(function(l){shared+=(gUse[l.game]||0)*0.5+(lUse[l.label+"|"+l.prop]||0)*1;});
+      var dup=false,shared=0;
+      s.w.pl.legs.forEach(function(l){
+        if(lUse[l.label+"|"+l.prop])dup=true;
+        shared+=(gUse[l.game]||0)*0.5;});
+      if(dup)continue;
       var eff=s.base/(1+shared);
       if(eff>bw+1e-12){bw=eff;best=s;} /* index order breaks ties -> deterministic */
     }
     if(!best)break;
     best.done=true;best.eff=bw;picked.push(best);
-    best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=(lUse[l.label+"|"+l.prop]||0)+1;});
+    best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=1;});
   }
   /* proportional stakes with the per-ticket cap (relaxed to 1/n when the pool is tiny,
      otherwise an exact sum would be impossible); water-fill redistribution */
@@ -2094,10 +2100,11 @@ function shAllocate(pool,amount,cfg){
     if(!placed){st[order[0]]+=left;left=0;}
   }
   if(left>0){st[order[0]]+=left;left=0;}
-  var sum=0,evAcc=0;
+  var sum=0,evAcc=0,legSet={};
   var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
+    s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
     out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
-  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null};
+  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet};
 }
 /* one stakeable ticket card (core or FUN) */
 function shCardTicket(w,stake,extra){
@@ -2118,10 +2125,14 @@ function shCardTicket(w,stake,extra){
 /* ===== build 40: FUN money bucket — tiered longshot SELECTION from the already-generated
    pool (no new generation logic, per spec). Positively-correlated same-game stacks first:
    sim-measured correlation is what makes a longshot's true probability beat its price. ===== */
-function shFunPick(pool,amount,cfg,excludeIds){
+function shFunPick(pool,amount,cfg,excludeIds,excludeLegs){
   amount=Math.max(0,Math.round(Number(amount)||0));
   if(!pool.length||amount<=0)return {picks:[],sum:0};
   var ex=excludeIds||{};
+  /* HARD RULE (user): no pick repeats anywhere on the day's card — FUN tickets must be
+     leg-disjoint from the core card and from each other */
+  var usedLegs={},k;for(k in (excludeLegs||{}))usedLegs[k]=1;
+  function legDup(w){return w.pl.legs.some(function(l){return usedLegs[l.label+"|"+l.prop];});}
   /* bucket playable tickets into odds tiers at the CAESARS price */
   var tiers=cfg.funTiers.map(function(){return [];});
   pool.forEach(function(w,i){
@@ -2144,9 +2155,11 @@ function shFunPick(pool,amount,cfg,excludeIds){
     var pick=null;
     [t,t+1,t+2,t-1,t-2].forEach(function(tt){
       if(pick||tt<0||tt>=tiers.length)return;
-      tiers[tt].forEach(function(c){if(!pick&&!used[shTicketId(c.w.pl)])pick=c;});
+      tiers[tt].forEach(function(c){if(!pick&&!used[shTicketId(c.w.pl)]&&!legDup(c.w))pick=c;});
     });
-    if(pick){used[shTicketId(pick.w.pl)]=1;picks.push({w:pick.w,share:split[k],tier:t});}
+    if(pick){used[shTicketId(pick.w.pl)]=1;
+      pick.w.pl.legs.forEach(function(l){usedLegs[l.label+"|"+l.prop]=1;});
+      picks.push({w:pick.w,share:split[k],tier:t});}
   });
   if(!picks.length)return {picks:[],sum:0};
   /* exact-dollar split, remainder on the first (biggest-share) ticket */
@@ -2167,7 +2180,7 @@ function shCardView(d){
   var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
   if(!cc||!cc.pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
   if(!(SH.daily>0)&&!(SH.fun>0))
-    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, EV-weighted, max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket. FUN $ buys tiered longshots from the same board.</div></div>";
+    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, EV-weighted, max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, and no pick ever repeats across card tickets (one bad prop can't sink multiple bets). FUN $ buys tiered longshots from the same board.</div></div>";
   if(shCardStarted(d,cc))h+="<div class='shthin'>First pitch has passed on a card game — amounts are frozen for today. Lock the card to record it, or it goes untracked.</div>";
   if(SH.daily>0){
     var alloc=cc.alloc;
@@ -2245,7 +2258,7 @@ function shCardCalc(d){
   var pool=shCardPool(d);
   var alloc=shAllocate(pool,SH.daily,SH_CFG);
   var ids={};alloc.picks.forEach(function(p){ids[p.id]=1;});
-  var fun=shFunPick(pool,SH.fun,SH_CFG,ids);
+  var fun=shFunPick(pool,SH.fun,SH_CFG,ids,alloc.legs);
   return {pool:pool,alloc:alloc,fun:fun};
 }
 /* freeze rule: once any card leg's game has thrown a first pitch, amounts are immutable */
