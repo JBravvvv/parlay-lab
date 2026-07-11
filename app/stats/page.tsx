@@ -8,14 +8,16 @@ import { Pill, FilterPill } from "@/components/ui/Pill";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
+import { UfcCard } from "@/components/ufc/UfcCard";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
    same filters, timeframes and sort behavior. Data flows through /api/stats —
    free feeds, no keys, no quota. */
 
-/* ---------- sport registry (verbatim from legacy) ---------- */
-type SportId = "mlb" | "nfl" | "cfb";
+/* ---------- sport registry (verbatim from legacy; ufc renders its own card view) ---------- */
+type SportId = "mlb" | "nfl" | "cfb" | "ufc";
+type TableSportId = Exclude<SportId, "ufc">;
 type GroupId = string;
 
 const TEAM_ABBR: Record<number, string> = {
@@ -63,7 +65,7 @@ const FB_COLS: Record<string, StatCol[]> = {
   receiving: fbCols(["GP", "REC", "TGTS", "YDS", "AVG", "TD", "LNG", "YDS/G"]),
 };
 
-const SPORTS: Record<SportId, {
+const SPORTS: Record<TableSportId, {
   label: string; groups: [string, string][]; seasons: number[]; defSeason: number;
 }> = {
   mlb: { label: "MLB", groups: [["hitting", "HITTING"], ["pitching", "PITCHING"]], seasons: [2026, 2025, 2024], defSeason: 2026 },
@@ -157,7 +159,7 @@ function parseFootball(d: unknown, grp: string): StatRow[] {
 }
 
 /* ---------- upstream URL builders (verbatim from legacy) ---------- */
-function apiUrl(sport: SportId, scope: "ind" | "team", group: string, season: number, timeframe: string) {
+function apiUrl(sport: TableSportId, scope: "ind" | "team", group: string, season: number, timeframe: string) {
   if (sport !== "mlb") {
     const lg = sport === "nfl" ? "nfl" : "college-football";
     const q = `?region=us&lang=en&contentorigin=espn&season=${season}&seasontype=2`;
@@ -187,12 +189,12 @@ const statNum = (v: unknown) => {
   return isFinite(n) ? n : -Infinity;
 };
 const ESPN_LOGO: Record<string, string> = { ARI: "ari", AZ: "ari", CWS: "chw", CHW: "chw", ATH: "oak", OAK: "oak" };
-function logoUrl(sport: SportId, ab: string) {
+function logoUrl(sport: TableSportId, ab: string) {
   if (!ab || ab === "—" || sport === "cfb") return null; // 750+ college programs — abbr only
   const code = sport === "nfl" ? ab.toLowerCase() : ESPN_LOGO[ab.toUpperCase()] || ab.toLowerCase();
   return `https://a.espncdn.com/i/teamlogos/${sport === "nfl" ? "nfl" : "mlb"}/500/${code}.png`;
 }
-function matchPos(sport: SportId, group: string, sel: string, p: StatRow) {
+function matchPos(sport: TableSportId, group: string, sel: string, p: StatRow) {
   if (sel === "ALL") return true;
   if (sport !== "mlb") return p.pos === sel;
   if (group === "pitching") {
@@ -207,16 +209,16 @@ function matchPos(sport: SportId, group: string, sel: string, p: StatRow) {
   if (sel === "OF") return ["LF", "CF", "RF", "OF"].includes(p.pos);
   return p.pos === sel;
 }
-function posOptions(sport: SportId, group: string): [string, string][] {
+function posOptions(sport: TableSportId, group: string): [string, string][] {
   if (sport !== "mlb") return [["ALL", "All pos"], ["QB", "QB"], ["RB", "RB"], ["WR", "WR"], ["TE", "TE"]];
   if (group === "hitting")
     return [["ALL", "All pos"], ["C", "C"], ["1B", "1B"], ["2B", "2B"], ["3B", "3B"], ["SS", "SS"], ["LF", "LF"], ["CF", "CF"], ["RF", "RF"], ["OF", "OF"], ["DH", "DH"]];
   return [["ALL", "All"], ["SP", "SP"], ["RP", "RP"], ["CP", "CP"]];
 }
-const minLabel = (sport: SportId, group: string) => (sport !== "mlb" ? "Min GP" : group === "hitting" ? "Min AB" : "Min G");
-const minMax = (sport: SportId, group: string) => (sport !== "mlb" ? 20 : sport === "mlb" && group === "hitting" ? 200 : 50);
-const minStep = (sport: SportId, group: string) => (sport === "mlb" && group === "hitting" ? 5 : 1);
-const defaultSort = (sport: SportId, group: string) =>
+const minLabel = (sport: TableSportId, group: string) => (sport !== "mlb" ? "Min GP" : group === "hitting" ? "Min AB" : "Min G");
+const minMax = (sport: TableSportId, group: string) => (sport !== "mlb" ? 20 : sport === "mlb" && group === "hitting" ? 200 : 50);
+const minStep = (sport: TableSportId, group: string) => (sport === "mlb" && group === "hitting" ? 5 : 1);
+const defaultSort = (sport: TableSportId, group: string) =>
   sport !== "mlb" ? { key: "YDS", asc: false } : group === "hitting" ? { key: "homeRuns", asc: false } : { key: "era", asc: true };
 
 const CAP = 400;
@@ -235,23 +237,29 @@ export default function StatsPage() {
   const [minVal, setMinVal] = useState(0);
   const [query, setQuery] = useState("");
 
+  /* ufc has no stat table — everything below tableSport only drives the table sports */
+  const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
+
   // restore the legacy-persisted sport choice
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem("pl_sport") || '"mlb"') as SportId;
-      if (SPORTS[s] && s !== "mlb") pickSport(s);
+      if (s === "ufc") setSport("ufc");
+      else if (SPORTS[s] && s !== "mlb") pickSport(s);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function pickSport(s: SportId) {
     setSport(s);
-    setGroup(SPORTS[s].groups[0][0]);
-    setSeason(SPORTS[s].defSeason);
-    setTimeframe("season");
-    setTeam("ALL");
-    setPosition("ALL");
-    setMinVal(0);
+    if (s !== "ufc") {
+      setGroup(SPORTS[s].groups[0][0]);
+      setSeason(SPORTS[s].defSeason);
+      setTimeframe("season");
+      setTeam("ALL");
+      setPosition("ALL");
+      setMinVal(0);
+    }
     try { localStorage.setItem("pl_sport", JSON.stringify(s)); } catch {}
   }
   function pickGroup(g: string) {
@@ -260,17 +268,18 @@ export default function StatsPage() {
     setMinVal(0);
   }
 
-  const url = apiUrl(sport, scope, group, season, sport === "mlb" ? timeframe : "season");
+  const url = apiUrl(tableSport, scope, group, season, tableSport === "mlb" ? timeframe : "season");
   const q = useQuery({
     queryKey: ["stats", url],
     queryFn: async (): Promise<StatRow[]> => {
       const r = await fetch(`/api/stats?u=${encodeURIComponent(url)}`);
       if (!r.ok) throw new Error(`stats feed ${r.status}`);
       const d = await r.json();
-      return sport === "mlb" ? parseSplits(d) : parseFootball(d, group);
+      return tableSport === "mlb" ? parseSplits(d) : parseFootball(d, group);
     },
     staleTime: 120_000,
     retry: 2,
+    enabled: sport !== "ufc",
   });
 
   const all = useMemo(() => q.data ?? [], [q.data]);
@@ -283,25 +292,25 @@ export default function StatsPage() {
     let r = all;
     if (team !== "ALL") r = r.filter((p) => p.team === team);
     if (scope !== "team") {
-      if (position !== "ALL") r = r.filter((p) => matchPos(sport, group, position, p));
+      if (position !== "ALL") r = r.filter((p) => matchPos(tableSport, group, position, p));
       if (minVal > 0) {
-        const mk = sport !== "mlb" ? "GP" : group === "hitting" ? "atBats" : "gamesPlayed";
+        const mk = tableSport !== "mlb" ? "GP" : group === "hitting" ? "atBats" : "gamesPlayed";
         r = r.filter((p) => statNum(p.stat[mk]) >= minVal);
       }
     }
     const qq = query.trim().toLowerCase();
     if (qq) r = r.filter((p) => p.name.toLowerCase().includes(qq) || (p.team || "").toLowerCase().includes(qq));
-    const ds = defaultSort(sport, group);
+    const ds = defaultSort(tableSport, group);
     return [...r].sort((a, b) => {
       const av = statNum(a.stat[ds.key]), bv = statNum(b.stat[ds.key]);
       return ds.asc ? av - bv : bv - av;
     });
-  }, [all, team, scope, position, minVal, query, sport, group]);
+  }, [all, team, scope, position, minVal, query, tableSport, group]);
 
   const shown = rows.slice(0, CAP);
 
   const columns = useMemo<Column<StatRow & { rank: number }>[]>(() => {
-    const statCols = sport !== "mlb" ? FB_COLS[group] || [] : group === "hitting" ? HIT_COLS : PIT_COLS;
+    const statCols = tableSport !== "mlb" ? FB_COLS[group] || [] : group === "hitting" ? HIT_COLS : PIT_COLS;
     return [
       {
         key: "rank", header: "#", stickyLeft: 0,
@@ -312,7 +321,7 @@ export default function StatsPage() {
         key: "name", header: scope === "team" ? "Team" : "Player", stickyLeft: 34,
         sortValue: (r) => r.name,
         cell: (r) => {
-          const lg = logoUrl(sport, r.team);
+          const lg = logoUrl(tableSport, r.team);
           return (
             <span className="flex max-w-[168px] items-center gap-1.5 truncate font-medium text-text md:max-w-[240px]">
               {lg && (
@@ -331,7 +340,7 @@ export default function StatsPage() {
         cell: (r: StatRow) => <span>{c.f(r.stat[c.k])}</span>,
       })),
     ];
-  }, [sport, group, scope]);
+  }, [tableSport, group, scope]);
 
   const ranked = useMemo(() => shown.map((r, i) => ({ ...r, rank: i + 1 })), [shown]);
 
@@ -339,31 +348,40 @@ export default function StatsPage() {
     <>
       <PageHeader
         title="Stats"
-        sub={`${SPORTS[sport].label} · ${season} — every ${scope === "team" ? "team" : "player"}, live on open · tap any column to sort`}
+        sub={
+          sport === "ufc"
+            ? "UFC — next card with live records from ESPN and Caesars moneylines"
+            : `${SPORTS[tableSport].label} · ${season} — every ${scope === "team" ? "team" : "player"}, live on open · tap any column to sort`
+        }
         action={
-          <Pill variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
-            {q.isFetching ? "Refreshing…" : "↻ Refresh"}
-          </Pill>
+          sport !== "ufc" ? (
+            <Pill variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
+              {q.isFetching ? "Refreshing…" : "↻ Refresh"}
+            </Pill>
+          ) : undefined
         }
       />
 
       <Reveal>
         <Panel className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
-            {(Object.keys(SPORTS) as SportId[]).map((s) => (
+            {(["mlb", "nfl", "cfb", "ufc"] as SportId[]).map((s) => (
               <FilterPill key={s} selected={sport === s} onClick={() => pickSport(s)}>
-                {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : "🏈 NCAAF"}
+                {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
               </FilterPill>
             ))}
+            {sport !== "ufc" && (<>
             <span className="mx-1 h-5 w-px bg-line-2" />
             <FilterPill selected={scope === "ind"} onClick={() => setScope("ind")}>INDIVIDUAL</FilterPill>
             <FilterPill selected={scope === "team"} onClick={() => setScope("team")}>TEAM</FilterPill>
             <span className="mx-1 h-5 w-px bg-line-2" />
-            {SPORTS[sport].groups.map(([g, label]) => (
+            {SPORTS[tableSport].groups.map(([g, label]) => (
               <FilterPill key={g} selected={group === g} onClick={() => pickGroup(g)}>{label}</FilterPill>
             ))}
+            </>)}
           </div>
 
+          {sport !== "ufc" && (<>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               value={query}
@@ -376,9 +394,9 @@ export default function StatsPage() {
               {teams.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
             <select className={selectCls} value={season} onChange={(e) => setSeason(Number(e.target.value))}>
-              {SPORTS[sport].seasons.map((y) => <option key={y} value={y}>{y}</option>)}
+              {SPORTS[tableSport].seasons.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
-            {sport === "mlb" && (
+            {tableSport === "mlb" && (
               <select className={selectCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
                 <option value="last7">Last 7 Days</option>
                 <option value="last15">Last 15 Days</option>
@@ -389,13 +407,13 @@ export default function StatsPage() {
             {scope !== "team" && (
               <>
                 <select className={selectCls} value={position} onChange={(e) => setPosition(e.target.value)}>
-                  {posOptions(sport, group).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {posOptions(tableSport, group).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
                 <label className="flex items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[11.5px] font-semibold text-muted">
-                  {minLabel(sport, group)}{minVal > 0 ? ` ${minVal}` : ""}
+                  {minLabel(tableSport, group)}{minVal > 0 ? ` ${minVal}` : ""}
                   <input
-                    type="range" min={0} max={minMax(sport, group)} step={minStep(sport, group)}
-                    value={Math.min(minVal, minMax(sport, group))}
+                    type="range" min={0} max={minMax(tableSport, group)} step={minStep(tableSport, group)}
+                    value={Math.min(minVal, minMax(tableSport, group))}
                     onChange={(e) => setMinVal(Number(e.target.value) || 0)}
                     className="w-[90px] accent-(--color-pos)"
                   />
@@ -412,10 +430,13 @@ export default function StatsPage() {
                 ? `Live · ${new Date(q.dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${all.length.toLocaleString()} ${scope === "team" ? "teams" : "players"}`
                 : "No data"}
           </div>
+          </>)}
         </Panel>
       </Reveal>
 
-      {q.isPending ? (
+      {sport === "ufc" ? (
+        <UfcCard />
+      ) : q.isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[38px] rounded-[12px]" />)}
         </div>
@@ -424,8 +445,8 @@ export default function StatsPage() {
           <ErrorState
             title="Couldn't load live stats"
             body={
-              sport !== "mlb" && season > SPORTS[sport].defSeason
-                ? `The ${season} ${SPORTS[sport].label} season hasn't kicked off yet — stats will appear here once games are played.`
+              tableSport !== "mlb" && season > SPORTS[tableSport].defSeason
+                ? `The ${season} ${SPORTS[tableSport].label} season hasn't kicked off yet — stats will appear here once games are played.`
                 : "The live feed didn't answer — tap Retry."
             }
             onRetry={() => q.refetch()}
@@ -436,8 +457,8 @@ export default function StatsPage() {
           <EmptyState
             title="No players match"
             body={
-              sport !== "mlb" && season > SPORTS[sport].defSeason
-                ? `The ${season} ${SPORTS[sport].label} season hasn't kicked off yet — stats will appear here once games are played.`
+              tableSport !== "mlb" && season > SPORTS[tableSport].defSeason
+                ? `The ${season} ${SPORTS[tableSport].label} season hasn't kicked off yet — stats will appear here once games are played.`
                 : "Loosen the filters or clear the search."
             }
           />
@@ -445,7 +466,7 @@ export default function StatsPage() {
       ) : (
         <Reveal>
           <DataTable
-            key={`${sport}-${scope}-${group}`}
+            key={`${tableSport}-${scope}-${group}`}
             columns={columns}
             rows={ranked}
             rowKey={(r) => `${r.id}`}

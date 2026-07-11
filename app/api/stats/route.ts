@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
  * the proxy exists so the browser never depends on third-party CORS behavior,
  * and the Next data cache absorbs repeat loads.
  */
-const ALLOWED_HOSTS = new Set(["statsapi.mlb.com", "site.web.api.espn.com"]);
+const ALLOWED_HOSTS = new Set(["statsapi.mlb.com", "site.web.api.espn.com", "site.api.espn.com"]);
 const TTL_SECONDS = 180;
 
 export async function GET(req: NextRequest) {

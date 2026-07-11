@@ -12,6 +12,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { getMoney } from "@/lib/engine-client";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
@@ -33,6 +34,14 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
+  const [sport, setSport] = useState<"mlb" | "ufc">(() => {
+    if (typeof window === "undefined") return "mlb";
+    try { return localStorage.getItem("pl_board_sport") === "ufc" ? "ufc" : "mlb"; } catch { return "mlb"; }
+  });
+  const pickSport = (s: "mlb" | "ufc") => {
+    setSport(s);
+    try { localStorage.setItem("pl_board_sport", s); } catch {}
+  };
 
   const d = board?.data;
   const cats = (live ? d?.categoriesLive : d?.categories) ?? {};
@@ -107,17 +116,30 @@ export default function BoardPage() {
       <PageHeader
         title="Board"
         sub={
-          d
-            ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-            : "Consensus de-vigged probability vs the Caesars line"
+          sport === "ufc"
+            ? "UFC — de-vigged market consensus vs the Caesars moneyline, records live from ESPN"
+            : d
+              ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              : "Consensus de-vigged probability vs the Caesars line"
         }
         action={
-          <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
-            {regen.isPending ? "Scanning slate…" : d ? "Refresh board" : "Generate board"}
-          </Pill>
+          sport === "mlb" ? (
+            <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
+              {regen.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
+            </Pill>
+          ) : undefined
         }
       />
 
+      <div className="mb-4 flex items-center gap-2">
+        <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
+        <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+      </div>
+
+      {sport === "ufc" ? (
+        <UfcBoard />
+      ) : (
+        <>
       {typeof d?.overview === "string" && d.overview && (
         <Reveal>
           <div className="mb-4 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-[12.5px] leading-relaxed text-muted">
@@ -208,6 +230,8 @@ export default function BoardPage() {
         Prices are Caesars&apos; US feed via The Odds API; the NV app can differ — confirm at lock.
         Informational only, not betting advice.
       </div>
+        </>
+      )}
     </>
   );
 }
