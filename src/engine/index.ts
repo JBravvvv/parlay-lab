@@ -210,7 +210,7 @@ return {
   get: function(n){ try { return eval(n); } catch(e) { return undefined; } },
   set: function(n, v){ __shims.__v = v; eval(n + " = __shims.__v"); __shims.__v = undefined; }
 };`,
-  ) as (shims: typeof shims, src: string) => {
+  ) as (s: object, src: string) => {
     get: (n: string) => unknown;
     set: (n: string, v: unknown) => void;
   };
