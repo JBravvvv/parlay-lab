@@ -185,6 +185,23 @@ export default function LedgerPage() {
             <Pill variant="ghost" onClick={doExport} disabled={empty}>
               Export
             </Pill>
+            <Pill
+              variant="ghost"
+              disabled={empty}
+              onClick={async () => {
+                if (!api) return;
+                try {
+                  await navigator.clipboard.writeText(api.exportText());
+                  setNote(
+                    "Ledger copied — on your iPhone, open the new app: Ledger → Import → tap the box → Paste (Apple's shared clipboard carries it between your Mac and phone).",
+                  );
+                } catch {
+                  setNote("Clipboard blocked by the browser — use Export and AirDrop the file instead.");
+                }
+              }}
+            >
+              Copy for phone
+            </Pill>
             <Pill variant="ghost" onClick={() => setShowPaste((s) => !s)}>
               Import
             </Pill>
