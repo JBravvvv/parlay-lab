@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { Pill } from "@/components/ui/Pill";
+import { Pill, FilterPill } from "@/components/ui/Pill";
+import { UfcSharp } from "@/components/ufc/UfcSharp";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
@@ -34,6 +35,14 @@ export default function SharpPage() {
   const { data: board, isPending } = useBoard();
   const regen = useRegenerateBoard();
   const d = board?.data;
+  const [sport, setSport] = useState<"mlb" | "ufc">(() => {
+    if (typeof window === "undefined") return "mlb";
+    try { return localStorage.getItem("pl_sharp_sport") === "ufc" ? "ufc" : "mlb"; } catch { return "mlb"; }
+  });
+  const pickSport = (s: "mlb" | "ufc") => {
+    setSport(s);
+    try { localStorage.setItem("pl_sharp_sport", s); } catch {}
+  };
 
   const plays: PickRow[] = useMemo(() => {
     if (!d) return [];
@@ -58,15 +67,28 @@ export default function SharpPage() {
     <>
       <PageHeader
         title="The Sharp"
-        sub="The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
+        sub={
+          sport === "ufc"
+            ? "The desk's UFC read — market consensus vs the Caesars line, no fight model, no key needed"
+            : "The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
+        }
         action={
-          <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
-            {regen.isPending ? "Working the slate…" : d ? "Refresh read" : "Generate today's read"}
-          </Pill>
+          sport === "mlb" ? (
+            <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
+              {regen.isPending ? "Working the slate…" : d ? "Refresh read" : "Generate today's read"}
+            </Pill>
+          ) : undefined
         }
       />
 
-      {!d ? (
+      <div className="mb-4 flex items-center gap-2">
+        <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
+        <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+      </div>
+
+      {sport === "ufc" ? (
+        <UfcSharp />
+      ) : !d ? (
         <Panel>
           <EmptyState
             title={isPending || regen.isPending ? "Working the numbers…" : "No read yet today"}
@@ -205,8 +227,9 @@ export default function SharpPage() {
       )}
 
       <div className="mt-6 text-[10.5px] text-faint">
-        Same math, provably: the engine runs verbatim from the original app and a test suite rejects any change
-        that alters its picks. Informational only, not betting advice.
+        {sport === "ufc"
+          ? "UFC numbers are market-derived only (de-vigged consensus) — no model, nothing invented. Informational only, not betting advice."
+          : "Same math, provably: the engine runs verbatim from the original app and a test suite rejects any change that alters its picks. Informational only, not betting advice."}
       </div>
     </>
   );

@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
+import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { getMoney } from "@/lib/engine-client";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
@@ -223,6 +224,14 @@ export default function BoardPage() {
             </details>
           )}
         </>
+      )}
+
+      {d && (
+        <ParlaysSection
+          parlays={d.parlays ?? []}
+          mixed={d.parlaysMixed ?? []}
+          live={d.parlaysLive ?? []}
+        />
       )}
 
       <div className="mt-4 text-[10.5px] text-faint">
