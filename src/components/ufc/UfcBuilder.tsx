@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { getMoney } from "@/lib/engine-client";
 import { loadUfcBoard, amToDec, decToAm, fmtAm } from "@/lib/ufc";
+import { UfcProps, type PropLeg } from "@/components/ufc/UfcProps";
 
 /* Build-your-own UFC parlay from the Caesars-priced sides of the next card.
    Same market math as the Board's UFC desk (consensus = de-vigged median
@@ -81,6 +82,18 @@ export function UfcBuilder() {
     }
     setNote("");
     setSlip((s) => [...s, { fightId: p.fightId, fight: p.fight, pick: p.pick, record: p.record, czOdds: p.czOdds, prob: p.prob }]);
+  };
+
+  /* typed prop legs — a prop shares its fight's id, so the same guard blocks
+     exclusive/correlated combos (two methods of one fight, or ML + method) */
+  const addProp = (p: PropLeg) => {
+    const clash = slip.find((l) => l.fightId === p.groupId);
+    if (clash) {
+      setNote(`${p.pick} can't ride with ${clash.pick} — same fight/market, outcomes aren't independent.`);
+      return;
+    }
+    setNote("");
+    setSlip((s) => [...s, { fightId: p.groupId, fight: p.fight, pick: p.pick, czOdds: p.czOdds, prob: p.prob }]);
   };
 
   const calc = useMemo(() => {
@@ -195,10 +208,13 @@ export function UfcBuilder() {
         </Reveal>
       )}
 
+      <UfcProps fights={q.data?.fights ?? []} onAdd={addProp} />
+
       <div className="text-[10.5px] leading-relaxed text-faint">
         True % is the de-vigged consensus across every US book in the feed — no fight model. Different fights are
-        independent, so combined probability is the straight product; both sides of one fight are blocked. Caesars
-        posts only moneylines for UFC in this feed. Informational only, not betting advice.
+        independent, so combined probability is the straight product; both sides of one fight are blocked. Method and
+        round props aren&apos;t in the feed at any book — the props desk above prices them from what you type in.
+        Informational only, not betting advice.
       </div>
     </div>
   );
