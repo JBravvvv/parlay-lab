@@ -11,8 +11,20 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 >   Everything below this box describes that legacy app; its golden rules apply only to `legacy/` until cutover.
 > - Node **is** installed now (nvm, `~/.nvm/versions/node/v24.18.0/bin`); validation = `npm run build`,
 >   `npm run typecheck`, `npm run test` (vitest). jsc is no longer needed for the new app.
-> - Phase status: 0 (foundations) + 1 (design system/app shell) done; 2 = engine extraction + odds proxy + Board;
->   3 = Dashboard + Ledger; 4 = Simulator; 5 = Sharp + Builder; 6 = polish/PWA/cutover. Review gate after Phase 1.
+> - Phase status: **ALL PHASES (0–6) COMPLETE** on this branch. Pages: / (dashboard), /board, /builder,
+>   /ledger, /sharp, /simulator, /settings, /design (design-system review page). Server routes: /api/odds
+>   (host-whitelisted proxy, ODDS_API_KEY env, ~4-min Next data cache, quota headers, fresh=1 passcode-gated)
+>   and /api/sharp (ANTHROPIC_API_KEY env, APP_PASSCODE gate, legacy SH_SCHEMA contract, prompt file traced).
+>   Engine facade: src/engine (get/set into the sandboxed legacy scope; shSimGames instrumented in
+>   src/lib/engine-client.ts to capture sim outputs — zero math impact). Same localStorage keys as legacy
+>   (pl_bankroll/pl_daily/pl_fun/pl_ledger/pl_sharp_ai/pl_board_r1/pl_pass/pl_quota). PWA: public/manifest +
+>   public/sw.js (network-first shell). Commands: `npm run dev` (port 3600), `npm run build` (writes
+>   .next-build — NEVER let a build share .next with a running dev server), `npm run typecheck`,
+>   `npm run test` (11 tests incl. the byte-identical baseline43 parity digest — run after ANY engine change).
+> - **Deploy**: Vercel (Josh's account), production branch `frontend-rebuild`; env vars ODDS_API_KEY (rotate
+>   the legacy public key at cutover), ANTHROPIC_API_KEY, APP_PASSCODE. Cutover checklist: deploy → set envs →
+>   rotate Odds key → export ledger from the old app on the phone → Import on /ledger → add new URL to home
+>   screen → merge to main and retire GitHub Pages.
 > - Rules that carry over regardless of stack: never fabricate prices/stats/grades; locked product rules
 >   (overs-only, HR isolation, no-repeat card, exact-sum allocator); ledger append-only after lock;
 >   thresholds in config not code.

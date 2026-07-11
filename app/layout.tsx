@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Space_Grotesk, Unbounded } from "next/font/google";
 import { AppShell } from "@/components/shell/AppShell";
+import { SwRegister } from "@/components/shell/SwRegister";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -23,6 +24,9 @@ const unbounded = Unbounded({
 export const metadata: Metadata = {
   title: "Parlay Lab",
   description: "MLB betting analytics terminal — informational only, not betting advice.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Parlay Lab" },
 };
 
 export const viewport: Viewport = {
@@ -42,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
+        <SwRegister />
       </body>
     </html>
   );
