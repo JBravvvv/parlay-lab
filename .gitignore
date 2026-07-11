@@ -2,6 +2,7 @@
 files.zip
 node_modules/
 .next/
+.next-build/
 out/
 *.tsbuildinfo
 .env*.local
