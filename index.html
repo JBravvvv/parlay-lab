@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 44 · 2026-07-10</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 45 · 2026-07-11</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -2886,7 +2886,8 @@ function shLedgerBackup(){
   return "<details class='shunav'><summary>Backup — export / import the ledger</summary>"+
     "<div class='shcardnote'>iOS can evict site storage if the app goes unused — copy an export into Notes now and then. Import only adds days missing on this device; locked days here are never overwritten.</div>"+
     "<textarea id='shLedgerIO' rows='4' class='shledio' placeholder='Export fills this box — or paste a backup here and tap Import.'></textarea>"+
-    "<div class='shaddrow shledbtns'><button class='shadd' data-shledexp>EXPORT</button><button class='shadd' data-shledimp>IMPORT</button></div></details>";
+    "<div class='shaddrow shledbtns'><button class='shadd' data-shledsend>➡ SEND TO NEW APP</button><button class='shadd' data-shledexp>EXPORT</button><button class='shadd' data-shledimp>IMPORT</button></div>"+
+    "<div class='shcardnote'>SEND TO NEW APP opens the new Parlay Lab (parlay-lab-six.vercel.app) with this ledger attached — it imports itself there in one tap. Nothing here is changed or deleted.</div></details>";
 }
 function shGradeNow(){
   shStatus("Grading from official box scores…");
@@ -3019,6 +3020,11 @@ function shRun(engine){
     var ls=e.target.closest?e.target.closest("[data-shledscope]"):null;if(ls){SH.ledgerScope=ls.getAttribute("data-shledscope");shRender();return;}
     var gr=e.target.closest?e.target.closest("[data-shgrade]"):null;if(gr){shGradeNow();return;}
     var sp=e.target.closest?e.target.closest("[data-shsnap]"):null;if(sp){shSnapshotClosing();return;}
+    var sd=e.target.closest?e.target.closest("[data-shledsend]"):null;if(sd){
+      var L45=shLedger();
+      if(!L45.length){shStatus("Nothing to send — the ledger is empty on this device.",true);return;}
+      var b45=btoa(unescape(encodeURIComponent(JSON.stringify(L45)))).replace(/\+/g,"-").replace(/\//g,"_");
+      location.href="https://parlay-lab-six.vercel.app/ledger#import="+b45;return;}
     var ex=e.target.closest?e.target.closest("[data-shledexp]"):null;if(ex){var io=$("shLedgerIO");if(io){io.value=JSON.stringify(shLedger());io.focus();try{io.select();}catch(err){}shStatus("Ledger exported below — copy it somewhere safe (Notes works).");}return;}
     var im=e.target.closest?e.target.closest("[data-shledimp]"):null;if(im){var io2=$("shLedgerIO");if(io2&&io2.value.trim())shLedgerImport(io2.value.trim());else shStatus("Paste a ledger export into the box first.",true);return;}
     var c=e.target.closest?e.target.closest("[data-shcat]"):null;if(c&&!c.disabled){SH.cat=c.getAttribute("data-shcat");shRender();return;}
