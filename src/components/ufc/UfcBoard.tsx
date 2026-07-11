@@ -201,10 +201,10 @@ export function UfcBoard() {
           </Reveal>
 
           <div className="text-[10.5px] leading-relaxed text-faint">
-            Fight props (method of victory, round betting) aren&apos;t carried for Caesars in this odds feed — only
-            moneylines are, so parlays here stick to what you can actually verify at the window. Rounds O/U shown is
-            another book&apos;s line for reference. Fights are treated as independent. Informational only, not betting
-            advice.
+            Fight props (method of victory, round betting) aren&apos;t in this odds feed at any book — to price them,
+            type the Caesars app&apos;s prices into the <b className="text-muted">props desk on the Builder&apos;s UFC
+            tab</b> and it de-vigs the market for you. Rounds O/U shown is another book&apos;s line for reference.
+            Fights are treated as independent. Informational only, not betting advice.
           </div>
         </>
       )}
