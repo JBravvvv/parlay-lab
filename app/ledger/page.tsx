@@ -91,6 +91,8 @@ export default function LedgerPage() {
   const [scope, setScope] = useState<"all" | "core" | "fun">("all");
   const [grading, setGrading] = useState(false);
   const [note, setNote] = useState("");
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const stats = useMemo(() => api?.stats(scope), [api, scope]);
@@ -137,6 +139,17 @@ export default function LedgerPage() {
     setNote("Import merged. Locked days already here were never overwritten.");
   };
 
+  const doPasteImport = () => {
+    if (!api || !pasteText.trim()) return;
+    const before = api.entries.length;
+    api.importText(pasteText.trim());
+    setPasteText("");
+    setShowPaste(false);
+    setNote(
+      `Import merged${before === 0 ? "" : " with what was already here"} — locked days are never overwritten. Check the days below.`,
+    );
+  };
+
   if (!api) return null;
   const empty = api.entries.length === 0;
 
@@ -153,7 +166,7 @@ export default function LedgerPage() {
             <Pill variant="ghost" onClick={doExport} disabled={empty}>
               Export
             </Pill>
-            <Pill variant="ghost" onClick={() => fileRef.current?.click()}>
+            <Pill variant="ghost" onClick={() => setShowPaste((s) => !s)}>
               Import
             </Pill>
             <input
@@ -167,6 +180,31 @@ export default function LedgerPage() {
         }
       />
       {note && <div className="mb-4 text-[12px] text-pos">{note}</div>}
+
+      {showPaste && (
+        <Panel title="Import a ledger backup" className="mb-4">
+          <div className="mb-2 text-[12px] leading-relaxed text-muted">
+            Moving from the old app? There: <b>Sharp tab → LEDGER → Backup → EXPORT</b>, then tap inside the box,
+            Select All, Copy. Here: paste below. Only missing days are added — locked days on this device are never
+            overwritten.
+          </div>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={4}
+            placeholder='Paste the export here — it starts with [{"date":"…'
+            className="num w-full rounded-[14px] border border-line-2 bg-surface-2 p-3 text-[11px] text-text outline-none focus:border-pos/50"
+          />
+          <div className="mt-2 flex gap-2">
+            <Pill variant="primary" onClick={doPasteImport} disabled={!pasteText.trim()}>
+              Import pasted backup
+            </Pill>
+            <Pill variant="ghost" onClick={() => fileRef.current?.click()}>
+              …or pick a file
+            </Pill>
+          </div>
+        </Panel>
+      )}
 
       {empty ? (
         <Panel>
