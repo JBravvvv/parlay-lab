@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3600",
-    "build": "NEXT_DIST_DIR=.next-build next build",
+    "build": "next build",
+    "build:local": "NEXT_DIST_DIR=.next-build next build",
     "start": "next start -p 3600",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

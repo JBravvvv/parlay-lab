@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // `npm run build` writes to .next-build so a verification build can never
-  // clobber the running dev server's .next state (that corruption serves the
-  // app with no stylesheet). Vercel/`next start` use the default via env.
+  // LOCAL verification builds use `npm run build:local` -> .next-build so they
+  // can never clobber a running dev server's .next state (that corruption
+  // serves the app with no stylesheet). Vercel runs plain `npm run build` and
+  // must use the default .next, or the deployment comes up NOT_FOUND.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // The Sharp's system prompt is read from disk at request time on Vercel.
   outputFileTracingIncludes: { "/api/sharp": ["./prompts/**"] },

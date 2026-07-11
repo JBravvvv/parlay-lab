@@ -18,8 +18,9 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 >   Engine facade: src/engine (get/set into the sandboxed legacy scope; shSimGames instrumented in
 >   src/lib/engine-client.ts to capture sim outputs — zero math impact). Same localStorage keys as legacy
 >   (pl_bankroll/pl_daily/pl_fun/pl_ledger/pl_sharp_ai/pl_board_r1/pl_pass/pl_quota). PWA: public/manifest +
->   public/sw.js (network-first shell). Commands: `npm run dev` (port 3600), `npm run build` (writes
->   .next-build — NEVER let a build share .next with a running dev server), `npm run typecheck`,
+>   public/sw.js (network-first shell). Commands: `npm run dev` (port 3600), `npm run build:local` for local
+>   verification (writes .next-build — NEVER let a local build share .next with a running dev server;
+>   plain `npm run build` is for Vercel, which requires the default .next), `npm run typecheck`,
 >   `npm run test` (11 tests incl. the byte-identical baseline43 parity digest — run after ANY engine change).
 > - **Deploy**: Vercel (Josh's account), production branch `frontend-rebuild`; env vars ODDS_API_KEY (rotate
 >   the legacy public key at cutover), ANTHROPIC_API_KEY, APP_PASSCODE. Cutover checklist: deploy → set envs →
