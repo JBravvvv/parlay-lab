@@ -10,9 +10,41 @@ import { browserFetchJson } from "./fetcher";
  */
 let engine: Engine | null = null;
 
+/**
+ * Per-game sim outputs. The engine keeps SIMS local to shAnalyzeLocal, so we
+ * instrument the global shSimGames — same function, same inputs, same returns,
+ * we just keep a reference to each output object (the caller stamps .gkey on
+ * it afterwards). Zero effect on the math; the parity suite still passes.
+ */
+export type SimOut = {
+  n: number;
+  pHome: number;
+  avgHome: number;
+  avgAway: number;
+  pHomeM15: number;
+  pHomeP15: number;
+  pAwayM15: number;
+  pAwayP15: number;
+  legP: Record<string, number>;
+  gkey?: string;
+};
+let simCapture: SimOut[] = [];
+
+export function getSims(): Record<string, SimOut> {
+  const out: Record<string, SimOut> = {};
+  for (const s of simCapture) if (s.gkey) out[s.gkey] = s;
+  return out;
+}
+
 export function getEngine(): Engine {
   if (!engine) {
     engine = createEngine({ fetchJson: browserFetchJson, storage: window.localStorage });
+    const orig = engine.get<(ctx: unknown, n: number, seed: number) => SimOut>("shSimGames");
+    engine.set("shSimGames", (ctx: unknown, n: number, seed: number) => {
+      const res = orig(ctx, n, seed);
+      simCapture.push(res);
+      return res;
+    });
   }
   return engine;
 }
@@ -42,6 +74,7 @@ export function cachedBoard(): Board | null {
 export async function generateBoard(): Promise<Board> {
   const eng = getEngine();
   const slate = await eng.collectSlate();
+  simCapture = [];
   const data = eng.analyze(slate);
   const board: Board = { date: todayStr(), at: Date.now(), data };
   try {
