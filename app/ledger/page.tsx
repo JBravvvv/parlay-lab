@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -94,6 +94,25 @@ export default function LedgerPage() {
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // One-tap migration: the old app's SEND TO NEW APP button opens this page
+  // with the ledger base64url-encoded in the hash. Import rules still apply —
+  // locked days already on this device are never overwritten.
+  useEffect(() => {
+    if (!api) return;
+    const h = window.location.hash;
+    if (!h.startsWith("#import=")) return;
+    history.replaceState(null, "", window.location.pathname);
+    try {
+      const b64 = h.slice(8).replace(/-/g, "+").replace(/_/g, "/");
+      const txt = decodeURIComponent(escape(atob(b64)));
+      api.importText(txt);
+      setNote("Ledger received from the old app and merged — check the days below.");
+    } catch {
+      setNote("The transfer didn't decode — use Import and paste the backup instead.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api]);
 
   const stats = useMemo(() => api?.stats(scope), [api, scope]);
   const proj = api?.projection ?? null;
