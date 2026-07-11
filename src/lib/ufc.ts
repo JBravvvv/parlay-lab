@@ -241,9 +241,11 @@ export async function loadUfcBoard(opts?: { fresh?: boolean; bankroll?: number }
   const bankroll = opts?.bankroll ?? 750;
   const [events, card] = await Promise.all([fetchOddsEvents(opts?.fresh ?? false), fetchEspnCard()]);
 
-  // next card = every fight inside 30h of the earliest upcoming one
+  // upcoming only: once a fight starts, books stream LIVE prices while others
+  // freeze at the close — mixing those manufactures phantom edges (and the
+  // window won't take a pre-fight bet anyway)
   const upcoming = events
-    .filter((e) => e.bookmakers.length > 0)
+    .filter((e) => e.bookmakers.length > 0 && new Date(e.commence_time).getTime() > Date.now())
     .sort((a, b) => a.commence_time.localeCompare(b.commence_time));
   if (!upcoming.length) return { eventName: card.eventName, fights: [], tickets: [], generatedAt: Date.now() };
   const first = new Date(upcoming[0].commence_time).getTime();
