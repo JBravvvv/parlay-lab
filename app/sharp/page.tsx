@@ -1,218 +1,246 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
-import { EmptyState, ErrorState } from "@/components/ui/states";
+import { OddsCell } from "@/components/ui/OddsCell";
+import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { getEngine, todayStr } from "@/lib/engine-client";
+import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import type { PickRow } from "@/engine";
 
-type SharpBoard = {
-  overview: string;
-  picks: {
-    rank: number;
-    player: string;
-    prop: string;
-    line: string;
-    odds: string;
-    game: string;
-    prob: number;
-    implied: number;
-    edge: number;
-    conviction: "A" | "B" | "C";
-    case: string;
-    risk: string;
-  }[];
-  parlays: { legs: string[]; note: string }[];
-  trap: { prop: string; reason: string };
-};
+/* The Sharp = the built-in quant engine's daily read. Same engine as the old
+   GitHub app, running verbatim (parity-proven in tests/parity.test.ts) — free,
+   no key, no AI. The optional Claude second-opinion mode lives at the bottom
+   and stays dormant unless a server key is ever configured. */
 
-const KEY = "pl_sharp_ai";
+type Trap = { prop: string; reason: string };
+type Pass = { prop: string; reason: string };
 
-function ConvBadge({ c }: { c: "A" | "B" | "C" }) {
+function ConvChip({ c }: { c?: string }) {
+  if (!c) return null;
   const tone =
-    c === "A" ? "text-pos border-pos/50 bg-pos/10" : c === "B" ? "text-gold border-gold/50 bg-gold/10" : "text-muted border-line-2 bg-surface-2";
+    c === "A"
+      ? "text-pos border-pos/50 bg-pos/10"
+      : c === "B"
+        ? "text-gold border-gold/50 bg-gold/10"
+        : "text-muted border-line-2 bg-surface-2";
   return <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${tone}`}>CONVICTION {c}</span>;
 }
 
 export default function SharpPage() {
-  const [board, setBoard] = useState<SharpBoard | null>(null);
-  const [ranAt, setRanAt] = useState<number | null>(null);
-  const [running, setRunning] = useState(false);
-  const [phase, setPhase] = useState("");
-  const [err, setErr] = useState("");
-  const [needPass, setNeedPass] = useState(false);
-  const [pass, setPass] = useState("");
+  const { data: board, isPending } = useBoard();
+  const regen = useRegenerateBoard();
+  const d = board?.data;
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const s = JSON.parse(raw) as { date: string; at: number; board: SharpBoard };
-        if (s.date === todayStr()) {
-          setBoard(s.board);
-          setRanAt(s.at);
-        }
-      }
-      setPass(localStorage.getItem("pl_pass") ?? "");
-    } catch {
-      /* no saved run */
-    }
-  }, []);
+  const plays: PickRow[] = useMemo(() => {
+    if (!d) return [];
+    const seen = new Set<string>();
+    return Object.entries(d.categories)
+      .filter(([k]) => k !== "all")
+      .flatMap(([, v]) => v)
+      .filter((r) => {
+        const k = `${r.label}|${r.sub}`;
+        if (r.cz == null || Number(r.czEv) <= 0 || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .sort((a, b) => Number(b.czEv) - Number(a.czEv))
+      .slice(0, 8);
+  }, [d]);
 
-  const run = async () => {
-    setRunning(true);
-    setErr("");
-    setNeedPass(false);
-    try {
-      setPhase("Collecting the live slate…");
-      const eng = getEngine();
-      const slate = await eng.collectSlate();
-      setPhase("The Sharp is working the numbers (1–3 minutes)…");
-      const r = await fetch("/api/sharp", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...(pass ? { "x-pl-pass": pass } : {}) },
-        body: JSON.stringify({ slate }),
-      });
-      const j = await r.json();
-      if (r.status === 401) {
-        setNeedPass(true);
-        throw new Error("This endpoint spends API credits — enter your device passcode once.");
-      }
-      if (!r.ok) throw new Error(j.error || `error ${r.status}`);
-      const at = Date.now();
-      setBoard(j.board);
-      setRanAt(at);
-      try {
-        localStorage.setItem(KEY, JSON.stringify({ date: todayStr(), at, board: j.board }));
-        if (pass) localStorage.setItem("pl_pass", pass);
-      } catch {
-        /* best-effort persistence */
-      }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRunning(false);
-      setPhase("");
-    }
-  };
+  const trap = d?.trap as Trap | undefined;
+  const passes = (d?.passes as Pass[] | undefined) ?? [];
 
   return (
     <>
       <PageHeader
         title="The Sharp"
-        sub="LLM handicapper over the same live slate — structured picks with the case, the risk, and the edge. ~$0.30–0.60 per run."
+        sub="The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
         action={
-          <Pill variant="primary" onClick={run} disabled={running}>
-            {running ? phase || "Working…" : board ? "Re-run The Sharp" : "Run The Sharp"}
+          <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
+            {regen.isPending ? "Working the slate…" : d ? "Refresh read" : "Generate today's read"}
           </Pill>
         }
       />
 
-      {needPass && (
-        <Panel className="mb-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-[12px] text-muted">Device passcode:</span>
-            <input
-              type="password"
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              className="num rounded-full border border-line-2 bg-surface-2 px-4 py-2 text-[13px] text-text outline-none focus:border-pos/60"
-              placeholder="passcode"
-            />
-            <Pill variant="primary" onClick={run} disabled={running || !pass}>
-              Unlock &amp; run
-            </Pill>
-          </div>
-        </Panel>
-      )}
-
-      {err && !needPass && <ErrorState title="The Sharp couldn't finish" body={err} onRetry={run} />}
-
-      {!board && !err && !running && (
+      {!d ? (
         <Panel>
           <EmptyState
-            title="No Sharp board today"
-            body="One tap collects the live slate and sends it to the handicapper. Your Anthropic key lives on the server — it never ships to this browser."
+            title={isPending || regen.isPending ? "Working the numbers…" : "No read yet today"}
+            body="One run pulls the slate, de-vigs every book, sims lineups and ranks the edges — the same engine that built every board since day one."
           />
         </Panel>
-      )}
-
-      {board && (
-        <div className="space-y-4">
-          {ranAt && (
-            <div className="text-[11px] text-faint">
-              Ran today at {new Date(ranAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} — picks are a
-              snapshot, lines move.
-            </div>
-          )}
-          <Reveal>
-            <Panel title="Overview">
-              <p className="text-[13px] leading-relaxed text-muted">{board.overview}</p>
-            </Panel>
-          </Reveal>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {board.picks.map((p, i) => (
-              <Reveal key={p.rank} delay={Math.min(i * 0.04, 0.3)}>
-                <Panel className={p.conviction === "A" ? "glow-pos" : ""}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="display text-[17px] text-text">
-                        <span className="num mr-2 text-muted">#{p.rank}</span>
-                        {p.player}
-                      </div>
-                      <div className="mt-0.5 text-[12px] text-muted">
-                        {p.prop} {p.line} · {p.game}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <span className="num text-[15px] font-bold text-gold">{p.odds}</span>
-                      <ConvBadge c={p.conviction} />
-                    </div>
-                  </div>
-                  <div className="num mt-3 flex flex-wrap items-center gap-3 text-[11.5px]">
-                    <span className="text-text">{p.prob}% true</span>
-                    <span className="text-muted">{p.implied}% implied</span>
-                    <EvBadge ev={p.edge} />
-                  </div>
-                  <p className="mt-3 text-[12px] leading-relaxed text-muted">{p.case}</p>
-                  <p className="mt-2 text-[11.5px] leading-relaxed text-neg/80">⚠ {p.risk}</p>
-                </Panel>
-              </Reveal>
-            ))}
-          </div>
-
-          {board.parlays.length > 0 && (
+      ) : (
+        <div className="space-y-5">
+          {typeof d.overview === "string" && (
             <Reveal>
-              <Panel title="Suggested parlays">
-                <div className="space-y-3">
-                  {board.parlays.map((pl, i) => (
-                    <div key={i} className="border-b border-white/[0.04] pb-3 last:border-0 last:pb-0">
-                      <div className="text-[13px] font-medium text-text">{pl.legs.join("  +  ")}</div>
-                      <div className="mt-1 text-[11.5px] text-muted">{pl.note}</div>
-                    </div>
-                  ))}
-                </div>
+              <Panel title="The engine's own overview">
+                <p className="text-[13px] leading-relaxed text-muted">{d.overview}</p>
               </Panel>
             </Reveal>
           )}
 
           <Reveal>
-            <Panel title="Trap of the day" className="border-neg/20">
-              <div className="text-[13px] font-semibold text-neg">{board.trap.prop}</div>
-              <div className="mt-1 text-[12px] leading-relaxed text-muted">{board.trap.reason}</div>
-            </Panel>
+            <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+              Today&apos;s plays — best playable EV at Caesars
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              {plays.map((r, i) => (
+                <Panel key={`${r.label}|${r.sub}`} className={i === 0 ? "glow-pos" : ""}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="display text-[16px] text-text">{r.label}</div>
+                      <div className="mt-0.5 text-[12px] text-muted">{r.sub}</div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <OddsCell odds={r.czOdds as never} book="caesars" />
+                      <ConvChip c={r.conv as string} />
+                    </div>
+                  </div>
+                  <div className="num mt-3 flex flex-wrap items-center gap-3 text-[11.5px]">
+                    <span className="text-text">{Number(r.prob).toFixed(1)}% true</span>
+                    <EvBadge ev={Number(r.czEv)} />
+                    {r.czBadge ? (
+                      <span className="rounded-full border border-pos/50 bg-pos/10 px-2 py-0.5 text-[9.5px] font-bold text-pos">
+                        EDGE
+                      </span>
+                    ) : null}
+                  </div>
+                  {Array.isArray(r.tags) && r.tags.length > 0 && (
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {(r.tags as string[]).slice(0, 4).map((t) => (
+                        <span key={t} className="rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[10px] text-muted">
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+              ))}
+            </div>
+            {plays.length === 0 && (
+              <Panel>
+                <EmptyState
+                  title="No positive-EV plays at Caesars right now"
+                  body="The engine found no playable edge on this slate — that's a real answer, not a failure. Passing is a position."
+                />
+              </Panel>
+            )}
+          </Reveal>
+
+          {trap && (
+            <Reveal>
+              <Panel title="Trap of the day" className="border-neg/20">
+                <div className="text-[13px] font-semibold text-neg">{trap.prop}</div>
+                <div className="mt-1 text-[12px] leading-relaxed text-muted">{trap.reason}</div>
+              </Panel>
+            </Reveal>
+          )}
+
+          {passes.length > 0 && (
+            <Reveal>
+              <details className="glass px-5 py-4">
+                <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                  What the engine passed on ({passes.length}) — and why
+                </summary>
+                <div className="mt-3 space-y-2.5">
+                  {passes.map((p) => (
+                    <div key={p.prop}>
+                      <div className="text-[12.5px] font-medium text-text">{p.prop}</div>
+                      <div className="text-[11.5px] text-muted">{p.reason}</div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </Reveal>
+          )}
+
+          <Reveal>
+            <details className="glass px-5 py-4">
+              <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                How the engine thinks (the method, in plain language)
+              </summary>
+              <div className="mt-3 space-y-2 text-[12.5px] leading-relaxed text-muted">
+                <p>
+                  <b className="text-text">1 · The market is the prior.</b> Every posted book gets de-vigged;
+                  the median across books is the consensus &quot;fair&quot; probability. The engine has to earn any
+                  disagreement with it.
+                </p>
+                <p>
+                  <b className="text-text">2 · Form without hot-hand chasing.</b> Player rates blend the last
+                  7/15/30 days, then shrink toward league averages by sample size — small samples get pulled
+                  hard, real signals survive. Batter-vs-pitcher history only nudges with 15+ career meetings.
+                </p>
+                <p>
+                  <b className="text-text">3 · Games get simulated.</b> 4,000 seeded Monte Carlo paths per game
+                  with confirmed lineups — a full per-plate-appearance base-out machine. It prices ML/RL,
+                  H+R+RBI, and flags correlated parlay legs.
+                </p>
+                <p>
+                  <b className="text-text">4 · Model meets market.</b> Final probability = 35% model / 65%
+                  consensus for props (15/85 for ML-RL). EV is computed at the Caesars price you can actually
+                  bet. EDGE badges need both the EV threshold and enough sample behind it.
+                </p>
+                <p>
+                  <b className="text-text">5 · Discipline is hard-coded.</b> ¼-Kelly capped at 2% per bet,
+                  overs only, HR props never mix with other types, no pick rides two tickets, the daily amount
+                  always sums exactly — and everything locked gets graded from official box scores.
+                </p>
+              </div>
+            </details>
+          </Reveal>
+
+          <Reveal>
+            <details className="glass px-5 py-4 opacity-80">
+              <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
+                Optional: AI second opinion (off — needs a server API key, ~$0.50/run)
+              </summary>
+              <AiMode />
+            </details>
           </Reveal>
         </div>
       )}
 
       <div className="mt-6 text-[10.5px] text-faint">
-        The Sharp reasons over live data but is still a model — track it in the ledger like everything else.
-        Informational only, not betting advice.
+        Same math, provably: the engine runs verbatim from the original app and a test suite rejects any change
+        that alters its picks. Informational only, not betting advice.
       </div>
     </>
+  );
+}
+
+/* ---------- optional Claude mode (dormant without ANTHROPIC_API_KEY) ---------- */
+function AiMode() {
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const run = async () => {
+    setBusy(true);
+    setMsg("Checking the server…");
+    try {
+      const r = await fetch("/api/sharp", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      const j = await r.json().catch(() => ({}));
+      setMsg(j.error || "Configured — ask Claude to wire the full AI run when you want it.");
+    } catch {
+      setMsg("Server unreachable.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 space-y-2 text-[12px] text-muted">
+      <p>
+        An LLM handicapper can read the same slate and argue its own card. It costs real money per run and is
+        entirely optional — the quant engine above is and stays the default brain of this app.
+      </p>
+      <Pill variant="ghost" onClick={run} disabled={busy}>
+        {busy ? "Checking…" : "Check availability"}
+      </Pill>
+      {msg && <div className="text-[11.5px] text-gold">{msg}</div>}
+    </div>
   );
 }
