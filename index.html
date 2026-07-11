@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 46 · 2026-07-11</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 47 · 2026-07-11</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -3079,27 +3079,32 @@ function updateSlipBadge(){var b=$("slipBadge");if(!b)return;var n=(S.legs&&S.le
    reload once the new service worker takes over so installed apps never get stuck
    on a stale build. (The shell is served network-first in sw.js, so an online open
    already pulls the latest index.html.) */
-/* build 46: unmissable one-tap ledger migration to the new Parlay Lab.
-   Shows whenever this device holds a ledger and hasn't dismissed the banner;
-   SEND packages pl_ledger into the new app's #import= hash (its importer
-   never overwrites locked days, so re-sending is always safe). */
+/* build 47: unmissable one-tap ledger migration to the new Parlay Lab.
+   ALWAYS shows (until dismissed) so the device's update + ledger state is
+   visible at a glance: with locked days it offers SEND (packages pl_ledger
+   into the new app's #import= hash — its importer never overwrites locked
+   days, so re-sending is always safe); with an empty ledger it says so. */
 (function(){
   try{
-    if(LS.get("pl_migNote",0))return;
+    if(LS.get("pl_migNote2",0))return;
     var Lmig=shLedger();
-    if(!Lmig.length)return;
+    var msg=Lmig.length
+      ?"Your season ledger ("+Lmig.length+" locked day"+(Lmig.length===1?"":"s")+") can move to the new Parlay Lab in one tap. <span style='color:var(--muted)'>(b47)</span>"
+      :"No locked ledger days on this device — nothing to migrate to the new Parlay Lab. If you expected data here, tell Claude. <span style='color:var(--muted)'>(b47)</span>";
     var bar=document.createElement("div");
     bar.innerHTML="<div style='position:fixed;left:10px;right:10px;bottom:78px;z-index:99999;background:#181203;border:1px solid var(--amber);border-radius:14px;padding:12px;box-shadow:0 10px 34px rgba(0,0,0,.65)'>"+
-      "<div style='font-size:12px;color:var(--amber);font-weight:700;margin-bottom:9px;letter-spacing:.3px'>Your season ledger ("+Lmig.length+" locked day"+(Lmig.length===1?"":"s")+") can move to the new Parlay Lab in one tap.</div>"+
+      "<div style='font-size:12px;color:var(--amber);font-weight:700;margin-bottom:9px;letter-spacing:.3px'>"+msg+"</div>"+
       "<div style='display:flex;gap:8px'>"+
-      "<button id='plMigGo' style='flex:1;background:var(--amber);color:#08090b;border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;font-family:inherit'>➡ SEND LEDGER TO NEW APP</button>"+
+      (Lmig.length?"<button id='plMigGo' style='flex:1;background:var(--amber);color:#08090b;border:none;border-radius:10px;padding:11px;font-weight:800;font-size:13px;font-family:inherit'>➡ SEND LEDGER TO NEW APP</button>"
+        :"<a href='https://parlay-lab-six.vercel.app' style='flex:1;display:block;text-align:center;background:var(--amber);color:#08090b;border-radius:10px;padding:11px;font-weight:800;font-size:13px;text-decoration:none'>OPEN THE NEW APP</a>")+
       "<button id='plMigX' style='background:none;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:11px 13px;font-family:inherit'>✕</button></div></div>";
     document.body.appendChild(bar);
-    document.getElementById("plMigGo").addEventListener("click",function(){
+    var go=document.getElementById("plMigGo");
+    if(go)go.addEventListener("click",function(){
       var enc=btoa(unescape(encodeURIComponent(JSON.stringify(shLedger())))).replace(/\+/g,"-").replace(/\//g,"_");
       location.href="https://parlay-lab-six.vercel.app/ledger#import="+enc;
     });
-    document.getElementById("plMigX").addEventListener("click",function(){LS.set("pl_migNote",1);bar.remove();});
+    document.getElementById("plMigX").addEventListener("click",function(){LS.set("pl_migNote2",1);bar.remove();});
   }catch(eMig){}
 })();
 if('serviceWorker' in navigator){
