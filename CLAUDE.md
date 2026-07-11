@@ -2,6 +2,21 @@
 
 Context for continuing development of **PARLAY//LAB**, a single-file multi-sport stat desk + parlay/bet-slip tool (MLB · NFL · NCAAF).
 
+> ## ⚠️ THIS BRANCH (`frontend-rebuild`): full frontend rebuild in progress
+> Per `parlay_lab_frontend_rebuild_prompt.md` (plan approved 2026-07-11): the app is being rebuilt as a
+> **Next.js (App Router) + TypeScript + Tailwind v4** terminal-style product, deployed to **Vercel** with API keys
+> server-side. The quant engine is being extracted **verbatim** into `src/engine/` (pure TS) — the math must not
+> change; parity is proven against `tests/fixtures/baseline43.json` via the harness preserved in `tests/legacy-harness/`.
+> - **The old single-file app now lives in `legacy/`** — unchanged and still what `main`/GitHub Pages serves.
+>   Everything below this box describes that legacy app; its golden rules apply only to `legacy/` until cutover.
+> - Node **is** installed now (nvm, `~/.nvm/versions/node/v24.18.0/bin`); validation = `npm run build`,
+>   `npm run typecheck`, `npm run test` (vitest). jsc is no longer needed for the new app.
+> - Phase status: 0 (foundations) + 1 (design system/app shell) done; 2 = engine extraction + odds proxy + Board;
+>   3 = Dashboard + Ledger; 4 = Simulator; 5 = Sharp + Builder; 6 = polish/PWA/cutover. Review gate after Phase 1.
+> - Rules that carry over regardless of stack: never fabricate prices/stats/grades; locked product rules
+>   (overs-only, HR isolation, no-repeat card, exact-sum allocator); ledger append-only after lock;
+>   thresholds in config not code.
+
 ## What it is
 A self-contained web app and installable PWA. A top sport bar switches between **MLB / NFL / NCAAF**; each sport has a live stat desk and a betting odds board. A bottom tab bar switches **Stats / Odds / Slip** (the bet slip with parlay math is shared across sports). Deployed to **GitHub Pages: https://jbravvvv.github.io/parlay-lab/** (repo `JBravvvv/parlay-lab`, public) — push to `main` and Pages redeploys. Tested live on iPhone via Add to Home Screen.
 

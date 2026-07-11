@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Parlay Lab design tokens — trading terminal × premium sportsbook.
+   Near-black base, layered surfaces, 1px borders, one accent per meaning:
+   electric green = +EV, red-orange = −EV, muted gold = the Caesars layer.
+   Everything else stays monochrome.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* surfaces (elevation by lightness, not shadow) */
+  --color-bg: #0a0b0d;
+  --color-surface: #101216;
+  --color-surface-2: #15181d;
+  --color-surface-3: #1a1e24;
+  --color-line: #1e222a;
+  --color-line-2: #2b303b;
+
+  /* text */
+  --color-text: #e9ecf1;
+  --color-muted: #8a919e;
+  --color-faint: #5a616d;
+
+  /* semantics */
+  --color-pos: #b6ff3d; /* electric green — +EV, wins, edges */
+  --color-neg: #ff5c45; /* red-orange — −EV, losses */
+  --color-gold: #c79a3b; /* muted gold — Caesars layer only */
+  --color-live: #5cc8ff; /* live/in-game marker */
+
+  --radius-panel: 12px;
+  --radius-chip: 8px;
+}
+
+@theme inline {
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", monospace;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* every number in the product renders mono + tabular so columns align */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* odds cells flash on line movement */
+@keyframes flash-up {
+  0% { background-color: color-mix(in srgb, var(--color-pos) 24%, transparent); }
+  100% { background-color: transparent; }
+}
+@keyframes flash-down {
+  0% { background-color: color-mix(in srgb, var(--color-neg) 24%, transparent); }
+  100% { background-color: transparent; }
+}
+.flash-up { animation: flash-up 0.9s ease-out; }
+.flash-down { animation: flash-down 0.9s ease-out; }
+
+/* skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 6px;
+}
+
+/* thin, quiet scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 3px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* live pulse dot */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
