@@ -12,7 +12,9 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 > - Node **is** installed now (nvm, `~/.nvm/versions/node/v24.18.0/bin`); validation = `npm run build`,
 >   `npm run typecheck`, `npm run test` (vitest). jsc is no longer needed for the new app.
 > - Phase status: **ALL PHASES (0–6) COMPLETE** on this branch. Pages: / (dashboard), /stats (MLB/NFL/NCAAF
->   live stat browser, ported from the legacy Stats tab), /board, /builder,
+>   live stat browser, ported from the legacy Stats tab; + UFC card view), /board (MLB|UFC sport tabs — UFC
+>   desk in src/lib/ufc.ts + src/components/ufc/: 7-book de-vig consensus vs CZ moneyline, ESPN records,
+>   deterministic parlay tickets, started fights excluded; NOT part of the parity-locked MLB engine), /builder,
 >   /ledger, /sharp, /simulator, /settings, /design (design-system review page). Server routes: /api/odds
 >   (host-whitelisted proxy, ODDS_API_KEY env, ~4-min Next data cache, quota headers, fresh=1 passcode-gated),
 >   /api/stats (host-whitelisted proxy for statsapi.mlb.com + site.web.api.espn.com, keyless, 3-min cache),
