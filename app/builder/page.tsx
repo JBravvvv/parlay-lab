@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { Pill } from "@/components/ui/Pill";
+import { Pill, FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard } from "@/lib/useBoard";
+import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { getEngine, getMoney, setMoney, todayStr } from "@/lib/engine-client";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
@@ -126,6 +127,14 @@ export default function BuilderPage() {
   const [slip, setSlip] = useState<PickRow[]>([]);
   const [query, setQuery] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sport, setSport] = useState<"mlb" | "ufc">(() => {
+    if (typeof window === "undefined") return "mlb";
+    try { return localStorage.getItem("pl_builder_sport") === "ufc" ? "ufc" : "mlb"; } catch { return "mlb"; }
+  });
+  const pickSport = (s: "mlb" | "ufc") => {
+    setSport(s);
+    try { localStorage.setItem("pl_builder_sport", s); } catch {}
+  };
 
   useEffect(() => setMoneyState(getMoney()), []);
 
@@ -223,9 +232,22 @@ export default function BuilderPage() {
     <>
       <PageHeader
         title="Builder"
-        sub="Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
+        sub={
+          sport === "ufc"
+            ? "UFC — build any parlay from the card's Caesars moneylines, priced against market consensus"
+            : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
+        }
       />
 
+      <div className="mb-4 flex items-center gap-2">
+        <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
+        <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+      </div>
+
+      {sport === "ufc" ? (
+        <UfcBuilder />
+      ) : (
+        <>
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <MoneyInput label="Daily" value={money.daily} onChange={(n) => updateMoney({ daily: n })} disabled={!!locked} />
         <MoneyInput label="Fun" value={money.fun} onChange={(n) => updateMoney({ fun: n })} disabled={!!locked} />
@@ -416,6 +438,8 @@ export default function BuilderPage() {
         Card discipline is hard-coded: one prop never rides two tickets, HR props parlay only with HR props and never
         into the core card, and the daily amount always sums exactly. Informational only, not betting advice.
       </div>
+        </>
+      )}
     </>
   );
 }
