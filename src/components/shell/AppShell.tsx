@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh">
       {/* desktop side rail */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-line bg-surface md:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl md:flex">
         <div className="px-4 py-4">
           <Brand />
           <div className="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.2em] text-faint">
@@ -57,10 +57,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                className={`flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-(--dur-fast) ${
                   active
                     ? "bg-pos/10 text-pos"
-                    : "text-muted hover:bg-surface-2 hover:text-text"
+                    : "text-muted hover:bg-white/[0.05] hover:text-text"
                 }`}
               >
                 <Icon className={active ? "text-pos" : "text-faint"} />
@@ -75,7 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-bg/90 px-4 py-3 backdrop-blur md:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 py-3 backdrop-blur-xl md:hidden">
         <Brand />
         <div className="flex items-center gap-1">
           <Link
@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* mobile bottom tab bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-surface/95 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-white/[0.05] bg-surface/70 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {NAV.filter((n) => n.mobile).map(({ href, label, icon: Icon }) => {

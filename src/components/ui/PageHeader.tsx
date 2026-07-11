@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+/** Page titles are statements: display face, big, tight. */
 export function PageHeader({
   title,
   sub,
@@ -10,10 +11,10 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-[20px] font-bold tracking-tight text-text">{title}</h1>
-        {sub && <div className="mt-0.5 text-[12px] text-muted">{sub}</div>}
+        <h1 className="display text-(length:--text-display) text-text">{title}</h1>
+        {sub && <div className="mt-2 max-w-xl text-[13px] leading-relaxed text-muted">{sub}</div>}
       </div>
       {action}
     </div>

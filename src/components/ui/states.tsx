@@ -48,13 +48,13 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-(--radius-panel) border border-neg/30 bg-neg/5 py-10 text-center">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-(--radius-panel) border border-neg/30 bg-neg/5 px-4 py-10 text-center">
       <div className="text-[13px] font-semibold text-neg">{title}</div>
       {body && <div className="max-w-sm text-[12px] leading-relaxed text-muted">{body}</div>}
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-2 rounded-(--radius-chip) border border-line-2 bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-text hover:border-line-2 hover:bg-surface-3"
+          className="mt-2 rounded-full border border-line-2 bg-white/[0.04] px-4 py-1.5 text-[12px] font-semibold text-text transition-transform duration-(--dur-fast) hover:bg-white/[0.08] active:scale-[0.96]"
         >
           Retry
         </button>

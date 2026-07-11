@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
-/** The basic elevated surface: 1px border, quiet radius, no drop shadow. */
+/**
+ * The basic surface: glassy, generously rounded, hairline border, floating
+ * over the glowing background. Elevation via light, not drop shadow.
+ */
 export function Panel({
   title,
   action,
@@ -13,18 +16,16 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section
-      className={`rounded-(--radius-panel) border border-line bg-surface ${className}`}
-    >
+    <section className={`glass ${className}`}>
       {(title || action) && (
-        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+        <header className="flex items-center justify-between gap-3 border-b border-white/[0.05] px-5 py-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             {title}
           </h2>
           {action}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-5">{children}</div>
     </section>
   );
 }

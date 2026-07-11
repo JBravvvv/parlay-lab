@@ -2,13 +2,13 @@
 
 /* ---------------------------------------------------------------------------
    Parlay Lab design tokens — trading terminal × premium sportsbook.
-   Near-black base, layered surfaces, 1px borders, one accent per meaning:
-   electric green = +EV, red-orange = −EV, muted gold = the Caesars layer.
-   Everything else stays monochrome.
+   Dark with depth: layered radial glows + grain behind glassy, rounded panels.
+   One accent per meaning: electric green = +EV, red-orange = −EV,
+   muted gold = the Caesars layer. Everything else stays monochrome.
 --------------------------------------------------------------------------- */
 
 @theme {
-  /* surfaces (elevation by lightness, not shadow) */
+  /* surfaces */
   --color-bg: #0a0b0d;
   --color-surface: #101216;
   --color-surface-2: #15181d;
@@ -27,13 +27,33 @@
   --color-gold: #c79a3b; /* muted gold — Caesars layer only */
   --color-live: #5cc8ff; /* live/in-game marker */
 
-  --radius-panel: 12px;
-  --radius-chip: 8px;
+  /* rounded, floating panels */
+  --radius-panel: 20px;
+  --radius-chip: 999px;
+
+  /* extreme type scale — display sizes are statements, not labels */
+  --text-display-xl: clamp(2.1rem, 9.6vw, 6.5rem);
+  --text-display: clamp(1.7rem, 5.5vw, 3.75rem);
+  --text-title: clamp(1.25rem, 2.6vw, 1.75rem);
+
+  /* motion tokens */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 180ms;
+  --dur-reveal: 700ms;
 }
 
 @theme inline {
   --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", monospace;
+  --font-display: var(--font-unbounded), var(--font-space-grotesk), ui-sans-serif, sans-serif;
+}
+
+html {
+  background: var(--color-bg);
+  /* decorative halos may bleed past the viewport; they must never cause
+     sideways page scroll (clip, not hidden — keeps position:sticky working) */
+  overflow-x: clip;
 }
 
 body {
@@ -42,16 +62,65 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  overflow-x: clip;
 }
 
-/* every number in the product renders mono + tabular so columns align */
+/* ---- background system: layered glows + grain (fixed, behind everything) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 480px at 82% -12%, rgba(182, 255, 61, 0.085), transparent 62%),
+    radial-gradient(700px 420px at -6% 4%, rgba(199, 154, 59, 0.07), transparent 58%),
+    radial-gradient(1000px 560px at 50% 118%, rgba(92, 200, 255, 0.055), transparent 62%);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.028;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- typography utilities */
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+}
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
-/* odds cells flash on line movement */
+/* ---- glass surface */
+.glass {
+  background: color-mix(in srgb, var(--color-surface) 66%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-panel);
+}
+
+/* ---- glow: elevation comes from light, not drop shadows */
+.glow-pos { box-shadow: 0 0 44px -8px rgba(182, 255, 61, 0.28), 0 0 0 1px rgba(182, 255, 61, 0.12); }
+.glow-gold { box-shadow: 0 0 44px -8px rgba(199, 154, 59, 0.30), 0 0 0 1px rgba(199, 154, 59, 0.14); }
+
+/* +EV rows get lit, not painted */
+.ev-glow {
+  background: linear-gradient(90deg, rgba(182, 255, 61, 0.07), transparent 55%);
+  box-shadow: inset 2px 0 0 rgba(182, 255, 61, 0.65);
+}
+
+/* ---- odds cells flash on line movement */
 @keyframes flash-up {
   0% { background-color: color-mix(in srgb, var(--color-pos) 24%, transparent); }
   100% { background-color: transparent; }
@@ -60,10 +129,17 @@ body {
   0% { background-color: color-mix(in srgb, var(--color-neg) 24%, transparent); }
   100% { background-color: transparent; }
 }
-.flash-up { animation: flash-up 0.9s ease-out; }
-.flash-down { animation: flash-down 0.9s ease-out; }
+.flash-up { animation: flash-up 0.9s var(--ease-out); }
+.flash-down { animation: flash-down 0.9s var(--ease-out); }
 
-/* skeleton shimmer */
+/* ---- staggered row reveal (used with per-row animation-delay) */
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.row-in { animation: row-in 0.45s var(--ease-out) both; }
+
+/* ---- skeleton shimmer */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -77,18 +153,28 @@ body {
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-/* thin, quiet scrollbars */
-* { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
-*::-webkit-scrollbar { width: 6px; height: 6px; }
-*::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 3px; }
-*::-webkit-scrollbar-track { background: transparent; }
-
-/* live pulse dot */
+/* ---- live pulse dot */
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
 .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* ---- thin, quiet scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--color-line-2) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 3px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- motion is identity, but never mandatory */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

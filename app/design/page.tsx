@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { KellyChip } from "@/components/ui/KellyChip";
 import { ProbBar } from "@/components/ui/ProbBar";
+import { Pill, FilterPill } from "@/components/ui/Pill";
+import { Glow } from "@/components/ui/Glow";
 import { DataTable, type Column } from "@/components/ui/DataTable";
-import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
+import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
+import { Reveal } from "@/components/motion/Reveal";
+import { CountUp } from "@/components/motion/CountUp";
+import { fmtMoney } from "@/lib/format";
 
 /* Everything on this page is SAMPLE data for design review only —
    no real prices, players, or edges. The banner says so. */
@@ -47,71 +51,185 @@ const COLUMNS: Column<SampleRow>[] = [
 ];
 
 const SWATCHES = [
-  ["bg", "var(--color-bg)", "#0A0B0D — base"],
-  ["surface", "var(--color-surface)", "panels"],
-  ["surface-2", "var(--color-surface-2)", "raised"],
-  ["surface-3", "var(--color-surface-3)", "highest"],
-  ["line", "var(--color-line)", "1px borders"],
-  ["pos", "var(--color-pos)", "+EV / wins"],
-  ["neg", "var(--color-neg)", "−EV / losses"],
-  ["gold", "var(--color-gold)", "Caesars layer"],
-  ["live", "var(--color-live)", "in-game"],
+  ["bg", "var(--color-bg)"],
+  ["surface", "var(--color-surface)"],
+  ["surface-2", "var(--color-surface-2)"],
+  ["surface-3", "var(--color-surface-3)"],
+  ["line", "var(--color-line)"],
+  ["pos", "var(--color-pos)"],
+  ["neg", "var(--color-neg)"],
+  ["gold", "var(--color-gold)"],
+  ["live", "var(--color-live)"],
 ] as const;
+
+const MARKETS = ["ALL", "HITS", "TB", "KS", "HR", "ML / RL"];
 
 export default function DesignPage() {
   const [tick, setTick] = useState(0);
+  const [market, setMarket] = useState("ALL");
+  const [tableKey, setTableKey] = useState(0);
   const movedOdds = [-310, -298, -325][tick % 3];
 
   return (
-    <>
-      <PageHeader
-        title="Design system"
-        sub="Phase 1 review page — every token and component in one place"
-        action={
-          <span className="rounded-(--radius-chip) border border-gold/50 bg-gold/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-gold">
-            Sample data only
-          </span>
-        }
-      />
+    <div className="space-y-16 pb-10">
+      {/* ---- hero: oversized type, glow from behind, count-up numerals ---- */}
+      <section className="pt-6 md:pt-14">
+        <Reveal>
+          <div className="flex justify-center md:justify-start">
+            <span className="rounded-full border border-gold/50 bg-gold/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-gold">
+              Phase 1 review · sample data only
+            </span>
+          </div>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <Glow tone="pos" className="mt-6 text-center md:text-left">
+            <h1 className="display text-(length:--text-display-xl) uppercase text-text">
+              The edge,
+              <br />
+              <span className="text-pos">quantified.</span>
+            </h1>
+          </Glow>
+        </Reveal>
+        <Reveal delay={0.16}>
+          <p className="mx-auto mt-5 max-w-lg text-center text-[14px] leading-relaxed text-muted md:mx-0 md:text-left">
+            De-vigged consensus, Monte Carlo sims, ¼-Kelly discipline — priced at the window you
+            actually bet. Informational only, never advice.
+          </p>
+        </Reveal>
 
-      <div className="space-y-4">
-        <Panel title="Colors">
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-9">
-            {SWATCHES.map(([name, v, note]) => (
-              <div key={name}>
-                <div className="h-12 rounded-lg border border-line" style={{ background: v }} />
-                <div className="mt-1.5 text-[11px] font-semibold text-text">{name}</div>
-                <div className="text-[10px] text-faint">{note}</div>
+        {/* bento: extreme hierarchy — one focal number per screenful */}
+        <div className="mt-10 grid gap-4 md:grid-cols-5">
+          <Reveal delay={0.2} className="md:col-span-3">
+            <Panel className="glow-pos h-full">
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
+                Bankroll <span className="text-faint">· sample</span>
               </div>
-            ))}
+              <div className="display mt-3 text-[clamp(3rem,7vw,5rem)] leading-none text-text">
+                <CountUp value={1284} format={(n) => fmtMoney(n)} />
+              </div>
+              <div className="num mt-3 text-[13px] text-pos">
+                +<CountUp value={534} format={(n) => fmtMoney(n).slice(1)} duration={1.6} /> since open
+              </div>
+            </Panel>
+          </Reveal>
+          <div className="grid gap-4 md:col-span-2">
+            <Reveal delay={0.28}>
+              <Panel>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
+                  Season ROI <span className="text-faint">· sample</span>
+                </div>
+                <div className="display mt-2 text-[clamp(2rem,4vw,2.9rem)] leading-none text-pos">
+                  +<CountUp value={12.4} format={(n) => n.toFixed(1)} duration={1.6} />%
+                </div>
+              </Panel>
+            </Reveal>
+            <Reveal delay={0.36}>
+              <Panel className="glow-gold">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">
+                    The Sharp · featured
+                  </div>
+                  <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold">
+                    @ Caesars
+                  </span>
+                </div>
+                <div className="mt-2 text-[14px] font-semibold text-text">
+                  Sample spotlight card — glassy, gold-lit, one clear focal point.
+                </div>
+              </Panel>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ---- type scale ---- */}
+      <Reveal>
+        <Panel title="Type scale — display sizes are statements">
+          <div className="space-y-5 overflow-x-auto">
+            <div className="display text-(length:--text-display-xl) leading-none">Aa 47%</div>
+            <div className="display text-(length:--text-display) leading-none text-muted">
+              Display — Unbounded
+            </div>
+            <div className="text-(length:--text-title) font-semibold">Title — Space Grotesk</div>
+            <div className="max-w-md text-[13px] leading-relaxed text-muted">
+              Body — quiet and readable. Numbers never render in the sans face:
+            </div>
+            <div className="num text-[18px]">
+              <span className="text-pos">+118</span> <span className="text-neg">-310</span>{" "}
+              <span className="text-gold">$37</span> 74.1% · tabular: 1111.11 / 8888.88
+            </div>
           </div>
         </Panel>
+      </Reveal>
 
-        <Panel title="Typography">
-          <div className="space-y-3">
-            <div className="text-[20px] font-bold tracking-tight">Space Grotesk — UI, headings, labels</div>
-            <div className="text-[13px] text-muted">
-              Body copy stays quiet and readable. Numbers never render in the sans face.
+      {/* ---- background + glow system ---- */}
+      <Reveal>
+        <Panel title="Background & glow — dark with depth, not flat dark">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="mb-3 text-[12px] text-muted">
+                The page floats on layered radial glows + film grain (look behind this panel).
+                Halos put light behind hero elements:
+              </div>
+              <div className="flex flex-wrap items-center gap-8 py-6">
+                <Glow tone="pos">
+                  <div className="display text-[34px] text-pos">+EV</div>
+                </Glow>
+                <Glow tone="gold">
+                  <div className="display text-[34px] text-gold">CZR</div>
+                </Glow>
+                <Glow tone="live">
+                  <div className="display text-[34px] text-live">LIVE</div>
+                </Glow>
+              </div>
             </div>
-            <div className="num text-[20px] font-semibold">
-              JetBrains Mono 0123456789 <span className="text-pos">+118</span>{" "}
-              <span className="text-neg">-310</span> <span className="text-gold">$37</span> 74.1%
-            </div>
-            <div className="num text-[12px] text-muted">
-              tabular figures: 1111.11 vs 8888.88 align perfectly in columns
+            <div className="grid grid-cols-3 gap-3">
+              {SWATCHES.map(([name, v]) => (
+                <div key={name}>
+                  <div className="h-10 rounded-xl border border-white/[0.07]" style={{ background: v }} />
+                  <div className="mt-1 text-[10.5px] font-semibold text-muted">{name}</div>
+                </div>
+              ))}
             </div>
           </div>
         </Panel>
+      </Reveal>
 
+      {/* ---- pills ---- */}
+      <Reveal>
+        <Panel title="Pill controls — buttons, filters, tabs">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <Pill variant="primary">Generate board</Pill>
+              <Pill variant="ghost">Refresh odds</Pill>
+              <Pill variant="gold">Lock card</Pill>
+              <Pill variant="danger">Clear slip</Pill>
+              <Pill variant="ghost" disabled>
+                Disabled
+              </Pill>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {MARKETS.map((m) => (
+                <FilterPill key={m} selected={market === m} onClick={() => setMarket(m)}>
+                  {m}
+                </FilterPill>
+              ))}
+            </div>
+            <div className="text-[11px] text-faint">
+              Hover brightens, press scales down 4% — every interactive element in the product is a pill.
+            </div>
+          </div>
+        </Panel>
+      </Reveal>
+
+      {/* ---- odds motion ---- */}
+      <Reveal>
         <Panel
           title="Odds cells — flash on line movement"
           action={
-            <button
-              onClick={() => setTick((t) => t + 1)}
-              className="rounded-(--radius-chip) border border-line-2 bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-text hover:bg-surface-3"
-            >
+            <Pill variant="ghost" onClick={() => setTick((t) => t + 1)} className="!px-3 !py-1 text-[11px]">
               Simulate a line move
-            </button>
+            </Pill>
           }
         >
           <div className="flex flex-wrap items-center gap-6">
@@ -125,19 +243,39 @@ export default function DesignPage() {
             </div>
             <EvBadge ev={4.2} />
             <EvBadge ev={-1.8} />
-            <EvBadge ev={0} />
             <KellyChip stake={14} />
           </div>
         </Panel>
+      </Reveal>
 
-        <Panel title="Board table — dense but breathable">
-          <DataTable columns={COLUMNS} rows={SAMPLE_ROWS} rowKey={(r) => r.id} maxHeight="none" />
-          <div className="mt-2 text-[10px] text-faint">
-            Sticky header, sortable columns, hover rows, horizontal scroll contained. All rows above are fabricated
-            placeholders for layout review — the real board only ever shows engine output.
+      {/* ---- the board stays a terminal ---- */}
+      <Reveal>
+        <Panel
+          title="Board table — density kept, rows cascade in, +EV rows lit"
+          action={
+            <Pill variant="ghost" onClick={() => setTableKey((k) => k + 1)} className="!px-3 !py-1 text-[11px]">
+              Replay reveal
+            </Pill>
+          }
+        >
+          <DataTable
+            key={tableKey}
+            columns={COLUMNS}
+            rows={SAMPLE_ROWS}
+            rowKey={(r) => r.id}
+            maxHeight="none"
+            stagger
+            rowClassName={(r) => (r.ev > 0 ? "ev-glow" : "")}
+          />
+          <div className="mt-3 text-[10.5px] leading-relaxed text-faint">
+            All rows are fabricated placeholders for layout review — the real board only ever shows
+            engine output. Monospace tabular numerals, sticky header, contained scroll: unchanged.
           </div>
         </Panel>
+      </Reveal>
 
+      {/* ---- states ---- */}
+      <Reveal>
         <div className="grid gap-4 md:grid-cols-3">
           <Panel title="Loading state">
             <SkeletonRows rows={4} />
@@ -153,28 +291,16 @@ export default function DesignPage() {
             />
           </Panel>
         </div>
+      </Reveal>
 
-        <Panel title="Probability bars">
-          <div className="max-w-sm space-y-2">
-            <ProbBar p={0.741} />
-            <ProbBar p={0.512} />
-            <ProbBar p={0.118} />
-          </div>
-        </Panel>
-
-        <Panel title="Misc">
-          <div className="flex flex-wrap items-center gap-4 text-[12px]">
-            <span className="flex items-center gap-1.5">
-              <span className="pulse-dot h-2 w-2 rounded-full bg-live" />
-              <span className="text-live">LIVE</span>
-            </span>
-            <Skeleton className="h-5 w-24" />
-            <span className="rounded-(--radius-chip) border border-gold/50 bg-gold/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-gold">
-              @ Caesars
-            </span>
-          </div>
-        </Panel>
-      </div>
-    </>
+      {/* ---- motion notes ---- */}
+      <Reveal>
+        <div className="text-center text-[11px] leading-relaxed text-faint">
+          Motion system: one shared easing (cubic-bezier .16,1,.3,1) · scroll reveals (fade + rise,
+          once) · count-ups land exactly · row cascades at 45ms — all disabled under
+          prefers-reduced-motion.
+        </div>
+      </Reveal>
+    </div>
   );
 }
