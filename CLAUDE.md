@@ -11,9 +11,11 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 >   Everything below this box describes that legacy app; its golden rules apply only to `legacy/` until cutover.
 > - Node **is** installed now (nvm, `~/.nvm/versions/node/v24.18.0/bin`); validation = `npm run build`,
 >   `npm run typecheck`, `npm run test` (vitest). jsc is no longer needed for the new app.
-> - Phase status: **ALL PHASES (0–6) COMPLETE** on this branch. Pages: / (dashboard), /board, /builder,
+> - Phase status: **ALL PHASES (0–6) COMPLETE** on this branch. Pages: / (dashboard), /stats (MLB/NFL/NCAAF
+>   live stat browser, ported from the legacy Stats tab), /board, /builder,
 >   /ledger, /sharp, /simulator, /settings, /design (design-system review page). Server routes: /api/odds
->   (host-whitelisted proxy, ODDS_API_KEY env, ~4-min Next data cache, quota headers, fresh=1 passcode-gated)
+>   (host-whitelisted proxy, ODDS_API_KEY env, ~4-min Next data cache, quota headers, fresh=1 passcode-gated),
+>   /api/stats (host-whitelisted proxy for statsapi.mlb.com + site.web.api.espn.com, keyless, 3-min cache),
 >   and /api/sharp (ANTHROPIC_API_KEY env, APP_PASSCODE gate, legacy SH_SCHEMA contract, prompt file traced).
 >   Engine facade: src/engine (get/set into the sandboxed legacy scope; shSimGames instrumented in
 >   src/lib/engine-client.ts to capture sim outputs — zero math impact). Same localStorage keys as legacy

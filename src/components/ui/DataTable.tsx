@@ -10,6 +10,8 @@ export type Column<T> = {
   sortValue?: (row: T) => number | string;
   cell: (row: T) => ReactNode;
   className?: string;
+  /** pin the column at this px offset while the table scrolls sideways */
+  stickyLeft?: number;
 };
 
 /**
@@ -73,7 +75,10 @@ export function DataTable<T>({
                   }
                   className={`whitespace-nowrap border-b border-white/[0.06] px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] ${
                     c.numeric ? "text-right" : "text-left"
-                  } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""}`}
+                  } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""} ${
+                    c.stickyLeft != null ? "sticky z-20 bg-surface-2" : ""
+                  }`}
+                  style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
                 >
                   {c.header}
                   {active && <span className="ml-1">{sort!.dir === 1 ? "▲" : "▼"}</span>}
@@ -94,7 +99,10 @@ export function DataTable<T>({
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`whitespace-nowrap px-3 py-2.5 ${c.numeric ? "num text-right" : ""} ${c.className ?? ""}`}
+                  className={`whitespace-nowrap px-3 py-2.5 ${c.numeric ? "num text-right" : ""} ${
+                    c.stickyLeft != null ? "sticky z-10 bg-bg" : ""
+                  } ${c.className ?? ""}`}
+                  style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
                 >
                   {c.cell(r)}
                 </td>

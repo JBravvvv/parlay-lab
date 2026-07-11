@@ -11,10 +11,12 @@ import {
   IconSettings,
   IconSharp,
   IconSim,
+  IconStats,
 } from "./icons";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: IconDash, mobile: true },
+  { href: "/stats", label: "Stats", icon: IconStats, mobile: true },
   { href: "/board", label: "Board", icon: IconBoard, mobile: true },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, mobile: true },
   { href: "/builder", label: "Builder", icon: IconBuilder, mobile: true },
@@ -102,7 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* mobile bottom tab bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-white/[0.05] bg-surface/70 backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-white/[0.05] bg-surface/70 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {NAV.filter((n) => n.mobile).map(({ href, label, icon: Icon }) => {

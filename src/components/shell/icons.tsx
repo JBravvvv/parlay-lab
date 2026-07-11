@@ -13,6 +13,16 @@ export function IconDash({ className = "" }: P) {
     </svg>
   );
 }
+export function IconStats({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
+      <path d="M5 21V10" />
+      <path d="M10.5 21V4" />
+      <path d="M16 21v-8" />
+      <path d="M21 21H3" />
+    </svg>
+  );
+}
 export function IconBoard({ className = "" }: P) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
