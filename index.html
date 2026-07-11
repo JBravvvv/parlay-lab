@@ -420,7 +420,7 @@ body{padding:0!important;min-height:100dvh}
     </div><!-- /panel card -->
 
     <footer>
-      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 43 · 2026-07-10</div>
+      <div style="font-family:'JetBrains Mono',monospace;color:var(--green);font-size:11px;margin-bottom:6px;letter-spacing:.5px">PARLAY//LAB · build 44 · 2026-07-10</div>
       Stats: MLB Stats API + ESPN (live). Caesars-preferred odds via The Odds API; other odds entered manually.
       Parlays stack the vig and correlated legs are priced against you. Personal analysis tool only.
     </footer>
@@ -1075,6 +1075,11 @@ var SH_CFG={perParlayCap:0.40,roundTo:1,maxCoreTickets:6,thinSlateEV:0,
   seasonEnd:"2026-09-27",projPaths:2000};
 var SH_MODEL="claude-opus-4-8";
 var SH_PROP_MARKETS="batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs";
+/* Caesars posts hits and Ks as milestone ladders ("1+ hits", "6+ Ks"), which The Odds API
+   exposes under the *_alternate market keys (Over 0.5/1.5/... only). Verified live: Caesars
+   absent from batter_hits/pitcher_strikeouts but present in both alternates. These feed ONLY
+   the Caesars playable price on existing rows — never consensus, line shopping, or new rows. */
+var SH_PROP_ALT="batter_hits_alternate,pitcher_strikeouts_alternate";
 var SH_SCHEMA={type:"object",additionalProperties:false,required:["overview","picks","parlays","trap"],properties:{
   overview:{type:"string"},
   picks:{type:"array",items:{type:"object",additionalProperties:false,
@@ -1207,13 +1212,26 @@ function shCollectSlate(){
       var chain=Promise.resolve();
       evs.forEach(function(e,idx){chain=chain.then(function(){
         shTick("Pulling props · game "+(idx+1)+"/"+evs.length);
-        return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events/"+e.id+"/odds?regions=us&oddsFormat=american&markets="+SH_PROP_MARKETS+"&apiKey="+encodeURIComponent(OB.key)).then(function(pr){
+        return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events/"+e.id+"/odds?regions=us&oddsFormat=american&markets="+SH_PROP_MARKETS+","+SH_PROP_ALT+"&apiKey="+encodeURIComponent(OB.key)).then(function(pr){
           var bks=(pr.body&&pr.body.bookmakers)||[];if(!bks.length)return;
           /* market layer: merge EVERY book per player|line — per-book de-vig of each O/U pair,
              consensus fair P(over) = median across books, prices kept = best per side (line shopping). */
-          var acc={},bookNames={};
+          var acc={},bookNames={},altCz={};
           bks.forEach(function(bk){var bn=bk.title||bk.key,czb=bk.key===CAESARS_KEY;bookNames[bn]=1;
             (bk.markets||[]).forEach(function(mk){
+              /* *_alternate markets = Caesars' milestone ladders ("1+ hits" = Over 0.5).
+                 They ONLY fill the Caesars playable price on rows the consensus books
+                 already created — never fairs, never line shopping, never new rows. */
+              if(/_alternate$/.test(mk.key)){
+                if(!czb)return;
+                var ab=altCz[mk.key.replace(/_alternate$/,"")]=altCz[mk.key.replace(/_alternate$/,"")]||{};
+                (mk.outcomes||[]).forEach(function(o){
+                  var sd2=(o.name||"").toLowerCase().indexOf("over")>=0?"o":"u";
+                  var kk2=(o.description||o.name)+"|"+(o.point!=null?o.point:"");
+                  if(!ab[kk2])ab[kk2]={o:null,u:null};
+                  ab[kk2][sd2]=o.price;});
+                return;
+              }
               var m=acc[mk.key]=acc[mk.key]||{rows:{},order:[]};
               var tmp={};
               (mk.outcomes||[]).forEach(function(o){var side=(o.name||"").toLowerCase().indexOf("over")>=0||o.name==="Yes"?"o":"u";
@@ -1231,9 +1249,10 @@ function shCollectSlate(){
                 if(x.o!=null&&(bo==null||amToDec(x.o)>amToDec(bo.price)))bo={price:x.o,book:x.book};
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
               var czx=r.list.filter(function(x){return x.cz;})[0];
+              var czAlt=(!czx&&altCz[mkey])?altCz[mkey][kk]:null; /* ladder fallback: standard Caesars quote wins */
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
                 fair:fairs.length?shMedian(fairs):null,books:fairs.length,
-                cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:null};
+                cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null)};
             });
           });
           if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[pnorm(e.away_team)+"@"+pnorm(e.home_team)]};
@@ -2538,7 +2557,11 @@ function shPickCard(p,addAttr,name,propTxt){
   var kf=czMode?p.czKellyF:p.kellyF;
   var stake=(kf&&kf>0)?Math.max(1,Math.round(SH.bankroll*kf)):0;
   var badge=czMode?p.czBadge:p.edgeBadge;
-  var priceTxt=czMode?(p.czOdds+" @ Caesars"):(p.odds+(p.book?" @ "+p.book:""));
+  /* Caesars lists prop overs as milestone ladders — "Hits O 0.5" is "1+ hits" in their app.
+     Show the equivalence so the bet is findable at the counter. */
+  var mOv=(czMode&&p.lkey&&p.lkey.indexOf("|")>=0)?String(p.sub||"").match(/ O (\d+\.5)$/):null;
+  var lad=mOv?(" · "+Math.ceil(Number(mOv[1]))+"+"):"";
+  var priceTxt=czMode?(p.czOdds+" @ Caesars"+lad):(p.odds+(p.book?" @ "+p.book:""));
   var oddsForSlip=czMode?p.czOdds:p.odds;
   var czChip=(czMode&&p.czEdge!=null)?"<span class='shchip "+(p.czEdge>=0?"edgeplus":"edgeminus")+"'>CZ vs fair <b>"+(p.czEdge>=0?"+":"")+esc(String(p.czEdge))+"%</b></span>":"";
   var tagsH=(p.tags&&p.tags.length)?"<div class='shtags'>"+p.tags.map(function(t){return "<span class='shtagc'>"+esc(t)+"</span>";}).join("")+"</div>":"";
