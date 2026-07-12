@@ -73,6 +73,47 @@ describe("engine v2 integration kernel", () => {
     eng.set("SH_PRIORS", null);
   });
 
+  it("Savant percentile factors: right direction, hard caps, dormant = 1", () => {
+    const pitF = eng.get<(pst: unknown) => number>("shPitPctF")!;
+    const oppF = eng.get<(l: unknown[]) => number>("shOppWhiffF")!;
+
+    // dormant → neutral
+    expect(pitF({ id: 7 })).toBe(1);
+
+    eng.set("SH_V2", { priors: true });
+    eng.set("SH_PRIORS", {
+      league: {},
+      batters: {
+        1: { pct: { whiff_percent: 90 } }, 2: { pct: { whiff_percent: 90 } }, 3: { pct: { whiff_percent: 90 } },
+        4: { pct: { whiff_percent: 90 } }, 5: { pct: { whiff_percent: 90 } },
+        11: { pct: { whiff_percent: 10 } }, 12: { pct: { whiff_percent: 10 } }, 13: { pct: { whiff_percent: 10 } },
+        14: { pct: { whiff_percent: 10 } }, 15: { pct: { whiff_percent: 10 } },
+      },
+      pitchers: { 7: { pct: { xwoba: 100 } }, 8: { pct: { xwoba: 1 } } },
+    });
+
+    // elite pitcher (100th pct run prevention) suppresses opposing offense, capped at 0.94
+    expect(pitF({ id: 7 })).toBeCloseTo(0.94, 6);
+    // batting-practice arm boosts it, capped at 1.06
+    expect(pitF({ id: 8 })).toBeGreaterThan(1);
+    expect(pitF({ id: 8 })).toBeLessThanOrEqual(1.06);
+    expect(pitF({ id: 999 })).toBe(1); // unknown → neutral
+
+    // contact lineup (whiff pct 90 = elite contact) → FEWER pitcher Ks
+    const contact = oppF([{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }]);
+    expect(contact).toBeLessThan(1);
+    expect(contact).toBeGreaterThanOrEqual(0.93);
+    // whiffy lineup (pct 10) → MORE pitcher Ks
+    const whiffy = oppF([{ id: 11 }, { id: 12 }, { id: 13 }, { id: 14 }, { id: 15 }]);
+    expect(whiffy).toBeGreaterThan(1);
+    expect(whiffy).toBeLessThanOrEqual(1.07);
+    // under 5 known batters → neutral (sample discipline)
+    expect(oppF([{ id: 1 }, { id: 2 }])).toBe(1);
+
+    eng.set("SH_V2", null);
+    eng.set("SH_PRIORS", null);
+  });
+
   it("ARMED end-to-end on the fixture slate: output changes and the overview says so", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FROZEN_NOW);

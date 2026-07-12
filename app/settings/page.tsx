@@ -34,6 +34,12 @@ function PriorsStatus() {
       <Row label="Park factors (by batter handedness)">
         <span className="num text-[12.5px] text-text">{Object.keys(p.parks.R).length} parks × R/L</span>
       </Row>
+      <Row label="Savant percentile ranks (100 = elite, orientation verified)">
+        <span className="num text-[12.5px] text-pos">
+          {Object.values(p.batters).filter((b) => (b as { pct?: unknown }).pct).length} batters ·{" "}
+          {Object.values(p.pitchers).filter((x) => (x as { pct?: unknown }).pct).length} pitchers
+        </span>
+      </Row>
       <Row label="League xwOBA baseline">
         <span className="num text-[12.5px] text-text">{p.league.xwoba ?? "—"}</span>
       </Row>

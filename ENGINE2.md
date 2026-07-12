@@ -21,6 +21,13 @@ fabricates a number; when a source is unavailable we say so and degrade.
        Weather uses statsapi's park-relative wind strings ("Out To CF") — no azimuth table needed.
        Lineup-slot PA effects are already emergent from the PA-by-PA sim (no table needed).
        Catcher framing still TODO (Savant endpoint shape differs).
+     - **Savant percentile ranks integrated 2026-07-12** (Josh's ask): `pct` per player in
+       priors.json (544 batters / 580 pitchers). Orientation EMPIRICALLY verified: always
+       100 = elite for the role (batter whiff/K inverted, pitcher BB/hard-hit/xwOBA inverted
+       — correlation-checked vs raw skill data; Kwan 100th / Rooker 1st whiff pct anchor).
+       Engine uses: pitcher xwOBA-pct quality nudge on opposing hit/TB/HR + sim vectors
+       (capped 0.94–1.06), opposing-lineup contact-skill factor on K props (capped 0.93–1.07,
+       needs 5+ known batters), batter percentile line in card bits, "sv-pct" tag when applied.
    - **Line history we own**: hourly snapshots (h2h/totals/spreads, us+eu regions) →
      `line-history` branch, `data/YYYY-MM-DD.json`, via `.github/workflows/line-history.yml`
      through the app's own /api/odds (no secrets). **DONE 2026-07-11.**

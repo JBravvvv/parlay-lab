@@ -1387,6 +1387,18 @@ function shUmpKf(g){if(!(SH_V2&&SH_V2.ctx&&SH_CTX&&SH_CTX.games&&g))return 1;
   return 1;}
 function shTempF(g){if(!(SH_V2&&SH_V2.ctx))return 1;var t=g&&g.weather&&parseFloat(g.weather.temp);
   if(!isFinite(t))return 1;return shClamp(1+0.008*(t-70),0.90,1.12);}
+/* Savant percentile ranks — orientation verified 2026-07-12: ALWAYS 100 = elite
+   for the player's role (Savant inverts negative stats on both sides). */
+function shPct(kind,id){var P=SH_V2&&SH_V2.priors&&SH_PRIORS&&SH_PRIORS[kind];var r=P&&id!=null&&P[id];return (r&&r.pct)||null;}
+/* pitcher run-prevention quality (xwOBA pct) nudging opposing hit/TB/HR — capped ±6% */
+function shPitPctF(pst){var pc=pst?shPct("pitchers",pst.id):null;if(!pc)return 1;
+  var v=(pc.xwoba!=null)?pc.xwoba:pc.xera;if(v==null)return 1;
+  return shClamp(1-(v-50)/50*0.06,0.94,1.06);}
+/* opposing-lineup contact skill for K props (batter whiff pct, 100 = contact) — capped ±7% */
+function shOppWhiffF(hsList){if(!(SH_V2&&SH_V2.priors&&SH_PRIORS)||!hsList||!hsList.length)return 1;
+  var sum=0,c=0;hsList.forEach(function(hs){var pc=hs?shPct("batters",hs.id):null;
+    if(pc&&pc.whiff_percent!=null){sum+=pc.whiff_percent;c++;}});
+  if(c<5)return 1;return shClamp(1+(50-sum/c)/50*0.08,0.93,1.07);}
 function shImp(am){var n=Number(am);if(!isFinite(n)||!n)return null;return n>0?100/(n+100):-n/(-n+100);}
 /* ---- market layer (doc Phase 2): exact odds math ----
    shDevig2: multiplicative de-vig of a two-way market — fair P(side1).
@@ -1613,7 +1625,7 @@ function shAnalyzeLocal(slate){
       if(useStarter&&pst){var whip=shPitchBlend(pst,"whip"),era2=shPitchBlend(pst,"era");
         if(whip!=null)contact=shClamp(whip/1.30,.85,1.15);
         if(era2!=null)power=shClamp((era2/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);}
-      var hF=contact*(coors?1.07:1),hrF=power*wind.f*(coors?1.08:1);
+      var pq=useStarter?shPitPctF(pst):1;var hF=contact*pq*(coors?1.07:1),hrF=power*pq*wind.f*(coors?1.08:1);
       var hitR=null,hrR=null,bbAB=null,s2=0.20,s3=0.015;
       if(st){
         var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,shPriorH(st,Lh));
@@ -1779,7 +1791,7 @@ function shAnalyzeLocal(slate){
         if(oppLineup&&oppLineup.length){var kr=0,c=0;oppLineup.forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.k);},"ab",10);if(r!=null){kr+=r;c++;}});
           if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2);bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");if(f!==1)tags.push("opp-offense");}}
         else riskBits.push("opposing lineup unconfirmed");
-        var uf=shUmpKf(g);lam=kps*f*uf;if(uf!==1){tags.push("ump-zone");bits.push("HP ump K factor "+uf.toFixed(2)+" (db)");}
+        var uf=shUmpKf(g),wf=shOppWhiffF((oppLineup||[]).map(function(nm){return lookupStats[pnorm(nm)];}));lam=kps*f*uf*wf;if(uf!==1){tags.push("ump-zone");bits.push("HP ump K factor "+uf.toFixed(2)+" (db)");}if(wf!==1){tags.push("sv-pct");bits.push("opposing contact skill (Savant pct) x"+wf.toFixed(2));}
         bits.unshift((k30&&g30?k30+" K in "+g30+" starts last 30 days":"season "+st.season.k+" K / "+st.season.g+" starts")+" → "+lam.toFixed(1)+" expected");
         var era=shPitchBlend(st,"era");if(era!=null)bits.push(era.toFixed(2)+" blended ERA");
       }else{
@@ -1796,7 +1808,7 @@ function shAnalyzeLocal(slate){
           if(era2!=null)power=shClamp((era2/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);
           bits.push("vs "+opp+(era2!=null?" ("+era2.toFixed(2)+" ERA":"")+(whip!=null?", "+whip.toFixed(2)+" WHIP)":")"));}
         else riskBits.push("no probable-starter data for the matchup");
-        var hrF=power*wind.f*(coors?1.08:1),tbF=power*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*(coors?1.07:1);
+        var pq=shPitPctF(pst);var hrF=power*pq*wind.f*(coors?1.08:1),tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*pq*(coors?1.07:1);
         /* batter-vs-pitcher career history — doc discipline, hard-coded caps:
            under 15 PA = ignored in the math (context only on the card);
            15–30 PA = tiny nudge; 30+ = modest weight; total effect capped ±10%. */
@@ -1837,7 +1849,7 @@ function shAnalyzeLocal(slate){
         if(shrunk)tags.push("shrunk-to-mean");
         if(wind.f!==1||coors)tags.push("park+wind");
         if(expAB>=4.3)tags.push("PA-volume");
-        if(contact!==1||power!==1)tags.push("starter-quality");
+        if(contact!==1||power!==1)tags.push("starter-quality");if(pq!==1)tags.push("sv-pct");var bpc=shPct("batters",st.id);if(bpc&&bpc.xwoba!=null)bits.push("Savant: xwOBA "+bpc.xwoba+"th pct"+(bpc.brl_percent!=null?" \u00b7 barrel "+bpc.brl_percent+"th":"")+(bpc.whiff_percent!=null?" \u00b7 contact "+bpc.whiff_percent+"th":""));
         nEff=bn?bn.n:null;
         var l30=st.last30;
         bits.unshift(l30.h+"-for-"+l30.ab+" ("+l30.avg+") with "+l30.hr+" HR / "+l30.tb+" TB last 30");
@@ -2052,7 +2064,7 @@ function shAnalyzeLocal(slate){
     +(simCount?" · "+simCount+" games Monte-Carlo simmed ("+SH_SIM_N+"× each)":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+"). ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
+    +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+"). ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
     +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL. "
     +"Playable card is Caesars-only (your book): displayed odds, EV and stakes use Caesars' price; picks Caesars doesn't offer are listed separately, never hidden. "
     +"TOP 50 ranks by EV; category tabs rank by win probability (the high-floor parlay pool) — "+(counts||"no pregame lines yet")+". "

@@ -76,6 +76,26 @@ def skills(kind):
         ] if r.get(src) not in (None, "")}
     return out
 
+def percentiles(kind):
+    """Savant percentile ranks. Orientation verified empirically 2026-07-12:
+    ALWAYS 100 = elite for the player's role (Savant inverts negative stats —
+    batter whiff/K percentiles, pitcher BB/hard-hit/xwOBA percentiles)."""
+    fields = (["xwoba", "xba", "xslg", "xiso", "brl_percent", "exit_velocity", "hard_hit_percent",
+               "k_percent", "bb_percent", "whiff_percent", "chase_percent", "sprint_speed", "bat_speed"]
+              if kind == "batter" else
+              ["xwoba", "xba", "xslg", "brl_percent", "exit_velocity", "hard_hit_percent",
+               "k_percent", "bb_percent", "whiff_percent", "chase_percent", "xera", "fb_velocity"])
+    t = get(f"{BASE}/leaderboard/percentile-rankings?type={kind}&year={SEASON}&team=&csv=true")
+    out = {}
+    for r in rows(t):
+        pid = str(r.get("player_id", "")).strip()
+        if not pid:
+            continue
+        d = {k: num(r.get(k)) for k in fields if r.get(k) not in (None, "")}
+        if d:
+            out[pid] = d
+    return out
+
 def park_factors(bat_side):
     """Savant serves park factors as HTML with an embedded `var data = [...]` blob."""
     t = get(f"{BASE}/leaderboard/statcast-park-factors?type=year&year={SEASON}&batSide={bat_side}"
@@ -115,7 +135,7 @@ def league_means(bat, skl):
             continue
         s = skl.get(pid, {})
         for k, v in list(b.items()) + list(s.items()):
-            if k in ("name", "pa") or v is None:
+            if k in ("name", "pa") or not isinstance(v, (int, float)):
                 continue
             acc.setdefault(k, [0.0, 0])
             acc[k][0] += v * pa
@@ -130,6 +150,10 @@ def main():
         bat_x.setdefault(pid, {}).update(s)
     for pid, s in pit_s.items():
         pit_x.setdefault(pid, {}).update(s)
+    for pid, d in percentiles("batter").items():
+        bat_x.setdefault(pid, {})["pct"] = d
+    for pid, d in percentiles("pitcher").items():
+        pit_x.setdefault(pid, {})["pct"] = d
     parks = {"R": park_factors("R"), "L": park_factors("L")}
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
