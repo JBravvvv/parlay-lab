@@ -121,16 +121,106 @@ describe("engine v2 integration kernel", () => {
       const fx = fixtureEngine();
       const priors = JSON.parse(readFileSync("public/model/priors.json", "utf8"));
       fx.set("SH_PRIORS", priors);
-      fx.set("SH_V2", { priors: true, ctx: false, shin: true, sharpW: true }); // regions stays "us": fixtures recorded us URLs
+      // regions stays "us" (fixtures recorded us URLs); simN kept at a test-fast 2000
+      fx.set("SH_V2", { priors: true, ctx: false, shin: true, sharpW: true, sim: true, simN: 2000 });
       const slate = await fx.collectSlate();
       const d = fx.analyze(slate) as unknown as Record<string, unknown>;
       expect(String(d.overview)).toContain("ENGINE V2 INTEGRATED");
+      expect(String(d.overview)).toContain("log5 batter×pitcher");
       // the integrated pipeline must actually move the numbers vs the classic baseline
       expect(JSON.stringify(digest(d))).not.toBe(readBaseline("baseline43.json"));
+      // sim pricing desk: every simmed game carries F5 + team-total model prices
+      const sm = d.simMarkets as Array<Record<string, never>> | null;
+      expect(Array.isArray(sm)).toBe(true);
+      for (const row of sm!) {
+        const f5 = row.f5 as { pHome: number; pAway: number; pTie: number };
+        expect(f5.pHome + f5.pAway + f5.pTie).toBeCloseTo(1, 8);
+        const tot = row.total as { model: number; final: number } | undefined;
+        if (tot) {
+          expect(tot.model).toBeGreaterThan(0);
+          expect(tot.model).toBeLessThan(1);
+          expect(tot.final).toBeGreaterThan(0);
+          expect(tot.final).toBeLessThan(1);
+        }
+      }
     } finally {
       vi.useRealTimers();
     }
   }, 120_000);
+
+  it("platoon / park / log5 / pen-fatigue kernels: direction, caps, dormant neutrality", () => {
+    const platoon = eng.get<(b: string | null, p: string | null) => { h: number; hr: number }>("shPlatoon")!;
+    const parkF = eng.get<(v: string | null, s: string | null) => { h: number; hr: number } | null>("shParkF")!;
+    const log5 = eng.get<(a: number, b: number, c: number) => number>("shLog5")!;
+    const penF = eng.get<(t: string) => number>("shPenF")!;
+
+    // dormant → everything neutral
+    expect(platoon("L", "L")).toEqual({ h: 1, hr: 1 });
+    expect(parkF("Coors Field", "R")).toBeNull();
+    expect(penF("New York Yankees")).toBe(1);
+
+    eng.set("SH_V2", { sim: true, priors: true });
+    eng.set("SH_PRIORS", {
+      league: { xba: 0.244, xslg: 0.4, barrel_pct: 8 },
+      batters: {},
+      pitchers: {},
+      parks: { R: { "Coors Field": { hits: 112, hr: 110 } }, L: { "Coors Field": { hits: 116, hr: 104 } } },
+    });
+    eng.set("SH_CTX", {
+      bullpen_last3: {
+        "New York Yankees": [{ name: "A", pitches: 200, daysAgo: 1 }],
+        "Boston Red Sox": [{ name: "B", pitches: 10, daysAgo: 3 }],
+      },
+    });
+
+    // platoon: same-hand hurts, opposite helps, switch always mildly helps
+    expect(platoon("R", "R").h).toBeLessThan(1);
+    expect(platoon("R", "R").hr).toBeLessThan(platoon("R", "R").h); // power split is bigger
+    expect(platoon("L", "R").h).toBeGreaterThan(1);
+    expect(platoon("S", "R").h).toBeGreaterThan(1);
+    // park×handedness: index 112 dampened 50% → 1.06; side-specific
+    expect(parkF("Coors Field", "R")!.h).toBeCloseTo(1.06, 10);
+    expect(parkF("Coors Field", "L")!.h).toBeCloseTo(1.08, 10);
+    expect(parkF("Unknown Park", "R")).toBeNull();
+    // log5: pitcher at league average → batter rate unchanged; tough pitcher suppresses
+    expect(log5(0.3, 0.244, 0.244)).toBeCloseTo(0.3, 10);
+    expect(log5(0.3, 0.2, 0.244)).toBeLessThan(0.3);
+    expect(log5(0.3, 0.3, 0.244)).toBeGreaterThan(0.3);
+    // pen fatigue: gassed pen boosts opposing offense, fresh pen suppresses, caps hold
+    const tired = penF("New York Yankees");
+    const fresh = penF("Boston Red Sox");
+    expect(tired).toBeGreaterThan(1);
+    expect(tired).toBeLessThanOrEqual(1.05);
+    expect(fresh).toBeLessThan(1);
+    expect(fresh).toBeGreaterThanOrEqual(0.96);
+    expect(penF("Not A Team")).toBe(1);
+
+    eng.set("SH_V2", null);
+    eng.set("SH_PRIORS", null);
+    eng.set("SH_CTX", null);
+  });
+
+  it("sim v2 block: TTO/hook + totals/F5 counters only exist when armed", () => {
+    const simGames = eng.get<(ctx: unknown, n: number, seed: number) => Record<string, never>>("shSimGames")!;
+    // a league-average-ish lineup vector: [BB,1B,2B,3B,HR]
+    const v = [0.08, 0.14, 0.04, 0.004, 0.03];
+    const bat = Array.from({ length: 9 }, () => ({ vSP: v, vBP: v }));
+    const base = { away: { bat }, home: { bat }, awayLeash: 18, homeLeash: 18, legs: [] };
+
+    const dormant = simGames({ ...base, v2: null }, 500, 42);
+    expect(dormant.v2m).toBeUndefined();
+
+    const armed = simGames({ ...base, v2: { total: 8.5 } }, 500, 42) as unknown as {
+      v2m: { pTotO: number; pF5Home: number; pF5Away: number; pF5Tie: number; avgF5: number; tt: { home: { o35: number; o45: number } } };
+      avgHome: number;
+    };
+    const m = armed.v2m;
+    expect(m.pF5Home + m.pF5Away + m.pF5Tie).toBeCloseTo(1, 8);
+    expect(m.pTotO).toBeGreaterThan(0);
+    expect(m.pTotO).toBeLessThan(1);
+    expect(m.avgF5).toBeGreaterThan(0);
+    expect(m.tt.home.o35).toBeGreaterThanOrEqual(m.tt.home.o45); // over 3.5 ⊇ over 4.5
+  });
 
   it("context factors are capped and default to 1", () => {
     const tempF = eng.get<(g: unknown) => number>("shTempF")!;

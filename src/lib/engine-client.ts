@@ -80,7 +80,15 @@ async function armV2(eng: Engine) {
   const [priors, ctx] = await Promise.all([grab("/model/priors.json"), grab("/model/context.json")]);
   eng.set("SH_PRIORS", priors);
   eng.set("SH_CTX", ctx);
-  eng.set("SH_V2", { priors: !!priors, ctx: !!ctx, shin: true, sharpW: true, regions: "us,eu" });
+  eng.set("SH_V2", {
+    priors: !!priors,
+    ctx: !!ctx,
+    shin: true,
+    sharpW: true,
+    regions: "us,eu",
+    sim: true, // log5/platoon/park×hand/TTO/hook/pen-fatigue + totals/F5 pricing
+    simN: 10000,
+  });
 }
 
 /** Full engine run: slate collection (via the odds proxy) + analysis. */

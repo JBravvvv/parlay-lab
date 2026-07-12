@@ -15,6 +15,7 @@ import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
+import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
 import { getMoney } from "@/lib/engine-client";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
@@ -234,6 +235,8 @@ export default function BoardPage() {
           live={d.parlaysLive ?? []}
         />
       )}
+
+      <SimDesk rows={(d?.simMarkets as SimMarketRow[] | null | undefined) ?? null} />
 
       <SharpDesk />
 

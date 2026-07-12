@@ -45,13 +45,33 @@ fabricates a number; when a source is unavailable we say so and degrade.
      temperature on HR (0.8%/°F vs 70°, capped 0.90–1.12), Shin de-vig + Pinnacle-weighted
      consensus for ML/RL/props, us+eu game-odds regions. Dormant = byte-identical to
      baseline43 (parity suite still passes); armed-on-fixtures test proves output moves and
-     the overview stamps "ENGINE V2 INTEGRATED". 24 tests green.
-     Still TODO from the spec: log5 batter×pitcher, platoon splits, park×handedness in the sim,
-     bullpen chains by fatigue, manager hook/TTO, 10k sims, totals/F5/team-total pricing,
-     platoon splits, park×handedness multipliers, ump/weather effects, odds-ratio/log5
-     batter×pitcher blending, manager-hook model (pitch count + times-through-order),
-     bullpen chains by availability, 10k sims, and new outputs: totals, F5, team totals.
-   - Ships as `src/engine2/` (TypeScript, unit-tested, seeded) — champion untouched.
+     the overview stamps "ENGINE V2 INTEGRATED".
+   - **Phase 2b sim upgrades DONE 2026-07-12** (all SH_V2.sim-gated; dormant = parity):
+     - **log5/odds-ratio batter×pitcher** (`shLog5`): batter rate × pitcher xBA-against
+       anchored at league xBA; when it fires the WHIP/percentile proxies come OFF the hit
+       channel (no double counting). HR channel: pitcher xISO-against, sqrt-dampened
+       (`shPitIsoF`, 0.75–1.30), replaces the ERA/WHIP power proxy.
+     - **Platoon** (`shPlatoon`): league-average magnitude by handedness (individual splits
+       too noisy in-season) — same-hand h×0.98/hr×0.94, opposite h×1.02/hr×1.06, switch
+       h×1.01/hr×1.03. stands/throws added to priors.json via a statsapi people batch
+       (595/595 batters, 744/744 pitchers covered).
+     - **Park×handedness** (`shParkF`): Savant park factor for the batter's side, dampened
+       50% (single-season noise), capped 0.85–1.18; replaces the Coors-only hack when armed.
+     - **Bullpen chains** (`shPenF`): weighted 3-day pen workload (day weights 1/0.6/0.3)
+       vs the slate average → vBP vectors scaled 0.96–1.05 (gassed pen = opposing boost).
+     - **TTO + manager hook** (inside `shSimGames`): 2nd pass h×1.02/hr×1.03, 3rd pass
+       h×1.045/hr×1.07 vs the starter; the hook pulls a starter at 6 runs allowed or 29
+       batters faced even before the outs-based leash.
+     - **10,000 sims** when armed (SH_V2.simN; dormant stays SH_SIM_N=4000).
+     - **Totals / F5 / team-total pricing**: armed odds parsing keeps per-book O/U prices at
+       the modal total point (Shin + weighted-median fair, Caesars quote captured); the sim
+       counts game totals, F5 result (home/away/tie), F5 totals 4.5/5.5 and team totals
+       3.5/4.5 per run → `d.simMarkets` → Board "SIM PRICING" desk (totals blended 30/70
+       model/market with EV at the CZ quote when the points match; F5/TT are model-fair
+       only and say so). DISPLAY-ONLY: not fed into parlays, the allocator, or ledger
+       grading — those markets have no auto-grade path yet. 27 tests green.
+   - Correlation note: totals/F5 could enter the sim's joint-legs machinery for SGP pricing
+     later; kept out until grading exists.
 
 3. **Market layer**
    - De-vig: power or Shin method (not proportional) — corrects favorite-longshot bias.

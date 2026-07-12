@@ -114,6 +114,25 @@ def park_factors(bat_side):
         ] if v.get(src) not in (None, "")}
     return out
 
+def handedness(ids):
+    """batSide/pitchHand from MLB statsapi (free, batched) — drives platoon and
+    park-by-handedness in the sim. Missing players are simply omitted."""
+    out = {}
+    ids = [str(i) for i in ids if str(i).isdigit()]
+    for i in range(0, len(ids), 400):
+        chunk = ids[i:i + 400]
+        try:
+            t = get("https://statsapi.mlb.com/api/v1/people?personIds=" + ",".join(chunk)
+                    + "&fields=people,id,batSide,pitchHand,code")
+            for p in json.loads(t).get("people", []):
+                out[str(p["id"])] = {
+                    "bats": (p.get("batSide") or {}).get("code"),
+                    "throws": (p.get("pitchHand") or {}).get("code"),
+                }
+        except Exception as e:
+            print(f"handedness chunk {i}: {e}", file=sys.stderr)
+    return out
+
 def framing():
     try:
         t = get(f"{BASE}/catcher_framing?year={SEASON}&team=&min=q&type=catcher&sort=4,1&csv=true")
@@ -154,6 +173,12 @@ def main():
         bat_x.setdefault(pid, {})["pct"] = d
     for pid, d in percentiles("pitcher").items():
         pit_x.setdefault(pid, {})["pct"] = d
+    hands = handedness(list(bat_x.keys()) + list(pit_x.keys()))
+    for pid, h in hands.items():
+        if pid in bat_x and h.get("bats"):
+            bat_x[pid]["stands"] = h["bats"]
+        if pid in pit_x and h.get("throws"):
+            pit_x[pid]["throws"] = h["throws"]
     parks = {"R": park_factors("R"), "L": park_factors("L")}
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
