@@ -12,6 +12,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { getMoney } from "@/lib/engine-client";
 import { loadUfcBoard, amToDec, decToAm, fmtAm } from "@/lib/ufc";
 import { UfcProps, type PropLeg } from "@/components/ufc/UfcProps";
+import { UfcLiveProps } from "@/components/ufc/UfcLiveProps";
 
 /* Build-your-own UFC parlay from the Caesars-priced sides of the next card.
    Same market math as the Board's UFC desk (consensus = de-vigged median
@@ -118,7 +119,14 @@ export function UfcBuilder() {
             <Link href="/board" className="text-pos underline underline-offset-2">Board&apos;s UFC tab</Link>.
           </div>
         </div>
-        <Pill variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["ufc-board"] })} disabled={q.isFetching}>
+        <Pill
+          variant="ghost"
+          onClick={() => {
+            qc.invalidateQueries({ queryKey: ["ufc-board"] });
+            qc.invalidateQueries({ queryKey: ["ufc-props"] });
+          }}
+          disabled={q.isFetching}
+        >
           {q.isFetching ? "Refreshing…" : "↻ Refresh UFC"}
         </Pill>
       </div>
@@ -207,6 +215,8 @@ export function UfcBuilder() {
           </Panel>
         </Reveal>
       )}
+
+      <UfcLiveProps fights={q.data?.fights ?? []} onAdd={addProp} />
 
       <UfcProps fights={q.data?.fights ?? []} onAdd={addProp} />
 
