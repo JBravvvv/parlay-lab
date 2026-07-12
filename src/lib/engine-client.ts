@@ -70,9 +70,23 @@ export function cachedBoard(): Board | null {
   }
 }
 
+/* ENGINE V2: feed Statcast priors + daily context into the engine and switch
+   the integrated pipeline on (skill-prior shrinkage, Shin de-vig, Pinnacle-
+   weighted consensus, us+eu books, ump/temperature context). Best-effort —
+   a missing artifact degrades that piece to classic behavior and the engine's
+   own overview says which mode ran. */
+async function armV2(eng: Engine) {
+  const grab = (u: string) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [priors, ctx] = await Promise.all([grab("/model/priors.json"), grab("/model/context.json")]);
+  eng.set("SH_PRIORS", priors);
+  eng.set("SH_CTX", ctx);
+  eng.set("SH_V2", { priors: !!priors, ctx: !!ctx, shin: true, sharpW: true, regions: "us,eu" });
+}
+
 /** Full engine run: slate collection (via the odds proxy) + analysis. */
 export async function generateBoard(): Promise<Board> {
   const eng = getEngine();
+  await armV2(eng);
   const slate = await eng.collectSlate();
   simCapture = [];
   const data = eng.analyze(slate);

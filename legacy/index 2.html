@@ -1149,7 +1149,7 @@ function shCollectSlate(){
     if(!slate.games.some(function(g){return g.lineup_away.length;}))gaps.push("Lineups not posted yet — weight lineup-spot factors accordingly.");
     shTick("Pulling game lines (ML + RL + totals)");
     /* 2) game odds: moneylines, run lines (spreads), and Vegas totals */
-    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions="+((SH_V2&&SH_V2.regions)||"us")+"&markets=h2h,spreads,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
+    return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions=us&markets=h2h,spreads,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
   }).then(function(res){
     (Array.isArray(res.body)?res.body:[]).forEach(function(g){
       if(!obSameDay(g.commence_time))return;
@@ -1165,15 +1165,15 @@ function shCollectSlate(){
       (g.bookmakers||[]).forEach(function(bk){var bn=bk.title||bk.key,cz=bk.key===CAESARS_KEY;
         (bk.markets||[]).forEach(function(m){
           if(m.key==="h2h"){var hp=null,ap=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team)hp=x.price;else if(x.name===g.away_team)ap=x.price;});
-            if(hp!=null&&ap!=null)mls.push({h:hp,a:ap,book:bn,k:bk.key,cz:cz});}
+            if(hp!=null&&ap!=null)mls.push({h:hp,a:ap,book:bn,cz:cz});}
           else if(m.key==="spreads"){var hr=null,ar=null,hpt=null,apt=null;(m.outcomes||[]).forEach(function(x){if(x.name===g.home_team){hr=x.price;hpt=x.point;}else if(x.name===g.away_team){ar=x.price;apt=x.point;}});
-            if(hr!=null&&ar!=null&&hpt!=null&&apt!=null)rls.push({h:hr,a:ar,hpt:hpt,apt:apt,book:bn,k:bk.key,cz:cz});}
+            if(hr!=null&&ar!=null&&hpt!=null&&apt!=null)rls.push({h:hr,a:ar,hpt:hpt,apt:apt,book:bn,cz:cz});}
           else if(m.key==="totals"&&m.outcomes&&m.outcomes[0]&&m.outcomes[0].point!=null)tots.push(m.outcomes[0].point);
         });
       });
       if(mls.length){
         o.ml_books=mls.length;
-        o.home_fair=shMedianW(mls.map(function(x){var v=shDevigPair(shImp(x.h),shImp(x.a));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;}));
+        o.home_fair=shMedian(mls.map(function(x){return shDevig2(shImp(x.h),shImp(x.a));}).filter(function(v){return v!=null;}));
         var bh=null,ba=null;mls.forEach(function(x){
           if(!bh||amToDec(x.h)>amToDec(bh.price))bh={price:x.h,book:x.book};
           if(!ba||amToDec(x.a)>amToDec(ba.price))ba={price:x.a,book:x.book};});
@@ -1188,7 +1188,7 @@ function shCollectSlate(){
         var modal=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0];
         var use=rls.filter(function(x){return String(x.hpt)===modal;});
         o.rl_books=use.length;o.home_rl_pt=Number(modal);o.away_rl_pt=use[0].apt;
-        o.home_rl_fair=shMedianW(use.map(function(x){var v=shDevigPair(shImp(x.h),shImp(x.a));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;}));
+        o.home_rl_fair=shMedian(use.map(function(x){return shDevig2(shImp(x.h),shImp(x.a));}).filter(function(v){return v!=null;}));
         var rh=null,ra=null;use.forEach(function(x){
           if(!rh||amToDec(x.h)>amToDec(rh.price))rh={price:x.h,book:x.book};
           if(!ra||amToDec(x.a)>amToDec(ra.price))ra={price:x.a,book:x.book};});
@@ -1238,20 +1238,20 @@ function shCollectSlate(){
                 var who=o.description||o.name;var kk=who+"|"+(o.point!=null?o.point:"");
                 if(!m.rows[kk]){m.rows[kk]={p:who,ln:(o.point!=null?o.point:null),list:[]};m.order.push(kk);}
                 if(!tmp[kk])tmp[kk]={};tmp[kk][side]=o.price;});
-              Object.keys(tmp).forEach(function(kk){m.rows[kk].list.push({o:tmp[kk].o,u:tmp[kk].u,book:bn,k:bk.key,cz:czb});});
+              Object.keys(tmp).forEach(function(kk){m.rows[kk].list.push({o:tmp[kk].o,u:tmp[kk].u,book:bn,cz:czb});});
             });
           });
           var g={};
           Object.keys(acc).forEach(function(mkey){
             g[mkey]=acc[mkey].order.map(function(kk){var r=acc[mkey].rows[kk];
-              var fairs=r.list.map(function(x){var v=shDevigPair(shImp(x.o),shImp(x.u));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;});
+              var fairs=r.list.map(function(x){return shDevig2(shImp(x.o),shImp(x.u));}).filter(function(v){return v!=null;});
               var bo=null,bu=null;r.list.forEach(function(x){
                 if(x.o!=null&&(bo==null||amToDec(x.o)>amToDec(bo.price)))bo={price:x.o,book:x.book};
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
               var czx=r.list.filter(function(x){return x.cz;})[0];
               var czAlt=(!czx&&altCz[mkey])?altCz[mkey][kk]:null; /* ladder fallback: standard Caesars quote wins */
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
-                fair:fairs.length?shMedianW(fairs):null,books:fairs.length,
+                fair:fairs.length?shMedian(fairs):null,books:fairs.length,
                 cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null)};
             });
           });
@@ -1285,7 +1285,7 @@ function shCollectSlate(){
         });
         slate.league[group+"_"+tag]=L;
         rows.forEach(function(p){if(!propNames[pnorm(p.name)])return;
-          var key=p.name+" ("+p.team+")";if(!into[key])into[key]={};into[key][tag]=rowFn(p);if(p.id!=null)into[key].id=p.id;});
+          var key=p.name+" ("+p.team+")";if(!into[key])into[key]={};into[key][tag]=rowFn(p);});
       });
     }
     return pull("hitting",7,"last7",slate.player_stats,shHitRow)
@@ -1345,48 +1345,6 @@ function shTbOver(line,lamH,s1,s2){
   if(line<3)return 1-(P0+P1*(s1+s2)+P2*s1*s1);       /* 2.5: adds 1 double, or 2 singles */
   return 1-(P0+P1+P2*(s1+s2)*(s1+s2));               /* 3.5+: rough — 0–1 hits, or 2 non-HR light hits */
 }
-/* ===== ENGINE V2 INTEGRATION =====
-   SH_V2 is set by the app shell at runtime ({priors,ctx,shin,sharpW,regions}).
-   Null = classic engine, byte-identical (fixtures/baseline run that way), so the
-   parity suite still proves every change to the numbers was intended. */
-var SH_V2=null,SH_PRIORS=null,SH_CTX=null;
-var SH_BOOKW={pinnacle:3,betfair_ex_eu:2,matchbook:2,betonlineag:1.5};
-function shBookW(k){return (SH_V2&&SH_V2.sharpW&&SH_BOOKW[k])||1;}
-/* Shin two-way de-vig — strips favorite-longshot bias (proportional keeps it) */
-function shShin2(i1,i2){if(i1==null||i2==null)return null;var S=i1+i2;if(!(S>0))return null;if(S<=1.0001)return i1/S;
-  function qq(z,x){return (Math.sqrt(z*z+4*(1-z)*x*x/S)-z)/(2*(1-z));}
-  var lo=0,hi=0.99;for(var it=0;it<60;it++){var mid=(lo+hi)/2;if(qq(mid,i1)+qq(mid,i2)>1)lo=mid;else hi=mid;}
-  return qq((lo+hi)/2,i1);}
-function shDevigPair(i1,i2){return (SH_V2&&SH_V2.shin)?shShin2(i1,i2):shDevig2(i1,i2);}
-/* weighted median over [{v,w}] — plain median when sharp weighting is off */
-function shMedianW(list){if(!list||!list.length)return null;
-  if(!(SH_V2&&SH_V2.sharpW))return shMedian(list.map(function(x){return x.v;}));
-  var srt=list.slice().sort(function(a,b){return a.v-b.v;}),tw=0;srt.forEach(function(x){tw+=x.w;});
-  var acc=0;for(var i=0;i<srt.length;i++){acc+=srt[i].w;if(acc>=tw/2)return srt[i].v;}
-  return srt[srt.length-1].v;}
-/* Statcast skill priors: shrink toward the PLAYER's expected-stat skill, not the league mean */
-function shPriorH(st,L){var pr=SH_V2&&SH_V2.priors&&SH_PRIORS&&st&&st.id!=null&&SH_PRIORS.batters[st.id];
-  return (pr&&pr.xba!=null)?pr.xba:L;}
-function shPriorHR(st,L){var pr=SH_V2&&SH_V2.priors&&SH_PRIORS&&st&&st.id!=null&&SH_PRIORS.batters[st.id];
-  if(!pr||L==null)return L;var lg=SH_PRIORS.league||{};
-  var iso=(pr.xslg!=null&&pr.xba!=null)?Math.max(0.02,pr.xslg-pr.xba):null;
-  var lgIso=(lg.xslg!=null&&lg.xba!=null)?Math.max(0.05,lg.xslg-lg.xba):null;
-  var br=(pr.barrel_pct!=null&&lg.barrel_pct)?pr.barrel_pct/lg.barrel_pct:null;
-  var ir=(iso!=null&&lgIso)?iso/lgIso:null;
-  var f=(br!=null&&ir!=null)?Math.sqrt(br*ir):(br!=null?br:ir);
-  return f==null?L:L*shClamp(f,0.4,2.8);}
-function shPriorKf(st){var pr=SH_V2&&SH_V2.priors&&SH_PRIORS&&st&&st.id!=null&&SH_PRIORS.pitchers[st.id];
-  var lg=SH_PRIORS&&SH_PRIORS.league;
-  if(!pr||pr.k_pct==null||!lg||!lg.k_pct)return 1;return shClamp(pr.k_pct/lg.k_pct,0.75,1.35);}
-/* context: HP-ump K factor (only once the ump has 5+ games in the db) + temperature on HR.
-   Conservative published magnitudes, hard caps, tagged on the card when applied. */
-function shUmpKf(g){if(!(SH_V2&&SH_V2.ctx&&SH_CTX&&SH_CTX.games&&g))return 1;
-  for(var i=0;i<SH_CTX.games.length;i++){var c=SH_CTX.games[i];
-    if(c.away&&c.home&&pnorm(c.away)===pnorm(g.away)&&pnorm(c.home)===pnorm(g.home)){
-      var f=c.hpUmp&&c.hpUmp.kFactor;return f?shClamp(f,0.92,1.08):1;}}
-  return 1;}
-function shTempF(g){if(!(SH_V2&&SH_V2.ctx))return 1;var t=g&&g.weather&&parseFloat(g.weather.temp);
-  if(!isFinite(t))return 1;return shClamp(1+0.008*(t-70),0.90,1.12);}
 function shImp(am){var n=Number(am);if(!isFinite(n)||!n)return null;return n>0?100/(n+100):-n/(-n+100);}
 /* ---- market layer (doc Phase 2): exact odds math ----
    shDevig2: multiplicative de-vig of a two-way market — fair P(side1).
@@ -1581,10 +1539,10 @@ function shAnalyzeLocal(slate){
     if((g.lineup_away||[]).some(function(x){return pnorm(x)===n;}))return g.probable_home;
     if((g.lineup_home||[]).some(function(x){return pnorm(x)===n;}))return g.probable_away;
     return null;}
-  function windNote(g){var w=(g&&g.weather&&g.weather.wind)||"";var mph=parseFloat(w)||0;var tf=shTempF(g);
-    if(/out/i.test(w)&&mph>=10)return {f:1.10*tf,txt:w+" (out)"};
-    if(/in\b/i.test(w)&&mph>=10)return {f:0.90*tf,txt:w+" (in)"};
-    return {f:tf,txt:(tf!==1?"temp-adjusted":null)};}
+  function windNote(g){var w=(g&&g.weather&&g.weather.wind)||"";var mph=parseFloat(w)||0;
+    if(/out/i.test(w)&&mph>=10)return {f:1.10,txt:w+" (out)"};
+    if(/in\b/i.test(w)&&mph>=10)return {f:0.90,txt:w+" (in)"};
+    return {f:1,txt:null};}
   function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
   function shOrd(n){return n+(n===1?"st":n===2?"nd":n===3?"rd":"th");}
   function shLiveKey(g){return g?(pnorm(g.away)+"@"+pnorm(g.home)):null;}
@@ -1616,8 +1574,8 @@ function shAnalyzeLocal(slate){
       var hF=contact*(coors?1.07:1),hrF=power*wind.f*(coors?1.08:1);
       var hitR=null,hrR=null,bbAB=null,s2=0.20,s3=0.015;
       if(st){
-        var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,shPriorH(st,Lh));
-        var hrb=shBlendN(st,function(s){return Number(s.hr);},"ab",25);if(hrb)hrR=shShrink(hrb.r,hrb.n,150,shPriorHR(st,Lhr));
+        var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,Lh);
+        var hrb=shBlendN(st,function(s){return Number(s.hr);},"ab",25);if(hrb)hrR=shShrink(hrb.r,hrb.n,150,Lhr);
         bbAB=shBlend(st,function(s){return Number(s.bb);},"ab",10);
         var l3=st.last30||{};var H=Number(l3.h)||0;
         if(H>=8){s2=shClamp((Number(l3["2b"])||0)/H,0.05,0.40);s3=shClamp((Number(l3["3b"])||0)/H,0,0.06);}
@@ -1771,7 +1729,7 @@ function shAnalyzeLocal(slate){
         if(isFinite(g30)&&g30>=3&&isFinite(k30)){kps=k30/g30;nK=g30;}
         else if(st.season&&Number(st.season.g)>=8){kps=Number(st.season.k)/Number(st.season.g);nK=Number(st.season.g);}
         if(kps==null)return;
-        var kpsRaw=kps,LkgP=(Lkg!=null)?Lkg*shPriorKf(st):Lkg;kps=shShrink(kps,nK,4,LkgP);if(LkgP!=null&&Math.abs(kps-kpsRaw)>kpsRaw*0.03)tags.push("shrunk-to-mean");
+        var kpsRaw=kps;kps=shShrink(kps,nK,4,Lkg);if(Lkg!=null&&Math.abs(kps-kpsRaw)>kpsRaw*0.03)tags.push("shrunk-to-mean");
         nEff=nK*20;
         var oppLineup=null;if(g){var n=pnorm(row.p);
           if(pnorm(g.probable_away||"")===n)oppLineup=g.lineup_home;else if(pnorm(g.probable_home||"")===n)oppLineup=g.lineup_away;}
@@ -1779,7 +1737,7 @@ function shAnalyzeLocal(slate){
         if(oppLineup&&oppLineup.length){var kr=0,c=0;oppLineup.forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.k);},"ab",10);if(r!=null){kr+=r;c++;}});
           if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2);bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");if(f!==1)tags.push("opp-offense");}}
         else riskBits.push("opposing lineup unconfirmed");
-        var uf=shUmpKf(g);lam=kps*f*uf;if(uf!==1){tags.push("ump-zone");bits.push("HP ump K factor "+uf.toFixed(2)+" (db)");}
+        lam=kps*f;
         bits.unshift((k30&&g30?k30+" K in "+g30+" starts last 30 days":"season "+st.season.k+" K / "+st.season.g+" starts")+" → "+lam.toFixed(1)+" expected");
         var era=shPitchBlend(st,"era");if(era!=null)bits.push(era.toFixed(2)+" blended ERA");
       }else{
@@ -1819,15 +1777,15 @@ function shAnalyzeLocal(slate){
         function shrinkTag(raw,sh){if(raw!=null&&sh!=null&&Math.abs(sh-raw)>raw*0.03)shrunk=true;return sh;}
         var rate=null,bn=null;
         if(mkt==="batter_hits"){bn=shBlendN(st,function(s){return Number(s.h);},"ab",10);
-          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,shPriorH(st,Lh))):null;rate=bvpRate(rate,bvp&&bvp.h);lam=rate!=null?rate*expAB*hF:null;}
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,Lh)):null;rate=bvpRate(rate,bvp&&bvp.h);lam=rate!=null?rate*expAB*hF:null;}
         if(mkt==="batter_total_bases"){bn=shBlendN(st,function(s){return Number(s.h);},"ab",10);
-          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,shPriorH(st,Lh))):null;rate=bvpRate(rate,bvp&&bvp.h);
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,60,Lh)):null;rate=bvpRate(rate,bvp&&bvp.h);
           if(rate!=null){var l3=st.last30,H=Number(l3.h)||0;
             var xb=(Number(l3["2b"])||0)+(Number(l3["3b"])||0),hrs=Number(l3.hr)||0;
             var s1=H>0?Math.max(0,(H-xb-hrs)/H):0.72,s2=H>0?Math.min(1,xb/H):0.2;
             lam={tb:1,lamH:rate*expAB*hF*(tbF>1?1.03:tbF<1?0.98:1),s1:s1,s2:s2};}}
         if(mkt==="batter_home_runs"){bn=shBlendN(st,function(s){return Number(s.hr);},"ab",25);
-          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,150,shPriorHR(st,Lhr))):null;rate=bvpRate(rate,bvp&&bvp.hr);lam=rate!=null?rate*expAB*hrF:null;}
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,150,Lhr)):null;rate=bvpRate(rate,bvp&&bvp.hr);lam=rate!=null?rate*expAB*hrF:null;}
         if(mkt==="batter_hits_runs_rbis"){bn=shBlendN(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);
           rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,10,Lhrr)):null;lam=rate!=null?rate*(coors?1.08:1)*power:null;
           if(lam!=null&&bvp){var bpa=Number(bvp.pa)||Number(bvp.ab)||0;
@@ -2052,7 +2010,7 @@ function shAnalyzeLocal(slate){
     +(simCount?" · "+simCount+" games Monte-Carlo simmed ("+SH_SIM_N+"× each)":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+"). ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
+    +"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
     +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL. "
     +"Playable card is Caesars-only (your book): displayed odds, EV and stakes use Caesars' price; picks Caesars doesn't offer are listed separately, never hidden. "
     +"TOP 50 ranks by EV; category tabs rank by win probability (the high-floor parlay pool) — "+(counts||"no pregame lines yet")+". "
