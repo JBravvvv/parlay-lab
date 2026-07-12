@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { createEngine, type Engine } from "@/engine";
 import { devigShin, impliedFromAmerican } from "@/engine2/devig";
+import { FROZEN_NOW, digest, fixtureEngine, readBaseline } from "./helpers/fixture-env";
 
 /* The v2 kernel lives INSIDE the verbatim engine (gated by SH_V2). These tests
    boot the real sandboxed engine and exercise the kernel directly:
@@ -70,6 +72,24 @@ describe("engine v2 integration kernel", () => {
     eng.set("SH_V2", null);
     eng.set("SH_PRIORS", null);
   });
+
+  it("ARMED end-to-end on the fixture slate: output changes and the overview says so", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN_NOW);
+    try {
+      const fx = fixtureEngine();
+      const priors = JSON.parse(readFileSync("public/model/priors.json", "utf8"));
+      fx.set("SH_PRIORS", priors);
+      fx.set("SH_V2", { priors: true, ctx: false, shin: true, sharpW: true }); // regions stays "us": fixtures recorded us URLs
+      const slate = await fx.collectSlate();
+      const d = fx.analyze(slate) as unknown as Record<string, unknown>;
+      expect(String(d.overview)).toContain("ENGINE V2 INTEGRATED");
+      // the integrated pipeline must actually move the numbers vs the classic baseline
+      expect(JSON.stringify(digest(d))).not.toBe(readBaseline("baseline43.json"));
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 120_000);
 
   it("context factors are capped and default to 1", () => {
     const tempF = eng.get<(g: unknown) => number>("shTempF")!;

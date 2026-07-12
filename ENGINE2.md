@@ -29,7 +29,18 @@ fabricates a number; when a source is unavailable we say so and degrade.
 
 2. **Projection core — PA-level Monte Carlo**
    - The champion sim is already PA-level (base-out machine, starter leash, joint legs).
-     v2 upgrades: skill-prior shrinkage (toward priors.json instead of league means),
+   - **INTEGRATED 2026-07-12 (Josh's call: ONE engine, no champion/challenger split).**
+     The v2 kernel lives inside the engine source (legacy/index.html → regenerated gen file),
+     gated by the runtime global `SH_V2` which the app always arms (`armV2()` in
+     src/lib/engine-client.ts). Live now: skill-prior shrinkage at every rate site
+     (xBA hits prior, barrel/ISO-indexed HR prior capped 0.4–2.8×, K%-scaled pitcher K prior
+     capped 0.75–1.35×, incl. the sim vectors), HP-ump K factor (0.92–1.08, needs 5+ db games),
+     temperature on HR (0.8%/°F vs 70°, capped 0.90–1.12), Shin de-vig + Pinnacle-weighted
+     consensus for ML/RL/props, us+eu game-odds regions. Dormant = byte-identical to
+     baseline43 (parity suite still passes); armed-on-fixtures test proves output moves and
+     the overview stamps "ENGINE V2 INTEGRATED". 24 tests green.
+     Still TODO from the spec: log5 batter×pitcher, platoon splits, park×handedness in the sim,
+     bullpen chains by fatigue, manager hook/TTO, 10k sims, totals/F5/team-total pricing,
      platoon splits, park×handedness multipliers, ump/weather effects, odds-ratio/log5
      batter×pitcher blending, manager-hook model (pitch count + times-through-order),
      bullpen chains by availability, 10k sims, and new outputs: totals, F5, team totals.
