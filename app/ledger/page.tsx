@@ -51,6 +51,80 @@ function GradePill({ g }: { g?: TicketGrade }) {
   );
 }
 
+const amSign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+function LegLine({
+  l,
+  r,
+}: {
+  l: { label: string; prop: string; cz?: number | null };
+  r?: { result: string; detail: string };
+}) {
+  const tone =
+    r?.result === "won" ? "text-pos" : r?.result === "lost" ? "text-neg" : r ? "text-gold" : "";
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11.5px]">
+      <span className="min-w-0 text-text">
+        {l.label} <span className="text-muted">· {l.prop}</span>
+      </span>
+      <span className="num flex shrink-0 items-center gap-2">
+        <span className="text-gold">{l.cz != null ? amSign(Number(l.cz)) : "no CZ price"}</span>
+        {r && (
+          <span className={`text-[10px] font-bold uppercase ${tone}`}>
+            {r.result}
+            {r.detail ? ` · ${r.detail}` : ""}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function TicketRow({ t, e, g }: { t: LedgerEntry["core"][number]; e: LedgerEntry; g?: TicketGrade }) {
+  const legRes = e.grading?.legs ?? {};
+  const dec = t.confirmed != null ? undefined : t.czDec; // confirmed NV price supersedes
+  const toWin =
+    t.confirmed != null
+      ? Math.round(t.stake * ((t.confirmed > 0 ? t.confirmed / 100 : 100 / -t.confirmed) as number))
+      : dec
+        ? Math.round(t.stake * (dec - 1))
+        : null;
+  return (
+    <details className="group border-t border-white/[0.04] pt-2">
+      <summary className="flex cursor-pointer select-none list-none flex-wrap items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <div className="text-[12px] font-medium text-text">
+            <span className="mr-1 inline-block text-[9px] text-faint transition-transform group-open:rotate-90">▶</span>
+            {t.bucket === "fun" && <span className="mr-1 text-gold">🎟</span>}
+            {t.name}
+          </div>
+          <div className="text-[10.5px] text-muted group-open:hidden">
+            {t.legs.map((l) => l.label).join(" · ")}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="num text-[11px] text-muted">${t.stake}</span>
+          <span className="num text-[11px] text-gold">
+            {t.confirmed != null ? `${amSign(t.confirmed)} (NV)` : String(t.czOdds ?? "")}
+          </span>
+          <GradePill g={g} />
+        </div>
+      </summary>
+      <div className="mt-2 space-y-1.5 rounded-[12px] bg-white/[0.03] px-3 py-2.5">
+        {t.legs.map((l, i) => (
+          <LegLine key={`${l.label}|${l.prop}|${i}`} l={l} r={legRes[`${l.label}|${l.prop}`]} />
+        ))}
+        <div className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] pt-1.5 text-[10.5px] text-faint">
+          <span>stake ${t.stake}</span>
+          {toWin != null && <span>to win ${toWin}</span>}
+          {t.prob != null && <span>hit {String(t.prob)}%</span>}
+          {t.tier && <span>{t.bucket === "fun" ? `FUN · ${t.tier}` : t.tier}</span>}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function DayCard({ e }: { e: LedgerEntry }) {
   const g = e.grading?.tickets ?? {};
   const tix = [...e.core, ...e.funT];
@@ -65,22 +139,7 @@ function DayCard({ e }: { e: LedgerEntry }) {
       </summary>
       <div className="mt-3 space-y-2">
         {tix.map((t) => (
-          <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.04] pt-2">
-            <div className="min-w-0">
-              <div className="text-[12px] font-medium text-text">
-                {t.bucket === "fun" && <span className="mr-1 text-gold">🎟</span>}
-                {t.name}
-              </div>
-              <div className="text-[10.5px] text-muted">
-                {t.legs.map((l) => l.label).join(" · ")}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="num text-[11px] text-muted">${t.stake}</span>
-              <span className="num text-[11px] text-gold">{String(t.czOdds ?? "")}</span>
-              <GradePill g={g[t.id]} />
-            </div>
-          </div>
+          <TicketRow key={t.id} t={t} e={e} g={g[t.id]} />
         ))}
       </div>
     </details>
