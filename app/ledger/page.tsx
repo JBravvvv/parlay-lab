@@ -16,6 +16,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
+import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 
@@ -297,6 +298,8 @@ export default function LedgerPage() {
               </Panel>
             </div>
           </Reveal>
+
+          <ProScoreboard entries={api ? api.entries : []} />
 
           {equity.length > 0 && (
             <Reveal>

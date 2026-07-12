@@ -1,0 +1,34 @@
+name: engine-v2-props-history
+# Player-prop line snapshots -> line-history branch (data/props/).
+# Two sweeps: post-lineup morning read + a near-close read before the evening
+# slate. The scoreboard's "close" = last snapshot before each game's start.
+on:
+  schedule:
+    - cron: "0 17 * * *"  # 10am PT
+    - cron: "45 22 * * *" # 3:45pm PT
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: line-history
+      - name: Fetch snapshot script from the app branch
+        run: |
+          git fetch --depth 1 origin frontend-rebuild
+          git checkout origin/frontend-rebuild -- tools/snapshot_props.py
+      - name: Snapshot props
+        run: python3 tools/snapshot_props.py
+      - name: Commit
+        run: |
+          git config user.name "engine-v2-bot"
+          git config user.email "noreply@github.com"
+          git add data/
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "prop history: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
