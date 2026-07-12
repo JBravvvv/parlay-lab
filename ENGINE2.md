@@ -73,6 +73,16 @@ fabricates a number; when a source is unavailable we say so and degrade.
      same-game combos. Caesars SGP haircuts are crude — this is the Parlay Lab edge.
 
 5. **Harness (what makes "most powerful" a fact, not a feeling)**
+   - **Prop line history LIVE 2026-07-12**: `tools/snapshot_props.py` + `props-history.yml`
+     (2 sweeps/day, 6 markets, ~90 credits/sweep) → line-history branch `data/props/`.
+     Close = last snapshot before each game's first pitch.
+   - **Pro Scoreboard v1 LIVE 2026-07-12** (`src/components/mlb/ProScoreboard.tsx`, Ledger page):
+     per-leg CLV vs de-vigged cross-book close (raw.githubusercontent fetch of the archive),
+     beat-the-CZ-close rate, ticket-probability calibration buckets, "verdict maturity" (n/500),
+     all sample sizes disclosed. Verified end-to-end on live data (synthetic leg matched the
+     real archive; CLV math hand-checked).
+   - NEXT for the harness: store model-vs-consensus probability decomposition on locked legs
+     (enables fitting the blend weight w from results), per-market CLV/log-loss breakdowns.
    - Archive: line history (running) + daily slate snapshots.
    - Score champion vs challenger daily: log-loss, calibration, CLV vs Pinnacle close, ROI
      by market. v2 becomes the default only when it wins on this scoreboard.
