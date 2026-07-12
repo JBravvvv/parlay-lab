@@ -1,0 +1,31 @@
+name: engine-v2-line-history
+# Hourly odds snapshots (MLB h2h/totals/spreads, us+eu incl. Pinnacle) into the
+# line-history branch — the open-to-close archive the backtest harness reads.
+# ~6 API credits per run through the app's own proxy; no secrets needed.
+on:
+  schedule:
+    - cron: "12 * * * *" # hourly; slate-hours gating happens in the script's data (empty slates are tiny)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: line-history
+      - name: Fetch snapshot script from the app branch
+        run: git checkout origin/frontend-rebuild -- tools/snapshot_odds.py
+      - name: Snapshot
+        run: python3 tools/snapshot_odds.py
+      - name: Commit
+        run: |
+          git config user.name "engine-v2-bot"
+          git config user.email "noreply@github.com"
+          git add data/
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "line history: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

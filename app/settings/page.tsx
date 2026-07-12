@@ -6,6 +6,46 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { getMoney, setMoney } from "@/lib/engine-client";
 
+/* Engine v2 data spine health — reads the nightly Statcast priors artifact */
+function PriorsStatus() {
+  const [p, setP] = useState<null | false | {
+    generated_at: string;
+    batters: Record<string, unknown>;
+    pitchers: Record<string, unknown>;
+    parks: { R: Record<string, unknown> };
+    league: { xwoba?: number };
+  }>(null);
+  useEffect(() => {
+    fetch("/model/priors.json")
+      .then((r) => (r.ok ? r.json() : false))
+      .then(setP)
+      .catch(() => setP(false));
+  }, []);
+  if (p === null) return <div className="py-3 text-[12px] text-muted">Checking…</div>;
+  if (p === false)
+    return <div className="py-3 text-[12px] text-gold">priors.json not published yet — first nightly job pending</div>;
+  return (
+    <>
+      <Row label="Skill priors (Savant xStats + K/BB/whiff/barrel)">
+        <span className="num text-[12.5px] text-pos">
+          {Object.keys(p.batters).length} batters · {Object.keys(p.pitchers).length} pitchers
+        </span>
+      </Row>
+      <Row label="Park factors (by batter handedness)">
+        <span className="num text-[12.5px] text-text">{Object.keys(p.parks.R).length} parks × R/L</span>
+      </Row>
+      <Row label="League xwOBA baseline">
+        <span className="num text-[12.5px] text-text">{p.league.xwoba ?? "—"}</span>
+      </Row>
+      <Row label="Refreshed">
+        <span className="num text-[12px] text-muted">
+          {new Date(p.generated_at).toLocaleString()} · nightly via GitHub Actions
+        </span>
+      </Row>
+    </>
+  );
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.04] py-3 last:border-0">
@@ -108,6 +148,10 @@ export default function SettingsPage() {
               {sharpOk == null ? "checking…" : sharpOk ? "configured on server" : "not configured — add ANTHROPIC_API_KEY in Vercel"}
             </span>
           </Row>
+        </Panel>
+
+        <Panel title="Engine v2 — data spine (Statcast priors)">
+          <PriorsStatus />
         </Panel>
 
         <Panel title="Data">
