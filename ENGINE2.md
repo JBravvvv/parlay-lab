@@ -15,9 +15,12 @@ fabricates a number; when a source is unavailable we say so and degrade.
        sprint speed → `tools/build_priors.py` → `public/model/priors.json`, nightly via
        `.github/workflows/model.yml`. **DONE 2026-07-11** (595 batters / 743 pitchers / 29 parks × R/L).
      - Park factors by batter handedness — in priors.json. **DONE**
-     - Weather (wind speed/direction vs stadium orientation, temp), umpire assignments
-       (K-zone effects for K props), bullpen usage last 3 days, catcher framing, lineup-slot
-       PA expectations (~4.7 leadoff → ~3.7 nine-hole) → daily `context.json` job. **TODO Phase 1b**
+     - Weather, HP umpires + self-building ump-K database (kFactor activates at 5+ games/ump),
+       bullpen fatigue (reliever pitches last 3 days, gamePk-deduped) → `tools/build_context.py`
+       → `public/model/context.json`, 2×/day via `.github/workflows/context.yml`. **DONE 2026-07-12.**
+       Weather uses statsapi's park-relative wind strings ("Out To CF") — no azimuth table needed.
+       Lineup-slot PA effects are already emergent from the PA-by-PA sim (no table needed).
+       Catcher framing still TODO (Savant endpoint shape differs).
    - **Line history we own**: hourly snapshots (h2h/totals/spreads, us+eu regions) →
      `line-history` branch, `data/YYYY-MM-DD.json`, via `.github/workflows/line-history.yml`
      through the app's own /api/odds (no secrets). **DONE 2026-07-11.**
@@ -34,6 +37,12 @@ fabricates a number; when a source is unavailable we say so and degrade.
 
 3. **Market layer**
    - De-vig: power or Shin method (not proportional) — corrects favorite-longshot bias.
+     **DONE 2026-07-12**: `src/engine2/devig.ts` (proportional/power/Shin + sharp-weighted
+     median consensus; Pinnacle ×3, Betfair/Matchbook ×2), unit-tested in
+     `tests/engine2-devig.test.ts`. Live on the Board as the **Sharp Desk**
+     (`src/engine2/sharpBoard.ts` + `src/components/mlb/SharpDesk.tsx`): per-game fair
+     ML/totals vs the Caesars line, us+eu regions, comparability guard when CZ hangs a
+     different total point.
    - Consensus weighted toward **Pinnacle** (confirmed available in the `eu` region for MLB;
      Circa is NOT in the feed — checked 2026-07-11).
    - Blend ~30% model / 70% market to start; the weight gets FIT from tracked results once
