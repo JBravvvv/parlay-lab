@@ -7,6 +7,8 @@ import { NextResponse } from "next/server";
  * Best-effort by nature: if BFO changes markup or blocks us, this returns 502
  * and the Builder's typed-price props desk still works.
  */
+export const maxDuration = 60; // cold scrape fetches two multi-MB pages
+
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const TTL = 240;
