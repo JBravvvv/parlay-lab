@@ -42,7 +42,32 @@ function PriorsStatus() {
           {new Date(p.generated_at).toLocaleString()} · nightly via GitHub Actions
         </span>
       </Row>
+      <ContextStatus />
     </>
+  );
+}
+
+function ContextStatus() {
+  const [c, setC] = useState<null | false | {
+    generated_at: string;
+    games: unknown[];
+    bullpen_last3: Record<string, unknown>;
+    ump_db_games: number;
+  }>(null);
+  useEffect(() => {
+    fetch("/model/context.json")
+      .then((r) => (r.ok ? r.json() : false))
+      .then(setC)
+      .catch(() => setC(false));
+  }, []);
+  if (!c) return <Row label="Daily context (weather · umps · bullpen)"><span className="text-[12px] text-gold">{c === false ? "not published yet" : "checking…"}</span></Row>;
+  return (
+    <Row label="Daily context (weather · umps · bullpen)">
+      <span className="num text-[12.5px] text-text">
+        {c.games.length} games · {Object.keys(c.bullpen_last3).length} bullpens · ump db {c.ump_db_games} gm ·{" "}
+        {new Date(c.generated_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+      </span>
+    </Row>
   );
 }
 

@@ -1,0 +1,30 @@
+name: engine-v2-context
+# Daily context: weather (park-relative wind strings), HP umpires + growing
+# K-factor database, bullpen fatigue. Runs twice so the night slate gets fresh
+# weather/ump postings; commits trigger a Vercel redeploy of context.json.
+on:
+  schedule:
+    - cron: "0 17 * * *"  # 10am PT — day games + ump db increment
+    - cron: "30 22 * * *" # 3:30pm PT — night slate weather/umps firm up
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: frontend-rebuild
+      - name: Build context.json (+ ump K database)
+        run: python3 tools/build_context.py public/model/context.json
+      - name: Commit if changed
+        run: |
+          git config user.name "engine-v2-bot"
+          git config user.email "noreply@github.com"
+          git add public/model/context.json data/ump_k.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "context: refresh (weather/umps/bullpen)"
+          git push
