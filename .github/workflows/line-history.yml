@@ -18,7 +18,9 @@ jobs:
         with:
           ref: line-history
       - name: Fetch snapshot script from the app branch
-        run: git checkout origin/frontend-rebuild -- tools/snapshot_odds.py
+        run: |
+          git fetch --depth 1 origin frontend-rebuild
+          git checkout origin/frontend-rebuild -- tools/snapshot_odds.py
       - name: Snapshot
         run: python3 tools/snapshot_odds.py
       - name: Commit
