@@ -4,8 +4,23 @@
     {
       "name": "parlay-lab",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8790", "--directory", "/Users/josh/Documents/Parlay-Lab"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8790",
+        "--directory",
+        "/Users/josh/Documents/Parlay-Lab"
+      ],
       "port": 8790
+    },
+    {
+      "name": "parlay-next-3601",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" && NEXT_DIST_DIR=.next-3601 npx next dev -p 3601"
+      ],
+      "port": 3601
     }
   ]
 }

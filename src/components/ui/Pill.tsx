@@ -2,7 +2,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type Variant = "primary" | "ghost" | "gold" | "danger";
+type Variant = "primary" | "ghost" | "gold" | "danger" | "hero";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
@@ -13,6 +13,7 @@ const VARIANTS: Record<Variant, string> = {
     "border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20",
   danger:
     "border border-neg/40 bg-neg/10 text-neg hover:bg-neg/20",
+  hero: "liquid-glass text-text hover:bg-white/[0.06]",
 };
 
 /** Pill-shaped button — the only button shape in the product. */

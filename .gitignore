@@ -11,3 +11,4 @@ out/
 # macOS/iCloud sync-conflict copies — never commit
 * 2.*
 **/* 2.*
+**/* 2/

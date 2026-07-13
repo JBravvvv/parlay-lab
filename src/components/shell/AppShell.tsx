@@ -33,7 +33,7 @@ function Brand() {
   return (
     <Link href="/" className="flex items-baseline gap-0.5 select-none">
       <span className="text-[15px] font-bold tracking-tight text-text">PARLAY</span>
-      <span className="text-[15px] font-bold text-pos">//</span>
+      <span className="text-gradient text-[15px] font-bold">//</span>
       <span className="text-[15px] font-bold tracking-tight text-text">LAB</span>
     </Link>
   );
@@ -41,11 +41,14 @@ function Brand() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // "/" is the immersive landing: full-bleed hero with its own navbar — no
+  // side rail, no mobile top bar, no content gutters. Bottom tabs stay (PWA nav).
+  const landing = pathname === "/";
 
   return (
     <div className="min-h-dvh">
       {/* desktop side rail */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl md:flex">
+      <aside className={`fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl ${landing ? "" : "md:flex"}`}>
         <div className="px-4 py-4">
           <Brand />
           <div className="mt-0.5 text-[9.5px] font-semibold uppercase tracking-[0.2em] text-faint">
@@ -77,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 py-3 backdrop-blur-xl md:hidden">
+      <header className={`sticky top-0 z-30 items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 py-3 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}>
         <Brand />
         <div className="flex items-center gap-1">
           <Link
@@ -98,9 +101,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {/* content */}
-      <main className="px-4 pb-24 pt-4 md:ml-[200px] md:px-8 md:pb-10 md:pt-6">
-        <div className="mx-auto w-full max-w-[1280px]">{children}</div>
-      </main>
+      {landing ? (
+        <main>{children}</main>
+      ) : (
+        <main className="px-4 pb-24 pt-4 md:ml-[200px] md:px-8 md:pb-10 md:pt-6">
+          <div className="mx-auto w-full max-w-[1280px]">{children}</div>
+        </main>
+      )}
 
       {/* mobile bottom tab bar */}
       <nav

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -12,16 +12,133 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
+import { VideoBackdrop } from "@/components/shell/VideoBackdrop";
 import { useLedger, roiPct } from "@/lib/useLedger";
 import { cachedBoard, getMoney } from "@/lib/engine-client";
 import { fmtMoneyExact } from "@/lib/format";
 import type { PickRow } from "@/engine";
 
+/* The books the engine's consensus actually reads (us + eu regions) — real
+   sources, not decoration. */
+const BOOKS = ["Pinnacle", "Caesars", "DraftKings", "FanDuel", "BetMGM", "Betfair"];
+
+const NAV_LINKS = [
+  { href: "/board", label: "Board", chevron: true },
+  { href: "/stats", label: "Stats", chevron: true },
+  { href: "/builder", label: "Builder", chevron: false },
+  { href: "/ledger", label: "Ledger", chevron: false },
+];
+
+function Chevron() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="opacity-60"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function Hero() {
+  return (
+    <div className="relative overflow-hidden">
+      <VideoBackdrop />
+      <div className="relative z-10 flex min-h-dvh flex-col">
+        {/* navbar */}
+        <header className="w-full px-5 py-5 md:px-8">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex select-none items-baseline gap-0.5">
+              <span className="display text-[20px] font-semibold tracking-tight text-text">PARLAY</span>
+              <span className="display text-gradient text-[20px] font-semibold">//</span>
+              <span className="display text-[20px] font-semibold tracking-tight text-text">LAB</span>
+            </Link>
+            <nav className="hidden items-center gap-7 md:flex">
+              {NAV_LINKS.map((n) => (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className="flex items-center gap-1 text-[14px] font-medium text-text/90 transition-colors duration-(--dur-fast) hover:text-text"
+                >
+                  {n.label}
+                  {n.chevron && <Chevron />}
+                </Link>
+              ))}
+            </nav>
+            <Link href="/sharp">
+              <Pill variant="hero" className="!px-4 !py-2">
+                The Sharp
+              </Pill>
+            </Link>
+          </div>
+        </header>
+        <div className="mt-[3px] h-px w-full bg-gradient-to-r from-transparent via-text/20 to-transparent" />
+
+        {/* hero content — blur shape sits behind, section stays overflow-visible */}
+        <section className="relative flex flex-1 items-center justify-center overflow-visible px-4">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[527px] w-[984px] -translate-x-1/2 -translate-y-1/2 bg-gray-950 opacity-90 blur-[82px]" />
+          <div className="relative text-center">
+            <h1
+              className="text-[clamp(64px,15vw,220px)] font-normal leading-[1.02] tracking-[-0.024em] text-text"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Parlay <span className="text-gradient">Lab</span>
+            </h1>
+            <p className="mx-auto mt-[9px] max-w-md text-lg leading-8 text-hero-sub opacity-80">
+              A 10,000-simulation quant engine for MLB &amp; UFC — sharp-anchored fair prices,
+              ¼-Kelly sizing, every bet graded against the close.
+            </p>
+            <Link href="/board" className="mt-[25px] inline-block">
+              <Pill variant="hero" className="!px-[29px] !py-6 text-[14px]">
+                Open Today&apos;s Board
+              </Pill>
+            </Link>
+          </div>
+        </section>
+
+        {/* book marquee */}
+        <div className="w-full px-5 pb-28 md:px-8 md:pb-10">
+          <div className="mx-auto flex max-w-5xl items-center gap-12">
+            <div className="shrink-0 text-sm leading-5 text-text/50">
+              Priced across the books
+              <br />
+              the market respects
+            </div>
+            <div className="min-w-0 flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+              <div className="flex w-max animate-marquee">
+                {[...BOOKS, ...BOOKS].map((b, i) => (
+                  <div key={`${b}-${i}`} className="mr-16 flex shrink-0 items-center gap-3">
+                    <div className="liquid-glass flex h-6 w-6 items-center justify-center rounded-lg text-[11px] font-bold text-text">
+                      {b[0]}
+                    </div>
+                    <span className="text-base font-semibold text-text">{b}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { api } = useLedger();
-  const stats = useMemo(() => api?.stats("all"), [api]);
-  const board = typeof window !== "undefined" ? cachedBoard() : null;
-  const money = typeof window !== "undefined" ? getMoney() : { bankroll: 750, daily: 0, fun: 0 };
+  // localStorage-backed data only exists on the client; render the SSR
+  // fallback until mounted so hydration sees identical markup.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const stats = useMemo(() => (mounted ? api?.stats("all") : undefined), [api, mounted]);
+  const board = mounted ? cachedBoard() : null;
+  const money = mounted ? getMoney() : { bankroll: 750, daily: 0, fun: 0 };
 
   const equity = money.bankroll + (stats?.pl ?? 0);
   const spark = (stats?.days ?? []).map((d) => ({ pl: d.cumPl }));
@@ -39,6 +156,9 @@ export default function DashboardPage() {
 
   return (
     <>
+      <Hero />
+
+      <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 pt-10 md:px-8 md:pb-12">
       <PageHeader
         title="Dashboard"
         sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No board yet today"}
@@ -152,6 +272,7 @@ export default function DashboardPage() {
       </Reveal>
 
       <div className="mt-4 text-[10.5px] text-faint">Informational only, not betting advice.</div>
+      </div>
     </>
   );
 }
