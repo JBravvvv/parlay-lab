@@ -121,9 +121,21 @@ against the full sports list), so market prices paste in from the book
 (winner / R1-pair H2H / player HR O/U with whole-derby-vs-R1 scope toggle),
 Shin de-vigged, blended 25/75 model/market for EV + ¼-Kelly. Caesars'
 API (api.americanwagering.com) is CloudFront-WAF'd — not scrapeable; the paste
-flow is the design, not a fallback. Display-only: never feeds parlays,
-allocator, or ledger. New swing-limited format has no history: rankings are
+flow is the design, not a fallback. New swing-limited format has no history: rankings are
 the trustworthy output, absolute HR totals the weakest (stated in the UI).
+
+**2026-07-13 (later, Josh's call): Derby is a first-class sport tab** (🏆) on
+the Board, The Sharp and the Builder, via shared `src/lib/useDerby.ts`
+(module-cached draws) + `src/components/derby/DerbySurfaces.tsx`. simDerby is
+now derived from `simDerbyDraws` — compact per-tournament outcome arrays —
+and `evalLegs` prices ANY leg set jointly by counting draws (push-excluded,
+same convention as singles). `derbyParlays` = 2–3 leg combos, correlation
+factor (sim joint ÷ Π marginals, clamped 0.2–5) applied to blended marginals.
+UI honesty split: corr ≤ 1.15 → "book-friendly" (EV + ¼-Kelly at multiplied
+odds); corr > 1.15 → "SGP territory" showing ONLY the fair price to beat
+(books reprice/refuse correlated combos — multiplied-odds EV would be
+fiction). Mutually exclusive slips price to zero and say so. Derby stays out
+of the allocator and auto-graded ledger.
 
 ## Decisions log
 - FanGraphs projections: Cloudflare-walled to scripts (403 page + API). NOT scraped.
