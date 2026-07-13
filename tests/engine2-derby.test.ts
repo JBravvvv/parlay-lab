@@ -4,6 +4,11 @@ import {
   buildHitters,
   powerFromPriors,
   simDerby,
+  simDerbyDraws,
+  aggregateDraws,
+  evalLegs,
+  priceDerbyLegs,
+  derbyParlays,
   simRound,
   makeRng,
   probOver,
@@ -202,6 +207,77 @@ describe("odds paste parsing", () => {
     expect(lastName("Kyle Schwarber")).toBe("Schwarber");
     const withJr: DerbyHitter[] = [{ ...hitters[0], id: 2001, name: "Jazz Chisholm Jr." }];
     expect(matchHitter("Chisholm +800", withJr)?.id).toBe(2001);
+  });
+});
+
+describe("joint pricing off the draws", () => {
+  const st = fixtureState();
+  const draws = simDerbyDraws(st, { n: 6000, seed: 11 });
+
+  it("aggregateDraws matches simDerby (same core)", () => {
+    const viaDraws = aggregateDraws(st, draws);
+    const direct = simDerby(st, { n: 6000, seed: 11 });
+    expect(viaDraws.byId[1001].win).toBe(direct.byId[1001].win);
+    expect(viaDraws.pairs[0].pA).toBe(direct.pairs[0].pA);
+    expect(viaDraws.totalAvg).toBe(direct.totalAvg);
+  });
+
+  it("single-leg eval agrees with marginals", () => {
+    const agg = aggregateDraws(st, draws);
+    expect(evalLegs(draws, [{ kind: "winner", id: 1001 }]).p).toBeCloseTo(agg.byId[1001].win, 10);
+    expect(evalLegs(draws, [{ kind: "advance", id: 1006 }]).p).toBeCloseTo(agg.byId[1006].advanceR1, 10);
+  });
+
+  it("two winners are mutually exclusive; correlated legs beat independence", () => {
+    expect(evalLegs(draws, [{ kind: "winner", id: 1001 }, { kind: "winner", id: 1007 }]).p).toBe(0);
+    // winner + same hitter's derby-total over: strongly positively correlated
+    const w = evalLegs(draws, [{ kind: "winner", id: 1001 }]).p;
+    const t = evalLegs(draws, [{ kind: "total", id: 1001, scope: "event", line: 12.5, side: "over" }]).p;
+    const joint = evalLegs(draws, [
+      { kind: "winner", id: 1001 },
+      { kind: "total", id: 1001, scope: "event", line: 12.5, side: "over" },
+    ]).p;
+    expect(joint).toBeGreaterThan(w * t * 1.3);
+  });
+
+  it("h2h push handling: integer-line totals report pushRate", () => {
+    const r = evalLegs(draws, [{ kind: "total", id: 1001, scope: "r1", line: 8, side: "over" }]);
+    expect(r.pushRate).toBeGreaterThan(0);
+    expect(r.p).toBeGreaterThan(0);
+    expect(r.p).toBeLessThan(1);
+  });
+
+  it("priceDerbyLegs + derbyParlays produce coherent, sorted output", () => {
+    const hitters = st.hitters;
+    const parsed = {
+      winner: [
+        { id: 1001, odds: 330 },
+        { id: 1007, odds: 500 },
+        { id: 1003, odds: 450 },
+        { id: 1006, odds: 900 },
+      ],
+      h2h: [{ aId: 1001, bId: 1008, aOdds: -140, bOdds: 120 }],
+      totals: [{ id: 1001, line: 15.5, overOdds: -115, underOdds: -105 }],
+    };
+    const legs = priceDerbyLegs(draws, hitters, parsed, "event");
+    expect(legs.length).toBe(8); // 4 winners + 2 h2h sides + 2 total sides
+    for (let i = 1; i < legs.length; i++) expect(legs[i - 1].ev).toBeGreaterThanOrEqual(legs[i].ev);
+    for (const l of legs) {
+      expect(l.blend).toBeGreaterThan(0);
+      expect(l.blend).toBeLessThan(1);
+    }
+    const parlays = derbyParlays(draws, legs, { bankroll: 750, top: 10 });
+    expect(parlays.length).toBeGreaterThan(0);
+    expect(parlays.length).toBeLessThanOrEqual(10);
+    for (const p of parlays) {
+      expect(p.legs.length).toBeGreaterThanOrEqual(2);
+      expect(p.legs.length).toBeLessThanOrEqual(3);
+      expect(p.pModel).toBeGreaterThan(0); // impossible combos dropped
+      expect(p.corr).toBeGreaterThanOrEqual(0.2);
+      expect(p.corr).toBeLessThanOrEqual(5);
+      expect(p.dec).toBeGreaterThan(1);
+    }
+    for (let i = 1; i < parlays.length; i++) expect(parlays[i - 1].ev).toBeGreaterThanOrEqual(parlays[i].ev);
   });
 });
 

@@ -320,18 +320,90 @@ function h2h(pA: number, pB: number, swings: number, rng: () => number, tally?: 
    One lognormal draw per hitter per tournament. */
 const FORM_SIGMA = 0.16;
 
-export function simDerby(
-  state: Pick<DerbyState, "hitters" | "rounds" | "pairs">,
+/** Compact per-tournament outcomes — the joint-pricing substrate. Any leg or
+    parlay is priced by scanning these draws, so correlations (a winner leg and
+    that hitter's HR total, two sides of the same pool) are exact by
+    construction instead of assumed independent. */
+export type DerbyDraws = {
+  n: number;
+  ids: number[]; // hitter ids by column index
+  r1: Uint8Array; // [sim * k + col] round-1 HRs
+  evt: Uint16Array; // total HRs across rounds hit (swing-offs excluded)
+  top4: Uint8Array; // 1 = advanced from the pool
+  final2: Uint8Array; // 1 = reached the final
+  champ: Uint8Array; // [sim] = winner column index
+};
+
+export function simDerbyDraws(
+  state: Pick<DerbyState, "hitters" | "rounds">,
   opts: { n?: number; seed?: number } = {},
-): SimResult {
+): DerbyDraws {
   const n = opts.n ?? 20000;
   const rng = makeRng(opts.seed ?? 20260713);
   const hitters = state.hitters;
-  const ids = hitters.map((h) => h.id);
+  const k = hitters.length;
   const swingsR1 = state.rounds.find((r) => r.round === 1)?.swings ?? 20;
   const swingsR2 = state.rounds.find((r) => r.round === 2)?.swings ?? 15;
   const swingsR3 = state.rounds.find((r) => r.round === 3)?.swings ?? 15;
 
+  const d: DerbyDraws = {
+    n,
+    ids: hitters.map((h) => h.id),
+    r1: new Uint8Array(n * k),
+    evt: new Uint16Array(n * k),
+    top4: new Uint8Array(n * k),
+    final2: new Uint8Array(n * k),
+    champ: new Uint8Array(n),
+  };
+
+  for (let s = 0; s < n; s++) {
+    // per-tournament effective rates (day-form wobble)
+    const p = hitters.map((h) => clamp(h.hrPerSwing * Math.exp(FORM_SIGMA * gauss(rng)), 0.05, 0.6));
+    const base = s * k;
+    const evt = new Array(k).fill(0);
+
+    // ---- round 1: single pool, top 4 advance
+    const r1 = hitters.map((_, i) => simRound(p[i], swingsR1, rng));
+    for (let i = 0; i < k; i++) {
+      d.r1[base + i] = Math.min(r1[i], 255);
+      evt[i] += r1[i];
+    }
+    // rank with the R1 tiebreak (longest HR) proxied by relative raw power
+    const order = hitters
+      .map((_, i) => i)
+      .sort((i, j) => r1[j] - r1[i] || (rng() < p[i] / (p[i] + p[j]) ? -1 : 1));
+    const semi = order.slice(0, 4); // seeded 1..4 by R1 finish
+    for (const i of semi) d.top4[base + i] = 1;
+
+    // ---- semis: 1v4, 2v3
+    const f1 = semi[h2h(p[semi[0]], p[semi[3]], swingsR2, rng, (a, b) => { evt[semi[0]] += a; evt[semi[3]] += b; }) === 0 ? 0 : 3];
+    const f2 = semi[h2h(p[semi[1]], p[semi[2]], swingsR2, rng, (a, b) => { evt[semi[1]] += a; evt[semi[2]] += b; }) === 0 ? 1 : 2];
+    d.final2[base + f1] = 1;
+    d.final2[base + f2] = 1;
+
+    // ---- final
+    const champ = h2h(p[f1], p[f2], swingsR3, rng, (a, b) => { evt[f1] += a; evt[f2] += b; }) === 0 ? f1 : f2;
+    d.champ[s] = champ;
+
+    for (let i = 0; i < k; i++) d.evt[base + i] = Math.min(evt[i], 65535);
+  }
+  return d;
+}
+
+export function simDerby(
+  state: Pick<DerbyState, "hitters" | "rounds" | "pairs">,
+  opts: { n?: number; seed?: number } = {},
+): SimResult {
+  return aggregateDraws(state, simDerbyDraws(state, opts));
+}
+
+/** Marginals, pair head-to-heads and histograms, all read off the draws. */
+export function aggregateDraws(
+  state: Pick<DerbyState, "hitters" | "pairs">,
+  d: DerbyDraws,
+): SimResult {
+  const { n, ids } = d;
+  const k = ids.length;
   const HIST_MAX = 40;
   const out: Record<number, SimHitterOut> = {};
   for (const id of ids)
@@ -344,59 +416,34 @@ export function simDerby(
       evtAvg: 0,
       evtHist: new Array(3 * HIST_MAX + 1).fill(0),
     };
-  const pairIdx = state.pairs.map(([a, b]) => ({
-    a,
-    b,
-    ia: hitters.findIndex((h) => h.id === a),
-    ib: hitters.findIndex((h) => h.id === b),
-    wa: 0,
-    wb: 0,
-    t: 0,
-  }));
+  const col = new Map(ids.map((id, i) => [id, i]));
+  const pairIdx = state.pairs.map(([a, b]) => ({ a, b, ia: col.get(a) ?? -1, ib: col.get(b) ?? -1, wa: 0, wb: 0, t: 0 }));
   const totalHist = new Array(8 * 3 * HIST_MAX).fill(0);
   let totalSum = 0;
 
   for (let s = 0; s < n; s++) {
-    // per-tournament effective rates
-    const p = hitters.map((h) => clamp(h.hrPerSwing * Math.exp(FORM_SIGMA * gauss(rng)), 0.05, 0.6));
-    const evt = new Array(hitters.length).fill(0);
-
-    // ---- round 1: single pool, top 4 advance
-    const r1 = hitters.map((_, i) => simRound(p[i], swingsR1, rng));
+    const base = s * k;
     let evtTotal = 0;
-    for (let i = 0; i < hitters.length; i++) {
-      const h = Math.min(r1[i], HIST_MAX);
-      out[ids[i]].r1Hist[h]++;
-      out[ids[i]].r1Avg += r1[i];
-      evt[i] += r1[i];
-      evtTotal += r1[i];
+    for (let i = 0; i < k; i++) {
+      const o = out[ids[i]];
+      const r1 = d.r1[base + i];
+      const evt = d.evt[base + i];
+      o.r1Hist[Math.min(r1, HIST_MAX)]++;
+      o.r1Avg += r1;
+      o.evtHist[Math.min(evt, 3 * HIST_MAX)]++;
+      o.evtAvg += evt;
+      if (d.top4[base + i]) o.advanceR1++;
+      if (d.final2[base + i]) o.reachFinal++;
+      evtTotal += evt;
     }
+    out[ids[d.champ[s]]].win++;
     for (const pr of pairIdx) {
       if (pr.ia < 0 || pr.ib < 0) continue;
-      if (r1[pr.ia] > r1[pr.ib]) pr.wa++;
-      else if (r1[pr.ia] < r1[pr.ib]) pr.wb++;
+      const a = d.r1[base + pr.ia];
+      const b = d.r1[base + pr.ib];
+      if (a > b) pr.wa++;
+      else if (a < b) pr.wb++;
       else pr.t++;
-    }
-    // rank with the R1 tiebreak (longest HR) proxied by relative raw power
-    const order = hitters
-      .map((_, i) => i)
-      .sort((i, j) => r1[j] - r1[i] || (rng() < p[i] / (p[i] + p[j]) ? -1 : 1));
-    const semi = order.slice(0, 4); // seeded 1..4 by R1 finish
-    for (const i of semi) out[ids[i]].advanceR1++;
-
-    // ---- semis: 1v4, 2v3
-    const f1 = semi[h2h(p[semi[0]], p[semi[3]], swingsR2, rng, (a, b) => { evt[semi[0]] += a; evt[semi[3]] += b; evtTotal += a + b; }) === 0 ? 0 : 3];
-    const f2 = semi[h2h(p[semi[1]], p[semi[2]], swingsR2, rng, (a, b) => { evt[semi[1]] += a; evt[semi[2]] += b; evtTotal += a + b; }) === 0 ? 1 : 2];
-    out[ids[f1]].reachFinal++;
-    out[ids[f2]].reachFinal++;
-
-    // ---- final
-    const champ = h2h(p[f1], p[f2], swingsR3, rng, (a, b) => { evt[f1] += a; evt[f2] += b; evtTotal += a + b; }) === 0 ? f1 : f2;
-    out[ids[champ]].win++;
-
-    for (let i = 0; i < hitters.length; i++) {
-      out[ids[i]].evtAvg += evt[i];
-      out[ids[i]].evtHist[Math.min(evt[i], 3 * HIST_MAX)]++;
     }
     totalSum += evtTotal;
     totalHist[Math.min(evtTotal, totalHist.length - 1)]++;
@@ -579,4 +626,168 @@ export function fairTwoWay(aOdds: number | null, bOdds: number | null): { a: num
   if (!(ia > 0 && ia < 1 && ib > 0 && ib < 1)) return null;
   const [a, b] = devigShin([ia, ib]);
   return { a, b };
+}
+
+/* ---------------------------------------------- legs & joint pricing */
+
+export type DerbyLeg =
+  | { kind: "winner"; id: number }
+  | { kind: "final"; id: number } // reaches the final
+  | { kind: "advance"; id: number } // top-4 out of the pool
+  | { kind: "h2h"; aId: number; bId: number; pick: "a" | "b" } // R1 pairing, graded on R1 totals
+  | { kind: "total"; id: number; scope: "r1" | "event"; line: number; side: "over" | "under" };
+
+/** 1 = leg wins in this sim, 0 = loses, -1 = pushes (H2H tie / exact integer line). */
+function legResult(d: DerbyDraws, s: number, leg: DerbyLeg, col: Map<number, number>): 1 | 0 | -1 {
+  const k = d.ids.length;
+  const base = s * k;
+  switch (leg.kind) {
+    case "winner":
+      return d.champ[s] === col.get(leg.id) ? 1 : 0;
+    case "final":
+      return d.final2[base + (col.get(leg.id) ?? -1)] ? 1 : 0;
+    case "advance":
+      return d.top4[base + (col.get(leg.id) ?? -1)] ? 1 : 0;
+    case "h2h": {
+      const a = d.r1[base + (col.get(leg.aId) ?? -1)];
+      const b = d.r1[base + (col.get(leg.bId) ?? -1)];
+      if (a === b) return -1;
+      return (a > b) === (leg.pick === "a") ? 1 : 0;
+    }
+    case "total": {
+      const v = (leg.scope === "r1" ? d.r1 : d.evt)[base + (col.get(leg.id) ?? -1)];
+      if (v === leg.line) return -1;
+      return (v > leg.line) === (leg.side === "over") ? 1 : 0;
+    }
+  }
+}
+
+/** Joint probability that EVERY leg wins, conditioned on no leg pushing —
+    the same push-excluded convention as the single-market prices. Exact
+    within the model: correlations come from counting joint outcomes. */
+export function evalLegs(d: DerbyDraws, legs: DerbyLeg[]): { p: number; pushRate: number } {
+  const col = new Map(d.ids.map((id, i) => [id, i]));
+  let win = 0;
+  let push = 0;
+  outer: for (let s = 0; s < d.n; s++) {
+    let anyPush = false;
+    for (const leg of legs) {
+      const r = legResult(d, s, leg, col);
+      if (r === 0) continue outer;
+      if (r === -1) anyPush = true;
+    }
+    if (anyPush) push++;
+    else win++;
+  }
+  const denom = d.n - push;
+  return { p: denom > 0 ? win / denom : 0, pushRate: push / d.n };
+}
+
+export type PricedLeg = {
+  key: string;
+  leg: DerbyLeg;
+  label: string; // hitter (or "A vs B")
+  prop: string; // market description
+  odds: number; // pasted book price
+  model: number;
+  market: number | null; // de-vigged, when the field/both sides exist
+  blend: number;
+  ev: number; // at the pasted price, on the blend
+};
+
+/** Turn the three paste results into a unified priced-leg list. */
+export function priceDerbyLegs(
+  d: DerbyDraws,
+  hitters: DerbyHitter[],
+  parsed: { winner: WinnerQuote[]; h2h: H2HQuote[]; totals: TotalQuote[] },
+  totalsScope: "r1" | "event",
+): PricedLeg[] {
+  const nm = new Map(hitters.map((h) => [h.id, h.name]));
+  const short = (id: number) => lastName(nm.get(id) ?? `#${id}`);
+  const legs: PricedLeg[] = [];
+  const add = (key: string, leg: DerbyLeg, label: string, prop: string, odds: number, market: number | null) => {
+    const model = evalLegs(d, [leg]).p;
+    const blend = blendProb(model, market);
+    legs.push({ key, leg, label, prop, odds, model, market, blend, ev: evAtAmerican(blend, odds) });
+  };
+
+  const winnerFair = parsed.winner.length >= 3 ? devigField(parsed.winner) : null;
+  for (const q of parsed.winner)
+    add(`w:${q.id}`, { kind: "winner", id: q.id }, nm.get(q.id) ?? `#${q.id}`, "wins the Derby", q.odds, winnerFair?.get(q.id) ?? null);
+
+  for (const q of parsed.h2h) {
+    const mkt = fairTwoWay(q.aOdds, q.bOdds);
+    add(`h:${q.aId}>${q.bId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "a" }, nm.get(q.aId) ?? "", `beats ${short(q.bId)} (R1)`, q.aOdds, mkt?.a ?? null);
+    add(`h:${q.bId}>${q.aId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "b" }, nm.get(q.bId) ?? "", `beats ${short(q.aId)} (R1)`, q.bOdds, mkt?.b ?? null);
+  }
+
+  for (const q of parsed.totals) {
+    const mkt = fairTwoWay(q.overOdds, q.underOdds);
+    const scopeTag = totalsScope === "r1" ? "R1" : "Derby";
+    if (q.overOdds != null)
+      add(`t:${q.id}:${q.line}:o`, { kind: "total", id: q.id, scope: totalsScope, line: q.line, side: "over" }, nm.get(q.id) ?? "", `Over ${q.line} HRs (${scopeTag})`, q.overOdds, mkt?.a ?? null);
+    if (q.underOdds != null)
+      add(`t:${q.id}:${q.line}:u`, { kind: "total", id: q.id, scope: totalsScope, line: q.line, side: "under" }, nm.get(q.id) ?? "", `Under ${q.line} HRs (${scopeTag})`, q.underOdds, mkt?.b ?? null);
+  }
+
+  return legs.sort((a, b) => b.ev - a.ev);
+}
+
+export type DerbyParlay = {
+  legs: PricedLeg[];
+  dec: number; // combined pasted price
+  pJoint: number; // blended joint (sim correlation × blended marginals)
+  pModel: number; // pure sim joint
+  corr: number; // jointModel / Π marginal models
+  ev: number;
+  kelly: number; // ¼-Kelly capped at 2% of bankroll, in dollars
+};
+
+/** Joint-price one combination off the draws. Correlation factor = sim joint
+    ÷ product of sim marginals, applied to the product of blended marginals —
+    market anchoring survives, correlation is the model's. Returns null for
+    impossible combos (two winners, over+under of the same line). */
+export function priceDerbyCombo(d: DerbyDraws, legs: PricedLeg[], bankroll: number): DerbyParlay | null {
+  const { p: pModel } = evalLegs(d, legs.map((l) => l.leg));
+  if (pModel <= 0) return null;
+  let prodModel = 1;
+  let prodBlend = 1;
+  let dec = 1;
+  for (const l of legs) {
+    prodModel *= l.model;
+    prodBlend *= l.blend;
+    dec *= decFromAmerican(l.odds);
+  }
+  if (prodModel <= 0) return null;
+  const corr = clamp(pModel / prodModel, 0.2, 5);
+  const pJoint = Math.min(0.99, prodBlend * corr);
+  const ev = pJoint * dec - 1;
+  const b = dec - 1;
+  const kellyF = b > 0 ? (pJoint * b - (1 - pJoint)) / b : 0;
+  const kelly = kellyF > 0 ? Math.round(Math.min(0.02, kellyF / 4) * bankroll) : 0;
+  return { legs, dec, pJoint, pModel, corr, ev, kelly };
+}
+
+/** 2–3 leg combinations of the pasted markets, joint-priced, best EV first. */
+export function derbyParlays(
+  d: DerbyDraws,
+  priced: PricedLeg[],
+  opts: { bankroll?: number; top?: number; maxCandidates?: number } = {},
+): DerbyParlay[] {
+  const bankroll = opts.bankroll ?? 750;
+  const top = opts.top ?? 12;
+  const cands = [...priced].sort((a, b) => b.ev - a.ev).slice(0, opts.maxCandidates ?? 14);
+  const out: DerbyParlay[] = [];
+  const price = (legs: PricedLeg[]) => {
+    const p = priceDerbyCombo(d, legs, bankroll);
+    if (p) out.push(p);
+  };
+
+  for (let i = 0; i < cands.length; i++)
+    for (let j = i + 1; j < cands.length; j++) {
+      price([cands[i], cands[j]]);
+      for (let m = j + 1; m < cands.length; m++) price([cands[i], cands[j], cands[m]]);
+    }
+
+  return out.sort((a, b) => b.ev - a.ev).slice(0, top);
 }

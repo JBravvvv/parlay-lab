@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
+import { DerbyBuilderTab } from "@/components/derby/DerbySurfaces";
 import { getEngine, getMoney, setMoney, todayStr } from "@/lib/engine-client";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
@@ -127,11 +128,16 @@ export default function BuilderPage() {
   const [slip, setSlip] = useState<PickRow[]>([]);
   const [query, setQuery] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sport, setSport] = useState<"mlb" | "ufc">(() => {
-    if (typeof window === "undefined") return "mlb";
-    try { return localStorage.getItem("pl_builder_sport") === "ufc" ? "ufc" : "mlb"; } catch { return "mlb"; }
-  });
-  const pickSport = (s: "mlb" | "ufc") => {
+  // localStorage only after mount — an initializer read renders "derby" on the
+  // client against the server's "mlb" and trips a hydration mismatch
+  const [sport, setSport] = useState<"mlb" | "ufc" | "derby">("mlb");
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("pl_builder_sport");
+      if (s === "ufc" || s === "derby") setSport(s);
+    } catch { /* fresh device */ }
+  }, []);
+  const pickSport = (s: "mlb" | "ufc" | "derby") => {
     setSport(s);
     try { localStorage.setItem("pl_builder_sport", s); } catch {}
   };
@@ -233,7 +239,9 @@ export default function BuilderPage() {
       <PageHeader
         title="Builder"
         sub={
-          sport === "ufc"
+          sport === "derby"
+            ? "Home Run Derby — combine any pasted derby markets; combos priced jointly off the tournament sim"
+            : sport === "ufc"
             ? "UFC — build any parlay from the card's Caesars moneylines, priced against market consensus"
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
         }
@@ -242,9 +250,12 @@ export default function BuilderPage() {
       <div className="mb-4 flex items-center gap-2">
         <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
         <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+        <FilterPill selected={sport === "derby"} onClick={() => pickSport("derby")}>🏆 Derby</FilterPill>
       </div>
 
-      {sport === "ufc" ? (
+      {sport === "derby" ? (
+        <DerbyBuilderTab />
+      ) : sport === "ufc" ? (
         <UfcBuilder />
       ) : (
         <>

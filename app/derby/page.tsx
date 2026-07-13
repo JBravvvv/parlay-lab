@@ -4,185 +4,43 @@
    Bracket + live HR counts come straight from MLB statsapi; the power model
    runs on the nightly Statcast priors; market prices arrive by paste (The
    Odds API has no derby key — verified) and get Shin de-vigged like every
-   other market in the product. Display-only: nothing here feeds parlays,
-   the allocator, or ledger grading. */
+   other market in the product. The same data feeds the Board, The Sharp and
+   the Builder derby tabs via the shared useDerby() hook. Display-only:
+   nothing here feeds the allocator or ledger grading. */
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { Pill, FilterPill } from "@/components/ui/Pill";
+import { Pill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { getMoney } from "@/lib/engine-client";
-import { fmtMoney } from "@/lib/format";
+import { useDerby, type DerbyMarket } from "@/lib/useDerby";
+import { PastePanel, ParlayGrid } from "@/components/derby/DerbySurfaces";
 import {
-  parseDerby,
-  buildHitters,
-  simDerby,
   probOver,
-  lastName,
-  parseWinnerOdds,
-  parseH2HOdds,
-  parseTotalOdds,
-  devigField,
   fairTwoWay,
   blendProb,
   evAtAmerican,
   quarterKelly,
   fairAmerican,
-  DERBY_MODEL_W,
+  devigField,
+  lastName,
   type DerbyState,
   type DerbyHitter,
   type SimResult,
-  type PriorsBatter,
 } from "@/engine2/derby";
-
-const STATS = "https://statsapi.mlb.com/api/v1";
-const SIM_N = 15000;
-const LS_KEY = "pl_derbyOdds";
 
 const fmtAm = (a: number | null | undefined) => (a == null ? "—" : a > 0 ? `+${a}` : `${a}`);
 const fmtP = (p: number | null | undefined, dp = 1) => (p == null ? "—" : `${(p * 100).toFixed(dp)}%`);
 const fairAm = (p: number | null | undefined) => (p == null ? "—" : fmtAm(fairAmerican(p)));
+const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`;
 const headshot = (id: number) =>
   `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,q_auto:best/v1/people/${id}/headshot/67/current`;
 
-/* ------------------------------------------------------------- data hook */
-
-type Loaded = { state: DerbyState; fetchedAt: number };
-
-function useDerby() {
-  const [data, setData] = useState<Loaded | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const eventIdRef = useRef<number | null>(null);
-  const priorsRef = useRef<Record<string, PriorsBatter> | null>(null);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    let dead = false;
-
-    async function findEventId(): Promise<number | null> {
-      if (eventIdRef.current) return eventIdRef.current;
-      const year = new Date().getFullYear();
-      const r = await fetch(
-        `${STATS}/schedule?sportId=1&startDate=${year}-07-01&endDate=${year}-07-31&scheduleTypes=events`,
-      );
-      if (!r.ok) throw new Error(`schedule ${r.status}`);
-      const j = (await r.json()) as { dates?: { events?: { id: number; name?: string }[] }[] };
-      // MLB also schedules rehearsals ("Home Run Derby Test #3") and the
-      // workout day — only the real event will do
-      const candidates: { id: number; name: string }[] = [];
-      for (const d of j.dates ?? [])
-        for (const e of d.events ?? []) {
-          const n = e.name ?? "";
-          if (/home run derby/i.test(n) && !/workout|batting practice|test/i.test(n)) candidates.push({ id: e.id, name: n });
-        }
-      const exact = candidates.find((c) => /^\d{4} MLB Home Run Derby$/i.test(c.name.trim()));
-      const pick = exact ?? candidates[0] ?? null;
-      if (pick) eventIdRef.current = pick.id;
-      return pick?.id ?? null;
-    }
-
-    async function load() {
-      try {
-        if (!priorsRef.current) {
-          const pr = await fetch("/model/priors.json");
-          priorsRef.current = pr.ok ? ((await pr.json()) as { batters?: Record<string, PriorsBatter> }).batters ?? {} : {};
-        }
-        const id = await findEventId();
-        if (dead) return;
-        if (!id) {
-          setErr("no-derby");
-          setLoading(false);
-          return;
-        }
-        const r = await fetch(`${STATS}/homeRunDerby/${id}`);
-        if (!r.ok) throw new Error(`derby ${r.status}`);
-        const parsed = parseDerby(await r.json());
-        if (dead) return;
-        if (!parsed) {
-          setErr("bad-payload");
-          setLoading(false);
-          return;
-        }
-        const hitters = buildHitters(parsed.players, priorsRef.current);
-        setData({ state: { ...parsed, hitters }, fetchedAt: Date.now() });
-        setErr(null);
-        setLoading(false);
-      } catch (e) {
-        if (!dead) {
-          setErr(String(e));
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-    return () => {
-      dead = true;
-    };
-  }, [tick]);
-
-  // live polling: every 20s while the event is near/in progress and not Final
-  useEffect(() => {
-    if (!data) return;
-    const { state } = data;
-    if (state.state === "Final") return;
-    const evT = Date.parse(state.dateIso);
-    const near = isFinite(evT) && Math.abs(Date.now() - evT) < 12 * 3600 * 1000;
-    if (!near) return;
-    const t = setTimeout(() => setTick((x) => x + 1), 20000);
-    return () => clearTimeout(t);
-  }, [data]);
-
-  return { data, err, loading, refresh: () => setTick((x) => x + 1) };
-}
-
-/* -------------------------------------------------------------- the page */
-
-type PasteState = { winner: string; h2h: string; totals: string; scope: "event" | "r1" };
-const EMPTY_PASTE: PasteState = { winner: "", h2h: "", totals: "", scope: "event" };
-
 export default function DerbyPage() {
-  const { data, err, loading, refresh } = useDerby();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const m = useDerby();
 
-  const [paste, setPaste] = useState<PasteState>(EMPTY_PASTE);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) setPaste({ ...EMPTY_PASTE, ...(JSON.parse(raw) as Partial<PasteState>) });
-    } catch {
-      /* fresh device */
-    }
-  }, []);
-  const savePaste = (p: PasteState) => {
-    setPaste(p);
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(p));
-    } catch {
-      /* storage full/blocked — paste still works this session */
-    }
-  };
-
-  const bankroll = mounted ? getMoney().bankroll : 750;
-
-  const state = data?.state ?? null;
-
-  // sim key: only re-run when the model inputs change, not on every live poll
-  const simKey = state
-    ? `${state.id}|${state.rounds.map((r) => r.swings).join(",")}|${state.hitters.map((h) => `${h.id}:${h.hrPerSwing.toFixed(4)}`).join(",")}`
-    : "";
-  const sim: SimResult | null = useMemo(() => {
-    if (!state) return null;
-    return simDerby(state, { n: SIM_N });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simKey]);
-
-  if (loading)
+  if (m.loading)
     return (
       <>
         <PageHeader title="HR Derby" sub="Pulling the official bracket from MLB…" />
@@ -193,12 +51,12 @@ export default function DerbyPage() {
       </>
     );
 
-  if (err === "no-derby" || !state || !sim)
+  if (m.err === "no-derby" || !m.state || !m.sim)
     return (
       <>
         <PageHeader title="HR Derby" sub="The engine's Home Run Derby desk" />
-        {err && err !== "no-derby" ? (
-          <ErrorState title="Couldn't reach MLB statsapi" body={err} onRetry={refresh} />
+        {m.err && m.err !== "no-derby" ? (
+          <ErrorState title="Couldn't reach MLB statsapi" body={m.err} onRetry={m.refresh} />
         ) : (
           <EmptyState
             title="No Home Run Derby on the calendar"
@@ -208,43 +66,27 @@ export default function DerbyPage() {
       </>
     );
 
-  return <DerbyDesk state={state} sim={sim} paste={paste} savePaste={savePaste} bankroll={bankroll} refresh={refresh} />;
+  return <DerbyDesk m={m} />;
 }
 
 /* ---------------------------------------------------------------- desk */
 
-function DerbyDesk({
-  state,
-  sim,
-  paste,
-  savePaste,
-  bankroll,
-  refresh,
-}: {
-  state: DerbyState;
-  sim: SimResult;
-  paste: PasteState;
-  savePaste: (p: PasteState) => void;
-  bankroll: number;
-  refresh: () => void;
-}) {
+function DerbyDesk({ m }: { m: DerbyMarket }) {
+  const state = m.state as DerbyState;
+  const sim = m.sim as SimResult;
   const hitters = state.hitters;
   const byId = new Map(hitters.map((h) => [h.id, h]));
   const nm = (id: number) => byId.get(id)?.name ?? `#${id}`;
   const last = (id: number) => lastName(nm(id));
 
-  const live = state.state !== "Preview";
   const started = Object.values(state.live).some((ls) => ls.some((l) => l.started || l.hr > 0));
   const when = new Date(state.dateIso);
   const whenLabel = isFinite(when.getTime())
     ? when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })
     : "";
 
-  /* ---- markets from paste */
-  const winner = parseWinnerOdds(paste.winner, hitters);
+  const { winner, h2h, totals } = m.parsed;
   const winnerFair = winner.quotes.length >= 3 ? devigField(winner.quotes) : null;
-  const h2h = parseH2HOdds(paste.h2h, hitters);
-  const totals = parseTotalOdds(paste.totals, hitters);
 
   const winnerRows = hitters
     .map((h) => {
@@ -253,11 +95,9 @@ function DerbyDesk({
       const mkt = q && winnerFair ? (winnerFair.get(h.id) ?? null) : null;
       const blend = blendProb(o.win, mkt);
       const ev = q ? evAtAmerican(blend, q.odds) : null;
-      return { h, o, q, mkt, blend, ev, kelly: q && ev != null && ev > 0 ? quarterKelly(blend, q.odds, bankroll) : 0 };
+      return { h, o, q, mkt, blend, ev, kelly: q && ev != null && ev > 0 ? quarterKelly(blend, q.odds, m.bankroll) : 0 };
     })
     .sort((a, b) => b.blend - a.blend);
-
-  const anyOdds = winner.quotes.length > 0 || h2h.quotes.length > 0 || totals.quotes.length > 0;
 
   return (
     <>
@@ -281,7 +121,7 @@ function DerbyDesk({
           </>
         }
         action={
-          <Pill variant="ghost" onClick={refresh}>
+          <Pill variant="ghost" onClick={m.refresh}>
             Refresh
           </Pill>
         }
@@ -381,52 +221,12 @@ function DerbyDesk({
         </Panel>
       </Reveal>
 
-      {/* ---- odds paste */}
-      <Reveal>
-        <Panel
-          title="Market odds · paste from the book"
-          className="mt-4"
-          action={
-            anyOdds ? (
-              <Pill variant="ghost" className="!px-3 !py-1 text-[11px]" onClick={() => savePaste(EMPTY_PASTE)}>
-                Clear
-              </Pill>
-            ) : undefined
-          }
-        >
-          <div className="mb-3 text-[11.5px] leading-relaxed text-muted">
-            The Odds API doesn&apos;t carry the Derby, so prices come from you: open the book&apos;s Derby page and
-            paste the lines below — one entry per line, any extra text is ignored. Everything gets Shin de-vigged, then
-            blended {Math.round(DERBY_MODEL_W * 100)}/{Math.round((1 - DERBY_MODEL_W) * 100)} model/market before EV.
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <PasteBox
-              label="Winner"
-              hint={`Kyle Schwarber +330`}
-              value={paste.winner}
-              onChange={(v) => savePaste({ ...paste, winner: v })}
-              parsed={winner.quotes.length}
-              unmatched={winner.unmatched}
-            />
-            <PasteBox
-              label="R1 matchups"
-              hint={`Schwarber -140 Caglianone +120`}
-              value={paste.h2h}
-              onChange={(v) => savePaste({ ...paste, h2h: v })}
-              parsed={h2h.quotes.length}
-              unmatched={h2h.unmatched}
-            />
-            <PasteBox
-              label="Player HR totals"
-              hint={`Schwarber Over 15.5 -115 Under 15.5 -105`}
-              value={paste.totals}
-              onChange={(v) => savePaste({ ...paste, totals: v })}
-              parsed={totals.quotes.length}
-              unmatched={totals.unmatched}
-            />
-          </div>
-        </Panel>
-      </Reveal>
+      {/* ---- odds paste (shared with Board/Sharp/Builder tabs) */}
+      <div className="mt-4">
+        <Reveal>
+          <PastePanel m={m} />
+        </Reveal>
+      </div>
 
       {/* ---- winner market */}
       <Reveal>
@@ -528,24 +328,13 @@ function DerbyDesk({
         </Reveal>
 
         <Reveal delay={0.06}>
-          <Panel
-            title="Player HR totals"
-            action={
-              <div className="flex gap-1">
-                {(["event", "r1"] as const).map((s) => (
-                  <FilterPill key={s} selected={paste.scope === s} onClick={() => savePaste({ ...paste, scope: s })}>
-                    {s === "event" ? "Whole derby" : "Round 1"}
-                  </FilterPill>
-                ))}
-              </div>
-            }
-          >
+          <Panel title={`Player HR totals · ${m.paste.scope === "r1" ? "round 1" : "whole derby"}`}>
             {totals.quotes.length ? (
               <div className="space-y-2.5">
                 {totals.quotes.map((q) => {
                   const o = sim.byId[q.id];
                   if (!o) return null;
-                  const hist = paste.scope === "r1" ? o.r1Hist : o.evtHist;
+                  const hist = m.paste.scope === "r1" ? o.r1Hist : o.evtHist;
                   const model = probOver(hist, q.line, sim.n);
                   const mkt = fairTwoWay(q.overOdds, q.underOdds);
                   const blendOver = blendProb(model.over, mkt?.a ?? null);
@@ -581,7 +370,7 @@ function DerbyDesk({
             ) : (
               <EmptyState
                 title="No totals pasted"
-                body={`Paste lines like "Schwarber Over 15.5 -115" and price them against the sim's HR distributions — toggle whole-derby vs round-1 scope to match how the book grades it.`}
+                body={`Paste lines like "Schwarber Over 15.5 -115" and price them against the sim's HR distributions — the scope toggle in the paste panel matches how the book grades it.`}
               />
             )}
             <div className="mt-2 text-[10.5px] text-faint">
@@ -592,10 +381,19 @@ function DerbyDesk({
         </Reveal>
       </div>
 
+      {/* ---- parlays */}
+      {m.parlays.length > 0 && (
+        <Reveal>
+          <div className="mt-4">
+            <ParlayGrid parlays={m.parlays} />
+          </div>
+        </Reveal>
+      )}
+
       <div className="mt-4 text-[10.5px] text-faint">
         Sources: MLB statsapi (bracket + live counts) · nightly Statcast priors (power model) · your pasted book prices
-        (market). Display-only desk — nothing here feeds parlays, the allocator, or the ledger. Informational only, not
-        betting advice.
+        (market). The same markets power the Board, Sharp and Builder derby tabs. Derby tickets stay out of the
+        allocator and auto-graded ledger. Informational only, not betting advice.
       </div>
     </>
   );
@@ -652,43 +450,6 @@ function PairCard({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function PasteBox({
-  label,
-  hint,
-  value,
-  onChange,
-  parsed,
-  unmatched,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (v: string) => void;
-  parsed: number;
-  unmatched: string[];
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">{label}</span>
-        {value.trim() && (
-          <span className={`num text-[10px] ${parsed ? "text-pos" : "text-neg"}`}>
-            {parsed} parsed{unmatched.length ? ` · ${unmatched.length} skipped` : ""}
-          </span>
-        )}
-      </div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={hint}
-        rows={4}
-        spellCheck={false}
-        className="num w-full resize-y rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2 text-[12px] text-text placeholder:text-faint focus:border-pos/40 focus:outline-none"
-      />
     </div>
   );
 }

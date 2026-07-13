@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
@@ -13,6 +13,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
+import { DerbyBoardTab } from "@/components/derby/DerbySurfaces";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -37,11 +38,16 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
-  const [sport, setSport] = useState<"mlb" | "ufc">(() => {
-    if (typeof window === "undefined") return "mlb";
-    try { return localStorage.getItem("pl_board_sport") === "ufc" ? "ufc" : "mlb"; } catch { return "mlb"; }
-  });
-  const pickSport = (s: "mlb" | "ufc") => {
+  // localStorage only after mount — an initializer read renders "derby" on the
+  // client against the server's "mlb" and trips a hydration mismatch
+  const [sport, setSport] = useState<"mlb" | "ufc" | "derby">("mlb");
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("pl_board_sport");
+      if (s === "ufc" || s === "derby") setSport(s);
+    } catch { /* fresh device */ }
+  }, []);
+  const pickSport = (s: "mlb" | "ufc" | "derby") => {
     setSport(s);
     try { localStorage.setItem("pl_board_sport", s); } catch {}
   };
@@ -119,7 +125,9 @@ export default function BoardPage() {
       <PageHeader
         title="Board"
         sub={
-          sport === "ufc"
+          sport === "derby"
+            ? "Home Run Derby — pasted book prices de-vigged and priced against the 15,000-tournament power sim"
+            : sport === "ufc"
             ? "UFC — de-vigged market consensus vs the Caesars moneyline, records live from ESPN"
             : d
               ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
@@ -137,9 +145,12 @@ export default function BoardPage() {
       <div className="mb-4 flex items-center gap-2">
         <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
         <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+        <FilterPill selected={sport === "derby"} onClick={() => pickSport("derby")}>🏆 Derby</FilterPill>
       </div>
 
-      {sport === "ufc" ? (
+      {sport === "derby" ? (
+        <DerbyBoardTab />
+      ) : sport === "ufc" ? (
         <UfcBoard />
       ) : (
         <>
