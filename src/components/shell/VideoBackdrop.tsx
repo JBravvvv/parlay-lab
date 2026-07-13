@@ -58,19 +58,19 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
 
     const tick = () => {
       const d = v.duration;
-      if (isFinite(d) && d > 0 && !v.ended && v.readyState >= 2) {
+      if (isFinite(d) && d > 0 && !v.ended && v.readyState >= 1) {
         if (!v.paused) {
           const t = v.currentTime;
           const o = t < 0.5 ? t / 0.5 : d - t < 0.5 ? Math.max(0, (d - t) / 0.5) : 1;
           v.style.opacity = o.toFixed(3);
         } else if (performance.now() - mountedAt > 1500) {
-          // Autoplay stayed vetoed: show a rich still frame instead of a
-          // blank page (a tap or the retry timer starts motion from here).
+          // Autoplay stayed vetoed: seek to a rich frame (the seek itself
+          // forces that frame to download and decode) and show it as a still.
           if (!stillSeeked && v.currentTime < 0.1) {
             stillSeeked = true;
             try { v.currentTime = d / 2; } catch { /* seek denied — keep frame 0 */ }
           }
-          v.style.opacity = "1";
+          if (v.readyState >= 2) v.style.opacity = "1";
         }
       }
       raf = requestAnimationFrame(tick);
@@ -132,6 +132,9 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
   if (!fixed) return video;
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
+      {/* CSS aurora sits UNDER the video: whenever the video can't play
+          (blocked, saving power, still loading) the backdrop still moves */}
+      <div className="aurora absolute inset-0" />
       {video}
       {scrim && <div className="absolute inset-0 bg-bg/40" />}
     </div>
