@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from "react";
 
-const SRC =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4";
+/* Self-hosted (public/media) — the original CloudFront copy was third-party,
+   which ad blockers / privacy extensions silently killed on some machines.
+   Same-origin media survives them and rides the Vercel CDN with immutable
+   caching (see next.config.ts headers). */
+const SRC = "/media/backdrop.mp4";
 
 /* The footage is purple; the brand is green. A hue rotation recolors the
    ribbons to emerald/teal in the compositor — no re-encode needed. */
@@ -81,8 +84,15 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
       }, 100);
     };
 
+    // A failed download (flaky network, sleep/wake) retries twice with backoff.
+    let loadRetries = 0;
+    const onError = () => {
+      if (loadRetries++ < 2) setTimeout(() => { v.load(); kick(); }, 1500 * loadRetries);
+    };
+
     v.addEventListener("ended", onEnded);
     v.addEventListener("canplay", kick);
+    v.addEventListener("error", onError);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", kick);
     window.addEventListener("pointerdown", onFirstTouch);
@@ -95,6 +105,7 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
       clearInterval(retry);
       v.removeEventListener("ended", onEnded);
       v.removeEventListener("canplay", kick);
+      v.removeEventListener("error", onError);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", kick);
       window.removeEventListener("pointerdown", onFirstTouch);

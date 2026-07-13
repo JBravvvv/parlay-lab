@@ -8,6 +8,15 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // The Sharp's system prompt is read from disk at request time on Vercel.
   outputFileTracingIncludes: { "/api/sharp": ["./prompts/**"] },
+  // The background video never changes — let browsers keep it forever.
+  async headers() {
+    return [
+      {
+        source: "/media/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
