@@ -41,6 +41,8 @@
   "exclude": [
     "node_modules",
     "legacy",
-    "tests"
+    "tests",
+    "**/* 2.ts",
+    "**/* 2.tsx"
   ]
 }
