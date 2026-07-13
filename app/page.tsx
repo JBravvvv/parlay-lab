@@ -79,9 +79,10 @@ function Hero() {
         </header>
         <div className="mt-[3px] h-px w-full bg-gradient-to-r from-transparent via-text/20 to-transparent" />
 
-        {/* hero content — blur shape sits behind, section stays overflow-visible */}
+        {/* hero content — a soft dark halo behind the type (NOT a slab: the
+            ribbons must stay visible through it), section stays overflow-visible */}
         <section className="relative flex flex-1 items-center justify-center overflow-visible px-4">
-          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[527px] w-[984px] -translate-x-1/2 -translate-y-1/2 bg-gray-950 opacity-90 blur-[82px]" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[527px] w-[984px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-bg/45 blur-[82px]" />
           <div className="relative text-center">
             <h1
               className="text-[clamp(64px,15vw,220px)] font-normal leading-[1.02] tracking-[-0.024em] text-text"
