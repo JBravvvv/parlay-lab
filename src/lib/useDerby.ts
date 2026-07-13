@@ -18,15 +18,12 @@ import {
   parseH2HOdds,
   parseTotalOdds,
   priceDerbyLegs,
-  derbyParlays,
   matchHitter,
-  parlayPool,
   type DerbyBook,
   type DerbyState,
   type DerbyDraws,
   type SimResult,
   type PricedLeg,
-  type DerbyParlay,
   type PriorsBatter,
   type WinnerQuote,
   type H2HQuote,
@@ -88,7 +85,6 @@ export type DerbyMarket = {
     totals: { quotes: TotalQuote[]; unmatched: string[] };
   };
   legs: PricedLeg[];
-  parlays: DerbyParlay[];
   bankroll: number;
   anyOdds: boolean;
   seed: DerbySeed | null;
@@ -288,16 +284,10 @@ export function useDerby(): DerbyMarket {
 
   const bankroll = mounted ? getMoney().bankroll : 750;
 
-  const parlays = useMemo(() => {
-    if (!draws) return [];
-    // kind filter + Josh's rule: no winner legs from the market's bottom
-    // quartile (the least likely champions never anchor a ticket)
-    const pool = parlayPool(legs);
-    if (pool.length < 2) return [];
-    // wide net: the UI splits book-friendly vs correlated (SGP) groups and
-    // slices each — both groups need representation regardless of EV rank
-    return derbyParlays(draws, pool, { bankroll, top: 200 });
-  }, [draws, legs, bankroll]);
+  // The Home Run Derby is straight bets only — the book offers no parlays,
+  // so the surfaces price every market as a single and the Builder sizes a
+  // straight-bet card. The parlay engine (derbyParlays/parlayPool) stays in
+  // derby.ts, dormant, in case a book ever hangs derby SGPs.
 
   return {
     loading,
@@ -310,7 +300,6 @@ export function useDerby(): DerbyMarket {
     savePaste,
     parsed,
     legs,
-    parlays,
     bankroll,
     anyOdds: legs.length > 0,
     seed,

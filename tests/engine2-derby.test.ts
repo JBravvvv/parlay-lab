@@ -11,6 +11,8 @@ import {
   derbyParlays,
   devigFieldSum,
   parlayPool,
+  derbyCard,
+  longshotWinnerKeys,
   simRound,
   makeRng,
   probOver,
@@ -332,6 +334,50 @@ describe("joint pricing off the draws", () => {
     // exotics excluded by kind, parlayable kinds retained
     expect(pool.some((l) => l.leg.kind === "finalists")).toBe(false);
     expect(pool.some((l) => l.leg.kind === "firstSwing")).toBe(true);
+  });
+
+  it("derbyCard sizes exact-sum daily + fun buckets with the discipline rules", () => {
+    const legs = priceDerbyLegs(draws, st.hitters, {
+      winner: st.hitters.map((h, i) => ({ id: h.id, odds: 250 + i * 200 })),
+      h2h: [
+        { aId: 1001, bId: 1008, aOdds: -140, bOdds: 130 },
+        { aId: 1003, bId: 1006, aOdds: -120, bOdds: 100 },
+      ],
+      totals: [
+        { id: 1001, line: 9.5, overOdds: 105, underOdds: -125 },
+        { id: 1006, line: 8.5, overOdds: -130, underOdds: 110 },
+      ],
+      totalsScope: "r1",
+      firstSwing: [
+        { id: 1001, odds: 160 },
+        { id: 1007, odds: 180 },
+        { id: 1004, odds: 220 },
+      ],
+    });
+    const card = derbyCard(legs, { daily: 40, fun: 10, bankroll: 750 });
+    // exact-sum discipline
+    expect(card.daily.sum).toBe(40);
+    expect(card.fun.sum).toBe(10);
+    expect(card.daily.picks.length).toBeGreaterThan(0);
+    expect(card.daily.picks.length).toBeLessThanOrEqual(5);
+    expect(card.fun.picks.length).toBeGreaterThanOrEqual(1);
+    expect(card.fun.picks.length).toBeLessThanOrEqual(3);
+    // the market's least-likely champions never make the DAILY card
+    const excluded = longshotWinnerKeys(legs);
+    for (const p of card.daily.picks) expect(excluded.has(p.leg.key)).toBe(false);
+    // diversification: max 2 per market family
+    const perGroup = new Map<string, number>();
+    for (const p of card.daily.picks) perGroup.set(p.leg.group, (perGroup.get(p.leg.group) ?? 0) + 1);
+    for (const n of perGroup.values()) expect(n).toBeLessThanOrEqual(2);
+    // no leg rides two tickets
+    const keys = [...card.daily.picks, ...card.fun.picks].map((p) => p.leg.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    // fun bucket is longshots only (+500 or longer)
+    for (const p of card.fun.picks) expect(p.leg.odds).toBeGreaterThanOrEqual(500);
+    // zero budgets → empty buckets
+    const empty = derbyCard(legs, { daily: 0, fun: 0, bankroll: 750 });
+    expect(empty.daily.picks).toHaveLength(0);
+    expect(empty.fun.picks).toHaveLength(0);
   });
 
   it("devigFieldSum strips overround to the target sum and refuses partial fields", () => {

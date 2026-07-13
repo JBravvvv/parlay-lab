@@ -7,7 +7,7 @@
    are counted, not assumed away. Display-only: derby tickets don't enter the
    allocator or auto-graded ledger — record them manually if you fire. */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
@@ -20,17 +20,17 @@ import {
   fairAmerican,
   quarterKelly,
   lastName,
-  priceDerbyCombo,
   devigFieldSum,
+  derbyCard,
   type PricedLeg,
-  type DerbyParlay,
+  type DerbyCardPick,
 } from "@/engine2/derby";
 import { impliedFromAmerican } from "@/engine2/devig";
+import { getMoney, setMoney } from "@/lib/engine-client";
 
 const fmtAm = (a: number | null | undefined) => (a == null ? "—" : a > 0 ? `+${a}` : `${a}`);
 const fmtP = (p: number | null | undefined, dp = 1) => (p == null ? "—" : `${(p * 100).toFixed(dp)}%`);
 const fairAm = (p: number | null | undefined) => (p == null ? "—" : fmtAm(fairAmerican(p)));
-const decToAm = (dc: number) => (dc >= 2 ? Math.round((dc - 1) * 100) : -Math.round(100 / (dc - 1)));
 
 /* ------------------------------------------------------------ paste panel */
 
@@ -306,98 +306,6 @@ export function UnmodeledPanel({ m }: { m: DerbyMarket }) {
   );
 }
 
-/* ----------------------------------------------------------- parlay card */
-
-/** Combos whose legs move together get repriced (or refused) by the book as
-    an SGP — the multiplied-singles price and its EV are fiction there. */
-export const CORRELATED = (p: DerbyParlay) => p.corr > 1.15;
-
-export function ParlayCard({ p, highlight }: { p: DerbyParlay; highlight?: boolean }) {
-  const names = [...new Set(p.legs.map((l) => lastName(l.label)))];
-  const name = names.join(" + ") + (names.length < p.legs.length ? ` · ${p.legs.length} legs` : "");
-  const sgp = CORRELATED(p);
-  return (
-    <div className={`glass px-4 py-3 ${!sgp && p.ev > 0 ? "ev-glow" : ""} ${highlight ? "glow-pos" : ""}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-text">{name}</div>
-        <div className="flex items-center gap-2">
-          {sgp ? (
-            <span className="num rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[12px] font-bold text-gold">
-              fair {fairAm(p.pJoint)}
-            </span>
-          ) : (
-            <>
-              {p.kelly > 0 && (
-                <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
-                  {fmtMoney(p.kelly)}
-                </span>
-              )}
-              <span className="num text-[13px] font-semibold text-gold">{fmtAm(decToAm(p.dec))}</span>
-              <EvBadge ev={p.ev * 100} />
-            </>
-          )}
-        </div>
-      </div>
-      <div className="mt-2 space-y-1">
-        {p.legs.map((l) => (
-          <div key={l.key} className="flex items-baseline justify-between gap-2 text-[11.5px]">
-            <span className="text-muted">
-              <span className="text-text">{l.label}</span> {l.prop}
-            </span>
-            <span className="num shrink-0 text-gold">{fmtAm(l.odds)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="num mt-2 text-[10.5px] text-faint">
-        {fmtP(p.pJoint)} to hit · fair {fairAm(p.pJoint)}
-        {sgp ? (
-          <>
-            {" "}
-            · legs correlated ×{p.corr.toFixed(2)} — the book will reprice this as an SGP (or refuse it). The number
-            that matters is <span className="text-gold">fair {fairAm(p.pJoint)}</span>: any book quote better than that
-            is +EV.
-          </>
-        ) : (
-          Math.abs(p.corr - 1) > 0.07 && <> · correlation ×{p.corr.toFixed(2)} counted off the sim</>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function ParlayGrid({ parlays, limit }: { parlays: DerbyParlay[]; limit?: number }) {
-  const clean = parlays.filter((p) => !CORRELATED(p)).slice(0, limit ?? 6);
-  const sgp = parlays.filter(CORRELATED).slice(0, limit ?? 6);
-  return (
-    <div className="space-y-4">
-      {clean.length > 0 && (
-        <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Derby parlays · independent legs, priced at multiplied book odds
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {clean.map((p, i) => (
-              <ParlayCard key={p.legs.map((l) => l.key).join("|")} p={p} highlight={i === 0 && p.ev > 0} />
-            ))}
-          </div>
-        </div>
-      )}
-      {sgp.length > 0 && (
-        <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">
-            Correlated combos · SGP territory — compare the book&apos;s quote to fair
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {sgp.map((p) => (
-              <ParlayCard key={p.legs.map((l) => l.key).join("|")} p={p} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ------------------------------------------------- shared loading shells */
 
 function DerbyShell({ m, children }: { m: DerbyMarket; children: (m: DerbyMarket) => React.ReactNode }) {
@@ -470,15 +378,10 @@ export function DerbyBoardTab() {
             </Panel>
           )}
           <UnmodeledPanel m={m} />
-          {m.parlays.length > 0 && (
-            <Reveal>
-              <ParlayGrid parlays={m.parlays} />
-            </Reveal>
-          )}
           <div className="text-[10.5px] text-faint">
-            Correlations are counted across simulated tournaments, not assumed. Exotic fields (exacta, finalists,
-            most-R1) stay out of the parlay generator. Derby tickets don&apos;t enter the allocator or auto-graded
-            ledger — record what you fire. Informational only, not betting advice.
+            Every market is a straight bet — the Home Run Derby has no parlays. Head to the Builder to size a Daily +
+            Fun card from these edges. Derby tickets don&apos;t enter the MLB allocator or auto-graded ledger — record
+            what you fire. Informational only, not betting advice.
           </div>
         </div>
       )}
@@ -510,8 +413,6 @@ export function DerbySharpTab() {
       {(m) => {
         const plays = m.legs.filter((l) => l.ev > 0).slice(0, 6);
         const top = [...m.state!.hitters].sort((a, b) => m.sim!.byId[b.id].win - m.sim!.byId[a.id].win).slice(0, 3);
-        // endorse only book-friendly combos — correlated ones get repriced as SGPs
-        const bestParlay = m.parlays.find((p) => !CORRELATED(p) && p.ev > 0) ?? null;
         return (
           <div className="space-y-5">
             <EventLine m={m} />
@@ -568,17 +469,9 @@ export function DerbySharpTab() {
                 />
               </Panel>
             )}
-            {bestParlay && (
-              <Reveal>
-                <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">
-                  Best book-friendly parlay
-                </h2>
-                <ParlayCard p={bestParlay} highlight />
-              </Reveal>
-            )}
             <div className="text-[10.5px] text-faint">
-              One-night event, tiny edges, huge variance — FUN-money sizing only. Informational only, not betting
-              advice.
+              One-night event, straight bets only, tiny edges, huge variance — FUN-money sizing only. Size a full card
+              in the Builder. Informational only, not betting advice.
             </div>
           </div>
         );
@@ -589,21 +482,88 @@ export function DerbySharpTab() {
 
 /* ========================================================== BUILDER tab */
 
+function MoneyInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-4 py-2">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</span>
+      <span className="num text-[13px] text-muted">$</span>
+      <input
+        type="number"
+        min={0}
+        value={value || ""}
+        placeholder="0"
+        onChange={(e) => onChange(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+        className="num w-16 bg-transparent text-[14px] font-semibold text-text outline-none"
+      />
+    </label>
+  );
+}
+
+function CardTicket({ p }: { p: DerbyCardPick }) {
+  return (
+    <div className={`glass px-4 py-3 ${p.leg.ev > 0 ? "ev-glow" : ""}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-[13px] font-semibold text-text">
+          {p.leg.label} <span className="font-normal text-muted">{p.leg.prop}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
+            {fmtMoney(p.stake)}
+          </span>
+          <span className="num text-[13px] font-semibold text-gold">{fmtAm(p.leg.odds)}</span>
+          <EvBadge ev={p.leg.ev * 100} />
+        </div>
+      </div>
+      <div className="num mt-1.5 text-[10.5px] text-faint">
+        {fmtP(p.leg.blend)} to hit · fair {fairAm(p.leg.blend)} · {p.leg.group}
+        {p.leg.market == null && " · one-sided market, anchored to the raw price"}
+      </div>
+    </div>
+  );
+}
+
+const DERBY_MONEY_KEY = "pl_derbyMoney";
+
 export function DerbyBuilderTab() {
   const m = useDerby();
-  const [slipKeys, setSlipKeys] = useState<string[]>([]);
-  const [query, setQuery] = useState("");
 
-  const slip = useMemo(() => slipKeys.map((k) => m.legs.find((l) => l.key === k)).filter(Boolean) as PricedLeg[], [slipKeys, m.legs]);
-  const combo = useMemo(
-    () => (m.draws && slip.length >= 2 ? priceDerbyCombo(m.draws, slip, m.bankroll) : null),
-    [m.draws, slip, m.bankroll],
+  // derby stakes are their own pot — deliberately NOT the MLB card's
+  // daily/fun (locking the MLB card consumes those); bankroll is shared
+  const [money, setMoneyState] = useState({ daily: 0, fun: 0, bankroll: 750 });
+  useEffect(() => {
+    let saved = { daily: 0, fun: 0 };
+    try {
+      saved = { ...saved, ...(JSON.parse(localStorage.getItem(DERBY_MONEY_KEY) ?? "{}") as Partial<typeof saved>) };
+    } catch {
+      /* fresh device */
+    }
+    setMoneyState({ daily: saved.daily, fun: saved.fun, bankroll: getMoney().bankroll });
+  }, []);
+  const updateMoney = (patch: Partial<{ daily: number; fun: number; bankroll: number }>) => {
+    setMoneyState((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem(DERBY_MONEY_KEY, JSON.stringify({ daily: next.daily, fun: next.fun }));
+      } catch {
+        /* session-only */
+      }
+      if (patch.bankroll != null) setMoney({ bankroll: patch.bankroll });
+      return next;
+    });
+  };
+
+  const card = useMemo(
+    () => (m.legs.length && (money.daily > 0 || money.fun > 0) ? derbyCard(m.legs, { ...money }) : null),
+    [m.legs, money],
   );
-  const results = useMemo(() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-    return m.legs.filter((l) => `${l.label} ${l.prop}`.toLowerCase().includes(q) && !slipKeys.includes(l.key)).slice(0, 6);
-  }, [query, m.legs, slipKeys]);
 
   return (
     <DerbyShell m={m}>
@@ -612,96 +572,92 @@ export function DerbyBuilderTab() {
           <EventLine m={m} />
           <SeedStamp m={m} />
           <PastePanel m={m} />
-          <Reveal>
-            <Panel title="Derby slip — combine any pasted markets (correlation-exact)">
-              {!m.legs.length ? (
-                <EmptyState
-                  title="Paste odds first"
-                  body="The slip combines any priced derby markets and prices the combo jointly off the 15,000-tournament sim — correlations between legs are counted, not assumed."
-                />
-              ) : (
-                <>
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search a hitter or market…"
-                    className="w-full rounded-full border border-line-2 bg-surface-2 px-4 py-2.5 text-[13px] text-text outline-none focus:border-pos/50"
-                  />
-                  {results.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {results.map((l) => (
-                        <button
-                          key={l.key}
-                          onClick={() => {
-                            setSlipKeys((s) => [...s, l.key]);
-                            setQuery("");
-                          }}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[12.5px] hover:bg-white/[0.05]"
-                        >
-                          <span>
-                            <span className="text-text">{l.label}</span> <span className="text-muted">{l.prop}</span>
-                          </span>
-                          <span className="num text-gold">{fmtAm(l.odds)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {slip.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      {slip.map((l) => (
-                        <div key={l.key} className="flex items-center justify-between gap-2 text-[12.5px]">
-                          <span>
-                            <span className="text-text">{l.label}</span> <span className="text-muted">{l.prop}</span>
-                          </span>
-                          <span className="flex items-center gap-2">
-                            <span className="num text-gold">{fmtAm(l.odds)}</span>
-                            <button
-                              onClick={() => setSlipKeys((s) => s.filter((k) => k !== l.key))}
-                              aria-label="remove"
-                              className="rounded-full px-2 text-muted hover:text-neg"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        </div>
-                      ))}
-                      {slip.length >= 2 &&
-                        (combo ? (
-                          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/[0.05] pt-3">
-                            <span className="num text-[13px] text-text">
-                              {fmtP(combo.pJoint)} true · <span className="text-gold">{fmtAm(decToAm(combo.dec))}</span>
-                            </span>
-                            <span className="num text-[12px] text-muted">fair {fairAm(combo.pJoint)}</span>
-                            <EvBadge ev={combo.ev * 100} />
-                            {combo.kelly > 0 && <span className="num text-[12px] text-muted">¼-Kelly {fmtMoney(combo.kelly)}</span>}
-                            {Math.abs(combo.corr - 1) > 0.07 && (
-                              <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] font-bold text-gold">
-                                correlated ×{combo.corr.toFixed(2)} — priced jointly, not independence
-                              </span>
-                            )}
-                            <Pill variant="ghost" onClick={() => setSlipKeys([])} className="!px-3 !py-1 text-[11px]">
-                              Clear
-                            </Pill>
-                          </div>
-                        ) : (
-                          <div className="mt-3 border-t border-white/[0.05] pt-3 text-[12px] text-neg">
-                            These legs can&apos;t all win together (mutually exclusive) — the combo prices to zero.
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </>
-              )}
+
+          {/* ---- money inputs */}
+          <div className="flex flex-wrap items-center gap-2">
+            <MoneyInput label="Daily" value={money.daily} onChange={(n) => updateMoney({ daily: n })} />
+            <MoneyInput label="Fun" value={money.fun} onChange={(n) => updateMoney({ fun: n })} />
+            <MoneyInput label="Bankroll" value={money.bankroll} onChange={(n) => updateMoney({ bankroll: n })} />
+          </div>
+
+          {/* ---- allocated card (straight bets — the derby has no parlays) */}
+          {!m.legs.length ? (
+            <Panel>
+              <EmptyState
+                title="No derby odds loaded"
+                body="The book board seeds automatically during All-Star week; paste fresh prices above to override it. Then set a Daily and/or Fun amount to size a card."
+              />
             </Panel>
-          </Reveal>
-          {m.parlays.length > 0 && (
+          ) : !card ? (
+            <Panel>
+              <EmptyState
+                title="Enter a Daily $ (and optional Fun $)"
+                body="Daily spreads across the strongest +EV straight bets — at most two per market family, capped at 2% of bankroll each, summed exactly to your amount, and never the market's least-likely champions. Fun buys 1–3 honest longshots (+500 or longer)."
+              />
+            </Panel>
+          ) : (
+            <div className="space-y-5">
+              {card.reduced && card.daily.picks.length > 0 && (
+                <div className="rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-4 py-3 text-[12px] text-gold">
+                  No positive-EV straight bet on this board — the model can&apos;t beat the vig anywhere. Allocating{" "}
+                  {fmtMoney(money.daily)} as requested across the least-bad prices; consider passing or trimming.
+                </div>
+              )}
+
+              {card.daily.picks.length > 0 && (
+                <Reveal>
+                  <div className="mb-2 flex items-baseline justify-between">
+                    <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+                      Today&apos;s derby card · {fmtMoney(card.daily.sum)} across {card.daily.picks.length} straight bets
+                    </h2>
+                    <span className="num flex items-center gap-1.5 text-[11px] text-muted">
+                      card EV <EvBadge ev={card.daily.ev * 100} />
+                    </span>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {card.daily.picks.map((p) => (
+                      <CardTicket key={p.leg.key} p={p} />
+                    ))}
+                  </div>
+                </Reveal>
+              )}
+
+              {card.fun.picks.length > 0 && (
+                <Reveal>
+                  <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">
+                    Fun money · {fmtMoney(card.fun.sum)} — longshots, most nights lose, tracked separately
+                  </h2>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {card.fun.picks.map((p) => (
+                      <CardTicket key={p.leg.key} p={p} />
+                    ))}
+                  </div>
+                </Reveal>
+              )}
+
+              {card.daily.picks.length === 0 && card.fun.picks.length === 0 && (
+                <Panel>
+                  <EmptyState
+                    title="Nothing to size yet"
+                    body="Daily needs at least a dollar; Fun needs a +500-or-longer market on the board. Adjust the amounts above."
+                  />
+                </Panel>
+              )}
+            </div>
+          )}
+
+          {/* ---- the full straight-bet board to hand-pick from */}
+          {m.legs.length > 0 && (
             <Reveal>
-              <ParlayGrid parlays={m.parlays} limit={4} />
+              <GroupedEdges legs={m.legs} bankroll={m.bankroll} />
             </Reveal>
           )}
+
           <div className="text-[10.5px] text-faint">
-            Derby tickets stay out of the locked card and auto-graded ledger — the event grades in one night, record
-            what you fire. Informational only, not betting advice.
+            The Home Run Derby is straight bets only — no parlays — so the card sizes individual tickets. Daily is
+            exact-sum ¼-Kelly across the best edges (two per family max, the market&apos;s least-likely champions
+            excluded); Fun is the longshot bucket. Derby tickets stay out of the MLB locked card and auto-graded ledger
+            — record what you fire. Informational only, not betting advice.
           </div>
         </div>
       )}

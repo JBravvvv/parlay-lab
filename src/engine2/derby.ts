@@ -792,23 +792,108 @@ export const PARLAYABLE_KINDS = new Set<DerbyLeg["kind"]>([
   "firstSwing",
 ]);
 
-/** The parlay candidate pool. Beyond the kind filter, WINNER legs from the
-    bottom quartile of the market's own winner board are excluded (Josh's
-    rule, 2026-07-13): when the model rates the market's biggest longshots as
-    "value", EV-ranked candidates stack every ticket on the least likely
-    champions. Those legs stay on the edges table as singles — they just
-    never anchor a parlay. Ranking is by the book's own posted price — the
-    market's opinion, deliberately not the model's. */
-export function parlayPool(legs: PricedLeg[]): PricedLeg[] {
+/** WINNER legs from the bottom quartile of the market's own winner board —
+    the least likely champions per the BOOK's posted prices (deliberately not
+    the model's opinion). Josh's rule, 2026-07-13: these never anchor a
+    parlay, and the DAILY card skips them too (FUN is the longshot bucket). */
+export function longshotWinnerKeys(legs: PricedLeg[]): Set<string> {
   const winners = legs.filter((l) => l.leg.kind === "winner");
   const cut = Math.floor(winners.length / 4);
-  const excluded = new Set(
+  return new Set(
     [...winners]
       .sort((a, b) => impliedFromAmerican(a.odds) - impliedFromAmerican(b.odds))
       .slice(0, cut)
       .map((l) => l.key),
   );
+}
+
+/** The parlay candidate pool: parlayable kinds minus the market's
+    least-likely champions. Excluded legs stay on the edges table as singles. */
+export function parlayPool(legs: PricedLeg[]): PricedLeg[] {
+  const excluded = longshotWinnerKeys(legs);
   return legs.filter((l) => PARLAYABLE_KINDS.has(l.leg.kind) && !excluded.has(l.key));
+}
+
+/* ------------------------------------------------------------ card allocator */
+
+export type DerbyCardPick = { leg: PricedLeg; stake: number };
+export type DerbyCard = {
+  daily: { picks: DerbyCardPick[]; sum: number; ev: number };
+  fun: { picks: DerbyCardPick[]; sum: number; ev: number };
+  reduced: boolean; // no positive-EV candidates — allocated as requested anyway
+};
+
+/** Round stakes to whole dollars so they sum EXACTLY to the requested total
+    (the product's exact-sum discipline). Largest stake absorbs the residue. */
+function exactSum(raw: number[], total: number): number[] {
+  const s = raw.reduce((a, b) => a + b, 0);
+  if (s <= 0 || total <= 0) return raw.map(() => 0);
+  const stakes = raw.map((r) => Math.max(1, Math.round((r / s) * total)));
+  let diff = total - stakes.reduce((a, b) => a + b, 0);
+  const order = stakes.map((_, i) => i).sort((i, j) => stakes[j] - stakes[i]);
+  for (let k = 0; diff !== 0 && k < 1000; k++) {
+    const i = order[k % order.length];
+    const step = diff > 0 ? 1 : -1;
+    if (stakes[i] + step >= 1) {
+      stakes[i] += step;
+      diff -= step;
+    }
+  }
+  return stakes;
+}
+
+/** Size a derby card the way the MLB builder does: DAILY spreads across the
+    strongest playable edges with ¼-Kelly weighting (capped 2% of bankroll a
+    ticket, exact-sum to the dollar, one leg never rides two tickets, at most
+    two per market family, the market's least-likely champions excluded);
+    FUN buys 1–3 honest longshots (+500 or longer — exotics and the excluded
+    longshot winners are allowed HERE, that's what the bucket is for). */
+export function derbyCard(
+  legs: PricedLeg[],
+  opts: { daily: number; fun: number; bankroll: number },
+): DerbyCard {
+  const { daily, fun, bankroll } = opts;
+  const excluded = longshotWinnerKeys(legs);
+
+  /* ---- DAILY */
+  const byEv = [...legs].sort((a, b) => b.ev - a.ev);
+  const pos = byEv.filter((l) => l.ev > 0 && !excluded.has(l.key));
+  const reduced = pos.length === 0;
+  const candidates = reduced ? byEv.filter((l) => !excluded.has(l.key)) : pos;
+  const perGroup = new Map<string, number>();
+  const dailyLegs: PricedLeg[] = [];
+  for (const l of candidates) {
+    if (dailyLegs.length >= 5) break;
+    const g = perGroup.get(l.group) ?? 0;
+    if (g >= 2) continue; // diversify across market families
+    perGroup.set(l.group, g + 1);
+    dailyLegs.push(l);
+  }
+  const cap = 0.02 * bankroll;
+  const rawDaily = dailyLegs.map((l) => {
+    const k = quarterKelly(l.blend, l.odds, bankroll);
+    return Math.min(cap, k > 0 ? k : cap / 4); // reduced-action day: equal-ish split
+  });
+  const dailyStakes = daily > 0 && dailyLegs.length ? exactSum(rawDaily, daily) : dailyLegs.map(() => 0);
+  const dailyPicks = dailyLegs.map((leg, i) => ({ leg, stake: dailyStakes[i] })).filter((p) => p.stake > 0);
+
+  /* ---- FUN */
+  const funCands = byEv.filter((l) => decFromAmerican(l.odds) >= 6 && !dailyPicks.some((p) => p.leg.key === l.key));
+  const funLegs = funCands.slice(0, Math.min(3, funCands.length));
+  const SPLITS: Record<number, number[]> = { 1: [1], 2: [0.6, 0.4], 3: [0.5, 0.3, 0.2] };
+  const funStakes =
+    fun > 0 && funLegs.length ? exactSum(SPLITS[funLegs.length].map((w) => w * fun), fun) : funLegs.map(() => 0);
+  const funPicks = funLegs.map((leg, i) => ({ leg, stake: funStakes[i] })).filter((p) => p.stake > 0);
+
+  const cardEv = (picks: DerbyCardPick[]) => {
+    const s = picks.reduce((a, p) => a + p.stake, 0);
+    return s > 0 ? picks.reduce((a, p) => a + p.stake * p.leg.ev, 0) / s : 0;
+  };
+  return {
+    daily: { picks: dailyPicks, sum: dailyPicks.reduce((a, p) => a + p.stake, 0), ev: cardEv(dailyPicks) },
+    fun: { picks: funPicks, sum: funPicks.reduce((a, p) => a + p.stake, 0), ev: cardEv(funPicks) },
+    reduced,
+  };
 }
 
 /** Everything the book hangs on the derby, in one typed structure. */

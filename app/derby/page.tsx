@@ -14,13 +14,7 @@ import { Pill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useDerby, type DerbyMarket } from "@/lib/useDerby";
-import {
-  PastePanel,
-  ParlayGrid,
-  GroupedEdges,
-  SeedStamp,
-  UnmodeledPanel,
-} from "@/components/derby/DerbySurfaces";
+import { PastePanel, GroupedEdges, SeedStamp, UnmodeledPanel } from "@/components/derby/DerbySurfaces";
 import { fairAmerican, type DerbyState, type DerbyHitter, type SimResult } from "@/engine2/derby";
 
 const fmtAm = (a: number | null | undefined) => (a == null ? "—" : a > 0 ? `+${a}` : `${a}`);
@@ -208,17 +202,13 @@ function DerbyDesk({ m }: { m: DerbyMarket }) {
           </Reveal>
         )}
         <UnmodeledPanel m={m} />
-        {m.parlays.length > 0 && (
-          <Reveal>
-            <ParlayGrid parlays={m.parlays} />
-          </Reveal>
-        )}
       </div>
 
       <div className="mt-4 text-[10.5px] text-faint">
         Sources: MLB statsapi (bracket + live counts) · nightly Statcast priors (power model) · the book board from
-        your screenshots (market). The same markets power the Board, Sharp and Builder derby tabs. Derby tickets stay
-        out of the allocator and auto-graded ledger. Informational only, not betting advice.
+        your screenshots (market). Every market is a straight bet — the derby has no parlays; size a Daily + Fun card
+        in the Builder. Derby tickets stay out of the MLB allocator and auto-graded ledger. Informational only, not
+        betting advice.
       </div>
     </>
   );

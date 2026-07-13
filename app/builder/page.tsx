@@ -240,7 +240,7 @@ export default function BuilderPage() {
         title="Builder"
         sub={
           sport === "derby"
-            ? "Home Run Derby — combine any pasted derby markets; combos priced jointly off the tournament sim"
+            ? "Home Run Derby — straight bets only (no parlays); set Daily & Fun to size an exact-sum card from the priced board"
             : sport === "ufc"
             ? "UFC — build any parlay from the card's Caesars moneylines, priced against market consensus"
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
