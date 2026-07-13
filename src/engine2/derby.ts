@@ -792,6 +792,25 @@ export const PARLAYABLE_KINDS = new Set<DerbyLeg["kind"]>([
   "firstSwing",
 ]);
 
+/** The parlay candidate pool. Beyond the kind filter, WINNER legs from the
+    bottom quartile of the market's own winner board are excluded (Josh's
+    rule, 2026-07-13): when the model rates the market's biggest longshots as
+    "value", EV-ranked candidates stack every ticket on the least likely
+    champions. Those legs stay on the edges table as singles — they just
+    never anchor a parlay. Ranking is by the book's own posted price — the
+    market's opinion, deliberately not the model's. */
+export function parlayPool(legs: PricedLeg[]): PricedLeg[] {
+  const winners = legs.filter((l) => l.leg.kind === "winner");
+  const cut = Math.floor(winners.length / 4);
+  const excluded = new Set(
+    [...winners]
+      .sort((a, b) => impliedFromAmerican(a.odds) - impliedFromAmerican(b.odds))
+      .slice(0, cut)
+      .map((l) => l.key),
+  );
+  return legs.filter((l) => PARLAYABLE_KINDS.has(l.leg.kind) && !excluded.has(l.key));
+}
+
 /** Everything the book hangs on the derby, in one typed structure. */
 export type DerbyBook = {
   winner?: WinnerQuote[];

@@ -10,6 +10,7 @@ import {
   priceDerbyLegs,
   derbyParlays,
   devigFieldSum,
+  parlayPool,
   simRound,
   makeRng,
   probOver,
@@ -314,6 +315,23 @@ describe("joint pricing off the draws", () => {
     // r1Total over at a low line ≈ certain, high line ≈ impossible
     expect(evalLegs(draws, [{ kind: "r1Total", line: 10.5, side: "over" }]).p).toBeGreaterThan(0.99);
     expect(evalLegs(draws, [{ kind: "r1Total", line: 200.5, side: "over" }]).p).toBe(0);
+  });
+
+  it("parlayPool drops the market's bottom-quartile winner legs (and exotics)", () => {
+    const legs = priceDerbyLegs(draws, st.hitters, {
+      winner: st.hitters.map((h, i) => ({ id: h.id, odds: 300 + i * 200 })), // 1001 shortest … 1008 longest
+      finalists: [{ aId: 1001, bId: 1002, odds: 600 }],
+      firstSwing: [{ id: 1001, odds: 160 }],
+    });
+    const pool = parlayPool(legs);
+    // 8 winners → quartile cut of 2: the two longest market prices (1007, 1008) are out
+    const winnerIds = pool.filter((l) => l.leg.kind === "winner").map((l) => (l.leg as { id: number }).id);
+    expect(winnerIds).toHaveLength(6);
+    expect(winnerIds).not.toContain(1007);
+    expect(winnerIds).not.toContain(1008);
+    // exotics excluded by kind, parlayable kinds retained
+    expect(pool.some((l) => l.leg.kind === "finalists")).toBe(false);
+    expect(pool.some((l) => l.leg.kind === "firstSwing")).toBe(true);
   });
 
   it("devigFieldSum strips overround to the target sum and refuses partial fields", () => {

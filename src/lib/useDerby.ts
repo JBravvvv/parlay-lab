@@ -20,7 +20,7 @@ import {
   priceDerbyLegs,
   derbyParlays,
   matchHitter,
-  PARLAYABLE_KINDS,
+  parlayPool,
   type DerbyBook,
   type DerbyState,
   type DerbyDraws,
@@ -290,7 +290,9 @@ export function useDerby(): DerbyMarket {
 
   const parlays = useMemo(() => {
     if (!draws) return [];
-    const pool = legs.filter((l) => PARLAYABLE_KINDS.has(l.leg.kind));
+    // kind filter + Josh's rule: no winner legs from the market's bottom
+    // quartile (the least likely champions never anchor a ticket)
+    const pool = parlayPool(legs);
     if (pool.length < 2) return [];
     // wide net: the UI splits book-friendly vs correlated (SGP) groups and
     // slices each — both groups need representation regardless of EV rank
