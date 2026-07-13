@@ -29,8 +29,17 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
+    // React does NOT render the `muted` attribute into server HTML — it only
+    // sets the property after hydration. Browsers that made their autoplay
+    // decision from the parsed HTML saw an UNMUTED video and vetoed it, which
+    // is why playback was intermittent. Set it imperatively before any play().
+    v.muted = true;
+    v.defaultMuted = true;
+
     let raf = 0;
     let replay: ReturnType<typeof setTimeout> | null = null;
+    let stillSeeked = false;
+    const mountedAt = performance.now();
 
     const kick = () => {
       if (v.paused && !v.ended) v.play().catch(() => {});
@@ -46,10 +55,20 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
 
     const tick = () => {
       const d = v.duration;
-      if (isFinite(d) && d > 0 && !v.ended && !v.paused) {
-        const t = v.currentTime;
-        const o = t < 0.5 ? t / 0.5 : d - t < 0.5 ? Math.max(0, (d - t) / 0.5) : 1;
-        v.style.opacity = o.toFixed(3);
+      if (isFinite(d) && d > 0 && !v.ended && v.readyState >= 2) {
+        if (!v.paused) {
+          const t = v.currentTime;
+          const o = t < 0.5 ? t / 0.5 : d - t < 0.5 ? Math.max(0, (d - t) / 0.5) : 1;
+          v.style.opacity = o.toFixed(3);
+        } else if (performance.now() - mountedAt > 1500) {
+          // Autoplay stayed vetoed: show a rich still frame instead of a
+          // blank page (a tap or the retry timer starts motion from here).
+          if (!stillSeeked && v.currentTime < 0.1) {
+            stillSeeked = true;
+            try { v.currentTime = d / 2; } catch { /* seek denied — keep frame 0 */ }
+          }
+          v.style.opacity = "1";
+        }
       }
       raf = requestAnimationFrame(tick);
     };
@@ -69,9 +88,11 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
     window.addEventListener("pointerdown", onFirstTouch);
     window.addEventListener("touchstart", onFirstTouch, { passive: true });
     kick();
+    const retry = setInterval(kick, 4000); // transient stalls / late policy grants
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
+      clearInterval(retry);
       v.removeEventListener("ended", onEnded);
       v.removeEventListener("canplay", kick);
       document.removeEventListener("visibilitychange", onVisible);
