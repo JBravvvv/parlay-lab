@@ -2,9 +2,10 @@
 
 /* Shared Home Run Derby data layer — one hook feeding /derby, the Board tab,
    The Sharp tab and the Builder tab. Bracket + live counts from MLB statsapi,
-   power model from the nightly priors, market prices from the paste stored in
-   localStorage (pl_derbyOdds), sim draws cached module-wide so four surfaces
-   don't re-run 15k tournaments each. */
+   power model from the nightly priors, market prices from the shipped seed
+   (public/model/derby-odds.json — transcribed from the book's full board) with
+   the paste boxes overriding their sections when used. Sim draws cached
+   module-wide so four surfaces don't re-run 15k tournaments each. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getMoney } from "@/lib/engine-client";
@@ -18,6 +19,9 @@ import {
   parseTotalOdds,
   priceDerbyLegs,
   derbyParlays,
+  matchHitter,
+  PARLAYABLE_KINDS,
+  type DerbyBook,
   type DerbyState,
   type DerbyDraws,
   type SimResult,
@@ -27,6 +31,7 @@ import {
   type WinnerQuote,
   type H2HQuote,
   type TotalQuote,
+  type DerbyHitter,
 } from "@/engine2/derby";
 
 const STATS = "https://statsapi.mlb.com/api/v1";
@@ -34,7 +39,36 @@ export const DERBY_SIM_N = 15000;
 const LS_KEY = "pl_derbyOdds";
 
 export type PasteState = { winner: string; h2h: string; totals: string; scope: "event" | "r1" };
-export const EMPTY_PASTE: PasteState = { winner: "", h2h: "", totals: "", scope: "event" };
+export const EMPTY_PASTE: PasteState = { winner: "", h2h: "", totals: "", scope: "r1" };
+
+/* ---- the shipped odds seed (transcribed book board) ---- */
+type SeedNamed = { name: string; odds: number };
+type SeedPair = { a: string; b: string; odds: number };
+export type DerbySeed = {
+  event?: string;
+  captured_at?: string;
+  source?: string;
+  winner?: SeedNamed[];
+  final2?: SeedNamed[];
+  final4?: SeedNamed[];
+  mostR1?: SeedNamed[];
+  finalists?: SeedPair[];
+  exacta?: { win: string; lose: string; odds: number }[];
+  h2h?: { a: string; b: string; aOdds: number; bOdds: number }[];
+  playerR1?: { name: string; line: number; over: number | null; under: number | null }[];
+  r1Total?: { line: number; over: number | null; under: number | null };
+  eventTotal?: { line: number; over: number | null; under: number | null };
+  comboR1?: { a: string; b: string; line: number; over: number }[];
+  allR1AtLeast?: { n: number; odds: number }[];
+  firstSwing?: SeedNamed[];
+  unmodeled?: {
+    longestHrPlayer?: SeedNamed[];
+    highestExitVelo?: SeedNamed[];
+    longestHrDistance?: { line: number; over: number; under: number };
+    any520Plus?: { odds: number };
+    boosts?: { label: string; odds: number; base?: number; warn?: string }[];
+  };
+};
 
 /* one sim per model-input signature, shared across surfaces/navigations */
 let drawsCache: { key: string; draws: DerbyDraws } | null = null;
@@ -57,10 +91,58 @@ export type DerbyMarket = {
   parlays: DerbyParlay[];
   bankroll: number;
   anyOdds: boolean;
+  seed: DerbySeed | null;
 };
+
+/** Resolve a seed's last names against the live field. Unresolvable names are
+    dropped (never guessed). */
+function seedToBook(seed: DerbySeed, hitters: DerbyHitter[]): DerbyBook {
+  const id = (n: string) => matchHitter(n, hitters)?.id ?? null;
+  const named = (xs?: SeedNamed[]): WinnerQuote[] =>
+    (xs ?? []).flatMap((q) => {
+      const i = id(q.name);
+      return i ? [{ id: i, odds: q.odds }] : [];
+    });
+  return {
+    winner: named(seed.winner),
+    final2: named(seed.final2),
+    final4: named(seed.final4),
+    mostR1: named(seed.mostR1),
+    firstSwing: named(seed.firstSwing),
+    finalists: (seed.finalists ?? []).flatMap((q) => {
+      const a = id(q.a);
+      const b = id(q.b);
+      return a && b ? [{ aId: a, bId: b, odds: q.odds }] : [];
+    }),
+    exacta: (seed.exacta ?? []).flatMap((q) => {
+      const w = id(q.win);
+      const l = id(q.lose);
+      return w && l ? [{ winId: w, loseId: l, odds: q.odds }] : [];
+    }),
+    h2h: (seed.h2h ?? []).flatMap((q) => {
+      const a = id(q.a);
+      const b = id(q.b);
+      return a && b ? [{ aId: a, bId: b, aOdds: q.aOdds, bOdds: q.bOdds }] : [];
+    }),
+    totals: (seed.playerR1 ?? []).flatMap((q) => {
+      const i = id(q.name);
+      return i ? [{ id: i, line: q.line, overOdds: q.over, underOdds: q.under }] : [];
+    }),
+    totalsScope: "r1",
+    r1Total: seed.r1Total,
+    eventTotal: seed.eventTotal,
+    comboR1: (seed.comboR1 ?? []).flatMap((q) => {
+      const a = id(q.a);
+      const b = id(q.b);
+      return a && b ? [{ aId: a, bId: b, line: q.line, over: q.over }] : [];
+    }),
+    allR1AtLeast: seed.allR1AtLeast,
+  };
+}
 
 export function useDerby(): DerbyMarket {
   const [data, setData] = useState<{ state: DerbyState } | null>(null);
+  const [seed, setSeed] = useState<DerbySeed | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const eventIdRef = useRef<number | null>(null);
@@ -116,8 +198,9 @@ export function useDerby(): DerbyMarket {
     async function load() {
       try {
         if (!priorsRef.current) {
-          const pr = await fetch("/model/priors.json");
+          const [pr, sd] = await Promise.all([fetch("/model/priors.json"), fetch("/model/derby-odds.json")]);
           priorsRef.current = pr.ok ? ((await pr.json()) as { batters?: Record<string, PriorsBatter> }).batters ?? {} : {};
+          if (sd.ok && !dead) setSeed((await sd.json()) as DerbySeed);
         }
         const id = await findEventId();
         if (dead) return;
@@ -192,21 +275,26 @@ export function useDerby(): DerbyMarket {
 
   const legs = useMemo(() => {
     if (!state || !draws) return [];
-    return priceDerbyLegs(
-      draws,
-      state.hitters,
-      { winner: parsed.winner.quotes, h2h: parsed.h2h.quotes, totals: parsed.totals.quotes },
-      paste.scope,
-    );
-  }, [state, draws, parsed, paste.scope]);
+    const book: DerbyBook = seed ? seedToBook(seed, state.hitters) : {};
+    // fresh paste overrides its seed section (prices move all day)
+    if (parsed.winner.quotes.length) book.winner = parsed.winner.quotes;
+    if (parsed.h2h.quotes.length) book.h2h = parsed.h2h.quotes;
+    if (parsed.totals.quotes.length) {
+      book.totals = parsed.totals.quotes;
+      book.totalsScope = paste.scope === "r1" ? "r1" : "event";
+    }
+    return priceDerbyLegs(draws, state.hitters, book);
+  }, [state, draws, seed, parsed, paste.scope]);
 
   const bankroll = mounted ? getMoney().bankroll : 750;
 
   const parlays = useMemo(() => {
-    if (!draws || legs.length < 2) return [];
+    if (!draws) return [];
+    const pool = legs.filter((l) => PARLAYABLE_KINDS.has(l.leg.kind));
+    if (pool.length < 2) return [];
     // wide net: the UI splits book-friendly vs correlated (SGP) groups and
     // slices each — both groups need representation regardless of EV rank
-    return derbyParlays(draws, legs, { bankroll, top: 200 });
+    return derbyParlays(draws, pool, { bankroll, top: 200 });
   }, [draws, legs, bankroll]);
 
   return {
@@ -223,5 +311,6 @@ export function useDerby(): DerbyMarket {
     parlays,
     bankroll,
     anyOdds: legs.length > 0,
+    seed,
   };
 }

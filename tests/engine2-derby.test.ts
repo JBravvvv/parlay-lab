@@ -9,6 +9,7 @@ import {
   evalLegs,
   priceDerbyLegs,
   derbyParlays,
+  devigFieldSum,
   simRound,
   makeRng,
   probOver,
@@ -249,7 +250,7 @@ describe("joint pricing off the draws", () => {
 
   it("priceDerbyLegs + derbyParlays produce coherent, sorted output", () => {
     const hitters = st.hitters;
-    const parsed = {
+    const legs = priceDerbyLegs(draws, hitters, {
       winner: [
         { id: 1001, odds: 330 },
         { id: 1007, odds: 500 },
@@ -258,13 +259,14 @@ describe("joint pricing off the draws", () => {
       ],
       h2h: [{ aId: 1001, bId: 1008, aOdds: -140, bOdds: 120 }],
       totals: [{ id: 1001, line: 15.5, overOdds: -115, underOdds: -105 }],
-    };
-    const legs = priceDerbyLegs(draws, hitters, parsed, "event");
+      totalsScope: "event",
+    });
     expect(legs.length).toBe(8); // 4 winners + 2 h2h sides + 2 total sides
     for (let i = 1; i < legs.length; i++) expect(legs[i - 1].ev).toBeGreaterThanOrEqual(legs[i].ev);
     for (const l of legs) {
       expect(l.blend).toBeGreaterThan(0);
       expect(l.blend).toBeLessThan(1);
+      expect(l.group).toBeTruthy();
     }
     const parlays = derbyParlays(draws, legs, { bankroll: 750, top: 10 });
     expect(parlays.length).toBeGreaterThan(0);
@@ -278,6 +280,52 @@ describe("joint pricing off the draws", () => {
       expect(p.dec).toBeGreaterThan(1);
     }
     for (let i = 1; i < parlays.length; i++) expect(parlays[i - 1].ev).toBeGreaterThanOrEqual(parlays[i].ev);
+  });
+
+  it("book-wide leg kinds evaluate coherently", () => {
+    // finalists = joint of two final legs
+    const fp = evalLegs(draws, [{ kind: "finalists", aId: 1001, bId: 1007 }]).p;
+    const jointFinals = evalLegs(draws, [
+      { kind: "final", id: 1001 },
+      { kind: "final", id: 1007 },
+    ]).p;
+    expect(fp).toBeCloseTo(jointFinals, 10);
+    // exacta ⊂ winner
+    const ex = evalLegs(draws, [{ kind: "exacta", winId: 1001, loseId: 1007 }]).p;
+    const win = evalLegs(draws, [{ kind: "winner", id: 1001 }]).p;
+    expect(ex).toBeGreaterThan(0);
+    expect(ex).toBeLessThan(win);
+    // mostR1 probs (strict, ties push) sum to ≤ 1 across the field
+    const most = st.hitters.map((h) => evalLegs(draws, [{ kind: "mostR1", id: h.id }]).p);
+    expect(most.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(1.0001);
+    expect(Math.max(...most)).toBeGreaterThan(0.1);
+    // allR1AtLeast is monotone decreasing in n
+    const a5 = evalLegs(draws, [{ kind: "allR1AtLeast", n: 5 }]).p;
+    const a7 = evalLegs(draws, [{ kind: "allR1AtLeast", n: 7 }]).p;
+    expect(a5).toBeGreaterThan(a7);
+    // comboR1 over+under complement (push-excluded)
+    const co = evalLegs(draws, [{ kind: "comboR1", aId: 1001, bId: 1007, line: 19.5, side: "over" }]).p;
+    const cu = evalLegs(draws, [{ kind: "comboR1", aId: 1001, bId: 1007, line: 19.5, side: "under" }]).p;
+    expect(co + cu).toBeCloseTo(1, 6);
+    // firstSwing marginal ≈ the hitter's HR/swing rate
+    const idx = draws.ids.indexOf(1001);
+    const fs = evalLegs(draws, [{ kind: "firstSwing", id: 1001 }]).p;
+    expect(Math.abs(fs - draws.rates[idx])).toBeLessThan(0.02);
+    // r1Total over at a low line ≈ certain, high line ≈ impossible
+    expect(evalLegs(draws, [{ kind: "r1Total", line: 10.5, side: "over" }]).p).toBeGreaterThan(0.99);
+    expect(evalLegs(draws, [{ kind: "r1Total", line: 200.5, side: "over" }]).p).toBe(0);
+  });
+
+  it("devigFieldSum strips overround to the target sum and refuses partial fields", () => {
+    const imps = [0.4, 0.3, 0.25, 0.2, 0.15, 0.1, 0.08, 0.07]; // sums 1.55
+    const fair1 = devigFieldSum(imps, 1)!;
+    expect(fair1.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
+    expect(fair1[0]).toBeGreaterThan(fair1[7]);
+    const imps2 = [0.6, 0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2]; // sums 3.05 → S=2 field ok? no wait
+    const fair2 = devigFieldSum(imps2, 2)!;
+    expect(fair2.reduce((a, b) => a + b, 0)).toBeCloseTo(2, 6);
+    // booksum below target = incomplete capture → no fair claimed
+    expect(devigFieldSum([0.3, 0.3], 1)).toBeNull();
   });
 });
 

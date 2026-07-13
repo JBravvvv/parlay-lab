@@ -209,11 +209,12 @@ const PCT_W: [string, number][] = [
   ["hard_hit_percent", 0.15],
 ];
 
-/* Base derby HR-per-swing for a league-average (50th pct) hitter, scaled
-   linearly by the percentile blend. New format ⇒ no history; 0.27 puts an
-   elite field's R1 mean around 7–8 HRs on 20 swings, in line with what
-   swing-limited BP rates suggest. Bounds keep degenerate priors sane. */
-const BASE_HR_PER_SWING = 0.27;
+/* HR-per-swing mapping, CALIBRATED TO THE MARKET'S SCALE (2026-07-13, the
+   posted board): player R1 lines 7.5–10.5 on 20 swings and R1/derby totals of
+   73.5/117.5 imply grooved-BP HR rates around 0.36–0.48 per swing — roughly
+   3× game rates and far above the first conservative guess. The absolute
+   level comes from the market; the ORDERING stays pure Statcast (the model's
+   real opinion). 50th pct → 0.285, 99th → 0.457. */
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
 export function powerFromPriors(b: PriorsBatter | null | undefined): {
@@ -234,13 +235,12 @@ export function powerFromPriors(b: PriorsBatter | null | undefined): {
     }
   }
   const pctPower = wsum > 0 ? sum / wsum : null;
-  // 50th pct → 1.0; the mapping is deliberately steep so elite raw power
-  // separates inside an all-elite field.
+  // relative raw-power multiplier (tie-break proxy); 50th pct → 1.0
   const powerFactor = pctPower == null ? 1 : 0.55 + 0.9 * (pctPower / 100);
   return {
     pctPower,
     powerFactor,
-    hrPerSwing: clamp(BASE_HR_PER_SWING * powerFactor, 0.14, 0.46),
+    hrPerSwing: clamp(0.11 + 0.35 * ((pctPower ?? 50) / 100), 0.18, 0.5),
   };
 }
 
@@ -287,19 +287,28 @@ const gauss = (rng: () => number) =>
   rng() + rng() + rng() + rng() + rng() + rng() + rng() + rng() + rng() + rng() + rng() + rng() - 6;
 
 /** One round: n scheduled swings; a HR on the last scheduled swing extends
-    the round until the first miss (the 2026 bonus rule). */
-export function simRound(p: number, swings: number, rng: () => number): number {
+    the round until the first miss (the 2026 bonus rule). Also reports the
+    first-swing result — the book hangs "first swing is a HR" props. */
+function simRoundFS(p: number, swings: number, rng: () => number): { hr: number; first: boolean } {
   let hr = 0;
   let last = false;
+  let first = false;
   for (let i = 0; i < swings; i++) {
     last = rng() < p;
-    if (last) hr++;
+    if (last) {
+      hr++;
+      if (i === 0) first = true;
+    }
   }
   while (last) {
     last = rng() < p;
     if (last) hr++;
   }
-  return hr;
+  return { hr, first };
+}
+
+export function simRound(p: number, swings: number, rng: () => number): number {
+  return simRoundFS(p, swings, rng).hr;
 }
 
 /** Head-to-head with 3-swing swing-offs until settled. */
@@ -327,7 +336,9 @@ const FORM_SIGMA = 0.16;
 export type DerbyDraws = {
   n: number;
   ids: number[]; // hitter ids by column index
+  rates: number[]; // hrPerSwing by column (analytic props, diagnostics)
   r1: Uint8Array; // [sim * k + col] round-1 HRs
+  fs: Uint8Array; // 1 = first R1 swing was a HR
   evt: Uint16Array; // total HRs across rounds hit (swing-offs excluded)
   top4: Uint8Array; // 1 = advanced from the pool
   final2: Uint8Array; // 1 = reached the final
@@ -349,7 +360,9 @@ export function simDerbyDraws(
   const d: DerbyDraws = {
     n,
     ids: hitters.map((h) => h.id),
+    rates: hitters.map((h) => h.hrPerSwing),
     r1: new Uint8Array(n * k),
+    fs: new Uint8Array(n * k),
     evt: new Uint16Array(n * k),
     top4: new Uint8Array(n * k),
     final2: new Uint8Array(n * k),
@@ -363,7 +376,12 @@ export function simDerbyDraws(
     const evt = new Array(k).fill(0);
 
     // ---- round 1: single pool, top 4 advance
-    const r1 = hitters.map((_, i) => simRound(p[i], swingsR1, rng));
+    const r1: number[] = [];
+    for (let i = 0; i < k; i++) {
+      const rr = simRoundFS(p[i], swingsR1, rng);
+      r1.push(rr.hr);
+      if (rr.first) d.fs[base + i] = 1;
+    }
     for (let i = 0; i < k; i++) {
       d.r1[base + i] = Math.min(r1[i], 255);
       evt[i] += r1[i];
@@ -509,6 +527,26 @@ export function devigField(quotes: { id: number; odds: number }[]): Map<number, 
   return new Map(quotes.map((q, i) => [q.id, fair[i]]));
 }
 
+/** Power-devig a field whose fair probabilities sum to S (S=2 for "reach the
+    final", S=4 for "top 4", S=1 for one-winner fields): find λ ≥ 1 with
+    Σ p_i^λ = S. Returns null when the field carries no overround (partial
+    capture) — no vig to strip means no fair to claim. */
+export function devigFieldSum(imps: number[], S: number): number[] | null {
+  if (imps.some((p) => !(p > 0 && p < 1))) return null;
+  const f = (lam: number) => imps.reduce((a, p) => a + Math.pow(p, lam), 0) - S;
+  if (f(1) <= 0) return null; // booksum ≤ S: incomplete field, don't pretend
+  let lo = 1;
+  let hi = 1;
+  while (f(hi) > 0 && hi < 200) hi *= 2;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  const lam = (lo + hi) / 2;
+  return imps.map((p) => Math.pow(p, lam));
+}
+
 /* ----------------------------------------------------------- odds paste */
 
 const normalize = (s: string) =>
@@ -634,8 +672,16 @@ export type DerbyLeg =
   | { kind: "winner"; id: number }
   | { kind: "final"; id: number } // reaches the final
   | { kind: "advance"; id: number } // top-4 out of the pool
-  | { kind: "h2h"; aId: number; bId: number; pick: "a" | "b" } // R1 pairing, graded on R1 totals
-  | { kind: "total"; id: number; scope: "r1" | "event"; line: number; side: "over" | "under" };
+  | { kind: "h2h"; aId: number; bId: number; pick: "a" | "b" } // any R1 pairing, graded on R1 totals
+  | { kind: "total"; id: number; scope: "r1" | "event"; line: number; side: "over" | "under" }
+  | { kind: "finalists"; aId: number; bId: number } // both reach the final
+  | { kind: "exacta"; winId: number; loseId: number } // winId champs, loseId runner-up
+  | { kind: "mostR1"; id: number } // strict R1 max; tied max = push (≈ dead-heat rules)
+  | { kind: "r1Total"; line: number; side: "over" | "under" } // all 8, round 1
+  | { kind: "eventTotal"; line: number; side: "over" | "under" } // all 8, all rounds
+  | { kind: "comboR1"; aId: number; bId: number; line: number; side: "over" | "under" } // duo R1 sum
+  | { kind: "allR1AtLeast"; n: number } // EVERY player hits ≥ n in R1
+  | { kind: "firstSwing"; id: number }; // first R1 swing is a HR
 
 /** 1 = leg wins in this sim, 0 = loses, -1 = pushes (H2H tie / exact integer line). */
 function legResult(d: DerbyDraws, s: number, leg: DerbyLeg, col: Map<number, number>): 1 | 0 | -1 {
@@ -659,6 +705,43 @@ function legResult(d: DerbyDraws, s: number, leg: DerbyLeg, col: Map<number, num
       if (v === leg.line) return -1;
       return (v > leg.line) === (leg.side === "over") ? 1 : 0;
     }
+    case "finalists":
+      return d.final2[base + (col.get(leg.aId) ?? -1)] && d.final2[base + (col.get(leg.bId) ?? -1)] ? 1 : 0;
+    case "exacta":
+      return d.champ[s] === col.get(leg.winId) && d.final2[base + (col.get(leg.loseId) ?? -1)] ? 1 : 0;
+    case "mostR1": {
+      const me = d.r1[base + (col.get(leg.id) ?? -1)];
+      let max = 0;
+      let ties = 0;
+      for (let i = 0; i < k; i++) {
+        const v = d.r1[base + i];
+        if (v > max) {
+          max = v;
+          ties = 1;
+        } else if (v === max) ties++;
+      }
+      if (me < max) return 0;
+      return ties === 1 ? 1 : -1; // shared max → push (book: dead-heat reduction)
+    }
+    case "r1Total":
+    case "eventTotal": {
+      const arr = leg.kind === "r1Total" ? d.r1 : d.evt;
+      let sum = 0;
+      for (let i = 0; i < k; i++) sum += arr[base + i];
+      if (sum === leg.line) return -1;
+      return (sum > leg.line) === (leg.side === "over") ? 1 : 0;
+    }
+    case "comboR1": {
+      const sum = d.r1[base + (col.get(leg.aId) ?? -1)] + d.r1[base + (col.get(leg.bId) ?? -1)];
+      if (sum === leg.line) return -1;
+      return (sum > leg.line) === (leg.side === "over") ? 1 : 0;
+    }
+    case "allR1AtLeast": {
+      for (let i = 0; i < k; i++) if (d.r1[base + i] < leg.n) return 0;
+      return 1;
+    }
+    case "firstSwing":
+      return d.fs[base + (col.get(leg.id) ?? -1)] ? 1 : 0;
   }
 }
 
@@ -686,49 +769,135 @@ export function evalLegs(d: DerbyDraws, legs: DerbyLeg[]): { p: number; pushRate
 export type PricedLeg = {
   key: string;
   leg: DerbyLeg;
-  label: string; // hitter (or "A vs B")
+  group: string; // market family, for grouped display
+  label: string; // hitter (or "A & B")
   prop: string; // market description
-  odds: number; // pasted book price
+  odds: number; // book price
   model: number;
   market: number | null; // de-vigged, when the field/both sides exist
   blend: number;
-  ev: number; // at the pasted price, on the blend
+  ev: number; // at the book price, on the blend
 };
 
-/** Turn the three paste results into a unified priced-leg list. */
-export function priceDerbyLegs(
-  d: DerbyDraws,
-  hitters: DerbyHitter[],
-  parsed: { winner: WinnerQuote[]; h2h: H2HQuote[]; totals: TotalQuote[] },
-  totalsScope: "r1" | "event",
-): PricedLeg[] {
+/* Leg kinds safe to multiply into parlays at book odds. The exotic fields
+   (exacta, finalists, most-R1, all-player specials) are already parlay-shaped
+   or dead-heat-ruled — they stay out of the combo generator. */
+export const PARLAYABLE_KINDS = new Set<DerbyLeg["kind"]>([
+  "winner",
+  "final",
+  "advance",
+  "h2h",
+  "total",
+  "comboR1",
+  "firstSwing",
+]);
+
+/** Everything the book hangs on the derby, in one typed structure. */
+export type DerbyBook = {
+  winner?: WinnerQuote[];
+  final2?: WinnerQuote[]; // to reach the final (fair sums to 2)
+  final4?: WinnerQuote[]; // to make the top 4 (fair sums to 4)
+  mostR1?: WinnerQuote[]; // most R1 HRs (dead-heat field, sums to 1)
+  finalists?: { aId: number; bId: number; odds: number }[]; // exact final pair
+  exacta?: { winId: number; loseId: number; odds: number }[]; // champ + runner-up
+  h2h?: H2HQuote[]; // R1 more-HRs pairings
+  totals?: TotalQuote[]; // player totals at `totalsScope`
+  totalsScope?: "r1" | "event";
+  r1Total?: { line: number; over: number | null; under: number | null };
+  eventTotal?: { line: number; over: number | null; under: number | null };
+  comboR1?: { aId: number; bId: number; line: number; over: number }[]; // duo "N+" combos
+  allR1AtLeast?: { n: number; odds: number }[]; // every player ≥ n in R1
+  firstSwing?: WinnerQuote[]; // first swing is a HR
+};
+
+/** Price every book market against the draws. */
+export function priceDerbyLegs(d: DerbyDraws, hitters: DerbyHitter[], book: DerbyBook): PricedLeg[] {
   const nm = new Map(hitters.map((h) => [h.id, h.name]));
   const short = (id: number) => lastName(nm.get(id) ?? `#${id}`);
   const legs: PricedLeg[] = [];
-  const add = (key: string, leg: DerbyLeg, label: string, prop: string, odds: number, market: number | null) => {
+  const add = (key: string, leg: DerbyLeg, group: string, label: string, prop: string, odds: number, market: number | null) => {
     const model = evalLegs(d, [leg]).p;
-    const blend = blendProb(model, market);
-    legs.push({ key, leg, label, prop, odds, model, market, blend, ev: evAtAmerican(blend, odds) });
+    // One-sided markets (no opposite price to de-vig) still get anchored —
+    // to the RAW book-implied probability, vig included. Without this the
+    // model runs unopposed exactly where its assumptions are shakiest
+    // (first-swing cold starts, exotic combos) and prints fantasy EV.
+    const anchor = market ?? impliedFromAmerican(odds);
+    const blend = blendProb(model, anchor);
+    legs.push({ key, leg, group, label, prop, odds, model, market, blend, ev: evAtAmerican(blend, odds) });
   };
 
-  const winnerFair = parsed.winner.length >= 3 ? devigField(parsed.winner) : null;
-  for (const q of parsed.winner)
-    add(`w:${q.id}`, { kind: "winner", id: q.id }, nm.get(q.id) ?? `#${q.id}`, "wins the Derby", q.odds, winnerFair?.get(q.id) ?? null);
+  /* n-way fields: winner (S=1), reach final (S=2), top 4 (S=4), most R1 (S=1) */
+  const fields: [WinnerQuote[] | undefined, number, string, string, (id: number) => DerbyLeg, string][] = [
+    [book.winner, 1, "w", "Winner", (id) => ({ kind: "winner", id }), "wins the Derby"],
+    [book.final2, 2, "f2", "Reach the final", (id) => ({ kind: "final", id }), "reaches the final"],
+    [book.final4, 4, "f4", "Make the top 4", (id) => ({ kind: "advance", id }), "makes the top 4"],
+    [book.mostR1, 1, "m1", "Most R1 HRs", (id) => ({ kind: "mostR1", id }), "most R1 HRs (ties push)"],
+  ];
+  for (const [quotes, S, tag, group, mk, prop] of fields) {
+    if (!quotes?.length) continue;
+    const fair = quotes.length >= 4 ? devigFieldSum(quotes.map((q) => impliedFromAmerican(q.odds)), S) : null;
+    quotes.forEach((q, i) => add(`${tag}:${q.id}`, mk(q.id), group, nm.get(q.id) ?? `#${q.id}`, prop, q.odds, fair?.[i] ?? null));
+  }
 
-  for (const q of parsed.h2h) {
+  /* exact final pair — one-winner field over the captured pairs */
+  if (book.finalists?.length) {
+    const fair = devigFieldSum(book.finalists.map((q) => impliedFromAmerican(q.odds)), 1);
+    book.finalists.forEach((q, i) =>
+      add(`fp:${q.aId}-${q.bId}`, { kind: "finalists", aId: q.aId, bId: q.bId }, "Finalists", `${short(q.aId)} & ${short(q.bId)}`, "both reach the final", q.odds, fair?.[i] ?? null),
+    );
+  }
+
+  /* exacta — champ + runner-up, one-winner field */
+  if (book.exacta?.length) {
+    const fair = devigFieldSum(book.exacta.map((q) => impliedFromAmerican(q.odds)), 1);
+    book.exacta.forEach((q, i) =>
+      add(`x:${q.winId}>${q.loseId}`, { kind: "exacta", winId: q.winId, loseId: q.loseId }, "Exacta", short(q.winId), `beats ${short(q.loseId)} in the final`, q.odds, fair?.[i] ?? null),
+    );
+  }
+
+  for (const q of book.h2h ?? []) {
     const mkt = fairTwoWay(q.aOdds, q.bOdds);
-    add(`h:${q.aId}>${q.bId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "a" }, nm.get(q.aId) ?? "", `beats ${short(q.bId)} (R1)`, q.aOdds, mkt?.a ?? null);
-    add(`h:${q.bId}>${q.aId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "b" }, nm.get(q.bId) ?? "", `beats ${short(q.aId)} (R1)`, q.bOdds, mkt?.b ?? null);
+    add(`h:${q.aId}>${q.bId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "a" }, "R1 head-to-head", nm.get(q.aId) ?? "", `more R1 HRs than ${short(q.bId)}`, q.aOdds, mkt?.a ?? null);
+    add(`h:${q.bId}>${q.aId}`, { kind: "h2h", aId: q.aId, bId: q.bId, pick: "b" }, "R1 head-to-head", nm.get(q.bId) ?? "", `more R1 HRs than ${short(q.aId)}`, q.bOdds, mkt?.b ?? null);
   }
 
-  for (const q of parsed.totals) {
+  const scope = book.totalsScope ?? "r1";
+  const scopeTag = scope === "r1" ? "R1" : "Derby";
+  for (const q of book.totals ?? []) {
     const mkt = fairTwoWay(q.overOdds, q.underOdds);
-    const scopeTag = totalsScope === "r1" ? "R1" : "Derby";
     if (q.overOdds != null)
-      add(`t:${q.id}:${q.line}:o`, { kind: "total", id: q.id, scope: totalsScope, line: q.line, side: "over" }, nm.get(q.id) ?? "", `Over ${q.line} HRs (${scopeTag})`, q.overOdds, mkt?.a ?? null);
+      add(`t:${q.id}:${q.line}:o`, { kind: "total", id: q.id, scope, line: q.line, side: "over" }, "Player HR totals", nm.get(q.id) ?? "", `Over ${q.line} HRs (${scopeTag})`, q.overOdds, mkt?.a ?? null);
     if (q.underOdds != null)
-      add(`t:${q.id}:${q.line}:u`, { kind: "total", id: q.id, scope: totalsScope, line: q.line, side: "under" }, nm.get(q.id) ?? "", `Under ${q.line} HRs (${scopeTag})`, q.underOdds, mkt?.b ?? null);
+      add(`t:${q.id}:${q.line}:u`, { kind: "total", id: q.id, scope, line: q.line, side: "under" }, "Player HR totals", nm.get(q.id) ?? "", `Under ${q.line} HRs (${scopeTag})`, q.underOdds, mkt?.b ?? null);
   }
+
+  const evTotals: [DerbyBook["r1Total"], "r1Total" | "eventTotal", string][] = [
+    [book.r1Total, "r1Total", "Total R1 HRs (all 8)"],
+    [book.eventTotal, "eventTotal", "Total derby HRs (all 8)"],
+  ];
+  for (const [q, kind, label] of evTotals) {
+    if (!q) continue;
+    const mkt = fairTwoWay(q.over, q.under);
+    if (q.over != null) add(`${kind}:o`, { kind, line: q.line, side: "over" }, "Derby totals", label, `Over ${q.line}`, q.over, mkt?.a ?? null);
+    if (q.under != null) add(`${kind}:u`, { kind, line: q.line, side: "under" }, "Derby totals", label, `Under ${q.line}`, q.under, mkt?.b ?? null);
+  }
+
+  for (const q of book.comboR1 ?? [])
+    add(
+      `c:${q.aId}+${q.bId}:${q.line}`,
+      { kind: "comboR1", aId: q.aId, bId: q.bId, line: q.line, side: "over" },
+      "R1 duos",
+      `${short(q.aId)} & ${short(q.bId)}`,
+      `combine for ${Math.ceil(q.line)}+ R1 HRs`,
+      q.over,
+      null, // one-sided — no de-vig
+    );
+
+  for (const q of book.allR1AtLeast ?? [])
+    add(`all:${q.n}`, { kind: "allR1AtLeast", n: q.n }, "Field specials", "Every player", `records ${q.n}+ R1 HRs`, q.odds, null);
+
+  for (const q of book.firstSwing ?? [])
+    add(`fsw:${q.id}`, { kind: "firstSwing", id: q.id }, "First swing", nm.get(q.id) ?? `#${q.id}`, "first swing is a HR", q.odds, null);
 
   return legs.sort((a, b) => b.ev - a.ev);
 }

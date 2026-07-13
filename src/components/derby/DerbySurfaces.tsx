@@ -21,9 +21,11 @@ import {
   quarterKelly,
   lastName,
   priceDerbyCombo,
+  devigFieldSum,
   type PricedLeg,
   type DerbyParlay,
 } from "@/engine2/derby";
+import { impliedFromAmerican } from "@/engine2/devig";
 
 const fmtAm = (a: number | null | undefined) => (a == null ? "—" : a > 0 ? `+${a}` : `${a}`);
 const fmtP = (p: number | null | undefined, dp = 1) => (p == null ? "—" : `${(p * 100).toFixed(dp)}%`);
@@ -182,6 +184,128 @@ export function DerbyEdgeTable({ legs, bankroll }: { legs: PricedLeg[]; bankroll
   );
 }
 
+/* canonical market-family order for the grouped board */
+const GROUP_ORDER = [
+  "Winner",
+  "Reach the final",
+  "Make the top 4",
+  "R1 head-to-head",
+  "Player HR totals",
+  "Derby totals",
+  "R1 duos",
+  "Field specials",
+  "First swing",
+  "Most R1 HRs",
+  "Finalists",
+  "Exacta",
+];
+
+export function GroupedEdges({ legs, bankroll }: { legs: PricedLeg[]; bankroll: number }) {
+  const groups = new Map<string, PricedLeg[]>();
+  for (const l of legs) (groups.get(l.group) ?? groups.set(l.group, []).get(l.group)!).push(l);
+  const ordered = [...groups.entries()].sort(
+    (a, b) => (GROUP_ORDER.indexOf(a[0]) + 100) % 200 - (GROUP_ORDER.indexOf(b[0]) + 100) % 200,
+  );
+  return (
+    <div className="space-y-2">
+      {ordered.map(([name, ls], i) => (
+        <details key={name} className="glass px-5 py-3.5" open={i < 3}>
+          <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+            {name} <span className="num text-[10px] text-faint">{ls.length}</span>
+            {ls.some((l) => l.ev > 0.01) && <span className="ml-2 text-pos">● edge</span>}
+          </summary>
+          <div className="mt-2">
+            <DerbyEdgeTable legs={ls} bankroll={bankroll} />
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+export function SeedStamp({ m }: { m: DerbyMarket }) {
+  if (!m.seed?.captured_at) return null;
+  const t = new Date(m.seed.captured_at);
+  return (
+    <div className="rounded-(--radius-panel) border border-gold/25 bg-gold/[0.06] px-4 py-2.5 text-[11.5px] text-muted">
+      Book board loaded from your screenshots, captured{" "}
+      <span className="text-gold">
+        {isFinite(t.getTime()) ? t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : m.seed.captured_at}
+      </span>{" "}
+      — prices move all day, so re-check the app at lock. Pasting fresh winner/matchup/total prices overrides the
+      seeded ones.
+    </div>
+  );
+}
+
+export function UnmodeledPanel({ m }: { m: DerbyMarket }) {
+  const u = m.seed?.unmodeled;
+  if (!u) return null;
+  const field = (xs: { name: string; odds: number }[] | undefined) => {
+    if (!xs?.length) return null;
+    const fair = devigFieldSum(xs.map((q) => impliedFromAmerican(q.odds)), 1);
+    return xs.map((q, i) => ({ ...q, fair: fair?.[i] ?? null }));
+  };
+  const longest = field(u.longestHrPlayer);
+  const ev = field(u.highestExitVelo);
+  return (
+    <details className="glass px-5 py-3.5">
+      <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
+        Distance & exit-velo props — market only, the sim doesn&apos;t model these
+      </summary>
+      <div className="mt-3 grid gap-4 text-[12px] md:grid-cols-2">
+        {longest && (
+          <div>
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Longest HR</div>
+            {longest.map((q) => (
+              <div key={q.name} className="num flex justify-between border-t border-white/[0.04] py-1.5">
+                <span className="font-sans text-text">{q.name}</span>
+                <span>
+                  <span className="text-gold">{fmtAm(q.odds)}</span>{" "}
+                  <span className="text-faint">fair {fmtP(q.fair)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        {ev && (
+          <div>
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Highest exit velo</div>
+            {ev.map((q) => (
+              <div key={q.name} className="num flex justify-between border-t border-white/[0.04] py-1.5">
+                <span className="font-sans text-text">{q.name}</span>
+                <span>
+                  <span className="text-gold">{fmtAm(q.odds)}</span>{" "}
+                  <span className="text-faint">fair {fmtP(q.fair)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="num mt-3 space-y-1 text-[11.5px] text-muted">
+        {u.longestHrDistance && (
+          <div>
+            Longest HR distance O/U {u.longestHrDistance.line} ft: O {fmtAm(u.longestHrDistance.over)} / U{" "}
+            {fmtAm(u.longestHrDistance.under)}
+          </div>
+        )}
+        {u.any520Plus && <div>Any player hits a 520+ ft HR: {fmtAm(u.any520Plus.odds)}</div>}
+        {u.boosts?.map((b) => (
+          <div key={b.label}>
+            Boost: {b.label} {fmtAm(b.odds)}
+            {b.base != null && <span className="text-faint"> (open field price {fmtAm(b.base)})</span>}
+            {b.warn && <span className="text-neg"> — {b.warn}</span>}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 text-[10.5px] text-faint">
+        &quot;Fair&quot; here is only the de-vigged market — no model opinion exists for distance or exit velo.
+      </div>
+    </details>
+  );
+}
+
 /* ----------------------------------------------------------- parlay card */
 
 /** Combos whose legs move together get repriced (or refused) by the book as
@@ -324,27 +448,37 @@ export function DerbyBoardTab() {
       {(m) => (
         <div className="space-y-4">
           <EventLine m={m} />
+          <SeedStamp m={m} />
           <PastePanel m={m} />
-          <Reveal>
-            <Panel title={`Derby edges · ${m.legs.length} priced markets`}>
-              {m.legs.length ? (
-                <DerbyEdgeTable legs={m.legs} bankroll={m.bankroll} />
-              ) : (
-                <EmptyState
-                  title="No derby odds loaded"
-                  body="Paste the book's winner board, matchups or HR totals above — every market gets de-vigged and priced against the 15,000-tournament sim."
-                />
-              )}
+          {m.legs.length > 0 && (
+            <Reveal>
+              <Panel title={`Top edges · best of ${m.legs.length} priced markets`}>
+                <DerbyEdgeTable legs={m.legs.slice(0, 10)} bankroll={m.bankroll} />
+              </Panel>
+            </Reveal>
+          )}
+          {m.legs.length > 0 ? (
+            <Reveal>
+              <GroupedEdges legs={m.legs} bankroll={m.bankroll} />
+            </Reveal>
+          ) : (
+            <Panel>
+              <EmptyState
+                title="No derby odds loaded"
+                body="Paste the book's winner board, matchups or HR totals above — every market gets de-vigged and priced against the 15,000-tournament sim."
+              />
             </Panel>
-          </Reveal>
+          )}
+          <UnmodeledPanel m={m} />
           {m.parlays.length > 0 && (
             <Reveal>
               <ParlayGrid parlays={m.parlays} />
             </Reveal>
           )}
           <div className="text-[10.5px] text-faint">
-            Correlations are counted across simulated tournaments, not assumed. Derby tickets don&apos;t enter the
-            allocator or auto-graded ledger — record what you fire. Informational only, not betting advice.
+            Correlations are counted across simulated tournaments, not assumed. Exotic fields (exacta, finalists,
+            most-R1) stay out of the parlay generator. Derby tickets don&apos;t enter the allocator or auto-graded
+            ledger — record what you fire. Informational only, not betting advice.
           </div>
         </div>
       )}
@@ -381,6 +515,7 @@ export function DerbySharpTab() {
         return (
           <div className="space-y-5">
             <EventLine m={m} />
+            <SeedStamp m={m} />
             <Reveal>
               <Panel title="The engine's derby read">
                 <p className="text-[13px] leading-relaxed text-muted">
@@ -475,6 +610,7 @@ export function DerbyBuilderTab() {
       {(m) => (
         <div className="space-y-4">
           <EventLine m={m} />
+          <SeedStamp m={m} />
           <PastePanel m={m} />
           <Reveal>
             <Panel title="Derby slip — combine any pasted markets (correlation-exact)">
