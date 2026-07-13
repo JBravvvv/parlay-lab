@@ -107,6 +107,24 @@ fabricates a number; when a source is unavailable we say so and degrade.
    - Score champion vs challenger daily: log-loss, calibration, CLV vs Pinnacle close, ROI
      by market. v2 becomes the default only when it wins on this scoreboard.
 
+## HR Derby desk (shipped 2026-07-13, event day)
+`src/engine2/derby.ts` + `/derby` — a standalone special-event desk, zero contact
+with the parity-locked game engine. Bracket/format/live HR counts come from MLB
+statsapi `/v1/homeRunDerby/{eventId}` (event id discovered from the July events
+schedule, excluding MLB's "Home Run Derby Test #N" rehearsal events); hitter
+power from priors.json percentiles (brl .35 / xiso .30 / EV .20 / hard-hit .15,
+mapped 0.55+0.9·pct to an HR-per-swing around base 0.27). Tournament Monte
+Carlo (15k in-page): 20-swing pool → top-4 (longest-HR tiebreak proxied by
+power) → re-seeded 15-swing semis/final, 3-swing swing-offs, final-swing
+extension; lognormal day-form σ=0.16. The Odds API has NO derby key (verified
+against the full sports list), so market prices paste in from the book
+(winner / R1-pair H2H / player HR O/U with whole-derby-vs-R1 scope toggle),
+Shin de-vigged, blended 25/75 model/market for EV + ¼-Kelly. Caesars'
+API (api.americanwagering.com) is CloudFront-WAF'd — not scrapeable; the paste
+flow is the design, not a fallback. Display-only: never feeds parlays,
+allocator, or ledger. New swing-limited format has no history: rankings are
+the trustworthy output, absolute HR totals the weakest (stated in the UI).
+
 ## Decisions log
 - FanGraphs projections: Cloudflare-walled to scripts (403 page + API). NOT scraped.
   Savant xStats carry the skill layer; projections revisit later (manual CSV import is an option).
