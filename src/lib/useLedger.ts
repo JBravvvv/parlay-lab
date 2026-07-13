@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getEngine } from "./engine-client";
 
 export type DayStat = {
@@ -77,7 +77,12 @@ export type TicketGrade = { result: string; payout: number; dec?: number; detail
 export function useLedger() {
   const [v, setV] = useState(0);
   const refresh = useCallback(() => setV((x) => x + 1), []);
-  const eng = typeof window !== "undefined" ? getEngine() : null;
+  // The engine reads localStorage, which only exists on the client — stay
+  // null until mounted so the first client render matches the SSR HTML
+  // (otherwise Next reports a hydration mismatch on every ledger-fed page).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const eng = mounted ? getEngine() : null;
 
   const api = useMemo(() => {
     if (!eng) return null;

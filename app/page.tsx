@@ -12,7 +12,6 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
-import { VideoBackdrop } from "@/components/shell/VideoBackdrop";
 import { useLedger, roiPct } from "@/lib/useLedger";
 import { cachedBoard, getMoney } from "@/lib/engine-client";
 import { fmtMoneyExact } from "@/lib/format";
@@ -49,8 +48,7 @@ function Chevron() {
 
 function Hero() {
   return (
-    <div className="relative overflow-hidden">
-      <VideoBackdrop />
+    <div className="relative">
       <div className="relative z-10 flex min-h-dvh flex-col">
         {/* navbar */}
         <header className="w-full px-5 py-5 md:px-8">

@@ -13,6 +13,7 @@ import {
   IconSim,
   IconStats,
 } from "./icons";
+import { VideoBackdrop } from "./VideoBackdrop";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: IconDash, mobile: true },
@@ -47,6 +48,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh">
+      {/* the looping video plays behind every page (mounted once — survives
+          navigation); data pages get a dark scrim, the landing runs it raw */}
+      <VideoBackdrop fixed scrim={!landing} />
+
       {/* desktop side rail */}
       <aside className={`fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl ${landing ? "" : "md:flex"}`}>
         <div className="px-4 py-4">

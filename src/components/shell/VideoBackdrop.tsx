@@ -6,14 +6,17 @@ const SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4";
 
 /**
- * Looping hero background video with a JS-controlled fade loop:
+ * Looping background video with a JS-controlled fade loop:
  * starts at opacity 0, fades in over the first 0.5s, fades out over the last
  * 0.5s (rAF-driven), and on `ended` resets to 0, waits 100ms, replays from 0.
- * No gradient overlays — readability comes from the blur shape above it.
  * If autoplay is blocked or the network is down, it simply stays invisible
  * and the ambient background carries the page.
+ *
+ * `fixed` pins it behind the whole app (mounted once in AppShell, so it never
+ * restarts on navigation); `scrim` lays a translucent dark wash over it for
+ * the data-dense pages — the landing hero runs unscrimmed with its blur shape.
  */
-export function VideoBackdrop() {
+export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolean; scrim?: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export function VideoBackdrop() {
     };
   }, []);
 
-  return (
+  const video = (
     <video
       ref={ref}
       src={SRC}
@@ -62,5 +65,13 @@ export function VideoBackdrop() {
       className="absolute inset-0 h-full w-full object-cover"
       style={{ opacity: 0 }}
     />
+  );
+
+  if (!fixed) return video;
+  return (
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden>
+      {video}
+      {scrim && <div className="absolute inset-0 bg-bg/55" />}
+    </div>
   );
 }
