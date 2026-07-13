@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Parlay Lab design tokens — immersive dark blue-purple, liquid glass,
-   indigo → purple → amber gradient accent. Geist Sans body, General Sans
-   display. One accent per meaning survives the reskin: green = +EV/wins,
-   red = −EV/losses, gold = the Caesars layer, indigo = live.
+   Parlay Lab design tokens — immersive deep-green liquid glass (the classic
+   Parlay Lab electric-green identity on the new immersive shell). Geist Sans
+   body, General Sans display. One accent per meaning: electric green =
+   +EV/wins, red-orange = −EV/losses, gold = the Caesars layer, ice = live.
 --------------------------------------------------------------------------- */
 
 @theme {
-  /* surfaces — deep blue-purple stack (hsl 260 87% 3% base) */
-  --color-bg: hsl(260 87% 3%);
-  --color-surface: hsl(260 50% 7%);
-  --color-surface-2: hsl(260 42% 10%);
-  --color-surface-3: hsl(260 36% 13%);
-  --color-line: hsl(260 32% 16%);
-  --color-line-2: hsl(260 26% 23%);
+  /* surfaces — deep green-black stack */
+  --color-bg: hsl(160 45% 3%);
+  --color-surface: hsl(160 28% 7%);
+  --color-surface-2: hsl(160 23% 10%);
+  --color-surface-3: hsl(160 19% 13%);
+  --color-line: hsl(160 16% 16%);
+  --color-line-2: hsl(160 13% 22%);
 
   /* text — warm off-white (hsl 40 6% 95%) */
   --color-text: hsl(40 6% 95%);
@@ -22,16 +22,16 @@
   --color-muted: hsl(40 5% 65%);
   --color-faint: hsl(40 4% 45%);
 
-  /* gradient accent (brand): indigo → purple → amber */
-  --color-acc-indigo: #6366f1;
-  --color-acc-purple: #a855f7;
-  --color-acc-amber: #fcd34d;
+  /* gradient accent (brand): teal → green → electric lime */
+  --color-acc-teal: #14b8a6;
+  --color-acc-green: #22c55e;
+  --color-acc-lime: #b6ff3d;
 
-  /* semantics — retuned to sit on purple */
-  --color-pos: #4ade80; /* emerald — +EV, wins, edges */
-  --color-neg: #f87171; /* soft red — −EV, losses */
-  --color-gold: #d4a94e; /* muted gold — Caesars layer only */
-  --color-live: #818cf8; /* indigo — live/in-game marker */
+  /* semantics — the classic Parlay Lab set */
+  --color-pos: #b6ff3d; /* electric green — +EV, wins, edges */
+  --color-neg: #ff5c45; /* red-orange — −EV, losses */
+  --color-gold: #c79a3b; /* muted gold — Caesars layer only */
+  --color-live: #5cc8ff; /* ice blue — live/in-game marker */
 
   /* rounded, floating panels */
   --radius-panel: 20px;
@@ -81,9 +81,9 @@ body::before {
   z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(900px 480px at 82% -12%, rgba(99, 102, 241, 0.14), transparent 62%),
-    radial-gradient(700px 420px at -6% 4%, rgba(168, 85, 247, 0.1), transparent 58%),
-    radial-gradient(1000px 560px at 50% 118%, rgba(252, 211, 77, 0.05), transparent 62%);
+    radial-gradient(900px 480px at 82% -12%, rgba(182, 255, 61, 0.1), transparent 62%),
+    radial-gradient(700px 420px at -6% 4%, rgba(20, 184, 166, 0.09), transparent 58%),
+    radial-gradient(1000px 560px at 50% 118%, rgba(199, 154, 59, 0.06), transparent 62%);
 }
 body::after {
   content: "";
@@ -109,9 +109,9 @@ body::after {
   letter-spacing: -0.01em;
 }
 
-/* ---- brand gradient text: indigo → purple → amber (to left) */
+/* ---- brand gradient text: teal → green → electric lime (to left) */
 .text-gradient {
-  background-image: linear-gradient(to left, #6366f1, #a855f7, #fcd34d);
+  background-image: linear-gradient(to left, #14b8a6, #22c55e, #b6ff3d);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -161,13 +161,13 @@ body::after {
 }
 
 /* ---- glow: elevation comes from light, not drop shadows */
-.glow-pos { box-shadow: 0 0 44px -8px rgba(74, 222, 128, 0.26), 0 0 0 1px rgba(74, 222, 128, 0.12); }
-.glow-gold { box-shadow: 0 0 44px -8px rgba(212, 169, 78, 0.3), 0 0 0 1px rgba(212, 169, 78, 0.14); }
+.glow-pos { box-shadow: 0 0 44px -8px rgba(182, 255, 61, 0.28), 0 0 0 1px rgba(182, 255, 61, 0.12); }
+.glow-gold { box-shadow: 0 0 44px -8px rgba(199, 154, 59, 0.3), 0 0 0 1px rgba(199, 154, 59, 0.14); }
 
 /* +EV rows get lit, not painted */
 .ev-glow {
-  background: linear-gradient(90deg, rgba(74, 222, 128, 0.07), transparent 55%);
-  box-shadow: inset 2px 0 0 rgba(74, 222, 128, 0.65);
+  background: linear-gradient(90deg, rgba(182, 255, 61, 0.07), transparent 55%);
+  box-shadow: inset 2px 0 0 rgba(182, 255, 61, 0.65);
 }
 
 /* ---- odds cells flash on line movement */

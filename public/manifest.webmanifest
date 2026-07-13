@@ -4,8 +4,8 @@
   "description": "MLB betting analytics terminal \u2014 informational only, not betting advice.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#05010e",
-  "theme_color": "#05010e",
+  "background_color": "#040b09",
+  "theme_color": "#040b09",
   "icons": [
     {
       "src": "/icon-192.png",

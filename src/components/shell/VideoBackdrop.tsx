@@ -5,12 +5,19 @@ import { useEffect, useRef } from "react";
 const SRC =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4";
 
+/* The footage is purple; the brand is green. A hue rotation recolors the
+   ribbons to emerald/teal in the compositor — no re-encode needed. */
+const GREEN_SHIFT = "hue-rotate(-120deg) saturate(0.95)";
+
 /**
  * Looping background video with a JS-controlled fade loop:
  * starts at opacity 0, fades in over the first 0.5s, fades out over the last
  * 0.5s (rAF-driven), and on `ended` resets to 0, waits 100ms, replays from 0.
- * If autoplay is blocked or the network is down, it simply stays invisible
- * and the ambient background carries the page.
+ *
+ * Playback is deliberately stubborn: iOS (Low Power Mode, PWA relaunches,
+ * bfcache restores) often rejects the first play() — so we retry on canplay,
+ * on visibility/pageshow, and on the first touch. If nothing ever starts,
+ * it stays invisible and the ambient background carries the page.
  *
  * `fixed` pins it behind the whole app (mounted once in AppShell, so it never
  * restarts on navigation); `scrim` lays a translucent dark wash over it for
@@ -24,6 +31,18 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
     if (!v) return;
     let raf = 0;
     let replay: ReturnType<typeof setTimeout> | null = null;
+
+    const kick = () => {
+      if (v.paused && !v.ended) v.play().catch(() => {});
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") kick();
+    };
+    const onFirstTouch = () => {
+      kick();
+      window.removeEventListener("pointerdown", onFirstTouch);
+      window.removeEventListener("touchstart", onFirstTouch);
+    };
 
     const tick = () => {
       const d = v.duration;
@@ -44,11 +63,21 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
     };
 
     v.addEventListener("ended", onEnded);
-    v.play().catch(() => {});
+    v.addEventListener("canplay", kick);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", kick);
+    window.addEventListener("pointerdown", onFirstTouch);
+    window.addEventListener("touchstart", onFirstTouch, { passive: true });
+    kick();
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
       v.removeEventListener("ended", onEnded);
+      v.removeEventListener("canplay", kick);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", kick);
+      window.removeEventListener("pointerdown", onFirstTouch);
+      window.removeEventListener("touchstart", onFirstTouch);
       if (replay) clearTimeout(replay);
     };
   }, []);
@@ -60,10 +89,11 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
       muted
       playsInline
       autoPlay
+      loop={false}
       preload="auto"
       aria-hidden
       className="absolute inset-0 h-full w-full object-cover"
-      style={{ opacity: 0 }}
+      style={{ opacity: 0, filter: GREEN_SHIFT, WebkitFilter: GREEN_SHIFT }}
     />
   );
 
