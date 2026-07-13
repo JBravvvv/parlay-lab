@@ -63,7 +63,9 @@ html {
 }
 
 body {
-  background: var(--color-bg);
+  /* NO background here — html's bg paints the canvas (the true bottom layer).
+     A body background paints ABOVE negative-z fixed elements and would hide
+     the global video backdrop behind an opaque purple sheet. */
   color: var(--color-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
