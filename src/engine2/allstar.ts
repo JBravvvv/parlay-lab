@@ -586,7 +586,11 @@ export function priceAsgLegs(
       }
       const mkt = fieldDevig ? imps[i] / S : null;
       const anchor = mkt ?? impliedFromAmerican(q.odds);
-      const blend = MODEL_W * mdl + (1 - MODEL_W) * anchor;
+      let blend = MODEL_W * mdl + (1 - MODEL_W) * anchor;
+      // an "any other" bucket's model prob depends on knowing EVERY listed
+      // score — on a partial paste it absorbs the unlisted ones and inflates,
+      // so the model may only lower it, never print EV the board can't prove
+      if (q.kind === "other" && !fieldDevig) blend = Math.min(blend, anchor);
       legs.push({
         key: `SCORE-${label}`,
         group: "SCORE",

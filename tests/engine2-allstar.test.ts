@@ -197,6 +197,15 @@ describe("pricing + card (straight bets only)", () => {
     const groups = new Set(legs.map((l) => l.group));
     for (const g of ["ML", "F3", "F5", "TOTAL", "HR", "SCORE"]) expect(groups.has(g as never)).toBe(true);
   });
+  it("'any other' buckets on a PARTIAL paste can never print positive EV", () => {
+    // only 2 exact scores listed → the model would credit "any other" with
+    // nearly the whole win mass; the cap must hold EV at ≤ 0
+    const partial = parseScoreLines("NL 5-4 +1000\nAny other NL win +330\nAny other AL win +360").quotes;
+    const priced = priceAsgLegs(book, fairs, sim, PLAYERS, partial, []);
+    for (const l of priced.filter((x) => x.group === "SCORE" && x.label.startsWith("Any other"))) {
+      expect(l.ev).toBeLessThanOrEqual(1e-9);
+    }
+  });
   it("one-sided HR props stay book-anchored (no manufactured EV)", () => {
     for (const l of legs.filter((x) => x.group === "HR")) {
       expect(l.market).toBeNull();
