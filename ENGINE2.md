@@ -107,7 +107,16 @@ fabricates a number; when a source is unavailable we say so and degrade.
    - Score champion vs challenger daily: log-loss, calibration, CLV vs Pinnacle close, ROI
      by market. v2 becomes the default only when it wins on this scoreboard.
 
-## HR Derby desk (shipped 2026-07-13, event day)
+## HR Derby desk — REMOVED 2026-07-13 (done for the year)
+All derby code (engine2/derby.ts, lib/useDerby.ts, components/derby/, /derby
+route, derby-odds.json seed, tests) was deleted after the event; recover from git
+history (commits up to 5cd4fb4) if it returns next July. UFC was hidden the same
+day behind `src/lib/features.ts` `UFC_ENABLED` (false) — it comes back the day
+before each card (Fridays) by flipping that one flag; the UFC components and
+/api/ufcprops stay in the tree. The historical derby design notes below are kept
+only as reusable lessons (market-scale calibration, one-sided-market anchoring).
+
+### (archived) HR Derby desk design
 `src/engine2/derby.ts` + `/derby` — a standalone special-event desk, zero contact
 with the parity-locked game engine. Bracket/format/live HR counts come from MLB
 statsapi `/v1/homeRunDerby/{eventId}` (event id discovered from the July events
