@@ -169,6 +169,36 @@ localStorage for the last view. ESPN's `.../mma/ufc/rankings` endpoint was
 rejected as STALE (listed retired fighters like Nunes as active) — do not use it.
 The tool refuses to publish if <80 ranked fighters parse (markup-change guard).
 
+## All-Star Game desk — added 2026-07-14 (game night)
+A standalone special-event desk (`src/engine2/allstar.ts` + `src/lib/useAllStar.ts`
++ `src/components/allstar/AllStarSurfaces.tsx`), zero contact with the
+parity-locked engine — the ASG is an exhibition (one-inning pitchers, rotating
+lineups) so the season sim's assumptions don't hold. ⭐ ASG tab on Board / The
+Sharp / Builder behind `ASG_ENABLED` in `src/lib/features.ts` (flip false after
+the game, same pattern as UFC). Markets, per Josh: ML, F3, F5, HR props,
+Correct Score. **STRAIGHT BETS ONLY — Caesars NV offers no ASG parlays**; the
+Builder card is singles (exact-sum ¼-Kelly daily + FUN longshots ≥ +500, HR/
+SCORE confined to FUN), and there is no combo UI at all.
+
+Market reality (probed live 2026-07-14): The Odds API carries the ASG as the
+only `baseball_mlb` event during the break — ML at 15 books (Pinnacle + Betfair
+exchange in `eu`), F5 h2h/totals/spreads at ~6 books, **F3 only at Caesars**
+(two-sided → de-vig its own prices, labeled "CZ-only"), `batter_home_runs` only
+at Caesars and ONE-SIDED (Over 0.5) — the Derby's fantasy-EV trap, so HR props
+are anchored to raw book-implied and the model (REAL season HR/PA from statsapi
+feed/live × expected trips by announced batting slot) may only reorder.
+**Correct Score is not in The Odds API for baseball** → pasted from the Caesars
+app (field de-vig when ≥8 lines with a sane implied sum, raw anchor otherwise).
+The sim (zero-inflated-geometric half-inning runs, walk-off bottom-9, ties →
+swing-off deciding the WINNER only) is CALIBRATED to reproduce the consensus ML
+fair and total fair — it never invents a different game; it only adds joint
+structure: correct-score probabilities and F3/F5 cross-checks. statsapi
+`/v1.1/game/{pk}/feed/live` supplies rosters (65 players incl. reserves) with
+real season HR/PA + battingOrder. Event id discovered from the events list,
+never hardcoded. 14 unit tests (`tests/engine2-allstar.test.ts`) incl. a
+no-manufactured-EV bound on one-sided props and exact-sum/no-parlay card
+invariants.
+
 ## Decisions log
 - FanGraphs projections: Cloudflare-walled to scripts (403 page + API). NOT scraped.
   Savant xStats carry the skill layer; projections revisit later (manual CSV import is an option).

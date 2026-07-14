@@ -6,3 +6,8 @@
    `false` hides them all. The UFC components stay in the tree either way, so
    this is the only edit needed to bring the sport back or put it away. */
 export const UFC_ENABLED = false;
+
+/* The MLB All-Star Game desk (⭐ ASG tab on Board / The Sharp / Builder).
+   One-night event: flip to `true` on game day, back to `false` after — the
+   components stay in the tree either way, this is the only edit. */
+export const ASG_ENABLED = true;

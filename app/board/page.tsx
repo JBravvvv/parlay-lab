@@ -13,7 +13,8 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
-import { UFC_ENABLED } from "@/lib/features";
+import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
+import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -40,13 +41,15 @@ export default function BoardPage() {
   const [live, setLive] = useState(false);
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
-  const [sport, setSport] = useState<"mlb" | "ufc">("mlb");
+  const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
   useEffect(() => {
     try {
-      if (UFC_ENABLED && localStorage.getItem("pl_board_sport") === "ufc") setSport("ufc");
+      const s = localStorage.getItem("pl_board_sport");
+      if (UFC_ENABLED && s === "ufc") setSport("ufc");
+      else if (ASG_ENABLED && s === "asg") setSport("asg");
     } catch { /* fresh device */ }
   }, []);
-  const pickSport = (s: "mlb" | "ufc") => {
+  const pickSport = (s: "mlb" | "ufc" | "asg") => {
     setSport(s);
     try { localStorage.setItem("pl_board_sport", s); } catch {}
   };
@@ -126,6 +129,8 @@ export default function BoardPage() {
         sub={
           sport === "ufc"
             ? "UFC — de-vigged market consensus vs the Caesars moneyline, records live from ESPN"
+            : sport === "asg"
+            ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
               ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
               : "Consensus de-vigged probability vs the Caesars line"
@@ -139,15 +144,18 @@ export default function BoardPage() {
         }
       />
 
-      {UFC_ENABLED && (
+      {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-4 flex items-center gap-2">
           <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
-          <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+          {UFC_ENABLED && <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>}
+          {ASG_ENABLED && <FilterPill selected={sport === "asg"} onClick={() => pickSport("asg")}>⭐ ASG</FilterPill>}
         </div>
       )}
 
       {sport === "ufc" ? (
         <UfcBoard />
+      ) : sport === "asg" ? (
+        <AsgBoardTab />
       ) : (
         <>
       {typeof d?.overview === "string" && d.overview && (

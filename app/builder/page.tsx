@@ -10,7 +10,8 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
-import { UFC_ENABLED } from "@/lib/features";
+import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
+import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { getEngine, getMoney, setMoney, todayStr } from "@/lib/engine-client";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
@@ -130,13 +131,15 @@ export default function BuilderPage() {
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
-  const [sport, setSport] = useState<"mlb" | "ufc">("mlb");
+  const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
   useEffect(() => {
     try {
-      if (UFC_ENABLED && localStorage.getItem("pl_builder_sport") === "ufc") setSport("ufc");
+      const s = localStorage.getItem("pl_builder_sport");
+      if (UFC_ENABLED && s === "ufc") setSport("ufc");
+      else if (ASG_ENABLED && s === "asg") setSport("asg");
     } catch { /* fresh device */ }
   }, []);
-  const pickSport = (s: "mlb" | "ufc") => {
+  const pickSport = (s: "mlb" | "ufc" | "asg") => {
     setSport(s);
     try { localStorage.setItem("pl_builder_sport", s); } catch {}
   };
@@ -240,19 +243,24 @@ export default function BuilderPage() {
         sub={
           sport === "ufc"
             ? "UFC — build any parlay from the card's Caesars moneylines, priced against market consensus"
+            : sport === "asg"
+            ? "All-Star Game — a sized card of STRAIGHT bets (Caesars NV takes no ASG parlays)"
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
         }
       />
 
-      {UFC_ENABLED && (
+      {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-4 flex items-center gap-2">
           <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
-          <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+          {UFC_ENABLED && <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>}
+          {ASG_ENABLED && <FilterPill selected={sport === "asg"} onClick={() => pickSport("asg")}>⭐ ASG</FilterPill>}
         </div>
       )}
 
       {sport === "ufc" ? (
         <UfcBuilder />
+      ) : sport === "asg" ? (
+        <AsgBuilderTab />
       ) : (
         <>
       <div className="mb-5 flex flex-wrap items-center gap-2">

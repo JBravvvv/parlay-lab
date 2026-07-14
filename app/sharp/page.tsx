@@ -5,7 +5,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { UfcSharp } from "@/components/ufc/UfcSharp";
-import { UFC_ENABLED } from "@/lib/features";
+import { AsgSharpTab } from "@/components/allstar/AllStarSurfaces";
+import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
@@ -38,13 +39,15 @@ export default function SharpPage() {
   const d = board?.data;
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
-  const [sport, setSport] = useState<"mlb" | "ufc">("mlb");
+  const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
   useEffect(() => {
     try {
-      if (UFC_ENABLED && localStorage.getItem("pl_sharp_sport") === "ufc") setSport("ufc");
+      const s = localStorage.getItem("pl_sharp_sport");
+      if (UFC_ENABLED && s === "ufc") setSport("ufc");
+      else if (ASG_ENABLED && s === "asg") setSport("asg");
     } catch { /* fresh device */ }
   }, []);
-  const pickSport = (s: "mlb" | "ufc") => {
+  const pickSport = (s: "mlb" | "ufc" | "asg") => {
     setSport(s);
     try { localStorage.setItem("pl_sharp_sport", s); } catch {}
   };
@@ -75,6 +78,8 @@ export default function SharpPage() {
         sub={
           sport === "ufc"
             ? "The desk's UFC read — market consensus vs the Caesars line, no fight model, no key needed"
+            : sport === "asg"
+            ? "The desk's All-Star read — consensus-anchored ML/F3/F5, sim-priced correct scores, straight bets only"
             : "The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
         }
         action={
@@ -86,15 +91,18 @@ export default function SharpPage() {
         }
       />
 
-      {UFC_ENABLED && (
+      {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-4 flex items-center gap-2">
           <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
-          <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+          {UFC_ENABLED && <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>}
+          {ASG_ENABLED && <FilterPill selected={sport === "asg"} onClick={() => pickSport("asg")}>⭐ ASG</FilterPill>}
         </div>
       )}
 
       {sport === "ufc" ? (
         <UfcSharp />
+      ) : sport === "asg" ? (
+        <AsgSharpTab />
       ) : !d ? (
         <Panel>
           <EmptyState
