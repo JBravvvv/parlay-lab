@@ -17,8 +17,7 @@ import {
   type AsgLeg,
   asgCard,
   fairAmerican,
-  parseHrLines,
-  parseScoreLines,
+  parseCaesarsBoard,
 } from "@/engine2/allstar";
 import { type AsgMarket, MONEY_KEY, useAllStar } from "@/lib/useAllStar";
 
@@ -83,65 +82,30 @@ function AsgShell({ m, children }: { m: AsgMarket; children: (m: AsgMarket) => R
 
 /* ----------------------------------------------------------- paste panel */
 
-function PasteBox({
-  label,
-  hint,
-  value,
-  parsedNote,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  parsedNote: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</span>
-        <span className="num text-[10px] text-faint">{parsedNote}</span>
-      </div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={hint}
-        rows={4}
-        className="w-full resize-y rounded-[12px] border border-line-2 bg-white/[0.03] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-text outline-none placeholder:text-faint focus:border-pos/60"
-      />
-    </div>
-  );
-}
-
 export function AsgPastePanel({ m }: { m: AsgMarket }) {
-  const sc = parseScoreLines(m.paste.scores);
-  const hr = parseHrLines(m.paste.hr);
+  const parsed = parseCaesarsBoard(m.paste.board);
+  const hasPaste = m.paste.board.trim().length > 0;
   return (
     <Reveal>
-      <Panel title="Paste from the Caesars app — markets the feed doesn't carry">
-        <div className="grid gap-4 md:grid-cols-2">
-          <PasteBox
-            label="Correct score"
-            hint={"AL 5-4 +900\nNL 3-2 +850\nAny other AL win +700\nAny other +250"}
-            value={m.paste.scores}
-            parsedNote={
-              m.paste.scores.trim()
-                ? `${sc.quotes.length} parsed${sc.unmatched.length ? ` · ${sc.unmatched.length} skipped` : ""}`
-                : "not posted in any API — paste is the design, not a fallback"
-            }
-            onChange={(v) => m.savePaste({ ...m.paste, scores: v })}
-          />
-          <PasteBox
-            label="Extra HR props"
-            hint={"Pete Alonso +650\nShohei Ohtani +425"}
-            value={m.paste.hr}
-            parsedNote={
-              m.paste.hr.trim()
-                ? `${hr.quotes.length} parsed${hr.unmatched.length ? ` · ${hr.unmatched.length} skipped` : ""}`
-                : `${m.book?.hr.length ?? 0} batters already in the feed — add the rest here`
-            }
-            onChange={(v) => m.savePaste({ ...m.paste, hr: v })}
-          />
+      <Panel title="Paste the Caesars ASG board — one paste, every market">
+        <p className="mb-2 text-[11.5px] leading-relaxed text-muted">
+          Every All-Star market is posted in your Caesars Sportsbook NV app. ML, F3, F5, the total and the
+          main HR props already stream in live from Caesars&apos; feed — copy the rest of the board (correct
+          score, the full HR list) and paste it all here; the desk sorts every line into the right market.
+        </p>
+        <textarea
+          value={m.paste.board}
+          onChange={(e) => m.savePaste({ board: e.target.value })}
+          placeholder={"AL 5-4 +900\nNL 3-2 +850\nAny other AL win +700\nAny other +250\nPete Alonso +650\nShohei Ohtani +425"}
+          rows={5}
+          className="w-full resize-y rounded-[12px] border border-line-2 bg-white/[0.03] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-text outline-none placeholder:text-faint focus:border-pos/60"
+        />
+        <div className="num mt-1.5 text-[10px] text-faint">
+          {hasPaste
+            ? `${parsed.scores.length} correct-score lines · ${parsed.hr.length} HR props${
+                parsed.covered ? ` · ${parsed.covered} game-market lines (already live from the feed)` : ""
+              }${parsed.unmatched.length ? ` · ${parsed.unmatched.length} skipped` : ""}`
+            : `${m.book?.hr.length ?? 0} HR props already live from Caesars' feed — the paste adds correct score and the rest of the board`}
         </div>
       </Panel>
     </Reveal>
@@ -184,9 +148,10 @@ export function AsgEdgeGroups({ legs }: { legs: AsgLeg[] }) {
               ))}
               {g === "HR" && (
                 <div className="mt-2 text-[10px] leading-relaxed text-faint">
-                  One book, one side — no de-vig exists, so every price is anchored to its own raw implied
-                  probability. The model (real season HR/PA × expected trips from the announced order) can
-                  reorder this list; it is not allowed to manufacture EV.
+                  All prices are Caesars&apos;. HR props are one-sided (Over only), so there is no de-vig —
+                  every price is anchored to its own raw implied probability. The model (real season HR/PA ×
+                  expected trips from the announced order) can reorder this list; it is not allowed to
+                  manufacture EV. Paste the rest of the Caesars HR board above to price every batter.
                 </div>
               )}
               {g === "SCORE" && (
@@ -363,6 +328,9 @@ function CardTicket({ p }: { p: AsgCardPick }) {
     <div className={`glass px-4 py-3 ${p.leg.ev > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-[13px] font-semibold text-text">
+          <span className="num mr-2 rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
+            Straight
+          </span>
           {p.leg.label} <span className="font-normal text-muted">{p.leg.prop}</span>
         </div>
         <div className="flex items-center gap-2">

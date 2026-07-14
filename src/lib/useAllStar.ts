@@ -22,8 +22,7 @@ import {
   asgFairs,
   calibrateSim,
   parseAsgOdds,
-  parseHrLines,
-  parseScoreLines,
+  parseCaesarsBoard,
   priceAsgLegs,
 } from "@/engine2/allstar";
 
@@ -32,8 +31,9 @@ const MARKETS =
 const PASTE_KEY = "pl_asgPaste";
 export const MONEY_KEY = "pl_asgMoney";
 
-export type AsgPaste = { scores: string; hr: string };
-export const EMPTY_PASTE: AsgPaste = { scores: "", hr: "" };
+/** One paste, the whole Caesars ASG board — the router sorts the lines. */
+export type AsgPaste = { board: string };
+export const EMPTY_PASTE: AsgPaste = { board: "" };
 
 export type AsgMeta = {
   eventName: string;
@@ -183,7 +183,12 @@ export function useAllStar(): AsgMarket {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PASTE_KEY);
-      if (raw) setPaste({ ...EMPTY_PASTE, ...(JSON.parse(raw) as Partial<AsgPaste>) });
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<AsgPaste> & { scores?: string; hr?: string };
+        // migrate the short-lived two-box shape into the single board paste
+        const board = saved.board ?? [saved.scores, saved.hr].filter(Boolean).join("\n");
+        setPaste({ board: board ?? "" });
+      }
     } catch {
       /* fresh device */
     }
@@ -227,17 +232,8 @@ export function useAllStar(): AsgMarket {
 
   const fairs = book ? asgFairs(book) : null;
   const sim = fairs ? calibrated(fairs) : null;
-  const legs =
-    book && fairs
-      ? priceAsgLegs(
-          book,
-          fairs,
-          sim,
-          players,
-          parseScoreLines(paste.scores).quotes,
-          parseHrLines(paste.hr).quotes,
-        )
-      : [];
+  const parsed = parseCaesarsBoard(paste.board);
+  const legs = book && fairs ? priceAsgLegs(book, fairs, sim, players, parsed.scores, parsed.hr) : [];
 
   // keep a stable reference across renders when inputs haven't changed
   const legsRef = useRef<AsgLeg[]>([]);

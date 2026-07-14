@@ -7,6 +7,7 @@ import {
   hrModelProb,
   matchPlayer,
   parseAsgOdds,
+  parseCaesarsBoard,
   parseHrLines,
   parseScoreLines,
   priceAsgLegs,
@@ -142,6 +143,28 @@ describe("paste parsers", () => {
     expect(quotes).toHaveLength(2);
     expect(quotes[0]).toMatchObject({ name: "Pete Alonso", odds: 650 });
     expect(unmatched).toEqual(["nope"]);
+  });
+  it("routes a raw one-paste Caesars board dump into the right markets", () => {
+    const dump = [
+      "Correct Score", // header, no odds — ignored silently
+      "AL 5-4 +900",
+      "NL 3-2 +850",
+      "Any other AL win +700",
+      "Any Other +250",
+      "To Hit A Home Run", // header
+      "Kyle Schwarber +360",
+      "Pete Alonso +650",
+      "Moneyline", // header
+      "American League +115", // game market — already live from the feed
+      "National League -135",
+      "First 5 Innings Over 4.5 -130",
+      "Total Runs Over 8.5 +100",
+    ].join("\n");
+    const b = parseCaesarsBoard(dump);
+    expect(b.scores).toHaveLength(4);
+    expect(b.hr.map((q) => q.name)).toEqual(["Kyle Schwarber", "Pete Alonso"]);
+    expect(b.covered).toBe(4); // ML ×2 + F5 total + game total recognized, not dropped
+    expect(b.unmatched).toEqual([]);
   });
 });
 

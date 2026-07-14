@@ -356,7 +356,44 @@ export function parseScoreLines(text: string): { quotes: ScoreQuote[]; unmatched
   return { quotes, unmatched };
 }
 
-/** HR-prop lines for batters the feed doesn't carry: "Name +600" per line. */
+/** One paste, the whole Caesars board. Every ASG market is posted in the
+    Caesars NV app; this router sorts a raw dump line-by-line: correct scores
+    and "any other" buckets → the score parser, player-price lines → HR props,
+    game-market lines (ML/F3/F5/totals — already live from the feed's Caesars
+    mirror) are recognized and counted so nothing looks dropped, and headers
+    without a price are ignored silently. */
+export function parseCaesarsBoard(text: string): {
+  scores: ScoreQuote[];
+  hr: { name: string; odds: number }[];
+  covered: number; // game-market lines the desk already prices live
+  unmatched: string[];
+} {
+  const scoreLines: string[] = [];
+  const hrLines: string[] = [];
+  let covered = 0;
+  const unmatched: string[] = [];
+  const GAME_RE =
+    /\b(over|under|total|moneyline|money line|run ?line|spread|innings?|f[35]\b|first\s+(3|5|three|five)|race to)\b/i;
+  const SIDE_RE = /\b(AL|NL|American(?:\s+League)?|National(?:\s+League)?)\b/i;
+  for (const raw of text.split(/\n+/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!/[+-]\d{3,5}\b/.test(line)) continue; // header / section label — ignore
+    if (/any\s+other/i.test(line) || (/\d{1,2}\s*[-–:]\s*\d{1,2}/.test(line) && SIDE_RE.test(line))) {
+      scoreLines.push(line);
+    } else if (GAME_RE.test(line) || (SIDE_RE.test(line) && !/[a-z]+\s+[a-z]+/i.test(line.replace(SIDE_RE, "").replace(/[+-]\d{3,5}/g, "").trim()))) {
+      covered++; // ML / F3 / F5 / totals — the feed already carries CZ's price
+    } else {
+      hrLines.push(line);
+    }
+  }
+  const sc = parseScoreLines(scoreLines.join("\n"));
+  const hr = parseHrLines(hrLines.join("\n"));
+  unmatched.push(...sc.unmatched, ...hr.unmatched);
+  return { scores: sc.quotes, hr: hr.quotes, covered, unmatched };
+}
+
+/** HR-prop lines: "Name +600" per line. */
 export function parseHrLines(text: string): { quotes: { name: string; odds: number }[]; unmatched: string[] } {
   const quotes: { name: string; odds: number }[] = [];
   const unmatched: string[] = [];
