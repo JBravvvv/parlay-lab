@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
-import { DerbyBoardTab } from "@/components/derby/DerbySurfaces";
+import { UFC_ENABLED } from "@/lib/features";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -38,16 +38,15 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
-  // localStorage only after mount — an initializer read renders "derby" on the
-  // client against the server's "mlb" and trips a hydration mismatch
-  const [sport, setSport] = useState<"mlb" | "ufc" | "derby">("mlb");
+  // localStorage only after mount — an initializer read would diverge from the
+  // server's "mlb" and trip a hydration mismatch
+  const [sport, setSport] = useState<"mlb" | "ufc">("mlb");
   useEffect(() => {
     try {
-      const s = localStorage.getItem("pl_board_sport");
-      if (s === "ufc" || s === "derby") setSport(s);
+      if (UFC_ENABLED && localStorage.getItem("pl_board_sport") === "ufc") setSport("ufc");
     } catch { /* fresh device */ }
   }, []);
-  const pickSport = (s: "mlb" | "ufc" | "derby") => {
+  const pickSport = (s: "mlb" | "ufc") => {
     setSport(s);
     try { localStorage.setItem("pl_board_sport", s); } catch {}
   };
@@ -125,9 +124,7 @@ export default function BoardPage() {
       <PageHeader
         title="Board"
         sub={
-          sport === "derby"
-            ? "Home Run Derby — pasted book prices de-vigged and priced against the 15,000-tournament power sim"
-            : sport === "ufc"
+          sport === "ufc"
             ? "UFC — de-vigged market consensus vs the Caesars moneyline, records live from ESPN"
             : d
               ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
@@ -142,15 +139,14 @@ export default function BoardPage() {
         }
       />
 
-      <div className="mb-4 flex items-center gap-2">
-        <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
-        <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
-        <FilterPill selected={sport === "derby"} onClick={() => pickSport("derby")}>🏆 Derby</FilterPill>
-      </div>
+      {UFC_ENABLED && (
+        <div className="mb-4 flex items-center gap-2">
+          <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
+          <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+        </div>
+      )}
 
-      {sport === "derby" ? (
-        <DerbyBoardTab />
-      ) : sport === "ufc" ? (
+      {sport === "ufc" ? (
         <UfcBoard />
       ) : (
         <>

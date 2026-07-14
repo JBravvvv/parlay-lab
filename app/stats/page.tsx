@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { UfcCard } from "@/components/ufc/UfcCard";
+import { UFC_ENABLED } from "@/lib/features";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -244,8 +245,9 @@ export default function StatsPage() {
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem("pl_sport") || '"mlb"') as SportId;
-      if (s === "ufc") setSport("ufc");
-      else if (SPORTS[s] && s !== "mlb") pickSport(s);
+      if (s === "ufc") {
+        if (UFC_ENABLED) setSport("ufc");
+      } else if (SPORTS[s] && s !== "mlb") pickSport(s);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -365,7 +367,7 @@ export default function StatsPage() {
       <Reveal>
         <Panel className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
-            {(["mlb", "nfl", "cfb", "ufc"] as SportId[]).map((s) => (
+            {(["mlb", "nfl", "cfb", ...(UFC_ENABLED ? (["ufc"] as const) : [])] as SportId[]).map((s) => (
               <FilterPill key={s} selected={sport === s} onClick={() => pickSport(s)}>
                 {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
               </FilterPill>

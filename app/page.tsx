@@ -24,7 +24,6 @@ const BOOKS = ["Pinnacle", "Caesars", "DraftKings", "FanDuel", "BetMGM", "Betfai
 const NAV_LINKS = [
   { href: "/board", label: "Board", chevron: true },
   { href: "/stats", label: "Stats", chevron: true },
-  { href: "/derby", label: "Derby", chevron: false },
   { href: "/builder", label: "Builder", chevron: false },
   { href: "/ledger", label: "Ledger", chevron: false },
 ];

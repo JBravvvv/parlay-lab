@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { UfcSharp } from "@/components/ufc/UfcSharp";
-import { DerbySharpTab } from "@/components/derby/DerbySurfaces";
+import { UFC_ENABLED } from "@/lib/features";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
@@ -36,16 +36,15 @@ export default function SharpPage() {
   const { data: board, isPending } = useBoard();
   const regen = useRegenerateBoard();
   const d = board?.data;
-  // localStorage only after mount — an initializer read renders "derby" on the
-  // client against the server's "mlb" and trips a hydration mismatch
-  const [sport, setSport] = useState<"mlb" | "ufc" | "derby">("mlb");
+  // localStorage only after mount — an initializer read would diverge from the
+  // server's "mlb" and trip a hydration mismatch
+  const [sport, setSport] = useState<"mlb" | "ufc">("mlb");
   useEffect(() => {
     try {
-      const s = localStorage.getItem("pl_sharp_sport");
-      if (s === "ufc" || s === "derby") setSport(s);
+      if (UFC_ENABLED && localStorage.getItem("pl_sharp_sport") === "ufc") setSport("ufc");
     } catch { /* fresh device */ }
   }, []);
-  const pickSport = (s: "mlb" | "ufc" | "derby") => {
+  const pickSport = (s: "mlb" | "ufc") => {
     setSport(s);
     try { localStorage.setItem("pl_sharp_sport", s); } catch {}
   };
@@ -74,9 +73,7 @@ export default function SharpPage() {
       <PageHeader
         title="The Sharp"
         sub={
-          sport === "derby"
-            ? "The desk's Home Run Derby read — the power sim against your pasted book prices, no key needed"
-            : sport === "ufc"
+          sport === "ufc"
             ? "The desk's UFC read — market consensus vs the Caesars line, no fight model, no key needed"
             : "The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
         }
@@ -89,15 +86,14 @@ export default function SharpPage() {
         }
       />
 
-      <div className="mb-4 flex items-center gap-2">
-        <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
-        <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
-        <FilterPill selected={sport === "derby"} onClick={() => pickSport("derby")}>🏆 Derby</FilterPill>
-      </div>
+      {UFC_ENABLED && (
+        <div className="mb-4 flex items-center gap-2">
+          <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
+          <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>
+        </div>
+      )}
 
-      {sport === "derby" ? (
-        <DerbySharpTab />
-      ) : sport === "ufc" ? (
+      {sport === "ufc" ? (
         <UfcSharp />
       ) : !d ? (
         <Panel>

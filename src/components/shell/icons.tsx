@@ -73,14 +73,3 @@ export function IconSettings({ className = "" }: P) {
     </svg>
   );
 }
-export function IconDerby({ className = "" }: P) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
-      <path d="M6 3h12v4a6 6 0 0 1-12 0z" />
-      <path d="M6 5H3.5a1 1 0 0 0-1 1c0 2 1.5 3.5 3.5 3.5" />
-      <path d="M18 5h2.5a1 1 0 0 1 1 1c0 2-1.5 3.5-3.5 3.5" />
-      <path d="M12 13v4" />
-      <path d="M8.5 21h7l-1-4h-5z" />
-    </svg>
-  );
-}
