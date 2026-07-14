@@ -1,0 +1,31 @@
+name: ufc-rankings
+# UFC divisional rankings + active rosters for the Stats tab. The UFC re-posts
+# official rankings roughly weekly (Tuesdays, after the weekend card settles),
+# so we refresh public/model/ufc.json twice a week. Commits trigger a Vercel
+# redeploy of the static file. Stdlib-only tool — no pip install needed.
+on:
+  schedule:
+    - cron: "0 15 * * 3"  # Wednesday 15:00 UTC — after Tuesday ranking updates
+    - cron: "0 15 * * 6"  # Saturday 15:00 UTC — catch mid-week roster moves
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ufc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: frontend-rebuild
+      - name: Build ufc.json (rankings + rosters)
+        run: python3 tools/build_ufc.py public/model/ufc.json
+      - name: Commit if changed
+        run: |
+          git config user.name "ufc-bot"
+          git config user.email "noreply@github.com"
+          git add public/model/ufc.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "ufc: refresh rankings + rosters"
+          git push

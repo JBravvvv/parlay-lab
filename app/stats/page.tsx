@@ -8,8 +8,7 @@ import { Pill, FilterPill } from "@/components/ui/Pill";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { UfcCard } from "@/components/ufc/UfcCard";
-import { UFC_ENABLED } from "@/lib/features";
+import { UfcRankings } from "@/components/ufc/UfcRankings";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -245,9 +244,8 @@ export default function StatsPage() {
   useEffect(() => {
     try {
       const s = JSON.parse(localStorage.getItem("pl_sport") || '"mlb"') as SportId;
-      if (s === "ufc") {
-        if (UFC_ENABLED) setSport("ufc");
-      } else if (SPORTS[s] && s !== "mlb") pickSport(s);
+      if (s === "ufc") setSport("ufc");
+      else if (SPORTS[s] && s !== "mlb") pickSport(s);
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -352,7 +350,7 @@ export default function StatsPage() {
         title="Stats"
         sub={
           sport === "ufc"
-            ? "UFC — next card with live records from ESPN and Caesars moneylines"
+            ? "UFC — official divisional rankings, pound-for-pound & the full active roster"
             : `${SPORTS[tableSport].label} · ${season} — every ${scope === "team" ? "team" : "player"}, live on open · tap any column to sort`
         }
         action={
@@ -367,7 +365,7 @@ export default function StatsPage() {
       <Reveal>
         <Panel className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
-            {(["mlb", "nfl", "cfb", ...(UFC_ENABLED ? (["ufc"] as const) : [])] as SportId[]).map((s) => (
+            {(["mlb", "nfl", "cfb", "ufc"] as SportId[]).map((s) => (
               <FilterPill key={s} selected={sport === s} onClick={() => pickSport(s)}>
                 {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
               </FilterPill>
@@ -437,7 +435,7 @@ export default function StatsPage() {
       </Reveal>
 
       {sport === "ufc" ? (
-        <UfcCard />
+        <UfcRankings />
       ) : q.isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[38px] rounded-[12px]" />)}

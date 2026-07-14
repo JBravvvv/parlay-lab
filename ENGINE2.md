@@ -146,6 +146,29 @@ odds); corr > 1.15 → "SGP territory" showing ONLY the fair price to beat
 fiction). Mutually exclusive slips price to zero and say so. Derby stays out
 of the allocator and auto-graded ledger.
 
+## UFC rankings desk (Stats tab) — added 2026-07-13
+A pure STATS reference (no odds, no model, nothing invented), and deliberately
+DECOUPLED from the UFC betting flag (`src/lib/features.ts` `UFC_ENABLED`): the
+rankings are useful year-round, the betting board only shows on fight weeks.
+`tools/build_ufc.py` (stdlib only) merges two authoritative live sources into
+`public/model/ufc.json`, refreshed twice-weekly by `.github/workflows/ufc.yml`:
+1. **ufc.com/rankings** — the official media-panel order: champion + #1..15 for
+   all 11 divisions, plus Men's & Women's Pound-for-Pound (with weekly movement).
+2. **Wikipedia "List of current UFC fighters"** — the full ACTIVE roster per
+   division with MMA records / nicknames / ages (ufc.com's rankings table has no
+   records). Rendered HTML tables (action=parse&prop=text) are parsed by header
+   label, not column index.
+Fuzzy name-match (accent-fold + Jr/Sr/III strip + order-independent token
+containment, with a global fallback so a fighter ranked in one division but
+rostered in another — e.g. Holloway at LW/FW — still resolves) overlays the rank
+order onto the roster, so each division reads "champion, then #1..15, then
+unranked (alphabetical)". A record the source doesn't carry shows "–" (never
+faked; ~7 brand-new fighters lack a Wikipedia record). `src/components/ufc/
+UfcRankings.tsx` reads the JSON, division/P4P pill selector, mounted-gated
+localStorage for the last view. ESPN's `.../mma/ufc/rankings` endpoint was
+rejected as STALE (listed retired fighters like Nunes as active) — do not use it.
+The tool refuses to publish if <80 ranked fighters parse (markup-change guard).
+
 ## Decisions log
 - FanGraphs projections: Cloudflare-walled to scripts (403 page + API). NOT scraped.
   Savant xStats carry the skill layer; projections revisit later (manual CSV import is an option).
