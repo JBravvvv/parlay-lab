@@ -84,8 +84,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* mobile top bar */}
-      <header className={`sticky top-0 z-30 items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 py-3 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}>
+      {/* mobile top bar — reserves the iOS status-bar inset (the app draws
+          edge-to-edge under it); max() keeps the normal padding in browsers */}
+      <header
+        className={`sticky top-0 z-30 items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 pb-3 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
+        style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+      >
         <Brand />
         <div className="flex items-center gap-1">
           <Link

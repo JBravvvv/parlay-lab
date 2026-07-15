@@ -50,8 +50,12 @@ function Hero() {
   return (
     <div className="relative">
       <div className="relative z-10 flex min-h-dvh flex-col">
-        {/* navbar */}
-        <header className="w-full px-5 py-5 md:px-8">
+        {/* navbar — the app draws under the iOS status bar (viewport-fit=cover),
+            so reserve the safe-area inset or the wordmark sits behind the clock */}
+        <header
+          className="w-full px-5 pb-5 md:px-8"
+          style={{ paddingTop: "max(env(safe-area-inset-top), 1.25rem)" }}
+        >
           <div className="flex items-center justify-between">
             <Link href="/" className="flex select-none items-baseline gap-0.5">
               <span className="display text-[20px] font-semibold tracking-tight text-text">PARLAY</span>
