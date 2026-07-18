@@ -223,8 +223,10 @@ export default function SharpPage() {
                 </p>
                 <p>
                   <b className="text-text">5 · Discipline is hard-coded.</b> ¼-Kelly capped at 2% per bet,
-                  overs only, HR props never mix with other types, no pick rides two tickets, the daily amount
-                  always sums exactly — and everything locked gets graded from official box scores.
+                  overs only, HR props never mix with other types, daily money never rides a K&apos;s parlay
+                  (max one K leg on the card — they went 0-for-4 and the ledger is the boss), no pick rides
+                  two tickets, the daily amount always sums exactly — and everything locked gets graded from
+                  official box scores.
                 </p>
               </div>
             </details>

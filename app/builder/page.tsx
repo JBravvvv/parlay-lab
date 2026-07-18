@@ -324,7 +324,7 @@ export default function BuilderPage() {
         <Panel>
           <EmptyState
             title="Enter a DAILY $ (and optional FUN $)"
-            body="DAILY spreads across the highest-quality Caesars-playable tickets — never HR props, never past +1400, never the same pick twice. FUN buys 1–3 honest longshots."
+            body="DAILY spreads across the highest-quality Caesars-playable tickets — never HR props, never K's parlays (max one K leg on the card), never past +1400, never the same pick twice. FUN buys 1–3 honest longshots."
           />
         </Panel>
       ) : (
@@ -451,7 +451,8 @@ export default function BuilderPage() {
 
       <div className="mt-4 text-[10.5px] text-faint">
         Card discipline is hard-coded: one prop never rides two tickets, HR props parlay only with HR props and never
-        into the core card, and the daily amount always sums exactly. Informational only, not betting advice.
+        into the core card, Pitcher K&apos;s parlays never take daily money (0-for-4 as the lead tickets — max one K
+        leg on the card now), and the daily amount always sums exactly. Informational only, not betting advice.
       </div>
         </>
       )}

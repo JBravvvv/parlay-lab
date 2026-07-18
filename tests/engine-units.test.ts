@@ -44,6 +44,46 @@ describe("daily allocator (core card discipline)", () => {
     expect(b.picks.map((p) => [p.id, p.stake])).toEqual(a.picks.map((p) => [p.id, p.stake]));
   });
 
+  it("K's parlays never take daily money and at most one K leg rides the card (user rule 2026-07-17)", () => {
+    // the fixture slate has no Caesars-playable K tickets, so exercise the rule
+    // through the real allocator on a synthetic pool where the K's parlay would
+    // otherwise be the Kelly favorite (short odds + biggest EV = biggest weight)
+    type Leg = { label: string; prop: string; lkey: string; game: string };
+    const leg = (label: string, mkt: string, game: string): Leg => ({
+      label,
+      prop: `${mkt} O`,
+      lkey: `${label.toLowerCase().replace(/\s/g, "")}|${mkt}|5.5`,
+      game,
+    });
+    const tik = (type: string, legs: Leg[], czDec: number, czEv: number, prob: number) => ({
+      pl: { type, name: `${type} · ${legs.length} legs`, legs, czDec, czEv, prob },
+      src: "p",
+      idx: 0,
+    });
+    const synth = [
+      tik("pitcher_strikeouts", [leg("Ace One", "pitcher_strikeouts", "g1"), leg("Ace Two", "pitcher_strikeouts", "g2")], 2.4, 12, 45),
+      tik("MIX", [leg("Ace Three", "pitcher_strikeouts", "g3"), leg("Bat One", "batter_hits", "g4")], 2.6, 6, 40),
+      tik("MIX", [leg("Ace Four", "pitcher_strikeouts", "g5"), leg("Bat Two", "batter_hits", "g6")], 2.6, 6, 40),
+      tik("batter_total_bases", [leg("Bat Three", "batter_total_bases", "g7"), leg("Bat Four", "batter_total_bases", "g8")], 2.8, 5, 38),
+      tik("ml", [leg("Team A", "ml", "g9"), leg("Team B", "ml", "g10")], 2.5, 4, 42),
+    ];
+    const a = eng.get<(p: unknown[], amt: number, c: unknown) => { picks: { stake: number; w: { pl: Ticket } }[]; sum: number }>(
+      "shAllocate",
+    )(synth as never, 100, CFG());
+    expect(a.sum).toBe(100);
+    expect(a.picks.length).toBeGreaterThan(0);
+    let kLegsOnCard = 0;
+    for (const p of a.picks) {
+      expect(p.w.pl.type).not.toBe("pitcher_strikeouts");
+      for (const l of p.w.pl.legs)
+        if (String(l.lkey || "").includes("|pitcher_strikeouts|")) kLegsOnCard++;
+    }
+    // two K-leg mixed tickets offered — the card-wide budget lets at most one through
+    expect(kLegsOnCard).toBeLessThanOrEqual(1);
+    // and the live fixture card stays K-parlay-free too
+    for (const p of alloc(750).picks) expect(p.w.pl.type).not.toBe("pitcher_strikeouts");
+  });
+
   it("never repeats a pick across the card and never takes HR or +1400-plus tickets", () => {
     const a = alloc(750);
     const seen = new Set<string>();

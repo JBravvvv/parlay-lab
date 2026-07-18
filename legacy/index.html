@@ -1068,6 +1068,9 @@ var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),t
 /* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
 var SH_CFG={perParlayCap:0.40,roundTo:1,maxCoreTickets:6,thinSlateEV:0,
   coreNoHR:true,   /* DAILY money never touches HR props — HR volatility lives in the FUN bucket only (user rule) */
+  coreNoKs:true,   /* user rule 2026-07-17: dedicated Pitcher K's parlays led the card 4 straight days and went
+                      0-for-4 — DAILY money never rides a pure K's parlay again (still browsable + FUN-eligible) */
+  coreKsLegMax:1,  /* mixed tickets can't rebuild one either: at most ONE pitcher-K leg on the whole daily card */
   coreMaxDec:15,   /* core odds ceiling ~+1400: longshot ticket "EV" is compounded model error, not edge */
   funTiers:[[800,2500],[2500,10000],[10000,1/0]],funTierNames:["BIG","MASSIVE","MOONSHOT"],
   funAmt2:15,funAmt3:50,funSplit2:[0.6,0.4],funSplit3:[0.5,0.3,0.2],
@@ -2253,14 +2256,16 @@ function shCardPool(d){
 }
 /* EV·√floor weighted, correlation-dampened, capped, whole-dollar EXACT-SUM allocation.
    Pure + deterministic: same pool/amount/cfg -> identical stakes (re-allocation is idempotent). */
-/* core-card discipline (user rules): DAILY money never rides an HR prop, and never a ticket
-   longer than cfg.coreMaxDec — a 5-leg HR "monster EV" is compounded model error and loses
-   nearly every day. Those tickets stay browsable and FUN-eligible; they just can't take
-   the daily bankroll. */
+/* core-card discipline (user rules): DAILY money never rides an HR prop, never a dedicated
+   Pitcher K's parlay (0-for-4 days as the card's lead tickets — the ledger spoke, 2026-07-17),
+   and never a ticket longer than cfg.coreMaxDec — a 5-leg HR "monster EV" is compounded model
+   error and loses nearly every day. Those tickets stay browsable and FUN-eligible; they just
+   can't take the daily bankroll. */
 function shCoreEligible(w,cfg){
   var pl=w.pl;
   if(cfg.coreNoHR&&(pl.type==="batter_home_runs"||
     pl.legs.some(function(l){return (l.lkey||"").indexOf("|batter_home_runs|")>=0;})))return false;
+  if(cfg.coreNoKs&&pl.type==="pitcher_strikeouts")return false;
   if(cfg.coreMaxDec&&pl.czDec!=null&&pl.czDec>cfg.coreMaxDec)return false;
   return true;
 }
@@ -2285,7 +2290,11 @@ function shAllocate(pool,amount,cfg){
      going wrong must never sink multiple tickets, and a repeated leg adds hidden leverage,
      not diversification. Tickets sharing an exact leg with anything already picked are
      skipped outright; sharing just a game is allowed but dampens the weight (0.5/leg). */
-  var picked=[],gUse={},lUse={};
+  var picked=[],gUse={},lUse={},kUse=0;
+  /* K-leg budget across the WHOLE card (user rule 2026-07-17): with dedicated K's parlays
+     already barred from daily money, mixed tickets must not quietly rebuild one */
+  var kMax=(cfg.coreKsLegMax!=null)?cfg.coreKsLegMax:1/0;
+  function kLegs(pl){var n=0;pl.legs.forEach(function(l){if((l.lkey||"").indexOf("|pitcher_strikeouts|")>=0)n++;});return n;}
   var wantN=Math.min(cfg.maxCoreTickets,scored.length);
   while(picked.length<wantN){
     var best=null,bw=-1;
@@ -2296,11 +2305,12 @@ function shAllocate(pool,amount,cfg){
         if(lUse[l.label+"|"+l.prop])dup=true;
         shared+=(gUse[l.game]||0)*0.5;});
       if(dup)continue;
+      if(kUse+kLegs(s.w.pl)>kMax)continue;
       var eff=s.base/(1+shared);
       if(eff>bw+1e-12){bw=eff;best=s;} /* index order breaks ties -> deterministic */
     }
     if(!best)break;
-    best.done=true;best.eff=bw;picked.push(best);
+    best.done=true;best.eff=bw;picked.push(best);kUse+=kLegs(best.w.pl);
     best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=1;});
   }
   /* proportional stakes with the per-ticket cap (relaxed to 1/n when the pool is tiny,
@@ -2410,7 +2420,7 @@ function shCardView(d){
   var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
   if(!cc||!cc.pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
   if(!(SH.daily>0)&&!(SH.fun>0))
-    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, ¼-Kelly-weighted (edge ÷ odds, the bankroll-growth math), max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, no pick ever repeated across tickets, <b>never an HR prop</b>, nothing longer than "+esc(obSign(decToAm(SH_CFG.coreMaxDec)))+". HR bombs and longshots live in FUN $ only — money you're fine losing.</div></div>";
+    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, ¼-Kelly-weighted (edge ÷ odds, the bankroll-growth math), max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, no pick ever repeated across tickets, <b>never an HR prop, never a Pitcher K's parlay</b> (max one K leg on the whole card), nothing longer than "+esc(obSign(decToAm(SH_CFG.coreMaxDec)))+". HR bombs, K's parlays and longshots live in FUN $ only — money you're fine losing.</div></div>";
   if(shCardStarted(d,cc))h+="<div class='shthin'>First pitch has passed on a card game — amounts are frozen for today. Lock the card to record it, or it goes untracked.</div>";
   if(SH.daily>0){
     var alloc=cc.alloc;
