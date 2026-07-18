@@ -14,6 +14,7 @@ import {
   IconStats,
 } from "./icons";
 import { VideoBackdrop } from "./VideoBackdrop";
+import { useLedgerSyncBeacon } from "@/lib/ledgerSync";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: IconDash, mobile: true },
@@ -42,6 +43,8 @@ function Brand() {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // ledger cloud sync runs app-wide: on open, on refocus, and on a timer
+  useLedgerSyncBeacon();
   // "/" is the immersive landing: full-bleed hero with its own navbar — no
   // side rail, no mobile top bar, no content gutters. Bottom tabs stay (PWA nav).
   const landing = pathname === "/";

@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
+import { syncNow, useSyncState } from "@/lib/ledgerSync";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 
 const TIP = {
@@ -52,6 +53,41 @@ function GradePill({ g }: { g?: TicketGrade }) {
 }
 
 const amSign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+
+/* live cloud-sync status — the phone and desktop share one season record */
+function SyncChip() {
+  const st = useSyncState();
+  if (st.kind === "off")
+    return (
+      <div className="mb-3 text-[11.5px] text-faint">
+        Sync is off — one phrase in <a href="/settings" className="text-pos hover:underline">Settings</a> keeps your
+        phone and desktop ledgers automatically identical.
+      </div>
+    );
+  const body =
+    st.kind === "synced" ? (
+      <span className="text-pos">
+        ⟳ Synced · {st.days} locked day{st.days === 1 ? "" : "s"} ·{" "}
+        {new Date(st.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+      </span>
+    ) : st.kind === "syncing" ? (
+      <span className="text-muted">⟳ Syncing…</span>
+    ) : st.kind === "not-configured" ? (
+      <span className="text-gold">Sync needs its one-time Vercel setup — steps are in Settings</span>
+    ) : st.kind === "bad-key" ? (
+      <span className="text-neg">Sync phrase doesn&apos;t match Vercel — fix it in Settings</span>
+    ) : (
+      <span className="text-gold">{st.detail}</span>
+    );
+  return (
+    <div className="num mb-3 flex items-center gap-3 text-[11.5px]">
+      {body}
+      <button onClick={() => void syncNow()} className="text-[11px] font-semibold text-muted hover:text-text">
+        Sync now
+      </button>
+    </div>
+  );
+}
 
 function LegLine({
   l,
@@ -147,13 +183,15 @@ function DayCard({ e }: { e: LedgerEntry }) {
 }
 
 export default function LedgerPage() {
-  const { api } = useLedger();
+  const { api, refresh } = useLedger();
   const [scope, setScope] = useState<"all" | "core" | "fun">("all");
   const [grading, setGrading] = useState(false);
   const [note, setNote] = useState("");
   const [showPaste, setShowPaste] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [wipeArmed, setWipeArmed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const wipeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // One-tap migration: the old app's SEND TO NEW APP button opens this page
   // with the ledger base64url-encoded in the hash. Import rules still apply —
@@ -196,6 +234,7 @@ export default function LedgerPage() {
     try {
       const n = await api.grade();
       setNote(n > 0 ? `Grades updated for ${n} day${n === 1 ? "" : "s"}.` : "Nothing new to grade yet.");
+      if (n > 0) void syncNow();
     } finally {
       setGrading(false);
     }
@@ -216,6 +255,33 @@ export default function LedgerPage() {
     if (!api) return;
     api.importText(await f.text());
     setNote("Import merged. Locked days already here were never overwritten.");
+    void syncNow();
+  };
+
+  /* wipe THIS device only — two taps, and a backup file downloads first.
+     With sync on, the cloud copy refills the device afterwards (by design). */
+  const doWipe = () => {
+    if (!api) return;
+    if (!wipeArmed) {
+      setWipeArmed(true);
+      if (wipeTimer.current) clearTimeout(wipeTimer.current);
+      wipeTimer.current = setTimeout(() => setWipeArmed(false), 6000);
+      setNote("Wipe clears the ledger on THIS device only, and a backup file downloads first. Tap the button again to confirm.");
+      return;
+    }
+    if (wipeTimer.current) clearTimeout(wipeTimer.current);
+    setWipeArmed(false);
+    if (api.entries.length) doExport();
+    try {
+      localStorage.removeItem("pl_ledger");
+    } catch {
+      /* nothing to clear */
+    }
+    refresh();
+    void syncNow();
+    setNote(
+      "Wiped — this device starts clean (backup downloaded). Import your phone's ledger below, or turn on Ledger sync in Settings and it fills itself.",
+    );
   };
 
   const doPasteImport = () => {
@@ -227,6 +293,7 @@ export default function LedgerPage() {
     setNote(
       `Import merged${before === 0 ? "" : " with what was already here"} — locked days are never overwritten. Check the days below.`,
     );
+    void syncNow();
   };
 
   if (!api) return null;
@@ -265,6 +332,14 @@ export default function LedgerPage() {
             <Pill variant="ghost" onClick={() => setShowPaste((s) => !s)}>
               Import
             </Pill>
+            <Pill
+              variant="ghost"
+              disabled={empty}
+              onClick={doWipe}
+              className={wipeArmed ? "!border-neg/60 !bg-neg/10 !text-neg" : "!text-neg/80"}
+            >
+              {wipeArmed ? "Confirm wipe" : "Wipe device"}
+            </Pill>
             <input
               ref={fileRef}
               type="file"
@@ -275,6 +350,7 @@ export default function LedgerPage() {
           </div>
         }
       />
+      <SyncChip />
       {note && <div className="mb-4 text-[12px] text-pos">{note}</div>}
 
       {showPaste && (

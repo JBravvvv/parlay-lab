@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getEngine } from "./engine-client";
+import { SYNC_EVENT } from "./ledgerSync";
 
 export type DayStat = {
   date: string;
@@ -82,6 +83,11 @@ export function useLedger() {
   // (otherwise Next reports a hydration mismatch on every ledger-fed page).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // cloud sync rewrote pl_ledger → recompute everything ledger-fed
+  useEffect(() => {
+    window.addEventListener(SYNC_EVENT, refresh);
+    return () => window.removeEventListener(SYNC_EVENT, refresh);
+  }, [refresh]);
   const eng = mounted ? getEngine() : null;
 
   const api = useMemo(() => {

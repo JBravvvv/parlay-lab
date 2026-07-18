@@ -5,6 +5,104 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { getMoney, setMoney } from "@/lib/engine-client";
+import { getSyncKey, setSyncKey, syncNow, useSyncState } from "@/lib/ledgerSync";
+
+/* Ledger cloud sync — one phrase, every device shares one season record */
+function LedgerSyncPanel() {
+  const st = useSyncState();
+  const [phrase, setPhrase] = useState("");
+  // probe server config on open so the setup steps show before a phrase exists
+  const [needsSetup, setNeedsSetup] = useState<string[] | null>(null);
+  useEffect(() => {
+    setPhrase(getSyncKey());
+    fetch("/api/ledger", { cache: "no-store" })
+      .then(async (r) => {
+        if (r.status === 503) {
+          const j = (await r.json().catch(() => ({}))) as { missing?: string[] };
+          setNeedsSetup(j.missing ?? ["store", "key"]);
+        } else setNeedsSetup([]);
+      })
+      .catch(() => {});
+  }, []);
+  const on = getSyncKey() !== "";
+  const missing = st.kind === "not-configured" ? st.missing : (needsSetup ?? []);
+
+  const statusLine = () => {
+    switch (st.kind) {
+      case "off":
+        return <span className="text-[12px] text-muted">Off — enter your sync phrase below to link this device</span>;
+      case "syncing":
+        return <span className="text-[12px] text-muted">Syncing…</span>;
+      case "synced":
+        return (
+          <span className="num text-[12.5px] text-pos">
+            Synced · {st.days} locked day{st.days === 1 ? "" : "s"} ·{" "}
+            {new Date(st.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          </span>
+        );
+      case "not-configured":
+        return <span className="text-[12px] font-semibold text-gold">Cloud store not set up yet — steps below</span>;
+      case "bad-key":
+        return <span className="text-[12px] font-semibold text-neg">Phrase doesn&apos;t match LEDGER_SYNC_KEY on Vercel</span>;
+      case "error":
+        return <span className="text-[12px] text-gold">{st.detail}</span>;
+    }
+  };
+
+  return (
+    <Panel title="Ledger sync — one record, every device">
+      <Row label="Status">{statusLine()}</Row>
+      <Row label="Sync phrase (same on every device)">
+        <input
+          type="text"
+          value={phrase}
+          onChange={(e) => setPhrase(e.target.value)}
+          placeholder="not set"
+          autoComplete="off"
+          className="num w-44 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[13px] text-text outline-none focus:border-pos/50"
+        />
+        <Pill variant="primary" onClick={() => setSyncKey(phrase)} className="!px-3 !py-1 text-[11px]">
+          {on ? "Update" : "Turn on"}
+        </Pill>
+        {on && (
+          <Pill variant="ghost" onClick={() => void syncNow()} className="!px-3 !py-1 text-[11px]">
+            Sync now
+          </Pill>
+        )}
+      </Row>
+      <div className="pt-2 text-[11px] leading-relaxed text-faint">
+        With sync on, every locked card, grade, and CLV sighting lands on all your devices automatically —
+        syncs on open, on returning to the app, and within a minute of any change. Locked days are merged,
+        never overwritten, so no device can erase another&apos;s record.
+      </div>
+      {missing.length > 0 && (
+        <div className="mt-3 rounded-xl border border-gold/30 bg-gold/[0.06] px-4 py-3 text-[12px] leading-relaxed text-muted">
+          <div className="mb-1.5 font-semibold text-gold">One-time setup (~3 minutes, in your Vercel dashboard)</div>
+          <ol className="list-decimal space-y-1 pl-4">
+            {missing.includes("store") && (
+              <li>
+                vercel.com → your <b className="text-text">parlay-lab</b> project → <b className="text-text">Storage</b> tab →
+                Browse Marketplace → <b className="text-text">Upstash</b> → <b className="text-text">Redis</b> → Free plan →
+                create &amp; connect it to the project (its env vars are added for you).
+              </li>
+            )}
+            {missing.includes("key") && (
+              <li>
+                Project <b className="text-text">Settings → Environment Variables</b> → add{" "}
+                <b className="text-text">LEDGER_SYNC_KEY</b> = a phrase you invent (this is the password for your sync).
+              </li>
+            )}
+            <li>
+              <b className="text-text">Deployments</b> tab → ⋯ on the newest deployment → <b className="text-text">Redeploy</b>{" "}
+              (new env vars only take effect on a fresh deploy).
+            </li>
+            <li>Come back here, type that same phrase, and hit Turn on — phone first, then the desktop.</li>
+          </ol>
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 /* Engine v2 data spine health — reads the nightly Statcast priors artifact */
 function PriorsStatus() {
@@ -123,7 +221,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" sub="Sizing, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
+      <PageHeader title="Settings" sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
       {saved && <div className="mb-3 text-[12px] text-pos">{saved}</div>}
 
       <div className="space-y-4">
@@ -145,6 +243,8 @@ export default function SettingsPage() {
             <span className="text-[12px] text-muted">set on the Builder, frozen once a card locks</span>
           </Row>
         </Panel>
+
+        <LedgerSyncPanel />
 
         <Panel title="Device passcode">
           <Row label="Passcode for spend-money actions (The Sharp, forced odds refresh)">
