@@ -4,8 +4,78 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
-import { getMoney, setMoney } from "@/lib/engine-client";
+import { getMoney, setMoney, getSelectionMode, setSelectionMode, type SelectionMode } from "@/lib/engine-client";
 import { getSyncKey, setSyncKey, syncNow, useSyncState } from "@/lib/ledgerSync";
+import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
+
+/* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
+function SelectionCalibrationPanel() {
+  const cal = useCalibration();
+  const [mode, setMode] = useState<SelectionMode>("probability");
+  const [auto, setAuto] = useState<"on" | "off">("on");
+  const [note, setNote] = useState("");
+  useEffect(() => setMode(getSelectionMode()), []);
+  useEffect(() => setAuto(cal.auto), [cal.auto]);
+
+  const flipMode = (m: SelectionMode) => {
+    setMode(m);
+    setSelectionMode(m);
+    setNote("Saved — takes effect on the next card calc / Sharp read.");
+    setTimeout(() => setNote(""), 2500);
+  };
+  const flipAuto = async (v: "on" | "off") => {
+    setAuto(v);
+    try {
+      const r = await fetch("/api/calibration", {
+        method: "POST",
+        headers: { "x-pl-sync": getSyncKey(), "content-type": "application/json" },
+        body: JSON.stringify({ auto: v }),
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      invalidateCalibration();
+      setNote(v === "off" ? "Auto-calibration OFF — flagging and reporting still run." : "Auto-calibration ON.");
+    } catch {
+      setNote("Couldn't reach the store — is Ledger sync set up with your phrase?");
+      setAuto(cal.auto);
+    }
+    setTimeout(() => setNote(""), 4000);
+  };
+
+  return (
+    <Panel title="Pick selection & calibration">
+      <Row label="Selection mode (The Sharp's plays + Builder suggestions)">
+        <div className="flex gap-1.5">
+          <Pill variant={mode === "probability" ? "primary" : "ghost"} onClick={() => flipMode("probability")} className="!px-3 !py-1 text-[11px]">
+            True probability
+          </Pill>
+          <Pill variant={mode === "caesars_ev" ? "primary" : "ghost"} onClick={() => flipMode("caesars_ev")} className="!px-3 !py-1 text-[11px]">
+            Caesars EV
+          </Pill>
+        </div>
+      </Row>
+      <Row label="Auto-calibration (self-correcting blend weights)">
+        <div className="flex gap-1.5">
+          <Pill variant={auto === "on" ? "primary" : "ghost"} onClick={() => void flipAuto("on")} className="!px-3 !py-1 text-[11px]">
+            On
+          </Pill>
+          <Pill variant={auto === "off" ? "primary" : "ghost"} onClick={() => void flipAuto("off")} className="!px-3 !py-1 text-[11px]">
+            Off
+          </Pill>
+        </div>
+      </Row>
+      {note && <div className="pt-1 text-[11.5px] text-pos">{note}</div>}
+      <div className="pt-2 text-[11px] leading-relaxed text-faint">
+        <b className="text-muted">True probability</b> (default): picks are chosen by the engine&apos;s blended true %
+        anchored to the full multi-book consensus — Caesars only prices and sizes what was already chosen, and picks
+        it doesn&apos;t offer are listed separately, never substituted. <b className="text-muted">Caesars EV</b> is the
+        legacy ranking by playable edge at CZ. Auto-calibration lets the nightly grader shrink a market&apos;s model
+        weight toward the consensus when 150+ graded picks show statistically significant overconfidence (capped ±10%
+        per week, shrink-only, every change logged under Stats → Calibration). Off = reporting continues, weights stay
+        at the shipped defaults.
+      </div>
+    </Panel>
+  );
+}
 
 /* Ledger cloud sync — one phrase, every device shares one season record */
 function LedgerSyncPanel() {
@@ -243,6 +313,8 @@ export default function SettingsPage() {
             <span className="text-[12px] text-muted">set on the Builder, frozen once a card locks</span>
           </Row>
         </Panel>
+
+        <SelectionCalibrationPanel />
 
         <LedgerSyncPanel />
 

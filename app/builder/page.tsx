@@ -107,6 +107,14 @@ function TicketCard({ t, stake, grade }: { t: Ticket & { tier?: string }; stake:
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11.5px]">
             <span className="text-muted">
               <span className="text-text">{l.label}</span> {l.prop}
+              {(l as { lu?: string }).lu === "projected" && (
+                <span
+                  className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold text-gold"
+                  title="Lineup not posted yet — projected everyday starter; Caesars auto-voids the leg if he sits"
+                >
+                  PROJ
+                </span>
+              )}
             </span>
             {l.cz != null && <span className="num shrink-0 text-gold">{fmtAmerican(Number(l.cz))}</span>}
           </div>

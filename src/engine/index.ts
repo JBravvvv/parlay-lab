@@ -46,6 +46,15 @@ export interface PickRow {
   conv?: string;
   tags?: string[];
   live?: boolean;
+  /* calibration spec additions (all additive) */
+  implied?: number;
+  edge?: number | null;
+  book?: string | null;
+  pModel?: number | null;
+  wBlend?: number | null;
+  lu?: "confirmed" | "projected";
+  noParlay?: boolean;
+  gkey?: string | null;
   [k: string]: unknown;
 }
 

@@ -12,6 +12,8 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { getSelectionMode } from "@/lib/engine-client";
+import { useCalibration } from "@/lib/useCalibration";
 import type { PickRow } from "@/engine";
 
 /* The Sharp = the built-in quant engine's daily read. Same engine as the old
@@ -52,21 +54,43 @@ export default function SharpPage() {
     try { localStorage.setItem("pl_sharp_sport", s); } catch {}
   };
 
-  const plays: PickRow[] = useMemo(() => {
-    if (!d) return [];
+  // selection_mode (calibration spec Update 1): probability (default) ranks
+  // today's plays by the engine's true % — Caesars' price never changes WHICH
+  // picks are chosen, it only prices them. caesars_ev is the legacy ranking.
+  const [selMode, setSelModeState] = useState<"probability" | "caesars_ev">("probability");
+  useEffect(() => setSelModeState(getSelectionMode()), []);
+  const cal = useCalibration();
+
+  const { plays, notOffered } = useMemo(() => {
+    if (!d) return { plays: [] as PickRow[], notOffered: [] as PickRow[] };
     const seen = new Set<string>();
-    return Object.entries(d.categories)
+    const rows = Object.entries(d.categories)
       .filter(([k]) => k !== "all")
-      .flatMap(([, v]) => v)
+      .flatMap(([mkt, v]) => v.map((r) => ({ ...r, __mkt: mkt })))
       .filter((r) => {
         const k = `${r.label}|${r.sub}`;
-        if (r.cz == null || Number(r.czEv) <= 0 || seen.has(k)) return false;
+        if (seen.has(k)) return false;
         seen.add(k);
         return true;
       })
-      .sort((a, b) => Number(b.czEv) - Number(a.czEv))
-      .slice(0, 8);
-  }, [d]);
+      // 3D sanity breaker: quarantined markets are frozen out of suggested
+      // plays (they stay on the Board, badged UNDER REVIEW)
+      .filter((r) => !cal.quarantine.includes((r as { __mkt: string }).__mkt));
+    if (selMode === "caesars_ev") {
+      return {
+        plays: rows
+          .filter((r) => r.cz != null && Number(r.czEv) > 0)
+          .sort((a, b) => Number(b.czEv) - Number(a.czEv))
+          .slice(0, 8),
+        notOffered: [] as PickRow[],
+      };
+    }
+    const top = rows.sort((a, b) => Number(b.prob) - Number(a.prob)).slice(0, 8);
+    return {
+      plays: top.filter((r) => r.cz != null),
+      notOffered: top.filter((r) => r.cz == null),
+    };
+  }, [d, selMode, cal.quarantine]);
 
   const trap = d?.trap as Trap | undefined;
   const passes = (d?.passes as Pass[] | undefined) ?? [];
@@ -120,9 +144,19 @@ export default function SharpPage() {
             </Reveal>
           )}
 
+          {cal.line && (
+            <Reveal>
+              <div className="num rounded-(--radius-panel) border border-white/[0.06] bg-surface/60 px-4 py-2.5 text-[11.5px] text-muted">
+                {cal.line}
+              </div>
+            </Reveal>
+          )}
+
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-              Today&apos;s plays — best playable EV at Caesars
+              {selMode === "probability"
+                ? "Today's plays — highest true probability (consensus-anchored; Caesars prices the ticket, never picks it)"
+                : "Today's plays — best playable EV at Caesars"}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {plays.map((r, i) => (
@@ -145,6 +179,14 @@ export default function SharpPage() {
                         EDGE
                       </span>
                     ) : null}
+                    {r.lu === "projected" && (
+                      <span
+                        className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"
+                        title="Lineup not posted yet — projected everyday starter; Caesars auto-voids the leg if he sits"
+                      >
+                        PROJ
+                      </span>
+                    )}
                   </div>
                   {Array.isArray(r.tags) && r.tags.length > 0 && (
                     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -158,11 +200,31 @@ export default function SharpPage() {
                 </Panel>
               ))}
             </div>
+            {notOffered.length > 0 && (
+              <div className="mt-4">
+                <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
+                  In the top picks, not offered at Caesars — never substituted with a lower-probability pick
+                </h3>
+                <div className="space-y-1.5">
+                  {notOffered.map((r) => (
+                    <div key={`${r.label}|${r.sub}`} className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
+                      <span>
+                        <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
+                        {r.lu === "projected" && <span className="ml-1.5 text-[9.5px] font-bold text-gold">PROJ</span>}
+                      </span>
+                      <span className="num text-[11.5px] text-muted">
+                        {Number(r.prob).toFixed(1)}% true · best {String(r.odds)} @ {String(r.book ?? "—")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {plays.length === 0 && (
               <Panel>
                 <EmptyState
-                  title="No positive-EV plays at Caesars right now"
-                  body="The engine found no playable edge on this slate — that's a real answer, not a failure. Passing is a position."
+                  title={selMode === "probability" ? "No playable picks right now" : "No positive-EV plays at Caesars right now"}
+                  body="The engine found nothing playable on this slate — that's a real answer, not a failure. Passing is a position."
                 />
               </Panel>
             )}

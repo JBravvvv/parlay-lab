@@ -2,6 +2,7 @@
 
 import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
+import { logBoardPredictions } from "./predictions";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -36,6 +37,28 @@ export function getSims(): Record<string, SimOut> {
   return out;
 }
 
+export type SelectionMode = "probability" | "caesars_ev";
+
+export function getSelectionMode(): SelectionMode {
+  try {
+    return localStorage.getItem("pl_selmode") === "caesars_ev" ? "caesars_ev" : "probability";
+  } catch {
+    return "probability";
+  }
+}
+
+export function setSelectionMode(mode: SelectionMode) {
+  try {
+    localStorage.setItem("pl_selmode", mode);
+  } catch {
+    /* private mode */
+  }
+  if (engine) {
+    const cfg = engine.get<Record<string, unknown>>("SH_CFG");
+    if (cfg) cfg.selMode = mode;
+  }
+}
+
 export function getEngine(): Engine {
   if (!engine) {
     engine = createEngine({ fetchJson: browserFetchJson, storage: window.localStorage });
@@ -45,6 +68,10 @@ export function getEngine(): Engine {
       simCapture.push(res);
       return res;
     });
+    // selection_mode (calibration spec Update 1): probability is the default;
+    // the legacy Caesars-EV ranking stays selectable in Settings
+    const cfg = engine.get<Record<string, unknown>>("SH_CFG");
+    if (cfg) cfg.selMode = getSelectionMode();
   }
   return engine;
 }
@@ -77,7 +104,11 @@ export function cachedBoard(): Board | null {
    own overview says which mode ran. */
 async function armV2(eng: Engine) {
   const grab = (u: string) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [priors, ctx] = await Promise.all([grab("/model/priors.json"), grab("/model/context.json")]);
+  const [priors, ctx, cal] = await Promise.all([
+    grab("/model/priors.json"),
+    grab("/model/context.json"),
+    grab("/api/calibration"),
+  ]);
   eng.set("SH_PRIORS", priors);
   eng.set("SH_CTX", ctx);
   eng.set("SH_V2", {
@@ -91,6 +122,9 @@ async function armV2(eng: Engine) {
     // projected lineups (user rule 2026-07-17): everyday starters count before
     // lineups post; a posted lineup missing the player scratches him entirely
     projLineup: true,
+    // calibration self-correction (3D): per-market shrink-only multipliers on
+    // the model blend weight; empty when auto_calibration is off or no data
+    calW: (cal as { mults?: Record<string, number> } | null)?.mults ?? null,
   });
 }
 
@@ -108,6 +142,8 @@ export async function generateBoard(): Promise<Board> {
     /* board too big for storage — regenerate next open instead */
   }
   syncEngineBoard(board);
+  // calibration 3A: log the full board (fire-and-forget, fail-silent by spec)
+  void logBoardPredictions(board.date, data);
   return board;
 }
 

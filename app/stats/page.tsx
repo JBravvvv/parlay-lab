@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { UfcRankings } from "@/components/ufc/UfcRankings";
+import { CalibrationPanel } from "@/components/stats/CalibrationPanel";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -236,6 +237,8 @@ export default function StatsPage() {
   const [position, setPosition] = useState("ALL");
   const [minVal, setMinVal] = useState(0);
   const [query, setQuery] = useState("");
+  // calibration spec 3C: the reliability view lives under Stats as its own tab
+  const [calView, setCalView] = useState(false);
 
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
@@ -366,11 +369,12 @@ export default function StatsPage() {
         <Panel className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
             {(["mlb", "nfl", "cfb", "ufc"] as SportId[]).map((s) => (
-              <FilterPill key={s} selected={sport === s} onClick={() => pickSport(s)}>
+              <FilterPill key={s} selected={sport === s && !calView} onClick={() => { setCalView(false); pickSport(s); }}>
                 {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
               </FilterPill>
             ))}
-            {sport !== "ufc" && (<>
+            <FilterPill selected={calView} onClick={() => setCalView(true)}>📐 CALIBRATION</FilterPill>
+            {sport !== "ufc" && !calView && (<>
             <span className="mx-1 h-5 w-px bg-line-2" />
             <FilterPill selected={scope === "ind"} onClick={() => setScope("ind")}>INDIVIDUAL</FilterPill>
             <FilterPill selected={scope === "team"} onClick={() => setScope("team")}>TEAM</FilterPill>
@@ -381,7 +385,7 @@ export default function StatsPage() {
             </>)}
           </div>
 
-          {sport !== "ufc" && (<>
+          {sport !== "ufc" && !calView && (<>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               value={query}
@@ -434,7 +438,9 @@ export default function StatsPage() {
         </Panel>
       </Reveal>
 
-      {sport === "ufc" ? (
+      {calView ? (
+        <CalibrationPanel />
+      ) : sport === "ufc" ? (
         <UfcRankings />
       ) : q.isPending ? (
         <div className="space-y-2">

@@ -210,3 +210,29 @@ invariants.
 Elite groups sustain ~52–55% vs the close. Edges come from softer prop markets, line
 shopping, speed on lineup/weather news, and discipline. The engine's job is to be on the
 right side of the closing line with honest sizing — not to promise more.
+
+## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
+Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
+- **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
+  played or not, CZ-offered or not) is serialized client-side (`src/lib/predictions.ts`) and
+  upserted to Upstash (`pl:pred:{date}`) via `/api/predictions` (sync-phrase gated). Rows carry
+  `pModel` / `pMkt` / `wBlend` / `lu` (lineup_status) — additive engine fields, digest-safe.
+  Freeze rules: graded records immutable; once a game starts its pre-start statement is frozen.
+- **3B grading:** `/api/calibrate` (Vercel cron 09:30 UTC + manual `?force=1` with sync key)
+  grades from statsapi schedule + boxscores via `src/engine2/grade.ts` — a tested port of the
+  engine's shGradeLeg with identical Caesars void rules. Projected-lineup picks get
+  `luRes`/`boAct` reconciliation (Update 2). Pinnacle-close CLV: NOT yet wired (needs the
+  line-history reader) — reserved fields exist; panel copy stays silent rather than fake it.
+- **3C analysis:** `src/engine2/calibration.ts` — prob/edge buckets per market per lineup_status,
+  Brier, Wilson 95% CI; significance = predicted outside the CI. Stats → 📐 CALIBRATION panel.
+- **3D self-correction:** shrink-ONLY per-market multipliers on the model blend weight
+  (`shWm()` in the engine, fed via `SH_V2.calW` from `/api/calibration`). Tiers: <50 MONITOR,
+  50–99 SOFT, 100–149 HARD, ≥150 ADJUST (CI-gated), ±10%/week cap, 5% absolute floor, ceiling
+  = shipped defaults (35/15). Sanity breaker (n≥30, 30%+ edge, actual < half predicted) →
+  market quarantined from The Sharp's plays, badged UNDER REVIEW. Kill switch `pl:cal:auto`
+  (Settings; reporting runs regardless). Every adjustment logged and displayed.
+- **Update 1 selection_mode:** `probability` (default) — Sharp plays + Builder card selection
+  rank by engine true % (consensus-anchored); Caesars prices/sizes only, never chooses; picks
+  CZ doesn't offer are listed separately, never substituted. `caesars_ev` = legacy ranking,
+  in Settings. TOP 50 unchanged. Allocator: `SH_CFG.selMode` drives the base weight.
+- Fail-silent contract: any calibration failure leaves board generation untouched.

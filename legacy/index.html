@@ -1505,6 +1505,15 @@ var SH_OVER_LEAN=0.25;
    w values are the doc's recommended ranges — we can't fit them out-of-sample without a
    backtest pipeline, so they stay conservative and configurable here. */
 var SH_W={props:0.35,ml:0.15,rl:0.15};
+/* Calibration self-correction (2026-07-17 spec): per-market multipliers on the MODEL
+   side of the blend, fed by the calibration module via SH_V2.calW. SHRINK-ONLY by
+   design — a multiplier can pull the model toward the consensus (floor 5% absolute)
+   but never above the shipped defaults. Dormant (no SH_V2/calW) = identical blend. */
+function shWm(base,mkt){
+  var m=(SH_V2&&SH_V2.calW&&SH_V2.calW[mkt]!=null)?Number(SH_V2.calW[mkt]):1;
+  if(!isFinite(m)||m>=1)return base;
+  return Math.max(0.05,base*Math.max(0,m));
+}
 var SH_EDGE_MIN={props:0.04,ml:0.02,rl:0.02}; /* minimum EV before a pick earns the EDGE badge */
 /* conviction from EV + sample-size uncertainty band: A = clears threshold AND band; B = positive EV; C = rest */
 function shBand(nEff){return shClamp(0.6/Math.sqrt((nEff||80)+10),0.02,0.10);}
@@ -1829,7 +1838,8 @@ function shAnalyzeLocal(slate){
     if(go.ml_books>=2){bits.push("consensus of "+go.ml_books+" books, de-vigged");tags.push("consensus");}
     if(go.total!=null)bits.push("Vegas total "+go.total);
     /* market-anchored blend: the consensus is the prior; the model must earn its deviation */
-    var pH=SH_W.ml*model+(1-SH_W.ml)*novH;
+    var wML=shWm(SH_W.ml,"ml");
+    var pH=wML*model+(1-wML)*novH;
     var homeSide=pH>=0.5;
     var live=shIsLive(g),glabel=shGameLabel(g,go.game),ginn=(g&&g.inning)||0;
     var gkeyML=pnorm(g.away)+"@"+pnorm(g.home);
@@ -1837,6 +1847,7 @@ function shAnalyzeLocal(slate){
       oddsN:homeSide?go.home_ml:go.away_ml,book:homeSide?go.home_ml_book:go.away_ml_book,
       czN:(homeSide?go.home_ml_cz:go.away_ml_cz)!=null?(homeSide?go.home_ml_cz:go.away_ml_cz):null,
       p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
+      pModel:homeSide?model:1-model,wBlend:wML,lu:"confirmed",
       lkey:homeSide?"ml_home":"ml_away",gkey:gkeyML,
       risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
     if(go.home_rl_pt!=null&&go.home_rl!=null&&go.away_rl!=null){
@@ -1848,12 +1859,14 @@ function shAnalyzeLocal(slate){
           pHomeCover=(go.home_rl_pt<0)?sim.pHomeM15:sim.pHomeP15;
           rlBits.unshift("sim run-line: home "+sPt(go.home_rl_pt)+" covers "+(pHomeCover*100).toFixed(1)+"% (bottom-9th truncation modeled)");
         }else pHomeCover=(go.home_rl_pt<0)?mapCover(pH):1-mapCover(1-pH);
-        var pHC=SH_W.rl*pHomeCover+(1-SH_W.rl)*novHr;
+        var wRL=shWm(SH_W.rl,"rl");
+        var pHC=wRL*pHomeCover+(1-wRL)*novHr;
         var side=pHC>=0.5;
         cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
           odds:obSign(side?go.home_rl:go.away_rl),oddsN:side?go.home_rl:go.away_rl,book:side?go.home_rl_book:go.away_rl_book,
           czN:(side?go.home_rl_cz:go.away_rl_cz)!=null?(side?go.home_rl_cz:go.away_rl_cz):null,
           p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
+          pModel:side?pHomeCover:1-pHomeCover,wBlend:wRL,lu:"confirmed",
           game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
           lkey:side?"rl_home":"rl_away",gkey:gkeyML,
           risk:((side?go.home_rl_pt:go.away_rl_pt)<0)?"Favorites win one-run games constantly — this needs a 2+ run margin.":"A blowout either way beats the +1.5 cushion."});
@@ -1871,7 +1884,7 @@ function shAnalyzeLocal(slate){
       var isK=(mkt==="pitcher_strikeouts"),isOuts=(mkt==="pitcher_outs"),isPitcher=isK||isOuts;
       var st=isPitcher?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
       if(!st)return;
-      var lam=null,bits=[],riskBits=[],tags=[],nEff=null,noParlay=false;
+      var lam=null,bits=[],riskBits=[],tags=[],nEff=null,noParlay=false,lu="confirmed";
       if(isOuts){
         /* expected outs = expected IP × 3; strong opposing offense trims the start short */
         var g30x=st.last30&&Number(st.last30.g),ip30x=st.last30&&shIp(st.last30.ip);
@@ -1925,6 +1938,7 @@ function shAnalyzeLocal(slate){
         }
         var pa=spot?4.68-0.11*(spot-1):(projStar?4.45:4.2);
         if(!spot){
+          lu="projected"; /* lineup_status (calibration spec Update 2): board-time truth */
           if(projStar){tags.push("projected-lineup");bits.push("lineup not posted — everyday starter ("+st.last30.g+" games in 30 days), projected in");riskBits.push("auto-voids at Caesars if he unexpectedly sits");}
           else riskBits.push("lineup spot unconfirmed (assumed mid-order)");
         }
@@ -2005,14 +2019,15 @@ function shAnalyzeLocal(slate){
       var isHitter=(mkt.indexOf("batter_")===0); /* hitter props: overs only (no unders, ever) */
       var nv=(row.fair!=null)?row.fair:((iO!=null&&iU!=null)?shDevig2(iO,iU):null);
       if(row.books>=2)tags.push("consensus");
-      if(nv!=null){var pAdj=SH_W.props*pO+(1-SH_W.props)*nv;
+      var wPr=shWm(SH_W.props,mkt);
+      if(nv!=null){var pAdj=wPr*pO+(1-wPr)*nv;
         if(Math.abs(pO-nv)>=0.10)tags.push("market-gap");
         sd=(isHitter||pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o,bk:row.oBook}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u,bk:row.uBook};
         /* pass list: hitter props where model+market agree the UNDER is the strong side */
         if(isHitter&&pAdj<0.35)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:"O",odds:row.o,imp:nv,edge:pAdj-nv,
           why:"model + market both favor the under — overs-only rule keeps it off the board"});
       }
-      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:SH_W.props*pO+(1-SH_W.props)*fair,imp:fair,odds:row.o,bk:row.oBook};}
+      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:wPr*pO+(1-wPr)*fair,imp:fair,odds:row.o,bk:row.oBook};}
       if(!sd||sd.odds==null)return;
       var edge=sd.p-sd.imp;
       if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge,
@@ -2020,6 +2035,7 @@ function shAnalyzeLocal(slate){
       var tmAb=lookupTeam[pnorm(row.p)];
       cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
         oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,
+        pModel:sd.side==="O"?pO:1-pO,wBlend:wPr,lu:lu,
         czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
         lkey:shLegKey(row.p,mkt,row.ln),gkey:g?(pnorm(g.away)+"@"+pnorm(g.home)):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
@@ -2052,6 +2068,9 @@ function shAnalyzeLocal(slate){
           czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
           czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
           czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),noParlay:!!r.noParlay,
+          pModel:(r.pModel!=null)?Math.round(r.pModel*1000)/10:null,
+          wBlend:(r.wBlend!=null)?Math.round(r.wBlend*1000)/1000:null,
+          lu:r.lu||"confirmed",
           edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band),tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
           conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });
@@ -2076,7 +2095,7 @@ function shAnalyzeLocal(slate){
      any player at `cap` tickets total, so you can play many without re-betting the same play. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
-    cz:(x.r.cz!=null?x.r.cz:null),live:!!x.r.live};}
+    cz:(x.r.cz!=null?x.r.cz:null),live:!!x.r.live,lu:x.r.lu||"confirmed"};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
     var use={uPlayer:{},uKey:{}};
@@ -2296,12 +2315,17 @@ function shAllocate(pool,amount,cfg){
   /* stake weight = ¼-Kelly-proportional fraction: edge ÷ odds. Kelly is what maximizes
      bankroll growth — it naturally starves long odds (huge denominator) and feeds
      high-floor edges, instead of chasing compounded parlay "EV". */
+  /* selection_mode (calibration spec Update 1): "probability" (default) selects and
+     weights tickets by the engine's true probability — the Caesars price only prices
+     and sizes what was already chosen. "caesars_ev" is the legacy ¼-Kelly-at-CZ
+     ranking, kept selectable in Settings. */
+  var probMode=(cfg.selMode||"probability")==="probability";
   var scored=[];
   pool.forEach(function(w,i){
     if(!shCoreEligible(w,cfg))return;
     var ev=((w.pl.czEv!=null?w.pl.czEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
     var dec=w.pl.czDec||2;
-    scored.push({w:w,i:i,ev:ev,prob:prob,base:(dec>1)?Math.max(ev,0)/(dec-1):0});
+    scored.push({w:w,i:i,ev:ev,prob:prob,base:probMode?prob:((dec>1)?Math.max(ev,0)/(dec-1):0)});
   });
   if(!scored.length)return {picks:[],sum:0,ev:null};
   /* negative-EV slate: still allocate the full amount (spec) weighted by hit floor — the

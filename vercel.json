@@ -4,5 +4,11 @@
       "main": false,
       "line-history": false
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/calibrate",
+      "schedule": "30 9 * * *"
+    }
+  ]
 }
