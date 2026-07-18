@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DayBlob, DayGames, ParlayPred, PredRecord } from "@/lib/predictions";
+import { mergeDayBlob, type DayBlob, type DayGames, type ParlayPred, type PredRecord } from "@/lib/pred-serialize";
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 
 /**
@@ -27,12 +27,6 @@ function gate(req: NextRequest): NextResponse | null {
   if (missing.length) return NextResponse.json({ error: "sync-not-configured", missing }, { status: 503 });
   if (!syncAuthed(req)) return NextResponse.json({ error: "bad-sync-key" }, { status: 401 });
   return null;
-}
-
-function gameStarted(games: DayGames, gkey: string | null, now: number): boolean {
-  if (!gkey) return false;
-  const start = games[gkey]?.start;
-  return !!start && new Date(start).getTime() <= now;
 }
 
 export async function GET(req: NextRequest) {
@@ -68,34 +62,12 @@ export async function PUT(req: NextRequest) {
 
   try {
     const now = Date.now();
-    const cur =
-      (await redisGetJson<DayBlob>(dayKey(date))) ??
-      ({ date, at: 0, records: {}, parlays: {}, games: {} } satisfies DayBlob);
-    cur.games = { ...cur.games, ...games };
-    let written = 0;
-    for (const r of records) {
-      if (!r || typeof r.k !== "string" || !isFinite(Number(r.p))) continue;
-      const prev = cur.records[r.k];
-      if (prev?.res && prev.res !== "pending") continue; // graded = frozen
-      if (prev && gameStarted(cur.games, prev.gkey, now)) continue; // pre-start statement = frozen
-      if (gameStarted(cur.games, r.gkey, now)) continue; // never log a pick after first pitch
-      cur.records[r.k] = { ...r, res: prev?.res ?? "pending" };
-      written++;
-    }
-    for (const t of parlays) {
-      if (!t || typeof t.k !== "string" || !isFinite(Number(t.prob))) continue;
-      const prev = cur.parlays[t.k];
-      if (prev?.res && prev.res !== "pending") continue;
-      const anyStarted = (t.legs ?? []).some((l) => gameStarted(cur.games, l.gkey, now));
-      if (anyStarted) continue;
-      cur.parlays[t.k] = { ...t, res: prev?.res ?? "pending" };
-    }
-    cur.at = now;
-    const json = JSON.stringify(cur);
-    if (json.length > MAX_BYTES) return NextResponse.json({ error: "day blob too large" }, { status: 413 });
-    await redisSetJson(dayKey(date), cur);
+    const cur = await redisGetJson<DayBlob>(dayKey(date));
+    const { blob, written } = mergeDayBlob(cur, date, records, parlays, games, now);
+    if (JSON.stringify(blob).length > MAX_BYTES) return NextResponse.json({ error: "day blob too large" }, { status: 413 });
+    await redisSetJson(dayKey(date), blob);
     await redis(["SADD", DAYS_SET, date]);
-    return NextResponse.json({ ok: true, written, total: Object.keys(cur.records).length });
+    return NextResponse.json({ ok: true, written, total: Object.keys(blob.records).length });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }

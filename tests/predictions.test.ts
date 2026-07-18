@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, fixtureEngine } from "./helpers/fixture-env";
-import { boardToPredictions } from "../src/lib/predictions";
+import { boardToPredictions, mergeDayBlob, type PredRecord } from "../src/lib/pred-serialize";
 import type { BoardData } from "@/engine";
 
 /* 3A write-side: the serializer must capture the FULL board — every priced
@@ -50,5 +50,49 @@ describe("boardToPredictions", () => {
     const { records } = boardToPredictions(d);
     const keys = new Set(records.map((r) => r.k));
     expect(keys.size).toBe(records.length);
+  });
+});
+
+describe("mergeDayBlob freeze rules (shared by /api/predictions and /api/generate)", () => {
+  const rec = (k: string, p: number, over: Partial<PredRecord> = {}): PredRecord => ({
+    k,
+    label: "X",
+    sub: "Hits O 1.5",
+    market: "batter_hits",
+    gkey: "g1",
+    lkey: "x|batter_hits|1.5",
+    p,
+    pModel: null,
+    pMkt: 50,
+    w: null,
+    edge: 1,
+    ev: 1,
+    odds: -110,
+    book: null,
+    cz: null,
+    czEv: null,
+    lu: "confirmed",
+    tags: [],
+    ...over,
+  });
+  const NOW = new Date("2026-07-18T15:00:00Z").getTime();
+  const futureGames = { g1: { pk: 1, start: "2026-07-18T20:00:00Z" } };
+  const pastGames = { g1: { pk: 1, start: "2026-07-18T14:00:00Z" } };
+
+  it("latest pre-start write wins; graded records are immutable", () => {
+    const first = mergeDayBlob(null, "2026-07-18", [rec("a", 55)], [], futureGames, NOW);
+    const second = mergeDayBlob(first.blob, "2026-07-18", [rec("a", 58)], [], futureGames, NOW + 1000);
+    expect(second.blob.records.a.p).toBe(58); // lines moved — last pre-start statement graded
+    second.blob.records.a.res = "won";
+    const third = mergeDayBlob(second.blob, "2026-07-18", [rec("a", 40)], [], futureGames, NOW + 2000);
+    expect(third.blob.records.a.p).toBe(58); // graded = frozen forever
+    expect(third.blob.records.a.res).toBe("won");
+  });
+
+  it("post-start writes can neither add nor rewrite a pick", () => {
+    const pre = mergeDayBlob(null, "2026-07-18", [rec("a", 55)], [], pastGames, NOW - 2 * 3600_000);
+    const post = mergeDayBlob(pre.blob, "2026-07-18", [rec("a", 70), rec("b", 60)], [], pastGames, NOW);
+    expect(post.blob.records.a.p).toBe(55); // the playable-time statement stands
+    expect(post.blob.records.b).toBeUndefined(); // no pick logged after first pitch
   });
 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DayBlob } from "@/lib/predictions";
+import type { DayBlob } from "@/lib/pred-serialize";
 import { applyWeeklyAdjustment, computeCalibration, type GradedPick, type WeightState } from "@/engine2/calibration";
 import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } from "@/engine2/grade";
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
