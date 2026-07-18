@@ -166,10 +166,12 @@ const HEARTBEAT_MS = 4 * 60_000;
 /** Mounted once in the app shell — the whole auto-sync loop. */
 export function useLedgerSyncBeacon() {
   useEffect(() => {
+    // first sync always runs — even a background-loaded tab gets one pull;
+    // the hidden-check only stops the RECURRING work from churning offscreen
+    void syncNow();
     const kick = () => {
       if (!document.hidden) void syncNow();
     };
-    kick();
     document.addEventListener("visibilitychange", kick);
     window.addEventListener("focus", kick);
     const iv = setInterval(() => {
