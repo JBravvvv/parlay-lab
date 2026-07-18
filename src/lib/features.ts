@@ -10,4 +10,4 @@ export const UFC_ENABLED = false;
 /* The MLB All-Star Game desk (⭐ ASG tab on Board / The Sharp / Builder).
    One-night event: flip to `true` on game day, back to `false` after — the
    components stay in the tree either way, this is the only edit. */
-export const ASG_ENABLED = true;
+export const ASG_ENABLED = false;
