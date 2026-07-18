@@ -2,15 +2,16 @@
 
 import { useEffect, useRef } from "react";
 
-/* Self-hosted (public/media) — the original CloudFront copy was third-party,
-   which ad blockers / privacy extensions silently killed on some machines.
-   Same-origin media survives them and rides the Vercel CDN with immutable
-   caching (see next.config.ts headers). */
-const SRC = "/media/backdrop.mp4";
+/* Self-hosted (public/media) — third-party CloudFront copies get silently
+   killed by ad blockers / privacy extensions on some machines, so the footage
+   always lives same-origin and rides the Vercel CDN with immutable caching
+   (see next.config.ts headers). New footage = NEW filename: the old URL is
+   cached immutable, so replacing bytes under it would never reach clients. */
+const SRC = "/media/backdrop-llama.mp4";
 
-/* The footage is purple; the brand is green. A hue rotation recolors the
-   ribbons to emerald/teal in the compositor — no re-encode needed. */
-const GREEN_SHIFT = "hue-rotate(-120deg) saturate(0.95)";
+/* The footage's neon goggles are red; the brand is green. A hue rotation
+   recolors them to electric lime in the compositor — no re-encode needed. */
+const GREEN_SHIFT = "hue-rotate(120deg) saturate(0.95)";
 
 /**
  * Looping background video with a JS-controlled fade loop:
