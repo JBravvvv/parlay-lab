@@ -1066,11 +1066,16 @@ var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),t
   daily:(function(){var b=Number(LS.get("pl_daily",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})(),
   fun:(function(){var b=Number(LS.get("pl_fun",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})()};
 /* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
-var SH_CFG={perParlayCap:0.40,roundTo:1,maxCoreTickets:6,thinSlateEV:0,
+var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSlateEV:0,
+  /* user rules 2026-07-17: the card must always spread — at least 4 tickets whenever the
+     pool allows, and no single ticket over 25% of the daily ($100 of $250 on one 3-leg
+     K's parlay was the complaint). K's parlays went 0-for-4 as lead tickets, so they are
+     FILL-ONLY: picked only when non-K tickets can't reach the 4-ticket minimum, capped
+     at 15%, and never alongside a mixed-ticket K leg. */
   coreNoHR:true,   /* DAILY money never touches HR props — HR volatility lives in the FUN bucket only (user rule) */
-  coreNoKs:true,   /* user rule 2026-07-17: dedicated Pitcher K's parlays led the card 4 straight days and went
-                      0-for-4 — DAILY money never rides a pure K's parlay again (still browsable + FUN-eligible) */
-  coreKsLegMax:1,  /* mixed tickets can't rebuild one either: at most ONE pitcher-K leg on the whole daily card */
+  coreKsFillOnly:true, /* dedicated K's parlays are last-resort fill, not contenders */
+  coreKsCap:0.15,  /* and when one does fill, it takes at most 15% of the daily */
+  coreKsLegMax:1,  /* mixed tickets: at most ONE pitcher-K leg across the whole daily card */
   coreMaxDec:15,   /* core odds ceiling ~+1400: longshot ticket "EV" is compounded model error, not edge */
   funTiers:[[800,2500],[2500,10000],[10000,1/0]],funTierNames:["BIG","MASSIVE","MOONSHOT"],
   funAmt2:15,funAmt3:50,funSplit2:[0.6,0.4],funSplit3:[0.5,0.3,0.2],
@@ -1866,7 +1871,7 @@ function shAnalyzeLocal(slate){
       var isK=(mkt==="pitcher_strikeouts"),isOuts=(mkt==="pitcher_outs"),isPitcher=isK||isOuts;
       var st=isPitcher?lookupPit[pnorm(row.p)]:lookupStats[pnorm(row.p)];
       if(!st)return;
-      var lam=null,bits=[],riskBits=[],tags=[],nEff=null;
+      var lam=null,bits=[],riskBits=[],tags=[],nEff=null,noParlay=false;
       if(isOuts){
         /* expected outs = expected IP × 3; strong opposing offense trims the start short */
         var g30x=st.last30&&Number(st.last30.g),ip30x=st.last30&&shIp(st.last30.ip);
@@ -1905,7 +1910,24 @@ function shAnalyzeLocal(slate){
         var ab30=st.last30&&Number(st.last30.ab);
         if(!isFinite(ab30)||ab30<25)return; /* sample-size discipline */
         var spot=lineupSpot(g,row.p);
-        var pa=spot?4.68-0.11*(spot-1):4.2;if(!spot)riskBits.push("lineup spot unconfirmed (assumed mid-order)");
+        var projStar=false;
+        if(!spot&&SH_V2&&SH_V2.projLineup){
+          /* projected-lineup rules (user, 2026-07-17): a POSTED lineup missing the player
+             means he's ruled out today -> off the board entirely (Caesars voids the leg
+             anyway; a card shouldn't lean on voids). Lineup NOT posted yet? Everyday
+             starters are presumed in ("Vlad and Trout play every day") and stay
+             parlay-eligible; fringe players stay board-visible but never make parlays. */
+          var postedLu=g&&(g.lineup_away||[]).length>=9&&(g.lineup_home||[]).length>=9;
+          if(postedLu)return; /* scratched from a posted lineup */
+          var gp30=st.last30&&Number(st.last30.g);
+          projStar=isFinite(gp30)&&gp30>=20;
+          if(!projStar)noParlay=true;
+        }
+        var pa=spot?4.68-0.11*(spot-1):(projStar?4.45:4.2);
+        if(!spot){
+          if(projStar){tags.push("projected-lineup");bits.push("lineup not posted — everyday starter ("+st.last30.g+" games in 30 days), projected in");riskBits.push("auto-voids at Caesars if he unexpectedly sits");}
+          else riskBits.push("lineup spot unconfirmed (assumed mid-order)");
+        }
         var bbr=shBlend(st,function(s){return Number(s.bb);},"ab",10)||0.09;
         var expAB=pa*(1-shClamp(bbr,0,.25)*0.9);
         var opp=oppStarter(g,row.p),pst=opp?lookupPit[pnorm(opp)]:null;
@@ -1997,7 +2019,7 @@ function shAnalyzeLocal(slate){
         why:"heavy favorite priced above its fair probability — negative EV at any book"});
       var tmAb=lookupTeam[pnorm(row.p)];
       cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
-        oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,
+        oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,
         czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
         lkey:shLegKey(row.p,mkt,row.ln),gkey:g?(pnorm(g.away)+"@"+pnorm(g.home)):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
@@ -2029,7 +2051,7 @@ function shAnalyzeLocal(slate){
           czEv:czEv!=null?Math.round(czEv*1000)/10:null,
           czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
           czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
-          czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),
+          czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),noParlay:!!r.noParlay,
           edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band),tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
           conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });
@@ -2065,6 +2087,7 @@ function shAnalyzeLocal(slate){
         return b.r.prob-a.r.prob;});
       var out=[],seenP={},seenG={};
       function pass(enforceGame){for(var i=0;i<ranked.length&&out.length<n;i++){var x=ranked[i];
+        if(x.r.noParlay)continue; /* projected-lineup rule: fringe players without a posted lineup stay off tickets */
         var gm=(x.r.game||"").split(" · ")[0];
         if((use.uPlayer[x.r.label]||0)>=cap)continue;
         if(seenP[x.r.label])continue;if(enforceGame&&seenG[gm])continue;
@@ -2256,16 +2279,14 @@ function shCardPool(d){
 }
 /* EV·√floor weighted, correlation-dampened, capped, whole-dollar EXACT-SUM allocation.
    Pure + deterministic: same pool/amount/cfg -> identical stakes (re-allocation is idempotent). */
-/* core-card discipline (user rules): DAILY money never rides an HR prop, never a dedicated
-   Pitcher K's parlay (0-for-4 days as the card's lead tickets — the ledger spoke, 2026-07-17),
-   and never a ticket longer than cfg.coreMaxDec — a 5-leg HR "monster EV" is compounded model
-   error and loses nearly every day. Those tickets stay browsable and FUN-eligible; they just
-   can't take the daily bankroll. */
+/* core-card discipline (user rules): DAILY money never rides an HR prop, and never a ticket
+   longer than cfg.coreMaxDec — a 5-leg HR "monster EV" is compounded model error and loses
+   nearly every day. Those tickets stay browsable and FUN-eligible; they just can't take the
+   daily bankroll. (Dedicated K's parlays are handled inside the allocator: fill-only.) */
 function shCoreEligible(w,cfg){
   var pl=w.pl;
   if(cfg.coreNoHR&&(pl.type==="batter_home_runs"||
     pl.legs.some(function(l){return (l.lkey||"").indexOf("|batter_home_runs|")>=0;})))return false;
-  if(cfg.coreNoKs&&pl.type==="pitcher_strikeouts")return false;
   if(cfg.coreMaxDec&&pl.czDec!=null&&pl.czDec>cfg.coreMaxDec)return false;
   return true;
 }
@@ -2290,39 +2311,61 @@ function shAllocate(pool,amount,cfg){
      going wrong must never sink multiple tickets, and a repeated leg adds hidden leverage,
      not diversification. Tickets sharing an exact leg with anything already picked are
      skipped outright; sharing just a game is allowed but dampens the weight (0.5/leg). */
-  var picked=[],gUse={},lUse={},kUse=0;
-  /* K-leg budget across the WHOLE card (user rule 2026-07-17): with dedicated K's parlays
-     already barred from daily money, mixed tickets must not quietly rebuild one */
-  var kMax=(cfg.coreKsLegMax!=null)?cfg.coreKsLegMax:1/0;
+  var picked=[],gUse={},lUse={},kMixUse=0,kTicket=false;
+  /* K exposure (user rules 2026-07-17): mixed tickets may carry at most cfg.coreKsLegMax
+     pitcher-K legs across the WHOLE card; dedicated K's parlays are FILL-ONLY — admitted
+     only when non-K tickets can't reach cfg.minCoreTickets — and the two never combine:
+     the card holds one dedicated K's parlay OR mixed K legs, not both. */
+  var kMixMax=(cfg.coreKsLegMax!=null)?cfg.coreKsLegMax:1/0;
+  function isKTik(s){return s.w.pl.type==="pitcher_strikeouts";}
   function kLegs(pl){var n=0;pl.legs.forEach(function(l){if((l.lkey||"").indexOf("|pitcher_strikeouts|")>=0)n++;});return n;}
   var wantN=Math.min(cfg.maxCoreTickets,scored.length);
-  while(picked.length<wantN){
-    var best=null,bw=-1;
-    for(var si=0;si<scored.length;si++){var s=scored[si];
-      if(s.done)continue;
-      var dup=false,shared=0;
-      s.w.pl.legs.forEach(function(l){
-        if(lUse[l.label+"|"+l.prop])dup=true;
-        shared+=(gUse[l.game]||0)*0.5;});
-      if(dup)continue;
-      if(kUse+kLegs(s.w.pl)>kMax)continue;
-      var eff=s.base/(1+shared);
-      if(eff>bw+1e-12){bw=eff;best=s;} /* index order breaks ties -> deterministic */
+  var minN=Math.min(cfg.minCoreTickets||1,scored.length);
+  function selectPass(allowK,stopN){
+    while(picked.length<stopN){
+      var best=null,bw=-1;
+      for(var si=0;si<scored.length;si++){var s=scored[si];
+        if(s.done)continue;
+        var kt=isKTik(s);
+        if(kt&&cfg.coreKsFillOnly&&!allowK)continue;
+        if(kt&&(kTicket||kMixUse>0))continue;
+        var km=kt?0:kLegs(s.w.pl);
+        if(km>0&&(kTicket||kMixUse+km>kMixMax))continue;
+        var dup=false,shared=0;
+        s.w.pl.legs.forEach(function(l){
+          if(lUse[l.label+"|"+l.prop])dup=true;
+          shared+=(gUse[l.game]||0)*0.5;});
+        if(dup)continue;
+        var eff=s.base/(1+shared);
+        if(eff>bw+1e-12){bw=eff;best=s;} /* index order breaks ties -> deterministic */
+      }
+      if(!best)break;
+      best.done=true;best.eff=bw;picked.push(best);
+      if(isKTik(best))kTicket=true;else kMixUse+=kLegs(best.w.pl);
+      best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=1;});
     }
-    if(!best)break;
-    best.done=true;best.eff=bw;picked.push(best);kUse+=kLegs(best.w.pl);
-    best.w.pl.legs.forEach(function(l){gUse[l.game]=(gUse[l.game]||0)+1;lUse[l.label+"|"+l.prop]=1;});
   }
-  /* proportional stakes with the per-ticket cap (relaxed to 1/n when the pool is tiny,
-     otherwise an exact sum would be impossible); water-fill redistribution */
-  var n=picked.length,cap=Math.max(cfg.perParlayCap,1/n)*amount;
+  selectPass(false,wantN);
+  if(picked.length<minN)selectPass(true,minN); /* K's parlays fill TO the minimum, never past it */
+  /* proportional stakes under PER-TICKET caps (general cap relaxed to 1/n when the pool is
+     tiny; K's-parlay tickets capped tighter). If the caps can't cover the full amount, the
+     deficit is spread onto the non-K caps so the exact-sum guarantee always holds. */
+  var n=picked.length,capG=Math.max(cfg.perParlayCap,1/n)*amount;
+  var caps=picked.map(function(s){return isKTik(s)?Math.min((cfg.coreKsCap!=null?cfg.coreKsCap:cfg.perParlayCap)*amount,capG):capG;});
+  var capSum=caps.reduce(function(a,b){return a+b;},0);
+  if(capSum<amount-1e-9){
+    var wide=[];picked.forEach(function(s,i){if(!isKTik(s))wide.push(i);});
+    if(!wide.length)wide=picked.map(function(s,i){return i;});
+    var add=(amount-capSum)/wide.length;
+    wide.forEach(function(i){caps[i]+=add;});
+  }
   var tw=0;picked.forEach(function(s){tw+=s.eff;});
   var raw=picked.map(function(s){return tw>0?amount*s.eff/tw:amount/n;});
   for(var it=0;it<12;it++){
     var over=0,freeW=0;
     picked.forEach(function(s,i){
       if(s.capped)return;
-      if(raw[i]>=cap-1e-9){over+=raw[i]-cap;raw[i]=cap;s.capped=true;}else freeW+=s.eff;});
+      if(raw[i]>=caps[i]-1e-9){over+=raw[i]-caps[i];raw[i]=caps[i];s.capped=true;}else freeW+=s.eff;});
     if(over<=1e-9||freeW<=0)break;
     picked.forEach(function(s,i){if(!s.capped)raw[i]+=over*s.eff/freeW;});
   }
@@ -2332,14 +2375,17 @@ function shAllocate(pool,amount,cfg){
   var st=raw.map(function(r){return Math.floor(r/inc+1e-9)*inc;});
   var left=amount-st.reduce(function(a,b){return a+b;},0);
   var order=picked.map(function(s,i){return i;}).sort(function(a,b){return picked[b].ev-picked[a].ev||a-b;});
+  /* when every cap is exhausted, the overflow lands on the best NON-K ticket —
+     the K's-parlay cap is a product rule, never breached by rounding */
+  var fbIx=order.filter(function(ix){return !isKTik(picked[ix]);})[0];if(fbIx==null)fbIx=order[0];
   var guard=0;
   while(left>=inc&&guard++<2000){
     var placed=false;
     for(var oi=0;oi<order.length;oi++){var ix=order[oi];
-      if(st[ix]+inc<=cap+1e-9){st[ix]+=inc;left-=inc;placed=true;break;}}
-    if(!placed){st[order[0]]+=left;left=0;}
+      if(st[ix]+inc<=caps[ix]+1e-9){st[ix]+=inc;left-=inc;placed=true;break;}}
+    if(!placed){st[fbIx]+=left;left=0;}
   }
-  if(left>0){st[order[0]]+=left;left=0;}
+  if(left>0){st[fbIx]+=left;left=0;}
   var sum=0,evAcc=0,legSet={};
   var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
     s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
@@ -2420,7 +2466,7 @@ function shCardView(d){
   var h="<div class='shcard'><div class='shcardhead'>TODAY'S CARD · CAESARS</div>";
   if(!cc||!cc.pool.length)return h+"<div class='shcardnote'>No Caesars-playable pregame tickets right now.</div></div>";
   if(!(SH.daily>0)&&!(SH.fun>0))
-    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, ¼-Kelly-weighted (edge ÷ odds, the bankroll-growth math), max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, no pick ever repeated across tickets, <b>never an HR prop, never a Pitcher K's parlay</b> (max one K leg on the whole card), nothing longer than "+esc(obSign(decToAm(SH_CFG.coreMaxDec)))+". HR bombs, K's parlays and longshots live in FUN $ only — money you're fine losing.</div></div>";
+    return h+"<div class='shcardnote'>Enter a DAILY $ amount up top and the allocator spreads it across the best "+SH_CFG.maxCoreTickets+" tickets — exact dollars, ¼-Kelly-weighted (edge ÷ odds, the bankroll-growth math), max "+Math.round(SH_CFG.perParlayCap*100)+"% on any one ticket, always "+SH_CFG.minCoreTickets+"+ tickets when the pool allows, no pick ever repeated across tickets, <b>never an HR prop</b>, K's parlays only as last-resort fill (capped at "+Math.round(SH_CFG.coreKsCap*100)+"%), nothing longer than "+esc(obSign(decToAm(SH_CFG.coreMaxDec)))+". HR bombs and longshots live in FUN $ only — money you're fine losing.</div></div>";
   if(shCardStarted(d,cc))h+="<div class='shthin'>First pitch has passed on a card game — amounts are frozen for today. Lock the card to record it, or it goes untracked.</div>";
   if(SH.daily>0){
     var alloc=cc.alloc;

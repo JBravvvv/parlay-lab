@@ -88,6 +88,9 @@ async function armV2(eng: Engine) {
     regions: "us,eu",
     sim: true, // log5/platoon/park×hand/TTO/hook/pen-fatigue + totals/F5 pricing
     simN: 10000,
+    // projected lineups (user rule 2026-07-17): everyday starters count before
+    // lineups post; a posted lineup missing the player scratches him entirely
+    projLineup: true,
   });
 }
 

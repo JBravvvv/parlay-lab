@@ -148,6 +148,53 @@ describe("engine v2 integration kernel", () => {
     }
   }, 120_000);
 
+  it("ARMED projected-lineup rule: players scratched from a posted lineup drop off the board", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN_NOW);
+    try {
+      type Cats = { categories: Record<string, { label: string; gkey: string | null }[]> };
+      const base = fixtureEngine();
+      const db = base.analyze(await base.collectSlate()) as unknown as Cats;
+
+      const fx = fixtureEngine();
+      fx.set("SH_V2", { projLineup: true });
+      const slate = (await fx.collectSlate()) as {
+        games: { away: string; home: string; lineup_away: string[]; lineup_home: string[] }[];
+      };
+      const d = fx.analyze(slate) as unknown as Cats;
+
+      // derive the expected scratches from the slate itself: a batter with a prop
+      // row whose game has BOTH lineups posted but doesn't include him
+      const pn = fx.get<(s: string) => string>("pnorm");
+      const posted = new Map<string, Set<string>>();
+      for (const g of slate.games) {
+        if ((g.lineup_away || []).length >= 9 && (g.lineup_home || []).length >= 9) {
+          posted.set(
+            `${pn(g.away)}@${pn(g.home)}`,
+            new Set([...g.lineup_away, ...g.lineup_home].map((x) => pn(x))),
+          );
+        }
+      }
+      const batCats = ["batter_hits", "batter_total_bases", "batter_home_runs", "batter_hits_runs_rbis"];
+      const scratched: string[] = [];
+      for (const c of batCats)
+        for (const r of db.categories[c] ?? []) {
+          const lu = r.gkey ? posted.get(String(r.gkey)) : undefined;
+          const name = pn(String(r.label).replace(/\s*\([A-Z]{2,3}\)$/, ""));
+          if (lu && !lu.has(name)) scratched.push(`${c}|${r.label}`);
+        }
+      const armed = new Set<string>();
+      for (const c of batCats) for (const r of d.categories[c] ?? []) armed.add(`${c}|${r.label}`);
+      for (const k of scratched) expect(armed.has(k), `still on the armed board: ${k}`).toBe(false);
+      // the fixture must actually exercise the rule, or the boards must be identical
+      if (scratched.length === 0) {
+        expect(JSON.stringify(d.categories)).toBe(JSON.stringify(db.categories));
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 120_000);
+
   it("platoon / park / log5 / pen-fatigue kernels: direction, caps, dormant neutrality", () => {
     const platoon = eng.get<(b: string | null, p: string | null) => { h: number; hr: number }>("shPlatoon")!;
     const parkF = eng.get<(v: string | null, s: string | null) => { h: number; hr: number } | null>("shParkF")!;

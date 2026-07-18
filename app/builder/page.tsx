@@ -236,6 +236,20 @@ export default function BuilderPage() {
 
   const decToAm = (dc: number) => (dc >= 2 ? Math.round((dc - 1) * 100) : -Math.round(100 / (dc - 1)));
 
+  /* morning honesty: how many slate games have Caesars-playable props RIGHT NOW —
+     games missing here are why an early card can't cover them yet */
+  const czCover = useMemo(() => {
+    if (!d) return null;
+    const total = Object.keys(d.gameInfo ?? {}).length;
+    if (!total) return null;
+    const have = new Set<string>();
+    for (const [k, rows] of Object.entries(d.categories)) {
+      if (k === "all" || k === "ml" || k === "rl") continue;
+      for (const r of rows) if (r.gkey && r.cz != null) have.add(String(r.gkey));
+    }
+    return { have: have.size, total };
+  }, [d]);
+
   return (
     <>
       <PageHeader
@@ -274,6 +288,13 @@ export default function BuilderPage() {
         )}
       </div>
       {status && <div className="mb-4 text-[12px] text-pos">{status}</div>}
+      {!locked && czCover && (
+        <div className={`num mb-4 text-[11.5px] ${czCover.have < czCover.total ? "text-gold" : "text-muted"}`}>
+          Caesars props live for {czCover.have} of {czCover.total} games right now
+          {czCover.have < czCover.total &&
+            " — the rest usually post closer to first pitch. If you're generating early, regenerate right before locking so the card can cover the whole day."}
+        </div>
+      )}
 
       {locked ? (
         <Reveal>
@@ -324,7 +345,7 @@ export default function BuilderPage() {
         <Panel>
           <EmptyState
             title="Enter a DAILY $ (and optional FUN $)"
-            body="DAILY spreads across the highest-quality Caesars-playable tickets — never HR props, never K's parlays (max one K leg on the card), never past +1400, never the same pick twice. FUN buys 1–3 honest longshots."
+            body="DAILY spreads across at least 4 tickets — max 25% on any one, never HR props, K's parlays only as last-resort fill (capped 15%), never past +1400, never the same pick twice. FUN buys 1–3 honest longshots."
           />
         </Panel>
       ) : (
@@ -450,9 +471,10 @@ export default function BuilderPage() {
       </Reveal>
 
       <div className="mt-4 text-[10.5px] text-faint">
-        Card discipline is hard-coded: one prop never rides two tickets, HR props parlay only with HR props and never
-        into the core card, Pitcher K&apos;s parlays never take daily money (0-for-4 as the lead tickets — max one K
-        leg on the card now), and the daily amount always sums exactly. Informational only, not betting advice.
+        Card discipline is hard-coded: at least 4 tickets whenever the pool allows with no ticket over 25% of the
+        daily, one prop never rides two tickets, HR props parlay only with HR props and never into the core card,
+        Pitcher K&apos;s parlays are last-resort fill only (capped at 15% — they went 0-for-4 as lead tickets), and
+        the daily amount always sums exactly. Informational only, not betting advice.
       </div>
         </>
       )}

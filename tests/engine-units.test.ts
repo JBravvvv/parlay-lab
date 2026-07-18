@@ -44,48 +44,68 @@ describe("daily allocator (core card discipline)", () => {
     expect(b.picks.map((p) => [p.id, p.stake])).toEqual(a.picks.map((p) => [p.id, p.stake]));
   });
 
-  it("K's parlays never take daily money and at most one K leg rides the card (user rule 2026-07-17)", () => {
-    // the fixture slate has no Caesars-playable K tickets, so exercise the rule
-    // through the real allocator on a synthetic pool where the K's parlay would
-    // otherwise be the Kelly favorite (short odds + biggest EV = biggest weight)
-    type Leg = { label: string; prop: string; lkey: string; game: string };
-    const leg = (label: string, mkt: string, game: string): Leg => ({
-      label,
-      prop: `${mkt} O`,
-      lkey: `${label.toLowerCase().replace(/\s/g, "")}|${mkt}|5.5`,
-      game,
-    });
-    const tik = (type: string, legs: Leg[], czDec: number, czEv: number, prob: number) => ({
-      pl: { type, name: `${type} · ${legs.length} legs`, legs, czDec, czEv, prob },
-      src: "p",
-      idx: 0,
-    });
+  /* synthetic-pool helpers for the K's-parlay + spread rules (2026-07-17):
+     the K's parlay is deliberately the Kelly favorite (short odds, biggest EV)
+     so only the rules — never the weights — can be what excludes it */
+  type Leg = { label: string; prop: string; lkey: string; game: string };
+  const leg = (label: string, mkt: string, game: string): Leg => ({
+    label,
+    prop: `${mkt} O`,
+    lkey: `${label.toLowerCase().replace(/\s/g, "")}|${mkt}|5.5`,
+    game,
+  });
+  const tik = (type: string, legs: Leg[], czDec: number, czEv: number, prob: number) => ({
+    pl: { type, name: `${type} · ${legs.length} legs`, legs, czDec, czEv, prob },
+    src: "p",
+    idx: 0,
+  });
+  const kTik = () =>
+    tik("pitcher_strikeouts", [leg("Ace One", "pitcher_strikeouts", "g1"), leg("Ace Two", "pitcher_strikeouts", "g2")], 2.4, 12, 45);
+  const synthAlloc = (pool: unknown[], amt: number) =>
+    eng.get<(p: unknown[], a: number, c: unknown) => { picks: { stake: number; w: { pl: Ticket } }[]; sum: number }>(
+      "shAllocate",
+    )(pool as never, amt, CFG());
+
+  it("with a healthy pool: 4+ tickets, ≤25% each, K's parlay shut out, ≤1 mixed K leg", () => {
     const synth = [
-      tik("pitcher_strikeouts", [leg("Ace One", "pitcher_strikeouts", "g1"), leg("Ace Two", "pitcher_strikeouts", "g2")], 2.4, 12, 45),
+      kTik(),
       tik("MIX", [leg("Ace Three", "pitcher_strikeouts", "g3"), leg("Bat One", "batter_hits", "g4")], 2.6, 6, 40),
       tik("MIX", [leg("Ace Four", "pitcher_strikeouts", "g5"), leg("Bat Two", "batter_hits", "g6")], 2.6, 6, 40),
       tik("batter_total_bases", [leg("Bat Three", "batter_total_bases", "g7"), leg("Bat Four", "batter_total_bases", "g8")], 2.8, 5, 38),
       tik("ml", [leg("Team A", "ml", "g9"), leg("Team B", "ml", "g10")], 2.5, 4, 42),
+      tik("batter_hits", [leg("Bat Five", "batter_hits", "g11"), leg("Bat Six", "batter_hits", "g12")], 2.7, 5, 39),
     ];
-    const a = eng.get<(p: unknown[], amt: number, c: unknown) => { picks: { stake: number; w: { pl: Ticket } }[]; sum: number }>(
-      "shAllocate",
-    )(synth as never, 100, CFG());
+    const a = synthAlloc(synth, 100);
     expect(a.sum).toBe(100);
-    expect(a.picks.length).toBeGreaterThan(0);
+    expect(a.picks.length).toBeGreaterThanOrEqual(4); // user rule: always 4+ when the pool allows
     let kLegsOnCard = 0;
     for (const p of a.picks) {
-      expect(p.w.pl.type).not.toBe("pitcher_strikeouts");
+      expect(p.w.pl.type).not.toBe("pitcher_strikeouts"); // fill-only: not needed here
+      expect(p.stake).toBeLessThanOrEqual(25); // 25% concentration cap
       for (const l of p.w.pl.legs)
         if (String(l.lkey || "").includes("|pitcher_strikeouts|")) kLegsOnCard++;
     }
-    // two K-leg mixed tickets offered — the card-wide budget lets at most one through
     expect(kLegsOnCard).toBeLessThanOrEqual(1);
-    // and the live fixture card stays K-parlay-free too
-    for (const p of alloc(750).picks) expect(p.w.pl.type).not.toBe("pitcher_strikeouts");
+  });
+
+  it("thin pool: a K's parlay fills to the minimum but takes at most 15%", () => {
+    const synth = [
+      kTik(),
+      tik("batter_total_bases", [leg("Bat Three", "batter_total_bases", "g7"), leg("Bat Four", "batter_total_bases", "g8")], 2.8, 5, 38),
+      tik("ml", [leg("Team A", "ml", "g9"), leg("Team B", "ml", "g10")], 2.5, 4, 42),
+    ];
+    const a = synthAlloc(synth, 100);
+    expect(a.sum).toBe(100);
+    expect(a.picks.length).toBe(3); // all it can do — and the K's parlay is one of them
+    const k = a.picks.find((p) => p.w.pl.type === "pitcher_strikeouts");
+    expect(k).toBeTruthy(); // "occasionally if needed" — needed here
+    expect(k!.stake).toBeLessThanOrEqual(15); // capped at 15% of the daily
   });
 
   it("never repeats a pick across the card and never takes HR or +1400-plus tickets", () => {
     const a = alloc(750);
+    expect(a.picks.length).toBeGreaterThanOrEqual(4); // spread rule on the real fixture pool
+    for (const p of a.picks) expect(p.stake).toBeLessThanOrEqual(187); // 25% of $750
     const seen = new Set<string>();
     for (const p of a.picks) {
       const pl = p.w.pl;
