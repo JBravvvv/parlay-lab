@@ -33,7 +33,10 @@ export const maxDuration = 60;
 const K_LASTRUN = "pl:clv:lastRun";
 const STORE_KEY = "pl:ledger:v1";
 const WINDOW_MS = 45 * 60_000; // sight games starting within the next 45 min
-const RATE_MS = 15 * 60_000;
+/* Josh's cron-job.org job fires every 15 minutes (the simple toggle) — the server
+   paces itself to ~one working run per half hour, so the extra ticks are free
+   no-ops and every game still gets its late (T-20-or-closer) sighting. */
+const RATE_MS = 25 * 60_000;
 
 function ptToday(): string {
   // the ledger's dates are Josh's local (Pacific) dates; the server runs UTC
