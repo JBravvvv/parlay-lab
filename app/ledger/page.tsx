@@ -240,6 +240,18 @@ export default function LedgerPage() {
     }
   };
 
+  // Grades post themselves: any locked day still ungraded (including a day a
+  // sync repair just reopened) grades on view, no tap needed. Once per visit —
+  // grade() bumps the api memo, so an unguarded effect would loop.
+  const autoGraded = useRef(false);
+  useEffect(() => {
+    if (autoGraded.current || !api || grading) return;
+    if (!api.entries.some((e) => !e.grading?.done)) return;
+    autoGraded.current = true;
+    void doGrade();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [api]);
+
   const doExport = () => {
     if (!api) return;
     const blob = new Blob([api.exportText()], { type: "application/json" });

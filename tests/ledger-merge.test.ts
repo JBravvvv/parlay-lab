@@ -73,3 +73,54 @@ describe("mergeLedgers", () => {
     expect(m.map((e) => e.date)).toEqual(["2026-07-15"]);
   });
 });
+
+describe("2026-07-18 doubleheader repair (Mangum graded vs the wrong game)", () => {
+  type GameRef = { pk: number | null; start?: string };
+  const GK = "pittsburghpirates@clevelandguardians";
+  const games = (e: SyncEntry) => e.games as Record<string, GameRef>;
+  const staleDay = (): SyncEntry =>
+    day("2026-07-18", {
+      games: {
+        [GK]: { pk: 824412, start: "2026-07-18T23:10:00Z" }, // game 2 — Mangum 1-for-5
+        "tampabayrays@boston": { pk: 555001, start: "2026-07-18T20:10:00Z" },
+      },
+      grading: { done: true, tickets: { t1: { result: "won", payout: 80 } }, legs: {} },
+      gradedAt: 1752900000000,
+    });
+
+  it("re-points the pk at game 1 and clears the stale grading, whichever side it arrives on", () => {
+    const cases = [
+      mergeLedgers([staleDay()], []),
+      mergeLedgers([], [staleDay()]),
+      mergeLedgers([staleDay()], [staleDay()]),
+    ];
+    for (const m of cases) {
+      expect(games(m[0])[GK].pk).toBe(824414); // game 1 — Mangum 0-for-5, the game the card priced
+      expect(games(m[0])[GK].start).toBe("2026-07-18T17:10:00Z");
+      expect(m[0].grading).toBeNull();
+      expect(games(m[0])["tampabayrays@boston"].pk).toBe(555001); // other legs untouched
+    }
+  });
+
+  it("a corrected, re-graded copy outranks every stale copy in both merge orders", () => {
+    const corrected = day("2026-07-18", {
+      games: { [GK]: { pk: 824414, start: "2026-07-18T17:10:00Z" } },
+      grading: { done: true, tickets: { t1: { result: "lost", payout: 0 } }, legs: {} },
+    });
+    for (const m of [mergeLedgers([corrected], [staleDay()]), mergeLedgers([staleDay()], [corrected])]) {
+      const t = (m[0].grading?.tickets as Record<string, { result: string }>).t1;
+      expect(t.result).toBe("lost");
+      expect(games(m[0])[GK].pk).toBe(824414);
+    }
+  });
+
+  it("touches nothing else — other days keep their grading even with the same pk", () => {
+    const other = day("2026-07-17", {
+      games: { anything: { pk: 824412 } },
+      grading: { done: true, tickets: {}, legs: {} },
+    });
+    const m = mergeLedgers([other], []);
+    expect(games(m[0]).anything.pk).toBe(824412);
+    expect(m[0].grading?.done).toBe(true);
+  });
+});

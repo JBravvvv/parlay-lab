@@ -102,14 +102,44 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   return out;
 }
 
+/* One-time data repair — 2026-07-18 doubleheader incident. The engine used to
+   collapse both games of a same-day matchup into one key, and the locked 7/18
+   card stored game 2's gamePk for PIT@CLE while the card had priced game 1
+   (Mangum hit, -260) — so the leg graded against the wrong box score (he went
+   0-for-5 in game 1, 1-for-5 in game 2). Any copy still carrying the wrong pk
+   is re-pointed at game 1 and its grading cleared so the grader re-runs from
+   the right game. The match is exact (date + key + wrong pk): a repaired,
+   re-graded copy no longer matches, so its corrected grades outrank every
+   stale copy in pickBase and the honest result wins all future merges. */
+const DH_REPAIR = {
+  date: "2026-07-18",
+  gkey: "pittsburghpirates@clevelandguardians",
+  wrongPk: 824412, // game 2 (last-write-wins under the old collapsed key)
+  pk: 824414, // game 1 — the game the card actually priced
+  start: "2026-07-18T17:10:00Z",
+};
+function repairEntry(e: SyncEntry): SyncEntry {
+  type GameRef = { pk?: number | null; start?: string | null };
+  const games = e.games as Record<string, GameRef> | undefined;
+  if (e.date !== DH_REPAIR.date || games?.[DH_REPAIR.gkey]?.pk !== DH_REPAIR.wrongPk) return e;
+  const out: SyncEntry = JSON.parse(JSON.stringify(e));
+  const g = (out.games as Record<string, GameRef>)[DH_REPAIR.gkey];
+  g.pk = DH_REPAIR.pk;
+  g.start = DH_REPAIR.start;
+  out.grading = null;
+  out.gradedAt = null;
+  return out;
+}
+
 /** Union by date, richer day wins, accruals overlaid. Symmetric + idempotent. */
 export function mergeLedgers(a: SyncEntry[], b: SyncEntry[]): SyncEntry[] {
   const byDate = new Map<string, SyncEntry>();
-  for (const e of a) if (e.locked) byDate.set(e.date, e);
+  for (const e of a) if (e.locked) byDate.set(e.date, repairEntry(e));
   for (const e of b) {
     if (!e.locked) continue;
-    const cur = byDate.get(e.date);
-    byDate.set(e.date, cur ? mergeDay(cur, e) : e);
+    const r = repairEntry(e);
+    const cur = byDate.get(r.date);
+    byDate.set(r.date, cur ? mergeDay(cur, r) : r);
   }
   return [...byDate.values()].sort((p, q) => (p.date < q.date ? -1 : 1));
 }
