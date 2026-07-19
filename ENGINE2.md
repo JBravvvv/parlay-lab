@@ -238,6 +238,35 @@ number automatically. Tickets carry `simJoint` + `probNaive` ("naive X% → join
 UI). Games with HR legs sim at `SH_V2.simNHR` (armed 20000) paths. Both upgrades are
 armed-path only — the parity digest stays byte-identical.
 
+## CLV automation + receipts (2026-07-19, upgrade spec 03)
+
+**Sighting.** `/api/clv` (auth: `?key=CRON_SECRET` timing-safe, or the sync phrase; never
+open — it spends odds quota) loads today's (Pacific-date) locked entry from the cloud
+ledger, and for every still-pregame leg whose game starts within 45 minutes pulls the
+current Caesars price + the de-vigged multi-book consensus fair
+(`clv[lid] = {am, at, consensusFair}`). Odds go through our own `/api/odds` proxy (shared
+4-min cache); ML/RL come from one slate call, props per event with only the needed
+markets + `_alternate` ladders. The pure kernel `src/lib/server/clv-core.ts` can only
+write `clv` — pregame-only, deduped, latest-pre-pitch wins, grading structurally
+untouchable. Schedule: cron-job.org every 30 min 09:00–20:00 PT (both Vercel Hobby crons
+are taken) + the in-app beacon (`clvTick` in ledgerSync, 15-min throttle, server
+rate-cap 15 min) whenever a synced device has the app open.
+
+**Receipts.** `src/lib/ledger-segments.ts` (pure): CLV in probability points
+(implied(close) − implied(locked); `fairPts` grades vs the consensus close), segmented by
+market / bucket / override days, per-market leg calibration (est vs realized, Wilson CI,
+voids excluded, n always shown), coverage "sighted X/Y", 7-day receipt. Rendered by
+`ReceiptsPanel` on the Ledger tab and `WeekReceipt` on the Dashboard (client-side over
+the synced local ledger); `/api/digest` (sync-gated — staked/P/L are personal) serves the
+same numbers + the weights-log drift.
+
+**Loop closed.** `/api/calibrate` also trains on the cloud ledger's graded legs for dates
+the prediction store never logged (deduped by date; ledger legs carry `p=est`,
+`edge=null`, `pMkt=null`), and `GradedPick.pMkt` flows from prediction records into
+`perMarket.mktCmp = {n, model, consensus}` — model vs consensus-only Brier over the SAME
+records. The CalibrationPanel's "vs market" column marks (▲) any market where the model's
+Brier beats the consensus: that's the earn-a-raise signal; until then shrink-only stands.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
