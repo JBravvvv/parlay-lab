@@ -52,3 +52,13 @@ export function syncAuthed(req: { headers: { get(k: string): string | null } }):
 export function syncConfigMissing(): string[] {
   return [...(!storeEnv() ? ["store"] : []), ...(!process.env.LEDGER_SYNC_KEY ? ["key"] : [])];
 }
+
+/** Upgrade 03: external-scheduler auth — ?key=<CRON_SECRET> (cron-job.org can't send
+    custom headers on the free tier). Timing-safe; absent env means the path is closed. */
+export function cronKeyAuthed(req: { nextUrl: { searchParams: { get(k: string): string | null } } }): boolean {
+  const want = process.env.CRON_SECRET;
+  const got = req.nextUrl.searchParams.get("key");
+  if (!want || !got) return false;
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(want), h(got));
+}

@@ -162,6 +162,18 @@ export async function syncNow(): Promise<SyncState> {
 
 const TICK_MS = 60_000;
 const HEARTBEAT_MS = 4 * 60_000;
+const CLV_MS = 15 * 60_000;
+
+/* upgrade 03: nudge the server-side CLV sighting whenever a synced device has
+   the app open — the server rate-caps and decides per game whether a pull is
+   worth quota, so this is free redundancy under the cron-job.org schedule. */
+let lastClv = 0;
+function clvTick() {
+  const key = getSyncKey();
+  if (!key || Date.now() - lastClv < CLV_MS) return;
+  lastClv = Date.now();
+  fetch("/api/clv", { headers: { "x-pl-sync": key }, cache: "no-store" }).catch(() => {});
+}
 
 /** Mounted once in the app shell — the whole auto-sync loop. */
 export function useLedgerSyncBeacon() {
@@ -169,6 +181,7 @@ export function useLedgerSyncBeacon() {
     // first sync always runs — even a background-loaded tab gets one pull;
     // the hidden-check only stops the RECURRING work from churning offscreen
     void syncNow();
+    clvTick();
     const kick = () => {
       if (!document.hidden) void syncNow();
     };
@@ -184,6 +197,7 @@ export function useLedgerSyncBeacon() {
       }
       const changed = lastSeenLocal !== null && raw !== lastSeenLocal;
       if (changed || Date.now() - lastSyncAt > HEARTBEAT_MS) void syncNow();
+      clvTick();
     }, TICK_MS);
     return () => {
       document.removeEventListener("visibilitychange", kick);

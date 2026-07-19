@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
+import { ReceiptsPanel } from "@/components/ledger/ReceiptsPanel";
 import { SYNC_EVENT, syncNow, useSyncState } from "@/lib/ledgerSync";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 
@@ -521,6 +522,10 @@ export default function LedgerPage() {
               </Panel>
             </Reveal>
           )}
+
+          <Reveal>
+            <ReceiptsPanel entries={api.entries as never} />
+          </Reveal>
 
           <Reveal>
             <div className="space-y-3">

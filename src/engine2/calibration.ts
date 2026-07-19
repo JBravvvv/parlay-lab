@@ -17,6 +17,9 @@ export type GradedPick = {
   edge: number | null; // stated edge %, may be null
   lu: "confirmed" | "projected";
   res: "won" | "lost";
+  /* upgrade 03: the de-vigged consensus probability at statement time (0-100), when
+     logged — lets the summary score the model AGAINST the consensus-only baseline */
+  pMkt?: number | null;
 };
 
 export const PROB_BUCKETS: [number, number][] = [
@@ -115,7 +118,18 @@ export type CalibrationSummary = {
   /* per-market rollup used for the one-line report + weights decision */
   perMarket: Record<
     string,
-    { n: number; predicted: number; actual: number; brier: number; tier: Tier; significant: boolean; direction: "hot" | "cold" | "ok" }
+    {
+      n: number;
+      predicted: number;
+      actual: number;
+      brier: number;
+      tier: Tier;
+      significant: boolean;
+      direction: "hot" | "cold" | "ok";
+      /* upgrade 03: model vs consensus Brier over the SAME records (both probs known) —
+         the day model < consensus in a market is the day its blend weight earned a raise */
+      mktCmp?: { n: number; model: number; consensus: number } | null;
+    }
   >;
   /* sanity breaker (any n>=30): stated edge 30%+ with actual below HALF the
      predicted rate → looks like a bug, not miscalibration. Quarantine. */
@@ -153,6 +167,16 @@ export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
       : 0;
     const ci = wilson(won, n);
     const significant = n > 0 && (predicted < ci.lo || predicted > ci.hi);
+    const withMkt = sel.filter((x) => x.pMkt != null);
+    const sq = (q: number, y: number) => (q - y) * (q - y);
+    const mktCmp = withMkt.length
+      ? {
+          n: withMkt.length,
+          model: withMkt.reduce((a, x) => a + sq(x.p / 100, x.res === "won" ? 1 : 0), 0) / withMkt.length,
+          consensus:
+            withMkt.reduce((a, x) => a + sq((x.pMkt as number) / 100, x.res === "won" ? 1 : 0), 0) / withMkt.length,
+        }
+      : null;
     perMarket[m] = {
       n,
       predicted,
@@ -161,6 +185,7 @@ export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
       tier: tierFor(n),
       significant,
       direction: !significant ? "ok" : actual < predicted ? "hot" : "cold",
+      mktCmp,
     };
   }
   const quarantine: string[] = [];

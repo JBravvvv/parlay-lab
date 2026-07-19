@@ -3,6 +3,16 @@ import type { DayBlob } from "@/lib/pred-serialize";
 import { applyWeeklyAdjustment, computeCalibration, type GradedPick, type WeightState } from "@/engine2/calibration";
 import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } from "@/engine2/grade";
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { marketOf } from "@/lib/ledger-segments";
+
+/* the slice of a synced ledger day the training loop reads */
+type LedgerDay = {
+  date: string;
+  locked?: boolean;
+  core?: { legs?: { label?: string; prop?: string; lkey?: string | null; est?: unknown }[] }[];
+  funT?: { legs?: { label?: string; prop?: string; lkey?: string | null; est?: unknown }[] }[];
+  grading?: { legs?: Record<string, { result?: string }> } | null;
+};
 
 /**
  * Calibration spec 3B/3C/3D (settle-side) — runs nightly via Vercel cron and
@@ -157,16 +167,44 @@ export async function GET(req: NextRequest) {
       if (changed) await redisSetJson(dayKey(date), blob);
     }
 
-    // 3C: rolling summary over the graded window
+    // 3C: rolling summary over the graded window (pMkt rides along so the summary
+    // can score the model against the consensus-only baseline — upgrade 03)
     const graded: GradedPick[] = [];
     for (const date of allDays.slice(-SUMMARY_DAYS)) {
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
       for (const r of Object.values(blob.records)) {
         if (r.res === "won" || r.res === "lost") {
-          graded.push({ market: r.market, p: r.p, edge: r.edge, lu: r.lu, res: r.res });
+          graded.push({ market: r.market, p: r.p, edge: r.edge, lu: r.lu, res: r.res, pMkt: r.pMkt ?? null });
         }
       }
+    }
+    // upgrade 03: the cloud ledger's graded legs join the training set for any date the
+    // prediction store never logged (the pre-logging history) — never double-counted:
+    // dates the store covers are skipped outright.
+    try {
+      const cut = new Date(Date.now() - SUMMARY_DAYS * 86_400_000).toISOString().slice(0, 10);
+      const dayset = new Set(allDays);
+      const rawLedger = (await redis(["GET", "pl:ledger:v1"])) as string | null;
+      const ledger: LedgerDay[] = rawLedger ? ((JSON.parse(rawLedger) as { ledger?: LedgerDay[] }).ledger ?? []) : [];
+      for (const e of ledger) {
+        if (!e.locked || e.date < cut || dayset.has(e.date)) continue;
+        const gLegs = e.grading?.legs ?? {};
+        const seen = new Set<string>();
+        for (const t of [...(e.core ?? []), ...(e.funT ?? [])]) {
+          for (const l of t.legs ?? []) {
+            if (!l.lkey || l.est == null || !l.label || !l.prop) continue;
+            const lid = `${l.label}|${l.prop}`;
+            if (seen.has(lid)) continue;
+            seen.add(lid);
+            const res = gLegs[lid]?.result;
+            if (res !== "won" && res !== "lost") continue;
+            graded.push({ market: marketOf(l.lkey), p: Number(l.est), edge: null, lu: "confirmed", res, pMkt: null });
+          }
+        }
+      }
+    } catch {
+      /* ledger unreadable — the prediction store still feeds the summary */
     }
     const summary = computeCalibration(graded);
     await redisSetJson(K_SUMMARY, summary);

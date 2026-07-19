@@ -174,3 +174,28 @@ describe("server grading port (matches the engine's void rules)", () => {
     expect(starterInfo(box, "nobody").started).toBe(false);
   });
 });
+
+describe("upgrade 03: model vs consensus Brier over the same records (mktCmp)", () => {
+  it("hand-computed: model beats the consensus when its probabilities are sharper", () => {
+    const picks = [
+      // model said 70, consensus 55, it won: model sq (.3)^2=.09, consensus (.45)^2=.2025
+      { market: "batter_hits", p: 70, edge: 5, lu: "confirmed" as const, res: "won" as const, pMkt: 55 },
+      // model said 60, consensus 50, it lost: model .36, consensus .25
+      { market: "batter_hits", p: 60, edge: 3, lu: "confirmed" as const, res: "lost" as const, pMkt: 50 },
+      // no pMkt: excluded from the comparison but still in the market rollup
+      { market: "batter_hits", p: 65, edge: 2, lu: "confirmed" as const, res: "won" as const, pMkt: null },
+    ];
+    const s = computeCalibration(picks);
+    const pm = s.perMarket.batter_hits;
+    expect(pm.n).toBe(3);
+    expect(pm.mktCmp).not.toBeNull();
+    expect(pm.mktCmp!.n).toBe(2);
+    expect(pm.mktCmp!.model).toBeCloseTo((0.09 + 0.36) / 2, 10);
+    expect(pm.mktCmp!.consensus).toBeCloseTo((0.2025 + 0.25) / 2, 10);
+  });
+  it("no consensus anywhere -> mktCmp null, everything else unchanged", () => {
+    const s = computeCalibration([{ market: "ml", p: 60, edge: 1, lu: "confirmed" as const, res: "won" as const }]);
+    expect(s.perMarket.ml.mktCmp).toBeNull();
+    expect(s.perMarket.ml.n).toBe(1);
+  });
+});

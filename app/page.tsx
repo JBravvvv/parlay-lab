@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
 import { useLedger, roiPct } from "@/lib/useLedger";
+import { ledgerSegments } from "@/lib/ledger-segments";
+import type { SyncEntry } from "@/lib/ledger-merge";
 import { cachedBoard, getMoney } from "@/lib/engine-client";
 import { fmtMoneyExact } from "@/lib/format";
 import type { PickRow } from "@/engine";
@@ -27,6 +29,42 @@ const NAV_LINKS = [
   { href: "/builder", label: "Builder", chevron: false },
   { href: "/ledger", label: "Ledger", chevron: false },
 ];
+
+/* upgrade 03: the weekly receipt — one glance answers "is the engine earning
+   or am I paying for variance?" CLV and coverage lead; P/L is the noisy number. */
+function WeekReceipt({ entries }: { entries: SyncEntry[] }) {
+  const w = ledgerSegments(entries).week;
+  if (!w.days) return null;
+  const stat = (label: string, value: string, cls = "text-text") => (
+    <div>
+      <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">{label}</div>
+      <div className={`num text-[15px] font-semibold ${cls}`}>{value}</div>
+    </div>
+  );
+  return (
+    <Panel title="7-day receipt">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {stat("Staked", `$${w.staked}`)}
+        {stat("P/L (settled)", `${w.pl < 0 ? "−" : "+"}$${Math.abs(w.pl).toFixed(0)}`, w.pl >= 0 ? "text-pos" : "text-neg")}
+        {stat(
+          "CLV",
+          w.clvPts == null ? "—" : `${w.clvPts >= 0 ? "+" : ""}${w.clvPts.toFixed(2)} pts`,
+          w.clvPts == null ? "text-faint" : w.clvPts >= 0 ? "text-pos" : "text-neg",
+        )}
+        {stat("Closes sighted", `${w.sighted}/${w.legs}`)}
+        {stat(
+          "Override P/L",
+          w.overridePl === 0 ? "$0" : `${w.overridePl < 0 ? "−" : "+"}$${Math.abs(w.overridePl).toFixed(0)}`,
+          w.overridePl < 0 ? "text-neg" : "text-muted",
+        )}
+      </div>
+      <div className="mt-2 text-[10.5px] text-faint">
+        CLV in probability points vs the last pre-pitch Caesars price — under parlay variance it converges long before
+        P/L does. Full segment tables live on the Ledger tab.
+      </div>
+    </Panel>
+  );
+}
 
 function Chevron() {
   return (
@@ -236,6 +274,14 @@ export default function DashboardPage() {
           </Reveal>
         </div>
       </div>
+
+      {api && api.entries.length > 0 && (
+        <Reveal>
+          <div className="mt-4">
+            <WeekReceipt entries={api.entries as never} />
+          </div>
+        </Reveal>
+      )}
 
       <Reveal>
         <Panel title="Today's top playable edges" className="mt-4">

@@ -117,6 +117,9 @@ export function CalibrationPanel() {
                   <th className="pb-2 text-right">Predicted</th>
                   <th className="pb-2 text-right">Actual</th>
                   <th className="pb-2 text-right">Brier</th>
+                  <th className="pb-2 text-right" title="Consensus-only baseline Brier over the same records — the model has earned a raise the day it beats this">
+                    vs market
+                  </th>
                   <th className="pb-2 text-right">Status</th>
                 </tr>
               </thead>
@@ -141,6 +144,19 @@ export function CalibrationPanel() {
                       </td>
                       <td className="py-1.5 text-right text-muted">{pm.brier.toFixed(3)}</td>
                       <td className="py-1.5 text-right">
+                        {pm.mktCmp ? (
+                          <span
+                            className={pm.mktCmp.model < pm.mktCmp.consensus ? "text-pos" : "text-muted"}
+                            title={`Model ${pm.mktCmp.model.toFixed(3)} vs consensus ${pm.mktCmp.consensus.toFixed(3)} over the same ${pm.mktCmp.n} records`}
+                          >
+                            {pm.mktCmp.consensus.toFixed(3)}
+                            {pm.mktCmp.model < pm.mktCmp.consensus ? " ▲" : ""}
+                          </span>
+                        ) : (
+                          <span className="text-faint">—</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-right">
                         <TierChip tier={pm.tier} significant={pm.significant} direction={pm.direction} />
                       </td>
                     </tr>
@@ -153,7 +169,9 @@ export function CalibrationPanel() {
             Statistical significance = the predicted rate falls outside the 95% confidence interval of the actual
             rate. Under 50 graded picks a bucket is pure variance and shows MONITOR no matter the gap; automatic
             adjustment needs 150+ AND significance, is capped at ±10% per week, and can only pull the model TOWARD
-            the market consensus — never away from it.
+            the market consensus — never away from it. <b className="text-muted">vs market</b> is the consensus-only
+            Brier over the same records (lower is better): the day the model&apos;s Brier beats it in a market (▲) is
+            the day that market&apos;s blend weight has earned a raise — until then, shrink-only stands.
           </div>
         </Panel>
       </Reveal>
