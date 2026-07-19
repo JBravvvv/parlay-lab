@@ -12,7 +12,7 @@ import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
-import { getEngine, getMoney, setMoney, todayStr } from "@/lib/engine-client";
+import { getEngine, getMoney, setMoney, getSelectionMode, todayStr } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
@@ -59,11 +59,14 @@ type LockedTicket = {
   czOdds?: string | number;
   prob?: number;
   czEv?: number | null;
+  bsOdds?: string | null;
+  bsDec?: number | null;
+  bsEv?: number | null;
   confirmed?: number | null;
   supplemental?: boolean;
   late?: boolean;
   lockedAt?: number;
-  legs: { label: string; prop: string; cz?: number | null; gkey?: string | null }[];
+  legs: { label: string; prop: string; cz?: number | null; bs?: number | null; bsBook?: string | null; gkey?: string | null }[];
 };
 /* supplemental fun locks: what the engine says can still be added today */
 type SuppCalc = {
@@ -102,7 +105,11 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade, tag }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string }) {
+function TicketCard({ t, stake, kelly, grade, tag, basisMode }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean }) {
+  /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
+     CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
+  const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
+  const czTax = basisMode && t.bsEv != null && t.czEv != null ? Number(t.czEv) - Number(t.bsEv) : null;
   /* upgrade 01: surface the ¼-Kelly stake whenever the allocator diverges from it by >2×
      either way — "allocator $49 · Kelly $11" is the tell that the entered daily, not the
      edge, is driving the size */
@@ -138,8 +145,24 @@ function TicketCard({ t, stake, kelly, grade, tag }: { t: Ticket & { tier?: stri
               Kelly {fmtMoney(kelly)}
             </span>
           )}
+          {basisMode && t.bsOdds != null && (
+            <span
+              className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-text"
+              title="DK/FD selection basis — the better of DraftKings/FanDuel, the price that picked and sized this ticket"
+            >
+              basis {String(t.bsOdds)}
+            </span>
+          )}
           <OddsCell odds={(t.czOdds ?? "") as never} book="caesars" />
-          {t.czEv != null && <EvBadge ev={Number(t.czEv)} />}
+          {primaryEv != null && <EvBadge ev={primaryEv} />}
+          {czTax != null && (
+            <span
+              className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[10.5px] text-muted"
+              title="Informational: EV at the Caesars price, and the tax vs the DK/FD basis — you settle at CZ/NV, selection never sees it"
+            >
+              @CZ {Number(t.czEv) >= 0 ? "+" : ""}{Number(t.czEv).toFixed(1)}% · tax {czTax >= 0 ? "+" : ""}{czTax.toFixed(1)}%
+            </span>
+          )}
           {grade && (
             <span
               className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -169,7 +192,14 @@ function TicketCard({ t, stake, kelly, grade, tag }: { t: Ticket & { tier?: stri
                 </span>
               )}
             </span>
-            {l.cz != null && <span className="num shrink-0 text-gold">{fmtAmerican(Number(l.cz))}</span>}
+            <span className="num shrink-0">
+              {basisMode && (l as { bs?: number | null }).bs != null && (
+                <span className="mr-1.5 text-text" title="DK/FD basis price for this leg">
+                  {fmtAmerican(Number((l as { bs?: number }).bs))} ({(l as { bsBook?: string }).bsBook ?? "DK"})
+                </span>
+              )}
+              {l.cz != null && <span className="text-gold">{fmtAmerican(Number(l.cz))}</span>}
+            </span>
           </div>
         ))}
       </div>
@@ -206,6 +236,9 @@ export default function BuilderPage() {
   };
 
   useEffect(() => setMoneyState(getMoney()), []);
+  // dk_fd: mounted-gated localStorage read (hydration rule)
+  const [basisMode, setBasisMode] = useState(false);
+  useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
 
   const eng = typeof window !== "undefined" ? getEngine() : null;
   const d = board?.data;
@@ -386,6 +419,13 @@ export default function BuilderPage() {
         )}
       </div>
       {status && <div className="mb-4 text-[12px] text-pos">{status}</div>}
+      {/* stale-quote VERIFY guard: dk_fd selection is only as good as its basis feed */}
+      {basisMode && board && Date.now() - board.at > 20 * 60_000 && (
+        <div className="num mb-4 text-[11.5px] text-gold">
+          ⚠ DK/FD basis quotes are {Math.round((Date.now() - board.at) / 60_000)} min old — regenerate the board
+          before locking so selection prices are verified fresh.
+        </div>
+      )}
       {!locked && czCover && (
         <div className={`num mb-4 text-[11.5px] ${czCover.have < czCover.total ? "text-gold" : "text-muted"}`}>
           Caesars props live for {czCover.have} of {czCover.total} games right now
@@ -415,10 +455,11 @@ export default function BuilderPage() {
                 return (
                   <div key={t.id}>
                     <TicketCard
-                      t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, prob: t.prob } as never}
+                      t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob } as never}
                       stake={t.stake}
                       grade={locked.grading?.tickets?.[t.id]}
                       tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}
+                      basisMode={basisMode}
                     />
                     {!started && !locked.grading?.tickets?.[t.id] && (
                       <div className="mt-1.5 flex items-center gap-2 px-1">
@@ -472,7 +513,7 @@ export default function BuilderPage() {
                 <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     {supp.fun.picks.map((p) => (
-                      <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" />
+                      <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -518,7 +559,7 @@ export default function BuilderPage() {
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         {shadow.alloc.picks.map((p) => (
-                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} />
+                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} />
                         ))}
                       </div>
                     </div>
@@ -528,7 +569,7 @@ export default function BuilderPage() {
                       <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
                       <div className="grid gap-3 md:grid-cols-2">
                         {shadow.fun.picks.map((p) => (
-                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} />
+                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                         ))}
                       </div>
                     </div>
@@ -630,7 +671,7 @@ export default function BuilderPage() {
               )}
               <div className="grid gap-3 md:grid-cols-2">
                 {card.alloc.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} />
+                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} />
                 ))}
               </div>
             </Reveal>
@@ -643,7 +684,7 @@ export default function BuilderPage() {
               </h2>
               <div className="grid gap-3 md:grid-cols-2">
                 {card.fun.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} />
+                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                 ))}
               </div>
             </Reveal>

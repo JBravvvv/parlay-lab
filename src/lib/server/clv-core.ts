@@ -14,7 +14,20 @@ import { pnorm } from "@/engine2/grade";
  * consensus fair probability, so CLV can be graded against both closes.
  */
 
-export type ClvSight = { am: number; at: number; consensusFair: number | null };
+/* dk_fd: each sighting carries BOTH closes — the Caesars close (the price that pays)
+   and the DK/FD basis close (the price that picked), so CLV is judged against each. */
+export type ClvSight = { am: number; at: number; consensusFair: number | null; bsAm?: number | null; bsBk?: string | null };
+
+const DK = "draftkings";
+const FD = "fanduel";
+const amDec = (am: number) => (am > 0 ? 1 + am / 100 : 1 + 100 / -am);
+/** Better of the DK/FD pair for one side; tie goes to DK. */
+const basisOf = (dk: number | null, fd: number | null): { am: number; bk: string } | null => {
+  if (dk == null && fd == null) return null;
+  if (dk == null) return { am: fd!, bk: "FD" };
+  if (fd == null) return { am: dk, bk: "DK" };
+  return amDec(fd) > amDec(dk) ? { am: fd, bk: "FD" } : { am: dk, bk: "DK" };
+};
 
 export type BookOutcome = { name?: string; description?: string; price?: number; point?: number };
 export type BookMarket = { key: string; outcomes?: BookOutcome[] };
@@ -122,6 +135,10 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
   let czUnder: number | null = null;
   let czAltOver: number | null = null;
   let czAltUnder: number | null = null;
+  let dkO: number | null = null;
+  let dkU: number | null = null;
+  let fdO: number | null = null;
+  let fdU: number | null = null;
   for (const bk of ev.bookmakers ?? []) {
     for (const mk of bk.markets ?? []) {
       const alt = mk.key === `${market}_alternate`;
@@ -146,12 +163,27 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
         if (o != null) czOver = o;
         if (u != null) czUnder = u;
       }
+      if (bk.key === DK) {
+        if (o != null) dkO = o;
+        if (u != null) dkU = u;
+      }
+      if (bk.key === FD) {
+        if (o != null) fdO = o;
+        if (u != null) fdU = u;
+      }
     }
   }
   const am = under ? (czUnder ?? czAltUnder) : (czOver ?? czAltOver);
   if (am == null) return null;
   const fairOver = fairs.length >= 2 ? median(fairs) : null;
-  return { am, at, consensusFair: fairOver == null ? null : under ? 1 - fairOver : fairOver };
+  const bs = under ? basisOf(dkU, fdU) : basisOf(dkO, fdO);
+  return {
+    am,
+    at,
+    consensusFair: fairOver == null ? null : under ? 1 - fairOver : fairOver,
+    bsAm: bs?.am ?? null,
+    bsBk: bs?.bk ?? null,
+  };
 }
 
 /** Sight an ML or RL leg from the slate game-odds payload (h2h + spreads). */
@@ -163,6 +195,8 @@ export function sightGameLeg(ev: OddsEvent, leg: PendingLeg, at: number): ClvSig
   if (!ml && pt == null) return null;
   const fairs: number[] = [];
   let cz: number | null = null;
+  let dk: number | null = null;
+  let fd: number | null = null;
   for (const bk of ev.bookmakers ?? []) {
     for (const mk of bk.markets ?? []) {
       if (mk.key !== (ml ? "h2h" : "spreads")) continue;
@@ -178,10 +212,13 @@ export function sightGameLeg(ev: OddsEvent, leg: PendingLeg, at: number): ClvSig
       const f = devigPair(impliedProb(mine.price), impliedProb(other.price));
       if (f != null) fairs.push(f);
       if (bk.key === CAESARS_KEY) cz = mine.price;
+      if (bk.key === DK) dk = mine.price;
+      if (bk.key === FD) fd = mine.price;
     }
   }
   if (cz == null) return null;
-  return { am: cz, at, consensusFair: fairs.length >= 2 ? median(fairs) : null };
+  const bs = basisOf(dk, fd);
+  return { am: cz, at, consensusFair: fairs.length >= 2 ? median(fairs) : null, bsAm: bs?.am ?? null, bsBk: bs?.bk ?? null };
 }
 
 /** Merge sightings into a COPY of the entry: clv only, latest wins, everything

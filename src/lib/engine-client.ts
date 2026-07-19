@@ -37,15 +37,16 @@ export function getSims(): Record<string, SimOut> {
   return out;
 }
 
-export type SelectionMode = "ev_gated" | "probability" | "caesars_ev";
+export type SelectionMode = "dk_fd" | "ev_gated" | "probability" | "caesars_ev";
 
 export function getSelectionMode(): SelectionMode {
   try {
     const v = localStorage.getItem("pl_selmode");
-    // ev_gated is the upgrade-01 default: zero edge = zero stake, NO-PLAY days are real
-    return v === "caesars_ev" || v === "probability" ? v : "ev_gated";
+    // dk_fd is the new default: ev_gated discipline priced at the better of DK/FD
+    // (the selection basis) — Caesars stays display + settlement only
+    return v === "caesars_ev" || v === "probability" || v === "ev_gated" ? v : "dk_fd";
   } catch {
-    return "ev_gated";
+    return "dk_fd";
   }
 }
 

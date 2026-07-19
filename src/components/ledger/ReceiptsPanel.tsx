@@ -37,6 +37,7 @@ function ClvTable({ rows, label }: { rows: SegRow[]; label: string }) {
             <tr className="text-left text-[9.5px] uppercase tracking-wider text-faint">
               <th className="py-1 pr-2">Segment</th>
               <th className="py-1 pr-2">CLV vs CZ close</th>
+              <th className="py-1 pr-2">vs DK/FD close</th>
               <th className="py-1 pr-2">vs consensus fair</th>
               <th className="py-1">Sighted</th>
             </tr>
@@ -48,6 +49,10 @@ function ClvTable({ rows, label }: { rows: SegRow[]; label: string }) {
                 <td className={`num py-1 pr-2 ${ptsClass(r.clvPts)}`}>
                   {pts(r.clvPts)}
                   {r.clvPts != null && <span className="ml-1 text-faint">(n={r.sighted})</span>}
+                </td>
+                <td className={`num py-1 pr-2 ${ptsClass(r.bsPts)}`} title="Locked basis price vs the DK/FD close — CLV at the price that picked the leg">
+                  {pts(r.bsPts)}
+                  {r.bsPts != null && <span className="ml-1 text-faint">(n={r.bsN})</span>}
                 </td>
                 <td className={`num py-1 pr-2 ${ptsClass(r.fairPts)}`}>
                   {pts(r.fairPts)}
@@ -113,6 +118,23 @@ export function ReceiptsPanel({ entries }: { entries: SyncEntry[] }) {
             <div className="mt-1 text-[10px] text-faint">
               Supplemental = fun tickets locked after the daily lock, inside the same day&apos;s FUN budget.
             </div>
+          </div>
+        )}
+
+        {s.nvTax.tickets + s.nvTax.skipped > 0 && (
+          <div className="rounded-(--radius-panel) border border-gold/30 bg-gold/5 px-3 py-2 text-[11.5px]">
+            <span className="font-bold text-gold">NV tax paid</span>{" "}
+            <span className="num text-muted">
+              <b className={s.nvTax.tax > 0 ? "text-neg" : "text-pos"}>{money(-s.nvTax.tax)}</b> vs the DK/FD basis
+              over {s.nvTax.tickets} settled ticket{s.nvTax.tickets === 1 ? "" : "s"}
+              {s.nvTax.skipped > 0 && ` (${s.nvTax.skipped} void-repriced win${s.nvTax.skipped === 1 ? "" : "s"} excluded)`}
+            </span>
+            {s.nvTax.byMarket.length > 1 && (
+              <span className="num ml-2 text-faint">
+                {s.nvTax.byMarket.map((m) => `${m.market} ${money(-m.tax)}`).join(" · ")}
+              </span>
+            )}
+            <span className="ml-1 text-faint">— what settling at Caesars cost vs the price that picked the card</span>
           </div>
         )}
 

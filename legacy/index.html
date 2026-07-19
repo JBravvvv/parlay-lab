@@ -1221,6 +1221,12 @@ function shCollectSlate(){
         /* Caesars-only playable layer: the user's book. Captured additively — consensus/best-price above untouched. */
         var czm=mls.filter(function(x){return x.cz;})[0];
         if(czm){o.home_ml_cz=czm.h;o.away_ml_cz=czm.a;}
+        /* DK/FD basis layer (additive) */
+        var dkm=mls.filter(function(x){return x.k==="draftkings";})[0],fdm=mls.filter(function(x){return x.k==="fanduel";})[0];
+        var bmh=shBasisPick(dkm?{am:dkm.h,bk:"DK"}:null,fdm?{am:fdm.h,bk:"FD"}:null);
+        var bma=shBasisPick(dkm?{am:dkm.a,bk:"DK"}:null,fdm?{am:fdm.a,bk:"FD"}:null);
+        if(bmh){o.home_ml_bs=bmh.am;o.home_ml_bsb=bmh.bk;}
+        if(bma){o.away_ml_bs=bma.am;o.away_ml_bsb=bma.bk;}
       }
       if(rls.length){
         /* consensus at the modal (most-quoted) home run-line point */
@@ -1236,6 +1242,12 @@ function shCollectSlate(){
         /* Caesars RL only counts when Caesars quotes the same modal ±1.5 point the engine prices */
         var czr=use.filter(function(x){return x.cz;})[0];
         if(czr){o.home_rl_cz=czr.h;o.away_rl_cz=czr.a;}
+        /* DK/FD basis at the same modal point (line-shopped within the pair only) */
+        var dkr=use.filter(function(x){return x.k==="draftkings";})[0],fdr=use.filter(function(x){return x.k==="fanduel";})[0];
+        var brh=shBasisPick(dkr?{am:dkr.h,bk:"DK"}:null,fdr?{am:fdr.h,bk:"FD"}:null);
+        var bra=shBasisPick(dkr?{am:dkr.a,bk:"DK"}:null,fdr?{am:fdr.a,bk:"FD"}:null);
+        if(brh){o.home_rl_bs=brh.am;o.home_rl_bsb=brh.bk;}
+        if(bra){o.away_rl_bs=bra.am;o.away_rl_bsb=bra.bk;}
       }
       if(tots.length){
         if(SH_V2){ /* consensus at the modal total point + Caesars quote (v2 totals pricing) */
@@ -1301,9 +1313,14 @@ function shCollectSlate(){
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
               var czx=r.list.filter(function(x){return x.cz;})[0];
               var czAlt=(!czx&&altCz[mkey])?altCz[mkey][kk]:null; /* ladder fallback: standard Caesars quote wins */
+              /* DK/FD basis pair for this exact line (additive) */
+              var dkx=r.list.filter(function(x){return x.k==="draftkings";})[0],fdx=r.list.filter(function(x){return x.k==="fanduel";})[0];
+              var bso=shBasisPick(dkx&&dkx.o!=null?{am:dkx.o,bk:"DK"}:null,fdx&&fdx.o!=null?{am:fdx.o,bk:"FD"}:null);
+              var bsu=shBasisPick(dkx&&dkx.u!=null?{am:dkx.u,bk:"DK"}:null,fdx&&fdx.u!=null?{am:fdx.u,bk:"FD"}:null);
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
                 fair:fairs.length?shMedianW(fairs):null,books:fairs.length,
-                cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null)};
+                cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null),
+                bs:(bso||bsu)?{o:bso?bso.am:null,ob:bso?bso.bk:null,u:bsu?bsu.am:null,ub:bsu?bsu.bk:null}:null};
             });
           });
           if(Object.keys(g).length){var gnE=evGnum(e.away_team,e.home_team,e.commence_time);
@@ -1404,6 +1421,16 @@ function shTbOver(line,lamH,s1,s2){
 var SH_V2=null,SH_PRIORS=null,SH_CTX=null;
 var SH_BOOKW={pinnacle:3,betfair_ex_eu:2,matchbook:2,betonlineag:1.5};
 function shBookW(k){return (SH_V2&&SH_V2.sharpW&&SH_BOOKW[k])||1;}
+/* DK/FD selection basis (dk_fd mode): the better offered price for one side between
+   DraftKings and FanDuel ONLY, line-shopped within that pair — tie goes to DK.
+   Captured additively, exactly like the Caesars layer: consensus and best-price
+   stay untouched, and no other book's price may reach the selection math. */
+function shBasisPick(dk,fd){
+  if(dk&&dk.am==null)dk=null;
+  if(fd&&fd.am==null)fd=null;
+  if(!dk)return fd;if(!fd)return dk;
+  return amToDec(fd.am)>amToDec(dk.am)?fd:dk;
+}
 /* Shin two-way de-vig — strips favorite-longshot bias (proportional keeps it) */
 function shShin2(i1,i2){if(i1==null||i2==null)return null;var S=i1+i2;if(!(S>0))return null;if(S<=1.0001)return i1/S;
   function qq(z,x){return (Math.sqrt(z*z+4*(1-z)*x*x/S)-z)/(2*(1-z));}
@@ -1897,6 +1924,8 @@ function shAnalyzeLocal(slate){
     cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
       oddsN:homeSide?go.home_ml:go.away_ml,book:homeSide?go.home_ml_book:go.away_ml_book,
       czN:(homeSide?go.home_ml_cz:go.away_ml_cz)!=null?(homeSide?go.home_ml_cz:go.away_ml_cz):null,
+      bsN:(homeSide?go.home_ml_bs:go.away_ml_bs)!=null?(homeSide?go.home_ml_bs:go.away_ml_bs):null,
+      bsBook:(homeSide?go.home_ml_bs:go.away_ml_bs)!=null?(homeSide?go.home_ml_bsb:go.away_ml_bsb):null,
       p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
       pModel:homeSide?model:1-model,wBlend:wML,lu:"confirmed",
       lkey:homeSide?"ml_home":"ml_away",gkey:gkeyML,
@@ -1916,6 +1945,8 @@ function shAnalyzeLocal(slate){
         cats.rl.push({label:side?g.home:g.away,sub:"RL "+sPt(side?go.home_rl_pt:go.away_rl_pt)+" vs "+(side?g.away:g.home),
           odds:obSign(side?go.home_rl:go.away_rl),oddsN:side?go.home_rl:go.away_rl,book:side?go.home_rl_book:go.away_rl_book,
           czN:(side?go.home_rl_cz:go.away_rl_cz)!=null?(side?go.home_rl_cz:go.away_rl_cz):null,
+          bsN:(side?go.home_rl_bs:go.away_rl_bs)!=null?(side?go.home_rl_bs:go.away_rl_bs):null,
+          bsBook:(side?go.home_rl_bs:go.away_rl_bs)!=null?(side?go.home_rl_bsb:go.away_rl_bsb):null,
           p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
           pModel:side?pHomeCover:1-pHomeCover,wBlend:wRL,lu:"confirmed",
           game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
@@ -2078,7 +2109,15 @@ function shAnalyzeLocal(slate){
         if(isHitter&&pAdj<0.35)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:"O",odds:row.o,imp:nv,edge:pAdj-nv,
           why:"model + market both favor the under — overs-only rule keeps it off the board"});
       }
-      else if(iO!=null){var fair=iO/1.06;sd={side:"O",p:wPr*pO+(1-wPr)*fair,imp:fair,odds:row.o,bk:row.oBook};}
+      else if(iO!=null){
+        /* one-sided market (no under to de-vig, e.g. anytime HR): the anchor is a vig
+           haircut off a single price. In dk_fd that price must be the DK/FD basis —
+           anchoring to the all-books best would let an NV quote steer selection (the
+           NV-blindness test catches exactly this). No basis → legacy anchor, and the
+           leg is card-ineligible anyway. */
+        var oneAm=(SH_CFG.selMode==="dk_fd"&&row.bs&&row.bs.o!=null)?row.bs.o:null;
+        var oneImp=oneAm!=null?shImp(oneAm):iO;
+        var fair=oneImp/1.06;sd={side:"O",p:wPr*pO+(1-wPr)*fair,imp:fair,odds:row.o,bk:row.oBook};}
       if(!sd||sd.odds==null)return;
       var edge=sd.p-sd.imp;
       if(sd.imp>=0.78&&edge<0)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:sd.side,odds:sd.odds,imp:sd.imp,edge:edge,
@@ -2088,6 +2127,8 @@ function shAnalyzeLocal(slate){
         oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,
         pModel:sd.side==="O"?pO:1-pO,wBlend:wPr,lu:lu,
         czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
+        bsN:(row.bs&&(sd.side==="O"?row.bs.o:row.bs.u)!=null)?(sd.side==="O"?row.bs.o:row.bs.u):null,
+        bsBook:(row.bs&&(sd.side==="O"?row.bs.o:row.bs.u)!=null)?(sd.side==="O"?row.bs.ob:row.bs.ub):null,
         lkey:shLegKey(row.p,mkt,row.ln),gkey:g?shGkey(g.away,g.home,g.gnum):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
@@ -2111,11 +2152,16 @@ function shAnalyzeLocal(slate){
         var czEv=czDec!=null?shEV(r.p,czDec):null;
         var czImp=czN!=null?shImp(czN):null;
         var czKellyF=czDec!=null?Math.min(0.25*shKelly(r.p,czDec),0.02):null;
+        /* DK/FD basis layer (additive): the price selection shops at in dk_fd mode */
+        var bsN2=(r.bsN!=null)?r.bsN:null,bsDec2=bsN2!=null?amToDec(bsN2):null;
+        var bsEv2=bsDec2!=null?shEV(r.p,bsDec2):null;
         return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,live:!!r.live,book:r.book||null,
           prob:Math.round(r.p*1000)/10,implied:Math.round(r.imp*1000)/10,edge:Math.round(edge*1000)/10,
           ev:ev!=null?Math.round(ev*1000)/10:null,kellyF:Math.round(kellyF*10000)/10000,
           cz:czN,czOdds:czN!=null?obSign(czN):null,
           czEv:czEv!=null?Math.round(czEv*1000)/10:null,
+          bs:bsN2,bsOdds:bsN2!=null?obSign(bsN2):null,bsBook:bsN2!=null?(r.bsBook||null):null,
+          bsEv:bsEv2!=null?Math.round(bsEv2*1000)/10:null,
           czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
           czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
           czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),noParlay:!!r.noParlay,
@@ -2146,9 +2192,19 @@ function shAnalyzeLocal(slate){
      any player at `cap` tickets total, so you can play many without re-betting the same play. ----- */
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
-    cz:(x.r.cz!=null?x.r.cz:null),live:!!x.r.live,lu:x.r.lu||"confirmed"};}
+    cz:(x.r.cz!=null?x.r.cz:null),bs:(x.r.bs!=null?x.r.bs:null),bsBook:x.r.bsBook||null,
+    live:!!x.r.live,lu:x.r.lu||"confirmed"};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
+    /* dk_fd: parlay building IS selection math, so its input is the basis-priced
+       universe only. A leg with no DK/FD quote can never be selected (rule), and
+       one-sided no-basis rows carry an NV-anchored prob — letting them into the
+       shared usage ledger would leak NV prices into which SELECTABLE tickets get
+       built. Single picks stay board-visible and manual-slip eligible. */
+    if(SH_CFG.selMode==="dk_fd"){
+      var C2={};Object.keys(C).forEach(function(k){C2[k]=C[k].filter(function(r){return r.bs!=null;});});
+      C=C2;
+    }
     var use={uPlayer:{},uKey:{}};
     function pick(pool,n,preferDistinctGame){
       var ranked=pool.slice().sort(function(a,b){
@@ -2214,6 +2270,12 @@ function shAnalyzeLocal(slate){
       legs.forEach(function(l){var d2=l.cz!=null?amToDec(l.cz):null;if(d2)czDec*=d2;else czAll=false;});
       var czOddsT=czAll?decToAm(czDec):null;
       var czEvT=(czAll&&prob>0)?prob*czDec-1:null;
+      /* DK/FD basis re-pricing (additive, mirrors the Caesars layer): a leg with no
+         DK and no FD quote leaves the ticket without a basis — flagged, never faked */
+      var bsDecT=1,bsAll=true;
+      legs.forEach(function(l){var d3=l.bs!=null?amToDec(l.bs):null;if(d3)bsDecT*=d3;else bsAll=false;});
+      var bsOddsT=bsAll?decToAm(bsDecT):null;
+      var bsEvT=(bsAll&&prob>0)?prob*bsDecT-1:null;
       var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
@@ -2222,7 +2284,9 @@ function shAnalyzeLocal(slate){
         simJoint:simJoint,probNaive:simJoint?Math.round(probNaive*1000)/10:null,
         odds:(am!=null?obSign(am):"—"),prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
         czOdds:(czOddsT!=null?obSign(czOddsT):null),czDec:czAll?Math.round(czDec*10000)/10000:null,
-        czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
+        czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,
+        bsOdds:(bsOddsT!=null?obSign(bsOddsT):null),bsDec:bsAll?Math.round(bsDecT*10000)/10000:null,
+        bsEv:bsEvT!=null?Math.round(bsEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
         ev:evT!=null?Math.round(evT*1000)/10:null,fair:(fairAm!=null?obSign(fairAm):null),
         note:(negCorr?"⛔ Sim says these legs work AGAINST each other (negatively correlated) — EV is worse than it looks. ":
               posCorr?"✳ Sim-confirmed positive correlation between same-game legs. ":
@@ -2379,7 +2443,9 @@ function shCoreEligible(w,cfg){
   var pl=w.pl;
   if(cfg.coreNoHR&&(pl.type==="batter_home_runs"||
     pl.legs.some(function(l){return (l.lkey||"").indexOf("|batter_home_runs|")>=0;})))return false;
-  if(cfg.coreMaxDec&&pl.czDec!=null&&pl.czDec>cfg.coreMaxDec)return false;
+  /* dk_fd: length cap applies at the basis price — the CZ quote may not shape selection */
+  var selDecE=(cfg.selMode==="dk_fd")?pl.bsDec:pl.czDec;
+  if(cfg.coreMaxDec&&selDecE!=null&&selDecE>cfg.coreMaxDec)return false;
   return true;
 }
 function shAllocate(pool,amount,cfg,force){
@@ -2392,17 +2458,23 @@ function shAllocate(pool,amount,cfg,force){
      EV clears cfg.coreEvMin — zero qualifiers means NO-PLAY, a first-class result, and
      stakes only flow after an explicit override (force=true, stamped on the ledger).
      "probability" selects/weights by true probability alone (calibration Update 1);
-     "caesars_ev" is the legacy ¼-Kelly-at-CZ ranking. Both stay selectable in Settings. */
+     "caesars_ev" is the legacy ¼-Kelly-at-CZ ranking. Both stay selectable in Settings.
+     "dk_fd" (new default) is ev_gated discipline with the PRICE swapped: every selection
+     number — the EV gate, weights, Kelly — computes at the DK/FD basis price; Caesars is
+     display + settlement only, and a ticket needs BOTH a basis and a CZ quote to play. */
   var mode=cfg.selMode||"ev_gated";
-  var evGated=mode==="ev_gated"&&!force;
-  var probMode=mode==="probability"||mode==="ev_gated";
+  var basisMode=mode==="dk_fd";
+  var evGated=(mode==="ev_gated"||basisMode)&&!force;
+  var probMode=mode==="probability"||mode==="ev_gated"||basisMode;
   var evMin=(cfg.coreEvMin!=null)?cfg.coreEvMin:0;
   var scored=[];
   pool.forEach(function(w,i){
     if(!shCoreEligible(w,cfg))return;
-    if(evGated&&!(w.pl.czEv!=null&&w.pl.czEv>=evMin))return;
-    var ev=((w.pl.czEv!=null?w.pl.czEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
-    var dec=w.pl.czDec||2;
+    if(basisMode&&(w.pl.bsDec==null||w.pl.czDec==null))return; /* no DK/FD basis (or no CZ) → ineligible, never faked */
+    var selEv=basisMode?w.pl.bsEv:w.pl.czEv;
+    if(evGated&&!(selEv!=null&&selEv>=evMin))return;
+    var ev=((selEv!=null?selEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
+    var dec=(basisMode?w.pl.bsDec:w.pl.czDec)||2;
     scored.push({w:w,i:i,ev:ev,prob:prob,base:probMode?prob:((dec>1)?Math.max(ev,0)/(dec-1):0)});
   });
   if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated};
@@ -2456,7 +2528,7 @@ function shAllocate(pool,amount,cfg,force){
      unallocated (reported, never forced). Legacy modes and the override keep exact-sum:
      the deficit spreads onto the non-K caps as before. */
   var n=picked.length,capG=Math.max(cfg.perParlayCap,1/n)*amount;
-  var disciplined=(mode==="ev_gated"&&!force);
+  var disciplined=((mode==="ev_gated"||basisMode)&&!force);
   var kMult=(cfg.kellyStakeMult!=null)?cfg.kellyStakeMult:4;
   var caps=picked.map(function(s){
     var c=isKTik(s)?Math.min((cfg.coreKsCap!=null?cfg.coreKsCap:cfg.perParlayCap)*amount,capG):capG;
@@ -2512,7 +2584,7 @@ function shAllocate(pool,amount,cfg,force){
     s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
     out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
   return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,
-    unallocated:Math.max(0,amount-sum),overrode:!!(force&&mode==="ev_gated")};
+    unallocated:Math.max(0,amount-sum),overrode:!!(force&&(mode==="ev_gated"||mode==="dk_fd"))};
 }
 /* one stakeable ticket card (core or FUN) */
 function shCardTicket(w,stake,extra){
@@ -2546,14 +2618,19 @@ function shFunPick(pool,amount,cfg,excludeIds,excludeLegs){
   pool.forEach(function(w,i){
     if(ex[shTicketId(w.pl)])return;
     if((Number(w.pl.prob)||0)<cfg.funMinProb)return; /* honest-longshot floor */
-    var am=w.pl.czDec!=null?decToAm(w.pl.czDec):null;if(am==null)return;
+    /* dk_fd: tiers cut at the basis price, and a FUN ticket still needs a CZ quote to play */
+    var bMode=(cfg.selMode==="dk_fd");
+    if(bMode&&(w.pl.bsDec==null||w.pl.czDec==null))return;
+    var tDec=bMode?w.pl.bsDec:w.pl.czDec;
+    var am=tDec!=null?decToAm(tDec):null;if(am==null)return;
     for(var t=0;t<cfg.funTiers.length;t++)
       if(am>=cfg.funTiers[t][0]&&am<cfg.funTiers[t][1]){tiers[t].push({w:w,i:i});break;}
   });
   tiers.forEach(function(list){list.sort(function(a,b){
     var pc=(b.w.pl.posCorr?1:0)-(a.w.pl.posCorr?1:0);if(pc)return pc;      /* sim-confirmed stacks first */
     var nc=(a.w.pl.negCorr?1:0)-(b.w.pl.negCorr?1:0);if(nc)return nc;      /* anti-correlated last */
-    var ev=(b.w.pl.czEv||0)-(a.w.pl.czEv||0);if(Math.abs(ev)>1e-9)return ev;
+    var bm2=(cfg.selMode==="dk_fd");
+    var ev=((bm2?b.w.pl.bsEv:b.w.pl.czEv)||0)-((bm2?a.w.pl.bsEv:a.w.pl.czEv)||0);if(Math.abs(ev)>1e-9)return ev;
     return a.i-b.i;});});                                                   /* deterministic */
   /* 1–3 tickets by amount; tier split from config; fall through to the nearest tier with stock */
   var wantTiers=amount<cfg.funAmt2?[0]:amount<=cfg.funAmt3?[0,1]:[0,1,2];
@@ -2664,8 +2741,11 @@ function shLedgerSave(entry){
 /* ¼-Kelly stake fraction for one ticket at its Caesars price: 0.25·f*, capped at 2% of
    bankroll, floored at 0 (a −EV ticket's Kelly is "don't bet", never negative). */
 function shKellyFrac(pl){
-  if(pl==null||pl.czDec==null||pl.prob==null)return null;
-  var k=shKelly(Number(pl.prob)/100,pl.czDec);
+  if(pl==null||pl.prob==null)return null;
+  /* dk_fd: Kelly is a selection number — it computes at the basis price */
+  var dec=(SH_CFG.selMode==="dk_fd")?pl.bsDec:pl.czDec;
+  if(dec==null)return null;
+  var k=shKelly(Number(pl.prob)/100,dec);
   return Math.max(0,Math.min(0.25*k,0.02));
 }
 /* upgrade 01 override: an ev_gated NO-PLAY day only stakes after this explicit, dated
@@ -2706,8 +2786,11 @@ function shTicketSnap(p,bucket,tierName,d,games){var pl=p.w.pl;
   pl.legs.forEach(function(l){if(l.gkey&&d.gameInfo&&d.gameInfo[l.gkey])games[l.gkey]=d.gameInfo[l.gkey];});
   return {id:p.id,bucket:bucket,name:pl.name,type:pl.type,tier:tierName,
     stake:p.stake,czOdds:pl.czOdds,czDec:pl.czDec,prob:pl.prob,czEv:(pl.czEv!=null?pl.czEv:null),fair:pl.fair||null,
+    /* dk_fd: lock stores BOTH bases — the price that picked it and the price that pays it */
+    bsOdds:(pl.bsOdds!=null?pl.bsOdds:null),bsDec:(pl.bsDec!=null?pl.bsDec:null),bsEv:(pl.bsEv!=null?pl.bsEv:null),
     confirmed:null,
-    legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est};})};}
+    legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est,
+      bs:(l.bs!=null?l.bs:null),bsBook:l.bsBook||null};})};}
 /* LOCK CARD: freeze today's parlays, Caesars prices and exact stakes into the ledger */
 function shLockCard(){
   var d=SH.board&&SH.board.data;

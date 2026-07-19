@@ -58,7 +58,7 @@ export default function SharpPage() {
   // today's plays by the engine's true % — Caesars' price never changes WHICH
   // picks are chosen, it only prices them (the EV gate lives in the Builder's
   // allocator, where stakes are). caesars_ev is the legacy ranking.
-  const [selMode, setSelModeState] = useState<"ev_gated" | "probability" | "caesars_ev">("ev_gated");
+  const [selMode, setSelModeState] = useState<"dk_fd" | "ev_gated" | "probability" | "caesars_ev">("dk_fd");
   useEffect(() => setSelModeState(getSelectionMode()), []);
   const cal = useCalibration();
 

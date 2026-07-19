@@ -41,6 +41,11 @@ export interface PickRow {
   czEdge?: number | null;
   czKellyF?: number | null;
   czBadge?: boolean;
+  /* dk_fd: the DK/FD selection basis (better of the pair, tie → DK) */
+  bs?: number | null;
+  bsOdds?: string | null;
+  bsBook?: string | null;
+  bsEv?: number | null;
   books?: number;
   lkey?: string;
   conv?: string;
@@ -63,6 +68,8 @@ export interface TicketLeg {
   prop: string;
   odds?: number;
   cz?: number | null;
+  bs?: number | null;
+  bsBook?: string | null;
   game?: string;
   gkey?: string | null;
   lkey?: string | null;
@@ -82,6 +89,9 @@ export interface Ticket {
   czOdds?: number | null;
   czDec?: number | null;
   czEv?: number | null;
+  bsOdds?: string | null;
+  bsDec?: number | null;
+  bsEv?: number | null;
   posCorr?: boolean;
   negCorr?: boolean;
   legs: TicketLeg[];

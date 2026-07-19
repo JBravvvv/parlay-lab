@@ -15,10 +15,10 @@ import { wilson } from "@/engine2/calibration";
  * side, both prices carry it); fairPts grades against the sharp consensus.
  */
 
-export type ClvEntry = { am: number; at: number; consensusFair?: number | null };
+export type ClvEntry = { am: number; at: number; consensusFair?: number | null; bsAm?: number | null; bsBk?: string | null };
 
-type Leg = { label?: string; prop?: string; cz?: number | null; lkey?: string | null; gkey?: string | null };
-type Ticket = { id?: string; stake?: number; supplemental?: boolean; legs?: Leg[] };
+type Leg = { label?: string; prop?: string; cz?: number | null; bs?: number | null; lkey?: string | null; gkey?: string | null };
+type Ticket = { id?: string; stake?: number; supplemental?: boolean; type?: string; czDec?: number; bsDec?: number | null; legs?: Leg[] };
 type Grade = { result?: string; payout?: number };
 
 export const impliedPct = (am: number): number => (am > 0 ? 100 * (100 / (am + 100)) : 100 * (-am / (-am + 100)));
@@ -37,6 +37,8 @@ export type SegRow = {
   clvPts: number | null; // mean CLV pts over sighted legs only
   fairPts: number | null; // mean vs consensus fair, over legs where it was stored
   fairN: number;
+  bsPts: number | null; // dk_fd: mean CLV vs the DK/FD basis close, over legs locked with a basis
+  bsN: number;
 };
 
 export type CalRow = {
@@ -65,6 +67,16 @@ export type LedgerSegments = {
   byMarket: SegRow[];
   byBucket: SegRow[];
   funSplit: { atLock: FunLine; supplemental: FunLine };
+  /* dk_fd: running "NV tax paid" — what settling at Caesars cost vs the DK/FD basis
+     price the card was selected at, over settled tickets locked with a basis.
+     Positive = money given up to the NV counter. Void-repriced wins are skipped
+     (a basis reprice would be a guess), and the skip count is disclosed. */
+  nvTax: {
+    tickets: number; // settled tickets that entered the tax line
+    skipped: number; // void-repriced wins excluded rather than approximated
+    tax: number;
+    byMarket: { market: string; tickets: number; tax: number }[];
+  };
   overrideDays: { days: number; staked: number; pl: number; clvPts: number | null; sighted: number; legs: number };
   calibration: CalRow[];
   week: { days: number; staked: number; settled: number; pl: number; clvPts: number | null; sighted: number; legs: number; overridePl: number };
@@ -78,6 +90,7 @@ type LegView = {
   overrode: boolean;
   date: string;
   lockedAm: number | null;
+  lockedBs: number | null; // dk_fd: the DK/FD basis price the leg was selected at
   clv: ClvEntry | null;
   est: number | null; // stated blended prob, percent
   res: string | null; // won | lost | void | push | pending
@@ -108,6 +121,7 @@ function legViews(entries: SyncEntry[]): LegView[] {
             overrode: (e as { overrode?: boolean }).overrode === true,
             date: e.date,
             lockedAm: l.cz ?? null,
+            lockedBs: l.bs ?? null,
             clv: clv[lid] ?? null,
             est: (l as { est?: unknown }).est != null ? Number((l as { est?: unknown }).est) : null,
             res: gLegs[lid]?.result ?? null,
@@ -126,6 +140,10 @@ function segRow(seg: string, legs: LegView[]): SegRow {
     .filter((l) => l.clv!.consensusFair != null)
     .map((l) => l.clv!.consensusFair! * 100 - impliedPct(l.lockedAm!));
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+  /* dk_fd: CLV against the price that PICKED the leg (basis close vs locked basis) */
+  const bsVals = legs
+    .filter((l) => l.clv?.bsAm != null && l.lockedBs != null)
+    .map((l) => impliedPct(l.clv!.bsAm!) - impliedPct(l.lockedBs!));
   return {
     seg,
     legs: legs.length,
@@ -133,6 +151,8 @@ function segRow(seg: string, legs: LegView[]): SegRow {
     clvPts: mean(clvVals),
     fairPts: mean(fairVals),
     fairN: fairVals.length,
+    bsPts: mean(bsVals),
+    bsN: bsVals.length,
   };
 }
 
@@ -185,6 +205,46 @@ export function ledgerSegments(entries: SyncEntry[], now = Date.now()): LedgerSe
   };
   const funSplit = { atLock: funLine(false), supplemental: funLine(true) };
 
+  // dk_fd: NV tax paid = basis P/L − actual P/L on settled basis-locked tickets.
+  // Losses cancel (−stake either way); a win pays stake×(bsDec−1) at basis vs
+  // (payout−stake) at the settled price — so per won ticket: stake×bsDec − payout.
+  const taxBy = new Map<string, { tickets: number; tax: number }>();
+  let taxTickets = 0;
+  let taxSkipped = 0;
+  let taxTotal = 0;
+  for (const e of locked) {
+    const grades = ((e.grading as { tickets?: Record<string, Grade> } | null)?.tickets ?? {}) as Record<string, Grade>;
+    for (const t of [...((e.core as Ticket[]) ?? []), ...((e.funT as Ticket[]) ?? [])]) {
+      if (t.bsDec == null || !t.id) continue;
+      const g = grades[t.id];
+      if (!g || g.result === "pending" || g.result === "ungradable") continue;
+      const stake = Number(t.stake) || 0;
+      let tax = 0;
+      if (g.result === "won") {
+        const gDec = (g as { dec?: number }).dec;
+        const repriced = gDec != null && t.czDec != null && Math.abs(gDec - t.czDec) > 1e-9;
+        if (repriced) {
+          taxSkipped++;
+          continue;
+        }
+        tax = stake * t.bsDec - (Number(g.payout) || 0);
+      }
+      taxTickets++;
+      taxTotal += tax;
+      const mkt = t.type || "MIX";
+      const row = taxBy.get(mkt) ?? { tickets: 0, tax: 0 };
+      row.tickets++;
+      row.tax += tax;
+      taxBy.set(mkt, row);
+    }
+  }
+  const nvTax = {
+    tickets: taxTickets,
+    skipped: taxSkipped,
+    tax: taxTotal,
+    byMarket: [...taxBy.entries()].map(([market, r]) => ({ market, ...r })).sort((a, b) => (a.market < b.market ? -1 : 1)),
+  };
+
   const ovLegs = legs.filter((l) => l.overrode);
   const ovRow = segRow("override", ovLegs);
   const ovEntries = locked.filter((e) => (e as { overrode?: boolean }).overrode === true);
@@ -230,6 +290,7 @@ export function ledgerSegments(entries: SyncEntry[], now = Date.now()): LedgerSe
     byMarket,
     byBucket,
     funSplit,
+    nvTax,
     overrideDays: { days: ovEntries.length, staked: ovStaked, pl: ovPl, clvPts: ovRow.clvPts, sighted: ovRow.sighted, legs: ovRow.legs },
     calibration,
     week: {

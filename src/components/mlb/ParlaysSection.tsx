@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getSelectionMode } from "@/lib/engine-client";
 import { Panel } from "@/components/ui/Panel";
 import { FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
@@ -50,6 +51,9 @@ function TierTag({ tier }: { tier?: string }) {
 export function ParlaysSection({ parlays, mixed, live }: { parlays: Ticket[]; mixed: Ticket[]; live: Ticket[] }) {
   const [view, setView] = useState<View>("parlays");
   const [pfilter, setPfilter] = useState("all");
+  // dk_fd: mounted-gated localStorage read (hydration rule)
+  const [basisMode, setBasisMode] = useState(false);
+  useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
 
   const lists: Record<View, Ticket[]> = { parlays, mixed, live };
   const all = lists[view] ?? [];
@@ -116,10 +120,21 @@ export function ParlaysSection({ parlays, mixed, live }: { parlays: Ticket[]; mi
                   <Panel key={`${view}|${ti}`} className={(t.czEv ?? -1) >= 0 ? "glow-pos" : ""}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="display text-[14px] text-text">{t.name}</div>
-                      <span className="num shrink-0 text-[13.5px] font-bold text-gold">{String(t.czOdds)} @ CZ</span>
+                      <span className="num shrink-0 text-[13.5px] font-bold text-gold">
+                        {basisMode && t.bsOdds != null && <span className="mr-2 text-text">{String(t.bsOdds)} basis</span>}
+                        {String(t.czOdds)} @ CZ
+                      </span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <TierTag tier={e.tier} />
+                      {basisMode && t.bsDec == null && (
+                        <span
+                          className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"
+                          title="No DraftKings or FanDuel quote on every leg — browsable and manual-slip eligible, but the card never selects without a basis price"
+                        >
+                          NO DK/FD BASIS
+                        </span>
+                      )}
                       {e.typeLabel && (
                         <span className="rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[9.5px] font-bold text-muted">
                           {e.typeLabel.toUpperCase()}
