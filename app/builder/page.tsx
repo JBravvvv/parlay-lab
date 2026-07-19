@@ -20,7 +20,16 @@ import type { PickRow, Ticket } from "@/engine";
 type CardPick = { id: string; stake: number; kelly?: number | null; tier?: number; w: { pl: Ticket & { tier?: string; fair?: string } } };
 type CardCalc = {
   pool: unknown[];
-  alloc: { picks: CardPick[]; sum: number; ev: number; legs: Record<string, number>; noPlay?: boolean; overrode?: boolean };
+  alloc: {
+    picks: CardPick[];
+    sum: number;
+    /* NOTE: the engine returns ev as a FRACTION (0.014 = +1.4%) — multiply by 100 for display */
+    ev: number | null;
+    legs: Record<string, number>;
+    noPlay?: boolean;
+    overrode?: boolean;
+    unallocated?: number;
+  };
   fun: { picks: CardPick[]; sum: number };
   kellyDaily: number;
   dailyCap: number;
@@ -425,7 +434,7 @@ export default function BuilderPage() {
 
           {card.alloc.ev != null && card.alloc.ev <= 0 && card.alloc.picks.length > 0 && !card.overrode && (
             <div className="rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-4 py-3 text-[12px] text-gold">
-              Model suggests reduced action today: slate EV ≈ {card.alloc.ev.toFixed(1)}%. Allocating{" "}
+              Model suggests reduced action today: slate EV ≈ {(card.alloc.ev * 100).toFixed(1)}%. Allocating{" "}
               {fmtMoney(card.alloc.sum)} as requested.
             </div>
           )}
@@ -442,13 +451,21 @@ export default function BuilderPage() {
                     Kelly-consistent <b className="text-text">{fmtMoney(card.kellyDaily)}</b>
                   </span>
                   <span>
-                    card EV <EvBadge ev={card.alloc.ev} />
+                    {/* engine ev is a fraction; EvBadge (like ticket czEv) speaks percent */}
+                    card EV <EvBadge ev={(card.alloc.ev ?? 0) * 100} />
                   </span>
                 </span>
               </div>
               {card.enteredDaily > card.dailyCap && (
                 <div className="mb-2 text-[11px] text-gold">
                   Daily capped at 10% of bankroll: allocating {fmtMoney(card.dailyCap)} of the {fmtMoney(card.enteredDaily)} entered.
+                </div>
+              )}
+              {(card.alloc.unallocated ?? 0) > 0 && (
+                <div className="mb-2 text-[11px] text-gold">
+                  {fmtMoney(card.alloc.unallocated!)} unallocated — pool too thin to absorb it at disciplined sizing
+                  (no ticket takes more than 4× its ¼-Kelly stake). Betting it anyway would be sizing off the wallet,
+                  not the edge.
                 </div>
               )}
               <div className="grid gap-3 md:grid-cols-2">
@@ -555,10 +572,11 @@ export default function BuilderPage() {
       </Reveal>
 
       <div className="mt-4 text-[10.5px] text-faint">
-        Card discipline is hard-coded: at least 4 tickets whenever the pool allows with no ticket over 25% of the
-        daily, one prop never rides two tickets, HR props parlay only with HR props and never into the core card,
-        Pitcher K&apos;s parlays are last-resort fill only (capped at 15% — they went 0-for-4 as lead tickets), and
-        the daily amount always sums exactly. Informational only, not betting advice.
+        Card discipline is hard-coded: at least 4 tickets whenever the pool allows, no ticket over 25% of the daily or
+        4× its ¼-Kelly stake (whichever is smaller — money the pool can&apos;t absorb at disciplined sizing is shown
+        unallocated, never forced onto tickets), one prop never rides two tickets, HR props parlay only with HR props
+        and never into the core card, and Pitcher K&apos;s parlays are last-resort fill only (capped at 15% — they went
+        0-for-4 as lead tickets). Informational only, not betting advice.
       </div>
         </>
       )}

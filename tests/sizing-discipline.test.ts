@@ -79,7 +79,7 @@ describe("ev_gated selection (spec tests 1-2)", () => {
     expect(a.noPlay).toBeUndefined();
   });
 
-  it("mixed pool: only tickets clearing coreEvMin are selected; exact-sum preserved", () => {
+  it("mixed pool: only tickets clearing coreEvMin are selected; stakes respect the Kelly ceilings", () => {
     const mixed = [
       tik("Pos1", 2.4, 8, 45, "g1", "g2"),
       tik("Neg1", 2.6, -6, 40, "g3", "g4"),
@@ -89,7 +89,13 @@ describe("ev_gated selection (spec tests 1-2)", () => {
       tik("Pos3", 3.1, 5, 34, "g11", "g12"),
     ];
     const a = allocate(mixed, 100, CFG());
-    expect(a.sum).toBe(100);
+    // this pool's edges are modest, so the 4x-quarter-Kelly ceilings bind: the allocator
+    // fills to the ceilings and reports the rest unallocated instead of forcing exact-sum
+    const kf = (pl: unknown) => eng.get<(x: unknown) => number | null>("shKellyFrac")(pl)!;
+    const expected = a.picks.reduce((s, p) => s + Math.min(25, Math.round(4 * 750 * kf(p.w.pl))), 0);
+    expect(a.sum).toBe(expected);
+    expect(a.sum + (a as { unallocated?: number }).unallocated!).toBe(100);
+    for (const p of a.picks) expect(p.stake).toBeLessThanOrEqual(Math.round(4 * 750 * kf(p.w.pl)));
     const names = a.picks.map((p) => p.w.pl.name.split(" ")[0]);
     expect(names.sort()).toEqual(["Pos1", "Pos2", "Pos3", "Zero"]);
     // a ticket Caesars can't price (czEv null) never clears the gate
@@ -102,6 +108,69 @@ describe("ev_gated selection (spec tests 1-2)", () => {
     const a = allocate(sixNegative(), 100, { ...CFG(), selMode: "probability" });
     expect(a.sum).toBe(100);
     expect(a.overrode).toBe(false);
+  });
+});
+
+describe("per-ticket Kelly ceiling (kellyStakeMult, default 4)", () => {
+  const kf = (pl: unknown) => eng.get<(x: unknown) => number | null>("shKellyFrac")(pl)!;
+  const ceilOf = (pl: unknown) => Math.round(4 * 750 * kf(pl));
+
+  it("a 6-ticket pool with healthy edges still allocates the full DAILY exactly as before", () => {
+    // strong edges: each quarter-Kelly hits the 2%-of-bankroll cap, so every ceiling is
+    // ~$60 — far above the 25% concentration cap. The ceiling may only bind on thin pools.
+    const healthy = [
+      tik("H1", 2.6, 12, 45, "g1", "g2"),
+      tik("H2", 2.5, 11, 46, "g3", "g4"),
+      tik("H3", 2.7, 10, 44, "g5", "g6"),
+      tik("H4", 2.6, 9, 45, "g7", "g8"),
+      tik("H5", 2.8, 9, 42, "g9", "g10"),
+      tik("H6", 2.5, 8, 46, "g11", "g12"),
+    ];
+    for (const t of healthy) expect(ceilOf(t.pl)).toBeGreaterThanOrEqual(50); // ceilings comfortably clear
+    const a = allocate(healthy, 100, CFG());
+    expect(a.sum).toBe(100); // exact-sum preserved on a healthy pool
+    expect((a as { unallocated?: number }).unallocated).toBe(0);
+    expect(a.picks.length).toBeGreaterThanOrEqual(4);
+    for (const p of a.picks) expect(p.stake).toBeLessThanOrEqual(25); // concentration cap still the binding rule
+  });
+
+  it("thin pool: ceilings bind, the remainder is reported unallocated, no ceiling is ever breached", () => {
+    // marginal edges: quarter-Kelly fractions are tiny, ceilings land well under the 25% cap
+    const thin = [
+      tik("T1", 2.5, 1.5, 41, "g1", "g2"),
+      tik("T2", 2.4, 1.2, 42.5, "g3", "g4"),
+      tik("T3", 2.6, 1.0, 39.5, "g5", "g6"),
+      tik("T4", 2.5, 0.8, 40.6, "g7", "g8"),
+    ];
+    const a = allocate(thin, 100, CFG());
+    expect(a.sum).toBeLessThan(100);
+    expect(a.sum + (a as { unallocated?: number }).unallocated!).toBe(100);
+    for (const p of a.picks) {
+      expect(p.stake).toBeLessThanOrEqual(ceilOf(p.w.pl));
+    }
+    // determinism holds with ceilings in play
+    const b = allocate(thin, 100, CFG());
+    expect(b.picks.map((p) => p.stake)).toEqual(a.picks.map((p) => p.stake));
+  });
+
+  it("the override and the legacy modes keep the exact-sum guarantee (ceilings are discipline, not law)", () => {
+    const thin = [
+      tik("T1", 2.5, 1.5, 41, "g1", "g2"),
+      tik("T2", 2.4, 1.2, 42.5, "g3", "g4"),
+      tik("T3", 2.6, 1.0, 39.5, "g5", "g6"),
+      tik("T4", 2.5, 0.8, 40.6, "g7", "g8"),
+    ];
+    expect(allocate(thin, 100, CFG(), true).sum).toBe(100); // override
+    expect(allocate(thin, 100, { ...CFG(), selMode: "probability" }).sum).toBe(100); // legacy
+  });
+
+  it("card-EV units: with a single ticket, alloc.ev × 100 equals that ticket's czEv", () => {
+    const one = [tik("Solo", 2.6, 1.4, 42, "g1", "g2")];
+    const a = allocate(one, 20, CFG());
+    expect(a.picks).toHaveLength(1);
+    // the engine returns ev as a FRACTION — the UI multiplies by 100; a 1.4% ticket
+    // must read +1.4% in the header, never +0.0%
+    expect((a.ev as number) * 100).toBeCloseTo(1.4, 10);
   });
 });
 

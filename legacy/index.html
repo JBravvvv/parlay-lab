@@ -1071,6 +1071,10 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
      floor (percent, same units as czEv) a ticket must clear under the ev_gated default;
      dailyBankrollCap bounds any day's core allocation to a fraction of bankroll. */
   coreEvMin:0,dailyBankrollCap:0.10,
+  /* per-ticket Kelly ceiling (disciplined path): no ticket's stake may exceed
+     kellyStakeMult × its ¼-Kelly stake — the entered DAILY is a ceiling the pool
+     must EARN, and money it can't absorb at disciplined sizing stays unallocated. */
+  kellyStakeMult:4,
   /* user rules 2026-07-17: the card must always spread — at least 4 tickets whenever the
      pool allows, and no single ticket over 25% of the daily ($100 of $250 on one 3-leg
      K's parlay was the complaint). K's parlays went 0-for-4 as lead tickets, so they are
@@ -2446,19 +2450,36 @@ function shAllocate(pool,amount,cfg,force){
   selectPass(false,wantN);
   if(picked.length<minN)selectPass(true,minN); /* K's parlays fill TO the minimum, never past it */
   /* proportional stakes under PER-TICKET caps (general cap relaxed to 1/n when the pool is
-     tiny; K's-parlay tickets capped tighter). If the caps can't cover the full amount, the
-     deficit is spread onto the non-K caps so the exact-sum guarantee always holds. */
+     tiny; K's-parlay tickets capped tighter). Under the DISCIPLINED path (ev_gated, no
+     override) every ticket also gets a Kelly ceiling: kellyStakeMult × its ¼-Kelly stake.
+     Ceilings are HARD — when they can't absorb the entered amount, the remainder stays
+     unallocated (reported, never forced). Legacy modes and the override keep exact-sum:
+     the deficit spreads onto the non-K caps as before. */
   var n=picked.length,capG=Math.max(cfg.perParlayCap,1/n)*amount;
-  var caps=picked.map(function(s){return isKTik(s)?Math.min((cfg.coreKsCap!=null?cfg.coreKsCap:cfg.perParlayCap)*amount,capG):capG;});
+  var disciplined=(mode==="ev_gated"&&!force);
+  var kMult=(cfg.kellyStakeMult!=null)?cfg.kellyStakeMult:4;
+  var caps=picked.map(function(s){
+    var c=isKTik(s)?Math.min((cfg.coreKsCap!=null?cfg.coreKsCap:cfg.perParlayCap)*amount,capG):capG;
+    if(disciplined&&kMult>0){
+      var f=shKellyFrac(s.w.pl);
+      if(f!=null)c=Math.min(c,Math.round(kMult*SH.bankroll*f));
+    }
+    return c;
+  });
   var capSum=caps.reduce(function(a,b){return a+b;},0);
+  var target=amount;
   if(capSum<amount-1e-9){
-    var wide=[];picked.forEach(function(s,i){if(!isKTik(s))wide.push(i);});
-    if(!wide.length)wide=picked.map(function(s,i){return i;});
-    var add=(amount-capSum)/wide.length;
-    wide.forEach(function(i){caps[i]+=add;});
+    if(disciplined){
+      target=Math.floor(capSum+1e-9); /* the pool absorbs this much at disciplined sizing — no more */
+    }else{
+      var wide=[];picked.forEach(function(s,i){if(!isKTik(s))wide.push(i);});
+      if(!wide.length)wide=picked.map(function(s,i){return i;});
+      var add=(amount-capSum)/wide.length;
+      wide.forEach(function(i){caps[i]+=add;});
+    }
   }
   var tw=0;picked.forEach(function(s){tw+=s.eff;});
-  var raw=picked.map(function(s){return tw>0?amount*s.eff/tw:amount/n;});
+  var raw=picked.map(function(s){return tw>0?target*s.eff/tw:target/n;});
   for(var it=0;it<12;it++){
     var over=0,freeW=0;
     picked.forEach(function(s,i){
@@ -2468,10 +2489,12 @@ function shAllocate(pool,amount,cfg,force){
     picked.forEach(function(s,i){if(!s.capped)raw[i]+=over*s.eff/freeW;});
   }
   /* round to whole increments; push the remainder onto the highest-EV ticket(s), cap-respecting
-     where possible — the sum always equals the entered amount exactly */
+     where possible. Legacy/override paths dump any final overflow on the best non-K ticket
+     (exact-sum guarantee); the disciplined path NEVER breaches a ceiling — what can't be
+     placed under the caps is returned as `unallocated`. */
   var inc=cfg.roundTo||1;
   var st=raw.map(function(r){return Math.floor(r/inc+1e-9)*inc;});
-  var left=amount-st.reduce(function(a,b){return a+b;},0);
+  var left=target-st.reduce(function(a,b){return a+b;},0);
   var order=picked.map(function(s,i){return i;}).sort(function(a,b){return picked[b].ev-picked[a].ev||a-b;});
   /* when every cap is exhausted, the overflow lands on the best NON-K ticket —
      the K's-parlay cap is a product rule, never breached by rounding */
@@ -2481,14 +2504,15 @@ function shAllocate(pool,amount,cfg,force){
     var placed=false;
     for(var oi=0;oi<order.length;oi++){var ix=order[oi];
       if(st[ix]+inc<=caps[ix]+1e-9){st[ix]+=inc;left-=inc;placed=true;break;}}
-    if(!placed){st[fbIx]+=left;left=0;}
+    if(!placed){if(disciplined)break;st[fbIx]+=left;left=0;}
   }
-  if(left>0){st[fbIx]+=left;left=0;}
+  if(left>0&&!disciplined){st[fbIx]+=left;left=0;}
   var sum=0,evAcc=0,legSet={};
   var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
     s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
     out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
-  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,overrode:!!(force&&mode==="ev_gated")};
+  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,
+    unallocated:Math.max(0,amount-sum),overrode:!!(force&&mode==="ev_gated")};
 }
 /* one stakeable ticket card (core or FUN) */
 function shCardTicket(w,stake,extra){
