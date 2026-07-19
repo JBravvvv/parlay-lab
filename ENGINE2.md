@@ -267,6 +267,45 @@ the prediction store never logged (deduped by date; ledger legs carry `p=est`,
 records. The CalibrationPanel's "vs market" column marks (▲) any market where the model's
 Brier beats the consensus: that's the earn-a-raise signal; until then shrink-only stands.
 
+## Shadow card + supplemental fun locks (2026-07-19)
+
+Fun-bucket-only additions; the core card stays one-lock-per-day and parity is untouched.
+
+**Shadow card (display-only).** When today's card is locked, the Builder renders
+"IF UNLOCKED — CURRENT CARD": `shCardCalc` (the exact shAllocate + shFunPick pipeline,
+current SH_CFG + entered amounts) run against the freshly generated board. Clearly
+labeled hypothetical, diff line vs the locked ticket ids, note that Board parlay tabs
+sort by hit probability (not card order). No lock button; zero ledger writes — the
+calc is a pure recompute, pinned by a byte-identity test on `pl_ledger`.
+
+**Supplemental fun locks.** Engine: `shFunRemaining()` (budget = the locked entry's
+`fun`, staked = Σ funT stakes), `shSupplementalCalc(d)` (pool = `shCardPool` of the
+current board through `shFunPick` at the REMAINING budget, with excludeIds/excludeLegs
+built from everything locked today — funMinProb floor, odds tiers, HR isolation, and
+leg-disjointness all hold), `shLockSupplemental()` (re-checks budget + disjointness at
+write time, appends funT tickets with `lockedAt` + `supplemental:true` — `late:true` if
+past first pitch — merges new `games` keys, reopens `grading.done`, direct LS write like
+shConfirmPrice). `shTicketSnap` is the shared snapshot builder (shLockCard's old local
+`tkt`, extracted verbatim). Grading and CLV cover supplemental tickets for free: both
+walk `core.concat(funT)` and key off `entry.games`.
+
+**Merge kernel.** `mergeDay` now unions funT by ticket id (an append on one device
+survives a merge with a richer-graded copy that predates it), unions `games` (base wins
+conflicts), does a fill-only merge of grading.tickets/legs maps, and reopens
+`grading.done` when any ticket id lacks a grade. Still symmetric + idempotent.
+Invariant kept honest: `done:true` always implies a grade for every ticket.
+
+**Receipts.** `ledger-segments` splits fun into `funSplit.atLock` vs
+`funSplit.supplemental` (tickets/staked/settled/P-L + own CLV line); ReceiptsPanel
+renders the split whenever a supplemental ticket exists. SUPP badges on Builder locked
+panel and Ledger ticket rows.
+
+Tests: `tests/supplemental.test.ts` (10) — budget exhaustion disables, disjointness vs
+locked legs, append immutability (grades/core/stakes untouched, guard intact), shadow
+zero-mutation, supplemental graded through real boxscore 822954 via shGrade + CLV
+sighted via pendingLegs/sightProp/applySights, merge union symmetry/idempotence,
+funSplit numbers. 128 tests total; parity digest unchanged.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
