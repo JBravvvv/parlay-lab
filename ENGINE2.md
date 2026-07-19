@@ -211,6 +211,33 @@ Elite groups sustain ~52–55% vs the close. Edges come from softer prop markets
 shopping, speed on lineup/weather news, and discipline. The engine's job is to be on the
 right side of the closing line with honest sizing — not to promise more.
 
+## Sizing & EV discipline + SGP joint pricing (2026-07-19, upgrade specs 01-02)
+
+**Upgrade 01 — "no bet" is a first-class output.** Default selection mode `ev_gated`:
+core-card tickets must clear `SH_CFG.coreEvMin` (percent, default 0 = breakeven) at the
+Caesars price. Zero qualifiers → `shAllocate` returns `noPlay:true`, the Builder renders a
+NO-PLAY card with $0 recommended, and staking anyway takes the explicit override
+(`shSetOverride` → LS `pl_override`, `force` arg to shAllocate) which stamps `overrode:true`
+on the locked ledger entry (file 03 reads it). Stakes allocate against
+`min(entered DAILY, SH_CFG.dailyBankrollCap × bankroll)` (default 10%). `shKellyFrac(pl)` =
+¼-Kelly at the CZ price capped at 2% of bankroll, floored at 0; `shCardCalc` returns
+`kellyDaily` (Σ fractions × bankroll, capped) + per-pick `.kelly`; the card header shows
+entered / Kelly-consistent / card EV, and tickets diverging >2× from ¼-Kelly wear the chip.
+Legacy `probability` / `caesars_ev` modes stay selectable in Settings.
+
+**Upgrade 02 — SGPs priced from joint sim paths.** Armed engines record per-leg hit
+bitsets across every simulated game (`bits` Uint32Arrays inside shSimGames, V2-gated —
+dormant allocates nothing) and expose `jointAll(keys) → hits/N`. In `build()`, each
+same-game leg group's blended product is scaled by the sim's **dependence ratio**
+`jointAll(group) ÷ Π sim-marginals`, clamped 0.25–4×. Deliberate deviation from the spec
+text (which said replace the product with raw jointAll): leg marginals are the
+market-anchored blend — swapping in raw sim numbers would unanchor marginal calibration,
+so the sim contributes only the dependence it alone can see. Cross-game independence
+stands; `prob`/`fair`/`ev`/`czEv` and shFunPick's floor + tiers flow from the corrected
+number automatically. Tickets carry `simJoint` + `probNaive` ("naive X% → joint Y%" in
+UI). Games with HR legs sim at `SH_V2.simNHR` (armed 20000) paths. Both upgrades are
+armed-path only — the parity digest stays byte-identical.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
