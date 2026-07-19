@@ -1109,6 +1109,11 @@ function shStop(){clearInterval(SH.timer);SH.timer=null;}
 function shHitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ab:s.atBats,h:s.hits,"2b":s.doubles,"3b":s.triples,hr:s.homeRuns,tb:s.totalBases,rbi:s.rbi,r:s.runs,bb:s.baseOnBalls,k:s.strikeOuts,sb:s.stolenBases,avg:s.avg,obp:s.obp,slg:s.slg};}
 /* baseball IP notation → real innings (.1 = 1/3, .2 = 2/3) — global (used at collect + analyze time) */
 function shIpNum(v){v=Number(v);if(!isFinite(v))return null;var w=Math.floor(v),f=Math.round((v-w)*10);return w+(f===1?1/3:f===2?2/3:0);}
+/* doubleheaders: when a matchup appears twice in one day, every key and matchup string carries
+   the game number, so the two games never share odds, props, sims, prices, or grades. gnum is
+   null on normal days — keys stay byte-identical to the single-game format. */
+function shGm(gnum){return gnum?" (GM "+gnum+")":"";}
+function shGkey(away,home,gnum){return pnorm(away)+"@"+pnorm(home)+(gnum?("gm"+gnum):"");}
 /* empirical-Bayes shrinkage (doc 3A): pull a small-sample rate toward the league mean.
    n = real sample size, k = pseudo-observations of the prior. No hot-streak chasing. */
 function shShrink(rate,n,k,prior){if(rate==null)return null;if(prior==null||!isFinite(n)||n<=0)return rate;return (n*rate+k*prior)/(n+k);}
@@ -1120,10 +1125,22 @@ function shStatsUrl(group,days){var end=shToday();return days
 function shCollectSlate(){
   var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — outcome stats shrunk to league means instead.","No odds history — CLV uses the last Caesars price seen before first pitch, not the true closing line (coverage disclosed in the ledger)."];
   var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{},league:{}};
+  /* which game of a doubleheader an odds-API event belongs to: the schedule game whose first
+     pitch is closest to the event's commence time (games are hours apart; single games → null) */
+  function evGnum(awayName,homeName,commence){
+    var mk=pnorm(awayName)+"@"+pnorm(homeName),same=[];
+    slate.games.forEach(function(x){if(pnorm(x.away)+"@"+pnorm(x.home)===mk)same.push(x);});
+    if(same.length<2)return null;
+    var t=new Date(commence).getTime(),best=null,bd=Infinity;
+    same.forEach(function(x){var d=Math.abs(new Date(x.start).getTime()-t);if(d<bd){bd=d;best=x;}});
+    return best?best.gnum:null;
+  }
   /* 1) schedule: matchups, weather, probables, lineups, and live inning state */
   return obFetchJson("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+shToday()+"&hydrate=probablePitcher,weather,lineups,venue,linescore").then(function(res){
     var dates=(res.ok&&res.body&&res.body.dates)||[];var games=(dates[0]&&dates[0].games)||[];
     var idToName={};
+    var dhCnt={};games.forEach(function(g){var k=pnorm(g.teams.away.team.name)+"@"+pnorm(g.teams.home.team.name);dhCnt[k]=(dhCnt[k]||0)+1;});
+    if(Object.keys(dhCnt).some(function(k){return dhCnt[k]>1;}))gaps.push("Doubleheader on the slate — each game is priced, labeled (GM 1 / GM 2), and graded separately.");
     games.forEach(function(g){
       var aw=g.teams.away,hm=g.teams.home;
       var lu=g.lineups||{};
@@ -1139,11 +1156,12 @@ function shCollectSlate(){
       /* fetch every non-final game; inning gating is applied per-board in the engine
          (general board: pregame + pre-7th; in-game board: any live game to the final out) */
       var eligible=phase!=="done";
-      var key=pnorm(aw.team.name)+"@"+pnorm(hm.team.name);
+      var gnum=(dhCnt[pnorm(aw.team.name)+"@"+pnorm(hm.team.name)]>1)?(g.gameNumber||1):null;
+      var key=shGkey(aw.team.name,hm.team.name,gnum);
       slate.eligible[key]=eligible;
       if(phase==="live"){slate.liveInfo[key]={inning:inning,inningState:inSt,away:aSc,home:hSc,state:st};
-        slate.liveGames.push({game:aw.team.name+" @ "+hm.team.name,inning:inning,inningState:inSt,away:(aSc==null?0:aSc),home:(hSc==null?0:hSc)});}
-      slate.games.push({away:aw.team.name,home:hm.team.name,start:g.gameDate,pk:g.gamePk||null,venue:(g.venue||{}).name,
+        slate.liveGames.push({game:aw.team.name+" @ "+hm.team.name+shGm(gnum),inning:inning,inningState:inSt,away:(aSc==null?0:aSc),home:(hSc==null?0:hSc)});}
+      slate.games.push({away:aw.team.name,home:hm.team.name,gnum:gnum,start:g.gameDate,pk:g.gamePk||null,venue:(g.venue||{}).name,
         weather:g.weather||null,phase:phase,eligible:eligible,inning:inning,inningState:inSt,awayScore:aSc,homeScore:hSc,
         probable_away:(aw.probablePitcher||{}).fullName||null,probable_home:(hm.probablePitcher||{}).fullName||null,
         probable_away_id:(aw.probablePitcher||{}).id||null,probable_home_id:(hm.probablePitcher||{}).id||null,
@@ -1161,12 +1179,13 @@ function shCollectSlate(){
   }).then(function(res){
     (Array.isArray(res.body)?res.body:[]).forEach(function(g){
       if(!obSameDay(g.commence_time))return;
-      var gkey=pnorm(g.away_team)+"@"+pnorm(g.home_team);
+      var gn=evGnum(g.away_team,g.home_team,g.commence_time);
+      var gkey=shGkey(g.away_team,g.home_team,gn);
       /* keep pregame + live pre-3rd games; drop anything the schedule marked ineligible */
       if(slate.eligible[gkey]===false)return;
       if(slate.eligible[gkey]===undefined&&new Date(g.commence_time).getTime()<=Date.now())return;
       var live=!!slate.liveInfo[gkey];
-      var o={game:g.away_team+" @ "+g.home_team,live:live};
+      var o={game:g.away_team+" @ "+g.home_team+shGm(gn),live:live};
       /* market layer: de-vig EVERY book (multiplicative), consensus = median fair prob,
          line-shop the best price per side. The consensus is the model's prior. */
       var mls=[],rls=[],tots=[];
@@ -1228,7 +1247,7 @@ function shCollectSlate(){
     shTick("Pulling prop lines");
     return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events?apiKey="+encodeURIComponent(OB.key)).then(function(ev){
       var evs=(Array.isArray(ev.body)?ev.body:[]).filter(function(e){if(!obSameDay(e.commence_time))return false;
-        var k=pnorm(e.away_team)+"@"+pnorm(e.home_team);
+        var k=shGkey(e.away_team,e.home_team,evGnum(e.away_team,e.home_team,e.commence_time));
         if(slate.eligible[k]===false)return false;
         if(slate.eligible[k]===undefined)return new Date(e.commence_time).getTime()>Date.now();
         return true;}).slice(0,16);
@@ -1279,7 +1298,8 @@ function shCollectSlate(){
                 cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null)};
             });
           });
-          if(Object.keys(g).length)slate.props[e.away_team+" @ "+e.home_team]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[pnorm(e.away_team)+"@"+pnorm(e.home_team)]};
+          if(Object.keys(g).length){var gnE=evGnum(e.away_team,e.home_team,e.commence_time);
+            slate.props[e.away_team+" @ "+e.home_team+shGm(gnE)]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[shGkey(e.away_team,e.home_team,gnE)]};}
         });
       });});
       return chain;
@@ -1684,7 +1704,7 @@ function shAnalyzeLocal(slate){
   var Lhrr=(LH.g>0)?((LH.h+LH.r+LH.rbi)/LH.g):null;
   var Lkg=(LP.gs>0)?LP.k/LP.gs:((LPs.gs>0)?LPs.k/LPs.gs:null);
   var Lipg=(LP.gs>0&&LP.ip!=null)?LP.ip/LP.gs:((LPs.gs>0&&LPs.ip!=null)?LPs.ip/LPs.gs:null);
-  var gameByKey={};slate.games.forEach(function(g){gameByKey[pnorm(g.away)+"@"+pnorm(g.home)]=g;});
+  var gameByKey={};slate.games.forEach(function(g){gameByKey[shGkey(g.away,g.home,g.gnum)]=g;});
   function findGame(matchup){var p=matchup.split(" @ ");return gameByKey[pnorm(p[0])+"@"+pnorm(p[1])]||null;}
   function lineupSpot(g,name){if(!g)return null;var n=pnorm(name);
     var a=(g.lineup_away||[]).findIndex(function(x){return pnorm(x)===n;});if(a>=0)return a+1;
@@ -1699,7 +1719,7 @@ function shAnalyzeLocal(slate){
     return {f:tf,txt:(tf!==1?"temp-adjusted":null)};}
   function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
   function shOrd(n){return n+(n===1?"st":n===2?"nd":n===3?"rd":"th");}
-  function shLiveKey(g){return g?(pnorm(g.away)+"@"+pnorm(g.home)):null;}
+  function shLiveKey(g){return g?shGkey(g.away,g.home,g.gnum):null;}
   /* game label: for live (pre-3rd) games show inning + score instead of first-pitch time */
   function shGameLabel(g,matchup){var li=g?slate.liveInfo[shLiveKey(g)]:null;
     if(li)return matchup+" · 🔴 "+(li.inningState?li.inningState+" ":"")+shOrd(li.inning)+" · "+(li.away==null?0:li.away)+"-"+(li.home==null?0:li.home);
@@ -1775,7 +1795,7 @@ function shAnalyzeLocal(slate){
       if(g.phase!=="pre")return;
       if(!(g.lineup_away&&g.lineup_away.length>=9&&g.lineup_home&&g.lineup_home.length>=9))return;
       if(!g.probable_away||!g.probable_home)return;
-      var gkey=pnorm(g.away)+"@"+pnorm(g.home);
+      var gkey=shGkey(g.away,g.home,g.gnum);
       var wind=windNote(g),coors=/coors/i.test(g.venue||"");
       var pstHome=lookupPit[pnorm(g.probable_home)]||null,pstAway=lookupPit[pnorm(g.probable_away)]||null;
       var penH=shPenF(g.home),penA=shPenF(g.away); /* v2 bullpen-chain fatigue (1 when dormant) */
@@ -1800,7 +1820,7 @@ function shAnalyzeLocal(slate){
           if(bi<0)return;
           legs.push({key:shLegKey(row.p,mkt,row.ln),team:team,bat:bi,stat:stat,ln:row.ln});
         });});}
-      var seed=shHash32(slate.date+"|"+g.away+"@"+g.home);
+      var seed=shHash32(slate.date+"|"+g.away+"@"+g.home+(g.gnum?("#"+g.gnum):""));
       SIMS[gkey]=shSimGames({away:{bat:awayBat},home:{bat:homeBat},
         awayLeash:leashOf(g.probable_away),homeLeash:leashOf(g.probable_home),legs:legs,
         v2:shV2Sim()?{total:(go&&go.total!=null)?go.total:null}:null},
@@ -1808,7 +1828,7 @@ function shAnalyzeLocal(slate){
       SIMS[gkey].gkey=gkey;
     });
   })();
-  function simOf(g){return g?SIMS[pnorm(g.away)+"@"+pnorm(g.home)]||null:null;}
+  function simOf(g){return g?SIMS[shGkey(g.away,g.home,g.gnum)]||null:null;}
 
   /* ----- ML & RL: light game model (lineup offense + starter ERA), blended 50/50
      with the vig-removed market price. One row per game — the more likely side. ----- */
@@ -1842,7 +1862,7 @@ function shAnalyzeLocal(slate){
     var pH=wML*model+(1-wML)*novH;
     var homeSide=pH>=0.5;
     var live=shIsLive(g),glabel=shGameLabel(g,go.game),ginn=(g&&g.inning)||0;
-    var gkeyML=pnorm(g.away)+"@"+pnorm(g.home);
+    var gkeyML=shGkey(g.away,g.home,g.gnum);
     cats.ml.push({label:homeSide?g.home:g.away,sub:"ML vs "+(homeSide?g.away:g.home),odds:obSign(homeSide?go.home_ml:go.away_ml),
       oddsN:homeSide?go.home_ml:go.away_ml,book:homeSide?go.home_ml_book:go.away_ml_book,
       czN:(homeSide?go.home_ml_cz:go.away_ml_cz)!=null?(homeSide?go.home_ml_cz:go.away_ml_cz):null,
@@ -2037,7 +2057,7 @@ function shAnalyzeLocal(slate){
         oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,
         pModel:sd.side==="O"?pO:1-pO,wBlend:wPr,lu:lu,
         czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
-        lkey:shLegKey(row.p,mkt,row.ln),gkey:g?(pnorm(g.away)+"@"+pnorm(g.home)):null,
+        lkey:shLegKey(row.p,mkt,row.ln),gkey:g?shGkey(g.away,g.home,g.gnum):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
@@ -2229,8 +2249,8 @@ function shAnalyzeLocal(slate){
     simMarkets=[];
     slate.games.forEach(function(gg){
       var sim=simOf(gg);if(!sim||!sim.v2m)return;
-      var m=sim.v2m,go2=oddsByKey[pnorm(gg.away)+"@"+pnorm(gg.home)]||null;
-      var row={game:gg.away+" @ "+gg.home,start:gg.start||null,n:sim.n,
+      var m=sim.v2m,go2=oddsByKey[shGkey(gg.away,gg.home,gg.gnum)]||null;
+      var row={game:gg.away+" @ "+gg.home+shGm(gg.gnum),start:gg.start||null,n:sim.n,
         avgAway:sim.avgAway,avgHome:sim.avgHome,
         f5:{pHome:m.pF5Home,pAway:m.pF5Away,pTie:m.pF5Tie,avg:m.avgF5,o45:m.pF5o45,o55:m.pF5o55},
         tt:{home:{avg:sim.avgHome,o35:m.tt.home.o35,o45:m.tt.home.o45},
@@ -2251,7 +2271,7 @@ function shAnalyzeLocal(slate){
   }
   /* game metadata for the card/ledger layer (additive): first-pitch time + gamePk per matchup —
      the lock step stores pks for boxscore grading; the freeze rule compares start vs now */
-  var gameInfo={};slate.games.forEach(function(gg){gameInfo[pnorm(gg.away)+"@"+pnorm(gg.home)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home};});
+  var gameInfo={};slate.games.forEach(function(gg){gameInfo[shGkey(gg.away,gg.home,gg.gnum)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home,gm:gg.gnum||null};});
   return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets};
 }
 
@@ -2798,7 +2818,7 @@ function shClvSight(slate){
     e.core.concat(e.funT).forEach(function(t){t.legs.forEach(function(l){
       var gi=l.gkey&&e.games[l.gkey];if(!gi)return;
       if(gi.start&&new Date(gi.start).getTime()<=now)return;
-      var mu=gi.away+" @ "+gi.home,lid=l.label+"|"+l.prop,am=null,lk=l.lkey||"";
+      var mu=gi.away+" @ "+gi.home+shGm(gi.gm),lid=l.label+"|"+l.prop,am=null,lk=l.lkey||"";
       if(lk==="ml_home"||lk==="ml_away"){var o=odds[mu];if(o)am=(lk==="ml_home")?o.home_ml_cz:o.away_ml_cz;}
       else if(lk==="rl_home"||lk==="rl_away"){var o2=odds[mu];if(o2)am=(lk==="rl_home")?o2.home_rl_cz:o2.away_rl_cz;}
       else{

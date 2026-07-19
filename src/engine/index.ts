@@ -95,7 +95,7 @@ export interface BoardData {
   liveGames?: unknown[];
   trap?: unknown;
   passes?: unknown[];
-  gameInfo?: Record<string, { pk: number | null; start: string; away: string; home: string }>;
+  gameInfo?: Record<string, { pk: number | null; start: string; away: string; home: string; gm?: number | null }>;
   data_gaps?: string[];
   [k: string]: unknown;
 }
