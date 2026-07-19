@@ -886,7 +886,7 @@ function toggleTimeframeVis(){var tf=$("timeframe");if(!tf)return;if(SPORT!=="ml
 
 /* ===== Odds Board: Caesars lines via The Odds API (user-supplied key) ===== */
 var CAESARS_KEY="williamhill_us";
-var ODDS_KEY_DEFAULT="8201fb6abc55beb5e78b9d14f5c3bbc2";
+var ODDS_KEY_DEFAULT=""; /* key scrubbed 2026-07-19 — enter via ⚙ (stored in localStorage); the new app never reads this (server proxy holds the key) */
 function curMarkets(){return SPORTS[SPORT].markets;}
 /* OB.ncaa holds the game-card rows for the ML/SPREAD views (any sport); OB.seq guards stale async responses */
 var OB={key:(LS.get("pl_oddskey","")||ODDS_KEY_DEFAULT),games:[],game:"",market:"batter_home_runs",rows:[],loading:false,err:null,note:null,mode:"ml",ncaa:[],seq:0};
