@@ -306,6 +306,51 @@ zero-mutation, supplemental graded through real boxscore 822954 via shGrade + CL
 sighted via pendingLegs/sightProp/applySights, merge union symmetry/idempotence,
 funSplit numbers. 128 tests total; parity digest unchanged.
 
+## DK/FD selection basis — dk_fd, the default selection mode (2026-07-19)
+
+**The idea:** shop at DraftKings/FanDuel, settle at Caesars NV. The basis price per
+leg is the better OFFERED price between DK and FD only, line-shopped within the pair
+(tie → DK; game lines at the modal point, props at the exact line), captured
+additively at slate collection exactly like the cz layer (`shBasisPick`; fields
+`bsN/bsBook` on rows → `bs/bsBook` on legs → `bsDec/bsOdds/bsEv` on tickets, all
+additive and parity-safe). In dk_fd mode EVERY selection number computes at the
+basis: the upgrade-01 EV gate, allocator weights and Kelly ceilings (`shKellyFrac`),
+`coreMaxDec`, FUN tiers, and parlay building. Caesars is display + settlement only —
+card legs need BOTH a basis and a CZ quote; the NV price-confirm stays the grading
+price of record; locked tickets store both bases.
+
+**The opinion is untouched:** the Pinnacle-weighted, Shin de-vigged, all-books
+consensus remains the model's probability anchor. dk_fd swaps the price the model
+shops at, not the opinion it holds.
+
+**Two dk_fd-only deviations the NV-blindness test forced (both documented here on
+purpose):**
+1. One-sided markets (anytime HR — no opposite side to de-vig, so no true consensus
+   exists) anchor their fair to the BASIS price instead of the all-books best price;
+   with no basis they keep the legacy best-price anchor and are card-ineligible.
+2. Parlay generation builds from the basis-priced universe only. Generation IS
+   selection (the spec lists it), and a no-basis row's NV-anchored prob steering the
+   builder's shared usage ledger would leak NV prices into which SELECTABLE tickets
+   exist — the perturbation test catches exactly this. No-basis picks stay
+   board-visible and manual-slip eligible (NO DK/FD BASIS tag); they just never
+   enter generated tickets in dk_fd.
+
+**The proof** (`tests/dkfd-basis.test.ts`): CZ + BetMGM quotes perturbed by scaling
+both sides' decimal odds by the same factor — every pair's de-vigged fair is exactly
+invariant, so the opinion is pinned while NV prices move wildly. Every pick, ranking
+(market tabs; the TOP-50 "all" tab is an EV-at-best-price display ranking outside
+selection), and card is byte-identical. Removing DK/FD entirely → everything
+ineligible, no CZ-priced fallback, board still browsable.
+
+**CLV + receipts:** each sighting stores both closes (`am` = CZ, `bsAm/bsBk` =
+better DK/FD) so CLV is judged against the price that picked it AND the price that
+paid it (Receipts "vs DK/FD close" column). "NV tax paid" = basis P/L − actual P/L
+over settled basis-locked tickets, split by market — the running cost of settling
+at the NV counter; void-repriced wins are excluded (a basis reprice would be a
+guess) and the skip count disclosed. Stale guard: the Builder warns when basis
+quotes are >20 min old. `caesars_ev`, `ev_gated` (@CZ), and `probability` stay in
+Settings; existing explicit choices are honored, dk_fd is the fallback default.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
