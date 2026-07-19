@@ -13,6 +13,7 @@ import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { getEngine, getMoney, setMoney, todayStr } from "@/lib/engine-client";
+import { syncNow } from "@/lib/ledgerSync";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 
@@ -59,8 +60,19 @@ type LockedTicket = {
   prob?: number;
   czEv?: number | null;
   confirmed?: number | null;
+  supplemental?: boolean;
+  late?: boolean;
+  lockedAt?: number;
   legs: { label: string; prop: string; cz?: number | null; gkey?: string | null }[];
 };
+/* supplemental fun locks: what the engine says can still be added today */
+type SuppCalc = {
+  budget: number;
+  staked: number;
+  left: number;
+  fun: { picks: CardPick[]; sum: number };
+};
+type SuppResult = { ok: boolean; err?: string; added?: number; sum?: number; left?: number };
 
 function MoneyInput({
   label,
@@ -90,7 +102,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number } }) {
+function TicketCard({ t, stake, kelly, grade, tag }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string }) {
   /* upgrade 01: surface the ¼-Kelly stake whenever the allocator diverges from it by >2×
      either way — "allocator $49 · Kelly $11" is the tell that the entered daily, not the
      edge, is driving the size */
@@ -98,7 +110,14 @@ function TicketCard({ t, stake, kelly, grade }: { t: Ticket & { tier?: string };
   return (
     <div className={`glass px-4 py-3 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-text">{t.name}</div>
+        <div className="text-[13px] font-semibold text-text">
+          {t.name}
+          {tag && (
+            <span className="ml-2 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold">
+              {tag}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
             {fmtMoney(stake)}
@@ -203,6 +222,43 @@ export default function BuilderPage() {
     void cardV;
     return eng.get<(x: unknown) => CardCalc | null>("shCardCalc")(d);
   }, [eng, d, cardV, locked]);
+
+  /* SHADOW CARD (display-only): the exact shAllocate + shFunPick pipeline run
+     against the fresh board while today's real card is locked — pure recompute,
+     zero ledger writes, no lock path */
+  const shadow: CardCalc | null = useMemo(() => {
+    if (!eng || !d || !locked) return null;
+    void cardV;
+    return eng.get<(x: unknown) => CardCalc | null>("shCardCalc")(d);
+  }, [eng, d, cardV, locked]);
+
+  const supp: SuppCalc | null = useMemo(() => {
+    if (!eng || !locked) return null;
+    void cardV;
+    return eng.get<(x: unknown) => SuppCalc | null>("shSupplementalCalc")(d ?? null);
+  }, [eng, d, cardV, locked]);
+
+  const shadowDiff = useMemo(() => {
+    if (!shadow || !locked) return null;
+    const lockedIds = new Set([...locked.core, ...locked.funT].map((t) => t.id));
+    const picks = [...shadow.alloc.picks, ...shadow.fun.picks];
+    const kept = picks.filter((p) => lockedIds.has(p.id)).length;
+    return { total: picks.length, kept, fresh: picks.length - kept, lockedN: lockedIds.size };
+  }, [shadow, locked]);
+
+  const lockSupp = () => {
+    if (!eng) return;
+    const r = eng.get<() => SuppResult>("shLockSupplemental")();
+    if (r.ok) {
+      setStatus(
+        `Supplemental locked — ${r.added} ticket${r.added === 1 ? "" : "s"}, $${r.sum} recorded · $${r.left} of the FUN budget left today.`,
+      );
+      void syncNow(); // push the append so grading + CLV cover it from the cloud copy too
+    } else {
+      setStatus(r.err ?? "Supplemental lock didn't take.");
+    }
+    setCardV((v) => v + 1);
+  };
 
   const updateMoney = useCallback((patch: Partial<typeof money>) => {
     setMoneyState((m) => {
@@ -339,6 +395,7 @@ export default function BuilderPage() {
       )}
 
       {locked ? (
+        <div className="space-y-5">
         <Reveal>
           <Panel
             title={`Today's card — LOCKED${locked.lateLock ? " (after first pitch, flagged)" : ""}${locked.overrode ? " · override day" : ""}`}
@@ -361,6 +418,7 @@ export default function BuilderPage() {
                       t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, prob: t.prob } as never}
                       stake={t.stake}
                       grade={locked.grading?.tickets?.[t.id]}
+                      tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}
                     />
                     {!started && !locked.grading?.tickets?.[t.id] && (
                       <div className="mt-1.5 flex items-center gap-2 px-1">
@@ -379,6 +437,108 @@ export default function BuilderPage() {
             </div>
           </Panel>
         </Reveal>
+
+        {/* SUPPLEMENTAL FUN LOCKS — fun bucket only, inside the day's frozen FUN budget */}
+        {supp && (
+          <Reveal>
+            <Panel title="Supplemental fun locks">
+              <div className="num mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted">
+                <span>
+                  FUN budget <b className="text-text">{fmtMoney(supp.budget)}</b>
+                </span>
+                <span>
+                  staked across today&apos;s locks <b className="text-text">{fmtMoney(supp.staked)}</b>
+                </span>
+                <span>
+                  remaining <b className={supp.left > 0 ? "text-gold" : "text-muted"}>{fmtMoney(supp.left)}</b>
+                </span>
+              </div>
+              {supp.left <= 0 ? (
+                <div className="text-[12px] text-muted">
+                  FUN budget fully deployed — supplemental locks reset tomorrow. The core card stays one lock per day,
+                  always.
+                </div>
+              ) : !d ? (
+                <div className="text-[12px] text-muted">
+                  Generate today&apos;s board (Board tab) and the remaining {fmtMoney(supp.left)} can buy fresh
+                  longshots — same rules as the at-lock FUN pick, and never a leg already on today&apos;s card.
+                </div>
+              ) : supp.fun.picks.length === 0 ? (
+                <div className="text-[12px] text-muted">
+                  No fun-eligible tickets clear the rules right now — longshot tiers (+800 up), at least a 0.1% true
+                  hit rate, and no leg that already rides today&apos;s card. Regenerate closer to the evening games.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {supp.fun.picks.map((p) => (
+                      <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" />
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Pill variant="gold" onClick={lockSupp}>
+                      🔒 Lock supplemental — {fmtMoney(supp.fun.sum)}
+                    </Pill>
+                    <span className="text-[10.5px] text-faint">
+                      Appends to today&apos;s ledger entry (own lock time, marked supplemental) — append-only, the core
+                      card and existing grades are untouchable.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </Reveal>
+        )}
+
+        {/* SHADOW CARD — display-only: what the pipeline would pick right now */}
+        {shadow && shadowDiff && (
+          <Reveal>
+            <Panel title="If unlocked — current card" className="border border-dashed border-line-2">
+              <div className="mb-3 text-[11.5px] text-muted">
+                <b className="text-gold">Hypothetical.</b> The exact allocator + fun-pick pipeline run against the
+                freshly generated board at your entered amounts — today&apos;s real card is the locked one above, and
+                nothing here is recorded or lockable. Board parlay tabs sort by hit probability, not card order.
+              </div>
+              <div className="num mb-3 text-[11.5px] text-text">
+                Diff vs locked: {shadowDiff.kept} of {shadowDiff.total} current ticket
+                {shadowDiff.total === 1 ? "" : "s"} match the locked card · {shadowDiff.fresh} new ·{" "}
+                {shadowDiff.lockedN} locked
+              </div>
+              {shadow.alloc.noPlay && shadow.fun.picks.length === 0 && shadow.alloc.picks.length === 0 ? (
+                <div className="text-[12px] text-muted">
+                  Right now the pipeline would sit: NO-PLAY — no ticket clears the EV gate on the current board.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {shadow.alloc.picks.length > 0 && (
+                    <div>
+                      <div className="num mb-2 text-[11px] text-muted">
+                        Core · {fmtMoney(shadow.alloc.sum)} across {shadow.alloc.picks.length} tickets · card EV{" "}
+                        <EvBadge ev={(shadow.alloc.ev ?? 0) * 100} />
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {shadow.alloc.picks.map((p) => (
+                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {shadow.fun.picks.length > 0 && (
+                    <div>
+                      <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {shadow.fun.picks.map((p) => (
+                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Panel>
+          </Reveal>
+        )}
+        </div>
       ) : !d ? (
         <Panel>
           <EmptyState title="Generate today's board first" body="The card allocates across tickets the engine already produced — open the Board tab and generate, then come back." />

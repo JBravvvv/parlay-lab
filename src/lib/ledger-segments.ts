@@ -18,7 +18,7 @@ import { wilson } from "@/engine2/calibration";
 export type ClvEntry = { am: number; at: number; consensusFair?: number | null };
 
 type Leg = { label?: string; prop?: string; cz?: number | null; lkey?: string | null; gkey?: string | null };
-type Ticket = { id?: string; stake?: number; legs?: Leg[] };
+type Ticket = { id?: string; stake?: number; supplemental?: boolean; legs?: Leg[] };
 type Grade = { result?: string; payout?: number };
 
 export const impliedPct = (am: number): number => (am > 0 ? 100 * (100 / (am + 100)) : 100 * (-am / (-am + 100)));
@@ -49,10 +49,22 @@ export type CalRow = {
   brier: number;
 };
 
+/** One fun-bucket group (at-lock vs supplemental): its own P/L and its own CLV. */
+export type FunLine = {
+  tickets: number;
+  staked: number;
+  settled: number;
+  pl: number;
+  clvPts: number | null;
+  sighted: number;
+  legs: number;
+};
+
 export type LedgerSegments = {
   coverage: { sighted: number; legs: number };
   byMarket: SegRow[];
   byBucket: SegRow[];
+  funSplit: { atLock: FunLine; supplemental: FunLine };
   overrideDays: { days: number; staked: number; pl: number; clvPts: number | null; sighted: number; legs: number };
   calibration: CalRow[];
   week: { days: number; staked: number; settled: number; pl: number; clvPts: number | null; sighted: number; legs: number; overridePl: number };
@@ -62,6 +74,7 @@ type LegView = {
   lid: string;
   market: string;
   bucket: "core" | "fun";
+  sup: boolean; // fun ticket locked supplementally (after the daily lock)
   overrode: boolean;
   date: string;
   lockedAm: number | null;
@@ -91,6 +104,7 @@ function legViews(entries: SyncEntry[]): LegView[] {
             lid,
             market: marketOf(l.lkey),
             bucket,
+            sup: bucket === "fun" && t.supplemental === true,
             overrode: (e as { overrode?: boolean }).overrode === true,
             date: e.date,
             lockedAm: l.cz ?? null,
@@ -146,6 +160,31 @@ export function ledgerSegments(entries: SyncEntry[], now = Date.now()): LedgerSe
   const byMarket = markets.map((m) => segRow(m, legs.filter((l) => l.market === m)));
   const byBucket = (["core", "fun"] as const).map((b) => segRow(b, legs.filter((l) => l.bucket === b)));
 
+  // fun bucket split: what the daily lock chose vs what supplemental locks added,
+  // each with its own P/L and its own CLV — one blended line would hide which
+  // lock discipline is earning
+  const funLine = (sup: boolean): FunLine => {
+    let tickets = 0;
+    let staked = 0;
+    let settled = 0;
+    let pl = 0;
+    for (const e of locked) {
+      const grades = ((e.grading as { tickets?: Record<string, Grade> } | null)?.tickets ?? {}) as Record<string, Grade>;
+      for (const t of ((e.funT as Ticket[]) ?? []).filter((t) => (t.supplemental === true) === sup)) {
+        tickets++;
+        const stake = Number(t.stake) || 0;
+        staked += stake;
+        const g = t.id ? grades[t.id] : undefined;
+        if (!g || g.result === "pending" || g.result === "ungradable") continue;
+        settled += stake;
+        pl += (Number(g.payout) || 0) - stake;
+      }
+    }
+    const row = segRow(sup ? "supplemental" : "at-lock", legs.filter((l) => l.bucket === "fun" && l.sup === sup));
+    return { tickets, staked, settled, pl, clvPts: row.clvPts, sighted: row.sighted, legs: row.legs };
+  };
+  const funSplit = { atLock: funLine(false), supplemental: funLine(true) };
+
   const ovLegs = legs.filter((l) => l.overrode);
   const ovRow = segRow("override", ovLegs);
   const ovEntries = locked.filter((e) => (e as { overrode?: boolean }).overrode === true);
@@ -190,6 +229,7 @@ export function ledgerSegments(entries: SyncEntry[], now = Date.now()): LedgerSe
     coverage: { sighted: legs.filter((l) => l.clv != null && l.lockedAm != null).length, legs: legs.length },
     byMarket,
     byBucket,
+    funSplit,
     overrideDays: { days: ovEntries.length, staked: ovStaked, pl: ovPl, clvPts: ovRow.clvPts, sighted: ovRow.sighted, legs: ovRow.legs },
     calibration,
     week: {

@@ -70,6 +70,9 @@ export type LedgerTicket = {
   prob?: number;
   czEv?: number | null;
   confirmed?: number | null;
+  supplemental?: boolean;
+  late?: boolean;
+  lockedAt?: number;
   legs: { label: string; prop: string; cz?: number | null }[];
 };
 export type TicketGrade = { result: string; payout: number; dec?: number; detail?: string };

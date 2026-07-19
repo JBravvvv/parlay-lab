@@ -99,6 +99,34 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   };
   fill(out.core, other.core);
   fill(out.funT ?? [], other.funT);
+  /* Supplemental fun locks append funT tickets after the daily lock, so the two
+     sides of a merge can hold different ticket SETS for the same day. Union by
+     ticket id — an append on one device must survive a merge with a copy that
+     predates it (even one that outranked it in pickBase by grading richness). */
+  const ids = new Set((out.funT ?? []).map((t) => t.id).filter(Boolean));
+  const extras = (other.funT ?? []).filter((t) => t.id && !ids.has(t.id));
+  if (extras.length) {
+    out.funT = [...(out.funT ?? []), ...extras.map((t) => JSON.parse(JSON.stringify(t)) as SyncTicket)];
+  }
+  /* games union (base wins conflicts): an appended ticket's legs may reference
+     games the base copy never saw, and grading + CLV both key off entry.games */
+  if (other.games || out.games) {
+    out.games = {
+      ...((other.games as Record<string, unknown>) ?? {}),
+      ...((out.games as Record<string, unknown>) ?? {}),
+    };
+  }
+  /* grades are deterministic from boxscores — fill-only map merge makes the
+     merged day strictly better-informed without ever overwriting a grade */
+  if (out.grading && other.grading) {
+    out.grading.tickets = { ...(other.grading.tickets ?? {}), ...(out.grading.tickets ?? {}) };
+    out.grading.legs = { ...(other.grading.legs ?? {}), ...(out.grading.legs ?? {}) };
+  }
+  /* any ticket without a grade reopens grading so the auto-grader picks it up */
+  if (out.grading?.done) {
+    const graded = out.grading.tickets ?? {};
+    if ([...out.core, ...(out.funT ?? [])].some((t) => t.id && !(t.id in graded))) out.grading.done = false;
+  }
   return out;
 }
 

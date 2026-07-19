@@ -40,8 +40,15 @@ describe("mergeLedgers", () => {
   });
 
   it("same day: the graded copy wins, and the other side's accruals overlay", () => {
+    // done:true always comes with a grade for EVERY ticket (shGrade writes all
+    // of them before setting done) — a done flag over a partial map would be
+    // reopened by the merge so the auto-grader covers the missing tickets
     const graded = day("2026-07-16", {
-      grading: { done: true, tickets: { t1: { result: "won", payout: 50 } }, legs: {} },
+      grading: {
+        done: true,
+        tickets: { t1: { result: "won", payout: 50 }, t2: { result: "lost", payout: 0 }, f1: { result: "lost", payout: 0 } },
+        legs: {},
+      },
     });
     const withClv = day("2026-07-16", {
       clv: { t2: { am: -120, at: 1752700000000 } },

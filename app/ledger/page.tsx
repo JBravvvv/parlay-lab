@@ -134,6 +134,14 @@ function TicketRow({ t, e, g }: { t: LedgerEntry["core"][number]; e: LedgerEntry
             <span className="mr-1 inline-block text-[9px] text-faint transition-transform group-open:rotate-90">▶</span>
             {t.bucket === "fun" && <span className="mr-1 text-gold">🎟</span>}
             {t.name}
+            {t.supplemental && (
+              <span
+                className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold uppercase text-gold"
+                title={`Locked after the daily lock${t.lockedAt ? ` · ${new Date(t.lockedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""} — inside the same day's FUN budget`}
+              >
+                supp{t.late ? " · late" : ""}
+              </span>
+            )}
           </div>
           <div className="text-[10.5px] text-muted group-open:hidden">
             {t.legs.map((l) => l.label).join(" · ")}

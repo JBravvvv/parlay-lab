@@ -80,6 +80,42 @@ export function ReceiptsPanel({ entries }: { entries: SyncEntry[] }) {
         <ClvTable rows={s.byMarket} label="By market" />
         <ClvTable rows={s.byBucket} label="By bucket" />
 
+        {s.funSplit.supplemental.tickets > 0 && (
+          <div>
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-gold">
+              Fun bucket — at-lock vs supplemental
+            </div>
+            {(
+              [
+                ["At-lock", s.funSplit.atLock],
+                ["Supplemental", s.funSplit.supplemental],
+              ] as const
+            ).map(([label, f]) => (
+              <div key={label} className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] py-1 text-[11.5px]">
+                <span className="w-24 text-text">{label}</span>
+                <span className="text-muted">
+                  {f.tickets} ticket{f.tickets === 1 ? "" : "s"} · staked ${f.staked}
+                </span>
+                <span>
+                  P/L{" "}
+                  <b className={f.pl >= 0 ? "text-pos" : "text-neg"}>{f.settled > 0 ? money(f.pl) : "—"}</b>
+                  {f.settled < f.staked && f.staked > 0 && <span className="ml-1 text-faint">(${f.staked - f.settled} pending)</span>}
+                </span>
+                <span>
+                  CLV <span className={ptsClass(f.clvPts)}>{pts(f.clvPts)}</span>
+                  {f.clvPts != null && <span className="ml-1 text-faint">(n={f.sighted})</span>}
+                </span>
+                <span className="text-muted">
+                  {f.sighted}/{f.legs} sighted
+                </span>
+              </div>
+            ))}
+            <div className="mt-1 text-[10px] text-faint">
+              Supplemental = fun tickets locked after the daily lock, inside the same day&apos;s FUN budget.
+            </div>
+          </div>
+        )}
+
         {s.overrideDays.days > 0 && (
           <div className="rounded-(--radius-panel) border border-neg/30 bg-neg/5 px-3 py-2 text-[11.5px]">
             <span className="font-bold text-neg">Override days</span>{" "}

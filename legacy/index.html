@@ -2700,6 +2700,14 @@ function shCardStarted(d,cc){
   cc.alloc.picks.forEach(chkT);cc.fun.picks.forEach(chkT);
   return started;
 }
+/* one locked-ticket snapshot — shared by the daily lock and supplemental fun locks:
+   frozen price, stake and legs; mutates `games` with every gkey the ticket touches */
+function shTicketSnap(p,bucket,tierName,d,games){var pl=p.w.pl;
+  pl.legs.forEach(function(l){if(l.gkey&&d.gameInfo&&d.gameInfo[l.gkey])games[l.gkey]=d.gameInfo[l.gkey];});
+  return {id:p.id,bucket:bucket,name:pl.name,type:pl.type,tier:tierName,
+    stake:p.stake,czOdds:pl.czOdds,czDec:pl.czDec,prob:pl.prob,czEv:(pl.czEv!=null?pl.czEv:null),fair:pl.fair||null,
+    confirmed:null,
+    legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est};})};}
 /* LOCK CARD: freeze today's parlays, Caesars prices and exact stakes into the ledger */
 function shLockCard(){
   var d=SH.board&&SH.board.data;
@@ -2711,12 +2719,7 @@ function shLockCard(){
   if(!cc.alloc.picks.length&&!cc.fun.picks.length){shStatus("Nothing to lock — enter a DAILY $ or FUN $ amount first.",true);return;}
   var late=shCardStarted(d,cc);
   var games={};
-  function tkt(p,bucket,tierName){var pl=p.w.pl;
-    pl.legs.forEach(function(l){if(l.gkey&&d.gameInfo&&d.gameInfo[l.gkey])games[l.gkey]=d.gameInfo[l.gkey];});
-    return {id:p.id,bucket:bucket,name:pl.name,type:pl.type,tier:tierName,
-      stake:p.stake,czOdds:pl.czOdds,czDec:pl.czDec,prob:pl.prob,czEv:(pl.czEv!=null?pl.czEv:null),fair:pl.fair||null,
-      confirmed:null,
-      legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est};})};}
+  function tkt(p,bucket,tierName){return shTicketSnap(p,bucket,tierName,d,games);}
   var entry={date:shToday(),lockedAt:Date.now(),locked:true,lateLock:late,
     overrode:!!cc.overrode, /* upgrade 01: forced allocation on a NO-PLAY day — file 03 reports its realized P/L separately */
     daily:SH.daily,fun:SH.fun,bankroll:SH.bankroll,cardEv:cc.alloc.ev,
@@ -2742,6 +2745,61 @@ function shConfirmPrice(tid,val){
   t.confirmed=am;LS.set("pl_ledger",L);
   shStatus("NV price confirmed for that ticket — grading will pay at "+obSign(am)+".");
   shRender();
+}
+/* ===== supplemental fun locks: additional FUN tickets AFTER the daily lock =====
+   The core card stays one-lock-per-day; only the fun bucket may add, and only
+   inside the day's frozen FUN budget. Hard rules, re-checked at write time:
+   (a) total fun staked across all locks today <= the locked entry's FUN $;
+   (b) appends carry lockedAt + supplemental:true and never touch core, stakes,
+       or existing grades — grading.done reopens so new tickets grade like any;
+   (c) new tickets must be leg-disjoint from EVERYTHING already locked today,
+       and come from the current board's fun-eligible pool under all existing
+       rules (funMinProb floor, HR isolation, odds tiers). */
+function shFunRemaining(){
+  var e=shLedgerFind(shToday());
+  if(!e||!e.locked)return null;
+  var staked=0;(e.funT||[]).forEach(function(t){staked+=t.stake;});
+  var budget=Number(e.fun)||0;
+  return {budget:budget,staked:staked,left:Math.max(0,budget-staked)};
+}
+function shSupplementalCalc(d){
+  var e=shLedgerFind(shToday());
+  if(!e||!e.locked)return null;
+  var r=shFunRemaining();
+  if(!d||d.picks||r.left<=0)return {budget:r.budget,staked:r.staked,left:r.left,fun:{picks:[],sum:0}};
+  var ids={},legs={};
+  (e.core||[]).concat(e.funT||[]).forEach(function(t){ids[t.id]=1;
+    (t.legs||[]).forEach(function(l){legs[l.label+"|"+l.prop]=1;});});
+  /* the remaining budget drives the tier split, exactly like an at-lock FUN pick */
+  return {budget:r.budget,staked:r.staked,left:r.left,
+    fun:shFunPick(shCardPool(d),r.left,SH_CFG,ids,legs)};
+}
+function shLockSupplemental(){
+  var d=SH.board&&SH.board.data;
+  if(!d||d.picks)return {ok:false,err:"Needs a generated quant board."};
+  if(SH.board.date!==shToday())return {ok:false,err:"Board is from another day — regenerate before locking."};
+  var L=shLedger(),e=null;L.forEach(function(x){if(x.date===shToday())e=x;});
+  if(!e||!e.locked)return {ok:false,err:"Lock today's card first — supplemental tickets only add to a locked day."};
+  var sc=shSupplementalCalc(d);
+  if(!sc||!sc.fun.picks.length)return {ok:false,
+    err:(sc&&sc.left<=0)?"FUN budget fully deployed — resets tomorrow.":"No fun-eligible tickets clear the rules right now."};
+  /* hard re-checks against the entry being written, not the calc's snapshot */
+  var staked=0;(e.funT||[]).forEach(function(t){staked+=t.stake;});
+  if(staked+sc.fun.sum>(Number(e.fun)||0))return {ok:false,err:"That would exceed the day's FUN budget."};
+  var have={};(e.core||[]).concat(e.funT||[]).forEach(function(t){(t.legs||[]).forEach(function(l){have[l.label+"|"+l.prop]=1;});});
+  var clash=sc.fun.picks.some(function(p){return p.w.pl.legs.some(function(l){return have[l.label+"|"+l.prop];});});
+  if(clash)return {ok:false,err:"A pick already rides today's card — regenerate and retry."};
+  var now=Date.now(),games={},added=0,sum=0;
+  sc.fun.picks.forEach(function(p){
+    var t=shTicketSnap(p,"fun",SH_CFG.funTierNames[p.tier]||"LONGSHOT",d,games);
+    t.lockedAt=now;t.supplemental=true;
+    if(p.w.pl.legs.some(function(l){var gi=l.gkey&&d.gameInfo&&d.gameInfo[l.gkey];
+      return gi&&gi.start&&new Date(gi.start).getTime()<=now;}))t.late=true;
+    e.funT.push(t);added++;sum+=t.stake;});
+  var k;for(k in games)if(!e.games[k])e.games[k]=games[k];
+  if(e.grading)e.grading.done=false; /* new tickets must grade; existing grades stand */
+  LS.set("pl_ledger",L);
+  return {ok:true,added:added,sum:sum,left:Math.max(0,(Number(e.fun)||0)-staked-sum)};
 }
 /* a locked (frozen) ticket card, with grade chip once results post */
 function shLockedTicket(t,entry){
