@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
-import { syncNow, useSyncState } from "@/lib/ledgerSync";
+import { SYNC_EVENT, syncNow, useSyncState } from "@/lib/ledgerSync";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 
 const TIP = {
@@ -241,9 +241,16 @@ export default function LedgerPage() {
   };
 
   // Grades post themselves: any locked day still ungraded (including a day a
-  // sync repair just reopened) grades on view, no tap needed. Once per visit —
-  // grade() bumps the api memo, so an unguarded effect would loop.
+  // sync repair just reopened) grades on view, no tap needed. One pass per
+  // ledger state — grade() bumps the api memo, so an unguarded effect would
+  // loop — but a cloud sync rewriting pl_ledger re-arms it, so a day the
+  // sync just changed always gets its own grading pass.
   const autoGraded = useRef(false);
+  useEffect(() => {
+    const rearm = () => (autoGraded.current = false);
+    window.addEventListener(SYNC_EVENT, rearm);
+    return () => window.removeEventListener(SYNC_EVENT, rearm);
+  }, []);
   useEffect(() => {
     if (autoGraded.current || !api || grading) return;
     if (!api.entries.some((e) => !e.grading?.done)) return;
