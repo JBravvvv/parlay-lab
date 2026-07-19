@@ -17,16 +17,21 @@ import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 
 /* ---------- engine card types ---------- */
-type CardPick = { id: string; stake: number; tier?: number; w: { pl: Ticket & { tier?: string; fair?: string } } };
+type CardPick = { id: string; stake: number; kelly?: number | null; tier?: number; w: { pl: Ticket & { tier?: string; fair?: string } } };
 type CardCalc = {
   pool: unknown[];
-  alloc: { picks: CardPick[]; sum: number; ev: number; legs: Record<string, number> };
+  alloc: { picks: CardPick[]; sum: number; ev: number; legs: Record<string, number>; noPlay?: boolean; overrode?: boolean };
   fun: { picks: CardPick[]; sum: number };
+  kellyDaily: number;
+  dailyCap: number;
+  enteredDaily: number;
+  overrode: boolean;
 };
 type LockedEntry = {
   date: string;
   locked: boolean;
   lateLock?: boolean;
+  overrode?: boolean;
   daily: number;
   fun: number;
   cardEv?: number;
@@ -76,7 +81,11 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, grade }: { t: Ticket & { tier?: string }; stake: number; grade?: { result: string; payout: number } }) {
+function TicketCard({ t, stake, kelly, grade }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number } }) {
+  /* upgrade 01: surface the ¼-Kelly stake whenever the allocator diverges from it by >2×
+     either way — "allocator $49 · Kelly $11" is the tell that the entered daily, not the
+     edge, is driving the size */
+  const kellyGap = kelly != null && (stake > 2 * kelly || kelly > 2 * stake);
   return (
     <div className={`glass px-4 py-3 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -85,6 +94,14 @@ function TicketCard({ t, stake, grade }: { t: Ticket & { tier?: string }; stake:
           <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
             {fmtMoney(stake)}
           </span>
+          {kellyGap && (
+            <span
+              className="num rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
+              title="¼-Kelly stake at this ticket's probability and Caesars price (2%-of-bankroll cap) — the bankroll-growth-consistent size"
+            >
+              Kelly {fmtMoney(kelly)}
+            </span>
+          )}
           <OddsCell odds={(t.czOdds ?? "") as never} book="caesars" />
           {t.czEv != null && <EvBadge ev={Number(t.czEv)} />}
           {grade && (
@@ -307,7 +324,7 @@ export default function BuilderPage() {
       {locked ? (
         <Reveal>
           <Panel
-            title={`Today's card — LOCKED${locked.lateLock ? " (after first pitch, flagged)" : ""}`}
+            title={`Today's card — LOCKED${locked.lateLock ? " (after first pitch, flagged)" : ""}${locked.overrode ? " · override day" : ""}`}
             className="glow-gold"
           >
             <div className="mb-3 text-[11.5px] text-muted">
@@ -358,26 +375,77 @@ export default function BuilderPage() {
         </Panel>
       ) : (
         <div className="space-y-5">
-          {card.alloc.ev <= 0 && card.alloc.picks.length > 0 && (
+          {/* upgrade 01: NO-PLAY is a first-class result — $0 recommended, staking takes an explicit override */}
+          {card.alloc.noPlay && money.daily > 0 && (
+            <Panel>
+              <div className="space-y-3 py-2 text-center">
+                <div className="text-[15px] font-semibold text-text">No positive-EV core card at Caesars today</div>
+                <div className="text-[12px] text-muted">
+                  Recommended stake <span className="num font-bold text-text">$0</span>. Zero edge means zero stake — passing is a
+                  position, and it costs nothing. Fun bucket unaffected.
+                </div>
+                <Pill
+                  variant="ghost"
+                  onClick={() => {
+                    eng?.get<(on: boolean) => void>("shSetOverride")(true);
+                    setCardV((v) => v + 1);
+                  }}
+                >
+                  Allocate anyway (tracked as an override)
+                </Pill>
+              </div>
+            </Panel>
+          )}
+
+          {card.overrode && (
+            <div className="flex items-center justify-between rounded-(--radius-panel) border border-neg/40 bg-neg/10 px-4 py-3 text-[12px] text-neg">
+              <span>
+                Override active — no ticket cleared breakeven EV, allocating anyway. The ledger stamps this day and tracks
+                override P/L separately.
+              </span>
+              <button
+                className="shrink-0 font-semibold underline"
+                onClick={() => {
+                  eng?.get<(on: boolean) => void>("shSetOverride")(false);
+                  setCardV((v) => v + 1);
+                }}
+              >
+                Undo
+              </button>
+            </div>
+          )}
+
+          {card.alloc.ev != null && card.alloc.ev <= 0 && card.alloc.picks.length > 0 && !card.overrode && (
             <div className="rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-4 py-3 text-[12px] text-gold">
               Model suggests reduced action today: slate EV ≈ {card.alloc.ev.toFixed(1)}%. Allocating{" "}
-              {fmtMoney(money.daily)} as requested.
+              {fmtMoney(card.alloc.sum)} as requested.
             </div>
           )}
 
           {card.alloc.picks.length > 0 && (
             <Reveal>
-              <div className="mb-2 flex items-baseline justify-between">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                   Today&apos;s card · {fmtMoney(card.alloc.sum)} across {card.alloc.picks.length} tickets
                 </h2>
-                <span className="num text-[11px] text-muted">
-                  card EV <EvBadge ev={card.alloc.ev} />
+                <span className="num flex items-center gap-3 text-[11px] text-muted">
+                  <span>entered {fmtMoney(card.enteredDaily)}</span>
+                  <span title="Sum of each ticket's ¼-Kelly stake (2%-of-bankroll cap per ticket) — the bankroll-math-consistent daily">
+                    Kelly-consistent <b className="text-text">{fmtMoney(card.kellyDaily)}</b>
+                  </span>
+                  <span>
+                    card EV <EvBadge ev={card.alloc.ev} />
+                  </span>
                 </span>
               </div>
+              {card.enteredDaily > card.dailyCap && (
+                <div className="mb-2 text-[11px] text-gold">
+                  Daily capped at 10% of bankroll: allocating {fmtMoney(card.dailyCap)} of the {fmtMoney(card.enteredDaily)} entered.
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-2">
                 {card.alloc.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} />
+                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} />
                 ))}
               </div>
             </Reveal>

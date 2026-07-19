@@ -37,13 +37,15 @@ export function getSims(): Record<string, SimOut> {
   return out;
 }
 
-export type SelectionMode = "probability" | "caesars_ev";
+export type SelectionMode = "ev_gated" | "probability" | "caesars_ev";
 
 export function getSelectionMode(): SelectionMode {
   try {
-    return localStorage.getItem("pl_selmode") === "caesars_ev" ? "caesars_ev" : "probability";
+    const v = localStorage.getItem("pl_selmode");
+    // ev_gated is the upgrade-01 default: zero edge = zero stake, NO-PLAY days are real
+    return v === "caesars_ev" || v === "probability" ? v : "ev_gated";
   } catch {
-    return "probability";
+    return "ev_gated";
   }
 }
 

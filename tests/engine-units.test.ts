@@ -22,7 +22,9 @@ beforeAll(async () => {
 afterAll(() => vi.useRealTimers());
 
 describe("daily allocator (core card discipline)", () => {
-  const CFG = () => eng.get<Record<string, unknown>>("SH_CFG");
+  /* these tests were written for the pre-upgrade-01 default and pin selMode explicitly:
+     the spread/K/cap rules they cover are mode-agnostic (ev_gated has its own suite) */
+  const CFG = () => ({ ...eng.get<Record<string, unknown>>("SH_CFG"), selMode: "probability" });
   const pool = () => eng.get<(x: BoardData) => unknown[]>("shCardPool")(d);
   const alloc = (amt: number) =>
     eng.get<(p: unknown[], a: number, c: unknown) => { picks: { stake: number; id: string; w: { pl: Ticket } }[]; sum: number; ev: number; legs: Record<string, number> }>(

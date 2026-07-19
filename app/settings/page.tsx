@@ -11,7 +11,7 @@ import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
 /* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
 function SelectionCalibrationPanel() {
   const cal = useCalibration();
-  const [mode, setMode] = useState<SelectionMode>("probability");
+  const [mode, setMode] = useState<SelectionMode>("ev_gated");
   const [auto, setAuto] = useState<"on" | "off">("on");
   const [note, setNote] = useState("");
   useEffect(() => setMode(getSelectionMode()), []);
@@ -44,7 +44,10 @@ function SelectionCalibrationPanel() {
   return (
     <Panel title="Pick selection & calibration">
       <Row label="Selection mode (The Sharp's plays + Builder suggestions)">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          <Pill variant={mode === "ev_gated" ? "primary" : "ghost"} onClick={() => flipMode("ev_gated")} className="!px-3 !py-1 text-[11px]">
+            EV-gated (recommended)
+          </Pill>
           <Pill variant={mode === "probability" ? "primary" : "ghost"} onClick={() => flipMode("probability")} className="!px-3 !py-1 text-[11px]">
             True probability
           </Pill>
@@ -65,7 +68,10 @@ function SelectionCalibrationPanel() {
       </Row>
       {note && <div className="pt-1 text-[11.5px] text-pos">{note}</div>}
       <div className="pt-2 text-[11px] leading-relaxed text-faint">
-        <b className="text-muted">True probability</b> (default): picks are chosen by the engine&apos;s blended true %
+        <b className="text-muted">EV-gated</b> (default): core-card tickets must clear breakeven EV at the Caesars
+        price — a day with no qualifying ticket is a NO-PLAY day with $0 recommended, and staking anyway takes an
+        explicit override that the ledger tracks separately. Zero edge, zero stake.{" "}
+        <b className="text-muted">True probability</b>: picks are chosen by the engine&apos;s blended true %
         anchored to the full multi-book consensus — Caesars only prices and sizes what was already chosen, and picks
         it doesn&apos;t offer are listed separately, never substituted. <b className="text-muted">Caesars EV</b> is the
         legacy ranking by playable edge at CZ. Auto-calibration lets the nightly grader shrink a market&apos;s model

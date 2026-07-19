@@ -54,10 +54,11 @@ export default function SharpPage() {
     try { localStorage.setItem("pl_sharp_sport", s); } catch {}
   };
 
-  // selection_mode (calibration spec Update 1): probability (default) ranks
+  // selection_mode: ev_gated (upgrade-01 default) and probability both rank
   // today's plays by the engine's true % — Caesars' price never changes WHICH
-  // picks are chosen, it only prices them. caesars_ev is the legacy ranking.
-  const [selMode, setSelModeState] = useState<"probability" | "caesars_ev">("probability");
+  // picks are chosen, it only prices them (the EV gate lives in the Builder's
+  // allocator, where stakes are). caesars_ev is the legacy ranking.
+  const [selMode, setSelModeState] = useState<"ev_gated" | "probability" | "caesars_ev">("ev_gated");
   useEffect(() => setSelModeState(getSelectionMode()), []);
   const cal = useCalibration();
 
@@ -154,7 +155,7 @@ export default function SharpPage() {
 
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-              {selMode === "probability"
+              {selMode !== "caesars_ev"
                 ? "Today's plays — highest true probability (consensus-anchored; Caesars prices the ticket, never picks it)"
                 : "Today's plays — best playable EV at Caesars"}
             </h2>
@@ -223,7 +224,7 @@ export default function SharpPage() {
             {plays.length === 0 && (
               <Panel>
                 <EmptyState
-                  title={selMode === "probability" ? "No playable picks right now" : "No positive-EV plays at Caesars right now"}
+                  title={selMode !== "caesars_ev" ? "No playable picks right now" : "No positive-EV plays at Caesars right now"}
                   body="The engine found nothing playable on this slate — that's a real answer, not a failure. Passing is a position."
                 />
               </Panel>

@@ -1067,6 +1067,10 @@ var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),t
   fun:(function(){var b=Number(LS.get("pl_fun",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})()};
 /* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
 var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSlateEV:0,
+  /* sizing discipline (upgrade 01): zero edge = zero stake. coreEvMin is the Caesars-EV
+     floor (percent, same units as czEv) a ticket must clear under the ev_gated default;
+     dailyBankrollCap bounds any day's core allocation to a fraction of bankroll. */
+  coreEvMin:0,dailyBankrollCap:0.10,
   /* user rules 2026-07-17: the card must always spread — at least 4 tickets whenever the
      pool allows, and no single ticket over 25% of the daily ($100 of $250 on one 3-leg
      K's parlay was the complaint). K's parlays went 0-for-4 as lead tickets, so they are
@@ -2329,27 +2333,32 @@ function shCoreEligible(w,cfg){
   if(cfg.coreMaxDec&&pl.czDec!=null&&pl.czDec>cfg.coreMaxDec)return false;
   return true;
 }
-function shAllocate(pool,amount,cfg){
+function shAllocate(pool,amount,cfg,force){
   amount=Math.max(0,Math.round(Number(amount)||0));
   if(!pool.length||amount<=0)return {picks:[],sum:0,ev:null};
   /* stake weight = ¼-Kelly-proportional fraction: edge ÷ odds. Kelly is what maximizes
      bankroll growth — it naturally starves long odds (huge denominator) and feeds
      high-floor edges, instead of chasing compounded parlay "EV". */
-  /* selection_mode (calibration spec Update 1): "probability" (default) selects and
-     weights tickets by the engine's true probability — the Caesars price only prices
-     and sizes what was already chosen. "caesars_ev" is the legacy ¼-Kelly-at-CZ
-     ranking, kept selectable in Settings. */
-  var probMode=(cfg.selMode||"probability")==="probability";
+  /* selection_mode: "ev_gated" (default, upgrade 01) admits only tickets whose Caesars
+     EV clears cfg.coreEvMin — zero qualifiers means NO-PLAY, a first-class result, and
+     stakes only flow after an explicit override (force=true, stamped on the ledger).
+     "probability" selects/weights by true probability alone (calibration Update 1);
+     "caesars_ev" is the legacy ¼-Kelly-at-CZ ranking. Both stay selectable in Settings. */
+  var mode=cfg.selMode||"ev_gated";
+  var evGated=mode==="ev_gated"&&!force;
+  var probMode=mode==="probability"||mode==="ev_gated";
+  var evMin=(cfg.coreEvMin!=null)?cfg.coreEvMin:0;
   var scored=[];
   pool.forEach(function(w,i){
     if(!shCoreEligible(w,cfg))return;
+    if(evGated&&!(w.pl.czEv!=null&&w.pl.czEv>=evMin))return;
     var ev=((w.pl.czEv!=null?w.pl.czEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
     var dec=w.pl.czDec||2;
     scored.push({w:w,i:i,ev:ev,prob:prob,base:probMode?prob:((dec>1)?Math.max(ev,0)/(dec-1):0)});
   });
-  if(!scored.length)return {picks:[],sum:0,ev:null};
-  /* negative-EV slate: still allocate the full amount (spec) weighted by hit floor — the
-     thin-slate banner discloses it; never block, never hide */
+  if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated};
+  /* negative-EV slate under the LEGACY modes: still allocate the full amount weighted by
+     hit floor — disclosed by the banner. Under ev_gated the empty pool above IS the answer. */
   if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
   /* greedy selection. HARD RULE (user): no pick may appear on two card tickets — one prop
      going wrong must never sink multiple tickets, and a repeated leg adds hidden leverage,
@@ -2434,7 +2443,7 @@ function shAllocate(pool,amount,cfg){
   var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
     s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
     out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
-  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet};
+  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,overrode:!!(force&&mode==="ev_gated")};
 }
 /* one stakeable ticket card (core or FUN) */
 function shCardTicket(w,stake,extra){
@@ -2583,13 +2592,35 @@ function shLedgerSave(entry){
   return shLedgerFind(entry.date);
 }
 /* the day's would-be card (pure recompute from the persisted board + amounts) */
+/* ¼-Kelly stake fraction for one ticket at its Caesars price: 0.25·f*, capped at 2% of
+   bankroll, floored at 0 (a −EV ticket's Kelly is "don't bet", never negative). */
+function shKellyFrac(pl){
+  if(pl==null||pl.czDec==null||pl.prob==null)return null;
+  var k=shKelly(Number(pl.prob)/100,pl.czDec);
+  return Math.max(0,Math.min(0.25*k,0.02));
+}
+/* upgrade 01 override: an ev_gated NO-PLAY day only stakes after this explicit, dated
+   opt-in — the lock flow never defaults into it, and the ledger entry is stamped. */
+function shSetOverride(on){LS.set("pl_override",on?shToday():"");}
+function shOverrideOn(){return LS.get("pl_override","")===shToday();}
 function shCardCalc(d){
   if(!d||d.picks)return null;
   var pool=shCardPool(d);
-  var alloc=shAllocate(pool,SH.daily,SH_CFG);
+  /* recommended vs mandated: stakes allocate against min(entered DAILY, cap×bankroll) —
+     the entered amount is a ceiling, never a mandate the allocator must push out */
+  var cap=Math.max(1,Math.round((SH_CFG.dailyBankrollCap||0.10)*SH.bankroll));
+  var amt=Math.min(SH.daily,cap);
+  var alloc=shAllocate(pool,amt,SH_CFG,shOverrideOn());
+  var kellySum=0;
+  alloc.picks.forEach(function(p){
+    var f=shKellyFrac(p.w.pl);
+    p.kelly=(f!=null)?Math.round(SH.bankroll*f):null;
+    if(f!=null)kellySum+=f;
+  });
+  var kellyDaily=Math.min(Math.round(SH.bankroll*kellySum),cap);
   var ids={};alloc.picks.forEach(function(p){ids[p.id]=1;});
   var fun=shFunPick(pool,SH.fun,SH_CFG,ids,alloc.legs);
-  return {pool:pool,alloc:alloc,fun:fun};
+  return {pool:pool,alloc:alloc,fun:fun,kellyDaily:kellyDaily,dailyCap:cap,enteredDaily:SH.daily,overrode:!!alloc.overrode};
 }
 /* freeze rule: once any card leg's game has thrown a first pitch, amounts are immutable */
 function shCardStarted(d,cc){
@@ -2618,6 +2649,7 @@ function shLockCard(){
       confirmed:null,
       legs:pl.legs.map(function(l){return {label:l.label,prop:l.prop,cz:l.cz,game:l.game,gkey:l.gkey||null,lkey:l.lkey||null,est:l.est};})};}
   var entry={date:shToday(),lockedAt:Date.now(),locked:true,lateLock:late,
+    overrode:!!cc.overrode, /* upgrade 01: forced allocation on a NO-PLAY day — file 03 reports its realized P/L separately */
     daily:SH.daily,fun:SH.fun,bankroll:SH.bankroll,cardEv:cc.alloc.ev,
     core:cc.alloc.picks.map(function(p){return tkt(p,"core",p.w.pl.tier);}),
     funT:cc.fun.picks.map(function(p){return tkt(p,"fun",SH_CFG.funTierNames[p.tier]||"LONGSHOT");}),
