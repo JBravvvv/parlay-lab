@@ -94,6 +94,14 @@ function TicketCard({ t, stake, kelly, grade }: { t: Ticket & { tier?: string };
           <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
             {fmtMoney(stake)}
           </span>
+          {t.simJoint && t.probNaive != null && Number(t.probNaive) !== Number(t.prob) && (
+            <span
+              className="num rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10.5px] font-bold text-pos"
+              title="Same-game legs priced from joint sim paths, not multiplied marginals"
+            >
+              naive {String(t.probNaive)}% → joint {String(t.prob)}%
+            </span>
+          )}
           {kellyGap && (
             <span
               className="num rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"

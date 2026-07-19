@@ -75,6 +75,9 @@ export interface Ticket {
   type?: string;
   odds?: number;
   prob?: number;
+  /* upgrade 02: same-game groups priced from joint sim paths (armed only) */
+  simJoint?: boolean;
+  probNaive?: number | null;
   ev?: number | null;
   czOdds?: number | null;
   czDec?: number | null;

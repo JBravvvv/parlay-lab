@@ -130,9 +130,26 @@ export function ParlaysSection({ parlays, mixed, live }: { parlays: Ticket[]; mi
                           CORRELATED
                         </span>
                       )}
+                      {t.simJoint && (
+                        <span
+                          className="rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[9.5px] font-bold text-pos"
+                          title="Same-game legs priced from the sim's joint paths — how often these legs actually hit TOGETHER — instead of multiplying each leg's probability as if they were independent"
+                        >
+                          SIM-JOINT
+                        </span>
+                      )}
                     </div>
                     <div className="num mt-2.5 flex flex-wrap items-center gap-3 text-[11.5px]">
-                      <span className="text-text">{String(t.prob)}% combined</span>
+                      <span className="text-text">
+                        {t.simJoint && t.probNaive != null && Number(t.probNaive) !== Number(t.prob) ? (
+                          <>
+                            <span className="text-faint line-through">naive {String(t.probNaive)}%</span>{" "}
+                            → joint {String(t.prob)}%
+                          </>
+                        ) : (
+                          <>{String(t.prob)}% combined</>
+                        )}
+                      </span>
                       {t.czEv != null && <EvBadge ev={Number(t.czEv)} />}
                       {e.stake != null && (
                         <span className="text-muted">${e.stake} → <b className="text-text">${toWin}</b></span>

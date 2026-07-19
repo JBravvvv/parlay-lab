@@ -1566,6 +1566,9 @@ function shSimGames(ctx,nSims,seed){
   /* v2 sim block (ctx.v2 set only when SH_V2.sim is armed): TTO + manager hook
      inside halfInning, plus totals / first-5 / team-total counters here. */
   var V2=ctx.v2||null;
+  /* upgrade 02 (armed only): per-leg hit bitsets across every sim — the raw joint paths
+     that price same-game parlays. The dormant path allocates and computes nothing. */
+  var bits=null;if(V2){bits=[];for(var b0=0;b0<L;b0++)bits.push(new Uint32Array((nSims+31)>>>5));}
   var cTotO=0,cF5H=0,cF5A=0,cF5T=0,cF5o45=0,cF5o55=0,cTTh35=0,cTTh45=0,cTTa35=0,cTTa45=0,sumF5=0;
   var NB=9;
   var bh=new Int32Array(NB),bt=new Int32Array(NB),bhr=new Int32Array(NB),br=new Int32Array(NB),brbi=new Int32Array(NB);
@@ -1619,7 +1622,7 @@ function shSimGames(ctx,nSims,seed){
                 (hArr?bh:ah)[bi]+(hArr?br:ar)[bi]+(hArr?brbi:arbi)[bi]; /* hrr */
         v=val>=Math.floor(lg.ln)+1;
       }
-      if(v){legHit[li]++;t.push(li);}
+      if(v){legHit[li]++;t.push(li);if(bits)bits[li][s>>>5]|=(1<<(s&31));}
     }
     for(var x=0;x<t.length;x++)for(var y=x+1;y<t.length;y++)pair[t[x]*L+t[y]]++;
   }
@@ -1694,6 +1697,22 @@ function shSimGames(ctx,nSims,seed){
   out.corr=function(kA,kB){var a=out.legP[kA],b=out.legP[kB],j=out.jointP(kA,kB);
     if(a==null||b==null||j==null)return null;var d=Math.sqrt(a*(1-a)*b*(1-b));if(!(d>0))return null;
     return (j-a*b)/d;};
+  /* upgrade 02 (armed only): fraction of sims where EVERY listed leg hit — the true
+     joint probability of a same-game combination, straight from the paths. Any key
+     the sim didn't grade returns null (caller falls back to marginals). */
+  if(bits)out.jointAll=function(keys){
+    var idx=[];for(var i2=0;i2<keys.length;i2++){var ix=out.legIdx[keys[i2]];if(ix==null)return null;idx.push(ix);}
+    if(!idx.length)return null;
+    if(idx.length===1)return legHit[idx[0]]/nSims;
+    var words=(nSims+31)>>>5,hits=0;
+    for(var w2=0;w2<words;w2++){
+      var m=bits[idx[0]][w2];
+      for(var j2=1;j2<idx.length;j2++)m&=bits[idx[j2]][w2];
+      m=m-((m>>>1)&0x55555555);m=(m&0x33333333)+((m>>>2)&0x33333333);
+      hits+=(((m+(m>>>4))&0x0F0F0F0F)*0x01010101)>>>24;
+    }
+    return hits/nSims;
+  };
   return out;
 }
 
@@ -1825,10 +1844,14 @@ function shAnalyzeLocal(slate){
           legs.push({key:shLegKey(row.p,mkt,row.ln),team:team,bat:bi,stat:stat,ln:row.ln});
         });});}
       var seed=shHash32(slate.date+"|"+g.away+"@"+g.home+(g.gnum?("#"+g.gnum):""));
+      /* upgrade 02: games carrying sub-5% legs (HR props) get SH_V2.simNHR paths —
+         joint tail frequencies need the extra resolution; everything else keeps simN */
+      var simN=shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N;
+      if(shV2Sim()&&(SH_V2.simNHR|0)&&legs.some(function(l){return l.stat==="hr";}))simN=(SH_V2.simNHR|0);
       SIMS[gkey]=shSimGames({away:{bat:awayBat},home:{bat:homeBat},
         awayLeash:leashOf(g.probable_away),homeLeash:leashOf(g.probable_home),legs:legs,
         v2:shV2Sim()?{total:(go&&go.total!=null)?go.total:null}:null},
-        shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N,seed);
+        simN,seed);
       SIMS[gkey].gkey=gkey;
     });
   })();
@@ -2145,6 +2168,27 @@ function shAnalyzeLocal(slate){
       var legs=sel.map(legOf);
       var dec=legs.reduce(function(a,l){var d=amToDec(l.odds);return d?a*d:a;},1);
       var prob=legs.reduce(function(a,l){return a*(Number(l.prob)/100);},1);
+      /* upgrade 02 (armed only): same-game groups priced from joint sim paths instead of
+         multiplied marginals. The marginals stay the blended, market-anchored numbers —
+         the sim contributes only the DEPENDENCE it alone can see: each same-game group's
+         product is scaled by (joint sim frequency ÷ product of the sim's own marginals),
+         clamped 0.25–4×. Cross-game independence stands; groups the sim didn't fully
+         grade fall back to the naive product. */
+      var probNaive=prob,simJoint=false;
+      if(shV2Sim()){
+        var byG={};legs.forEach(function(l){if(l.gkey&&l.lkey)(byG[l.gkey]=byG[l.gkey]||[]).push(l);});
+        var pJ=prob;
+        Object.keys(byG).forEach(function(gk2){
+          var grp=byG[gk2];if(grp.length<2)return;
+          var sm2=SIMS[gk2];if(!(sm2&&sm2.jointAll))return;
+          var j2=sm2.jointAll(grp.map(function(l){return l.lkey;}));if(j2==null)return;
+          var pm=1,ok=true;grp.forEach(function(l){var mp=sm2.legP[l.lkey];if(!(mp>0))ok=false;pm*=mp;});
+          if(!ok)return;
+          pJ*=Math.max(0.25,Math.min(4,j2/pm));
+          simJoint=true;
+        });
+        if(simJoint)prob=Math.max(0,Math.min(1,pJ));
+      }
       var gs={},sg=false;legs.forEach(function(l){if(gs[l.game])sg=true;gs[l.game]=1;});
       /* same-game correlation measured from the sims (doc Phase 5): joint outcomes, not a guess */
       var posCorr=false,negCorr=false;
@@ -2171,6 +2215,7 @@ function shAnalyzeLocal(slate){
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
       var am=decToAm(dec);
       return {name:name,type:type,typeLabel:(type==="MIX"?"Mixed":SH_TYPE_NAME[type]),tier:tier,legs:legs,
+        simJoint:simJoint,probNaive:simJoint?Math.round(probNaive*1000)/10:null,
         odds:(am!=null?obSign(am):"—"),prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
         czOdds:(czOddsT!=null?obSign(czOddsT):null),czDec:czAll?Math.round(czDec*10000)/10000:null,
         czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,

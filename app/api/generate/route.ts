@@ -105,6 +105,7 @@ export async function GET(req: NextRequest) {
       regions: "us,eu",
       sim: true,
       simN: 10000,
+      simNHR: 20000,
       projLineup: true,
       calW: auto === "off" ? null : weights?.mults ?? null,
     });
