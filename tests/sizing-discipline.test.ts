@@ -84,10 +84,12 @@ describe("ev_gated selection (spec tests 1-2)", () => {
       tik("Pos1", 2.4, 8, 45, "g1", "g2"),
       tik("Neg1", 2.6, -6, 40, "g3", "g4"),
       tik("Pos2", 2.8, 3, 38, "g5", "g6"),
-      tik("Zero", 2.5, 0, 42, "g7", "g8"), // exactly breakeven clears the default floor of 0
+      tik("Zero", 2.5, 0, 42, "g7", "g8"), // breakeven no longer clears: the floor is +2%
       tik("Neg2", 2.7, -4, 39, "g9", "g10"),
+      tik("AtGate", 2.5, 2, 43, "g13", "g14"), // exactly +2% clears — the gate is inclusive
       tik("Pos3", 3.1, 5, 34, "g11", "g12"),
     ];
+    expect((CFG() as { coreEvMin?: number }).coreEvMin).toBe(2); // percent units, same as czEv/bsEv — 2 means +2%
     const a = allocate(mixed, 100, CFG());
     // this pool's edges are modest, so the 4x-quarter-Kelly ceilings bind: the allocator
     // fills to the ceilings and reports the rest unallocated instead of forcing exact-sum
@@ -97,7 +99,7 @@ describe("ev_gated selection (spec tests 1-2)", () => {
     expect(a.sum + (a as { unallocated?: number }).unallocated!).toBe(100);
     for (const p of a.picks) expect(p.stake).toBeLessThanOrEqual(Math.round(4 * 750 * kf(p.w.pl)));
     const names = a.picks.map((p) => p.w.pl.name.split(" ")[0]);
-    expect(names.sort()).toEqual(["Pos1", "Pos2", "Pos3", "Zero"]);
+    expect(names.sort()).toEqual(["AtGate", "Pos1", "Pos2", "Pos3"]);
     // a ticket Caesars can't price (czEv null) never clears the gate
     const withNull = [...mixed, { ...tik("NoCz", 2.5, 0, 50, "g13", "g14"), pl: { ...tik("NoCz", 2.5, 0, 50, "g13", "g14").pl, czEv: null } }];
     const b = allocate(withNull, 100, CFG());
@@ -142,14 +144,17 @@ describe("per-ticket Kelly ceiling (kellyStakeMult, default 4)", () => {
       tik("T3", 2.6, 1.0, 39.5, "g5", "g6"),
       tik("T4", 2.5, 0.8, 40.6, "g7", "g8"),
     ];
-    const a = allocate(thin, 100, CFG());
+    // subject here is the CEILINGS, not the gate — pin the floor at breakeven so the
+    // marginal-edge fixture still enters the pool under the +2% default
+    const cfg = { ...CFG(), coreEvMin: 0 };
+    const a = allocate(thin, 100, cfg);
     expect(a.sum).toBeLessThan(100);
     expect(a.sum + (a as { unallocated?: number }).unallocated!).toBe(100);
     for (const p of a.picks) {
       expect(p.stake).toBeLessThanOrEqual(ceilOf(p.w.pl));
     }
     // determinism holds with ceilings in play
-    const b = allocate(thin, 100, CFG());
+    const b = allocate(thin, 100, cfg);
     expect(b.picks.map((p) => p.stake)).toEqual(a.picks.map((p) => p.stake));
   });
 
@@ -166,7 +171,8 @@ describe("per-ticket Kelly ceiling (kellyStakeMult, default 4)", () => {
 
   it("card-EV units: with a single ticket, alloc.ev × 100 equals that ticket's czEv", () => {
     const one = [tik("Solo", 2.6, 1.4, 42, "g1", "g2")];
-    const a = allocate(one, 20, CFG());
+    // units pin, not a gate test: floor at breakeven so the 1.4% ticket allocates
+    const a = allocate(one, 20, { ...CFG(), coreEvMin: 0 });
     expect(a.picks).toHaveLength(1);
     // the engine returns ev as a FRACTION — the UI multiplies by 100; a 1.4% ticket
     // must read +1.4% in the header, never +0.0%

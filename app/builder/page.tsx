@@ -239,6 +239,16 @@ export default function BuilderPage() {
   // dk_fd: mounted-gated localStorage read (hydration rule)
   const [basisMode, setBasisMode] = useState(false);
   useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
+  // active EV gate + sizing-guide config, straight from the engine (mounted only)
+  const [gatePct, setGatePct] = useState<number | null>(null);
+  const [kellyGuide, setKellyGuide] = useState(false);
+  useEffect(() => {
+    const mode = getSelectionMode();
+    const cfg = getEngine().get<{ coreEvMin?: number; dailyKellyGuide?: boolean }>("SH_CFG");
+    // the gate only exists on the disciplined paths (dk_fd / ev_gated)
+    setGatePct(mode === "dk_fd" || mode === "ev_gated" ? (cfg?.coreEvMin ?? 0) : null);
+    setKellyGuide(cfg?.dailyKellyGuide !== false);
+  }, []);
 
   const eng = typeof window !== "undefined" ? getEngine() : null;
   const d = board?.data;
@@ -655,8 +665,23 @@ export default function BuilderPage() {
                     {/* engine ev is a fraction; EvBadge (like ticket czEv) speaks percent */}
                     card EV <EvBadge ev={(card.alloc.ev ?? 0) * 100} />
                   </span>
+                  {gatePct != null && (
+                    <span
+                      title={`Core tickets must clear +${gatePct}% EV at the selection price (${basisMode ? "DK/FD basis" : "Caesars"}) — below the gate is a NO-PLAY, not a smaller bet`}
+                    >
+                      gate: <b className="text-text">+{gatePct}% EV min</b>
+                    </span>
+                  )}
                 </span>
               </div>
+              {/* dailyKellyGuide — advisory only, never blocks: oversizing is the one leak
+                  discipline can't cap, so it gets named while the record is still young */}
+              {kellyGuide && card.kellyDaily > 0 && card.enteredDaily > 5 * card.kellyDaily && (
+                <div className="num mb-2 text-[11px] text-gold">
+                  Entered {fmtMoney(card.enteredDaily)} is {(card.enteredDaily / card.kellyDaily).toFixed(1)}x the
+                  Kelly-consistent {fmtMoney(card.kellyDaily)} — consider sizing down until CLV turns positive.
+                </div>
+              )}
               {card.enteredDaily > card.dailyCap && (
                 <div className="mb-2 text-[11px] text-gold">
                   Daily capped at 10% of bankroll: allocating {fmtMoney(card.dailyCap)} of the {fmtMoney(card.enteredDaily)} entered.

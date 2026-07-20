@@ -1067,10 +1067,15 @@ var SH={key:LS.get("pl_claudekey",""),busy:false,board:LS.get("pl_sharp",null),t
   fun:(function(){var b=Number(LS.get("pl_fun",0));return (isFinite(b)&&b>=0)?Math.round(b):0;})()};
 /* build 40: card/ledger layer config — thresholds live here, not in code (doc guardrail) */
 var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSlateEV:0,
-  /* sizing discipline (upgrade 01): zero edge = zero stake. coreEvMin is the Caesars-EV
-     floor (percent, same units as czEv) a ticket must clear under the ev_gated default;
+  /* sizing discipline (upgrade 01): zero edge = zero stake. coreEvMin is the EV floor
+     a core ticket must clear at the SELECTION price (basis in dk_fd, CZ in ev_gated).
+     UNITS: percent, same as czEv/bsEv — 2 means +2% EV (the user request "0.02" is the
+     fraction convention; 0.02 here would gate at +0.02% and silently mean breakeven).
      dailyBankrollCap bounds any day's core allocation to a fraction of bankroll. */
-  coreEvMin:0,dailyBankrollCap:0.10,
+  coreEvMin:2,dailyBankrollCap:0.10,
+  /* advisory only, never blocks: when the entered DAILY exceeds 5× the Kelly-consistent
+     figure, the Builder shows an amber sizing note (dailyKellyGuide:false hides it) */
+  dailyKellyGuide:true,
   /* per-ticket Kelly ceiling (disciplined path): no ticket's stake may exceed
      kellyStakeMult × its ¼-Kelly stake — the entered DAILY is a ceiling the pool
      must EARN, and money it can't absorb at disciplined sizing stays unallocated. */
