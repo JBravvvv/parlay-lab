@@ -351,6 +351,22 @@ guess) and the skip count disclosed. Stale guard: the Builder warns when basis
 quotes are >20 min old. `caesars_ev`, `ev_gated` (@CZ), and `probability` stay in
 Settings; existing explicit choices are honored, dk_fd is the fallback default.
 
+## Board + Sharp at the basis (2026-07-20)
+All three selection surfaces now present the SAME numbers in dk_fd. Engine rows gain
+`bsKellyF` (¼-Kelly at the basis price, 2% cap) + `bsBadge` (edge badge at basis EV)
+mirroring the cz layer — additive fields, parity digest is field-selective so the
+baseline is untouched; the engine overview copy is mode-aware. Board (dk_fd): TOP 50
+re-ranks by EV @ basis (the legacy "all" ranking is EV-at-best-price, a price dk_fd
+forbids); Basis column with DK/FD tag; CZ column labeled "(settles)"; EV/Kelly/row
+glow at the basis; no-basis rows flagged `NO DK/FD BASIS`, visible, never promoted.
+The Sharp (dk_fd): plays replicate the allocator's discipline — basis + CZ quotes
+both required, `coreEvMin` gate at the basis (read live from SH_CFG), ranked by
+basis EV; gate-clearing picks with no CZ quote are disclosed with their basis price,
+never substituted. SharpDesk v2 (`sharpBoard.ts`): DK/FD captured for ML + totals at
+the consensus point, `basisPick` (better payout, tie → DK) shared rule, EV judged at
+the basis in dk_fd with CZ kept gold as settlement. Tests: `basis-surfaces.test.ts`
+(row Kelly/badge honesty, Sharp-selection replica invariants, basisPick pair rules).
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
