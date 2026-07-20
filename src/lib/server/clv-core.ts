@@ -139,22 +139,39 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
   let dkU: number | null = null;
   let fdO: number | null = null;
   let fdU: number | null = null;
+  let dkAltO: number | null = null;
+  let dkAltU: number | null = null;
+  let fdAltO: number | null = null;
+  let fdAltU: number | null = null;
   for (const bk of ev.bookmakers ?? []) {
     for (const mk of bk.markets ?? []) {
       const alt = mk.key === `${market}_alternate`;
       if (mk.key !== market && !alt) continue;
-      if (alt && bk.key !== CAESARS_KEY) continue; // ladders only ever fill the Caesars price
+      // ladders fill the Caesars price and (mirroring the engine's basis capture)
+      // the DK/FD basis for markets those books quote only as milestones ("1+ HR")
+      if (alt && bk.key !== CAESARS_KEY && bk.key !== DK && bk.key !== FD) continue;
       let o: number | null = null;
       let u: number | null = null;
       for (const x of mk.outcomes ?? []) {
         if (pnorm(x.description ?? x.name ?? "") !== player) continue;
-        if ((x.point ?? null) !== ln) continue;
+        // integer milestone points normalize to the standard half-line (1+ → 0.5)
+        const pt0 = x.point ?? null;
+        const ptN = alt && pt0 != null && pt0 % 1 === 0 && pt0 >= 1 ? pt0 - 0.5 : pt0;
+        if (ptN !== ln) continue;
         if ((x.name ?? "").toLowerCase().includes("over") || x.name === "Yes") o = x.price ?? null;
         else u = x.price ?? null;
       }
       if (alt) {
-        if (o != null) czAltOver = o;
-        if (u != null) czAltUnder = u;
+        if (bk.key === CAESARS_KEY) {
+          if (o != null) czAltOver = o;
+          if (u != null) czAltUnder = u;
+        } else if (bk.key === DK) {
+          if (o != null) dkAltO = o;
+          if (u != null) dkAltU = u;
+        } else {
+          if (o != null) fdAltO = o;
+          if (u != null) fdAltU = u;
+        }
         continue;
       }
       const f = devigPair(o != null ? impliedProb(o) : null, u != null ? impliedProb(u) : null);
@@ -176,7 +193,8 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
   const am = under ? (czUnder ?? czAltUnder) : (czOver ?? czAltOver);
   if (am == null) return null;
   const fairOver = fairs.length >= 2 ? median(fairs) : null;
-  const bs = under ? basisOf(dkU, fdU) : basisOf(dkO, fdO);
+  // standard-market quote wins per book; milestone ladder fills in (same bet)
+  const bs = under ? basisOf(dkU ?? dkAltU, fdU ?? fdAltU) : basisOf(dkO ?? dkAltO, fdO ?? fdAltO);
   return {
     am,
     at,

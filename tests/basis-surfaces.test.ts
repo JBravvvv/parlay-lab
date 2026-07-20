@@ -119,6 +119,66 @@ describe("The Sharp's dk_fd play selection (page logic, replicated)", () => {
   });
 });
 
+describe("HR parlays in dk_fd: '1+ HR' milestone IS Over 0.5", () => {
+  /* Reproduces the live gap: DK/FD list home runs only as the milestone ladder
+     ("1+ HR"), not the standard O/U market — so HR rows had no basis and dk_fd's
+     parlay builder (basis-priced universe only) generated ZERO HR parlays. The
+     fix maps integer milestone points to the standard half-line (1 → 0.5) and
+     lets DK/FD alternates fill the basis (standard quote still wins per book). */
+  function dkAltFetch(url: string) {
+    return fixtureFetchJson(url).then((r) => {
+      if (!/\/events\/[a-f0-9]+\/odds/.test(url)) return r;
+      const body = JSON.parse(JSON.stringify(r.body)) as {
+        bookmakers?: { key: string; markets: { key: string; outcomes: { name: string; description?: string; point?: number; price: number }[] }[] }[];
+      };
+      const wh = body.bookmakers?.find((b) => b.key === "williamhill_us");
+      const hr = wh?.markets.find((m) => m.key === "batter_home_runs");
+      if (!hr) return { ok: r.ok, body };
+      body.bookmakers!.push({
+        key: "draftkings",
+        markets: [
+          {
+            key: "batter_home_runs_alternate",
+            // "1+ HR" milestone: integer point, over-side only, slightly better price
+            outcomes: hr.outcomes
+              .filter((o) => o.name === "Over" && o.point === 0.5)
+              .map((o) => ({ name: "Over", description: o.description, point: 1, price: o.price + 10 })),
+          },
+        ],
+      });
+      return { ok: r.ok, body };
+    });
+  }
+
+  it("HR rows gain a DK basis from the milestone ladder and HR parlays generate (longshot tickets included)", async () => {
+    const eng = createEngine({ fetchJson: dkAltFetch, today: TODAY, storage: memoryStorage() });
+    eng.get<Record<string, unknown>>("SH_CFG").selMode = "dk_fd";
+    const board = eng.analyze(await eng.collectSlate()) as BoardData;
+
+    const hrRows = board.categories.batter_home_runs ?? [];
+    const withBasis = hrRows.filter((r) => r.bs != null);
+    expect(withBasis.length).toBeGreaterThan(0);
+    for (const r of withBasis) expect(r.bsBook).toBe("DK");
+
+    const hrParlays = board.parlays.filter((t) => t.type === "batter_home_runs");
+    expect(hrParlays.length).toBeGreaterThan(0);
+    // every generated HR ticket is basis-priced (selection rule) and HR-pure (isolation rule)
+    for (const t of hrParlays) {
+      expect(t.bsDec).not.toBeNull();
+      for (const l of t.legs) expect(l.bs).not.toBeNull();
+    }
+    // the point of the exercise: HR tickets reach the LONGSHOT tier
+    expect(hrParlays.some((t) => (t as { tier?: string }).tier === "LONGSHOT")).toBe(true);
+  });
+
+  it("without a DK/FD quote in any form, dk_fd still generates no HR parlays (never fabricated)", async () => {
+    const eng = createEngine({ fetchJson: fixtureFetchJson, today: TODAY, storage: memoryStorage() });
+    eng.get<Record<string, unknown>>("SH_CFG").selMode = "dk_fd";
+    const board = eng.analyze(await eng.collectSlate()) as BoardData;
+    expect(board.parlays.filter((t) => t.type === "batter_home_runs").length).toBe(0);
+  });
+});
+
 describe("sharp desk basisPick (DK/FD pair shop)", () => {
   it("better payout wins the pair", () => {
     expect(basisPick(-115, -105)).toEqual({ am: -105, bk: "FD" });

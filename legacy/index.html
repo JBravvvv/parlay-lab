@@ -1100,7 +1100,7 @@ var SH_PROP_MARKETS="batter_hits,batter_total_bases,batter_home_runs,batter_hits
    exposes under the *_alternate market keys (Over 0.5/1.5/... only). Verified live: Caesars
    absent from batter_hits/pitcher_strikeouts but present in both alternates. These feed ONLY
    the Caesars playable price on existing rows — never consensus, line shopping, or new rows. */
-var SH_PROP_ALT="batter_hits_alternate,pitcher_strikeouts_alternate";
+var SH_PROP_ALT="batter_hits_alternate,pitcher_strikeouts_alternate,batter_home_runs_alternate";
 var SH_SCHEMA={type:"object",additionalProperties:false,required:["overview","picks","parlays","trap"],properties:{
   overview:{type:"string"},
   picks:{type:"array",items:{type:"object",additionalProperties:false,
@@ -1284,20 +1284,33 @@ function shCollectSlate(){
           var bks=(pr.body&&pr.body.bookmakers)||[];if(!bks.length)return;
           /* market layer: merge EVERY book per player|line — per-book de-vig of each O/U pair,
              consensus fair P(over) = median across books, prices kept = best per side (line shopping). */
-          var acc={},bookNames={},altCz={};
+          var acc={},bookNames={},altCz={},altBs={};
           bks.forEach(function(bk){var bn=bk.title||bk.key,czb=bk.key===CAESARS_KEY;bookNames[bn]=1;
+            var bsb=(bk.key==="draftkings"||bk.key==="fanduel");
             (bk.markets||[]).forEach(function(mk){
-              /* *_alternate markets = Caesars' milestone ladders ("1+ hits" = Over 0.5).
-                 They ONLY fill the Caesars playable price on rows the consensus books
-                 already created — never fairs, never line shopping, never new rows. */
+              /* *_alternate markets = milestone ladders ("1+ hits" = Over 0.5).
+                 They ONLY fill playable/basis prices on rows the consensus books
+                 already created — never fairs, never line shopping, never new rows.
+                 Caesars fills czAlt (as before); DK/FD fill altBs so the dk_fd basis
+                 exists on markets those books quote only as milestones (notably HR:
+                 "1+ HR" IS Over 0.5 — same bet, milestone label). Integer milestone
+                 points normalize to the standard half-line (1 → 0.5). */
               if(/_alternate$/.test(mk.key)){
-                if(!czb)return;
-                var ab=altCz[mk.key.replace(/_alternate$/,"")]=altCz[mk.key.replace(/_alternate$/,"")]||{};
+                if(!czb&&!bsb)return;
+                var abase=mk.key.replace(/_alternate$/,"");
                 (mk.outcomes||[]).forEach(function(o){
-                  var sd2=(o.name||"").toLowerCase().indexOf("over")>=0?"o":"u";
-                  var kk2=(o.description||o.name)+"|"+(o.point!=null?o.point:"");
-                  if(!ab[kk2])ab[kk2]={o:null,u:null};
-                  ab[kk2][sd2]=o.price;});
+                  var sd2=(o.name||"").toLowerCase().indexOf("over")>=0||o.name==="Yes"?"o":"u";
+                  var pt2=(o.point!=null&&o.point%1===0&&o.point>=1)?o.point-0.5:o.point;
+                  var kk2=(o.description||o.name)+"|"+(pt2!=null?pt2:"");
+                  if(czb){
+                    var ab=altCz[abase]=altCz[abase]||{};
+                    if(!ab[kk2])ab[kk2]={o:null,u:null};
+                    ab[kk2][sd2]=o.price;
+                  }else{
+                    var abb=altBs[abase]=altBs[abase]||{};
+                    if(!abb[kk2])abb[kk2]={draftkings:{o:null,u:null},fanduel:{o:null,u:null}};
+                    abb[kk2][bk.key][sd2]=o.price;
+                  }});
                 return;
               }
               var m=acc[mk.key]=acc[mk.key]||{rows:{},order:[]};
@@ -1318,10 +1331,17 @@ function shCollectSlate(){
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
               var czx=r.list.filter(function(x){return x.cz;})[0];
               var czAlt=(!czx&&altCz[mkey])?altCz[mkey][kk]:null; /* ladder fallback: standard Caesars quote wins */
-              /* DK/FD basis pair for this exact line (additive) */
+              /* DK/FD basis pair for this exact line (additive). Standard-market quote
+                 wins per book; the milestone ladder ("1+" = Over 0.5) fills in when a
+                 book lists the market only as alternates — same bet, same line. */
               var dkx=r.list.filter(function(x){return x.k==="draftkings";})[0],fdx=r.list.filter(function(x){return x.k==="fanduel";})[0];
-              var bso=shBasisPick(dkx&&dkx.o!=null?{am:dkx.o,bk:"DK"}:null,fdx&&fdx.o!=null?{am:fdx.o,bk:"FD"}:null);
-              var bsu=shBasisPick(dkx&&dkx.u!=null?{am:dkx.u,bk:"DK"}:null,fdx&&fdx.u!=null?{am:fdx.u,bk:"FD"}:null);
+              var abk=altBs[mkey]&&altBs[mkey][kk]?altBs[mkey][kk]:null;
+              var dkO=(dkx&&dkx.o!=null)?dkx.o:(abk&&abk.draftkings.o!=null?abk.draftkings.o:null);
+              var dkU=(dkx&&dkx.u!=null)?dkx.u:(abk&&abk.draftkings.u!=null?abk.draftkings.u:null);
+              var fdO=(fdx&&fdx.o!=null)?fdx.o:(abk&&abk.fanduel.o!=null?abk.fanduel.o:null);
+              var fdU=(fdx&&fdx.u!=null)?fdx.u:(abk&&abk.fanduel.u!=null?abk.fanduel.u:null);
+              var bso=shBasisPick(dkO!=null?{am:dkO,bk:"DK"}:null,fdO!=null?{am:fdO,bk:"FD"}:null);
+              var bsu=shBasisPick(dkU!=null?{am:dkU,bk:"DK"}:null,fdU!=null?{am:fdU,bk:"FD"}:null);
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
                 fair:fairs.length?shMedianW(fairs):null,books:fairs.length,
                 cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null),
