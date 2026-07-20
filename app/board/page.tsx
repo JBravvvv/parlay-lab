@@ -18,7 +18,7 @@ import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
-import { getMoney } from "@/lib/engine-client";
+import { getMoney, getSelectionMode } from "@/lib/engine-client";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 
@@ -39,6 +39,11 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
+  // dk_fd: mounted-gated localStorage read (hydration rule) — when on, the board
+  // is priced exactly like the Builder's allocator: EV/Kelly at the DK/FD basis,
+  // Caesars shown as the settlement price only
+  const [basisMode, setBasisMode] = useState(false);
+  useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
   const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
@@ -56,7 +61,18 @@ export default function BoardPage() {
 
   const d = board?.data;
   const cats = (live ? d?.categoriesLive : d?.categories) ?? {};
-  const rows: PickRow[] = useMemo(() => cats[cat] ?? [], [cats, cat]);
+  const rows: PickRow[] = useMemo(() => {
+    const base = cats[cat] ?? [];
+    // dk_fd: the TOP 50 tab re-ranks by EV at the selection basis (the legacy
+    // "all" ranking is EV at the all-books best price — a price dk_fd forbids
+    // from influencing anything). No-basis rows sink to the bottom, flagged.
+    if (basisMode && cat === "all") {
+      return base
+        .slice()
+        .sort((a, b) => (b.bsEv == null ? -99 : Number(b.bsEv)) - (a.bsEv == null ? -99 : Number(a.bsEv)));
+    }
+    return base;
+  }, [cats, cat, basisMode]);
   const playable = useMemo(() => rows.filter((r) => r.cz != null), [rows]);
   const offBook = rows.length - playable.length;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
@@ -81,41 +97,104 @@ export default function BoardPage() {
         sortValue: (r) => Number(r.prob) || 0,
         cell: (r) => <ProbBar p={(Number(r.prob) || 0) / 100} className="w-28 justify-end md:w-36" />,
       },
-      {
-        key: "best",
-        header: "Best",
-        numeric: true,
-        sortValue: (r) => Number(String(r.odds).replace(/[^\d.-]/g, "")) || 0,
-        cell: (r) => (r.odds != null ? <OddsCell odds={r.odds as never} /> : <span className="text-faint">—</span>),
-      },
-      {
-        key: "cz",
-        header: "Caesars",
-        numeric: true,
-        sortValue: (r) => Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
-        cell: (r) => <OddsCell odds={r.czOdds as never} book="caesars" />,
-      },
-      {
-        key: "czEv",
-        header: "EV @ CZR",
-        numeric: true,
-        sortValue: (r) => Number(r.czEv) || 0,
-        cell: (r) => (r.czEv != null ? <EvBadge ev={Number(r.czEv)} /> : <span className="text-faint">—</span>),
-      },
-      {
-        key: "stake",
-        header: "¼-Kelly",
-        numeric: true,
-        sortValue: (r) => Number(r.czKellyF) || 0,
-        cell: (r) =>
-          r.czKellyF != null && Number(r.czKellyF) > 0 ? (
-            <KellyChip stake={Number(r.czKellyF) * bankroll} />
-          ) : (
-            <span className="text-faint">—</span>
-          ),
-      },
+      ...(basisMode
+        ? [
+            // dk_fd: the "Best" (all-books) column is dropped on purpose — that
+            // price is exactly what the basis mode forbids from steering anything
+            {
+              key: "basis",
+              header: "Basis",
+              numeric: true,
+              sortValue: (r) => Number(String(r.bsOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
+              cell: (r) =>
+                r.bsOdds != null ? (
+                  <span className="num inline-flex items-baseline gap-1.5">
+                    <OddsCell odds={r.bsOdds as never} />
+                    <span className="text-[9.5px] uppercase text-muted">{String(r.bsBook ?? "").replace("draftkings", "DK").replace("fanduel", "FD")}</span>
+                  </span>
+                ) : (
+                  <span
+                    className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"
+                    title="No DraftKings or FanDuel quote — card-ineligible under dk_fd (still a real pick; manual slips only)"
+                  >
+                    NO DK/FD BASIS
+                  </span>
+                ),
+            } satisfies Column<PickRow>,
+            {
+              key: "cz",
+              header: "CZ (settles)",
+              numeric: true,
+              sortValue: (r) => Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
+              cell: (r) => <OddsCell odds={r.czOdds as never} book="caesars" />,
+            } satisfies Column<PickRow>,
+            {
+              key: "bsEv",
+              header: "EV @ basis",
+              numeric: true,
+              sortValue: (r) => (r.bsEv == null ? -99 : Number(r.bsEv)),
+              cell: (r) =>
+                r.bsEv != null ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <EvBadge ev={Number(r.bsEv)} />
+                    {r.bsBadge ? (
+                      <span className="rounded-full border border-pos/50 bg-pos/10 px-1.5 py-0.5 text-[9px] font-bold text-pos">EDGE</span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className="text-faint">—</span>
+                ),
+            } satisfies Column<PickRow>,
+            {
+              key: "stake",
+              header: "¼-Kelly",
+              numeric: true,
+              sortValue: (r) => Number(r.bsKellyF) || 0,
+              cell: (r) =>
+                r.bsKellyF != null && Number(r.bsKellyF) > 0 ? (
+                  <KellyChip stake={Number(r.bsKellyF) * bankroll} />
+                ) : (
+                  <span className="text-faint">—</span>
+                ),
+            } satisfies Column<PickRow>,
+          ]
+        : [
+            {
+              key: "best",
+              header: "Best",
+              numeric: true,
+              sortValue: (r) => Number(String(r.odds).replace(/[^\d.-]/g, "")) || 0,
+              cell: (r) => (r.odds != null ? <OddsCell odds={r.odds as never} /> : <span className="text-faint">—</span>),
+            } satisfies Column<PickRow>,
+            {
+              key: "cz",
+              header: "Caesars",
+              numeric: true,
+              sortValue: (r) => Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
+              cell: (r) => <OddsCell odds={r.czOdds as never} book="caesars" />,
+            } satisfies Column<PickRow>,
+            {
+              key: "czEv",
+              header: "EV @ CZR",
+              numeric: true,
+              sortValue: (r) => Number(r.czEv) || 0,
+              cell: (r) => (r.czEv != null ? <EvBadge ev={Number(r.czEv)} /> : <span className="text-faint">—</span>),
+            } satisfies Column<PickRow>,
+            {
+              key: "stake",
+              header: "¼-Kelly",
+              numeric: true,
+              sortValue: (r) => Number(r.czKellyF) || 0,
+              cell: (r) =>
+                r.czKellyF != null && Number(r.czKellyF) > 0 ? (
+                  <KellyChip stake={Number(r.czKellyF) * bankroll} />
+                ) : (
+                  <span className="text-faint">—</span>
+                ),
+            } satisfies Column<PickRow>,
+          ]),
     ],
-    [bankroll],
+    [bankroll, basisMode],
   );
 
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
@@ -132,8 +211,10 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} picks · consensus is multi-book, prices are Caesars · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-              : "Consensus de-vigged probability vs the Caesars line"
+              ? `${gameCount} games · ${pickCount} picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              : basisMode
+                ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
+                : "Consensus de-vigged probability vs the Caesars line"
         }
         action={
           sport === "mlb" ? (
@@ -217,7 +298,7 @@ export default function BoardPage() {
             rows={playable}
             rowKey={(r) => `${r.label}|${r.sub}`}
             stagger
-            rowClassName={(r) => (Number(r.czEv) > 0 ? "ev-glow" : "")}
+            rowClassName={(r) => (Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
           {offBook > 0 && (
             <details className="mt-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3">
@@ -257,7 +338,9 @@ export default function BoardPage() {
 
       <div className="mt-4 text-[10.5px] text-faint">
         {quota && <>Odds API quota remaining: <span className="num">{quota}</span> · </>}
-        Prices are Caesars&apos; US feed via The Odds API; the NV app can differ — confirm at lock.
+        {basisMode
+          ? "EV and Kelly are at the DK/FD basis (the better de-vigged price of the pair, tie → DK) — the exact price the Builder selects on. Caesars is the settlement price; the NV app can differ — confirm at lock."
+          : "Prices are Caesars' US feed via The Odds API; the NV app can differ — confirm at lock."}
         Informational only, not betting advice.
       </div>
         </>

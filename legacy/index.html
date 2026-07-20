@@ -2157,9 +2157,12 @@ function shAnalyzeLocal(slate){
         var czEv=czDec!=null?shEV(r.p,czDec):null;
         var czImp=czN!=null?shImp(czN):null;
         var czKellyF=czDec!=null?Math.min(0.25*shKelly(r.p,czDec),0.02):null;
-        /* DK/FD basis layer (additive): the price selection shops at in dk_fd mode */
+        /* DK/FD basis layer (additive): the price selection shops at in dk_fd mode.
+           Kelly + edge badge mirrored at the basis so Board/Sharp can present the exact
+           numbers the Builder's allocator selects on. */
         var bsN2=(r.bsN!=null)?r.bsN:null,bsDec2=bsN2!=null?amToDec(bsN2):null;
         var bsEv2=bsDec2!=null?shEV(r.p,bsDec2):null;
+        var bsKellyF2=bsDec2!=null?Math.min(0.25*shKelly(r.p,bsDec2),0.02):null;
         return {rank:i+1,label:r.label,sub:r.sub,odds:r.odds,live:!!r.live,book:r.book||null,
           prob:Math.round(r.p*1000)/10,implied:Math.round(r.imp*1000)/10,edge:Math.round(edge*1000)/10,
           ev:ev!=null?Math.round(ev*1000)/10:null,kellyF:Math.round(kellyF*10000)/10000,
@@ -2167,6 +2170,8 @@ function shAnalyzeLocal(slate){
           czEv:czEv!=null?Math.round(czEv*1000)/10:null,
           bs:bsN2,bsOdds:bsN2!=null?obSign(bsN2):null,bsBook:bsN2!=null?(r.bsBook||null):null,
           bsEv:bsEv2!=null?Math.round(bsEv2*1000)/10:null,
+          bsKellyF:bsKellyF2!=null?Math.round(bsKellyF2*10000)/10000:null,
+          bsBadge:!!(bsEv2!=null&&bsEv2>=thresh&&bsEv2>=band),
           czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
           czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
           czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),noParlay:!!r.noParlay,
@@ -2357,7 +2362,9 @@ function shAnalyzeLocal(slate){
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+")"+(SH_V2.sim?", sim: log5 batter×pitcher, platoon, park×handedness, TTO/manager hook, bullpen fatigue, totals/F5/team-total pricing":"")+". ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
     +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL. "
-    +"Playable card is Caesars-only (your book): displayed odds, EV and stakes use Caesars' price; picks Caesars doesn't offer are listed separately, never hidden. "
+    +(SH_CFG.selMode==="dk_fd"
+      ?"Selection is priced at the DK/FD basis (better of the pair, tie DK): EV, stakes and the card gate all compute there; Caesars settles the ticket. Legs without a DK/FD quote are card-ineligible (flagged, never hidden). "
+      :"Playable card is Caesars-only (your book): displayed odds, EV and stakes use Caesars' price; picks Caesars doesn't offer are listed separately, never hidden. ")
     +"TOP 50 ranks by EV; category tabs rank by win probability (the high-floor parlay pool) — "+(counts||"no pregame lines yet")+". "
     +"Rates are recency-blended (7/15/30d), shrunk to league means, BvP capped by sample size. "
     +parlays.length+" not-started + "+parlaysMixed.length+" mixed + "+parlaysLive.length+" in-game parlays (per-type + cross-type, safe→longshot)."

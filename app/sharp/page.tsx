@@ -12,7 +12,7 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
-import { getSelectionMode } from "@/lib/engine-client";
+import { getEngine, getSelectionMode } from "@/lib/engine-client";
 import { useCalibration } from "@/lib/useCalibration";
 import type { PickRow } from "@/engine";
 
@@ -59,7 +59,14 @@ export default function SharpPage() {
   // picks are chosen, it only prices them (the EV gate lives in the Builder's
   // allocator, where stakes are). caesars_ev is the legacy ranking.
   const [selMode, setSelModeState] = useState<"dk_fd" | "ev_gated" | "probability" | "caesars_ev">("dk_fd");
-  useEffect(() => setSelModeState(getSelectionMode()), []);
+  // dk_fd: the active core EV gate, straight from the engine (mounted only) —
+  // The Sharp's plays clear the same bar the Builder's allocator enforces
+  const [gatePct, setGatePct] = useState(0);
+  useEffect(() => {
+    setSelModeState(getSelectionMode());
+    const cfg = getEngine().get<{ coreEvMin?: number }>("SH_CFG");
+    setGatePct(cfg?.coreEvMin ?? 0);
+  }, []);
   const cal = useCalibration();
 
   const { plays, notOffered } = useMemo(() => {
@@ -86,12 +93,25 @@ export default function SharpPage() {
         notOffered: [] as PickRow[],
       };
     }
+    if (selMode === "dk_fd") {
+      // Builder discipline, verbatim: a play needs BOTH a DK/FD basis quote and a
+      // Caesars quote, must clear the core EV gate at the basis, and is ranked by
+      // EV at the basis. Gate-clearing picks Caesars doesn't offer are disclosed,
+      // never substituted.
+      const gated = rows
+        .filter((r) => r.bs != null && Number(r.bsEv) >= gatePct)
+        .sort((a, b) => Number(b.bsEv) - Number(a.bsEv));
+      return {
+        plays: gated.filter((r) => r.cz != null).slice(0, 8),
+        notOffered: gated.filter((r) => r.cz == null).slice(0, 8),
+      };
+    }
     const top = rows.sort((a, b) => Number(b.prob) - Number(a.prob)).slice(0, 8);
     return {
       plays: top.filter((r) => r.cz != null),
       notOffered: top.filter((r) => r.cz == null),
     };
-  }, [d, selMode, cal.quarantine]);
+  }, [d, selMode, gatePct, cal.quarantine]);
 
   const trap = d?.trap as Trap | undefined;
   const passes = (d?.passes as Pass[] | undefined) ?? [];
@@ -155,7 +175,9 @@ export default function SharpPage() {
 
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-              {selMode !== "caesars_ev"
+              {selMode === "dk_fd"
+                ? `Today's plays — EV at the DK/FD basis, gate +${gatePct}% (the Builder's exact bar; Caesars settles, never picks)`
+                : selMode !== "caesars_ev"
                 ? "Today's plays — highest true probability (consensus-anchored; Caesars prices the ticket, never picks it)"
                 : "Today's plays — best playable EV at Caesars"}
             </h2>
@@ -168,14 +190,27 @@ export default function SharpPage() {
                       <div className="mt-0.5 text-[12px] text-muted">{r.sub}</div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {selMode === "dk_fd" && r.bsOdds != null && (
+                        <span className="num inline-flex items-baseline gap-1.5">
+                          <OddsCell odds={r.bsOdds as never} />
+                          <span className="text-[9.5px] uppercase text-muted">
+                            {String(r.bsBook ?? "").replace("draftkings", "DK").replace("fanduel", "FD")}
+                          </span>
+                        </span>
+                      )}
                       <OddsCell odds={r.czOdds as never} book="caesars" />
                       <ConvChip c={r.conv as string} />
                     </div>
                   </div>
                   <div className="num mt-3 flex flex-wrap items-center gap-3 text-[11.5px]">
                     <span className="text-text">{Number(r.prob).toFixed(1)}% true</span>
-                    <EvBadge ev={Number(r.czEv)} />
-                    {r.czBadge ? (
+                    <EvBadge ev={Number(selMode === "dk_fd" ? r.bsEv : r.czEv)} />
+                    {selMode === "dk_fd" && r.czEv != null && (
+                      <span className="text-muted" title="Informational: EV at the Caesars settlement price">
+                        @CZ {Number(r.czEv) > 0 ? "+" : ""}{Number(r.czEv).toFixed(1)}%
+                      </span>
+                    )}
+                    {(selMode === "dk_fd" ? r.bsBadge : r.czBadge) ? (
                       <span className="rounded-full border border-pos/50 bg-pos/10 px-2 py-0.5 text-[9.5px] font-bold text-pos">
                         EDGE
                       </span>
@@ -204,7 +239,9 @@ export default function SharpPage() {
             {notOffered.length > 0 && (
               <div className="mt-4">
                 <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
-                  In the top picks, not offered at Caesars — never substituted with a lower-probability pick
+                  {selMode === "dk_fd"
+                    ? "Clears the gate at the basis, not offered at Caesars — never substituted with a weaker pick"
+                    : "In the top picks, not offered at Caesars — never substituted with a lower-probability pick"}
                 </h3>
                 <div className="space-y-1.5">
                   {notOffered.map((r) => (
@@ -214,7 +251,9 @@ export default function SharpPage() {
                         {r.lu === "projected" && <span className="ml-1.5 text-[9.5px] font-bold text-gold">PROJ</span>}
                       </span>
                       <span className="num text-[11.5px] text-muted">
-                        {Number(r.prob).toFixed(1)}% true · best {String(r.odds)} @ {String(r.book ?? "—")}
+                        {selMode === "dk_fd"
+                          ? `${Number(r.prob).toFixed(1)}% true · basis ${String(r.bsOdds)} (${String(r.bsBook ?? "").replace("draftkings", "DK").replace("fanduel", "FD")}) · +${Number(r.bsEv).toFixed(1)}% EV`
+                          : `${Number(r.prob).toFixed(1)}% true · best ${String(r.odds)} @ ${String(r.book ?? "—")}`}
                       </span>
                     </div>
                   ))}
@@ -224,7 +263,13 @@ export default function SharpPage() {
             {plays.length === 0 && (
               <Panel>
                 <EmptyState
-                  title={selMode !== "caesars_ev" ? "No playable picks right now" : "No positive-EV plays at Caesars right now"}
+                  title={
+                    selMode === "dk_fd"
+                      ? `Nothing clears +${gatePct}% EV at the DK/FD basis right now`
+                      : selMode !== "caesars_ev"
+                      ? "No playable picks right now"
+                      : "No positive-EV plays at Caesars right now"
+                  }
                   body="The engine found nothing playable on this slate — that's a real answer, not a failure. Passing is a position."
                 />
               </Panel>

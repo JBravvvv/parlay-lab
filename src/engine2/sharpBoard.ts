@@ -24,6 +24,10 @@ export type SharpSide = {
   fairAm: number | null;
   cz: number | null;
   czEv: number | null; // per $1 at CZ vs sharp fair
+  /* dk_fd basis: better payout of the DK/FD pair (tie → DK), EV vs the same fair */
+  bsAm: number | null;
+  bsBk: "DK" | "FD" | null;
+  bsEv: number | null;
 };
 export type SharpTotal = {
   point: number | null;
@@ -33,6 +37,13 @@ export type SharpTotal = {
   czPoint: number | null;
   overEv: number | null;
   underEv: number | null;
+  /* dk_fd basis at the consensus point (always apples-to-apples) */
+  bsOver: number | null;
+  bsOverBk: "DK" | "FD" | null;
+  bsUnder: number | null;
+  bsUnderBk: "DK" | "FD" | null;
+  bsOverEv: number | null;
+  bsUnderEv: number | null;
 };
 export type SharpGame = {
   id: string;
@@ -51,10 +62,21 @@ function ev(p: number | null, am: number | null): number | null {
   return p * decFromAmerican(am) - 1;
 }
 
+/** The DK/FD selection basis: better payout of the pair wins, tie → DK (same rule
+    as the engine's shBasisPick). Null when neither book quotes the side. */
+export function basisPick(dk: number | null, fd: number | null): { am: number; bk: "DK" | "FD" } | null {
+  if (dk == null && fd == null) return null;
+  if (fd == null) return { am: dk!, bk: "DK" };
+  if (dk == null) return { am: fd, bk: "FD" };
+  return decFromAmerican(fd) > decFromAmerican(dk) ? { am: fd, bk: "FD" } : { am: dk, bk: "DK" };
+}
+
 function mlConsensus(ev_: OddsEvent) {
   const books: { key: string; a: number; b: number }[] = [];
   let czAway: number | null = null;
   let czHome: number | null = null;
+  let dkAway: number | null = null, dkHome: number | null = null;
+  let fdAway: number | null = null, fdHome: number | null = null;
   for (const bk of ev_.bookmakers) {
     const m = bk.markets.find((x) => x.key === "h2h");
     const away = m?.outcomes.find((o) => o.name === ev_.away_team);
@@ -65,8 +87,16 @@ function mlConsensus(ev_: OddsEvent) {
       czAway = away.price;
       czHome = home.price;
     }
+    if (bk.key === "draftkings") { dkAway = away.price; dkHome = home.price; }
+    if (bk.key === "fanduel") { fdAway = away.price; fdHome = home.price; }
   }
-  return { c: consensusProb(books, "shin"), czAway, czHome, n: books.length };
+  return {
+    c: consensusProb(books, "shin"),
+    czAway, czHome,
+    bsAway: basisPick(dkAway, fdAway),
+    bsHome: basisPick(dkHome, fdHome),
+    n: books.length,
+  };
 }
 
 function totalConsensus(ev_: OddsEvent) {
@@ -87,8 +117,18 @@ function totalConsensus(ev_: OddsEvent) {
   for (const [point, books] of byPoint) {
     if (!best || books.length > best.books.length) best = { point, books };
   }
-  if (!best) return { point: null, c: null, cz };
-  return { point: best.point, c: consensusProb(best.books, "shin"), cz };
+  if (!best) return { point: null, c: null, cz, bsOver: null, bsUnder: null };
+  // dk_fd basis at the consensus point — drawn from the same point-matched set,
+  // so basis EV is always apples-to-apples (unlike CZ, which can hang a different number)
+  const dk = best.books.find((b) => b.key === "draftkings") ?? null;
+  const fd = best.books.find((b) => b.key === "fanduel") ?? null;
+  return {
+    point: best.point,
+    c: consensusProb(best.books, "shin"),
+    cz,
+    bsOver: basisPick(dk?.a ?? null, fd?.a ?? null),
+    bsUnder: basisPick(dk?.b ?? null, fd?.b ?? null),
+  };
 }
 
 export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number }> {
@@ -116,6 +156,9 @@ export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number
         fairAm: pAway != null ? americanFromProb(pAway) : null,
         cz: ml.czAway,
         czEv: ev(pAway, ml.czAway),
+        bsAm: ml.bsAway?.am ?? null,
+        bsBk: ml.bsAway?.bk ?? null,
+        bsEv: ev(pAway, ml.bsAway?.am ?? null),
       },
       home: {
         name: e.home_team,
@@ -123,6 +166,9 @@ export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number
         fairAm: pHome != null ? americanFromProb(pHome) : null,
         cz: ml.czHome,
         czEv: ev(pHome, ml.czHome),
+        bsAm: ml.bsHome?.am ?? null,
+        bsBk: ml.bsHome?.bk ?? null,
+        bsEv: ev(pHome, ml.bsHome?.am ?? null),
       },
       total: {
         point: tot.point,
@@ -132,6 +178,12 @@ export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number
         czUnder: tot.cz?.under ?? null,
         overEv: samePoint ? ev(overP, tot.cz!.over) : null,
         underEv: samePoint && overP != null ? ev(1 - overP, tot.cz!.under) : null,
+        bsOver: tot.bsOver?.am ?? null,
+        bsOverBk: tot.bsOver?.bk ?? null,
+        bsUnder: tot.bsUnder?.am ?? null,
+        bsUnderBk: tot.bsUnder?.bk ?? null,
+        bsOverEv: ev(overP, tot.bsOver?.am ?? null),
+        bsUnderEv: overP != null ? ev(1 - overP, tot.bsUnder?.am ?? null) : null,
       },
       books: ml.n,
       hasSharp: e.bookmakers.some((b) => SHARPS.has(b.key)),

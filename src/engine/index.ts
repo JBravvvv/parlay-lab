@@ -46,6 +46,8 @@ export interface PickRow {
   bsOdds?: string | null;
   bsBook?: string | null;
   bsEv?: number | null;
+  bsKellyF?: number | null;
+  bsBadge?: boolean;
   books?: number;
   lkey?: string;
   conv?: string;
