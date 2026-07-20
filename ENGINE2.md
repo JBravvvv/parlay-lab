@@ -367,6 +367,20 @@ the consensus point, `basisPick` (better payout, tie → DK) shared rule, EV jud
 the basis in dk_fd with CZ kept gold as settlement. Tests: `basis-surfaces.test.ts`
 (row Kelly/badge honesty, Sharp-selection replica invariants, basisPick pair rules).
 
+## HR parlays in dk_fd — milestone-ladder basis (2026-07-20)
+DK/FD quote home runs as the milestone ladder (`batter_home_runs_alternate`, "1+ HR")
+rather than the standard O/U market, so HR rows carried no basis and dk_fd's
+basis-only `buildParlaySet` generated zero HR parlays (no HR longshots, no HR FUN
+tickets). Fix: `batter_home_runs_alternate` joins the same per-event props request
+(no extra credits); alternate ladders now fill the DK/FD basis in addition to the
+Caesars price, with integer milestone points normalized to the standard half-line
+(1+ = Over 0.5 — the identical bet). A book's standard quote always beats its own
+ladder; ladders still never touch fairs, line shopping, or row creation. CLV
+`sightProp` mirrors the rule (DK/FD alternates accepted, integer points normalized)
+so HR basis closes get sighted. With the basis present, the one-sided HR fair
+anchors at the basis price (NV-blind, per the dk_fd deviation rule). Tests in
+`basis-surfaces.test.ts` build a synthetic DK "1+" ladder over the fixture slate.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
