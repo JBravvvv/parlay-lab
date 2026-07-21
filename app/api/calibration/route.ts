@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { calibrationLine, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
+import { calibrationLine, slopeMults, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { redis, redisGetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 
 /**
@@ -16,15 +16,22 @@ import { redis, redisGetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!storeEnv()) return NextResponse.json({ summary: null, line: null, mults: {}, quarantine: [], auto: "on", log: [] });
+  if (!storeEnv())
+    return NextResponse.json({ summary: null, line: null, mults: {}, global: null, quarantine: [], auto: "on", log: [] });
   try {
     const summary = await redisGetJson<CalibrationSummary>("pl:cal:summary");
     const weights = (await redisGetJson<WeightState>("pl:cal:weights")) ?? { mults: {}, lastAdjust: 0, log: [] };
     const auto = (((await redis(["GET", "pl:cal:auto"])) as string | null) ?? "on") as "on" | "off";
+    // effective mults = the stricter of the weekly 3D state machine and the
+    // nightly reliability-slope fit — both shrink-only, so min() is honest
+    const sm = summary?.reliability ? slopeMults(summary.reliability) : {};
+    const merged: Record<string, number> = { ...weights.mults };
+    for (const [m, v] of Object.entries(sm)) merged[m] = Math.min(merged[m] ?? 1, v);
     return NextResponse.json({
       summary,
       line: calibrationLine(summary),
-      mults: auto === "off" ? {} : weights.mults,
+      mults: auto === "off" ? {} : merged,
+      global: auto === "off" ? null : summary?.globalShrink ?? null,
       quarantine: summary?.quarantine ?? [],
       auto,
       log: weights.log.slice(-20),

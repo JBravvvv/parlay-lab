@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { DayBlob } from "@/lib/pred-serialize";
-import { applyWeeklyAdjustment, computeCalibration, type GradedPick, type WeightState } from "@/engine2/calibration";
+import {
+  applyWeeklyAdjustment,
+  computeCalibration,
+  fitGlobalShrink,
+  fitReliability,
+  type GradedPick,
+  type WeightState,
+} from "@/engine2/calibration";
 import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } from "@/engine2/grade";
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { marketOf } from "@/lib/ledger-segments";
@@ -207,6 +214,10 @@ export async function GET(req: NextRequest) {
       /* ledger unreadable — the prediction store still feeds the summary */
     }
     const summary = computeCalibration(graded);
+    // 2026-07-20: per-market reliability slopes + the backtested global
+    // model-confidence shrink ride on the same nightly summary
+    summary.reliability = fitReliability(graded);
+    summary.globalShrink = fitGlobalShrink(graded);
     await redisSetJson(K_SUMMARY, summary);
 
     // 3D: weekly, capped, shrink-only, significance-gated

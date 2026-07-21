@@ -106,10 +106,35 @@ export function CalibrationPanel() {
 
   return (
     <div className="space-y-4">
+      {s.globalShrink && (
+        <Reveal>
+          <div className="num rounded-(--radius-panel) border border-white/[0.06] bg-surface/60 px-4 py-3 text-[12px]">
+            <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted">
+              Model confidence
+            </span>
+            <div className="mt-1 text-text">
+              {s.globalShrink.s >= 1 ? (
+                <>no global shrink applied — pooled reliability slope {s.globalShrink.slopeBefore != null ? s.globalShrink.slopeBefore.toFixed(2) : "—"} over {s.globalShrink.n} consensus-logged legs</>
+              ) : (
+                <>
+                  every prop&apos;s model probability is blended {Math.round((1 - s.globalShrink.s) * 100)}% further
+                  toward the de-vigged consensus (confidence ×{s.globalShrink.s.toFixed(2)}) — backtested pooled
+                  slope {s.globalShrink.slopeBefore != null ? s.globalShrink.slopeBefore.toFixed(2) : "—"} →{" "}
+                  {s.globalShrink.slopeAfter != null ? s.globalShrink.slopeAfter.toFixed(2) : "—"} over {s.globalShrink.n} legs
+                </>
+              )}
+            </div>
+            <div className="mt-1 font-sans text-[10.5px] leading-relaxed text-faint">
+              Slope 1.00 = perfectly calibrated; below 1 = overconfident. The shrink is refit nightly from the graded
+              record and only ever pulls TOWARD the market — it lifts automatically as slopes return to 1.
+            </div>
+          </div>
+        </Reveal>
+      )}
       <Reveal>
         <Panel title={`Reliability by market — ${s.graded.toLocaleString()} graded predictions`}>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-[12px]">
+            <table className="w-full min-w-[680px] text-[12px]">
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-faint">
                   <th className="pb-2">Market</th>
@@ -119,6 +144,12 @@ export function CalibrationPanel() {
                   <th className="pb-2 text-right">Brier</th>
                   <th className="pb-2 text-right" title="Consensus-only baseline Brier over the same records — the model has earned a raise the day it beats this">
                     vs market
+                  </th>
+                  <th className="pb-2 text-right" title="Reliability slope: OLS of outcome on stated probability. 1.00 = calibrated, below 1 = overconfident">
+                    Slope
+                  </th>
+                  <th className="pb-2 text-right" title="The model-weight multiplier currently applied to this market (weekly 3D state machine and nightly slope fit — whichever is stricter)">
+                    Shrink
                   </th>
                   <th className="pb-2 text-right">Status</th>
                 </tr>
@@ -152,6 +183,25 @@ export function CalibrationPanel() {
                             {pm.mktCmp.consensus.toFixed(3)}
                             {pm.mktCmp.model < pm.mktCmp.consensus ? " ▲" : ""}
                           </span>
+                        ) : (
+                          <span className="text-faint">—</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-right">
+                        {s.reliability?.[m]?.slope != null ? (
+                          <span
+                            className={s.reliability[m].slope! < 0.85 ? "text-gold" : s.reliability[m].slope! > 1.15 ? "text-live" : "text-pos"}
+                            title={s.reliability[m].se != null ? `±${(1.96 * s.reliability[m].se!).toFixed(2)} (95% CI)` : undefined}
+                          >
+                            {s.reliability[m].slope!.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-faint">—</span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-right">
+                        {cal.mults[m] != null && cal.mults[m] < 1 ? (
+                          <span className="text-gold">×{cal.mults[m].toFixed(2)}</span>
                         ) : (
                           <span className="text-faint">—</span>
                         )}

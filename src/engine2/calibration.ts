@@ -134,6 +134,10 @@ export type CalibrationSummary = {
   /* sanity breaker (any n>=30): stated edge 30%+ with actual below HALF the
      predicted rate → looks like a bug, not miscalibration. Quarantine. */
   quarantine: string[];
+  /* 2026-07-20: reliability slopes per market (+ pooled "all") and the fitted
+     global model-confidence shrink — attached by the nightly cron */
+  reliability?: Record<string, { n: number; slope: number | null; se: number | null }>;
+  globalShrink?: { s: number; n: number; slopeBefore: number | null; slopeAfter: number | null };
 };
 
 export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
@@ -198,6 +202,124 @@ export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
     }
   }
   return { at: Date.now(), graded: picks.length, markets, buckets, perMarket, quarantine };
+}
+
+/* ---------- reliability slopes + global confidence shrink (2026-07-20) ----------
+   Diagnosis of prop over-confidence from the graded record:
+   - fitReliability: per-market OLS of outcome (0/1) on stated probability.
+     slope 1.0 = perfectly calibrated; slope < 1 = overconfident (stated edges
+     are systematically larger than real ones).
+   - fitGlobalShrink: backtest search for ONE factor s ≤ 1 such that replaying
+     every graded leg with p' = consensus + s·(p − consensus) brings the pooled
+     reliability slope back toward 1.0. Shrink-only, floored, and it refuses to
+     act below 150 graded legs that logged their consensus baseline.
+   - slopeMults: per-market shrink multipliers for the calW channel — a market
+     whose realized rate trails prediction (slope CI-significantly below 1)
+     gets its model weight pulled by exactly that slope. Nightly, shrink-only. */
+
+export type ReliabilityFit = { n: number; slope: number | null; se: number | null };
+export type Reliability = Record<string, ReliabilityFit>;
+export type GlobalShrink = {
+  s: number; // the applied model-confidence factor, 1 = no shrink
+  n: number; // graded legs with a logged consensus baseline
+  slopeBefore: number | null;
+  slopeAfter: number | null;
+};
+
+export const SHRINK_FLOOR = 0.15;
+export const SLOPE_MIN_N = 100; // per-market slope needs this many graded legs to act
+export const GLOBAL_MIN_N = 150; // the global fit needs this many pMkt-logged legs
+
+function olsSlope(xs: number[], ys: number[]): { slope: number | null; se: number | null } {
+  const n = xs.length;
+  if (n < 2) return { slope: null, se: null };
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxx = 0;
+  let sxy = 0;
+  for (let i = 0; i < n; i++) {
+    sxx += (xs[i] - mx) * (xs[i] - mx);
+    sxy += (xs[i] - mx) * (ys[i] - my);
+  }
+  if (sxx < 1e-9) return { slope: null, se: null }; // no spread in predictions — unfittable
+  const slope = sxy / sxx;
+  let sse = 0;
+  for (let i = 0; i < n; i++) {
+    const yhat = my + slope * (xs[i] - mx);
+    sse += (ys[i] - yhat) * (ys[i] - yhat);
+  }
+  const se = n > 2 ? Math.sqrt(sse / (n - 2) / sxx) : null;
+  return { slope, se };
+}
+
+/** Per-market reliability slope (plus the pooled "all" row). */
+export function fitReliability(picks: GradedPick[]): Reliability {
+  const out: Reliability = {};
+  const groups = new Map<string, GradedPick[]>();
+  for (const x of picks) {
+    (groups.get(x.market) ?? groups.set(x.market, []).get(x.market)!).push(x);
+  }
+  groups.set("all", picks);
+  for (const [m, sel] of groups) {
+    const xs = sel.map((x) => x.p / 100);
+    const ys = sel.map((x) => (x.res === "won" ? 1 : 0));
+    const f = olsSlope(xs, ys);
+    out[m] = { n: sel.length, slope: f.slope, se: f.se };
+  }
+  return out;
+}
+
+/** Replay a stated probability at confidence s against its consensus anchor. */
+export function shrunkP(p: number, pMkt: number, s: number): number {
+  return pMkt + s * (p - pMkt);
+}
+
+/** Pooled reliability slope with every prediction replayed at confidence s. */
+export function pooledSlopeAt(picks: GradedPick[], s: number): { n: number; slope: number | null } {
+  const sel = picks.filter((x) => x.pMkt != null);
+  const xs = sel.map((x) => shrunkP(x.p, x.pMkt as number, s) / 100);
+  const ys = sel.map((x) => (x.res === "won" ? 1 : 0));
+  return { n: sel.length, slope: olsSlope(xs, ys).slope };
+}
+
+/**
+ * Backtest search for the global model-confidence factor: the LARGEST s (least
+ * intervention) whose replayed pooled slope lands in [0.85, 1.15]; if no s
+ * qualifies, the s that gets closest to 1.0. Never above 1 (shrink-only),
+ * never below SHRINK_FLOOR, and s = 1 outright on insufficient data.
+ */
+export function fitGlobalShrink(picks: GradedPick[]): GlobalShrink {
+  const withMkt = picks.filter((x) => x.pMkt != null);
+  const before = pooledSlopeAt(picks, 1);
+  if (withMkt.length < GLOBAL_MIN_N || before.slope == null) {
+    return { s: 1, n: withMkt.length, slopeBefore: before.slope, slopeAfter: before.slope };
+  }
+  let best = { s: 1, dist: Math.abs(before.slope - 1), slope: before.slope as number | null };
+  for (let s = 1; s >= SHRINK_FLOOR - 1e-9; s -= 0.05) {
+    const r = pooledSlopeAt(picks, s);
+    if (r.slope == null) continue;
+    if (r.slope >= 0.85 && r.slope <= 1.15) {
+      return { s: Math.round(s * 100) / 100, n: r.n, slopeBefore: before.slope, slopeAfter: r.slope };
+    }
+    const dist = Math.abs(r.slope - 1);
+    if (dist < best.dist - 1e-9) best = { s: Math.round(s * 100) / 100, dist, slope: r.slope };
+  }
+  return { s: best.s, n: withMkt.length, slopeBefore: before.slope, slopeAfter: best.slope };
+}
+
+/**
+ * Per-market calW multipliers from the reliability fit. Acts only when the
+ * slope is CI-significantly below 1 over SLOPE_MIN_N+ graded legs; the
+ * multiplier IS the slope (theoretically the exact recalibration), floored.
+ */
+export function slopeMults(rel: Reliability): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [m, f] of Object.entries(rel)) {
+    if (m === "all" || f.slope == null || f.se == null || f.n < SLOPE_MIN_N) continue;
+    if (f.slope + 1.96 * f.se >= 1) continue; // not significantly overconfident
+    out[m] = Math.max(MULT_FLOOR, Math.round(Math.max(0, f.slope) * 1000) / 1000);
+  }
+  return out;
 }
 
 /* ---------- 3D: weight adjustment (shrink-only, capped, weekly) ---------- */

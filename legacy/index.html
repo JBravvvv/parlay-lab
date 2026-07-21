@@ -1618,8 +1618,15 @@ var SH_W={props:0.35,ml:0.15,rl:0.15};
    but never above the shipped defaults. Dormant (no SH_V2/calW) = identical blend. */
 function shWm(base,mkt){
   var m=(SH_V2&&SH_V2.calW&&SH_V2.calW[mkt]!=null)?Number(SH_V2.calW[mkt]):1;
-  if(!isFinite(m)||m>=1)return base;
-  return Math.max(0.05,base*Math.max(0,m));
+  if(!isFinite(m)||m>1)m=1;
+  /* global model-confidence shrink (2026-07-20): ONE factor for every market,
+     backtested nightly against the graded record so post-shrink reliability
+     slopes approach 1.0. Shrink-only like calW; dormant = exactly 1. */
+  var g=(SH_V2&&SH_V2.calG!=null)?Number(SH_V2.calG):1;
+  if(!isFinite(g)||g>1||g<=0)g=1;
+  var f=m*g;
+  if(f>=1)return base;
+  return Math.max(0.05,base*Math.max(0,f));
 }
 var SH_EDGE_MIN={props:0.04,ml:0.02,rl:0.02}; /* minimum EV before a pick earns the EDGE badge */
 /* conviction from EV + sample-size uncertainty band: A = clears threshold AND band; B = positive EV; C = rest */

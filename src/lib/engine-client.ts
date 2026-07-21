@@ -129,6 +129,9 @@ async function armV2(eng: Engine) {
     // calibration self-correction (3D): per-market shrink-only multipliers on
     // the model blend weight; empty when auto_calibration is off or no data
     calW: (cal as { mults?: Record<string, number> } | null)?.mults ?? null,
+    // global model-confidence shrink fitted by the nightly calibration cron;
+    // null (dormant) whenever the store is empty or auto_calibration is off
+    calG: (cal as { global?: { s?: number } | null } | null)?.global?.s ?? null,
   });
 }
 

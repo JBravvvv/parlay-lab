@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CalibrationSummary, WeightState } from "@/engine2/calibration";
+import type { CalibrationSummary, GlobalShrink, WeightState } from "@/engine2/calibration";
 
 /**
  * Client read of the calibration module (3C/3E) — one fetch per mount with a
@@ -13,12 +13,13 @@ export type CalibrationRead = {
   summary: CalibrationSummary | null;
   line: string | null;
   mults: Record<string, number>;
+  global: GlobalShrink | null;
   quarantine: string[];
   auto: "on" | "off";
   log: WeightState["log"];
 };
 
-const EMPTY: CalibrationRead = { summary: null, line: null, mults: {}, quarantine: [], auto: "on", log: [] };
+const EMPTY: CalibrationRead = { summary: null, line: null, mults: {}, global: null, quarantine: [], auto: "on", log: [] };
 
 let cache: { at: number; data: CalibrationRead } | null = null;
 const TTL = 10 * 60_000;
@@ -33,6 +34,7 @@ export async function fetchCalibration(): Promise<CalibrationRead> {
       summary: j.summary ?? null,
       line: j.line ?? null,
       mults: j.mults ?? {},
+      global: j.global ?? null,
       quarantine: j.quarantine ?? [],
       auto: j.auto === "off" ? "off" : "on",
       log: j.log ?? [],
