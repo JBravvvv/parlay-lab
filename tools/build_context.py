@@ -102,6 +102,76 @@ def bullpen_usage(today):
                             {"name": p.get("person", {}).get("fullName"), "pitches": int(n), "daysAgo": back})
     return usage
 
+def update_pen_db(today):
+    """Rolling 30-day reliever run-prevention per team → pen ERA/WHIP (quality,
+    complementing the 3-day fatigue signal). Grown incrementally from yesterday's
+    final boxscores like the ump db; small samples are shipped with their IP so
+    the engine can refuse to act on thin data (it ignores pens under 15 IP)."""
+    db = load_json("data/pen_quality.json", {"days": {}, "pks": []})
+    y = (datetime.fromisoformat(today) - timedelta(days=1)).date().isoformat()
+    if y not in db["days"]:
+        day = {}
+        for g in sched(y, "linescore"):
+            if g.get("status", {}).get("abstractGameState") != "Final":
+                continue
+            if g["gamePk"] in db["pks"]:
+                continue
+            db["pks"] = (db["pks"] + [g["gamePk"]])[-600:]
+            try:
+                box = get(f"{API}/game/{g['gamePk']}/boxscore")
+            except Exception:
+                continue
+            for side in ("away", "home"):
+                t = box.get("teams", {}).get(side, {})
+                team = t.get("team", {}).get("name")
+                if not team:
+                    continue
+                for p in t.get("players", {}).values():
+                    pit = p.get("stats", {}).get("pitching", {})
+                    if not pit:
+                        continue
+                    started = p.get("gameStatus", {}).get("isStarter") or pit.get("gamesStarted")
+                    if started:
+                        continue  # relievers only
+                    outs = pit.get("outs")
+                    if outs is None:
+                        try:
+                            w_, f_ = (str(pit.get("inningsPitched", "0")).split(".") + ["0"])[:2]
+                            outs = int(w_) * 3 + int(f_)
+                        except Exception:
+                            outs = 0
+                    d = day.setdefault(team, {"outs": 0, "er": 0, "h": 0, "bb": 0})
+                    d["outs"] += int(outs or 0)
+                    d["er"] += int(pit.get("earnedRuns", 0) or 0)
+                    d["h"] += int(pit.get("hits", 0) or 0)
+                    d["bb"] += int(pit.get("baseOnBalls", 0) or 0)
+        db["days"][y] = day
+    db["days"] = {k: db["days"][k] for k in sorted(db["days"])[-30:]}
+    os.makedirs("data", exist_ok=True)
+    with open("data/pen_quality.json", "w") as f:
+        json.dump(db, f, separators=(",", ":"))
+
+    agg, lg = {}, {"outs": 0, "er": 0, "h": 0, "bb": 0}
+    for day in db["days"].values():
+        for team, d in day.items():
+            a = agg.setdefault(team, {"outs": 0, "er": 0, "h": 0, "bb": 0})
+            for k in a:
+                a[k] += d[k]
+                lg[k] += d[k]
+
+    def fmt(d):
+        ip = d["outs"] / 3
+        if ip < 1:
+            return None
+        return {"era": round(d["er"] * 9 / ip, 2), "whip": round((d["h"] + d["bb"]) / ip, 2), "ip": round(ip, 1)}
+
+    out = {t: v for t, v in ((t, fmt(d)) for t, d in agg.items()) if v}
+    league = fmt(lg)
+    if league:
+        out["__league"] = league
+    return out
+
+
 def main():
     today = datetime.now(timezone.utc).date().isoformat()
     db = update_ump_db(today)
@@ -142,6 +212,7 @@ def main():
         "ump_db_games": db["league"]["g"],
         "games": games,
         "bullpen_last3": bullpen_usage(today),
+        "pen_quality": update_pen_db(today),
     }
     path = sys.argv[1] if len(sys.argv) > 1 else "public/model/context.json"
     with open(path, "w") as f:

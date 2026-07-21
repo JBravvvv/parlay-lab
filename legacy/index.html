@@ -1130,7 +1130,8 @@ function shGkey(away,home,gnum){return pnorm(away)+"@"+pnorm(home)+(gnum?("gm"+g
 /* empirical-Bayes shrinkage (doc 3A): pull a small-sample rate toward the league mean.
    n = real sample size, k = pseudo-observations of the prior. No hot-streak chasing. */
 function shShrink(rate,n,k,prior){if(rate==null)return null;if(prior==null||!isFinite(n)||n<=0)return rate;return (n*rate+k*prior)/(n+k);}
-function shPitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ip:s.inningsPitched,era:s.era,whip:s.whip,k:s.strikeOuts,bb:s.baseOnBalls,k9:s.strikeoutsPer9Inn,h:s.hits,er:s.earnedRuns};}
+function shPitRow(p){var s=p.stat||{};return {g:s.gamesPlayed,ip:s.inningsPitched,era:s.era,whip:s.whip,k:s.strikeOuts,bb:s.baseOnBalls,k9:s.strikeoutsPer9Inn,h:s.hits,er:s.earnedRuns,
+  hr:s.homeRuns,hbp:s.hitBatsmen,np:s.numberOfPitches,gsn:s.gamesStarted};}
 function shStatsUrl(group,days){var end=shToday();return days
   ?"https://statsapi.mlb.com/api/v1/stats?stats=byDateRange&group="+group+"&startDate="+shDaysAgo(days)+"&endDate="+end+"&sportId=1&playerPool=All&limit=2500"
   :"https://statsapi.mlb.com/api/v1/stats?stats=season&group="+group+"&season="+new Date().getFullYear()+"&sportId=1&playerPool=All&limit=2500";}
@@ -1543,6 +1544,32 @@ function shPenF(team){if(!(shV2Sim()&&SH_CTX&&SH_CTX.bullpen_last3&&team))return
   keys.forEach(function(k){var L=loadOf(B[k]);tot+=L;c++;if(pnorm(k)===pnorm(team))mine=L;});
   if(mine==null||!c)return 1;var avg=tot/c;if(!(avg>0))return 1;
   return shClamp(1+(mine/avg-1)*0.10,0.96,1.05);}
+/* ---- pitching-metrics upgrades (2026-07-20): FIP, ERA-vs-xERA luck, pitch-count
+   efficiency, bullpen QUALITY (ERA/WHIP, complementing the fatigue chain above).
+   All v2-gated (fail-silent when dormant), conservative magnitudes, hard caps,
+   tagged on the card whenever applied — never silent, never fabricated. ---- */
+function shFip(pst){var s=pst&&pst.season;if(!s)return null;
+  var ip=shIpNum(s.ip);var hr=Number(s.hr),bb=Number(s.bb),hbp=Number(s.hbp),k=Number(s.k);
+  if(ip==null||ip<20||!isFinite(hr)||!isFinite(bb)||!isFinite(k))return null;
+  /* defense-independent: 13·HR + 3·(BB+HBP) − 2·K over IP, +3.10 league constant */
+  return (13*hr+3*(bb+(isFinite(hbp)?hbp:0))-2*k)/ip+3.10;}
+function shEraLuck(pst){if(!shV2Sim()||!(SH_PRIORS&&SH_PRIORS.pitchers))return null;
+  var pr=pst&&pst.id!=null&&SH_PRIORS.pitchers[pst.id];
+  if(!pr||pr.era==null||pr.xera==null)return null;
+  var d=pr.era-pr.xera; /* Savant xERA = exit-velo/launch-angle expected runs */
+  if(d<=-0.75)return {f:1.04,tag:"era-luck (fade)",txt:"ERA "+pr.era+" flatters him — xERA "+pr.xera+" says regression is due"};
+  if(d>=0.75)return {f:0.96,tag:"xERA-better",txt:"xERA "+pr.xera+" says he's better than the "+pr.era+" ERA shows"};
+  return null;}
+function shLaborPpg(pst){var s=pst&&pst.season;var np=s&&Number(s.np),gsn=s&&Number(s.gsn);
+  if(!isFinite(np)||!isFinite(gsn)||gsn<3||!(np>0))return null;return np/gsn;}
+function shLaborF(pst){if(!shV2Sim())return 1;var ppg=shLaborPpg(pst);
+  if(ppg==null)return 1;if(ppg>=97)return 0.96;if(ppg<=84)return 1.02;return 1;}
+function shPenQF(team){if(!(shV2Sim()&&SH_CTX&&SH_CTX.pen_quality&&team))return 1;
+  var P=SH_CTX.pen_quality,lg=P.__league,row=null;
+  Object.keys(P).forEach(function(k){if(k!=="__league"&&pnorm(k)===pnorm(team))row=P[k];});
+  if(!row||!lg||!(lg.era>0)||row.era==null||!(row.ip>=15))return 1;
+  /* a leaky pen boosts opposing late-game offense; a shutdown pen trims it */
+  return shClamp(1+(row.era-lg.era)/lg.era*0.12,0.95,1.06);}
 function shImp(am){var n=Number(am);if(!isFinite(n)||!n)return null;return n>0?100/(n+100):-n/(-n+100);}
 /* ---- market layer (doc Phase 2): exact odds math ----
    shDevig2: multiplicative de-vig of a two-way market — fair P(side1).
@@ -1877,7 +1904,8 @@ function shAnalyzeLocal(slate){
       var gkey=shGkey(g.away,g.home,g.gnum);
       var wind=windNote(g),coors=/coors/i.test(g.venue||"");
       var pstHome=lookupPit[pnorm(g.probable_home)]||null,pstAway=lookupPit[pnorm(g.probable_away)]||null;
-      var penH=shPenF(g.home),penA=shPenF(g.away); /* v2 bullpen-chain fatigue (1 when dormant) */
+      /* v2 bullpen chain: 3-day fatigue × rolling pen QUALITY (ERA vs league), both 1 when dormant */
+      var penH=shClamp(shPenF(g.home)*shPenQF(g.home),0.92,1.10),penA=shClamp(shPenF(g.away)*shPenQF(g.away),0.92,1.10);
       var awayBat=[],homeBat=[],ok=true;
       for(var i=0;i<9;i++){
         var av=batVec(g.lineup_away[i],pstHome,wind,coors,true,g),avB=batVec(g.lineup_away[i],null,wind,coors,false,g,penH);
@@ -2007,6 +2035,11 @@ function shAnalyzeLocal(slate){
         if(oo!=null){of=shClamp(0.140/oo,0.86,1.12);bits.push("opposing lineup "+oo.toFixed(3)+" TB/AB ("+(of<1?"trims the start":"lets him go deeper")+")");if(of!==1)tags.push("opp-offense");}
         else riskBits.push("opposing lineup unconfirmed");
         lam=ipg*3*of;
+        /* v2: pitch-count efficiency — starters averaging deep counts fade late */
+        var labF=shLaborF(st);
+        if(labF!==1){lam*=labF;var ppgX=shLaborPpg(st);
+          tags.push(labF<1?"laboring":"efficient");
+          bits.push("avg "+ppgX.toFixed(0)+" pitches/start ("+(labF<1?"labors through deep counts — late innings at risk":"efficient — earns extra outs")+")");}
         bits.unshift((ip30x&&g30x?ip30x.toFixed(1)+" IP over "+g30x+" starts last 30 days":"season "+shIp(st.season.ip).toFixed(1)+" IP / "+st.season.g+" starts")+" → ~"+lam.toFixed(1)+" outs (Poisson est.)");
         var eraO=shPitchBlend(st,"era");if(eraO!=null)bits.push(eraO.toFixed(2)+" blended ERA");
       }else if(isK){
@@ -2053,12 +2086,21 @@ function shAnalyzeLocal(slate){
         var expAB=pa*(1-shClamp(bbr,0,.25)*0.9);
         var opp=oppStarter(g,row.p),pst=opp?lookupPit[pnorm(opp)]:null;
         var contact=1,power=1;
+        var fip=null,luck=null;
         if(pst){var whip=shPitchBlend(pst,"whip"),era2=shPitchBlend(pst,"era");
+          /* v2: FIP (defense-independent) shares the quality read with raw ERA —
+             ERA alone carries defense + sequencing luck FIP strips out */
+          fip=shV2Sim()?shFip(pst):null;
+          var eraQ=(fip!=null)?((era2!=null)?(era2+fip)/2:fip):era2;
           if(whip!=null)contact=shClamp(whip/1.30,.85,1.15);
-          if(era2!=null)power=shClamp((era2/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);
-          bits.push("vs "+opp+(era2!=null?" ("+era2.toFixed(2)+" ERA":"")+(whip!=null?", "+whip.toFixed(2)+" WHIP)":")"));}
+          if(eraQ!=null)power=shClamp((eraQ/4.20+(whip!=null?whip/1.30:1))/2,.85,1.18);
+          var qb=[];if(era2!=null)qb.push(era2.toFixed(2)+" ERA");if(fip!=null)qb.push(fip.toFixed(2)+" FIP");if(whip!=null)qb.push(whip.toFixed(2)+" WHIP");
+          bits.push("vs "+opp+(qb.length?" ("+qb.join(", ")+")":""));}
         else riskBits.push("no probable-starter data for the matchup");
-        var pq=shPitPctF(pst);var hrF=power*pq*wind.f*(coors?1.08:1),tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1),hF=contact*pq*(coors?1.07:1);
+        /* v2: ERA-vs-xERA luck read — a flattered starter gets faded, an unlucky one credited */
+        luck=shEraLuck(pst);var luckF=luck?luck.f:1;
+        if(luck){tags.push(luck.tag);bits.push(luck.txt);}
+        var pq=shPitPctF(pst);var hrF=power*pq*wind.f*(coors?1.08:1)*luckF,tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1)*luckF,hF=contact*pq*(coors?1.07:1)*luckF;
         /* batter-vs-pitcher career history — doc discipline, hard-coded caps:
            under 15 PA = ignored in the math (context only on the card);
            15–30 PA = tiny nudge; 30+ = modest weight; total effect capped ±10%. */
@@ -2380,7 +2422,7 @@ function shAnalyzeLocal(slate){
     +(simCount?" · "+simCount+" games Monte-Carlo simmed ("+(shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N)+"× each)":"")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
-    +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+")"+(SH_V2.sim?", sim: log5 batter×pitcher, platoon, park×handedness, TTO/manager hook, bullpen fatigue, totals/F5/team-total pricing":"")+". ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
+    +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+")"+(SH_V2.sim?", sim: log5 batter×pitcher, platoon, park×handedness, TTO/manager hook, bullpen fatigue+quality, FIP-informed starter quality, xERA-luck fade, pitch-count efficiency, totals/F5/team-total pricing":"")+". ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
     +Math.round(SH_W.props*100)+"% for props / "+Math.round(SH_W.ml*100)+"% for ML-RL. "
     +(SH_CFG.selMode==="dk_fd"
       ?"Selection is priced at the DK/FD basis (better of the pair, tie DK): EV, stakes and the card gate all compute there; Caesars settles the ticket. Legs without a DK/FD quote are card-ineligible (flagged, never hidden). "

@@ -316,18 +316,28 @@ export default function SharpPage() {
                 </p>
                 <p>
                   <b className="text-text">2 · Form without hot-hand chasing.</b> Player rates blend the last
-                  7/15/30 days, then shrink toward league averages by sample size — small samples get pulled
-                  hard, real signals survive. Batter-vs-pitcher history only nudges with 15+ career meetings.
+                  7/15/30 days, then shrink toward the player&apos;s own Statcast skill (xwOBA/xBA/xSLG, barrel
+                  and hard-hit rates) — small samples get pulled hard, real signals survive. Batter-vs-pitcher
+                  history only nudges with 15+ career meetings.
                 </p>
                 <p>
-                  <b className="text-text">3 · Games get simulated.</b> 4,000 seeded Monte Carlo paths per game
-                  with confirmed lineups — a full per-plate-appearance base-out machine. It prices ML/RL,
-                  H+R+RBI, and flags correlated parlay legs.
+                  <b className="text-text">2b · Pitchers judged on what they control.</b> Starter quality blends
+                  ERA with FIP (strikeouts, walks, HBP, homers — defense stripped out) plus WHIP for baserunner
+                  traffic. A starter whose ERA flatters his xERA gets faded as a regression candidate; the
+                  unlucky ones get credit. Starters averaging deep pitch counts lose late-inning outs, and the
+                  bullpen behind every lead is scored on both fatigue (3-day workload) and quality (rolling pen
+                  ERA/WHIP vs league).
+                </p>
+                <p>
+                  <b className="text-text">3 · Games get simulated.</b> 10,000 seeded Monte Carlo paths per game
+                  with confirmed lineups — a full per-plate-appearance base-out machine with platoon (LHP/RHP)
+                  splits, park factors by batter handedness, wind and temperature, ump strike zones, and
+                  bullpen chains. It prices ML/RL, H+R+RBI, and flags correlated parlay legs.
                 </p>
                 <p>
                   <b className="text-text">4 · Model meets market.</b> Final probability = 35% model / 65%
-                  consensus for props (15/85 for ML-RL). EV is computed at the Caesars price you can actually
-                  bet. EDGE badges need both the EV threshold and enough sample behind it.
+                  consensus for props (15/85 for ML-RL). EV is computed at the DK/FD selection basis (Caesars
+                  settles the ticket). EDGE badges need both the EV threshold and enough sample behind it.
                 </p>
                 <p>
                   <b className="text-text">5 · Discipline is hard-coded.</b> ¼-Kelly capped at 2% per bet,
