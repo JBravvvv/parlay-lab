@@ -381,6 +381,25 @@ so HR basis closes get sighted. With the basis present, the one-sided HR fair
 anchors at the basis price (NV-blind, per the dk_fd deviation rule). Tests in
 `basis-surfaces.test.ts` build a synthetic DK "1+" ladder over the fixture slate.
 
+## Pitching-metrics upgrades (2026-07-20 audit vs Josh's metrics checklist)
+Audit outcome: xwOBA/xBA/xSLG + barrel/hard-hit (Statcast priors → rate shrinkage,
+HR prior, log5, xISO suppression), WHIP/ERA starter read (`contact`/`power`),
+platoon LHP/RHP, park-by-handedness, wind/temp/ump, pen fatigue, and the manager
+hook were all already modeled. wOBA/wRC+ are functionally covered by the xwOBA
+prior + park adjustment. Added the four true gaps — every factor v2-gated
+(exactly neutral when SH_V2 is off → parity), capped, and tagged on the card:
+- **FIP** (`shFip`, from the season pitching pull's K/BB/HBP/HR/IP; ≥20 IP) —
+  blends 50/50 with raw ERA in the batter-prop `power` read; shown in case line.
+- **ERA-vs-xERA luck** (`shEraLuck`, priors carry era+xera per pitcher): gap
+  ≥0.75 → ±4% on opposing offense, tags `era-luck (fade)` / `xERA-better`.
+- **Pitch-count efficiency** (`shLaborPpg`/`shLaborF`, numberOfPitches ÷
+  gamesStarted, 3+ starts): ≥97 → outs λ ×0.96 (`laboring`), ≤84 → ×1.02.
+- **Bullpen quality** (`shPenQF` × existing `shPenF`, combined clamp 0.92–1.10):
+  `tools/build_context.py::update_pen_db` grows a rolling 30-day per-team
+  reliever ER/H/BB/outs db (`data/pen_quality.json`, committed by context.yml)
+  → context.json `pen_quality` {team:{era,whip,ip}, __league}; engine ignores
+  pens under 15 IP of sample. Tests: `tests/pitching-metrics.test.ts`.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
