@@ -400,6 +400,28 @@ prior + park adjustment. Added the four true gaps — every factor v2-gated
   → context.json `pen_quality` {team:{era,whip,ip}, __league}; engine ignores
   pens under 15 IP of sample. Tests: `tests/pitching-metrics.test.ts`.
 
+## Reliability slopes + global confidence shrink (2026-07-20)
+Prop over-confidence diagnosis and correction, layered on the 3A-3E loop:
+- **Report:** `fitReliability` (engine2/calibration.ts) fits per-market OLS of
+  outcome on stated probability over the graded record (prediction store +
+  cloud-ledger backfill). Slope 1.0 = calibrated, <1 = overconfident. Attached
+  to the nightly summary as `summary.reliability` (with SEs) by /api/calibrate.
+- **Auto calW:** `slopeMults` — markets with slope CI-significantly < 1 over
+  100+ legs (SLOPE_MIN_N) get mult = slope (floored at the 5%-absolute-weight
+  MULT_FLOOR). /api/calibration serves `min(weekly 3D mult, slope mult)`;
+  nightly, shrink-only, auto_calibration kill switch honored.
+- **Global confidence:** `fitGlobalShrink` backtests s ∈ [SHRINK_FLOOR=0.15, 1]
+  by replaying every pMkt-logged leg at p' = pMkt + s·(p − pMkt); picks the
+  LARGEST s with pooled slope in [0.85, 1.15] (else closest-to-1; s=1 under
+  GLOBAL_MIN_N=150 legs). Served as `global`, consumed as `SH_V2.calG` inside
+  `shWm` — multiplicative with calW, 5% absolute floor, exactly neutral when
+  dormant (parity). armV2 wires it on every board generation.
+- **UI:** Stats calibration panel gains a "Model confidence" banner (current
+  shrink + slope before/after) and per-market Slope / Shrink columns.
+- **Tests:** `tests/reliability.test.ts` — deterministic slope-0.5 fixture;
+  post-shrink predictions inside each level's 95% Wilson CI of realized;
+  floor/thin-data/dormant guarantees; parity digest unchanged.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
