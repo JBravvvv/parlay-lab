@@ -440,6 +440,25 @@ CURRENT number from the official boxscore ("● now 1 H+R+RBI · Bot 5th").
   cloud blob `pl:ledger:v1` wraps it as {ledger:[...]}).
 - Tests: `tests/live-current.test.ts` against the real fixture boxscore.
 
+## Live-state Monte Carlo (2026-07-21)
+In-progress games now get the full sim treatment by RESUMING from reality:
+`collectSlate` (v2-gated) pulls linescore + boxscore per live game → `shLiveState`
+builds {inn, half (Middle/End normalized), outs, runners as lineup indices, next
+batter per side (team PA%9, refined by the linescore's current batter), starter
+outs/gone (gone → bullpen vectors via outsBySP=1e9), f5a/f5h when past the 5th,
+per-player tallies}. `shSimGames` takes optional `ctx.init`: first half-inning
+resumes with real outs/runners (walk-off logic intact), prop legs carry
+`base` = current tally (full-game lines grade current + remainder). NO init =
+the exact pregame loop bit-for-bit (RNG-stream identity test). Consumption is
+automatic — live ML/RL model = resumed pHome/covers ("live-sim" tag), live
+batter props' model side = resumed sim marginal, live same-game parlays get
+joint pricing + corr from paths. `SIM_PATHS`/`SIM_PATHS_TXT` (engine-client) is
+the single depth constant feeding armV2 and all static UI copy. Overview says
+"(N games simmed this run — M resumed live…)". Tests: `tests/live-sim.test.ts`.
+Approximations, disclosed: starter PA ≈ outs×1.4 (hook timing only), unmapped
+runners fall back to the previous batter's index, current reliever = generic
+pen vector.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
