@@ -422,6 +422,24 @@ Prop over-confidence diagnosis and correction, layered on the 3A-3E loop:
   post-shrink predictions inside each level's 95% Wilson CI of realized;
   floor/thin-data/dormant guarantees; parity digest unchanged.
 
+## Live "now" stats on every surface (2026-07-21)
+While a game is in progress, Ledger legs, the Builder's locked/supplemental
+tickets, Board pick rows + parlay legs, and The Sharp's plays show the leg's
+CURRENT number from the official boxscore ("● now 1 H+R+RBI · Bot 5th").
+- `engine2/grade.ts::currentValue(lkey, status, box)` — the grader's stat
+  extraction read mid-game (no void/lineup rules); ML/RL show the live score;
+  a player not yet in the box returns null, never a fabricated 0.
+- `src/lib/liveNow.ts::useLiveNow(reqs)` — shared client poll: schedule call
+  per involved date (state/score/inning via hydrate=linescore), boxscores
+  fetched ONLY for live games (cap 16), 60s cadence while live / 5min
+  otherwise, dormant once all requested games are final. Free statsapi.
+- Ledger gotcha: the auto-grader writes result:"pending" for in-progress
+  legs — the chip must key on `!r || r.result === "pending"`, and it replaces
+  the bare "pending" label. Fully graded days request nothing.
+- Seeding gotcha: localStorage `pl_ledger` is a BARE ARRAY of entries (the
+  cloud blob `pl:ledger:v1` wraps it as {ledger:[...]}).
+- Tests: `tests/live-current.test.ts` against the real fixture boxscore.
+
 ## Calibration & self-correction module (2026-07-17 spec: "update-calibration-and-selection")
 Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-and-selection.md`).
 - **3A logging:** every generated board's FULL pick set (all categories + suggested parlays,
