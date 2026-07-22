@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
 import { ProbBar } from "@/components/ui/ProbBar";
-import { getSims, type SimOut as Sim } from "@/lib/engine-client";
+import { getSims, SIM_PATHS_TXT, type SimOut as Sim } from "@/lib/engine-client";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { fmtAmerican, fmtPct } from "@/lib/format";
 
@@ -58,7 +58,7 @@ export default function SimulatorPage() {
     <>
       <PageHeader
         title="Simulator"
-        sub="The engine's Monte Carlo game sims — 50,000 seeded paths per game, per-PA base-out machine, real lineups only"
+        sub={`The engine's Monte Carlo game sims — ${SIM_PATHS_TXT} seeded paths per game, per-PA base-out machine, real lineups only; live games resume from the real state`}
         action={
           <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending}>
             {regen.isPending ? "Simulating…" : "Run fresh sims"}

@@ -18,7 +18,7 @@ import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
-import { getMoney, getSelectionMode } from "@/lib/engine-client";
+import { getMoney, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
@@ -236,7 +236,7 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              ? `${gameCount} games · ${pickCount} picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
                 : "Consensus de-vigged probability vs the Caesars line"
@@ -299,7 +299,8 @@ export default function BoardPage() {
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>
           <div className="mb-3 text-[12px] text-muted">
             Pulling schedule, lineups, multi-book odds and player form — then de-vigging, simulating
-            (50,000 paths per game) and ranking. ~30–60 seconds on a full slate.
+            ({SIM_PATHS_TXT} paths per game; live games resume from the real state) and ranking. ~30–60
+            seconds on a full slate.
           </div>
           <SkeletonRows rows={10} />
         </Panel>

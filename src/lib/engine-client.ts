@@ -79,6 +79,12 @@ export function getEngine(): Engine {
   return engine;
 }
 
+/** The engine's Monte Carlo depth (user rule 2026-07-20) — ONE constant feeds
+    armV2's simN/simNHR and every piece of static UI copy, so the number shown
+    can never drift from the number run. */
+export const SIM_PATHS = 50000;
+export const SIM_PATHS_TXT = SIM_PATHS.toLocaleString("en-US");
+
 export type Board = { date: string; at: number; data: BoardData };
 
 const BOARD_KEY = "pl_board_r1";
@@ -121,11 +127,11 @@ async function armV2(eng: Engine) {
     sharpW: true,
     regions: "us,eu",
     sim: true, // log5/platoon/park×hand/TTO/hook/pen-fatigue + totals/F5 pricing
-    // user rule 2026-07-20: 50,000 seeded paths per game, everywhere the sim is
-    // consumed (Board, The Sharp, Simulator all read this same run's SIMS).
+    // user rule 2026-07-20: SIM_PATHS seeded paths per game, everywhere the sim
+    // is consumed (Board, The Sharp, Simulator all read this same run's SIMS).
     // simNHR (the sub-5%-leg/HR bump) matches — 50k is already the ceiling.
-    simN: 50000,
-    simNHR: 50000,
+    simN: SIM_PATHS,
+    simNHR: SIM_PATHS,
     // projected lineups (user rule 2026-07-17): everyday starters count before
     // lineups post; a posted lineup missing the player scratches him entirely
     projLineup: true,

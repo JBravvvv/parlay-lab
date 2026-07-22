@@ -12,7 +12,7 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
-import { getEngine, getSelectionMode } from "@/lib/engine-client";
+import { getEngine, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { useCalibration } from "@/lib/useCalibration";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import type { PickRow } from "@/engine";
@@ -174,6 +174,11 @@ export default function SharpPage() {
             <Reveal>
               <Panel title="The engine's own overview">
                 <p className="text-[13px] leading-relaxed text-muted">{d.overview}</p>
+                <div className="num mt-2 border-t border-white/[0.05] pt-2 text-[10.5px] text-faint">
+                  Engine setting: Monte Carlo {SIM_PATHS_TXT} paths per game (live games resume from the real
+                  score/inning/base-out state). The paragraph above is frozen at generation time — refresh for a
+                  current read.
+                </div>
               </Panel>
             </Reveal>
           )}
@@ -353,10 +358,12 @@ export default function SharpPage() {
                   ERA/WHIP vs league).
                 </p>
                 <p>
-                  <b className="text-text">3 · Games get simulated.</b> 50,000 seeded Monte Carlo paths per game
-                  with confirmed lineups — a full per-plate-appearance base-out machine with platoon (LHP/RHP)
-                  splits, park factors by batter handedness, wind and temperature, ump strike zones, and
-                  bullpen chains. It prices ML/RL, H+R+RBI, and flags correlated parlay legs.
+                  <b className="text-text">3 · Games get simulated.</b> {SIM_PATHS_TXT} seeded Monte Carlo paths
+                  per game with confirmed lineups — a full per-plate-appearance base-out machine with platoon
+                  (LHP/RHP) splits, park factors by batter handedness, wind and temperature, ump strike zones,
+                  and bullpen chains. In-progress games RESUME from the real score, inning, outs, runners and
+                  each player&apos;s current tally, and simulate only the remainder. It prices ML/RL, props,
+                  and flags correlated parlay legs.
                 </p>
                 <p>
                   <b className="text-text">4 · Model meets market.</b> Final probability = 35% model / 65%

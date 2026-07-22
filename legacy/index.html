@@ -1356,6 +1356,25 @@ function shCollectSlate(){
       return chain;
     });
   }).then(function(){
+    /* 3b) live-state capture (v2 only): linescore + boxscore per in-progress game
+       so the sim can RESUME from the real score/inning/base-out state. Free
+       statsapi; a game missing any piece simply gets no liveState (the live
+       closed-form fallback applies — never guessed). */
+    if(!shV2Sim())return;
+    slate.liveState={};
+    var lives=slate.games.filter(function(g){return g.phase==="live"&&g.pk&&g.lineup_away.length>=9&&g.lineup_home.length>=9;}).slice(0,10);
+    var lchain=Promise.resolve();
+    lives.forEach(function(g,ix){lchain=lchain.then(function(){
+      shTick("Live game state · "+(ix+1)+"/"+lives.length);
+      return obFetchJson("https://statsapi.mlb.com/api/v1/game/"+g.pk+"/linescore").then(function(lr){
+        return obFetchJson("https://statsapi.mlb.com/api/v1/game/"+g.pk+"/boxscore").then(function(br){
+          var st=shLiveState(lr.ok?lr.body:null,br.ok?br.body:null);
+          if(st)slate.liveState[shGkey(g.away,g.home,g.gnum)]=st;
+        });
+      });
+    });});
+    return lchain;
+  }).then(function(){
     /* 4) player stats — last 7/15/30 hitting + season/last-30 pitching, filtered to slate players */
     shTick("Pulling player form (7/15/30 day)");
     var propNames={};
@@ -1648,6 +1667,59 @@ var SH_ADV={scoreFrom2ndOn1B:0.60,firstTo3rdOn1B:0.28,scoreFrom1stOn2B:0.42,sacF
          awayLeash,homeLeash (outs the away/home STARTER records before the bullpen),
          legs:[{team:'away'|'home'|null,bat:idx|null,stat:'h'|'tb'|'hr'|'hrr'|null,ln,type:'ml_home'|'ml_away'|'rl'|null,pt}] }
    Vectors are cumulative-friendly plain probabilities; OUT is the remainder. */
+/* ---- live-state capture (2026-07-21): the real mid-game state from statsapi
+   linescore + boxscore, so the sim can RESUME an in-progress game instead of
+   replaying it from first pitch. Returns null on any missing piece — the live
+   closed-form fallback then applies, nothing is ever guessed. ---- */
+function shLiveState(ls,bx){
+  if(!ls||!bx||!(ls.currentInning>=1))return null;
+  var half=String(ls.inningState||"").toLowerCase(),inn=ls.currentInning|0,outs=ls.outs|0;
+  if(half==="middle"){half="bot";outs=0;}
+  else if(half==="end"){half="top";inn=inn+1;outs=0;}
+  else half=(half==="bottom")?"bot":"top";
+  if(outs>2)outs=2;
+  var runsA=(ls.teams&&ls.teams.away&&ls.teams.away.runs)|0,runsH=(ls.teams&&ls.teams.home&&ls.teams.home.runs)|0;
+  /* first-5 totals from the real line score — needed once the resume point is past the 5th */
+  var f5a=0,f5h=0,innings=ls.innings||[];
+  for(var i=0;i<Math.min(5,innings.length);i++){
+    f5a+=((innings[i].away&&innings[i].away.runs)|0);f5h+=((innings[i].home&&innings[i].home.runs)|0);}
+  var past5=inn>5;
+  function side(sd){
+    var players=(bx.teams&&bx.teams[sd]&&bx.teams[sd].players)||{},orderIdx={},tallies={},pa=0;
+    Object.keys(players).forEach(function(k){var p=players[k];if(!p||!p.person)return;
+      var bat=(p.stats&&p.stats.batting)||{};
+      if(bat.plateAppearances)pa+=Number(bat.plateAppearances)||0;
+      var bo=Number(p.battingOrder);
+      if(isFinite(bo)&&bo>0)orderIdx[p.person.id]=Math.floor(bo/100)-1;
+      if(Object.keys(bat).length){var H=Number(bat.hits)||0,D=Number(bat.doubles)||0,T=Number(bat.triples)||0,HR=Number(bat.homeRuns)||0;
+        tallies[pnorm(p.person.fullName||"")]={h:H,tb:H+D+2*T+3*HR,hr:HR,r:Number(bat.runs)||0,rbi:Number(bat.rbi)||0};}
+    });
+    return {orderIdx:orderIdx,tallies:tallies,pa:pa};
+  }
+  function sp(sd){
+    var players=(bx.teams&&bx.teams[sd]&&bx.teams[sd].players)||{},n=0,out={outs:0,runs:0,gone:true};
+    Object.keys(players).forEach(function(k){var p=players[k],pit=(p.stats&&p.stats.pitching)||{};
+      if(!Object.keys(pit).length)return;n++;
+      if(Number(pit.gamesStarted)){out.outs=Number(pit.outs)||0;out.runs=Number(pit.earnedRuns)||0;}});
+    out.gone=n!==1; /* exactly one pitcher used = the starter is still in */
+    return out;
+  }
+  var A=side("away"),H=side("home");
+  var idxA=A.pa%9,idxH=H.pa%9;
+  var batId=ls.offense&&ls.offense.batter&&ls.offense.batter.id;
+  if(batId!=null){var mi=(half==="top"?A:H).orderIdx[batId];
+    if(mi!=null&&mi>=0&&mi<9){if(half==="top")idxA=mi;else idxH=mi;}}
+  var om=(half==="top"?A:H).orderIdx,nx=(half==="top"?idxA:idxH);
+  function ridx(o){var id=o&&o.id;var v=(id!=null)?om[id]:null;return (v!=null&&v>=0&&v<9)?v:((nx+8)%9);}
+  var off=ls.offense||{};
+  var tal={};Object.keys(A.tallies).forEach(function(k){tal[k]=A.tallies[k];});
+  Object.keys(H.tallies).forEach(function(k){tal[k]=H.tallies[k];});
+  return {inn:inn,half:half,outs:outs,runsA:runsA,runsH:runsH,idxA:idxA,idxH:idxH,
+    b1:off.first?ridx(off.first):-1,b2:off.second?ridx(off.second):-1,b3:off.third?ridx(off.third):-1,
+    f5a:past5?f5a:null,f5h:past5?f5h:null,
+    spAway:sp("away"),spHome:sp("home"),tallies:tal};
+}
+
 function shSimGames(ctx,nSims,seed){
   var rng=shMulberry(seed);
   var L=ctx.legs.length;
@@ -1664,22 +1736,37 @@ function shSimGames(ctx,nSims,seed){
   var bh=new Int32Array(NB),bt=new Int32Array(NB),bhr=new Int32Array(NB),br=new Int32Array(NB),brbi=new Int32Array(NB);
   var ah=new Int32Array(NB),at=new Int32Array(NB),ahr=new Int32Array(NB),ar=new Int32Array(NB),arbi=new Int32Array(NB);
   function resetArr(a){for(var i=0;i<NB;i++)a[i]=0;}
+  /* live-state resume (2026-07-21): ctx.init carries the REAL mid-game state —
+     score, inning/half, outs, runners (as lineup indices), next batter per side,
+     starter outs-recorded (or gone → bullpen vectors immediately), and the real
+     first-5 totals when resuming past the 5th. Absent init = the exact pregame
+     loop, bit for bit (no extra RNG draws on the dormant path). */
+  var I=ctx.init||null;
   for(var s=0;s<nSims;s++){
     resetArr(bh);resetArr(bt);resetArr(bhr);resetArr(br);resetArr(brbi);
     resetArr(ah);resetArr(at);resetArr(ahr);resetArr(ar);resetArr(arbi);
-    var runsA=0,runsH=0,idxA=0,idxH=0,outsBySPHome=0,outsBySPAway=0,inn=1,over=false;
-    var paSPHome=0,runsSPHome=0,paSPAway=0,runsSPAway=0,rA5=0,rH5=0;
+    var runsA=I?I.runsA:0,runsH=I?I.runsH:0,idxA=I?I.idxA:0,idxH=I?I.idxH:0,
+        outsBySPHome=I?(I.spHome.gone?1e9:I.spHome.outs):0,
+        outsBySPAway=I?(I.spAway.gone?1e9:I.spAway.outs):0,
+        inn=I?I.inn:1,over=false;
+    var paSPHome=I?(I.spHome.gone?0:Math.round(I.spHome.outs*1.4)):0,runsSPHome=I?I.spHome.runs:0,
+        paSPAway=I?(I.spAway.gone?0:Math.round(I.spAway.outs*1.4)):0,runsSPAway=I?I.spAway.runs:0,
+        rA5=(I&&I.f5a!=null)?I.f5a:0,rH5=(I&&I.f5h!=null)?I.f5h:0;
+    var rs=I?{half:I.half,outs:I.outs,b1:I.b1,b2:I.b2,b3:I.b3}:null;
     while(!over){
-      /* ---- top: away bats vs home pitching ---- */
-      var res=halfInning(ctx.away.bat,idxA,inn,runsA-runsH,false,outsBySPHome,ctx.homeLeash,ah,at,ahr,ar,arbi,paSPHome,runsSPHome);
-      runsA+=res.runs;idxA=res.next;outsBySPHome=res.spOuts;paSPHome=res.spPA;runsSPHome=res.spRuns;
+      /* ---- top: away bats vs home pitching (skipped when resuming a bottom half) ---- */
+      if(!(rs&&rs.half==="bot")){
+        var res=halfInning(ctx.away.bat,idxA,inn,runsA-runsH,false,outsBySPHome,ctx.homeLeash,ah,at,ahr,ar,arbi,paSPHome,runsSPHome,(rs&&rs.half==="top")?rs:null);
+        runsA+=res.runs;idxA=res.next;outsBySPHome=res.spOuts;paSPHome=res.spPA;runsSPHome=res.spRuns;
+      }
       /* ---- bottom: home bats vs away pitching (skipped in 9th+ if home leads) ---- */
       if(inn<9||runsH<=runsA){
         var need=(inn>=9)?(runsA-runsH+1):Infinity; /* walk-off: stop once home leads */
-        var res2=halfInning(ctx.home.bat,idxH,inn,runsH-runsA,need,outsBySPAway,ctx.awayLeash,bh,bt,bhr,br,brbi,paSPAway,runsSPAway);
+        var res2=halfInning(ctx.home.bat,idxH,inn,runsH-runsA,need,outsBySPAway,ctx.awayLeash,bh,bt,bhr,br,brbi,paSPAway,runsSPAway,(rs&&rs.half==="bot")?rs:null);
         runsH+=res2.runs;idxH=res2.next;outsBySPAway=res2.spOuts;paSPAway=res2.spPA;runsSPAway=res2.spRuns;
       }
-      if(inn===5){rA5=runsA;rH5=runsH;} /* first-5-innings snapshot */
+      rs=null;
+      if(inn===5&&!(I&&I.f5a!=null)){rA5=runsA;rH5=runsH;} /* first-5-innings snapshot */
       if(inn>=9&&runsA!==runsH)over=true;
       inn++;
       if(inn>20){if(rng()<0.5)runsH++;else runsA++;over=true;} /* unreachable safety valve */
@@ -1710,16 +1797,19 @@ function shSimGames(ctx,nSims,seed){
         var hArr=lg.team==="home",bi=lg.bat;
         var val=lg.stat==="h"?(hArr?bh:ah)[bi]:lg.stat==="tb"?(hArr?bt:at)[bi]:lg.stat==="hr"?(hArr?bhr:ahr)[bi]:
                 (hArr?bh:ah)[bi]+(hArr?br:ar)[bi]+(hArr?brbi:arbi)[bi]; /* hrr */
-        v=val>=Math.floor(lg.ln)+1;
+        /* live resume: lg.base = the player's REAL tally so far — full-game lines
+           grade on current + remaining, exactly like the book settles them */
+        v=val+(lg.base||0)>=Math.floor(lg.ln)+1;
       }
       if(v){legHit[li]++;t.push(li);if(bits)bits[li][s>>>5]|=(1<<(s&31));}
     }
     for(var x=0;x<t.length;x++)for(var y=x+1;y<t.length;y++)pair[t[x]*L+t[y]]++;
   }
-  function halfInning(bat,idx,inn,diff,need,spOuts,leash,hA,tA,hrA,rA,rbiA,spPA,spRuns){
-    var outs=0,runs=0;
-    var b1=-1,b2=-1,b3=-1; /* batter index occupying each base, -1 empty */
-    if(inn>=10){b2=(idx+NB-1)%NB;} /* extra-innings placed runner (10th on) */
+  function halfInning(bat,idx,inn,diff,need,spOuts,leash,hA,tA,hrA,rA,rbiA,spPA,spRuns,rs){
+    var outs=rs?(rs.outs|0):0,runs=0;
+    /* batter index occupying each base, -1 empty; a resume (rs) supplies the real ones */
+    var b1=rs&&rs.b1!=null?rs.b1:-1,b2=rs&&rs.b2!=null?rs.b2:-1,b3=rs&&rs.b3!=null?rs.b3:-1;
+    if(inn>=10&&!rs){b2=(idx+NB-1)%NB;} /* extra-innings placed runner (10th on) */
     while(outs<3){
       if(need!==false&&need!==Infinity&&runs>=need)break; /* walk-off */
       var vsBP=spOuts>=leash;
@@ -1905,10 +1995,14 @@ function shAnalyzeLocal(slate){
       return Math.max(6,Math.round((ipg!=null?ipg:5.4)*3));
     }
     slate.games.forEach(function(g){
-      if(g.phase!=="pre")return;
+      /* live-state sims (2026-07-21, v2): an in-progress game with captured state
+         resumes from the real score/inning/base-out; pregame runs as always */
+      var gkeyLS=shGkey(g.away,g.home,g.gnum);
+      var lst=(g.phase==="live"&&shV2Sim()&&slate.liveState)?(slate.liveState[gkeyLS]||null):null;
+      if(g.phase!=="pre"&&!lst)return;
       if(!(g.lineup_away&&g.lineup_away.length>=9&&g.lineup_home&&g.lineup_home.length>=9))return;
       if(!g.probable_away||!g.probable_home)return;
-      var gkey=shGkey(g.away,g.home,g.gnum);
+      var gkey=gkeyLS;
       var wind=windNote(g),coors=/coors/i.test(g.venue||"");
       var pstHome=lookupPit[pnorm(g.probable_home)]||null,pstAway=lookupPit[pnorm(g.probable_away)]||null;
       /* v2 bullpen chain: 3-day fatigue × rolling pen QUALITY (ERA vs league), both 1 when dormant */
@@ -1932,7 +2026,11 @@ function shAnalyzeLocal(slate){
           var n=pnorm(row.p),bi=-1,team=null;
           for(var j=0;j<9;j++){if(pnorm(g.lineup_away[j])===n){bi=j;team="away";break;}if(pnorm(g.lineup_home[j])===n){bi=j;team="home";break;}}
           if(bi<0)return;
-          legs.push({key:shLegKey(row.p,mkt,row.ln),team:team,bat:bi,stat:stat,ln:row.ln});
+          /* live resume: seed the leg with the player's real tally so far */
+          var base=0;
+          if(lst){var tl=lst.tallies[n];
+            if(tl)base=stat==="h"?tl.h:stat==="tb"?tl.tb:stat==="hr"?tl.hr:tl.h+tl.r+tl.rbi;}
+          legs.push({key:shLegKey(row.p,mkt,row.ln),team:team,bat:bi,stat:stat,ln:row.ln,base:base});
         });});}
       var seed=shHash32(slate.date+"|"+g.away+"@"+g.home+(g.gnum?("#"+g.gnum):""));
       /* upgrade 02: games carrying sub-5% legs (HR props) get SH_V2.simNHR paths —
@@ -1941,8 +2039,10 @@ function shAnalyzeLocal(slate){
       if(shV2Sim()&&(SH_V2.simNHR|0)&&legs.some(function(l){return l.stat==="hr";}))simN=(SH_V2.simNHR|0);
       SIMS[gkey]=shSimGames({away:{bat:awayBat},home:{bat:homeBat},
         awayLeash:leashOf(g.probable_away),homeLeash:leashOf(g.probable_home),legs:legs,
-        v2:shV2Sim()?{total:(go&&go.total!=null)?go.total:null}:null},
+        v2:shV2Sim()?{total:(go&&go.total!=null)?go.total:null}:null,
+        init:lst||null},
         simN,seed);
+      if(lst)SIMS[gkey].liveInit=true;
       SIMS[gkey].gkey=gkey;
     });
   })();
@@ -1961,8 +2061,8 @@ function shAnalyzeLocal(slate){
     var sim=simOf(g),bits=[],risk=[],tags=[],nEffG=null;
     var model=novH;
     if(sim){
-      model=sim.pHome;nEffG=1500;tags.push("sim");
-      bits.push(sim.n+" simulated games: home wins "+(sim.pHome*100).toFixed(1)+"% · avg score "+sim.avgAway.toFixed(1)+"-"+sim.avgHome.toFixed(1)+" (away-home)");
+      model=sim.pHome;nEffG=1500;tags.push(sim.liveInit?"live-sim":"sim");
+      bits.push(sim.n+" simulated games"+(sim.liveInit?" RESUMED from the real score/inning/base-out state":"")+": home wins "+(sim.pHome*100).toFixed(1)+"% · avg final "+sim.avgAway.toFixed(1)+"-"+sim.avgHome.toFixed(1)+" (away-home)");
     }else{
       var oH=offense(g.lineup_home),oA=offense(g.lineup_away);
       var eH=eraOf(g.probable_home),eA=eraOf(g.probable_away);
@@ -2164,9 +2264,17 @@ function shAnalyzeLocal(slate){
       /* H+R+RBI has joint dependence on teammates (runs/RBI) — the doc mandates it comes
          from the game sims, not a closed-form guess. Sim marginal replaces Poisson here. */
       var simP=simOf(g);
-      if(simP&&mkt==="batter_hits_runs_rbis"){
+      if(simP&&mkt==="batter_hits_runs_rbis"&&!simP.liveInit){
         var sp=simP.legP[shLegKey(row.p,mkt,row.ln)];
         if(sp!=null){pO=sp;tags.push("sim");bits.push(simP.n+" sims → over hits "+(sp*100).toFixed(1)+"% (teammate-dependent, jointly simulated)");}
+      }
+      /* live-state sim (2026-07-21): mid-game, full-game rate models are the wrong
+         object — the resumed sim's marginal (real tally so far + simulated remainder)
+         replaces the model side for EVERY batter market it graded */
+      if(simP&&simP.liveInit){
+        var spL=simP.legP[shLegKey(row.p,mkt,row.ln)];
+        if(spL!=null){pO=shClamp(spL,0.001,0.999);tags.push("live-sim");
+          bits.unshift(simP.n+" sims resumed from the live score/inning/base-out → "+(spL*100).toFixed(1)+"% to clear "+row.ln+" (current tally counted)");}
       }
       var iO=shImp(row.o),iU=shImp(row.u);
       var sd=null;
@@ -2422,6 +2530,7 @@ function shAnalyzeLocal(slate){
     return {prop:t.player+" "+(SH_MKT_LABEL[t.mkt]||t.mkt)+" "+t.side+" "+t.ln+" ("+obSign(t.odds)+")",reason:t.why||"priced above fair probability"};});
 
   var simCount=Object.keys(SIMS).length;
+  var liveSimCount=Object.keys(SIMS).filter(function(k){return SIMS[k].liveInit;}).length;
   var windSpot=null;slate.games.forEach(function(gg){var w=windNote(gg);if(w.f>1&&!windSpot)windSpot=gg.away+" @ "+gg.home+" ("+gg.weather.wind+")";});
   var counts=SH_CATS.filter(function(c){return c[0]!=="all";}).map(function(c){return preF.cats[c[0]].length?preF.cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
   var lg=slate.liveGames||[];
@@ -2429,7 +2538,7 @@ function shAnalyzeLocal(slate){
     /* always state the sim depth — even when nothing was simmable this run
        (late-day boards: every game already started), the configured paths show */
     +" · Monte Carlo "+String((shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N)).replace(/\B(?=(\d{3})+$)/g,",")+" paths per game"
-    +(simCount?" ("+simCount+" games simmed this run)":" (no not-started games with confirmed lineups left to sim)")+". "
+    +(simCount?" ("+simCount+" games simmed this run"+(liveSimCount?" — "+liveSimCount+" resumed live from the real score/inning/base-out state":"")+")":" (no simmable games right now)")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+")"+(SH_V2.sim?", sim: log5 batter×pitcher, platoon, park×handedness, TTO/manager hook, bullpen fatigue+quality, FIP-informed starter quality, xERA-luck fade, pitch-count efficiency, totals/F5/team-total pricing":"")+". ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
