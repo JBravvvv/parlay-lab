@@ -329,7 +329,7 @@ export default function SharpPage() {
                   ERA/WHIP vs league).
                 </p>
                 <p>
-                  <b className="text-text">3 · Games get simulated.</b> 10,000 seeded Monte Carlo paths per game
+                  <b className="text-text">3 · Games get simulated.</b> 50,000 seeded Monte Carlo paths per game
                   with confirmed lineups — a full per-plate-appearance base-out machine with platoon (LHP/RHP)
                   splits, park factors by batter handedness, wind and temperature, ump strike zones, and
                   bullpen chains. It prices ML/RL, H+R+RBI, and flags correlated parlay legs.

@@ -58,7 +58,7 @@ export default function SimulatorPage() {
     <>
       <PageHeader
         title="Simulator"
-        sub="The engine's Monte Carlo game sims — 4,000 seeded paths per game, per-PA base-out machine, real lineups only"
+        sub="The engine's Monte Carlo game sims — 50,000 seeded paths per game, per-PA base-out machine, real lineups only"
         action={
           <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending}>
             {regen.isPending ? "Simulating…" : "Run fresh sims"}

@@ -273,8 +273,8 @@ export default function BoardPage() {
       {isPending || regen.isPending ? (
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>
           <div className="mb-3 text-[12px] text-muted">
-            Pulling schedule, lineups, multi-book odds and player form — then de-vigging, simulating and
-            ranking. ~15–30 seconds on a full slate.
+            Pulling schedule, lineups, multi-book odds and player form — then de-vigging, simulating
+            (50,000 paths per game) and ranking. ~30–60 seconds on a full slate.
           </div>
           <SkeletonRows rows={10} />
         </Panel>

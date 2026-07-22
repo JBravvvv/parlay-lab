@@ -121,8 +121,11 @@ async function armV2(eng: Engine) {
     sharpW: true,
     regions: "us,eu",
     sim: true, // log5/platoon/park×hand/TTO/hook/pen-fatigue + totals/F5 pricing
-    simN: 10000,
-    simNHR: 20000, // upgrade 02: games with sub-5% legs (HR props) get double the paths for joint tails
+    // user rule 2026-07-20: 50,000 seeded paths per game, everywhere the sim is
+    // consumed (Board, The Sharp, Simulator all read this same run's SIMS).
+    // simNHR (the sub-5%-leg/HR bump) matches — 50k is already the ceiling.
+    simN: 50000,
+    simNHR: 50000,
     // projected lineups (user rule 2026-07-17): everyday starters count before
     // lineups post; a posted lineup missing the player scratches him entirely
     projLineup: true,
