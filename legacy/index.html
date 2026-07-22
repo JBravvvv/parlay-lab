@@ -2426,7 +2426,10 @@ function shAnalyzeLocal(slate){
   var counts=SH_CATS.filter(function(c){return c[0]!=="all";}).map(function(c){return preF.cats[c[0]].length?preF.cats[c[0]].length+" "+c[1]:null;}).filter(Boolean).join(" · ");
   var lg=slate.liveGames||[];
   var overview=slate.games.length+"-game slate"+(lg.length?" · "+lg.length+" live":"")
-    +(simCount?" · "+simCount+" games Monte-Carlo simmed ("+String((shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N)).replace(/\B(?=(\d{3})+$)/g,",")+"× each)":"")+". "
+    /* always state the sim depth — even when nothing was simmable this run
+       (late-day boards: every game already started), the configured paths show */
+    +" · Monte Carlo "+String((shV2Sim()?((SH_V2.simN|0)||10000):SH_SIM_N)).replace(/\B(?=(\d{3})+$)/g,",")+" paths per game"
+    +(simCount?" ("+simCount+" games simmed this run)":" (no not-started games with confirmed lineups left to sim)")+". "
     +(slate.games.some(function(gg){return /coors/i.test(gg.venue||"");})?"Coors is in play. ":"")
     +(windSpot?("Best wind-out spot: "+windSpot+". "):"")
     +(SH_V2?"ENGINE V2 INTEGRATED: Statcast skill priors + Savant percentiles ("+(SH_PRIORS?Object.keys(SH_PRIORS.batters).length+" batters":"unavailable")+"), Shin de-vig, Pinnacle-weighted consensus across "+((SH_V2.regions)||"us")+" books, ump K-zones + temperature ("+(SH_CTX?"context live":"context unavailable")+")"+(SH_V2.sim?", sim: log5 batter×pitcher, platoon, park×handedness, TTO/manager hook, bullpen fatigue+quality, FIP-informed starter quality, xERA-luck fade, pitch-count efficiency, totals/F5/team-total pricing":"")+". ":"")+"Market-anchored engine: every price de-vigged across all posted books (median = consensus prior), model blended in at "
