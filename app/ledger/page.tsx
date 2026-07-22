@@ -20,6 +20,7 @@ import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
 import { ReceiptsPanel } from "@/components/ledger/ReceiptsPanel";
 import { SYNC_EVENT, syncNow, useSyncState } from "@/lib/ledgerSync";
+import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 
 const TIP = {
@@ -93,12 +94,17 @@ function SyncChip() {
 function LegLine({
   l,
   r,
+  now,
 }: {
   l: { label: string; prop: string; cz?: number | null };
   r?: { result: string; detail: string };
+  now?: LegNow | null;
 }) {
   const tone =
     r?.result === "won" ? "text-pos" : r?.result === "lost" ? "text-neg" : r ? "text-gold" : "";
+  // an undecided leg (no grade yet, or graded "pending" mid-game) shows the live
+  // number instead of a bare "pending" label
+  const undecided = !r || r.result === "pending";
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11.5px]">
       <span className="min-w-0 text-text">
@@ -106,7 +112,12 @@ function LegLine({
       </span>
       <span className="num flex shrink-0 items-center gap-2">
         <span className="text-gold">{l.cz != null ? amSign(Number(l.cz)) : "no CZ price"}</span>
-        {r && (
+        {undecided && now && (
+          <span className="text-[10px] font-bold text-live" title="Live from the official boxscore — updates every minute while the game is in progress">
+            ● {nowLabel(now)}
+          </span>
+        )}
+        {r && !(undecided && now) && (
           <span className={`text-[10px] font-bold uppercase ${tone}`}>
             {r.result}
             {r.detail ? ` · ${r.detail}` : ""}
@@ -117,8 +128,19 @@ function LegLine({
   );
 }
 
-function TicketRow({ t, e, g }: { t: LedgerEntry["core"][number]; e: LedgerEntry; g?: TicketGrade }) {
+function TicketRow({
+  t,
+  e,
+  g,
+  legNow,
+}: {
+  t: LedgerEntry["core"][number];
+  e: LedgerEntry;
+  g?: TicketGrade;
+  legNow?: (pk: number | null | undefined, lkey: string | null | undefined) => LegNow | null;
+}) {
   const legRes = e.grading?.legs ?? {};
+  const pkOf = (gkey?: string | null) => (gkey && e.games ? e.games[gkey]?.pk ?? null : null);
   const dec = t.confirmed != null ? undefined : t.czDec; // confirmed NV price supersedes
   const toWin =
     t.confirmed != null
@@ -157,7 +179,12 @@ function TicketRow({ t, e, g }: { t: LedgerEntry["core"][number]; e: LedgerEntry
       </summary>
       <div className="mt-2 space-y-1.5 rounded-[12px] bg-white/[0.03] px-3 py-2.5">
         {t.legs.map((l, i) => (
-          <LegLine key={`${l.label}|${l.prop}|${i}`} l={l} r={legRes[`${l.label}|${l.prop}`]} />
+          <LegLine
+            key={`${l.label}|${l.prop}|${i}`}
+            l={l}
+            r={legRes[`${l.label}|${l.prop}`]}
+            now={legNow ? legNow(pkOf(l.gkey), l.lkey) : null}
+          />
         ))}
         <div className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] pt-1.5 text-[10.5px] text-faint">
           <span>stake ${t.stake}</span>
@@ -173,6 +200,16 @@ function TicketRow({ t, e, g }: { t: LedgerEntry["core"][number]; e: LedgerEntry
 function DayCard({ e }: { e: LedgerEntry }) {
   const g = e.grading?.tickets ?? {};
   const tix = [...e.core, ...e.funT];
+  // live "now" stats: only days that still have something ungraded poll (a
+  // fully graded day requests nothing and the hook goes dormant)
+  const liveReqs = useMemo(
+    () =>
+      !e.grading?.done && e.games
+        ? Object.values(e.games).map((gm) => ({ pk: gm.pk ?? null, date: e.date }))
+        : [],
+    [e],
+  );
+  const live = useLiveNow(liveReqs);
   return (
     <details className="glass px-4 py-3">
       <summary className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2">
@@ -184,7 +221,7 @@ function DayCard({ e }: { e: LedgerEntry }) {
       </summary>
       <div className="mt-3 space-y-2">
         {tix.map((t) => (
-          <TicketRow key={t.id} t={t} e={e} g={g[t.id]} />
+          <TicketRow key={t.id} t={t} e={e} g={g[t.id]} legNow={live.legNow} />
         ))}
       </div>
     </details>

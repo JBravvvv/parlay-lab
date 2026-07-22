@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
@@ -14,6 +14,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { getEngine, getSelectionMode } from "@/lib/engine-client";
 import { useCalibration } from "@/lib/useCalibration";
+import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import type { PickRow } from "@/engine";
 
 /* The Sharp = the built-in quant engine's daily read. Same engine as the old
@@ -116,6 +117,18 @@ export default function SharpPage() {
   const trap = d?.trap as Trap | undefined;
   const passes = (d?.passes as Pass[] | undefined) ?? [];
 
+  // live "now" stats for plays whose games are in progress
+  const liveReqs = useMemo(
+    () => (d?.gameInfo ? Object.values(d.gameInfo).map((g) => ({ pk: g.pk, date: g.start ?? null })) : []),
+    [d],
+  );
+  const liveNow = useLiveNow(liveReqs);
+  const playNow = useCallback(
+    (r: PickRow) =>
+      r.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[r.gkey]?.pk ?? null, r.lkey) : null,
+    [d, liveNow],
+  );
+
   return (
     <>
       <PageHeader
@@ -204,6 +217,17 @@ export default function SharpPage() {
                   </div>
                   <div className="num mt-3 flex flex-wrap items-center gap-3 text-[11.5px]">
                     <span className="text-text">{Number(r.prob).toFixed(1)}% true</span>
+                    {(() => {
+                      const n = playNow(r);
+                      return n ? (
+                        <span
+                          className="text-[10px] font-bold text-live"
+                          title="Live from the official boxscore — updates every minute while the game is in progress"
+                        >
+                          ● {nowLabel(n)}
+                        </span>
+                      ) : null;
+                    })()}
                     <EvBadge ev={Number(selMode === "dk_fd" ? r.bsEv : r.czEv)} />
                     {selMode === "dk_fd" && r.czEv != null && (
                       <span className="text-muted" title="Informational: EV at the Caesars settlement price">

@@ -14,6 +14,7 @@ import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { getEngine, getMoney, setMoney, getSelectionMode, todayStr } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
+import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 
@@ -66,7 +67,7 @@ type LockedTicket = {
   supplemental?: boolean;
   late?: boolean;
   lockedAt?: number;
-  legs: { label: string; prop: string; cz?: number | null; bs?: number | null; bsBook?: string | null; gkey?: string | null }[];
+  legs: { label: string; prop: string; cz?: number | null; bs?: number | null; bsBook?: string | null; gkey?: string | null; lkey?: string | null }[];
 };
 /* supplemental fun locks: what the engine says can still be added today */
 type SuppCalc = {
@@ -105,7 +106,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade, tag, basisMode }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean }) {
+function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null }) {
   /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
      CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
   const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
@@ -191,6 +192,18 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode }: { t: Ticket & { 
                   PROJ
                 </span>
               )}
+              {legNow &&
+                (() => {
+                  const n = legNow(l as { gkey?: string | null; lkey?: string | null });
+                  return n ? (
+                    <span
+                      className="num ml-1.5 text-[10px] font-bold text-live"
+                      title="Live from the official boxscore — updates every minute while the game is in progress"
+                    >
+                      ● {nowLabel(n)}
+                    </span>
+                  ) : null;
+                })()}
             </span>
             <span className="num shrink-0">
               {basisMode && (l as { bs?: number | null }).bs != null && (
@@ -259,6 +272,18 @@ export default function BuilderPage() {
     const e = eng.get<(dt: string) => LockedEntry | null>("shLedgerFind")(todayStr());
     return e?.locked ? e : null;
   }, [eng, cardV]);
+
+  // live "now" stats on the locked card's legs while games are in progress
+  const liveReqs = useMemo(
+    () => (locked?.games ? Object.values(locked.games).map((g) => ({ pk: g.pk, date: g.start ?? null })) : []),
+    [locked],
+  );
+  const liveNow = useLiveNow(liveReqs);
+  const lockedLegNow = useCallback(
+    (l: { gkey?: string | null; lkey?: string | null }): LegNow | null =>
+      locked?.games && l.gkey ? liveNow.legNow(locked.games[l.gkey]?.pk ?? null, l.lkey) : null,
+    [locked, liveNow],
+  );
 
   const card: CardCalc | null = useMemo(() => {
     if (!eng || !d || locked) return null;
@@ -470,6 +495,7 @@ export default function BuilderPage() {
                       grade={locked.grading?.tickets?.[t.id]}
                       tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}
                       basisMode={basisMode}
+                      legNow={lockedLegNow}
                     />
                     {!started && !locked.grading?.tickets?.[t.id] && (
                       <div className="mt-1.5 flex items-center gap-2 px-1">

@@ -48,7 +48,18 @@ function TierTag({ tier }: { tier?: string }) {
   return <span className={`rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${cls}`}>{tier ?? "BALANCED"}</span>;
 }
 
-export function ParlaysSection({ parlays, mixed, live }: { parlays: Ticket[]; mixed: Ticket[]; live: Ticket[] }) {
+export function ParlaysSection({
+  parlays,
+  mixed,
+  live,
+  legNow,
+}: {
+  parlays: Ticket[];
+  mixed: Ticket[];
+  live: Ticket[];
+  /** live "now" chip for a leg while its game is in progress (Board passes it) */
+  legNow?: (l: { gkey?: string | null; lkey?: string | null }) => { txt: string; inning: string | null } | null;
+}) {
   const [view, setView] = useState<View>("parlays");
   const [pfilter, setPfilter] = useState("all");
   // dk_fd: mounted-gated localStorage read (hydration rule)
@@ -171,12 +182,24 @@ export function ParlaysSection({ parlays, mixed, live }: { parlays: Ticket[]; mi
                       )}
                     </div>
                     <ul className="mt-2.5 space-y-1 text-[12px] text-muted">
-                      {t.legs.map((l, i) => (
-                        <li key={i} className="truncate">
-                          <span className="text-text">{l.label}</span> · {l.prop}
-                          {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
-                        </li>
-                      ))}
+                      {t.legs.map((l, i) => {
+                        const n = legNow ? legNow(l as { gkey?: string | null; lkey?: string | null }) : null;
+                        return (
+                          <li key={i} className="truncate">
+                            <span className="text-text">{l.label}</span> · {l.prop}
+                            {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
+                            {n && (
+                              <span
+                                className="num ml-1.5 text-[10px] font-bold text-live"
+                                title="Live from the official boxscore — updates every minute while the game is in progress"
+                              >
+                                ● now {n.txt}
+                                {n.inning ? ` · ${n.inning}` : ""}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                     {e.note && <div className="mt-2 text-[10.5px] leading-relaxed text-faint">{e.note}</div>}
                   </Panel>

@@ -132,3 +132,43 @@ export function gradePrediction(
   if (val === ln) return { result: "push", detail: val + unit };
   return { result: (side === "O" ? val > ln : val < ln) ? "won" : "lost", detail: val + unit };
 }
+
+/* ---------- live "current" read (2026-07-21) ----------
+   The same stat extraction as the grader, but for a game IN PROGRESS: what is
+   this leg's number right now? No void/lineup rules (nothing is being settled),
+   no fabrication — a player not yet in the boxscore returns null, not 0. */
+export function currentValue(
+  lkey: string,
+  status: GameStatus | null,
+  box: Boxscore | null,
+): { txt: string } | null {
+  if (lkey === "ml_home" || lkey === "ml_away" || lkey === "rl_home" || lkey === "rl_away") {
+    if (status?.away == null || status?.home == null) return null;
+    return { txt: `${status.away}-${status.home}` };
+  }
+  const parts = lkey.split("|");
+  if (parts.length !== 3 || !box) return null;
+  const [pn, mkt] = parts;
+  const pl = findBoxPlayer(box, pn);
+  if (!pl) return null;
+  if (mkt === "pitcher_strikeouts" || mkt === "pitcher_outs") {
+    const pit = pl.stats?.pitching ?? {};
+    if (!Object.keys(pit).length) return null;
+    return mkt === "pitcher_strikeouts"
+      ? { txt: `${num(pit.strikeOuts)} K` }
+      : { txt: `${num(pit.outs)} outs` };
+  }
+  const bat = pl.stats?.batting ?? {};
+  if (!Object.keys(bat).length) return null;
+  const H = num(bat.hits);
+  const R = num(bat.runs);
+  const BI = num(bat.rbi);
+  const HR = num(bat.homeRuns);
+  const D2 = num(bat.doubles);
+  const T3 = num(bat.triples);
+  if (mkt === "batter_hits") return { txt: `${H} H` };
+  if (mkt === "batter_total_bases") return { txt: `${H + D2 + 2 * T3 + 3 * HR} TB` };
+  if (mkt === "batter_home_runs") return { txt: `${HR} HR` };
+  if (mkt === "batter_hits_runs_rbis") return { txt: `${H + R + BI} H+R+RBI` };
+  return null;
+}

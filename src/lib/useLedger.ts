@@ -57,6 +57,8 @@ export type LedgerEntry = {
   funT: LedgerTicket[];
   grading?: { tickets: Record<string, TicketGrade>; legs: Record<string, { result: string; detail: string }>; done: boolean } | null;
   clv?: Record<string, { am: number; at: number }>;
+  /* per-game keys captured at lock (pk/start) — feeds grading, CLV and live "now" stats */
+  games?: Record<string, { pk?: number | null; start?: string | null }>;
   [k: string]: unknown;
 };
 export type LedgerTicket = {
@@ -73,7 +75,7 @@ export type LedgerTicket = {
   supplemental?: boolean;
   late?: boolean;
   lockedAt?: number;
-  legs: { label: string; prop: string; cz?: number | null }[];
+  legs: { label: string; prop: string; cz?: number | null; lkey?: string | null; gkey?: string | null }[];
 };
 export type TicketGrade = { result: string; payout: number; dec?: number; detail?: string };
 

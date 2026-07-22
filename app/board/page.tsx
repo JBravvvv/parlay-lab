@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
@@ -19,6 +19,7 @@ import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
 import { getMoney, getSelectionMode } from "@/lib/engine-client";
+import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 
@@ -77,18 +78,42 @@ export default function BoardPage() {
   const offBook = rows.length - playable.length;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
 
+  // live "now" stats for in-progress games — one shared poll for the whole page
+  // (board rows, parlay legs); only live games fetch boxscores
+  const liveReqs = useMemo(
+    () => (d?.gameInfo ? Object.values(d.gameInfo).map((g) => ({ pk: g.pk, date: g.start ?? null })) : []),
+    [d],
+  );
+  const liveNow = useLiveNow(liveReqs);
+  const legLive = useCallback(
+    (l: { gkey?: string | null; lkey?: string | null }) =>
+      l.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[l.gkey]?.pk ?? null, l.lkey) : null,
+    [d, liveNow],
+  );
+
   const columns: Column<PickRow>[] = useMemo(
     () => [
       {
         key: "pick",
         header: "Pick",
         sortValue: (r) => r.label,
-        cell: (r) => (
-          <div>
-            <div className="font-medium text-text">{r.label}</div>
-            <div className="text-[11px] text-muted">{r.sub}</div>
-          </div>
-        ),
+        cell: (r) => {
+          const n = legLive({ gkey: r.gkey, lkey: r.lkey });
+          return (
+            <div>
+              <div className="font-medium text-text">{r.label}</div>
+              <div className="text-[11px] text-muted">{r.sub}</div>
+              {n && (
+                <div
+                  className="num text-[10px] font-bold text-live"
+                  title="Live from the official boxscore — updates every minute while the game is in progress"
+                >
+                  ● {nowLabel(n)}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
       {
         key: "prob",
@@ -194,7 +219,7 @@ export default function BoardPage() {
             } satisfies Column<PickRow>,
           ]),
     ],
-    [bankroll, basisMode],
+    [bankroll, basisMode, legLive],
   );
 
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
@@ -329,6 +354,7 @@ export default function BoardPage() {
           parlays={d.parlays ?? []}
           mixed={d.parlaysMixed ?? []}
           live={d.parlaysLive ?? []}
+          legNow={legLive}
         />
       )}
 
