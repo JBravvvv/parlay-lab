@@ -484,3 +484,37 @@ Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-a
   CZ doesn't offer are listed separately, never substituted. `caesars_ev` = legacy ranking,
   in Settings. TOP 50 unchanged. Allocator: `SH_CFG.selMode` drives the base weight.
 - Fail-silent contract: any calibration failure leaves board generation untouched.
+
+## Ledger autopsy fixes (2026-07-22, after the first 6 graded days: 6-32, −$376.91)
+1. **Grading audit** — every settled ML/RL leg re-verified against statsapi finals with
+   explicit home/away team-ID mapping (incl. the 7/18 PIT@CLE doubleheader by gamePk):
+   **all results were correct**. The defect was display: `detail` printed the raw
+   away-home score unlabeled ("1-6" beside a Phillies bet that WON 6-1). Both graders
+   (engine `shGradeLeg` + cloud `gradePrediction`) and the live `currentValue` chip now
+   render **[bet team]-[opponent]**, always. Stored v1 strings migrate once via
+   `shGradeOrientFix()` (runs at the top of every grade pass; flips *_home ML/RL details,
+   stamps `grading.v=2`; results/tickets untouched; idempotent). Tests:
+   `tests/grade-orientation.test.ts` pins both bet sides on the real audited finals.
+2. **Settlement floor** — `SH_CFG.coreCzEvMin:0`: in dk_fd, a core ticket must ALSO be
+   ≥0% EV at Caesars (the settling book) to lock. Selection math stays 100% basis-priced;
+   this is a refusal, not a ranking input. Refusals are returned in `alloc.blocked`
+   (reason `nv_tax`) and the Builder shows "blocked: NV tax turns this negative".
+3. **H+R+RBI alt-ladder suspension** — `SH_CFG.hrrAltMax:0.5`: H+R+RBI lines above O0.5
+   are excluded from every auto-built ticket (parlays tab, card, FUN) until recalibrated;
+   board rows stay visible. Audit: the closed-form H+R+RBI λ was a per-GAME rate with no
+   PA conditioning (Hits/TB/HR scale by `expAB`; hrr didn't) — now v2-gated re-based to
+   tonight's slot-implied ABs vs the player's own last-30 AB/g, clamped ±15%, disclosed
+   in the pick's case ("H+R+RBI rate re-based to #7 spot PA"). The sim path was already
+   order-aware.
+4. **Small-sample consensus gate** — a ticket touching any market with <`consMinN:100`
+   graded ledger legs (counts arrive as `SH_CFG.mktN` from the calibration summary at arm
+   time; missing store ⇒ every market small) must also carry de-vigged consensus-fair EV
+   (`ticket.consEv`, product of leg `imp` at the basis price) ≥ `consMinEv:-1`%. Refusal
+   reason `consensus` → Builder chip "consensus disagrees".
+5. **Structure caps** — `SH_CFG.coreMaxLegs:3` in shCoreEligible (graded record: 2-leg
+   −0.7% on $464; 3+ legs 1-25); FUN keeps longshots. FUN daily default = `FUN_DEFAULT` $5
+   (engine-client): a typed FUN amount holds for that day only (`pl_fun_day`), every new
+   day reopens at $5 (graded FUN record 0-13, −$220 = 58% of all losses).
+Tests: `tests/autopsy-floors.test.ts` (floors, gates, caps, suspension incl. board-visibility
+split). Parity digest unchanged (suspension lives inside the dk_fd branch; PA-conditioning
+is v2-gated; floors only fire under basisMode+evGated).

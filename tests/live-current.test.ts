@@ -26,8 +26,8 @@ describe("currentValue — live leg reads from the official boxscore", () => {
     expect(currentValue("drewrasmussen|pitcher_strikeouts|4.5", live, box)).toEqual({ txt: "2 K" });
     expect(currentValue("drewrasmussen|pitcher_outs|14.5", live, box)).toEqual({ txt: "7 outs" });
   });
-  it("ML/RL legs read the live score", () => {
-    expect(currentValue("ml_home", live, box)).toEqual({ txt: "3-2" });
+  it("ML/RL legs read the live score, rendered [bet team]-[opponent]", () => {
+    expect(currentValue("ml_home", live, box)).toEqual({ txt: "2-3" });
     expect(currentValue("rl_away", live, box)).toEqual({ txt: "3-2" });
     expect(currentValue("ml_home", { state: "In Progress", away: null, home: 2 }, box)).toBeNull();
   });

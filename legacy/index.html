@@ -1073,6 +1073,18 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
      fraction convention; 0.02 here would gate at +0.02% and silently mean breakeven).
      dailyBankrollCap bounds any day's core allocation to a fraction of bankroll. */
   coreEvMin:2,dailyBankrollCap:0.10,
+  /* ledger-autopsy floors (2026-07-22):
+     coreCzEvMin — settlement floor: selection prices at the DK/FD basis, but every ticket
+       SETTLES at Caesars; a core ticket that's negative-EV at the settling book never locks.
+     coreMaxLegs — core cards stop at 3 legs (graded record: 2-leg tickets −0.7% on $464;
+       3+-leg tickets 1-25); longer builds stay browsable and FUN-eligible.
+     hrrAltMax — H+R+RBI alternate lines ABOVE this are suspended from all auto-built
+       tickets until the market's calibration earns them back (O0.5 performs; O1.5+ bled).
+     consMinN/consMinEv — small-sample market gate: a ticket touching any market with fewer
+       than consMinN graded ledger legs also needs the de-vigged consensus itself to price it
+       no worse than consMinEv% at the basis. mktN arrives from the calibration store at arm
+       time; an unknown market counts as small — a market is never assumed proven. */
+  coreCzEvMin:0,coreMaxLegs:3,hrrAltMax:0.5,consMinN:100,consMinEv:-1,mktN:null,
   /* advisory only, never blocks: when the entered DAILY exceeds 5× the Kelly-consistent
      figure, the Builder shows an amber sizing note (dailyKellyGuide:false hides it) */
   dailyKellyGuide:true,
@@ -2241,6 +2253,16 @@ function shAnalyzeLocal(slate){
           rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,150,shPriorHR(st,Lhr))):null;rate=bvpRate(rate,bvp&&bvp.hr);lam=rate!=null?rate*expAB*hrF:null;}
         if(mkt==="batter_hits_runs_rbis"){bn=shBlendN(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);
           rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,10,Lhrr)):null;lam=rate!=null?rate*(coors?1.08:1)*power:null;
+          /* PA-conditioning (2026-07-22 audit): the per-game H+R+RBI rate carries the
+             player's historical PA volume, not tonight's batting-order slot — a counting
+             stat priced without it overrates bottom-of-order alt lines. Re-base the rate
+             to tonight's slot-implied ABs vs his own last-30 ABs/game. v2-gated; the sim
+             path (when a lineup sims) is order-aware already. */
+          if(lam!=null&&shV2Sim()){
+            var g30v=Number(st.last30.g)||0,ab30v=Number(st.last30.ab)||0;
+            if(g30v>=5&&ab30v>0){var abG=ab30v/g30v;
+              if(abG>=2.2&&abG<=5.5){lam*=shClamp(expAB/abG,0.85,1.15);
+                bits.push("H+R+RBI rate re-based to "+(spot?("#"+spot+" spot"):"projected")+" PA (~"+expAB.toFixed(1)+" AB vs "+abG.toFixed(1)+" AB/g)");}}}
           if(lam!=null&&bvp){var bpa=Number(bvp.pa)||Number(bvp.ab)||0;
             if(bpa>=15){var w2=bpa/(bpa+(bpa<30?300:150));lam*=shClamp(1+(((bvp.tb/Math.max(1,bvp.ab))/0.40)-1)*w2,0.90,1.10);bvpUsed=true;}}}
         if(lam==null)return;
@@ -2380,6 +2402,7 @@ function shAnalyzeLocal(slate){
   function legOf(x){return {label:x.r.label,prop:x.r.sub,odds:String(x.r.odds).replace(/[^\d+-]/g,""),est:String(x.r.prob),
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
     cz:(x.r.cz!=null?x.r.cz:null),bs:(x.r.bs!=null?x.r.bs:null),bsBook:x.r.bsBook||null,
+    imp:(x.r.implied!=null?x.r.implied:null),
     live:!!x.r.live,lu:x.r.lu||"confirmed"};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
@@ -2389,7 +2412,14 @@ function shAnalyzeLocal(slate){
        shared usage ledger would leak NV prices into which SELECTABLE tickets get
        built. Single picks stay board-visible and manual-slip eligible. */
     if(SH_CFG.selMode==="dk_fd"){
-      var C2={};Object.keys(C).forEach(function(k){C2[k]=C[k].filter(function(r){return r.bs!=null;});});
+      var hrrMax=(SH_CFG.hrrAltMax!=null)?SH_CFG.hrrAltMax:1/0;
+      var C2={};Object.keys(C).forEach(function(k){C2[k]=C[k].filter(function(r){
+        if(r.bs==null)return false;
+        /* H+R+RBI alt-ladder suspension (2026-07-22): lines above hrrAltMax are barred
+           from every auto-built ticket until the market's calibration earns them back */
+        var lp=(r.lkey||"").split("|");
+        if(lp[1]==="batter_hits_runs_rbis"&&Number(lp[2])>hrrMax)return false;
+        return true;});});
       C=C2;
     }
     var use={uPlayer:{},uKey:{}};
@@ -2463,6 +2493,11 @@ function shAnalyzeLocal(slate){
       legs.forEach(function(l){var d3=l.bs!=null?amToDec(l.bs):null;if(d3)bsDecT*=d3;else bsAll=false;});
       var bsOddsT=bsAll?decToAm(bsDecT):null;
       var bsEvT=(bsAll&&prob>0)?prob*bsDecT-1:null;
+      /* de-vigged consensus read of the same ticket at the basis price: what the market
+         itself says this parlay is worth. Small-sample gate input — never a selector. */
+      var consP=1,consAll=true;
+      legs.forEach(function(l){var ip2=(l.imp!=null)?Number(l.imp)/100:null;if(ip2>0)consP*=ip2;else consAll=false;});
+      var consEvT=(consAll&&bsAll&&bsDecT>1)?consP*bsDecT-1:null;
       var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
@@ -2473,7 +2508,8 @@ function shAnalyzeLocal(slate){
         czOdds:(czOddsT!=null?obSign(czOddsT):null),czDec:czAll?Math.round(czDec*10000)/10000:null,
         czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,
         bsOdds:(bsOddsT!=null?obSign(bsOddsT):null),bsDec:bsAll?Math.round(bsDecT*10000)/10000:null,
-        bsEv:bsEvT!=null?Math.round(bsEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
+        bsEv:bsEvT!=null?Math.round(bsEvT*1000)/10:null,
+        consEv:consEvT!=null?Math.round(consEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
         ev:evT!=null?Math.round(evT*1000)/10:null,fair:(fairAm!=null?obSign(fairAm):null),
         note:(negCorr?"⛔ Sim says these legs work AGAINST each other (negatively correlated) — EV is worse than it looks. ":
               posCorr?"✳ Sim-confirmed positive correlation between same-game legs. ":
@@ -2636,6 +2672,9 @@ function shCoreEligible(w,cfg){
   var pl=w.pl;
   if(cfg.coreNoHR&&(pl.type==="batter_home_runs"||
     pl.legs.some(function(l){return (l.lkey||"").indexOf("|batter_home_runs|")>=0;})))return false;
+  /* structure cap (2026-07-22): daily money never rides more than coreMaxLegs legs —
+     the graded record priced it (2-leg −0.7% on $464; 3+ legs 1-25). FUN keeps longshots. */
+  if(cfg.coreMaxLegs&&pl.legs&&pl.legs.length>cfg.coreMaxLegs)return false;
   /* dk_fd: length cap applies at the basis price — the CZ quote may not shape selection */
   var selDecE=(cfg.selMode==="dk_fd")?pl.bsDec:pl.czDec;
   if(cfg.coreMaxDec&&selDecE!=null&&selDecE>cfg.coreMaxDec)return false;
@@ -2643,7 +2682,7 @@ function shCoreEligible(w,cfg){
 }
 function shAllocate(pool,amount,cfg,force){
   amount=Math.max(0,Math.round(Number(amount)||0));
-  if(!pool.length||amount<=0)return {picks:[],sum:0,ev:null};
+  if(!pool.length||amount<=0)return {picks:[],sum:0,ev:null,blocked:[]};
   /* stake weight = ¼-Kelly-proportional fraction: edge ÷ odds. Kelly is what maximizes
      bankroll growth — it naturally starves long odds (huge denominator) and feeds
      high-floor edges, instead of chasing compounded parlay "EV". */
@@ -2660,17 +2699,34 @@ function shAllocate(pool,amount,cfg,force){
   var evGated=(mode==="ev_gated"||basisMode)&&!force;
   var probMode=mode==="probability"||mode==="ev_gated"||basisMode;
   var evMin=(cfg.coreEvMin!=null)?cfg.coreEvMin:0;
-  var scored=[];
+  var scored=[],blocked=[];
   pool.forEach(function(w,i){
     if(!shCoreEligible(w,cfg))return;
     if(basisMode&&(w.pl.bsDec==null||w.pl.czDec==null))return; /* no DK/FD basis (or no CZ) → ineligible, never faked */
     var selEv=basisMode?w.pl.bsEv:w.pl.czEv;
     if(evGated&&!(selEv!=null&&selEv>=evMin))return;
+    /* 2026-07-22 floors — checked AFTER the basis gate, so `blocked` discloses exactly
+       the tickets that would have made the card without them. */
+    if(basisMode&&evGated){
+      /* settlement floor: the ticket settles at Caesars; NV tax must not turn it negative */
+      var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
+      if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
+        blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
+      /* small-sample market gate: unproven markets also need the consensus on side */
+      var mn=cfg.mktN||null,minN=(cfg.consMinN!=null)?cfg.consMinN:100,
+          cMin=(cfg.consMinEv!=null)?cfg.consMinEv:-1;
+      var small=w.pl.legs.some(function(l){
+        var lk2=l.lkey||"",lp3=lk2.split("|");
+        var mk=(lk2==="ml_home"||lk2==="ml_away")?"ml":(lk2==="rl_home"||lk2==="rl_away")?"rl":lp3[1];
+        return !(mn&&mk&&mn[mk]>=minN);});
+      if(small&&!(w.pl.consEv!=null&&Number(w.pl.consEv)>=cMin)){
+        blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,consEv:w.pl.consEv,reason:"consensus"});return;}
+    }
     var ev=((selEv!=null?selEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
     var dec=(basisMode?w.pl.bsDec:w.pl.czDec)||2;
     scored.push({w:w,i:i,ev:ev,prob:prob,base:probMode?prob:((dec>1)?Math.max(ev,0)/(dec-1):0)});
   });
-  if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated};
+  if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated,blocked:blocked};
   /* negative-EV slate under the LEGACY modes: still allocate the full amount weighted by
      hit floor — disclosed by the banner. Under ev_gated the empty pool above IS the answer. */
   if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
@@ -2776,7 +2832,7 @@ function shAllocate(pool,amount,cfg,force){
   var out=[];picked.forEach(function(s,i){if(st[i]<=0)return;sum+=st[i];evAcc+=st[i]*s.ev;
     s.w.pl.legs.forEach(function(l){legSet[l.label+"|"+l.prop]=1;});
     out.push({id:shTicketId(s.w.pl),w:s.w,stake:st[i]});});
-  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,
+  return {picks:out,sum:sum,ev:sum>0?evAcc/sum:null,legs:legSet,blocked:blocked,
     unallocated:Math.max(0,amount-sum),overrode:!!(force&&(mode==="ev_gated"||mode==="dk_fd"))};
 }
 /* one stakeable ticket card (core or FUN) */
@@ -3139,7 +3195,9 @@ function shGradeLeg(leg,entry,boxes,statusMap){
   if(lk==="ml_home"||lk==="ml_away"||lk==="rl_home"||lk==="rl_away"){
     var hR=stt.home,aR=stt.away;
     if(hR==null||aR==null)return {result:"ungradable",detail:"no final score"};
-    var sc=aR+"-"+hR;
+    /* score is always rendered [bet team]-[opponent] — never raw away-home */
+    var betHome=(lk==="ml_home"||lk==="rl_home");
+    var sc=betHome?(hR+"-"+aR):(aR+"-"+hR);
     if(lk==="ml_home")return {result:hR>aR?"won":"lost",detail:sc};
     if(lk==="ml_away")return {result:aR>hR?"won":"lost",detail:sc};
     var mPt=(leg.prop||"").match(/RL ([+-][\d.]+)/),pt=mPt?Number(mPt[1]):null;
@@ -3205,7 +3263,27 @@ function shGradeTicket(t,legRes){
 }
 /* grade every locked, unfinished ledger entry from live box scores. Re-runnable + idempotent:
    boxscores are immutable once final, and only grading/clv subfields ever merge. */
+/* grading.v 2 (2026-07-22 audit): ML/RL details stored before the orientation fix are raw
+   away-home; re-render them [bet team]-[opponent]. Results are never touched — this is a
+   display-string adjustment on the grading blob only, and it runs exactly once per entry. */
+function shGradeOrientFix(){
+  var n=0;
+  shLedger().forEach(function(e){
+    if(!e.locked||!e.grading||(e.grading.v||1)>=2)return;
+    var legs=e.grading.legs||{};
+    e.core.concat(e.funT||[]).forEach(function(t){(t.legs||[]).forEach(function(l){
+      var g=legs[l.label+"|"+l.prop];
+      if(!g)return;
+      if((l.lkey==="ml_home"||l.lkey==="rl_home")&&/^\d+-\d+$/.test(g.detail||"")){
+        var p=g.detail.split("-");g.detail=p[1]+"-"+p[0];n++;}
+    });});
+    e.grading.v=2;
+    shLedgerSave({date:e.date,grading:e.grading,gradedAt:e.gradedAt||Date.now()});
+  });
+  return n;
+}
 function shGrade(){
+  shGradeOrientFix();
   var pend=shLedger().filter(function(e){return e.locked&&(!e.grading||!e.grading.done);});
   if(!pend.length)return Promise.resolve(0);
   var pks={},dates={};
@@ -3233,7 +3311,7 @@ function shGrade(){
       e.core.concat(e.funT).forEach(function(t){
         var g=shGradeTicket(t,legRes);tickets[t.id]=g;
         if(g.result==="pending"||g.result==="ungradable")done=false;});
-      var next={date:e.date,grading:{legs:legRes,tickets:tickets,done:done},gradedAt:Date.now()};
+      var next={date:e.date,grading:{legs:legRes,tickets:tickets,done:done,v:2},gradedAt:Date.now()};
       var prev=JSON.stringify(e.grading&&e.grading.tickets);
       shLedgerSave(next);
       if(JSON.stringify(tickets)!==prev)changed++;

@@ -74,7 +74,9 @@ export function gradePrediction(
     const hR = status.home;
     const aR = status.away;
     if (hR == null || aR == null) return { result: "ungradable", detail: "no final score" };
-    const sc = `${aR}-${hR}`;
+    // score is always rendered [bet team]-[opponent] — never raw away-home
+    const betHome = lkey === "ml_home" || lkey === "rl_home";
+    const sc = betHome ? `${hR}-${aR}` : `${aR}-${hR}`;
     if (lkey === "ml_home") return { result: hR > aR ? "won" : "lost", detail: sc };
     if (lkey === "ml_away") return { result: aR > hR ? "won" : "lost", detail: sc };
     const mPt = sub.match(/RL ([+-][\d.]+)/);
@@ -144,7 +146,9 @@ export function currentValue(
 ): { txt: string } | null {
   if (lkey === "ml_home" || lkey === "ml_away" || lkey === "rl_home" || lkey === "rl_away") {
     if (status?.away == null || status?.home == null) return null;
-    return { txt: `${status.away}-${status.home}` };
+    // [bet team]-[opponent], matching the grader's settled details
+    const betHome = lkey === "ml_home" || lkey === "rl_home";
+    return { txt: betHome ? `${status.home}-${status.away}` : `${status.away}-${status.home}` };
   }
   const parts = lkey.split("|");
   if (parts.length !== 3 || !box) return null;

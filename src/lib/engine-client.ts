@@ -142,6 +142,14 @@ async function armV2(eng: Engine) {
     // null (dormant) whenever the store is empty or auto_calibration is off
     calG: (cal as { global?: { s?: number } | null } | null)?.global?.s ?? null,
   });
+  // small-sample consensus gate (2026-07-22): graded-leg counts per market from the
+  // nightly calibration summary. Missing store → null → every market counts as small,
+  // which only ever tightens selection — a market is never assumed proven.
+  const cfg = eng.get<Record<string, unknown>>("SH_CFG");
+  if (cfg) {
+    const rel = (cal as { summary?: { reliability?: Record<string, { n?: number }> } } | null)?.summary?.reliability ?? null;
+    cfg.mktN = rel ? Object.fromEntries(Object.entries(rel).map(([k, v]) => [k, v?.n ?? 0])) : null;
+  }
 }
 
 /** Full engine run: slate collection (via the odds proxy) + analysis. */
@@ -170,13 +178,25 @@ function syncEngineBoard(b: Board) {
   if (SH) SH.board = { date: b.date, data: b.data };
 }
 
+/** FUN bucket daily default (2026-07-22): the graded FUN record is 0-13 for −$220 —
+    58% of all losses. A FUN amount typed in the field holds for THAT day; every new
+    day opens back at this default. The field stays fully editable. */
+export const FUN_DEFAULT = 5;
+
 /** Money state lives in the same legacy keys. */
 export function getMoney() {
   const eng = getEngine();
   const SH = eng.get<{ daily?: number; fun?: number; bankroll?: number }>("SH") || {};
+  const LS = eng.get<{ get: (k: string, d: unknown) => unknown }>("LS");
+  // fun is day-scoped: yesterday's override never silently carries forward
+  let fun = Number(SH.fun) || 0;
+  if (LS?.get("pl_fun_day", "") !== todayStr()) {
+    fun = FUN_DEFAULT;
+    if (SH) (SH as { fun?: number }).fun = fun; // engine must agree with what the field shows
+  }
   return {
     daily: Number(SH.daily) || 0,
-    fun: Number(SH.fun) || 0,
+    fun,
     bankroll: Number(SH.bankroll) || 750,
   };
 }
@@ -193,6 +213,7 @@ export function setMoney(patch: { daily?: number; fun?: number; bankroll?: numbe
   if (patch.fun != null) {
     SH.fun = patch.fun;
     LS?.set("pl_fun", patch.fun);
+    LS?.set("pl_fun_day", todayStr()); // fun overrides are for today only (FUN_DEFAULT rule)
   }
   if (patch.bankroll != null) {
     SH.bankroll = patch.bankroll;

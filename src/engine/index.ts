@@ -94,6 +94,8 @@ export interface Ticket {
   bsOdds?: string | null;
   bsDec?: number | null;
   bsEv?: number | null;
+  /* de-vigged consensus EV% of the whole ticket at the basis price (small-sample gate input) */
+  consEv?: number | null;
   posCorr?: boolean;
   negCorr?: boolean;
   legs: TicketLeg[];

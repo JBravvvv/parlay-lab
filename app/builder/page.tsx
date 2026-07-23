@@ -31,6 +31,10 @@ type CardCalc = {
     noPlay?: boolean;
     overrode?: boolean;
     unallocated?: number;
+    /* 2026-07-22 floors: tickets that cleared the basis EV gate but were refused —
+       "nv_tax" (negative EV at the settling book) or "consensus" (small-sample market
+       the de-vigged consensus disagrees with) */
+    blocked?: { name: string; bsEv?: number | null; czEv?: number | null; consEv?: number | null; reason: "nv_tax" | "consensus" }[];
   };
   fun: { picks: CardPick[]; sum: number };
   kellyDaily: number;
@@ -647,6 +651,32 @@ export default function BuilderPage() {
                 >
                   Allocate anyway (tracked as an override)
                 </Pill>
+              </div>
+            </Panel>
+          )}
+
+          {/* 2026-07-22 floors: tickets that cleared the basis EV gate but were refused,
+              disclosed so a shrinking card is never a mystery */}
+          {(card.alloc.blocked?.length ?? 0) > 0 && (
+            <Panel>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Cleared the gate, refused anyway</div>
+              <div className="mt-2 space-y-1.5">
+                {card.alloc.blocked!.map((b, i) => (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
+                    <span className="font-semibold text-text">{b.name}</span>
+                    {b.reason === "nv_tax" ? (
+                      <span className="text-gold">
+                        blocked: NV tax turns this negative
+                        <span className="num text-muted"> (basis {b.bsEv != null ? `+${b.bsEv}%` : "—"} → CZ {b.czEv != null ? `${b.czEv}%` : "no quote"})</span>
+                      </span>
+                    ) : (
+                      <span className="text-gold">
+                        consensus disagrees
+                        <span className="num text-muted"> (small-sample market · consensus EV {b.consEv != null ? `${b.consEv}%` : "—"})</span>
+                      </span>
+                    )}
+                  </div>
+                ))}
               </div>
             </Panel>
           )}
