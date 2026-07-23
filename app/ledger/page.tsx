@@ -299,7 +299,8 @@ export default function LedgerPage() {
   }, []);
   useEffect(() => {
     if (autoGraded.current || !api || grading) return;
-    if (!api.entries.some((e) => !e.grading?.done)) return;
+    // v<2 days need the one-time score-orientation migration even when fully graded
+    if (!api.entries.some((e) => !e.grading?.done || (e.grading?.v ?? 1) < 2)) return;
     autoGraded.current = true;
     void doGrade();
     // eslint-disable-next-line react-hooks/exhaustive-deps

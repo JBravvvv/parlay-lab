@@ -55,7 +55,7 @@ export type LedgerEntry = {
   cardEv?: number;
   core: LedgerTicket[];
   funT: LedgerTicket[];
-  grading?: { tickets: Record<string, TicketGrade>; legs: Record<string, { result: string; detail: string }>; done: boolean } | null;
+  grading?: { tickets: Record<string, TicketGrade>; legs: Record<string, { result: string; detail: string }>; done: boolean; v?: number } | null;
   clv?: Record<string, { am: number; at: number }>;
   /* per-game keys captured at lock (pk/start) — feeds grading, CLV and live "now" stats */
   games?: Record<string, { pk?: number | null; start?: string | null }>;
