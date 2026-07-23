@@ -2411,12 +2411,14 @@ function shAnalyzeLocal(slate){
        one-sided no-basis rows carry an NV-anchored prob — letting them into the
        shared usage ledger would leak NV prices into which SELECTABLE tickets get
        built. Single picks stay board-visible and manual-slip eligible. */
-    if(SH_CFG.selMode==="dk_fd"){
+    var selMP=SH_CFG.selMode;
+    if(selMP==="dk_fd"||selMP==="ev_gated"){
       var hrrMax=(SH_CFG.hrrAltMax!=null)?SH_CFG.hrrAltMax:1/0;
       var C2={};Object.keys(C).forEach(function(k){C2[k]=C[k].filter(function(r){
-        if(r.bs==null)return false;
+        if(selMP==="dk_fd"&&r.bs==null)return false; /* basis-priced universe only in dk_fd */
         /* H+R+RBI alt-ladder suspension (2026-07-22): lines above hrrAltMax are barred
-           from every auto-built ticket until the market's calibration earns them back */
+           from every auto-built ticket in BOTH disciplined modes until the market's
+           calibration earns them back */
         var lp=(r.lkey||"").split("|");
         if(lp[1]==="batter_hits_runs_rbis"&&Number(lp[2])>hrrMax)return false;
         return true;});});
@@ -2498,6 +2500,7 @@ function shAnalyzeLocal(slate){
       var consP=1,consAll=true;
       legs.forEach(function(l){var ip2=(l.imp!=null)?Number(l.imp)/100:null;if(ip2>0)consP*=ip2;else consAll=false;});
       var consEvT=(consAll&&bsAll&&bsDecT>1)?consP*bsDecT-1:null;
+      var consCzEvT=(consAll&&czAll&&czDec>1)?consP*czDec-1:null; /* same read at the CZ price (ev_gated mode) */
       var stake=dec<=3?100:dec<=6?50:dec<=12?25:dec<=40?10:5;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
@@ -2509,7 +2512,8 @@ function shAnalyzeLocal(slate){
         czEv:czEvT!=null?Math.round(czEvT*1000)/10:null,
         bsOdds:(bsOddsT!=null?obSign(bsOddsT):null),bsDec:bsAll?Math.round(bsDecT*10000)/10000:null,
         bsEv:bsEvT!=null?Math.round(bsEvT*1000)/10:null,
-        consEv:consEvT!=null?Math.round(consEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
+        consEv:consEvT!=null?Math.round(consEvT*1000)/10:null,
+        consCzEv:consCzEvT!=null?Math.round(consCzEvT*1000)/10:null,posCorr:posCorr,negCorr:negCorr,
         ev:evT!=null?Math.round(evT*1000)/10:null,fair:(fairAm!=null?obSign(fairAm):null),
         note:(negCorr?"⛔ Sim says these legs work AGAINST each other (negatively correlated) — EV is worse than it looks. ":
               posCorr?"✳ Sim-confirmed positive correlation between same-game legs. ":
@@ -2705,22 +2709,30 @@ function shAllocate(pool,amount,cfg,force){
     if(basisMode&&(w.pl.bsDec==null||w.pl.czDec==null))return; /* no DK/FD basis (or no CZ) → ineligible, never faked */
     var selEv=basisMode?w.pl.bsEv:w.pl.czEv;
     if(evGated&&!(selEv!=null&&selEv>=evMin))return;
-    /* 2026-07-22 floors — checked AFTER the basis gate, so `blocked` discloses exactly
+    /* 2026-07-22 floors — checked AFTER the selection gate, so `blocked` discloses exactly
        the tickets that would have made the card without them. */
-    if(basisMode&&evGated){
-      /* settlement floor: the ticket settles at Caesars; NV tax must not turn it negative */
-      var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
-      if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
-        blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
-      /* small-sample market gate: unproven markets also need the consensus on side */
+    if(evGated){
+      if(basisMode){
+        /* settlement floor (dk_fd only — in ev_gated the selection gate already prices
+           at CZ): the ticket settles at Caesars; NV tax must not turn it negative */
+        var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
+        if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
+          blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
+      }
+      /* small-sample market gate (both disciplined modes): unproven markets also need
+         the de-vigged consensus on side, read at the mode's own selection price */
       var mn=cfg.mktN||null,minN=(cfg.consMinN!=null)?cfg.consMinN:100,
           cMin=(cfg.consMinEv!=null)?cfg.consMinEv:-1;
       var small=w.pl.legs.some(function(l){
         var lk2=l.lkey||"",lp3=lk2.split("|");
         var mk=(lk2==="ml_home"||lk2==="ml_away")?"ml":(lk2==="rl_home"||lk2==="rl_away")?"rl":lp3[1];
         return !(mn&&mk&&mn[mk]>=minN);});
-      if(small&&!(w.pl.consEv!=null&&Number(w.pl.consEv)>=cMin)){
-        blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,consEv:w.pl.consEv,reason:"consensus"});return;}
+      /* the gate fires only when the consensus read EXISTS and disagrees — an absent
+         read can't disagree (engine-built tickets always carry one; ad-hoc pool
+         objects without leg imps stay ungated rather than silently all-blocked) */
+      var cEv=basisMode?w.pl.consEv:w.pl.consCzEv;
+      if(small&&cEv!=null&&Number(cEv)<cMin){
+        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,consEv:cEv,reason:"consensus"});return;}
     }
     var ev=((selEv!=null?selEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
     var dec=(basisMode?w.pl.bsDec:w.pl.czDec)||2;

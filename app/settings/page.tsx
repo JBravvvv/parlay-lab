@@ -45,11 +45,11 @@ function SelectionCalibrationPanel() {
     <Panel title="Pick selection & calibration">
       <Row label="Selection mode (The Sharp's plays + Builder suggestions)">
         <div className="flex flex-wrap gap-1.5">
-          <Pill variant={mode === "dk_fd" ? "primary" : "ghost"} onClick={() => flipMode("dk_fd")} className="!px-3 !py-1 text-[11px]">
-            DK/FD basis (recommended)
-          </Pill>
           <Pill variant={mode === "ev_gated" ? "primary" : "ghost"} onClick={() => flipMode("ev_gated")} className="!px-3 !py-1 text-[11px]">
-            EV-gated @ CZ
+            EV-gated @ CZ (default)
+          </Pill>
+          <Pill variant={mode === "dk_fd" ? "primary" : "ghost"} onClick={() => flipMode("dk_fd")} className="!px-3 !py-1 text-[11px]">
+            DK/FD basis
           </Pill>
           <Pill variant={mode === "probability" ? "primary" : "ghost"} onClick={() => flipMode("probability")} className="!px-3 !py-1 text-[11px]">
             True probability
@@ -71,14 +71,13 @@ function SelectionCalibrationPanel() {
       </Row>
       {note && <div className="pt-1 text-[11.5px] text-pos">{note}</div>}
       <div className="pt-2 text-[11px] leading-relaxed text-faint">
-        <b className="text-muted">DK/FD basis</b> (default): all selection math — the EV gate, edge badges, Kelly,
-        FUN tiers — computes at the better de-vigged price between DraftKings and FanDuel only (tie goes to DK);
-        no other book&apos;s price influences selection. The consensus fair probability stays the model&apos;s anchor
-        — this swaps the price the model shops at, not the opinion it holds. A leg with no DK/FD quote is ineligible
-        for the card (flagged, still board-visible); card legs also still need a Caesars quote, because CZ remains
-        display + settlement only. <b className="text-muted">EV-gated @ CZ</b>: the same discipline priced at
-        Caesars — a day with no qualifying ticket is a NO-PLAY day with $0 recommended, and staking anyway takes an
-        explicit override that the ledger tracks separately. Zero edge, zero stake.{" "}
+        <b className="text-muted">EV-gated @ CZ</b> (default): every selection number — the EV gate, edge badges,
+        Kelly, FUN tiers — computes at the Caesars price, the book the ticket actually settles at. A day with no
+        qualifying ticket is a NO-PLAY day with $0 recommended, and staking anyway takes an explicit override that
+        the ledger tracks separately. Zero edge, zero stake. <b className="text-muted">DK/FD basis</b>: the same
+        discipline priced at the better de-vigged price between DraftKings and FanDuel (tie goes to DK); no other
+        book&apos;s price influences selection, and CZ becomes display + settlement only — a card ticket still needs
+        both a DK/FD basis and a Caesars quote, and one that goes negative-EV at Caesars is refused at lock.{" "}
         <b className="text-muted">True probability</b>: picks are chosen by the engine&apos;s blended true %
         anchored to the full multi-book consensus — Caesars only prices and sizes what was already chosen, and picks
         it doesn&apos;t offer are listed separately, never substituted. <b className="text-muted">Caesars EV</b> is the

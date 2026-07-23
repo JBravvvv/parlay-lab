@@ -121,6 +121,25 @@ describe("small-sample consensus gate — unproven markets need the market on si
     expect(a.picks).toEqual([]);
     expect(a.blocked?.[0]?.reason).toBe("consensus");
   });
+  it("ev_gated mode (2026-07-22 default): the same gate reads the consensus at the CZ price", () => {
+    const mk = (name: string, consCzEv: number) => {
+      const t = mkTicket({ name, type: "ml", legs: [
+        { label: "Team A", prop: "ML", lkey: "ml_away", gkey: "g1" },
+        { label: "Team B", prop: "ML", lkey: "ml_home", gkey: "g2" },
+      ], czEv: 4 });
+      (t.pl as Record<string, unknown>).consCzEv = consCzEv;
+      return t;
+    };
+    const a = alloc([mk("CzFade", -5), mk("CzOk", -0.5)], { selMode: "ev_gated" });
+    expect(a.picks.map((p) => p.w.pl.name)).toEqual(["CzOk"]);
+    expect(a.blocked?.[0]).toMatchObject({ name: "CzFade", reason: "consensus" });
+  });
+  it("a ticket with NO consensus read is never blocked by it — absence can't disagree", () => {
+    const t = mkTicket({ name: "NoRead" });
+    (t.pl as Record<string, unknown>).consEv = null;
+    const a = alloc([t], { mktN: null });
+    expect(a.picks.map((p) => p.w.pl.name)).toEqual(["NoRead"]);
+  });
 });
 
 describe("structure cap — core stops at 3 legs", () => {
@@ -167,5 +186,20 @@ describe("H+R+RBI alt-ladder suspension — no auto ticket above O0.5", () => {
   it("the Board itself still shows the suspended lines (visibility ≠ selectability)", () => {
     const rows = (d.categories?.batter_hits_runs_rbis ?? []) as { lkey?: string | null }[];
     expect(rows.some((r) => (hrrLine(r.lkey) ?? 0) > 0.5)).toBe(true);
+  });
+  it("the suspension survives the ev_gated default too (mode switch must not re-open it)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN_NOW);
+    const e3 = fixtureEngine();
+    e3.get<Record<string, unknown>>("SH_CFG").selMode = "ev_gated";
+    const d3 = e3.analyze(await e3.collectSlate());
+    const all: Ticket[] = [...(d3.parlays ?? []), ...(d3.parlaysMixed ?? []), ...(d3.parlaysLive ?? [])];
+    expect(all.length).toBeGreaterThan(0);
+    for (const t of all)
+      for (const l of t.legs) {
+        const ln = hrrLine((l as { lkey?: string | null }).lkey);
+        if (ln != null) expect(ln).toBeLessThanOrEqual(0.5);
+      }
+    vi.useRealTimers();
   });
 });

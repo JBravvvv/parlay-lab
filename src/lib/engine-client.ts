@@ -42,11 +42,12 @@ export type SelectionMode = "dk_fd" | "ev_gated" | "probability" | "caesars_ev";
 export function getSelectionMode(): SelectionMode {
   try {
     const v = localStorage.getItem("pl_selmode");
-    // dk_fd is the new default: ev_gated discipline priced at the better of DK/FD
-    // (the selection basis) — Caesars stays display + settlement only
-    return v === "caesars_ev" || v === "probability" || v === "ev_gated" ? v : "dk_fd";
+    // ev_gated @ CZ is the default (user rule 2026-07-22): selection and settlement
+    // both price at Caesars, so the EV gate IS the settlement floor. dk_fd (DK/FD
+    // basis selection) stays selectable in Settings.
+    return v === "caesars_ev" || v === "probability" || v === "dk_fd" ? v : "ev_gated";
   } catch {
-    return "dk_fd";
+    return "ev_gated";
   }
 }
 
