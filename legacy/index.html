@@ -2353,6 +2353,12 @@ function shAnalyzeLocal(slate){
       var thresh=SH_EDGE_MIN[k==="ml"?"ml":k==="rl"?"rl":"props"];
       var rows=cats[k].filter(pred).slice().sort(function(a,b){return b.p-a.p;});
       out[k]=rows.slice(0,50).map(function(r,i){var edge=r.p-r.imp;any=true;
+        /* market suspension tags (fix-file Phase 2): H+R+RBI lines above hrrAltMax are
+           SUSPENDED in the disciplined modes (visible, greyed, never an edge, never a
+           ticket); O0.5 carries a "watch" tag. Legacy modes untagged (parity). */
+        var lpq=(r.lkey||"").split("|"),hrrRow=lpq[1]==="batter_hits_runs_rbis";
+        var dscpM=(SH_CFG.selMode==="dk_fd"||SH_CFG.selMode==="ev_gated");
+        var suspRow=dscpM&&hrrRow&&SH_CFG.hrrAltMax!=null&&Number(lpq[2])>SH_CFG.hrrAltMax;
         /* EV at the best available price; ¼-Kelly fraction capped at 2% of bankroll (doc Phase 7) */
         var dec=amToDec(r.oddsN),ev=shEV(r.p,dec),band=shBand(r.nEff);
         var kellyF=Math.min(0.25*shKelly(r.p,dec),0.02);
@@ -2376,14 +2382,15 @@ function shAnalyzeLocal(slate){
           bs:bsN2,bsOdds:bsN2!=null?obSign(bsN2):null,bsBook:bsN2!=null?(r.bsBook||null):null,
           bsEv:bsEv2!=null?Math.round(bsEv2*1000)/10:null,
           bsKellyF:bsKellyF2!=null?Math.round(bsKellyF2*10000)/10000:null,
-          bsBadge:!!(bsEv2!=null&&bsEv2>=thresh&&bsEv2>=band),
+          bsBadge:!!(bsEv2!=null&&bsEv2>=thresh&&bsEv2>=band)&&!suspRow,
+          susp:suspRow||undefined,watch:(dscpM&&hrrRow&&!suspRow)||undefined,
           czEdge:(czImp!=null)?Math.round((r.imp-czImp)*1000)/10:null,
           czKellyF:czKellyF!=null?Math.round(czKellyF*10000)/10000:null,
-          czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band),noParlay:!!r.noParlay,
+          czBadge:!!(czEv!=null&&czEv>=thresh&&czEv>=band)&&!suspRow,noParlay:!!r.noParlay,
           pModel:(r.pModel!=null)?Math.round(r.pModel*1000)/10:null,
           wBlend:(r.wBlend!=null)?Math.round(r.wBlend*1000)/1000:null,
           lu:r.lu||"confirmed",
-          edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band),tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
+          edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band)&&!suspRow,tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
           conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });
     var allRows=[];SH_NAMED_CATS.forEach(function(k){out[k].forEach(function(r){allRows.push(r);});});

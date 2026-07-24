@@ -84,7 +84,9 @@ export default function SharpPage() {
       })
       // 3D sanity breaker: quarantined markets are frozen out of suggested
       // plays (they stay on the Board, badged UNDER REVIEW)
-      .filter((r) => !cal.quarantine.includes((r as { __mkt: string }).__mkt));
+      .filter((r) => !cal.quarantine.includes((r as { __mkt: string }).__mkt))
+      // Phase 2: suspended lines (H+R+RBI alt ladder) are board-visible but never plays
+      .filter((r) => !r.susp);
     if (selMode === "caesars_ev") {
       return {
         plays: rows
@@ -106,6 +108,14 @@ export default function SharpPage() {
         plays: gated.filter((r) => r.cz != null).slice(0, 8),
         notOffered: gated.filter((r) => r.cz == null).slice(0, 8),
       };
+    }
+    if (selMode === "ev_gated") {
+      // the default: same discipline as dk_fd with the price swapped — a play needs
+      // a Caesars quote and must clear the core EV gate AT Caesars, ranked by czEv
+      const gatedCz = rows
+        .filter((r) => r.cz != null && Number(r.czEv) >= gatePct)
+        .sort((a, b) => Number(b.czEv) - Number(a.czEv));
+      return { plays: gatedCz.slice(0, 8), notOffered: [] as PickRow[] };
     }
     const top = rows.sort((a, b) => Number(b.prob) - Number(a.prob)).slice(0, 8);
     return {

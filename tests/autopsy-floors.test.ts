@@ -263,3 +263,48 @@ describe("FUN structure caps (Correction 2): one lottery ticket, four legs max",
     expect(picks.picks).toHaveLength(1);
   });
 });
+
+/* ===== Fix-file Phase 2 (approved 2026-07-24): suspension is visible, not silent ===== */
+
+describe("Phase 2 — susp/watch tags on H+R+RBI rows", () => {
+  const rowsOf = async (mode: string | null) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN_NOW);
+    const e = fixtureEngine();
+    if (mode) e.get<Record<string, unknown>>("SH_CFG").selMode = mode;
+    const d = e.analyze(await e.collectSlate());
+    vi.useRealTimers();
+    return (d.categories?.batter_hits_runs_rbis ?? []) as {
+      lkey?: string | null; susp?: boolean; watch?: boolean; edgeBadge?: boolean; bsBadge?: boolean; czBadge?: boolean;
+    }[];
+  };
+  const line = (lkey?: string | null) => Number((lkey ?? "").split("|")[2]);
+
+  it("disciplined modes: O1.5+ rows are susp (and never badge as edges); O0.5 rows are watch", async () => {
+    for (const mode of ["ev_gated", "dk_fd"]) {
+      const rows = await rowsOf(mode);
+      const high = rows.filter((r) => line(r.lkey) > 0.5);
+      const low = rows.filter((r) => line(r.lkey) <= 0.5);
+      expect(high.length).toBeGreaterThan(0);
+      expect(low.length).toBeGreaterThan(0);
+      for (const r of high) {
+        expect(r.susp).toBe(true);
+        expect(r.watch).toBeUndefined();
+        expect(r.edgeBadge).toBe(false);
+        expect(r.bsBadge).toBe(false);
+        expect(r.czBadge).toBe(false);
+      }
+      for (const r of low) {
+        expect(r.susp).toBeUndefined();
+        expect(r.watch).toBe(true);
+      }
+    }
+  });
+  it("legacy modes stay untagged (parity posture)", async () => {
+    const rows = await rowsOf(null);
+    for (const r of rows) {
+      expect(r.susp).toBeUndefined();
+      expect(r.watch).toBeUndefined();
+    }
+  });
+});

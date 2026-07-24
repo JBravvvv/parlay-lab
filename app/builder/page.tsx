@@ -371,7 +371,8 @@ export default function BuilderPage() {
       .flatMap(([, v]) => v)
       .filter((r) => {
         const k = `${r.label}|${r.sub}`;
-        if (r.cz == null || seen.has(k)) return false;
+        // Phase 2: suspended lines can't enter a slip — visible on the Board only
+        if (r.cz == null || r.susp || seen.has(k)) return false;
         seen.add(k);
         return true;
       });

@@ -100,9 +100,22 @@ export default function BoardPage() {
         cell: (r) => {
           const n = legLive({ gkey: r.gkey, lkey: r.lkey });
           return (
-            <div>
+            <div className={r.susp ? "opacity-50" : undefined}>
               <div className="font-medium text-text">{r.label}</div>
               <div className="text-[11px] text-muted">{r.sub}</div>
+              {r.susp && (
+                <div
+                  className="mt-0.5 inline-block rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted"
+                  title="H+R+RBI alt lines above O0.5 hit 32% vs 55%+ implied over the graded ledger — barred from every auto-built ticket until the market recalibrates"
+                >
+                  Suspended — sim recalibration
+                </div>
+              )}
+              {r.watch && (
+                <div className="mt-0.5 inline-block rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold" title="H+R+RBI O0.5 stays active (12/19 this week) but is on watch">
+                  watch
+                </div>
+              )}
               {n && (
                 <div
                   className="num text-[10px] font-bold text-live"
@@ -324,7 +337,7 @@ export default function BoardPage() {
             rows={playable}
             rowKey={(r) => `${r.label}|${r.sub}`}
             stagger
-            rowClassName={(r) => (Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
+            rowClassName={(r) => (r.susp ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
           {offBook > 0 && (
             <details className="mt-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3">

@@ -48,6 +48,9 @@ export interface PickRow {
   bsEv?: number | null;
   bsKellyF?: number | null;
   bsBadge?: boolean;
+  /* fix-file Phase 2: market suspension tags (H+R+RBI alt ladder) */
+  susp?: boolean;
+  watch?: boolean;
   books?: number;
   lkey?: string;
   conv?: string;
