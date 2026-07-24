@@ -382,7 +382,8 @@ export default function SharpPage() {
                 </p>
                 <p>
                   <b className="text-text">5 · Discipline is hard-coded.</b> ¼-Kelly capped at 2% per bet,
-                  overs only, HR props never mix with other types, the daily card always spreads across 4+
+                  both sides of every line rank by edge (a direction filter is a Settings choice, never a
+                  hardcode), HR props never mix with other types, the daily card always spreads across 4+
                   tickets with no ticket over 25%, K&apos;s parlays are last-resort fill capped at 15% (they
                   went 0-for-4 as lead tickets — the ledger is the boss), no pick rides two tickets, the
                   daily amount always sums exactly — and everything locked gets graded from official box

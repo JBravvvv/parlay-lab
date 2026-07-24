@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
-import { getMoney, setMoney, getSelectionMode, setSelectionMode, type SelectionMode } from "@/lib/engine-client";
+import { getMoney, setMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, DIR_MARKETS, type DirPref, type SelectionMode } from "@/lib/engine-client";
 import { getSyncKey, setSyncKey, syncNow, useSyncState } from "@/lib/ledgerSync";
 import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
 
@@ -13,9 +13,18 @@ function SelectionCalibrationPanel() {
   const cal = useCalibration();
   const [mode, setMode] = useState<SelectionMode>("ev_gated");
   const [auto, setAuto] = useState<"on" | "off">("on");
+  const [dir, setDir] = useState<Record<string, DirPref>>({});
   const [note, setNote] = useState("");
   useEffect(() => setMode(getSelectionMode()), []);
+  useEffect(() => setDir(getDirPref()), []);
   useEffect(() => setAuto(cal.auto), [cal.auto]);
+
+  const flipDir = (mkt: string, v: DirPref) => {
+    setDirPref(mkt, v);
+    setDir(getDirPref());
+    setNote("Saved — direction preference applies on the next board generation.");
+    setTimeout(() => setNote(""), 2500);
+  };
 
   const flipMode = (m: SelectionMode) => {
     setMode(m);
@@ -67,6 +76,25 @@ function SelectionCalibrationPanel() {
           <Pill variant={auto === "off" ? "primary" : "ghost"} onClick={() => void flipAuto("off")} className="!px-3 !py-1 text-[11px]">
             Off
           </Pill>
+        </div>
+      </Row>
+      <Row label="Direction per market (fix-file Phase 5 — a side filter is a choice, never a hardcode)">
+        <div className="space-y-1.5">
+          {DIR_MARKETS.map((m) => (
+            <div key={m.id} className="flex items-center gap-2">
+              <span className="w-24 text-[11px] text-muted">{m.label}</span>
+              {(["both", "over", "under"] as DirPref[]).map((v) => (
+                <Pill
+                  key={v}
+                  variant={(dir[m.id] ?? "both") === v ? "primary" : "ghost"}
+                  onClick={() => flipDir(m.id, v)}
+                  className="!px-2.5 !py-0.5 text-[10.5px]"
+                >
+                  {v === "both" ? "Both" : v === "over" ? "Overs" : "Unders"}
+                </Pill>
+              ))}
+            </div>
+          ))}
         </div>
       </Row>
       {note && <div className="pt-1 text-[11.5px] text-pos">{note}</div>}

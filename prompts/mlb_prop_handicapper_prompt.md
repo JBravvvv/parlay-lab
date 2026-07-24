@@ -19,7 +19,7 @@ Analyze today's full MLB slate — every game, every listed prop — and produce
 
 ## Prop Types to Consider
 
-Hits (0.5/1.5), Total Bases (1.5/2.5), Home Runs, RBIs, Runs Scored, Hits+Runs+RBIs, Singles, Stolen Bases, Pitcher Strikeouts (over AND under), Pitcher Outs Recorded, Earned Runs Allowed, Hits Allowed, Walks Allowed.
+Hits (0.5/1.5), Total Bases (1.5/2.5), Home Runs, RBIs, Runs Scored, Hits+Runs+RBIs, Singles, Stolen Bases, Pitcher Strikeouts, Pitcher Outs Recorded, Earned Runs Allowed, Hits Allowed, Walks Allowed. Consider BOTH the over and the under of every two-sided line — never prefer a direction; rank purely by edge vs the fair price.
 
 ## Analytical Rules (non-negotiable)
 

@@ -1091,6 +1091,11 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
      it) and at most funMaxLegs legs per ticket. The $ default is FUN_DEFAULT ($5)
      client-side; the field stays editable. */
   funMaxLegs:4,funMaxTickets:1,
+  /* per-market direction preference (fix-file Phase 5): "both" (default) lets the engine
+     pick whichever side beats the de-vigged fair; "over"/"under" is a deliberate USER
+     filter set in Settings — a directional lean is never hardcoded again. Keys are
+     market ids (batter_hits, pitcher_strikeouts, …); missing key = both. */
+  dirPref:{},
   /* advisory only, never blocks: when the entered DAILY exceeds 5× the Kelly-consistent
      figure, the Builder shows an amber sizing note (dailyKellyGuide:false hides it) */
   dailyKellyGuide:true,
@@ -2314,9 +2319,21 @@ function shAnalyzeLocal(slate){
       var wPr=shWm(SH_W.props,mkt);
       if(nv!=null){var pAdj=wPr*pO+(1-wPr)*nv;
         if(Math.abs(pO-nv)>=0.10)tags.push("market-gap");
-        sd=(isHitter||pAdj>=SH_OVER_LEAN)?{side:"O",p:pAdj,imp:nv,odds:row.o,bk:row.oBook}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u,bk:row.uBook};
-        /* pass list: hitter props where model+market agree the UNDER is the strong side */
-        if(isHitter&&pAdj<0.35)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:"O",odds:row.o,imp:nv,edge:pAdj-nv,
+        /* fix-file Phase 5 (2026-07-24): in the disciplined modes BOTH sides flow through
+           the same de-vig → fair → edge pipeline — the side is simply whichever one the
+           model favors against the de-vigged fair. A directional filter exists only as a
+           per-market USER preference (Settings → dirPref; default both). Legacy modes
+           keep the historical over-lean verbatim (parity). */
+        var dscp5=(SH_CFG.selMode==="dk_fd"||SH_CFG.selMode==="ev_gated");
+        var sideCh;
+        if(dscp5){
+          sideCh=(pAdj>=nv)?"O":"U";
+          var pref=(SH_CFG.dirPref&&SH_CFG.dirPref[mkt])||"both";
+          if(pref==="over")sideCh="O";else if(pref==="under")sideCh="U";
+        }else sideCh=(isHitter||pAdj>=SH_OVER_LEAN)?"O":"U";
+        sd=(sideCh==="O")?{side:"O",p:pAdj,imp:nv,odds:row.o,bk:row.oBook}:{side:"U",p:1-pAdj,imp:1-nv,odds:row.u,bk:row.uBook};
+        /* pass list (legacy modes only — under the disciplined modes that under IS the pick) */
+        if(!dscp5&&isHitter&&pAdj<0.35)traps.push({player:row.p,mkt:mkt,ln:row.ln,side:"O",odds:row.o,imp:nv,edge:pAdj-nv,
           why:"model + market both favor the under — overs-only rule keeps it off the board"});
       }
       else if(iO!=null){

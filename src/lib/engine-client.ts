@@ -63,6 +63,39 @@ export function setSelectionMode(mode: SelectionMode) {
   }
 }
 
+/* fix-file Phase 5: per-market direction preference — a directional filter is a
+   deliberate user choice in Settings, never a hardcode. Default: both sides on. */
+export type DirPref = "both" | "over" | "under";
+export const DIR_MARKETS: { id: string; label: string }[] = [
+  { id: "batter_hits", label: "Hits" },
+  { id: "batter_total_bases", label: "Total Bases" },
+  { id: "batter_hits_runs_rbis", label: "H+R+RBI" },
+  { id: "pitcher_strikeouts", label: "Pitcher K's" },
+  { id: "pitcher_outs", label: "Pitcher Outs" },
+];
+export function getDirPref(): Record<string, DirPref> {
+  try {
+    const v = JSON.parse(localStorage.getItem("pl_dirpref") ?? "{}") as Record<string, DirPref>;
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+export function setDirPref(mkt: string, v: DirPref) {
+  const all = getDirPref();
+  if (v === "both") delete all[mkt];
+  else all[mkt] = v;
+  try {
+    localStorage.setItem("pl_dirpref", JSON.stringify(all));
+  } catch {
+    /* private mode */
+  }
+  if (engine) {
+    const cfg = engine.get<Record<string, unknown>>("SH_CFG");
+    if (cfg) cfg.dirPref = all;
+  }
+}
+
 export function getEngine(): Engine {
   if (!engine) {
     engine = createEngine({ fetchJson: browserFetchJson, storage: window.localStorage });
@@ -75,7 +108,10 @@ export function getEngine(): Engine {
     // selection_mode (calibration spec Update 1): probability is the default;
     // the legacy Caesars-EV ranking stays selectable in Settings
     const cfg = engine.get<Record<string, unknown>>("SH_CFG");
-    if (cfg) cfg.selMode = getSelectionMode();
+    if (cfg) {
+      cfg.selMode = getSelectionMode();
+      cfg.dirPref = getDirPref();
+    }
   }
   return engine;
 }

@@ -554,3 +554,21 @@ suite updated to the 1-ticket cap. 208/208; parity digest unchanged.
   FUN keeps HR parlays. No change needed, documented here.
 Tests: susp/watch tagging per mode + badge suppression (autopsy-floors Phase 2 block).
 210/210; parity digest unchanged.
+
+## Fix-file Phase 5 (2026-07-24, approved): unders enabled — direction is a choice, not a hardcode
+- The "hitter props: OVERS ONLY (no unders, ever)" rule and the pitcher over-lean
+  (SH_OVER_LEAN 0.25) now apply ONLY in the legacy modes (parity posture). In ev_gated
+  and dk_fd, the side is simply whichever one the model favors against the de-vigged
+  fair (pAdj vs nv); both sides ride the identical pipeline — side-aware CZ/DK/FD
+  capture, grading, live chips, and prediction logging were already symmetric.
+- `SH_CFG.dirPref` (per-market "both"/"over"/"under", default both) is the only
+  directional filter, set in Settings → "Direction per market" (localStorage
+  pl_dirpref, stamped into the engine at init and on change). Rows lacking a posted
+  price on the chosen side drop out — never fabricated.
+- The legacy "pass list" trap entries ("overs-only rule keeps it off the board")
+  emit only in legacy modes — under the disciplined modes that under IS the pick.
+- Sharp prompt + Sharp method copy audited: "overs only" language removed; the prompt
+  now instructs both sides of every two-sided line, ranked purely by edge.
+Tests: `tests/unders.test.ts` — unders exist and rank side-blind in ev_gated, zero
+hitter unders in legacy, dirPref filters both directions, an under holds the #1 rank.
+216/216; parity digest unchanged.
