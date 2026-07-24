@@ -1,34 +1,31 @@
-# Progress — 2026-07-24 (hardening series)
+# Progress — 2026-07-24 (session end)
 
-## Status: parlay-lab-hardening-instructions.md (Downloads) — ALL 4 PHASES DONE
-Phase 4 (docs/collection-period.md): data-collection FREEZE through late August;
-exits = ~150 graded HRR O0.5 legs or 60 days (≈2026-09-22); every frozen parameter's
-deployed value tabled for drift detection. After Phase 4 the correct amount of new
-feature work is ZERO until an exit condition fires.
-- Phase 1 (APPROVED, deployed 9793d2c): bankroll adjustment log cloud-syncs with the
-  ledger — append-only union merge (mergeBankStores, de-dup ts+kind+amt+note), server
-  blob pl:bank:v1 in /api/ledger, pl_bank2 is now a mirror of the cloud copy. Kelly +
-  10% cap price off one converged bankroll everywhere.
-- Phase 3 (APPROVED, deployed ca03a02): override accountability.
-  Synced pl_noplay verdict log (pl:noplay:v1, append-only union by date; Builder
-  records the NO-PLAY verdict on sight); pure discipline() in src/lib/noplay.ts;
-  Stats Discipline panel (gated vs override, month+lifetime, NO-PLAY honored vs
-  overridden), Dashboard month-override one-liner, red OVERRIDE tags on Ledger.
-- Phase 2 (APPROVED, deployed 70dfa8e): CLV report. Legs already stored
-  cz/bs/imp at lock; entries now stamp selMode. clv-report.ts: fairPts = closing
-  consensus fair − locked fair (imp), czCents on seam-free cents scale; Stats →
-  CALIBRATION gains a CLV panel (mean+n+SE, by-market, 30d trend, filters
-  market/tier/direction/mode). docs/clv.md. No backfill — dataset starts clean.
+## Status: parlay-lab-hardening-instructions.md — ALL 4 PHASES DONE, deployed
+Live at parlay-lab-six.vercel.app (branch frontend-rebuild = Vercel prod).
+Commits 9793d2c → 18ec6ad. 242/242 tests, baseline43 parity digest intact.
+Phases 1–3 approved by Josh individually; Phase 4 run on his "run the rest".
 
-## Next: NOTHING — the freeze is on. Only sanctioned work: bug fixes with Josh's
-sign-off, and the deferred HRR sim recalibration when an exit condition fires.
+## What shipped this session
+- P1: bankroll adjustment log (pl_bank2) cloud-syncs — mergeBankStores append-only
+  union in src/lib/bankroll.ts, server blob pl:bank:v1 on /api/ledger, pull-merge-push
+  in ledgerSync.ts. One converged bankroll feeds Kelly + the 10% cap everywhere.
+- P2: CLV report — entries stamp selMode at lock; src/lib/clv-report.ts (fairPts =
+  closing consensus fair − locked imp; czCents seam-free); Stats → CALIBRATION ClvPanel
+  (mean+n+SE, by-market, 30d trend, filters); docs/clv.md. No backfill, starts clean.
+- P3: override accountability — synced pl_noplay verdict log (pl:noplay:v1; Builder
+  marks the NO-PLAY banner, write-once/day); discipline() in src/lib/noplay.ts; Stats
+  DisciplinePanel, Dashboard month-override one-liner, red OVERRIDE tags on Ledger.
+- P4: docs/collection-period.md — FREEZE through late Aug 2026; exits = ~150 graded
+  HRR O0.5 legs (→ deferred HRR sim recal project) or 60 days (≈2026-09-22); every
+  frozen parameter's deployed value tabled there for drift detection.
 
-## Gotchas (carried forward)
-- After ANY legacy/index.html edit: `node tools/extract-engine.mjs`, then vitest
-  (236 tests incl. baseline43 parity digest).
-- env: export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"; build:local;
-  `git pull --rebase origin frontend-rebuild` before push; purge iCloud dupes
+## THE EXACT NEXT STEP: NOTHING. The freeze is on.
+Only sanctioned work: bug fixes with Josh's sign-off; the HRR sim recalibration when
+an exit condition fires. Do not tune weights/gates/caps — check collection-period.md.
+
+## Gotchas for the next session
+- After ANY legacy/index.html edit: `node tools/extract-engine.mjs`, then vitest.
+- env: export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"; `npm run build:local`;
+  `git pull --rebase origin frontend-rebuild` before push; purge iCloud dupes with
   `find . -name "* [0-9].*" -not -path "./node_modules/*" -delete`.
-- Frozen protections (never weaken without Josh): EV gate, HRR O1.5+/HR-parlay
-  suspensions, CORE≤3/FUN≤4 legs, FUN $5/day, managed bankroll, 10% exposure cap,
-  append-only ledger + bank log.
+- Browser pane: unfocused clicks/form_input may not fire React handlers — DOM .click().
