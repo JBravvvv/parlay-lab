@@ -95,3 +95,33 @@ describe("shGradeOrientFix — one-time migration of stored v1 details", () => {
     expect(eng.get<() => number>("shGradeOrientFix")()).toBe(0);
   });
 });
+
+/* Fix-file Phase 4: the complete settlement matrix, each named case explicit.
+   (Several were already pinned above; this block makes every row of the fix
+   file's matrix a first-class assertion on its own final.) */
+describe("settlement matrix — every RL/ML case the fix file names", () => {
+  const F = (away: number, home: number): GameStatus => ({ state: "Final", away, home });
+  it("home team picked and wins", () => {
+    expect(gradePrediction("ml_home", "ML", F(1, 6), null).result).toBe("won");
+  });
+  it("away team picked and wins", () => {
+    expect(gradePrediction("ml_away", "ML", F(7, 0), null).result).toBe("won");
+  });
+  it("RL +1.5 covers via outright win", () => {
+    expect(gradePrediction("rl_home", "RL +1.5", F(2, 3), null)).toEqual({ result: "won", detail: "3-2" });
+    expect(gradePrediction("rl_away", "RL +1.5", F(5, 4), null)).toEqual({ result: "won", detail: "5-4" });
+  });
+  it("RL +1.5 covers via a 1-run loss", () => {
+    expect(gradePrediction("rl_home", "RL +1.5", F(4, 3), null)).toEqual({ result: "won", detail: "3-4" });
+    expect(gradePrediction("rl_away", "RL +1.5", F(2, 3), null)).toEqual({ result: "won", detail: "2-3" });
+  });
+  it("RL +1.5 fails by exactly 2, and by more", () => {
+    expect(gradePrediction("rl_home", "RL +1.5", F(5, 3), null).result).toBe("lost");
+    expect(gradePrediction("rl_away", "RL +1.5", F(1, 3), null).result).toBe("lost");
+    expect(gradePrediction("rl_away", "RL +1.5", F(1, 6), null).result).toBe("lost");
+  });
+  it("RL -1.5 needs a 2+ run win; a 1-run win loses it", () => {
+    expect(gradePrediction("rl_home", "RL -1.5", F(3, 4), null).result).toBe("lost");
+    expect(gradePrediction("rl_home", "RL -1.5", F(3, 5), null).result).toBe("won");
+  });
+});
