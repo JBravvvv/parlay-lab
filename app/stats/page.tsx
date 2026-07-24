@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { UfcRankings } from "@/components/ufc/UfcRankings";
 import { CalibrationPanel } from "@/components/stats/CalibrationPanel";
+import { ClvPanel } from "@/components/stats/ClvPanel";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -439,7 +440,10 @@ export default function StatsPage() {
       </Reveal>
 
       {calView ? (
-        <CalibrationPanel />
+        <div className="space-y-4">
+          <ClvPanel />
+          <CalibrationPanel />
+        </div>
       ) : sport === "ufc" ? (
         <UfcRankings />
       ) : q.isPending ? (

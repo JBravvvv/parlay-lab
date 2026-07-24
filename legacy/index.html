@@ -3108,6 +3108,7 @@ function shLockCard(){
   var games={};
   function tkt(p,bucket,tierName){return shTicketSnap(p,bucket,tierName,d,games);}
   var entry={date:shToday(),lockedAt:Date.now(),locked:true,lateLock:late,
+    selMode:(SH_CFG.selMode||"ev_gated"), /* hardening Phase 2: CLV report slices by the mode that picked the card */
     overrode:!!cc.overrode, /* upgrade 01: forced allocation on a NO-PLAY day — file 03 reports its realized P/L separately */
     daily:SH.daily,fun:SH.fun,bankroll:SH.bankroll,cardEv:cc.alloc.ev,
     core:cc.alloc.picks.map(function(p){return tkt(p,"core",p.w.pl.tier);}),
