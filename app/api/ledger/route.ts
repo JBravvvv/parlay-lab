@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry } from "@/lib/ledger-merge";
 import { mergeBankStores, validateBankStore, type BankStore } from "@/lib/bankroll";
+import { mergeNoPlayLogs, validateNoPlayLog, type NoPlayLog } from "@/lib/noplay";
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 
 /**
@@ -30,6 +31,18 @@ async function readBank(): Promise<BankStore | null> {
   return v.ok ? v.store : null;
 }
 
+/* Hardening Phase 3: the NO-PLAY verdict log — the "honored" half of override
+   accountability — syncs on the same rails. Append-only union by date. */
+const NOPLAY_STORE_KEY = "pl:noplay:v1";
+type StoredNoPlay = { noplay: NoPlayLog; at: number };
+
+async function readNoPlay(): Promise<NoPlayLog | null> {
+  const s = await redisGetJson<StoredNoPlay>(NOPLAY_STORE_KEY);
+  if (!s?.noplay) return null;
+  const v = validateNoPlayLog(s.noplay);
+  return v.ok ? v.log : null;
+}
+
 function gate(req: NextRequest): NextResponse | null {
   const missing = syncConfigMissing();
   if (missing.length) {
@@ -56,8 +69,8 @@ export async function GET(req: NextRequest) {
   const blocked = gate(req);
   if (blocked) return blocked;
   try {
-    const [s, bank] = await Promise.all([readStore(), readBank()]);
-    return NextResponse.json({ ledger: s?.ledger ?? [], bank, at: s?.at ?? null });
+    const [s, bank, noplay] = await Promise.all([readStore(), readBank(), readNoPlay()]);
+    return NextResponse.json({ ledger: s?.ledger ?? [], bank, noplay, at: s?.at ?? null });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }
@@ -81,6 +94,12 @@ export async function PUT(req: NextRequest) {
     if (!vb.ok) return NextResponse.json({ error: vb.error }, { status: 400 });
     sentBank = vb.store;
   }
+  let sentNoPlay: NoPlayLog | null = null;
+  if ((body as { noplay?: unknown }).noplay != null) {
+    const vn = validateNoPlayLog((body as { noplay?: unknown }).noplay);
+    if (!vn.ok) return NextResponse.json({ error: vn.error }, { status: 400 });
+    sentNoPlay = vn.log;
+  }
   try {
     const cur = await readStore();
     const merged = mergeLedgers(cur?.ledger ?? [], v.entries);
@@ -93,8 +112,13 @@ export async function PUT(req: NextRequest) {
       bank = bank ? mergeBankStores(bank, sentBank) : sentBank;
       await redisSetJson(BANK_STORE_KEY, { bank, at } satisfies StoredBank);
     }
+    let noplay = await readNoPlay();
+    if (sentNoPlay) {
+      noplay = noplay ? mergeNoPlayLogs(noplay, sentNoPlay) : sentNoPlay;
+      await redisSetJson(NOPLAY_STORE_KEY, { noplay, at } satisfies StoredNoPlay);
+    }
     await redis(["SET", STORE_KEY, JSON.stringify({ ledger: merged, at } satisfies Stored)]);
-    return NextResponse.json({ ok: true, ledger: merged, bank, at });
+    return NextResponse.json({ ok: true, ledger: merged, bank, noplay, at });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }

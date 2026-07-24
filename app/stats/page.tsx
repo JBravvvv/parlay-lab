@@ -11,6 +11,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { UfcRankings } from "@/components/ufc/UfcRankings";
 import { CalibrationPanel } from "@/components/stats/CalibrationPanel";
 import { ClvPanel } from "@/components/stats/ClvPanel";
+import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -442,6 +443,7 @@ export default function StatsPage() {
       {calView ? (
         <div className="space-y-4">
           <ClvPanel />
+          <DisciplinePanel />
           <CalibrationPanel />
         </div>
       ) : sport === "ufc" ? (

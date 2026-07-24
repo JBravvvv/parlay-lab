@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { mergeLedgers, type SyncEntry } from "./ledger-merge";
 import { BANK_KEY, mergeBankStores, validateBankStore, type BankStore } from "./bankroll";
+import { NOPLAY_KEY, mergeNoPlayLogs, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
  * Client side of ledger sync. One sync phrase (entered once per device in
@@ -102,9 +103,26 @@ function readLocalBank(): { store: BankStore | null; raw: string } {
   return { store: null, raw };
 }
 
-/** Raw pl_ledger + pl_bank2 as of the last completed sync — the change detector. */
+/* Hardening Phase 3: the NO-PLAY verdict log (pl_noplay) syncs the same way —
+   append-only union by date, earlier sighting wins. */
+function readLocalNoPlay(): { log: NoPlayLog | null; raw: string } {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(NOPLAY_KEY) ?? "";
+    if (raw) {
+      const v = validateNoPlayLog(JSON.parse(raw));
+      if (v.ok) return { log: v.log, raw };
+    }
+  } catch {
+    /* unreadable — treat as absent */
+  }
+  return { log: null, raw };
+}
+
+/** Raw pl_ledger + pl_bank2 + pl_noplay as of the last completed sync — the change detector. */
 let lastSeenLocal: string | null = null;
 let lastSeenBank: string | null = null;
+let lastSeenNoPlay: string | null = null;
 let lastSyncAt = 0;
 let inFlight = false;
 
@@ -133,10 +151,12 @@ export async function syncNow(): Promise<SyncState> {
       setState({ kind: "error", detail: `sync server ${res.status}` });
       return state;
     }
-    const got = (await res.json()) as { ledger: SyncEntry[]; bank?: unknown };
+    const got = (await res.json()) as { ledger: SyncEntry[]; bank?: unknown; noplay?: unknown };
     const remote = got.ledger ?? [];
     const vb = got.bank != null ? validateBankStore(got.bank) : null;
     const remoteBank: BankStore | null = vb?.ok ? vb.store : null;
+    const vn = got.noplay != null ? validateNoPlayLog(got.noplay) : null;
+    const remoteNoPlay: NoPlayLog | null = vn?.ok ? vn.log : null;
 
     const local = readLocal();
     let merged = mergeLedgers(local.locked, remote);
@@ -146,19 +166,30 @@ export async function syncNow(): Promise<SyncState> {
       localBank.store && remoteBank ? mergeBankStores(localBank.store, remoteBank) : (localBank.store ?? remoteBank);
     const bankNeedsPush = mergedBank != null && JSON.stringify(mergedBank) !== JSON.stringify(remoteBank);
 
-    if (JSON.stringify(merged) !== JSON.stringify(remote) || bankNeedsPush) {
+    const localNoPlay = readLocalNoPlay();
+    let mergedNoPlay: NoPlayLog | null =
+      localNoPlay.log && remoteNoPlay ? mergeNoPlayLogs(localNoPlay.log, remoteNoPlay) : (localNoPlay.log ?? remoteNoPlay);
+    const noPlayNeedsPush = mergedNoPlay != null && JSON.stringify(mergedNoPlay) !== JSON.stringify(remoteNoPlay);
+
+    if (JSON.stringify(merged) !== JSON.stringify(remote) || bankNeedsPush || noPlayNeedsPush) {
       const put = await fetch("/api/ledger", {
         method: "PUT",
         headers,
         cache: "no-store",
-        body: JSON.stringify({ ledger: merged, ...(mergedBank ? { bank: mergedBank } : {}) }),
+        body: JSON.stringify({
+          ledger: merged,
+          ...(mergedBank ? { bank: mergedBank } : {}),
+          ...(mergedNoPlay ? { noplay: mergedNoPlay } : {}),
+        }),
       });
       if (put.ok) {
         // the server merged again (covers a concurrent push from the phone)
-        const back = (await put.json()) as { ledger: SyncEntry[]; bank?: unknown };
+        const back = (await put.json()) as { ledger: SyncEntry[]; bank?: unknown; noplay?: unknown };
         merged = back.ledger ?? merged;
         const vbb = back.bank != null ? validateBankStore(back.bank) : null;
         if (vbb?.ok) mergedBank = vbb.store;
+        const vnb = back.noplay != null ? validateNoPlayLog(back.noplay) : null;
+        if (vnb?.ok) mergedNoPlay = vnb.log;
       } else if (put.status === 401) {
         setState({ kind: "bad-key" });
         return state;
@@ -190,9 +221,19 @@ export async function syncNow(): Promise<SyncState> {
         /* device storage full — the cloud copy is still the truth next sync */
       }
     }
+    const noPlayRaw = mergedNoPlay ? JSON.stringify(mergedNoPlay) : localNoPlay.raw;
+    if (mergedNoPlay && noPlayRaw !== localNoPlay.raw) {
+      try {
+        localStorage.setItem(NOPLAY_KEY, noPlayRaw);
+        changed = true;
+      } catch {
+        /* device storage full — the cloud copy is still the truth next sync */
+      }
+    }
     if (changed) window.dispatchEvent(new CustomEvent(SYNC_EVENT));
     lastSeenLocal = nextRaw;
     lastSeenBank = bankRaw;
+    lastSeenNoPlay = noPlayRaw;
     lastSyncAt = Date.now();
     setState({ kind: "synced", at: lastSyncAt, days: merged.length });
     return state;
@@ -235,14 +276,18 @@ export function useLedgerSyncBeacon() {
       if (document.hidden || !getSyncKey()) return;
       let raw = "";
       let bankRaw = "";
+      let noPlayRaw = "";
       try {
         raw = localStorage.getItem(LEDGER_LS) ?? "";
         bankRaw = localStorage.getItem(BANK_KEY) ?? "";
+        noPlayRaw = localStorage.getItem(NOPLAY_KEY) ?? "";
       } catch {
         /* unreadable — let the heartbeat handle it */
       }
       const changed =
-        (lastSeenLocal !== null && raw !== lastSeenLocal) || (lastSeenBank !== null && bankRaw !== lastSeenBank);
+        (lastSeenLocal !== null && raw !== lastSeenLocal) ||
+        (lastSeenBank !== null && bankRaw !== lastSeenBank) ||
+        (lastSeenNoPlay !== null && noPlayRaw !== lastSeenNoPlay);
       if (changed || Date.now() - lastSyncAt > HEARTBEAT_MS) void syncNow();
       clvTick();
     }, TICK_MS);

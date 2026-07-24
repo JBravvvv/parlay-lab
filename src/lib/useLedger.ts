@@ -50,6 +50,7 @@ export type LedgerEntry = {
   date: string;
   locked: boolean;
   lateLock?: boolean;
+  overrode?: boolean; // day locked through the NO-PLAY gate (hardening Phase 3)
   daily: number;
   fun: number;
   cardEv?: number;

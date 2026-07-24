@@ -164,6 +164,14 @@ function TicketRow({
                 supp{t.late ? " · late" : ""}
               </span>
             )}
+            {e.overrode && (
+              <span
+                className="ml-1.5 rounded-full border border-neg/50 bg-neg/10 px-1.5 py-px text-[8.5px] font-bold uppercase text-neg"
+                title="Locked through the NO-PLAY gate — this day's stake was an explicit override"
+              >
+                override
+              </span>
+            )}
           </div>
           <div className="text-[10.5px] text-muted group-open:hidden">
             {t.legs.map((l) => l.label).join(" · ")}
@@ -215,6 +223,11 @@ function DayCard({ e }: { e: LedgerEntry }) {
       <summary className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2">
         <span className="num text-[13px] font-semibold text-text">{e.date}</span>
         <span className="flex items-center gap-2 text-[11px] text-muted">
+          {e.overrode && (
+            <span className="rounded-full border border-neg/50 bg-neg/10 px-2 py-0.5 text-[9px] font-bold text-neg">
+              OVERRIDE
+            </span>
+          )}
           {e.lateLock && <span className="text-gold">late lock</span>}
           <span className="num">{tix.length} tickets · ${e.daily + e.fun}</span>
         </span>

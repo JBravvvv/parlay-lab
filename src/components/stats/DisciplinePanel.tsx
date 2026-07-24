@@ -1,0 +1,90 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Panel } from "@/components/ui/Panel";
+import { FilterPill } from "@/components/ui/Pill";
+import { Reveal } from "@/components/motion/Reveal";
+import { useLedger } from "@/lib/useLedger";
+import { getNoPlayLog, todayStr } from "@/lib/engine-client";
+import { discipline, type DiscLine } from "@/lib/noplay";
+import type { SyncEntry } from "@/lib/ledger-merge";
+
+/**
+ * Hardening Phase 3 — the mirror that shows whether the old behavior is
+ * creeping back in. Gated vs override, month and lifetime, plus NO-PLAY days
+ * honored vs overridden. All figures derive from the ledger's own overrode
+ * stamp and the synced NO-PLAY verdict log; history is never reconstructed —
+ * "honored" counting starts the day this shipped.
+ */
+
+const money = (v: number, sign = false) => `${v < 0 ? "−" : sign && v > 0 ? "+" : ""}$${Math.abs(v).toFixed(2).replace(/\.00$/, "")}`;
+const roiF = (r: number | null) => (r == null ? "—" : `${r >= 0 ? "+" : ""}${(r * 100).toFixed(1)}%`);
+
+function Line({ label, l, tone }: { label: string; l: DiscLine; tone: "pos" | "neg" }) {
+  return (
+    <tr className="border-t border-white/[0.04]">
+      <td className={`py-1.5 font-sans font-semibold ${tone === "pos" ? "text-text" : "text-neg"}`}>{label}</td>
+      <td className="py-1.5 text-right text-muted">{l.tickets}</td>
+      <td className="py-1.5 text-right">{money(l.staked)}</td>
+      <td className={`py-1.5 text-right ${l.pl > 0 ? "text-pos" : l.pl < 0 ? "text-neg" : "text-muted"}`}>{money(l.pl, true)}</td>
+      <td className={`py-1.5 text-right ${l.roi != null && l.roi < 0 ? "text-neg" : l.roi != null ? "text-pos" : "text-faint"}`}>
+        {roiF(l.roi)}
+      </td>
+    </tr>
+  );
+}
+
+export function DisciplinePanel() {
+  const { api } = useLedger();
+  const [scope, setScope] = useState<"month" | "lifetime">("month");
+  const disc = useMemo(
+    () => discipline(((api?.entries ?? []) as unknown) as SyncEntry[], typeof window !== "undefined" ? getNoPlayLog() : {}, todayStr()),
+    [api],
+  );
+  const s = disc[scope];
+
+  return (
+    <Reveal>
+      <Panel title="Discipline — gated vs override">
+        <div className="mb-3 flex gap-1.5">
+          <FilterPill selected={scope === "month"} onClick={() => setScope("month")}>
+            THIS MONTH
+          </FilterPill>
+          <FilterPill selected={scope === "lifetime"} onClick={() => setScope("lifetime")}>
+            LIFETIME
+          </FilterPill>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="num w-full min-w-[420px] text-[12px]">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wider text-faint">
+                <th className="pb-2">Bucket</th>
+                <th className="pb-2 text-right">Tickets</th>
+                <th className="pb-2 text-right">Staked</th>
+                <th className="pb-2 text-right">P/L</th>
+                <th className="pb-2 text-right" title="P/L over settled stake">
+                  ROI
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <Line label="Gated" l={s.gated} tone="pos" />
+              <Line label="Override" l={s.override} tone="neg" />
+            </tbody>
+          </table>
+        </div>
+        <div className="num mt-3 text-[12px]">
+          <span className="font-sans text-[10px] font-bold uppercase tracking-[0.18em] text-muted">NO-PLAY days</span>{" "}
+          <span className="text-pos">{s.noPlay.honored} honored</span>
+          <span className="text-faint"> · </span>
+          <span className={s.noPlay.overridden > 0 ? "text-neg" : "text-muted"}>{s.noPlay.overridden} overridden</span>
+        </div>
+        <div className="mt-2 text-[10.5px] leading-relaxed text-faint">
+          Override figures come from the ledger&apos;s own per-day stamp. A NO-PLAY verdict counts as honored once its
+          day ends with no override lock; honored counting starts from this deploy (nothing reconstructed), so early
+          numbers undercount the discipline, never the overrides.
+        </div>
+      </Panel>
+    </Reveal>
+  );
+}

@@ -4,6 +4,7 @@ import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
 import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
+import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -268,6 +269,32 @@ export function getBankroll(): number {
 export function getTodayExposure(): number {
   const eng = getEngine();
   return todayExposure(eng.get<() => LedgerDayLike[]>("shLedger")(), todayStr());
+}
+
+/* ---- NO-PLAY verdict log (hardening Phase 3) ---- */
+export function getNoPlayLog(): NoPlayLog {
+  try {
+    const raw = localStorage.getItem(NOPLAY_KEY);
+    if (raw) {
+      const v = validateNoPlayLog(JSON.parse(raw));
+      if (v.ok) return v.log;
+    }
+  } catch {
+    /* absent */
+  }
+  return {};
+}
+
+/** Record today's NO-PLAY verdict (write-once per date; syncs like the ledger). */
+export function markNoPlay(date: string, mode: string | null) {
+  const log = getNoPlayLog();
+  if (log[date]) return;
+  log[date] = { at: Date.now(), mode };
+  try {
+    localStorage.setItem(NOPLAY_KEY, JSON.stringify(log));
+  } catch {
+    /* private mode — the verdict is re-marked next open */
+  }
 }
 
 /** Money state lives in the same legacy keys — except bankroll, which is MANAGED

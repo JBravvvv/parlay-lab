@@ -12,7 +12,7 @@ import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
-import { getEngine, getMoney, setMoney, getSelectionMode, todayStr } from "@/lib/engine-client";
+import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
@@ -300,6 +300,13 @@ export default function BuilderPage() {
     void cardV;
     return eng.get<(x: unknown) => CardCalc | null>("shCardCalc")(d);
   }, [eng, d, cardV, locked]);
+
+  /* Hardening Phase 3: record today's NO-PLAY verdict the moment the gate shows
+     it (write-once per date; cloud-syncs). Honored vs overridden is derived
+     later: an override lock on this date flips it to "overridden". */
+  useEffect(() => {
+    if (card?.alloc.noPlay && board?.date === todayStr()) markNoPlay(todayStr(), getSelectionMode());
+  }, [card, board]);
 
   /* SHADOW CARD (display-only): the exact shAllocate + shFunPick pipeline run
      against the fresh board while today's real card is locked — pure recompute,

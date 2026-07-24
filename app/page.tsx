@@ -15,7 +15,8 @@ import { CountUp } from "@/components/motion/CountUp";
 import { useLedger, roiPct } from "@/lib/useLedger";
 import { ledgerSegments } from "@/lib/ledger-segments";
 import type { SyncEntry } from "@/lib/ledger-merge";
-import { cachedBoard, getMoney, getTodayExposure } from "@/lib/engine-client";
+import { cachedBoard, getMoney, getNoPlayLog, getTodayExposure, todayStr } from "@/lib/engine-client";
+import { discipline } from "@/lib/noplay";
 import { fmtMoneyExact } from "@/lib/format";
 import type { PickRow } from "@/engine";
 
@@ -58,11 +59,38 @@ function WeekReceipt({ entries }: { entries: SyncEntry[] }) {
           w.overridePl < 0 ? "text-neg" : "text-muted",
         )}
       </div>
+      <MonthOverrideLine entries={entries} />
       <div className="mt-2 text-[10.5px] text-faint">
         CLV in probability points vs the last pre-pitch Caesars price — under parlay variance it converges long before
         P/L does. Full segment tables live on the Ledger tab.
       </div>
     </Panel>
+  );
+}
+
+/* Hardening Phase 3: the accountability one-liner — this month's overrides,
+   visible without navigation. No nagging; just the number. */
+function MonthOverrideLine({ entries }: { entries: SyncEntry[] }) {
+  const m = discipline(entries, getNoPlayLog(), todayStr()).month;
+  const o = m.override;
+  return (
+    <div className="num mt-2 text-[11px] text-muted">
+      Overrides this month:{" "}
+      <span className={o.tickets > 0 ? "font-semibold text-neg" : "font-semibold text-pos"}>{o.tickets} tickets</span>
+      {o.tickets > 0 && (
+        <>
+          {" "}
+          · P/L{" "}
+          <span className={o.pl < 0 ? "text-neg" : "text-pos"}>
+            {o.pl < 0 ? "−" : "+"}${Math.abs(o.pl).toFixed(0)}
+          </span>
+        </>
+      )}
+      <span className="text-faint">
+        {" "}
+        · NO-PLAY days {m.noPlay.honored} honored / {m.noPlay.overridden} overridden
+      </span>
+    </div>
   );
 }
 
