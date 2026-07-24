@@ -1085,6 +1085,12 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
        no worse than consMinEv% at the basis. mktN arrives from the calibration store at arm
        time; an unknown market counts as small — a market is never assumed proven. */
   coreCzEvMin:0,coreMaxLegs:3,hrrAltMax:0.5,consMinN:100,consMinEv:-1,mktN:null,
+  /* FUN structure caps (Correction 2, 2026-07-23): FUN is exempt from the EV gate —
+     a lottery ticket is never +EV, that's what makes it a lottery — so it is capped by
+     structure instead: at most funMaxTickets per day (supplemental locks count toward
+     it) and at most funMaxLegs legs per ticket. The $ default is FUN_DEFAULT ($5)
+     client-side; the field stays editable. */
+  funMaxLegs:4,funMaxTickets:1,
   /* advisory only, never blocks: when the entered DAILY exceeds 5× the Kelly-consistent
      figure, the Builder shows an amber sizing note (dailyKellyGuide:false hides it) */
   dailyKellyGuide:true,
@@ -2711,14 +2717,16 @@ function shAllocate(pool,amount,cfg,force){
     if(evGated&&!(selEv!=null&&selEv>=evMin))return;
     /* 2026-07-22 floors — checked AFTER the selection gate, so `blocked` discloses exactly
        the tickets that would have made the card without them. */
+    if(mode==="ev_gated"||basisMode){
+      /* settlement floor (Correction 1, 2026-07-23): below zero EV at the settling book
+         is a HARD block with NO override — this check runs on the force path too. The
+         0-to-coreEvMin warning band keeps its stamped override (the selEv gate above is
+         what force bypasses); below zero at Caesars nothing bypasses. */
+      var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
+      if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
+        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
+    }
     if(evGated){
-      if(basisMode){
-        /* settlement floor (dk_fd only — in ev_gated the selection gate already prices
-           at CZ): the ticket settles at Caesars; NV tax must not turn it negative */
-        var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
-        if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
-          blocked.push({name:w.pl.name,bsEv:w.pl.bsEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
-      }
       /* small-sample market gate (both disciplined modes): unproven markets also need
          the de-vigged consensus on side, read at the mode's own selection price */
       var mn=cfg.mktN||null,minN=(cfg.consMinN!=null)?cfg.consMinN:100,
@@ -2738,7 +2746,10 @@ function shAllocate(pool,amount,cfg,force){
     var dec=(basisMode?w.pl.bsDec:w.pl.czDec)||2;
     scored.push({w:w,i:i,ev:ev,prob:prob,base:probMode?prob:((dec>1)?Math.max(ev,0)/(dec-1):0)});
   });
-  if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated,blocked:blocked};
+  /* an override day where every ticket is floor-blocked is still a NO-PLAY: the hard
+     settlement floor has no override, and the blocked list says exactly why */
+  if(!scored.length)return {picks:[],sum:0,ev:null,noPlay:evGated||(force&&(mode==="ev_gated"||basisMode)&&blocked.length>0),
+    blocked:blocked,overrode:false};
   /* negative-EV slate under the LEGACY modes: still allocate the full amount weighted by
      hit floor — disclosed by the banner. Under ev_gated the empty pool above IS the answer. */
   if(!scored.some(function(s){return s.base>0;}))scored.forEach(function(s){s.base=s.prob;});
@@ -2879,6 +2890,7 @@ function shFunPick(pool,amount,cfg,excludeIds,excludeLegs){
   pool.forEach(function(w,i){
     if(ex[shTicketId(w.pl)])return;
     if((Number(w.pl.prob)||0)<cfg.funMinProb)return; /* honest-longshot floor */
+    if(cfg.funMaxLegs&&w.pl.legs.length>cfg.funMaxLegs)return; /* structure cap (Correction 2) */
     /* dk_fd: tiers cut at the basis price, and a FUN ticket still needs a CZ quote to play */
     var bMode=(cfg.selMode==="dk_fd");
     if(bMode&&(w.pl.bsDec==null||w.pl.czDec==null))return;
@@ -2893,8 +2905,10 @@ function shFunPick(pool,amount,cfg,excludeIds,excludeLegs){
     var bm2=(cfg.selMode==="dk_fd");
     var ev=((bm2?b.w.pl.bsEv:b.w.pl.czEv)||0)-((bm2?a.w.pl.bsEv:a.w.pl.czEv)||0);if(Math.abs(ev)>1e-9)return ev;
     return a.i-b.i;});});                                                   /* deterministic */
-  /* 1–3 tickets by amount; tier split from config; fall through to the nearest tier with stock */
+  /* 1–3 tickets by amount; tier split from config; fall through to the nearest tier with stock.
+     funMaxTickets (Correction 2) caps the count — default 1: one lottery ticket a day. */
   var wantTiers=amount<cfg.funAmt2?[0]:amount<=cfg.funAmt3?[0,1]:[0,1,2];
+  if(cfg.funMaxTickets)wantTiers=wantTiers.slice(0,cfg.funMaxTickets);
   var split=wantTiers.length===1?[1]:wantTiers.length===2?cfg.funSplit2:cfg.funSplit3;
   var used={},picks=[];
   wantTiers.forEach(function(t,k){
@@ -3110,6 +3124,10 @@ function shSupplementalCalc(d){
   var e=shLedgerFind(shToday());
   if(!e||!e.locked)return null;
   var r=shFunRemaining();
+  /* funMaxTickets (Correction 2) counts locked FUN tickets too — one lottery
+     ticket a day means one, whether it locked with the card or after */
+  var fmax=(SH_CFG.funMaxTickets!=null)?SH_CFG.funMaxTickets:1/0;
+  if((e.funT||[]).length>=fmax)return {budget:r.budget,staked:r.staked,left:r.left,fun:{picks:[],sum:0},capped:true};
   if(!d||d.picks||r.left<=0)return {budget:r.budget,staked:r.staked,left:r.left,fun:{picks:[],sum:0}};
   var ids={},legs={};
   (e.core||[]).concat(e.funT||[]).forEach(function(t){ids[t.id]=1;
@@ -3130,6 +3148,8 @@ function shLockSupplemental(){
   /* hard re-checks against the entry being written, not the calc's snapshot */
   var staked=0;(e.funT||[]).forEach(function(t){staked+=t.stake;});
   if(staked+sc.fun.sum>(Number(e.fun)||0))return {ok:false,err:"That would exceed the day's FUN budget."};
+  var fmaxW=(SH_CFG.funMaxTickets!=null)?SH_CFG.funMaxTickets:1/0;
+  if((e.funT||[]).length+sc.fun.picks.length>fmaxW)return {ok:false,err:"FUN is capped at "+fmaxW+" ticket"+(fmaxW===1?"":"s")+" a day — resets tomorrow."};
   var have={};(e.core||[]).concat(e.funT||[]).forEach(function(t){(t.legs||[]).forEach(function(l){have[l.label+"|"+l.prop]=1;});});
   var clash=sc.fun.picks.some(function(p){return p.w.pl.legs.some(function(l){return have[l.label+"|"+l.prop];});});
   if(clash)return {ok:false,err:"A pick already rides today's card — regenerate and retry."};

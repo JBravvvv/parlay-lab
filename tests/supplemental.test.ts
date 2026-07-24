@@ -122,8 +122,10 @@ describe("supplemental fun locks (engine)", () => {
     const sc = eng.get<(x: unknown) => SuppCalc>("shSupplementalCalc")(d);
     expect(sc.left).toBe(20);
     const names = sc.fun.picks.map((p) => (p.w.pl as { name?: string }).name);
-    expect(names).toEqual(["F1", "F2"]); // F-DUP excluded despite sorting first
-    expect(sc.fun.sum).toBe(20); // $12/$8 tier split of the remaining budget
+    // funMaxTickets=1 (Correction 2, 2026-07-23): one lottery ticket a day — the
+    // tainted F-DUP is still excluded, and only the single best tier pick returns
+    expect(names).toEqual(["F1"]);
+    expect(sc.fun.sum).toBe(20); // the whole remaining budget rides the one ticket
     // no picked leg may collide with a locked leg
     const lockedLids = new Set(
       eng
@@ -146,10 +148,11 @@ describe("supplemental fun locks (engine)", () => {
 
     SH.board = { date: TODAY, data: eveningBoard() };
     const r = eng.get<() => SuppResult>("shLockSupplemental")();
-    expect(r).toMatchObject({ ok: true, added: 2, sum: 20, left: 0 });
+    // funMaxTickets=1: a single supplemental ticket takes the whole remaining budget
+    expect(r).toMatchObject({ ok: true, added: 1, sum: 20, left: 0 });
 
     const e = eng.get<(dt: string) => Entry>("shLedgerFind")(TODAY);
-    expect(e.funT).toHaveLength(2);
+    expect(e.funT).toHaveLength(1);
     for (const t of e.funT!) {
       expect(t.supplemental).toBe(true);
       expect(t.lockedAt).toBe(FROZEN_NOW);
@@ -157,7 +160,7 @@ describe("supplemental fun locks (engine)", () => {
     }
     expect(e.funT!.reduce((s, t) => s + (t.stake as number), 0)).toBeLessThanOrEqual(e.fun);
     expect(e.games.g9).toBeTruthy();
-    expect(e.games.g10).toBeTruthy();
+    expect(e.games.g10).toBeUndefined(); // F2 no longer locks under funMaxTickets=1
     expect(e.games.g11).toBeUndefined(); // F-DUP never locked, its game never recorded
     expect(JSON.stringify(e.core)).toBe(coreBefore); // core untouchable
     const g = e.grading as { done: boolean; tickets: Record<string, { result: string; payout: number }> };

@@ -390,18 +390,31 @@ export default function BuilderPage() {
     const amToDec = (am: number) => (am > 0 ? 1 + am / 100 : 1 + 100 / -am);
     let p = 1;
     let dec = 1;
+    // Phase 1 (fix file item 4): per-leg EV vs fair, live as legs come and go —
+    // the leg with the worst price-vs-fair gap is what drags a ticket negative
+    const legEvs: (number | null)[] = [];
     for (const r of slip) {
-      p *= (Number(r.prob) || 0) / 100;
+      const lp = (Number(r.prob) || 0) / 100;
       const cz = Number(String(r.czOdds).replace(/[^\d.-]/g, ""));
-      dec *= amToDec(cz);
+      const ld = amToDec(cz);
+      p *= lp;
+      dec *= ld;
+      legEvs.push(lp > 0 && isFinite(ld) ? lp * ld - 1 : null);
     }
+    const worstIdx: number | null =
+      slip.length >= 2
+        ? legEvs.reduce<number | null>(
+            (best, e, i) => (e != null && (best == null || e < (legEvs[best] as number)) ? i : best),
+            null,
+          )
+        : null;
     const fairDec = p > 0 ? 1 / p : null;
     const ev = p * dec - 1;
     const kelly = eng ? eng.get<(pp: number, dd: number) => number>("shKelly")(p, dec) : 0;
-    const stake = Math.round(Math.min(0.02, kelly / 4) * money.bankroll);
+    const stake = ev > 0 ? Math.round(Math.min(0.02, kelly / 4) * money.bankroll) : 0; // Kelly is $0 at edge ≤ 0
     const games = slip.map((r) => String((r as { game?: string }).game ?? "")).filter(Boolean);
     const sameGame = new Set(games).size < games.length;
-    return { p, dec, fairDec, ev, stake, sameGame };
+    return { p, dec, fairDec, ev, stake, sameGame, legEvs, worstIdx };
   }, [slip, eng, money.bankroll]);
 
   const decToAm = (dc: number) => (dc >= 2 ? Math.round((dc - 1) * 100) : -Math.round(100 / (dc - 1)));
@@ -665,9 +678,12 @@ export default function BuilderPage() {
                   <div key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
                     <span className="font-semibold text-text">{b.name}</span>
                     {b.reason === "nv_tax" ? (
-                      <span className="text-gold">
-                        blocked: NV tax turns this negative
-                        <span className="num text-muted"> (basis {b.bsEv != null ? `+${b.bsEv}%` : "—"} → CZ {b.czEv != null ? `${b.czEv}%` : "no quote"})</span>
+                      <span className="text-neg">
+                        Blocked — the NV price turns this negative
+                        <span className="num text-muted">
+                          {" "}
+                          ({basisMode ? `basis ${b.bsEv != null ? `+${b.bsEv}%` : "—"} → ` : ""}CZ {b.czEv != null ? `${b.czEv}%` : "no quote"}) · no override
+                        </span>
                       </span>
                     ) : (
                       <span className="text-gold">
@@ -807,23 +823,38 @@ export default function BuilderPage() {
               )}
               {slip.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {slip.map((r, i) => (
-                    <div key={`${r.label}|${r.sub}`} className="flex items-center justify-between gap-2 text-[12.5px]">
-                      <span>
-                        <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="num text-gold">{String(r.czOdds)}</span>
-                        <button
-                          onClick={() => setSlip((s) => s.filter((_, j) => j !== i))}
-                          aria-label="remove"
-                          className="rounded-full px-2 text-muted hover:text-neg"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    </div>
-                  ))}
+                  {slip.map((r, i) => {
+                    const lev = slipCalc?.legEvs?.[i] ?? null;
+                    const worst = slipCalc?.worstIdx === i && lev != null && lev < 0;
+                    return (
+                      <div key={`${r.label}|${r.sub}`} className="flex items-center justify-between gap-2 text-[12.5px]">
+                        <span>
+                          <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
+                          {worst && (
+                            <span className="ml-2 rounded-full border border-neg/40 bg-neg/10 px-2 py-0.5 text-[9.5px] font-bold text-neg">
+                              WORST PRICE VS FAIR
+                            </span>
+                          )}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          {lev != null && (
+                            <span className={`num text-[11px] ${lev >= 0 ? "text-pos" : "text-neg"}`}>
+                              {lev >= 0 ? "+" : ""}
+                              {(lev * 100).toFixed(1)}%
+                            </span>
+                          )}
+                          <span className="num text-gold">{String(r.czOdds)}</span>
+                          <button
+                            onClick={() => setSlip((s) => s.filter((_, j) => j !== i))}
+                            aria-label="remove"
+                            className="rounded-full px-2 text-muted hover:text-neg"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      </div>
+                    );
+                  })}
                   {slipCalc && slip.length >= 2 && (
                     <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/[0.05] pt-3">
                       <span className="num text-[13px] text-text">
@@ -844,6 +875,19 @@ export default function BuilderPage() {
                       <Pill variant="ghost" onClick={() => setSlip([])} className="!px-3 !py-1 text-[11px]">
                         Clear
                       </Pill>
+                    </div>
+                  )}
+                  {/* Phase 1 EV gate on the slip: below zero is a hard no; 0..gate is a warning band */}
+                  {slipCalc && slip.length >= 2 && slipCalc.ev < 0 && (
+                    <div className="mt-2 rounded-(--radius-panel) border border-neg/40 bg-neg/10 px-3 py-2 text-[12px] text-neg">
+                      Engine grades this ticket {(slipCalc.ev * 100).toFixed(1)}% EV. Parlay Lab does not lock
+                      negative-EV tickets — the flagged leg is what drags it under.
+                    </div>
+                  )}
+                  {slipCalc && slip.length >= 2 && slipCalc.ev >= 0 && gatePct != null && slipCalc.ev * 100 < gatePct && (
+                    <div className="mt-2 rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-3 py-2 text-[12px] text-gold">
+                      +{(slipCalc.ev * 100).toFixed(1)}% EV is below the +{gatePct}% gate — playable only as an
+                      explicit override, and the ledger would stamp it.
                     </div>
                   )}
                 </div>

@@ -70,13 +70,27 @@ describe("ev_gated selection (spec tests 1-2)", () => {
     expect(a.noPlay).toBe(true);
   });
 
-  it("the override path stakes the exact sum and stamps overrode", () => {
-    const a = allocate(sixNegative(), 250, CFG(), true);
-    expect(a.sum).toBe(250);
-    expect(a.picks.reduce((s, p) => s + p.stake, 0)).toBe(250);
-    expect(a.picks.length).toBeGreaterThanOrEqual(4); // spread rules still apply under override
+  it("Correction 1 (2026-07-23): below zero at the settling book has NO override — six negative tickets stay blocked under force", () => {
+    const a = allocate(sixNegative(), 250, CFG(), true) as AllocOut & { blocked?: { reason: string }[] };
+    expect(a.sum).toBe(0);
+    expect(a.picks).toHaveLength(0);
+    expect(a.noPlay).toBe(true); // an override day with nothing lockable is still NO-PLAY
+    expect(a.blocked).toHaveLength(6);
+    for (const b of a.blocked ?? []) expect(b.reason).toBe("nv_tax");
+  });
+
+  it("the warning band (0 to coreEvMin) keeps its stamped override — force allocates exactly there", () => {
+    const band = [
+      tik("W1", 2.4, 0.5, 45, "g1", "g2"),
+      tik("W2", 2.6, 1.2, 40, "g3", "g4"),
+      tik("W3", 2.8, 0, 38, "g5", "g6"),
+      tik("W4", 2.5, 1.8, 42, "g7", "g8"),
+    ];
+    expect(allocate(band, 100, CFG()).noPlay).toBe(true); // below the +2% gate without force
+    const a = allocate(band, 100, CFG(), true);
+    expect(a.sum).toBe(100);
+    expect(a.picks.reduce((s, p) => s + p.stake, 0)).toBe(100);
     expect(a.overrode).toBe(true);
-    expect(a.noPlay).toBeUndefined();
   });
 
   it("mixed pool: only tickets clearing coreEvMin are selected; stakes respect the Kelly ceilings", () => {
@@ -211,26 +225,20 @@ describe("quarter-Kelly recommended daily (spec test 3)", () => {
     expect(noPlay.kellyDaily).toBe(0);
     expect(noPlay.overrode).toBe(false);
 
-    // explicit override: allocation returns, but against min($250, $75) = the bankroll cap
+    // Correction 1 (2026-07-23): the fixture slate is BELOW ZERO at Caesars everywhere
+    // (−4.7%..−59.3%), and below zero at the settling book has no override — force now
+    // changes nothing: still $0, every ticket disclosed as floor-blocked
     eng.get<(on: boolean) => void>("shSetOverride")(true);
     const forced = calc();
-    expect(forced.overrode).toBe(true);
-    expect(forced.alloc.sum).toBe(75); // cap binds, never the entered $250
-    // kellyDaily is the sum of per-ticket quarter-Kelly stakes, capped by dailyCap
-    const expected = Math.min(
-      Math.round(750 * forced.alloc.picks.reduce((s, p) => s + (kf(p.w.pl as never) ?? 0), 0)),
-      75,
-    );
-    expect(forced.kellyDaily).toBe(expected);
-    for (const p of forced.alloc.picks) {
-      expect(p.kelly).toBe(Math.round(750 * (kf(p.w.pl as never) ?? 0)));
-    }
-
-    // entered DAILY binds when it is the smaller number
-    SH.daily = 40;
-    const small = calc();
-    expect(small.alloc.sum).toBe(40);
+    const fAlloc = forced.alloc as typeof forced.alloc & { blocked?: { reason: string }[] };
+    expect(fAlloc.sum).toBe(0);
+    expect(fAlloc.picks).toHaveLength(0);
+    expect(fAlloc.noPlay).toBe(true);
+    expect(fAlloc.blocked!.length).toBeGreaterThan(0);
+    for (const b of fAlloc.blocked!) expect(b.reason).toBe("nv_tax");
+    expect(forced.kellyDaily).toBe(0);
+    void kf;
     eng.get<(on: boolean) => void>("shSetOverride")(false);
-    expect(calc().alloc.noPlay).toBe(true); // override off -> discipline back on
+    expect(calc().alloc.noPlay).toBe(true); // override off -> discipline unchanged
   });
 });

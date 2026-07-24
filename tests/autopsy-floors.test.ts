@@ -203,3 +203,63 @@ describe("H+R+RBI alt-ladder suspension — no auto ticket above O0.5", () => {
     vi.useRealTimers();
   });
 });
+
+/* ===== Fix-file Phase 1 (approved 2026-07-23) ===== */
+
+describe("Phase 1 acceptance — this week's negative-EV locks are now refused, override or not", () => {
+  // rebuilt from the graded ledger: the EVs the fix file names, at internally
+  // consistent prob/CZ-decimal pairs (czDec = (1+EV)/p)
+  const hist = [
+    { name: "07-18 FUN Mixed 5L", prob: 3.2, czEv: -23.8 },
+    { name: "07-18 HR 3L", prob: 13.5, czEv: -22.9 },
+    { name: "07-17 Hits 2L ($50)", prob: 45, czEv: -10 },
+  ];
+  for (const mode of ["ev_gated", "dk_fd"] as const) {
+    it(`${mode}: all three hard-block with reason nv_tax, force included`, () => {
+      for (const h of hist) {
+        for (const force of [false, true]) {
+          const t = mkTicket({ name: h.name, prob: h.prob, czEv: h.czEv, bsEv: 5 });
+          const a = eng.get<(p: unknown[], amt: number, c: unknown, f?: boolean) => Alloc>("shAllocate")(
+            [t], 100, { ...eng.get<Record<string, unknown>>("SH_CFG"), selMode: mode, minCoreTickets: 1, perParlayCap: 1, mktN: PROVEN }, force);
+          expect(a.picks).toHaveLength(0);
+          expect(a.sum).toBe(0);
+          // long tickets can fall to the structural dec cap before the floor even
+          // sees them — refused either way; when the floor is the refuser, it says so
+          if (a.blocked?.length) expect(a.blocked[0]).toMatchObject({ name: h.name, reason: "nv_tax" });
+        }
+      }
+    });
+  }
+  it("Kelly agrees: $0 at edge ≤ 0 (defense in depth)", () => {
+    const kf = eng.get<(pl: unknown) => number | null>("shKellyFrac");
+    for (const h of hist) {
+      const dec = (1 + h.czEv / 100) / (h.prob / 100);
+      expect(kf({ prob: h.prob, czDec: dec, bsDec: dec })).toBe(0);
+    }
+  });
+});
+
+describe("FUN structure caps (Correction 2): one lottery ticket, four legs max", () => {
+  const funLegs = (n: number, g0: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      label: `F${g0 + i}`, prop: "Hits O 0.5", lkey: `f${g0 + i}|batter_hits|0.5`, gkey: `g${g0 + i}`,
+    }));
+  const funT = (name: string, legs: number, g0: number, czDec: number) => ({
+    pl: { name, type: "MIX", tier: "LONGSHOT", prob: 5, legs: funLegs(legs, g0), czDec, czEv: -20, bsDec: czDec, bsEv: -18 },
+  });
+  const fpick = (pool: unknown[]) =>
+    eng.get<(p: unknown[], amt: number, c: unknown, ex: unknown, el: unknown) => { picks: unknown[] }>("shFunPick")(
+      pool, 50, { ...eng.get<Record<string, unknown>>("SH_CFG"), selMode: "ev_gated" }, {}, {});
+
+  it("a 5-leg ticket is FUN-ineligible; 4 legs is the ceiling", () => {
+    const five = funT("FiveLegs", 5, 1, 12);
+    const four = funT("FourLegs", 4, 10, 12);
+    const picks = fpick([five, four]) as { picks: { w: { pl: { name: string } } }[] };
+    expect(picks.picks.map((p) => p.w.pl.name)).toEqual(["FourLegs"]);
+  });
+  it("funMaxTickets=1: a $50 FUN budget that used to spread 3 tiers now buys exactly one ticket", () => {
+    const pool = [funT("Big", 3, 1, 12), funT("Massive", 3, 10, 40), funT("Moon", 3, 20, 150)];
+    const picks = fpick(pool) as { picks: unknown[] };
+    expect(picks.picks).toHaveLength(1);
+  });
+});
