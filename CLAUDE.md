@@ -33,6 +33,15 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 > - Rules that carry over regardless of stack: never fabricate prices/stats/grades; locked product rules
 >   (overs-only, HR isolation, no-repeat card, exact-sum allocator); ledger append-only after lock;
 >   thresholds in config not code.
+> - **July 2026 overhaul (fix-file, all 6 phases deployed):** default selection mode = **EV-gated @ CZ**;
+>   settlement floor czEv ≥ 0 on core locks (override-proof, "nv_tax" blocked reason); HRR O1.5+ and
+>   HR-anytime-parlay suspended from auto-selection; <100-graded-leg markets need consensus-fair EV ≥ −1%;
+>   CORE max 3 legs / FUN max 4 legs, 1 FUN ticket, FUN $5/day default; **managed bankroll** ($2,500 base,
+>   localStorage `pl_bank2`, computed = base + logged deposits/withdrawals + graded P/L, no free edits;
+>   10% daily exposure cap at lock); unders enabled in disciplined modes with per-market direction prefs
+>   (`pl_dirpref`); grading renders scores [bet team]–[opponent] (grading.v=2 migration). Full per-phase
+>   record: **ENGINE2.md** + `docs/progress.md` + `docs/settlement-audit.md` + `docs/hrr-recalibration.md`.
+>   None of these protections may be weakened without Josh's explicit sign-off.
 
 ## What it is
 A self-contained web app and installable PWA. A top sport bar switches between **MLB / NFL / NCAAF**; each sport has a live stat desk and a betting odds board. A bottom tab bar switches **Stats / Odds / Slip** (the bet slip with parlay math is shared across sports). Deployed to **GitHub Pages: https://jbravvvv.github.io/parlay-lab/** (repo `JBravvvv/parlay-lab`, public) — push to `main` and Pages redeploys. Tested live on iPhone via Add to Home Screen.
