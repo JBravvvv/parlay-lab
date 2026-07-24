@@ -572,3 +572,23 @@ Tests: susp/watch tagging per mode + badge suppression (autopsy-floors Phase 2 b
 Tests: `tests/unders.test.ts` — unders exist and rank side-blind in ev_gated, zero
 hitter unders in legacy, dirPref filters both directions, an under holds the #1 rank.
 216/216; parity digest unchanged.
+
+## Fix-file Phase 6 (2026-07-24, approved): managed bankroll
+- `src/lib/bankroll.ts` (pure math) + engine-client storage: bankroll = **$2,500 base**
+  (Correction 4; init date stamps `asOf`, the old free-edited pl_bankroll is NOT carried)
+  **+ logged deposits − withdrawals** (append-only `pl_bank2.log`, each with timestamp +
+  note, entered in Settings) **+ realized graded P/L** for locked days ≥ asOf (won:
+  payout−stake; lost: −stake; push/void/pending: 0). getMoney() computes it and stamps
+  SH.bankroll so every Kelly/cap figure prices off the honest number.
+- **Free-edit removed everywhere**: setMoney no longer accepts bankroll; the Builder
+  field is a read-only "managed" chip; Settings shows the computed value + the
+  deposit/withdrawal form + the append-only log.
+- **Combined 10% exposure cap at lock time** (engine): shLockCard refuses when
+  CORE+FUN together exceed dailyBankrollCap × bankroll, message shows $staked, %, and
+  the cap; shLockSupplemental re-checks the combined figure at write time.
+- **Dashboard**: Equity = the managed bankroll itself (it already contains graded P/L —
+  the old bankroll+P/L sum would now double-count), plus a "today's exposure $X · Y% of
+  bankroll (cap 10%)" line that turns gold past 10%.
+Tests: `tests/bankroll.test.ts` — $2,500 init, ticket P/L conventions, pre-asOf days
+excluded, pending never counted, exposure sum, supplemental refusal past the cap.
+225/225; parity digest unchanged.

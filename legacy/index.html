@@ -3099,6 +3099,11 @@ function shLockCard(){
   if(ex&&ex.locked){shStatus("Today's card is already locked — no retroactive edits, ever.");return;}
   var cc=shCardCalc(d);
   if(!cc.alloc.picks.length&&!cc.fun.picks.length){shStatus("Nothing to lock — enter a DAILY $ or FUN $ amount first.",true);return;}
+  /* Phase 6: combined daily exposure cap — CORE + FUN together may not exceed
+     dailyBankrollCap × the managed bankroll. Blocked with the numbers shown. */
+  var capX=Math.max(1,Math.round((SH_CFG.dailyBankrollCap||0.10)*SH.bankroll));
+  var totX=cc.alloc.sum+cc.fun.sum;
+  if(totX>capX){shStatus("Lock blocked — $"+totX+" staked would be "+Math.round(totX/Math.max(1,SH.bankroll)*100)+"% of the $"+SH.bankroll+" bankroll (cap "+Math.round((SH_CFG.dailyBankrollCap||0.10)*100)+"% = $"+capX+"). Trim DAILY or FUN first.",true);return;}
   var late=shCardStarted(d,cc);
   var games={};
   function tkt(p,bucket,tierName){return shTicketSnap(p,bucket,tierName,d,games);}
@@ -3174,6 +3179,10 @@ function shLockSupplemental(){
   if(staked+sc.fun.sum>(Number(e.fun)||0))return {ok:false,err:"That would exceed the day's FUN budget."};
   var fmaxW=(SH_CFG.funMaxTickets!=null)?SH_CFG.funMaxTickets:1/0;
   if((e.funT||[]).length+sc.fun.picks.length>fmaxW)return {ok:false,err:"FUN is capped at "+fmaxW+" ticket"+(fmaxW===1?"":"s")+" a day — resets tomorrow."};
+  /* Phase 6: the combined 10% daily exposure cap holds for supplemental adds too */
+  var capS=Math.max(1,Math.round((SH_CFG.dailyBankrollCap||0.10)*SH.bankroll));
+  var totS=0;(e.core||[]).concat(e.funT||[]).forEach(function(t){totS+=t.stake;});
+  if(totS+sc.fun.sum>capS)return {ok:false,err:"That would take today past the "+Math.round((SH_CFG.dailyBankrollCap||0.10)*100)+"% exposure cap ($"+(totS+sc.fun.sum)+" of $"+capS+" on the $"+SH.bankroll+" bankroll)."};
   var have={};(e.core||[]).concat(e.funT||[]).forEach(function(t){(t.legs||[]).forEach(function(l){have[l.label+"|"+l.prop]=1;});});
   var clash=sc.fun.picks.some(function(p){return p.w.pl.legs.some(function(l){return have[l.label+"|"+l.prop];});});
   if(clash)return {ok:false,err:"A pick already rides today's card — regenerate and retry."};

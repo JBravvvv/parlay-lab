@@ -3,6 +3,7 @@
 import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
+import { BANK_BASE, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -220,7 +221,56 @@ function syncEngineBoard(b: Board) {
     day opens back at this default. The field stays fully editable. */
 export const FUN_DEFAULT = 5;
 
-/** Money state lives in the same legacy keys. */
+/* ---- managed bankroll (fix-file Phase 6 + Correction 4) ---- */
+const BANK_KEY = "pl_bank2";
+export function getBankStore(): BankStore {
+  try {
+    const raw = localStorage.getItem(BANK_KEY);
+    if (raw) {
+      const v = JSON.parse(raw) as BankStore;
+      if (v && typeof v.base === "number" && Array.isArray(v.log)) return v;
+    }
+  } catch {
+    /* fall through to init */
+  }
+  // first run on this device: initialize at the true figure (Correction 4) —
+  // the old free-edited pl_bankroll number is deliberately NOT carried over
+  const store: BankStore = { base: BANK_BASE, asOf: todayStr(), log: [] };
+  try {
+    localStorage.setItem(BANK_KEY, JSON.stringify(store));
+  } catch {
+    /* private mode */
+  }
+  return store;
+}
+export function addBankAdjustment(kind: "deposit" | "withdrawal", amt: number, note: string): BankStore {
+  const store = getBankStore();
+  const clean = Math.max(0, Math.round(Number(amt) || 0));
+  if (clean > 0) {
+    store.log.push({ ts: Date.now(), kind, amt: clean, note: (note || "").slice(0, 120) });
+    try {
+      localStorage.setItem(BANK_KEY, JSON.stringify(store));
+    } catch {
+      /* private mode */
+    }
+  }
+  return store;
+}
+/** The one true bankroll: base + logged adjustments + realized graded P/L. */
+export function getBankroll(): number {
+  const eng = getEngine();
+  const ledger = eng.get<() => LedgerDayLike[]>("shLedger")();
+  return computeBankroll(getBankStore(), ledger);
+}
+/** Today's locked exposure in dollars (CORE + FUN). */
+export function getTodayExposure(): number {
+  const eng = getEngine();
+  return todayExposure(eng.get<() => LedgerDayLike[]>("shLedger")(), todayStr());
+}
+
+/** Money state lives in the same legacy keys — except bankroll, which is MANAGED
+    (Phase 6): computed from base + logged adjustments + graded P/L, stamped into
+    the engine so every Kelly/cap figure prices off the honest number. */
 export function getMoney() {
   const eng = getEngine();
   const SH = eng.get<{ daily?: number; fun?: number; bankroll?: number }>("SH") || {};
@@ -231,14 +281,18 @@ export function getMoney() {
     fun = FUN_DEFAULT;
     if (SH) (SH as { fun?: number }).fun = fun; // engine must agree with what the field shows
   }
+  const bankroll = getBankroll();
+  if (SH) (SH as { bankroll?: number }).bankroll = bankroll;
   return {
     daily: Number(SH.daily) || 0,
     fun,
-    bankroll: Number(SH.bankroll) || 750,
+    bankroll,
   };
 }
 
-export function setMoney(patch: { daily?: number; fun?: number; bankroll?: number }) {
+/* Phase 6: bankroll is managed — no free-edit path exists anymore. Deposits and
+   withdrawals go through addBankAdjustment; everything else is graded P/L. */
+export function setMoney(patch: { daily?: number; fun?: number }) {
   const eng = getEngine();
   const SH = eng.get<Record<string, unknown>>("SH");
   const LS = eng.get<{ set: (k: string, v: unknown) => void }>("LS");
@@ -251,9 +305,5 @@ export function setMoney(patch: { daily?: number; fun?: number; bankroll?: numbe
     SH.fun = patch.fun;
     LS?.set("pl_fun", patch.fun);
     LS?.set("pl_fun_day", todayStr()); // fun overrides are for today only (FUN_DEFAULT rule)
-  }
-  if (patch.bankroll != null) {
-    SH.bankroll = patch.bankroll;
-    LS?.set("pl_bankroll", patch.bankroll);
   }
 }

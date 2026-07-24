@@ -15,7 +15,7 @@ import { CountUp } from "@/components/motion/CountUp";
 import { useLedger, roiPct } from "@/lib/useLedger";
 import { ledgerSegments } from "@/lib/ledger-segments";
 import type { SyncEntry } from "@/lib/ledger-merge";
-import { cachedBoard, getMoney } from "@/lib/engine-client";
+import { cachedBoard, getMoney, getTodayExposure } from "@/lib/engine-client";
 import { fmtMoneyExact } from "@/lib/format";
 import type { PickRow } from "@/engine";
 
@@ -181,7 +181,10 @@ export default function DashboardPage() {
   const board = mounted ? cachedBoard() : null;
   const money = mounted ? getMoney() : { bankroll: 750, daily: 0, fun: 0 };
 
-  const equity = money.bankroll + (stats?.pl ?? 0);
+  // Phase 6: the managed bankroll ALREADY includes realized graded P/L (from its
+  // init date forward) — equity IS the bankroll; adding stats.pl would double-count
+  const equity = money.bankroll;
+  const exposure = mounted ? getTodayExposure() : 0;
   const spark = (stats?.days ?? []).map((d) => ({ pl: d.cumPl }));
 
   const topEdges: PickRow[] = useMemo(() => {
@@ -223,7 +226,14 @@ export default function DashboardPage() {
               <span className={(stats?.pl ?? 0) >= 0 ? "text-pos" : "text-neg"}>
                 {stats ? fmtMoneyExact(stats.pl) : "$0.00"}
               </span>{" "}
-              <span className="text-muted">season P/L on a ${money.bankroll} bankroll</span>
+              <span className="text-muted">season P/L · managed bankroll (base + logged moves + graded P/L)</span>
+            </div>
+            <div className="num mt-1 text-[12px] text-muted">
+              today&apos;s exposure{" "}
+              <span className={exposure / Math.max(1, money.bankroll) > 0.1 ? "text-gold" : "text-text"}>
+                ${exposure} · {((exposure / Math.max(1, money.bankroll)) * 100).toFixed(1)}%
+              </span>{" "}
+              of bankroll (cap 10%)
             </div>
             {spark.length > 1 && (
               <div className="mt-4 h-16">

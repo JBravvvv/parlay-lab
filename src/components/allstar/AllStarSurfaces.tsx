@@ -372,7 +372,8 @@ export function AsgBuilderTab() {
       } catch {
         /* session-only */
       }
-      if (patch.bankroll != null) setMoney({ bankroll: patch.bankroll });
+      // Phase 6: bankroll is managed (base + logged moves + graded P/L) — no free edits
+      void setMoney;
       return next;
     });
   };

@@ -470,7 +470,15 @@ export default function BuilderPage() {
       <div className="mb-5 flex flex-wrap items-center gap-2">
         <MoneyInput label="Daily" value={money.daily} onChange={(n) => updateMoney({ daily: n })} disabled={!!locked} />
         <MoneyInput label="Fun" value={money.fun} onChange={(n) => updateMoney({ fun: n })} disabled={!!locked} />
-        <MoneyInput label="Bankroll" value={money.bankroll} onChange={(n) => updateMoney({ bankroll: n })} />
+        {/* Phase 6: bankroll is managed — base + logged deposits/withdrawals + graded P/L; edits live in Settings */}
+        <span
+          className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-4 py-2"
+          title="Managed bankroll: $2,500 base + logged deposits/withdrawals + realized graded P/L. Deposits and withdrawals are logged in Settings — the number itself is never hand-edited."
+        >
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Bankroll</span>
+          <span className="num text-[14px] font-semibold text-text">{fmtMoney(money.bankroll)}</span>
+          <span className="text-[9px] font-bold uppercase tracking-wide text-faint">managed</span>
+        </span>
         {!locked && (
           <Pill variant="gold" onClick={lock} disabled={!card || (card.alloc.picks.length === 0 && card.fun.picks.length === 0)}>
             🔒 Lock card

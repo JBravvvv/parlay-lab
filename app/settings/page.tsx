@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
-import { getMoney, setMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, DIR_MARKETS, type DirPref, type SelectionMode } from "@/lib/engine-client";
+import { getMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, DIR_MARKETS, getBankStore, addBankAdjustment, type DirPref, type SelectionMode } from "@/lib/engine-client";
+import type { BankStore } from "@/lib/bankroll";
 import { getSyncKey, setSyncKey, syncNow, useSyncState } from "@/lib/ledgerSync";
 import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
 
@@ -296,7 +297,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export default function SettingsPage() {
-  const [bankroll, setBankroll] = useState(750);
+  const [bankroll, setBankroll] = useState(0);
+  const [bank, setBank] = useState<BankStore | null>(null);
+  const [adjKind, setAdjKind] = useState<"deposit" | "withdrawal">("deposit");
+  const [adjAmt, setAdjAmt] = useState(0);
+  const [adjNote, setAdjNote] = useState("");
   const [pass, setPass] = useState("");
   const [quota, setQuota] = useState<string | null>(null);
   const [quotaAt, setQuotaAt] = useState<string | null>(null);
@@ -305,6 +310,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setBankroll(getMoney().bankroll);
+    setBank(getBankStore());
     try {
       setPass(localStorage.getItem("pl_pass") ?? "");
       setQuota(localStorage.getItem("pl_quota"));
@@ -318,8 +324,17 @@ export default function SettingsPage() {
       .catch(() => setSharpOk(null));
   }, []);
 
+  const logAdjustment = () => {
+    if (!(adjAmt > 0)) return;
+    setBank(addBankAdjustment(adjKind, adjAmt, adjNote));
+    setBankroll(getMoney().bankroll);
+    setAdjAmt(0);
+    setAdjNote("");
+    setSaved("Logged.");
+    setTimeout(() => setSaved(""), 2000);
+  };
+
   const save = () => {
-    setMoney({ bankroll });
     try {
       if (pass) localStorage.setItem("pl_pass", pass);
       else localStorage.removeItem("pl_pass");
@@ -337,16 +352,56 @@ export default function SettingsPage() {
 
       <div className="space-y-4">
         <Panel title="Sizing">
-          <Row label="Season bankroll">
-            <span className="num text-[13px] text-muted">$</span>
-            <input
-              type="number"
-              min={1}
-              value={bankroll}
-              onChange={(e) => setBankroll(Math.max(1, Math.floor(Number(e.target.value) || 0)))}
-              className="num w-24 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[13px] text-text outline-none focus:border-pos/50"
-            />
+          {/* Phase 6 (Correction 4): bankroll is MANAGED — $2,500 base + logged
+              deposits/withdrawals + realized graded P/L. No free edits: hand-editing
+              it ($750→$2,000→$2,500→$350 in a week) corrupted every Kelly figure;
+              the DAILY field is the stake lever. */}
+          <Row label="Season bankroll (managed — never hand-edited)">
+            <span className="num text-[15px] font-semibold text-text">${bankroll.toLocaleString()}</span>
+            <span className="text-[10.5px] text-faint">
+              = ${bank?.base.toLocaleString() ?? "2,500"} base ({bank?.asOf ?? "—"}) + logged moves + graded P/L
+            </span>
           </Row>
+          <Row label="Log a deposit / withdrawal">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Pill variant={adjKind === "deposit" ? "primary" : "ghost"} onClick={() => setAdjKind("deposit")} className="!px-2.5 !py-0.5 text-[10.5px]">
+                Deposit
+              </Pill>
+              <Pill variant={adjKind === "withdrawal" ? "primary" : "ghost"} onClick={() => setAdjKind("withdrawal")} className="!px-2.5 !py-0.5 text-[10.5px]">
+                Withdrawal
+              </Pill>
+              <span className="num text-[12px] text-muted">$</span>
+              <input
+                type="number"
+                min={0}
+                value={adjAmt || ""}
+                placeholder="0"
+                onChange={(e) => setAdjAmt(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                className="num w-20 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[12.5px] text-text outline-none focus:border-pos/50"
+              />
+              <input
+                value={adjNote}
+                onChange={(e) => setAdjNote(e.target.value)}
+                placeholder="note (why)"
+                className="w-36 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[12px] text-text outline-none focus:border-pos/50"
+              />
+              <Pill variant="gold" onClick={logAdjustment} className="!px-3 !py-1 text-[11px]">
+                Log it
+              </Pill>
+            </div>
+          </Row>
+          {(bank?.log.length ?? 0) > 0 && (
+            <Row label="Adjustment log (append-only)">
+              <div className="space-y-1">
+                {bank!.log.map((a, i) => (
+                  <div key={i} className="num text-[11.5px] text-muted">
+                    {new Date(a.ts).toLocaleDateString()} · {a.kind === "deposit" ? "+" : "−"}${a.amt.toLocaleString()}
+                    {a.note && <span className="text-faint"> — {a.note}</span>}
+                  </div>
+                ))}
+              </div>
+            </Row>
+          )}
           <Row label="Kelly fraction">
             <span className="num text-[12px] text-muted">¼-Kelly, capped at 2% per bet (engine rule — by design, not editable)</span>
           </Row>
