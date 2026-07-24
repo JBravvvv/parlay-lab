@@ -69,7 +69,17 @@ export const headshotUrl = (id: number) =>
   `https://img.mlbstatic.com/mlb-photos/image/upload/w_120,q_auto/v1/people/${id}/headshot/67/current`;
 
 const HS_KEY = "pl_headshots";
-const nameKey = (n: string) => n.trim().toLowerCase();
+/** Accent/suffix/punctuation-proof key: the odds feed says "Jose Ramirez",
+    statsapi answers "José Ramírez" — both must land on the same cache slot. */
+const nameKey = (n: string) =>
+  n
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv)\.?$/g, "")
+    .replace(/[^a-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 
 function readCache(): Record<string, number> {
   try {

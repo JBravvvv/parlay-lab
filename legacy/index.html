@@ -2111,6 +2111,11 @@ function shAnalyzeLocal(slate){
       bsBook:(homeSide?go.home_ml_bs:go.away_ml_bs)!=null?(homeSide?go.home_ml_bsb:go.away_ml_bsb):null,
       p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
       pModel:homeSide?model:1-model,wBlend:wML,lu:"confirmed",
+      /* sandbox parlay-builder (2026-07-24, display-only additive): the OTHER side's
+         real quotes so both teams render — never a fabricated price */
+      oppLabel:homeSide?g.away:g.home,oppOdds:obSign(homeSide?go.away_ml:go.home_ml),
+      oppCz:(homeSide?go.away_ml_cz:go.home_ml_cz)!=null?(homeSide?go.away_ml_cz:go.home_ml_cz):null,
+      oppLkey:homeSide?"ml_away":"ml_home",
       lkey:homeSide?"ml_home":"ml_away",gkey:gkeyML,
       risk:risk[0]||("A quality start from "+((homeSide?g.probable_away:g.probable_home)||"the other side")+" flips a one-run game.")});
     if(go.home_rl_pt!=null&&go.home_rl!=null&&go.away_rl!=null){
@@ -2133,6 +2138,10 @@ function shAnalyzeLocal(slate){
           p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
           pModel:side?pHomeCover:1-pHomeCover,wBlend:wRL,lu:"confirmed",
           game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
+          oppLabel:side?g.away:g.home,oppOdds:obSign(side?go.away_rl:go.home_rl),
+          oppCz:(side?go.away_rl_cz:go.home_rl_cz)!=null?(side?go.away_rl_cz:go.home_rl_cz):null,
+          oppPt:side?go.away_rl_pt:go.home_rl_pt,
+          oppLkey:side?"rl_away":"rl_home",
           lkey:side?"rl_home":"rl_away",gkey:gkeyML,
           risk:((side?go.home_rl_pt:go.away_rl_pt)<0)?"Favorites win one-run games constantly — this needs a 2+ run margin.":"A blowout either way beats the +1.5 cushion."});
       }
@@ -2407,6 +2416,9 @@ function shAnalyzeLocal(slate){
           pModel:(r.pModel!=null)?Math.round(r.pModel*1000)/10:null,
           wBlend:(r.wBlend!=null)?Math.round(r.wBlend*1000)/1000:null,
           lu:r.lu||"confirmed",
+          /* sandbox parlay-builder: the other side of an ML/RL game row (real quotes only) */
+          opp:(r.oppLabel!=null)?{label:r.oppLabel,odds:r.oppOdds||null,cz:(r.oppCz!=null?r.oppCz:null),
+            prob:Math.round((1-r.p)*1000)/10,pt:(r.oppPt!=null?r.oppPt:null),lkey:r.oppLkey||null}:null,
           edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band)&&!suspRow,tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
           conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
     });

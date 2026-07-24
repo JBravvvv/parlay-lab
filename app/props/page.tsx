@@ -83,6 +83,39 @@ function groupByGame(rows: PickRow[]): GameGroup[] {
 const legId = (r: PickRow) => `${r.lkey ?? ""}|${r.label}|${r.sub}`;
 const isGameMarket = (cat: string) => cat === "ml" || cat === "rl";
 
+type OppSide = { label: string; odds?: string | null; cz?: number | null; prob?: number; pt?: number | null; lkey?: string | null };
+const sPt = (v: number) => (v > 0 ? `+${v}` : String(v));
+
+/** The other team of an ML/RL row (real quotes the engine now exports). Boards
+    generated before this shipped lack `opp` and just show the engine's side. */
+function oppRow(r: PickRow): PickRow | null {
+  const o = r.opp as OppSide | null | undefined;
+  if (!o || !o.label) return null;
+  const rl = (r.lkey ?? "").startsWith("rl");
+  return {
+    label: o.label,
+    sub: rl ? `RL ${o.pt != null ? sPt(o.pt) : ""} vs ${r.label}`.replace("  ", " ") : `ML vs ${r.label}`,
+    cz: o.cz ?? null,
+    prob: o.prob,
+    game: r.game,
+    gkey: r.gkey,
+    lkey: o.lkey ?? null,
+    live: r.live,
+  } as PickRow;
+}
+
+/** Expand game-market rows to both sides, away listed first (Caesars order). */
+function bothSides(rows: PickRow[]): PickRow[] {
+  const out: PickRow[] = [];
+  for (const r of rows) {
+    const o = oppRow(r);
+    const pair = o ? [r, o] : [r];
+    pair.sort((a, b) => ((a.lkey ?? "").endsWith("away") ? -1 : 1) - ((b.lkey ?? "").endsWith("away") ? -1 : 1));
+    out.push(...pair);
+  }
+  return out;
+}
+
 function Avatar({ src, label }: { src: string | null; label: string }) {
   const [broken, setBroken] = useState(false);
   if (src && !broken) {
@@ -92,6 +125,7 @@ function Avatar({ src, label }: { src: string | null; label: string }) {
         src={src}
         alt=""
         loading="lazy"
+        referrerPolicy="no-referrer"
         onError={() => setBroken(true)}
         className="h-8 w-8 shrink-0 rounded-full border border-white/[0.08] bg-surface-2 object-cover"
       />
@@ -262,12 +296,14 @@ export default function PropsPage() {
     const cats = (d.categories ?? {}) as Record<string, PickRow[]>;
     const live = (d.categoriesLive ?? {}) as Record<string, PickRow[]>;
     const seen = new Set<string>();
-    return [...(cats[cat] ?? []), ...(live[cat] ?? [])].filter((r) => {
+    const base = [...(cats[cat] ?? []), ...(live[cat] ?? [])].filter((r) => {
       const id = legId(r);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
+    // games show BOTH teams' ML/RL — the engine exports the other side's real quotes
+    return isGameMarket(cat) ? bothSides(base) : base;
   }, [d, cat]);
   const games = useMemo(() => groupByGame(rows), [rows]);
   const playerNames = useMemo(
