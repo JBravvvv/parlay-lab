@@ -110,7 +110,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null }) {
+function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
   /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
      CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
   const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
@@ -183,6 +183,12 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow }: { t: Tic
           )}
         </div>
       </div>
+      {/* fix-file Phase 3: soft warning at the 3-leg ceiling (4+ is hard-blocked upstream) */}
+      {legWarn && (
+        <div className="mt-1 text-[10.5px] text-gold">
+          ⚠ 3 legs — the graded record's ceiling: 2-leg tickets ran −0.7% ROI; 3+ legs went 1-25.
+        </div>
+      )}
       <div className="mt-2 space-y-1">
         {t.legs.map((l, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11.5px]">
@@ -613,7 +619,7 @@ export default function BuilderPage() {
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         {shadow.alloc.picks.map((p) => (
-                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} />
+                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                         ))}
                       </div>
                     </div>
@@ -769,7 +775,7 @@ export default function BuilderPage() {
               )}
               <div className="grid gap-3 md:grid-cols-2">
                 {card.alloc.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} />
+                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                 ))}
               </div>
             </Reveal>
@@ -889,6 +895,18 @@ export default function BuilderPage() {
                     <div className="mt-2 rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-3 py-2 text-[12px] text-gold">
                       +{(slipCalc.ev * 100).toFixed(1)}% EV is below the +{gatePct}% gate — playable only as an
                       explicit override, and the ledger would stamp it.
+                    </div>
+                  )}
+                  {/* fix-file Phase 3: leg-count discipline, live on the slip */}
+                  {slip.length === 3 && (
+                    <div className="mt-2 text-[11px] text-gold">
+                      ⚠ 3 legs — the ceiling. 2-leg tickets are running −0.7% ROI; 3+ legs are 1-25.
+                    </div>
+                  )}
+                  {slip.length >= 4 && (
+                    <div className="mt-2 rounded-(--radius-panel) border border-neg/40 bg-neg/10 px-3 py-2 text-[12px] text-neg">
+                      {slip.length} legs — core money is hard-capped at 3 legs (3+ leg tickets went 1-25), and even
+                      the FUN bucket stops at 4. This build can&apos;t take daily money.
                     </div>
                   )}
                 </div>
