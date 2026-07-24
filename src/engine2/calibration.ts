@@ -322,6 +322,64 @@ export function slopeMults(rel: Reliability): Record<string, number> {
   return out;
 }
 
+/* ---------- the armed calibration state (Phase 0.5, 2026-07-24) ----------
+
+   Every generator must arm the engine from ONE computation. Before this, the
+   app read /api/calibration (weekly mults merged with the slope fit, plus the
+   global shrink and the per-market graded counts) while /api/generate read the
+   weekly mults straight out of Redis — so the cron ran without the slope fit,
+   without calG and without mktN. Both now call this function on the same two
+   stored objects. A divergence would have to be a code change to a shared
+   pure function, not a quiet difference between two call sites. */
+
+export type ArmedCalibration = {
+  /** calW: per-market shrink-only multipliers on the model blend weight */
+  mults: Record<string, number>;
+  /** calG: the fitted global model-confidence factor (1 = no shrink, null = dormant) */
+  globalS: number | null;
+  /** SH_CFG.mktN: graded legs per market — the small-sample consensus gate's input.
+      null when no summary exists, which the engine reads as "every market is small". */
+  mktN: Record<string, number> | null;
+};
+
+export function effectiveCalibration(
+  summary: CalibrationSummary | null,
+  weights: WeightState | null,
+  auto: "on" | "off",
+): ArmedCalibration {
+  const rel = summary?.reliability ?? null;
+  const mktN = rel ? Object.fromEntries(Object.entries(rel).map(([m, f]) => [m, f?.n ?? 0])) : null;
+  if (auto === "off") return { mults: {}, globalS: null, mktN };
+  // effective mults = the stricter of the weekly 3D state machine and the
+  // nightly reliability-slope fit — both shrink-only, so min() is honest
+  const merged: Record<string, number> = { ...(weights?.mults ?? {}) };
+  if (rel) for (const [m, v] of Object.entries(slopeMults(rel))) merged[m] = Math.min(merged[m] ?? 1, v);
+  return { mults: merged, globalS: summary?.globalShrink?.s ?? null, mktN };
+}
+
+/* ---------- calibration training window (Phase 0.5, 2026-07-24) ----------
+
+   From 2026-07-17 (client full-board logging) to 2026-07-24, the prediction
+   store was written by two generators running different selection policies:
+   /api/generate armed no selMode at all — so it emitted the legacy overs-only
+   board — while the app armed ev_gated and emitted both sides. ~30% of rows
+   differ in SIDE between the two, and the cron's board was additionally built
+   pre-lineup (16:00 UTC), so most of it never reached the sim path.
+
+   Those rows are kept — they stay auditable and gradeable, exactly like ledger
+   addenda — but they are excluded from the calibration/reliability channel.
+   No per-row attribution is attempted: an under-side row is provably the app's,
+   but an over-side row could have come from either generator, and a guess there
+   would be false precision. The channel restarts by DATE, the same no-backfill
+   rule CLV uses. */
+
+export const CAL_START = "2026-07-25";
+
+/** Is this date's prediction row eligible to TRAIN the calibration channel? */
+export function calibrationEligible(date: string): boolean {
+  return date >= CAL_START;
+}
+
 /* ---------- 3D: weight adjustment (shrink-only, capped, weekly) ---------- */
 
 export type WeightState = {

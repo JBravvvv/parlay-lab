@@ -25,6 +25,13 @@ export type PredRecord = {
   czEv: number | null;
   lu: "confirmed" | "projected";
   tags: string[];
+  /* provenance (Phase 0.5, 2026-07-24): which generator wrote the row and which
+     selection mode was armed when it did. Two generators write this store; for
+     six days they ran different policies and nothing recorded which was which.
+     Rows written before this deploy carry neither field — that is exactly the
+     ambiguity CAL_START excludes rather than guesses at. */
+  src?: "cron" | "client";
+  selMode?: string;
   // grading fields (cron-owned)
   res?: "won" | "lost" | "push" | "void" | "pending" | "ungradable";
   detail?: string;
@@ -61,8 +68,14 @@ const oddsNum = (v: unknown): number | null => {
   return isFinite(n) && n !== 0 ? n : null;
 };
 
+/** Who generated the board being serialized, and under which selection mode. */
+export type PredSource = { src: "cron" | "client"; selMode?: string };
+
 /** Serialize a generated board into prediction records (pregame rows only). */
-export function boardToPredictions(d: BoardData): { records: PredRecord[]; parlays: ParlayPred[]; games: DayGames } {
+export function boardToPredictions(
+  d: BoardData,
+  from?: PredSource,
+): { records: PredRecord[]; parlays: ParlayPred[]; games: DayGames } {
   const records: PredRecord[] = [];
   const seen = new Set<string>();
   for (const [market, rows] of Object.entries(d.categories ?? {})) {
@@ -91,6 +104,7 @@ export function boardToPredictions(d: BoardData): { records: PredRecord[]; parla
         czEv: r.czEv != null ? Number(r.czEv) : null,
         lu: r.lu === "projected" ? "projected" : "confirmed",
         tags: Array.isArray(r.tags) ? (r.tags as string[]).slice(0, 8) : [],
+        ...(from ? { src: from.src, ...(from.selMode ? { selMode: from.selMode } : {}) } : {}),
       });
     }
   }

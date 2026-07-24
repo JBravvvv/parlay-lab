@@ -205,8 +205,9 @@ export async function generateBoard(): Promise<Board> {
     /* board too big for storage — regenerate next open instead */
   }
   syncEngineBoard(board);
-  // calibration 3A: log the full board (fire-and-forget, fail-silent by spec)
-  void logBoardPredictions(board.date, data);
+  // calibration 3A: log the full board (fire-and-forget, fail-silent by spec).
+  // Phase 0.5: rows are stamped with this generator and the mode it armed.
+  void logBoardPredictions(board.date, data, getSelectionMode());
   return board;
 }
 

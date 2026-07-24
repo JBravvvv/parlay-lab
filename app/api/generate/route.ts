@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-serialize";
-import type { WeightState } from "@/engine2/calibration";
+import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 
 /**
@@ -19,6 +19,10 @@ import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/s
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+/** docs/collection-period.md, frozen row "selection mode default". The cron has no
+    localStorage to read pl_selmode from, so the frozen default is stated here. */
+const CRON_SEL_MODE = "ev_gated";
 
 const K_LASTGEN = "pl:gen:lastRun";
 const DAYS_SET = "pl:pred:days";
@@ -87,12 +91,15 @@ export async function GET(req: NextRequest) {
     const base = selfBase();
     const grab = (u: string) =>
       fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const [priors, ctx, weights, auto] = await Promise.all([
+    const [priors, ctx, summary, weights, auto] = await Promise.all([
       grab(`${base}/model/priors.json`),
       grab(`${base}/model/context.json`),
+      redisGetJson<CalibrationSummary>("pl:cal:summary"),
       redisGetJson<WeightState>("pl:cal:weights"),
       redis(["GET", "pl:cal:auto"]).catch(() => null),
     ]);
+    // identical computation to the one the app receives from /api/calibration
+    const armed = effectiveCalibration(summary, weights, auto === "off" ? "off" : "on");
 
     const eng = createEngine({ fetchJson: serverFetchJson, storage: memoryStorage() });
     eng.set("SH_PRIORS", priors);
@@ -104,16 +111,34 @@ export async function GET(req: NextRequest) {
       sharpW: true,
       regions: "us,eu",
       sim: true,
+      // sim DEPTH is deliberately LOWER here than in the app, and that is settled
+      // (Josh, 2026-07-24): this run's sims only ever produce leg-level marginals
+      // for the prediction log — it never allocates, so its joints price nothing —
+      // and at 16:00 UTC almost no lineup is posted, so the sim path barely engages
+      // at all. Measured across 10k→50k, marginals move nothing past 0.10pp (the
+      // storage rounding grain). Do not "converge" this to the app's 50k.
       simN: 10000,
       simNHR: 20000,
       projLineup: true,
-      calW: auto === "off" ? null : weights?.mults ?? null,
+      calW: armed.mults,
+      calG: armed.globalS,
     });
+    /* SH_CFG has no engine-side selMode default and every disciplined branch tests
+       it by exact string, so an unset value silently ran the LEGACY board here:
+       overs-only hitter props, no HRR suspension tags. docs/collection-period.md
+       freezes the selection mode at ev_gated; this restores compliance on the
+       surface the drift table never covered. If the app's mode is ever changed,
+       this constant moves with it — the arming table is what catches a mismatch. */
+    const cfg = eng.get<Record<string, unknown>>("SH_CFG");
+    if (cfg) {
+      cfg.selMode = CRON_SEL_MODE;
+      cfg.mktN = armed.mktN;
+    }
 
     const slate = await eng.collectSlate();
     const data = eng.analyze(slate) as BoardData;
     const date = eng.get<() => string>("shToday")();
-    const { records, parlays, games } = boardToPredictions(data);
+    const { records, parlays, games } = boardToPredictions(data, { src: "cron", selMode: CRON_SEL_MODE });
     if (!records.length) {
       return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)" });
     }

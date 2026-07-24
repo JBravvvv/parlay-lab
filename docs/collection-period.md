@@ -27,9 +27,16 @@ by default; any change needs Josh's explicit sign-off against this document.
 
 ## Frozen parameters — current deployed values (drift detector)
 
-Verified against `legacy/index.html` (SH_CFG et al.) and `src/lib/engine-client.ts`
-at commit `ca03a02`. If a live value ever differs from this table, something moved
-during the freeze and that is itself a finding.
+Verified against `legacy/index.html` (SH_CFG et al.), `src/lib/engine-client.ts` and
+`app/api/generate/route.ts`. If a live value ever differs from this table, something
+moved during the freeze and that is itself a finding.
+
+**Every generator counts.** Two surfaces arm the engine, and until 2026-07-24 this
+table named only one of them — so `/api/generate` ran six days with no `selMode` at
+all (i.e. the legacy overs-only board, ~30% of rows on a different side than the app's)
+without the drift check being able to see it. A value is only "deployed" when it is
+deployed on **both** surfaces; a row that differs between the two columns below is
+drift, even when both values look reasonable on their own.
 
 ### Selection & gates
 | parameter | value | meaning |
@@ -73,12 +80,77 @@ during the freeze and that is itself a finding.
 | `BANK_BASE` | `$2,500` | managed bankroll base (asOf 2026-07-24); computed, never typed |
 | ledger / bank log / NO-PLAY log | append-only, cloud-synced | locked days never rewritten; corrections are addenda |
 
+### Engine arming — per generator (added Phase 0.5, 2026-07-24)
+
+Both columns must match, field for field. The app arms in `armV2()`
+(`src/lib/engine-client.ts`); the cron arms inline in `app/api/generate/route.ts`.
+
+**Check the CALL SITE, not the value.** Two values agreeing today is not compliance —
+`calW` agreed for six days and then didn't, because the two sides computed it
+separately and only one side gained the nightly slope-fit merge. A row is compliant
+only when both surfaces reach the value through the *same function*. `tests/arming-parity.test.ts`
+enforces the call sites by reading the route sources, so this table can't quietly rot
+into decoration.
+
+| parameter | app (engine-client `armV2`) | cron (`/api/generate`) | shared call site |
+|---|---|---|---|
+| `SH_CFG.selMode` | `ev_gated` (`getSelectionMode()`, stored override respected) | `ev_gated` (`CRON_SEL_MODE` — no localStorage on the server) | — (two literals; the constant, the table and the test are the only guards) |
+| `SH_CFG.mktN` | graded legs/market from the calibration summary | same — hygiene only¹ | `effectiveCalibration()` |
+| `calW` | `/api/calibration` `.mults` | same | `effectiveCalibration()` |
+| `calG` | `/api/calibration` `.global.s` | same | `effectiveCalibration()` |
+| `shin` · `sharpW` · `sim` · `projLineup` | `true` | `true` |
+| `regions` | `us,eu` | `us,eu` |
+| `priors` · `ctx` | `!!` the fetched artifact | `!!` the same artifact |
+| **`simN` / `simNHR`** | **50,000 / 50,000** (`SIM_PATHS`) | **10,000 / 20,000** |
+
+`calW`/`calG`/`mktN` come from one shared pure function (`effectiveCalibration` in
+`src/engine2/calibration.ts`) called by both `/api/calibration` and `/api/generate`,
+so those three cannot silently diverge again — a difference would take a code change
+to a shared function, not two call sites drifting apart.
+
+¹ **`mktN` on the cron is hygiene, not function.** It is read at exactly one place —
+`shAllocate` (legacy/index.html, the small-sample consensus gate) — and the cron never
+allocates. It is wired so that a future server-side caller can't inherit the old hole,
+and it changes nothing about the board the cron logs today.
+
+**`simN`/`simNHR` are KNOWINGLY UNEQUAL, and that is a decision, not a gap.** The
+cron's sims produce leg-level marginals for the prediction log only: it never
+allocates, so its joints price nothing, and it runs at 16:00 UTC when almost no lineup
+is posted, so the sim path barely engages. Measured 2026-07-24 across 10k → 50k paths,
+zero marginal rows changed side and no probability moved more than 0.10pp (the storage
+rounding grain). Cron depth stays 10k/20k. Do not "converge" it upward.
+
+That measurement covers **marginals only**, and it is not a licence to lower the APP.
+The joint path — `jointAll()`, the same-game scaling factor clamped 0.25–4× that prices
+every SGP — has never been measured across depths, and Monte Carlo noise on a joint
+tail is far worse than on a marginal (a 0.3% joint sees ~30 hits at 10k, ~18% relative
+SE; ~8% at 50k). `simNHR` exists for exactly that reason. **Any proposal to drop the app
+from 50k requires that joint-stability measurement first** — per same-game group:
+`jointAll()`, Π sim marginals, the resulting factor, its spread across 10k/20k/50k with
+seeds held, split CORE vs FUN-tier near `funMinProb`, plus how many tickets change tier,
+stake or gate outcome.
+
 ### Calibration guardrails (the one moving part)
 | parameter | value |
 |---|---|
 | adjustment trigger | 150+ graded picks AND statistical significance |
 | adjustment cap | ±10% per week, shrink-only (toward consensus) |
 | tier ladder | MONITOR <50 · SOFT 50–99 · HARD 100–149 · ADJUST 150+ |
+| training window start | `CAL_START` = **2026-07-25** (Phase 0.5) |
+
+**`CAL_START`.** Prediction rows dated before it are kept and still graded, but do not
+train the channel: from 2026-07-17 to 2026-07-24 the store was written by two
+generators running different selection policies, and no row recorded which wrote it.
+No retroactive attribution is attempted — an under-side row is provably the app's, an
+over-side row could be either, and guessing would be false precision. From this deploy
+every row carries `src: "cron" | "client"` and the armed `selMode`, so the question is
+never ambiguous again. Same no-backfill rule as CLV (`docs/clv.md`).
+
+Expect the summary's `n` to collapse on the first run after the cutoff and rebuild at
+roughly the board's daily row count. While it rebuilds, `mktN` is small, so the
+small-sample consensus gate (`consMinN` 100) applies to more markets than usual —
+selection tightens. That is the safe direction and it is temporary, but it is a real
+change in which tickets clear the gate for the first few days.
 
 ## What "done" looks like
 

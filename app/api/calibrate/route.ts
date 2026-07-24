@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { DayBlob } from "@/lib/pred-serialize";
 import {
+  CAL_START,
   applyWeeklyAdjustment,
+  calibrationEligible,
   computeCalibration,
   fitGlobalShrink,
   fitReliability,
@@ -178,6 +180,10 @@ export async function GET(req: NextRequest) {
     // can score the model against the consensus-only baseline — upgrade 03)
     const graded: GradedPick[] = [];
     for (const date of allDays.slice(-SUMMARY_DAYS)) {
+      // Phase 0.5 date cutoff: rows written while two generators ran different
+      // selection policies are still stored and still graded above — they just
+      // don't train the channel. See CAL_START in engine2/calibration.
+      if (!calibrationEligible(date)) continue;
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
       for (const r of Object.values(blob.records)) {
@@ -189,6 +195,10 @@ export async function GET(req: NextRequest) {
     // upgrade 03: the cloud ledger's graded legs join the training set for any date the
     // prediction store never logged (the pre-logging history) — never double-counted:
     // dates the store covers are skipped outright.
+    // NOTE (Phase 0.5): this source is deliberately NOT cut at CAL_START. These are
+    // locked ledger legs, which only ever came from the app — the two-generator
+    // ambiguity never touched them. They do predate the ev_gated default, so if the
+    // channel should hold exactly one policy, this loop takes the same cutoff.
     try {
       const cut = new Date(Date.now() - SUMMARY_DAYS * 86_400_000).toISOString().slice(0, 10);
       const dayset = new Set(allDays);
@@ -234,6 +244,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       newlyGraded,
+      calStart: CAL_START, // the training window's start (Phase 0.5 cutoff)
       gradedTotal: graded.length,
       markets: summary.markets.length,
       quarantine: summary.quarantine,

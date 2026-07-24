@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { calibrationLine, slopeMults, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
+import { calibrationLine, effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { redis, redisGetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 
 /**
@@ -22,15 +22,13 @@ export async function GET() {
     const summary = await redisGetJson<CalibrationSummary>("pl:cal:summary");
     const weights = (await redisGetJson<WeightState>("pl:cal:weights")) ?? { mults: {}, lastAdjust: 0, log: [] };
     const auto = (((await redis(["GET", "pl:cal:auto"])) as string | null) ?? "on") as "on" | "off";
-    // effective mults = the stricter of the weekly 3D state machine and the
-    // nightly reliability-slope fit — both shrink-only, so min() is honest
-    const sm = summary?.reliability ? slopeMults(summary.reliability) : {};
-    const merged: Record<string, number> = { ...weights.mults };
-    for (const [m, v] of Object.entries(sm)) merged[m] = Math.min(merged[m] ?? 1, v);
+    // one shared computation for every generator (Phase 0.5) — the app reads it
+    // over HTTP here, /api/generate calls the same function on the same objects
+    const armed = effectiveCalibration(summary, weights, auto);
     return NextResponse.json({
       summary,
       line: calibrationLine(summary),
-      mults: auto === "off" ? {} : merged,
+      mults: armed.mults,
       global: auto === "off" ? null : summary?.globalShrink ?? null,
       quarantine: summary?.quarantine ?? [],
       auto,

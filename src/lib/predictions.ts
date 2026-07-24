@@ -17,12 +17,14 @@ import { getSyncKey } from "./ledgerSync";
 export type { DayBlob, DayGames, ParlayPred, PredRecord } from "./pred-serialize";
 export { boardToPredictions } from "./pred-serialize";
 
-/** Fire-and-forget push after a board generates. Never throws. */
-export async function logBoardPredictions(date: string, d: BoardData): Promise<void> {
+/** Fire-and-forget push after a board generates. Never throws.
+    `selMode` is passed in (not read here) so this module never imports
+    engine-client, which imports this one. */
+export async function logBoardPredictions(date: string, d: BoardData, selMode?: string): Promise<void> {
   try {
     const key = getSyncKey();
     if (!key) return; // no sync phrase on this device — the Vercel cron still logs daily
-    const payload = boardToPredictions(d);
+    const payload = boardToPredictions(d, { src: "client", selMode });
     if (!payload.records.length) return;
     await fetch("/api/predictions", {
       method: "PUT",
