@@ -8,6 +8,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import type { PickRow } from "@/engine";
 import { amFmt, combineTicket, type SandboxLeg } from "@/lib/ticket-math";
+import { parseMatchup, teamAbbr, teamCode, teamLogo, teamLogoFromLabel, useHeadshots } from "@/lib/mlb-visuals";
 
 /**
  * PARLAY BUILDER (sandbox, 2026-07-24) — a Caesars-style prop board for
@@ -17,6 +18,10 @@ import { amFmt, combineTicket, type SandboxLeg } from "@/lib/ticket-math";
  * the side the engine prices; the opposite side's price isn't captured, so it
  * is never shown (nothing here is ever fabricated). Combined true % is the
  * naive product — same-game correlation is NOT modeled in this sandbox.
+ *
+ * The category rows mirror the Caesars app 1:1 (Josh's screenshots). Markets
+ * the app's odds feed doesn't mirror yet get an honest empty state — every
+ * market IS posted at the book; the feed just carries a subset.
  */
 
 const TABS = [
@@ -26,24 +31,38 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-const MARKETS: Record<TabKey, { key: string; label: string }[]> = {
+/** cat = engine market key; null = posted at the book, not in the feed mirror. */
+const MARKETS: Record<TabKey, { key: string; label: string; cat: string | null }[]> = {
   games: [
-    { key: "ml", label: "Moneyline" },
-    { key: "rl", label: "Run Line" },
+    { key: "ml", label: "Moneyline", cat: "ml" },
+    { key: "rl", label: "Run Line", cat: "rl" },
+    { key: "r1st", label: "Run In 1st Inning", cat: null },
+    { key: "fp", label: "First Pitch", cat: null },
+    { key: "f3", label: "1st 3 Innings", cat: null },
+    { key: "f5", label: "1st 5 Innings", cat: null },
   ],
   batter: [
-    { key: "batter_hits", label: "Hits" },
-    { key: "batter_total_bases", label: "Total Bases" },
-    { key: "batter_hits_runs_rbis", label: "Hits + Runs + RBI" },
-    { key: "batter_home_runs", label: "Home Runs" },
+    { key: "hr", label: "Anytime HR", cat: "batter_home_runs" },
+    { key: "hits", label: "Hits", cat: "batter_hits" },
+    { key: "tb", label: "Total Bases O/U", cat: "batter_total_bases" },
+    { key: "hrr", label: "Hits + Runs + RBI O/U", cat: "batter_hits_runs_rbis" },
+    { key: "rbi", label: "RBI", cat: null },
+    { key: "runs", label: "Batter Runs", cat: null },
+    { key: "althr", label: "Alternate Home Runs", cat: null },
+    { key: "xbh", label: "Extra-Base Hit", cat: null },
+    { key: "singles", label: "Singles", cat: null },
   ],
   pitcher: [
-    { key: "pitcher_strikeouts", label: "Strikeouts" },
-    { key: "pitcher_outs", label: "Outs Recorded" },
+    { key: "k", label: "Pitcher Strikeouts O/U", cat: "pitcher_strikeouts" },
+    { key: "outs", label: "Outs Recorded O/U", cat: "pitcher_outs" },
+    { key: "er", label: "Earned Runs Allowed O/U", cat: null },
+    { key: "ha", label: "Hits Allowed O/U", cat: null },
+    { key: "walks", label: "Pitcher Walks O/U", cat: null },
+    { key: "mostk", label: "Most Strikeouts", cat: null },
   ],
 };
 
-type GameGroup = { game: string; matchup: string; time: string; rows: PickRow[] };
+type GameGroup = { game: string; away: string; home: string; time: string; rows: PickRow[] };
 
 function groupByGame(rows: PickRow[]): GameGroup[] {
   const by = new Map<string, GameGroup>();
@@ -55,39 +74,89 @@ function groupByGame(rows: PickRow[]): GameGroup[] {
       cur.rows.push(r);
       continue;
     }
-    const [matchup, ...rest] = g.split(" · ");
-    by.set(g, { game: g, matchup, time: rest.join(" · "), rows: [r] });
+    const m = parseMatchup(g);
+    by.set(g, { game: g, away: m.away, home: m.home, time: m.time, rows: [r] });
   }
   return [...by.values()].sort((a, b) => (a.game < b.game ? -1 : 1));
 }
 
 const legId = (r: PickRow) => `${r.lkey ?? ""}|${r.label}|${r.sub}`;
+const isGameMarket = (cat: string) => cat === "ml" || cat === "rl";
+
+function Avatar({ src, label }: { src: string | null; label: string }) {
+  const [broken, setBroken] = useState(false);
+  if (src && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        onError={() => setBroken(true)}
+        className="h-8 w-8 shrink-0 rounded-full border border-white/[0.08] bg-surface-2 object-cover"
+      />
+    );
+  }
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-surface-2 text-[11px] font-bold text-muted">
+      {label
+        .split(" ")
+        .slice(0, 2)
+        .map((w) => w[0] ?? "")
+        .join("")
+        .toUpperCase()}
+    </span>
+  );
+}
+
+function TeamMark({ name, side }: { name: string; side: "away" | "home" }) {
+  const code = teamCode(name);
+  const img = code ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={teamLogo(code)} alt="" loading="lazy" className="h-7 w-7 object-contain" />
+  ) : null;
+  const ab = <span className="text-[14px] font-bold tracking-wide text-text">{teamAbbr(name)}</span>;
+  return (
+    <span className="flex items-center gap-2">
+      {side === "away" ? img : ab}
+      {side === "away" ? ab : img}
+    </span>
+  );
+}
 
 function PropRow({
   r,
   market,
+  gameCat,
+  headshot,
   selected,
   onToggle,
 }: {
   r: PickRow;
   market: string;
+  gameCat: boolean;
+  headshot: string | null;
   selected: boolean;
   onToggle: (leg: SandboxLeg) => void;
 }) {
   const cz = typeof r.cz === "number" ? r.cz : null;
   const prob = typeof r.prob === "number" ? r.prob : null;
+  const avatarSrc = gameCat ? teamLogoFromLabel(r.label) : headshot;
   return (
     <div className={`flex items-center justify-between gap-2 border-t border-white/[0.04] py-2 ${r.susp ? "opacity-60" : ""}`}>
-      <div className="min-w-0">
-        <div className="truncate text-[12.5px] font-medium text-text">
-          {r.label}
-          {r.susp && (
-            <span className="ml-1.5 rounded-full border border-line-2 bg-surface-2 px-1.5 py-px text-[8.5px] font-bold uppercase text-muted">
-              susp
-            </span>
-          )}
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Avatar src={avatarSrc} label={r.label} />
+        <div className="min-w-0">
+          <div className="truncate text-[12.5px] font-medium text-text">
+            {r.label}
+            {r.susp && (
+              <span className="ml-1.5 rounded-full border border-line-2 bg-surface-2 px-1.5 py-px text-[8.5px] font-bold uppercase text-muted">
+                susp
+              </span>
+            )}
+          </div>
+          <div className="text-[10.5px] text-muted">{r.sub}</div>
         </div>
-        <div className="text-[10.5px] text-muted">{r.sub}</div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {prob != null && (
@@ -130,33 +199,45 @@ function PropRow({
 function GameCard({
   g,
   market,
+  gameCat,
+  headshots,
   isSel,
   onToggle,
 }: {
   g: GameGroup;
   market: string;
+  gameCat: boolean;
+  headshots: Record<string, string>;
   isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [shown, setShown] = useState(6);
-  const rows = g.rows;
   return (
     <Panel>
-      <button className="flex w-full items-center justify-between" onClick={() => setOpen((o) => !o)}>
-        <span className="text-[13px] font-semibold text-text">{g.matchup}</span>
+      <button className="flex w-full items-center justify-between gap-2" onClick={() => setOpen((o) => !o)}>
+        <TeamMark name={g.away} side="away" />
         <span className="num text-[11px] text-muted">
           {g.time} {open ? "▾" : "▸"}
         </span>
+        <TeamMark name={g.home} side="home" />
       </button>
       {open && (
         <div className="mt-2">
-          {rows.slice(0, shown).map((r) => (
-            <PropRow key={legId(r)} r={r} market={market} selected={isSel(legId(r))} onToggle={onToggle} />
+          {g.rows.slice(0, shown).map((r) => (
+            <PropRow
+              key={legId(r)}
+              r={r}
+              market={market}
+              gameCat={gameCat}
+              headshot={headshots[r.label] ?? null}
+              selected={isSel(legId(r))}
+              onToggle={onToggle}
+            />
           ))}
-          {rows.length > shown && (
-            <button className="mt-2 w-full text-center text-[11.5px] font-semibold text-pos" onClick={() => setShown(rows.length)}>
-              Show More ({rows.length - shown}) ▾
+          {g.rows.length > shown && (
+            <button className="mt-2 w-full text-center text-[11.5px] font-semibold text-pos" onClick={() => setShown(g.rows.length)}>
+              Show More ({g.rows.length - shown}) ▾
             </button>
           )}
         </div>
@@ -169,26 +250,31 @@ export default function PropsPage() {
   const q = useBoard();
   const regen = useRegenerateBoard();
   const [tab, setTab] = useState<TabKey>("games");
-  const [mkt, setMkt] = useState<string>("ml");
+  const [mktKey, setMktKey] = useState<string>("ml");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
 
   const d = q.data?.data;
-  const activeMkt = MARKETS[tab].some((m) => m.key === mkt) ? mkt : MARKETS[tab][0].key;
+  const mkt = MARKETS[tab].find((m) => m.key === mktKey) ?? MARKETS[tab][0];
+  const cat = mkt.cat;
   const rows = useMemo(() => {
-    if (!d) return [];
-    const cats = { ...(d.categories ?? {}) } as Record<string, PickRow[]>;
+    if (!d || !cat) return [];
+    const cats = (d.categories ?? {}) as Record<string, PickRow[]>;
     const live = (d.categoriesLive ?? {}) as Record<string, PickRow[]>;
     const seen = new Set<string>();
-    const all = [...(cats[activeMkt] ?? []), ...(live[activeMkt] ?? [])];
-    return all.filter((r) => {
+    return [...(cats[cat] ?? []), ...(live[cat] ?? [])].filter((r) => {
       const id = legId(r);
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
-  }, [d, activeMkt]);
+  }, [d, cat]);
   const games = useMemo(() => groupByGame(rows), [rows]);
+  const playerNames = useMemo(
+    () => (cat && !isGameMarket(cat) ? [...new Set(rows.map((r) => r.label))] : []),
+    [rows, cat],
+  );
+  const headshots = useHeadshots(playerNames);
 
   const isSel = (id: string) => legs.some((l) => l.id === id);
   const toggle = (leg: SandboxLeg) =>
@@ -205,16 +291,25 @@ export default function PropsPage() {
 
       <div className="mb-2 flex gap-1.5">
         {TABS.map((t) => (
-          <FilterPill key={t.key} selected={tab === t.key} onClick={() => setTab(t.key)}>
+          <FilterPill
+            key={t.key}
+            selected={tab === t.key}
+            onClick={() => {
+              setTab(t.key);
+              setMktKey(MARKETS[t.key][0].key);
+            }}
+          >
             {t.label}
           </FilterPill>
         ))}
       </div>
-      <div className="mb-3 flex flex-wrap gap-1.5">
+      <div className="mb-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
         {MARKETS[tab].map((m) => (
-          <FilterPill key={m.key} selected={activeMkt === m.key} onClick={() => setMkt(m.key)}>
-            {m.label}
-          </FilterPill>
+          <span key={m.key} className="shrink-0">
+            <FilterPill selected={mkt.key === m.key} onClick={() => setMktKey(m.key)}>
+              {m.label}
+            </FilterPill>
+          </span>
         ))}
       </div>
 
@@ -224,6 +319,13 @@ export default function PropsPage() {
             <Skeleton key={i} className="h-[64px] rounded-[14px]" />
           ))}
         </div>
+      ) : cat == null ? (
+        <Panel>
+          <EmptyState
+            title={`${mkt.label} — not in the feed mirror yet`}
+            body="This market is posted at Caesars Sportsbook — the app's odds feed simply mirrors a subset of the book and doesn't carry it yet, so there are no real prices to show here (prices are never invented). The priced categories are the ones the engine already collects."
+          />
+        </Panel>
       ) : !d || games.length === 0 ? (
         <Panel>
           <EmptyState
@@ -240,7 +342,14 @@ export default function PropsPage() {
         <div className="space-y-3 pb-40">
           {games.map((g) => (
             <Reveal key={g.game}>
-              <GameCard g={g} market={activeMkt} isSel={isSel} onToggle={toggle} />
+              <GameCard
+                g={g}
+                market={cat}
+                gameCat={isGameMarket(cat)}
+                headshots={headshots}
+                isSel={isSel}
+                onToggle={toggle}
+              />
             </Reveal>
           ))}
           <div className="text-[10px] leading-relaxed text-faint">
