@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry } from "@/lib/ledger-merge";
-import { redis, syncAuthed, syncConfigMissing } from "@/lib/server/store";
+import { mergeBankStores, validateBankStore, type BankStore } from "@/lib/bankroll";
+import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 
 /**
  * Ledger cloud sync — one tiny record ("the season ledger") in Upstash Redis,
@@ -16,6 +17,18 @@ import { redis, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 export const dynamic = "force-dynamic";
 
 const STORE_KEY = "pl:ledger:v1";
+/* Hardening Phase 1: the bankroll adjustment log rides the same sync (same
+   gate, same durability) under its own blob. Merging is append-only union —
+   the server never replaces the log, so no device can erase another's entry. */
+const BANK_STORE_KEY = "pl:bank:v1";
+type StoredBank = { bank: BankStore; at: number };
+
+async function readBank(): Promise<BankStore | null> {
+  const s = await redisGetJson<StoredBank>(BANK_STORE_KEY);
+  if (!s?.bank) return null;
+  const v = validateBankStore(s.bank);
+  return v.ok ? v.store : null;
+}
 
 function gate(req: NextRequest): NextResponse | null {
   const missing = syncConfigMissing();
@@ -43,8 +56,8 @@ export async function GET(req: NextRequest) {
   const blocked = gate(req);
   if (blocked) return blocked;
   try {
-    const s = await readStore();
-    return NextResponse.json({ ledger: s?.ledger ?? [], at: s?.at ?? null });
+    const [s, bank] = await Promise.all([readStore(), readBank()]);
+    return NextResponse.json({ ledger: s?.ledger ?? [], bank, at: s?.at ?? null });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }
@@ -53,7 +66,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const blocked = gate(req);
   if (blocked) return blocked;
-  let body: { ledger?: unknown };
+  let body: { ledger?: unknown; bank?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -61,6 +74,13 @@ export async function PUT(req: NextRequest) {
   }
   const v = validateLedger(body.ledger);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+  // bank is optional on the wire (older clients omit it) but validated when sent
+  let sentBank: BankStore | null = null;
+  if (body.bank != null) {
+    const vb = validateBankStore(body.bank);
+    if (!vb.ok) return NextResponse.json({ error: vb.error }, { status: 400 });
+    sentBank = vb.store;
+  }
   try {
     const cur = await readStore();
     const merged = mergeLedgers(cur?.ledger ?? [], v.entries);
@@ -68,8 +88,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "merged ledger too large" }, { status: 413 });
     }
     const at = Date.now();
+    let bank = await readBank();
+    if (sentBank) {
+      bank = bank ? mergeBankStores(bank, sentBank) : sentBank;
+      await redisSetJson(BANK_STORE_KEY, { bank, at } satisfies StoredBank);
+    }
     await redis(["SET", STORE_KEY, JSON.stringify({ ledger: merged, at } satisfies Stored)]);
-    return NextResponse.json({ ok: true, ledger: merged, at });
+    return NextResponse.json({ ok: true, ledger: merged, bank, at });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }

@@ -3,7 +3,7 @@
 import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
-import { BANK_BASE, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
+import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -221,8 +221,10 @@ function syncEngineBoard(b: Board) {
     day opens back at this default. The field stays fully editable. */
 export const FUN_DEFAULT = 5;
 
-/* ---- managed bankroll (fix-file Phase 6 + Correction 4) ---- */
-const BANK_KEY = "pl_bank2";
+/* ---- managed bankroll (fix-file Phase 6 + Correction 4) ----
+   Hardening Phase 1: pl_bank2 is the device's MIRROR of the cloud-synced
+   adjustment log (same pattern as pl_ledger) — ledgerSync merges it with the
+   server copy on every sync, so no device-local value feeds the bankroll. */
 export function getBankStore(): BankStore {
   try {
     const raw = localStorage.getItem(BANK_KEY);

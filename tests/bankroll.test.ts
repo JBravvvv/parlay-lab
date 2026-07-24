@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANK_BASE, computeBankroll, realizedPL, ticketPL, todayExposure, type BankStore, type LedgerDayLike } from "@/lib/bankroll";
+import { BANK_BASE, computeBankroll, mergeBankStores, realizedPL, ticketPL, todayExposure, validateBankStore, type BankAdjustment, type BankStore, type LedgerDayLike } from "@/lib/bankroll";
 import { fixtureEngine } from "./helpers/fixture-env";
 import type { Engine } from "@/engine";
 
@@ -52,6 +52,64 @@ describe("managed bankroll math", () => {
     e.funT = [{ id: "f", stake: 5 }];
     expect(todayExposure([e, day("2026-07-23", [{ id: "x", stake: 99 }])], "2026-07-24")).toBe(47);
     expect(todayExposure([], "2026-07-24")).toBe(0);
+  });
+});
+
+/* Hardening Phase 1: the adjustment log cloud-syncs with the ledger. The merge
+   kernel must behave exactly like the ledger's: symmetric, idempotent, and
+   append-only — no order of syncs may lose an entry or fork the bankroll. */
+describe("bank store sync merge (hardening Phase 1)", () => {
+  const adj = (ts: number, kind: BankAdjustment["kind"], amt: number, note = ""): BankAdjustment => ({ ts, kind, amt, note });
+
+  it("union de-duplicates by ts+kind+amt+note; distinct entries all survive", () => {
+    const a = store([adj(1, "deposit", 100, "reload"), adj(3, "withdrawal", 40)]);
+    const b = store([adj(1, "deposit", 100, "reload"), adj(2, "deposit", 25, "bonus")]);
+    const m = mergeBankStores(a, b);
+    expect(m.log).toEqual([adj(1, "deposit", 100, "reload"), adj(2, "deposit", 25, "bonus"), adj(3, "withdrawal", 40)]);
+  });
+
+  it("is symmetric and idempotent (re-merging changes nothing)", () => {
+    const a = store([adj(5, "deposit", 10, "x")], "2026-07-25");
+    const b = store([adj(4, "withdrawal", 7, "y")], "2026-07-24");
+    const ab = mergeBankStores(a, b);
+    expect(mergeBankStores(b, a)).toEqual(ab);
+    expect(mergeBankStores(ab, a)).toEqual(ab);
+    expect(mergeBankStores(ab, ab)).toEqual(ab);
+  });
+
+  it("earlier init date wins — a fresh device converges to the season baseline", () => {
+    const cloud = store([adj(1, "deposit", 50)], "2026-07-24");
+    const fresh = store([], "2026-07-30"); // just-initialized second device
+    const m = mergeBankStores(fresh, cloud);
+    expect(m.asOf).toBe("2026-07-24");
+    expect(m.base).toBe(BANK_BASE);
+    expect(m.log).toHaveLength(1);
+  });
+
+  it("validate rejects malformed stores from the wire", () => {
+    expect(validateBankStore(null).ok).toBe(false);
+    expect(validateBankStore({ base: 2500, asOf: "not-a-date", log: [] }).ok).toBe(false);
+    expect(validateBankStore({ base: 2500, asOf: "2026-07-24", log: {} }).ok).toBe(false);
+    expect(validateBankStore({ base: 2500, asOf: "2026-07-24", log: [{ ts: 1, kind: "edit", amt: 5, note: "" }] }).ok).toBe(false);
+    expect(validateBankStore({ base: 2500, asOf: "2026-07-24", log: [{ ts: 1, kind: "deposit", amt: -5, note: "" }] }).ok).toBe(false);
+    expect(validateBankStore({ base: 2500, asOf: "2026-07-24", log: [adj(1, "deposit", 5, "ok")] }).ok).toBe(true);
+  });
+
+  it("two clients syncing out of order converge to one bankroll (acceptance)", () => {
+    // Device A logs a deposit, device B logs a withdrawal, both offline.
+    const devA = store([adj(10, "deposit", 200, "reload")]);
+    const devB = store([adj(20, "withdrawal", 75, "cash out")]);
+    // B syncs first (cloud empty → cloud = B), then A, then B pulls again.
+    let cloud = mergeBankStores(store(), devB);
+    cloud = mergeBankStores(cloud, devA); // A's push (server-side merge)
+    const aView = mergeBankStores(devA, cloud); // A adopts the server reply
+    const bView = mergeBankStores(devB, cloud); // B's next pull
+    expect(aView).toEqual(bView);
+    // Both devices price Kelly + the 10% exposure cap off the same number:
+    const ledger = [day("2026-07-24", [{ id: "w", stake: 100, result: "won", payout: 198.33 }])];
+    const bank = computeBankroll(aView, ledger);
+    expect(bank).toBe(computeBankroll(bView, ledger));
+    expect(bank).toBe(2500 + 200 - 75 + 98); // base + deposit − withdrawal + realized (rounded)
   });
 });
 

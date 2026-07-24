@@ -2,6 +2,7 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { mergeLedgers, type SyncEntry } from "./ledger-merge";
+import { BANK_KEY, mergeBankStores, validateBankStore, type BankStore } from "./bankroll";
 
 /**
  * Client side of ledger sync. One sync phrase (entered once per device in
@@ -82,8 +83,28 @@ function readLocal(): { all: SyncEntry[]; locked: SyncEntry[]; unlocked: SyncEnt
   };
 }
 
-/** Raw pl_ledger as of the last completed sync — the change detector. */
+/* Hardening Phase 1: the bankroll adjustment log (pl_bank2) rides the same
+   pull → merge → push. The merge is an append-only union (see mergeBankStores),
+   so a deposit logged on one device reaches every other device and no side can
+   erase an entry — a first sync from a device with pre-sync local entries just
+   merges them in (that IS the migration; de-dup is by ts+kind+amt+note). */
+function readLocalBank(): { store: BankStore | null; raw: string } {
+  let raw = "";
+  try {
+    raw = localStorage.getItem(BANK_KEY) ?? "";
+    if (raw) {
+      const v = validateBankStore(JSON.parse(raw));
+      if (v.ok) return { store: v.store, raw };
+    }
+  } catch {
+    /* unreadable — treat as absent; engine-client re-inits on next read */
+  }
+  return { store: null, raw };
+}
+
+/** Raw pl_ledger + pl_bank2 as of the last completed sync — the change detector. */
 let lastSeenLocal: string | null = null;
+let lastSeenBank: string | null = null;
 let lastSyncAt = 0;
 let inFlight = false;
 
@@ -112,21 +133,32 @@ export async function syncNow(): Promise<SyncState> {
       setState({ kind: "error", detail: `sync server ${res.status}` });
       return state;
     }
-    const remote = ((await res.json()) as { ledger: SyncEntry[] }).ledger ?? [];
+    const got = (await res.json()) as { ledger: SyncEntry[]; bank?: unknown };
+    const remote = got.ledger ?? [];
+    const vb = got.bank != null ? validateBankStore(got.bank) : null;
+    const remoteBank: BankStore | null = vb?.ok ? vb.store : null;
 
     const local = readLocal();
     let merged = mergeLedgers(local.locked, remote);
 
-    if (JSON.stringify(merged) !== JSON.stringify(remote)) {
+    const localBank = readLocalBank();
+    let mergedBank: BankStore | null =
+      localBank.store && remoteBank ? mergeBankStores(localBank.store, remoteBank) : (localBank.store ?? remoteBank);
+    const bankNeedsPush = mergedBank != null && JSON.stringify(mergedBank) !== JSON.stringify(remoteBank);
+
+    if (JSON.stringify(merged) !== JSON.stringify(remote) || bankNeedsPush) {
       const put = await fetch("/api/ledger", {
         method: "PUT",
         headers,
         cache: "no-store",
-        body: JSON.stringify({ ledger: merged }),
+        body: JSON.stringify({ ledger: merged, ...(mergedBank ? { bank: mergedBank } : {}) }),
       });
       if (put.ok) {
         // the server merged again (covers a concurrent push from the phone)
-        merged = ((await put.json()) as { ledger: SyncEntry[] }).ledger ?? merged;
+        const back = (await put.json()) as { ledger: SyncEntry[]; bank?: unknown };
+        merged = back.ledger ?? merged;
+        const vbb = back.bank != null ? validateBankStore(back.bank) : null;
+        if (vbb?.ok) mergedBank = vbb.store;
       } else if (put.status === 401) {
         setState({ kind: "bad-key" });
         return state;
@@ -139,6 +171,7 @@ export async function syncNow(): Promise<SyncState> {
 
     const next = [...merged, ...local.unlocked].sort((a, b) => (a.date < b.date ? -1 : 1));
     const nextRaw = JSON.stringify(next);
+    let changed = false;
     if (nextRaw !== local.raw) {
       try {
         localStorage.setItem(LEDGER_LS, nextRaw);
@@ -146,9 +179,20 @@ export async function syncNow(): Promise<SyncState> {
         setState({ kind: "error", detail: "device storage full" });
         return state;
       }
-      window.dispatchEvent(new CustomEvent(SYNC_EVENT));
+      changed = true;
     }
+    const bankRaw = mergedBank ? JSON.stringify(mergedBank) : localBank.raw;
+    if (mergedBank && bankRaw !== localBank.raw) {
+      try {
+        localStorage.setItem(BANK_KEY, bankRaw);
+        changed = true;
+      } catch {
+        /* device storage full — the cloud copy is still the truth next sync */
+      }
+    }
+    if (changed) window.dispatchEvent(new CustomEvent(SYNC_EVENT));
     lastSeenLocal = nextRaw;
+    lastSeenBank = bankRaw;
     lastSyncAt = Date.now();
     setState({ kind: "synced", at: lastSyncAt, days: merged.length });
     return state;
@@ -190,12 +234,15 @@ export function useLedgerSyncBeacon() {
     const iv = setInterval(() => {
       if (document.hidden || !getSyncKey()) return;
       let raw = "";
+      let bankRaw = "";
       try {
         raw = localStorage.getItem(LEDGER_LS) ?? "";
+        bankRaw = localStorage.getItem(BANK_KEY) ?? "";
       } catch {
         /* unreadable — let the heartbeat handle it */
       }
-      const changed = lastSeenLocal !== null && raw !== lastSeenLocal;
+      const changed =
+        (lastSeenLocal !== null && raw !== lastSeenLocal) || (lastSeenBank !== null && bankRaw !== lastSeenBank);
       if (changed || Date.now() - lastSyncAt > HEARTBEAT_MS) void syncNow();
       clvTick();
     }, TICK_MS);

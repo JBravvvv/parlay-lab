@@ -6,7 +6,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { getMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, DIR_MARKETS, getBankStore, addBankAdjustment, type DirPref, type SelectionMode } from "@/lib/engine-client";
 import type { BankStore } from "@/lib/bankroll";
-import { getSyncKey, setSyncKey, syncNow, useSyncState } from "@/lib/ledgerSync";
+import { getSyncKey, setSyncKey, syncNow, useSyncState, SYNC_EVENT } from "@/lib/ledgerSync";
 import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
 
 /* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
@@ -322,12 +322,21 @@ export default function SettingsPage() {
     fetch("/api/sharp", { method: "POST", body: "{}" })
       .then((r) => setSharpOk(r.status !== 501))
       .catch(() => setSharpOk(null));
+    // Hardening Phase 1: the adjustment log is cloud-synced — refresh the
+    // panel whenever a sync lands (a deposit from the phone shows up here)
+    const onSync = () => {
+      setBankroll(getMoney().bankroll);
+      setBank(getBankStore());
+    };
+    window.addEventListener(SYNC_EVENT, onSync);
+    return () => window.removeEventListener(SYNC_EVENT, onSync);
   }, []);
 
   const logAdjustment = () => {
     if (!(adjAmt > 0)) return;
     setBank(addBankAdjustment(adjKind, adjAmt, adjNote));
     setBankroll(getMoney().bankroll);
+    void syncNow(); // push the append so every other device prices off it
     setAdjAmt(0);
     setAdjNote("");
     setSaved("Logged.");
