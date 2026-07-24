@@ -19,6 +19,12 @@ Phases 1–3 approved by Josh individually; Phase 4 run on his "run the rest".
   HRR O0.5 legs (→ deferred HRR sim recal project) or 60 days (≈2026-09-22); every
   frozen parameter's deployed value tabled there for drift detection.
 
+## Post-freeze addition (Josh's explicit request, display-only — no frozen param touched)
+- "Parlay Builder" nav tab (/props): Caesars-style sandbox prop board from the cached
+  engine board (games/batter/pitcher tabs, market pills, per-game cards, True Win %
+  beside each CZ price) + bottom ticket slip (combined odds, naive true %, EV, payout).
+  Never locks, never enters the ledger. src/lib/ticket-math.ts + app/props/page.tsx.
+
 ## THE EXACT NEXT STEP: NOTHING. The freeze is on.
 Only sanctioned work: bug fixes with Josh's sign-off; the HRR sim recalibration when
 an exit condition fires. Do not tune weights/gates/caps — check collection-period.md.

@@ -22,6 +22,7 @@ const NAV = [
   { href: "/board", label: "Board", icon: IconBoard, mobile: true },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, mobile: true },
   { href: "/builder", label: "Builder", icon: IconBuilder, mobile: true },
+  { href: "/props", label: "Parlay Builder", icon: IconBoard, mobile: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, mobile: true },
   { href: "/simulator", label: "Simulator", icon: IconSim, mobile: false },
   { href: "/settings", label: "Settings", icon: IconSettings, mobile: false },
