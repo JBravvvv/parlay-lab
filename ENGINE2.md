@@ -518,3 +518,21 @@ Additive layer; spec archived at Josh's iCloud (`parlay-lab-update-calibration-a
 Tests: `tests/autopsy-floors.test.ts` (floors, gates, caps, suspension incl. board-visibility
 split). Parity digest unchanged (suspension lives inside the dk_fd branch; PA-conditioning
 is v2-gated; floors only fire under basisMode+evGated).
+
+## Fix-file Phase 1 (2026-07-24, approved): hard EV gate everywhere it was soft
+- Builder manual slip: live per-leg EV (p·dec−1 at CZ) as legs are added/removed; the worst
+  price-vs-fair leg wears a WORST PRICE VS FAIR chip; ticket EV < 0 → red "does not lock
+  negative-EV tickets" banner; 0..coreEvMin → amber override-band note; slip ¼-Kelly is $0
+  at edge ≤ 0.
+- Correction 1: the below-zero-at-settlement floor is now OVERRIDE-PROOF — shAllocate checks
+  czEv ≥ coreCzEvMin on the force path too, in both disciplined modes. The 0..+2% warning
+  band keeps its stamped override. An override day with everything floor-blocked reports
+  noPlay + the full blocked list. (This changed the pinned upgrade-01 override tests
+  deliberately: the all-negative fixture now allocates $0 even under force.)
+- Correction 2: FUN caps — funMaxTickets:1 (supplemental locks count toward it; write-time
+  re-check in shLockSupplemental), funMaxLegs:4. FUN stays EV-gate-exempt.
+- Blocked message wording per the correction: "Blocked — the NV price turns this negative
+  (basis +X% → CZ −Y%) · no override".
+Tests: autopsy-floors Phase-1 acceptance (the week's three −EV tickets refused in both
+modes, force included; Kelly $0), sizing-discipline override tests re-pinned, supplemental
+suite updated to the 1-ticket cap. 208/208; parity digest unchanged.
