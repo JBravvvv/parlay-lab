@@ -536,3 +536,21 @@ is v2-gated; floors only fire under basisMode+evGated).
 Tests: autopsy-floors Phase-1 acceptance (the week's three −EV tickets refused in both
 modes, force included; Kelly $0), sizing-discipline override tests re-pinned, supplemental
 suite updated to the 1-ticket cap. 208/208; parity digest unchanged.
+
+## Fix-file Phase 2 (2026-07-24, approved): suspension made visible
+- finalizeCats tags H+R+RBI rows in the disciplined modes: lines > hrrAltMax get `susp`
+  (all edge badges forced false), O0.5 gets `watch`. Legacy modes untagged (parity).
+- Board: suspended rows grey at 50% opacity with a "Suspended — sim recalibration" chip
+  (tooltip carries the 32%-vs-55% record), no ev-glow; watch rows carry a gold "watch" tag.
+- The Sharp: susp rows excluded from plays in every mode; NEW ev_gated plays branch —
+  under the default mode plays now mirror the allocator exactly (cz quote + czEv ≥ gate,
+  ranked by czEv) instead of falling through to the prob-ranked path.
+- Builder manual slip: susp rows excluded from search results (board-visible only).
+- `docs/hrr-recalibration.md`: full audit per the fix file — (a) PA-conditioning defect
+  confirmed + already fixed v2-gated, (b) starter quality yes / expected innings only in
+  the sim path, (c) park in the hit channel only for the closed form. Retirement criteria
+  stated (slope in [0.85,1.15] over ≥100 PA-conditioned graded legs).
+- HR-anytime parlay ban: CORE-only per Correction 2 — `coreNoHR` already enforced it;
+  FUN keeps HR parlays. No change needed, documented here.
+Tests: susp/watch tagging per mode + badge suppression (autopsy-floors Phase 2 block).
+210/210; parity digest unchanged.
