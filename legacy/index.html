@@ -1373,7 +1373,11 @@ function shCollectSlate(){
             });
           });
           if(Object.keys(g).length){var gnE=evGnum(e.away_team,e.home_team,e.commence_time);
-            slate.props[e.away_team+" @ "+e.home_team+shGm(gnE)]={book:Object.keys(bookNames).length+" books",markets:g,live:!!slate.liveInfo[shGkey(e.away_team,e.home_team,gnE)]};}
+            /* `alt` = the Caesars milestone ladders exactly as posted ("2+ hits", "3+ K",
+               "2+ HR"), kept for the browse-only prop board. The analysis pipeline still
+               only ever reads `markets` — ladders never create rows, fairs or line shopping
+               there (see the czAlt fallback above), so selection is untouched. */
+            slate.props[e.away_team+" @ "+e.home_team+shGm(gnE)]={book:Object.keys(bookNames).length+" books",markets:g,alt:altCz,live:!!slate.liveInfo[shGkey(e.away_team,e.home_team,gnE)]};}
         });
       });});
       return chain;
@@ -2360,7 +2364,7 @@ function shAnalyzeLocal(slate){
         why:"heavy favorite priced above its fair probability — negative EV at any book"});
       var tmAb=lookupTeam[pnorm(row.p)];
       cats[mkt].push({label:row.p+(tmAb?" ("+tmAb+")":""),sub:SH_MKT_LABEL[mkt]+" "+sd.side+" "+row.ln,odds:obSign(sd.odds),
-        oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,
+        oddsN:sd.odds,book:sd.bk||null,tags:tags.slice(),nEff:nEff,noParlay:noParlay,side:sd.side,
         pModel:sd.side==="O"?pO:1-pO,wBlend:wPr,lu:lu,
         czN:(row.cz&&(sd.side==="O"?row.cz.o:row.cz.u)!=null)?(sd.side==="O"?row.cz.o:row.cz.u):null,
         bsN:(row.bs&&(sd.side==="O"?row.bs.o:row.bs.u)!=null)?(sd.side==="O"?row.bs.o:row.bs.u):null,
@@ -2437,6 +2441,67 @@ function shAnalyzeLocal(slate){
   var preF=finalizeCats(function(r){return !r.live||(r.inning||0)<=6;});
   var liveF=finalizeCats(function(r){return !!r.live;});
   if(!preF.any&&!liveF.any)throw new Error("No lines posted for eligible games right now — try again closer to game time.");
+
+  /* ----- FULL PROP BOARD (browse-only, 2026-07-24) — EVERY player the feed posts, both
+     sides, every line, uncapped.
+     `categories` above is the SELECTION pool and is deliberately narrow: top 50 per market
+     ranked by win probability, ONE side per line (the side the model favors), and only
+     players that clear the model's filters (25+ AB in the last 30 days, in or projected into
+     the lineup). That is right for picking plays and wrong for browsing a book — the Parlay
+     Builder tab was showing the survivors of all three filters, not the market.
+     This walks the raw slate instead and emits every priced row. Display-only: nothing here
+     feeds selection, allocation, grading, the card or the ledger, and the parity digest never
+     sees it. Prices are real quotes only — `pO` is the engine's own blended probability when
+     it priced that exact line, `fO` is the de-vigged market fair, and a row with neither
+     shows no percentage rather than an invented one. ----- */
+  var modelBy={};
+  SH_NAMED_CATS.forEach(function(k){cats[k].forEach(function(r){
+    if(!r.lkey||!r.side)return;
+    modelBy[r.lkey]={pO:(r.side==="O")?r.p:1-r.p,lu:r.lu||"confirmed",noParlay:!!r.noParlay};});});
+  function shPropRow(mkt,row,isAlt){
+    var lk=shLegKey(row.p,mkt,row.ln),md=modelBy[lk]||null,cz=row.cz||null;
+    var oAm=(row.o!=null)?row.o:null,uAm=(row.u!=null)?row.u:null;
+    var iO=shImp(oAm!=null?oAm:(cz?cz.o:null)),iU=shImp(uAm!=null?uAm:(cz?cz.u:null));
+    /* market fair for the OVER: the consensus de-vig when both sides are posted, else the
+       same single-price vig haircut the engine's one-sided anchor uses (anytime HR). */
+    var fO=(row.fair!=null)?row.fair:((iO!=null&&iU!=null)?shDevig2(iO,iU):(iO!=null?iO/1.06:null));
+    var out={p:row.p,tm:lookupTeam[pnorm(row.p)]||null,ln:row.ln,lkey:lk,
+      o:oAm,oBook:row.oBook||null,u:uAm,uBook:row.uBook||null,
+      cz:(cz&&(cz.o!=null||cz.u!=null))?{o:(cz.o!=null?cz.o:null),u:(cz.u!=null?cz.u:null)}:null,
+      pO:(md&&md.pO!=null)?Math.round(md.pO*1000)/10:null,
+      fO:(fO!=null)?Math.round(fO*1000)/10:null,books:row.books||0};
+    if(md&&md.lu)out.lu=md.lu;
+    if(md&&md.noParlay)out.noParlay=true;
+    if(isAlt)out.alt=true;
+    return out;
+  }
+  var propBoard=[];
+  Object.keys(slate.props).forEach(function(matchup){
+    var g=findGame(matchup),entry=slate.props[matchup],mks=entry.markets||{},alt=entry.alt||{};
+    var mkOut={},anyRow=false;
+    Object.keys(mks).forEach(function(mkt){
+      if(!SH_MKT_LABEL[mkt])return; /* only markets this app labels/models */
+      var seen={},rows=[];
+      mks[mkt].forEach(function(row){
+        if(row.ln==null)return;
+        if(row.o==null&&row.u==null&&!row.cz)return;
+        seen[row.p+"|"+row.ln]=1;
+        rows.push(shPropRow(mkt,row,false));});
+      /* Caesars milestone ladders ("2+ hits", "3+ K", "2+ HR") are real posted lines the
+         consensus books don't mirror — browsable here, flagged ALT, Caesars-priced. */
+      var ab=alt[mkt];
+      if(ab)Object.keys(ab).forEach(function(kk){
+        var ix=kk.lastIndexOf("|");if(ix<0)return;
+        var who=kk.slice(0,ix),ln=Number(kk.slice(ix+1));
+        if(kk.slice(ix+1)===""||!isFinite(ln))return;
+        if(seen[who+"|"+ln])return;
+        if(ab[kk].o==null&&ab[kk].u==null)return;
+        seen[who+"|"+ln]=1;
+        rows.push(shPropRow(mkt,{p:who,ln:ln,o:null,u:null,cz:{o:ab[kk].o,u:ab[kk].u}},true));});
+      if(rows.length){mkOut[mkt]=rows;anyRow=true;}});
+    if(anyRow)propBoard.push({game:shGameLabel(g,matchup),gkey:g?shGkey(g.away,g.home,g.gnum):null,
+      start:(g&&g.start)||null,live:!!entry.live,markets:mkOut});
+  });
 
   /* ----- parlay builder: per-prop-type single-category tickets (ML/RL/Hits/TB/HR/H+R+RBI/K's/Outs)
      PLUS mixed cross-type tickets — 100+ on a full board. One shared usage ledger per set caps
@@ -2664,7 +2729,7 @@ function shAnalyzeLocal(slate){
   /* game metadata for the card/ledger layer (additive): first-pitch time + gamePk per matchup —
      the lock step stores pks for boxscore grading; the freeze rule compares start vs now */
   var gameInfo={};slate.games.forEach(function(gg){gameInfo[shGkey(gg.away,gg.home,gg.gnum)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home,gm:gg.gnum||null};});
-  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets};
+  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets,propBoard:propBoard};
 }
 
 /* --- the Claude API call --- */

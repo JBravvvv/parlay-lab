@@ -6,22 +6,25 @@ import { FilterPill, Pill } from "@/components/ui/Pill";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
-import type { PickRow } from "@/engine";
+import type { PickRow, PropBoardGame, PropBoardRow } from "@/engine";
 import { amFmt, combineTicket, type SandboxLeg } from "@/lib/ticket-math";
 import { parseMatchup, teamAbbr, teamCode, teamLogo, teamLogoFromLabel, useHeadshots } from "@/lib/mlb-visuals";
 
 /**
- * PARLAY BUILDER (sandbox, 2026-07-24) — a Caesars-style prop board for
- * messing around with tickets that are NOT tracked: no lock, no ledger, no
- * bankroll math. Every price is the engine board's captured Caesars quote and
- * every True Win % is the engine's blended probability for that exact side —
- * the side the engine prices; the opposite side's price isn't captured, so it
- * is never shown (nothing here is ever fabricated). Combined true % is the
- * naive product — same-game correlation is NOT modeled in this sandbox.
+ * PARLAY BUILDER (sandbox, 2026-07-24) — a Caesars-style prop board for messing
+ * around with tickets that are NOT tracked: no lock, no ledger, no bankroll math.
  *
- * The category rows mirror the Caesars app 1:1 (Josh's screenshots). Markets
- * the app's odds feed doesn't mirror yet get an honest empty state — every
- * market IS posted at the book; the feed just carries a subset.
+ * Player props read the board's FULL prop board (`data.propBoard`): every player
+ * the odds feed posts, both sides, every line, uncapped. The engine's ranked
+ * `categories` are the selection pool — top 50 per market, one side, and only
+ * players past the model's lineup/sample filters — which is the right pool to
+ * pick plays from and the wrong one to browse a book with. Game markets (ML/RL)
+ * still come from `categories`, where they are never truncated.
+ *
+ * Nothing is ever invented: prices are real posted quotes (Caesars when Caesars
+ * posts the line, otherwise the best price in the feed, labelled with the book),
+ * and the win % is either the engine's own model number for that line or the
+ * de-vigged market fair, always tagged as one or the other.
  */
 
 const TABS = [
@@ -48,7 +51,6 @@ const MARKETS: Record<TabKey, { key: string; label: string; cat: string | null }
     { key: "hrr", label: "Hits + Runs + RBI O/U", cat: "batter_hits_runs_rbis" },
     { key: "rbi", label: "RBI", cat: null },
     { key: "runs", label: "Batter Runs", cat: null },
-    { key: "althr", label: "Alternate Home Runs", cat: null },
     { key: "xbh", label: "Extra-Base Hit", cat: null },
     { key: "singles", label: "Singles", cat: null },
   ],
@@ -61,6 +63,47 @@ const MARKETS: Record<TabKey, { key: string; label: string; cat: string | null }
     { key: "mostk", label: "Most Strikeouts", cat: null },
   ],
 };
+
+const MKT_LABEL: Record<string, string> = {
+  batter_hits: "Hits",
+  batter_total_bases: "Total Bases",
+  batter_home_runs: "HR",
+  batter_hits_runs_rbis: "H+R+RBI",
+  pitcher_strikeouts: "K's",
+  pitcher_outs: "Outs",
+};
+
+/** book titles as the feed spells them → the short tag that fits on a price button */
+const BOOK_AB: Record<string, string> = {
+  caesars: "CZ",
+  "william hill (us)": "CZ",
+  draftkings: "DK",
+  fanduel: "FD",
+  betmgm: "MGM",
+  "espn bet": "ESPN",
+  betrivers: "BR",
+  fanatics: "FAN",
+  bovada: "BOV",
+  pinnacle: "PIN",
+  betonlineag: "BOL",
+  lowvig: "LOW",
+  "betus": "BUS",
+  mybookieag: "MYB",
+  betfair: "BF",
+};
+const bookAb = (b: string) => BOOK_AB[b.trim().toLowerCase()] ?? b.slice(0, 4).toUpperCase();
+
+const isGameMarket = (cat: string) => cat === "ml" || cat === "rl";
+const legId = (r: PickRow) => `${r.lkey ?? ""}|${r.label}|${r.sub}`;
+/** accent/punctuation-proof search key */
+const norm = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z ]/g, "");
+
+/* ---------------------------------------------------------------- game markets */
 
 type GameGroup = { game: string; away: string; home: string; time: string; rows: PickRow[] };
 
@@ -79,9 +122,6 @@ function groupByGame(rows: PickRow[]): GameGroup[] {
   }
   return [...by.values()].sort((a, b) => (a.game < b.game ? -1 : 1));
 }
-
-const legId = (r: PickRow) => `${r.lkey ?? ""}|${r.label}|${r.sub}`;
-const isGameMarket = (cat: string) => cat === "ml" || cat === "rl";
 
 type OppSide = { label: string; odds?: string | null; cz?: number | null; prob?: number; pt?: number | null; lkey?: string | null };
 const sPt = (v: number) => (v > 0 ? `+${v}` : String(v));
@@ -115,6 +155,8 @@ function bothSides(rows: PickRow[]): PickRow[] {
   }
   return out;
 }
+
+/* ------------------------------------------------------------------- visuals */
 
 function Avatar({ src, label }: { src: string | null; label: string }) {
   const [broken, setBroken] = useState(false);
@@ -158,120 +200,216 @@ function TeamMark({ name, side }: { name: string; side: "away" | "home" }) {
   );
 }
 
-function PropRow({
+function GameHeader({ game, open, onToggle }: { game: string; open: boolean; onToggle: () => void }) {
+  const m = parseMatchup(game);
+  return (
+    <button className="flex w-full items-center justify-between gap-2" onClick={onToggle}>
+      <TeamMark name={m.away} side="away" />
+      <span className="num text-[11px] text-muted">
+        {m.time} {open ? "▾" : "▸"}
+      </span>
+      <TeamMark name={m.home} side="home" />
+    </button>
+  );
+}
+
+/* --------------------------------------------------------------- player props */
+
+type Side = "o" | "u";
+
+/** The price for one side: Caesars when Caesars posts it, else the feed's best. */
+function sidePrice(r: PropBoardRow, side: Side): { am: number; book: string } | null {
+  const cz = r.cz ? (side === "o" ? r.cz.o : r.cz.u) : null;
+  if (cz != null) return { am: cz, book: "CZ" };
+  const am = side === "o" ? r.o : r.u;
+  if (am == null) return null;
+  const b = side === "o" ? r.oBook : r.uBook;
+  return { am, book: b ? bookAb(b) : "BOOK" };
+}
+
+/** The win % for one side, and where it came from. */
+function sideProb(r: PropBoardRow, side: Side): { pct: number; src: "model" | "market" } | null {
+  const base = r.pO != null ? { pct: r.pO, src: "model" as const } : r.fO != null ? { pct: r.fO, src: "market" as const } : null;
+  if (!base) return null;
+  return { pct: side === "o" ? base.pct : 100 - base.pct, src: base.src };
+}
+
+const rankOf = (r: PropBoardRow) => (r.pO != null ? r.pO : r.fO != null ? r.fO : -1);
+
+/** "Anytime HR" / "Over 1.5" — the bet as the book words it. */
+function sideLabel(cat: string, r: PropBoardRow, side: Side): string {
+  if (cat === "batter_home_runs" && r.ln === 0.5) return side === "o" ? "Anytime HR" : "No HR";
+  return `${side === "o" ? "Over" : "Under"} ${r.ln}`;
+}
+
+function SideButton({
   r,
-  market,
-  gameCat,
-  headshot,
+  cat,
+  side,
   selected,
   onToggle,
 }: {
-  r: PickRow;
-  market: string;
-  gameCat: boolean;
-  headshot: string | null;
+  r: PropBoardRow;
+  cat: string;
+  side: Side;
   selected: boolean;
+  onToggle: () => void;
+}) {
+  const price = sidePrice(r, side);
+  const prob = sideProb(r, side);
+  if (!price) {
+    return (
+      <span className="flex-1 rounded-[10px] border border-white/[0.05] bg-surface-2/40 px-2 py-1.5 text-center text-[10px] text-faint">
+        not posted
+      </span>
+    );
+  }
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex flex-1 items-center justify-between gap-2 rounded-[10px] border px-2.5 py-1.5 transition-colors ${
+        selected ? "border-pos/60 bg-pos/15" : "border-white/[0.08] bg-surface-2 hover:border-pos/40"
+      }`}
+    >
+      <span className="min-w-0 text-left">
+        <span className="block truncate text-[10.5px] text-muted">{sideLabel(cat, r, side)}</span>
+        {prob && (
+          <span className={`num block text-[9.5px] ${prob.src === "model" ? "text-faint" : "text-faint italic"}`}>
+            {prob.pct.toFixed(1)}%{prob.src === "market" ? " mkt" : ""}
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="num block text-[12.5px] font-semibold text-pos">{amFmt(price.am)}</span>
+        {price.book !== "CZ" && <span className="block text-[8.5px] uppercase text-faint">{price.book}</span>}
+      </span>
+    </button>
+  );
+}
+
+function PlayerRow({
+  r,
+  cat,
+  game,
+  gkey,
+  headshot,
+  isSel,
+  onToggle,
+}: {
+  r: PropBoardRow;
+  cat: string;
+  game: string;
+  gkey: string | null;
+  headshot: string | null;
+  isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
 }) {
-  const cz = typeof r.cz === "number" ? r.cz : null;
-  const prob = typeof r.prob === "number" ? r.prob : null;
-  const avatarSrc = gameCat ? teamLogoFromLabel(r.label) : headshot;
+  const mk = (side: Side): SandboxLeg | null => {
+    const price = sidePrice(r, side);
+    const prob = sideProb(r, side);
+    if (!price) return null;
+    return {
+      id: `${gkey ?? game}|${r.lkey}|${side}`,
+      label: r.p + (r.tm ? ` (${r.tm})` : ""),
+      sub: `${MKT_LABEL[cat] ?? cat} ${sideLabel(cat, r, side)}`,
+      game,
+      cz: price.am,
+      prob: prob?.pct ?? 0,
+      market: cat,
+      book: price.book,
+      src: prob?.src,
+    };
+  };
+  const sides: Side[] = ["o", "u"];
   return (
-    <div className={`flex items-center justify-between gap-2 border-t border-white/[0.04] py-2 ${r.susp ? "opacity-60" : ""}`}>
-      <div className="flex min-w-0 items-center gap-2.5">
-        <Avatar src={avatarSrc} label={r.label} />
-        <div className="min-w-0">
+    <div className="border-t border-white/[0.04] py-2">
+      <div className="mb-1.5 flex items-center gap-2.5">
+        <Avatar src={headshot} label={r.p} />
+        <div className="min-w-0 flex-1">
           <div className="truncate text-[12.5px] font-medium text-text">
-            {r.label}
-            {r.susp && (
-              <span className="ml-1.5 rounded-full border border-line-2 bg-surface-2 px-1.5 py-px text-[8.5px] font-bold uppercase text-muted">
-                susp
+            {r.p}
+            {r.tm && <span className="ml-1.5 text-[10px] text-muted">{r.tm}</span>}
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted">
+            <span>{MKT_LABEL[cat] ?? cat}</span>
+            {r.alt && (
+              <span className="rounded-full border border-line-2 bg-surface-2 px-1.5 py-px text-[8.5px] font-bold uppercase text-muted">
+                alt
               </span>
             )}
+            {r.lu === "projected" && (
+              <span className="rounded-full border border-line-2 bg-surface-2 px-1.5 py-px text-[8.5px] font-bold uppercase text-muted">
+                proj
+              </span>
+            )}
+            {r.pO == null && <span className="text-faint">market price only</span>}
           </div>
-          <div className="text-[10.5px] text-muted">{r.sub}</div>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {prob != null && (
-          <span className="num text-[10.5px] text-muted" title="Engine blended true win % for this exact side">
-            {prob.toFixed(1)}%
-          </span>
-        )}
-        {cz != null ? (
-          <button
-            onClick={() =>
-              onToggle({
-                id: legId(r),
-                label: r.label,
-                sub: r.sub,
-                game: String(r.game ?? ""),
-                cz,
-                prob: prob ?? 0,
-                market,
-                susp: r.susp,
-              })
-            }
-            className={`num min-w-[72px] rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition-colors ${
-              selected
-                ? "border-pos/60 bg-pos/15 text-pos"
-                : "border-white/[0.08] bg-surface-2 text-pos hover:border-pos/40"
-            }`}
-          >
-            {amFmt(cz)}
-          </button>
-        ) : (
-          <span className="min-w-[72px] rounded-[10px] border border-white/[0.05] bg-surface-2/50 px-3 py-2 text-center text-[10px] text-faint">
-            no CZ
-          </span>
-        )}
+      <div className="flex gap-1.5 pl-[42px]">
+        {sides.map((side) => {
+          const leg = mk(side);
+          return leg ? (
+            <SideButton
+              key={side}
+              r={r}
+              cat={cat}
+              side={side}
+              selected={isSel(leg.id)}
+              onToggle={() => onToggle(leg)}
+            />
+          ) : (
+            <span key={side} className="flex-1" />
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function GameCard({
+function PropGameCard({
   g,
-  market,
-  gameCat,
+  cat,
+  rows,
   headshots,
   isSel,
   onToggle,
 }: {
-  g: GameGroup;
-  market: string;
-  gameCat: boolean;
+  g: PropBoardGame;
+  cat: string;
+  rows: PropBoardRow[];
   headshots: Record<string, string>;
   isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [shown, setShown] = useState(6);
+  const [shown, setShown] = useState(8);
   return (
     <Panel>
-      <button className="flex w-full items-center justify-between gap-2" onClick={() => setOpen((o) => !o)}>
-        <TeamMark name={g.away} side="away" />
-        <span className="num text-[11px] text-muted">
-          {g.time} {open ? "▾" : "▸"}
-        </span>
-        <TeamMark name={g.home} side="home" />
-      </button>
+      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} />
       {open && (
         <div className="mt-2">
-          {g.rows.slice(0, shown).map((r) => (
-            <PropRow
-              key={legId(r)}
+          <div className="text-[10px] text-faint">
+            {rows.length} line{rows.length === 1 ? "" : "s"} priced
+          </div>
+          {rows.slice(0, shown).map((r) => (
+            <PlayerRow
+              key={`${r.lkey}|${r.alt ? "a" : "s"}`}
               r={r}
-              market={market}
-              gameCat={gameCat}
-              headshot={headshots[r.label] ?? null}
-              selected={isSel(legId(r))}
+              cat={cat}
+              game={g.game}
+              gkey={g.gkey}
+              headshot={headshots[r.p] ?? null}
+              isSel={isSel}
               onToggle={onToggle}
             />
           ))}
-          {g.rows.length > shown && (
-            <button className="mt-2 w-full text-center text-[11.5px] font-semibold text-pos" onClick={() => setShown(g.rows.length)}>
-              Show More ({g.rows.length - shown}) ▾
+          {rows.length > shown && (
+            <button
+              className="mt-2 w-full text-center text-[11.5px] font-semibold text-pos"
+              onClick={() => setShown(rows.length)}
+            >
+              Show More ({rows.length - shown}) ▾
             </button>
           )}
         </div>
@@ -280,6 +418,82 @@ function GameCard({
   );
 }
 
+function GameMarketCard({
+  g,
+  market,
+  isSel,
+  onToggle,
+}: {
+  g: GameGroup;
+  market: string;
+  isSel: (id: string) => boolean;
+  onToggle: (leg: SandboxLeg) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Panel>
+      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} />
+      {open && (
+        <div className="mt-2">
+          {g.rows.map((r) => {
+            const cz = typeof r.cz === "number" ? r.cz : null;
+            const prob = typeof r.prob === "number" ? r.prob : null;
+            const id = legId(r);
+            return (
+              <div key={id} className="flex items-center justify-between gap-2 border-t border-white/[0.04] py-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Avatar src={teamLogoFromLabel(r.label)} label={r.label} />
+                  <div className="min-w-0">
+                    <div className="truncate text-[12.5px] font-medium text-text">{r.label}</div>
+                    <div className="text-[10.5px] text-muted">{r.sub}</div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {prob != null && (
+                    <span className="num text-[10.5px] text-muted" title="Engine blended true win % for this side">
+                      {prob.toFixed(1)}%
+                    </span>
+                  )}
+                  {cz != null ? (
+                    <button
+                      onClick={() =>
+                        onToggle({
+                          id,
+                          label: r.label,
+                          sub: r.sub,
+                          game: String(r.game ?? ""),
+                          cz,
+                          prob: prob ?? 0,
+                          market,
+                          book: "CZ",
+                          src: "model",
+                        })
+                      }
+                      className={`num min-w-[72px] rounded-[10px] border px-3 py-2 text-[12.5px] font-semibold transition-colors ${
+                        isSel(id)
+                          ? "border-pos/60 bg-pos/15 text-pos"
+                          : "border-white/[0.08] bg-surface-2 text-pos hover:border-pos/40"
+                      }`}
+                    >
+                      {amFmt(cz)}
+                    </button>
+                  ) : (
+                    <span className="min-w-[72px] rounded-[10px] border border-white/[0.05] bg-surface-2/50 px-3 py-2 text-center text-[10px] text-faint">
+                      no CZ
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/* ---------------------------------------------------------------------- page */
+
 export default function PropsPage() {
   const q = useBoard();
   const regen = useRegenerateBoard();
@@ -287,12 +501,16 @@ export default function PropsPage() {
   const [mktKey, setMktKey] = useState<string>("ml");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
+  const [search, setSearch] = useState("");
 
   const d = q.data?.data;
   const mkt = MARKETS[tab].find((m) => m.key === mktKey) ?? MARKETS[tab][0];
   const cat = mkt.cat;
-  const rows = useMemo(() => {
-    if (!d || !cat) return [];
+  const gameTab = !!cat && isGameMarket(cat);
+
+  /* ML/RL: the ranked categories (never truncated — one row per game) */
+  const gameRows = useMemo(() => {
+    if (!d || !cat || !gameTab) return [];
     const cats = (d.categories ?? {}) as Record<string, PickRow[]>;
     const live = (d.categoriesLive ?? {}) as Record<string, PickRow[]>;
     const seen = new Set<string>();
@@ -302,21 +520,43 @@ export default function PropsPage() {
       seen.add(id);
       return true;
     });
-    // games show BOTH teams' ML/RL — the engine exports the other side's real quotes
-    return isGameMarket(cat) ? bothSides(base) : base;
-  }, [d, cat]);
-  const games = useMemo(() => groupByGame(rows), [rows]);
+    return bothSides(base);
+  }, [d, cat, gameTab]);
+  const gameGroups = useMemo(() => groupByGame(gameRows), [gameRows]);
+
+  /* player props: the FULL prop board — every player, both sides, uncapped */
+  const propBoard = (d?.propBoard ?? []) as PropBoardGame[];
+  const propGames = useMemo(() => {
+    if (!cat || gameTab) return [];
+    const needle = norm(search.trim());
+    return propBoard
+      .map((g) => {
+        let rows = (g.markets?.[cat] ?? []).slice();
+        if (needle) rows = rows.filter((r) => norm(r.p).includes(needle));
+        rows.sort((a, b) => rankOf(b) - rankOf(a));
+        return { g, rows };
+      })
+      .filter((x) => x.rows.length > 0);
+  }, [propBoard, cat, gameTab, search]);
+
+  const totalRows = propGames.reduce((n, x) => n + x.rows.length, 0);
   const playerNames = useMemo(
-    () => (cat && !isGameMarket(cat) ? [...new Set(rows.map((r) => r.label))] : []),
-    [rows, cat],
+    () => [...new Set(propGames.flatMap((x) => x.rows.map((r) => r.p)))],
+    [propGames],
   );
   const headshots = useHeadshots(playerNames);
+
+  /* a board generated before the full prop board shipped has no `propBoard` */
+  const legacyBoard = !!d && !d.propBoard && !gameTab;
 
   const isSel = (id: string) => legs.some((l) => l.id === id);
   const toggle = (leg: SandboxLeg) =>
     setLegs((cur) => (cur.some((l) => l.id === leg.id) ? cur.filter((l) => l.id !== leg.id) : [...cur, leg]));
 
   const calc = useMemo(() => combineTicket(legs), [legs]);
+  const anyMarketProb = legs.some((l) => l.src === "market");
+
+  const empty = gameTab ? gameGroups.length === 0 : propGames.length === 0;
 
   return (
     <>
@@ -349,6 +589,20 @@ export default function PropsPage() {
         ))}
       </div>
 
+      {!gameTab && cat != null && (
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search players…"
+            className="min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
+          />
+          <span className="num shrink-0 text-[10.5px] text-faint">
+            {totalRows} line{totalRows === 1 ? "" : "s"} · {propGames.length} game{propGames.length === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
+
       {q.isPending ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -362,37 +616,69 @@ export default function PropsPage() {
             body="This market is posted at Caesars Sportsbook — the app's odds feed simply mirrors a subset of the book and doesn't carry it yet, so there are no real prices to show here (prices are never invented). The priced categories are the ones the engine already collects."
           />
         </Panel>
-      ) : !d || games.length === 0 ? (
+      ) : legacyBoard ? (
         <Panel>
           <EmptyState
-            title="No board yet"
-            body="The prop board comes from today's generated quant board. Generate one (Board tab or the button below) and every game, batter prop, and pitcher prop appears here with the engine's True Win % next to its Caesars price."
+            title="This board predates the full prop board"
+            body="Your cached board was generated before every player's prices were exported. Regenerate it and the whole book — every player, both sides — appears here."
           />
           <div className="mt-3 text-center">
             <Pill variant="ghost" onClick={() => regen.mutate()}>
-              {regen.isPending ? "Generating…" : "Generate today's board"}
+              {regen.isPending ? "Generating…" : "Regenerate board"}
             </Pill>
           </div>
         </Panel>
+      ) : !d || empty ? (
+        <Panel>
+          <EmptyState
+            title={search.trim() ? "No player matches that search" : "No board yet"}
+            body={
+              search.trim()
+                ? "Clear the search to see every player the book posts for this market."
+                : "The prop board comes from today's generated quant board. Generate one (Board tab or the button below) and every game, batter prop and pitcher prop appears here with the engine's win % next to its price."
+            }
+          />
+          {!search.trim() && (
+            <div className="mt-3 text-center">
+              <Pill variant="ghost" onClick={() => regen.mutate()}>
+                {regen.isPending ? "Generating…" : "Generate today's board"}
+              </Pill>
+            </div>
+          )}
+        </Panel>
       ) : (
         <div className="space-y-3 pb-40">
-          {games.map((g) => (
-            <Reveal key={g.game}>
-              <GameCard
-                g={g}
-                market={cat}
-                gameCat={isGameMarket(cat)}
-                headshots={headshots}
-                isSel={isSel}
-                onToggle={toggle}
-              />
-            </Reveal>
-          ))}
+          {gameTab
+            ? gameGroups.map((g) => (
+                <Reveal key={g.game}>
+                  <GameMarketCard g={g} market={cat} isSel={isSel} onToggle={toggle} />
+                </Reveal>
+              ))
+            : propGames.map(({ g, rows }) => (
+                <Reveal key={g.game}>
+                  <PropGameCard
+                    g={g}
+                    cat={cat}
+                    rows={rows}
+                    headshots={headshots}
+                    isSel={isSel}
+                    onToggle={toggle}
+                  />
+                </Reveal>
+              ))}
           <div className="text-[10px] leading-relaxed text-faint">
-            Prices are the engine board&apos;s captured Caesars quotes; True Win % is the engine&apos;s blended
-            probability for that exact side. Only the side the engine prices is shown — the opposite side&apos;s
-            price isn&apos;t captured and is never invented. SUSP rows are markets suspended from the real card;
-            here they&apos;re selectable because this is a sandbox.
+            {gameTab ? (
+              <>Prices are the board&apos;s captured Caesars quotes; the % is the engine&apos;s blended win % for that side.</>
+            ) : (
+              <>
+                Every player the odds feed posts for this market, both sides, uncapped. Prices are real posted quotes —
+                Caesars when Caesars posts the line, otherwise the best price in the feed with the book named on the
+                button. The % is the engine&apos;s model number for that line; where the engine didn&apos;t price the
+                player (bench bats, sub-25-AB samples, unposted lineups) it is the de-vigged market fair, tagged{" "}
+                <span className="italic">mkt</span> — a price the market thinks is fair, not an edge. ALT = a Caesars
+                milestone ladder line. Nothing here is tracked or enters the ledger.
+              </>
+            )}
           </div>
         </div>
       )}
@@ -417,8 +703,13 @@ export default function PropsPage() {
                     <span className="ml-1 text-faint">({l.game.split(" · ")[0]})</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
-                    <span className="num text-muted">{l.prob.toFixed(1)}%</span>
-                    <span className="num text-pos">{amFmt(l.cz)}</span>
+                    <span className={`num text-muted ${l.src === "market" ? "italic" : ""}`}>
+                      {l.prob.toFixed(1)}%
+                    </span>
+                    <span className="num text-pos">
+                      {amFmt(l.cz)}
+                      {l.book && l.book !== "CZ" && <span className="ml-0.5 text-[9px] uppercase text-faint">{l.book}</span>}
+                    </span>
                     <button className="text-neg" onClick={() => setLegs((cur) => cur.filter((x) => x.id !== l.id))}>
                       ✕
                     </button>
@@ -460,6 +751,9 @@ export default function PropsPage() {
             </div>
             <div className="mt-1.5 text-[9.5px] text-faint">
               True % is the naive product — same-game legs are correlated and this sandbox does not model that.
+              {anyMarketProb && (
+                <> Italic legs use the market&apos;s own fair %, so their EV is ~0 by construction, not an edge.</>
+              )}{" "}
               Not tracked, never enters the ledger.
             </div>
           </div>

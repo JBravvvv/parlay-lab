@@ -8,14 +8,18 @@
  */
 
 export type SandboxLeg = {
-  id: string; // lkey|label|sub — dedupe key
+  id: string; // gkey|lkey|side — dedupe key
   label: string;
   sub: string;
   game: string;
-  cz: number; // american
-  prob: number; // percent (engine true win %)
+  cz: number; // american — the Caesars price when posted, else the best price in the feed
+  prob: number; // percent
   market: string;
   susp?: boolean;
+  /** which book the price came from — "CZ" whenever Caesars posts it */
+  book?: string | null;
+  /** where `prob` came from: the engine's model, or the de-vigged market fair */
+  src?: "model" | "market";
 };
 
 export const amToDec = (am: number): number => (am > 0 ? 1 + am / 100 : 1 + 100 / -am);

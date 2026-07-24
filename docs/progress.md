@@ -25,6 +25,30 @@ Phases 1–3 approved by Josh individually; Phase 4 run on his "run the rest".
   beside each CZ price) + bottom ticket slip (combined odds, naive true %, EV, payout).
   Never locks, never enters the ledger. src/lib/ticket-math.ts + app/props/page.tsx.
 
+## Parlay Builder coverage fix (2026-07-24, Josh: "only showing certain players odds")
+The sandbox was reading the engine's ranked `categories`, which are the SELECTION pool:
+top 50 rows per market by win probability, ONE side per line, and only players past the
+model's filters (25+ AB in 30 days; scratched-from-a-posted-lineup returns early). On
+the 6-game fixture that showed 50 of 133 posted anytime-HR prices and 50 of 81 hits rows
+— on a 15-game slate it is far worse. Right pool for picking plays, wrong one for
+browsing a book.
+- Engine (`legacy/index.html` → `node tools/extract-engine.mjs`): new `data.propBoard`,
+  built from the RAW slate after finalizeCats — every game, every market, every player,
+  every line, BOTH sides, uncapped. Rows carry best-price + book, the Caesars quote,
+  `pO` (the engine's own model % for that line when it priced it) and `fO` (de-vigged
+  market fair). Caesars milestone ladders now ride along on the slate (`slate.props[].alt`)
+  and appear as ALT rows, de-duped against standard rows (integer rung n → n−0.5).
+  Additive + display-only: `categories`, parlays, allocator, ledger and the parity digest
+  are untouched (parity green), and NO frozen parameter moved.
+- UI (`app/props/page.tsx`): player props render from propBoard — two price buttons per
+  row (Over/Under with per-side %), player search, per-game counts, book tags (DK/FD/CZ…),
+  ALT + PROJ + "market price only" tags, and market-fair legs shown italic with a slip
+  note that their EV is ~0 by construction. Boards cached before this deploy lack
+  `propBoard` → honest "regenerate" panel instead of silently showing the old 50.
+- `tests/prop-board.test.ts` (10) pins full coverage, no dupes, the model-% match against
+  categories, the ladder normalisation/de-dupe, and that categories stay ≤50 with their
+  EV layers. 255 tests total.
+
 ## THE EXACT NEXT STEP: NOTHING. The freeze is on.
 Only sanctioned work: bug fixes with Josh's sign-off; the HRR sim recalibration when
 an exit condition fires. Do not tune weights/gates/caps — check collection-period.md.

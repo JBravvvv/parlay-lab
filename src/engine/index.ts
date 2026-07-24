@@ -105,9 +105,43 @@ export interface Ticket {
   [k: string]: unknown;
 }
 
+/**
+ * FULL PROP BOARD (browse-only) — one row per player/line the odds feed posts,
+ * both sides, uncapped and unfiltered. `categories` is the narrow SELECTION pool
+ * (top 50 per market, one side, model-filtered); this is the whole book, for the
+ * Parlay Builder tab. Display-only: never feeds selection, grading or the ledger.
+ */
+export interface PropBoardRow {
+  p: string; // player, exactly as the feed names him
+  tm: string | null; // team abbreviation when known
+  ln: number; // the line (0.5 = "anytime"/"1+")
+  lkey: string;
+  o: number | null; // best posted OVER price across the feed's books
+  oBook: string | null;
+  u: number | null; // best posted UNDER price (null on one-sided markets, e.g. anytime HR)
+  uBook: string | null;
+  cz: { o: number | null; u: number | null } | null; // the Caesars quote (what Josh actually bets)
+  pO: number | null; // engine model % for the OVER — null when the engine didn't price this line
+  fO: number | null; // de-vigged market fair % for the OVER
+  books: number;
+  lu?: "confirmed" | "projected";
+  noParlay?: boolean;
+  alt?: boolean; // Caesars milestone-ladder line ("2+ hits"), Caesars-priced only
+}
+
+export interface PropBoardGame {
+  game: string;
+  gkey: string | null;
+  start: string | null;
+  live: boolean;
+  markets: Record<string, PropBoardRow[]>;
+}
+
 export interface BoardData {
   overview?: unknown;
   categories: Record<string, PickRow[]>;
+  /** every priced player row the feed carries (browse-only; see PropBoardRow) */
+  propBoard?: PropBoardGame[];
   categoriesLive?: Record<string, PickRow[]>;
   parlays: Ticket[];
   parlaysMixed: Ticket[];
