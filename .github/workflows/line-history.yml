@@ -3,8 +3,11 @@ name: engine-v2-line-history
 # line-history branch — the open-to-close archive the backtest harness reads.
 # ~6 API credits per run through the app's own proxy; no secrets needed.
 on:
-  schedule:
-    - cron: "12 * * * *" # hourly; slate-hours gating happens in the script's data (empty slates are tiny)
+  # MINIMAL-CREDIT MODE (paused hourly odds snapshots (~144 credits/day)):
+  # schedule disabled; workflow_dispatch still runs it by hand.
+  #schedule:
+  #  - cron: "12 * * * *" # hourly; slate-hours gating happens in the script's data (empty slates are tiny)
+
   workflow_dispatch:
 
 permissions:

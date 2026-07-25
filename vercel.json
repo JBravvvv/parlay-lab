@@ -7,10 +7,6 @@
   },
   "crons": [
     {
-      "path": "/api/generate",
-      "schedule": "0 16 * * *"
-    },
-    {
       "path": "/api/calibrate",
       "schedule": "30 9 * * *"
     }

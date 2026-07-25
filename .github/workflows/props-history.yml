@@ -3,9 +3,12 @@ name: engine-v2-props-history
 # Two sweeps: post-lineup morning read + a near-close read before the evening
 # slate. The scoreboard's "close" = last snapshot before each game's start.
 on:
-  schedule:
-    - cron: "0 17 * * *"  # 10am PT
-    - cron: "45 22 * * *" # 3:45pm PT
+  # MINIMAL-CREDIT MODE (paused 2x daily prop snapshots (~192 credits/day)):
+  # schedule disabled; workflow_dispatch still runs it by hand.
+  #schedule:
+  #  - cron: "0 17 * * *"  # 10am PT
+  #  - cron: "45 22 * * *" # 3:45pm PT
+
   workflow_dispatch:
 
 permissions:
