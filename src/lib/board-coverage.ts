@@ -43,3 +43,40 @@ export function liveCoverageOf(gi: GameInfoLike, now: number): LiveCov {
 export function deadSlate(starts: number[], now: number): boolean {
   return !starts.some((s) => isFinite(s) && s > now);
 }
+
+/**
+ * COMPLETENESS — how many still-bettable games the board actually PRICED.
+ *
+ * Coverage is a lineup metric and is computed from the schedule, so it is blind to
+ * whether a game carries odds at all: a board that lost a quarter of the slate can
+ * still score 82%. That is not hypothetical — a calendar-day filter did exactly that
+ * to every server board for a week, and a mid-chain API failure or an unposted market
+ * produces the identical shape with no timezone bug involved.
+ *
+ * So the source comparison asks this FIRST: never take a board that prices fewer of
+ * the games you can still bet, however well-covered it looks.
+ */
+export type PricedRow = { gkey?: string | null };
+
+export function pricedGames(
+  categories: Record<string, PricedRow[]> | null | undefined,
+  gi: GameInfoLike,
+  now: number,
+): number {
+  const upcoming = new Set(
+    Object.entries(gi ?? {})
+      .filter(([, g]) => {
+        const t = g?.start ? Date.parse(g.start) : NaN;
+        return isFinite(t) && t > now;
+      })
+      .map(([k]) => k),
+  );
+  const seen = new Set<string>();
+  for (const rows of Object.values(categories ?? {})) {
+    for (const r of rows ?? []) {
+      const k = r?.gkey;
+      if (k && upcoming.has(k)) seen.add(k);
+    }
+  }
+  return seen.size;
+}

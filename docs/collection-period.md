@@ -232,6 +232,27 @@ deliberately kept, still stored and still graded — and the training set, shoul
 lengthen. A constant that filters zero rows in September is doing its job, not
 loitering. Deleting it re-admits a two-policy sample the moment anything widens.
 
+### The censored window (2026-07-18 → 2026-07-25) — CENSORED, not corrupted
+
+`CAL_START` **does not move for this.** From 2026-07-18 (first cron) to the 2026-07-25
+timezone fix, every cron-written board was missing all games starting at or after
+00:00 UTC — **~24% of each slate, west-coast and late-game shaped**
+(`docs/rebaseline-2026-07-25.md`). The rows that exist are honest; rows are simply
+absent. That is censoring, not contradiction, and it is a different defect from the one
+`CAL_START` exists for (duplicated, contradictory statements — wrong numbers).
+
+Moving the boundary again would cost ~7 days, likely push exit 1 past exit 2's
+2026-09-22 and make exit 1 decorative, and — worse — establish that every newly found
+defect slides the freeze boundary. Owner's call, 2026-07-25: **it stays.**
+
+**OPEN ITEM, dated 2026-07-25 — do not lose this.** Once ~2 weeks of complete boards
+exist (i.e. from ~2026-08-08), compare per-market reliability slopes for **post-8 PM ET**
+games against **pre-8 PM ET** games. The specific mechanism to test: west-coast parks
+skew pitcher-friendly, so the censored sample over-represents hitter-friendly eastern
+parks — if the model carries park-conditional bias, the pooled slope was fitted on a
+distorted distribution. If the two groups sit within noise, the censoring was harmless
+and no cutoff was ever needed. If they differ, cut then, **with evidence**.
+
 Expect the summary's `n` to collapse on the first run after the cutoff and rebuild at
 roughly the board's daily row count. While it rebuilds, `mktN` is small, so the
 small-sample consensus gate (`consMinN` 100) applies to more markets than usual —

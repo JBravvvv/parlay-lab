@@ -5,7 +5,7 @@ import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
 import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
 import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
-import { liveCoverageOf, type GameInfoLike } from "./board-coverage";
+import { liveCoverageOf, pricedGames, type GameInfoLike } from "./board-coverage";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
@@ -236,16 +236,24 @@ export async function bestBoard(): Promise<Board> {
   const cached = cachedBoard();
   const server = await serverBoard();
   const now = Date.now();
-  /* Better LIVE coverage wins. On a tie, the FRESHER board wins: coverage is a
-     lineup metric, but prices move independently of lineups and EV is computed on
-     prices at lock — so between two equally-covered boards the newer one is the
-     better instrument. Adopting costs a localStorage write and no credits, so
-     there is no churn worth protecting against. */
+  /* Three tests, in this order:
+       1. COMPLETENESS — how many still-bettable games the board actually priced.
+          Coverage is computed from the schedule and is blind to whether a game has
+          odds at all, so an incomplete board can score 82% while missing a quarter
+          of the slate. Never take fewer priced games, however good the coverage.
+       2. LIVE COVERAGE — lineups, over unstarted games only.
+       3. FRESHNESS — coverage is a lineup metric, but prices move independently and
+          EV is computed on prices at lock, so equal boards go to the newer one. */
+  const pricedS = server ? pricedGames(server.data?.categories, server.data?.gameInfo as GameInfoLike, now) : -1;
+  const pricedC = cached ? pricedGames(cached.data?.categories, cached.data?.gameInfo as GameInfoLike, now) : -1;
+  const covS = coverageOf(server, now);
+  const covC = coverageOf(cached, now);
   const better =
     !!server &&
     (!cached ||
-      coverageOf(server, now) > coverageOf(cached, now) ||
-      (coverageOf(server, now) === coverageOf(cached, now) && server.at > cached.at));
+      pricedS > pricedC ||
+      (pricedS === pricedC &&
+        (covS > covC || (covS === covC && server.at > cached.at))));
   const pick = better ? server : cached;
   if (pick) {
     if (pick === server) {

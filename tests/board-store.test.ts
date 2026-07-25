@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decodeBoard, encodeBoard, liveCoverage, SKIP_COVERAGE, type StoredBoard } from "@/lib/server/board-store";
 import type { BoardData } from "@/engine";
-import { liveCoverageOf } from "@/lib/board-coverage";
+import { liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 
 /**
  * SERVER BOARD DELIVERY + THE CONDITIONAL SKIP (Phase 1, 2026-07-25)
@@ -210,5 +210,52 @@ describe("live coverage basis (shared by the skip AND the board picker)", () => 
     );
     expect(cov.live).toBe(1);
     expect(cov.pct).toBe(0);
+  });
+});
+
+/* COMPLETENESS (Josh, 2026-07-25). Coverage is computed from the SCHEDULE, so it is
+   blind to whether a game carries odds at all — a board that lost a quarter of the
+   slate still scores 82%. That is what the calendar-day filter did to every server
+   board for a week, and a mid-chain API failure or an unposted market produces the
+   identical shape with no timezone bug involved. */
+describe("completeness beats coverage", () => {
+  const gi = (n: number) =>
+    Object.fromEntries(
+      Array.from({ length: n }, (_, i) => [`g${i}`, { start: "2026-07-26T23:05:00Z", lu: true }]),
+    );
+  const cats = (n: number) => ({ ml: Array.from({ length: n }, (_, i) => ({ gkey: `g${i}` })) });
+
+  it("counts distinct UNSTARTED games that actually carry priced rows", () => {
+    const games = { a: { start: "2026-07-26T17:00:00Z" }, b: { start: "2026-07-26T23:05:00Z" } };
+    // 'a' has started; a row for it must not count toward completeness
+    expect(pricedGames({ ml: [{ gkey: "a" }, { gkey: "b" }] }, games, NOW)).toBe(1);
+  });
+
+  it("does not double-count a game priced in several markets", () => {
+    const games = { a: { start: "2026-07-26T23:05:00Z" } };
+    expect(pricedGames({ ml: [{ gkey: "a" }], rl: [{ gkey: "a" }], batter_hits: [{ gkey: "a" }] }, games, NOW)).toBe(1);
+  });
+
+  it("THE CASE: an incomplete 82%-coverage server board must LOSE to a complete client board", () => {
+    // server: 15 scheduled, all lineups posted (82%+ coverage) — but only 11 priced
+    const server = { priced: pricedGames(cats(11), gi(15), NOW), cov: 1 };
+    // client: same slate, lower lineup coverage, but every game priced
+    const client = { priced: pricedGames(cats(15), gi(15), NOW), cov: 0.4 };
+    expect(server.cov).toBeGreaterThan(client.cov); // coverage would pick the server board
+    const pick = server.priced > client.priced ? "server" : server.priced === client.priced && server.cov > client.cov ? "server" : "client";
+    expect(pick).toBe("client"); // completeness decides first
+  });
+
+  it("with equal completeness, coverage decides — then freshness", () => {
+    const a = pricedGames(cats(15), gi(15), NOW);
+    const b = pricedGames(cats(15), gi(15), NOW);
+    expect(a).toBe(b);
+    const byCov = 0.9 > 0.3 ? "server" : "client";
+    expect(byCov).toBe("server");
+  });
+
+  it("a board with no categories at all prices nothing", () => {
+    expect(pricedGames({}, gi(15), NOW)).toBe(0);
+    expect(pricedGames(null, gi(15), NOW)).toBe(0);
   });
 });

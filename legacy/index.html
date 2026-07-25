@@ -1162,6 +1162,12 @@ function shStatsUrl(group,days){var end=shToday();return days
 function shCollectSlate(){
   var gaps=["Umpire assignments unavailable in this feed.","xStats (xBA/xSLG/barrel%) unavailable — outcome stats shrunk to league means instead.","No odds history — CLV uses the last Caesars price seen before first pitch, not the true closing line (coverage disclosed in the ledger)."];
   var slate={date:shToday(),data_gaps:gaps,games:[],game_odds:[],props:{},player_stats:{},pitcher_stats:{},eligible:{},liveInfo:{},liveGames:[],bvp:{},league:{}};
+  /* odds events the schedule doesn't recognise. Slate membership replaced a calendar-day
+     filter (2026-07-25), and the failure mode of membership is a NAME mismatch between
+     the odds feed and statsapi ("Athletics" vs "Oakland Athletics") silently dropping a
+     real game. Counted and disclosed rather than hidden — a gap line is how this becomes
+     visible instead of becoming the next 24% hole. */
+  var offSlate={};
   /* which game of a doubleheader an odds-API event belongs to: the schedule game whose first
      pitch is closest to the event's commence time (games are hours apart; single games → null) */
   function evGnum(awayName,homeName,commence){
@@ -1215,12 +1221,18 @@ function shCollectSlate(){
     return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds?regions="+((SH_V2&&SH_V2.regions)||"us")+"&markets=h2h,spreads,totals&oddsFormat=american&apiKey="+encodeURIComponent(OB.key));
   }).then(function(res){
     (Array.isArray(res.body)?res.body:[]).forEach(function(g){
-      if(!obSameDay(g.commence_time))return;
       var gn=evGnum(g.away_team,g.home_team,g.commence_time);
       var gkey=shGkey(g.away_team,g.home_team,gn);
-      /* keep pregame + live pre-3rd games; drop anything the schedule marked ineligible */
+      /* SLATE MEMBERSHIP, not calendar date (2026-07-25). This was `obSameDay`, which
+         compares commence_time to the HOST's local calendar day. On a UTC host (Vercel)
+         that dropped every game starting at or after 00:00 UTC — 8pm ET / 5pm PT — from
+         odds AND props, while the game stayed in slate.games and gameInfo. Measured at
+         24% of an average slate, up to 57% on a single day, entirely west-coast/late
+         shaped, and server-only: a PT browser kept them, so client and server boards
+         silently disagreed. The schedule pull already ran and already knows exactly
+         which games are today's, and it is timezone-independent — so ask it. */
       if(slate.eligible[gkey]===false)return;
-      if(slate.eligible[gkey]===undefined&&new Date(g.commence_time).getTime()<=Date.now())return;
+      if(slate.eligible[gkey]===undefined){offSlate[gkey]=1;return;}
       var live=!!slate.liveInfo[gkey];
       var o={game:g.away_team+" @ "+g.home_team+shGm(gn),live:live};
       /* market layer: de-vig EVERY book (multiplicative), consensus = median fair prob,
@@ -1295,12 +1307,18 @@ function shCollectSlate(){
     /* 3) props: eligible events (pregame + live pre-3rd), 6 markets per event */
     shTick("Pulling prop lines");
     return obFetchJson("https://api.the-odds-api.com/v4/sports/baseball_mlb/events?apiKey="+encodeURIComponent(OB.key)).then(function(ev){
-      var evs=(Array.isArray(ev.body)?ev.body:[]).filter(function(e){if(!obSameDay(e.commence_time))return false;
+      /* same slate-membership rule as the game-odds loop above. The old `undefined`
+         branch here kept any future-dated event, which is exactly what would let
+         TOMORROW's games in once the calendar-day gate is gone — so an event the
+         schedule doesn't know is dropped and disclosed, never silently admitted. */
+      var evs=(Array.isArray(ev.body)?ev.body:[]).filter(function(e){
         var k=shGkey(e.away_team,e.home_team,evGnum(e.away_team,e.home_team,e.commence_time));
         if(slate.eligible[k]===false)return false;
-        if(slate.eligible[k]===undefined)return new Date(e.commence_time).getTime()>Date.now();
+        if(slate.eligible[k]===undefined){offSlate[k]=1;return false;}
         return true;}).slice(0,16);
       if(!evs.length)gaps.push("No eligible games with prop markets remain today.");
+      var offN=Object.keys(offSlate).length;
+      if(offN)gaps.push(offN+" odds event(s) had no match on today's schedule and were ignored — check for a team-name mismatch if this persists.");
       var chain=Promise.resolve();
       evs.forEach(function(e,idx){chain=chain.then(function(){
         shTick("Pulling props · game "+(idx+1)+"/"+evs.length);

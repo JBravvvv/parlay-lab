@@ -35,33 +35,42 @@ lineups. This is not only a calibration-channel problem.
 
 Median first pitch **19:07 UTC**.
 
-## Coverage by candidate pass time
+## Coverage by candidate pass time — ONE metric, defined once
 
-"Covered" = lineup posted **and** game not yet started, so the sim path can price it.
+Two earlier tables used different denominators and could not be reconciled (a pair
+scored lower than one of its members). This is the single table. Everything else is
+superseded.
 
-| pass (UTC) | alone | with 16:00 | weekday | Sunday |
-|---|---|---|---|---|
-| 19:30 | 18% | 42% | 27% | 94% |
-| 20:00 | 23% | 48% | 35% | 94% |
-| 21:00 | 31% | 55% | 50% | 74% |
-| **22:00** | **45%** | **69%** | **67%** | **74%** |
-| 23:00 | — | 67% | 65% | 74% |
+- **Denominator:** every game on the day's official slate — constant across every row,
+  which is what makes rows comparable and pairs monotonic.
+- **Numerator:** games *live* at some pass — not started at that pass **and** lineup
+  posted (modelled at pitch − 3h).
+- **Post-fix**: since 2026-07-25 every scheduled game is priceable on a server board,
+  so "priceable" and "scheduled" are the same set (`docs/rebaseline-2026-07-25.md`).
 
-**16:00 alone: 71% on Sundays, 11% on weekdays.** It is a Sunday-slate instrument, and
-it stays — the `started(gkey)` freeze means a later pass cannot clobber early-game rows,
-so the two passes are complementary rather than competing.
+| pass(es) UTC | all | weekday | Sunday |
+|---|---|---|---|
+| 16:00 | 24% | 11% | **71%** |
+| 20:00 | 23% | 24% | 23% |
+| 21:00 | 31% | 39% | 3% |
+| **22:00** | **45%** | **56%** | 3% |
+| 23:00 | 43% | 55% | 3% |
+| **16:00 + 22:00** | **69%** | **67%** | **74%** |
+| 16:00 + 20:00 | 48% | 35% | 94% |
+| 20:00 + 22:00 | 60% | 70% | 26% |
 
-**Answer: 22:00 UTC.** It dominates every earlier candidate and coverage falls again
-past it (23:30 + 16:00 → 52%) as the 23:00 bucket, the largest single group, starts
-before being caught.
+Monotonicity holds (24% ≤ 69% ≥ 45%), which is the check the previous tables failed.
+
+**Answer: 22:00 UTC** as a single pass, and it is the best single hour on weekdays by a
+wide margin (56% vs 11% at 16:00). **16:00 alone is a Sunday instrument** — 71% Sunday
+against 11% weekday — because Sunday slates are early-heavy.
 
 ### The caveat that matters
-First-pitch times are **measured**. "Lineup posted" is **modeled** at pitch − 3h,
-because statsapi does not retain lineup-posting timestamps. The ranking is robust — 22:00
-wins at 2h, 3h and 4h assumptions — but the absolute percentages are not.
-**`luCoverage` (Phase 1b) makes this measurable.** After a week of stamped boards,
-re-derive this table from real coverage and decide the pass on measured data. That
-costs zero credits.
+First-pitch times are **measured**. "Lineup posted" is **modelled** at pitch − 3h,
+because statsapi does not retain posting timestamps. The ranking is stable across
+2h/3h/4h assumptions, but the absolute percentages are not. `luCoverage` (Phase 1b) now
+stamps real coverage on every board — after a week, re-derive this table from measured
+data. That costs zero credits.
 
 ## No third pass
 `16 + 20 + 23` reaches 91% against 69% for `16 + 22` — real coverage, but it costs
@@ -78,7 +87,7 @@ run must stay. It probably must not:
   board, and it is the *only* thing the calibration channel gets on days the app is not
   opened.
 - Once the owner generates at 22:00 UTC on weekdays (`docs/generate-timing.md`), his own
-  board is ~82% confirmed and logs to the same store — strictly better data, same cost,
+  board scores 56% on the single table above against 16:00's 11% on weekdays — strictly better data, same cost,
   already being spent.
 
 So the highest-value change is not a new cron, it is **retiming the existing one from
