@@ -87,7 +87,7 @@ function lockedMorning() {
   SH.fun = 20;
   SH.bankroll = 750;
   const d = board(CORE4(), gameInfo(["g1", "g2", "g3", "g4", "g5", "g6", "g7", "g8"]));
-  SH.board = { date: TODAY, data: d };
+  SH.board = { date: TODAY, at: Date.now(), data: d };
   eng.get<() => void>("shLockCard")();
   const entry = eng.get<(dt: string) => Entry | null>("shLedgerFind")(TODAY)!;
   return { eng, SH, storage, entry };
@@ -118,7 +118,7 @@ describe("supplemental fun locks (engine)", () => {
   it("pool is leg-disjoint against everything locked today — the tainted ticket is skipped, remaining budget drives the tier split", () => {
     const { eng, SH } = lockedMorning();
     const d = eveningBoard();
-    SH.board = { date: TODAY, data: d };
+    SH.board = { date: TODAY, at: Date.now(), data: d };
     const sc = eng.get<(x: unknown) => SuppCalc>("shSupplementalCalc")(d);
     expect(sc.left).toBe(20);
     const names = sc.fun.picks.map((p) => (p.w.pl as { name?: string }).name);
@@ -146,7 +146,7 @@ describe("supplemental fun locks (engine)", () => {
     save({ date: TODAY, grading: { legs: {}, tickets, done: true }, gradedAt: 1 });
     const coreBefore = JSON.stringify(eng.get<(dt: string) => Entry>("shLedgerFind")(TODAY).core);
 
-    SH.board = { date: TODAY, data: eveningBoard() };
+    SH.board = { date: TODAY, at: Date.now(), data: eveningBoard() };
     const r = eng.get<() => SuppResult>("shLockSupplemental")();
     // funMaxTickets=1: a single supplemental ticket takes the whole remaining budget
     expect(r).toMatchObject({ ok: true, added: 1, sum: 20, left: 0 });
@@ -176,7 +176,7 @@ describe("supplemental fun locks (engine)", () => {
 
   it("budget exhaustion disables the feature until tomorrow", () => {
     const { eng, SH } = lockedMorning();
-    SH.board = { date: TODAY, data: eveningBoard() };
+    SH.board = { date: TODAY, at: Date.now(), data: eveningBoard() };
     expect(eng.get<() => SuppResult>("shLockSupplemental")().ok).toBe(true);
     // budget now fully deployed
     expect(eng.get<() => { left: number }>("shFunRemaining")().left).toBe(0);
@@ -191,7 +191,7 @@ describe("supplemental fun locks (engine)", () => {
   it("shadow card: shCardCalc on the fresh board while locked mutates nothing in the ledger", () => {
     const { eng, SH, storage } = lockedMorning();
     const d = eveningBoard();
-    SH.board = { date: TODAY, data: d };
+    SH.board = { date: TODAY, at: Date.now(), data: d };
     const ledgerBefore = storage.dump("pl_ledger");
     const entryBefore = JSON.stringify(eng.get<(dt: string) => Entry>("shLedgerFind")(TODAY));
     const cc = eng.get<(x: unknown) => { alloc: { picks: unknown[] }; fun: { picks: unknown[] } }>("shCardCalc")(d);

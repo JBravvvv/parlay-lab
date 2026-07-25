@@ -1099,6 +1099,16 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
   /* advisory only, never blocks: when the entered DAILY exceeds 5× the Kelly-consistent
      figure, the Builder shows an amber sizing note (dailyKellyGuide:false hides it) */
   dailyKellyGuide:true,
+  /* price-age guard (2026-07-25): a card may not be locked against a board older than
+     this many minutes, because locking writes the board's STORED Caesars prices into
+     the append-only ledger. Measured basis: over a 4-5h gap near first pitch, Caesars
+     ML moves a median 0.97 implied points and p90 2.55 (line-history archive, n=182) —
+     small, but the ledger records a price, not a distribution, and a leg booked at a
+     price that was never available is unrecoverable in a way a smaller card is not.
+     The legacy app's own prior was 12 minutes; 30 is the conservative side of the
+     measured range. One constant — revise it here when props-history gives a tighter
+     read on prop drift, which ML movement does not stand in for. */
+  lockMaxAgeMin:30,
   /* per-ticket Kelly ceiling (disciplined path): no ticket's stake may exceed
      kellyStakeMult × its ¼-Kelly stake — the entered DAILY is a ceiling the pool
      must EARN, and money it can't absorb at disciplined sizing stays unallocated. */
@@ -3208,6 +3218,18 @@ function shLockCard(){
   var d=SH.board&&SH.board.data;
   if(!d||d.picks){shStatus("Lock needs a generated quant board.",true);return;}
   if(SH.board.date!==shToday()){shStatus("Board is from another day — regenerate before locking.",true);return;}
+  /* PRICE-AGE GUARD (2026-07-25). Locking uses the board's STORED prices: shCardCalc
+     reads SH.board.data with no re-fetch and shTicketSnap writes czOdds/czDec straight
+     into the append-only ledger. The only prior guard was a whole-DAY date check, so a
+     9am board could be locked at 4pm and the ledger would record prices that were never
+     available — CLV then compares a close against an `imp` that was never locked at.
+     That is the "never fabricate prices" rule failing quietly, and it is a defect in
+     the CURRENT workflow, not only under a later-cron plan. */
+  var ageMin=Math.round((Date.now()-(SH.board.at||0))/60000);
+  var maxAge=(SH_CFG.lockMaxAgeMin!=null)?SH_CFG.lockMaxAgeMin:30;
+  if(ageMin>maxAge){
+    shStatus("Lock blocked — this board is "+ageMin+"m old and the prices may no longer be live (limit "+maxAge+"m). Tap Generate for current prices, or use Confirm price on each ticket to record what you actually got.",true);
+    return;}
   var ex=shLedgerFind(shToday());
   if(ex&&ex.locked){shStatus("Today's card is already locked — no retroactive edits, ever.");return;}
   var cc=shCardCalc(d);

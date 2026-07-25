@@ -27,8 +27,13 @@ const CRON_SEL_MODE = "ev_gated";
 
 const K_LASTGEN = "pl:gen:lastRun";
 const K_RUNS = "pl:gen:runs:";
-/** ~120 Odds credits a run, so a leaked secret costs at most ~480 in a day. */
-const MAX_RUNS_PER_DATE = 4;
+/** 114-150 Odds credits a run (measured), so a leaked secret costs at most ~450 in a
+    day. Lowered 4 → 3 on 2026-07-25: a normal day under the day-of-week split is 2
+    (the cron, plus one lock-guard regenerate), so 3 leaves room for one mistake while
+    keeping a leak nearer the plan. NOTE: this bounds SERVER runs only — an in-app
+    regenerate executes in the browser and never reaches this route, so the cap does
+    not bound the spend most likely to run away. See docs/credit-budget.md. */
+const MAX_RUNS_PER_DATE = 3;
 const DAYS_SET = "pl:pred:days";
 const dayKey = (d: string) => `pl:pred:${d}`;
 const MAX_BYTES = 3_000_000;
