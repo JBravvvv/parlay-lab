@@ -55,6 +55,32 @@ Ranked by what is lost, cut in this order: line-history (nothing) → props-hist
 superseded panel) → client generates (the real lever after that: ~120 per device per
 day) → never `/api/clv` or `/api/generate`.
 
+## The tier decision (2026-07-25): 100K, and WHY — read this before "optimising" it
+
+**Josh took the 100K tier at ~15–20% utilisation, knowing 20K fits.** That is not an
+oversight to be tidied up later, and the reasoning is the point:
+
+> Every other failure mode here is recoverable or bounded. A missed `/api/clv` sighting
+> is **permanently gone** from the dataset this entire freeze exists to build. $29 to
+> remove tail risk on an unrecoverable loss is a different purchase from $29 for
+> throughput. I'd take it at 50% utilisation.
+
+So the margin is **insurance on an unrecoverable loss**, not headroom for growth. A
+future reader who sees 15% utilisation and downgrades to "save $29" is trading a
+permanent hole in the CLV series against a month of coffee. Don't.
+
+The same asymmetry decides the emergency ordering in `emergency/minimal-credits`:
+`/api/clv` is the last thing to stop, not the first.
+
+## Minimal-credit mode — prepared, not applied
+Branch **`emergency/minimal-credits`** (commit `874b8f2`) pauses everything that spends
+Odds credits except `/api/clv`: both archive schedules commented out, the
+`/api/generate` cron removed from `vercel.json`, `/api/calibrate` kept (it spends
+nothing and still grades). Burn drops **~501/day → ~45/day**, turning 4,128 remaining
+credits from ~8 days of everything into **~90 days of CLV**. Every workflow keeps
+`workflow_dispatch`, so any archive can still be run by hand for a day that matters.
+Merge it only if the key is about to run dry; revert is a single `git revert`.
+
 ## If the archives are worth keeping
 The next tier is **100,000 credits/month at $59** (current: 20,000 at $30). At the
 present ~20,500/month, upgrading buys ~5× headroom for $29/month more and requires no
