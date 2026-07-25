@@ -47,6 +47,29 @@ significant miscalibration, and every adjustment is logged under Stats → Calib
      negligible here either (1 ticket/day up to 4 legs, against core's ~3 HRR legs/day),
      so it is excluded deliberately rather than waved through as immaterial. Cost: the
      counter fills slightly slower.
+
+   **Projected trigger date: ~2026-09-15 (range 09-10 → 09-26).** Written down rather
+   than inferred, with its assumptions, so drift is visible:
+
+   | core-only rate | 150 legs reached |
+   |---|---|
+   | 3.2/day (the observed all-legs rate, i.e. FUN share ≈ 0) | 2026-09-10 |
+   | 3.0/day | 2026-09-13 |
+   | **2.9/day (central: ~10% of HRR O0.5 legs assumed FUN)** | **2026-09-15** |
+   | 2.5/day (FUN share ≈ 20%) | 2026-09-23 |
+
+   Add roughly 3 days: the first days after `CAL_START` run with `mktN` rebuilt from
+   zero, so the small-sample consensus gate is strict and H+R+RBI is unlikely to be
+   ticketed at all. Central estimate lands **~2026-09-18**, versus exit 2 at
+   **2026-09-22**.
+
+   ⚠️ **The margin is thin and the low end crosses over.** At 2.5 legs/day (a 20% FUN
+   share) exit 1 fires 2026-09-23 — *after* exit 2 — which would make it decorative.
+   The underlying rate (19 O0.5 legs over six days, 2026-07-17 → 07-22) is a six-day
+   sample that included FUN, from before the ev_gated default and before the consensus
+   gate; the FUN share of those legs was never measured and cannot be recovered from
+   here. **Recheck this date once ~2 weeks of core-only O0.5 legs exist**, and if the
+   realized rate is under ~2.6/day, exit 1 is decorative and exit 2 is the real clock.
 2. **60 days elapsed** (≈ 2026-09-22).
 
 Until one fires, requests to tune, loosen, or "just try" a parameter below are declined
@@ -170,7 +193,7 @@ stake or gate outcome.
 | adjustment trigger | 150+ graded picks AND statistical significance |
 | adjustment cap | ±10% per week, shrink-only (toward consensus) |
 | tier ladder | MONITOR <50 · SOFT 50–99 · HARD 100–149 · ADJUST 150+ |
-| training window start | `CAL_START` = **2026-07-25** (Phase 0.5) |
+| training window start | `CAL_START` = **2026-07-25** (Phase 0.5) — load-bearing until ~2026-09-08, then inert. **Do not remove.**¹ |
 
 **`CAL_START`.** Prediction rows dated before it are kept and still graded, but do not
 train the channel: from 2026-07-17 to 2026-07-24 the store was written by two
@@ -179,6 +202,18 @@ No retroactive attribution is attempted — an under-side row is provably the ap
 over-side row could be either, and guessing would be false precision. From this deploy
 every row carries `src: "cron" | "client"` and the armed `selMode`, so the question is
 never ambiguous again. Same no-backfill rule as CLV (`docs/clv.md`).
+
+¹ **`CAL_START` goes inert on its own — that is expected, and it is still not dead code.**
+Both consumers look back 45 days: the summary loop takes the last `SUMMARY_DAYS` (45)
+*logged dates*, and the ledger-join takes a 45-day *date* window. From roughly
+**2026-09-08** (2026-07-25 + 45; later if slates are ever missed, since the summary
+counts entries rather than calendar days) the window start is always later than
+`CAL_START`, so the filter excludes nothing and every row it sees is already clean.
+It stays anyway: it is the only thing standing between the pre-restart rows — which are
+deliberately kept, still stored and still graded — and the training set, should
+`SUMMARY_DAYS` ever be raised, an old date be re-logged, or the window otherwise
+lengthen. A constant that filters zero rows in September is doing its job, not
+loitering. Deleting it re-admits a two-policy sample the moment anything widens.
 
 Expect the summary's `n` to collapse on the first run after the cutoff and rebuild at
 roughly the board's daily row count. While it rebuilds, `mktN` is small, so the
