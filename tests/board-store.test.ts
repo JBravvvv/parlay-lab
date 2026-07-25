@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { decodeBoard, encodeBoard, liveCoverage, SKIP_COVERAGE, type StoredBoard } from "@/lib/server/board-store";
 import type { BoardData } from "@/engine";
+import { liveCoverageOf } from "@/lib/board-coverage";
 
 /**
  * SERVER BOARD DELIVERY + THE CONDITIONAL SKIP (Phase 1, 2026-07-25)
@@ -150,4 +151,64 @@ describe("never silently downgrade", () => {
   it("keeps the cache when the server has nothing", () => expect(pick(0.3, undefined)).toBe("cached"));
   it("generates only when BOTH are empty — the old behaviour, unchanged", () =>
     expect(pick(undefined, undefined)).toBe("generate"));
+});
+
+/* Josh's item 2: retiming the cron to 22:00 deletes the 16:00 board, so on Sundays
+   the store can be EMPTY at decision time. Empty used to mean "run" — ~120 credits
+   on a slate that finished hours ago. The schedule is consulted independently, and
+   it is keyless and free, so the emptiest case is also the cheapest to answer. */
+describe("empty store (the Sunday case after retiming)", () => {
+  const SUN_STARTS = [
+    Date.parse("2026-07-26T17:05:00Z"),
+    Date.parse("2026-07-26T17:10:00Z"),
+    Date.parse("2026-07-26T20:05:00Z"),
+  ];
+
+  it("NO board and every game already started → skip, not a wasted run", () => {
+    const v = liveCoverage(null, NOW, SUN_STARTS); // NOW = 22:00 UTC
+    expect(v.skip).toBe(true);
+    expect(v.reason).toBe("dead-slate");
+  });
+
+  it("NO board but games still to come → runs, which is the whole point", () => {
+    const v = liveCoverage(null, Date.parse("2026-07-26T16:00:00Z"), SUN_STARTS);
+    expect(v.skip).toBe(false);
+    expect(v.reason).toBe("no-board");
+  });
+
+  it("a dead slate skips even when a stored board looks fine", () => {
+    const b = board({ a: { start: "2026-07-26T17:05:00Z", lu: true } });
+    expect(liveCoverage(b, NOW, SUN_STARTS).reason).toBe("dead-slate");
+  });
+
+  it("no schedule available degrades to the previous behaviour, never to a false skip", () => {
+    expect(liveCoverage(null, NOW, []).skip).toBe(false);
+    expect(liveCoverage(null, NOW, undefined).skip).toBe(false);
+  });
+});
+
+describe("live coverage basis (shared by the skip AND the board picker)", () => {
+  it("a board that predates the lu flag reports UNKNOWN, not 0%", () => {
+    const older = liveCoverageOf({ a: { start: "2026-07-26T23:05:00Z" } }, NOW);
+    expect(older.known).toBe(false);
+    expect(older.pct).toBe(0); // and the caller maps unknown → -1, losing every comparison
+  });
+
+  it("distinguishes 'none confirmed' from 'no data'", () => {
+    const none = liveCoverageOf({ a: { start: "2026-07-26T23:05:00Z", lu: false } }, NOW);
+    expect(none.known).toBe(true);
+    expect(none.pct).toBe(0);
+  });
+
+  it("counts only unstarted games — the whole-day number would say 100% here", () => {
+    const cov = liveCoverageOf(
+      {
+        past: { start: "2026-07-26T17:05:00Z", lu: true },
+        next: { start: "2026-07-26T23:05:00Z", lu: false },
+      },
+      NOW,
+    );
+    expect(cov.live).toBe(1);
+    expect(cov.pct).toBe(0);
+  });
 });

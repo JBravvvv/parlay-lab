@@ -1,5 +1,6 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import type { BoardData } from "@/engine";
+import { deadSlate, liveCoverageOf } from "@/lib/board-coverage";
 
 /**
  * SERVER BOARD DELIVERY (Phase 1, 2026-07-25)
@@ -58,30 +59,32 @@ export const SKIP_COVERAGE = 0.7;
 
 export type SkipCheck = {
   skip: boolean;
-  reason: "no-board" | "no-games-left" | "covered" | "thin";
+  reason: "no-board" | "no-games-left" | "covered" | "thin" | "dead-slate";
   live: number; // games not yet started
   confirmed: number; // ...of those, with both lineups posted when the board was built
   pct: number;
 };
 
-export function liveCoverage(board: StoredBoard | null, now: number): SkipCheck {
+/**
+ * @param board    the stored board for the date, if any
+ * @param now      decision time
+ * @param starts   first-pitch times from the SCHEDULE, independent of any stored
+ *                 board. Without this an empty store always means "run" — which on
+ *                 a Sunday at 22:00, with every game long since started, buys ~120
+ *                 Odds credits of a dead slate. The schedule is keyless and free,
+ *                 so the emptiest case is also the cheapest one to answer.
+ */
+export function liveCoverage(board: StoredBoard | null, now: number, starts?: number[]): SkipCheck {
+  if (starts && starts.length && deadSlate(starts, now)) {
+    return { skip: true, reason: "dead-slate", live: 0, confirmed: 0, pct: 0 };
+  }
   if (!board) return { skip: false, reason: "no-board", live: 0, confirmed: 0, pct: 0 };
   const gi = (board.data?.gameInfo ?? {}) as Record<string, { start?: string | null; lu?: boolean }>;
-  const upcoming = Object.values(gi).filter((g) => {
-    const t = g?.start ? Date.parse(g.start) : NaN;
-    return isFinite(t) && t > now;
-  });
-  if (!upcoming.length) {
+  const cov = liveCoverageOf(gi, now);
+  if (!cov.live) {
     // nothing left to price today — a fresh board would have nothing to add
     return { skip: true, reason: "no-games-left", live: 0, confirmed: 0, pct: 0 };
   }
-  const confirmed = upcoming.filter((g) => g.lu === true).length;
-  const pct = confirmed / upcoming.length;
-  return {
-    skip: pct >= SKIP_COVERAGE,
-    reason: pct >= SKIP_COVERAGE ? "covered" : "thin",
-    live: upcoming.length,
-    confirmed,
-    pct: Math.round(pct * 1000) / 1000,
-  };
+  const covered = cov.pct >= SKIP_COVERAGE;
+  return { skip: covered, reason: covered ? "covered" : "thin", ...cov };
 }

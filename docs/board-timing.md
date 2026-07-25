@@ -1,5 +1,18 @@
 # Board timing — when the engine should generate (Phase 1, 2026-07-25)
 
+> ## ⚠️ PRESSING GENERATE IN THE APP DOES NOT WRITE A SERVER BOARD
+> The in-app regenerate runs the engine **in the browser**. It writes `pl_board_r1`
+> in that device's localStorage and posts prediction records to `/api/predictions`.
+> It does **not** populate `pl:board:{date}`, so `/api/board` will still answer
+> `{"board": null}` afterwards — that is correct behaviour, not a broken pipeline.
+>
+> Only `/api/generate` writes a server board: the Vercel cron, or a manual call with
+> the `X-Cron-Key` header:
+> ```
+> curl -s -H "x-cron-key: <CRON_SECRET>" "https://parlay-lab-six.vercel.app/api/generate"
+> ```
+> Verify with `curl -s "https://parlay-lab-six.vercel.app/api/board?date=YYYY-MM-DD"`.
+
 ## The problem
 
 The Monte Carlo path requires a confirmed 9-man lineup on both sides. Without one the

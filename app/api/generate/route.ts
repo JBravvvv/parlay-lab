@@ -61,6 +61,23 @@ async function serverFetchJson(url: string): Promise<{ ok: boolean; body: unknow
   }
 }
 
+/** First-pitch times for a date, straight from statsapi. Keyless and free — it
+    spends no Odds credits, which is the point: the check that prevents a wasted
+    ~120-credit run must never cost credits itself. Empty on any failure, which
+    degrades to the previous behaviour (run). */
+async function slateStarts(date: string): Promise<number[]> {
+  try {
+    const r = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}`, { cache: "no-store" });
+    if (!r.ok) return [];
+    const j = (await r.json()) as { dates?: { games?: { gameDate?: string }[] }[] };
+    return (j.dates?.[0]?.games ?? [])
+      .map((g) => (g.gameDate ? Date.parse(g.gameDate) : NaN))
+      .filter((n) => isFinite(n));
+  } catch {
+    return [];
+  }
+}
+
 function memoryStorage() {
   const m = new Map<string, string>();
   return {
@@ -121,8 +138,13 @@ export async function GET(req: NextRequest) {
        board can read high coverage with all of it already underway. Manual callers
        with ?force=1 bypass this; the cron never does. */
     if (!force) {
-      const existing = decodeBoard((await redis(["GET", BOARD_KEY(new Date().toISOString().slice(0, 10))])) as string | null);
-      const cov = liveCoverage(existing, now);
+      const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
+      /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
+         store would otherwise always mean "run" — and on a Sunday at 22:00, with the
+         whole early slate long since started, that buys ~120 Odds credits of nothing.
+         statsapi is keyless and free, so the emptiest case is the cheapest to answer. */
+      const starts = await slateStarts(dateNow);
+      const cov = liveCoverage(existing, now, starts);
       if (cov.skip) {
         return NextResponse.json({
           ok: true,

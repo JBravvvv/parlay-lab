@@ -5,6 +5,7 @@ import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
 import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
 import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
+import { liveCoverageOf, type GameInfoLike } from "./board-coverage";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
@@ -165,7 +166,7 @@ export function cachedBoard(): Board | null {
        open the app at 6pm and lock a card built at 9am off projected lineups. */
     const gi = (b.data?.gameInfo ?? {}) as Record<string, { start?: string | null }>;
     const verdict = boardStale({
-      pct: (b.data?.luCoverage as { pct?: number } | undefined)?.pct,
+      pct: coverageOf(b),
       at: b.at,
       starts: Object.values(gi)
         .map((g) => (g?.start ? Date.parse(g.start) : NaN))
@@ -187,11 +188,20 @@ export function cachedBoard(): Board | null {
   }
 }
 
-/** A board's lineup coverage, 0–1; -1 when it predates luCoverage (so an unknown
-    never wins a comparison against a known one). */
-export function coverageOf(b: Board | null | undefined): number {
-  const p = (b?.data?.luCoverage as { pct?: number } | undefined)?.pct;
-  return typeof p === "number" ? p : -1;
+/**
+ * A board's LIVE lineup coverage — over games that haven't started yet, never the
+ * whole-day `luCoverage.pct`. Whole-day lies in one direction: a 9am board can read
+ * high coverage entirely on games that are now underway, and would win a comparison
+ * against the evening board that actually prices what's still open. Same basis the
+ * conditional skip uses, same reason.
+ */
+export function coverageOf(b: Board | null | undefined, now = Date.now()): number {
+  if (!b) return -1;
+  const cov = liveCoverageOf(b.data?.gameInfo as GameInfoLike, now);
+  // -1 = unknown (board predates the per-game lu flag). It loses every comparison
+  // against a board that actually carries lineup data, and the staleness gate
+  // reads it as "can't judge" rather than "0% covered".
+  return cov.known ? cov.pct : -1;
 }
 
 /**
@@ -225,8 +235,18 @@ export async function serverBoard(): Promise<Board | null> {
 export async function bestBoard(): Promise<Board> {
   const cached = cachedBoard();
   const server = await serverBoard();
-  const pick =
-    server && (!cached || coverageOf(server) > coverageOf(cached)) ? server : cached;
+  const now = Date.now();
+  /* Better LIVE coverage wins. On a tie, the FRESHER board wins: coverage is a
+     lineup metric, but prices move independently of lineups and EV is computed on
+     prices at lock — so between two equally-covered boards the newer one is the
+     better instrument. Adopting costs a localStorage write and no credits, so
+     there is no churn worth protecting against. */
+  const better =
+    !!server &&
+    (!cached ||
+      coverageOf(server, now) > coverageOf(cached, now) ||
+      (coverageOf(server, now) === coverageOf(cached, now) && server.at > cached.at));
+  const pick = better ? server : cached;
   if (pick) {
     if (pick === server) {
       // adopt it locally so the next open is instant and offline-safe
@@ -248,7 +268,7 @@ export function boardNeedsRefresh(b: Board | null | undefined): StaleVerdict | n
   if (!b) return null;
   const gi = (b.data?.gameInfo ?? {}) as Record<string, { start?: string | null }>;
   return boardStale({
-    pct: (b.data?.luCoverage as { pct?: number } | undefined)?.pct,
+    pct: coverageOf(b),
     at: b.at,
     starts: Object.values(gi)
       .map((g) => (g?.start ? Date.parse(g.start) : NaN))

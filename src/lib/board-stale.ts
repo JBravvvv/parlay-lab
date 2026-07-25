@@ -22,7 +22,8 @@
  */
 
 export type StaleInputs = {
-  /** the cached board's luCoverage.pct (0–1); undefined on boards generated before 1b */
+  /** LIVE lineup coverage (0–1) over games not yet started; -1 or null when the
+      board predates the per-game `lu` flag and there is nothing to judge */
   pct: number | null | undefined;
   /** when the cached board was generated (ms) */
   at: number;
@@ -65,7 +66,8 @@ export const MAX_AUTO_RUNS_PER_DAY = 0;
 export function boardStale(i: StaleInputs): StaleVerdict {
   // a board from before luCoverage existed can't be judged on coverage; treat it as
   // acceptable rather than burning credits on an assumption
-  if (i.pct == null) return { stale: false, reason: "unknown-coverage" };
+  // null or negative = the board carries no lineup data to judge (pre-1b board)
+  if (i.pct == null || i.pct < 0) return { stale: false, reason: "unknown-coverage" };
   if (i.pct >= LU_PCT_FLOOR) return { stale: false, reason: "coverage-ok" };
   if (i.now - i.at < MIN_CACHE_AGE_MS) return { stale: false, reason: "cache-fresh" };
   const upcoming = i.starts.filter((s) => s > i.now);
