@@ -4,7 +4,7 @@ import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
 import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
-import { boardStale } from "./board-stale";
+import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
@@ -173,7 +173,10 @@ export function cachedBoard(): Board | null {
       autoRuns: autoRuns(today),
       now: Date.now(),
     });
-    if (verdict.stale) {
+    /* PROMPT-ONLY while MAX_AUTO_RUNS_PER_DAY is 0: a stale verdict is surfaced by
+       the UI ("lineups have posted — regenerate?"), never acted on by spending.
+       The auto path stays wired and tested so raising the cap is one character. */
+    if (verdict.stale && mayAutoRun(autoRuns(today))) {
       noteAutoRun(today);
       return null; // useBoard falls through to a fresh generate
     }
@@ -182,6 +185,22 @@ export function cachedBoard(): Board | null {
   } catch {
     return null;
   }
+}
+
+/** Ask whether a board on screen has been overtaken by posted lineups. Pure read —
+    never spends. Surfaces the prompt that replaces the old auto-regenerate. */
+export function boardNeedsRefresh(b: Board | null | undefined): StaleVerdict | null {
+  if (!b) return null;
+  const gi = (b.data?.gameInfo ?? {}) as Record<string, { start?: string | null }>;
+  return boardStale({
+    pct: (b.data?.luCoverage as { pct?: number } | undefined)?.pct,
+    at: b.at,
+    starts: Object.values(gi)
+      .map((g) => (g?.start ? Date.parse(g.start) : NaN))
+      .filter((n) => isFinite(n)),
+    autoRuns: 0,
+    now: Date.now(),
+  });
 }
 
 /* ENGINE V2: feed Statcast priors + daily context into the engine and switch

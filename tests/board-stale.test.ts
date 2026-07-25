@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boardStale,
+  mayAutoRun,
   LU_PCT_FLOOR,
   MAX_AUTO_RUNS_PER_DAY,
   MIN_CACHE_AGE_MS,
@@ -80,10 +81,18 @@ describe("boardStale", () => {
     expect(boardStale({ ...base, starts: [NOW - H, NOW + 1.5 * H] }).stale).toBe(true);
   });
 
-  it("caps automatic regenerates per day — ~120 credits each, so the worst case is bounded", () => {
-    expect(boardStale({ ...base, autoRuns: MAX_AUTO_RUNS_PER_DAY - 1 }).stale).toBe(true);
-    expect(boardStale({ ...base, autoRuns: MAX_AUTO_RUNS_PER_DAY }).reason).toBe("cap");
-    expect(boardStale({ ...base, autoRuns: 99 }).stale).toBe(false);
+  it("PROMPT-ONLY: the verdict is independent of whether anything may spend", () => {
+    // the decision and the spend are deliberately separate — a prompt is worth
+    // showing even when nothing is allowed to auto-run
+    expect(MAX_AUTO_RUNS_PER_DAY).toBe(0);
+    expect(boardStale({ ...base, autoRuns: 99 }).stale).toBe(true);
+    expect(mayAutoRun(0)).toBe(false); // 0 = prompt-only, nothing spends on its own
+  });
+
+  it("mayAutoRun is the single gate on automatic spending", () => {
+    // flipping the constant to 2 later re-enables the auto path and nothing else
+    expect(mayAutoRun(0)).toBe(MAX_AUTO_RUNS_PER_DAY > 0);
+    expect(mayAutoRun(MAX_AUTO_RUNS_PER_DAY)).toBe(false);
   });
 
   it("never judges a board that predates luCoverage — no spending on an assumption", () => {

@@ -52,10 +52,15 @@ export const NEAR_FIRST_PITCH_MS = 4 * 3600_000;
 export const MIN_CACHE_AGE_MS = 30 * 60_000;
 /** MLB posts lineups roughly this far ahead of first pitch. */
 export const LINEUP_LEAD_MS = 3 * 3600_000;
-/** ~120 Odds credits each. Held at 2 pending the plan tier; the `no-new-lineups`
-    condition below is what actually keeps this from firing pointlessly, so the cap
-    is a backstop rather than the primary control. */
-export const MAX_AUTO_RUNS_PER_DAY = 2;
+/**
+ * Automatic regenerates allowed per day. **0 means PROMPT-ONLY**: the gate still
+ * decides, the UI still says "lineups have posted — regenerate?", but nothing
+ * spends without a tap. Set to 0 while credits are tight and the billing reset
+ * date is unknown; flipping it to 2 later is one character, and the mechanism
+ * stays built and tested either way. Revisit after one clean billing cycle of
+ * measured burn. ~120 Odds credits per automatic run.
+ */
+export const MAX_AUTO_RUNS_PER_DAY = 0;
 
 export function boardStale(i: StaleInputs): StaleVerdict {
   // a board from before luCoverage existed can't be judged on coverage; treat it as
@@ -74,6 +79,15 @@ export function boardStale(i: StaleInputs): StaleVerdict {
      now — i.e. some upcoming game's posting window opened after the board was made. */
   const improvable = upcoming.some((s) => i.at < s - LINEUP_LEAD_MS && i.now >= s - LINEUP_LEAD_MS);
   if (!improvable) return { stale: false, reason: "no-new-lineups" };
-  if (i.autoRuns >= MAX_AUTO_RUNS_PER_DAY) return { stale: false, reason: "cap" };
   return { stale: true, reason: "stale" };
+}
+
+/**
+ * May the app spend ~120 credits on its own to act on a stale verdict? With
+ * MAX_AUTO_RUNS_PER_DAY at 0 the answer is always no and the board is refreshed
+ * only by a deliberate tap. The staleness DECISION is deliberately separate from
+ * the SPEND: a prompt is still worth showing when nothing may auto-run.
+ */
+export function mayAutoRun(autoRuns: number): boolean {
+  return MAX_AUTO_RUNS_PER_DAY > 0 && autoRuns < MAX_AUTO_RUNS_PER_DAY;
 }
