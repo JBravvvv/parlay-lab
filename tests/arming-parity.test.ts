@@ -9,7 +9,7 @@ import {
   type CalibrationSummary,
   type WeightState,
 } from "@/engine2/calibration";
-import { boardToPredictions } from "@/lib/pred-serialize";
+import { boardToPredictions, lineOf } from "@/lib/pred-serialize";
 import type { BoardData } from "@/engine";
 
 /**
@@ -152,6 +152,53 @@ describe("arming call sites (structural, not value-based)", () => {
 
   it("the cron stamps provenance on what it logs", () => {
     expect(src(GEN)).toMatch(/boardToPredictions\(data,\s*\{\s*src:\s*"cron"/);
+  });
+});
+
+/* Phase 0.6: line + suspension capture. Neither threshold in the freeze docs is
+   computable without them — the panel's per-market count cannot tell an H+R+RBI
+   O0.5 (bettable, "watch") from an O1.5+ (suspended from every ticket), and on a
+   real board ~93% of that market's rows are the suspended ones. */
+describe("line + suspension capture", () => {
+  const boardWith = (rows: Record<string, unknown>[]): BoardData =>
+    ({
+      categories: { batter_hits_runs_rbis: rows },
+      parlays: [],
+      parlaysMixed: [],
+      gameInfo: { g1: { pk: 1, start: "2026-07-26T23:00:00Z", away: "NYY", home: "BOS" } },
+    }) as unknown as BoardData;
+
+  it("stamps the line off lkey and flags suspended rows", () => {
+    const { records } = boardToPredictions(
+      boardWith([
+        { label: "A", sub: "H+R+RBI O 0.5", prob: 71, lkey: "a|batter_hits_runs_rbis|0.5", gkey: "g1", odds: "-140" },
+        { label: "B", sub: "H+R+RBI O 1.5", prob: 40, lkey: "b|batter_hits_runs_rbis|1.5", gkey: "g1", odds: "+150", susp: true },
+      ]),
+      { src: "cron", selMode: "ev_gated" },
+    );
+    expect(records.map((r) => [r.ln, r.susp])).toEqual([
+      [0.5, undefined],
+      [1.5, true],
+    ]);
+  });
+
+  it("game markets have no line rather than a fake one", () => {
+    const { records } = boardToPredictions(
+      ({
+        categories: { ml: [{ label: "NYY", sub: "ML vs BOS", prob: 55, lkey: "ml_home", gkey: "g1", odds: "-120" }] },
+        parlays: [],
+        parlaysMixed: [],
+        gameInfo: { g1: { pk: 1, start: "2026-07-26T23:00:00Z", away: "NYY", home: "BOS" } },
+      }) as unknown as BoardData,
+    );
+    expect(records[0].ln).toBe(null);
+  });
+
+  it("lineOf parses exactly what shLegKey builds", () => {
+    expect(lineOf("aaronjudge|batter_hits|1.5")).toBe(1.5);
+    expect(lineOf("ml_away")).toBe(null);
+    expect(lineOf(null)).toBe(null);
+    expect(lineOf("garbage|only")).toBe(null);
   });
 });
 

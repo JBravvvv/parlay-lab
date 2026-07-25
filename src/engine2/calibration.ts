@@ -20,6 +20,16 @@ export type GradedPick = {
   /* upgrade 03: the de-vigged consensus probability at statement time (0-100), when
      logged — lets the summary score the model AGAINST the consensus-only baseline */
   pMkt?: number | null;
+  /* Phase 0.6 (2026-07-24): the LINE and the suspension flag. Without these the
+     graded set cannot separate an H+R+RBI O0.5 from an O1.5+ — and on a real board
+     ~93% of H+R+RBI rows are the suspended O1.5+ alternates, i.e. exactly the rows
+     no ticket may contain. Both freeze-exit thresholds are written about specific
+     line subsets (docs/collection-period.md exit 1: O0.5 legs; docs/hrr-recalibration.md
+     retirement: the O1.5+ subset), so until these fields accumulate, neither
+     threshold is computable and the panel's per-market n answers neither question.
+     Captured only — no consumer reads them yet, by design. */
+  ln?: number | null;
+  susp?: boolean;
 };
 
 export const PROB_BUCKETS: [number, number][] = [

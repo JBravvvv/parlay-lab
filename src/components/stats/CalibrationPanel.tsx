@@ -98,7 +98,7 @@ export function CalibrationPanel() {
       <Panel>
         <EmptyState
           title="No graded predictions yet"
-          body="Every board the engine generates is now logged in full — played or not — and graded nightly against official box scores. The first reliability table appears after the first graded slate; adjustment decisions need 150+ graded picks per market, so early numbers are strictly informational."
+          body="Every board the engine generates is now logged in full — played or not, every line including suspended ones — and graded nightly against official box scores. These are board rows, not the legs you bet. The first reliability table appears after the first graded slate; adjustment decisions need 150+ graded rows per market, so early numbers are strictly informational."
         />
       </Panel>
     );
@@ -138,7 +138,12 @@ export function CalibrationPanel() {
               <thead>
                 <tr className="text-left text-[10px] uppercase tracking-wider text-faint">
                   <th className="pb-2">Market</th>
-                  <th className="pb-2 text-right">Graded</th>
+                  <th
+                    className="pb-2 text-right"
+                    title="Every row the engine printed on a board and later graded — played or not, both sides, every line INCLUDING lines suspended from all tickets. This is not a count of your bets, and it is not the freeze-exit counter."
+                  >
+                    Board rows
+                  </th>
                   <th className="pb-2 text-right">Predicted</th>
                   <th className="pb-2 text-right">Actual</th>
                   <th className="pb-2 text-right">Brier</th>
@@ -214,6 +219,19 @@ export function CalibrationPanel() {
                 })}
               </tbody>
             </table>
+          </div>
+          {/* Phase 0.6: this column used to be headed "n", which read as "legs" at a
+              glance. It counts BOARD ROWS. For H+R+RBI ~93% of them are the O1.5+
+              alternates suspended from every ticket, so the row that looks most
+              alarming is mostly lines that can't be bet. Say so on the screen. */}
+          <div className="mt-3 rounded-[10px] border border-white/[0.06] bg-surface-2/40 p-2.5 text-[10.5px] leading-relaxed text-muted">
+            <b className="text-text">What &ldquo;board rows&rdquo; counts.</b> Every row the engine printed and later
+            graded — played or not, both sides, every line, <b>including lines suspended from all tickets</b>. It is
+            not a count of legs you bet. For <b>H+R+RBI</b> that matters most: on a typical board ~93% of its rows are
+            the O1.5+ alternates `hrrAltMax` bars from every ticket, so this market&apos;s slope and hot/cold read are
+            dominated by lines you never wager. <b className="text-text">This is not the freeze-exit counter</b> —
+            docs/collection-period.md exit 1 is written about O0.5 legs actually bet, which lives in the ledger.
+            Line-level splits start accumulating from 2026-07-25; rows logged before that carry no line.
           </div>
           <div className="mt-3 text-[10.5px] leading-relaxed text-faint">
             Statistical significance = the predicted rate falls outside the 95% confidence interval of the actual

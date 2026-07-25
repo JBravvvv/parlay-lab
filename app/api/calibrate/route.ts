@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DayBlob } from "@/lib/pred-serialize";
+import { lineOf, type DayBlob } from "@/lib/pred-serialize";
 import {
   CAL_START,
   applyWeeklyAdjustment,
@@ -188,7 +188,18 @@ export async function GET(req: NextRequest) {
       if (!blob) continue;
       for (const r of Object.values(blob.records)) {
         if (r.res === "won" || r.res === "lost") {
-          graded.push({ market: r.market, p: r.p, edge: r.edge, lu: r.lu, res: r.res, pMkt: r.pMkt ?? null });
+          graded.push({
+            market: r.market,
+            p: r.p,
+            edge: r.edge,
+            lu: r.lu,
+            res: r.res,
+            pMkt: r.pMkt ?? null,
+            // Phase 0.6: line + suspension ride along so the freeze-exit thresholds
+            // become computable. Rows logged before this deploy carry neither.
+            ln: r.ln ?? lineOf(r.lkey),
+            ...(r.susp ? { susp: true } : {}),
+          });
         }
       }
     }
@@ -216,7 +227,18 @@ export async function GET(req: NextRequest) {
             seen.add(lid);
             const res = gLegs[lid]?.result;
             if (res !== "won" && res !== "lost") continue;
-            graded.push({ market: marketOf(l.lkey), p: Number(l.est), edge: null, lu: "confirmed", res, pMkt: null });
+            // a ledger leg's line is in its lkey; `susp` is left unset rather than
+            // inferred — a leg that was BET was by definition not suspended, and the
+            // suspension state at lock isn't recorded anywhere to check against
+            graded.push({
+              market: marketOf(l.lkey),
+              p: Number(l.est),
+              edge: null,
+              lu: "confirmed",
+              res,
+              pMkt: null,
+              ln: lineOf(l.lkey),
+            });
           }
         }
       }

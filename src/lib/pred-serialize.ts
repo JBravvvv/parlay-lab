@@ -25,6 +25,13 @@ export type PredRecord = {
   czEv: number | null;
   lu: "confirmed" | "projected";
   tags: string[];
+  /* Phase 0.6: the line this row states, and whether it was SUSPENDED from every
+     ticket when stated. The freeze-exit thresholds are written about line subsets
+     (O0.5 vs O1.5+); without these the graded set can't tell them apart. Parsed
+     from lkey, the same string shLegKey built (`player|market|line`); null on
+     game markets, which have no line. */
+  ln: number | null;
+  susp?: boolean;
   /* provenance (Phase 0.5, 2026-07-24): which generator wrote the row and which
      selection mode was armed when it did. Two generators write this store; for
      six days they ran different policies and nothing recorded which was which.
@@ -68,6 +75,14 @@ const oddsNum = (v: unknown): number | null => {
   return isFinite(n) && n !== 0 ? n : null;
 };
 
+/** The line out of a prop lkey (`player|market|line`); null for ml_/rl_ keys. */
+export const lineOf = (lkey: string | null | undefined): number | null => {
+  const parts = String(lkey ?? "").split("|");
+  if (parts.length !== 3) return null;
+  const n = Number(parts[2]);
+  return isFinite(n) ? n : null;
+};
+
 /** Who generated the board being serialized, and under which selection mode. */
 export type PredSource = { src: "cron" | "client"; selMode?: string };
 
@@ -104,6 +119,8 @@ export function boardToPredictions(
         czEv: r.czEv != null ? Number(r.czEv) : null,
         lu: r.lu === "projected" ? "projected" : "confirmed",
         tags: Array.isArray(r.tags) ? (r.tags as string[]).slice(0, 8) : [],
+        ln: lineOf(r.lkey as string | null),
+        ...(r.susp ? { susp: true } : {}),
         ...(from ? { src: from.src, ...(from.selMode ? { selMode: from.selMode } : {}) } : {}),
       });
     }
