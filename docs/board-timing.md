@@ -35,42 +35,46 @@ lineups. This is not only a calibration-channel problem.
 
 Median first pitch **19:07 UTC**.
 
-## Coverage by candidate pass time — ONE metric, defined once
+## Coverage by pass hour — 8 weeks, 52 slate days, 710 games
 
-Two earlier tables used different denominators and could not be reconciled (a pair
-scored lower than one of its members). This is the single table. Everything else is
-superseded.
+> ⚠️ **THIS TABLE IS MODELLED, NOT MEASURED.** First-pitch times are real; "lineup
+> posted" is *assumed* at pitch − 3h because statsapi does not retain posting
+> timestamps. The perfect additivity across columns is a consequence of that
+> assumption making the two sets disjoint by construction — it is not an empirical
+> result. Good enough to choose a starting hour; not evidence of anything else.
+> **`luCoverage` (Phase 1b) now stamps real coverage on every board — re-derive this
+> from measured data after ~1 week (target: 2026-08-01).** That costs zero credits.
 
-- **Denominator:** every game on the day's official slate — constant across every row,
-  which is what makes rows comparable and pairs monotonic.
-- **Numerator:** games *live* at some pass — not started at that pass **and** lineup
-  posted (modelled at pitch − 3h).
-- **Post-fix**: since 2026-07-25 every scheduled game is priceable on a server board,
-  so "priceable" and "scheduled" are the same set (`docs/rebaseline-2026-07-25.md`).
+- **Denominator:** every game on the day's slate — constant across rows, so pairs are
+  monotonic.
+- **Numerator:** unstarted at the pass **and** past the assumed lineup window.
 
-| pass(es) UTC | all | weekday | Sunday |
-|---|---|---|---|
-| 16:00 | 24% | 11% | **71%** |
-| 20:00 | 23% | 24% | 23% |
-| 21:00 | 31% | 39% | 3% |
-| **22:00** | **45%** | **56%** | 3% |
-| 23:00 | 43% | 55% | 3% |
-| **16:00 + 22:00** | **69%** | **67%** | **74%** |
-| 16:00 + 20:00 | 48% | 35% | 94% |
-| 20:00 + 22:00 | 60% | 70% | 26% |
+| day | days | games | 16:00 | 17:00 | 18:00 | 20:00 | 21:00 | 22:00 | 23:00 | best |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Sun | 8 | 121 | 66% | **71%** | 51% | 17% | 5% | 6% | 7% | **17:00** |
+| Mon | 7 | 76 | 1% | 1% | 1% | 21% | 57% | **71%** | 71% | **22:00** |
+| Tue | 7 | 106 | 1% | 1% | 2% | 28% | 62% | **76%** | 68% | **22:00** |
+| Wed | 7 | 107 | 21% | 28% | 18% | 21% | 45% | **56%** | 46% | **22:00** |
+| Thu | 7 | 62 | 37% | 35% | 18% | 16% | 39% | **44%** | 39% | **22:00** |
+| Fri | 8 | 117 | 3% | 3% | 3% | 15% | 52% | **74%** | 73% | **22:00** |
+| Sat | 8 | 121 | 14% | 18% | **47%** | 36% | 19% | 26% | 31% | **18:00** |
 
-Monotonicity holds (24% ≤ 69% ≥ 45%), which is the check the previous tables failed.
+### Saturday is a THIRD pattern, not a Sunday
+The hypothesis was that Saturday might behave like Sunday and belong on the early
+entry. It does not. Saturday's own best hour is **18:00 UTC (47%)** — 16:00 gives it
+only 14% and 22:00 only 26%. Sunday peaks at 17:00, five points better than 16:00.
 
-**Answer: 22:00 UTC** as a single pass, and it is the best single hour on weekdays by a
-wide margin (56% vs 11% at 16:00). **16:00 alone is a Sunday instrument** — 71% Sunday
-against 11% weekday — because Sunday slates are early-heavy.
+**So the split is three entries, not two.** They are mutually exclusive by day of week,
+so the total is still ~1 call/day and ~1 board/day:
 
-### The caveat that matters
-First-pitch times are **measured**. "Lineup posted" is **modelled** at pitch − 3h,
-because statsapi does not retain posting timestamps. The ranking is stable across
-2h/3h/4h assumptions, but the absolute percentages are not. `luCoverage` (Phase 1b) now
-stamps real coverage on every board — after a week, re-derive this table from measured
-data. That costs zero credits.
+| cron-job.org entry | schedule (UTC) | coverage |
+|---|---|---|
+| weekdays | **22:00, Mon–Fri** | 66% |
+| Saturday | **18:00, Sat** | 47% |
+| Sunday | **17:00, Sun** | 71% |
+
+Game-weighted that is ~62% of the season's slate, against ~51% for a single 22:00 daily
+entry and ~44% for the current 16:00 daily cron.
 
 ## No third pass
 `16 + 20 + 23` reaches 91% against 69% for `16 + 22` — real coverage, but it costs

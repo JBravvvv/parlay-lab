@@ -52,6 +52,35 @@ entry here.
 | `addEventListener` / `removeEventListener` → no-ops | real listeners | every event-driven path: visibility changes, online/offline, storage events, pageshow. Nothing the engine registers is ever fired |
 | `scrollTo` → no-op | real | scroll side effects (UI only) |
 
+## OPEN ITEMS — ranked by risk
+
+### 1. `setTimeout` / `setInterval` never fire — HIGHEST RISK (owner-flagged, 2026-07-25)
+The sandbox returns `0` and never invokes the callback, so **every retry, backoff and
+pacing path in the engine is untested by construction**. The one that matters is
+`/api/clv`'s self-pacing: `RATE_MS` (25 min) and `WINDOW_MS` (45 min) decide whether a
+leg gets its pre-pitch sighting, and a missed sighting is the single unrecoverable loss
+in the whole system — no backfill, the close is gone. A pacing bug there would be silent
+in tests, silent in production, and only visible weeks later as thin CLV coverage.
+
+**A minimal test would not need timers at all.** The pacing decisions are pure functions
+of `(now, lastRun, game start)`; what makes them untestable today is that they read the
+clock inline. Extract them — e.g. `shouldRun(now, lastRun)` and
+`legsInWindow(entry, now, windowMs)` — into pure predicates the route calls, then assert
+a table: a run 24 min after the last one is refused and 26 min is allowed; a leg 44 min
+from first pitch is in the window and 46 min is not; a game already started is never
+sighted. Perhaps 30 lines of test against ~10 lines of extraction, and it needs no fake
+timers, which is precisely why it is worth doing before Phase 2 leans harder on CLV.
+
+### 2. `console.*` silenced
+Every diagnostic the engine emits is invisible — in tests *and* in the sandbox at
+runtime. A `data_gaps` line is the only channel that survives, which is why the
+timezone fix routes its disclosure there rather than to `console.warn`.
+
+### 3. `fetch` always fails
+Any path that bypasses `obFetchJson` sees a permanent failure, so its success branch has
+never run. Low risk today (the engine routes I/O through the injected fetcher), but it
+would hide a newly added direct call completely.
+
 ## NOT substituted (and must stay that way)
 
 - **`Date`** — the host clock and host timezone are real. This is what makes

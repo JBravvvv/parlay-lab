@@ -44,6 +44,25 @@ export function deadSlate(starts: number[], now: number): boolean {
   return !starts.some((s) => isFinite(s) && s > now);
 }
 
+/** MLB posts lineups roughly this far ahead of first pitch. */
+export const LINEUP_LEAD_MS = 3 * 3600_000;
+
+/**
+ * ACHIEVABLE coverage at a moment, from the SCHEDULE alone — the share of the day's
+ * games that are both still unstarted and past their lineup-posting window. It needs
+ * no board and no odds call, so it can be asked before deciding to spend.
+ *
+ * This is the guard against a mis-scheduled pass: a 16:00 UTC run on a Monday can
+ * reach ~1% of the slate no matter how well the engine works, because nothing is
+ * posted yet. Independent of whether the day-of-week split is right.
+ */
+export function achievableCoverage(starts: number[], now: number): number {
+  const valid = starts.filter((s) => isFinite(s));
+  if (!valid.length) return 0;
+  const ready = valid.filter((s) => s > now && s - LINEUP_LEAD_MS <= now).length;
+  return Math.round((ready / valid.length) * 1000) / 1000;
+}
+
 /**
  * COMPLETENESS — how many still-bettable games the board actually PRICED.
  *

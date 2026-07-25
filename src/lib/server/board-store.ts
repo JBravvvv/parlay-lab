@@ -1,6 +1,6 @@
 import { gunzipSync, gzipSync } from "node:zlib";
 import type { BoardData } from "@/engine";
-import { deadSlate, liveCoverageOf } from "@/lib/board-coverage";
+import { achievableCoverage, deadSlate, liveCoverageOf } from "@/lib/board-coverage";
 
 /**
  * SERVER BOARD DELIVERY (Phase 1, 2026-07-25)
@@ -14,11 +14,13 @@ import { deadSlate, liveCoverageOf } from "@/lib/board-coverage";
  * Storing the board closes that. The cron's board becomes the day's board; the
  * client loads it instead of building its own.
  *
- * Encoding: gzip → base64. A 15-game board measures ~517KB raw and ~59KB gzipped
- * (JSON of repeated keys compresses ~9:1), so the stored value is ~80KB — far under
- * any per-key ceiling, and small enough that a fat slate can't creep up on it. The
- * route decompresses before responding, so the client sees ordinary JSON and gains
- * no new failure mode.
+ * Encoding: gzip → base64. Re-measured after the timezone fix (2026-07-25): a
+ * 15-game board with props on 6 of them is 539KB raw / 62KB gzipped / **83KB stored**.
+ * propBoard is the only part that scales with slate size (~9.7KB per prop-game;
+ * categories are capped at 50 rows/market and saturate), so a full 18-game slate with
+ * props on every game projects to ~655KB raw / **~104KB stored** — 19x headroom against
+ * MAX_STORED_BYTES. The route decompresses before responding, so the client sees
+ * ordinary JSON and gains no new failure mode.
  */
 
 export const BOARD_KEY = (date: string) => `pl:board:${date}`;
@@ -56,10 +58,17 @@ export function decodeBoard(blob: string | null): StoredBoard | null {
    can't be used to suppress a run that should happen. */
 
 export const SKIP_COVERAGE = 0.7;
+/**
+ * Below this achievable coverage a pass cannot do useful work whatever the engine
+ * does, because the lineups simply are not posted yet — a 16:00 UTC run on a Monday
+ * reaches ~1% of the slate. Guards a mis-scheduled cron from spending ~120 Odds
+ * credits a day for nothing, independently of whether the day-of-week split is right.
+ */
+export const MIN_ACHIEVABLE = 0.15;
 
 export type SkipCheck = {
   skip: boolean;
-  reason: "no-board" | "no-games-left" | "covered" | "thin" | "dead-slate";
+  reason: "no-board" | "no-games-left" | "covered" | "thin" | "dead-slate" | "low-ceiling";
   live: number; // games not yet started
   confirmed: number; // ...of those, with both lineups posted when the board was built
   pct: number;
@@ -77,6 +86,15 @@ export type SkipCheck = {
 export function liveCoverage(board: StoredBoard | null, now: number, starts?: number[]): SkipCheck {
   if (starts && starts.length && deadSlate(starts, now)) {
     return { skip: true, reason: "dead-slate", live: 0, confirmed: 0, pct: 0 };
+  }
+  /* Ceiling check, before any board is consulted: what could a fresh board reach at
+     this hour at best? Below the floor the answer is "almost nothing", and that is
+     true of a correct engine on a badly chosen hour, so no board can rescue it. */
+  if (starts && starts.length) {
+    const ceiling = achievableCoverage(starts, now);
+    if (ceiling < MIN_ACHIEVABLE) {
+      return { skip: true, reason: "low-ceiling", live: 0, confirmed: 0, pct: ceiling };
+    }
   }
   if (!board) return { skip: false, reason: "no-board", live: 0, confirmed: 0, pct: 0 };
   const gi = (board.data?.gameInfo ?? {}) as Record<string, { start?: string | null; lu?: boolean }>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { decodeBoard, encodeBoard, liveCoverage, SKIP_COVERAGE, type StoredBoard } from "@/lib/server/board-store";
+import { decodeBoard, encodeBoard, liveCoverage, MIN_ACHIEVABLE, SKIP_COVERAGE, type StoredBoard } from "@/lib/server/board-store";
 import type { BoardData } from "@/engine";
-import { liveCoverageOf, pricedGames } from "@/lib/board-coverage";
+import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 
 /**
  * SERVER BOARD DELIVERY + THE CONDITIONAL SKIP (Phase 1, 2026-07-25)
@@ -257,5 +257,42 @@ describe("completeness beats coverage", () => {
   it("a board with no categories at all prices nothing", () => {
     expect(pricedGames({}, gi(15), NOW)).toBe(0);
     expect(pricedGames(null, gi(15), NOW)).toBe(0);
+  });
+});
+
+/* COVERAGE FLOOR (Josh, 2026-07-25): independent of whether the day-of-week split is
+   right, a pass at a badly chosen hour cannot do useful work — a 16:00 UTC run on a
+   Monday reaches ~1% of the slate because nothing is posted yet. Asked from the
+   schedule alone, before any spend. */
+describe("coverage floor", () => {
+  const day = "2026-07-27"; // a Monday
+  const at = (h: number, m = 0) => Date.parse(`${day}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`);
+  const MONDAY = [at(23, 5), at(23, 10), at(23, 40), Date.parse("2026-07-28T00:05:00Z"), Date.parse("2026-07-28T02:10:00Z")];
+
+  it("skips a pass whose ceiling is under the floor, whatever the engine could do", () => {
+    const v = liveCoverage(null, at(16), MONDAY); // 16:00 Monday: nothing posted yet
+    expect(v.skip).toBe(true);
+    expect(v.reason).toBe("low-ceiling");
+  });
+
+  it("runs once the lineup windows have opened", () => {
+    const v = liveCoverage(null, at(21), MONDAY); // 3 of 5 games inside their window
+    expect(v.skip).toBe(false);
+    expect(v.reason).toBe("no-board");
+  });
+
+  it("the floor is checked BEFORE any board, so it holds with a board present too", () => {
+    const b = board({ a: { start: "2026-07-27T23:05:00Z", lu: false } });
+    expect(liveCoverage(b, at(16), MONDAY).reason).toBe("low-ceiling");
+  });
+
+  it("dead slate still wins over low ceiling — both skip, the reason stays honest", () => {
+    expect(liveCoverage(null, Date.parse("2026-07-28T05:00:00Z"), MONDAY).reason).toBe("dead-slate");
+  });
+
+  it("achievableCoverage is a pure schedule read: no board, no odds call, no credits", () => {
+    expect(achievableCoverage(MONDAY, at(16))).toBe(0);
+    expect(achievableCoverage(MONDAY, at(21))).toBeGreaterThan(MIN_ACHIEVABLE);
+    expect(achievableCoverage([], at(21))).toBe(0);
   });
 });

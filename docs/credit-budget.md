@@ -6,6 +6,43 @@ over-subscribed *before* adding anything. At this rate the key exhausts in ~6 da
 which would take `/api/clv` down with it — and CLV is the scoreboard the entire
 collection period is built on.
 
+## RE-MEASURED after the timezone fix (2026-07-25)
+
+The fix put ~24% more events into the per-event prop loop, which is upstream of
+`slice(0,16)`. Measured by instrumenting the fetcher and billing 1 credit per market
+per region (game odds = 3 markets x us,eu = 6; each event = 9 markets x us = 9):
+
+| slate | pre-fix events / credits | post-fix events / credits | delta |
+|---|---|---|---|
+| 12 games | 9 → 87 | 12 → **114** | +27 |
+| 15 games | 11 → 105 | 15 → **141** | +36 |
+| 16 games | 12 → 114 | 16 → **150** | +36 |
+| 18 games | 14 → 132 | 16 → **150** | +18 |
+| 20 games | 15 → 141 | 16 → **150** | +9 |
+
+**Saturates at 150 credits** — `slice(0,16)` caps the prop loop, so a 16-, 18- or
+20-game slate all cost the same. A generate is therefore **114–150 credits**, not the
+~120 the earlier tier math assumed; call it **141/day** on a typical 15-game slate.
+
+Note for anyone reading the rebaseline diff: the fixture has prop files for only the
+nine early events, so the six recovered games added **no prop rows** to the +6/+6/+5.
+**In production they will.** The fixture diff understates the real change.
+
+### Rebuilt totals — day-of-week split, one generate/day
+
+| line | /day | /month |
+|---|---|---|
+| generate (one entry fires per day) | 141 | 4,290 |
+| `/api/clv` | ~45 | ~1,370 |
+| line-history | 144 | 4,380 |
+| props-history | 192 | 5,840 |
+| client generates (weekdays) | ~0 — the cron board is loadable now | — |
+| **total** | **~522** | **~15,900** |
+
+**20K plan: 79% used. 100K plan: 16%.** The fix cost ~1,100 credits/month and the tier
+answer does not change: 20K still fits, and the case for 100K remains the asymmetry
+argument below, not throughput.
+
 ## Consumer audit
 
 | consumer | credits/day | /month | what it feeds | what breaks if it stops |
