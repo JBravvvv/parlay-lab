@@ -187,6 +187,61 @@ export function cachedBoard(): Board | null {
   }
 }
 
+/** A board's lineup coverage, 0–1; -1 when it predates luCoverage (so an unknown
+    never wins a comparison against a known one). */
+export function coverageOf(b: Board | null | undefined): number {
+  const p = (b?.data?.luCoverage as { pct?: number } | undefined)?.pct;
+  return typeof p === "number" ? p : -1;
+}
+
+/**
+ * The board the Vercel cron built for today, if there is one. Costs ZERO Odds
+ * credits — the cron already paid for it. Never throws: any failure here leaves
+ * the caller on exactly the path it had before (its own cache, or a generate).
+ */
+export async function serverBoard(): Promise<Board | null> {
+  try {
+    const r = await fetch(`/api/board?date=${encodeURIComponent(todayStr())}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { board?: Board | null };
+    const b = j?.board ?? null;
+    return b && b.date === todayStr() && b.data ? b : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Today's board, cheapest acceptable source first.
+ *
+ * Order matters and the rule is never to DOWNGRADE: the server board is preferred
+ * only when it carries strictly better lineup coverage than what is already cached.
+ * A cached board built after lineups posted must not be replaced by an earlier cron
+ * board just because the cron board is "official".
+ *
+ * If neither source has anything, the old behaviour stands exactly: generate. No
+ * new way to end up without a board.
+ */
+export async function bestBoard(): Promise<Board> {
+  const cached = cachedBoard();
+  const server = await serverBoard();
+  const pick =
+    server && (!cached || coverageOf(server) > coverageOf(cached)) ? server : cached;
+  if (pick) {
+    if (pick === server) {
+      // adopt it locally so the next open is instant and offline-safe
+      try {
+        localStorage.setItem(BOARD_KEY, JSON.stringify(server));
+      } catch {
+        /* storage full — it will be re-fetched next open */
+      }
+      syncEngineBoard(server);
+    }
+    return pick;
+  }
+  return generateBoard();
+}
+
 /** Ask whether a board on screen has been overtaken by posted lineups. Pure read —
     never spends. Surfaces the prompt that replaces the old auto-regenerate. */
 export function boardNeedsRefresh(b: Board | null | undefined): StaleVerdict | null {

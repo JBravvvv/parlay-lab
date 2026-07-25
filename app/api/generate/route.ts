@@ -3,6 +3,7 @@ import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-serialize";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { BOARD_KEY, decodeBoard, encodeBoard, liveCoverage } from "@/lib/server/board-store";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -115,6 +116,23 @@ export async function GET(req: NextRequest) {
         { status: 429 },
       );
     }
+    /* CONDITIONAL SKIP: a good board for this date already exists, so don't buy a
+       second one. Coverage is measured over games that have NOT started — a morning
+       board can read high coverage with all of it already underway. Manual callers
+       with ?force=1 bypass this; the cron never does. */
+    if (!force) {
+      const existing = decodeBoard((await redis(["GET", BOARD_KEY(new Date().toISOString().slice(0, 10))])) as string | null);
+      const cov = liveCoverage(existing, now);
+      if (cov.skip) {
+        return NextResponse.json({
+          ok: true,
+          skipped: cov.reason,
+          live: cov.live,
+          confirmed: cov.confirmed,
+          pct: cov.pct,
+        });
+      }
+    }
     await redis(["SET", K_LASTGEN, String(now)]);
 
     // arm the same v2 stack the app arms (armV2 in engine-client)
@@ -168,6 +186,22 @@ export async function GET(req: NextRequest) {
     const slate = await eng.collectSlate();
     const data = eng.analyze(slate) as BoardData;
     const date = eng.get<() => string>("shToday")();
+
+    /* Persist the BOARD, not just the prediction records. Until this, the cron's work
+       could only ever be logged, never bet — the client had no way to load it and paid
+       ~120 credits to rebuild the same day. Storing it is what makes retiming the cron
+       a saving instead of a doubling. Best-effort: a failure here must never cost the
+       run, because the records below are the part that cannot be regenerated later. */
+    const enc = encodeBoard({ date, at: now, data });
+    if ("error" in enc) {
+      console.warn(`[generate] board not stored: ${enc.error}`);
+    } else {
+      try {
+        await redis(["SET", BOARD_KEY(date), enc.blob, "EX", String(3 * 86_400)]);
+      } catch (e) {
+        console.warn(`[generate] board store failed: ${(e as Error).message}`);
+      }
+    }
     const { records, parlays, games } = boardToPredictions(data, { src: "cron", selMode: CRON_SEL_MODE });
     if (!records.length) {
       return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)" });

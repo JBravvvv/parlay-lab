@@ -2728,7 +2728,13 @@ function shAnalyzeLocal(slate){
   }
   /* game metadata for the card/ledger layer (additive): first-pitch time + gamePk per matchup —
      the lock step stores pks for boxscore grading; the freeze rule compares start vs now */
-  var gameInfo={};slate.games.forEach(function(gg){gameInfo[shGkey(gg.away,gg.home,gg.gnum)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home,gm:gg.gnum||null};});
+  /* `lu` (Phase 1, 2026-07-25): did THIS game have both lineups posted when the board
+     was built. luCoverage is the day's aggregate; the per-game flag is what lets a
+     later generation ask "is the existing board still good for the games that haven't
+     started YET" — a morning board can read 71% coverage with every one of those games
+     already underway. Additive; nothing in selection reads it. */
+  var gameInfo={};slate.games.forEach(function(gg){gameInfo[shGkey(gg.away,gg.home,gg.gnum)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home,gm:gg.gnum||null,
+    lu:((gg.lineup_away||[]).length>=9&&(gg.lineup_home||[]).length>=9)};});
   /* ----- LINEUP COVERAGE (Phase 1b) — how much of this board was priced off REAL
      lineups. The Monte Carlo path requires a confirmed 9-man lineup on both sides;
      without one the game falls to the closed-form path, which carries the documented

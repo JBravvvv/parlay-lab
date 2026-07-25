@@ -1,13 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cachedBoard, generateBoard, type Board } from "./engine-client";
+import { bestBoard, generateBoard, type Board } from "./engine-client";
 
-/** Today's board: instant from localStorage when fresh, else a full engine run. */
+/**
+ * Today's board, from the cheapest acceptable source: this device's cache, or the
+ * board the Vercel cron already paid for (preferred only when its lineup coverage is
+ * strictly better — never a downgrade), or failing both, a fresh engine run.
+ */
 export function useBoard() {
   return useQuery<Board>({
     queryKey: ["board"],
-    queryFn: async () => cachedBoard() ?? (await generateBoard()),
+    queryFn: bestBoard,
     staleTime: Infinity,
     gcTime: Infinity,
   });
