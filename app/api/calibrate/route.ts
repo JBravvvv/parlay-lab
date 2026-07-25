@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { lineOf, type DayBlob } from "@/lib/pred-serialize";
+import { gradedFromBlob, lineOf, type DayBlob } from "@/lib/pred-serialize";
 import {
   CAL_START,
   applyWeeklyAdjustment,
@@ -186,22 +186,9 @@ export async function GET(req: NextRequest) {
       if (!calibrationEligible(date)) continue;
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
-      for (const r of Object.values(blob.records)) {
-        if (r.res === "won" || r.res === "lost") {
-          graded.push({
-            market: r.market,
-            p: r.p,
-            edge: r.edge,
-            lu: r.lu,
-            res: r.res,
-            pMkt: r.pMkt ?? null,
-            // Phase 0.6: line + suspension ride along so the freeze-exit thresholds
-            // become computable. Rows logged before this deploy carry neither.
-            ln: r.ln ?? lineOf(r.lkey),
-            ...(r.susp ? { susp: true } : {}),
-          });
-        }
-      }
+      // ONE door into the training channel (Phase 1): settled rows only, superseded
+      // statements excluded, `hist` structurally unreachable. See gradedFromBlob.
+      graded.push(...gradedFromBlob(blob));
     }
     // upgrade 03: the cloud ledger's graded legs join the training set for any date the
     // prediction store never logged (the pre-logging history) — never double-counted:

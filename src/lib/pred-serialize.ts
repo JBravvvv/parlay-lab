@@ -39,6 +39,22 @@ export type PredRecord = {
      ambiguity CAL_START excludes rather than guesses at. */
   src?: "cron" | "client";
   selMode?: string;
+  /* Phase 1 idempotency (2026-07-25). A second generation pass restates the same
+     day: same leg, different probability, because 9am prices a projected lineup and
+     1pm prices a confirmed one. The store measures the ENGINE, not the bets, so the
+     most informed statement of the day stands — but the one it replaced is kept for
+     audit, because comparing projected-lineup against confirmed-lineup calibration is
+     the entire evidence base for whether the second pass earns its odds credits. */
+  at?: number; // when this statement was written
+  hist?: { p: number; lu: "confirmed" | "projected"; src?: "cron" | "client"; at: number }[];
+  /* the SAME line restated on the other side by a later pass (a confirmed lineup can
+     move ml_home → ml_away). Two contradictory forecasts of one outcome must never
+     both be graded, so this one is kept, marked, and excluded from training. */
+  superseded?: true;
+  /* a later pass covered this player+market but not THIS line — the book moved on.
+     Nothing contradicts it, so it is kept AND still trains; the mark is for audit.
+     Deleting it would be the same class of error as backfilling one. */
+  stale?: true;
   // grading fields (cron-owned)
   res?: "won" | "lost" | "push" | "void" | "pending" | "ungradable";
   detail?: string;
@@ -74,6 +90,42 @@ const oddsNum = (v: unknown): number | null => {
   const n = Number(String(v ?? "").replace(/[^\d+-]/g, ""));
   return isFinite(n) && n !== 0 ? n : null;
 };
+
+/**
+ * Two keys above the record key, for generation-scoped replacement.
+ *
+ * `k` = `gkey|lkey|sub` is finer than it looks: `sub` carries the SIDE and the line,
+ * and for game markets the side is inside `lkey` itself (`ml_home` vs `ml_away`). So
+ * a later pass that changes its mind writes a DIFFERENT key and the old statement
+ * survives beside it — which is how two contradictory forecasts of one outcome would
+ * both reach the grader. These keys are what let a pass supersede its predecessor.
+ *
+ * - `lineKeyOf` — one betting line, side-agnostic. Same line, other side ⇒ same key.
+ *   Game markets have the side in the lkey, so it is stripped (`ml_home` → `ml`);
+ *   prop lkeys are already side-agnostic (`player|market|line`).
+ * - `groupKeyOf` — one player+market (or one game market), line-agnostic. This is the
+ *   unit a generation speaks about: if a pass says anything here, it has re-read this
+ *   player's night. NB game markets carry no player, which is exactly why the group
+ *   key must be built off the lkey rather than a player field.
+ */
+const SIDED = /^(ml|rl)_(home|away)$/;
+
+export function lineKeyOf(gkey: string | null | undefined, lkey: string | null | undefined): string {
+  const lk = String(lkey ?? "");
+  const base = SIDED.test(lk) ? lk.split("_")[0] : lk;
+  return `${gkey ?? "?"}|${base}`;
+}
+
+export function groupKeyOf(gkey: string | null | undefined, lkey: string | null | undefined): string {
+  const lk = String(lkey ?? "");
+  if (SIDED.test(lk)) return `${gkey ?? "?"}|${lk.split("_")[0]}`;
+  const parts = lk.split("|");
+  // player|market|line → drop the line; anything else keys on itself
+  return parts.length === 3 ? `${gkey ?? "?"}|${parts[0]}|${parts[1]}` : `${gkey ?? "?"}|${lk}`;
+}
+
+/** How many superseded statements a record keeps for audit. */
+export const HIST_MAX = 4;
 
 /** The line out of a prop lkey (`player|market|line`); null for ml_/rl_ keys. */
 export const lineOf = (lkey: string | null | undefined): number | null => {
@@ -181,14 +233,40 @@ export function mergeDayBlob(
     const start = blob.games[gkey]?.start;
     return !!start && new Date(start).getTime() <= now;
   };
+  /* ---- generation-scoped replacement (Phase 1) ----
+     A pass that speaks about a player+market has re-read that player's night, so its
+     statement supersedes the previous pass's for the same LINE — including when the
+     side flipped, which writes a different record key and would otherwise leave two
+     contradictory forecasts of one outcome in the grader. Lines the pass did NOT
+     restate are left alone and keep training: nothing contradicts them.
+     Frozen rows (graded, or their game already started) are never touched. */
+  const incoming = records.filter(
+    (r) => r && typeof r.k === "string" && isFinite(Number(r.p)) && !started(r.gkey),
+  );
+  const frozen = (r: PredRecord) => (!!r.res && r.res !== "pending") || started(r.gkey);
+  const inKeys = new Set(incoming.map((r) => r.k));
+  const inLines = new Set(incoming.map((r) => lineKeyOf(r.gkey, r.lkey)));
+  const inGroups = new Set(incoming.map((r) => groupKeyOf(r.gkey, r.lkey)));
+  for (const prev of Object.values(blob.records)) {
+    if (inKeys.has(prev.k) || frozen(prev)) continue;
+    if (inLines.has(lineKeyOf(prev.gkey, prev.lkey))) {
+      prev.superseded = true; // same line, restated (usually the other side)
+      delete prev.stale;
+    } else if (inGroups.has(groupKeyOf(prev.gkey, prev.lkey))) {
+      prev.stale = true; // the pass covered this player+market, but not this line
+    }
+  }
+
   let written = 0;
-  for (const r of records) {
-    if (!r || typeof r.k !== "string" || !isFinite(Number(r.p))) continue;
+  for (const r of incoming) {
     const prev = blob.records[r.k];
     if (prev?.res && prev.res !== "pending") continue; // graded = frozen
     if (prev && started(prev.gkey)) continue; // pre-start statement = frozen
-    if (started(r.gkey)) continue; // never log a pick after first pitch
-    blob.records[r.k] = { ...r, res: prev?.res ?? "pending" };
+    // keep what this statement replaced, so projected-vs-confirmed stays measurable
+    const hist = prev
+      ? [...(prev.hist ?? []), { p: prev.p, lu: prev.lu, src: prev.src, at: prev.at ?? 0 }].slice(-HIST_MAX)
+      : null;
+    blob.records[r.k] = { ...r, res: prev?.res ?? "pending", at: now, ...(hist?.length ? { hist } : {}) };
     written++;
   }
   for (const t of parlays) {
@@ -200,4 +278,50 @@ export function mergeDayBlob(
   }
   blob.at = now;
   return { blob, written };
+}
+
+/* ---- the ONLY door from the prediction store into the calibration channel ----
+
+   Everything the nightly fit trains on comes through here. Three exclusions, and
+   they are stated as code rather than left implicit:
+
+   1. Only settled statements (won/lost). Voids, pushes and pendings carry no
+      information about whether a probability was right.
+   2. `superseded` rows never train. They are the earlier pass's forecast of a line
+      a later pass restated on the other side — kept for audit, but grading both
+      would weight one outcome against two contradictory claims.
+   3. `hist` NEVER trains. Superseded probabilities live inside the surviving record
+      and are deliberately unreachable from this function: the fit reads the row, not
+      the row's history. A future fit that wants the projected-vs-confirmed comparison
+      must ask for it explicitly rather than pick it up by accident. */
+
+export type GradedFromBlob = {
+  market: string;
+  p: number;
+  edge: number | null;
+  lu: "confirmed" | "projected";
+  res: "won" | "lost";
+  pMkt: number | null;
+  ln: number | null;
+  susp?: true;
+};
+
+export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {
+  if (!blob) return [];
+  const out: GradedFromBlob[] = [];
+  for (const r of Object.values(blob.records ?? {})) {
+    if (r.res !== "won" && r.res !== "lost") continue;
+    if (r.superseded) continue;
+    out.push({
+      market: r.market,
+      p: r.p,
+      edge: r.edge,
+      lu: r.lu,
+      res: r.res,
+      pMkt: r.pMkt ?? null,
+      ln: r.ln ?? lineOf(r.lkey),
+      ...(r.susp ? { susp: true as const } : {}),
+    });
+  }
+  return out;
 }

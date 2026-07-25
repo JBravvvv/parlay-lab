@@ -63,6 +63,15 @@ significant miscalibration, and every adjustment is logged under Stats → Calib
    ticketed at all. Central estimate lands **~2026-09-18**, versus exit 2 at
    **2026-09-22**.
 
+   **This threshold assumes OUTCOME-based power, and is expected to be superseded.**
+   150 was chosen for detecting miscalibration from win/loss results, which is a weak
+   instrument — a 2pp model bias needs ~2,400 graded legs to detect that way, so even
+   150 is a compromise number. The Phase 2 model-vs-close instrument reaches
+   significance at 20–50 legs by measuring bias against the closing consensus instead
+   of against coin flips. **When Phase 2 lands, H+R+RBI readiness should be judged on
+   its CLV bias estimate rather than on this count.** Until then 150 stands unchanged
+   and this condition is live, not decorative.
+
    ⚠️ **The margin is thin and the low end crosses over.** At 2.5 legs/day (a 20% FUN
    share) exit 1 fires 2026-09-23 — *after* exit 2 — which would make it decorative.
    The underlying rate (19 O0.5 legs over six days, 2026-07-17 → 07-22) is a six-day
@@ -71,6 +80,14 @@ significant miscalibration, and every adjustment is logged under Stats → Calib
    here. **Recheck this date once ~2 weeks of core-only O0.5 legs exist**, and if the
    realized rate is under ~2.6/day, exit 1 is decorative and exit 2 is the real clock.
 2. **60 days elapsed** (≈ 2026-09-22).
+
+**A third exit condition is PROPOSED and UNSIGNED.** The original edge-instructions file
+proposed: *a market accumulates enough legs for the model-vs-close bias estimate to reach
+95% power on a 2pp effect (typically 20–50 legs), and the estimate is significant.* On
+the numbers above that would fire **first, by weeks** — it is the only exit whose clock
+runs on the efficient instrument rather than on outcome counting. It is not in force:
+amending the exit conditions needs Josh's separate sign-off. **Raise it when Phase 2
+lands**, since that is what makes the condition measurable in the first place.
 
 Until one fires, requests to tune, loosen, or "just try" a parameter below are declined
 by default; any change needs Josh's explicit sign-off against this document.
