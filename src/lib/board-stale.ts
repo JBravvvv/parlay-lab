@@ -52,8 +52,10 @@ export const NEAR_FIRST_PITCH_MS = 4 * 3600_000;
 export const MIN_CACHE_AGE_MS = 30 * 60_000;
 /** MLB posts lineups roughly this far ahead of first pitch. */
 export const LINEUP_LEAD_MS = 3 * 3600_000;
-/** ~120 Odds credits each; the monthly budget is the binding constraint, not the clock. */
-export const MAX_AUTO_RUNS_PER_DAY = 1;
+/** ~120 Odds credits each. Held at 2 pending the plan tier; the `no-new-lineups`
+    condition below is what actually keeps this from firing pointlessly, so the cap
+    is a backstop rather than the primary control. */
+export const MAX_AUTO_RUNS_PER_DAY = 2;
 
 export function boardStale(i: StaleInputs): StaleVerdict {
   // a board from before luCoverage existed can't be judged on coverage; treat it as

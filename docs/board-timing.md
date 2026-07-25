@@ -55,6 +55,27 @@ costs zero credits.
 another ~120 Odds credits/day (~3,720/month) for +22 points. That is a bad trade at any
 budget and an impossible one at this budget. Two passes is the ceiling.
 
+## The second pass may not need a second cron at all
+
+Vercel Hobby allows 2 crons and both are used, which framed the second pass as "add an
+external scheduler and pay for another 120 credits/day". That framing assumed the 16:00
+run must stay. It probably must not:
+
+- On **weekdays** the 16:00 board is 11% lineup-confirmed. It is a near-fully-projected
+  board, and it is the *only* thing the calibration channel gets on days the app is not
+  opened.
+- Once the owner generates at 22:00 UTC on weekdays (`docs/generate-timing.md`), his own
+  board is ~82% confirmed and logs to the same store — strictly better data, same cost,
+  already being spent.
+
+So the highest-value change is not a new cron, it is **retiming the existing one from
+16:00 to 22:00 UTC**: no external scheduler, no `X-Cron-Key`, no extra credits, and the
+cron becomes a genuine backstop that only matters on days the app is never opened.
+
+The one thing 16:00 does well is **Sundays** (71% confirmed, and the Sunday slate is
+mostly over by 22:00). That is also the day the owner already generates early himself,
+so the cron's Sunday value is largely duplicated by his own routine.
+
 ## Status: SHELVED on cost, not on merit
 The second pass is **not scheduled** — see `docs/credit-budget.md`. The plan is
 structurally over-subscribed before adding anything, so the pass waits until the budget
