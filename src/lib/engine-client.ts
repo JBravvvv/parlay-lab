@@ -145,6 +145,33 @@ function autoRuns(date: string): number {
   }
 }
 
+/* Every generate on this device today, automatic or manual. The SERVER's per-date cap
+   (MAX_RUNS_PER_DATE) bounds /api/generate only — an in-app regenerate runs the engine
+   in the browser and never reaches that route, so it is unbounded by design. This
+   counter exists to make the spend VISIBLE, never to block it: the price-age lock
+   guard depends on being able to regenerate, and nothing should stop a bet. */
+const GEN_KEY = "pl_gencount";
+
+export function generatesToday(): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(GEN_KEY) ?? "{}") as { date?: string; n?: number };
+    return v.date === todayStr() ? Number(v.n) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** ~114-150 Odds credits each (measured). Counted for visibility, not enforcement. */
+export const GEN_CREDITS_EST = 140;
+
+function noteGenerate() {
+  try {
+    localStorage.setItem(GEN_KEY, JSON.stringify({ date: todayStr(), n: generatesToday() + 1 }));
+  } catch {
+    /* private mode — the counter just stays at 0 */
+  }
+}
+
 /** Count an automatic (staleness-triggered) regenerate against today's cap. */
 function noteAutoRun(date: string) {
   try {
@@ -335,6 +362,7 @@ async function armV2(eng: Engine) {
 /** Full engine run: slate collection (via the odds proxy) + analysis. */
 export async function generateBoard(): Promise<Board> {
   const eng = getEngine();
+  noteGenerate();
   await armV2(eng);
   const slate = await eng.collectSlate();
   simCapture = [];

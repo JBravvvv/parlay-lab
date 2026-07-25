@@ -12,7 +12,7 @@ import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
-import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr } from "@/lib/engine-client";
+import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr, generatesToday, GEN_CREDITS_EST } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
 import { useCalibration } from "@/lib/useCalibration";
@@ -332,6 +332,9 @@ export default function BuilderPage() {
      going cold, and an override booked on that misread would put false creep
      into the Discipline report. Scope: the card's own markets when there is a
      card, every market when there isn't (that's the "why is it strict" case). */
+  const [genCount, setGenCount] = useState(0);
+  useEffect(() => setGenCount(generatesToday()), [cardV, board]);
+
   const cal = useCalibration();
   const rebuild = useMemo(() => {
     if (consMinN == null) return null;
@@ -789,6 +792,16 @@ export default function BuilderPage() {
             <div className="rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-4 py-3 text-[12px] text-gold">
               Model suggests reduced action today: slate EV ≈ {(card.alloc.ev * 100).toFixed(1)}%. Allocating{" "}
               {fmtMoney(card.alloc.sum)} as requested.
+            </div>
+          )}
+
+          {/* Odds spend is invisible until the month runs out: the server cap bounds
+              /api/generate only, and an in-app regenerate never reaches it. Shown, not
+              enforced — the price-age lock guard depends on being able to regenerate. */}
+          {genCount >= 2 && (
+            <div className="num rounded-(--radius-panel) border border-line-2 bg-surface-2/50 px-4 py-2 text-[11px] text-muted">
+              {genCount} board generates on this device today · ~{(genCount * GEN_CREDITS_EST).toLocaleString()} Odds credits
+              {genCount >= 4 && <span className="text-gold"> — heavy for one day</span>}
             </div>
           )}
 
