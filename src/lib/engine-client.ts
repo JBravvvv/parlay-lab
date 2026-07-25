@@ -4,6 +4,7 @@ import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
 import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, type LedgerDayLike } from "./bankroll";
+import { boardStale } from "./board-stale";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 
 /**
@@ -132,12 +133,50 @@ export function todayStr(): string {
   return getEngine().get<() => string>("shToday")();
 }
 
+const AUTO_KEY = "pl_autogen"; // {date, n} — automatic regenerates spent today
+
+function autoRuns(date: string): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(AUTO_KEY) ?? "{}") as { date?: string; n?: number };
+    return v.date === date ? Number(v.n) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Count an automatic (staleness-triggered) regenerate against today's cap. */
+function noteAutoRun(date: string) {
+  try {
+    localStorage.setItem(AUTO_KEY, JSON.stringify({ date, n: autoRuns(date) + 1 }));
+  } catch {
+    /* storage full — the cap fails closed on the next read */
+  }
+}
+
 export function cachedBoard(): Board | null {
   try {
     const raw = localStorage.getItem(BOARD_KEY);
     if (!raw) return null;
     const b = JSON.parse(raw) as Board;
-    if (b.date !== todayStr()) return null;
+    const today = todayStr();
+    if (b.date !== today) return null;
+    /* Phase 1c: a board priced before lineups posted is a different instrument from
+       one priced after — and the old cache rule (same date ⇒ serve it) is how you
+       open the app at 6pm and lock a card built at 9am off projected lineups. */
+    const gi = (b.data?.gameInfo ?? {}) as Record<string, { start?: string | null }>;
+    const verdict = boardStale({
+      pct: (b.data?.luCoverage as { pct?: number } | undefined)?.pct,
+      at: b.at,
+      starts: Object.values(gi)
+        .map((g) => (g?.start ? Date.parse(g.start) : NaN))
+        .filter((n) => isFinite(n)),
+      autoRuns: autoRuns(today),
+      now: Date.now(),
+    });
+    if (verdict.stale) {
+      noteAutoRun(today);
+      return null; // useBoard falls through to a fresh generate
+    }
     syncEngineBoard(b);
     return b;
   } catch {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-serialize";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
-import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -25,6 +25,9 @@ export const maxDuration = 300;
 const CRON_SEL_MODE = "ev_gated";
 
 const K_LASTGEN = "pl:gen:lastRun";
+const K_RUNS = "pl:gen:runs:";
+/** ~120 Odds credits a run, so a leaked secret costs at most ~480 in a day. */
+const MAX_RUNS_PER_DATE = 4;
 const DAYS_SET = "pl:pred:days";
 const dayKey = (d: string) => `pl:pred:${d}`;
 const MAX_BYTES = 3_000_000;
@@ -69,10 +72,21 @@ function memoryStorage() {
 export async function GET(req: NextRequest) {
   if (!storeEnv()) return NextResponse.json({ error: "sync-not-configured" }, { status: 503 });
   const manual = syncAuthed(req);
-  if (!manual) {
+  // Phase 1a: an external scheduler (cron-job.org) drives the second, post-lineup
+  // pass — Vercel Hobby allows only 2 crons and both are spoken for. The secret
+  // travels in a HEADER, never the query string: this route spends money.
+  const scheduled = !manual && cronHeaderAuthed(req);
+  if (!manual && !scheduled) {
     const ua = req.headers.get("user-agent") ?? "";
     const hour = new Date().getUTCHours();
     if (!ua.startsWith("vercel-cron") || hour < 12 || hour >= 21) {
+      // (c) leave a trail a probe would show up in — this endpoint spends quota,
+      // so repeated 401s here are worth noticing in the Vercel logs
+      console.warn(
+        `[generate] unauthorized attempt ua=${JSON.stringify(ua.slice(0, 80))} hour=${hour}UTC ` +
+          `key=${req.headers.get("x-cron-key") ? "header-bad" : req.nextUrl.searchParams.get("key") ? "query-attempt" : "none"} ` +
+          `ip=${req.headers.get("x-forwarded-for") ?? "?"}`,
+      );
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
   }
@@ -84,6 +98,22 @@ export async function GET(req: NextRequest) {
     const force = manual && req.nextUrl.searchParams.get("force") === "1";
     if (!force && now - lastRun < 45 * 60_000) {
       return NextResponse.json({ ok: true, skipped: "ran recently" });
+    }
+    /* (b) PER-DATE RUN CAP — the real protection. The secret stops a stranger; this
+       stops a LEAK from draining the month: each run costs ~120 Odds credits, so a
+       hard ceiling of MAX_RUNS_PER_DATE bounds the damage at ~480 no matter how hard
+       the endpoint is hit. Counted BEFORE the work, incremented for every authorized
+       caller (scheduled and manual alike), expires with the date. */
+    const dateNow = new Date().toISOString().slice(0, 10);
+    const runsKey = `${K_RUNS}${dateNow}`;
+    const runs = Number(await redis(["INCR", runsKey])) || 0;
+    if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
+    if (runs > MAX_RUNS_PER_DATE) {
+      console.warn(`[generate] run cap hit: ${runs} attempts on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
+      return NextResponse.json(
+        { error: "run cap reached for this date", runs, cap: MAX_RUNS_PER_DATE },
+        { status: 429 },
+      );
     }
     await redis(["SET", K_LASTGEN, String(now)]);
 

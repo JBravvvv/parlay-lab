@@ -62,3 +62,19 @@ export function cronKeyAuthed(req: { nextUrl: { searchParams: { get(k: string): 
   const h = (s: string) => createHash("sha256").update(s).digest();
   return timingSafeEqual(h(want), h(got));
 }
+
+/**
+ * Phase 1a: the same secret in a HEADER instead of the query string. A query
+ * string lands in Vercel's request logs and in every proxy along the way, which
+ * was an acceptable trade for /api/clv (read-only) and is not for /api/generate,
+ * where a leaked key spends ~120 Odds credits a call. cron-job.org supports
+ * custom request headers (`extendedData.headers`), so there is no reason to put
+ * this one in a URL. /api/clv keeps its existing contract untouched.
+ */
+export function cronHeaderAuthed(req: { headers: { get(k: string): string | null } }): boolean {
+  const want = process.env.CRON_SECRET;
+  const got = req.headers.get("x-cron-key");
+  if (!want || !got) return false;
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(want), h(got));
+}

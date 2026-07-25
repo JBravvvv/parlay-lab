@@ -2729,7 +2729,19 @@ function shAnalyzeLocal(slate){
   /* game metadata for the card/ledger layer (additive): first-pitch time + gamePk per matchup —
      the lock step stores pks for boxscore grading; the freeze rule compares start vs now */
   var gameInfo={};slate.games.forEach(function(gg){gameInfo[shGkey(gg.away,gg.home,gg.gnum)]={pk:gg.pk||null,start:gg.start||null,away:gg.away,home:gg.home,gm:gg.gnum||null};});
-  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets,propBoard:propBoard};
+  /* ----- LINEUP COVERAGE (Phase 1b) — how much of this board was priced off REAL
+     lineups. The Monte Carlo path requires a confirmed 9-man lineup on both sides;
+     without one the game falls to the closed-form path, which carries the documented
+     H+R+RBI PA-conditioning weakness. A board generated pre-lineup is therefore a
+     different instrument from one generated after, and until now nothing recorded
+     which you were looking at. Pure addition — no selection math reads it, and the
+     parity digest covers only categories/parlays. ----- */
+  var luConf=0;
+  slate.games.forEach(function(gg){
+    if((gg.lineup_away||[]).length>=9&&(gg.lineup_home||[]).length>=9)luConf++;});
+  var luCoverage={confirmed:luConf,eligible:slate.games.length,
+    pct:slate.games.length?Math.round((luConf/slate.games.length)*1000)/1000:0};
+  return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets,propBoard:propBoard,luCoverage:luCoverage};
 }
 
 /* --- the Claude API call --- */
