@@ -52,6 +52,19 @@ entry here.
 | `addEventListener` / `removeEventListener` → no-ops | real listeners | every event-driven path: visibility changes, online/offline, storage events, pageshow. Nothing the engine registers is ever fired |
 | `scrollTo` → no-op | real | scroll side effects (UI only) |
 
+## The inventory has now caught two measurement errors in one day
+
+1. **The 24% slate hole** — `obSameDay` replaced by a UTC-string comparison, so the
+   suite tested neither production nor the browser.
+2. **The blob size** — quoted at 517KB (measured with `today` pinned), then 198KB
+   (unpinned, where the stat-range fixtures stop matching and prop rows silently
+   vanish), against a real 539KB. Same root cause: a harness substitution changing
+   what the measurement was actually measuring.
+
+Both were *measurements taken through the harness and reported as facts about
+production*. That is the argument for the manifest rule — not that mocks are bad, but
+that a number measured behind a substitution is a number about the substitution.
+
 ## OPEN ITEMS — ranked by risk
 
 ### 1. `setTimeout` / `setInterval` never fire — HIGHEST RISK (owner-flagged, 2026-07-25)

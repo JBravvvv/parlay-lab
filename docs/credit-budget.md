@@ -28,6 +28,31 @@ Note for anyone reading the rebaseline diff: the fixture has prop files for only
 nine early events, so the six recovered games added **no prop rows** to the +6/+6/+5.
 **In production they will.** The fixture diff understates the real change.
 
+### THE BUDGET ASSUMES A BEHAVIOUR — stated out loud (Josh, 2026-07-25)
+
+**Every total below assumes client generates are ~0 on weekdays**, i.e. that the cron
+board is good enough to lock as-is. If a stale board cannot be locked honestly and the
+owner regenerates before locking, that is a second ~141–150 credit run on those days.
+Behaviour assumptions have already been wrong twice in this project — the 9:30am/pm
+ambiguity, and "pressing Generate writes a server board" — so this one is written down
+rather than left implicit.
+
+Archive costs below are **measured from the archives themselves**, not from the cron
+schedules. `line-history.yml` is scheduled hourly but GitHub Actions actually delivers
+**~4.1 snapshots/day** (14-day count), so it costs **~25 credits/day, not 144**.
+`props-history` delivers its 2 snapshots/day reliably: ~161/day.
+
+| scenario | /day | /month | 20K | 100K |
+|---|---|---|---|---|
+| never regenerate | 372 | 11,300 | 57% | 11% |
+| regenerate half the weekdays | 422 | 12,800 | 64% | 13% |
+| **regenerate every day before locking** | **513** | **15,600** | **78%** | **16%** |
+| worst case the per-date cap allows (4 runs) | 831 | 25,300 | **126%** | 25% |
+
+**All three realistic scenarios fit 20K. The per-date cap of 4 does NOT protect a 20K
+plan** — it bounds a leak at ~25,300/month, which is over. The cap bounds *abuse*, not
+*use*; the thing that keeps the bill down is that only one entry fires per day.
+
 ### Rebuilt totals — day-of-week split, one generate/day
 
 | line | /day | /month |
