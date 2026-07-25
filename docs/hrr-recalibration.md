@@ -49,8 +49,52 @@ run-scoring dynamics in the simulated park environment. Residual gap accepted fo
 closed form; documented here rather than papered over.
 
 ## Retirement criteria
-Raise `hrrAltMax` (or delete it) when, over a rolling window of ≥100 graded H+R+RBI
-legs that include O1.5+ lines priced by the PA-conditioned model, the market's
-reliability slope sits inside [0.85, 1.15] and the O1.5+ subset's realized hit rate is
-within the Wilson 95% CI of prediction. The calibration panel (Stats → 📐) carries the
-live slope and n.
+Raise `hrrAltMax` when, over a rolling window of **≥100 graded H+R+RBI legs** that
+include O1.5+ lines priced by the PA-conditioned model, the market's reliability slope
+sits inside **[0.85, 1.15]** and the O1.5+ subset's realized hit rate is within the
+**Wilson 95% CI** of prediction. Thresholds unchanged.
+
+**Source: the BOARD SAMPLE (the prediction store), filtered `market =
+batter_hits_runs_rbis`, `susp = true`, `ln ≥ 1.5`. Not the ledger — and that cannot
+change.** The suspension means no O1.5+ leg is ever wagered, so the ledger can never
+contain one. This population is **counterfactual by construction**: priced, printed and
+graded against real box scores, but never executed — no fill, no CLV, no settlement.
+That is what the staged return below exists to handle.
+
+**The window opens at the Phase 0.6 deploy — 2026-07-25 — not at the 2026-07-22
+PA-conditioning fix.** `susp` did not exist as a stored field until 0.6, so rows from
+07-22 to the deploy carry no flag and a `susp = true` filter excludes them anyway. The
+code's start date is the doc's start date; writing 07-22 here when the data begins 07-25
+is precisely the failure this phase series exists to correct.
+
+**The filter is self-cleaning — do not bolt a `CAL_START`-style cutoff onto it.** `susp`
+is computed only in the disciplined selection modes (`dscpM` in `finalizeCats`), so a
+legacy-mode row can never carry it. Any row written by a generator running the wrong
+policy is excluded automatically by the same condition that selects the population.
+
+The calibration panel (Stats → 📐) carries the live slope, but its per-market count is
+**board rows** across all lines — it does not yet split O0.5 from O1.5+. The `ln`/`susp`
+fields land in the graded set from 2026-07-25; until a split view exists, the panel's
+H+R+RBI figures answer neither this criterion nor `collection-period.md` exit 1.
+
+## Staged return
+The criterion above fires on a counterfactual population: prices nobody took, with no
+execution, no CLV and no settlement behind them. A model that predicts an unbet line
+well has not been shown to produce a bettable edge at Caesars. So the suspension does
+not simply lift:
+
+1. **Stage 1 — `hrrAltMax` → 1.5 only.** O1.5 becomes eligible; O2.5+ stays suspended.
+   Exposure is reduced: FUN-eligible, or core capped, at the owner's election at the time.
+2. **Stage 2 — full reinstatement** requires **ledger confirmation on real graded O1.5+
+   legs**: enough executed legs to satisfy the same slope and Wilson tests on bets that
+   actually settled, with their CLV visible in the receipts.
+3. **Stage 0 — the failure path.** If the real graded O1.5+ legs from Stage 1 come in
+   below prediction — slope outside [0.85, 1.15], **or** realized hit rate below the
+   Wilson 95% CI — `hrrAltMax` returns to **0.5**, and **the counterfactual criterion
+   does not fire again on its own**. Re-entry then requires a **new model change**, not
+   merely more board rows: the board sample already said yes once and the money said no,
+   so more of the same evidence is not evidence.
+
+Written 2026-07-24/25, while nothing is at stake, precisely so none of it — least of all
+the failure path — is decided in the moment the criterion fires and the number looks
+exciting.

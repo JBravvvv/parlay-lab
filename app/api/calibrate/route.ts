@@ -206,17 +206,20 @@ export async function GET(req: NextRequest) {
     // upgrade 03: the cloud ledger's graded legs join the training set for any date the
     // prediction store never logged (the pre-logging history) — never double-counted:
     // dates the store covers are skipped outright.
-    // NOTE (Phase 0.5): this source is deliberately NOT cut at CAL_START. These are
-    // locked ledger legs, which only ever came from the app — the two-generator
-    // ambiguity never touched them. They do predate the ev_gated default, so if the
-    // channel should hold exactly one policy, this loop takes the same cutoff.
+    // Phase 0.6 (Josh's call): this source now takes the SAME cutoff. These legs are
+    // free of the two-generator ambiguity, but they predate the ev_gated default and
+    // the fix-file Phase 5 deploy, so hitter props on them were picked under the
+    // hardcoded over-lean — a different selection policy. One policy per population,
+    // both channels, same boundary. In practice the branch now fires only when the
+    // prediction store is missing a date it should have (a failed cron run), which is
+    // exactly when a ledger backfill is still wanted.
     try {
       const cut = new Date(Date.now() - SUMMARY_DAYS * 86_400_000).toISOString().slice(0, 10);
       const dayset = new Set(allDays);
       const rawLedger = (await redis(["GET", "pl:ledger:v1"])) as string | null;
       const ledger: LedgerDay[] = rawLedger ? ((JSON.parse(rawLedger) as { ledger?: LedgerDay[] }).ledger ?? []) : [];
       for (const e of ledger) {
-        if (!e.locked || e.date < cut || dayset.has(e.date)) continue;
+        if (!e.locked || e.date < cut || dayset.has(e.date) || !calibrationEligible(e.date)) continue;
         const gLegs = e.grading?.legs ?? {};
         const seen = new Set<string>();
         for (const t of [...(e.core ?? []), ...(e.funT ?? [])]) {

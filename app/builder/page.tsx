@@ -15,6 +15,10 @@ import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
+import { useCalibration } from "@/lib/useCalibration";
+import { gateRebuild, rebuildCounts, type RebuildRow } from "@/lib/gate-rebuild";
+import { CAL_START } from "@/engine2/calibration";
+import { marketOf } from "@/lib/ledger-segments";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 
@@ -81,6 +85,24 @@ type SuppCalc = {
   fun: { picks: CardPick[]; sum: number };
 };
 type SuppResult = { ok: boolean; err?: string; added?: number; sum?: number; left?: number };
+
+/** The sample-rebuild notice (Phase 1). Same words on the card and on NO-PLAY. */
+function RebuildNote({ rows, daysIn }: { rows: RebuildRow[]; daysIn: number }) {
+  return (
+    <div className="rounded-(--radius-panel) border border-line-2 bg-surface-2/50 px-4 py-3 text-[11.5px] leading-relaxed text-muted">
+      <b className="text-text">Market sample rebuilding since the 0.5 restart</b>{" "}
+      <span className="num">({rebuildCounts(rows)})</span> — consensus gate temporarily strict;{" "}
+      <b className="text-text">this is not a model signal</b>.
+      <div className="mt-1 text-[10.5px] text-faint">
+        {/* the date comes from the constant that defines it — never retyped here */}
+        Day {daysIn + 1} since the calibration sample restarted on {CAL_START}. Under {rows[0]?.need ?? 100} graded legs
+        a market is treated as unproven, so its tickets must also clear the de-vigged consensus — the card gets
+        quieter and NO-PLAY gets likelier until the counts refill (days on props, ~2 weeks on ML/RL). Nothing about
+        the model changed. Overriding on this reads as override creep in the Discipline report.
+      </div>
+    </div>
+  );
+}
 
 function MoneyInput({
   label,
@@ -265,12 +287,14 @@ export default function BuilderPage() {
   // active EV gate + sizing-guide config, straight from the engine (mounted only)
   const [gatePct, setGatePct] = useState<number | null>(null);
   const [kellyGuide, setKellyGuide] = useState(false);
+  const [consMinN, setConsMinN] = useState<number | null>(null);
   useEffect(() => {
     const mode = getSelectionMode();
-    const cfg = getEngine().get<{ coreEvMin?: number; dailyKellyGuide?: boolean }>("SH_CFG");
+    const cfg = getEngine().get<{ coreEvMin?: number; dailyKellyGuide?: boolean; consMinN?: number }>("SH_CFG");
     // the gate only exists on the disciplined paths (dk_fd / ev_gated)
     setGatePct(mode === "dk_fd" || mode === "ev_gated" ? (cfg?.coreEvMin ?? 0) : null);
     setKellyGuide(cfg?.dailyKellyGuide !== false);
+    setConsMinN(cfg?.consMinN ?? 100);
   }, []);
 
   const eng = typeof window !== "undefined" ? getEngine() : null;
@@ -300,6 +324,25 @@ export default function BuilderPage() {
     void cardV;
     return eng.get<(x: unknown) => CardCalc | null>("shCardCalc")(d);
   }, [eng, d, cardV, locked]);
+
+  /* SELECTION-TIGHTENING NOTICE (Phase 1). The 0.5 restart zeroed every market's
+     graded count, and mktN feeds the small-sample consensus gate — so for a few
+     days the card is quieter and NO-PLAY is likelier for a reason that has
+     nothing to do with edge. Unlabelled, that looks exactly like the model
+     going cold, and an override booked on that misread would put false creep
+     into the Discipline report. Scope: the card's own markets when there is a
+     card, every market when there isn't (that's the "why is it strict" case). */
+  const cal = useCalibration();
+  const rebuild = useMemo(() => {
+    if (consMinN == null) return null;
+    const rel = cal.summary?.reliability ?? null;
+    const mktN = rel ? Object.fromEntries(Object.entries(rel).map(([m, f]) => [m, f?.n ?? 0])) : null;
+    const cardMarkets = (card?.alloc.picks ?? []).flatMap((p) =>
+      (p.w.pl.legs ?? []).map((l) => marketOf(String(l.lkey ?? ""))),
+    );
+    const r = gateRebuild(mktN, consMinN, todayStr(), cardMarkets);
+    return r.rebuilding ? r : null;
+  }, [cal, consMinN, card]);
 
   /* Hardening Phase 3: record today's NO-PLAY verdict the moment the gate shows
      it (write-once per date; cloud-syncs). Honored vs overridden is derived
@@ -677,6 +720,11 @@ export default function BuilderPage() {
                   Recommended stake <span className="num font-bold text-text">$0</span>. Zero edge means zero stake — passing is a
                   position, and it costs nothing. Fun bucket unaffected.
                 </div>
+                {rebuild && (
+                  <div className="text-left">
+                    <RebuildNote rows={rebuild.rows} daysIn={rebuild.daysIn} />
+                  </div>
+                )}
                 <Pill
                   variant="ghost"
                   onClick={() => {
@@ -743,6 +791,10 @@ export default function BuilderPage() {
               {fmtMoney(card.alloc.sum)} as requested.
             </div>
           )}
+
+          {/* Phase 1: on the card too — a quieter card needs the same explanation
+              the NO-PLAY banner gets, before it reads as the model going cold */}
+          {rebuild && card.alloc.picks.length > 0 && <RebuildNote rows={rebuild.rows} daysIn={rebuild.daysIn} />}
 
           {card.alloc.picks.length > 0 && (
             <Reveal>

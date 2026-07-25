@@ -15,11 +15,38 @@ significant miscalibration, and every adjustment is logged under Stats → Calib
 
 ## Exit conditions (whichever fires first)
 
-1. **~150 graded HRR O0.5 legs accumulated** → triggers the deferred H+R+RBI sim
+1. **~150 graded H+R+RBI O0.5 legs actually bet** → triggers the deferred H+R+RBI sim
    recalibration project (its own instruction file, not this one). Scope sketch, for the
    record: condition the H+R+RBI distribution on projected PA by lineup slot, opposing
    starter quality and expected innings, and park; backtest against the graded set before
    any thought of reactivating O1.5+ alternates (see docs/hrr-recalibration.md).
+
+   **Source: the LEDGER — graded CORE legs whose `lkey` line is 0.5, dated `CAL_START`
+   (2026-07-25) or later. Threshold unchanged at 150.** Three filters, each for a reason:
+
+   - *Ledger, not the calibration panel.* The panel counts **board rows** — every line
+     the engine printed, including the O1.5+ alternates suspended from every ticket
+     (~93% of that market's rows, 13 of 14 on the baseline board). Read there, this
+     condition was satisfied within days of being written (403 rows against a threshold
+     of 150) and would fire ~25× sooner than exit 2, making the 60-day condition dead
+     letter. The 150 was calibrated on ledger accrual: this document's evidence base is
+     19 O0.5 legs over six days (~3.2/day, `docs/hrr-recalibration.md`), which puts 150
+     at ~47 days — commensurate with the 60-day alternative, as two comparable exits
+     should be.
+   - *From `CAL_START` forward.* One policy per population. Legs locked before
+     2026-07-24 were picked under the hardcoded over-lean (fix-file Phase 5 made
+     direction a choice; before it, hitter props were overs-only in every mode), so they
+     answer a different question. The same boundary is applied in code to the
+     calibration channel's ledger-join (`/api/calibrate`). **This is a correctness fix,
+     not a numbers fix** — it discards roughly 20 legs (~6 days of accrual on a ~47-day
+     clock), an estimate, since counting them exactly needs the ledger.
+   - *CORE only, not FUN.* FUN legs are selected under a different policy: exempt from
+     the EV gate, capped by structure, chosen by odds tier. This condition gates a CORE
+     selection decision — whether the disciplined path may price H+R+RBI alternates —
+     so a leg that never faced the EV gate is not evidence about it. FUN is not
+     negligible here either (1 ticket/day up to 4 legs, against core's ~3 HRR legs/day),
+     so it is excluded deliberately rather than waved through as immaterial. Cost: the
+     counter fills slightly slower.
 2. **60 days elapsed** (≈ 2026-09-22).
 
 Until one fires, requests to tune, loosen, or "just try" a parameter below are declined
@@ -94,7 +121,7 @@ into decoration.
 
 | parameter | app (engine-client `armV2`) | cron (`/api/generate`) | shared call site |
 |---|---|---|---|
-| `SH_CFG.selMode` | `ev_gated` (`getSelectionMode()`, stored override respected) | `ev_gated` (`CRON_SEL_MODE` — no localStorage on the server) | — (two literals; the constant, the table and the test are the only guards) |
+| `SH_CFG.selMode` | `ev_gated` (`getSelectionMode()`, stored override respected) | `ev_gated` (`CRON_SEL_MODE` — no localStorage on the server) | two literals, guarded by test² |
 | `SH_CFG.mktN` | graded legs/market from the calibration summary | same — hygiene only¹ | `effectiveCalibration()` |
 | `calW` | `/api/calibration` `.mults` | same | `effectiveCalibration()` |
 | `calG` | `/api/calibration` `.global.s` | same | `effectiveCalibration()` |
@@ -107,6 +134,13 @@ into decoration.
 `src/engine2/calibration.ts`) called by both `/api/calibration` and `/api/generate`,
 so those three cannot silently diverge again — a difference would take a code change
 to a shared function, not two call sites drifting apart.
+
+² **The cron's mode is a hardcoded literal on purpose — that is the mechanism, not a
+limitation.** `tests/arming-parity.test.ts` asserts `CRON_SEL_MODE === "ev_gated"`, so
+changing the app's selection mode at freeze exit **fails the build** until the cron's
+constant is changed with it. A runtime-detected mode would have converged silently and
+only revealed a mismatch after a wrong board had already shipped and been logged. Build
+time beats board time: leave it hardcoded and let the test do the catching.
 
 ¹ **`mktN` on the cron is hygiene, not function.** It is read at exactly one place —
 `shAllocate` (legacy/index.html, the small-sample consensus gate) — and the cron never
