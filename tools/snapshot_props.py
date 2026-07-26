@@ -41,7 +41,18 @@ def median(xs):
 
 def compact(eventodds):
     """per market/player/line: Caesars O/U, cross-book proportional-devig median
-    fair P(over) (the classic CLV convention), best prices, book count."""
+    fair P(over) (the classic CLV convention), best prices, book count.
+
+    2026-07-25 — WHICH books are behind the fair, not just how many. `n` alone
+    cannot answer the two questions the eligibility rule turns on:
+      1. is the settlement book pricing itself?  -> `czf`
+      2. when only one book is behind a fair, is it a sharp or a placeholder-prone
+         offshore key?                            -> `fb`
+    `n = 1` plus a two-sided `cz` recovers (1) exactly for past days, but (2) is
+    not inferable from anything already archived. Costs zero extra credits — the
+    book keys are already in the response we pay for. `n` is kept verbatim so the
+    12 days archived before this change stay directly comparable.
+    """
     acc = {}
     for bk in eventodds.get("bookmakers", []):
         is_cz = bk["key"] == CZ
@@ -54,10 +65,13 @@ def compact(eventodds):
                 kk = f'{o.get("description") or o.get("name")}|{o.get("point", "")}'
                 rows.setdefault(kk, {})[side] = o["price"]
             for kk, pair in rows.items():
-                r = acc.setdefault(m["key"], {}).setdefault(kk, {"fairs": [], "cz": None, "bo": None, "bu": None})
+                r = acc.setdefault(m["key"], {}).setdefault(kk, {"fairs": [], "fb": [], "no": 0, "cz": None, "bo": None, "bu": None})
                 if "o" in pair and "u" in pair:
                     io, iu = imp(pair["o"]), imp(pair["u"])
                     r["fairs"].append(io / (io + iu))
+                    r["fb"].append(bk["key"])  # this book contributed a fair
+                if "o" in pair:
+                    r["no"] += 1  # books posting an OVER at all (one-sided depth)
                 if is_cz:
                     r["cz"] = {"o": pair.get("o"), "u": pair.get("u")}
                 if "o" in pair and (r["bo"] is None or pair["o"] > r["bo"]):
@@ -71,6 +85,17 @@ def compact(eventodds):
             out[mkt][kk] = {
                 "fair": round(median(r["fairs"]), 4) if r["fairs"] else None,
                 "n": len(r["fairs"]),
+                "fb": sorted(r["fb"]),
+                "czf": CZ in r["fb"],
+                # `bo`/`bu` were already computed and then thrown away. They are what
+                # the engine's one-sided fallback actually anchors to (best over price
+                # across books, legacy/index.html L2388) — without them the 1.06
+                # constant can only be audited at Caesars, not where it is applied.
+                # `no` is how many books posted an over at all, so "the best of one"
+                # is distinguishable from "the best of six". Zero extra credits.
+                "bo": r["bo"],
+                "bu": r["bu"],
+                "no": r["no"],
                 "cz": r["cz"],
             }
     return out
