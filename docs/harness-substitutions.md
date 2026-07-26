@@ -19,7 +19,14 @@ entry here.
 1. **Every substitution is listed below**, with what it diverges from and what could
    hide behind it. Enforced by test.
 2. **Time- and timezone-dependent behaviour is tested at BOTH `TZ=UTC` and
-   `TZ=America/Los_Angeles`, never patched out.** The server runs UTC and the phone
+   `TZ=America/Los_Angeles`, never patched out.** This now covers **any date-deriving
+   function**, not just the engine's: three server-local date defects have shipped or
+   nearly shipped in this codebase — `obSameDay` (~24% of every server board),
+   `CAL_START` (caught pre-ship), and `/api/generate` (wrote the board and its
+   prediction rows under *tomorrow's* date after 00:00 UTC). All three were the same
+   mistake, and `/api/clv` had the correct pattern in the repo the whole time. Server
+   routes derive dates only from `ptToday()` (`src/lib/server/pt-date.ts`), and
+   `tests/server-date-basis.test.ts` asserts it at both timezones. The server runs UTC and the phone
    runs Pacific; any function whose output depends on the host calendar day must be
    proven identical in both. Pattern: `tests/timezone-parity.test.ts`.
 3. A substitution that exists only to pin determinism (a frozen clock, a seeded RNG)

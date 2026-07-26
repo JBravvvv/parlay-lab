@@ -4,6 +4,7 @@ import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-seria
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { BOARD_KEY, decodeBoard, encodeBoard, liveCoverage } from "@/lib/server/board-store";
+import { ptToday } from "@/lib/server/pt-date";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -127,7 +128,10 @@ export async function GET(req: NextRequest) {
        hard ceiling of MAX_RUNS_PER_DATE bounds the damage at ~480 no matter how hard
        the endpoint is hit. Counted BEFORE the work, incremented for every authorized
        caller (scheduled and manual alike), expires with the date. */
-    const dateNow = new Date().toISOString().slice(0, 10);
+    /* PACIFIC, not server-local. On a UTC host every run after 00:00 UTC used to key
+       the run cap, the stored board and the prediction rows to TOMORROW — so a Pacific
+       client asking /api/board for today got a miss and paid to generate its own. */
+    const dateNow = ptToday();
     const runsKey = `${K_RUNS}${dateNow}`;
     const runs = Number(await redis(["INCR", runsKey])) || 0;
     if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
@@ -176,7 +180,10 @@ export async function GET(req: NextRequest) {
     // identical computation to the one the app receives from /api/calibration
     const armed = effectiveCalibration(summary, weights, auto === "off" ? "off" : "on");
 
-    const eng = createEngine({ fetchJson: serverFetchJson, storage: memoryStorage() });
+    /* `today` pins the engine's own shToday() to the Pacific date, so the schedule
+       pull, slate.date and every downstream key agree with the ledger's basis. Safe
+       now that the engine no longer calls obSameDay (which this option also stubs). */
+    const eng = createEngine({ fetchJson: serverFetchJson, storage: memoryStorage(), today: dateNow });
     eng.set("SH_PRIORS", priors);
     eng.set("SH_CTX", ctx);
     eng.set("SH_V2", {
@@ -212,7 +219,7 @@ export async function GET(req: NextRequest) {
 
     const slate = await eng.collectSlate();
     const data = eng.analyze(slate) as BoardData;
-    const date = eng.get<() => string>("shToday")();
+    const date = dateNow;
 
     /* Persist the BOARD, not just the prediction records. Until this, the cron's work
        could only ever be logged, never bet — the client had no way to load it and paid

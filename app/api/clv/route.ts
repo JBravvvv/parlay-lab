@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { cronKeyAuthed, redis, storeEnv, syncAuthed } from "@/lib/server/store";
+import { ptToday } from "@/lib/server/pt-date";
 import {
   applySights,
   marketsFor,
@@ -37,11 +38,6 @@ const WINDOW_MS = 45 * 60_000; // sight games starting within the next 45 min
    paces itself to ~one working run per half hour, so the extra ticks are free
    no-ops and every game still gets its late (T-20-or-closer) sighting. */
 const RATE_MS = 25 * 60_000;
-
-function ptToday(): string {
-  // the ledger's dates are Josh's local (Pacific) dates; the server runs UTC
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());
-}
 
 function selfBase(): string {
   const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;

@@ -35,46 +35,50 @@ lineups. This is not only a calibration-channel problem.
 
 Median first pitch **19:07 UTC**.
 
-## Coverage by pass hour — 8 weeks, 52 slate days, 710 games
+## THE CANONICAL COVERAGE METRIC — one definition, everything else superseded
 
-> ⚠️ **THIS TABLE IS MODELLED, NOT MEASURED.** First-pitch times are real; "lineup
-> posted" is *assumed* at pitch − 3h because statsapi does not retain posting
-> timestamps. The perfect additivity across columns is a consequence of that
-> assumption making the two sets disjoint by construction — it is not an empirical
-> result. Good enough to choose a starting hour; not evidence of anything else.
-> **`luCoverage` (Phase 1b) now stamps real coverage on every board — re-derive this
-> from measured data after ~1 week (target: 2026-08-01).** That costs zero credits.
+Three separate tables in this project have disagreed on the same cell (22:00 weekday
+has been quoted as 45%, 56%, 66% and 82%). Every one was computed on a different
+denominator or a different sample, and none of them said so. **This is the definition.
+Any number not computed this way is superseded and should be treated as wrong.**
 
-- **Denominator:** every game on the day's slate — constant across rows, so pairs are
-  monotonic.
-- **Numerator:** unstarted at the pass **and** past the assumed lineup window.
+> **Denominator:** every game on the day's *official MLB slate* (statsapi's date
+> grouping), for the day types being averaged. Constant across every row, which is
+> what makes rows comparable and pairs monotonic.
+> **Numerator:** games that are **unstarted at the pass** AND **past the lineup-posting
+> window** (modelled at first pitch − 3h).
+> **Sample:** 52 slate days / 710 games (2026-05-31 → 2026-07-25).
 
-| day | days | games | 16:00 | 17:00 | 18:00 | 20:00 | 21:00 | 22:00 | 23:00 | best |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Sun | 8 | 121 | 66% | **71%** | 51% | 17% | 5% | 6% | 7% | **17:00** |
-| Mon | 7 | 76 | 1% | 1% | 1% | 21% | 57% | **71%** | 71% | **22:00** |
-| Tue | 7 | 106 | 1% | 1% | 2% | 28% | 62% | **76%** | 68% | **22:00** |
-| Wed | 7 | 107 | 21% | 28% | 18% | 21% | 45% | **56%** | 46% | **22:00** |
-| Thu | 7 | 62 | 37% | 35% | 18% | 16% | 39% | **44%** | 39% | **22:00** |
-| Fri | 8 | 117 | 3% | 3% | 3% | 15% | 52% | **74%** | 73% | **22:00** |
-| Sat | 8 | 121 | 14% | 18% | **47%** | 36% | 19% | 26% | 31% | **18:00** |
+This is also the *loggable* metric: the prediction store rejects live rows
+(`boardToPredictions`: "calibration measures pregame statements only"), so a game that
+has started contributes nothing whether or not its lineup is known.
 
-### Saturday is a THIRD pattern, not a Sunday
-The hypothesis was that Saturday might behave like Sunday and belong on the early
-entry. It does not. Saturday's own best hour is **18:00 UTC (47%)** — 16:00 gives it
-only 14% and 22:00 only 26%. Sunday peaks at 17:00, five points better than 16:00.
+| hour (UTC) | all | weekday | Saturday | Sunday |
+|---|---|---|---|---|
+| 17:00 | 23% | 12% | 18% | **71%** |
+| 18:00 | 22% | 8% | **47%** | 51% |
+| 19:00 | 15% | 5% | 40% | 27% |
+| 20:00 | 23% | 21% | 36% | 17% |
+| 21:00 | 38% | 52% | 19% | 5% |
+| **22:00** | **49%** | **66%** | 26% | 6% |
+| 23:00 | 46% | 61% | 31% | 7% |
 
-**So the split is three entries, not two.** They are mutually exclusive by day of week,
-so the total is still ~1 call/day and ~1 board/day:
+**Weekday peak is 22:00 UTC at 66%** — confirmed by sweeping 16:00–24:00, not assumed.
+The 21:00 → 22:00 → 23:00 shape (52 → 66 → 61) is a genuine peak, not a plateau edge.
 
-| cron-job.org entry | schedule (UTC) | coverage |
-|---|---|---|
-| weekdays | **22:00, Mon–Fri** | 66% |
-| Saturday | **18:00, Sat** | 47% |
-| Sunday | **17:00, Sun** | 71% |
+### Superseded numbers, for the record
+- "22:00 = 45% all / 56% weekday" — same metric, **10-day sample**. Superseded by the
+  52-day figures above.
+- "22:00 = 82% coverage" — different denominator (*unstarted games only*, not the whole
+  slate). That denominator moves with the hour, so its rows are not comparable and pairs
+  are not monotonic. Do not use it.
+- "22:00 = 56% priceable" — the same 82% metric with the timezone bug's dropped games
+  removed. Obsolete: the bug is fixed, so priceable == scheduled.
 
-Game-weighted that is ~62% of the season's slate, against ~51% for a single 22:00 daily
-entry and ~44% for the current 16:00 daily cron.
+### Still modelled
+"Lineup posted" is **assumed** at pitch − 3h; statsapi does not retain posting
+timestamps. First-pitch times are measured. Re-derive from real `luCoverage` once ~1
+week of stamped boards exists (target 2026-08-01) — free, no credits.
 
 ## No third pass
 `16 + 20 + 23` reaches 91% against 69% for `16 + 22` — real coverage, but it costs
