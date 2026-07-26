@@ -234,12 +234,46 @@ loitering. Deleting it re-admits a two-policy sample the moment anything widens.
 
 ### ⚠️ DO NOT "PASS UNGATED" TO PAD A THIN CARD (2026-07-25)
 
-Measured: on most prop rows the "de-vigged multi-book consensus" is **one book**, and in
-`batter_total_bases` **44% of the rows that include Caesars have Caesars as the only book
-in the pool** — so the independent check on Caesars is a de-vigged Caesars price. On those
-rows `consCzEv = f × czDec − 1 = 1/(1+h) − 1 ≈ −h`: measured hold median **7.1%**,
-`consCzEv` median **−6.60%**, and **100% of them fail `consMinEv` (−1%)**. The
-small-sample gate is reading the **hold**, not disagreement.
+Measured: the "de-vigged multi-book consensus" behind a prop row is often thin, and on some
+rows the settlement book is inside its own consensus — so the independent check on Caesars
+is a de-vigged Caesars price. On those rows `consCzEv = f × czDec − 1 = 1/(1+h) − 1 ≈ −h`,
+i.e. the gate is reading the **hold**, not disagreement.
+
+#### The measurement, corrected against 12 real days (2026-07-25)
+
+The first pass at this was taken off a **single fixture slate** with a proxy that counted a
+Caesars *milestone-ladder* price as if Caesars had contributed to the fair. It reported
+"44% of Caesars rows are Caesars-only" and "38% of total-bases rows lose eligibility".
+**Both were wrong.** Re-measured against `line-history/data/props` — 12 archived days
+(2026-07-12 → 07-25), last snapshot of each day, where `n` is the fair's book count and
+`cz` is a standard two-sided Caesars quote only (ladders excluded), so
+`n = 1 ∧ cz two-sided` identifies a Caesars-only fair **exactly**:
+
+| market | rows | no fair at all (`n=0`) | Caesars **in** the fair | **Caesars-only fair** | ineligible if ≥1 independent book required |
+|---|---|---|---|---|---|
+| `batter_home_runs` | 4,524 | **4,524 (100%)** | 0 | 0 | **100%** |
+| `batter_total_bases` | 2,363 | 381 (16.1%) | 1,336 (56.5%) | **16 (0.7%)** | **16.8%** |
+| `batter_hits` | 1,901 | 41 (2.2%) | 0 | 0 | 2.2% |
+| `batter_hits_runs_rbis` | 1,861 | 0 | 1,560 (83.8%) | 0 | 0% |
+| `pitcher_outs` | 210 | 13 (6.2%) | 150 (71.4%) | 0 | 6.2% |
+| `pitcher_strikeouts` | 213 | 0 | 0 | 0 | 0% |
+
+Three things change because of this:
+
+1. **Sole-sourcing is rare** (0.7% of total bases, zero everywhere else) and its per-day
+   range is 0.0–1.8%. It is a real hole, but a small one.
+2. **The dominant hole is `n = 0` — no consensus fair at all**, because the market is
+   quoted one-sided. `batter_home_runs` is `n = 0` on **all 4,524 rows across 12 days**;
+   there has never been a de-vigged HR consensus in this dataset. For those rows the engine
+   falls back to `fair = oneImp / 1.06` (`legacy/index.html` L2388) — the same posted price
+   with a flat 6% haircut. So `consCzEv` on a one-sided Caesars leg is
+   `1/1.06 − 1 = −5.66%`, a **constant**, which fails `consMinEv` (−1%) for every bet
+   regardless of its merits. HR is blocked today by arithmetic, not by evidence.
+3. **Caesars is usually inside the fair rather than alone in it** — 56.5% of total-bases
+   rows, 83.8% of H+R+RBI, 71.4% of outs. Requiring *two* independent books instead of one
+   costs far more: 50.8% of total bases, 17.6% of hits, 15.0% of H+R+RBI. The rule below is
+   written at **≥1 independent book**, which is what "you never price a book against
+   itself" actually says.
 
 **The fix is NOT to let those rows through.** A row with no independent market is the
 weakest case available, not an exempt one — the same principle as the Phase 3 band rule
@@ -252,9 +286,70 @@ ungated" will look like a free way to pad it. It is not — it is loosening a sh
 protection to solve a volume problem, which this document forbids. A thin card is
 information about the slate; it is not a bug to be tuned away.
 
-**Implementation note:** `finalizeCats` does not carry `books` onto board rows, so the
-rule is not implementable until the book count (or a settlement-book-only flag) is
-threaded through. Not a frozen-parameter change; still not to be built without sign-off.
+### THE GATE'S COVERAGE IS A FUNCTION OF `mktN` — A MOVING PART NOBODY HAD WRITTEN DOWN
+
+`consMinN` only bites while a market is **unproven**: `shAllocate` computes
+`small = legs.some(l => !(mn && mk && mn[mk] >= minN))`, and `mn` is `SH_CFG.mktN`, which
+is `summary.reliability[market].n` — graded legs **since `CAL_START`**.
+
+So the gate's coverage moves on its own, in both directions, with no code change:
+
+- **A counter reset silently WIDENS protection.** `CAL_START = 2026-07-25` zeroed every
+  market. That is the only reason 100% of thin rows fail the gate today — every market is
+  temporarily small. The protection is universal **by accident, not by design.**
+- **A counter crossing silently NARROWS it.** The moment `mktN[m] ≥ 100`, the consensus
+  check stops running for market `m` entirely, and every structurally-unchecked row in it
+  (`n = 0` or Caesars-only) becomes selectable with nothing reading its fair.
+
+Anyone reading a "the gate blocks these" measurement must first ask what `mktN` was when it
+was taken. A measurement taken at `n = 0` describes the reset, not the rule.
+
+### DEADLINE: the rule must ship before `batter_total_bases` crosses `consMinN`
+
+Verified against production `/api/calibration` on 2026-07-25 22:20 PT:
+`reliability = { all: { n: 0 } }`, `graded: 0` — no per-market entry exists yet, and an
+absent entry counts as small (`undefined >= 100` is false). The first non-zero reading
+lands on the **09:30 UTC `/api/calibrate` run of 2026-07-26**, grading the 07-25 slate.
+
+Accrual is one board per day (generation-scoped replacement means a second generate
+supersedes rather than doubles), and `/api/calibrate` grades **every pending prediction
+record** off the statsapi boxscore — not just ledger legs — so `mktN` grows at the board's
+own per-market row count. Measured on the fixture board: `batter_hits` 50, `batter_home_runs`
+50 (both at the 50-row cap), `batter_total_bases` 41, `batter_hits_runs_rbis` 14,
+`pitcher_strikeouts` 11, `pitcher_outs` 7, `ml` 15, `rl` 15 — 203 records/day.
+
+Projected crossings (allowing ~10% attrition to void/ungradable; a real 16-event slate
+lifts the uncapped markets, so these are the **late** end):
+
+| market | records/day | crosses `n ≥ 100` on |
+|---|---|---|
+| `batter_hits`, `batter_home_runs` | ~45 | **2026-07-28** |
+| `batter_total_bases` | ~43 | **2026-07-28** |
+| `batter_hits_runs_rbis` | ~22 | ~2026-07-30 |
+| `pitcher_strikeouts` | ~18 | ~2026-07-31 |
+| `ml`, `rl` | ~15 | ~2026-08-01 |
+| `pitcher_outs` | ~11 | ~2026-08-04 |
+
+**Runway on total bases and HR: three calibrate runs.**
+
+**Implementation (not yet built).** The row does not record *which* books formed the fair,
+and it cannot be derived downstream — `fairs` at `legacy/index.html` L1398 drops the
+per-book `cz` flag before the count is taken, and `finalizeCats` never carries `books`
+onto the board row at all. Four touch points:
+
+1. L1398 — keep the flag through the fair map, emit `booksInd` (fairs from non-Caesars
+   books) alongside the existing `books`.
+2. the cats-row push (~L2401) — carry `books` / `booksInd` onto `r`.
+3. `finalizeCats` (~L2412) — emit both on the board row.
+4. `legOf` (L2537) — carry `booksInd` onto the ticket leg, so the gate can read it.
+
+Then the gate (L2877–2890) blocks a leg in an unproven market when `booksInd < 1`, reason
+`no_ind_consensus`. This changes selection, so it changes the parity digest: a deliberate,
+documented rebaseline — **not** a silencing one.
+
+**Fallback if it cannot ship by 2026-07-28:** hold `batter_total_bases` (and
+`batter_home_runs`, which is 100% `n = 0`) out of selection until it does. Owner's stated
+preference, 2026-07-25: *"I'd rather lose a market for a week than run one ungated."*
 
 ### The censored window (2026-07-18 → 2026-07-25) — CENSORED, not corrupted
 

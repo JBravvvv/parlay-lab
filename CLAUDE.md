@@ -108,3 +108,82 @@ Both produce the same JSON shape → `shRender()`; board persists per-day in `pl
 
 ## Deploy workflow
 Edit `index.html` → bump footer build number → bump `sw.js` CACHE if shell changed → validate JS (jsc) → commit → `git push` → wait ~1 min → open https://jbravvvv.github.io/parlay-lab/ → **confirm footer build number**. (Legacy Netlify drag-and-drop target `parlaylab-jbravvv.netlify.app` still exists but Pages is primary.)
+
+---
+
+# Next.js rebuild (`frontend-rebuild`) — collection-period facts, 2026-07-24/25
+
+Live: https://parlay-lab-six.vercel.app · repo `JBravvvv/parlay-lab` · production branch
+**`frontend-rebuild`** (`main` and `line-history` have Vercel deploys disabled in `vercel.json`).
+The quant engine runs **verbatim** inside a sandbox facade: `legacy/index.html` →
+`node tools/extract-engine.mjs` → `src/engine/legacy-src.gen.ts`. **Every engine edit
+requires re-running the extractor and the full suite** (`npx vitest run --no-file-parallelism`;
+Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
+
+## The collection-period FREEZE (through ~2026-09-22)
+Parameters are frozen; the frozen-parameter table in `docs/collection-period.md` is a drift
+detector. Standing rules, learned the hard way: **never rebaseline a parity digest to silence
+a test**, and **never loosen a shipped protection to solve a volume problem** (a thin card is
+information about the slate).
+
+## Date basis — three server-local date bugs, all now fixed
+`src/lib/server/pt-date.ts` exports `ptToday()`; **no route may derive a calendar date from
+the server clock** (Vercel runs `TZ=UTC`). `tests/server-date-basis.test.ts` scans every
+`app/api/*/route.ts` — a hardcoded route list was itself the bug once. Pinned: `generate`,
+`calibrate`, `clv`. The three defects were: `obSameDay` (dropped ~24% of every server board —
+the late/west slate), `CAL_START`, and `/api/generate` (wrote board + prediction rows under
+tomorrow's date after 00:00 UTC).
+
+## Calibration channel
+- `CAL_START = "2026-07-25"`; `calibrationEligible(date)` gates training. Self-cleaning — it
+  goes inert once the window has passed.
+- `gradedFromBlob()` in `src/lib/pred-serialize.ts` is the **one door** into the training
+  channel; `hist` rows and `superseded` rows are structurally unreachable.
+- `mergeDayBlob` does **generation-scoped replacement** — a second generate on a day
+  supersedes, never doubles. So accrual is one board/day.
+- `/api/calibrate` grades **every pending prediction record** off statsapi boxscores, not just
+  ledger legs. `mktN[m] = summary.reliability[m].n`; `fitReliability` emits an entry at n ≥ 1.
+- **`consMinN` (100) only bites while a market is unproven** — so the small-sample consensus
+  gate's coverage silently widens on a counter reset and narrows on a crossing. Written up in
+  `docs/collection-period.md` with the projected crossing dates (total bases ≈ 2026-07-28).
+
+## Market microstructure — measured, don't re-derive
+From `line-history` branch, `data/props/`, 12 days (2026-07-12 → 07-25), 11,072 rows:
+- **`batter_home_runs` has `n = 0` (no de-vigged consensus) on 100% of 4,524 rows** — it is
+  quoted one-sided, so the engine falls back to `fair = oneImp/1.06` (`legacy/index.html`
+  L2388). `consCzEv` on a one-sided Caesars leg is therefore the constant **−5.66%**, which
+  fails `consMinEv` (−1%) for every bet regardless of merit.
+- `batter_total_bases`: 16.1% `n = 0`, Caesars **in** the fair on 56.5%, Caesars **alone**
+  on only **0.7%** (16/2,363). Requiring ≥1 independent book costs 16.8% of rows; ≥2 costs 50.8%.
+- Caesars in the fair: H+R+RBI 83.8%, outs 71.4%, hits 0%, K's 0% (Caesars quotes hits/K's/HR
+  as milestone ladders, which never create fairs).
+- A single-fixture version of this measurement was **wrong by ~20×**. Fixture slates are not a
+  substitute for the archive; `tools/snapshot_props.py` stores `n` + `cz` per row.
+- Game lines (`line-history/data/`) gave the price-movement percentiles behind `lockMaxAgeMin`
+  and the p90 offshore-book artifact (fat tail = coolbet, winamax_de, betfair_ex_eu, nordicbet,
+  betclic_fr, betsson — not the US books).
+
+## Credits (The Odds API)
+1 credit **per market per region**; `/v4/sports` and `/events` are free; statsapi is keyless.
+A generate is **114–150 credits**, saturating at 150 (`slice(0,16)` caps the prop loop).
+`docs/credit-budget.md` is the live budget — key correction: the lock guard makes a
+**two-regenerate day** normal (look at 5, lock at 6:30), which puts a 16-game September day at
+~712/day ≈ **107% of a 20K plan**. Free balance check:
+`curl -sS -o /dev/null -D - "https://api.the-odds-api.com/v4/sports/?apiKey=$ODDS_API_KEY" | grep -i x-requests`
+— there is **no reset-date header**; subtract two days' `x-requests-remaining` to get burn.
+
+## Credentials — Josh types his own
+Never enter his sync phrase, Odds API key, Claude key, or `CRON_SECRET` on his behalf; never
+upgrade a paid plan or buy anything for him. `/api/generate` and `/api/calibrate` stay gated
+(`X-Cron-Key`). `/api/board` (GET) is deliberately **not** sync-phrase gated.
+
+## Scheduling
+Vercel Hobby allows 2 crons and both are used (`/api/generate` `0 16 * * *`, `/api/calibrate`
+`30 9 * * *`). The day-of-week generate split (weekday 22:00 / Sat 18:00 / Sun 17:00 UTC) moves
+to **cron-job.org** (supports custom headers; free tier 100 executions/day, CLV job already uses
+96). `/api/generate` comes out of `vercel.json` only once those entries exist.
+
+## Working rhythm with Josh
+Report before pushing; stop at every phase gate; measure rather than model; state the
+denominator of every number. He catches unreconciled tables — if two of your figures disagree
+on the same cell, that is the finding, not a rounding issue.

@@ -52,10 +52,64 @@ Archive costs are measured from the archives themselves, not from the cron sched
 doubleheaders add more. Generate saturates at 150 each, and props-history scales to
 ~192/day at 16 games → **~562/day ≈ 17,100/month ≈ 85% of 20K.**
 
-**It clears, with ~15% margin.** But that margin absorbs exactly one thing: a second
-regenerate on a day he changes his mind, which costs ~150 and puts a 16-game September
-day over. So the plainer tier argument is this rather than the asymmetry one — **78%
-today, 85% in September, and one extra regenerate a day breaks it.**
+### CORRECTION (2026-07-25): the normal day is TWO regenerates, and 20K does NOT clear
+
+The line above assumed one regenerate per day. The owner's stated lock window is **5–7 PM
+PT**, and a day where he looks at 5:00 and locks at 6:30 is **two** blocked locks by the
+guard's own rule (the 30-minute limit is exceeded before each one), not one. Both cost a
+full board.
+
+| | 15-game day (now) | 16-game day (September) |
+|---|---|---|
+| fixed: cron + `/api/clv` + line-history + props-history | 141+45+25+161 = **372** | 150+45+25+192 = **412** |
+| + 1 regenerate | 513 → 15,900/mo → **80%** | 562 → 16,900/mo → **84%** |
+| + 2 regenerates (look, then lock) | 654 → 20,300/mo → **101%** | **712 → 21,400/mo → 107%** |
+| + 3 regenerates (changed his mind once) | 795 → 24,600/mo → **123%** | 862 → 25,900/mo → **129%** |
+
+**On the workflow actually described, a 20K plan fails — 101% this month, 107% in
+September.** The break-even is the number of *betting* days: with fixed cost 412/day in
+September, 20,000 − 12,360 = 7,640 credits buy 50 regenerates, i.e. **25 two-regenerate
+days out of 30**. Bet on 26 days and the key runs dry before the month does.
+
+The one lever that fixes this without buying anything: retime the cron so the **first**
+look is already fresh (a board < 30 min old at 5 PM PT), which removes one of the two
+regenerates and returns September to ~562/day / 84%. It cannot remove both — with a
+30-minute guard and a two-hour lock window, at most one look-point can be free. And it
+costs lineup coverage, which is exactly why 22:00 UTC was chosen over an earlier hour.
+So the honest trade is **~$29/month vs. confirmed lineups**, and the tier decision below
+already answers it.
+
+**This supersedes "it clears with ~15% margin."** That sentence was written against a
+one-regenerate day, and the guard the owner approved makes two the normal case.
+
+### Archive ranking, recorded 2026-07-25 while nothing is at stake
+
+Written down *before* a squeeze so a future cut is decided on evidence rather than urgency.
+Neither archive is being cut today.
+
+| archive | /day | share | what it has actually been read for | verdict |
+|---|---|---|---|---|
+| `line-history` (game lines) | 25 | ~5% | **every measurement that changed a decision this phase**: the 3/4/5/6-hour price-movement percentiles that set `lockMaxAgeMin`, the p90 offshore-book artifact, the 31-book ML consensus depth | cheapest line in the budget, highest realised yield — never cut first |
+| `props-history` (player props) | 161 (→192 Sept) | **31%** | **read for the first time on 2026-07-25**: the 12-day, 11,072-row independence measurement that corrected the eligibility rule's cost from a wrong 38% to a measured 16.8% — see `collection-period.md` | keep; it now has a named use |
+
+**What `props-history` needed to be read FOR — answered, not deferred.** It is the only
+multi-day record of `n`, the fair's book count, per prop row. The single-fixture version of
+that measurement was wrong by a factor of ~20 and would have shipped a rule scoped to the
+wrong market. No other artifact in the repo can answer "is this slate's book depth typical
+or an artifact of one day," and `/api/clv` cannot substitute — it stores a per-leg sighting
+for legs that were *bet*, not the shape of the whole board.
+
+**One free improvement worth making:** `tools/snapshot_props.py` records `n` and `cz` but
+not whether Caesars was among the `n` fairs. `n = 1 ∧ cz two-sided` recovers the sole-source
+case exactly, but the *partial* case (Caesars as 1 of 2) is only inferable. Adding a
+`cz_in_fair` boolean in `compact()` costs **zero extra credits** and starts the series
+accruing now. Not built yet.
+
+Ordering if the budget is ever genuinely squeezed, most-cuttable first: **props-history →
+line-history → client regenerates → never `/api/clv`, never `/api/generate`.** Note this
+inverts the earlier ranking: props-history is 6× the cost of line-history for a question
+that is now answered, whereas line-history is 5% of burn and has repeatedly produced the
+numbers that set live thresholds.
 
 ### Superseded: the three-scenario table
 Kept for the record because the reasoning matters. It assumed regeneration was
@@ -76,6 +130,28 @@ discretionary; the lock guard makes it structural. Any future budget that models
 **20K plan: 79% used. 100K plan: 16%.** The fix cost ~1,100 credits/month and the tier
 answer does not change: 20K still fits, and the case for 100K remains the asymmetry
 argument below, not throughput.
+
+## Checking the balance for free (and what it does NOT tell you)
+
+`/v4/sports` is a **free** endpoint — it returns the quota headers without billing a credit:
+
+```
+curl -sS -o /dev/null -D - "https://api.the-odds-api.com/v4/sports/?apiKey=$ODDS_API_KEY" | grep -i x-requests
+```
+
+Returns `x-requests-remaining`, `x-requests-used`, `x-requests-last`.
+
+**There is no reset-date header.** The Odds API does not expose the cycle boundary through
+the API at all; the reset is the subscription's monthly billing anniversary and lives on the
+account page. What the curl *does* answer, and what actually decides the question:
+run it two days running and the difference **is** the measured daily burn — which converts
+"do I have 7 days or 25" into arithmetic without needing the reset date at all. Baseline for
+that subtraction: **4,128 remaining, measured 2026-07-25.**
+
+**Still live and still spending: the Vercel `/api/generate` cron at `0 16 * * *` UTC
+(9 AM PT).** It has not been removed from `vercel.json` — removal was deliberately held
+until the cron-job.org entries exist, so there is no gap in coverage. Any "no cron is
+scheduled yet" reasoning is wrong: ~141 credits/day are already going out at 9 AM PT.
 
 ## Consumer audit
 
