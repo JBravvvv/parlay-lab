@@ -224,8 +224,9 @@ describe("fitByDisagreement — the tail the pooled slope cannot see", () => {
     // high-disagreement rows: stated 59%, hits 46% — the HRR shape
     for (let i = 0; i < 200; i++) picks.push(pick(59, 34, i % 100 < 46));
     const fits = fitByDisagreement(picks);
-    const low = fits[0]; // gap 1
-    const high = fits[4]; // gap 25
+    // both synthetic populations are model-ABOVE-market, so they land in the "high" rows
+    const low = fits.find((f) => f.dir === "high" && f.lo === 0)!; // gap 1
+    const high = fits.find((f) => f.dir === "high" && f.hi === Infinity)!; // gap 25
     expect(low.n).toBe(200);
     expect(high.n).toBe(200);
     expect(low.actual).toBeCloseTo(0.55, 2);
@@ -233,6 +234,20 @@ describe("fitByDisagreement — the tail the pooled slope cannot see", () => {
     // the tail bucket over-states by ~13 points while the calibrated bucket does not
     expect(high.predicted - high.actual).toBeGreaterThan(0.1);
     expect(Math.abs(low.predicted - low.actual)).toBeLessThan(0.02);
+  });
+
+  it("keeps DIRECTION — model-high and model-low never pool", () => {
+    const picks: GradedPick[] = [];
+    for (let i = 0; i < 100; i++) picks.push(pick(70, 45, i % 100 < 50)); // high by 25, over-states
+    for (let i = 0; i < 100; i++) picks.push(pick(45, 70, i % 100 < 50)); // low by 25, under-states
+    const fits = fitByDisagreement(picks);
+    const hi = fits.find((f) => f.dir === "high" && f.hi === Infinity)!;
+    const lo = fits.find((f) => f.dir === "low" && f.hi === Infinity)!;
+    expect(hi.n).toBe(100);
+    expect(lo.n).toBe(100);
+    // pooled on |gap| these two would cancel to "well calibrated" — separated they do not
+    expect(hi.predicted - hi.actual).toBeCloseTo(0.2, 2);
+    expect(lo.predicted - lo.actual).toBeCloseTo(-0.05, 2);
   });
 
   it("excludes rows with no consensus baseline rather than assuming one", () => {

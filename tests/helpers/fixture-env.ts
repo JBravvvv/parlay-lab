@@ -80,7 +80,13 @@ export function fixtureEngine(): Engine {
  */
 export function armedFixtureEngine(opts: { pinned?: boolean } = {}): Engine {
   const eng = createEngine({ fetchJson: fixtureFetchJson, today: TODAY });
-  eng.set("SH_PRIORS", JSON.parse(fs.readFileSync(path.join(FIX, "..", "..", "public", "model", "priors.json"), "utf8")));
+  // FROZEN SNAPSHOT, not the live artifact (2026-07-26). The first version of this read
+  // `public/model/priors.json` directly — which `model.yml` rewrites EVERY NIGHT. The
+  // baseline duly broke within hours of being written, on a nightly Statcast refresh
+  // (b75e905) and no code change at all. A regression baseline wired to a moving input
+  // fails for reasons that are not regressions, and the reflex it trains is to regenerate,
+  // which is exactly the habit this freeze forbids. Both fixture inputs are now static.
+  eng.set("SH_PRIORS", JSON.parse(fs.readFileSync(path.join(FIX, "fix45", "priors.json"), "utf8")));
   eng.set("SH_CTX", JSON.parse(fs.readFileSync(path.join(FIX, "fix45", "context.json"), "utf8")));
   // mirrors armV2() in src/lib/engine-client.ts
   eng.set("SH_V2", {

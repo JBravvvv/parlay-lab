@@ -304,6 +304,11 @@ export function fitReliability(picks: GradedPick[]): Reliability {
  * bucketing, so `gapBucket` is exported for reuse.
  */
 export type DisagreementFit = {
+  /** "high" = model above market, "low" = model below. Direction MUST survive into the
+      output: absolute bucketing pools a biased population with a clean one and dilutes
+      exactly the signal this instrument exists to catch. The case that motivated it was
+      directional — H+R+RBI over-stating on overs. */
+  dir: "high" | "low";
   lo: number; // inclusive lower bound of |p − pMkt|, in probability POINTS
   hi: number; // exclusive upper bound (Infinity on the tail bucket)
   n: number;
@@ -331,21 +336,45 @@ export function gapBucket(p: number, pMkt: number): number {
  */
 export function fitByDisagreement(picks: GradedPick[], market?: string): DisagreementFit[] {
   const sel = picks.filter((x) => x.pMkt != null && (market == null || x.market === market));
-  return GAP_EDGES.map(([lo, hi], i) => {
-    const b = sel.filter((x) => gapBucket(x.p, x.pMkt as number) === i);
+  const out: DisagreementFit[] = [];
+  for (const dir of ["high", "low"] as const)
+    for (const [i, [lo, hi]] of GAP_EDGES.entries()) {
+      const b = sel.filter(
+        (x) =>
+          gapBucket(x.p, x.pMkt as number) === i &&
+          (dir === "high" ? x.p >= (x.pMkt as number) : x.p < (x.pMkt as number)),
+      );
     const xs = b.map((x) => x.p / 100);
     const ys = b.map((x) => (x.res === "won" ? 1 : 0));
     const f = olsSlope(xs, ys);
-    const mean = (a: number[]) => (a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : 0);
-    return {
-      lo, hi, n: b.length,
+      const mean = (a: number[]) => (a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : 0);
+      out.push({
+        dir, lo, hi, n: b.length,
       meanGap: Math.round(mean(b.map((x) => Math.abs(x.p - (x.pMkt as number)))) * 100) / 100,
       slope: f.slope, se: f.se,
-      actual: Math.round(mean(ys) * 1000) / 1000,
-      predicted: Math.round(mean(xs) * 1000) / 1000,
-    };
-  });
+        actual: Math.round(mean(ys) * 1000) / 1000,
+        predicted: Math.round(mean(xs) * 1000) / 1000,
+      });
+    }
+  return out;
 }
+
+/**
+ * WHEN DOES PER-MARKET SLICING BECOME POWERED? A documented exit, so "markets pooled" is
+ * not permanent by default.
+ *
+ * The quantity is a slope, whose SE scales as ~1/(σ_p·√n) with σ_p the spread of stated
+ * probabilities inside the bucket. On the observed board that spread is ~0.08, so
+ * separating a slope 0.15 from 1.0 at 2σ needs on the order of **300 graded rows per
+ * bucket per market**. With 10 buckets (5 gaps × 2 directions) that is ~3,000 graded rows
+ * in one market — at measured accrual (`batter_hits` ~45/day, `pitcher_outs` ~11/day),
+ * ~9 weeks for the fastest market and past a season for the slowest.
+ *
+ * So: pooled until the BUCKET BEING READ has ≥ this many rows — check the per-bucket `n`,
+ * never the market total. The tail buckets are the thin ones and the interesting ones at
+ * the same time, which is exactly where a pooled-by-default habit does the most damage.
+ */
+export const GAP_BUCKET_MIN_N = 300;
 
 /** Replay a stated probability at confidence s against its consensus anchor. */
 export function shrunkP(p: number, pMkt: number, s: number): number {

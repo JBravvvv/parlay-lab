@@ -1399,3 +1399,107 @@ measurement rather than by reading the code.**
 set from the *locked entry's* `core.concat(funT)` and passes it to `shFunPick` as
 `excludeLegs`, so a supplemental cannot reuse a leg already on that day's card. No second
 failure mode for the join.
+
+## PAIR #5 — THE TYPESCRIPT SIDE. `lid` IS `label|prop`, AND CLV IS NOT WRONG
+
+Checked because if `lid` were bare `lkey`, every ML/RL sighting on a multi-game day would
+have been colliding and CLV — the freeze's primary scoreboard — would be the broken thing.
+**It is not.** One key is used everywhere, and it is `label + "|" + prop`:
+
+| site | line | use |
+|---|---|---|
+| `shAllocate` `lUse` | L3010, L3019 | card no-repeat |
+| `shFunPick` `usedLegs` | L3115, L3149 | FUN disjointness |
+| `shSupplementalCalc` / clash check | L3380, L3403–04 | supplemental disjointness |
+| `shGrade` `legRes` | L3435, L3529, L3590–91 | grading |
+| `clv-core.ts` | L74–82, L248–50 | sighting + write |
+| `clv-report.ts` | L61–64 | aggregation |
+| `ledger-segments.ts` | L113–127 | segments, CLV join, result join |
+
+**No ML/RL cross-game collision**: `label` is the team and `prop` embeds the opponent
+("Detroit Tigers" | "ML vs Philadelphia Phillies"), so game-market lids are unique per
+matchup. The bare-`lkey` hazard found in pair #1 lives in the *prediction* channel, which
+correctly uses the composite `gkey|lkey|sub`, and nowhere else.
+
+### The doubleheader collision is real in principle — and prevented by the `lUse` quirk
+
+On a doubleheader both games carry the same teams, so `label|prop` is **identical across
+GM1 and GM2**. Left alone, that would mean a GM2 leg overwriting GM1's CLV sighting and its
+grade.
+
+It cannot happen, and the reason is item 4's "quirk": **the card's own no-repeat rule uses
+the same colliding key**, so the second game's leg is dropped before it can ever be locked.
+At most one leg per `lid` exists in any ledger entry, so grading and CLV have nothing to
+collide.
+
+> ⚠️ **THIS IS A LOAD-BEARING COUPLING, NOT TWO INDEPENDENT QUIRKS.** `lUse`'s
+> `label|prop` dedupe looks over-restrictive — it drops a legitimately different bet (the
+> same player in GM2). "Fixing" it to `gkey|lkey` would be correct in isolation and would
+> **silently open a grading and CLV collision on doubleheaders the same day**. If that
+> restriction is ever lifted, `lid` must become composite in `clv-core.ts`,
+> `clv-report.ts`, `ledger-segments.ts` and `shGrade` **in the same change**.
+
+Recorded as a restriction rather than fixed: it is conservative, it is rare, and the
+freeze's rule is that a shipped protection is not loosened to solve a volume problem.
+
+## `gnum` AUDIT — every `shGkey` call site supplies it (15 of 15)
+
+The composite join key rests on `gkey` being doubleheader-unique, which rests on `gnum`
+reaching every construction site. Audited:
+
+| path | sites | gnum source |
+|---|---|---|
+| statsapi schedule | L1188, L1239 | `gameNumber` from the schedule hydrate |
+| odds events | L1261, L1356, L1443 | `evGnum(away, home, commence_time)` — matched by closest start |
+| analysis / sim / cats / gameInfo | L1462, 2015, 2030, 2105, 2154, 2188, 2452, 2588, 2796, 2823 | `g.gnum` carried on the slate game |
+
+**No call site omits it.** The TypeScript side never reconstructs a `gkey` — both
+`boardToPredictions` (`r.gkey`) and `shTicketSnap` (`l.gkey`) propagate the engine's value,
+so there is no second construction to diverge from the first.
+
+## THE DISAGREEMENT GAP IS SIGNED
+
+`|p − pMkt|` alone pools "model above market" with "model below" — different failure modes,
+and the case that motivated the instrument was directional (H+R+RBI over-stating on overs).
+Pooled, a biased population averages with a clean one and dilutes precisely the signal.
+
+`fitByDisagreement` now emits `dir: "high" | "low"` on every bucket — 5 gap bands × 2
+directions = 10 rows. A test pins it: two populations that would cancel to "well
+calibrated" under absolute bucketing stay separated at +20 points and −5 points.
+
+**Documented exit for "markets pooled":** `GAP_BUCKET_MIN_N = 300`. The slope's SE scales
+as ~1/(σ_p·√n), and with the observed σ_p ≈ 0.08 separating a slope 0.15 from 1.0 at 2σ
+needs ~300 graded rows **per bucket per market** — ~3,000 in one market across all ten
+buckets, i.e. ~9 weeks for `batter_hits` at ~45/day and past a season for `pitcher_outs` at
+~11/day. **Check the per-bucket `n`, never the market total**: the tail buckets are the thin
+ones and the interesting ones at once, which is where a pooled-by-default habit costs most.
+
+### The armed baseline broke within hours — and the cause was NOT code
+
+Worth recording as its own finding, because the instrument worked and exposed a flaw in
+how I built it.
+
+`baseline-armed-v1` was written at ~00:30, and failed at ~05:50 on the `categories`
+section. **No code touched the board in between.** The cause: `armedFixtureEngine()` read
+**`public/model/priors.json` directly** — the artifact `model.yml` rewrites *every night*.
+`b75e905 priors: nightly Statcast refresh` landed at 12:47 UTC, a rebase pulled it in, and
+the armed board moved with it.
+
+**A regression baseline wired to a moving input fails for reasons that are not
+regressions.** Worse, the reflex it trains is to regenerate the baseline — which is exactly
+the habit this freeze forbids, and which would have quietly absorbed a real regression the
+first time one coincided with a nightly refresh.
+
+Fixed: `priors.json` is now a frozen snapshot at `tests/fixtures/fix45/priors.json`, beside
+the context fixture. Both armed inputs are static.
+
+**The baseline was regenerated ONCE, and that is a legitimate regeneration** — it was six
+hours old, had never gated a code change, and the purpose was to *remove* a moving
+dependency, not to accommodate a diff. Any future regeneration needs the same standard:
+say what changed, why the old value was wrong rather than merely different, and date it.
+
+**General rule, added to the pairs discipline:** a fixture may read a committed artifact,
+but never one a scheduled job rewrites. The candidates in this repo are `priors.json`
+(`model.yml`, nightly), `context.json` (`context.yml`, 2×/day) and anything under
+`line-history`. All three are now either snapshotted into `tests/fixtures/` or unused by
+tests.
