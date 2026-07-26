@@ -167,9 +167,29 @@ into decoration.
 | `calW` | `/api/calibration` `.mults` | same | `effectiveCalibration()` |
 | `calG` | `/api/calibration` `.global.s` | same | `effectiveCalibration()` |
 | `shin` · `sharpW` · `sim` · `projLineup` | `true` | `true` |
-| `regions` | `us,eu` | `us,eu` |
+| `regions` — **GAME MARKETS ONLY** (`h2h,spreads,totals`, L1231) | `us,eu` | `us,eu` |
+| **prop-market regions — HARDCODED, ignores `SH_V2.regions`** (L1335) | **`us`** | **`us`** |
 | `priors` · `ctx` | `!!` the fetched artifact | `!!` the same artifact |
 | **`simN` / `simNHR`** | **50,000 / 50,000** (`SIM_PATHS`) | **10,000 / 20,000** |
+
+**The `regions` row described half of what it appeared to describe (fixed 2026-07-25).**
+`SH_V2.regions` governs the **game-odds** pull only (L1231). The per-event **prop** pull
+hardcodes `regions=us` (L1335) and ignores the setting entirely. Same omission class as
+`simN`/`simNHR` and the `1.06` haircut: a real, behaviour-governing split that the table
+implied did not exist.
+
+**This settles the `booksInd` threshold at 1, more firmly than the argument that reached it.**
+The case for instrumenting toward 2 was that a lone "independent" book might be a
+placeholder-prone offshore key — the fat tail behind the p90 price-movement artifact
+(coolbet, winamax_de, betfair_ex_eu, nordicbet, betclic_fr, betsson). **Those books are all
+EU, and props never fetch EU.** For props the concern is structurally impossible. The p90
+artifact and the 31-book ML consensus depth are properties of the *game* markets alone and
+must not be carried across to prop reasoning. **Threshold 1 stands; the 1-vs-2 decision is
+off the schedule** unless the `fb` keys show something surprising.
+
+`fb` is still worth capturing — it is free, and knowing *which* US books actually quote props
+is direct input to the Phase 5 multi-book work. It is no longer collecting evidence for a
+pending threshold decision.
 
 `calW`/`calG`/`mktN` come from one shared pure function (`effectiveCalibration` in
 `src/engine2/calibration.ts`) called by both `/api/calibration` and `/api/generate`,
@@ -432,9 +452,47 @@ Consequences worth stating explicitly, because they are not obvious from any sin
 `coreNoHR` means HR can *only* land on FUN, and FUN is ungated — therefore **the consensus
 gate has never evaluated a single HR ticket**, and the `−5.66%` constant that appeared to be
 protecting HR was never in that path. A `booksInd` rule written into `shAllocate` alone
-**documents a core protection and changes nothing for HR.** Whether the rule should also
-apply at `shFunPick` is a live decision, not a detail — it is the difference between the rule
-covering 0 and 12 of the fixture's affected tickets.
+**documents a core protection and changes nothing for HR.**
+
+#### DECISION (owner, 2026-07-25): `booksInd` does NOT apply at `shFunPick`
+
+**FUN is by explicit design not EV-gated** — *"a lottery ticket is never +EV, that's what
+makes it a lottery, so it is capped by structure instead."* Bolting an evidence gate onto it
+is a category error; every FUN cap is in the frozen table, so it is a frozen-parameter
+change; and it would be changing behaviour to solve a problem that has not been measured.
+**The HR overround test lands ~2026-08-09. That is what decides it.**
+
+**The hole is not opening on 2026-07-28 — it has always been open.** The 07-28 concern was
+that HR crossing `consMinN` would lift its protection. It never had that protection:
+`coreNoHR` keeps HR off core and `shFunPick` never runs the gate. Nothing changes on 07-28
+for HR. The exposure is unchanged from the day HR-anytime shipped.
+
+#### The exposure, precisely
+
+Not just "FUN is ungated" — what the `1.06` constant can and cannot reach through FUN:
+
+- **`funMinProb` (0.1%) is the ONLY probability-sensitive cap FUN has**, and probability is
+  exactly what an inflated fair corrupts. It is therefore the one cap the constant can
+  defeat: a ticket whose true joint probability is under the floor can be lifted over it by
+  inflated leg fairs. At a **0.1%** floor the practical effect is marginal — the constant
+  would have to inflate a sub-1-in-1000 ticket into a 1-in-1000 one — but it is a real
+  channel and it is the only one.
+- **Tier assignment is by AMERICAN ODDS, not probability** (`shFunPick`: `am = decToAm(tDec)`
+  against `funTiers`). So inflation does **not** move a ticket between BIG / MASSIVE /
+  MOONSHOT, does not change the split, and does not change stake. Anyone reading this later
+  should not assume a larger effect than exists: the constant cannot reprice a FUN ticket,
+  only (marginally) qualify one.
+- **A `booksInd == 0` row blocked from core can still land on FUN. That is coherent, not an
+  oversight.** Core is money the system claims an edge on, so a row with no independent read
+  has no business there. FUN explicitly does not claim edge — it is capped by structure
+  (one ticket, ≤4 legs, tier-split stake, 0.1% floor) precisely because its EV is not the
+  thing being managed. Applying an evidence gate to a bucket that does not assert evidence
+  would be inconsistent in the other direction.
+- **NAMED TRIGGER — do not lose this.** At the HR overround reading (~2026-08-09): **if the
+  measured overround is ≥ 1.20, reopen the FUN question with evidence.** At that level the
+  constant is inflating HR fairs by ≥13% relative, `funMinProb` stops being a marginal
+  channel, and the FUN 0-13 record acquires a mechanism. Below 1.20, this section stands as
+  written and no change is warranted.
 
 ### IS `booksInd == 0` DISTINGUISHABLE FROM "NOT QUOTED TONIGHT"? — partly, and the gap is now instrumented
 
@@ -599,6 +657,12 @@ plays (locked rule).
   roughly four times the sample, i.e. ~8 weeks. Read the 2026-08-09 number with that in mind
   and do not treat a 1.12 point estimate as a finding.
 
+**READ A NULL RESULT CORRECTLY.** If 2026-08-09 comes back near 1.07, that rules out the
+**large** effect and nothing more. It does **not** establish "the constant is fine" — the
+test has no power to separate 1.07 from 1.15 at that sample size, and a 1.15 overround would
+still be overstating czEV by ~5.5pp, which is larger than `coreEvMin`. The honest reading of
+a null at 14 days is: *"not 1.3–1.5; 1.07-to-1.15 remains open, revisit at ~8 weeks."*
+
 Either decisive answer is worth the wait: at ~1.3–1.5 the FUN 0-13 HR record stops being
 unremarkable and gets a mechanism; at ~1.07 the constant is fine and HR's problem is
 elsewhere.
@@ -651,3 +715,59 @@ At freeze exit we read, in order: average CLV (prob points, with n and SE) overa
 by market · the Discipline report (override creep) · per-market calibration slopes ·
 and only then P/L. Decisions come from that reading — not from any single week's
 results, and not from feel.
+
+## SILENT CONFIG SPLIT — `context.yml` diverged between `main` and `frontend-rebuild`
+
+Found 2026-07-25 while checking whether the archive-producing workflows matched the code
+being read. **GitHub only fires scheduled workflows from the default branch, so `main`'s copy
+is the one that actually runs.** Audit of all four scheduled workflows:
+
+| workflow | `main` vs `frontend-rebuild` |
+|---|---|
+| `line-history.yml` | identical |
+| `props-history.yml` | identical — so the 12-day prop archive *is* produced by the code read here |
+| `model.yml` | identical |
+| **`context.yml`** | **DIVERGED** |
+
+The whole diff is one line in the commit step:
+
+```
+-  git add public/model/context.json data/ump_k.json
++  git add public/model/context.json data/ump_k.json data/pen_quality.json
+```
+
+`main` — the copy that runs — **never commits `data/pen_quality.json`.**
+
+### Consequence: `shPenQF` has been inert since it shipped
+
+`update_pen_db()` (`tools/build_context.py` L105) is **incremental**: it loads
+`data/pen_quality.json`, adds **yesterday only**, trims to the last 30 days, and writes back.
+It does not backfill. With the file never committed, every scheduled run restarts from the
+last hand-committed copy.
+
+Measured: `data/pen_quality.json` on `frontend-rebuild` was last written by **`4cd1c5d`,
+2026-07-20** — the commit that introduced the feature — and contains **exactly one day**
+(`2026-07-20`), 26 teams, **2.0–6.0 IP each**.
+
+`shPenQF` (`legacy/index.html` L1641) returns `1` — no effect — unless `row.ip >= 15`. At
+runtime the DB is that one stale day plus yesterday: roughly 4–12 IP per team. **No team has
+reached 15 IP, so the bullpen-quality factor has returned 1 for every team on every day since
+2026-07-20.**
+
+This is a **graceful** failure — the `ip >= 15` guard is doing exactly its job, refusing to
+act on thin data — but the feature has never once acted, and nothing surfaced that.
+
+### The fix is one line on `main`, and it is NOT a free fix
+
+Adding `data/pen_quality.json` to `main`'s `git add` makes the DB accumulate; a pen throws
+~3–4 IP/game, so teams cross 15 IP in roughly **5 days**, at which point `shPenQF` starts
+moving prices for the first time. **That is a dormant engine input becoming live — a
+selection change during the freeze, even though no parameter value changes.** It belongs to
+the frozen class by effect, not by syntax.
+
+**Not fixed. Owner's decision.** The options are: (a) leave it inert until freeze exit, which
+keeps the collection window clean and costs a modeling input that has contributed nothing so
+far anyway; (b) fix it now and treat the ~5-days-later activation as a dated, documented
+behaviour change like any other. Recorded here rather than quietly repaired, because a config
+fix that silently arms an engine input is exactly the kind of change this document exists to
+prevent.
