@@ -2212,3 +2212,83 @@ Nobody intended that, and it was not written down anywhere before it happened.
 
 A ticket needs **every** leg's market proven, so a mixed ticket reopens on its slowest leg.
 ML/RL-only tickets are the first to return, ~2026-08-02.
+
+## THE RAW MODEL GAP — measured from stored `pModel`, not inferred
+
+The 9.1 EV points is **post-blend**. `czEv` uses the blended probability, `consCzEv` uses
+`imp`, and `p_blend − imp = w·(pModel − imp)`, so:
+
+> **`pModel − imp = (czEv − consCzEv) / (w × czDec)`**
+
+Algebra confirmed. At w = 0.35 and czDec 1.9 that predicts ~13.7 pp. **Measured directly
+from the stored `pModel` field on the real 2026-07-26 board, it is larger:**
+
+### Board-wide `|pModel − implied|`, probability points
+
+| market | n | p25 | **median** | p75 | p90 |
+|---|---|---|---|---|---|
+| `rl` | 15 | 1.9 | **2.9** | 7.7 | 9.7 |
+| `ml` | 15 | 0.9 | **4.2** | 10.1 | 11.7 |
+| `batter_home_runs` | 50 | 2.0 | **4.8** | 7.5 | 9.1 |
+| `batter_hits` | 50 | 2.1 | **5.6** | 8.9 | 10.5 |
+| `batter_total_bases` | 50 | 4.2 | **6.6** | 12.7 | 18.2 |
+| `batter_hits_runs_rbis` | 50 | 6.8 | **11.0** | 15.9 | 21.2 |
+| `pitcher_strikeouts` | 35 | 6.0 | **12.6** | 17.6 | 24.1 |
+| **`pitcher_outs`** | 38 | 18.1 | **23.5** | 28.9 | 37.2 |
+| **ALL BOARD ROWS** | **303** | 3.6 | **7.6** | 14.8 | 22.8 |
+
+### Selected legs — the 46 on tickets that cleared +2% EV
+
+| market | n | p25 | **median** | p75 | max |
+|---|---|---|---|---|---|
+| `batter_total_bases` | 6 | 7.6 | 12.7 | 14.3 | 18.9 |
+| `batter_hits_runs_rbis` | 5 | 12.6 | 15.0 | 17.6 | 32.6 |
+| `pitcher_strikeouts` | 12 | 9.6 | 15.8 | 20.3 | 23.4 |
+| **`pitcher_outs`** | **23** | 15.7 | 19.2 | 32.7 | 40.6 |
+| **ALL SELECTED** | **46** | 12.7 | **17.3** | 24.2 | 40.6 |
+
+> ### WINNER'S CURSE MAGNITUDE = **2.28×**
+> Selected legs sit **17.3 pp** from the market. The board median is **7.6 pp**.
+
+**The gate is a noise amplifier, and it is measurable today.** Phase 3's uncertainty band
+was going to guess this ratio; it is 2.28 on this board.
+
+### And one market dominates the selection
+
+**`pitcher_outs` is 23 of the 46 selected legs — exactly half** — while being only 38 of
+303 board rows. Its board-wide median gap of **23.5 pp is 3× the board median and 8× `rl`'s**.
+The model is systematically far from the market on pitcher outs, and the +2% gate
+concentrates there precisely because of that distance.
+
+⚠️ **`pitcher_outs` is also the market that reopens LAST** (5 graded legs/day → `mktN` ≥ 100
+around **2026-09-13**, essentially freeze exit). So the market driving half the selected
+legs will be gated for the entire collection period.
+
+## THE RESTRICTED-MARKET WINDOW (~2026-08-02 → ~2026-09-13) — a named window
+
+Like the censored west-coast window, this is a period whose sample is **not
+market-neutral**, and any fit computed across it inherits the restriction.
+
+Markets cross `mktN` ≥ 100 at different dates, and a ticket needs **every** leg's market
+proven. Measured on the real board — core-eligible tickets that could actually form from
+each proven set:
+
+| from | proven markets | core-eligible tickets formable |
+|---|---|---|
+| **~08-02** | ml, rl | **8 of 47** |
+| ~08-06 | + total bases | 13 of 47 |
+| ~08-09 | + hits, H+R+RBI | 28 of 47 |
+| ~09-13 | + K's, outs | 47 of 47 |
+
+**Answering the sub-question directly: rarely.** At ~08-02 only **8 of 47** core-eligible
+tickets can form, and those 8 must *still* clear +2% EV and the consensus gate on their own
+merits. **The effective date for a card that reaches `minCoreTickets` (4) is ~2026-08-09,
+not 08-02** — and even then it is drawn from a set with no K's and no outs.
+
+**Consequence to carry:** from ~08-02 to ~09-13 the card is drawn from a **restricted market
+set**, so any calibration slope, CLV mean or Discipline figure computed over August is
+**not** market-neutral — it is a measurement of ml/rl/TB/hits/HRR only, and it
+systematically excludes the two markets where the model sits furthest from the market.
+Read August numbers with that stated, or split them at the reopening dates.
+
+Not a change request: this follows from a frozen parameter behaving correctly.

@@ -37,6 +37,40 @@ As of 2026-07-26 the card is **NO-PLAY**, and projected to stay that way until r
 **For roughly two weeks, Phase 2 is the evidence channel.** Everything else that reads the
 freeze's scoreboard needs a bet to have been placed, and none will be.
 
+## PHASE 2 IS THE DECISIVE TEST — this is the headline, the bias estimate is secondary
+
+Measured on the real 2026-07-26 board: the legs the +2% gate selects sit a median of
+**17.3 probability points** from the de-vigged market, against a board median of **7.6** —
+a **2.28× winner's-curse ratio**. Two readings fit that, and they have opposite
+consequences:
+
+1. the model holds ~17 pp of **real information** the consensus lacks, on ~46 legs a day; or
+2. **the gate selects model error** — it concentrates wherever the model is furthest from
+   the market, which is also wherever the model is most likely wrong.
+
+Priors favour (2), and the H+R+RBI ledger agrees. **Priors do not settle it. This does:**
+
+> **Conditional on the model disagreeing with the OPEN by X, how far does the CLOSE move
+> toward the model?**
+>
+> `regression of (close_fair − open_fair) on (pModel − open_fair)`
+>
+> - **slope ≈ 1** → the model is early to real movement. Reading (1). Genuine edge.
+> - **slope ≈ 0** → the market never comes to it. Reading (2). The disagreement is noise
+>   and the gate is amplifying it.
+
+**That single number answers whether this engine has edge**, and it needs **no outcomes and
+no ledger** — which is decisive right now, because both are dark for ~2 weeks.
+
+**So Series A's primary readout is the movement slope. The model-vs-close bias estimate is
+secondary** — it says how wrong, the slope says whether the disagreement means anything at
+all.
+
+Both sides come from `props-history`: `open_fair` from the first snapshot of the day,
+`close_fair` from the last before first pitch, both recomputed at the engine's own Shin
+de-vig from `fp`. `pModel` comes from the prediction store, which is where the sync phrase
+binds (below).
+
 ## The problem it solves
 
 Outcome-grading is a weak instrument: detecting a 2pp model bias from win/loss needs

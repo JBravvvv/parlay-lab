@@ -337,3 +337,23 @@ always plausible — which is why nothing looks wrong.
 production path, never from re-implementing its conditions.** Where the path needs inputs
 that are not to hand, say the number is unmeasured rather than estimate it — the estimate
 will be believed, and it will be believed most confidently when it is wrong.
+
+### A fourth example of the class: `tsc` passing on a build that could not build
+
+`npx tsc --noEmit` passed cleanly on a `app/builder/page.tsx` that then **OOM'd webpack at
+4 GB**. The panel used nested ternaries inside a `.map` inside a conditional inside JSX;
+types were perfectly valid and the bundler still could not finish.
+
+**Type-correct and buildable are independent properties**, and the passing type check was
+not merely unhelpful — it was **actively misleading about where to look**, because the
+natural next move after a green `tsc` is to suspect anything except the file it just
+approved.
+
+**And the isolation was the diff-two-things technique applied to a build:** revert the page
+alone, keep the engine change, rebuild. The engine built; therefore the page was the cause.
+Naming it as the same technique, because it did not look like one at the time — the "two
+things" were *the same tree with and without one file*, not two parallel implementations.
+
+**Practical rule:** when a build fails for a reason the type checker cannot see, bisect by
+reverting files rather than reading them. And never treat a green `tsc` as evidence about a
+build failure.
