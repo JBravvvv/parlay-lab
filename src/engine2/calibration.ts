@@ -30,6 +30,11 @@ export type GradedPick = {
      Captured only — no consumer reads them yet, by design. */
   ln?: number | null;
   susp?: boolean;
+  /* EV at the SELECTION price, in PERCENT (2026-07-26). UNITS TRAP: czEv/ev are percent
+     (8 = +8%), EV_EDGES are fractions — always divide by 100 before bucketing. Nothing new
+     had to be captured: the prediction blob already stored czEv/ev per row, and only the
+     projection into GradedPick dropped them. */
+  ev?: number | null;
 };
 
 export const PROB_BUCKETS: [number, number][] = [
@@ -149,7 +154,7 @@ export type CalibrationSummary = {
   reliability?: Record<string, { n: number; slope: number | null; se: number | null }>;
   /* 2026-07-26: the same slope, bucketed by |p − pMkt|. The pooled figure cannot see a
      model that is fine on the board and wrong where it is actually bet. */
-  disagreement?: DisagreementFit[];
+  disagreement?: EvFit[];
   globalShrink?: { s: number; n: number; slopeBefore: number | null; slopeAfter: number | null };
 };
 
@@ -303,111 +308,134 @@ export function fitReliability(picks: GradedPick[]): Reliability {
  * the outcome-graded version of it. Phase 2 should swap the grading input, not rebuild the
  * bucketing, so `gapBucket` is exported for reuse.
  */
-export type DisagreementFit = {
-  /** "high" = model above market, "low" = model below. Direction MUST survive into the
-      output: absolute bucketing pools a biased population with a clean one and dilutes
-      exactly the signal this instrument exists to catch. The case that motivated it was
-      directional — H+R+RBI over-stating on overs. */
+/**
+ * RE-SCOPED TO EV (2026-07-26) — absolute probability points were the WRONG AXIS.
+ *
+ * Clearing a +2% EV filter requires a probability edge of 0.02/dec, so the absolute gap
+ * needed SHRINKS mechanically as odds lengthen: measured, 1.33 points at −200 down to
+ * 0.15 points at +1200. Bucketing on absolute points therefore anti-correlates with the
+ * thing it was built to isolate. Confirmed on a real board: of 199 rows, the 10 that clear
+ * +2% EV ALL sit in the 0–5 point buckets (|gap| median 2.3, max 4.8), while the 10–20 and
+ * 20+ "tail" buckets on the model-high side receive ZERO rows per day.
+ *
+ * EV is the relative gap — EV = p·dec − 1, and with dec ≈ 1/pMkt that is ≈ p/pMkt − 1 — so
+ * it is scale-free across prices and it is the axis the selection gate itself uses.
+ *
+ * WHY THE SHAPE MATTERS BEYOND DIAGNOSIS: with the gate ON AN EDGE, the buckets above it
+ * are exactly the bet population and those below are exactly the rows passed over. The
+ * contrast between them IS the winner's curse, measured — see `evGapShrink`.
+ *
+ * Edges are FIXED, chosen from the measured board distribution (n=135 priced rows:
+ * <−10% 46 · −10..−5 39 · −5..−2 25 · −2..0 13 · 0..+2 2 · +2..+5 4 · +5..+10 3 · >+10 3),
+ * not sample quantiles — a bucket must mean the same thing week to week.
+ */
+export const EV_EDGES: [number, number][] = [
+  [-Infinity, -0.10], [-0.10, -0.05], [-0.05, -0.02], [-0.02, 0],
+  [0, 0.02], [0.02, 0.05], [0.05, 0.10], [0.10, Infinity],
+];
+/** The selection gate, on an edge by construction — bet and non-bet never share a bucket. */
+export const EV_GATE = 0.02;
+
+export function evBucket(ev: number): number {
+  for (let i = 0; i < EV_EDGES.length; i++) if (ev >= EV_EDGES[i][0] && ev < EV_EDGES[i][1]) return i;
+  return EV_EDGES.length - 1;
+}
+
+export type EvFit = {
+  /** "high" = model above the de-vigged consensus, "low" = below. NOT redundant with the
+      sign of EV: EV is computed at the CAESARS price, so a row can be model-high on
+      consensus and still negative-EV because Caesars is worse than consensus. Both are
+      kept because the failure mode that motivated this was directional. */
   dir: "high" | "low";
-  lo: number; // inclusive lower bound of |p − pMkt|, in probability POINTS
-  hi: number; // exclusive upper bound (Infinity on the tail bucket)
+  lo: number; // inclusive lower EV bound, as a FRACTION (-0.05 = -5%)
+  hi: number; // exclusive upper bound (+/-Infinity on the end buckets)
   n: number;
-  meanGap: number; // realised mean |p − pMkt| inside the bucket
-  /* THE SLOPE IS DECORATIVE IN THESE BUCKETS — see GAP_BUCKET_MIN_N. Kept because it
-     costs nothing and because Phase 2 will have the sample sizes the slope needs. */
-  slope: number | null;
-  se: number | null;
+  meanEv: number; // realised mean EV inside the bucket, fraction
   actual: number; // realised hit rate
   predicted: number; // mean stated probability
-  /* THE POWERED READOUT. gap = predicted − actual, in probability POINTS: positive means
-     the model over-states. gapSe is the binomial SE of the realised rate, so |gap| / gapSe
-     is a z-score you can read directly. sig = |gap| >= 2·gapSe AND n >= GAP_BUCKET_MIN_N. */
+  /* THE POWERED READOUT — see GAP_BUCKET_MIN_N. gap = predicted - actual in probability
+     POINTS (positive = the model over-states); gapSe is the binomial SE of the realised
+     rate, so |gap|/gapSe reads as a z directly. */
   gap: number;
   gapSe: number | null;
   sig: boolean;
+  /* Slope kept as a DIAGNOSTIC ONLY and never as a criterion: at the measured within-market
+     sigma_p (0.022-0.064) its SE at n=100 is 0.78-2.27, so a [0.85,1.15] band admits a
+     perfectly calibrated market only 5-15% of the time. See docs/collection-period.md. */
+  slope: number | null;
+  se: number | null;
 };
 
-/** Fixed edges, not sample quantiles: buckets must mean the same thing week to week. */
-export const GAP_EDGES: [number, number][] = [
-  [0, 2], [2, 5], [5, 10], [10, 20], [20, Infinity],
-];
-
-export function gapBucket(p: number, pMkt: number): number {
-  const g = Math.abs(p - pMkt);
-  for (let i = 0; i < GAP_EDGES.length; i++) if (g >= GAP_EDGES[i][0] && g < GAP_EDGES[i][1]) return i;
-  return GAP_EDGES.length - 1;
-}
-
-/**
- * Per-bucket fit. `market` optional — omitted pools every market, which is the honest
- * default at current sample sizes; per-market slicing here would be powerless.
- */
-export function fitByDisagreement(picks: GradedPick[], market?: string): DisagreementFit[] {
-  const sel = picks.filter((x) => x.pMkt != null && (market == null || x.market === market));
-  const out: DisagreementFit[] = [];
+/** Rows above the gate are the BET population; rows below it were passed over. */
+export function fitByEv(picks: GradedPick[], market?: string): EvFit[] {
+  const sel = picks.filter((x) => x.ev != null && (market == null || x.market === market));
+  const out: EvFit[] = [];
   for (const dir of ["high", "low"] as const)
-    for (const [i, [lo, hi]] of GAP_EDGES.entries()) {
+    for (const [i, [lo, hi]] of EV_EDGES.entries()) {
       const b = sel.filter(
         (x) =>
-          gapBucket(x.p, x.pMkt as number) === i &&
-          (dir === "high" ? x.p >= (x.pMkt as number) : x.p < (x.pMkt as number)),
+          evBucket((x.ev as number) / 100) === i && // PERCENT -> fraction
+          (dir === "high" ? x.pMkt == null || x.p >= (x.pMkt as number) : x.pMkt != null && x.p < (x.pMkt as number)),
       );
-    const xs = b.map((x) => x.p / 100);
-    const ys = b.map((x) => (x.res === "won" ? 1 : 0));
-    const f = olsSlope(xs, ys);
+      const xs = b.map((x) => x.p / 100);
+      const ys = b.map((x) => (x.res === "won" ? 1 : 0));
+      const f = olsSlope(xs, ys);
       const mean = (a: number[]) => (a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : 0);
+      const a = mean(ys), pr = mean(xs);
+      const se = b.length > 0 ? Math.sqrt(Math.max(a * (1 - a), 1e-9) / b.length) : null;
+      const gap = pr - a;
       out.push({
         dir, lo, hi, n: b.length,
-      meanGap: Math.round(mean(b.map((x) => Math.abs(x.p - (x.pMkt as number)))) * 100) / 100,
-      slope: f.slope, se: f.se,
-        actual: Math.round(mean(ys) * 1000) / 1000,
-        predicted: Math.round(mean(xs) * 1000) / 1000,
-        ...(() => {
-          const a = mean(ys), pr = mean(xs);
-          const se = b.length > 0 ? Math.sqrt(Math.max(a * (1 - a), 1e-9) / b.length) : null;
-          const gap = pr - a;
-          return {
-            gap: Math.round(gap * 10000) / 10000,
-            gapSe: se == null ? null : Math.round(se * 10000) / 10000,
-            sig: se != null && b.length >= GAP_BUCKET_MIN_N && Math.abs(gap) >= 2 * se,
-          };
-        })(),
+        meanEv: Math.round(mean(b.map((x) => (x.ev as number) / 100)) * 10000) / 10000,
+        actual: Math.round(a * 1000) / 1000,
+        predicted: Math.round(pr * 1000) / 1000,
+        gap: Math.round(gap * 10000) / 10000,
+        gapSe: se == null ? null : Math.round(se * 10000) / 10000,
+        sig: se != null && b.length >= GAP_BUCKET_MIN_N && Math.abs(gap) >= 2 * se,
+        slope: f.slope, se: f.se,
       });
     }
   return out;
 }
 
 /**
- * READ THE GAP, NOT THE SLOPE — and the threshold is set on the gap.
+ * PHASE 3 INPUT — the winner's curse, measured instead of guessed.
  *
- * CORRECTION (2026-07-26): an earlier version of this comment stated the SE formula and
- * then wrote "≈300 rows", which does not follow from it. Worked properly:
+ * Phase 3 specifies shrinking measured EV by an uncertainty band whose size was to be
+ * assumed. With the gate on a bucket edge, the buckets ABOVE it are exactly the legs that
+ * were selectable and the buckets BELOW it are exactly the legs that were passed over, so
+ * the difference in their calibration gaps is the selection penalty in probability points.
  *
- *   SE(slope) ≈ σ_resid / (σ_p·√n),  σ_resid ≈ 0.5 (Bernoulli at p≈0.5), σ_p ≈ 0.08
+ * Returns the shrink factor Phase 3 should apply to a stated EV: 1 = no curse detected,
+ * 0.6 = a stated +2% should be treated as +1.2%. `null` when either side is under
+ * GAP_BUCKET_MIN_N — an unmeasured curse must NOT be silently treated as zero.
+ */
+export function evGapShrink(fits: EvFit[]): { shrink: number | null; above: number; below: number; nAbove: number; nBelow: number } {
+  const agg = (pred: (f: EvFit) => boolean) => {
+    const g = fits.filter(pred);
+    const n = g.reduce((s, f) => s + f.n, 0);
+    const gap = n ? g.reduce((s, f) => s + f.gap * f.n, 0) / n : 0;
+    return { n, gap };
+  };
+  const A = agg((f) => f.lo >= EV_GATE);
+  const B = agg((f) => f.hi <= EV_GATE && f.lo >= 0); // 0..gate: passed over, but still +EV
+  if (A.n < GAP_BUCKET_MIN_N || B.n < GAP_BUCKET_MIN_N)
+    return { shrink: null, above: A.gap, below: B.gap, nAbove: A.n, nBelow: B.n };
+  const excess = A.gap - B.gap; // extra over-statement among the selected, in fraction
+  const meanEvAbove = fits.filter((f) => f.lo >= EV_GATE).reduce((s, f) => s + f.meanEv * f.n, 0) / A.n;
+  const shrink = meanEvAbove > 0 ? Math.max(0, Math.min(1, 1 - excess / meanEvAbove)) : null;
+  return { shrink, above: A.gap, below: B.gap, nAbove: A.n, nBelow: B.n };
+}
+
+/**
+ * READ THE GAP, NOT THE SLOPE. GAP_BUCKET_MIN_N = 150, on the gap's arithmetic:
+ * SE(gap) = sqrt(p(1-p)/n) = 4.1 points at n=150, so the 12.9-point H+R+RBI miss reads at
+ * 3.2 sigma. The SLOPE needs ~13,100 legs in that market for a 2-sigma test at its measured
+ * sigma_p, which is why it is a diagnostic here and never a criterion.
  *
- *   n = 150 → SE 0.51    n = 300 → SE 0.36    n = 1,000 → SE 0.20    n = 3,000 → SE 0.11
- *
- * Detecting a slope 0.15 from 1.0 at 2σ needs **n ≈ 6,944 per bucket per market**. At
- * n = 300 the smallest detectable deviation is 0.72 — a slope of 0.28 or 1.72. **The slope
- * is noise at every sample size this freeze will ever see**, and reporting it per bucket
- * would have been reporting nothing with a number attached.
- *
- * The CALIBRATION GAP is a different quantity and is well powered:
- *
- *   SE(gap) = √(p(1−p)/n)  →  n = 100 → 5.0 pts   150 → 4.1   300 → 2.9   1,000 → 1.6
- *
- * The case that motivated this instrument — H+R+RBI stating 59.2% and hitting 46.3%, a
- * **12.9-point** gap — reads as **3.2σ at n = 150** and 4.5σ at n = 300. So 150 is usable
- * and 300 was needlessly conservative.
- *
- * **GAP_BUCKET_MIN_N = 150**, chosen on that arithmetic: it is the n at which a
- * HRR-magnitude miscalibration clears 3σ, and at measured accrual (`batter_hits` ~45/day)
- * a well-populated bucket reaches it inside the freeze rather than after it.
- *
- * ⚠️ **Rows are NOT evenly spread across the ten buckets.** Mass concentrates at low
- * disagreement; the 20+ tail buckets — the interesting ones — will be the last to qualify
- * and may not qualify at all before freeze exit. Check the per-bucket `n`, never the market
- * total, and treat a thin tail bucket as unread rather than as reassuring.
+ * CAVEAT, UNRESOLVED: every SE here assumes INDEPENDENT legs. Same-game legs are
+ * correlated; the design effect is 1 + (m-1)*rho and the clustering UNIT decides the
+ * verdict. Not yet measured on real graded data — see docs/collection-period.md.
  */
 export const GAP_BUCKET_MIN_N = 150;
 

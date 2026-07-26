@@ -1703,3 +1703,105 @@ exactly the way a missing input is, and neither shows up in a value-based drift 
 not the engine, not the API, not the UI. The instrument built specifically to catch the
 failure the pooled slope missed currently gates nothing and displays nothing. Recorded rather
 than quietly wired up: adding a consumer is a behaviour change and needs its own sign-off.
+
+## THE EV RE-SCOPE — and two corrections to my own numbers
+
+### Absolute probability points were the wrong axis
+
+Clearing a +2% EV filter needs a probability edge of `0.02 / dec`, so the absolute gap
+required **shrinks mechanically as odds lengthen**:
+
+| price | dec | implied fair | min model p | **min gap** |
+|---|---|---|---|---|
+| −200 | 1.50 | 66.7% | 68.0% | **1.33 pts** |
+| −110 | 1.91 | 52.4% | 53.4% | 1.05 |
+| +250 | 3.50 | 28.6% | 29.1% | 0.57 |
+| +1200 | 13.00 | 7.7% | 7.8% | **0.15 pts** |
+
+Measured on a real board: of 199 rows, the **10 that clear +2% EV all sit in the 0–5 point
+buckets** (|gap| median 2.3, max 4.8), while `high 10-20` and `high 20+` — the "tail"
+buckets built to catch the failure — take **zero rows per day**. The axis anti-correlated
+with the population it existed to isolate.
+
+**EV is the relative gap** (`EV = p·dec − 1`, and with `dec ≈ 1/pMkt` that is `≈ p/pMkt − 1`),
+so it is scale-free across prices and it is the axis the gate itself uses.
+
+### Edges, from the measured distribution, with the gate ON an edge
+
+135 priced rows: `<−10%` 46 · `−10..−5` 39 · `−5..−2` 25 · `−2..0` 13 · `0..+2` 2 ·
+`+2..+5` 4 · `+5..+10` 3 · `>+10` 3.
+
+```
+EV_EDGES = [ <−10 | −10..−5 | −5..−2 | −2..0 | 0..+2 | +2..+5 | +5..+10 | >+10 ]
+EV_GATE  = 0.02, on an edge by construction
+```
+
+Fixed, not sample quantiles. **Direction (`dir: high|low`) is kept and is NOT redundant with
+the sign of EV** — EV is computed at the Caesars price, so a row can be model-high against
+consensus and still negative-EV because Caesars is worse than consensus.
+
+### How it feeds Phase 3 — the guessed shrink becomes a measured one
+
+Phase 3 specifies shrinking measured EV by an uncertainty band whose size was to be
+**assumed**. With the gate on an edge, the buckets above it are exactly the legs that were
+selectable and those below are exactly the legs passed over, so the difference in their
+calibration gaps **is the winner's curse in probability points**.
+
+`evGapShrink(fits)` returns the factor Phase 3 should apply: `1` = no curse detected,
+`0.6` = a stated +2% should be treated as +1.2%. It returns **`null`** when either side is
+under `GAP_BUCKET_MIN_N` — an unmeasured curse must never be silently treated as zero,
+which is the same rule as the band's own "absent evidence is not certainty".
+
+### CORRECTION 1 — my accrual projection was ~6× too fast
+
+The first real calibrate run since `CAL_START` landed: **`graded: 70`**, not the ~180 I
+projected from 203 board rows. Per market: `ml` 15 · `rl` 15 · `batter_total_bases` 9 ·
+`batter_hits` 7 · `batter_home_runs` 7 · `batter_hits_runs_rbis` 7 · `pitcher_strikeouts` 5 ·
+`pitcher_outs` 5.
+
+I projected from **board row counts** and applied a guessed 10% attrition. Real attrition is
+~65% — most prop rows grade void (player not in the posted lineup) rather than won/lost.
+
+**So the `mktN` crossing dates move out by ~6×:**
+
+| market | rows/day (projected) | **graded/day (measured)** | crossing `n ≥ 100` |
+|---|---|---|---|
+| `batter_total_bases` | ~43 | **9** | ~2026-08-06 *(was 07-28)* |
+| `batter_hits` | ~45 | **7** | ~2026-08-09 *(was 07-28)* |
+| `ml` / `rl` | ~15 | **15** | ~2026-08-02 |
+| `pitcher_outs` | ~11 | **5** | ~2026-09-13 |
+
+**The `booksInd` urgency I asserted was overstated** — total bases crosses in ~11 days, not
+3. The rule still shipped correctly and early; the deadline was simply not what I said.
+
+### CORRECTION 2 — the weekly adjuster has NEVER fired
+
+`/api/calibration` returns **`log: []`** and **`mults: {}`**. The adjustment log is
+append-only in `pl:cal:weights` and survives `CAL_START`, so this is the lifetime record:
+**`applyWeeklyAdjustment` has never moved a weight, and no per-market multiplier has ever
+been set.** Combined with `slopeMults` being unfireable at the measured σ_p, **neither
+weight channel has ever acted.**
+
+That is a **fifth** inert protection, and it makes the count worth stating plainly:
+`shPenQF`, `shUmpKf`, the HRR slope criterion, `slopeMults`, and `applyWeeklyAdjustment`.
+
+### The live slopes, as a demonstration of the audit's point
+
+First real fit, n=70 pooled:
+
+| market | n | slope | se |
+|---|---|---|---|
+| pooled `all` | 70 | 1.697 | 0.412 |
+| `ml` | 15 | 2.624 | 2.917 |
+| `rl` | 15 | 3.048 | 3.057 |
+| `batter_total_bases` | 9 | 0.509 | 6.106 |
+| **`batter_hits_runs_rbis`** | 7 | **18.802** | **19.838** |
+
+A fitted slope of **18.8 ± 19.8**. This is not a criticism of the estimator — it is the
+audit's conclusion arriving as data on day one.
+
+⚠️ **And one live hazard found in passing:** `pitcher_outs` reports `significant: true` at
+**n = 5**. `computeCalibration` guards only `n > 0` (L191); the minimum-sample check lives
+separately in `applyWeeklyAdjustment`'s `tier === "ADJUST"` test. **The flag is safe only
+because a second, distant check catches it** — the same coupling shape as `lUse`/`lid`. Any
+new consumer reading `perMarket.significant` without also checking `tier` would act on n=5.

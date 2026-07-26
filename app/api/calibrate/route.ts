@@ -5,7 +5,7 @@ import {
   CAL_START,
   applyWeeklyAdjustment,
   calibrationEligible,
-  fitByDisagreement,
+  fitByEv,
   computeCalibration,
   fitGlobalShrink,
   fitReliability,
@@ -247,8 +247,9 @@ export async function GET(req: NextRequest) {
     // model-confidence shrink ride on the same nightly summary
     summary.reliability = fitReliability(graded);
     // the pooled slope cannot see a model that is fine on the board and wrong where it is
-    // actually bet — see fitByDisagreement in engine2/calibration
-    summary.disagreement = fitByDisagreement(graded);
+    // actually bet. Bucketed by EV with the +2% gate ON AN EDGE, so the buckets above it
+    // are the bet population and those below are the rows passed over — see fitByEv.
+    summary.disagreement = fitByEv(graded);
     summary.globalShrink = fitGlobalShrink(graded);
     await redisSetJson(K_SUMMARY, summary);
 

@@ -317,6 +317,9 @@ export type GradedFromBlob = {
   lu: "confirmed" | "projected";
   res: "won" | "lost";
   pMkt: number | null;
+  /* EV at the selection price, PERCENT (2026-07-26). Nothing new is captured — the blob
+     already stored czEv/ev; only this projection dropped them. fitByEv divides by 100. */
+  ev: number | null;
   ln: number | null;
   susp?: true;
 };
@@ -334,6 +337,9 @@ export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {
       lu: r.lu,
       res: r.res,
       pMkt: r.pMkt ?? null,
+      // czEv is the EV at the SELECTION price in ev_gated (the mode the gate runs in);
+      // ev is the best-price fallback. Percent units — fitByEv divides by 100.
+      ev: r.czEv ?? r.ev ?? null,
       ln: r.ln ?? lineOf(r.lkey),
       ...(r.susp ? { susp: true as const } : {}),
     });

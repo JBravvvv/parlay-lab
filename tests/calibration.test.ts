@@ -3,8 +3,11 @@ import {
   applyWeeklyAdjustment,
   calibrationLine,
   computeCalibration,
-  fitByDisagreement,
-  gapBucket,
+  EV_EDGES,
+  EV_GATE,
+  evBucket,
+  evGapShrink,
+  fitByEv,
   tierFor,
   wilson,
   WEEK_MS,
@@ -202,88 +205,77 @@ describe("upgrade 03: model vs consensus Brier over the same records (mktCmp)", 
   });
 });
 
-/* Disagreement-conditional slope (2026-07-26). The pooled slope is blind to a model that
-   prices the board well and the tail badly — the population it is USED on. */
-describe("fitByDisagreement — the tail the pooled slope cannot see", () => {
-  const pick = (p: number, pMkt: number, won: boolean): GradedPick => ({
-    market: "batter_hits_runs_rbis", p, pMkt, edge: p - pMkt, lu: "confirmed", res: won ? "won" : "lost",
+/* EV-bucketed calibration (2026-07-26). Re-scoped from absolute probability points:
+   clearing +2% EV needs 0.02/dec points, so the absolute gap shrinks as odds lengthen and
+   the axis anti-correlated with the population of interest. EV is the relative gap and is
+   the axis the gate itself uses. */
+describe("fitByEv — the bet population sits above a bucket EDGE", () => {
+  const pick = (p: number, pMkt: number, ev: number, won: boolean): GradedPick => ({
+    market: "batter_hits_runs_rbis", p, pMkt, ev, edge: p - pMkt, lu: "confirmed", res: won ? "won" : "lost",
   });
 
-  it("buckets by |p − pMkt| on fixed edges, not sample quantiles", () => {
-    expect(gapBucket(50, 50)).toBe(0); // gap 0
-    expect(gapBucket(53, 50)).toBe(1); // gap 3
-    expect(gapBucket(58, 50)).toBe(2); // gap 8
-    expect(gapBucket(35, 50)).toBe(3); // gap 15 — sign-independent
-    expect(gapBucket(80, 50)).toBe(4); // gap 30, tail bucket
+  it("puts the +2% gate on an edge so bet and non-bet never share a bucket", () => {
+    expect(EV_GATE).toBe(0.02);
+    expect(EV_EDGES.some(([lo]) => lo === EV_GATE)).toBe(true);
+    expect(evBucket(0.019)).not.toBe(evBucket(0.02)); // straddling the gate splits
+    expect(evBucket(0.02)).toBe(evBucket(0.049));     // and the bet bucket is contiguous
   });
 
-  it("separates a model that is calibrated on the board and broken at the tail", () => {
+  it("buckets on FRACTIONS while GradedPick.ev is PERCENT — the units trap, pinned", () => {
+    // ev: 8 means +8%, which is the 0.05..0.10 bucket, NOT the >+10% one
+    const f = fitByEv([pick(45, 40, 8, true)]).filter((x) => x.n > 0);
+    expect(f).toHaveLength(1);
+    expect(f[0].lo).toBe(0.05);
+    expect(f[0].hi).toBe(0.10);
+  });
+
+  it("keeps direction, which is NOT the sign of EV", () => {
+    // model BELOW consensus but still +EV at Caesars: a real combination, and the two
+    // labels must not collapse into one
+    const f = fitByEv([pick(38, 40, 6, true)]).filter((x) => x.n > 0);
+    expect(f).toHaveLength(1);
+    expect(f[0].dir).toBe("low");
+    expect(f[0].lo).toBe(0.05);
+  });
+
+  it("separates a model that prices the board well and the SELECTED legs badly", () => {
     const picks: GradedPick[] = [];
-    // low-disagreement rows: stated 55%, hits 55% — well calibrated
-    for (let i = 0; i < 200; i++) picks.push(pick(55, 54, i % 100 < 55));
-    // high-disagreement rows: stated 59%, hits 46% — the HRR shape
-    for (let i = 0; i < 200; i++) picks.push(pick(59, 34, i % 100 < 46));
-    const fits = fitByDisagreement(picks);
-    // both synthetic populations are model-ABOVE-market, so they land in the "high" rows
-    const low = fits.find((f) => f.dir === "high" && f.lo === 0)!; // gap 1
-    const high = fits.find((f) => f.dir === "high" && f.hi === Infinity)!; // gap 25
-    expect(low.n).toBe(200);
-    expect(high.n).toBe(200);
-    expect(low.actual).toBeCloseTo(0.55, 2);
-    expect(high.actual).toBeCloseTo(0.46, 2);
-    // the tail bucket over-states by ~13 points while the calibrated bucket does not
-    expect(high.predicted - high.actual).toBeGreaterThan(0.1);
-    expect(Math.abs(low.predicted - low.actual)).toBeLessThan(0.02);
+    // passed-over rows (0..+2% EV): stated 55, hits 55 — calibrated
+    for (let i = 0; i < 200; i++) picks.push(pick(55, 50, 1, i % 100 < 55));
+    // selected rows (+2..+5% EV): stated 59, hits 46 — the H+R+RBI shape
+    for (let i = 0; i < 200; i++) picks.push(pick(59, 50, 3, i % 100 < 46));
+    const fits = fitByEv(picks);
+    const below = fits.find((f) => f.dir === "high" && f.lo === 0)!;
+    const above = fits.find((f) => f.dir === "high" && f.lo === 0.02)!;
+    expect(below.n).toBe(200);
+    expect(above.n).toBe(200);
+    expect(Math.abs(below.gap)).toBeLessThan(0.02);
+    expect(above.gap).toBeGreaterThan(0.1);
+    expect(above.sig).toBe(true);
   });
 
-  it("keeps DIRECTION — model-high and model-low never pool", () => {
+  it("evGapShrink turns the winner's curse into a Phase 3 number — or refuses to", () => {
     const picks: GradedPick[] = [];
-    for (let i = 0; i < 100; i++) picks.push(pick(70, 45, i % 100 < 50)); // high by 25, over-states
-    for (let i = 0; i < 100; i++) picks.push(pick(45, 70, i % 100 < 50)); // low by 25, under-states
-    const fits = fitByDisagreement(picks);
-    const hi = fits.find((f) => f.dir === "high" && f.hi === Infinity)!;
-    const lo = fits.find((f) => f.dir === "low" && f.hi === Infinity)!;
-    expect(hi.n).toBe(100);
-    expect(lo.n).toBe(100);
-    // pooled on |gap| these two would cancel to "well calibrated" — separated they do not
-    expect(hi.predicted - hi.actual).toBeCloseTo(0.2, 2);
-    expect(lo.predicted - lo.actual).toBeCloseTo(-0.05, 2);
+    for (let i = 0; i < 200; i++) picks.push(pick(55, 50, 1, i % 100 < 55));   // below gate, clean
+    for (let i = 0; i < 200; i++) picks.push(pick(59, 50, 3, i % 100 < 46));   // above gate, 13pt miss
+    const r = evGapShrink(fitByEv(picks));
+    expect(r.nAbove).toBe(200);
+    expect(r.nBelow).toBe(200);
+    expect(r.shrink).not.toBeNull();
+    expect(r.shrink!).toBeLessThan(1);   // a curse was detected...
+    expect(r.shrink!).toBeGreaterThanOrEqual(0);
   });
 
-  it("excludes rows with no consensus baseline rather than assuming one", () => {
-    const fits = fitByDisagreement([
-      { market: "m", p: 60, pMkt: null, edge: null, lu: "confirmed", res: "won" },
-    ]);
-    expect(fits.reduce((s, f) => s + f.n, 0)).toBe(0);
+  it("refuses to report a shrink below GAP_BUCKET_MIN_N — an unmeasured curse is not zero", () => {
+    const picks: GradedPick[] = [];
+    for (let i = 0; i < 20; i++) picks.push(pick(55, 50, 1, i % 100 < 55));
+    for (let i = 0; i < 20; i++) picks.push(pick(59, 50, 3, i % 100 < 46));
+    const r = evGapShrink(fitByEv(picks));
+    expect(r.shrink).toBeNull();
   });
-});
 
-/* The gap is the powered readout; the slope in these buckets is not (GAP_BUCKET_MIN_N). */
-describe("fitByDisagreement — gap significance", () => {
-  const pick = (p: number, pMkt: number, won: boolean): GradedPick => ({
-    market: "batter_hits_runs_rbis", p, pMkt, edge: p - pMkt, lu: "confirmed", res: won ? "won" : "lost",
-  });
-  it("flags an HRR-magnitude gap at n=150 and refuses to flag the same gap at n=50", () => {
-    const mk = (n: number) => {
-      const out: GradedPick[] = [];
-      for (let i = 0; i < n; i++) out.push(pick(59, 34, (i * 100) / n < 46));
-      return fitByDisagreement(out).find((f) => f.dir === "high" && f.hi === Infinity)!;
-    };
-    const big = mk(150);
-    expect(big.n).toBe(150);
-    expect(big.gap).toBeGreaterThan(0.1); // ~13 points, the measured HRR shape
-    expect(big.gapSe).toBeLessThan(0.05);
-    expect(big.sig).toBe(true);
-    const small = mk(50);
-    expect(small.gap).toBeGreaterThan(0.1); // same effect...
-    expect(small.sig).toBe(false); // ...but below GAP_BUCKET_MIN_N, so never flagged
-  });
-  it("a well-calibrated bucket is not flagged however large it gets", () => {
-    const out: GradedPick[] = [];
-    for (let i = 0; i < 600; i++) out.push(pick(55, 30, i % 100 < 55));
-    const f = fitByDisagreement(out).find((x) => x.dir === "high" && x.hi === Infinity)!;
-    expect(f.n).toBe(600);
-    expect(Math.abs(f.gap)).toBeLessThan(0.02);
-    expect(f.sig).toBe(false);
+  it("excludes rows with no EV rather than bucketing them as zero", () => {
+    expect(fitByEv([{ market: "m", p: 60, pMkt: 50, edge: null, lu: "confirmed", res: "won" }])
+      .reduce((s, f) => s + f.n, 0)).toBe(0);
   });
 });
