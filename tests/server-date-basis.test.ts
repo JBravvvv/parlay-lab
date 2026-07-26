@@ -56,15 +56,36 @@ describe("ptToday is timezone-independent", () => {
 });
 
 describe("every date-deriving server route pins Pacific", () => {
-  const routes = ["app/api/generate/route.ts", "app/api/clv/route.ts"];
+  /* Scanned, not listed. The first version of this test iterated a hardcoded pair and
+     was described as covering "any route" — it did not cover /api/calibrate, which was
+     still server-local. A hardcoded list is a substitution by another name: it silently
+     defines the part of the codebase the test can see. */
+  const routes = fs
+    .readdirSync(path.join(root, "app/api"), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => `app/api/${d.name}/route.ts`)
+    .filter((r) => fs.existsSync(path.join(root, r)));
 
-  it("uses the shared helper, never a local re-derivation", () => {
+  it("scans every route under app/api, not a hand-maintained list", () => {
+    expect(routes.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("no route derives a calendar date from the server clock", () => {
     for (const r of routes) {
       const src = strip(read(r));
-      expect(src, `${r} should import ptToday`).toMatch(/ptToday/);
-      expect(src, `${r} re-derives a date from the server clock`).not.toMatch(
-        /new Date\(\)\.toISOString\(\)\.slice\(0, ?10\)/,
+      expect(src, `${r} derives a date from the server clock`).not.toMatch(
+        /new Date\([^)]*\)\.toISOString\(\)\.slice\(0, ?10\)/,
       );
+      expect(src, `${r} calls shToday() (server-local inside the sandbox)`).not.toMatch(/shToday"\)\(\)/);
+    }
+  });
+
+  it("any route that does derive a date uses the shared Pacific helper", () => {
+    for (const r of routes) {
+      const src = strip(read(r));
+      // a route either has no date of its own, or it imports ptToday
+      const derives = /ptToday|toISOString\(\)\.slice/.test(src);
+      if (derives) expect(src, `${r} should import ptToday`).toMatch(/from "@\/lib\/server\/pt-date"/);
     }
   });
 

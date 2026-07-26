@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { gradedFromBlob, lineOf, type DayBlob } from "@/lib/pred-serialize";
+import { ptToday } from "@/lib/server/pt-date";
 import {
   CAL_START,
   applyWeeklyAdjustment,
@@ -99,7 +100,12 @@ export async function GET(req: NextRequest) {
     await redis(["SET", K_LASTRUN, String(now)]);
 
     const allDays = (((await redis(["SMEMBERS", DAYS_SET])) as string[] | null) ?? []).sort();
-    const today = new Date().toISOString().slice(0, 10);
+    /* PACIFIC, like every other date in this product. This was server-local and was
+       "safe because it runs at 09:30 UTC" — a load-bearing coincidence, and this whole
+       phase has been about changing when things run. Move the cron and a server-local
+       date silently grades the wrong day, which the reliability fit would absorb
+       without a symptom. */
+    const today = ptToday();
     let boxFetches = 0;
     let newlyGraded = 0;
 
@@ -201,7 +207,7 @@ export async function GET(req: NextRequest) {
     // prediction store is missing a date it should have (a failed cron run), which is
     // exactly when a ledger backfill is still wanted.
     try {
-      const cut = new Date(Date.now() - SUMMARY_DAYS * 86_400_000).toISOString().slice(0, 10);
+      const cut = ptToday(new Date(Date.now() - SUMMARY_DAYS * 86_400_000));
       const dayset = new Set(allDays);
       const rawLedger = (await redis(["GET", "pl:ledger:v1"])) as string | null;
       const ledger: LedgerDay[] = rawLedger ? ((JSON.parse(rawLedger) as { ledger?: LedgerDay[] }).ledger ?? []) : [];

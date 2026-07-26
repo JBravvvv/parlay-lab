@@ -28,30 +28,39 @@ Note for anyone reading the rebaseline diff: the fixture has prop files for only
 nine early events, so the six recovered games added **no prop rows** to the +6/+6/+5.
 **In production they will.** The fixture diff understates the real change.
 
-### THE BUDGET ASSUMES A BEHAVIOUR — stated out loud (Josh, 2026-07-25)
+### THE BUDGET IS ONE SCENARIO, NOT THREE (corrected 2026-07-25)
 
-**Every total below assumes client generates are ~0 on weekdays**, i.e. that the cron
-board is good enough to lock as-is. If a stale board cannot be locked honestly and the
-owner regenerates before locking, that is a second ~141–150 credit run on those days.
-Behaviour assumptions have already been wrong twice in this project — the 9:30am/pm
-ambiguity, and "pressing Generate writes a server board" — so this one is written down
-rather than left implicit.
+The three-scenario table was wrong, and the price-age lock guard is why. The weekday
+cron fires at 22:00 UTC = 3 PM PT; the owner locks at 5 PM PT; the board is then 2h old
+against a 30-minute limit, so **the guard blocks the lock and a regenerate is mandatory
+by design on every day he bets.** "Never regenerate" and "half the days" were fictional.
 
-Archive costs below are **measured from the archives themselves**, not from the cron
-schedules. `line-history.yml` is scheduled hourly but GitHub Actions actually delivers
-**~4.1 snapshots/day** (14-day count), so it costs **~25 credits/day, not 144**.
-`props-history` delivers its 2 snapshots/day reliably: ~161/day.
+Archive costs are measured from the archives themselves, not from the cron schedules:
+`line-history.yml` is scheduled hourly but GitHub Actions delivers **~4.1 snapshots/day**
+(14-day count) → ~25 credits/day, not 144. `props-history` delivers its 2/day reliably.
 
-| scenario | /day | /month | 20K | 100K |
-|---|---|---|---|---|
-| never regenerate | 372 | 11,300 | 57% | 11% |
-| regenerate half the weekdays | 422 | 12,800 | 64% | 13% |
-| **regenerate every day before locking** | **513** | **15,600** | **78%** | **16%** |
-| worst case the per-date cap allows (4 runs) | 831 | 25,300 | **126%** | 25% |
+| line | /day | note |
+|---|---|---|
+| cron generate | 141 | 22:00 UTC backstop; saturates at 150 on a 16+ game slate |
+| lock-guard regenerate | 141 | mandatory, not discretionary — the guard requires it |
+| `/api/clv` | 45 | |
+| line-history | 25 | measured, not scheduled |
+| props-history | 161 | scales with slate size |
+| **total** | **~513/day → ~15,600/month** | **78% of a 20K plan** |
 
-**All three realistic scenarios fit 20K. The per-date cap of 4 does NOT protect a 20K
-plan** — it bounds a leak at ~25,300/month, which is over. The cap bounds *abuse*, not
-*use*; the thing that keeps the bill down is that only one entry fires per day.
+**September:** slates run 15–16 games consistently (pennant races, fewer off days), and
+doubleheaders add more. Generate saturates at 150 each, and props-history scales to
+~192/day at 16 games → **~562/day ≈ 17,100/month ≈ 85% of 20K.**
+
+**It clears, with ~15% margin.** But that margin absorbs exactly one thing: a second
+regenerate on a day he changes his mind, which costs ~150 and puts a 16-game September
+day over. So the plainer tier argument is this rather than the asymmetry one — **78%
+today, 85% in September, and one extra regenerate a day breaks it.**
+
+### Superseded: the three-scenario table
+Kept for the record because the reasoning matters. It assumed regeneration was
+discretionary; the lock guard makes it structural. Any future budget that models
+"never regenerate" is modelling a workflow the guard forbids.
 
 ### Rebuilt totals — day-of-week split, one generate/day
 

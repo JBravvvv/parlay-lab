@@ -232,6 +232,30 @@ deliberately kept, still stored and still graded — and the training set, shoul
 lengthen. A constant that filters zero rows in September is doing its job, not
 loitering. Deleting it re-admits a two-policy sample the moment anything widens.
 
+### ⚠️ DO NOT "PASS UNGATED" TO PAD A THIN CARD (2026-07-25)
+
+Measured: on most prop rows the "de-vigged multi-book consensus" is **one book**, and in
+`batter_total_bases` **44% of the rows that include Caesars have Caesars as the only book
+in the pool** — so the independent check on Caesars is a de-vigged Caesars price. On those
+rows `consCzEv = f × czDec − 1 = 1/(1+h) − 1 ≈ −h`: measured hold median **7.1%**,
+`consCzEv` median **−6.60%**, and **100% of them fail `consMinEv` (−1%)**. The
+small-sample gate is reading the **hold**, not disagreement.
+
+**The fix is NOT to let those rows through.** A row with no independent market is the
+weakest case available, not an exempt one — the same principle as the Phase 3 band rule
+(*a missing sample size is never treated as certainty*). Owner's decision, 2026-07-25:
+**no independent consensus ⇒ NOT ELIGIBLE in an unproven market.**
+
+**The trap, written down before anyone reaches for it:** those rows already fail today,
+so any card-fill count already excludes them. If a count comes back thin, "pass them
+ungated" will look like a free way to pad it. It is not — it is loosening a shipped
+protection to solve a volume problem, which this document forbids. A thin card is
+information about the slate; it is not a bug to be tuned away.
+
+**Implementation note:** `finalizeCats` does not carry `books` onto board rows, so the
+rule is not implementable until the book count (or a settlement-book-only flag) is
+threaded through. Not a frozen-parameter change; still not to be built without sign-off.
+
 ### The censored window (2026-07-18 → 2026-07-25) — CENSORED, not corrupted
 
 `CAL_START` **does not move for this.** From 2026-07-18 (first cron) to the 2026-07-25
