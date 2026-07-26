@@ -267,9 +267,13 @@ Three things change because of this:
    quoted one-sided. `batter_home_runs` is `n = 0` on **all 4,524 rows across 12 days**;
    there has never been a de-vigged HR consensus in this dataset. For those rows the engine
    falls back to `fair = oneImp / 1.06` (`legacy/index.html` L2388) — the same posted price
-   with a flat 6% haircut. So `consCzEv` on a one-sided Caesars leg is
-   `1/1.06 − 1 = −5.66%`, a **constant**, which fails `consMinEv` (−1%) for every bet
-   regardless of its merits. HR is blocked today by arithmetic, not by evidence.
+   with a flat 6% haircut, so the "independent consensus" for such a row is the row's own
+   price. **CORRECTION (2026-07-25):** an earlier draft of this section said "HR is blocked
+   today by arithmetic" because `consCzEv` on a one-sided Caesars leg reduces to the constant
+   `1/1.06 − 1 = −5.66%`, below `consMinEv`. That constant is real, **but it never applies to
+   HR**: the consensus gate lives in `shAllocate`, `coreNoHR` keeps HR off core, and FUN does
+   not run through `shAllocate` at all (see the scope section below). **HR has never been
+   touched by this gate.**
 3. **Caesars is usually inside the fair rather than alone in it** — 56.5% of total-bases
    rows, 83.8% of H+R+RBI, 71.4% of outs. Requiring *two* independent books instead of one
    costs far more: 50.8% of total bases, 17.6% of hits, 15.0% of H+R+RBI. The rule below is
@@ -344,13 +348,116 @@ onto the board row at all. Four touch points:
 3. `finalizeCats` (~L2412) — emit both on the board row.
 4. `legOf` (L2537) — carry `booksInd` onto the ticket leg, so the gate can read it.
 
-Then the gate (L2877–2890) blocks a leg in an unproven market when `booksInd < 1`, reason
-`no_ind_consensus`. This changes selection, so it changes the parity digest: a deliberate,
-documented rebaseline — **not** a silencing one.
+Then the gate (L2877–2890) blocks, reason `no_ind_consensus`. This changes selection, so it
+changes the parity digest: a deliberate, documented rebaseline — **not** a silencing one.
 
 **Fallback if it cannot ship by 2026-07-28:** hold `batter_total_bases` (and
 `batter_home_runs`, which is 100% `n = 0`) out of selection until it does. Owner's stated
 preference, 2026-07-25: *"I'd rather lose a market for a week than run one ungated."*
+
+### SCOPE CORRECTION — `booksInd == 0` blocks regardless of `mktN` (owner, 2026-07-25)
+
+The rule was first written as "no independent consensus ⇒ not eligible **in an unproven
+market**", inheriting `consMinN`'s structure. **That structure does not transfer.** "100
+graded legs, so stop consulting the consensus" is coherent when a consensus *exists* and the
+question is whether to trust the model over it. It is incoherent when none was ever posted:
+graded volume cannot conjure a price nobody quoted. So the two cases separate:
+
+| condition | scope | why |
+|---|---|---|
+| `booksInd == 0` — **no independent read exists** | blocks **always**, at any `mktN` | nothing about the market's graded history makes an unposted price appear |
+| `booksInd >= 1` but the market is thin | gated only while `mktN < consMinN` | this is the "should we still consult it" question `consMinN` was built for |
+
+Had it shipped at the unproven-only scope, on 2026-07-28 HR crosses 100, both gates lift,
+and every HR row returns priced by `oneImp / 1.06` — a constant measured as a **floor**,
+applied to the **least liquid** rows, in the one market where nothing could be measured.
+
+#### The cost of the wider scope — measured
+
+Fixture board (9 prop-priced events), board rows and pregame tickets, counting anything the
+`books == 0` block would remove:
+
+| market | board rows | rows removed | core-eligible |
+|---|---|---|---|
+| `batter_home_runs` | 50 | **50 (100%)** | no — `coreNoHR` |
+| `batter_hits`, `batter_total_bases`, `batter_hits_runs_rbis`, `pitcher_strikeouts`, `pitcher_outs`, `ml`, `rl` | 138 | **0** | — |
+
+| ticket set | total | removed |
+|---|---|---|
+| `parlays` (pregame) | 99 | **12 — all of type `batter_home_runs`** |
+| `parlaysMixed` | 72 | **0** |
+
+**On this fixture the wider scope costs nothing on core and does not change card fill** —
+the entire cost is that FUN loses HR tickets, and FUN takes one ticket a day.
+
+**But the fixture understates it, and the archive says by how much.** The fixture slate
+happens to have zero `n = 0` total-bases rows. The 12-day archive has them on **every day
+with real volume**:
+
+| date | `batter_total_bases` `n=0` | `pitcher_outs` | `batter_hits` |
+|---|---|---|---|
+| 07-17 | 76/335 (23%) | 3/35 (9%) | 8/285 (3%) |
+| 07-18 | 51/239 (21%) | 0/18 | 9/223 (4%) |
+| 07-20 | 62/390 (16%) | 3/40 (8%) | 4/303 (1%) |
+| 07-21 | 43/375 (11%) | 3/33 (9%) | 7/291 (2%) |
+| 07-22 | 21/224 (9%) | 0/18 | 1/184 (1%) |
+| 07-24 | 71/388 (18%) | 1/32 (3%) | 4/280 (1%) |
+| 07-25 | 29/271 (11%) | 2/23 (9%) | 6/215 (3%) |
+
+Range 9–26%, never absent. Region scope was checked and matches — both the engine
+(`legacy/index.html` L1335) and `snapshot_props.py` fetch props at `regions=us`, so this is
+not a denominator artifact. **So a real slate WILL have core-eligible total-bases rows that
+this blocks, and the fixture's "zero core cost" must not be generalised.** How many reach the
+top-50 board cut is not knowable until a real board is measured — first opportunity is the
+2026-07-26 cron board.
+
+### DOES THE GATE TOUCH FUN AT ALL? — No, and that is a bigger hole than the rule
+
+**Answered by reading the call path, not inferred.** `shCardCalc` (L3177) computes
+`alloc = shAllocate(pool, ...)` and then calls `shFunPick(pool, SH.fun, ...)` — **on the same
+raw `pool`, not on the allocator's survivors.** `shFunPick` (L3027) filters on exactly five
+things: not already used, `prob >= funMinProb` (0.1%), `legs <= funMaxLegs`, a priced ticket
+in the selection mode, and an odds tier.
+
+So the FUN bucket bypasses **every** discipline gate in `shAllocate`:
+
+| gate | core | FUN |
+|---|---|---|
+| `coreEvMin` (+2% EV floor) | yes | **no** |
+| `coreCzEvMin` (settlement floor, override-proof) | yes | **no** |
+| `consMinN` / `consMinEv` (consensus gate) | yes | **no** |
+| `coreNoHR` / `coreMaxLegs` / `coreMaxDec` | yes | **no** |
+
+Consequences worth stating explicitly, because they are not obvious from any single file:
+`coreNoHR` means HR can *only* land on FUN, and FUN is ungated — therefore **the consensus
+gate has never evaluated a single HR ticket**, and the `−5.66%` constant that appeared to be
+protecting HR was never in that path. A `booksInd` rule written into `shAllocate` alone
+**documents a core protection and changes nothing for HR.** Whether the rule should also
+apply at `shFunPick` is a live decision, not a detail — it is the difference between the rule
+covering 0 and 12 of the fixture's affected tickets.
+
+### IS `booksInd == 0` DISTINGUISHABLE FROM "NOT QUOTED TONIGHT"? — partly, and the gap is now instrumented
+
+Three cases, and today only the first is cleanly separable:
+
+1. **Market not quoted at all** — no row is created, so there is nothing to block. Not a
+   false positive; it simply never enters the pipeline.
+2. **Structural absence** — many books post an over, none posts an under (anytime HR is the
+   pure case). `booksInd == 0`, correctly.
+3. **Feed degradation** — a book that normally posts both sides is missing from this pull, so
+   a row that is usually `n = 2` reads `n = 0` or `n = 1`.
+
+**Cases 2 and 3 are indistinguishable from `books` alone**, which is exactly why `no` (books
+posting an over at all) was added to `snapshot_props.py` tonight: structural absence shows
+*many* overs and zero pairs, degradation shows *few* of everything. Until that series
+accrues, the failure direction is at least the safe one — a hiccup makes a row **less**
+eligible, never more, and no row is ever admitted by an absent read. That is the same
+principle as the Phase 3 band rule.
+
+**What is NOT protected against:** a hiccup on a *thin* day silently shrinking the card while
+looking like structural absence. The mitigation is the same one this document already
+insists on — a thin card is information, not a bug to tune away — plus the `no` series making
+the two cases separable in ~2 weeks.
 
 ## THE `1.06` ONE-SIDED HAIRCUT — measured 2026-07-25, NOT changed
 
@@ -403,6 +510,8 @@ rows *toward* the gate rather than away, on 16.1% of total bases and 6.2% of out
    props-history stored only `fair`/`n`/`cz` for them — all null. HR rows in the archive are
    **empty shells with no price in them at all.**
 
+   **This is now scheduled rather than aspirational — see "The HR overround test" below.**
+
    The sensitivity is what matters, and it is wide:
 
    | if HR's true overround is… | czEV overstatement |
@@ -441,6 +550,58 @@ while leaving the difference it does imply unaddressed.
 measured* overround, floored at the observed two-sided value, and only once the one-sided
 rows can be audited directly. Do not guess a fatter number in the meantime — a guessed 1.12
 would be as unevidenced as the 1.06 it replaced.
+
+**"Once one-sided rows can be audited" now has a date, not an aspiration.** `bo`/`no` (added
+below) make the one-sided rows auditable directly, and the HR overround test (next section)
+is scheduled and self-gating. First reading ~**2026-08-09**; freeze exit is ~2026-09-22, so
+the evidence lands with ~6 weeks to spare.
+
+## THE HR OVERROUND TEST — built and scheduled 2026-07-25, first reading ~2026-08-09
+
+`tools/hr_overround.py` + `.github/workflows/hr-overround.yml` (Sundays 15:00 UTC,
+`--min-days 14`, so every run before ~2026-08-09 prints INSUFFICIENT and writes nothing).
+**Zero Odds API credits** — numerator from the prop archive, denominator from keyless
+statsapi box scores.
+
+**The estimator is exact, not approximate.** By linearity of expectation, the sum of
+P(player *i* hits ≥1 HR) over a set of players **is** E[distinct HR hitters in that set] —
+no independence assumption required, which is what makes anytime-HR measurable this way:
+
+```
+overround_HR = Σ implied(bo_i) over listed players
+             / realized distinct HR hitters AMONG THOSE SAME PLAYERS
+```
+
+`bo` (best over price across books) rather than any one book's price, because `bo` is what
+the fallback actually consumes (`oneImp = iO`, L2388). The player set is restricted to the
+same population on both sides.
+
+**Scratches are excluded from the primary figure.** A listed player who never appears carries
+posted probability and zero chance of a HR, so counting him inflates the estimate — and
+Caesars voids those bets anyway. Both variants are reported; the gap between them *is* the
+scratch effect (on 2026-07-24: 245 of 250 listed players appeared).
+
+**A bug caught during validation, worth recording.** The archive carries HR at **three**
+lines — on 2026-07-24: 0.5 × 250, 1.5 × 231, 2.5 × 210. Keying by player name without
+filtering silently keeps whichever line iterated last, and the estimator is exact **only**
+for P(≥1 HR): the 1.5/2.5 rows are P(≥2), P(≥3), which do not sum to E[distinct hitters].
+A first plumbing test with a single constant fake price could not reveal this — the row
+*count* came out right by construction. Re-running with line-distinct fake prices exposed it.
+The script now filters `point == 0.5` explicitly, which is also the only HR line the engine
+plays (locked rule).
+
+**What 14 days can and cannot settle.** The denominator is realized HR hitters — 22 across
+14 games on 2026-07-24, so ~300 by 2026-08-09, giving a Poisson SE of ~5.7% on the ratio.
+
+- **1.07 vs 1.3–1.5 — settled decisively** (a 22–42% gap, 4–7σ). This is the case that
+  matters: at 1.3–1.5 the constant is manufacturing double-digit phantom EV on every HR row.
+- **1.07 vs 1.15 — NOT settled at 14 days** (a 7.5% gap, ~1.3σ). Separating those needs
+  roughly four times the sample, i.e. ~8 weeks. Read the 2026-08-09 number with that in mind
+  and do not treat a 1.12 point estimate as a finding.
+
+Either decisive answer is worth the wait: at ~1.3–1.5 the FUN 0-13 HR record stops being
+unremarkable and gets a mechanism; at ~1.07 the constant is fine and HR's problem is
+elsewhere.
 
 ### Archive fields added 2026-07-25 (zero credits, effective from the next sweep)
 

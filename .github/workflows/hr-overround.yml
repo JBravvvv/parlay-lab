@@ -1,0 +1,43 @@
+name: hr-overround
+# Realized overround on the anytime-HR market — the one test that can settle whether
+# the hardcoded 1.06 one-sided haircut (legacy/index.html L2388) is manufacturing
+# phantom EV on every HR row. See docs/collection-period.md.
+#
+# Costs ZERO Odds API credits: the numerator comes from the prop archive already on
+# the line-history branch, the denominator from keyless statsapi box scores.
+#
+# SELF-GATING: --min-days 14 means every run before ~2026-08-09 prints
+# "INSUFFICIENT" and writes nothing. No reminder to miss.
+#
+# NOTE: like every other workflow here, this is only SCHEDULED if it exists on the
+# default branch (main). On frontend-rebuild it can still be run by hand.
+on:
+  schedule:
+    - cron: "0 15 * * 0"  # Sundays, 8am PT
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: line-history
+      - name: Fetch the measurement script from the app branch
+        run: |
+          git fetch --depth 1 origin frontend-rebuild
+          git checkout origin/frontend-rebuild -- tools/hr_overround.py
+      - name: Measure
+        run: python3 tools/hr_overround.py --dir data/props --min-days 14 --json data/hr_overround.json
+      - name: Commit the reading
+        run: |
+          git config user.name "engine-v2-bot"
+          git config user.email "noreply@github.com"
+          git checkout -- tools/hr_overround.py 2>/dev/null || true
+          git add data/hr_overround.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "hr overround: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
