@@ -195,3 +195,104 @@ additions from the same reasoning, not requests.
 **The general form:** any value that is computed in two places, or crosses a process
 boundary (engine ↔ cron, engine ↔ archive tool, JS ↔ Python), is a candidate. The
 question is never "is this code correct" but "do these two agree, and has anyone checked."
+
+## THE 8ed8dd2 RETRO DIFF — every mover identified, not just "nothing else moved"
+
+Run 2026-07-26 against the armed harness held constant while only the engine varied:
+`8ed8dd2` (the phase handoff) checked out in an isolated worktree, `tests/fixtures/fix45`
+and `tests/helpers/fixture-env.ts` copied in from HEAD, same `armedDigest`, same frozen
+clock, same pinned `SIM_PATHS_FIXTURE`.
+
+### The control lands exactly
+
+| section | 8ed8dd2 → HEAD |
+|---|---|
+| `categories.ml` | 9 → 15 rows (**+6**) |
+| `categories.rl` | 9 → 15 rows (**+6**) |
+| `batter_hits`, `batter_total_bases`, `batter_home_runs`, `pitcher_outs` | **+0, byte-identical** |
+| `categoriesLive`, `parlaysLive`, `alloc` | **byte-identical**, including the blocked list and its reason |
+
+**The six recovered games, and only the six.** The timezone fix behaved exactly as
+`docs/rebaseline-2026-07-25.md` says it should.
+
+### Two sections moved that the control does not explain — and they are the PINS
+
+`categories.pitcher_strikeouts` (8 rows) and `categories.batter_hits_runs_rbis` (14 rows)
+differed. The tell was in the tags: K rows carried **`ump-zone`** at `8ed8dd2` and did not
+at HEAD.
+
+- **K rows** — `SH_CFG.umpKFrozen` (commit `29400d0`). The fix45 context carries
+  `hpUmp.g` spanning 3/5/9/40 with `kFactor` set at g ≥ 5, precisely so the guard is
+  exercised, so `shUmpKf` fires at `8ed8dd2` and returns 1 at HEAD.
+- **H+R+RBI / ml / rl probabilities** — `SH_CFG.penQFrozen` (commit `2ee13c5`). fix45's
+  `pen_quality.ip` alternates 9.0/40.0, so half the teams clear the 15-IP guard;
+  `shPenQF` feeds `penH`/`penA` into the sim's late-game run scoring.
+
+**Proved constructively rather than asserted.** Re-running HEAD with
+`armedFixtureEngine({ pinned: false })` reproduces `8ed8dd2` **byte-for-byte** on
+`categories` (every market, including both movers), `categoriesLive`, `parlaysMixed`,
+`parlaysLive`, `alloc` and `fun`. Only `parlays` and `pool` still differ — and those are
+where the six recovered ml/rl games land (89 → 94 tickets, 42 → 48 pool).
+
+### Verdict
+
+| commit | change | verified effect on the board |
+|---|---|---|
+| `c5d0594` timezone fix | slate membership | **+6 ml, +6 rl** — the control |
+| `68c5743` price-age lock guard | `shLockCard` | **none** |
+| `1d64f53` propBoard | additive board key | **none** |
+| `0870d53` booksInd | fields + `shAllocate` gate | **none** (no affected ticket reaches the gate on this fixture) |
+| `2ee13c5` penQFrozen | pinned factor | **exactly the pin**, HRR/ml/rl probabilities |
+| `29400d0` umpKFrozen | pinned factor | **exactly the pin**, K probabilities |
+
+**Four commits verified as producing zero board change; two produce exactly their pin
+effects and nothing else.** The parity story is closed.
+
+### A correction this surfaced about my own claim
+
+I said the pins "change nothing today", citing the production measurement (`kFactor` null
+on all 15 real games, `pen_quality.ip` 3.0–12.3 against a 15-IP guard). **That is true in
+production and false on the armed fixture** — where they move 8 K rows and 14 H+R+RBI rows,
+because the fixture was deliberately built to exercise both guards. Production-inert,
+fixture-active. I should have predicted that in the diff rather than discovered it.
+
+## PAIR #2 — engine de-vig vs the Python archives. A real divergence; no measurement affected
+
+| | de-vig |
+|---|---|
+| engine (`shDevigPair`) | **Shin** (`shShin2`) whenever `SH_V2.shin` is armed — always, in production |
+| `tools/snapshot_props.py` | **proportional**, `io / (io + iu)` |
+| `tools/snapshot_odds.py` | **none — it stores RAW PRICES** (`compact()` keeps `{team: price}` per book) |
+
+Divergence measured across the realistic price range:
+
+| fav/dog | overround | proportional | Shin | diff |
+|---|---|---|---|---|
+| −110 / −110 | 1.048 | 50.00% | 50.00% | **0.00 pp** |
+| −200 / +170 | 1.037 | 64.29% | 64.81% | 0.53 |
+| −500 / +400 | 1.033 | 80.65% | 81.67% | 1.02 |
+| +400 / −520 | 1.039 | 19.25% | 18.06% | **1.19 pp** |
+
+Zero at even money, growing with imbalance — the known Shin property of attributing more
+of the vig to the longshot. Note `snapshot_props.py`'s docstring already says
+"proportional-devig … the classic CLV convention", so this is a **deliberate choice, not a
+bug**.
+
+### Which of this phase's retrospective measurements are affected? NONE.
+
+| measurement | de-vig dependent? | why |
+|---|---|---|
+| the **1.071 overround** | **no** | computed as `imp(o) + imp(u)` — the raw sum *before* any de-vig |
+| the **independence table** (`n`, books, Caesars-only) | **no** | counts whether a two-sided pair exists; the de-vig method cannot change that |
+| the **movement percentiles** | **no** | `line-history` stores raw prices and the percentiles were computed on raw implied points |
+
+The owner's prior was that overround and set membership were independent but that
+consensus-fair movement was not. The first two are right; the third is **also** independent,
+for a reason that had to be checked rather than assumed — the game-line archive never
+de-vigs anything.
+
+**Where the exposure actually is, for the future:** `props-history`'s stored `fair` field
+*is* proportional and is **not** the engine's fair — up to ~1.2 pp apart at long odds.
+Anything that later treats `props-history.fair` as the engine's consensus (a prop-CLV
+reader is the obvious candidate) inherits that bias. The HR overround test dodges it by
+construction: it consumes `bo`, the raw best price, not `fair`.
