@@ -5,6 +5,7 @@ import {
   CAL_START,
   applyWeeklyAdjustment,
   calibrationEligible,
+  fitByDisagreement,
   computeCalibration,
   fitGlobalShrink,
   fitReliability,
@@ -245,6 +246,9 @@ export async function GET(req: NextRequest) {
     // 2026-07-20: per-market reliability slopes + the backtested global
     // model-confidence shrink ride on the same nightly summary
     summary.reliability = fitReliability(graded);
+    // the pooled slope cannot see a model that is fine on the board and wrong where it is
+    // actually bet — see fitByDisagreement in engine2/calibration
+    summary.disagreement = fitByDisagreement(graded);
     summary.globalShrink = fitGlobalShrink(graded);
     await redisSetJson(K_SUMMARY, summary);
 

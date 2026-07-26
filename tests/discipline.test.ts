@@ -97,3 +97,52 @@ describe("discipline report", () => {
     expect(d.lifetime.noPlay.honored).toBe(0);
   });
 });
+
+/* CORE/FUN split (2026-07-26) — the misread this fixes: a NO-PLAY day locked with FUN
+   only used to count as an honored NO-PLAY *and* pour its stake and P/L into the `gated`
+   line, which is meant to be EV-gated core action. Both halves are asserted here. */
+describe("discipline — CORE and FUN are distinguishable", () => {
+  const day = (date: string, core: unknown[], funT: unknown[], grading: unknown) =>
+    ({ date, locked: true, core, funT, grading }) as never;
+  const tkt = (id: string, stake: number) => ({ id, stake, legs: [] });
+  const graded = (id: string, payout: number) => ({ tickets: { [id]: { result: payout > 0 ? "won" : "lost", payout } } });
+
+  it("a FUN-only lock on a NO-PLAY day does not masquerade as gated core action", () => {
+    const d = discipline(
+      [day("2026-07-20", [], [tkt("f1", 5)], graded("f1", 0))],
+      { "2026-07-20": { at: 1, mode: "ev_gated" } },
+      "2026-07-26",
+    );
+    const m = d.lifetime;
+    expect(m.noPlay.honored).toBe(1); // the CORE gate was honored — true, and still reported
+    expect(m.noPlay.funOnly).toBe(1); // but the day was not action-free, and now it says so
+    expect(m.gated.fun.tickets).toBe(1);
+    expect(m.gated.fun.staked).toBe(5);
+    expect(m.gated.core.tickets).toBe(0); // the number that used to be wrong
+    expect(m.gated.core.staked).toBe(0);
+  });
+
+  it("totals still equal core + fun, so nothing that read the old shape breaks", () => {
+    const d = discipline(
+      [day("2026-07-21", [tkt("c1", 100)], [tkt("f1", 5)], graded("c1", 250))],
+      {},
+      "2026-07-26",
+    );
+    const g = d.lifetime.gated;
+    expect(g.tickets).toBe(g.core.tickets + g.fun.tickets);
+    expect(g.staked).toBe(g.core.staked + g.fun.staked);
+    expect(g.pl).toBe(g.core.pl + g.fun.pl);
+    expect(g.core.pl).toBe(150);
+    expect(g.fun.pl).toBe(0); // ungraded FUN ticket contributes nothing to settled/pl
+    expect(g.fun.settled).toBe(0);
+  });
+
+  it("a day with core action is NOT counted as funOnly", () => {
+    const d = discipline(
+      [day("2026-07-22", [tkt("c1", 100)], [tkt("f1", 5)], graded("c1", 0))],
+      { "2026-07-22": { at: 1, mode: "ev_gated" } },
+      "2026-07-26",
+    );
+    expect(d.lifetime.noPlay.funOnly).toBe(0);
+  });
+});

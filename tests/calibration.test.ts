@@ -3,6 +3,8 @@ import {
   applyWeeklyAdjustment,
   calibrationLine,
   computeCalibration,
+  fitByDisagreement,
+  gapBucket,
   tierFor,
   wilson,
   WEEK_MS,
@@ -197,5 +199,46 @@ describe("upgrade 03: model vs consensus Brier over the same records (mktCmp)", 
     const s = computeCalibration([{ market: "ml", p: 60, edge: 1, lu: "confirmed" as const, res: "won" as const }]);
     expect(s.perMarket.ml.mktCmp).toBeNull();
     expect(s.perMarket.ml.n).toBe(1);
+  });
+});
+
+/* Disagreement-conditional slope (2026-07-26). The pooled slope is blind to a model that
+   prices the board well and the tail badly — the population it is USED on. */
+describe("fitByDisagreement — the tail the pooled slope cannot see", () => {
+  const pick = (p: number, pMkt: number, won: boolean): GradedPick => ({
+    market: "batter_hits_runs_rbis", p, pMkt, edge: p - pMkt, lu: "confirmed", res: won ? "won" : "lost",
+  });
+
+  it("buckets by |p − pMkt| on fixed edges, not sample quantiles", () => {
+    expect(gapBucket(50, 50)).toBe(0); // gap 0
+    expect(gapBucket(53, 50)).toBe(1); // gap 3
+    expect(gapBucket(58, 50)).toBe(2); // gap 8
+    expect(gapBucket(35, 50)).toBe(3); // gap 15 — sign-independent
+    expect(gapBucket(80, 50)).toBe(4); // gap 30, tail bucket
+  });
+
+  it("separates a model that is calibrated on the board and broken at the tail", () => {
+    const picks: GradedPick[] = [];
+    // low-disagreement rows: stated 55%, hits 55% — well calibrated
+    for (let i = 0; i < 200; i++) picks.push(pick(55, 54, i % 100 < 55));
+    // high-disagreement rows: stated 59%, hits 46% — the HRR shape
+    for (let i = 0; i < 200; i++) picks.push(pick(59, 34, i % 100 < 46));
+    const fits = fitByDisagreement(picks);
+    const low = fits[0]; // gap 1
+    const high = fits[4]; // gap 25
+    expect(low.n).toBe(200);
+    expect(high.n).toBe(200);
+    expect(low.actual).toBeCloseTo(0.55, 2);
+    expect(high.actual).toBeCloseTo(0.46, 2);
+    // the tail bucket over-states by ~13 points while the calibrated bucket does not
+    expect(high.predicted - high.actual).toBeGreaterThan(0.1);
+    expect(Math.abs(low.predicted - low.actual)).toBeLessThan(0.02);
+  });
+
+  it("excludes rows with no consensus baseline rather than assuming one", () => {
+    const fits = fitByDisagreement([
+      { market: "m", p: 60, pMkt: null, edge: null, lu: "confirmed", res: "won" },
+    ]);
+    expect(fits.reduce((s, f) => s + f.n, 0)).toBe(0);
   });
 });

@@ -49,7 +49,7 @@ export function mergeNoPlayLogs(a: NoPlayLog, b: NoPlayLog): NoPlayLog {
 
 /* ---- the Discipline report ---- */
 
-export type DiscLine = {
+export type DiscSplit = {
   tickets: number;
   staked: number;
   settled: number; // stake with a final grade — the ROI denominator
@@ -57,10 +57,36 @@ export type DiscLine = {
   roi: number | null; // pl / settled
 };
 
+/**
+ * CORE/FUN SPLIT (2026-07-26) — this report was a live misread risk without it.
+ *
+ * FUN is EV-gate-exempt BY DESIGN, and `overrode` is stamped only when the owner forces
+ * an allocation. So a NO-PLAY day on which only a FUN ticket was locked produced an entry
+ * with `overrode: false`, and the old `addEntry` folded `[...core, ...funT]` into ONE
+ * line — meaning that day counted as an **honored NO-PLAY** *and* contributed its stake
+ * and P/L to the **`gated`** line, which is supposed to represent EV-gated core plays.
+ * It read as "discipline held" while money moved, and it inflated the gated line's
+ * denominator with action that never faced the gate.
+ *
+ * `core`/`fun` are additive; the top-level totals are unchanged, so nothing that already
+ * read this type breaks.
+ */
+export type DiscLine = DiscSplit & {
+  core: DiscSplit; // tickets that faced the EV gate, the settlement floor and the consensus gates
+  fun: DiscSplit; // tickets that faced NONE of them (see the FUN table in docs/collection-period.md)
+};
+
 export type DisciplineScope = {
   gated: DiscLine; // tickets locked on days that passed the gate
   override: DiscLine; // tickets locked on days stamped overrode
-  noPlay: { honored: number; overridden: number };
+  noPlay: {
+    honored: number;
+    overridden: number;
+    /** NO-PLAY days that were locked with FUN only. Counted inside `honored` — the core
+        gate WAS honored — but surfaced separately, because "I bet nothing" and "I bet the
+        lottery ticket" are different days and the panel must not show them as one. */
+    funOnly: number;
+  };
 };
 
 export type Discipline = { month: DisciplineScope; lifetime: DisciplineScope };
@@ -68,19 +94,31 @@ export type Discipline = { month: DisciplineScope; lifetime: DisciplineScope };
 type Grade = { result?: string; payout?: number };
 type Ticket = { id?: string; stake?: number };
 
-const emptyLine = (): DiscLine => ({ tickets: 0, staked: 0, settled: 0, pl: 0, roi: null });
+const emptySplit = (): DiscSplit => ({ tickets: 0, staked: 0, settled: 0, pl: 0, roi: null });
+const emptyLine = (): DiscLine => ({ ...emptySplit(), core: emptySplit(), fun: emptySplit() });
+
+function addTickets(into: DiscSplit[], tix: Ticket[], grades: Record<string, Grade>) {
+  for (const t of tix) {
+    const stake = Number(t.stake) || 0;
+    const g = t.id ? grades[t.id] : undefined;
+    const settled = !(!g || g.result === "pending" || g.result === "ungradable");
+    const pl = settled ? (Number(g.payout) || 0) - stake : 0;
+    for (const l of into) {
+      l.tickets++;
+      l.staked += stake;
+      if (settled) {
+        l.settled += stake;
+        l.pl += pl;
+      }
+    }
+  }
+}
 
 function addEntry(line: DiscLine, e: SyncEntry) {
   const grades = ((e.grading as { tickets?: Record<string, Grade> } | null)?.tickets ?? {}) as Record<string, Grade>;
-  for (const t of [...((e.core as Ticket[]) ?? []), ...((e.funT as Ticket[]) ?? [])]) {
-    line.tickets++;
-    const stake = Number(t.stake) || 0;
-    line.staked += stake;
-    const g = t.id ? grades[t.id] : undefined;
-    if (!g || g.result === "pending" || g.result === "ungradable") continue;
-    line.settled += stake;
-    line.pl += (Number(g.payout) || 0) - stake;
-  }
+  // each ticket lands in the total AND in its bucket — one pass, so they cannot diverge
+  addTickets([line, line.core], (e.core as Ticket[]) ?? [], grades);
+  addTickets([line, line.fun], (e.funT as Ticket[]) ?? [], grades);
 }
 
 /**
@@ -102,10 +140,20 @@ export function discipline(entries: SyncEntry[], noplay: NoPlayLog, today: strin
       if (!inScope(e.date)) continue;
       addEntry((e as { overrode?: boolean }).overrode === true ? override : gated, e);
     }
-    for (const l of [gated, override]) l.roi = l.settled > 0 ? l.pl / l.settled : null;
-    const honored = Object.keys(noplay).filter((d) => inScope(d) && d < today && !ovDates.has(d)).length;
+    for (const l of [gated, override, gated.core, gated.fun, override.core, override.fun])
+      l.roi = l.settled > 0 ? l.pl / l.settled : null;
+    const honoredDays = Object.keys(noplay).filter((d) => inScope(d) && d < today && !ovDates.has(d));
+    const honored = honoredDays.length;
+    // a NO-PLAY day locked with FUN and no core: the gate was honored, but it was not a
+    // day with no action, and the panel must be able to say so
+    const funOnlyDates = new Set(
+      locked
+        .filter((e) => ((e.core as Ticket[]) ?? []).length === 0 && ((e.funT as Ticket[]) ?? []).length > 0)
+        .map((e) => e.date),
+    );
+    const funOnly = honoredDays.filter((d) => funOnlyDates.has(d)).length;
     const overridden = [...ovDates].filter(inScope).length;
-    return { gated, override, noPlay: { honored, overridden } };
+    return { gated, override, noPlay: { honored, overridden, funOnly } };
   };
 
   return {

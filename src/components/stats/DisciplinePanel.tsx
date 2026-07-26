@@ -6,7 +6,7 @@ import { FilterPill } from "@/components/ui/Pill";
 import { Reveal } from "@/components/motion/Reveal";
 import { useLedger } from "@/lib/useLedger";
 import { getNoPlayLog, todayStr } from "@/lib/engine-client";
-import { discipline, type DiscLine } from "@/lib/noplay";
+import { discipline, type DiscSplit } from "@/lib/noplay";
 import type { SyncEntry } from "@/lib/ledger-merge";
 
 /**
@@ -20,10 +20,14 @@ import type { SyncEntry } from "@/lib/ledger-merge";
 const money = (v: number, sign = false) => `${v < 0 ? "−" : sign && v > 0 ? "+" : ""}$${Math.abs(v).toFixed(2).replace(/\.00$/, "")}`;
 const roiF = (r: number | null) => (r == null ? "—" : `${r >= 0 ? "+" : ""}${(r * 100).toFixed(1)}%`);
 
-function Line({ label, l, tone }: { label: string; l: DiscLine; tone: "pos" | "neg" }) {
+function Line({ label, l, tone }: { label: string; l: DiscSplit; tone: "pos" | "neg" | "muted" }) {
   return (
     <tr className="border-t border-white/[0.04]">
-      <td className={`py-1.5 font-sans font-semibold ${tone === "pos" ? "text-text" : "text-neg"}`}>{label}</td>
+      <td
+        className={`py-1.5 font-sans font-semibold ${tone === "pos" ? "text-text" : tone === "neg" ? "text-neg" : "text-muted"}`}
+      >
+        {label}
+      </td>
       <td className="py-1.5 text-right text-muted">{l.tickets}</td>
       <td className="py-1.5 text-right">{money(l.staked)}</td>
       <td className={`py-1.5 text-right ${l.pl > 0 ? "text-pos" : l.pl < 0 ? "text-neg" : "text-muted"}`}>{money(l.pl, true)}</td>
@@ -68,8 +72,13 @@ export function DisciplinePanel() {
               </tr>
             </thead>
             <tbody>
-              <Line label="Gated" l={s.gated} tone="pos" />
-              <Line label="Override" l={s.override} tone="neg" />
+              {/* CORE and FUN are split because FUN is EV-gate-exempt BY DESIGN. Folded
+                  together, a FUN-only lock on a NO-PLAY day showed up as gated core
+                  action — discipline held while money moved. */}
+              <Line label="Gated · core" l={s.gated.core} tone="pos" />
+              <Line label="Gated · fun" l={s.gated.fun} tone="muted" />
+              <Line label="Override · core" l={s.override.core} tone="neg" />
+              <Line label="Override · fun" l={s.override.fun} tone="muted" />
             </tbody>
           </table>
         </div>
@@ -78,9 +87,19 @@ export function DisciplinePanel() {
           <span className="text-pos">{s.noPlay.honored} honored</span>
           <span className="text-faint"> · </span>
           <span className={s.noPlay.overridden > 0 ? "text-neg" : "text-muted"}>{s.noPlay.overridden} overridden</span>
+          {s.noPlay.funOnly > 0 ? (
+            <>
+              <span className="text-faint"> · </span>
+              <span className="text-muted" title="The core gate was honored, but a FUN ticket was still locked — not an action-free day">
+                {s.noPlay.funOnly} fun-only
+              </span>
+            </>
+          ) : null}
         </div>
         <div className="mt-2 text-[10.5px] leading-relaxed text-faint">
-          Override figures come from the ledger&apos;s own per-day stamp. A NO-PLAY verdict counts as honored once its
+          FUN never faces the EV gate, the settlement floor or the consensus gates, so its rows are shown apart
+          from core rather than added to it — a &quot;fun-only&quot; NO-PLAY day honored the core gate but was not an
+          action-free day. Override figures come from the ledger&apos;s own per-day stamp. A NO-PLAY verdict counts as honored once its
           day ends with no override lock; honored counting starts from this deploy (nothing reconstructed), so early
           numbers undercount the discipline, never the overrides.
         </div>

@@ -147,6 +147,9 @@ export type CalibrationSummary = {
   /* 2026-07-20: reliability slopes per market (+ pooled "all") and the fitted
      global model-confidence shrink — attached by the nightly cron */
   reliability?: Record<string, { n: number; slope: number | null; se: number | null }>;
+  /* 2026-07-26: the same slope, bucketed by |p − pMkt|. The pooled figure cannot see a
+     model that is fine on the board and wrong where it is actually bet. */
+  disagreement?: DisagreementFit[];
   globalShrink?: { s: number; n: number; slopeBefore: number | null; slopeAfter: number | null };
 };
 
@@ -277,6 +280,71 @@ export function fitReliability(picks: GradedPick[]): Reliability {
     out[m] = { n: sel.length, slope: f.slope, se: f.se };
   }
   return out;
+}
+
+/**
+ * SLOPE CONDITIONED ON DISAGREEMENT (2026-07-26) — the pooled slope hides the tail.
+ *
+ * The fit population is the WHOLE board (~203 rows/day), but the model is USED at the
+ * tail: only rows where it disagrees with the market enough to clear +2% EV are ever
+ * backed. A model can be well calibrated on the ~195 rows nobody bets and badly
+ * calibrated on the ~8 that clear the gate; pooled, that reads ~1.0, nothing fires, and
+ * the bets keep losing.
+ *
+ * That is not hypothetical. H+R+RBI hit 46.3% against 59.2% implied on BET legs while the
+ * pooled slope over all rows read 1.74 — two populations, two answers, and the pooled
+ * number is the one that could not see it.
+ *
+ * So: bucket by |p − pMkt| (stated probability minus the de-vigged consensus, in points)
+ * and fit the same OLS slope inside each bucket. If the slope degrades as disagreement
+ * grows, that IS the finding, and it is invisible by construction in the pooled figure.
+ *
+ * Deliberately the same QUANTITY Phase 2 will measure against the closing line — this is
+ * the outcome-graded version of it. Phase 2 should swap the grading input, not rebuild the
+ * bucketing, so `gapBucket` is exported for reuse.
+ */
+export type DisagreementFit = {
+  lo: number; // inclusive lower bound of |p − pMkt|, in probability POINTS
+  hi: number; // exclusive upper bound (Infinity on the tail bucket)
+  n: number;
+  meanGap: number; // realised mean |p − pMkt| inside the bucket
+  slope: number | null;
+  se: number | null;
+  actual: number; // realised hit rate
+  predicted: number; // mean stated probability
+};
+
+/** Fixed edges, not sample quantiles: buckets must mean the same thing week to week. */
+export const GAP_EDGES: [number, number][] = [
+  [0, 2], [2, 5], [5, 10], [10, 20], [20, Infinity],
+];
+
+export function gapBucket(p: number, pMkt: number): number {
+  const g = Math.abs(p - pMkt);
+  for (let i = 0; i < GAP_EDGES.length; i++) if (g >= GAP_EDGES[i][0] && g < GAP_EDGES[i][1]) return i;
+  return GAP_EDGES.length - 1;
+}
+
+/**
+ * Per-bucket fit. `market` optional — omitted pools every market, which is the honest
+ * default at current sample sizes; per-market slicing here would be powerless.
+ */
+export function fitByDisagreement(picks: GradedPick[], market?: string): DisagreementFit[] {
+  const sel = picks.filter((x) => x.pMkt != null && (market == null || x.market === market));
+  return GAP_EDGES.map(([lo, hi], i) => {
+    const b = sel.filter((x) => gapBucket(x.p, x.pMkt as number) === i);
+    const xs = b.map((x) => x.p / 100);
+    const ys = b.map((x) => (x.res === "won" ? 1 : 0));
+    const f = olsSlope(xs, ys);
+    const mean = (a: number[]) => (a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : 0);
+    return {
+      lo, hi, n: b.length,
+      meanGap: Math.round(mean(b.map((x) => Math.abs(x.p - (x.pMkt as number)))) * 100) / 100,
+      slope: f.slope, se: f.se,
+      actual: Math.round(mean(ys) * 1000) / 1000,
+      predicted: Math.round(mean(xs) * 1000) / 1000,
+    };
+  });
 }
 
 /** Replay a stated probability at confidence s against its consensus anchor. */

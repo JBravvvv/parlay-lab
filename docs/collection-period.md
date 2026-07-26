@@ -1183,9 +1183,219 @@ Instrument readiness, checked 2026-07-26:
 | Calibration slopes | **NO** — `fitReliability` groups by market only; nothing carries the bucket into `GradedPick` |
 | Discipline report | **NO** — `discipline()` counts gated-vs-override days; FUN never faces the gate, so it is structurally absent rather than filtered |
 
-**Two gaps, flagged now while they are cheap.** The calibration one is the live risk: FUN
-legs are graded into the same reliability fit as core legs, so **FUN outcomes are already
-moving the per-market slopes that steer core weights** — a bucket exempt from the EV gate
-is contributing to the calibration that gates core. Fixing it needs a bucket field on
-`GradedPick`, which must be captured *during* the window; it cannot be backfilled. Not
-built — flagged, with the same no-backfill logic as CLV.
+### CORRECTION (2026-07-26) — I had the calibration gap wrong
+
+An earlier draft said *"FUN legs are graded into the same reliability fit as core legs, so
+FUN outcomes are already moving the per-market slopes that steer core weights."* **That
+framing is wrong, and the fit population is why.** Traced through `app/api/calibrate`:
+
+```
+for (const date of allDays.slice(-SUMMARY_DAYS))     -> graded.push(...gradedFromBlob(blob))
+```
+
+`gradedFromBlob` returns **every settled row in the prediction blob**, and
+`boardToPredictions` logs the **whole pregame board** (~203 records/day), not the rows that
+reached a ticket. The ledger-join branch below it is explicitly skipped for any date the
+prediction store covers (`dayset.has(e.date)`), so on a normal day it contributes nothing.
+
+**So the fit population is ALL PREGAME BOARD ROWS.** A FUN leg is not an extra row in the
+fit — it is a row that would have been in the fit whether or not it was ever bet. **Nothing
+is contaminated by FUN; the rows are simply unlabelled.** The bucket is *diagnostic*, not
+*corrective*.
+
+**What the bucket actually buys**, stated properly: the ability to ask whether the model is
+worse **in the probability region FUN operates in** — long-odds, low-probability legs — than
+in the region core operates in. That is a real and useful question, and a different one from
+"is FUN corrupting core's weights." It cannot be answered today because nothing marks which
+rows those were.
+
+**And it does NOT need a new captured field.** The join is fully reconstructible from data
+already being captured: the ledger stores every locked leg's `lkey` under `core[]` vs
+`funT[]` (`shTicketSnap`), the prediction blob stores every row's `lkey` for the same date,
+and the leg-disjointness rule guarantees no `lkey` is in both buckets on one day. So the
+bucket is a **query at freeze exit, not a capture during the window** — this is not a
+CLV-style unrecoverable field, and adding one would be redundant schema.
+
+### DESIGN INTENT — the fit is dominated by rows that were never bet
+
+Stated because it is load-bearing and was never written down: **the reliability slopes that
+steer core weights are fitted on ~203 board rows/day, of which only a handful are ever
+backed.** That is calibrating *pricing*, not *betting*.
+
+It is defensible, and it is the right default: the model's job is to price the board, the
+sample is ~30× larger, and restricting the fit to bet rows would introduce a selection
+effect — bet rows are exactly the rows where the model disagreed most with the market, which
+is the least representative slice available for measuring calibration.
+
+But the consequence has to be held in view: **a slope can move on rows the money never
+touched.** Anyone reading a per-market slope should read it as "the model prices this market
+X% too confidently," never as "this market lost money."
+
+### The Discipline gap was a live misread, and it is FIXED (2026-07-26)
+
+Not merely a reporting limitation. Traced: `overrode` is stamped only when the owner forces
+an allocation (`alloc.overrode = force && disciplined mode`). A NO-PLAY day locked with FUN
+only therefore produced an entry with `overrode: false`, and `addEntry` folded
+`[...core, ...funT]` into ONE line. That day counted as an **honored NO-PLAY** *and* poured
+its stake and P/L into the **`gated`** line — the line that is supposed to mean EV-gated core
+action. **It read as discipline held while money moved**, and it inflated the gated ROI
+denominator with action that never faced a gate. Worse than either of the two failure modes
+that were anticipated.
+
+Fixed additively in `src/lib/noplay.ts`: every `DiscLine` now carries `core` and `fun`
+sub-lines (totals unchanged, so nothing that read the old shape breaks), and
+`noPlay.funOnly` counts NO-PLAY days locked with FUN and no core. The panel shows four rows
+(Gated · core / Gated · fun / Override · core / Override · fun) and a "fun-only" chip.
+Three tests pin it, including that totals still equal core + fun.
+
+### `booksInd` on ML/RL is a NO-OP in practice — written down, not left to be rediscovered
+
+The gate reads `booksInd` on every leg regardless of market, which is right for symmetry.
+On game markets it will essentially never fire, and that should be recorded rather than
+turning up as a "finding" in six weeks.
+
+Measured on the captured real slate (15 games, `tests/fixtures/fix39/odds.json`):
+
+| market | `books` (pool) | `booksInd` min / median / max | rows at `booksInd == 0` |
+|---|---|---|---|
+| ML | 11 | **10 / 10 / 10** | **0** |
+| RL | — | **6 / 10 / 10** | **0** |
+
+Game markets are also the only ones fetched with `regions=us,eu` (L1231), so their pools are
+the deepest in the system — the line-history archive puts the ML pool median at 31 books.
+`ml_booksInd`/`rl_booksInd` reaching 0 would require every book except Caesars to stop
+quoting a game. **The rule does no work on ML/RL. It is kept for symmetry and because a
+market that silently loses its consensus should still be caught.**
+
+`ml_books`/`rl_books` were deliberately NOT repurposed — they still mean pool size and drive
+the "consensus of N books" tag on the board. Changing displayed board text to satisfy a gate
+would have been the wrong trade.
+
+## THE FIT POPULATION, THE FUN FRAMING, AND WHAT THE POOLED SLOPE CANNOT SEE
+
+### CORRECTION (2026-07-26) — I had the calibration gap wrong
+
+An earlier draft said *"FUN legs are graded into the same reliability fit as core legs, so
+FUN outcomes are already moving the per-market slopes that steer core weights."* **Wrong.**
+Traced through `app/api/calibrate/route.ts`:
+
+```
+for (const date of allDays.slice(-SUMMARY_DAYS))  ->  graded.push(...gradedFromBlob(blob))
+```
+
+`gradedFromBlob` returns **every settled row in the prediction blob**, and
+`boardToPredictions` logs the **whole pregame board** (~203 records/day), not the rows that
+reached a ticket. The ledger-join branch below it is skipped outright for any date the
+prediction store covers (`dayset.has(e.date)`), so on a normal day it contributes nothing.
+
+**The fit population is ALL PREGAME BOARD ROWS.** A FUN leg is not an extra row — it is a
+row that would be in the fit whether or not it was ever bet. **Nothing is contaminated by
+FUN; the rows are simply unlabelled.** The bucket is *diagnostic*, not *corrective*.
+
+**No bucket field was added, and that is deliberate.** The join is fully reconstructible:
+the ledger stores every locked leg under `core[]` vs `funT[]` with its `lkey` and `gkey`
+(`shTicketSnap`), and the prediction blob stores the same keys for the same date. This is a
+**query at freeze exit, not a capture during the window** — the CLV no-backfill rule does
+not apply, and adding a field would be redundant schema.
+
+### DESIGN INTENT — the fit is dominated by rows that were never bet
+
+Recorded because it is load-bearing and was never written down: **the reliability slopes
+that steer core weights are fitted on ~203 board rows/day, of which only a handful are ever
+backed.** That is calibrating *pricing*, not *betting*.
+
+It is defensible and it is the right default: the model's job is to price the board, the
+sample is ~30× larger, and restricting the fit to bet rows would introduce a selection
+effect — bet rows are exactly the rows where the model disagreed most with the market, the
+least representative slice available for measuring calibration.
+
+> **The consequence, which will matter at freeze exit: a per-market slope means "the model
+> prices this market X% too confidently," never "this market lost money."** A slope can move
+> on rows the money never touched.
+
+### THE SELECTION EFFECT CUTS BOTH WAYS — disagreement-conditional slope added
+
+The argument above justifies fitting on all rows. It does **not** justify reading only the
+pooled number. The model is *used* at the tail: only rows where it disagrees with the market
+enough to clear +2% EV are ever backed. A model can be well calibrated on the ~195 rows
+nobody bets and badly calibrated on the ~8 that clear the gate. Pooled, that reads ~1.0,
+nothing fires, and the bets keep losing.
+
+**This already happened.** H+R+RBI hit **46.3% against 59.2% implied on BET legs** while the
+pooled slope over all rows read **1.74**. Two populations, two answers — and the pooled
+number is the one that could not see it.
+
+So `fitByDisagreement` (`src/engine2/calibration.ts`) fits the same OLS slope inside fixed
+buckets of `|p − pMkt|` — 0–2, 2–5, 5–10, 10–20, 20+ probability points — and
+`/api/calibrate` writes it to `summary.disagreement` nightly. Edges are **fixed, not sample
+quantiles**, so a bucket means the same thing week to week. Markets are pooled: per-market
+slicing at current sample sizes would be powerless.
+
+**Built for Phase 2 to reuse, not duplicate.** This is the same quantity Phase 2 will
+measure against the closing line — outcome-graded here, close-graded there. `gapBucket` is
+exported so Phase 2 swaps the grading input and keeps the bucketing.
+
+### The Discipline gap was a live misread, and it is FIXED
+
+`overrode` is stamped only when the owner forces an allocation. A NO-PLAY day locked with
+FUN only therefore produced `overrode: false`, and `addEntry` folded `[...core, ...funT]`
+into ONE line — so that day counted as an **honored NO-PLAY** *and* poured its stake and P/L
+into the **`gated`** line, the line meant to represent EV-gated core action. **It read as
+discipline held while money moved**, and inflated the gated ROI denominator with action that
+never faced a gate. Worse than either anticipated failure mode.
+
+Fixed additively in `src/lib/noplay.ts`: every `DiscLine` carries `core` and `fun` sub-lines
+(totals unchanged, so nothing reading the old shape breaks) and `noPlay.funOnly` counts
+NO-PLAY days locked with FUN and no core. The panel shows four rows plus a "fun-only" chip.
+
+**On quantifying the historical damage:** the correction is **not forward-only**. `funOnly`
+is computed from stored history — locked ledger entries with empty `core` and non-empty
+`funT`, intersected with the existing `pl:noplay:v1` log — so opening the Discipline panel
+now reports the count over every day already in the log. What remains forward-only is the
+log's own start (2026-07-24), which the panel footnote already discloses. The count itself
+cannot be computed from here: both the ledger and the no-play log are sync-phrase gated and
+that phrase is the owner's to type.
+
+### `booksInd` on ML/RL is a NO-OP in practice
+
+Measured on the captured real slate (15 games, `tests/fixtures/fix39/odds.json`):
+
+| market | pool | `booksInd` min / median / max | rows at 0 |
+|---|---|---|---|
+| ML | 11 | **10 / 10 / 10** | **0** |
+| RL | — | **6 / 10 / 10** | **0** |
+
+Game markets are the only ones fetched at `regions=us,eu` (L1231), so their pools are the
+deepest in the system — line-history puts the ML pool median at 31 books. Reaching 0 would
+require every book except Caesars to stop quoting a game.
+
+**Note RL's min of 6 against ML's 10: run-line pools are measurably thinner.** Never zero,
+so the conclusion stands, but if anything ever erodes these pools **RL is where it shows
+first** — the run line is quoted at the modal point only, so a book disagreeing on the point
+drops out of the fair entirely.
+
+`ml_books`/`rl_books` were NOT repurposed — they still mean pool size and drive the
+"consensus of N books" board tag. Changing displayed text to satisfy a gate is the wrong trade.
+
+### WORKLIST PAIR #1 — RUN, and it found a real precondition
+
+`boardToPredictions` vs `shTicketSnap` for the same leg (`tests/pair-pred-vs-lock.test.ts`).
+Result: **the values agree — but `lkey` alone is NOT a safe join key.**
+
+Prop lkeys are `player|market|line`, globally unique on a slate. **ML/RL lkeys are the
+literals `ml_home` / `ml_away` / `rl_home` / `rl_away`, identical in every game.** A
+freeze-exit reconstruction keyed on `lkey` alone collapses all 15 games' game-market rows
+into one and silently mis-attributes them — the exact silent-undercount failure the join was
+supposed to be checked for. My first version of the test did precisely this and produced 22
+spurious mismatches, all `ml_*`/`rl_*`, none prop.
+
+**The join key is `gkey|lkey`.** Both channels carry `gkey`, and the prediction record's own
+primary key is already `gkey|lkey|sub`, so the store was never at risk — only a naive join
+was. With the composite key: every ticket leg has a matching prediction row, and `est`/`p`
+and `imp`/`pMkt` agree exactly. **Keys are clean, so no bucket field — confirmed by
+measurement rather than by reading the code.**
+
+**Supplemental locks preserve leg-disjointness.** `shSupplementalCalc` builds its exclusion
+set from the *locked entry's* `core.concat(funT)` and passes it to `shFunPick` as
+`excludeLegs`, so a supplemental cannot reuse a leg already on that day's card. No second
+failure mode for the join.
