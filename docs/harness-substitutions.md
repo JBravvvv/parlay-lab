@@ -120,3 +120,53 @@ never reached through the `collectSlate` / `analyze` facade the Next app uses:
 Both are dead code in the Next app and retire with `legacy/` at cutover. They are named
 here so a future reader doesn't find a timezone-sensitive function still in the file and
 assume the defect is still live.
+
+## THE SILENT NO-OP IS A CLASS, NOT A COINCIDENCE (2026-07-25)
+
+Three instances now, each found by accident while looking for something else:
+
+| # | instance | what was silently doing nothing | how it surfaced |
+|---|---|---|---|
+| 1 | **`obSameDay` substituted in tests** | the harness replaced the real date gate, so the suite could not see that the server board was dropping ~24% of every slate | a timezone probe for an unrelated question |
+| 2 | **`calW` missing the merge** | per-market calibration multipliers were computed and never applied on one of the two arming surfaces | a config diff between the cron and the client |
+| 3 | **`data/pen_quality.json` never committed** | `shPenQF` returned identity for every team, every day, from the day it shipped | a workflow divergence audit for an unrelated push to `main` |
+
+None of the three was a crash, a wrong number, or a failing test. **In all three cases the
+system reported success while a component contributed nothing.** Three is a class.
+
+### The general rule
+
+> **Anything that can return an identity value on missing, stale, or insufficient data must
+> be observable somewhere — so that "contributing nothing" is never indistinguishable from
+> "working."**
+
+Identity fallbacks are the correct *behaviour* (a factor that guesses on thin data is worse
+than one that abstains — the `ip >= 15` guard in `shPenQF` was right). The defect is that
+abstention is **unobservable**. A guard that refuses to act should say so.
+
+### What this obliges, concretely
+
+1. **Every identity-returning factor is counted, not just implemented.**
+   `tools/factor_activity.py` reports the live share of all seven on a real slate, and
+   `docs/collection-period.md` carries a dated baseline. A material change in a share is a
+   finding with the same standing as a frozen-parameter drift.
+2. **A test that a factor CAN act is not a test that it DOES act.** All seven have unit
+   tests proving the formula. All seven passed while two of them were returning identity on
+   every real row. Unit coverage of the calculation and coverage of its *activation* are
+   different things, and only the second would have caught any of these.
+3. **A guard threshold is a scheduled event, not a constant.** `shPenQF` fails a 15-IP guard
+   forever because its data never accumulates; `shUmpKf` fails a 5-game guard **today** and
+   will pass it around 2026-08-04 with no code change. Both are invisible to a value-based
+   drift check. Any new guard threshold should be recorded with the date it is expected to
+   clear, or with an explicit note that it never will.
+4. **Deriving a value and committing it are different steps.** The `pen_quality` *aggregate*
+   was present and plausible in `context.json` the whole time; only the accumulating source
+   DB was missing. Inspecting the artifact showed nothing wrong. When a workflow writes both
+   a derived artifact and a state file, the state file is the one that silently rots.
+
+### The pattern in all three
+
+Each was caught by comparing **two things that should have been identical** — test harness
+vs production, cron config vs client config, `main`'s workflow vs `frontend-rebuild`'s.
+None was caught by reading one of them carefully. That is the reusable technique: when a
+component exists in two places, diff them; the diff finds what inspection does not.

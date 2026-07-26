@@ -83,8 +83,24 @@ describe("shPenQF — bullpen quality (rolling pen ERA vs league)", () => {
     expect(eng().get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBe(1);
     expect(armed().get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBe(1);
   });
-  it("leaky pen boosts opposing late offense; shutdown pen trims it (both capped)", () => {
+  /* SH_CFG.penQFrozen (2026-07-25) pins shPenQF off for the collection period. The
+     formula tests below still exercise the MATH — they just have to unfreeze first,
+     because the pin is an outer guard, not a change to the calculation. Rebaselining
+     these expectations to 1 would have deleted the only coverage the formula has. */
+  const unfrozen = () => {
     const e = armed();
+    const cfg = e.get<Record<string, unknown>>("SH_CFG");
+    e.set("SH_CFG", { ...cfg, penQFrozen: false });
+    return e;
+  };
+  it("is PINNED OFF by default for the freeze — identity for every input", () => {
+    const e = armed();
+    e.set("SH_CTX", ctx(6.0, 60)); // would be 1.06 unfrozen; the guard precedes the math
+    expect(e.get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBe(1);
+    expect(e.get<Record<string, unknown>>("SH_CFG").penQFrozen).toBe(true);
+  });
+  it("leaky pen boosts opposing late offense; shutdown pen trims it (both capped)", () => {
+    const e = unfrozen();
     e.set("SH_CTX", ctx(6.0, 60));
     expect(e.get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBeCloseTo(1.06, 10); // capped
     e.set("SH_CTX", ctx(2.0, 60));
@@ -92,8 +108,10 @@ describe("shPenQF — bullpen quality (rolling pen ERA vs league)", () => {
     e.set("SH_CTX", ctx(4.4, 60));
     expect(e.get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBeCloseTo(1.012, 10);
   });
+  /* unfrozen() here too, deliberately: under the pin this test would still PASS, but
+     for the wrong reason — the freeze guard, not the 15-IP guard it is named for. */
   it("refuses pens under 15 IP of sample and unknown teams", () => {
-    const e = armed();
+    const e = unfrozen();
     e.set("SH_CTX", ctx(9.0, 10));
     expect(e.get<(t: string) => number>("shPenQF")("Boston Red Sox")).toBe(1);
     e.set("SH_CTX", ctx(9.0, 60));

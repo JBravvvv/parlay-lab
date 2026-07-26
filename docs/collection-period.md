@@ -119,6 +119,7 @@ drift, even when both values look reasonable on their own.
 |---|---|---|
 | `hrrAltMax` | `0.5` | H+R+RBI alternate lines above O0.5 suspended from all auto-selection |
 | `coreNoHR` | `true` | HR props never on core; HR-anytime parlays are FUN-only |
+| **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period. Setting it was **provably a no-op** — the factor already returned 1 for every team (see KNOWN-INERT below). Makes "inert" a decision instead of an accident. |
 
 ### Structure caps
 | parameter | value | meaning |
@@ -771,3 +772,138 @@ far anyway; (b) fix it now and treat the ~5-days-later activation as a dated, do
 behaviour change like any other. Recorded here rather than quietly repaired, because a config
 fix that silently arms an engine input is exactly the kind of change this document exists to
 prevent.
+
+## FACTOR ACTIVITY — the drift check the frozen table structurally could not do
+
+### The hole
+
+The frozen-parameter table tracks parameter **values**. Seven engine factors are not
+parameters at all — they are **data-availability outcomes**, each returning identity
+(`1.0`) when its input is missing, stale, or under a guard threshold:
+
+`shUmpKf` · `shTempF` · `shPitPctF` · `shOppWhiffF` · `shPenF` · `shLaborF` · `shPenQF`
+
+**So an engine input can go inert → live or live → inert mid-freeze without a single
+frozen value changing, and the drift detector reports clean.** That is precisely how
+`shPenQF` spent its entire life returning 1.0 unnoticed. It is not a one-off: `shUmpKf`
+is on course to switch itself **ON** during the freeze, by itself, with no code change.
+
+`tools/factor_activity.py` closes it — zero API credits (committed artifacts + keyless
+statsapi). **A material change in any factor's live share during the freeze is a finding
+with the same standing as a parameter drift.**
+
+### Baseline reading — real slate, 2026-07-25, 15 games
+
+`context.json` generated 2026-07-25T20:16Z · `priors.json` 2026-07-25T14:43Z
+
+| factor | live | applicable | share | status |
+|---|---|---|---|---|
+| `shTempF` | 15 | 15 games | **100%** | live |
+| `shPenF` | 30 | 30 teams | **100%** | live |
+| `shOppWhiffF` | 29 | 30 lineups | **97%** | live |
+| `shPitPctF` | 26 | 30 pitchers | **87%** | live |
+| `shLaborF` | 11 | 30 pitchers | **37%** | live — **by design**, see below |
+| **`shUmpKf`** | 0 | 15 games | **0%** | **INERT — will self-activate ~2026-08-04** |
+| **`shPenQF`** | 0 | 30 teams | **0%** | **INERT — pinned, see KNOWN-INERT** |
+
+`shLaborF`'s 37% is **not** a defect: it returns identity for any starter between 85 and
+96 pitches per start, which is a deliberate dead zone. Today's 30 probables span
+72.0–188.0 ppg and 11 sit outside the band. Recorded so a future reader does not "fix" it.
+
+### Why each zero is zero — different causes, don't conflate them
+
+**`shPenQF` — upstream workflow gap.** `main`'s `context.yml` (the copy GitHub actually
+schedules) omits `data/pen_quality.json` from its `git add`. `update_pen_db()` is
+incremental, so the rolling DB restarts from the last hand-committed copy every run.
+Measured on the **live** artifact 2026-07-25: per-team IP is **3.0–12.3** against a
+15-IP guard. Never cleared, on any day, since 2026-07-20.
+
+**`shUmpKf` — guard threshold not yet met, and NOT a workflow gap.** `data/ump_k.json`
+*is* git-added and *is* accumulating correctly: 14 days tracked (2026-07-11 → 07-24),
+141 league games, 77 umpires. The guard is `db["umps"][hp]["g"] >= 5`
+(`tools/build_context.py` L189) and the games-per-umpire histogram is **{1: 29, 2: 36,
+3: 12} — nobody has reached 5.** So every game today carries
+`hpUmp: {name, g, kFactor: null}` and the factor returns 1.
+
+⚠️ **This one arms itself.** HP duty rotates within a 4-umpire crew, so an umpire accrues
+~1 plate appearance behind the dish every ~4 crew games — about 0.21/day at the observed
+rate. The 12 umpires already at `g = 3` need two more each: **~2026-08-04**. The `g = 2`
+group follows ~2026-08-08, the `g = 1` group ~2026-08-13. **`shUmpKf` therefore goes from
+0% to a growing share of games in early-to-mid August — in the middle of the collection
+window, silently, with no parameter change and no deploy.** It shifts strikeout-prop
+pricing by up to ±8% (clamped 0.92–1.08).
+
+This is the single strongest argument for the factor-activity check existing: nobody
+decided this, nobody scheduled it, and without the check nobody would see it.
+
+### `context.yml` git-add audit — `pen_quality.json` is the ONLY gap (confirmed)
+
+`main`'s add list, read from `origin/main` directly:
+`git add public/model/context.json data/ump_k.json`
+
+| factor | reads | committed by `main`'s `context.yml`? |
+|---|---|---|
+| `shUmpKf` | `SH_CTX.games[].hpUmp` — inside `context.json`; its accumulating DB is `data/ump_k.json` | **yes**, both |
+| `shPenF` | `SH_CTX.bullpen_last3` — inside `context.json`, recomputed fresh each run, no separate DB | **yes** |
+| `shPenQF` | `SH_CTX.pen_quality` — inside `context.json`, but its accumulating DB is `data/pen_quality.json` | **NO** — the only gap |
+
+**What made it invisible:** the `pen_quality` *aggregate* IS present in `context.json` and
+IS committed — 30 teams, a `__league` row, plausible ERA/WHIP values. Inspecting
+`context.json` shows a fully populated block. Only the *source DB* behind it is missing,
+so the aggregate is computed from ~1–2 days of games instead of 30. Nothing looked broken.
+
+### Since when are the live ones live? (is the collection window uniform for them)
+
+| factor | source | live since |
+|---|---|---|
+| `shTempF` | `g.weather.temp` from the **statsapi slate** — never touches `context.json` | since `SH_V2.ctx` was armed; uniform |
+| `shPitPctF`, `shOppWhiffF` | `priors.json` Savant percentiles, rebuilt nightly by `model.yml` | since priors first shipped, 2026-07-11; uniform |
+| `shPenF` | `bullpen_last3`, recomputed each run — no accumulation to lose | since `context.yml` shipped, 2026-07-11; uniform |
+| `shLaborF` | statsapi season `numberOfPitches`/`gamesStarted` in the slate | uniform; the 85–96 dead zone is by design |
+
+**All four live factors have been live for the whole window.** The collection window is
+uniform for them. The two zeros are the entire non-uniformity, and one of them
+(`shUmpKf`) is scheduled to break that uniformity in early August unless it is pinned too.
+
+## KNOWN-INERT INPUTS — declared, with dated activation plans
+
+An input listed here contributes **nothing** today, deliberately. Anything that leaves
+this list changes engine behaviour and must be dated and announced.
+
+### `shPenQF` — bullpen quality. PINNED OFF (`SH_CFG.penQFrozen = true`, 2026-07-25)
+
+**Owner's decision, 2026-07-25: leave it inert.** Fixing the workflow now would need a
+third `CAL_START`-style cutoff, and that pattern is ruled out. Worse, this split is
+**invisible to the drift detector** — no parameter value moves — and a silent two-policy
+window is worse than a declared one; it would corrupt exactly the channel `CAL_START`
+exists to protect.
+
+It was inert *by luck* — a guard refusing thin data. `SH_CFG.penQFrozen` makes it inert
+*by decision*, so the factor cannot come alive unannounced if that file ever accumulates
+for any reason. **Setting the flag was provably a no-op** (nothing clears the 15-IP guard
+today), which is what made it safe to ship mid-freeze — and the full board suite passed
+unchanged, with only the two direct unit tests needing an explicit `penQFrozen: false`
+to keep exercising the formula. Those tests were **not** rebaselined to `1`: that would
+have deleted the only coverage the calculation has, and one of them would then have
+passed for the wrong reason (the freeze guard rather than the 15-IP guard it is named for).
+
+**Activation plan — it has a LEAD TIME and needs scheduling, not just a decision:**
+
+1. At freeze exit (~2026-09-22), decide whether to activate.
+2. If yes: add `data/pen_quality.json` to `main`'s `context.yml` `git add`. **Nothing
+   happens for ~5 days** — a bullpen throws ~3–4 IP/game, so teams need ~5 games to cross
+   the 15-IP guard.
+3. Then, and only then, flip `penQFrozen` to `false`. **Activation date = workflow fix +
+   5 days**, so the two steps must be scheduled apart. Flipping the flag on the same day
+   does nothing and would look like the feature failing.
+4. Record the activation date; from that date the factor-activity baseline above is
+   expected to change, and that change is planned rather than drift.
+
+### `shUmpKf` — umpire K-factor. NOT pinned. **DECISION NEEDED before ~2026-08-04**
+
+Inert today for an honest reason (no umpire has 5 plate-appearances of history) and it
+will arm itself in early August with no action from anyone. The options are symmetric with
+`shPenQF`: pin it now and activate deliberately at freeze exit, or let it come live
+mid-window and record the date so the collection window is known to be non-uniform for
+strikeout props from that point. **Not pinned unilaterally — this one changes behaviour
+in the direction of doing more, and that is the owner's call.**

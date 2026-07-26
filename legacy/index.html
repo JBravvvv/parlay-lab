@@ -1119,6 +1119,20 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
      FILL-ONLY: picked only when non-K tickets can't reach the 4-ticket minimum, capped
      at 15%, and never alongside a mixed-ticket K leg. */
   coreNoHR:true,   /* DAILY money never touches HR props — HR volatility lives in the FUN bucket only (user rule) */
+  /* penQFrozen (2026-07-25): shPenQF is PINNED OFF for the collection period.
+     It has returned 1 for every team on every day since it shipped on 2026-07-20 —
+     `update_pen_db` is incremental and main's context.yml (the copy GitHub actually
+     schedules) never git-adds data/pen_quality.json, so the rolling DB restarts from
+     the last hand-committed copy every run and no team reaches the 15-IP guard
+     (measured 2026-07-25 on the live artifact: 3.0–12.3 IP, threshold 15).
+     Left inert deliberately: fixing the workflow would arm a dormant engine input
+     ~5 days later, mid-freeze, with NO frozen parameter value changing — a split the
+     drift detector structurally cannot see. This flag makes "inert" a decision instead
+     of an accident, so the factor cannot come alive unannounced if that file ever
+     accumulates for any reason. **Setting it today is provably a no-op** (nothing
+     currently clears the guard), which is what makes it safe to ship during a freeze.
+     Activation plan is dated in docs/collection-period.md. */
+  penQFrozen:true,
   coreKsFillOnly:true, /* dedicated K's parlays are last-resort fill, not contenders */
   coreKsCap:0.15,  /* and when one does fill, it takes at most 15% of the daily */
   coreKsLegMax:1,  /* mixed tickets: at most ONE pitcher-K leg across the whole daily card */
@@ -1638,7 +1652,8 @@ function shLaborPpg(pst){var s=pst&&pst.season;var np=s&&Number(s.np),gsn=s&&Num
   if(!isFinite(np)||!isFinite(gsn)||gsn<3||!(np>0))return null;return np/gsn;}
 function shLaborF(pst){if(!shV2Sim())return 1;var ppg=shLaborPpg(pst);
   if(ppg==null)return 1;if(ppg>=97)return 0.96;if(ppg<=84)return 1.02;return 1;}
-function shPenQF(team){if(!(shV2Sim()&&SH_CTX&&SH_CTX.pen_quality&&team))return 1;
+function shPenQF(team){if(SH_CFG.penQFrozen)return 1; /* pinned off for the freeze — see SH_CFG.penQFrozen */
+  if(!(shV2Sim()&&SH_CTX&&SH_CTX.pen_quality&&team))return 1;
   var P=SH_CTX.pen_quality,lg=P.__league,row=null;
   Object.keys(P).forEach(function(k){if(k!=="__league"&&pnorm(k)===pnorm(team))row=P[k];});
   if(!row||!lg||!(lg.era>0)||row.era==null||!(row.ip>=15))return 1;
