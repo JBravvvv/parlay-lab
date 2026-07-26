@@ -316,3 +316,24 @@ Discipline log, `summary.disagreement`, and the gate-activity output itself.
 produced it; every reader displays both.** `gate_activity.py` now prints the summary's
 timestamp with exactly that warning. The commit stamp is not yet written by anything —
 recorded here as the obligation, not as done.
+
+## THIRD METHODOLOGY RULE: a filter chain must be RUN, not reconstructed
+
+Beside *"diff two things that should be identical"* and *"anything that can return an
+identity value must be observable"*.
+
+Both of us made this mistake on the same number. I reported that 2 non-HR tickets carrying
+a `booksInd = 0` leg "reach the gate and are blocked", having applied `coreNoHR` and a
+`czEv ≥ 2` test **directly to `d.parlays`**. The owner then specced a UI change on that
+figure. The real chain — `shCardPool` → `shCoreEligible` → basis → `coreEvMin` → `nv_tax` →
+consensus → `booksInd` — drops 20 of 67 tickets at `shCoreEligible` alone, on leg count and
+odds ceiling, and neither of the 2 survives that far. **The true answer is zero.**
+
+A reconstruction reproduces the filters you remember, in the order you remember them. The
+ones you forget are exactly the ones that would have changed the answer, and the result is
+always plausible — which is why nothing looks wrong.
+
+**Rule: any claim of the form "N items pass/fail gate X" must come from executing the
+production path, never from re-implementing its conditions.** Where the path needs inputs
+that are not to hand, say the number is unmeasured rather than estimate it — the estimate
+will be believed, and it will be believed most confidently when it is wrong.

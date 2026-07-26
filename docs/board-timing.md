@@ -112,3 +112,25 @@ structurally over-subscribed before adding anything, so the pass waits until the
 is fixed. The engineering is done and dormant: `/api/generate` accepts an `X-Cron-Key`
 header for an external scheduler, with a 4-runs-per-date cap. Only the schedule is
 missing.
+
+## LOCK WINDOWS BY DAY TYPE — when there is actually a slate left to bet
+
+The cron schedule says when the board is *generated*. This says when there is still
+something to bet, which is a different question and had never been written down beside it.
+
+Measured on the real 2026-07-26 board: restricting the ticket pool to games unstarted at
+**00:00 UTC (5 PM PT)** left **0 of 67 tickets**. Latest first pitch that day was 23:20 UTC
+— **4:20 PM PT**. A 5 PM PT lock on that Saturday had no games at all.
+
+| day type | board generated | realistic lock window (PT) | slate remaining |
+|---|---|---|---|
+| **weekday** | 22:00 UTC (3 PM PT) | **5–7 PM PT** | ~33% — evening games only |
+| **Saturday** | 18:00 UTC (11 AM PT) | **before ~1 PM PT** | day-heavy; by 5 PM PT often **nothing left** |
+| **Sunday** | 17:00 UTC (10 AM PT) | **before ~1 PM PT** | early-heavy, same shape as Saturday |
+
+**The stated 5–7 PM PT habit works on weekdays and does not work on weekends.** That is not
+a scheduling bug — it is a property of when MLB plays — but it means the weekend cron hours
+exist to serve a lock that has to happen much earlier in the day, and a weekend board
+generated for a 5 PM PT lock would be pricing games that have already started.
+
+Recorded here so the schedule actually bet on sits beside the schedule the cron runs.

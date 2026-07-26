@@ -2130,3 +2130,85 @@ That is a day-heavy-Saturday artifact, not a general result — but it is the fi
 evidence on the schedule question, and it points the same way as the coverage tables: the
 Saturday hour (18:00 UTC) exists because Saturday slates start early, and a 5 PM PT lock
 habit does not fit a Saturday at all.
+
+## THE NO-PLAY DIAGNOSTIC — it is the second story, and it measures phantom edge
+
+The question was whether the consensus gate is *structurally impossible for parlays*
+(compounding, telling us nothing about edge) or whether *the consensus genuinely
+disagrees*. Run on all 18 blocked tickets from the real 2026-07-26 board, at the ticket
+level **and** leg by leg:
+
+| | |
+|---|---|
+| individual legs across the 18 tickets | **46** |
+| legs individually passing `consMinEv` (≥ −1%) | **0 of 46** |
+| leg consensus EV | min −12.6% · p25 −7.6% · **median −7.1%** · p75 −5.7% · max −1.7% |
+| tickets whose every leg would pass | **0** |
+
+**It is not compounding.** Not one leg passes on its own. The per-leg bar for a ticket to
+clear −1% is only −0.50% (2-leg) or −0.33% (3-leg), and the *best* leg on the board is
+−1.7%. So the gate is not an artifact of multiplying legs together — **the de-vigged
+consensus disagrees with the model on all 46 legs.**
+
+### Decomposing the −7.1%: how much is hold, how much is disagreement
+
+`consCzEv = p_consensus × czDec − 1`. A leg the consensus agrees with *exactly* still reads
+negative, because `czDec` carries Caesars' vig. At the measured Caesars overround of
+**1.071**, split evenly, a perfectly-agreeing leg reads **−3.43%**.
+
+> **Measured median −7.10% − structural hold −3.43% = ~3.67 points of GENUINE consensus
+> disagreement per leg.**
+
+And the model's own claim on these legs is `czEv ≥ +2%`, so model-minus-consensus is
+≥ **9.1 EV points**, which converts to model-over-consensus of:
+
+| `czDec` | probability points |
+|---|---|
+| 1.8 | 5.06 |
+| 2.0 | 4.55 |
+| 2.5 | 3.64 |
+| 3.0 | 3.03 |
+
+**That is the winner's curse, measured directly, without waiting for a single outcome** —
+roughly **3–5 probability points** of model-over-consensus on exactly the legs the +2% gate
+selects. It is the quantity Phase 3 was specced to correct with a *guessed* shrink factor,
+and it bears on Phase 4's sizing for the same reason.
+
+⚠️ **Caveat, stated because it is load-bearing:** the even-split assumption on the overround
+is an assumption. If Caesars loads more vig onto one side, the structural component differs
+by side and the 3.67 is off by that amount. The `fp` field added 2026-07-27 makes the
+per-side split measurable per row; until then this decomposition is an estimate and the
+raw −7.10% median is the measurement.
+
+**`consMinEv` and `consMinN` are NOT changed.** Frozen, and *"requests to loosen a
+parameter are declined by default"* applies most exactly when the parameter is inconvenient.
+The gate is doing what it was built to do; that it is currently universal is a separate
+fact, below.
+
+### THE COUPLING NOBODY INTENDED: a calibration cutoff silently disabled selection
+
+`CAL_START` was a **calibration** boundary — one policy per training population. But
+`mktN` is derived from the same graded set, and `mktN` gates **selection** through
+`consMinN`. So resetting a calibration counter **turned the small-sample consensus gate on
+for every market at once**, and the card has been NO-PLAY since.
+
+Nobody intended that, and it was not written down anywhere before it happened.
+
+> **NAMED CONSEQUENCE — any future cutoff does this again.** Anything that resets, filters
+> or re-scopes the graded population resets `mktN` and therefore re-disables selection for
+> the length of the rebuild. That includes: a second `CAL_START`-style boundary, a change to
+> `calibrationEligible`, a change to `gradedFromBlob`'s filters, a Phase 2 re-scoping of the
+> training set, and the ICC work if it ever excludes clustered rows. **Before any such
+> change, state the projected NO-PLAY window it creates.**
+
+### Projected reopening, from measured per-market accrual
+
+| market | graded/day (measured) | reaches `mktN` ≥ 100 |
+|---|---|---|
+| `ml` / `rl` | 15 | **~2026-08-02** |
+| `batter_total_bases` | 9 | **~2026-08-06** |
+| `batter_hits` · `batter_home_runs` · `batter_hits_runs_rbis` | 7 | **~2026-08-09** |
+| `pitcher_strikeouts` · `pitcher_outs` | 5 | ~2026-09-13 |
+
+A ticket needs **every** leg's market proven, so a mixed ticket reopens on its slowest leg.
+ML/RL-only tickets are the first to return, ~2026-08-02.

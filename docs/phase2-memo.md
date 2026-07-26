@@ -3,6 +3,40 @@
 **Status: memo only. No code. Report-only during the freeze — no weight moves, and exit
 condition 3 stays unsigned until the instrument produces numbers.**
 
+## WHEN THE SYNC PHRASE BINDS — read this first
+
+It binds in exactly one place, and less than has been assumed:
+
+| half | needs the phrase? | why |
+|---|---|---|
+| **inputs accruing** (`fp`, `fair`, `cz` in `props-history`) | **NO** | a GitHub Actions archive on the `line-history` branch, public |
+| **computing the close fair** for every board row | **NO** | pure arithmetic over that archive |
+| **joining close → model `p`** | **YES** | `p` lives behind `/api/predictions`, sync-gated |
+| **the panel that displays it** | **YES** | reads the joined result |
+
+**So the instrument accumulates whether or not the owner acts, and only reporting requires
+his key.** Nothing is lost by not running it; nothing accrues faster by running it. That is
+the opposite posture from CLV, where the *capture* itself needed the phrase and a missed
+sighting was gone forever.
+
+## WHY THIS IS NOW LOAD-BEARING, NOT MERELY VALUABLE
+
+As of 2026-07-26 the card is **NO-PLAY**, and projected to stay that way until roughly
+**2026-08-02** (ML/RL) → **2026-08-09** (most prop markets), because `CAL_START` reset
+`mktN` and made the small-sample consensus gate universal. With zero locked cards:
+
+| channel | state during the NO-PLAY window |
+|---|---|
+| ledger P/L | **dark** — no locks |
+| `/api/clv` sightings | **dark** — sights locked legs only |
+| Discipline report | **dark** — nothing to classify |
+| receipts / NV-tax accounting | **dark** |
+| outcome-graded calibration | thin — 70 legs/day of *board* rows, no bet rows at all |
+| **Phase 2 board-wide close-grading** | **the only channel still measuring anything** |
+
+**For roughly two weeks, Phase 2 is the evidence channel.** Everything else that reads the
+freeze's scoreboard needs a bet to have been placed, and none will be.
+
 ## The problem it solves
 
 Outcome-grading is a weak instrument: detecting a 2pp model bias from win/loss needs

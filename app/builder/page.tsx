@@ -38,7 +38,7 @@ type CardCalc = {
     /* 2026-07-22 floors: tickets that cleared the basis EV gate but were refused —
        "nv_tax" (negative EV at the settling book) or "consensus" (small-sample market
        the de-vigged consensus disagrees with) */
-    blocked?: { name: string; bsEv?: number | null; czEv?: number | null; consEv?: number | null; reason: "nv_tax" | "consensus" }[];
+    blocked?: BlockedRow[];
   };
   fun: { picks: CardPick[]; sum: number };
   kellyDaily: number;
@@ -256,6 +256,80 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
     </div>
   );
 }
+
+/* Tickets that cleared the EV gate and were refused anyway.
+   REBUILT 2026-07-26. On the real board that day this panel IS the story: 18 tickets
+   cleared +2% EV and every one died at the small-sample consensus gate, because CAL_START
+   reset mktN and made that gate universal. A card empty because a counter is rebuilding
+   looks identical to a card empty because the model found nothing — unless this says so.
+   Reasons are ordered by count so whatever dominates leads; today that is `consensus`,
+   and `no_ind_consensus` is currently a non-event (zero tickets). */
+type BlockedRow = {
+  name: string;
+  type?: string | null;
+  bsEv?: number | null;
+  czEv?: number | null;
+  consEv?: number | null;
+  reason: string;
+};
+
+const BLOCK_LABEL: Record<string, string> = {
+  consensus: "consensus disagrees",
+  nv_tax: "NV price turns it negative",
+  no_ind_consensus: "no independent consensus",
+};
+
+function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
+  const rows = props.rows;
+  if (rows.length === 0) return null;
+
+  const counts: Record<string, number> = {};
+  for (const r of rows) counts[r.reason] = (counts[r.reason] || 0) + 1;
+  const order: string[] = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+
+  let best: number | null = null;
+  for (const r of rows) if (r.czEv != null && (best === null || r.czEv > best)) best = r.czEv;
+
+  const sorted: BlockedRow[] = [];
+  for (const reason of order) for (const r of rows) if (r.reason === reason) sorted.push(r);
+
+  return (
+    <Panel>
+      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Cleared the gate, refused anyway</div>
+      <div className="num mt-1 text-[12px] text-text">
+        <b>{rows.length}</b> {rows.length === 1 ? "ticket" : "tickets"} had your edge and were stopped
+        {order.map((r) => ` · ${counts[r]} ${BLOCK_LABEL[r] || r}`).join("")}
+        {best !== null ? <span className="text-muted"> (best refused: +{best}% EV at Caesars)</span> : null}
+      </div>
+      {counts.consensus ? (
+        <div className="mt-1 text-[10.5px] leading-relaxed text-faint">
+          The consensus gate applies to every market under 100 graded legs. That counter restarted at CAL_START, so it
+          is strict everywhere right now — see the calibration banner. Safe direction and temporary, but it is why the
+          card is thin.
+        </div>
+      ) : null}
+      <div className="mt-2 space-y-1.5">
+        {sorted.map((b, i) => (
+          <div key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
+            <span className="font-semibold text-text">{b.name}</span>
+            {b.czEv != null ? <span className="num text-pos">+{b.czEv}% EV</span> : null}
+            <span className={b.reason === "nv_tax" ? "text-neg" : "text-gold"}>
+              {BLOCK_LABEL[b.reason] || b.reason}
+              <span className="num text-muted">
+                {b.reason === "consensus"
+                  ? ` (small-sample market · consensus EV ${b.consEv != null ? b.consEv + "%" : "—"})`
+                  : b.reason === "no_ind_consensus"
+                    ? " (every book behind this fair is the settling book, or the line is one-sided)"
+                    : ` (CZ ${b.czEv != null ? b.czEv + "%" : "no quote"}) · no override`}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 
 export default function BuilderPage() {
   const { data: board } = useBoard();
@@ -741,34 +815,7 @@ export default function BuilderPage() {
             </Panel>
           )}
 
-          {/* 2026-07-22 floors: tickets that cleared the basis EV gate but were refused,
-              disclosed so a shrinking card is never a mystery */}
-          {(card.alloc.blocked?.length ?? 0) > 0 && (
-            <Panel>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Cleared the gate, refused anyway</div>
-              <div className="mt-2 space-y-1.5">
-                {card.alloc.blocked!.map((b, i) => (
-                  <div key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
-                    <span className="font-semibold text-text">{b.name}</span>
-                    {b.reason === "nv_tax" ? (
-                      <span className="text-neg">
-                        Blocked — the NV price turns this negative
-                        <span className="num text-muted">
-                          {" "}
-                          ({basisMode ? `basis ${b.bsEv != null ? `+${b.bsEv}%` : "—"} → ` : ""}CZ {b.czEv != null ? `${b.czEv}%` : "no quote"}) · no override
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-gold">
-                        consensus disagrees
-                        <span className="num text-muted"> (small-sample market · consensus EV {b.consEv != null ? `${b.consEv}%` : "—"})</span>
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Panel>
-          )}
+          <BlockedPanel rows={card.alloc.blocked ?? []} basisMode={basisMode} />
 
           {card.overrode && (
             <div className="flex items-center justify-between rounded-(--radius-panel) border border-neg/40 bg-neg/10 px-4 py-3 text-[12px] text-neg">

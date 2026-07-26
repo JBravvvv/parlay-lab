@@ -2962,7 +2962,7 @@ function shAllocate(pool,amount,cfg,force){
          what force bypasses); below zero at Caesars nothing bypasses. */
       var czMin=(cfg.coreCzEvMin!=null)?cfg.coreCzEvMin:0;
       if(!(w.pl.czEv!=null&&Number(w.pl.czEv)>=czMin)){
-        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
+        blocked.push({name:w.pl.name,type:w.pl.type||null,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
     }
     if(evGated){
       /* NO INDEPENDENT CONSENSUS -> NOT ELIGIBLE (2026-07-26). This blocks at ANY mktN,
@@ -2978,7 +2978,7 @@ function shAllocate(pool,amount,cfg,force){
          requirement cannot be in a prop pool at all. See docs/collection-period.md. */
       var noInd=w.pl.legs.some(function(l){return l.booksInd===0;});
       if(noInd){
-        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"no_ind_consensus"});return;}
+        blocked.push({name:w.pl.name,type:w.pl.type||null,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"no_ind_consensus"});return;}
       /* small-sample market gate (both disciplined modes): unproven markets also need
          the de-vigged consensus on side, read at the mode's own selection price */
       var mn=cfg.mktN||null,minN=(cfg.consMinN!=null)?cfg.consMinN:100,
@@ -2992,7 +2992,7 @@ function shAllocate(pool,amount,cfg,force){
          objects without leg imps stay ungated rather than silently all-blocked) */
       var cEv=basisMode?w.pl.consEv:w.pl.consCzEv;
       if(small&&cEv!=null&&Number(cEv)<cMin){
-        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,consEv:cEv,reason:"consensus"});return;}
+        blocked.push({name:w.pl.name,type:w.pl.type||null,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,consEv:cEv,reason:"consensus"});return;}
     }
     var ev=((selEv!=null?selEv:w.pl.ev)||0)/100,prob=(Number(w.pl.prob)||0)/100;
     var dec=(basisMode?w.pl.bsDec:w.pl.czDec)||2;
