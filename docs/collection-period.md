@@ -1008,3 +1008,96 @@ of the silent-no-op class.
 
 **Extend this to any future dormant factor where the input exists but the output is
 suppressed.** A pinned factor with no shadow log is a two-month delay bought for nothing.
+
+## WHAT THE PARITY DIGEST ACTUALLY COVERS — scope statement (2026-07-26)
+
+"Parity digest unchanged" has been carrying commits for two days. It is a **much narrower
+claim than it reads**, and this section exists so it is never read wider.
+
+### Inputs present when `baseline43.json` is generated
+
+`legacy/index.html` L1547 declares `var SH_V2=null, SH_PRIORS=null, SH_CTX=null;`.
+The parity run is `fixtureEngine()` = `createEngine({ fetchJson, today })`
+(`tests/helpers/fixture-env.ts`) and it **never calls `set()` on any of them**.
+
+| input | in the parity run | in production |
+|---|---|---|
+| `SH_V2` | **null** — the entire v2 kernel dormant | armed by `armV2()` (`src/lib/engine-client.ts` L321–330) |
+| `SH_PRIORS` | **null** | the real `priors.json` |
+| `SH_CTX` | **null** — and the harness has no `context.json` route at all | the real `context.json` |
+
+**So the baseline is a v2-DORMANT board by construction.** That is the documented design —
+"dormant = byte-identical baseline43" — but its consequence has not been written down.
+
+### Therefore the digest exercises ZERO of the seven identity factors
+
+Every one is v2-gated, so with `SH_V2 = null` all seven return identity in the parity run:
+
+| factor | gate | live share in PRODUCTION (2026-07-25) |
+|---|---|---|
+| `shTempF` | `SH_V2.ctx` | **100%** |
+| `shPenF` | `shV2Sim()` | **100%** |
+| `shOppWhiffF` | `SH_V2.priors` | 97% |
+| `shPitPctF` | `SH_V2.priors` | 87% |
+| `shLaborF` | `shV2Sim()` | 37% |
+| `shUmpKf` | `SH_V2.ctx` | 0% (pinned) |
+| `shPenQF` | `shV2Sim()` | 0% (pinned) |
+
+**`shPenF` is 100% live in the real engine and identity in the parity baseline.** The
+digest cannot see a change to it, in either direction.
+
+### And there is no armed baseline either
+
+`engine-v2-integration.test.ts` arms the kernel, but at L131 it asserts the armed digest
+**`.not.toBe(baseline43)`** — it proves the armed board *differs*, never that it matches a
+stored armed digest. Its L125 arming is also `ctx: false`, so even that full-board run
+does not exercise the `SH_CTX` factors. `SH_CTX` appears only inside narrow unit blocks
+(L216, L274). **There is no digest-level regression net for any armed path.** Armed code
+is covered by unit assertions only.
+
+### Where "parity green" was weaker evidence than it appeared
+
+| commit | engine change | inside digest coverage? |
+|---|---|---|
+| `c5d0594` timezone slate fix | changed which games enter the slate | **YES** — and it was correctly rebaselined (`docs/rebaseline-2026-07-25.md`) |
+| `68c5743` price-age lock guard | `shLockCard` — the lock path, not generation | **no** |
+| `2ee13c5` `penQFrozen` | v2-gated factor | **no** |
+| `29400d0` `umpKFrozen` + shadow readers + `gameInfo.shadow` | v2-gated factors; additive board key | **no** |
+| `1d64f53` `propBoard` | additive top-level board key | **no** |
+
+Four of the five engine-touching changes landed **outside** what the digest can see. None
+is believed wrong — `pinned-factors.test.ts`, `prop-board.test.ts` and
+`lock-price-age.test.ts` are their actual coverage — but "parity green" was not the
+evidence it appeared to be for any of them.
+
+### The digest's field scope, for completeness
+
+`digest()` keeps `categories`, `categoriesLive`, `parlays`, `parlaysMixed`,
+`parlaysLive` — and within those only `[label, sub, odds, prob, ev]` per row and
+`{name, odds, prob, legs[label|prop|odds]}` per ticket. **New row or leg FIELDS are
+invisible to it.** So is everything `analyze()` does not return: `shAllocate` and the whole
+card path, `shLockCard`, `shFunPick`, `gameInfo`, `propBoard`, `simMarkets`, `luCoverage`.
+
+### DO NOT regenerate the baseline with more inputs
+
+Arming the parity run would invalidate every prior digest comparison in the repo's history
+and destroy the one property the baseline has — that it pins the *legacy* math verbatim.
+If armed coverage is wanted it must be a **second, separately-named** baseline, and that is
+its own decision. Not taken here.
+
+### Consequence for `booksInd`
+
+**The `booksInd` change lands entirely OUTSIDE the digest**, and this needs saying before
+it ships rather than after:
+
+- adding `booksInd` to slate rows, cats rows and `legOf` adds **fields**, which the digest
+  does not hash;
+- the block itself is in `shAllocate`, which the digest does not cover at all — `parlays`
+  is the *generated ticket list* from `buildParlaySet`, while the allocator runs later at
+  card time.
+
+**So the digest will be byte-identical before and after, and that is not evidence of
+anything.** The earlier plan to record "old and new digest" was the wrong instrument. The
+evidence to record instead, and what the delta report will contain: rows removed per
+market, tickets removed from `shCardPool`, the allocator's `blocked` list with
+`reason: "no_ind_consensus"`, and the card composition before/after on the same board.
