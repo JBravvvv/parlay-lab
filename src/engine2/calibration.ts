@@ -313,10 +313,18 @@ export type DisagreementFit = {
   hi: number; // exclusive upper bound (Infinity on the tail bucket)
   n: number;
   meanGap: number; // realised mean |p − pMkt| inside the bucket
+  /* THE SLOPE IS DECORATIVE IN THESE BUCKETS — see GAP_BUCKET_MIN_N. Kept because it
+     costs nothing and because Phase 2 will have the sample sizes the slope needs. */
   slope: number | null;
   se: number | null;
   actual: number; // realised hit rate
   predicted: number; // mean stated probability
+  /* THE POWERED READOUT. gap = predicted − actual, in probability POINTS: positive means
+     the model over-states. gapSe is the binomial SE of the realised rate, so |gap| / gapSe
+     is a z-score you can read directly. sig = |gap| >= 2·gapSe AND n >= GAP_BUCKET_MIN_N. */
+  gap: number;
+  gapSe: number | null;
+  sig: boolean;
 };
 
 /** Fixed edges, not sample quantiles: buckets must mean the same thing week to week. */
@@ -354,27 +362,54 @@ export function fitByDisagreement(picks: GradedPick[], market?: string): Disagre
       slope: f.slope, se: f.se,
         actual: Math.round(mean(ys) * 1000) / 1000,
         predicted: Math.round(mean(xs) * 1000) / 1000,
+        ...(() => {
+          const a = mean(ys), pr = mean(xs);
+          const se = b.length > 0 ? Math.sqrt(Math.max(a * (1 - a), 1e-9) / b.length) : null;
+          const gap = pr - a;
+          return {
+            gap: Math.round(gap * 10000) / 10000,
+            gapSe: se == null ? null : Math.round(se * 10000) / 10000,
+            sig: se != null && b.length >= GAP_BUCKET_MIN_N && Math.abs(gap) >= 2 * se,
+          };
+        })(),
       });
     }
   return out;
 }
 
 /**
- * WHEN DOES PER-MARKET SLICING BECOME POWERED? A documented exit, so "markets pooled" is
- * not permanent by default.
+ * READ THE GAP, NOT THE SLOPE — and the threshold is set on the gap.
  *
- * The quantity is a slope, whose SE scales as ~1/(σ_p·√n) with σ_p the spread of stated
- * probabilities inside the bucket. On the observed board that spread is ~0.08, so
- * separating a slope 0.15 from 1.0 at 2σ needs on the order of **300 graded rows per
- * bucket per market**. With 10 buckets (5 gaps × 2 directions) that is ~3,000 graded rows
- * in one market — at measured accrual (`batter_hits` ~45/day, `pitcher_outs` ~11/day),
- * ~9 weeks for the fastest market and past a season for the slowest.
+ * CORRECTION (2026-07-26): an earlier version of this comment stated the SE formula and
+ * then wrote "≈300 rows", which does not follow from it. Worked properly:
  *
- * So: pooled until the BUCKET BEING READ has ≥ this many rows — check the per-bucket `n`,
- * never the market total. The tail buckets are the thin ones and the interesting ones at
- * the same time, which is exactly where a pooled-by-default habit does the most damage.
+ *   SE(slope) ≈ σ_resid / (σ_p·√n),  σ_resid ≈ 0.5 (Bernoulli at p≈0.5), σ_p ≈ 0.08
+ *
+ *   n = 150 → SE 0.51    n = 300 → SE 0.36    n = 1,000 → SE 0.20    n = 3,000 → SE 0.11
+ *
+ * Detecting a slope 0.15 from 1.0 at 2σ needs **n ≈ 6,944 per bucket per market**. At
+ * n = 300 the smallest detectable deviation is 0.72 — a slope of 0.28 or 1.72. **The slope
+ * is noise at every sample size this freeze will ever see**, and reporting it per bucket
+ * would have been reporting nothing with a number attached.
+ *
+ * The CALIBRATION GAP is a different quantity and is well powered:
+ *
+ *   SE(gap) = √(p(1−p)/n)  →  n = 100 → 5.0 pts   150 → 4.1   300 → 2.9   1,000 → 1.6
+ *
+ * The case that motivated this instrument — H+R+RBI stating 59.2% and hitting 46.3%, a
+ * **12.9-point** gap — reads as **3.2σ at n = 150** and 4.5σ at n = 300. So 150 is usable
+ * and 300 was needlessly conservative.
+ *
+ * **GAP_BUCKET_MIN_N = 150**, chosen on that arithmetic: it is the n at which a
+ * HRR-magnitude miscalibration clears 3σ, and at measured accrual (`batter_hits` ~45/day)
+ * a well-populated bucket reaches it inside the freeze rather than after it.
+ *
+ * ⚠️ **Rows are NOT evenly spread across the ten buckets.** Mass concentrates at low
+ * disagreement; the 20+ tail buckets — the interesting ones — will be the last to qualify
+ * and may not qualify at all before freeze exit. Check the per-bucket `n`, never the market
+ * total, and treat a thin tail bucket as unread rather than as reassuring.
  */
-export const GAP_BUCKET_MIN_N = 300;
+export const GAP_BUCKET_MIN_N = 150;
 
 /** Replay a stated probability at confidence s against its consensus anchor. */
 export function shrunkP(p: number, pMkt: number, s: number): number {

@@ -257,3 +257,33 @@ describe("fitByDisagreement — the tail the pooled slope cannot see", () => {
     expect(fits.reduce((s, f) => s + f.n, 0)).toBe(0);
   });
 });
+
+/* The gap is the powered readout; the slope in these buckets is not (GAP_BUCKET_MIN_N). */
+describe("fitByDisagreement — gap significance", () => {
+  const pick = (p: number, pMkt: number, won: boolean): GradedPick => ({
+    market: "batter_hits_runs_rbis", p, pMkt, edge: p - pMkt, lu: "confirmed", res: won ? "won" : "lost",
+  });
+  it("flags an HRR-magnitude gap at n=150 and refuses to flag the same gap at n=50", () => {
+    const mk = (n: number) => {
+      const out: GradedPick[] = [];
+      for (let i = 0; i < n; i++) out.push(pick(59, 34, (i * 100) / n < 46));
+      return fitByDisagreement(out).find((f) => f.dir === "high" && f.hi === Infinity)!;
+    };
+    const big = mk(150);
+    expect(big.n).toBe(150);
+    expect(big.gap).toBeGreaterThan(0.1); // ~13 points, the measured HRR shape
+    expect(big.gapSe).toBeLessThan(0.05);
+    expect(big.sig).toBe(true);
+    const small = mk(50);
+    expect(small.gap).toBeGreaterThan(0.1); // same effect...
+    expect(small.sig).toBe(false); // ...but below GAP_BUCKET_MIN_N, so never flagged
+  });
+  it("a well-calibrated bucket is not flagged however large it gets", () => {
+    const out: GradedPick[] = [];
+    for (let i = 0; i < 600; i++) out.push(pick(55, 30, i % 100 < 55));
+    const f = fitByDisagreement(out).find((x) => x.dir === "high" && x.hi === Infinity)!;
+    expect(f.n).toBe(600);
+    expect(Math.abs(f.gap)).toBeLessThan(0.02);
+    expect(f.sig).toBe(false);
+  });
+});

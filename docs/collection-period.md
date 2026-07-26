@@ -123,6 +123,7 @@ drift, even when both values look reasonable on their own.
 | **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |
 | **ump `g >= 5` gate** | `5` (`tools/build_context.py` L189) | umpire plate-appearance count required before a `kFactor` is emitted. **No stated rationale — see the analysis below; it is ~7× too low.** |
 | **ump kFactor clamp** | `[0.92, 1.08]` (`shUmpKf`) | ±8% cap on the umpire K adjustment. **No stated rationale; narrower than the sampling noise the gate admits.** |
+| **`GAP_BUCKET_MIN_N`** | `150` | rows needed in a disagreement bucket before its calibration gap is read. **Fifth entry of the unexamined-constant class — and the only one with its arithmetic stated up front:** at n=150 SE(gap)=4.1 points, so the 12.9-point H+R+RBI miscalibration reads at 3.2σ. |
 
 ### Structure caps
 | parameter | value | meaning |
@@ -1503,3 +1504,79 @@ but never one a scheduled job rewrites. The candidates in this repo are `priors.
 (`model.yml`, nightly), `context.json` (`context.yml`, 2×/day) and anything under
 `line-history`. All three are now either snapshotted into `tests/fixtures/` or unused by
 tests.
+
+## MOVING INPUTS — what the freeze does NOT hold still
+
+The frozen table lists parameter **values**. Two of the production engine's inputs are
+**artifacts rewritten on a schedule**, so they are outside that table by construction —
+the same structural hole the factor-activity check exists to cover. **Not frozen. Written
+down**, so the freeze's scope is honest.
+
+| input | rewritten by | schedule | read by production |
+|---|---|---|---|
+| `public/model/priors.json` | `model.yml` | **nightly**, 09:30 UTC | `armV2()` → `SH_PRIORS` |
+| `public/model/context.json` | `context.yml` | **2×/day**, 17:00 + 22:30 UTC | `armV2()` → `SH_CTX` |
+| `data/ump_k.json` | `context.yml` | same job | feeds `context.json`'s `hpUmp` |
+| `data/pen_quality.json` | `context.yml` (**not committed on `main`**) | same job | feeds `pen_quality`; inert — see KNOWN-INERT |
+| `line-history` branch (`data/`, `data/props/`) | `line-history.yml` (hourly), `props-history.yml` (2×/day) | — | **nothing live** — measurement only |
+
+### `priors.json` is CUMULATIVE season-to-date, not a rolling window
+
+Checked, because the two answers have different consequences. `tools/build_priors.py`
+pulls every Savant leaderboard with `year=SEASON` (`SEASON = 2026`, L16) — expected stats,
+custom skills, percentile rankings, park factors, framing. **No date range, no lookback
+window.** Each nightly run is the full season to date.
+
+So the drift is **convergence, not a moving window**: no old data leaves the sample, each
+new day is a smaller fraction of a growing total, and a player's prior gets *more precise*
+across the collection window rather than shifting to a different population.
+
+**Stated as a design choice rather than left unexamined:** week-1 and week-8 rows ARE
+priced by different-vintage priors, and that is intended — the model is meant to stay
+current, and a frozen prior would be worse than a converging one by September. The
+consequence to hold in view is narrow: **early-window rows carry noisier priors than
+late-window rows**, so if a per-market slope is ever read across the whole window, the
+early rows contribute more variance than the late ones. Nothing corrects for that today
+and nothing needs to — but it is a reason to prefer the second half of the window if a
+slope ever disagrees with itself across halves.
+
+### The fixture rule, restated so both halves are visible
+
+- **Tests**: a fixture may read a committed artifact, but **never one a scheduled job
+  rewrites**. Enforced by snapshotting — `tests/fixtures/fix45/priors.json` and
+  `.../context.json` are static copies. This was learned the hard way: the armed baseline
+  broke six hours after it was written, on a nightly Statcast refresh and no code change.
+- **Production**: reads them live, **by design**, per the above.
+
+The two rules point in opposite directions and both are correct. The test must hold still
+so a failure means a regression; production must move so the model stays current.
+
+## LIFTING THE DOUBLEHEADER RESTRICTION — the ordered procedure
+
+`lUse` drops the second game's leg on a doubleheader because leg identity is
+`label + "|" + prop`, which is identical across GM1 and GM2. That looks over-restrictive
+and it is — it drops a legitimately different bet. **It is also the only thing preventing a
+grading and CLV collision**, because `lid` uses the same key. Encoded in
+`tests/lid-coupling.test.ts`; changing either side alone fails the build.
+
+If both games are wanted, this is the procedure — **one change, all six sites**:
+
+1. `legacy/index.html` — `shAllocate`: `lUse` read + write, and `legSet`.
+2. `legacy/index.html` — `shFunPick`: `legDup` read + the post-pick mark.
+3. `legacy/index.html` — `shSupplementalCalc` exclusion map and the clash check in
+   `shLockSupplemental`.
+4. `legacy/index.html` — `shGrade`: `legRes` construction (3 sites), and `shTicketId`'s
+   hash input, so ticket ids and leg ids stay derived from the same key.
+5. `src/lib/server/clv-core.ts`, `src/lib/clv-report.ts`, `src/lib/ledger-segments.ts` —
+   `const lid = ...`.
+6. `tests/lid-coupling.test.ts` — update `ENGINE_KEY`/`TS_KEY` and the site table in the
+   same commit, or the build stays red (which is the point).
+
+Use `gkey + "|" + label + "|" + prop` — **not** `gkey|lkey`. `lkey` alone is not unique
+either (`ml_home` repeats across games, pair #1), and `label|prop` already carries the
+human-readable identity the ledger displays.
+
+**Migration hazard:** existing ledger entries are keyed the old way. Grading and CLV read
+`entry.clv[lid]` and `grading.legs[lid]` by key, so a key change orphans every historical
+sighting and grade. Either version the key and read both shapes, or accept that
+pre-change days lose their CLV join. **Do not discover this after the change.**
