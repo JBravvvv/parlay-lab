@@ -98,3 +98,50 @@ not simply lift:
 Written 2026-07-24/25, while nothing is at stake, precisely so none of it — least of all
 the failure path — is decided in the moment the criterion fires and the number looks
 exciting.
+
+---
+
+## PROPOSED AMENDMENT — the slope criterion is not usable (2026-07-26, UNSIGNED)
+
+**Not applied. This is a freeze-document amendment and needs the owner's sign-off.**
+
+### The problem
+
+The retirement criterion (L53–54), the stage-2 reinstatement bar (L89) and the stage-0
+failure path (L92) all require the reliability slope to sit inside **[0.85, 1.15]** over
+**≥100 graded legs**. Measured, that band is **0.175 SE units wide** for this market
+(σ_p = 0.058 within `batter_hits_runs_rbis`, SE(slope) ≈ 0.86 at n = 100).
+
+- A **perfectly calibrated** H+R+RBI market passes **13.9%** of the time — it fails ~86%.
+- A market with **zero information** (true slope 0.00) still passes **7.1%** of the time.
+- Making the band usable at 2σ needs **~13,100 graded legs** in this market alone.
+
+So the suspension can currently only retire **by luck**, the stage-0 failure path fires on
+~86% of perfectly healthy markets, and both look like real tests the entire time.
+Full derivation and the per-market table: `docs/collection-period.md`, "The slope is not
+usable as a criterion".
+
+### The proposed replacement
+
+Use the **predicted-vs-actual rate gap**, which is what the live weight gate already uses —
+`applyWeeklyAdjustment` reads `perMarket.significant`, built at `calibration.ts:186` as a
+Wilson-interval comparison of the mean stated probability against the realized hit rate. It
+is the powered statistic here: SE(gap) = √(p(1−p)/n) ≈ **4.9 points at n=100**, so the
+observed 12.9-point H+R+RBI miss reads at ~2.7σ.
+
+| | current | proposed |
+|---|---|---|
+| retirement (L53–54) | slope in [0.85, 1.15] **and** O1.5+ hit rate within Wilson CI | **O1.5+ realized rate within the Wilson CI of the PA-conditioned model's stated rate**, at n ≥ 100. Slope reported as a point estimate **with its ±0.86 interval**, never as a pass/fail |
+| stage-2 reinstatement (L89) | "same slope and Wilson tests" | Wilson test only, same wording as above |
+| stage-0 failure (L92) | "slope outside [0.85, 1.15] **or** rate below prediction" | **rate below the Wilson CI** — drop the slope disjunct entirely, since it fires on ~86% of healthy markets |
+
+### Two things the replacement does NOT fix, stated plainly
+
+1. **It measures a different thing.** The gap tests the LEVEL of the model's probabilities;
+   the slope tests whether stated confidence SCALES. A market can have a zero gap and a
+   badly wrong slope. This amendment does not solve that — it concedes the slope is
+   unmeasurable at any n this project will reach, and stops pretending otherwise.
+2. **Clustered errors.** The Wilson interval assumes independent legs. Same-game and
+   same-slate legs are correlated; at ρ ≈ 0.05 the 12.9-point gap falls from ~2.7σ to
+   **~1.1σ**. **Before this criterion is relied on, the gap should be re-tested with
+   clustered standard errors.** Not yet done, and it could change the verdict.

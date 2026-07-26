@@ -1468,7 +1468,10 @@ Pooled, a biased population averages with a clean one and dilutes precisely the 
 directions = 10 rows. A test pins it: two populations that would cancel to "well
 calibrated" under absolute bucketing stay separated at +20 points and −5 points.
 
-**Documented exit for "markets pooled":** `GAP_BUCKET_MIN_N = 300`. The slope's SE scales
+**Documented exit for "markets pooled":** `GAP_BUCKET_MIN_N = 150` (corrected 2026-07-26 — this
+paragraph said 300 after the constant had already been lowered; the stale figure is the kind
+of drift the frozen table exists to catch, and it was caught by an audit rather than by me).
+The slope's SE scales
 as ~1/(σ_p·√n), and with the observed σ_p ≈ 0.08 separating a slope 0.15 from 1.0 at 2σ
 needs ~300 graded rows **per bucket per market** — ~3,000 in one market across all ten
 buckets, i.e. ~9 weeks for `batter_hits` at ~45/day and past a season for `pitcher_outs` at
@@ -1569,14 +1572,134 @@ If both games are wanted, this is the procedure — **one change, all six sites*
    hash input, so ticket ids and leg ids stay derived from the same key.
 5. `src/lib/server/clv-core.ts`, `src/lib/clv-report.ts`, `src/lib/ledger-segments.ts` —
    `const lid = ...`.
-6. `tests/lid-coupling.test.ts` — update `ENGINE_KEY`/`TS_KEY` and the site table in the
-   same commit, or the build stays red (which is the point).
+6. **Versioned read — REQUIRED, not one of two options.** Every reader of
+   `entry.clv[lid]` and `grading.legs[lid]` must try the new key and then fall back to the
+   old one. **Never rewrite stored entries.** New writes use the new shape; historical
+   entries keep theirs and are still found. Concretely:
+   `const s = clv[newLid] ?? clv[oldLid];` at each of the four read sites
+   (`clv-core`, `clv-report`, `ledger-segments`, `shGrade`).
+7. `tests/lid-coupling.test.ts` — update `ENGINE_KEY`/`TS_KEY` and the site table in the
+   same commit, or the build stays red (which is the point). Add a case asserting the
+   fallback read still resolves an old-shape entry.
 
 Use `gkey + "|" + label + "|" + prop` — **not** `gkey|lkey`. `lkey` alone is not unique
 either (`ml_home` repeats across games, pair #1), and `label|prop` already carries the
 human-readable identity the ledger displays.
 
-**Migration hazard:** existing ledger entries are keyed the old way. Grading and CLV read
-`entry.clv[lid]` and `grading.legs[lid]` by key, so a key change orphans every historical
-sighting and grade. Either version the key and read both shapes, or accept that
-pre-change days lose their CLV join. **Do not discover this after the change.**
+### Why the versioned read is mandatory, and how it ranks against no-backfill
+
+An earlier draft of this procedure offered a choice: version the key, **or** accept that
+pre-change days lose their CLV join. **That was wrong, and the two are not the same
+severity.**
+
+- **No-backfill** says: do not FABRICATE what you did not capture. It protects against
+  inventing data.
+- **Orphaning** DISCARDS what you *did* capture — sightings that were taken correctly, at
+  the only moment they could ever be taken, against an append-only ledger that cannot be
+  re-derived.
+
+**Destroying real captured data is strictly worse than declining to invent absent data,
+and unlike a missing capture it is self-inflicted and avoidable.** Ranked explicitly here
+so a future reader does not treat the second option as equally legitimate: **there is no
+second option.**
+
+## THE SLOPE IS NOT USABLE AS A CRITERION — measured, and worse than estimated
+
+Audited 2026-07-26 by three independent derivations (algebraic OLS variance, a 400,000-rep
+Monte Carlo with the true Bernoulli DGP, and a GLM cross-check) plus a full repo scan.
+
+### The arithmetic, confirmed
+
+At σ_p = 0.08 and n = 100: **SE(slope) ≈ 0.61** (Monte Carlo; 0.625 analytic with
+σ_resid = 0.5, a ~3% conservative upper bound). The `[0.85, 1.15]` band is **0.24 SE units**,
+so a perfectly calibrated market lands inside it **19% of the time** and **fails ~81%**.
+The estimator is fine — unbiased, simulated mean 0.9997 — **the band is the problem.**
+
+### σ_p WAS AN ASSUMPTION. Measured, it is 2–4× smaller, and the criterion gets worse
+
+`fitReliability` groups **by market**, so the σ_p that applies is the within-market spread of
+stated probabilities, not the pooled one. Measured on a real board (199 rows):
+
+| market | σ_p | SE(slope) @ n=100 | **P(pass \| perfectly calibrated)** | n for a 2σ test |
+|---|---|---|---|---|
+| `pitcher_outs` | 0.022 | 2.27 | **5.3%** | 91,827 |
+| `batter_hits` | 0.032 | 1.56 | **7.6%** | 43,402 |
+| `batter_home_runs` | 0.036 | 1.40 | 8.5% | 35,068 |
+| `batter_total_bases` | 0.036 | 1.38 | 8.6% | 33,915 |
+| `rl` | 0.045 | 1.11 | 10.7% | 22,045 |
+| `ml` | 0.048 | 1.05 | 11.4% | 19,533 |
+| **`batter_hits_runs_rbis`** | **0.058** | **0.86** | **13.9%** | **13,121** |
+| `pitcher_strikeouts` | 0.064 | 0.78 | 15.2% | 10,953 |
+| *(the assumed 0.08)* | 0.080 | 0.62 | 19.0% | 6,944 |
+
+Pooled across all markets σ_p is 0.177 — but only because it mixes HR at ~13% with hits at
+~65%. **That number must never be used here.**
+
+**So for H+R+RBI the retirement criterion passes a perfectly calibrated market 13.9% of the
+time. It fails ~86%.**
+
+### The sharper indictment: the band barely discriminates AT ALL
+
+Failing 86% of the time is not the worst of it. Acceptance probability at σ_p = 0.058,
+n = 100, by **true** slope:
+
+| true slope | passes |
+|---|---|
+| 1.00 (perfect) | 13.9% |
+| 0.75 | 13.3% |
+| 0.50 (badly overconfident) | 11.7% |
+| 0.25 | 9.5% |
+| 0.00 (no information at all) | 7.1% |
+
+**A market carrying zero information passes half as often as a perfect one.** The test cannot
+separate "calibrated" from "worthless". Passing it is near-meaningless evidence of
+calibration — which is a worse defect than the failure rate, and the reason the criterion has
+to be replaced rather than loosened.
+
+### AND I WAS WRONG THAT THE SLOPE GATES NOTHING
+
+An earlier report said *"fitReliability is computed and reported but never gates a weight."*
+**False.** `slopeMults` (`src/engine2/calibration.ts:457–462`) reaches production: it is
+min-merged into `mults` by `effectiveCalibration` (:498), handed to both arming paths
+(`/api/generate` :181/:205 and `engine-client` :347) as `SH_V2.calW`, and lands in `shWm`
+(`legacy/index.html:1744`). It acts at `SLOPE_MIN_N = 100` — **lower** than the weekly
+channel's 150 — nightly with no rate limit, and its multiplier **is the slope itself**, not a
+capped 10% step. On paper it is the looser-n and faster-acting of the two weight channels.
+
+**But it is effectively unfireable.** Its gate is `slope + 1.96·se < 1`, so at the measured
+σ_p it needs a fitted slope below:
+
+| market | required fitted slope |
+|---|---|
+| `pitcher_strikeouts` | < −0.54 |
+| `batter_hits_runs_rbis` | < −0.68 |
+| `ml` | < −1.05 |
+| `batter_total_bases` | < −1.71 |
+| `batter_hits` | < −2.06 |
+| `pitcher_outs` | < −3.45 |
+
+A calibration slope that negative means higher stated probability predicting a *lower* hit
+rate, strongly. **`slopeMults` has almost certainly never moved a weight and at achievable n
+never will.** That is reassuring for the freeze — no unnoticed weight movement — but it is a
+**fourth inert shipped protection**, after `shPenQF`, `shUmpKf`, and the HRR criterion itself.
+Added to the factor-activity discipline: **a gate whose threshold is unreachable is inert in
+exactly the way a missing input is, and neither shows up in a value-based drift check.**
+
+### Two caveats that apply to the REPLACEMENT too, not just the thing being replaced
+
+1. **Independence.** Every SE here assumes independent legs. Same-game and same-slate legs are
+   correlated; at an average pairwise ρ ≈ 0.05 the 12.9-point H+R+RBI gap moves from ~2.7σ to
+   **~1.1σ**. The gap test is the one being proposed as the replacement, so this must be
+   checked with clustered SEs before it is relied on. **Not yet done.**
+2. **Gap and slope measure different things.** The gap tests the LEVEL (mean bias); the slope
+   tests RELIABILITY (whether stated confidence scales correctly). A book can have a zero gap
+   and a slope of 0.4. Replacing one with the other **loses something real** — the honest
+   position is that the slope is unmeasurable at any n this project will reach, not that it
+   was never worth measuring.
+
+### `summary.disagreement` HAS NO READER — my own gap
+
+`fitByDisagreement` is written at `app/api/calibrate/route.ts:251` and read by **nothing** —
+not the engine, not the API, not the UI. The instrument built specifically to catch the
+failure the pooled slope missed currently gates nothing and displays nothing. Recorded rather
+than quietly wired up: adding a consumer is a behaviour change and needs its own sign-off.
