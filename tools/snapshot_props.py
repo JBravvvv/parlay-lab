@@ -65,11 +65,17 @@ def compact(eventodds):
                 kk = f'{o.get("description") or o.get("name")}|{o.get("point", "")}'
                 rows.setdefault(kk, {})[side] = o["price"]
             for kk, pair in rows.items():
-                r = acc.setdefault(m["key"], {}).setdefault(kk, {"fairs": [], "fb": [], "no": 0, "cz": None, "bo": None, "bu": None})
+                r = acc.setdefault(m["key"], {}).setdefault(kk, {"fairs": [], "fb": [], "fp": {}, "no": 0, "cz": None, "bo": None, "bu": None})
                 if "o" in pair and "u" in pair:
                     io, iu = imp(pair["o"]), imp(pair["u"])
                     r["fairs"].append(io / (io + iu))
                     r["fb"].append(bk["key"])  # this book contributed a fair
+                    # ...and ITS OWN PAIR. Added 2026-07-26: without the per-book prices the
+                    # archive's `fair` can never be recomputed at the engine's de-vig. `bo`/`bu`
+                    # are cross-book BESTS, so de-vigging them prices a pair no book posted —
+                    # measured on a live row, S=1.0564 against the real per-book 1.0654, i.e.
+                    # 0.90 points of vig that does not exist. See docs/collection-period.md.
+                    r["fp"][bk["key"]] = [pair["o"], pair["u"]]
                 if "o" in pair:
                     r["no"] += 1  # books posting an OVER at all (one-sided depth)
                 if is_cz:
@@ -83,9 +89,18 @@ def compact(eventodds):
         out[mkt] = {}
         for kk, r in rows.items():
             out[mkt][kk] = {
+                # PROPORTIONAL de-vig — the classic CLV convention, and deliberately NOT the
+                # engine's. The engine runs Shin (shShin2 via shDevigPair, armed in production).
+                # NEVER read this as "the engine's consensus fair"; recompute from `fp` instead.
                 "fair": round(median(r["fairs"]), 4) if r["fairs"] else None,
                 "n": len(r["fairs"]),
                 "fb": sorted(r["fb"]),
+                # per-book {key: [over, under]} for every book behind the fair. This is the
+                # ONLY field from which the engine's Shin fair is recomputable; `fair` below
+                # is PROPORTIONAL and is NOT the engine's number (they differ by 0 pp at an
+                # even market and up to ~1.2 pp at long odds — a product of imbalance and
+                # overround, so no flat correction exists).
+                "fp": r["fp"],
                 "czf": CZ in r["fb"],
                 # `bo`/`bu` were already computed and then thrown away. They are what
                 # the engine's one-sided fallback actually anchors to (best over price

@@ -1965,3 +1965,110 @@ First real per-market reliability fit, 2026-07-26, n = 70 pooled:
 `batter_total_bases` 0.509 ± 6.106 · `ml` 2.624 ± 2.917 · `rl` 3.048 ± 3.057 · pooled
 1.697 ± 0.412. This is not a criticism of the estimator — it is what "the slope needs
 ~13,100 legs per market" looks like on day one.
+
+## `props-history.fair` IS NOT THE ENGINE'S FAIR — and Phase 2's design turns on it
+
+**Flagged at the field level**, in `tools/snapshot_props.py` beside the field itself, because
+the next reader will find the name reassuring. The stored `fair` is a **proportional**
+de-vig; the engine runs **Shin** (`shShin2` via `shDevigPair`, armed in production).
+
+### Was the archive's fair recomputable at the engine's de-vig? NO — and here is why
+
+`bo`/`bu` are **cross-book bests**, from potentially different books. De-vigging that pair
+prices something no book ever posted. Measured on a live archived row
+(`Will Warren|14.5`, 2026-07-26):
+
+| pair | overround |
+|---|---|
+| `bo` / `bu` (−115 / −109) — the cross-book best | **1.0564** |
+| Caesars' own real pair (−115 / −113) | **1.0654** |
+
+The best-of pair carries **0.90 points of vig that does not exist**. Shin's whole mechanism
+is how it distributes the overround, so feeding it a fictitious overround produces a
+fictitious fair. `fb` named the contributing books but not their prices.
+
+### And a flat correction cannot rescue it — the bias is a PRODUCT, not a constant
+
+| `p_prop` | S=1.02 | S=1.04 | S=1.06 | S=1.10 |
+|---|---|---|---|---|
+| 0.50 | +0.00 | +0.00 | +0.00 | +0.00 |
+| 0.70 | +0.40 | +0.80 | +1.20 | +2.00 |
+| 0.90 | +0.80 | +1.60 | +2.40 | **+4.00** |
+
+Zero at an even market for **every** overround; grows with imbalance **and** with the
+overround. The archive stored neither the per-book overround nor the pair, so the bias was
+not even estimable per row. The owner's read was right.
+
+### FIXED — `fp` captures the per-book pairs, from 2026-07-27
+
+`snapshot_props.py` now emits `fp: {bookKey: [over, under]}` for every book behind the fair.
+Verified end to end: from `fp` the per-book Shin fairs recompute to `[0.5022, 0.5099]`,
+median **0.5060**, against the stored proportional **0.5057** — different numbers, as
+documented.
+
+**Consequence for Phase 2, which is the reason this mattered:** close-grading only the
+**locked** legs via `entry.clv[lid]` is 3–8 rows/day. With `fp`, Phase 2 can close-grade the
+**whole board at the engine's own de-vig, for zero credits**, from **2026-07-27** forward.
+Days 2026-07-12 → 07-26 carry `fair`/`n`/`cz` only, so they support proportional
+close-grading and Caesars-only Shin (via `cz`), not multi-book Shin.
+
+## THE CRON HOUR — the model is VALIDATED; what remains is confirmation, not re-derivation
+
+Stated plainly so this does not read as an open question for weeks. On the 2026-07-26 board
+`pitch − 3h` was **exact**: 13 games past the window, 13 with confirmed lineups, **zero
+anomalies in either direction** — no lineup posted early, none missing inside the window.
+That is the assumption the whole 52-day table rests on, and it held on all 15 games.
+
+**So `22:00 weekday / 18:00 Saturday / 17:00 Sunday` stands as derived.** What was broken
+was a *field measuring something else*, now fixed. The residual uncertainty is
+**slate-to-slate variance, not model error.**
+
+**How many observed days before calling it: FIVE.** Each board is 15 independent
+game-level checks of the lineup window, so five days ≈ **75 checks** — enough to catch a
+model that is right, say, only 90% of the time (which would show ~7 misses) against a
+current record of 15/15. Five days must include **at least one Saturday and one Sunday**,
+since those are separate rows in the table with their own hours. At one board/day from
+2026-07-26, that is **~2026-07-31**.
+
+Five days confirms the *model*. It does **not** re-derive the *table* — that would need
+~7 observations per day-type, i.e. seven Saturdays. The table already has 52 days behind
+it and does not need re-deriving unless the model fails.
+
+## GATE ACTIVITY — built, per category, and it caught something on its first run
+
+`tools/gate_activity.py`. Reports **per category, never as one flat count**, because
+"structurally unreachable", "deliberately pinned" and "not yet reached" are three different
+states and a single never-fired number blurs them. Gates behind the sync phrase are listed
+as **UNREADABLE rather than omitted** — an unmeasured gate must not look like a passing one.
+
+First run, real board 2026-07-26 (303 rows, 196 tickets):
+
+| category | gate | state |
+|---|---|---|
+| **A structural** ⚠ | `slopeMults` · HRR slope band | never / n-a |
+| **B pinned** ✓ | `shPenQF` · `shUmpKf` | never, by decision |
+| **C zeroed** ✓ | `mayAutoRun` | never, by design |
+| **D pending** 👁 | `applyWeeklyAdjustment` · `fitGlobalShrink` · `quarantine` | never — n far below thresholds |
+| **E firing** ✓ | `coreNoHR` 12/196 · `coreEvMin` 172/196 · `coreMaxLegs` 82/196 · `coreMaxDec` 15/196 · `hrrAltMax` 18/303 rows · **`booksInd` 2/196** | all firing |
+
+### `booksInd` RESOLVED — category F is empty; it fires on a real board
+
+| market | rows at `booksInd = 0` |
+|---|---|
+| `batter_home_runs` | **50 / 50 (100%)** |
+| **`pitcher_outs`** | **4 / 38** — and outs is **core-eligible** |
+| everything else | 0 |
+
+54 of 303 rows. **16 of 196 tickets carry a `booksInd = 0` leg; 12 are HR and die at
+`coreNoHR` first; 2 are non-HR and clear +2% EV — they reach the gate and are blocked.**
+
+So the rule is **not** inert on a real slate, the fixture's zero was a fixture artifact
+exactly as recorded, and **the never-fired count stays at eight.**
+
+### The check's first run found a stale artifact
+
+`significant` reported **FIRED** while every market sat at n = 5–15, far below
+`SIG_MIN_N = 50`. Not a bug in the fix — the **stored summary predates it** (written
+2026-07-26T10:23Z; `SIG_MIN_N` was committed after). Category D reads the stored summary,
+so **a stale artifact and a live gate look identical unless the timestamp is checked**. The
+tool now prints that timestamp on every run with exactly that warning.

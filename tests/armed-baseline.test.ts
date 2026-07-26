@@ -19,6 +19,15 @@ import { ARMED_DAILY, ARMED_FUN, FROZEN_NOW, armedDigest, armedFixtureEngine, di
  * It captures TODAY'S PRODUCTION STATE, pins included (`umpKFrozen`/`penQFrozen` true) —
  * that is current behaviour, and current behaviour is what a regression test holds.
  *
+ * THE FIXTURE DIVERGES FROM PRODUCTION IN BOTH DIRECTIONS ON THE PINNED FACTORS, so its
+ * numbers describe neither. `SH_CTX` is absent from the DORMANT harness, making the seven
+ * identity factors fixture-inert while `shPenF`/`shTempF` are 100% production-active; and
+ * the fix45 context deliberately carries `hpUmp.kFactor` and `pen_quality.ip` values that
+ * clear both guards, making `shUmpKf`/`shPenQF` fixture-ACTIVE while both are pinned and
+ * production-inert. Same factors, opposite directions. The 8ed8dd2 retro diff is the proof:
+ * releasing the pins on HEAD reproduced 8ed8dd2 byte-for-byte, i.e. the pins move this
+ * fixture by 8 K rows and 14 H+R+RBI rows while moving production by nothing at all.
+ *
  * IT IS A REGRESSION INSTRUMENT, NOT A SOURCE OF PRODUCTION VALUES. The fixture context's
  * `hpUmp.g` spans (3/5/9/40) and `pen_quality.ip` alternation (9.0/40.0) are chosen to
  * exercise both sides of each guard, which is right for catching movement and wrong for
