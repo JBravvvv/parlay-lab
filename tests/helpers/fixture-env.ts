@@ -59,6 +59,117 @@ export function fixtureEngine(): Engine {
   return createEngine({ fetchJson: fixtureFetchJson, today: TODAY });
 }
 
+/**
+ * ARMED fixture engine (2026-07-26) — arms the v2 kernel exactly as production's
+ * `armV2()` does, so the seven identity factors are actually exercised.
+ *
+ * `fixtureEngine()` leaves `SH_V2`/`SH_PRIORS`/`SH_CTX` at their `legacy/index.html`
+ * L1547 defaults of `null`, which is why `baseline43.json` is a v2-DORMANT board and
+ * cannot see any v2-gated change (see docs/collection-period.md, "What the parity digest
+ * actually covers"). This is the counterpart used by `baseline-armed-v1`.
+ *
+ * `tests/fixtures/fix45/context.json` is a SYNTHETIC COMPOSITION of real values: the
+ * weather/probables/bullpen/pen_quality blocks come verbatim from a real committed
+ * `context.json`, remapped onto the fixture slate's teams, with `hpUmp.g` spanning
+ * 3/5/9/40 and `pen_quality.ip` alternating 9.0/40.0 so both sides of the `g >= 5` and
+ * `ip >= 15` guards are covered. It is test data and is labelled as such — no market
+ * price is synthesised anywhere in it.
+ *
+ * `pinned` defaults to true = today's production state (`umpKFrozen`/`penQFrozen` on),
+ * which is what a regression baseline should hold.
+ */
+export function armedFixtureEngine(opts: { pinned?: boolean } = {}): Engine {
+  const eng = createEngine({ fetchJson: fixtureFetchJson, today: TODAY });
+  eng.set("SH_PRIORS", JSON.parse(fs.readFileSync(path.join(FIX, "..", "..", "public", "model", "priors.json"), "utf8")));
+  eng.set("SH_CTX", JSON.parse(fs.readFileSync(path.join(FIX, "fix45", "context.json"), "utf8")));
+  // mirrors armV2() in src/lib/engine-client.ts
+  eng.set("SH_V2", {
+    shin: true, sharpW: true, sim: true, projLineup: true,
+    priors: true, ctx: true, regions: "us,eu",
+    simN: SIM_PATHS_FIXTURE, simNHR: SIM_PATHS_FIXTURE,
+  });
+  if (opts.pinned === false) {
+    const cfg = eng.get<Record<string, unknown>>("SH_CFG");
+    eng.set("SH_CFG", { ...cfg, umpKFrozen: false, penQFrozen: false });
+  }
+  return eng;
+}
+
+/* Pinned low for baseline runtime. The production value is SIM_PATHS (50,000) — the
+   inequality is deliberate and documented; what matters for a baseline is that the
+   number is FIXED, since sim depth changes every probability. */
+export const SIM_PATHS_FIXTURE = 2000;
+
+/** Fixed inputs for the card path, so the baseline never depends on `SH` UI state. */
+export const ARMED_DAILY = 250;
+export const ARMED_FUN = 5;
+
+/**
+ * ARMED DIGEST — deliberately WIDER than `digest()`.
+ *
+ * `digest()` keeps only `[label, sub, odds, prob, ev]` per row, and covers nothing the
+ * allocator does. Phases 3 (shAllocate), 4 (buildParlaySet/shCardPool) and 5 (row shape)
+ * all land outside it, which is why their "parity digest unchanged" acceptance criterion
+ * was void. This one carries the row fields selection actually reads, plus the whole card
+ * path including the BLOCKED LIST WITH REASONS — the surface a gate change moves.
+ */
+export function armedDigest(d: Record<string, unknown>, eng: Engine) {
+  type Row = Record<string, unknown>;
+  const rows = (C: Record<string, Row[]> = {} as never) => {
+    const o: Record<string, unknown[]> = {};
+    Object.keys(C)
+      .sort()
+      .forEach((k) => {
+        o[k] = (C[k] || []).map((r) => [
+          r.label, r.sub, String(r.odds), r.prob, r.ev, r.implied, r.edge,
+          r.cz, r.czEv, r.bs, r.bsEv, r.kellyF, r.lu, r.susp ?? null,
+          Array.isArray(r.tags) ? (r.tags as string[]).join(",") : null,
+        ]);
+      });
+    return o;
+  };
+  const tix = (set: Record<string, unknown>[] = []) =>
+    (set || []).map((p) => ({
+      n: p.name, o: p.odds, p: p.prob, cz: p.czOdds, czEv: p.czEv,
+      bsEv: p.bsEv, consEv: p.consEv, consCzEv: p.consCzEv,
+      legs: (p.legs as Record<string, unknown>[]).map((l) => `${l.label}|${l.prop}|${l.odds}|${l.lkey}`),
+    }));
+
+  const pool = eng.get<(b: unknown) => { pl: Record<string, unknown> }[]>("shCardPool")(d);
+  const cfg = eng.get<Record<string, unknown>>("SH_CFG");
+  const tid = eng.get<(pl: unknown) => string>("shTicketId");
+  const alloc = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => Record<string, unknown>>(
+    "shAllocate",
+  )(pool, ARMED_DAILY, cfg, false);
+  const ids: Record<string, number> = {};
+  (alloc.picks as { id: string }[]).forEach((p) => (ids[p.id] = 1));
+  const fun = eng.get<(p: unknown, a: number, c: unknown, i: unknown, l: unknown) => Record<string, unknown>>(
+    "shFunPick",
+  )(pool, ARMED_FUN, cfg, ids, alloc.legs);
+
+  return {
+    categories: rows(d.categories as never),
+    categoriesLive: rows(d.categoriesLive as never),
+    parlays: tix(d.parlays as never),
+    parlaysMixed: tix(d.parlaysMixed as never),
+    parlaysLive: tix(d.parlaysLive as never),
+    // ---- the card path, which digest() never saw ----
+    pool: pool.map((w) => tid(w.pl)).sort(),
+    alloc: {
+      sum: alloc.sum, ev: alloc.ev, noPlay: alloc.noPlay ?? false, overrode: alloc.overrode ?? false,
+      unallocated: alloc.unallocated ?? null,
+      picks: (alloc.picks as Record<string, unknown>[]).map((p) => [p.id, p.amt ?? p.amount]),
+      blocked: (alloc.blocked as Record<string, unknown>[] | undefined ?? [])
+        .map((b) => `${b.name}|${b.reason}`)
+        .sort(),
+    },
+    fun: {
+      sum: fun.sum,
+      picks: (fun.picks as Record<string, unknown>[]).map((p) => [p.id, p.amt ?? p.amount]),
+    },
+  };
+}
+
 /** The exact digest from tests/legacy-harness/baseline40.js. */
 export function digest(d: Record<string, unknown>) {
   type Row = { label: string; sub: string; odds: unknown; prob: unknown; ev: unknown };
