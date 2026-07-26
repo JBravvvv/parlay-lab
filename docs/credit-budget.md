@@ -92,6 +92,19 @@ Neither archive is being cut today.
 | `line-history` (game lines) | 25 | ~5% | **every measurement that changed a decision this phase**: the 3/4/5/6-hour price-movement percentiles that set `lockMaxAgeMin`, the p90 offshore-book artifact, the 31-book ML consensus depth | cheapest line in the budget, highest realised yield — never cut first |
 | `props-history` (player props) | 161 (→192 Sept) | **31%** | **read for the first time on 2026-07-25**: the 12-day, 11,072-row independence measurement that corrected the eligibility rule's cost from a wrong 38% to a measured 16.8% — see `collection-period.md` | keep; it now has a named use |
 
+### THE ARGUMENT AGAINST CUTTING AN ARCHIVE BECAUSE IT LOOKS IDLE
+
+Put plainly, because it is the strongest form of the case and it should not have to be
+re-derived: **`props-history` had never been read once in the ~13 days it had been running,
+and on its first read it prevented shipping a selection rule scoped to the wrong market off
+a number that was wrong by a factor of twenty.** The rule would have been written against
+"38% of total-bases rows"; the archive said 0.7%, and said the real hole was somewhere else
+entirely (`n = 0`, and `batter_home_runs` at 100%).
+
+An archive's value is not its read frequency. It is bought before the question exists, and
+the question that needed it here was not foreseeable when the workflow was written. Anything
+proposing a cut on "nothing reads it" has to answer this case first.
+
 **What `props-history` needed to be read FOR — answered, not deferred.** It is the only
 multi-day record of `n`, the fair's book count, per prop row. The single-fixture version of
 that measurement was wrong by a factor of ~20 and would have shipped a rule scoped to the
@@ -99,11 +112,13 @@ wrong market. No other artifact in the repo can answer "is this slate's book dep
 or an artifact of one day," and `/api/clv` cannot substitute — it stores a per-leg sighting
 for legs that were *bet*, not the shape of the whole board.
 
-**One free improvement worth making:** `tools/snapshot_props.py` records `n` and `cz` but
-not whether Caesars was among the `n` fairs. `n = 1 ∧ cz two-sided` recovers the sole-source
-case exactly, but the *partial* case (Caesars as 1 of 2) is only inferable. Adding a
-`cz_in_fair` boolean in `compact()` costs **zero extra credits** and starts the series
-accruing now. Not built yet.
+**Built 2026-07-25, zero extra credits:** `tools/snapshot_props.py` now records `fb` (the
+book keys behind the fair), `czf` (was the settlement book among them), `bo`/`bu` (best
+prices — already computed and previously discarded) and `no` (how many books posted an over
+at all). `n` is unchanged so the 12 archived days stay comparable. These are the fields that
+decide the `booksInd` threshold (1 vs 2) and that make the `1.06` haircut auditable where it
+is actually applied — see `collection-period.md`. Effective from the next sweep; ~2 weeks to
+a usable series.
 
 Ordering if the budget is ever genuinely squeezed, most-cuttable first: **props-history →
 line-history → client regenerates → never `/api/clv`, never `/api/generate`.** Note this
@@ -202,10 +217,26 @@ Ranked by what is lost, cut in this order: line-history (nothing) → props-hist
 superseded panel) → client generates (the real lever after that: ~120 per device per
 day) → never `/api/clv` or `/api/generate`.
 
-## The tier decision (2026-07-25): 100K, and WHY — read this before "optimising" it
+## The tier decision (2026-07-25): 100K — read this before "optimising" it
 
-**Josh took the 100K tier at ~15–20% utilisation, knowing 20K fits.** That is not an
-oversight to be tidied up later, and the reasoning is the point:
+### The first reason is arithmetic: **20K does not fit.**
+
+On the workflow actually in use — a two-regenerate day, because the price-age lock guard
+blocks both the 5 PM look and the 6:30 PM lock — the burn is **~654/day now (101% of a 20K
+plan) and ~712/day in September (107%)**. The break-even is 25 betting days out of 30. This
+is not a margin-of-safety argument; the smaller plan runs out.
+
+**The alternative that avoids the purchase — considered and rejected.** Retiming the cron so
+the *first* look is already inside the 30-minute window removes one of the two regenerates
+and returns September to ~562/day (84%). It cannot remove both: with a 30-minute guard and a
+two-hour lock window, at most one look-point can ever be free. And it only works by
+generating earlier, which is the opposite of the change that was just made — 22:00 UTC was
+chosen precisely to sit after lineups post. **So the trade is confirmed lineups for $29/month,
+and confirmed lineups are worth more than that.** Rejected 2026-07-25.
+
+### The second reason is asymmetry — it was the original argument, and it still stands
+
+Even had 20K fitted, the purchase was correct:
 
 > Every other failure mode here is recoverable or bounded. A missed `/api/clv` sighting
 > is **permanently gone** from the dataset this entire freeze exists to build. $29 to

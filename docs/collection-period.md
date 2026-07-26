@@ -140,6 +140,7 @@ drift, even when both values look reasonable on their own.
 | `SH_OVER_LEAN` | `0.25` | legacy-mode over-lean threshold (disciplined modes pick sides vs fair; `dirPref` default `{}` = both) |
 | Kelly | ¼-Kelly, capped 2% of bankroll per bet | sizing |
 | global shrink | `s = 1` (none) | pooled reliability slope 1.05 over 1,487 legs (2026-07-22 fit); per-market mults empty |
+| **one-sided vig haircut** | **`1.06`** (`legacy/index.html` L2388) | the assumed overround when a row has no second side to de-vig: `fair = oneImp / 1.06`. **Added to this table 2026-07-25** — it was materially pricing rows and appeared in no table, the same omission `simN`/`simNHR` had. Measured overround is **1.071** (below). **Frozen; do not change during collection.** |
 
 ### Bankroll & ledger
 | parameter | value | meaning |
@@ -350,6 +351,111 @@ documented rebaseline — **not** a silencing one.
 **Fallback if it cannot ship by 2026-07-28:** hold `batter_total_bases` (and
 `batter_home_runs`, which is 100% `n = 0`) out of selection until it does. Owner's stated
 preference, 2026-07-25: *"I'd rather lose a market for a week than run one ungated."*
+
+## THE `1.06` ONE-SIDED HAIRCUT — measured 2026-07-25, NOT changed
+
+`legacy/index.html` L2388 assumes a flat 6% overround on every row with no second side to
+de-vig: `fair = oneImp / 1.06`. That path prices **100% of HR rows, 16.1% of total bases,
+6.2% of pitcher outs and 2.2% of hits** — and total bases and outs are core-eligible. It
+was in no frozen table. It is now (above). **It has not been touched: this is a
+freeze-class parameter and changing it is a freeze decision.**
+
+### What the archive can measure
+
+`line-history/data/props`, 12 days, using rows that carry **two** Caesars sides, so the
+true overround is observable and the constant can be audited directly:
+
+| market | n | p25 | **median** | p75 | p90 | fair overstated by | relative | czEV overstated by |
+|---|---|---|---|---|---|---|---|---|
+| `batter_total_bases` | 1,336 | 1.070 | **1.071** | 1.073 | 1.074 | +0.51 pp | +1.0% | **+0.63 pp** |
+| `batter_hits_runs_rbis` | 1,560 | 1.070 | **1.071** | 1.073 | 1.074 | +0.54 pp | +1.1% | **+0.65 pp** |
+| `pitcher_outs` | 150 | 1.070 | **1.072** | 1.075 | 1.081 | +0.59 pp | +1.2% | **+0.71 pp** |
+| `batter_hits`, `pitcher_strikeouts`, `batter_home_runs` | 0 | — | — | — | — | — | — | Caesars posts no standard two-sided quote in these markets |
+
+Against the **multi-book consensus fair** rather than Caesars' own de-vig (n ≥ 2 rows), the
+overstatement is slightly larger because it also carries Caesars' offset from consensus:
+total bases **+0.70 pp** median / +1.59 p90, H+R+RBI +0.63 / +1.40, outs +0.61 / +1.46.
+
+**By price bucket it is flat** — 1.071 at ≤ −150, 1.072 at −149…+99, 1.071 at +100…+250.
+There is no fat-tail-at-long-odds structure in the measurable range, and there is a reason:
+the EV overstatement is `0.65 × Δfair × dec`, and `Δfair = fair × r` where `r = overround/1.06 − 1`,
+so `ΔczEV ≈ 0.65 × r` **independently of the price**. The bias is *relative*, not absolute.
+
+### So the premise "if the true figure is ~1.12" does not hold where we can see
+
+Measured 1.071, not 1.12 — the constant is thin by ~1.1% relative, worth ~0.6 pp of czEV,
+not the ~3 pp a 0.8 pp absolute probability error would manufacture. That is well under
+`coreEvMin` (+2%). It is still a **systematic, one-directional** overstatement that pushes
+rows *toward* the gate rather than away, on 16.1% of total bases and 6.2% of outs.
+
+### Three limits, stated rather than buried
+
+1. **This is a floor, not an estimate.** The measurement can only use two-sided rows, which
+   are the *more* liquid ones. One-sided rows are less liquid, so their true overround is at
+   least this fat and never thinner. The direction of the remaining error is known even
+   though its size is not.
+2. **The engine anchors to the BEST over price across books**, not to Caesars' — `oneImp = iO`
+   at L2388, with the `dk_fd` basis branch inactive in `ev_gated`. Line-shopping shades `iO`
+   *down*, partially offsetting the thin haircut. The magnitude is **unmeasured**: the archive
+   dropped `bo`/`bu` before writing. Fixed 2026-07-25 (below).
+3. **HR is entirely unmeasurable from this archive, so the hypothesis is untested — not
+   refuted.** No book posted both sides of a HR line on any of 4,524 rows over 12 days, and
+   props-history stored only `fair`/`n`/`cz` for them — all null. HR rows in the archive are
+   **empty shells with no price in them at all.**
+
+   The sensitivity is what matters, and it is wide:
+
+   | if HR's true overround is… | czEV overstatement |
+   |---|---|
+   | 1.07 (like the measurable markets) | ≈ +0.7 pp |
+   | 1.15 | ≈ +5.5 pp |
+   | 1.25 | ≈ +11.7 pp |
+
+   The second and third rows would each dwarf `coreEvMin` entirely. **Which row is true is
+   exactly what cannot be determined today.**
+
+### The FUN 0-13 connection — a hypothesis with a test, not a conclusion
+
+HR-anytime parlays were suspended after FUN went 0-13, attributed to structure and variance.
+An overstated HR fair is a **mechanistic candidate** for the same record. 0-13 at those odds
+is unremarkable on its own — it is not evidence of anything by itself, and this section does
+not claim it is. What makes it worth writing down is that the two explanations make
+*different* predictions and one of them is now testable.
+
+**The test that settles it** (needs the fields added 2026-07-25, ~2 weeks of accrual): sum
+the de-vigged implied probabilities of every listed player's anytime-HR price in a game and
+compare it against the **realized average number of distinct HR hitters per game**, counted
+free from statsapi boxscores. The ratio *is* the field overround. Nothing in the current
+archive supports it because HR prices were never stored.
+
+### Should `1.06` be per-market?
+
+**On the evidence, no — and per-market would be false precision.** The three measurable
+markets are 1.071 / 1.071 / 1.072; they are indistinguishable from each other. The real gap
+is not between markets, it is between the measurable two-sided rows (1.071) and the
+one-sided rows that actually use the fallback (unmeasured, ≥ 1.071), with HR unmeasured
+entirely. Splitting a constant by market would encode a difference the data does not show
+while leaving the difference it does imply unaddressed.
+
+**Recommendation for freeze exit, not now:** replace the constant with each market's *own
+measured* overround, floored at the observed two-sided value, and only once the one-sided
+rows can be audited directly. Do not guess a fatter number in the meantime — a guessed 1.12
+would be as unevidenced as the 1.06 it replaced.
+
+### Archive fields added 2026-07-25 (zero credits, effective from the next sweep)
+
+`tools/snapshot_props.py` now records, alongside the existing `fair`/`n`/`cz`:
+
+| field | what it answers |
+|---|---|
+| `fb` | **which** book keys are behind the fair — so "when `booksInd == 1`, is that book sharp or a placeholder-prone offshore key" becomes data instead of argument (the threshold-1-vs-2 decision) |
+| `czf` | was the settlement book among them — the self-reference question, exactly |
+| `bo` / `bu` | best over/under price across books — **already computed and then discarded**; these are what the one-sided fallback actually anchors to, so without them the 1.06 constant can only be audited at Caesars and not where it is applied |
+| `no` | how many books posted an over at all — distinguishes "the best of one" from "the best of six", i.e. how much line-shopping is offsetting the thin haircut |
+
+`n` is unchanged so the 12 days archived before this stay directly comparable. Owner
+approved `czf` and `fb` on 2026-07-25; `bo`/`bu`/`no` were added in the same pass to make
+the HR question answerable at all, and are called out here rather than slipped in.
 
 ### The censored window (2026-07-18 → 2026-07-25) — CENSORED, not corrupted
 
