@@ -296,3 +296,23 @@ de-vigs anything.
 Anything that later treats `props-history.fair` as the engine's consensus (a prop-CLV
 reader is the obvious candidate) inherits that bias. The HR overround test dodges it by
 construction: it consumes `bo`, the raw best price, not `fair`.
+
+### Fifth obligation: a persisted summary must carry its own provenance
+
+The gate-activity check's first run reported `significant: FIRED` while every market sat at
+n = 5–15, far below `SIG_MIN_N = 50`. Not a bug in the fix — **the stored summary predated
+it**, written 2026-07-26T10:23Z while the constant was committed after.
+
+> **A stale artifact and a live gate look identical unless the timestamp is checked.**
+
+This cuts both ways, which is what makes it dangerous: after a fix, a panel still showing
+the old behaviour is **not** failure; and a panel that looks right may be reporting a run
+from before the change. Both readings are wrong, and neither is visible.
+
+It applies to every persisted summary in the system — `pl:cal:summary`, the CLV report, the
+Discipline log, `summary.disagreement`, and the gate-activity output itself.
+
+**Rule: every persisted summary carries its computation timestamp AND the commit that
+produced it; every reader displays both.** `gate_activity.py` now prints the summary's
+timestamp with exactly that warning. The commit stamp is not yet written by anything —
+recorded here as the obligation, not as done.

@@ -2072,3 +2072,61 @@ exactly as recorded, and **the never-fired count stays at eight.**
 2026-07-26T10:23Z; `SIG_MIN_N` was committed after). Category D reads the stored summary,
 so **a stale artifact and a live gate look identical unless the timestamp is checked**. The
 tool now prints that timestamp on every run with exactly that warning.
+
+## CARD FILL — answered from the persisted board, and the answer is NO-PLAY for a reason nobody named
+
+Run against the real 2026-07-26 board through the **actual** `shAllocate` filter chain,
+not a reconstruction of it:
+
+| step | tickets |
+|---|---|
+| `shCardPool` | 67 |
+| `shCoreEligible` (coreNoHR, coreMaxLegs 3, coreMaxDec 15) | 67 → **47** |
+| `coreEvMin` (+2% at CZ) | 47 → **18** |
+| `coreCzEvMin` (nv_tax) | 18 → 18 |
+| **consensus gate (`consMinN`/`consMinEv`)** | **18 → 0** |
+| `booksInd != 0` | 0 → 0 |
+| **allocator** | **picks 0, sum $0, `noPlay: true`** |
+
+`blocked by reason: {"consensus": 18}`.
+
+**Eighteen tickets cleared the +2% EV floor and every one died at the small-sample
+consensus gate.** The card is empty not because the model found no edge, but because
+`CAL_START` reset `mktN` to zero, so **every market is "unproven" and every ticket must
+also satisfy `consCzEv ≥ −1%`** — which none does, for the arithmetic reason already
+recorded (a thin or self-referential consensus reads the hold, not disagreement).
+
+This is exactly what this document predicted — *"while it rebuilds, `mktN` is small, so the
+small-sample consensus gate applies to more markets than usual — selection tightens…
+temporary"* — and it is now **measured rather than predicted**: the card is NO-PLAY for the
+whole `mktN` rebuild, projected to clear around **2026-08-06** (total bases) to
+**2026-08-09** (hits) at the measured 7–9 graded legs/day per market.
+
+`minCoreTickets` is 4 and `maxCoreTickets` 6; neither is reachable today. A thinner
+10-game slate changes nothing while this gate is universal — the binding constraint is
+`mktN`, not slate size.
+
+### CORRECTION to my own booksInd count
+
+Last report I said 2 non-HR tickets carrying a `booksInd = 0` leg "reach the gate and are
+blocked." **The real allocator run says `booksInd` blocks zero today.** I counted those 2
+by applying `coreNoHR` and a `czEv ≥ 2` test directly to `d.parlays`, which is not the
+filter chain — `shCoreEligible` also drops tickets on leg count and odds ceiling, and it
+removes 20 of 67 before the EV floor is even reached. The 2 do not survive to the gate.
+
+The row-level finding stands and is unchanged: **54 of 303 rows are at `booksInd = 0`,
+including 4 of 38 core-eligible `pitcher_outs` rows.** What was wrong was the ticket-level
+projection, and the lesson is the one this project keeps relearning: **a filter chain must
+be run, not reconstructed.**
+
+### THE 5 PM PT SLATE WAS EMPTY ON THIS DAY
+
+Restricting the pool to games unstarted at **00:00 UTC (5 PM PT)**: **0 of 67 tickets.**
+Every game on 2026-07-26 had first pitch before 23:20 UTC — the latest was NYY@PHI at
+23:20, i.e. 4:20 PM PT. A 5 PM PT lock on this Saturday would have had **no games left at
+all**.
+
+That is a day-heavy-Saturday artifact, not a general result — but it is the first direct
+evidence on the schedule question, and it points the same way as the coverage tables: the
+Saturday hour (18:00 UTC) exists because Saturday slates start early, and a 5 PM PT lock
+habit does not fit a Saturday at all.
