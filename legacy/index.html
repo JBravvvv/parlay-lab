@@ -2837,11 +2837,35 @@ function shAnalyzeLocal(slate){
      different instrument from one generated after, and until now nothing recorded
      which you were looking at. Pure addition — no selection math reads it, and the
      parity digest covers only categories/parlays. ----- */
-  var luConf=0;
+  /* CORRECTED 2026-07-26 — this field did NOT implement the canonical metric in
+     docs/board-timing.md, which is the fourth time a coverage number in this project has
+     been computed on a denominator its reader assumed was something else.
+       canonical numerator: games UNSTARTED at the pass AND past the lineup window (pitch-3h)
+       as implemented:      games with lineups observed, INCLUDING games already in progress
+     On the 2026-07-26 board that read 13/15 = 86.7% while the canonical figure was 12/15 =
+     80.0%: one game was already live, and a live game always has posted lineups, so it
+     inflated the numerator while contributing nothing loggable (boardToPredictions rejects
+     live rows outright).
+     Both quantities are now emitted OVER THE SAME DENOMINATOR so they are comparable:
+       modelled = the scheduling tables' assumption (pitch-3h), unstarted only
+       observed = lineups actually posted, unstarted only  <- the empirical check on it
+     `confirmed`/`eligible`/`pct` are kept, now unstarted-only, so existing readers keep
+     working and mean what they say. Purely additive; no selection math reads any of it. */
+  var luConf=0,luModel=0,luUnstarted=0,luNow=Date.now(),LU_LEAD=3*3600000;
   slate.games.forEach(function(gg){
+    var st=gg.start?Date.parse(gg.start):null;
+    var started=(st!=null&&st<=luNow);
+    if(started)return;                       /* a started game is not loggable either way */
+    luUnstarted++;
+    if(st!=null&&(st-luNow)<=LU_LEAD)luModel++;
     if((gg.lineup_away||[]).length>=9&&(gg.lineup_home||[]).length>=9)luConf++;});
-  var luCoverage={confirmed:luConf,eligible:slate.games.length,
-    pct:slate.games.length?Math.round((luConf/slate.games.length)*1000)/1000:0};
+  var luDen=slate.games.length;
+  var luCoverage={confirmed:luConf,eligible:luDen,
+    pct:luDen?Math.round((luConf/luDen)*1000)/1000:0,
+    unstarted:luUnstarted,
+    modelled:luModel,modelledPct:luDen?Math.round((luModel/luDen)*1000)/1000:0,
+    observedPct:luDen?Math.round((luConf/luDen)*1000)/1000:0,
+    leadMs:LU_LEAD};
   return {overview:overview,categories:preF.cats,categoriesLive:liveF.cats,parlays:parlays,parlaysMixed:parlaysMixed,parlaysLive:parlaysLive,liveGames:lg,trap:trap,passes:passes,gameInfo:gameInfo,simMarkets:simMarkets,propBoard:propBoard,luCoverage:luCoverage};
 }
 
