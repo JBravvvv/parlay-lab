@@ -1805,3 +1805,163 @@ audit's conclusion arriving as data on day one.
 separately in `applyWeeklyAdjustment`'s `tier === "ADJUST"` test. **The flag is safe only
 because a second, distant check catches it** — the same coupling shape as `lUse`/`lid`. Any
 new consumer reading `perMarket.significant` without also checking `tier` would act on n=5.
+
+## THE ATTRITION FINDING — my explanation was CONTRADICTED by the first real board
+
+I said the ~65% attrition (203 board rows → 70 graded) was because *"the 16:00 UTC board
+prices players who aren't in the lineup yet."* **The first persisted real board says
+otherwise.**
+
+Board for 2026-07-26, generated **16:46 UTC**, 1.35 MB, now retrievable via `/api/board`:
+
+| market | rows | confirmed lineup | projected | projected % |
+|---|---|---|---|---|
+| `ml` / `rl` | 15 / 15 | 15 / 15 | 0 | **0%** |
+| `batter_hits` | 50 | 45 | 5 | 10% |
+| `batter_total_bases` | 50 | 44 | 6 | 12% |
+| `batter_home_runs` | 50 | 47 | 3 | 6% |
+| `batter_hits_runs_rbis` | 50 | 37 | 13 | 26% |
+| `pitcher_strikeouts` | 35 | 35 | 0 | 0% |
+| `pitcher_outs` | 38 | 38 | 0 | 0% |
+| **TOTAL** | **303** | **276** | **27** | **9%** |
+
+`luCoverage: {confirmed: 13, eligible: 15, pct: 0.867}` — **87% of games already had a
+confirmed 9-man lineup at generation**, and only 9% of rows were projected. That cannot
+produce 65% voids.
+
+**So I do not know the cause of the attrition, and I am not going to supply a second
+explanation to replace a contradicted first one.** What is now true:
+
+- The 2026-07-25 board was **never persisted** (persistence shipped 13:05 PT that day,
+  after the 16:00 UTC cron), so the 70 graded rows have **no denominator**. The ~65% was
+  inferred against the *fixture's* row count, not the real board's.
+- **The 2026-07-26 board IS persisted with a real per-market denominator.** Tomorrow's
+  09:30 UTC calibrate run grades it, and that is the first true void rate per market.
+- 2026-07-26 is a **Saturday** with day games, which is why lineups were up at 16:46 UTC.
+  A weekday all-evening slate at the same hour would look nothing like this — which means
+  the retime question cannot be answered from one board either.
+
+**The re-derivation of the cron hour on graded rows per run therefore waits for that
+measurement, and for at least one weekday board beside it.** Deciding it on this Saturday
+board would repeat exactly the error being corrected: generalising from a slate that is not
+representative.
+
+## PHASE 2's PREMISE — partially true, and NOT enough to confirm a 3× speedup
+
+The reasoning offered: a voided row has no outcome but does have a closing consensus price,
+so close-grading works on the rows outcome-grading discards, accruing ~3× faster.
+
+**The first half is right in principle; the archive says the close is often missing too.**
+Measured across 12 archived days — of rows priced in the MORNING snapshot, how many still
+carry a price in the day's LAST snapshot:
+
+| | morning rows | also at close | **dropped** |
+|---|---|---|---|
+| 12-day total | 10,251 | 5,741 | **4,510 (44.0%)** |
+
+Per-day range 0% to 100%. The 100% (07-19) and 88% (07-12) days are almost certainly failed
+snapshots rather than real market removal; excluding them the median drop is **~20%**.
+
+Two reasons this does not yet support the 3× claim:
+
+1. **The close is not free.** Even for rows that existed in the morning, ~20% (median) have
+   no closing price. A scratched player is exactly the case where the book *pulls* the
+   market — so the population that voids and the population that loses its close **overlap
+   by construction**, which is the opposite of the assumed independence.
+2. **The system's close is `/api/clv`, not props-history** — a sighting within 45 minutes of
+   first pitch, taken only for legs on the **locked card**. Phase 2's close-graded population
+   is locked legs, not board rows, so the board-row arithmetic above is an upper bound on a
+   different quantity.
+
+**So: Phase 2's ~100× sample efficiency stands on its own and is not in question. The
+additional ~3× from grading voided rows is unconfirmed, and the honest estimate is smaller —
+somewhere between 1× and 3×, resolvable once `/api/clv` sightings can be joined against
+voided rows.** I have not produced corrected Phase 2 timelines, because doing so would mean
+multiplying a real number by an unverified one.
+
+## FIVE — ACTUALLY EIGHT — PROTECTIONS THAT HAVE NEVER ACTED
+
+`collection-period.md` opens by calling auto-calibration *"the only sanctioned mechanism for
+weight movement"*. **The one moving part has never moved.** Written down plainly, because
+the document currently implies a system that is actively self-correcting and it is not.
+
+This does not change the freeze. A stationary weight channel during a collection window is
+arguably ideal — nothing is contaminating the sample. But it should be a known fact rather
+than an assumption.
+
+### Gate enumeration — the full set, categorised
+
+**A. Structurally unreachable at any achievable n** — will not fire, by arithmetic:
+
+| gate | threshold | why it cannot fire |
+|---|---|---|
+| `slopeMults` | `slope + 1.96·se < 1` at n ≥ 100 | needs a fitted slope below −0.54 to −3.45 at measured σ_p |
+| HRR retirement/failure band | slope in [0.85, 1.15] at n ≥ 100 | band is 0.17 SE wide; admits a perfect market 13.9% of the time |
+
+**B. Deliberately pinned** — inert by decision, with dated activation plans:
+
+| gate | flag |
+|---|---|
+| `shPenQF` | `SH_CFG.penQFrozen` |
+| `shUmpKf` | `SH_CFG.umpKFrozen` |
+
+**C. Configured to zero:**
+
+| gate | value |
+|---|---|
+| `mayAutoRun` | `MAX_AUTO_RUNS_PER_DAY = 0` — prompt-only by design, so it can never auto-run |
+
+**D. Not yet reached, but reachable** — these may well fire later, and are NOT defects:
+
+| gate | needs | current |
+|---|---|---|
+| `applyWeeklyAdjustment` | ADJUST tier, n ≥ 150/market + Wilson significance + 7-day gap | **`log: []` lifetime — never fired**; n=5–15/market |
+| `fitGlobalShrink` → `calG` | n ≥ 150 legs with a logged `pMkt` | `s = 1`, n = 70 |
+| quarantine sanity-breaker | n ≥ 30 extreme-edge legs, realised < predicted/2 | `quarantine: []`, n too small |
+| `evGapShrink` / `sig` | `GAP_BUCKET_MIN_N = 150` per bucket | far below |
+
+**E. Firing routinely** — for contrast, so "inert" means something:
+`coreNoHR` (12 HR tickets/board), `coreEvMin` (+2%: 29 → 1 on the fixture), `coreCzEvMin`,
+`consMinN`, `coreMaxLegs`/`coreMaxDec`, the `kellyStakeMult` ceiling (capped $250 → $60),
+`hrrAltMax` suspension, `lockMaxAgeMin` (by design, daily), the four live identity factors.
+
+**F. Unknown:** `booksInd` — 0 fires on the fixture because every affected ticket is HR and
+`coreNoHR` drops it first. Real-slate behaviour is not yet observed.
+
+**The count is eight in categories A–D, not five.** A gate-activity check — fires per gate
+over the window, flagging any at zero — is the natural extension of the factor-activity
+check. **Not built; this list is the enumeration requested before building.**
+
+## CLUSTERED SE — the measurement is BUILT, and here is when it reports
+
+`tools/icc.py`. Computes the intraclass correlation of the calibration residual
+`e = y − p` at **three** candidate units — game, day, player — and lets the data choose,
+rather than defaulting. Negative ICC is reported as-is, never clamped to zero: clamping
+would quietly bias every downstream SE upward.
+
+Self-tested against a synthetic blob with an injected game-level ICC of 0.10 — the
+estimator recovered **0.127** at 30 clusters, and correctly refused a verdict at 240 rows
+(below the 300-row floor).
+
+**Schedule, at the measured 70 graded rows/day:**
+
+| unit | needs | reports from |
+|---|---|---|
+| **game** | ≥ 20 clusters (15/day) + ≥ 300 rows | **~2026-07-31** |
+| **player** | same | ~2026-07-31 |
+| **day** | ≥ 20 day-clusters at 1/day | **~2026-08-15** |
+
+So the game-level answer — the unit with the identified mechanism — lands **~2026-07-31**,
+and the day-level answer, which is the one that decides whether 2.7σ becomes 1.1σ, lands
+**~2026-08-15**. **The HRR amendment stays unsigned until then.** It requires the owner's
+sync phrase to run against the prediction store, so it is his to execute, not mine.
+
+## KEPT VERBATIM — the audit's conclusion arriving as data
+
+First real per-market reliability fit, 2026-07-26, n = 70 pooled:
+
+> **`batter_hits_runs_rbis`: slope 18.802, se 19.838, n = 7.**
+
+`batter_total_bases` 0.509 ± 6.106 · `ml` 2.624 ± 2.917 · `rl` 3.048 ± 3.057 · pooled
+1.697 ± 0.412. This is not a criticism of the estimator — it is what "the slope needs
+~13,100 legs per market" looks like on day one.

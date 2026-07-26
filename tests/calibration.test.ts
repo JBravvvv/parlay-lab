@@ -3,6 +3,7 @@ import {
   applyWeeklyAdjustment,
   calibrationLine,
   computeCalibration,
+  SIG_MIN_N,
   EV_EDGES,
   EV_GATE,
   evBucket,
@@ -277,5 +278,37 @@ describe("fitByEv — the bet population sits above a bucket EDGE", () => {
   it("excludes rows with no EV rather than bucketing them as zero", () => {
     expect(fitByEv([{ market: "m", p: 60, pMkt: 50, edge: null, lu: "confirmed", res: "won" }])
       .reduce((s, f) => s + f.n, 0)).toBe(0);
+  });
+});
+
+/* `significant` must not make a false statement at tiny n (2026-07-26). Found live:
+   pitcher_outs reported significant:true at n=5, and CalibrationPanel renders that flag
+   with no tier guard, so it was on screen. */
+describe("significant — gated on sample size, not just n > 0", () => {
+  const legs = (n: number, p: number, hit: number): GradedPick[] =>
+    Array.from({ length: n }, (_, i) => ({
+      market: "pitcher_outs", p, pMkt: p, edge: 0, lu: "confirmed" as const,
+      res: (i < hit ? "won" : "lost") as "won" | "lost",
+    }));
+
+  it("a market at n=5 reports significant:false however extreme the miss", () => {
+    // stated 90%, hit 0 of 5 — as far outside the Wilson interval as it gets
+    const s = computeCalibration(legs(5, 90, 0));
+    expect(s.perMarket.pitcher_outs.n).toBe(5);
+    expect(s.perMarket.pitcher_outs.significant).toBe(false);
+    expect(s.perMarket.pitcher_outs.direction).toBe("ok");
+  });
+
+  it("the SAME miss at n=SIG_MIN_N does report significant", () => {
+    const s = computeCalibration(legs(SIG_MIN_N, 90, 0));
+    expect(s.perMarket.pitcher_outs.significant).toBe(true);
+    expect(s.perMarket.pitcher_outs.direction).toBe("hot");
+  });
+
+  it("is more conservative than before — it can never newly fire", () => {
+    expect(SIG_MIN_N).toBeGreaterThan(0);
+    // and the ACTION threshold is untouched: MONITOR below 50, ADJUST at 150
+    expect(tierFor(SIG_MIN_N - 1)).toBe("MONITOR");
+    expect(tierFor(150)).toBe("ADJUST");
   });
 });

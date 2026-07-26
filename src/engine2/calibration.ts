@@ -46,6 +46,24 @@ export const EDGE_BUCKETS: [number, number][] = [
 
 export type Tier = "MONITOR" | "SOFT" | "HARD" | "ADJUST";
 
+/**
+ * MINIMUM SAMPLE FOR THE `significant` FLAG (2026-07-26).
+ *
+ * `significant` is a predicted-vs-actual RATE test, and it was guarded only by `n > 0`.
+ * Live consequence, found on the first real fit: `pitcher_outs` reported
+ * `significant: true` at **n = 5**, and `CalibrationPanel` L178 renders that flag with no
+ * tier guard — so a false significance was on screen. No weight could move (that path
+ * checks `tier === "ADJUST"`, n >= 150 separately), but the field itself was making a
+ * false statement, which is a different defect from the lUse/lid coupling: there, two
+ * things had to agree; here the value is simply wrong.
+ *
+ * 50 is `tierFor`'s own MONITOR boundary — the codebase's existing word for "not enough
+ * to say anything" — so this reuses the vocabulary rather than inventing a threshold. It
+ * is strictly more conservative than before and cannot make anything act that did not act.
+ * The ACTION threshold is unchanged at 150 (ADJUST).
+ */
+export const SIG_MIN_N = 50;
+
 export function tierFor(n: number): Tier {
   if (n < 50) return "MONITOR";
   if (n < 100) return "SOFT";
@@ -107,7 +125,7 @@ function bucketize(
     return a + (q - y) * (q - y);
   }, 0) / n;
   const ci = wilson(won, n);
-  const significant = predicted < ci.lo || predicted > ci.hi;
+  const significant = n >= SIG_MIN_N && (predicted < ci.lo || predicted > ci.hi);
   return {
     market,
     kind,
@@ -188,7 +206,7 @@ export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
         }, 0) / n
       : 0;
     const ci = wilson(won, n);
-    const significant = n > 0 && (predicted < ci.lo || predicted > ci.hi);
+    const significant = n >= SIG_MIN_N && (predicted < ci.lo || predicted > ci.hi);
     const withMkt = sel.filter((x) => x.pMkt != null);
     const sq = (q: number, y: number) => (q - y) * (q - y);
     const mktCmp = withMkt.length
