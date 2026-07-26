@@ -19,6 +19,12 @@ import { ARMED_DAILY, ARMED_FUN, FROZEN_NOW, armedDigest, armedFixtureEngine, di
  * It captures TODAY'S PRODUCTION STATE, pins included (`umpKFrozen`/`penQFrozen` true) —
  * that is current behaviour, and current behaviour is what a regression test holds.
  *
+ * IT IS A REGRESSION INSTRUMENT, NOT A SOURCE OF PRODUCTION VALUES. The fixture context's
+ * `hpUmp.g` spans (3/5/9/40) and `pen_quality.ip` alternation (9.0/40.0) are chosen to
+ * exercise both sides of each guard, which is right for catching movement and wrong for
+ * anything else. Its numbers answer "did my change move something", never "is this number
+ * correct". Do not cite a figure from this baseline as a production measurement.
+ *
  * Determinism was verified before the baseline was written: three armed runs produced
  * byte-identical full boards (555,890 chars each). Sim seeding is `shMulberry`,
  * `simN`/`simNHR` are pinned to `SIM_PATHS_FIXTURE`, and dates are pinned via

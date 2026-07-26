@@ -396,7 +396,22 @@ Had it shipped at the unproven-only scope, on 2026-07-28 HR crosses 100, both ga
 and every HR row returns priced by `oneImp / 1.06` — a constant measured as a **floor**,
 applied to the **least liquid** rows, in the one market where nothing could be measured.
 
-#### The cost of the wider scope — measured
+#### The cost of the wider scope — measured, and CORRECTED 2026-07-26
+
+> **The "12 of 99 pregame parlays" figure below overstates the gate's reach by an order of
+> magnitude, and it was used to justify the rule's scope.** Corrected against the
+> allocator's actual filter order: the pool `shAllocate` sees is 48 tickets, of which **12
+> carry a `books == 0` leg and all 12 are `batter_home_runs`**. `shAllocate` filters
+> `shCoreEligible` → basis → **+2% EV** → `nv_tax` → **consensus gate**, and `coreNoHR`
+> drops every HR ticket at step 1. Measured: 29 of 48 pass `shCoreEligible` (**zero** of
+> them `books == 0`), 1 passes the +2% EV gate (**zero** `books == 0`).
+> **So on this fixture the gate blocks exactly zero tickets.** The `d.parlays` count of 12
+> is a count of *generated* tickets, not of tickets that ever reach the gate.
+>
+> **The real-slate figure is unknown.** The gate's live scope is non-HR tickets carrying a
+> `books == 0` leg that also clear +2% EV. On the fixture none can exist, because only HR
+> rows have `books == 0` there. On a real slate they can: total-bases `n = 0` runs
+> **9–26%** daily in the 12-day archive and **0%** on the fixture.
 
 Fixture board (9 prop-priced events), board rows and pregame tickets, counting anything the
 `books == 0` block would remove:
@@ -1101,3 +1116,76 @@ anything.** The earlier plan to record "old and new digest" was the wrong instru
 evidence to record instead, and what the delta report will contain: rows removed per
 market, tickets removed from `shCardPool`, the allocator's `blocked` list with
 `reason: "no_ind_consensus"`, and the card composition before/after on the same board.
+
+## THE FUN BUCKET — WHAT DOES AND DOES NOT APPLY (written down 2026-07-26)
+
+**This table exists because the same structural fact was rediscovered three times from
+three directions in one week** — via the HR consensus question, via the `booksInd` scope
+question, and via the allocator's filter order. Every FUN *cap* was tabled; the *absence*
+of everything else never was. That is a documentation failure, and this is the fix.
+
+`shCardCalc` (L3177) computes `alloc = shAllocate(pool, …)` and then calls
+`shFunPick(pool, …)` **on the same raw pool — not on the allocator's survivors.** So no
+filter inside `shAllocate` touches FUN.
+
+| protection | CORE | FUN |
+|---|---|---|
+| `coreEvMin` (+2% EV floor) | ✅ | ❌ |
+| `coreCzEvMin` (settlement floor, override-proof) | ✅ | ❌ |
+| `consMinN` / `consMinEv` (small-sample consensus gate) | ✅ | ❌ |
+| **`booksInd` (no independent consensus)** | ✅ | ❌ |
+| `coreNoHR` | ✅ | ❌ (HR is FUN-only *because* of this) |
+| `coreMaxLegs` (3) | ✅ | ❌ (`funMaxLegs` 4 instead) |
+| `coreMaxDec` (15) | ✅ | ❌ (tiers go to +10000 and beyond) |
+| `coreKsFillOnly` / `coreKsCap` / `coreKsLegMax` | ✅ | ❌ |
+| `perParlayCap` / `minCoreTickets` / `maxCoreTickets` | ✅ | ❌ |
+| `dailyBankrollCap` (10% combined exposure, at lock) | ✅ | ✅ |
+| `hrrAltMax` (H+R+RBI O1.5+ suspension) | ✅ | ✅ — enforced in `buildParlaySet`, upstream of both |
+
+**`shFunPick`'s complete filter list — all five of them** (L3027):
+
+1. not already used by the core card (`excludeIds`) and leg-disjoint from it (`excludeLegs`)
+2. `prob >= funMinProb` (0.1%)
+3. `legs <= funMaxLegs` (4)
+4. priced in the active selection mode (in `dk_fd`, needs both a basis and a CZ quote)
+5. falls inside an odds tier (`funTiers`, by **american odds**, not probability)
+
+Then: sort by posCorr → negCorr → EV, take `funMaxTickets` (1).
+
+**This is not a bug and FUN is not being gated.** That decision stands and the reasoning
+has not changed: *a lottery ticket is never +EV — that is what makes it a lottery — so it
+is capped by structure instead.* An evidence gate on a bucket that asserts no evidence
+would be a category error. What was wrong was that none of this was written down.
+
+**Consequences that follow directly, so nobody has to re-derive them:**
+
+- HR can only reach FUN, and FUN is ungated, so **no HR ticket has ever faced the EV gate,
+  the settlement floor, the consensus gate, or `booksInd`.**
+- The `−5.66%` one-sided `consCzEv` constant never protected HR — it lives in `shAllocate`.
+- `funMinProb` is the **only** probability-sensitive FUN cap, so it is the only one an
+  inflated fair can defeat. Tier assignment is by american odds, so inflation cannot move
+  a ticket between tiers, change the split, or change the stake.
+
+## READ CORE AND FUN SEPARATELY AT FREEZE EXIT
+
+"What done looks like" reads CLV → Discipline → calibration slopes → P/L. **All four must
+be split CORE vs FUN.** At $5/day FUN is **~$1,800/year of deliberately negative-EV
+action** — the same order as the entire expected edge from core — and it must be priced
+against evidence at exit, not carried on an assumption that it is small.
+
+Instrument readiness, checked 2026-07-26:
+
+| instrument | can it split CORE/FUN? |
+|---|---|
+| CLV panel | **yes** — `docs/clv.md` records a tier filter |
+| Ledger P/L | **yes** — `shLedgerStats` takes ALL / CORE / FUN scopes |
+| Receipts | **yes** — `ledger-segments.ts` already reports `funSplit.atLock` / `.supplemental` |
+| Calibration slopes | **NO** — `fitReliability` groups by market only; nothing carries the bucket into `GradedPick` |
+| Discipline report | **NO** — `discipline()` counts gated-vs-override days; FUN never faces the gate, so it is structurally absent rather than filtered |
+
+**Two gaps, flagged now while they are cheap.** The calibration one is the live risk: FUN
+legs are graded into the same reliability fit as core legs, so **FUN outcomes are already
+moving the per-market slopes that steer core weights** — a bucket exempt from the EV gate
+is contributing to the calibration that gates core. Fixing it needs a bucket field on
+`GradedPick`, which must be captured *during* the window; it cannot be backfilled. Not
+built — flagged, with the same no-backfill logic as CLV.

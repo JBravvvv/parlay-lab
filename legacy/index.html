@@ -1290,6 +1290,10 @@ function shCollectSlate(){
       });
       if(mls.length){
         o.ml_books=mls.length;
+        /* booksInd (2026-07-26): fairs contributed by books that are NOT the settlement
+           book. `ml_books` keeps its old meaning (pool size, drives the "consensus of N
+           books" tag) — do not repurpose it. */
+        o.ml_booksInd=mls.filter(function(x){return !x.cz&&shDevigPair(shImp(x.h),shImp(x.a))!=null;}).length;
         o.home_fair=shMedianW(mls.map(function(x){var v=shDevigPair(shImp(x.h),shImp(x.a));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;}));
         var bh=null,ba=null;mls.forEach(function(x){
           if(!bh||amToDec(x.h)>amToDec(bh.price))bh={price:x.h,book:x.book};
@@ -1311,6 +1315,7 @@ function shCollectSlate(){
         var modal=Object.keys(cnt).sort(function(a,b){return cnt[b]-cnt[a];})[0];
         var use=rls.filter(function(x){return String(x.hpt)===modal;});
         o.rl_books=use.length;o.home_rl_pt=Number(modal);o.away_rl_pt=use[0].apt;
+        o.rl_booksInd=use.filter(function(x){return !x.cz&&shDevigPair(shImp(x.h),shImp(x.a))!=null;}).length;
         o.home_rl_fair=shMedianW(use.map(function(x){var v=shDevigPair(shImp(x.h),shImp(x.a));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;}));
         var rh=null,ra=null;use.forEach(function(x){
           if(!rh||amToDec(x.h)>amToDec(rh.price))rh={price:x.h,book:x.book};
@@ -1403,7 +1408,10 @@ function shCollectSlate(){
           var g={};
           Object.keys(acc).forEach(function(mkey){
             g[mkey]=acc[mkey].order.map(function(kk){var r=acc[mkey].rows[kk];
-              var fairs=r.list.map(function(x){var v=shDevigPair(shImp(x.o),shImp(x.u));return v==null?null:{v:v,w:shBookW(x.k)};}).filter(function(v){return v!=null;});
+              /* the cz flag rides through the fair map (2026-07-26): without it the count
+                 is taken and the provenance thrown away, and "is the settlement book alone
+                 behind this fair" becomes underivable downstream. shMedianW reads .v/.w only. */
+              var fairs=r.list.map(function(x){var v=shDevigPair(shImp(x.o),shImp(x.u));return v==null?null:{v:v,w:shBookW(x.k),cz:!!x.cz};}).filter(function(v){return v!=null;});
               var bo=null,bu=null;r.list.forEach(function(x){
                 if(x.o!=null&&(bo==null||amToDec(x.o)>amToDec(bo.price)))bo={price:x.o,book:x.book};
                 if(x.u!=null&&(bu==null||amToDec(x.u)>amToDec(bu.price)))bu={price:x.u,book:x.book};});
@@ -1422,6 +1430,7 @@ function shCollectSlate(){
               var bsu=shBasisPick(dkU!=null?{am:dkU,bk:"DK"}:null,fdU!=null?{am:fdU,bk:"FD"}:null);
               return {p:r.p,ln:r.ln,o:bo?bo.price:null,oBook:bo?bo.book:null,u:bu?bu.price:null,uBook:bu?bu.book:null,
                 fair:fairs.length?shMedianW(fairs):null,books:fairs.length,
+                booksInd:fairs.filter(function(f){return !f.cz;}).length,
                 cz:czx?{o:(czx.o!=null?czx.o:null),u:(czx.u!=null?czx.u:null)}:(czAlt?{o:czAlt.o,u:czAlt.u}:null),
                 bs:(bso||bsu)?{o:bso?bso.am:null,ob:bso?bso.bk:null,u:bsu?bsu.am:null,ub:bsu?bsu.bk:null}:null};
             });
@@ -2183,6 +2192,7 @@ function shAnalyzeLocal(slate){
       bsN:(homeSide?go.home_ml_bs:go.away_ml_bs)!=null?(homeSide?go.home_ml_bs:go.away_ml_bs):null,
       bsBook:(homeSide?go.home_ml_bs:go.away_ml_bs)!=null?(homeSide?go.home_ml_bsb:go.away_ml_bsb):null,
       p:homeSide?pH:1-pH,imp:homeSide?novH:1-novH,game:glabel,live:live,inning:ginn,bits:bits.slice(),tags:tags.slice(),nEff:nEffG,
+      books:go.ml_books||0,booksInd:go.ml_booksInd||0,
       pModel:homeSide?model:1-model,wBlend:wML,lu:"confirmed",
       /* sandbox parlay-builder (2026-07-24, display-only additive): the OTHER side's
          real quotes so both teams render — never a fabricated price */
@@ -2209,6 +2219,7 @@ function shAnalyzeLocal(slate){
           bsN:(side?go.home_rl_bs:go.away_rl_bs)!=null?(side?go.home_rl_bs:go.away_rl_bs):null,
           bsBook:(side?go.home_rl_bs:go.away_rl_bs)!=null?(side?go.home_rl_bsb:go.away_rl_bsb):null,
           p:side?pHC:1-pHC,imp:side?novHr:1-novHr,
+          books:go.rl_books||0,booksInd:go.rl_booksInd||0,
           pModel:side?pHomeCover:1-pHomeCover,wBlend:wRL,lu:"confirmed",
           game:glabel,live:live,inning:ginn,bits:rlBits,tags:rlTags,nEff:nEffG,
           oppLabel:side?g.away:g.home,oppOdds:obSign(side?go.away_rl:go.home_rl),
@@ -2440,6 +2451,7 @@ function shAnalyzeLocal(slate){
         bsBook:(row.bs&&(sd.side==="O"?row.bs.o:row.bs.u)!=null)?(sd.side==="O"?row.bs.ob:row.bs.ub):null,
         lkey:shLegKey(row.p,mkt,row.ln),gkey:g?shGkey(g.away,g.home,g.gnum):null,
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
+        books:row.books||0,booksInd:(row.booksInd!=null)?row.booksInd:0,
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
     });});
   });
@@ -2493,7 +2505,12 @@ function shAnalyzeLocal(slate){
           opp:(r.oppLabel!=null)?{label:r.oppLabel,odds:r.oppOdds||null,cz:(r.oppCz!=null?r.oppCz:null),
             prob:Math.round((1-r.p)*1000)/10,pt:(r.oppPt!=null?r.oppPt:null),lkey:r.oppLkey||null}:null,
           edgeBadge:!!(ev!=null&&ev>=thresh&&ev>=band)&&!suspRow,tags:r.tags||[],lkey:r.lkey||null,gkey:r.gkey||null,
-          conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk};});
+          conviction:shConv2(ev,thresh,band),game:r.game,"case":r.bits.join("; ")+(r.bits.length?".":""),risk:r.risk,
+          /* booksInd (2026-07-26): independent (non-settlement) books behind this row's
+             de-vigged fair. 0 means NO independent read exists — the fair is either the
+             settlement book pricing itself or a one-sided 1.06 haircut off a single
+             posted price. Carried to the ticket leg by legOf so the gate can gate on it. */
+          books:(r.books!=null)?r.books:null,booksInd:(r.booksInd!=null)?r.booksInd:null};});
     });
     var allRows=[];SH_NAMED_CATS.forEach(function(k){out[k].forEach(function(r){allRows.push(r);});});
     /* TOP 50 = the daily card, ranked by EV (doc Phase 4); category tabs stay probability-ranked
@@ -2579,6 +2596,7 @@ function shAnalyzeLocal(slate){
     txt:x.r.label+" · "+x.r.sub+" ("+x.r.odds+")",game:(x.r.game||"").split(" · ")[0],prob:x.r.prob,lkey:x.r.lkey||null,gkey:x.r.gkey||null,
     cz:(x.r.cz!=null?x.r.cz:null),bs:(x.r.bs!=null?x.r.bs:null),bsBook:x.r.bsBook||null,
     imp:(x.r.implied!=null?x.r.implied:null),
+    booksInd:(x.r.booksInd!=null?x.r.booksInd:null),
     live:!!x.r.live,lu:x.r.lu||"confirmed"};}
   var SH_TYPE_NAME={ml:"ML",rl:"RL",batter_hits:"Hits",batter_total_bases:"Total Bases",batter_home_runs:"HR",batter_hits_runs_rbis:"H+R+RBI",pitcher_strikeouts:"K's",pitcher_outs:"Outs"};
   function buildParlaySet(C,cap){
@@ -2923,6 +2941,20 @@ function shAllocate(pool,amount,cfg,force){
         blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"nv_tax"});return;}
     }
     if(evGated){
+      /* NO INDEPENDENT CONSENSUS -> NOT ELIGIBLE (2026-07-26). This blocks at ANY mktN,
+         deliberately, and does NOT inherit consMinN's structure. "100 graded legs, so
+         stop consulting the consensus" is coherent when a consensus EXISTS and the
+         question is whether to trust the model over it. It is incoherent when none was
+         ever posted: graded volume cannot conjure a price nobody quoted. A row with
+         booksInd === 0 is priced either by the settlement book against itself or by the
+         one-sided 1.06 haircut off its own posted price — in both cases the "independent
+         check" is the number being checked. Measured: total-bases n=0 runs 9-26% of rows
+         daily, HR 100%. Threshold is 1 and not 2: props are fetched at regions=us only
+         (L1335), so the placeholder-prone offshore books that motivated a depth
+         requirement cannot be in a prop pool at all. See docs/collection-period.md. */
+      var noInd=w.pl.legs.some(function(l){return l.booksInd===0;});
+      if(noInd){
+        blocked.push({name:w.pl.name,bsEv:basisMode?w.pl.bsEv:w.pl.czEv,czEv:w.pl.czEv,reason:"no_ind_consensus"});return;}
       /* small-sample market gate (both disciplined modes): unproven markets also need
          the de-vigged consensus on side, read at the mode's own selection price */
       var mn=cfg.mktN||null,minN=(cfg.consMinN!=null)?cfg.consMinN:100,
