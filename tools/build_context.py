@@ -185,12 +185,25 @@ def main():
         for o in (g.get("officials") or []):
             if o.get("officialType") == "Home Plate":
                 hp = o.get("official", {}).get("fullName")
+        # SHADOW MODE (2026-07-25): `kFactor` stays gated at g >= 5 exactly as before —
+        # it is the value the engine would multiply by, and it is pinned off for the
+        # freeze anyway (SH_CFG.umpKFrozen). `kRaw` is the SAME ratio computed at ANY g,
+        # emitted alongside so the counterfactual exists for every game in the collection
+        # window. At freeze exit that plus realized K totals answers empirically what the
+        # g >= 5 guard was guessed at: the g beyond which the shadow factor predicts
+        # anything. Nothing reads kRaw; it is recorded, never applied.
         ump = None
-        if hp and hp in db["umps"] and db["umps"][hp]["g"] >= 5 and lg_kpg:
-            u = db["umps"][hp]
-            ump = {"name": hp, "g": u["g"], "kFactor": round((u["k"] / u["g"]) / lg_kpg, 3)}
-        elif hp:
-            ump = {"name": hp, "g": db["umps"].get(hp, {}).get("g", 0), "kFactor": None}
+        if hp:
+            u = db["umps"].get(hp, {})
+            g_ = u.get("g", 0)
+            raw = round((u["k"] / u["g"]) / lg_kpg, 4) if (u.get("g") and lg_kpg) else None
+            ump = {
+                "name": hp,
+                "g": g_,
+                "kFactor": (raw if (g_ >= 5 and raw is not None) else None),
+                "kRaw": raw,
+                "lgKpg": round(lg_kpg, 3) if lg_kpg else None,
+            }
         games.append({
             "pk": g.get("gamePk"),
             "start": g.get("gameDate"),

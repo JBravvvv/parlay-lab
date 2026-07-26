@@ -119,7 +119,10 @@ drift, even when both values look reasonable on their own.
 |---|---|---|
 | `hrrAltMax` | `0.5` | H+R+RBI alternate lines above O0.5 suspended from all auto-selection |
 | `coreNoHR` | `true` | HR props never on core; HR-anytime parlays are FUN-only |
-| **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period. Setting it was **provably a no-op** — the factor already returned 1 for every team (see KNOWN-INERT below). Makes "inert" a decision instead of an accident. |
+| **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period — see KNOWN-INERT below. |
+| **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |
+| **ump `g >= 5` gate** | `5` (`tools/build_context.py` L189) | umpire plate-appearance count required before a `kFactor` is emitted. **No stated rationale — see the analysis below; it is ~7× too low.** |
+| **ump kFactor clamp** | `[0.92, 1.08]` (`shUmpKf`) | ±8% cap on the umpire K adjustment. **No stated rationale; narrower than the sampling noise the gate admits.** |
 
 ### Structure caps
 | parameter | value | meaning |
@@ -880,12 +883,28 @@ exists to protect.
 
 It was inert *by luck* — a guard refusing thin data. `SH_CFG.penQFrozen` makes it inert
 *by decision*, so the factor cannot come alive unannounced if that file ever accumulates
-for any reason. **Setting the flag was provably a no-op** (nothing clears the 15-IP guard
-today), which is what made it safe to ship mid-freeze — and the full board suite passed
-unchanged, with only the two direct unit tests needing an explicit `penQFrozen: false`
-to keep exercising the formula. Those tests were **not** rebaselined to `1`: that would
-have deleted the only coverage the calculation has, and one of them would then have
-passed for the wrong reason (the freeze guard rather than the 15-IP guard it is named for).
+for any reason. Only the two direct unit tests needed an explicit `penQFrozen: false` to
+keep exercising the formula. Those tests were **not** rebaselined to `1`: that would have
+deleted the only coverage the calculation has, and one of them would then have passed for
+the wrong reason (the freeze guard rather than the 15-IP guard it is named for).
+
+> **CORRECTION (2026-07-25), and it applies to `umpKFrozen` too.** An earlier draft said
+> setting the flag was *"provably a no-op — the full board suite passed unchanged."*
+> **That proof is empty.** `tests/helpers/fixture-env.ts` has **no route for
+> `context.json`**, so `SH_CTX` is absent in every full-board test and *both* factors
+> already returned 1 there regardless of any flag. A green parity digest says nothing
+> about either pin. This is the harness-substitution class again — the fixture cannot
+> exercise the context-dependent factors at all, which is also why the seven-factor audit
+> had to run against live artifacts.
+>
+> The real evidence that the pins change nothing today is the **measurement** in the
+> factor-activity baseline: `shPenQF` 0/30 (per-team IP 3.0–12.3 against a 15-IP guard)
+> and `shUmpKf` 0/15 (`kFactor` null on every game) on the real 2026-07-25 slate. That is
+> good evidence, but it is a measurement of today's data, not a test — and it will stop
+> being true for `shUmpKf` in early August, which is exactly why it is pinned.
+> `tests/pinned-factors.test.ts` supplies the actual coverage by injecting `SH_CTX`
+> directly, including an assertion that **unfrozen, the same input moves the factor 7%** —
+> so the pin is provably load-bearing rather than merely coinciding with inertness.
 
 **Activation plan — it has a LEAD TIME and needs scheduling, not just a decision:**
 
@@ -907,3 +926,85 @@ will arm itself in early August with no action from anyone. The options are symm
 mid-window and record the date so the collection window is known to be non-uniform for
 strikeout props from that point. **Not pinned unilaterally — this one changes behaviour
 in the direction of doing more, and that is the owner's call.**
+
+### `shUmpKf` — umpire K-factor. PINNED OFF (`SH_CFG.umpKFrozen = true`, 2026-07-25)
+
+**Owner's decision, 2026-07-25: pin it, and the reasoning is stronger than `penQ`'s.**
+`penQ` would flip. **This one SMEARS.** Three cohorts cross `g >= 5` across ~2026-08-04
+(12 umpires), ~08-08 (36) and ~08-13 (29), so the collection window would have no clean
+before or after — just a two-week ramp in the share of games carrying a K-factor. That is
+uninterpretable, and it is a model change nobody decided, during a freeze whose entire
+premise is that nothing moves.
+
+**Framing corrected:** an earlier draft called activation "the conservative option, so
+it's the owner's call." Backwards. **Pinning PRESERVES today's behaviour; letting it
+activate is the intervention.** The pin is the conservative action and it needed no
+special justification — only the shadow log (below) so nothing is lost by waiting.
+
+**Activation plan, same shape as `penQ`:** decide at freeze exit (~2026-09-22), and by
+then the shadow log answers empirically whether it is worth activating at all. No lead
+time on this one — the DB is already accumulating correctly, so flipping the flag acts
+immediately for whichever umpires have cleared the gate by then.
+
+## THE `g >= 5` GATE AND THE ±8% CLAMP ARE UNEXAMINED — measured 2026-07-25
+
+Both are now in the frozen table. Neither has a stated rationale anywhere in the repo.
+**That is the fourth entry of this class**, after `simN`/`simNHR`, the `1.06` haircut,
+and the props-regions split.
+
+**The formula, read from `tools/build_context.py` L189–191 — it is a RAW RATIO with NO
+shrinkage:**
+
+```python
+kFactor = round((u["k"] / u["g"]) / lg_kpg, 3)   # umpire K/game ÷ league K/game
+```
+
+So the owner's arithmetic assumption holds exactly. From the live DB (141 league games,
+2,357 K → `lg_kpg` = **16.716** K/game, both teams combined):
+
+| `g` | expected K behind the ratio | Poisson relative SE |
+|---|---|---|
+| **5 (the gate)** | 83.6 | **10.94%** |
+| 9 | 150.4 | 8.15% |
+| 20 | 334.3 | 5.47% |
+| 37 | 618.5 | 4.02% |
+
+**At the gate the 1σ sampling noise (±10.9%) is WIDER than the entire clamp (±8%).** So
+on the day the factor activates it is noise saturated against its own bounds and the
+clamp is doing all the work — the value carries essentially no umpire-specific signal.
+SE equal to the *full* clamp arrives at g ≈ 9.3; SE equal to *half* the clamp needs
+**g ≈ 37**, roughly 7× the current gate.
+
+The clamp has the second problem: the owner's prior is that real HP-umpire effects on
+K rate run ~3–5% for extreme umpires, which would mean **the permitted range already
+exceeds the phenomenon** — a factor that can move a price 8% for something worth 3–5%.
+That prior is not measured here and is not treated as established.
+
+**Not changed.** Both are frozen-class, and this is the one section of this document that
+would most tempt a "just fix the obviously-wrong number" edit. The shadow log answers it
+properly instead: with `kRaw` and `g` recorded per game for the whole window, freeze exit
+can ask directly **at what `g` the shadow factor starts predicting realized K totals** —
+and set the gate and the clamp from that, with evidence, rather than from arithmetic
+about what they cannot possibly support.
+
+## SHADOW MODE — every pinned factor records its counterfactual
+
+**The pattern is Phase 3c's, applied to dormant factors: compute it, log it beside the
+row, never multiply by it.** Pinning alone would cost two months — flip the flag at
+freeze exit, then wait for outcomes. Shadow logging converts freeze exit from *"flip and
+see"* into *"we already know."* Zero credits, zero selection change.
+
+| piece | what it does |
+|---|---|
+| `tools/build_context.py` | emits `kRaw` (the same ratio at **any** `g`) and `lgKpg` alongside the still-gated `kFactor`. The gate is untouched — `kFactor` remains null below `g = 5`. |
+| `shUmpCtx` | one lookup shared by the live factor and the shadow reader, so the two can never drift apart (the pairs-that-should-be-identical rule) |
+| `shUmpKfShadow` / `shPenQFShadow` | the value each factor *would* have returned, plus its sample size (`g`, `ip`) |
+| `gameInfo[gkey].shadow` | where it is recorded, per game |
+| `DayGames.shadow` in `pred-serialize.ts` | rides into the prediction store's `games` block, so **every graded leg can be joined by `gkey` to what the factor would have said** |
+
+Shadow readers return **null** on missing context, never a fabricated `1` — "no reading"
+and "reading of exactly no effect" must stay distinguishable, which is the whole lesson
+of the silent-no-op class.
+
+**Extend this to any future dormant factor where the input exists but the output is
+suppressed.** A pinned factor with no shadow log is a two-month delay bought for nothing.

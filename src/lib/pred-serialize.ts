@@ -75,7 +75,18 @@ export type ParlayPred = {
   gradedAt?: number;
 };
 
-export type DayGames = Record<string, { pk: number | null; start: string | null }>;
+/* Counterfactual values of the PINNED engine factors, per game (2026-07-25). Recorded,
+   never applied — `umpKf.g` is the umpire's plate-appearance count behind `raw`, which is
+   what makes "at what g does this start predicting anything" answerable at freeze exit. */
+export type GameShadow = {
+  umpKf?: { kf: number | null; raw: number | null; g: number | null } | null;
+  penQAway?: { f: number; era: number; ip: number | null } | null;
+  penQHome?: { f: number; era: number; ip: number | null } | null;
+};
+export type DayGames = Record<
+  string,
+  { pk: number | null; start: string | null; shadow?: GameShadow }
+>;
 
 /** One stored day of predictions (the /api/predictions blob shape). */
 export type DayBlob = {
@@ -207,7 +218,11 @@ export function boardToPredictions(
   }
   const games: DayGames = {};
   for (const [gk, gi] of Object.entries(d.gameInfo ?? {})) {
-    games[gk] = { pk: gi.pk ?? null, start: gi.start ?? null };
+    // `shadow` carries the counterfactual value of every PINNED engine factor for this
+    // game (2026-07-25). Recorded so freeze exit can backtest an activation instead of
+    // flipping a flag and waiting. Nothing reads it — see docs/collection-period.md.
+    const sh = (gi as { shadow?: unknown }).shadow;
+    games[gk] = { pk: gi.pk ?? null, start: gi.start ?? null, ...(sh ? { shadow: sh as GameShadow } : {}) };
   }
   return { records, parlays, games };
 }

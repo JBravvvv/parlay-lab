@@ -170,3 +170,28 @@ Each was caught by comparing **two things that should have been identical** — 
 vs production, cron config vs client config, `main`'s workflow vs `frontend-rebuild`'s.
 None was caught by reading one of them carefully. That is the reusable technique: when a
 component exists in two places, diff them; the diff finds what inspection does not.
+
+## THE UNDIFFED PAIRS — the worklist (2026-07-25)
+
+If every silent no-op so far was caught by diffing two things that should have been
+identical, then the productive move is to **name the pairs that have never been diffed**
+and work the list. Ranked by what a disagreement would invalidate.
+
+| # | pair | what a mismatch would mean | status |
+|---|---|---|---|
+| 1 | `boardToPredictions` output **vs** `shTicketSnap` output, for the SAME leg | the calibration channel and the CLV/ledger channel are measuring **different numbers for the same bet** — every cross-channel comparison (model-vs-close, reliability slopes joined to P/L, the NV-tax accounting) is invalid | **owner's #1, not yet run** |
+| 2 | `shGradeLeg` (engine) **vs** `gradePrediction` (calibration cron) | two graders disagreeing anywhere means **P/L and reliability disagree** about what happened. The settlement audit fixed orientation in both, but no systematic full-slate diff has been reported | **owner's #2, not yet run** |
+| 3 | client `armV2()` **vs** `/api/generate`'s arming block | the original `selMode` defect. Now covered by `arming-parity.test.ts` at the call site | **diffed, covered** |
+| 4 | `main` **vs** `frontend-rebuild` workflow copies | found the `context.yml` split | **diffed 2026-07-25; re-run whenever either is touched** |
+| 5 | fixture harness **vs** production engine environment | found `obSameDay`; and again on 2026-07-25 — the harness has **no `context.json` route**, so `SH_CTX` is absent in every board test and all seven identity factors are unexercised there | **partially diffed; the `SH_CTX` gap is open** |
+| 6 | `shDevigPair`/`shDevig2` in the engine **vs** the Python `imp`/de-vig in `snapshot_props.py` and `snapshot_odds.py` | the archives are the measurement instrument for the freeze. If their de-vig differs from the engine's, every archive-derived number this phase produced (the 1.071 overround, the independence table, the movement percentiles) is measuring a slightly different quantity than the engine acts on | **added here; not yet run** |
+| 7 | `/api/clv`'s consensus fair **vs** the board's `fair` for the same leg | CLV is scored as `closing fair − locked implied`. If the two fairs are built differently, CLV has a constant offset — and CLV is the freeze's primary scoreboard | **added here; not yet run** |
+| 8 | `SIM_PATHS` in `engine-client` **vs** the value the server actually arms | already a known unequal pair (50,000 / 10,000–20,000), documented as deliberate. Worth a standing assertion that it stays deliberate | **known, undocumented as a test** |
+| 9 | `lkey` construction in `shLegKey` **vs** the `lkey` parsing in the gate, grader and `lineOf()` | a key built one way and split another is how a market or line silently drops out of a filter — the HR three-lines bug was this shape, caught only by validation | **added here; not yet run** |
+
+**Run order is the owner's:** 1, then 2, then the rest. Items 6, 7 and 9 are proposed
+additions from the same reasoning, not requests.
+
+**The general form:** any value that is computed in two places, or crosses a process
+boundary (engine ↔ cron, engine ↔ archive tool, JS ↔ Python), is a candidate. The
+question is never "is this code correct" but "do these two agree, and has anyone checked."
