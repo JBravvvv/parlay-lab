@@ -1,0 +1,18 @@
+{
+  "days": 1,
+  "games": 1,
+  "rows": 18,
+  "rows_without_price": 1671,
+  "games_unmatched_or_unfinal": 14,
+  "appeared": {
+    "sum_implied": 1.99,
+    "realized_hr_hitters": 0,
+    "overround": null
+  },
+  "all_listed": {
+    "sum_implied": 2.26,
+    "realized_hr_hitters": 0,
+    "overround": null
+  },
+  "verdict": "INSUFFICIENT \u2014 1 day(s) with HR prices, need 14"
+}
