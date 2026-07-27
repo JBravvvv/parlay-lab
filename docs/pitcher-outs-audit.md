@@ -231,20 +231,180 @@ documents, and it fires here.
 
 ---
 
+## 8. THE THIRD DEFECT — the shrinkage weight, which neither fix touches
+
+Splitting the tail result by *why* each row is short isolates a mechanism I originally
+mis-attributed. The residual after the `0.400` substitution is **not** mostly the missing
+hook term:
+
+| median (model − market), outs | ALL (38) | lines ≤15.5 (20) | lines ≥16.5 (18) |
+|---|---|---|---|
+| closed form, as built | −2.48 | −1.83 | −3.03 |
+| with `0.140 → 0.400` | −1.13 | −0.51 | **−2.57** |
+| sim leash (see §9) | +0.03 | +0.39 | −1.68 |
+
+```js
+ipg = shShrink(ipg, nOut, 4, Lipg)   //  (n*ipg + 4*Lipg) / (n + 4)
+```
+
+**`nOut` is the pitcher's starts in the last 30 days, and on this board it is 4 for almost
+every pitcher.** With `k = 4` and `n = 4`, the weight on the pitcher's own workload is
+`4/(4+4)` = **exactly 0.5. Every starter is priced as half himself, half league average.**
+
+Measured consequence: the shrunk estimator spans **4.67 → 6.17 IP/start** (median 5.32), and
+**only 2 of 38 rows exceed 6.0 IP**. The market's expectation for the deep-start group is
+6.2–6.5 IP. The estimator's *range* is the binding constraint — it is compressed into a band
+the market's own distribution exceeds at the top.
+
+**This is why the tail survives the constant fix**, and it is a distinct defect from both
+others: `of` is a wrong constant, the hook is a missing term, and this is a **mis-set
+shrinkage weight for the sample size available**. A 30-day window yields n≈4 starts; `k = 4`
+was presumably chosen against a larger implied n.
+
+**Correction to §5 of this document as first written.** I attributed the residual tail
+entirely to the missing hook term, carrying over `hrr-recalibration.md`'s framing. The
+measurement says the dominant mechanism is the 50/50 shrinkage. The hook remains genuinely
+absent, and §9 shows it is *also* not the fix — but it is not what the tail number is
+measuring.
+
+---
+
+## 9. WOULD ROUTING OUTS THROUGH THE SIM FIX IT? Partly — and NOT the tail
+
+### What the sim already produces per start
+
+`legacy/index.html` L1913–1970. The sim threads a starter-workload triple through every half
+inning and returns it to the game loop:
+
+```js
+function halfInning(bat,idx,inn,diff,need,spOuts,leash,...,spPA,spRuns,rs){
+  var vsBP = spOuts >= leash;
+  if (V2 && !vsBP && (spRuns>=6 || spPA>=29)) vsBP = true;   // shelled / deep -> pulled early
+  ...
+  outs++; if(!vsBP) spOuts++;                                 // <-- the settled quantity
+```
+and the caller (L1864–1871) keeps it alive for the whole simulated game:
+```js
+runsA+=res.runs; idxA=res.next; outsBySPHome=res.spOuts; paSPHome=res.spPA; runsSPHome=res.spRuns;
+```
+
+> **The sim already simulates `pitcher_outs` exactly, on every path, and throws the number
+> away.** `out` carries `legP`, `pairP`, `v2m`, `pHome`, `avgHome`… and no starter-outs
+> distribution. `outsBySPHome`/`outsBySPAway` die with the loop iteration.
+
+### Is outs derivable without new simulation work? **Yes.**
+
+No new simulation is required — only accumulation. Bucket the final `outsBySP*` per path into
+a histogram on `out`, then `P(over line) = Σ_{k ≥ ⌊line⌋+1} h[k] / nSims`, read in
+`shPropRow`/the `isOuts` branch the same way `simP.legP` is read for H+R+RBI. It is an
+accumulator, an output field, and a read site.
+
+### Would it fix the CONSTANT defect? **Yes, incidentally.**
+
+`leashOf` (L2094) **never calls the `of` clamp**. The sim's leash carries no opposing-offense
+haircut at all, so the 14% flat cut simply does not exist on that path.
+
+### Would it fix the TAIL defect? **No — and the reason is decisive.**
+
+```js
+function leashOf(name){
+  ...  ipg = ip30/g30  (or season)  ...
+  ipg = shShrink(ipg, n, 4, Lipg);            // IDENTICAL to the closed form
+  return Math.max(6, Math.round(ipg*3));      // IDENTICAL x3
+}
+```
+
+**`leashOf` recomputes the closed form's estimator verbatim** — same 30-day IP/G, same
+`shShrink(·, ·, 4, Lipg)`, same `×3`. So the sim inherits **defect 3 exactly**, which is the
+one the tail number is actually measuring.
+
+Worse, the leash is a **ceiling, not a centre**: `vsBP = spOuts >= leash` is a one-way early
+exit, and `spRuns>=6` / `spPA>=29` only ever pull the starter *sooner*. Simulated starter
+outs are therefore bounded above by ≈ `leash`, and the realised mean sits strictly **below**
+it. The closed form's Poisson at least has an unbounded right tail; the sim would not.
+
+So the +0.03 / −1.68 row in §8 is the sim's **best possible case**, not its expected value:
+
+- overall, the leash ceiling is near-unbiased (**+0.03 outs**, 18 of 38 negative);
+- at the deep end it is still **−1.68 outs** short before any early-hook mass is subtracted;
+- and the realised sim mean is below that by however often the two early hooks fire.
+
+**Verdict on the sim route.** It fixes defect 1 for free and improves the tail from −2.57 to
+at best −1.68, but it **cannot fix defect 3, because it shares the estimator**. Routing outs
+through the sim is worth doing for the hook realism, but *on its own it is not the fix* — and
+the framing "the sim models the hook, so it should project the 6+ IP starts the closed form
+can't" does not survive contact with `leashOf`. **The shrinkage weight has to change on both
+paths regardless.**
+
+**One number is missing and cannot be derived from a board:** the realised mean of
+`outsBySP*`, i.e. how far below the leash the early hooks pull it. That needs an instrumented
+sim run. It is the single measurement that decides whether the sim route beats the `0.400`
+stopgap, and it is not attempted here — this section is investigation, not a build.
+
+---
+
+## THE FIX, PRE-WRITTEN
+
+Ready to apply when the trigger fires (**Phase 2 reports on `pitcher_outs`, or freeze exit,
+whichever is first** — see `docs/phase2-memo.md`, "The positive control").
+
+**Change, `legacy/index.html` L2258 — one constant:**
+
+```js
+// as built
+if(oo!=null){of=shClamp(0.140/oo,0.86,1.12); ...
+// fixed
+if(oo!=null){of=shClamp(0.400/oo,0.86,1.12); ...
+```
+
+`0.400` is the league TB/AB, and is already the constant this file uses for the same
+quantity in the batter-vs-pitcher adjustment. Nothing else changes: `of` remains a pure
+multiplier, the clamp bounds are untouched, and no other market reads this site.
+
+**Measured effect (arithmetic on published λ — exact, since `of` is a pure multiplier):**
+
+| | as built | fixed |
+|---|---|---|
+| median raw model gap | **−23.3 pp** | **−11.5 pp** |
+| rows with model above market | **0 of 38** | **11 of 38** |
+| median λ | 13.7 outs | 15.3 outs |
+| median λ − λ_market | −2.48 outs | −1.13 outs |
+| `of` values taken | 0.86, 1.00 only | 0.86 – 1.12, full range |
+| median (lines ≥16.5) | −3.03 outs | **−2.57 outs** — residual, see §8 |
+
+**Residual after this fix, stated so it is not mistaken for a complete repair:** the tail
+remains −2.57 outs, driven by the 50/50 shrinkage (§8), and 5 of 38 rows still floor at 0.86
+even with the corrected constant because their opponents genuinely slug above ~0.465.
+
+**Mandatory when applied:** re-run `node tools/extract-engine.mjs`, the full vitest suite,
+and `tests/clamp-activity.test.ts` — the last will fail at L2258 by design, and that failure
+IS the confirmation the clamp stopped being degenerate. Update
+`tests/fixtures/clamp-activity-v1.json` in the same commit and say so in the message.
+
+---
+
 ## Verdict
 
-Two defects, both in the direction the ledger observed, neither previously recorded:
+Three defects, all in the direction the ledger observed, none previously recorded:
 
 1. **`0.140` should be ≈ `0.400`.** The opposing-offense factor is pinned at its clamp floor
    on 100% of rows, applying a flat −14% to every start and conveying zero information about
    the opponent. Accounts for ~half the gap and all of the one-sidedness.
-2. **No hook-timing / earned-workload term.** A shrunk 30-day IP/G mean is structurally
-   incapable of projecting a 6+ IP start, so the model is short by −2.6 outs on exactly the
-   pitchers the market expects to go deep. Survives fix (1). Same failure as H+R+RBI O1.5+.
+2. **Shrinkage weight `k = 4` against `n ≈ 4` starts** — every starter priced as half
+   himself, half league average, compressing the estimator into 4.67–6.17 IP when the market
+   spreads wider. Drives the residual tail (−2.57 outs at lines ≥16.5). **Survives fix (1),
+   and is shared verbatim by `leashOf`, so the sim route does not fix it either.**
+3. **No hook-timing / earned-workload term.** Genuinely absent from the closed form. Present
+   in the sim — which never prices this market. Real, but *not* what the tail number
+   measures; see §8's correction.
 
-**Both are frozen parameters. Nothing has been changed and nothing should be until the owner
-signs off** — a mid-window change to `of` would move every outs price and break the frozen
-parameter table's role as a drift detector.
+**All are frozen parameters. Nothing has been changed** — a mid-window change to `of` would
+move every outs price and break the frozen parameter table's role as a drift detector, and
+would split the outs prediction population (the `CAL_START` coupling in a new variable).
+
+**DELIBERATELY LEFT BROKEN** as Phase 2's positive control — see `docs/phase2-memo.md`. The
+fix is approved in principle and pre-written above; the trigger is *Phase 2 reports on
+`pitcher_outs`, or freeze exit, whichever is first*.
 
 **Exposure while it stands:** none in daily money. `pitcher_outs` is gated by `consMinN`
 until ~09-13 (see the restricted-market window in `docs/collection-period.md`), so the
@@ -252,6 +412,6 @@ defect cannot take a stake during the collection period. That protection is **ac
 `consMinN` is a small-sample rule and knows nothing about this. It also expires within days
 of freeze exit, which is when a decision is actually required.
 
-**Re-measure on ≥ 2 more boards before acting.** The mechanism (the clamp arithmetic) is
-board-independent and needs no confirmation; the magnitudes (−2.48 outs, −23.1 pp) are one
-board.
+**Re-measure on ≥ 2 more boards before acting.** The mechanisms (the clamp arithmetic, the
+`n/(n+k)` weight, `leashOf`'s shared estimator) are board-independent and need no
+confirmation; the magnitudes (−2.48 outs, −23.1 pp, −2.57 tail) are one board.

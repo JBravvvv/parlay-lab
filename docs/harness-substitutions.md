@@ -400,3 +400,78 @@ and where it is now measured at −2.6 outs per start on deep-start pitchers.
 hole most directly governs, and check them in the same pass.** A hole recorded against one
 subject reads, on later re-reading, as a fact *about that subject* — which is exactly how it
 stays unchecked everywhere else.
+
+---
+
+## FIFTH METHODOLOGY RULE: a test count comes from that run, and red is reported first
+
+I reported **"418 tests passing"** on two consecutive commits (`dfe5352`, `2f478c4`) while
+`tests/autopsy-floors.test.ts` was **red**. It had been red since `dfe5352` itself, which
+added `type` to the `nv_tax` blocked entry and broke an exact `toEqual`. The count was right
+(418 tests exist); the *claim attached to it* was not checked. The owner accepted it twice,
+which is what makes it a process failure rather than a slip — a success claim nobody can
+audit is worse than no claim.
+
+**Rule, two parts:**
+1. **The test count in a report comes from that run's own output.** Not from the last run,
+   not from the expected total, not from memory. If the suite was not run, say it was not run.
+2. **A red suite is reported as red BEFORE anything else in the message** — above the
+   findings, above the headline, before any result that depends on the build being sound.
+
+**Corollary, and the argument against loosening assertions:** the exact `toEqual` is what
+caught the shape change. `objectContaining` would have passed silently and the extra field
+would have entered the blocked-entry contract unrecorded. The assertion was updated to
+include `type` and **deliberately kept exact**. When a strict assertion fails on an intended
+change, the fix is to update the expectation, never to weaken the comparison.
+
+---
+
+## THE CLAMP DEGENERACY AUDIT — the third drift check (2026-07-26)
+
+`tools/factor_activity.py` catches an **input** that has gone missing. `tools/gate_activity.py`
+catches a **threshold** that can never be reached. Neither could see
+`shClamp(0.140/oo, 0.86, 1.12)` sitting on its floor for 100% of rows — because a pinned
+clamp emits a perfectly plausible number, and no value moved.
+
+`tests/clamp-activity.test.ts` closes that gap. It replaces `shClamp` with a recorder,
+attributes each call to a source line via the stack trace (the engine is `eval`'d verbatim,
+so frame line numbers map to `legacy/index.html` by the `<script>` offset), and reports per
+site: input samples, fraction at the low bound, fraction at the high bound, fraction in
+range. The snapshot is committed, so **a clamp that starts or stops binding fails the test** —
+a behaviour change with no parameter movement behind it, which is exactly what no frozen
+parameter table can show.
+
+**Result on the armed fixture slate — 25 of 30 static call sites executed:**
+
+| | |
+|---|---|
+| **L2258** `[0.86, 1.12]` | **100% low, 0% in range** — the `pitcher_outs` defect. The only site ≥80% at one bound. |
+| L1615 `[0.95, 1.06]` | 37% low / 37% high, **27% in range** |
+| L2055 `[0.85, 1.18]` | 36% / 27%, 36% in range |
+| L2319 `[0.85, 1.18]` | 40% / 20%, 40% in range |
+| 21 others | ≤ 46% pinned; 9 sites never bind at all |
+
+**Two pathologies, and they need different fixes:**
+- **OFFSET** — pinned at *one* bound (L2258). The neutral point is wrong; the factor conveys
+  nothing and is really a flag. **This is the flagged class.**
+- **SATURATED** — pinned at *both* bounds (L1615: 37/37, only 27% in range). The clamp is
+  narrower than its input, discretising a continuous signal into three states. It still
+  carries information, just far less than its presence in the code implies.
+
+**The audit rediscovered both pins independently.** Of the 5 cold sites, **L1605 is
+`shUmpKf`'s live path and L1696 is `shPenQF`'s** — dead behind `umpKFrozen`/`penQFrozen`,
+matching `gate_activity.py` category B exactly. That agreement between two instruments built
+for different purposes is the evidence that this one measures what it claims to.
+
+**Cold sites are listed, never omitted** — same rule as `gate_activity.py`'s UNREADABLE
+section. **L1617 (`shTempF`) is a harness limitation, not a finding**: the fixture slate
+carries no `g.weather.temp`, so the guard returns 1 early. It is production-active and
+**unmeasured here**, which is not the same as in range. L2175 is the ML closed-form fallback,
+dead code whenever the sim is armed; L2402 is the live-sim marginal, and the fixture is
+entirely pregame.
+
+**Denominator:** this runs on the **armed fixture slate** (real captured MLB data,
+2026-07-09), not the live board — a regression instrument, per the same rule stated in
+`tests/armed-baseline.test.ts`. The cross-check that it is not merely internally consistent:
+**L2258 reads 100% low-pinned here and was independently measured at 35 of 35 low-pinned on
+the real 2026-07-26 board** by `tools/outs_audit.py`.

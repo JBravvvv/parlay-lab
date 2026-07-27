@@ -2277,19 +2277,32 @@ sampled units. A first attempt did exactly that and silently dropped those four 
 reporting a "within" of 1.97 that was really "mix among the four survivors". Splitting the
 market-set restriction into its own term (AVAILABILITY) is what makes the rest well-defined.
 
-> ### THE BAND MUST BE PER-MARKET — Phase 3 note
-> **A global 1/2.13 shrink is wrong in both directions.** It over-shrinks every market
-> (no within-market ratio exceeds 1.81) and it **inverts on `pitcher_outs`, whose ratio is
-> 0.83** — the gate selects *less* extreme outs rows than the outs board average, so a
-> global shrink would penalise the one market where selection is protective.
+> ### PHASE 3 BAND: THE DEFAULT IS **NO SHRINK** (settled 2026-07-26)
+> `WITHIN = 1.00 [0.90, 1.17]`, and **no market's CI excludes 1**. There is no measurable
+> within-market winner's curse on this board; `AVAILABILITY × MIX` accounts for the whole
+> 2.13. **Phase 3 applies no shrink**, revisited only when the per-market ratio has been
+> re-measured across **≥ 20 boards**.
 >
-> This replaces the original spec, which derived the band from `shBand(nEff)` — a
-> **sample-size proxy**, not a selection measurement. The proxy cannot see market mix at all,
-> so it would have mis-set the band by the full 1.59 × 1.34 composition factor.
+> Two superseded positions, both recorded so neither is re-derived:
+> - the **original spec** derived the band from `shBand(nEff)` — a *sample-size proxy*, which
+>   cannot see market mix at all and would have mis-set the band by the full 1.59 × 1.34;
+> - the **per-market band** (this doc's previous position) is also wrong *as a default*: with
+>   every per-market CI containing 1, a per-market band is fitting noise. Per-market is the
+>   right SHAPE once it is estimable; it is not yet estimable.
 >
-> Carry-forward: per-market ratio with its CI, re-measured across ≥ 20 boards. On one board
-> every per-market CI contains 1, so **no per-market band is estimable yet** — the honest
-> Phase 3 default until then is **no shrink**, not a guessed one.
+> #### ⚠️ WITHIN = 1.00 DOES NOT CLOSE THE WINNER'S-CURSE QUESTION
+> **This decomposition measures GAP-BASED selection. The winner's curse is EDGE-ESTIMATE
+> ERROR.** They are not the same quantity, and the gate is what separates them: it selects
+> on **EV**, and `EV = f(gap, price)`. At long odds a small gap clears +2%, so the gate can
+> select *low*-gap rows — decoupling gap from selection entirely.
+>
+> So `WITHIN ≈ 1.00` establishes exactly one thing: **the gate is not picking extreme-gap
+> rows within a market.** It says nothing about whether the selected legs' *true* edge
+> matches their *measured* edge, which is the actual question. A reader who takes
+> `WITHIN = 1.00` as "no winner's curse, question closed" has substituted the measurable
+> quantity for the one that matters — the same substitution `shBand(nEff)` made.
+>
+> **Phase 2's movement slope is the test of the real quantity.** See `docs/phase2-memo.md`.
 
 ### The market-mix lift, stated directly
 
@@ -2352,17 +2365,45 @@ blocking, by accident, exactly the exposure the audit says is defective. No mone
 defect during collection. **This is luck, not design**: `consMinN` was set for small-sample
 discipline and knows nothing about the outs model.
 
-**COSTLY.** Every August measurement therefore describes **an engine without its largest
-disagreement source**. Concretely, computed over August:
-- the **winner's-curse ratio** loses the market with the 3.66× mix lift and the 0.83
-  within-market ratio — the term that pulls the pooled figure in *both* directions;
-- **CLV and the movement-slope regression** (Phase 2's headline) lose 46% of the legs where
-  the model most disagrees with the open, i.e. precisely the high-`|pModel − open|` end of
-  the regression's x-axis, which is where slope is identified;
-- **Discipline / ROI** describes a card whose market composition will never recur after 09-13.
+**COSTLY — but ONLY on the ledger channel. CORRECTED 2026-07-26 (owner-caught).**
 
-So an August fit is not a smaller version of the September engine — it is a fit on a
-different engine. **Any number computed in the window must state which markets were
-reachable when it was computed**, and no August result may be extrapolated across 09-13
-without re-measuring. This is the same class as the censored west-coast window: a
-restriction that is invisible in the output unless it is written next to it.
+> The first version of this section claimed Phase 2 loses "the high-`|pModel − open|` end of
+> the regression's x-axis, which is where slope is identified". **That is wrong, and it was
+> wrong in the direction that overstated the damage.** The correction and its proof follow;
+> the retracted claim is left visible because it would otherwise be re-derived.
+
+`consMinN`/`consMinEv` gate **tickets inside `shAllocate`**, which runs at *card time*. They
+do not touch the board, and nothing between the board and the prediction store consults
+them. The full path, verified end to end:
+
+| step | what it drops | consults a gate? |
+|---|---|---|
+| `finalizeCats` (`legacy/index.html` L2461) | nothing gate-related; top 50/market by probability, one side per line | **no** |
+| `boardToPredictions` (`src/lib/pred-serialize.ts:153`) | `market === "all"` (dupes), `r.live`, `r.prob == null`, key dupes | **no** |
+| `mergeDayBlob` (same file) | rows whose game already started; generation-scoped supersede | **no** |
+| `tools/snapshot_props.py` | nothing — it never sees the engine board, it sweeps the Odds API directly | **no** |
+
+**Empirical confirmation, from public data:** `/api/calibration` reports `graded: 70` with
+`pitcher_outs` at `n = 5`, while the ledger holds **zero locked cards** and `pitcher_outs`
+has **never been ticketed**. Those five graded outs rows exist *because the prediction
+channel logs board rows regardless of whether any ticket containing them can lock*. The
+gate cannot have removed them; they were graded while the gate was blocking every ticket.
+
+**So Phase 2 keeps its full x-axis.** All 38 outs rows/day continue to accrue, including the
+entire high-`|pModel − open|` end — which, given `docs/pitcher-outs-audit.md`, is the most
+informative part of the population, not the least.
+
+**What the window DOES still bind:** the **ledger channel** — realised P/L, CLV-on-bets,
+Discipline, ROI, and any per-market breakdown of them. All of which are dark anyway (zero
+locked cards), so the practical cost in the window is close to zero.
+
+**The one real limitation on the close-graded channel is different and smaller:**
+`categories` is capped at **top 50 per market**, so the prediction side of Phase 2's join is
+**303 rows/day, not the 1,207 rows `propBoard` carries**. TB (350 available), hits (267), HR
+(246) and H+R+RBI (271) are truncated; **`pitcher_outs` (38) and K's (35) are under the cap
+and therefore complete**. The positive control is unaffected by the cap.
+
+So an August *ledger* number is not a smaller version of the September engine. An August
+*close-graded* number is market-neutral in coverage and merely capped in the four big
+markets. **State which channel a figure came from** — that distinction is what the first
+version of this section collapsed.

@@ -188,14 +188,50 @@ form as 5.59/5.59/5.58 from the three rows with no lineup read. Units are correc
 **Exposure is zero and the protection is accidental**: `consMinN` gates `pitcher_outs` until
 ~09-13. Do not change either parameter mid-freeze — the frozen table is the drift detector.
 
+3. **Shrinkage weight `k = 4` against `n ≈ 4` starts** = every starter priced as **half
+   himself, half league average**. Estimator compressed to 4.67–6.17 IP; only 2 of 38 rows
+   exceed 6.0 IP. Drives the residual tail and **is shared verbatim by `leashOf`**, so the
+   sim route does not fix it either.
+
+**`pitcher_outs` is DELIBERATELY LEFT BROKEN as Phase 2's positive control** (expected result
+stated in advance: **slope ≈ 0**; a slope ≈ 1 there means Phase 2 itself doesn't work).
+Trigger to fix: Phase 2 reports on outs, **or** freeze exit. The one-line change (`0.140` →
+`0.400`) is pre-written in the audit doc with its measured effect.
+
+**The sim already computes `pitcher_outs` and throws it away.** `outsBySPHome`/`outsBySPAway`
+(L1864–1871) accumulate the exact settled quantity on every path and never reach `out`.
+Deriving the market needs *accumulation only, no new simulation*. But `leashOf` (L2094)
+recomputes the closed form's estimator verbatim — same `shShrink(ipg,n,4,Lipg)`, same ×3 —
+and the leash is a **ceiling** (`vsBP = spOuts >= leash` is one-way), so the sim's realised
+mean sits below it. Sim ceiling vs market: **+0.03 outs overall but −1.68 at lines ≥16.5**.
+The sim route fixes the constant for free and cannot fix the shrinkage.
+
 **Winner's curse is composition, not selection.** Pooled selected/board ratio **2.13**
 [1.75, 2.77] decomposes exactly as **AVAILABILITY 1.59 × MIX 1.34 × WITHIN 1.00** [0.90, 1.17].
-No market's own ratio exceeds 1.81 and **none has a CI excluding 1**; `pitcher_outs` runs
-**0.83**, so a global 1/2.13 shrink would *invert* on the market supplying 46% of legs.
-**Phase 3's band must be per-market**, replacing the original `shBand(nEff)` sample-size proxy —
-and on one board no per-market band is estimable, so the honest default is **no shrink**.
-`tools/selection_effect.py`. Denominator note: **37 distinct legs**, not the 46 leg *instances*
-first reported.
+**No market's CI excludes 1**, so **Phase 3's default is NO SHRINK**, revisited at ≥20 boards.
+Both a global band (`shBand(nEff)`, a sample-size proxy) and a per-market band are wrong as
+defaults — per-market is the right shape but is not yet estimable. ⚠️ **`WITHIN = 1.00` does
+NOT close the winner's-curse question**: it measures *gap-based* selection, while the curse is
+*edge-estimate error*, and the gate selects on EV = f(gap, price) — at long odds a small gap
+clears +2%. Phase 2's movement slope tests the real quantity. `tools/selection_effect.py`.
+Denominator note: **37 distinct legs**, not the 46 leg *instances* first reported.
+
+**Gates do NOT reach the prediction store.** `consMinN`/`consMinEv` gate tickets inside
+`shAllocate` at card time. `finalizeCats` → `boardToPredictions` → `mergeDayBlob` consult no
+gate (they drop only `all`, live rows, dupes, and started games), and `snapshot_props.py`
+never sees the board. Proof: `/api/calibration` shows `pitcher_outs n=5` graded with **zero
+locked cards ever**. So Phase 2 keeps its full x-axis; the restricted-market window binds the
+**ledger channel only**. The real limit on the close-graded channel is that `categories` caps
+at **top 50/market** — outs (38) and K's (35) are complete, TB/hits/HR/HRR are truncated.
+
+**Third drift check: `tests/clamp-activity.test.ts`.** Factor activity catches a missing
+input, gate activity a threshold that can't be reached, and this a **clamp pinned at a bound**
+— all three invisible to a parameter table because no value moves. Per `shClamp` call site it
+reports low/high/in-range fractions and snapshots them, so a clamp that *starts or stops*
+binding fails. Two pathologies: **OFFSET** (one bound — L2258 at 100% low, the outs defect) vs
+**SATURATED** (both bounds — L1615 at 37/37, only 27% in range). It independently rediscovered
+both pins (L1605 `shUmpKf`, L1696 `shPenQF` are cold). Cold sites are listed, never omitted —
+L1617 `shTempF` is a **harness limitation** (fixture has no `g.weather.temp`), not an inert factor.
 
 ## Credits (The Odds API)
 1 credit **per market per region**; `/v4/sports` and `/events` are free; statsapi is keyless.
@@ -238,7 +274,12 @@ to **cron-job.org** (supports custom headers; free tier 100 executions/day, CLV 
 ## Working rhythm with Josh
 Report before pushing; stop at every phase gate; measure rather than model; state the
 denominator of every number. He catches unreconciled tables — if two of your figures disagree
-on the same cell, that is the finding, not a rounding issue. Four standing methodology rules
+on the same cell, that is the finding, not a rounding issue. Five standing methodology rules
 live in `docs/harness-substitutions.md`: diff two things that should be identical · anything
 that can return an identity value must be observable · **a filter chain must be RUN, not
-reconstructed** · **a directional claim needs a population that could have gone the other way**.
+reconstructed** · **a directional claim needs a population that could have gone the other way** ·
+**the test count comes from that run's output, and a red suite is reported first**.
+
+**Test reporting:** run the suite, quote that run's numbers, and if anything is red say so at
+the top of the message before any finding. Never loosen a strict assertion to make it pass —
+`toEqual` catching an added field is the assertion working.

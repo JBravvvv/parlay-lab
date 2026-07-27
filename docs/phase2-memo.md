@@ -40,9 +40,9 @@ freeze's scoreboard needs a bet to have been placed, and none will be.
 ## PHASE 2 IS THE DECISIVE TEST — this is the headline, the bias estimate is secondary
 
 Measured on the real 2026-07-26 board: the legs the +2% gate selects sit a median of
-**17.3 probability points** from the de-vigged market, against a board median of **7.6** —
-a **2.28× winner's-curse ratio**. Two readings fit that, and they have opposite
-consequences:
+**16.2 probability points** from the de-vigged market, against a board median of **7.6** —
+a **2.13× ratio** (37 distinct legs; the first pass said 17.3/2.28 counting leg *instances*).
+Two readings fit that, and they have opposite consequences:
 
 1. the model holds ~17 pp of **real information** the consensus lacks, on ~46 legs a day; or
 2. **the gate selects model error** — it concentrates wherever the model is furthest from
@@ -70,6 +70,57 @@ Both sides come from `props-history`: `open_fair` from the first snapshot of the
 `close_fair` from the last before first pitch, both recomputed at the engine's own Shin
 de-vig from `fp`. `pModel` comes from the prediction store, which is where the sync phrase
 binds (below).
+
+### Why the decomposition did NOT already answer this
+
+`docs/collection-period.md` measures the gate's selection effect at
+**`WITHIN = 1.00 [0.90, 1.17]`** — no measurable within-market winner's curse. **That does
+not close reading (2), and must not be read as doing so.**
+
+The decomposition measures **gap-based selection**. The winner's curse is **edge-estimate
+error**. The gate is what separates them: it selects on **EV**, and `EV = f(gap, price)` —
+at long odds a small gap clears +2%, so the gate can select *low*-gap rows and decouple gap
+from selection entirely. `WITHIN ≈ 1.00` establishes only that the gate is not picking
+extreme-*gap* rows within a market. Whether the selected legs' **true** edge matches their
+**measured** edge is untouched by it, and is precisely what the movement slope tests.
+
+## THE POSITIVE CONTROL — `pitcher_outs`, left broken on purpose
+
+**Phase 2 had no validation criterion.** A slope near 0 could mean the model has no edge, or
+that the instrument doesn't work; nothing distinguished them. `pitcher_outs` now does.
+
+`docs/pitcher-outs-audit.md` establishes, on mechanism and on 38 board rows, that the outs
+model is **confidently and one-sidedly wrong**: a constant off by ~3× (`0.140` where the
+league value is ~`0.400`), a clamp pinned at its floor on **35 of 35** rows, a **0 of 38**
+one-sided sign, and **λ_model − λ_market = −2.48 outs, negative in 38/38**. It is the
+strongest known-bad signal available anywhere in this engine.
+
+**The fix is approved in principle and DEFERRED, deliberately.** Reasons, in order:
+1. `pitcher_outs` cannot take money before ~09-13 (`consMinN`), so leaving it broken costs
+   nothing in realised P/L;
+2. fixing mid-window **splits the outs prediction population** — the `CAL_START` coupling
+   in a new variable, and that coupling has already fired once;
+3. it is the only available way to validate Phase 2 itself.
+
+> ### EXPECTED RESULT, STATED IN ADVANCE
+> **Slope ≈ 0 on `pitcher_outs`.** The model's disagreement there is a constant error, not
+> information, so the close should not move toward it.
+>
+> - **slope ≈ 0 on outs** → the instrument discriminates. Slopes on other markets can be read.
+> - **slope ≈ 1 on outs** → **Phase 2 does not work.** A model this measurably wrong cannot
+>   be predicting closing-line movement; a high slope means the regression is picking up
+>   something structural — mean reversion in the open, a stale-open artifact, or the join
+>   itself. Do not report any other market's slope until that is explained.
+>
+> Writing the expectation down *before* the data exists is the point. A control whose
+> expected value is decided after the readout is not a control.
+
+**Coverage check:** outs is 38 rows/day and `categories` caps at 50/market, so the control's
+population is **complete** — unlike TB/hits/HR/H+R+RBI, which are truncated.
+
+**TRIGGER FOR FIXING: Phase 2 reports on `pitcher_outs`, OR freeze exit — whichever comes
+first.** The one-line change is written out in `docs/pitcher-outs-audit.md` under "THE FIX,
+PRE-WRITTEN".
 
 ## The problem it solves
 
