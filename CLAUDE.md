@@ -125,19 +125,19 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | **`e0e1ae1` committed, NOT pushed** — everything before it is pushed |
+| `frontend-rebuild` (production) | **`ab73291` committed, NOT pushed** — everything before it is pushed. **494 passing (55 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
 
 Nightly bots push to `frontend-rebuild` (`context.yml`, `model.yml`). **Expect to rebase before
-pushing**; that has happened three times.
+pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, and twice since).
 
 ## cron-job.org entries — Josh creates them, Josh types `CRON_SECRET`
 | # | when (UTC) | target | status |
 |---|---|---|---|
 | 1–4 | `0 22 * * 1-5` · `0 18 * * 6` · `0 17 * * 0` · `30 22 * * 0` | `/api/generate` | **created** |
-| 5–6 | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** | `/api/propsnap` | **being created** — these REPLACE the `0 16` I first gave, which measured 14.9% vs 52.9% |
+| 5–6 | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** | `/api/propsnap` | **being created** — these REPLACE the `0 16` I first gave, which measured **14.9% vs 52.9%**. ⚠️ `/api/propsnap` is **not deployed yet** — it ships with `ab73291` |
 
 **Free tier is 100/day and `/api/clv` uses 96.** Sunday = 2 generate + 2 propsnap = **exactly
 100**. A third propsnap entry does not fit.
@@ -167,6 +167,19 @@ pushing**; that has happened three times.
 | **~2026-09-08** | `SUMMARY_DAYS` window first caps — any raise must land BEFORE this |
 | **~2026-09-22** | parameter exit. **Bankroll exit is unscheduled and cannot be dated yet** |
 
+## The model findings, one line each — full detail in `docs/freeze-exit-bundle.md`
+| id | what | status |
+|---|---|---|
+| **M8** | `shTbOver` prices a 0.5 line with the 1.5 formula — **one number for two questions** | **rank 1, a BUG.** Pinned as a known defect by `tests/self-consistency.test.ts` |
+| **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
+| **M2 / M2′** | outs `0.140`→`0.400` **or** route outs through the sim (the answer is already computed and discarded) | a CHOICE, not a sequence |
+| **M3** | HRR λ = `rate × coorsFlag × power` — **zero site variation** | scoped |
+| **M4** | sim routing, **TB and HR only** | conditional, fixture-thin |
+| ~~M5~~ | sim routing for hits | **refuted** — sim mean-abs 7.1 vs closed form 5.6 |
+| **M6** | K's → sim, a sixth PA outcome | contained IF the second RNG stream is used |
+| **M7+M9** | Poisson-where-binomial (**+4.8 pp**) exactly cancelled by a **+13.9%** λ inflation | ⚠️ **INTERLOCKED — never ship separately** |
+| **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
+
 ## Deferred, written up, NOT shipped
 `pitcher_outs` `0.140`→`0.400` · everything in `docs/freeze-exit-bundle.md` · the board-archive
 `gen=best`+`latest` is BUILT and running · `pen_quality` same-day replace (bounded, recorded) ·
@@ -175,6 +188,7 @@ pushing**; that has happened three times.
 ## The docs, and what each is for
 | file | holds |
 |---|---|
+| `tools/self_consistency.py` | **the independent instrument.** Logical identities on any board or the whole archive — a violation is a PROOF |
 | `docs/freeze-exit-bundle.md` | **the 09-22 deliverable, in draft.** 6 model + 4 allocation amendments, each with measured effect, axis, dependencies; plus closed-with-magnitude |
 | `docs/collection-period.md` | the frozen parameter table, the two exits, `mktN`, the sim/closed-form split, factor consumer table |
 | `docs/harness-substitutions.md` | **the methodology rules.** Negative assertions, whole-symbol matching, guard-testing, detector blind spots, impossible branches |
@@ -540,6 +554,10 @@ no leading `*`. Measured 2026-07-27: 7 whitespace-defeatable negatives across 4 
 vacuous loops, and `no arming path touches summary.full` had **iterated zero times since it was
 written** — its file list omitted the only file containing a literal `.full`. It never worked,
 and only a `mentions > 0` counter found that.
+⚠️ **AND IT REPRODUCED ONE TURN LATER.** The first `tests/self-consistency.test.ts` asserted the
+M8 identity across fixture players and passed green on **99 players, ZERO carrying both rows**.
+Knowing the rule did not prevent writing the defect. **Assert on a PURE FUNCTION when one
+exists** — `shTbOver` needs no board, no overlap and no slate.
 
 ## Three build-enforced guardrails — the build refuses unanswered questions
 `tests/workflow-timing.test.ts` (every scheduled workflow classified SENSITIVE/INSENSITIVE with
@@ -845,4 +863,12 @@ the closed list in that format.
     than caveating them — most are invariant, and the ones that move tell you the direction.
 20. **A magnitude is not a direction of correctness.** Two paths disagreeing by 9.2 pp says
     nothing about which is right; check against something external.
+21. **The model checked against ITSELF needs no external reference, and a violation is a PROOF.**
+    Logical identities between two prices the model emits — `TB≥1 == H≥1`, `HRR≥3 ≥ HR≥1`, ladder
+    monotonicity. No market, no fixture, no accrual, no waiting. This found M8 in one run after
+    every other detector had been bottlenecked on lacking an independent check.
+22. **Before comparing two quantities, check the comparison is not a monotone transform of the
+    thing you are testing.** `λ = −ln(1−P)` makes "model λ − market λ" identical to
+    "model P − market P", so it cannot detect a distributional error by construction. It read
+    −1.8% and looked like a refutation.
 
