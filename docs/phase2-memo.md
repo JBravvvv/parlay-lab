@@ -139,6 +139,22 @@ largest favourable gap of any market (every other is within ±0.012, and `pitche
 > "no edge anywhere" reading — which is a *result*, but only once the instrument has shown it
 > can produce a non-zero slope somewhere.
 
+### PRE-COMMITTED INTERPRETATION — both branches, before the numbers arrive
+
+`batter_hits` is a **thin** margin: Brier 0.099 vs 0.109 on a market where every row sits
+within 0.012 of consensus. An ambiguous return is therefore the *expected* failure mode, and
+it must not be allowed to look like a verdict either way. All four cells are fixed now:
+
+| `pitcher_outs` | `batter_hits` | reading — **committed in advance** |
+|---|---|---|
+| ≈ 0 | **materially > 0** | **Instrument works.** Every market's slope is readable. |
+| ≈ 0 | **≈ 0** | **NON-DISCRIMINATING.** No market's slope may be read, including outs'. |
+| ≈ 0 | **ambiguous** (CI spans 0) | **Valid on outs, inconclusive on hits.** Outs' control passes on its own — it rests on mechanism. Report other markets' slopes with the caveat that the positive direction is unvalidated. **This is not an instrument failure; it is underpowered on that market.** |
+| **≫ 0** | any | **PHASE 2 DOES NOT WORK.** A model this measurably wrong cannot predict closing-line movement; something structural is being picked up. Explain it before reading anything else. |
+
+"Ambiguous" is defined before the fit: **the 95% CI on the hits slope contains 0 while its
+point estimate is positive**. "Materially > 0" means the CI excludes 0.
+
 **This control is weaker than the outs one, and that is stated deliberately.** `pitcher_outs`
 rests on **mechanism** — a constant off by ~3×, a clamp pinned 35/35, 0-of-38 one-sidedness —
 which is board-independent. `batter_hits` rests on **n = 7 graded legs** and a 0.010 Brier

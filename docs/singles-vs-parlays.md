@@ -245,19 +245,66 @@ parameter uncertainty and this shade models the same uncertainty.
    reduce**. The allocator always places the full daily; a tighter ceiling just forces a
    more even split.
 
-> ### So the amendment is not "lower the Kelly fraction"
-> The mechanism is that **the allocator over-concentrates PARLAY stakes**, and a lower Kelly
-> fraction is a blunt instrument that happens to force evenness. It works because parlay
-> tickets have widely varying odds — a ¼-Kelly weight starves the long ones and feeds the
-> short ones — while singles sit in a narrow odds band where the ceiling binds on all or
-> none.
+> ### ⛔ CORRECTION: THE MECHANISM IS NOT OVER-CONCENTRATION EITHER
+> I first framed this as "the allocator over-concentrates parlay stakes and 1/8 accidentally
+> corrects for it." **That was wrong, and two measurements kill it.**
 >
-> A freeze-exit amendment should target the concentration directly (a weight-ratio cap or a
-> per-ticket floor) rather than move a global risk parameter whose meaning is bankroll
-> management. **Worth ~5–6 bp/day on a parlay card**, measured on one board, and only where
-> `perParlayCap`/Kelly interact — which is exactly the regime the card has been in.
+> **(a) Perfectly even is WORSE.** Same picks, stakes re-derived:
+>
+> | card | current | perfectly even | Δ |
+> |---|---|---|---|
+> | singles | 55.3 bp | 54.5 bp | −0.8 |
+> | **parlays** | **126.6 bp** | **112.5 bp** | **−14.2** |
+>
+> **(b) 1/8 Kelly is MORE concentrated, not less** — max/min stake **4.14** vs **3.11**:
+>
+> | czEv of ticket | 7.0% | 12.9% | 25.5% | 26.5% | 3.3% | 6.6% |
+> |---|---|---|---|---|---|---|
+> | stake @ ¼ | $59 | $53 | $49 | $46 | $24 | $19 |
+> | **stake @ 1/8** | $55 | **$58** | **$53** | **$49** | **$14** | $21 |
+>
+> **1/8 moves money toward the high-edge tickets and away from the 3.3% one.** Evenness has
+> nothing to do with it.
+>
+> ### THE ACTUAL MECHANISM — the disciplined allocator weights by PROBABILITY, not edge
+>
+> `legacy/index.html` L2999:
+> ```js
+> base: probMode ? prob : ((dec>1) ? Math.max(ev,0)/(dec-1) : 0)
+> ```
+> with `probMode = mode==="probability" || mode==="ev_gated" || basisMode` — **true for every
+> disciplined mode, including the production default.** So the stake weight is the ticket's
+> **hit probability**, and *edge enters the allocation only through the Kelly ceiling*.
+>
+> **And the comment above it (L2934) describes the other branch:** *"stake weight =
+> ¼-Kelly-proportional fraction: edge ÷ odds"*. That is the `caesars_ev` legacy path, which
+> production never takes. **Comment and code diverge on the load-bearing line**, which is why
+> this took three attempts to characterise.
+>
+> At ¼ Kelly the ceiling is slack (`4 × 2500 × 0.02` = $200, far above `perParlayCap`'s
+> $62.50), so probability weighting dominates and the highest-edge tickets are under-staked.
+> At 1/8 the ceiling binds and re-sorts toward edge. **1/8 Kelly is not a risk setting here —
+> it is the only thing making the allocation edge-aware.**
+>
+> Singles show +0.0 because they sit in a narrow band on *both* axes (probability 63.5–70.7%,
+> edge 2.1–13.5%), so probability-weighting and edge-weighting agree.
+>
+> ### PROPOSED POST-FREEZE AMENDMENT (unsigned): make the base weight edge-aware
+>
+> Use the ¼-Kelly-proportional weight the comment already claims — `max(ev,0)/(dec−1)` — in
+> the disciplined modes, so edge drives the allocation and the Kelly ceiling returns to being
+> a risk limit rather than the only edge signal. **Do not change the Kelly fraction**: the
+> ~5–6 bp/day is a weighting artifact, and moving a global bankroll-risk parameter to fix a
+> weighting bug treats the symptom.
+>
+> Candidate forms considered and rejected: an **odds-scaled per-ticket cap** and a
+> **card-level variance budget** both target concentration, which measurement (a) shows is
+> not the problem. **Argue for the base-weight change.**
+>
+> **Measured on this board only, and the parlay pool exhausts at 9 picks**, so card sizes
+> above 9 are untested. Re-run on the next board before signing.
 
-**Kelly fraction stays frozen.** This is specified, not proposed.
+**Kelly fraction stays frozen at ¼.** This is specified, not proposed.
 
 ### To whether the bias is correlated or independent
 

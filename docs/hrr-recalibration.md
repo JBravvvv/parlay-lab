@@ -84,6 +84,64 @@ Two pricing paths exist:
   > at 1.15. That is the correct conservative behaviour, and it is another reason the clamp
   > should not be widened.
   >
+  > ## THE CLAMP IS NOT THE RESIDUAL — IT IS THE THING PROTECTING AGAINST IT
+  >
+  > The clamp was nominated as the leading candidate for the H+R+RBI residual. **Measured, it
+  > runs the wrong way for that role: unclamping makes the model MORE overconfident, on
+  > exactly the lines that bled.** Model-minus-market (over-oriented, board 2026-07-26):
+  >
+  > | line | n | gap @ 1.15 (today) | gap @ 1.40 | gap unclamped | **Δ 1.15 → ∞** |
+  > |---|---|---|---|---|---|
+  > | O0.5 | 28 | **+11.5** | +14.7 | +15.7 | **+4.2** |
+  > | O1.5 | 13 | **−1.4** | +8.1 | +9.7 | **+11.1** |
+  > | O2.5 | 3 | −4.2 | −4.2 | −4.2 | +0.0 |
+  > | **O1.5+** | 16 | **−2.5** | +5.3 | +9.3 | **+11.8** |
+  >
+  > The 2026-07 miss was **the model too HIGH** (46.3% realised vs 59.2% implied). Widening
+  > the clamp to 1.40 would add **+11.8 pp** of model-over-market to O1.5+ — the suspended
+  > lines, the ones that took the money. **The clamp is currently the single largest thing
+  > holding H+R+RBI down, and removing it would widen the miss rather than explain it.**
+  >
+  > ### Where the truncation binds — and the owner's hypothesis (b) is CONFIRMED
+  >
+  > | slot | n | median raw | max raw | rows > 1.15 |
+  > |---|---|---|---|---|
+  > | projected | 10 | 1.379 | 1.696 | **7** |
+  > | #1 | 4 | 1.074 | 1.150 | 0 |
+  > | #2–#5 | 12 | 1.026–1.138 | 1.265 | 1 |
+  > | #6 | 3 | 1.320 | 1.393 | 2 |
+  > | **#7** | 3 | **1.393** | **1.773** | **3 of 3** |
+  > | **#8** | 9 | **1.348** | 1.542 | **6 of 9** |
+  > | #9 | 3 | 1.172 | 1.391 | 2 |
+  >
+  > **It binds hardest exactly where PA conditioning matters most** — bottom-of-order and
+  > projected rows, essentially never at #1–#5. (The max is **#7 Taylor Trammell at 1.773**,
+  > not a leadoff hitter; top-of-order rows barely clamp at all.)
+  >
+  > But "defeating the fix in its highest-value cases" does not follow, because the correction
+  > *there* is upward. The original audit's concern was that the closed form **overrated
+  > bottom-of-order alt lines**; the re-basing as built **raises** them (median 1.35 at #8),
+  > and only the clamp holds that to +15%.
+  >
+  > ### The candidate this leaves — labelled as inference, not measurement
+  >
+  > The algebra is right (`(HRR/AB) × expAB`), but `expAB` is **ABs in a full start**. For a
+  > player whose `abG` is low *because he is regularly pinch-hit for or lifted*, the
+  > correction imports a full-start assumption for tonight. That is strongest for exactly the
+  > #7/#8/projected rows above. **Whether tonight is a full start is not knowable from the
+  > board**, so this is a hypothesis about `expAB`'s applicability, not a measured defect —
+  > and it is the better candidate for the residual than the clamp.
+  >
+  > **Nothing changes. The clamp stays at [0.85, 1.15] and should NOT be widened.** Recorded
+  > as a specified freeze-exit item to be decided alongside the leg-equivalent floor and
+  > `consMinEv` — all three touch the same card.
+  >
+  > ### STANDING QUESTION, left open by the retraction
+  > **`hrrAltMax` stays at 0.5 because a second defect exists and is unidentified.** The clamp
+  > was a candidate and is now excluded — it protects rather than causes. The `expAB`
+  > full-start assumption is the current candidate and is unproven. Do not lift the suspension
+  > on the strength of an eliminated candidate.
+  >
   > ## ⚠️ WHAT STILL STANDS: THE FIX CANNOT EXPLAIN THE MISS. A SECOND DEFECT EXISTS.
   >
   > The bound below was derived from the **clamp limits**, not from the direction claim, so

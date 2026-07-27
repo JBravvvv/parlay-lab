@@ -520,6 +520,47 @@ describe("singles-vs-parlays counterfactual (analysis harness, report only)", ()
     }
     eng.set("shKellyFrac", origKF);
 
+    /* WHICH CONCENTRATION LIMIT? 1/8 Kelly works by forcing a more even split, so the
+       question is how much of the gain a DIRECT evenness constraint captures. Brackets the
+       space: current (1/4-Kelly ceilings) vs perfectly even vs 1/8. Stakes are re-derived
+       from the same picks, so this isolates the ALLOCATION from the selection. */
+    const regrow = (card: { pl: Row; stake: number }[], stakes: number[]) =>
+      growth(card.map((c, i) => ({ ...c, stake: stakes[i] })));
+    // eslint-disable-next-line no-console
+    console.log(`\n5c. HOW MUCH OF THE 1/8 GAIN IS PURE EVENNESS?  (same picks, stakes re-derived)`);
+    for (const [name, card] of [["singles", sC0], ["parlays", pC0]] as const) {
+      const n = card.length;
+      if (!n) continue;
+      const tot = card.reduce((a, c) => a + c.stake, 0);
+      const even = Array(n).fill(Math.floor(tot / n));
+      even[0] += tot - even.reduce((a: number, b: number) => a + b, 0);
+      const cur = (growth(card) ?? 0) * 10000;
+      const ev = (regrow(card, even) ?? 0) * 10000;
+      const conc = Math.max(...card.map((c) => c.stake)) / Math.min(...card.map((c) => c.stake));
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ${name.padEnd(9)} n=${n}  stake spread ${card.map((c) => "$" + c.stake).join(" ")}` +
+          `  max/min ${conc.toFixed(2)}\n` +
+          `${"".padEnd(11)}current ${cur.toFixed(1)} bp   perfectly even ${ev.toFixed(1)} bp` +
+          `   delta ${(ev - cur >= 0 ? "+" : "") + (ev - cur).toFixed(1)} bp`,
+      );
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(`\n5d. WHAT DOES 1/8 ACTUALLY DO TO THE STAKES?`);
+    for (const kf of [0.125, 0.25]) {
+      setKelly(kf);
+      const c = cardOf(alloc(parlays.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen));
+      // eslint-disable-next-line no-console
+      console.log(
+        `  1/${Math.round(1 / kf)}  ` +
+          c.map((x) => `$${x.stake}(czEv ${x.pl.czEv}%)`).join("  ") +
+          `   max/min ${(Math.max(...c.map((x) => x.stake)) / Math.min(...c.map((x) => x.stake))).toFixed(2)}` +
+          `   g ${((growth(c) ?? 0) * 10000).toFixed(1)} bp`,
+      );
+    }
+    eng.set("shKellyFrac", origKF);
+
     // ======================================================================
     // 6. THE EV FLOOR MIS-SCALED BY LEG COUNT — sized for a freeze-exit decision
     // ======================================================================
