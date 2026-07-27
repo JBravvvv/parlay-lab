@@ -216,6 +216,24 @@ NOT close the winner's-curse question**: it measures *gap-based* selection, whil
 clears +2%. Phase 2's movement slope tests the real quantity. `tools/selection_effect.py`.
 Denominator note: **37 distinct legs**, not the 46 leg *instances* first reported.
 
+**Parlays beat singles on log-growth — conditional on calibration, with a stated threshold.**
+At the model's own probabilities: **+126.6 bp vs +55.3 bp** (exact over 2⁶ card outcomes, ¼-Kelly
+stakes, $2,500 bankroll), and the advantage **survives a leg-equivalent floor** (`1.02^n − 1` →
++139.1 bp). Per-leg czEv behind each card is indistinguishable (5.76% vs 5.80%), so the fixed
+floor did **not** manufacture it — though it *is* mis-scaled: **4 of 18 tickets (22%) clear +2%
+only because the floor doesn't scale with leg count**. ⚠️ **The ranking inverts at −3 pp of
+per-leg overconfidence** (−3: +8.2 vs +7.9; −5: −67.3 vs −23.7, parlays lose 2.8× as much), and
+the parlay card is **79× more likely to go 0-for-6** (9.5% vs 0.12%). **Do not re-spec Phase 4
+on this** — it reduces to one unmeasured calibration parameter with a threshold Phase 2 and the
+calibration channel exist to produce.
+
+**`consMinEv` is a STRUCTURE filter wearing a quality filter's name.** `consCzEv` is
+multiplicative — `Π(1+cᵢ)−1` — so the per-leg bar *tightens* with leg count: −1.000% at 1 leg,
+−0.501% at 2, −0.334% at 3. Measured: median −5.60%, max −0.60%, **1 of 205 rows clears even as
+a single**. Mechanism is the 1.071 Caesars overround compounding. **And it pulls against
+`coreEvMin`**, a *fixed* ticket floor that gets **looser** with leg count. Two gates, opposite
+directions on the same axis, neither designed with the other in mind. Both frozen.
+
 **Singles do not solve NO-PLAY, and structure barely matters** (`docs/singles-vs-parlays.md`,
 `tests/singles-counterfactual.test.ts`). **1 of 205** playable rows clears `consMinEv` as a
 single (best −0.60%), and **none of the wall is compounding** — 24 of 24 gate-reaching singles
@@ -250,11 +268,16 @@ own-sample weight. **The flag is a prompt to justify each k, not a verdict** —
 HR/AB is defensible for a rare event; `k=4` on `ipg` at n≈4 is not.
 
 **Range compression is a distinct pathology from bias** — a model centred right that can't
-reach the tails. Measure it in **λ space, not probability** (probability transforms *(λ,
-line)* and lines vary), and **orient to the over first**. Both versions of that tool produced
-confident, plausible, wrong tables before it worked; `pitcher_outs` was the known-bad control
-that caught them. Result: outs λ-IQR ratio **0.51**, HRR **0.50** — and HRR's cause is not
-`shShrink` but the 60%-saturated `power` clamp, since HRR's λ is `rate × coors × power`.
+reach the tails. `tools/range_compression.py` was wrong **three** times first: wrong space
+(probability transforms *(λ, line)*, and books set lines near their own λ, so any
+probability-scale ratio flatters a biased model), wrong orientation (`categories` is the
+UNDER on 35 of 38 outs rows), and **wrong population** — `categories` ranks on win
+probability, which is a function of `pModel`, so the sample was selected on the model side of
+the ratio. Population is now `propBoard` (uncapped, over-oriented), with `pModel` recovered
+from the stored blend and the recovery **checked** (max error 0.26 pp over 223 rows).
+**Result: `pitcher_outs` 0.50 and nothing else.** ⚠️ **The earlier H+R+RBI 0.50 is RETRACTED**
+— on the uncapped population it is 1.78, *wider*; `--truncation-check` swings it 0.50 → 4.88.
+`power`'s 60% saturation is real but has **no demonstrated downstream consequence**.
 
 **Third drift check: `tests/clamp-activity.test.ts`.** Factor activity catches a missing
 input, gate activity a threshold that can't be reached, and this a **clamp pinned at a bound**

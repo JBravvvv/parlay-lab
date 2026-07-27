@@ -1,0 +1,11 @@
+{
+  "nBlend": 14,
+  "nShrunk": 14,
+  "nLam": 14,
+  "iqrBlend": 0.43,
+  "iqrShrunk": 0.312,
+  "iqrLamModel": 0.371,
+  "iqrLamMkt": 0.2284,
+  "stage12": 0.7255,
+  "stage23": 1.189
+}

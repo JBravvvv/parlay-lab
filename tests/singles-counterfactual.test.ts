@@ -215,6 +215,151 @@ describe("singles-vs-parlays counterfactual (analysis harness, report only)", ()
       );
     }
 
+    // ======================================================================
+    // IS THE PARLAY EV ADVANTAGE REAL, OR MANUFACTURED BY A FIXED +2% FLOOR?
+    // ======================================================================
+    // coreEvMin is a FIXED ticket-level floor, so it is a weaker filter the more legs a
+    // ticket has: three legs at +2% each compound to 1.02^3-1 = +6.1%, so a 3-legger clears
+    // a +2% ticket floor on legs averaging only +0.7%. The parlay path may therefore be
+    // drawing from a wider, lower-quality leg pool and reporting a higher TICKET EV by
+    // construction. Three checks.
+    const legCzEv = (l: Row) => {
+      const d2 = amToDec(num(l.cz));
+      const p = num(l.prob);
+      return d2 != null && p != null ? p / 100 * d2 - 1 : null;
+    };
+    const dist = (xs: number[]) => {
+      const s = [...xs].sort((a, b) => a - b);
+      const qq = (p: number) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+      return `n=${s.length}  min ${(100 * s[0]).toFixed(2)}%  p25 ${(100 * qq(0.25)).toFixed(2)}%` +
+        `  median ${(100 * qq(0.5)).toFixed(2)}%  p75 ${(100 * qq(0.75)).toFixed(2)}%` +
+        `  max ${(100 * s[s.length - 1]).toFixed(2)}%  mean ${(100 * s.reduce((a, b) => a + b, 0) / s.length).toFixed(2)}%`;
+    };
+
+    const cardOf = (a: Record<string, unknown>) =>
+      ((a.picks as Row[]) ?? []).map((p) => ({ pl: (p.w as Row).pl as Row, stake: Number(p.stake) }));
+
+    const singlesCard = cardOf(alloc(mkPool(playable) as unknown[], DAILY, cfgOpen));
+    const parlayCard = cardOf(alloc(parlays.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen));
+
+    const sLegs = singlesCard.flatMap((c) => ((c.pl.legs as Row[]) ?? []).map(legCzEv)).filter((x): x is number => x != null);
+    const pLegs = parlayCard.flatMap((c) => ((c.pl.legs as Row[]) ?? []).map(legCzEv)).filter((x): x is number => x != null);
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n1. PER-LEG czEv BEHIND EACH CARD (the like-for-like test)\n` +
+        `  singles card legs : ${dist(sLegs)}\n` +
+        `  parlay  card legs : ${dist(pLegs)}\n` +
+        `  parlay tickets by leg count: ${JSON.stringify(
+          parlayCard.reduce((o: Record<number, number>, c) => {
+            const n = ((c.pl.legs as Row[]) ?? []).length;
+            o[n] = (o[n] ?? 0) + 1;
+            return o;
+          }, {}),
+        )}`,
+    );
+
+    // LEG-EQUIVALENT FLOOR: admit a parlay only if its ticket czEv clears 1.02^n - 1, i.e.
+    // every leg would have had to average +2%. Applied as an UPSTREAM POOL RESTRICTION and
+    // then the real allocator is run — the gate itself is untouched.
+    const legEquiv = parlays.filter((p) => {
+      const n = ((p.legs as Row[]) ?? []).length;
+      return Number(p.czEv ?? -99) >= (Math.pow(1.02, n) - 1) * 100;
+    });
+    const aLE = alloc(legEquiv.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen);
+    const leCard = cardOf(aLE);
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n2. LEG-EQUIVALENT FLOOR (ticket floor = 1.02^n - 1, applied upstream)\n` +
+        `  parlays surviving: ${legEquiv.length} of ${parlays.length}` +
+        `  ->  picks ${leCard.length}  staked $${aLE.sum}` +
+        `  stake-wtd EV ${aLE.ev != null ? (Number(aLE.ev) * 100).toFixed(2) + "%" : "—"}\n` +
+        `  their legs        : ${leCard.length ? dist(leCard.flatMap((c) => ((c.pl.legs as Row[]) ?? []).map(legCzEv)).filter((x): x is number => x != null)) : "—"}`,
+    );
+
+    // KELLY LOG-GROWTH — the scoreboard EV-per-pick cannot be.
+    // EXACT over all 2^n card outcomes (n <= 6), assuming tickets are independent. The
+    // allocator already forbids a repeated leg across tickets, so the residual dependence
+    // is same-game legs on different tickets — real, and it makes this an approximation.
+    const growth = (card: { pl: Row; stake: number }[]) => {
+      if (!card.length) return null;
+      const n = card.length;
+      let e = 0;
+      for (let mask = 0; mask < 1 << n; mask++) {
+        let prob = 1, end = BANKROLL;
+        for (let i = 0; i < n; i++) {
+          const p = Number(card[i].pl.prob) / 100;
+          const won = (mask >> i) & 1;
+          prob *= won ? p : 1 - p;
+          end -= card[i].stake;
+          if (won) end += card[i].stake * Number(card[i].pl.czDec);
+        }
+        if (prob > 0 && end > 0) e += prob * Math.log(end / BANKROLL);
+        else if (prob > 0) return -Infinity;
+      }
+      return e;
+    };
+    // how much does the FIXED floor over-admit relative to the leg-equivalent one?
+    const evPass = parlays.filter((p) => core(p) && Number(p.czEv ?? -99) >= 2);
+    const bothPass = evPass.filter((p) =>
+      Number(p.czEv ?? -99) >= (Math.pow(1.02, ((p.legs as Row[]) ?? []).length) - 1) * 100);
+    // eslint-disable-next-line no-console
+    console.log(
+      `  of the ${evPass.length} tickets clearing the FIXED +2% floor, ${bothPass.length} also clear` +
+        ` the leg-equivalent floor  ->  ${evPass.length - bothPass.length} are admitted only because` +
+        ` the floor does not scale with leg count`,
+    );
+
+    const rows2 = [
+      ["singles card", singlesCard],
+      ["parlay card", parlayCard],
+      ["parlay card, leg-equivalent floor", leCard],
+    ] as const;
+    // eslint-disable-next-line no-console
+    console.log(`\n3. EXPECTED LOG-GROWTH at the actual 1/4-Kelly stakes, bankroll $${BANKROLL}`);
+    for (const [lbl, card] of rows2) {
+      const g = growth(card as { pl: Row; stake: number }[]);
+      const staked = (card as { stake: number }[]).reduce((a, c) => a + c.stake, 0);
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ${lbl.padEnd(34)} picks ${String(card.length).padStart(2)}  staked $${String(staked).padStart(3)}` +
+          `  E[ln(B'/B)] ${g == null ? "—" : (g >= 0 ? "+" : "") + (g * 10000).toFixed(1) + " bp"}` +
+          `  P(card loses everything staked) ${(card as { pl: Row }[]).reduce((a, c) => a * (1 - Number(c.pl.prob) / 100), 1).toFixed(4)}`,
+      );
+    }
+
+    /* THE CAVEAT THAT DECIDES WHETHER THE ABOVE MEANS ANYTHING.
+       Every number in section 3 is computed at THE MODEL'S OWN probabilities. A parlay is
+       multiplicatively more sensitive to probability error than a single: shading each leg
+       by d multiplies an n-leg ticket's probability by ~(1 - d/p)^n. Given docs/
+       pitcher-outs-audit.md and the H+R+RBI ledger, systematic overconfidence is the live
+       hypothesis, not a remote one — so the ranking is re-run under it rather than asserted
+       to be robust. The shade is applied per LEG and propagated through the ticket, keeping
+       any sim-joint adjustment intact by scaling the stored prob by the naive-product ratio. */
+    const shaded = (card: { pl: Row; stake: number }[], dpp: number) =>
+      card.map((c) => {
+        const legs = (c.pl.legs as Row[]) ?? [];
+        let a = 1, b = 1;
+        for (const l of legs) {
+          const p = Number(l.prob) / 100;
+          a *= p;
+          b *= Math.max(0.001, p - dpp / 100);
+        }
+        return { ...c, pl: { ...c.pl, prob: Number(c.pl.prob) * (a > 0 ? b / a : 0) } };
+      });
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n4. THE SAME, UNDER PER-LEG OVERCONFIDENCE (every leg's true prob is d points lower)\n` +
+        `${"   shade".padEnd(12)}${rows2.map(([l]) => l.split(",")[0].padStart(22)).join("")}`,
+    );
+    for (const dpp of [0, 1, 2, 3, 5]) {
+      const cells = rows2.map(([, card]) => {
+        const g = growth(shaded(card as { pl: Row; stake: number }[], dpp));
+        return (g == null ? "—" : ((g >= 0 ? "+" : "") + (g * 10000).toFixed(1) + " bp")).padStart(22);
+      });
+      // eslint-disable-next-line no-console
+      console.log(`   -${dpp} pp`.padEnd(12) + cells.join(""));
+    }
+
     // ---- the per-leg consensus bar, stated directly -------------------------
     // `consCzEv` is null when the leg has no Caesars quote. Number(null) === 0, which would
     // silently count every unquoted leg as sitting exactly ON the bar — filter BEFORE casting.

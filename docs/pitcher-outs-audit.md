@@ -293,24 +293,55 @@ justify each `k`, not a verdict that all seven are wrong.** None of the nine is 
 anywhere in the repo.
 
 **`tools/range_compression.py`** confirms the consequence independently, in the market's own
-units (both sides inverted through the engine's own Poisson at each row's line):
+units, on the **uncapped `propBoard` population** (both sides inverted through the engine's
+own Poisson at each row's own `ln`):
 
-| market | IQR(λ_model) | IQR(λ_market) | ratio | p10–90 ratio | verdict |
-|---|---|---|---|---|---|
-| **H+R+RBI** | 0.27 | 0.55 | **0.50** | 1.21 | **COMPRESSED** |
-| **`pitcher_outs`** | 1.14 | 2.26 | **0.51** | **0.55** | **COMPRESSED** |
-| HR | 0.08 | 0.06 | 1.35 | 1.11 | ok |
-| K's | 1.90 | 1.11 | 1.72 | 0.97 | ok |
-| hits | 0.19 | 0.06 | 2.96 | 2.89 | wider than market |
+| market | n | IQR(λ_model) | IQR(λ_market) | ratio | p10–90 ratio | verdict |
+|---|---|---|---|---|---|---|
+| **`pitcher_outs`** | 38 | 1.13 | 2.26 | **0.50** | **0.55** | **COMPRESSED** |
+| hits | 267 | 0.32 | 0.24 | 1.32 | 1.45 | wider |
+| HR | 246 | 0.11 | 0.08 | 1.35 | 1.50 | wider |
+| K's | 35 | 1.91 | 1.11 | 1.72 | 0.97 | ok |
+| H+R+RBI | 271 | 0.60 | 0.34 | 1.78 | 1.13 | ok |
 
-**`pitcher_outs`'s λ spread is half the market's — defect 3 measured directly.** And a second
-market falls out: **H+R+RBI is equally compressed at 0.50**, but *not* through `shShrink` —
-its site (L2359, k=10) has the best weight in the table. Its λ is
-`rate × coors × power` (L2359), and **`power` is the clamp measured at 60% saturated**
-(L2319, `tests/clamp-activity.test.ts`). Same pathology, different mechanism.
+> **`pitcher_outs` is the ONLY compressed market** — its λ spread is half the market's, which
+> is defect 3 measured directly and independently of the `case`-string arithmetic in §8.
 
-Three instruments, built for three different purposes, converging on the same two markets is
-the evidence that the pathology is real and not an artifact of any one of them.
+### ⚠️ RETRACTED: the H+R+RBI compression finding
+
+An earlier version of this table read **H+R+RBI at 0.50** and treated it as a second market
+with the same pathology, attributed to the 60%-saturated `power` clamp. **That was an
+artifact of the population and is withdrawn.** On the uncapped population H+R+RBI reads
+**1.78 — wider than the market, not compressed.**
+
+The artifact: that table used `categories`, which is *"top 50 per market ranked by win
+**probability**"*, and probability is a function of `pModel` — so the sample was selected on
+the **model side of the ratio**. `pitcher_outs` (38 rows of 42 available) and K's (35 of 39)
+are effectively uncapped and were unaffected; H+R+RBI (**50 of 304**), hits (50 of 296) and
+HR (50 of 768) were severely truncated.
+
+`python3 tools/range_compression.py <board> --truncation-check` demonstrates the mechanism —
+restricting to the top 30/20/12 by probability moves the ratio:
+
+| market | all | top 30 | top 20 | top 12 |
+|---|---|---|---|---|
+| H+R+RBI | 0.50 | 2.10 | **4.88** | 1.83 |
+| hits | 2.96 | 10.24 | 13.05 | **15.66** |
+| **outs** | **0.51** | 0.41 | 0.32 | 0.66 |
+
+**A statistic that swings 10× under truncation is measuring the truncation.** Independent
+corroboration that outs is the real finding: it is the only market whose value is stable
+across that sweep, and it reads 0.50 on the uncapped population too.
+
+**Second, independent disconfirmation of the H+R+RBI claim:** `tests/hrr-compression.test.ts`
+decomposes the H+R+RBI λ build stage by stage on the armed fixture slate (uncapped, n=14) and
+finds λ_model **1.62× the market's — wider**, with the only compressive stage being the EB
+pull (IQR retention **0.726**) and the factor stack *expanding* spread (1.189). Two
+populations, neither capped, both contradicting the retracted number.
+
+**What survives:** three instruments — the `case`-string arithmetic (§8), the `shShrink`
+audit, and the range detector — converge on `pitcher_outs` and only `pitcher_outs`. The
+convergence is still the strongest evidence here; it is one market, not two.
 
 ---
 

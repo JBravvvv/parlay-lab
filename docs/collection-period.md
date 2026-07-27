@@ -145,6 +145,54 @@ a change fails.
 | L2351 | 60 | 95 | 0.613 | hits rate/AB (sim, no-starter path) |
 | L2359 | 10 | 26 | 0.722 | H+R+RBI per game |
 
+### `consMinEv` IS A STRUCTURE FILTER WEARING A QUALITY FILTER'S NAME (2026-07-26)
+
+`consCzEv` is **multiplicative**: `consP = Π(imp_i)` and `czDec = Π(czDec_i)`, so
+
+```
+consCzEv = Π (imp_i × czDec_i) − 1 = Π (1 + c_i) − 1        c_i = that leg's own consCzEv
+```
+
+**The per-leg bar therefore TIGHTENS with leg count.** To clear `consMinEv = −1%`:
+
+| legs | required geometric-mean per-leg `consCzEv` |
+|---|---|
+| 1 | ≥ **−1.000%** |
+| 2 | ≥ −0.501% |
+| 3 | ≥ −0.334% |
+
+Measured against the actual distribution (205 playable rows with a Caesars quote, board
+2026-07-26): median **−5.60%**, p25 −7.00%, **max −0.60%**, and **1 of 205 clears −1% even
+as a single**. At two legs that one row has no partner; at three, none.
+
+**Mechanism:** the de-vigged consensus is priced against Caesars, whose measured overround is
+**1.071**, so a typical leg starts ~5–6 points under water and the product only deepens it.
+`consMinEv ≥ −1%` asks the consensus to price a ticket at near-zero vig against the
+settlement book on *every leg simultaneously*.
+
+> **At any leg count above one, `consMinEv` is not filtering on quality — the bar is
+> unreachable regardless of merit. It admits by structure (leg count 1) and excludes the
+> rest mathematically.** It only ever behaved like a quality filter because markets crossed
+> `consMinN` fast enough that it rarely bound; `CAL_START` made it universal.
+
+**Correction to the framing that prompted this section:** the *pass rate* is **1 of 205
+rows (0.5%)** and **0 of 67 tickets**. The 15.08% figure is the parlay card's stake-weighted
+**EV** with the gate open — not a pass rate. The structural conclusion is unaffected.
+
+**And it pulls against the EV floor on the same axis.** `coreEvMin` is a *fixed* ticket
+floor, so it filters **more weakly** as legs increase (a 3-legger clears +2% on legs
+averaging +0.7%; measured over-admission **4 of 18 tickets, 22%**). `consMinEv` is a
+*multiplicative* floor, so it filters **more strictly** as legs increase.
+
+| gate | scaling with leg count | direction |
+|---|---|---|
+| `coreEvMin` (+2%) | fixed ticket-level | **looser** with more legs |
+| `consMinEv` (−1%) | multiplicative | **stricter** with more legs |
+
+**Neither was designed with the other in mind, and on leg count they point in opposite
+directions.** Not a change request — both are frozen. Recorded so the interaction is not
+rediscovered as two separate surprises. See `docs/singles-vs-parlays.md`.
+
 **Seven of nine sit below 0.6 own-sample weight, and the flag is a prompt, not a verdict.**
 A large `k` on a *rate* is defensible — HR/AB has enormous per-AB variance, so `k = 150` at
 n≈80 is a real choice about a rare event. `pitcher_outs` is different in kind: `ipg` averages

@@ -508,10 +508,15 @@ the model sees the opposing starter as one of two values with no gradation.
 tell: `contact` is `whip/1.30`, a single ratio, while `power` averages two ratios and so
 inherits the wider of the two spreads without a wider clamp.
 
-**This is the same range-compression pathology as `pitcher_outs` defect 3, in a different
-mechanism**, and `tools/range_compression.py` independently flags H+R+RBI — whose λ is
-`rate × coors × power` — at an IQR ratio of **0.50**, matching `pitcher_outs`'s 0.51. Not
-proposed for change: frozen, and the owner signs off.
+**Accounted for, and NOT downstream-confirmed.** An earlier version of this section claimed
+`power`'s saturation was the mechanism behind an H+R+RBI range compression of 0.50. **That
+compression was an artifact and is retracted** (see below and `docs/pitcher-outs-audit.md`);
+on the uncapped population H+R+RBI reads 1.78, *wider* than the market. So `power`'s 60%
+saturation is a real measurement with **no demonstrated downstream consequence**. It stays in
+the frozen-table notes because a factor delivering a near-constant to two thirds of the board
+is worth knowing regardless — not because it has been shown to cost anything.
+
+**Both `power` sites are recorded as accounted for.** Frozen; owner signs off.
 
 ---
 
@@ -520,7 +525,7 @@ proposed for change: frozen, and the owner signs off.
 `tools/range_compression.py`. A model can be **centred correctly and still unable to reach
 the tails**; a bias check reports that as a small mean error, and nothing named it.
 
-**Both failures are recorded because each produced a plausible table.**
+**All THREE failures are recorded because each produced a confident, plausible, ranked table.**
 
 1. **Probability space is the wrong space.** The first version compared the spread of
    `pModel` against the spread of `implied` and reported `pitcher_outs` as **1.20× WIDER**
@@ -535,13 +540,52 @@ the tails**; a bias check reports that as a small mean error, and nothing named 
    *is* side-invariant for `|gap|`, which is why the earlier claim stands and this one still
    broke. **Side-invariance is a property of a statistic, not of a population.**
 
-Only after both fixes does the tool report what three other instruments independently
-support: **`pitcher_outs` 0.51 and H+R+RBI 0.50** — model λ spread half the market's.
+3. **Then the POPULATION was wrong — the failure that actually mattered, because by this
+   point the tool looked right.** v3 was oriented, in λ space, and reported `pitcher_outs`
+   0.51 (real) alongside **H+R+RBI 0.50 (not real)**. `categories` is *"top 50 per market
+   ranked by win **probability**"*, and probability is a function of `pModel` — **the sample
+   was selected on the model side of the ratio.** `--truncation-check` proves it: restricting
+   to the top 30/20/12 swings H+R+RBI 0.50 → 2.10 → **4.88** → 1.83 and hits 2.96 → 10.24 →
+   13.05 → **15.66**. **A statistic that moves 10× under truncation is measuring the
+   truncation.** Fixed by moving to `propBoard` (uncapped, over-oriented, not ranked on
+   anything the model produces), recovering the raw `pModel` from the stored blend and
+   **checking that recovery rather than assuming it** — median error −0.01 pp, max 0.26 pp
+   over 223 rows, printed every run.
 
-**The general lesson, and why this belongs in this file:** a detector that returns a
-confident number on its first run is not thereby working. Both broken versions produced
-ranked tables with plausible verdicts, and the only reason either was caught is that a
-**known-bad market** was in the output and read the wrong way. **Build a detector against a
-case whose answer you already know, and treat disagreement with that case as a bug in the
-detector until proven otherwise.** `pitcher_outs` served as the positive control for the
+Only after all three fixes does the tool report a stable result: **`pitcher_outs` 0.50 and
+nothing else**. H+R+RBI is 1.78 — *wider* — and its earlier 0.50 is withdrawn.
+
+**Three lessons, and why they belong in this file:**
+
+**(a) A detector that returns a confident number is not thereby working.** All three broken
+versions produced ranked tables with plausible verdicts. The only reason any was caught is
+that a **known-bad market** sat in the output and read the wrong way. **Build a detector
+against a case whose answer you already know, and treat disagreement with that case as a bug
+in the detector until proven otherwise.** `pitcher_outs` was the positive control for this
 instrument before it became one for Phase 2.
+
+**(b) The failure mode escalated as the tool improved.** v1 and v2 were wrong in ways the
+control immediately exposed. v3 got the control *right* and was wrong about a market with no
+control — which is far more dangerous, and was caught only by asking whether the statistic
+was stable under a change that should not have mattered. **When a detector agrees with your
+control, that validates the control's row, not the table.** Add a stability check against a
+nuisance parameter before believing an uncontrolled row.
+
+**(c) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
+is genuinely side-invariant, which is why the magnitudes measured on `categories` stand. The
+spread ratio is not, and neither is anything conditioned on probability rank. Establishing
+that a population is safe for one statistic says nothing about the next one computed on it.
+
+### The convergence, stated plainly (2026-07-26)
+
+**Four instruments built for four different purposes — the `case`-string arithmetic, the
+`shShrink` k audit, the clamp audit and the range detector — independently converge on
+`pitcher_outs`, and only on `pitcher_outs`.** That is the strongest validation this toolchain
+has produced, and it is worth naming as the standard: a finding supported by one instrument
+is a hypothesis; one that survives instruments with different failure modes is a result.
+
+The same convergence is what killed the H+R+RBI claim: it had **one** instrument behind it,
+and the moment a second (the fixture stage-decomposition, `tests/hrr-compression.test.ts`,
+1.62× *wider*) and a third (the uncapped population, 1.78× wider) were applied, it did not
+survive. **Convergence is only evidence when the instruments could have disagreed** — which
+is exactly why the retraction matters as much as the confirmation.

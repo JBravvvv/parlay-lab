@@ -95,6 +95,93 @@ disagreement into a higher-variance, higher-nominal-EV object.
 
 ---
 
+---
+
+## IS THE PARLAY ADVANTAGE REAL, OR MANUFACTURED BY THE FIXED +2% FLOOR?
+
+`coreEvMin` is a **fixed ticket-level floor**, so it filters more weakly the more legs a
+ticket has: three legs at +2% each compound to `1.02³ − 1` = **+6.1%**, so a 3-legger clears
+a +2% ticket floor on legs averaging only **+0.7%**. Three checks.
+
+### 1. Per-leg czEv behind each card — the pools are the same quality
+
+| card | n legs | min | p25 | median | p75 | max | **mean** |
+|---|---|---|---|---|---|---|---|
+| singles | 6 | 2.07% | 2.60% | 2.88% | 10.95% | 13.55% | **5.80%** |
+| parlay | 14 | **−3.58%** | 1.93% | 2.60% | 10.66% | 23.12% | **5.76%** |
+
+**The hypothesis is not confirmed at the card level.** Mean per-leg czEv is 5.80% vs 5.76% —
+indistinguishable. The parlay card is 4 two-leg and 2 three-leg tickets, and **one leg is at
+−3.58%**, riding on a ticket that clears +2% — exactly the predicted mechanism, but 1 of 14,
+not a systematic dilution.
+
+**The floor IS mis-scaled, though, and here is the size of it:** of the **18** tickets
+clearing the fixed +2% floor, **14** also clear a leg-equivalent floor. **4 of 18 (22%) are
+admitted only because the floor does not scale with leg count.** They just weren't good
+enough to make the top 6.
+
+### 2. Leg-equivalent floor — the advantage survives, and grows
+
+Ticket floor `1.02^n − 1`, applied as an upstream **pool restriction** with the real
+allocator run afterwards (the gate itself untouched):
+
+| | tickets surviving | picks | staked | stake-wtd EV |
+|---|---|---|---|---|
+| fixed +2% floor | 67 pool | 6 | $250 | 15.08% |
+| **leg-equivalent floor** | **17 of 67** | 6 | $250 | **16.45%** |
+
+### 3. Expected log-growth — the scoreboard EV cannot be
+
+Exact over all 2⁶ card outcomes, at the actual ¼-Kelly stakes under the 2%/10% caps,
+bankroll $2,500. (Tickets are leg-disjoint by the allocator's no-repeat rule; residual
+same-game dependence across tickets makes this an approximation.)
+
+| card | E[ln(B′/B)] | P(0-for-6) |
+|---|---|---|
+| singles | **+55.3 bp** | 0.0012 |
+| parlay | **+126.6 bp** | 0.0949 |
+| parlay, leg-equivalent floor | **+139.1 bp** | 0.1001 |
+
+> **Parlays win by 2.3× on log-growth, and the advantage survives — indeed improves under —
+> a leg-equivalent floor. The EV gap is not a selection artifact.**
+>
+> **But the parlay card is 79× more likely to lose everything staked** (9.5% vs 0.12% of
+> days going 0-for-6, i.e. −$250 on a $2,500 bankroll).
+
+### ⚠️ 4. AND THE RANKING INVERTS AT −3 pp OF OVERCONFIDENCE
+
+Every number above is computed **at the model's own probabilities**. A parlay is
+multiplicatively more sensitive to probability error than a single. Given
+`docs/pitcher-outs-audit.md` and the H+R+RBI history, systematic overconfidence is a live
+hypothesis, so the ranking is re-run under it rather than asserted robust — each leg's true
+probability shaded down by δ, propagated through the ticket:
+
+| per-leg shade | singles | parlay | parlay (leg-equiv) |
+|---|---|---|---|
+| −0 pp | +55.3 bp | **+126.6 bp** | **+139.1 bp** |
+| −1 pp | +39.5 bp | +86.5 bp | +98.2 bp |
+| −2 pp | +23.7 bp | +47.0 bp | +58.0 bp |
+| **−3 pp** | **+7.9 bp** | **+8.2 bp** | +18.5 bp |
+| −5 pp | **−23.7 bp** | **−67.3 bp** | −58.4 bp |
+
+> ### THE CROSSOVER IS AT −3 pp
+> At the model's own numbers parlays win 2.3×. At **3 points** of per-leg overconfidence the
+> two are equal. At 5 points **singles lose 24 bp and parlays lose 67 bp — 2.8× as much.**
+
+**So this is not "parlays win". It is: parlays win iff per-leg overconfidence is under ~3
+points, and that quantity has not been measured.** For scale, the board-wide raw model gap
+is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
+rather than information, the crossover is breached. The global reliability slope is
+**1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the
+clustering unit still unmeasured (`tools/icc.py` has not reported), and the H+R+RBI slope
+criterion is precisely how this repo previously over-read a slope at small n.
+
+**Recommendation: do not re-spec Phase 4 on this.** The decision reduces to one unmeasured
+calibration parameter with a stated threshold — **−3 pp per leg** — which is exactly the
+quantity Phase 2 and the calibration channel exist to produce. Re-run this table when they do.
+
+---
+
 ## B. INFORMATION YIELD — the premise needs correcting
 
 The question assumed 46 unconfounded leg results vs 18 confounded ticket results, feeding the
