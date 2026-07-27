@@ -122,6 +122,56 @@ population is **complete** — unlike TB/hits/HR/H+R+RBI, which are truncated.
 first.** The one-line change is written out in `docs/pitcher-outs-audit.md` under "THE FIX,
 PRE-WRITTEN".
 
+## A SECOND CONTROL, IN THE OPPOSITE DIRECTION
+
+One control only proves the instrument can detect *absence* of signal. Two controls pointing
+opposite ways is a materially stronger validation: an instrument that reports slope ≈ 0
+everywhere passes the outs test for the wrong reason.
+
+**Proposed positive-direction control: `batter_hits`.** It is the market where the graded
+record says the model *beats* the market — model Brier **0.099** vs consensus **0.109**, the
+largest favourable gap of any market (every other is within ±0.012, and `pitcher_outs` is
+0.285 vs 0.215 against). If the engine has edge anywhere, hits is where the evidence points.
+
+> **Expected result, stated in advance: `batter_hits` slope materially above 0**, and above
+> `pitcher_outs`'s. If **both** come in near 0, the instrument is not discriminating and no
+> market's slope may be read. If **hits** comes in near 0 while outs does too, that is the
+> "no edge anywhere" reading — which is a *result*, but only once the instrument has shown it
+> can produce a non-zero slope somewhere.
+
+**This control is weaker than the outs one, and that is stated deliberately.** `pitcher_outs`
+rests on **mechanism** — a constant off by ~3×, a clamp pinned 35/35, 0-of-38 one-sidedness —
+which is board-independent. `batter_hits` rests on **n = 7 graded legs** and a 0.010 Brier
+gap. It is a directional prior, not a known-good market. Weight the two accordingly: outs
+failing invalidates Phase 2; hits failing is a finding to investigate.
+
+**H+R+RBI was considered as the second control and rejected.** The plan was to use a
+denominator fix as a pre/post split with an expected slope improvement — but that fix was
+**retracted before shipping** (the term is algebraically correct; see
+`docs/hrr-recalibration.md`). No fix will land, so there is no post-fix population to compare.
+
+## POPULATION STAMPS — H+R+RBI is already split, and it is not the only one
+
+`CAL_START` taught this once: a cutoff mid-window splits a population silently, and the split
+is invisible unless it is stamped on the rows. Three splits already exist in the H+R+RBI
+record and **Series A must carry a stamp per row for each**:
+
+| date | event | effect on H+R+RBI rows |
+|---|---|---|
+| **2026-07-22** | PA-conditioning re-basing shipped (`lam *= clamp(expAB/abG, .85, 1.15)`) | median **+4.8 pp** on O0.5, **+4.7 pp** on O1.5 — pre- and post- rows are different models |
+| 2026-07-24 | `hrrAltMax = 0.5` suspension | O1.5+ rows stop being ticketed (board rows continue to accrue) |
+| 2026-07-25 | `CAL_START` | the calibration counter resets |
+
+**Rule: never pool H+R+RBI rows across 2026-07-22.** The measured +4.8 pp shift is larger
+than most of the effects Phase 2 is trying to detect, so pooling would swamp the slope with a
+step change. Report H+R+RBI as two vintages — as `props-history` Series A and B already are —
+and if the post-07-22 vintage is too thin to fit, say so rather than pooling.
+
+**The general form of the rule, since this is the second time:** any dated change to a
+pricing term creates a vintage boundary in every market it touches. Stamp the row with the
+engine commit that priced it; `docs/harness-substitutions.md` records the commit-stamp
+obligation for persisted summaries, and this is the same obligation one level down.
+
 ## The problem it solves
 
 Outcome-grading is a weak instrument: detecting a 2pp model bias from win/loss needs

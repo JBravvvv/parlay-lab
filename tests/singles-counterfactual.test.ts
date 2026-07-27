@@ -469,6 +469,58 @@ describe("singles-vs-parlays counterfactual (analysis harness, report only)", ()
     );
 
     // ======================================================================
+    // 5b. IS THE 1/8-KELLY ADVANTAGE REAL, OR ONLY WHERE perParlayCap BINDS?
+    // ======================================================================
+    // 133.0 bp at 1/8 vs 126.6 at 1/4 was measured on ONE card of 6 parlays, where
+    // perParlayCap ($62.50 = 0.25 x $250) is the binding ceiling. Card size changes which
+    // constraint binds, so it is re-run across card sizes and across card TYPES, and the
+    // total staked is reported alongside — spreading the same $250 wider is a different
+    // claim from staking less.
+    const mixedPool = [
+      ...mkPool(playable).map((w) => ({ pl: w.pl as Row, src: "s", idx: 0 })),
+      ...parlays.map((pl, idx) => ({ pl, src: "p", idx })),
+    ];
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n5b. 1/8 vs 1/4 KELLY BY CARD TYPE AND CARD SIZE  (maxCoreTickets varied; bankroll $${BANKROLL}, daily $${DAILY})\n` +
+        `${"card".padEnd(10)}${"maxTix".padStart(7)}${"picks 1/8".padStart(11)}${"staked 1/8".padStart(12)}` +
+        `${"g 1/8".padStart(10)}${"picks 1/4".padStart(11)}${"staked 1/4".padStart(12)}${"g 1/4".padStart(10)}` +
+        `${"delta".padStart(10)}`,
+    );
+    const setKelly = (kf: number) =>
+      eng.set("shKellyFrac", function (pl: Row) {
+        const decK = Number(pl.czDec);
+        const p = Number(pl.prob) / 100;
+        if (!isFinite(decK) || decK <= 1 || !isFinite(p)) return null;
+        const bK = decK - 1;
+        const k = Math.max(0, (bK * p - (1 - p)) / bK);
+        return Math.max(0, Math.min(kf * k, 0.02));
+      });
+    for (const [name, pool] of [
+      ["singles", mkPool(playable)],
+      ["parlays", parlays.map((pl, idx) => ({ pl, src: "p", idx }))],
+      ["mixed", mixedPool],
+    ] as const) {
+      for (const maxTix of [6, 10, 15]) {
+        const cfgN = { ...cfgOpen, maxCoreTickets: maxTix, minCoreTickets: Math.min(4, maxTix) };
+        const out: { g: number; n: number; s: number }[] = [];
+        for (const kf of [0.125, 0.25]) {
+          setKelly(kf);
+          const c = cardOf(alloc(pool as unknown[], DAILY, cfgN));
+          out.push({ g: (growth(c) ?? 0) * 10000, n: c.length, s: c.reduce((a, x) => a + x.stake, 0) });
+        }
+        // eslint-disable-next-line no-console
+        console.log(
+          `${name.padEnd(10)}${String(maxTix).padStart(7)}` +
+            `${String(out[0].n).padStart(11)}${("$" + out[0].s).padStart(12)}${out[0].g.toFixed(1).padStart(10)}` +
+            `${String(out[1].n).padStart(11)}${("$" + out[1].s).padStart(12)}${out[1].g.toFixed(1).padStart(10)}` +
+            `${(out[0].g - out[1].g >= 0 ? "+" : "") + (out[0].g - out[1].g).toFixed(1)}`.padStart(10),
+        );
+      }
+    }
+    eng.set("shKellyFrac", origKF);
+
+    // ======================================================================
     // 6. THE EV FLOOR MIS-SCALED BY LEG COUNT — sized for a freeze-exit decision
     // ======================================================================
     // eslint-disable-next-line no-console

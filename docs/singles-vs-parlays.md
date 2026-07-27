@@ -218,10 +218,46 @@ parameter uncertainty and this shade models the same uncertainty.
    setting is load-bearing only on the downside** — raising it changes nothing at this
    bankroll/daily ratio.
 2. **1/8 Kelly gives the parlay card HIGHER growth** (133.0 vs 126.6 bp) at the same $250
-   total. The allocator always places the full daily, so a tighter ceiling only makes the
-   split more even — and more even is better here. **The parlay card is over-concentrated at
-   ¼ Kelly relative to growth-optimal**, which is a separate observation from the crossover
-   and is not a change request.
+   total — followed up below.
+
+### The 1/8-Kelly result, checked across card type and card size
+
+| card | maxTix | picks 1/8 | staked | g 1/8 | picks 1/4 | staked | g 1/4 | **Δ** |
+|---|---|---|---|---|---|---|---|---|
+| singles | 6 | 6 | $250 | 55.3 | 6 | $250 | 55.3 | **+0.0** |
+| singles | 10 | 10 | $250 | 48.0 | 10 | $250 | 48.0 | **+0.0** |
+| singles | 15 | 15 | $250 | 61.5 | 15 | $250 | 61.5 | **+0.0** |
+| **parlays** | 6 | 6 | $250 | **133.0** | 6 | $250 | 126.6 | **+6.4** |
+| **parlays** | 10 | 9 | $250 | **141.3** | 9 | $250 | 136.2 | **+5.1** |
+| **parlays** | 15 | 9 | $250 | **141.3** | 9 | $250 | 136.2 | **+5.1** |
+| mixed | 6/10/15 | 6/10/15 | $250 | 55.3/48.0/61.5 | same | $250 | same | **+0.0** |
+
+**Three answers, and they narrow the claim considerably:**
+
+1. **It is a PARLAY-CARD-ONLY effect.** Singles show **+0.0 at every card size**; the Kelly
+   ceiling never binds there. The mixed card is identical to the singles card because the
+   singles dominate the ¼-Kelly weighting and take every slot — so "mixed" is not a third
+   case on this board.
+2. **It is not a small-card artifact.** It persists at 10 and 15 (+5.1 bp), though the parlay
+   pool exhausts at **9** picks, so 10 and 15 produce the same card. Card size is therefore
+   only tested up to 9 here, and that limit should be stated in any amendment.
+3. **The total daily stake is $250 in every cell.** 1/8 Kelly **redistributes, it does not
+   reduce**. The allocator always places the full daily; a tighter ceiling just forces a
+   more even split.
+
+> ### So the amendment is not "lower the Kelly fraction"
+> The mechanism is that **the allocator over-concentrates PARLAY stakes**, and a lower Kelly
+> fraction is a blunt instrument that happens to force evenness. It works because parlay
+> tickets have widely varying odds — a ¼-Kelly weight starves the long ones and feeds the
+> short ones — while singles sit in a narrow odds band where the ceiling binds on all or
+> none.
+>
+> A freeze-exit amendment should target the concentration directly (a weight-ratio cap or a
+> per-ticket floor) rather than move a global risk parameter whose meaning is bankroll
+> management. **Worth ~5–6 bp/day on a parlay card**, measured on one board, and only where
+> `perParlayCap`/Kelly interact — which is exactly the regime the card has been in.
+
+**Kelly fraction stays frozen.** This is specified, not proposed.
 
 ### To whether the bias is correlated or independent
 
@@ -294,6 +330,27 @@ ones carrying sub-par legs.
 
 **Not to be applied during the freeze**: it would move ticket selection, and the frozen
 parameter table is the drift detector. **Sign at freeze exit or reject explicitly.**
+
+> ### DECIDE THIS TOGETHER WITH `consMinEv` — one amendment, not two
+> The two gates are functions of the **same variable**, leg count, and they move in opposite
+> directions: `coreEvMin` under-filters as legs increase, `consMinEv` over-filters. Amending
+> either alone changes the *net* leg-count preference by an amount that depends on the other,
+> so two separate decisions would interact in a way neither was evaluated against.
+>
+> Concretely: scaling the EV floor removes 4 of 18 tickets — all multi-leg — which shifts the
+> card toward fewer legs. `consMinEv` already shifts it that way, harder. A single amendment
+> must state the **combined** implied per-leg bar it is choosing at each leg count:
+>
+> | legs | `coreEvMin` bar (scaled) | `consMinEv` bar | net effect on leg count |
+> |---|---|---|---|
+> | 1 | +2.00% | −1.000% | — |
+> | 2 | +2.00% | −0.501% | tighter than today |
+> | 3 | +2.00% | −0.334% | tighter than today |
+>
+> Scaling the EV floor makes the per-leg bar **flat** at +2%, which is the point. But
+> `consMinEv`'s bar keeps rising, so the combined gate still penalises leg count — just less
+> arbitrarily. **Whether that residual leg-count penalty is intended is the actual decision**,
+> and it cannot be made by looking at either gate alone.
 
 ---
 

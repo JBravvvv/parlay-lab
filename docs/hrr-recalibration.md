@@ -27,8 +27,67 @@ Two pricing paths exist:
   hardest on O1.5+ where the tail matters (O0.5 ≈ P(X≥1) saturates and mostly survives
   the error).
 
-  > ## ⚠️ 2026-07-26 — THE PA FIX DOES NOT EXPLAIN THE MISS, AND ON A REAL BOARD IT RUNS
-  > ## THE WRONG WAY. A SECOND DEFECT EXISTS.
+  > # ⛔ RETRACTED 2026-07-26 — "THE PA FIX RUNS THE WRONG WAY" WAS MY ERROR
+  >
+  > **There is no denominator mismatch. The correction term is algebraically correct and
+  > must not be changed.** The owner approved a fix on this premise; the premise is wrong,
+  > and the fix was not applied.
+  >
+  > ```
+  > bn.r = shBlendN(st, H+R+RBI, "g", 3)   ->  HRR per game PLAYED
+  > abG  = ab30 / g30                      ->  AB  per game PLAYED
+  >
+  > lam = (HRR/G) x expAB/(AB/G) = HRR x expAB / AB = (HRR/AB) x expAB
+  > ```
+  >
+  > **Both terms are per-game-played and they cancel.** The correction converts a per-game
+  > rate into a **per-AB** rate and rescales it to tonight's expected ABs — which is exactly
+  > the right operation, and is the same shape `batter_hits`, `batter_total_bases` and
+  > `batter_home_runs` already use explicitly (`lam = rate * expAB * ...`). H+R+RBI is the
+  > one market whose base rate is per-game rather than per-AB, which is *why* it needs the
+  > conversion at all.
+  >
+  > **How I got it wrong:** I inferred a units bug from the *sign* of the factor (upward on
+  > 86% of rows) without ever checking the algebra. The factor is upward because `expAB` (ABs
+  > in a game he starts) genuinely exceeds `abG` (ABs averaged over every game he appeared
+  > in, including partial appearances) — **which is the correction doing its job**, not
+  > evidence against it. This is the fourth methodology rule turned on its own author:
+  > a directional reading was treated as a mechanism without a mechanism being checked.
+  >
+  > ### What the measurement actually shows, kept because it is real
+  >
+  > Raw `expAB/abG` before the clamp, 44 rows recovered from the board's own `case` string:
+  >
+  > | | min | p25 | median | p75 | max |
+  > |---|---|---|---|---|---|
+  > | raw ratio | 0.789 | 1.028 | **1.144** | 1.393 | **1.773** |
+  >
+  > | | count |
+  > |---|---|
+  > | **above the 1.15 cap** | **21 of 44** |
+  > | inside the clamp | 22 of 44 |
+  > | below the 0.85 floor | 1 of 44 |
+  >
+  > | lineup status | n | median `expAB` | median `abG` | median ratio |
+  > |---|---|---|---|---|
+  > | projected | 10 | 4.10 | 3.10 | **1.379** |
+  > | posted spot | 34 | 3.80 | 3.40 | 1.118 |
+  >
+  > **The finding that survives is the opposite of the one I reported: the clamp is
+  > TRUNCATING an algebraically-correct correction on 21 of 44 rows.** The model applies
+  > *less* re-basing than its own logic implies — and since the truncated correction is
+  > upward, the truncation is **conservative**, which is the safe direction for a market
+  > with H+R+RBI's history. No change proposed.
+  >
+  > The one place worth watching: **projected-lineup rows carry a raw 1.379 uplift built on
+  > an assumption** (`pa = 4.45` for a `projStar`) rather than a read slot. The clamp caps it
+  > at 1.15. That is the correct conservative behaviour, and it is another reason the clamp
+  > should not be widened.
+  >
+  > ## ⚠️ WHAT STILL STANDS: THE FIX CANNOT EXPLAIN THE MISS. A SECOND DEFECT EXISTS.
+  >
+  > The bound below was derived from the **clamp limits**, not from the direction claim, so
+  > the retraction does not touch it.
   >
   > The range-compression hypothesis for H+R+RBI was retracted (see
   > `docs/pitcher-outs-audit.md`), which left the PA-conditioning defect as the *only*
@@ -40,7 +99,7 @@ Two pricing paths exist:
   > ("H+R+RBI rate re-based to #N spot PA (~X AB vs Y AB/g)"), so the correction it applied
   > can be read off directly — **44 of 50 rows** on the 2026-07-26 board.
   >
-  > ### It is an UPWARD correction on 86% of rows
+  > ### It is an UPWARD correction on 86% of rows — correctly (see the retraction)
   >
   > | | |
   > |---|---|
@@ -50,12 +109,10 @@ Two pricing paths exist:
   > | factors **> 1** (fix RAISES the model's probability) | **38 of 44 (86%)** |
   > | factors < 1 (fix lowers it) | 3 of 44 |
   >
-  > **Mechanism — a denominator mismatch.** `expAB` is "ABs in a game he *starts*"; `abG` is
-  > "ABs per game *appeared in*", which includes partial appearances and pinch-hit games and
-  > is therefore systematically lower. The ratio is biased above 1 for essentially every
-  > everyday starter (typical 4.4 / 3.4 = 1.29, clamped to 1.15). The intended correction —
-  > scale a #8 hitter down relative to a leadoff hitter — is real, but it is riding on top of
-  > a systematic upward bias in the reference quantity.
+  > **Why the factor is upward (NOT a mismatch — see the retraction above).** `expAB` is ABs
+  > in a game he starts; `abG` averages over every game he appeared in, including partial
+  > appearances. `expAB > abG` is therefore the normal case for an everyday starter, and
+  > scaling up is precisely what a per-AB rebasing should do.
   >
   > ### Effect on stated probabilities, by line
   >
@@ -72,17 +129,20 @@ Two pricing paths exist:
   > The observed miss is **12.9 pp overall** and **27 pp on O1.5+** (59.2% implied vs 32%
   > realised).
   >
-  > **So the fix could not account for the miss even if it ran at full strength in the right
-  > direction on every row — and it runs the other way on 86% of them. A second defect
-  > exists, and the O1.5+ suspension is protecting against something that has not been
-  > identified.**
+  > **So the fix could not account for the miss even at its maximum downward setting on every
+  > row. A second defect exists, and the O1.5+ suspension is protecting against something
+  > that has not been identified.** This is the conclusion the retraction leaves standing,
+  > and it is the reason `hrrAltMax` stays at 0.5.
   >
-  > ### And the fix injected confidence into the one line still taking money
+  > ### Where the model's disagreement now sits
   >
-  > Model-minus-market on the same rows: **O0.5 +11.5 pp**, O1.5 **−1.4 pp**, O2.5 −4.2 pp.
-  > O1.5+ is suspended by `hrrAltMax`; **O0.5 is active and tagged `watch`** — and the PA fix
-  > added a median **+4.8 pp** there. A repair aimed at O1.5+ overconfidence moved confidence
-  > into O0.5, where the money still flows.
+  > Model-minus-market: **O0.5 +11.5 pp**, O1.5 **−1.4 pp**, O2.5 −4.2 pp. O1.5+ is suspended
+  > by `hrrAltMax`; **O0.5 is active and tagged `watch`**. So the model's H+R+RBI
+  > disagreement is now concentrated entirely on the ACTIVE line, and is near zero on the
+  > suspended ones. The re-basing contributes a median +4.8 pp of that — correctly, per the
+  > retraction above, but it means **`hrrAltMax` is currently suspending the lines where the
+  > model agrees with the market and leaving open the line where it does not.** That is a
+  > statement about where to look next, not a case for lifting the suspension.
   >
   > **Two caveats, stated.** (1) This is one board and it is *post*-fix; the graded legs that
   > produced 46.3%/59.2% are pre-fix and sit behind the sync phrase, so the direct

@@ -610,7 +610,33 @@ selection is a function of `pModel` → anything comparing `pModel`'s distributi
 something else is invalid. Chain-position selection is a function of the upstream filters →
 any "N reach gate X" claim is invalid without running the chain.
 
-**(d) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
+**(d) SEVENTH RULE — check that a ratio's numerator and denominator describe the same
+population, BEFORE inferring anything from the ratio's sign.**
+
+Proposed after I claimed `shClamp(expAB/abG, 0.85, 1.15)` was a units bug because the factor
+ran upward on 86% of rows. **It is not.** `bn.r` is H+R+RBI per game *played* and `abG` is AB
+per game *played*; they cancel exactly:
+
+```
+(HRR/G) x expAB/(AB/G) = HRR x expAB / AB = (HRR/AB) x expAB
+```
+
+— a per-game rate converted to per-AB and rescaled to tonight's ABs, which is the same shape
+hits/TB/HR already use explicitly. The owner approved a fix on my premise; the fix was not
+applied and the premise is retracted.
+
+**The rule is right even though this instance passes it**, and that is the point: running the
+check is what caught the error. State the population of the numerator, state the population
+of the denominator, and only then read the sign. A mismatch produces a *systematically signed*
+error — which looks exactly like a real directional finding — and a clamp then hides its
+magnitude, so the sign is all you ever see.
+
+**And the failure that actually occurred is the fourth rule turned on its author:** I read a
+direction (86% upward) off a real measurement and supplied a mechanism for it without
+checking the mechanism. The population could not have gone the other way — `expAB > abG` is
+the normal case for an everyday starter — so the 86% was never evidence of anything.
+
+**(e) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
 is genuinely side-invariant, which is why the magnitudes measured on `categories` stand. The
 spread ratio is not, and neither is anything conditioned on probability rank. Establishing
 that a population is safe for one statistic says nothing about the next one computed on it.

@@ -248,14 +248,19 @@ one leg and improves the card on every axis (EV 15.08→16.45%, growth +126.6→
 crossover 3.05→**3.50 pp**). **Not during the freeze.** Sign or reject at exit —
 `docs/singles-vs-parlays.md`.
 
-**H+R+RBI: the PA fix does NOT explain the miss, and runs the wrong way.** Recoverable from
-the board's `case` string: `clamp(expAB/abG, 0.85, 1.15)` has median **1.144**, sits at the
-HIGH clamp on 22 of 44 rows and the low clamp on 1, and is **upward on 38 of 44 (86%)** —
-because `expAB` is ABs-in-a-game-started while `abG = ab30/g30` is ABs-per-game-*appeared*,
-a systematically smaller denominator. Max possible downward effect **5.9 pp (O0.5) / 7.2 pp
-(O1.5)** against a **27 pp** miss on O1.5+. **A second defect exists and is unidentified.**
-Worse: the fix added a median **+4.8 pp** to O0.5 — the one line still active and taking
-money. `hrrAltMax` stays. Replaying graded legs needs the sync phrase (owner-executable).
+**H+R+RBI: the PA fix does NOT explain the miss.** ⛔ **RETRACTED: it does NOT "run the wrong
+way" — there is no denominator mismatch and the term must not be changed.** `bn.r` is HRR per
+game *played* and `abG` is AB per game *played*; they cancel to `(HRR/AB) × expAB`, the same
+per-AB shape hits/TB/HR use. The factor is upward on 86% of rows because `expAB > abG` is
+normal for an everyday starter — the correction doing its job. What survives: the **bound**
+(derived from the clamp limits, untouched by the retraction) — max downward effect **5.9 pp
+(O0.5) / 7.2 pp (O1.5)** against a **27 pp** O1.5+ miss, so **a second defect exists and is
+unidentified**; `hrrAltMax` stays. New: the clamp **truncates an algebraically-correct
+correction on 21 of 44 rows** (raw ratio max 1.773) — conservative, no change proposed.
+`tools/hrr_pa_audit.py`. Replaying graded legs
+needs the sync phrase (owner-executable). Note the model's H+R+RBI disagreement now sits
+**entirely on the ACTIVE line** — O0.5 +11.5 pp vs O1.5 −1.4 pp — i.e. `hrrAltMax` suspends
+the lines where the model agrees with the market.
 
 **`consMinEv` is a STRUCTURE filter wearing a quality filter's name.** `consCzEv` is
 multiplicative — `Π(1+cᵢ)−1` — so the per-leg bar *tightens* with leg count: −1.000% at 1 leg,
