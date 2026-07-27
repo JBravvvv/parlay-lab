@@ -1826,7 +1826,7 @@ function shLiveState(ls,bx){
 }
 
 function shSimGames(ctx,nSims,seed){
-  var rng=shMulberry(seed);
+  var rng=shMulberry(seed); /* ⚠️ PRIMARY STREAM — every simulated outcome is a POSITION in it. Adding ANY rng() call inside the sim shifts every subsequent draw and rebaselines the whole simulation plus both parity baselines. A new draw MUST come from a SECOND, independently seeded generator (shMulberry(seed^0x…)), which keeps this stream byte-identical and makes the feature additive. Pinned by tests/sim-rng-stream.test.ts; sizing recorded in docs/collection-period.md. */
   var L=ctx.legs.length;
   var legHit=new Int32Array(L),pair=new Int32Array(L*L);
   var homeWins=0,sumH=0,sumA=0,mHome15=0,mAway15p=0,mAway15=0,mHome15p=0;

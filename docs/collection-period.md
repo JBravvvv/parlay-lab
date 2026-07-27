@@ -3249,3 +3249,76 @@ was proven byte-identical against both baselines by hashing the whole board minu
 > **The distinction is entirely in the RNG design, not in the modelling.** That is worth stating
 > plainly, because "re-architecture" was the right word for what a naive implementation costs and
 > the wrong word for what the change actually is.
+
+# ⚠️ THE HITS BRACKET IS A THIRD FINDING — a DERIVED distributional error (2026-07-27)
+
+Closed form **−4.3**, sim **+5.0**, same rows, bracketing the market. Decomposed as asked.
+
+## They share the base EXACTLY
+
+| step | closed form (L2348–2349) | sim (`batVec` L2065) |
+|---|---|---|
+| window blend | `shBlendN(st, s.h, "ab", 10)` | **identical** |
+| EB shrink | `shShrink(bn.r, bn.n, **60**, shPriorH(st, Lh))` | **identical — same k, same prior** |
+
+**The bases are the same function with the same arguments.** So the 9.3 pp disagreement is
+entirely downstream, and four divergences produce it:
+
+| | closed form | sim |
+|---|---|---|
+| pitcher adjustment | `contact` (WHIP proxy) × `pq` × **`bvpRate`** | **`shLog5(hitR, pBAx, lgXBA)`** — xBA-against. **No `bvpRate`** |
+| park / platoon | Coors flag only | `parkH × pl.h` |
+| **PA count** | **`expAB = pa·(1 − clamp(bbr,0,.25)·0.9)` — deterministic** | **SIMULATED — endogenous** |
+| clamp | none on the rate | `shClamp(hitR·hF, 0.12, 0.42)` |
+| **distribution** | **`shPOver(0.5, λ) = 1 − e^{−λ}` — POISSON** | empirical over *n* discrete PAs |
+
+## The level error is DERIVED, not hypothesised
+
+`shPOver` prices a 0.5 line as `1 − e^{−λ}` with `λ = rate × expAB × hF`. But λ is a **mean count
+over `n` at-bats at per-AB rate `p`**, and the true process is `n` Bernoulli trials:
+
+> **`(1−p)^n < e^{−np}` for every `p ∈ (0,1)`. So Poisson ALWAYS understates `P(≥1)` for the
+> same mean** — it spends probability mass on two-or-more hits *in a single at-bat*, which cannot
+> happen, and that mass comes straight out of `P(≥1)`.
+
+| n (AB) | p | λ | Poisson | Binomial | **understated by** |
+|---|---|---|---|---|---|
+| 4.1 | 0.22 | 0.902 | 59.4% | 63.9% | **+4.5 pp** |
+| 4.1 | 0.24 | 0.984 | 62.6% | 67.5% | **+4.9 pp** |
+| 4.1 | 0.26 | 1.066 | 65.6% | 70.9% | **+5.3 pp** |
+
+**Median across a realistic grid: +4.9 pp. Re-priced on the board's own 36 hits O0.5 rows,
+inverting the engine's own λ: +6.3 pp median (p10 +5.8, p90 +6.8).**
+
+**Measured closed-form-minus-market on `batter_hits`: −4.3 pp.** The family error alone accounts
+for the whole level miss.
+
+### The cross-market test, and it passes
+
+The error scales with per-AB `p`, so it must be large for hits and near-zero for home runs:
+
+| market | per-AB p | **predicted error** | **measured cf − market** |
+|---|---|---|---|
+| `batter_hits` | 0.240 | **+4.9 pp** | **−4.3 pp** |
+| `batter_home_runs` | 0.040 | **+0.3 pp** | **−1.1 pp** |
+
+**The ordering and the rough magnitudes both match**, on a prediction made from the arithmetic
+rather than fitted to the data. That is an independent check the market-comparison alone could
+not provide.
+
+> ### What this means for the two paths
+>
+> **The sim uses the right family** — discrete at-bats — and its `+5.0` overshoot must come from
+> elsewhere. The leading candidate is the **endogenous PA count**: a batter's plate appearances
+> in the sim depend on how the whole lineup performs, so a marginally hot offence gives everyone
+> extra PAs and raises `P(≥1 hit)` through *both* channels at once. `expAB` is exogenous and
+> cannot do that. **Traced to the mechanism, not yet measured.**
+>
+> **The bracket is therefore not two conditioning errors.** It is one path with the wrong
+> distributional family and another with a plausible endogeneity — which is why they miss in
+> opposite directions and why **no blend of the two is the right answer**.
+
+**Nothing changed.** This is a new model amendment (**M7**) and it outranks the others on hits:
+it is derivable, it is one function call (`shPOver` → a binomial/`expAB`-aware form on 0.5
+lines), and it needs no new data. **It also touches every 0.5-line market priced by `shPOver`**,
+so its blast radius must be measured before it is proposed.

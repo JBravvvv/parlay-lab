@@ -582,7 +582,34 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ THE SIM COMPUTES FOUR MARKETS AND THE LOOP READS ONE
+for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ `shPOver` USES POISSON ON 0.5 LINES WHERE THE PROCESS IS BINOMIAL — derived, not guessed
+`shPOver(0.5, λ) = 1 − e^{−λ}` with `λ = rate × expAB × hF`. But λ is a MEAN COUNT over n at-bats
+at per-AB rate p, and **`(1−p)^n < e^{−np}` for every p ∈ (0,1)** — Poisson spends mass on
+two-or-more hits *in one at-bat*, which cannot happen, and it comes straight out of `P(≥1)`.
+**+4.9 pp median** on a realistic grid; **+6.3 pp** re-priced on the board's own 36 hits O0.5 rows
+by inverting the engine's own λ. **Measured `batter_hits` closed-form-minus-market: −4.3 pp** —
+the family error accounts for the whole level miss.
+**Cross-market check PASSES**: the error scales with per-AB p, so it predicts +4.9 pp for hits and
+**+0.3 pp for HR** (p≈0.04); measured −4.3 and −1.1. Ordering and magnitude both match, on a
+prediction made from arithmetic rather than fitted.
+**The two paths bracket the market for DIFFERENT reasons**: the closed form has the wrong
+distributional family; the sim uses the right one and overshoots +5.0, leading candidate being the
+**endogenous PA count** (a batter's PAs depend on how the lineup performs, so a hot offence raises
+`P(≥1)` twice over). **They share the base EXACTLY** — same `shBlendN(…,"ab",10)`, same
+`shShrink(k=60, shPriorH)`. **So no blend of the two is the right answer.** This is M7 and it
+touches every 0.5-line market priced by `shPOver`; blast radius unmeasured.
+
+## ⚠️ ANY NEW DRAW INSIDE THE SIM USES A SECOND GENERATOR — NEVER THE PRIMARY STREAM
+`rng = shMulberry(seed)` (L1829) is deterministic; every simulated outcome is a POSITION in it, so
+one added `rng()` call shifts every subsequent draw and rebaselines the whole sim plus both parity
+baselines. Draw new features from a **second, independently seeded generator**.
+Pinned by `tests/sim-rng-stream.test.ts`: **11 generators, 3,379,570 primary draws** on the armed
+fixture. Verified to fire — a planted draw reported 5,114,365. The warning is also **on L1829
+itself**, edited IN PLACE (a test only fires when run; the comment is what the next editor sees).
+⚠️ **Never add or remove a line at or above L2402** — `clampActivity` site ids ARE line numbers.
+`legacy/index.html` is 4,205 lines and every structural edit this phase kept it there.
+
+## ⚠️ THE SIM COMPUTES FOUR MARKETS AND THE LOOP READS ONE
 `SIM_STAT` (L2045) maps hits/TB/HR/HRR; legs are pushed for all four (L2138); `legP` is populated
 for all four; **L2394 reads only `mkt==="batter_hits_runs_rbis"`.** On the armed fixture `legP`
 holds **96 HR + 57 hits + 30 TB + 13 HRR — 183 of 196 batter legs simulated and discarded every
