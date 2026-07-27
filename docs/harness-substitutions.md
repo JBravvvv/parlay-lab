@@ -20,6 +20,26 @@
 > This sits at the top of this file because it generalises past the harness: it is the reason
 > to distrust the moment a measurement starts confirming things.
 
+> # WRITTEN RULES HAVE NOT BEEN SUFFICIENT — stated plainly (2026-07-27)
+>
+> The vacuous-pass rule below was written on 2026-07-26. On 2026-07-27 the defect it names was
+> written again — **by the same author, one turn later, in the test for the very finding the
+> rule came from** (`tests/self-consistency.test.ts` v1: 99 fixture players, zero carrying both
+> rows, green). Knowing the rule did not prevent the failure the rule names.
+>
+> The track record across this whole phase says the same thing. What has actually stopped a
+> defect class from recurring, every time, is one of two things:
+>
+> - **an encoded invariant** — a test that FAILS: the timing markers, the factor registry
+>   guard, the pinned M8 assertion, the `mentions > 0` counters;
+> - **a measured check** — a number that must be produced and compared: the paired shortfall,
+>   the ladder self-consistency bound, `tools/close_capture.py` read daily.
+>
+> A written rule speeds up *diagnosis* once something is wrong. It does not *prevent*.
+> So the standard for closing any finding in this file is: the rule text is the residue, the
+> enforcement is the closure — **a section that ends without naming its test or its measured
+> number is not closed.**
+
 > ## ⚠️ EVERY "BYTE-IDENTICAL PARITY" CLAIM IN THIS PHASE WAS ABOUT PICKS AND TICKETS ONLY
 >
 > `digest()` serialises **`categories`, `categoriesLive`, `parlays`, `parlaysMixed`,

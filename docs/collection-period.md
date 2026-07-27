@@ -3533,3 +3533,89 @@ reconstructing a filter chain instead of running it.
 > a way one defect would not be.**
 >
 > Marked in `docs/freeze-exit-bundle.md` as **M7+M9, interlocked. Never separately.**
+
+## THE UNIFORM COMPENSATOR IS REFUTED — measured, 2026-07-27
+
+The interlock is derivable, so it was tested before waiting for accrual. **If M9 is a uniform
+λ inflation calibrated to cancel M7 at the 0.5 rung, every rung above 0.5 must read ≈ +5 pp**
+(binomial n=4, p=0.24 → 66.6/24.5/4.5; Poisson at λ×1.139 → 66.5/29.9/9.8; net −0.1/+5.4/+5.3
+— arithmetic verified exactly).
+
+Measured per row on the real 2026-07-26 board (`tools/rung_signature.py`; un-blend
+`pModel = (pO − 0.65·fO)/0.35` validated by ladder self-consistency — 18 recovered hits
+ladders, worst Poisson inconsistency **0.29 pp**, so the recovery chain is exact):
+
+| quantity | value |
+|---|---|
+| Δmeasured — hits O1.5 residual minus the same player's O0.5 residual | **median +2.00 pp, mean +1.43** (n=18 pairs) |
+| Δpredicted — each row's own λ̂ and case-string expAB | **median +5.72, mean +5.75** (n=17) |
+| **paired shortfall (pred − meas)** | **+4.35 pp, SE 0.39, t = 11.1** |
+
+**The uniform-inflation characterisation of M9 is dead.** And it takes the reference
+distribution with it: within the (fixed-n binomial truth) × (uniform λ inflation) family, *no*
+inflation fits both rungs — cancelling at 0.5 forces +5.4 at 1.5, and the board reads +1.4–2.0.
+The market's own rung structure prices hits ~70% of the way from a fixed-n binomial toward a
+Poisson — which is what a real hit distribution looks like once AB counts are random and p
+varies by matchup. **M7's magnitude and M9's compensator were both computed against a
+reference the market itself refutes.**
+
+Rungs elsewhere: **TB** O2.5 carries n=1 model-priced row and O0.5 is M8 (−22.6 median on this
+board, n=127 — consistent with the −23.4 measured by the suite) — no clean rung pair until M8
+ships. **HR** has no model-priced rung above 0.5 at all (ALT ladder rungs carry no `pO`). The
+rung-signature instrument lives entirely on hits today.
+
+| | |
+|---|---|
+| **established** | the compensation is NOT a uniform λ scale; the net model-vs-market rung structure on hits is **+1.4–2.0 pp at O1.5**, t ≈ 3.6 — small, real, and opposite in sign to HRR's ladder |
+| **still open** | whether the residual tail gap is the model's or the market's — the market is the reference here, and only graded outcomes remove that assumption |
+| **caveat** | the within-player pairing kills player-level offsets, not rung-level market shading; a longshot-side shade at 1.5 would bias Δmeasured down. n=18 pairs, one board — the archive series re-measures this daily |
+
+## THE RESIDUAL FIELD IS NOT A LEVEL — two gradients dwarf everything above (2026-07-27)
+
+Regressing the hits O0.5 residual (`pModel − fO`) on each row's own inputs, 2026-07-26 board.
+The slope survives a **common** market bias that the level cannot — but not a market bias
+*correlated with the regressor*, so ownership still needs grading. expAB/avg30/xwOBA come from
+the board's own case strings (input-side reads — a price-derived control would be rule-22
+circular): coverage **135 of 232** hits O0.5 rows (the uncovered 97 are outside every cats
+top-50, so the sample tilts toward higher-probability rows).
+
+| gradient | slope | predicted by the interlock's non-flatness |
+|---|---|---|
+| **expAB** (simple) | **+7.39 pp/AB, SE 1.73** — n=135 | **−0.57 pp/AB** (computed per row at fixed +13.9%) |
+| expAB (controlling avg30 + xwOBA pct, n=104) | **+6.16, SE 1.57** — survives quality controls | — |
+| **avg30** (last-30 average, same regression) | **+0.79 pp per 10 points, SE 0.09, t ≈ 9** | — |
+| xwOBA percentile (same regression) | −0.016/pct, SE 0.018 — **nothing** | — |
+
+**The measured gradient is 13× the predicted magnitude and the opposite sign.** The
+interlock's ±1.4 pp cancellation-drift concern is a rounding error next to this: across the
+observed expAB range (3.0–4.6) the expAB gradient alone spans ~12 pp of residual.
+
+Three structural readings, each pinned by a sub-measurement:
+
+1. **It is not slot alone.** Decomposing expAB = pa(spot) × (1 − 0.9·bbr): pa(spot)
+   +3.98 pp/AB (SE 2.48, weak) vs walk-discount **+3.97 pp per 0.1 (SE 0.99, 4 SE)** — the
+   engine discounts a walker's hit λ harder than the market does. Candidate mechanisms: the
+   0.9 coefficient, or errors-in-variables in the `bbr` blend (min denominator 10 AB — noise
+   in the engine's own walk read produces exactly this slope against a market using truer
+   rates). By-spot means are nearly flat (+3.5 at #1 to −3.1 at #9, nonmonotone, n 7–22).
+2. **The hot-form gradient is separate and larger per unit of spread**: +0.79 pp per 10
+   points of last-30 average means a .320-vs-.220 pair differ by ~8 pp of residual. The skill
+   read (xwOBA pct) carries nothing — the model diverges from the market on *recency*, not
+   quality. The mechanism candidate is `shShrink(bn.r, bn.n, 60, prior)`: k=60 shrinks
+   last-30 form less than the market does.
+3. **The sim does not show it.** HRR O0.5 splits by pricing path: sim-priced slope **+0.73
+   (SE 2.54, n=22 — flat)**; closed-form n=8 (+18.1, SE 10.8 — noise-level but same sign as
+   hits). The sim simulates PA volume lineup-slot by lineup-slot and never consumes expAB —
+   and it agrees with the market along expAB while the closed form disagrees. Two independent
+   volume models (sim, market) against one: the defect locus is **the closed form's
+   λ = rate × expAB mapping**, not an input upstream of both paths.
+
+**Status: PROVISIONAL — one board, cats-selected sample.** Pre-registered for two checks:
+(a) the archive series re-runs `tools/rung_signature.py` daily — stability by ~08-05;
+(b) graded outcomes bucket hit rate by expAB tercile (spread ≈ 6.3 pp predicted between
+extreme terciles at 135 expAB-covered rows/day) — **3σ by ~08-20, decisive well before exit.**
+That grading test is the non-circular reference the M9 hunt was waiting for, and it
+adjudicates the avg30 gradient with the same rows.
+
+Indexed as **M10** (closed-form expAB over-steepness) and **M11** (hot-form under-shrinkage)
+in `CLAUDE.md` — both PROVISIONAL until (a) or (b) lands.

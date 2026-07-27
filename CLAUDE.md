@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | **`ab73291` committed, NOT pushed** — everything before it is pushed. **494 passing (55 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`f33583e`** (2026-07-27). **494 passing (55 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -137,7 +137,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | # | when (UTC) | target | status |
 |---|---|---|---|
 | 1–4 | `0 22 * * 1-5` · `0 18 * * 6` · `0 17 * * 0` · `30 22 * * 0` | `/api/generate` | **created** |
-| 5–6 | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** | `/api/propsnap` | **being created** — these REPLACE the `0 16` I first gave, which measured **14.9% vs 52.9%**. ⚠️ `/api/propsnap` is **not deployed yet** — it ships with `ab73291` |
+| 5–6 | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** | `/api/propsnap` | **being created** — these REPLACE the `0 16` I first gave, which measured **14.9% vs 52.9%**. `/api/propsnap` deployed with the 2026-07-27 push of `ab73291` |
 
 **Free tier is 100/day and `/api/clv` uses 96.** Sunday = 2 generate + 2 propsnap = **exactly
 100**. A third propsnap entry does not fit.
@@ -160,6 +160,8 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
+| **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
+| **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
 | **2026-08-06** | `pitcher_outs` first readable in Phase 2 (~3 rows/day) |
 | **2026-08-09** | first HR-overround reading |
 | **2026-08-14 / 15** | **20-board archive series.** Clamp fixture-representativeness, range detector, ten-factor share table, crossover doctrine review |
@@ -177,7 +179,9 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **M4** | sim routing, **TB and HR only** | conditional, fixture-thin |
 | ~~M5~~ | sim routing for hits | **refuted** — sim mean-abs 7.1 vs closed form 5.6 |
 | **M6** | K's → sim, a sixth PA outcome | contained IF the second RNG stream is used |
-| **M7+M9** | Poisson-where-binomial (**+4.8 pp**) exactly cancelled by a **+13.9%** λ inflation | ⚠️ **INTERLOCKED — never ship separately** |
+| **M7+M9** | Poisson-where-binomial + its compensator | ⚠️ **INTERLOCKED — never ship separately.** M9-as-uniform-λ **REFUTED 2026-07-27** (predicted +5.7 at hits O1.5, measured +1.4–2.0, shortfall t=11.1); the fixed-n binomial reference fails with it. Real rung structure **+1.4–2.0 pp**. Needs re-derivation; demoted below M10 |
+| **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board.** Grading by expAB tercile: 3σ ~08-20 |
+| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill; candidate `shShrink` k=60 | **PROVISIONAL — one board.** Same graded rows adjudicate |
 | **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
 
 ## Deferred, written up, NOT shipped
@@ -189,6 +193,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | file | holds |
 |---|---|
 | `tools/self_consistency.py` | **the independent instrument.** Logical identities on any board or the whole archive — a violation is a PROOF |
+| `tools/rung_signature.py` | **the rung/gradient instrument.** Un-blends any archived board (`pModel = (pO−0.65·fO)/0.35`, validated to 0.29 pp), recovers each row's λ̂, parses expAB/avg30/xwOBA from case strings, and reports the M7+M9 rung test + the M10/M11 gradients. Re-run on every archived board |
 | `docs/freeze-exit-bundle.md` | **the 09-22 deliverable, in draft.** 6 model + 4 allocation amendments, each with measured effect, axis, dependencies; plus closed-with-magnitude |
 | `docs/collection-period.md` | the frozen parameter table, the two exits, `mktN`, the sim/closed-form split, factor consumer table |
 | `docs/harness-substitutions.md` | **the methodology rules.** Negative assertions, whole-symbol matching, guard-testing, detector blind spots, impossible branches |
@@ -558,6 +563,11 @@ and only a `mentions > 0` counter found that.
 M8 identity across fixture players and passed green on **99 players, ZERO carrying both rows**.
 Knowing the rule did not prevent writing the defect. **Assert on a PURE FUNCTION when one
 exists** — `shTbOver` needs no board, no overlap and no slate.
+**Stated plainly (2026-07-27, Josh's call): written rules have not been sufficient in this
+project. What has stopped a defect class recurring, every time, is an encoded invariant (a test
+that fails) or a measured check (a number that must be produced).** The rules 1–22 below are for
+diagnosis speed; a finding is only CLOSED when it names its test or its measured number. Full
+statement at the top of `docs/harness-substitutions.md`.
 
 ## Three build-enforced guardrails — the build refuses unanswered questions
 `tests/workflow-timing.test.ts` (every scheduled workflow classified SENSITIVE/INSENSITIVE with
@@ -662,6 +672,15 @@ looking like a refutation. **M9 cannot be localised until graded hits accrue** �
 probability, not a mean. **M7 and M9 ship together or not at all**: fixing either alone moves 617
 rows ~5 pp the wrong way, and the cancellation is only known over λ≈0.96, expAB 3.5–4.5 (the error
 runs +5.7 at n=3.5, +4.3 at n=4.5 — not flat).
+**PARTIALLY LOCALISED 2026-07-27 (`tools/rung_signature.py`): M9 is NOT a uniform λ inflation.**
+Uniform +13.9% predicts +5.7 pp at hits O1.5; within-player Δmeasured is **+1.4–2.0**; paired
+shortfall **+4.35 pp, t=11.1, n=17**. No uniform inflation fits both rungs over a fixed-n binomial
+truth — so the *reference distribution* fails too: the market prices hits ~70% of the way from
+fixed-n binomial to Poisson (random AB counts + p heterogeneity do exactly that). Both M7's −4.9
+and M9's +13.9% were computed against a reference the market refutes. Re-derivation must treat
+the truth distribution as an output of grading, not an assumption. The 617-row blast radius of
+shipping either half alone is unchanged. Full write-up in `docs/collection-period.md`; the
+residual's real structure is M10/M11 (the expAB and hot-form gradients), not a level.
 ⚠️ **The side-bias check nearly went wrong the same way:** the first cut used `categories` and read
 118/118 OVER at 0.5 lines — meaningless, because `categories` ranks by win probability and the
 over IS the likelier side at 0.5. **Fourth time that population has produced a confident wrong
