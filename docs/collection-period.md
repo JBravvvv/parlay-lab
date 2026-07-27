@@ -2835,3 +2835,43 @@ day are not distinguishable after the fact — merging them would silently doubl
 The correct fix is to write the day only when the boxscore loop had no failures, which needs a
 failure counter the loop does not currently keep. Scoped, low priority: it needs a same-day
 re-run *and* a fetch failure to bite, and the job runs 2–3× a day.
+
+# THE TWO UNAUDITED FACTORS — what they multiply, and where they sit (2026-07-27)
+
+| factor | live share | what it multiplies | ever examined? |
+|---|---|---|---|
+| **`shParkF`** | **92%** (11 of 12 venues) | **the hit rate AND the HR rate**: L2060 `parkH=pk?pk.h:(coors?1.07:1)`, `parkHR=pk?pk.hr:(coors?1.08:1)`, then `hF=contact*pq*parkH*pl.h*(bpF‖1)` and `hrF=power*pq*wind.f*parkHR*pl.hr*(bpF‖1)`. Feeds **hits, total bases, HR — and H+R+RBI through both** | **NO** — no audit, no drift line, no doc entry until today |
+| **`shPitIsoF`** | **100%** (23 of 23 starters) | **REPLACES `hrF` outright**: L2086 `if(isoF!=null)hrF=isoF*wind.f*parkHR*pl.hr` | **NO** |
+| `shPriorKf` | **87%** (20 of 23 starters) | the K's rate, `shClamp(pr.k_pct/lg.k_pct, 0.75, 1.35)` | **NO** |
+
+### `shPitIsoF` at 100% live means a branch is dead
+
+When it resolves, `hrF` is **overwritten**, so the `power*pq*wind.f*parkHR*pl.hr` expression
+computed one line earlier is discarded. At 23 of 23 starters that is every row with a starter.
+The `power` and `pq` terms — starter quality and pitcher percentile — **do not reach the HR rate
+at all** on those rows. Whether that is intended is unexamined; it is recorded here because a
+100% live share on a REPLACING factor is a different fact from 100% on a multiplying one.
+
+### ⚠️ `shParkF` sits directly under an open finding
+
+`docs/hrr-recalibration.md` L482–485 records that the closed form applies "a Coors bump (×1.08)
+and the shared park×handedness factor", with **no park-scoring term for runs/RBI** — a residual
+gap accepted for the collection period. That accepted gap was assessed **without anyone knowing
+the park factor was 92% live and unmonitored.** It does not invalidate the acceptance; it means
+the acceptance was made against an unmeasured input, and the H+R+RBI ladder finding — already
+one-instrument — has a second unexamined term inside it.
+
+**No change proposed under the freeze.** Recorded so the freeze-exit review of the HRR residual
+has the park factor's live share in front of it.
+
+### The corrected scan must run against the ARCHIVE, not the fixture
+
+`shParkF` and `shPitIsoF` defeated a source scan **by spelling** — their identity is supplied at
+the call site, so no scan of the function body could have found them. The only check that catches
+that class is **measured live share on real slates**, which is what `tools/factor_activity.py`
+now does for all ten.
+
+**So the ten-factor share table joins the 2026-08-15 archive-series reading**, beside the clamp
+comparison. A factor at 100% or 0% on the fixture and materially different across twenty real
+boards is the same finding as a clamp whose pinned fraction moves — and the fixture cannot
+answer it, for exactly the reason the clamp comparison could not.

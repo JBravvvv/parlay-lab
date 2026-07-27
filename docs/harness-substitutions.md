@@ -37,6 +37,33 @@
 > `tests/clamp-instrumentation.test.ts` hashes the whole board object. **Read every parity
 > claim in this repo dated before 2026-07-27 with that scope attached.**
 
+> # A NEGATIVE ASSERTION THAT MATCHES NOTHING PASSES SILENTLY
+>
+> **Positive assertions are self-correcting. Negative ones are not.** That asymmetry is the most
+> transferable thing in this phase, and it sits above every other rule in this file because it
+> explains a whole class rather than an instance.
+>
+> * `expect(x).toContain("f(a")` — if the text moved, **the test fails and tells you**.
+> * `expect(x).not.toContain("f(a")` — if the text moved, **the test passes and tells you nothing**.
+> * `for (const y of found) expect(...)` — if `found` is empty, **the loop asserts nothing at all**.
+>
+> A negative assertion only has force when the thing it denies is *findable*. So every one needs
+> a companion that proves the scan is live: a non-empty count, or a positive assertion that the
+> guarded symbol still exists.
+>
+> **Measured 2026-07-27: seven whitespace-defeatable negatives across four guards, three
+> vacuously-passing loops, and one guard — `no arming path touches summary.full` — that had
+> ITERATED ZERO TIMES SINCE THE DAY IT WAS WRITTEN.** Not weakened over time: it never worked.
+> Its file list did not include the only file containing a literal `.full`. It was found the
+> moment a `mentions > 0` counter was added, and not one minute before.
+>
+> **Three practical forms:**
+> 1. every source-scanning negative is `not.toMatch(/\bname\s*\(/)`, never `not.toContain("name(")`;
+> 2. every loop-based assertion carries a non-empty guard **in place**, not in a sibling test;
+> 3. strip comments by **parsing** (`/\/\*[\s\S]*?\*\//g`), never by sniffing line prefixes — a
+>    wrapped line inside a block comment has no leading `*`, which is exactly how the `.full`
+>    guard produced its first false positive once it started running at all.
+
 ## Why this file exists
 
 339 tests passed, the parity digest was byte-identical, and a **24% hole in every
@@ -1161,3 +1188,23 @@ real factors for the entire life of the drift check**.
 **Positive assertions are self-correcting — a missed substring fails loudly. Negative ones are
 not: a missed substring passes silently.** That asymmetry is why every `not.toContain` on source
 was worth converting and every `toContain` was left alone.
+
+
+## THE FOURTH INSTANCE OF A RULE CREATING THE BLIND SPOT IT WAS WRITTEN TO CLOSE
+
+| # | the rule | the blind spot it made |
+|---|---|---|
+| 1 | `categories` is the ranked board population | every statistic computed on it inherited a probability-rank selection |
+| 2 | "the parity digest is byte-identical" | `gameInfo`, `propBoard`, `simMarkets`, `luCoverage`, `overview` — never covered, never noticed |
+| 3 | `CAL_START` goes inert ~2026-09-08 | correct, and it stopped one inference short of the exit reading losing fifteen dates |
+| 4 | **an identity-fallback factor `return`s 1** | **`shParkF` and `shPitIsoF` return `null` and let the CALL SITE supply identity — hidden from the drift check for its entire life** |
+
+**None of these rules was wrong. Each was NARROW.** And a narrow detector is indistinguishable
+from an absent one in its output: `factor_activity.py` reported seven healthy factors for weeks,
+which is exactly what it would have printed if `shParkF` did not exist.
+
+**So the question to ask of any detector is not "is this correct?" but "what shape of the thing
+would this miss?"** — and that question has to be asked against the *contract* the detector
+claims to enforce, not against the examples that prompted it. `return 1` was the example.
+"Its contribution disappears when the input is missing" is the contract, and it admits at least
+three spellings.

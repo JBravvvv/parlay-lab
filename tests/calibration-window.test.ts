@@ -38,16 +38,22 @@ const SUMMARY_DAYS = Number(/const SUMMARY_DAYS = (\d+);/.exec(ROUTE)?.[1]);
 describe("the calibration window declares itself, and the exit reading is not the sliding one", () => {
   it("nothing is pruned: no DEL, no SREM, no TTL on the prediction store", () => {
     const files = ["app/api/calibrate/route.ts", "app/api/predictions/route.ts", "app/api/generate/route.ts"];
+    /* NON-EMPTY GUARD (2026-07-27): this only inspects lines that CONTAIN a DEL/SREM/EXPIRE, so
+       zero such lines would pass having checked nothing. The board keys legitimately expire, so
+       a positive count is the expected state and its absence means the scan broke. */
+    let seen = 0;
     for (const f of files) {
       const src = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
       for (const line of src.split("\n")) {
         if (!/"DEL"|"SREM"|"EXPIRE"/.test(line)) continue;
+        seen++;
         // the only expiring keys are the BOARD ones (3-day TTL, hence the board archive)
         expect(/BOARD_|runsKey/.test(line), `${f} expires or deletes a non-board key: ${line.trim()}`).toBe(true);
       }
       // and the day blob is written with a bare SET
       expect(src.includes('redisSetJson(dayKey(date)') || !src.includes("dayKey(date)")).toBe(true);
     }
+    expect(seen, "no DEL/SREM/EXPIRE line found at all — the scan is matching nothing").toBeGreaterThan(0);
   });
 
   it("the collection period is LONGER than the training window — so it really does cap", () => {

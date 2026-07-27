@@ -162,14 +162,35 @@ describe("arming call sites (structural, not value-based)", () => {
      because the sample grew, with no parameter changed and nothing for a drift check to
      see. Cheapest possible guard, so it exists. */
   it("no arming path touches summary.full", () => {
-    for (const f of [GEN, CAL, "src/engine2/calibration.ts", "src/lib/engine-client.ts", "src/lib/gate-rebuild.ts"]) {
-      for (const line of src(f).split("\n")) {
+    /* NON-EMPTY GUARD (2026-07-27). The loop below only asserts on lines that MENTION `.full`,
+       so if the field were ever renamed it would iterate nothing and pass having checked
+       nothing — a negative assertion failing silent, the class audited in
+       docs/harness-substitutions.md. Establish that the thing being guarded still exists. */
+    expect(
+      fs.readFileSync(path.join(__dirname, "..", "src/engine2/calibration.ts"), "utf8"),
+      "summary.full is gone from the type — this guard is now protecting nothing",
+    ).toMatch(/\bfull\?:\s*Omit<CalibrationSummary/);
+    let mentions = 0;
+    /* `app/api/calibrate/route.ts` IS IN THE LIST, and that is the fix rather than an oversight.
+       Without it no scanned file contains a literal `.full` at all, so this loop iterated ZERO
+       times and asserted NOTHING from the day it was written — found 2026-07-27 by adding the
+       counter below. Including the writer proves the scan is live AND checks the one file that
+       legitimately touches the field for stray reads. */
+    for (const f of [GEN, CAL, "app/api/calibrate/route.ts", "src/engine2/calibration.ts",
+                     "src/lib/engine-client.ts", "src/lib/gate-rebuild.ts"]) {
+      /* STRIP COMMENTS STRUCTURALLY, don't sniff line prefixes. The first version tested
+         `/^\s*(\*|\/\/|\/\*)/` per line, which misses a WRAPPED line inside a block comment —
+         it has no leading `*`. Same lesson as the rest of this audit: parse the structure,
+         do not pattern-match its usual typography. */
+      const code = src(f).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      for (const line of code.split("\n")) {
         if (!/\.full\b/.test(line)) continue;
-        const isComment = /^\s*(\*|\/\/|\/\*)/.test(line);
-        const isTheWriter = /summary\.full = full|full\?: Omit</.test(line);
-        expect(isComment || isTheWriter, `${f} READS summary.full: ${line.trim()}`).toBe(true);
+        mentions++;
+        const isTheWriter = /summary\.full = full/.test(line);
+        expect(isTheWriter, `${f} READS summary.full: ${line.trim()}`).toBe(true);
       }
     }
+    expect(mentions, "no line mentions `.full` at all — this scan checked nothing").toBeGreaterThan(0);
   });
 
   it("only /api/calibrate builds the full window, and it never feeds the adjuster", () => {

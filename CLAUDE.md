@@ -467,6 +467,16 @@ wrongly reclassified it A STRUCTURAL off the morning file).
 Write-path audit: `data/ump_k.json` is an accumulator with two idempotence guards (**safe**);
 `data/pen_quality.json` merges per day but **replaces same-day** (bounded, recorded, unfixed).
 
+## ⚠️ A NEGATIVE ASSERTION THAT MATCHES NOTHING PASSES SILENTLY
+Positive assertions self-correct; negative ones fail silent. Every source-scanning negative is
+`not.toMatch(/\bname\s*\(/)`, never `not.toContain("name(")`. **Every loop-based assertion
+carries a non-empty guard IN PLACE**, not in a sibling test. **Strip comments by parsing**
+(`/\/\*[\s\S]*?\*\//g`), never by sniffing line prefixes — a wrapped line in a block comment has
+no leading `*`. Measured 2026-07-27: 7 whitespace-defeatable negatives across 4 guards, 3
+vacuous loops, and `no arming path touches summary.full` had **iterated zero times since it was
+written** — its file list omitted the only file containing a literal `.full`. It never worked,
+and only a `mentions > 0` counter found that.
+
 ## Three build-enforced guardrails — the build refuses unanswered questions
 `tests/workflow-timing.test.ts` (every scheduled workflow classified SENSITIVE/INSENSITIVE with
 a named, existing guard) · `tests/factor-classification.test.ts` (every identity-fallback factor
@@ -499,9 +509,14 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 29% of days**. The 300-min wait cap never binds; every loss is a game already started at fire time.
 **Phase 2 buckets every row by `kind` (close/pre) and never pools across it.**
 
-**TEN identity-fallback factors, not seven** — `shPriorKf` (returns 1, **87% live**), plus
-`shParkF` and `shPitIsoF`, which return **null** and let the CALL SITE supply identity
-(`pk?pk.h:(coors?1.07:1)`). A scan for `return 1` finds one spelling; match the CONTRACT.
+**TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
+`shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
+supply identity, so no source scan could ever find them — only measured live share does. A scan
+for `return 1` finds one spelling; match the CONTRACT. **`shParkF` multiplies the hit AND HR
+rates** and therefore sits under the open H+R+RBI park-conditioning residual; **`shPitIsoF`
+REPLACES `hrF` outright**, so at 100% live the `power*pq*...` branch is dead on every row with a
+starter. Neither has ever been audited. The ten-factor share table joins the 2026-08-15 archive
+reading — the fixture cannot answer it.
 
 Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not
 one:** low-frequency schedules (2/day — `context`, `props-history`) fire **every tick** but

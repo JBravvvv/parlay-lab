@@ -73,6 +73,8 @@ describe("every scheduled workflow declares whether its value depends on WHEN it
   });
 
   it("EVERY scheduled workflow carries a TIMING classification", () => {
+    // guarded IN PLACE, not by a sibling test: an empty `rows` would pass this loop silently
+    expect(rows.filter((r) => r.scheduled).length, "no scheduled workflow found — scan broken").toBeGreaterThanOrEqual(6);
     for (const r of rows) {
       if (!r.scheduled) continue;
       expect(

@@ -730,3 +730,45 @@ Expected close coverage from a single 20:30Z fire, against the 52-day first-pitc
 
 **With the Sat/Sun entry, coverage goes 64% → ~90%. With Wed/Thu as well, ~99%.** Both are one
 cron-job.org entry each and no new secret.
+
+## THE EVIDENCE BASE IS NIGHT GAMES UNTIL THE `/api/propsnap` ENTRY LANDS
+
+Phase 2 is the entire evidence base for the parameter exit. **64% of games reach a true close**
+from the single 20:30Z fire — so more than a third of the only channel with anything in it
+carries an attenuated reading, and **it is not spread evenly**.
+
+| | |
+|---|---|
+| what is missing | the **matinee block** on Wed/Thu/Sat and nearly all of Sunday |
+| what that population is | **day games** — different lineups, different bullpen state, different liquidity |
+| why it matters | 36% attenuation spread evenly is a **precision** problem. Concentrated on day games it is a **selection** |
+
+> **This is the THIRD time start-time selection has shaped a measurement in this project.**
+> First: Series B's second reading kept only games that had not started (Sunday 3/45 = 6.7%).
+> Second: the `luCoverage` denominators, where "started" games silently changed what a ratio was
+> over. Third: this. The pattern is now reliable enough to check for by default — **whenever a
+> capture happens at a clock time and the population has start times, ask which games were gone
+> before the capture ran.**
+
+### What the entry recovers, and when
+
+| coverage | pooled true close |
+|---|---|
+| today — one 20:30Z fire | **64%** |
+| **+ `0 16 * * 0,6`** (Sat/Sun) | **~90%** |
+| **+ `0 15 * * 3,4`** (Wed/Thu matinees) | **~99%** |
+
+**Phase 2's usable window starts when the entry lands, not tonight.** Rows captured before then
+are real and kept — but they are a night-game sample, stamped as such, and the slope fit over
+them is a *different population* from the one that follows. Same rule as Series A vs B: **the
+vintages are labelled and never pooled.**
+
+### Every Phase 2 output carries two splits, not one
+
+1. **by close quality** — `close` / `pre` (already stamped per snapshot by `kind`);
+2. **by day game vs night game** — first pitch before/after 21:00 UTC.
+
+**The second is the one that matters.** The first measures attenuation, which shrinks a slope
+toward zero and is a known, statable bias. The second measures *which games are in the sample at
+all*, and no amount of care with the first fixes it. **A pooled slope is not reported while the
+day-game bucket is under-covered** — the memo's existing rung rule, applied to a second axis.
