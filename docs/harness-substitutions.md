@@ -357,3 +357,46 @@ things" were *the same tree with and without one file*, not two parallel impleme
 **Practical rule:** when a build fails for a reason the type checker cannot see, bisect by
 reverting files rather than reading them. And never treat a green `tsc` as evidence about a
 build failure.
+
+---
+
+## FOURTH METHODOLOGY RULE: a directional claim needs a population that could have gone the other way
+
+Beside *"diff two things that should be identical"*, *"anything that can return an identity
+value must be observable"*, and *"a filter chain must be RUN, not reconstructed"*.
+
+I reported that every prop market was systematically model-high — 100% of K's, H+R+RBI, TB
+and hits rows above the market. **It was an artifact of the population.** `categories` is,
+by the engine's own comment, *"top 50 per market ranked by win probability, **ONE side per
+line (the side the model favors)**"*. Selecting the favoured side manufactures the sign. The
+measurement could not have produced any other answer.
+
+What makes this its own rule rather than an instance of the reconstruction one: **the
+magnitudes on that same population were fine.** `|pModel − implied|` is *side-invariant* —
+choosing the over or the under leaves it unchanged — so the 23.1 pp figure survived
+untouched while the sign next to it, from the same rows in the same table, was meaningless.
+A population can be valid for one statistic and invalid for the neighbouring one.
+
+**Rule: before reporting a direction, a rate, or a share, name the mechanism by which the
+population could have produced the opposite answer.** If none exists, the number measures
+the selection, not the subject. Corollary: when a table mixes signed and unsigned statistics,
+check them separately — validity does not propagate across columns.
+
+The re-measurement (`propBoard`, both sides oriented to the over, uncapped) reversed the
+headline: the board is 48% high overall, and `pitcher_outs` is the *only* one-sided market —
+0 of 38 — which is what made it a finding instead of one entry in a uniform column. **The
+artifact was hiding the real result**, not merely inflating it. See
+`docs/pitcher-outs-audit.md`.
+
+### A fifth example of the class: a finding filed against the wrong subject
+
+`docs/hrr-recalibration.md` recorded, while auditing H+R+RBI, that *"Expected innings: not
+explicitly in the closed form — there is no hook-timing term."* **Pitcher outs IS expected
+innings.** The audit found the defect and filed it under the market where it was a secondary
+effect, never checking the market it most directly governs — where it is the primary one,
+and where it is now measured at −2.6 outs per start on deep-start pitchers.
+
+**Rule: when an audit records a structural hole, enumerate every market or code path that
+hole most directly governs, and check them in the same pass.** A hole recorded against one
+subject reads, on later re-reading, as a fact *about that subject* — which is exactly how it
+stays unchecked everywhere else.

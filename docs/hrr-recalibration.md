@@ -41,6 +41,18 @@ the per-game historical rate implicitly averages over typical starter/bullpen sp
 The sim path models the hook explicitly (outs leash, pitch-efficiency λ adjustment,
 bullpen chains). Residual gap accepted for the closed form; the sim is the primary path.
 
+> **AMENDED 2026-07-26 — this paragraph was filed against the wrong market.**
+> "Expected innings" **is** the `pitcher_outs` market, and for `pitcher_outs` the last
+> sentence is false in both halves: **the sim never prices it** (the pregame sim marginal
+> replaces `pO` for `batter_hits_runs_rbis` only — 0 of 38 outs rows carry a `sim` tag), so
+> the closed form is not the secondary path there, it is the **only** path; and the residual
+> gap is not small — it is measured at **−2.6 outs per start** on pitchers the market expects
+> to go 6+ IP, and **−23.1 pp median, 0 of 38 rows above market**, on the 2026-07-26 board.
+> The engine contains a manager-hook model that never reaches the one market that is entirely
+> about when the manager pulls the starter. See `docs/pitcher-outs-audit.md`, which also
+> identifies a separate and larger defect (`0.140` used as the TB/AB neutral where the league
+> mean is ≈ 0.40, pinning the opposing-offense factor at its clamp floor on 100% of rows).
+
 **(c) Park factors for the run/RBI components — partially conditioned.**
 The closed form applies a Coors bump (×1.08) and the shared park×handedness factor
 enters through the hit channel, but the **run/RBI components** have no dedicated

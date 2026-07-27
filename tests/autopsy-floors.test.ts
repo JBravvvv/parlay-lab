@@ -83,7 +83,12 @@ describe("settlement floor — czEv ≥ 0 required to lock, disclosed when it bi
     const good = mkTicket({ name: "Clean", bsEv: 5, czEv: 2 });
     const a = alloc([bad, good]);
     expect(a.picks.map((p) => p.w.pl.name)).toEqual(["Clean"]);
-    expect(a.blocked).toEqual([{ name: "TaxTrap", bsEv: 6, czEv: -1.2, reason: "nv_tax" }]);
+    // `type` joined the blocked entry in dfe5352 (the BlockedPanel groups by reason and
+    // labels each ticket). Kept as an EXACT toEqual rather than objectContaining: this
+    // assertion is the only thing that noticed the shape change, and it should keep noticing.
+    expect(a.blocked).toEqual([
+      { name: "TaxTrap", type: "batter_hits", bsEv: 6, czEv: -1.2, reason: "nv_tax" },
+    ]);
   });
   it("czEv exactly 0 clears the floor (the floor is ≥ 0, not > 0)", () => {
     const a = alloc([mkTicket({ name: "Breakeven", bsEv: 5, czEv: 0 })]);

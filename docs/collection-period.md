@@ -2237,32 +2237,78 @@ from the stored `pModel` field on the real 2026-07-26 board, it is larger:**
 | **`pitcher_outs`** | 38 | 18.1 | **23.5** | 28.9 | 37.2 |
 | **ALL BOARD ROWS** | **303** | 3.6 | **7.6** | 14.8 | 22.8 |
 
-### Selected legs — the 46 on tickets that cleared +2% EV
+### Selected legs — the tickets that cleared +2% EV
 
-| market | n | p25 | **median** | p75 | max |
+**Denominator correction (2026-07-26, same day):** the first pass reported **46**, which is
+leg *instances* (10 three-leg + 8 two-leg tickets). A leg on two tickets was counted twice,
+which weights toward legs that combine well. **37 legs are distinct** by `gkey|lkey`. Both
+are reported; the distinct set is the one a selection effect must be measured on.
+
+| market | n distinct | **median** | board median | ratio | 95% CI (game-clustered) |
 |---|---|---|---|---|---|
-| `batter_total_bases` | 6 | 7.6 | 12.7 | 14.3 | 18.9 |
-| `batter_hits_runs_rbis` | 5 | 12.6 | 15.0 | 17.6 | 32.6 |
-| `pitcher_strikeouts` | 12 | 9.6 | 15.8 | 20.3 | 23.4 |
-| **`pitcher_outs`** | **23** | 15.7 | 19.2 | 32.7 | 40.6 |
-| **ALL SELECTED** | **46** | 12.7 | **17.3** | 24.2 | 40.6 |
+| `batter_total_bases` | 6 | 11.9 | 6.5 | **1.81** | [0.82, 2.70] |
+| `batter_hits_runs_rbis` | 5 | 15.0 | 11.0 | **1.36** | [0.36, 2.69] |
+| `pitcher_strikeouts` | 9 | 12.6 | 12.6 | **1.00** | [0.68, 1.52] |
+| **`pitcher_outs`** | **17** | 19.2 | 23.1 | **0.83** | [0.71, 1.22] |
+| hits · HR · ml · rl | 0 | — | — | — | — |
+| **ALL SELECTED** | **37** | **16.2** | **7.6** | **2.13** | [1.75, 2.78] |
+| *(instances)* | *46* | *16.8* | *7.6* | *2.20* | *the first-pass 2.28 figure* |
 
-> ### WINNER'S CURSE MAGNITUDE = **2.28×**
-> Selected legs sit **17.3 pp** from the market. The board median is **7.6 pp**.
+### THE POOLED RATIO IS ALMOST ENTIRELY COMPOSITION
 
-**The gate is a noise amplifier, and it is measurable today.** Phase 3's uncertainty band
-was going to guess this ratio; it is 2.28 on this board.
+**No market reaches 2.1, and none has a CI excluding 1.** The pooled figure is what happens
+when a gate draws 46% of its legs from the market with the highest baseline while selecting
+*less* extreme rows inside it. Decomposed multiplicatively (game-clustered CIs, 4000
+resamples, `tools/` scratch script reproduced below):
 
-### And one market dominates the selection
+| term | value | 95% CI | what it is |
+|---|---|---|---|
+| **POOLED** | **2.13** | [1.75, 2.77] | 16.2 / 7.6 |
+| AVAILABILITY | 1.59 | [1.36, 1.99] | 12.1 / 7.6 — which markets the gate can reach at all |
+| MIX | 1.34 | [1.10, 1.61] | 16.2 / 12.1 — weighting *inside* those markets |
+| **WITHIN** | **1.00** | **[0.90, 1.17]** | 16.2 / 16.2 — **the actual winner's curse** |
 
-**`pitcher_outs` is 23 of the 46 selected legs — exactly half** — while being only 38 of
-303 board rows. Its board-wide median gap of **23.5 pp is 3× the board median and 8× `rl`'s**.
-The model is systematically far from the market on pitcher outs, and the +2% gate
-concentrates there precisely because of that distance.
+`AVAILABILITY × MIX × WITHIN = 2.13` exactly, by construction.
+
+Note the decomposition is **three** terms, not two. "Reweight the selected legs back to the
+board mix" is **undefined**: four of eight markets contribute zero selected legs (HR dies at
+`coreNoHR`; hits/ml/rl never clear +2%), and you cannot standardise to a stratum with no
+sampled units. A first attempt did exactly that and silently dropped those four markets,
+reporting a "within" of 1.97 that was really "mix among the four survivors". Splitting the
+market-set restriction into its own term (AVAILABILITY) is what makes the rest well-defined.
+
+> ### THE BAND MUST BE PER-MARKET — Phase 3 note
+> **A global 1/2.13 shrink is wrong in both directions.** It over-shrinks every market
+> (no within-market ratio exceeds 1.81) and it **inverts on `pitcher_outs`, whose ratio is
+> 0.83** — the gate selects *less* extreme outs rows than the outs board average, so a
+> global shrink would penalise the one market where selection is protective.
+>
+> This replaces the original spec, which derived the band from `shBand(nEff)` — a
+> **sample-size proxy**, not a selection measurement. The proxy cannot see market mix at all,
+> so it would have mis-set the band by the full 1.59 × 1.34 composition factor.
+>
+> Carry-forward: per-market ratio with its CI, re-measured across ≥ 20 boards. On one board
+> every per-market CI contains 1, so **no per-market band is estimable yet** — the honest
+> Phase 3 default until then is **no shrink**, not a guessed one.
+
+### The market-mix lift, stated directly
+
+| market | board share | selected share | lift |
+|---|---|---|---|
+| **`pitcher_outs`** | 12.5% | **45.9%** | **3.66×** |
+| `pitcher_strikeouts` | 11.6% | 24.3% | 2.11× |
+| `batter_total_bases` | 16.5% | 16.2% | 0.98× |
+| `batter_hits_runs_rbis` | 16.5% | 13.5% | 0.82× |
+| hits · HR · ml · rl | 43.4% | 0% | 0 |
+
+**`pitcher_outs` is 17 of the 37 selected legs (46%)** while being 38 of 303 board rows
+(12.5%). Its board-wide median gap of **23.1 pp is 3× the board median and 8× `rl`'s**. That
+level is a **model property, not selection** — see `docs/pitcher-outs-audit.md`, which finds
+a specific defect behind it.
 
 ⚠️ **`pitcher_outs` is also the market that reopens LAST** (5 graded legs/day → `mktN` ≥ 100
-around **2026-09-13**, essentially freeze exit). So the market driving half the selected
-legs will be gated for the entire collection period.
+around **2026-09-13**, essentially freeze exit). So the market driving nearly half the
+selected legs will be gated for the entire collection period.
 
 ## THE RESTRICTED-MARKET WINDOW (~2026-08-02 → ~2026-09-13) — a named window
 
@@ -2292,3 +2338,31 @@ systematically excludes the two markets where the model sits furthest from the m
 Read August numbers with that stated, or split them at the reopening dates.
 
 Not a change request: this follows from a frozen parameter behaving correctly.
+
+### The schedule cuts BOTH ways — state both, always
+
+`pitcher_outs` reopens ~09-13, i.e. **at freeze exit**. Since `docs/pitcher-outs-audit.md`
+found a confirmed defect in that market, the schedule has two opposite effects and the
+protective one must never be quoted without the other:
+
+**PROTECTIVE.** The market that would have taken **46% of the selected legs** — every one of
+them an UNDER, priced by a model measured at **−2.5 outs per start** against the same books
+it is betting into — cannot take daily money for the whole window. The consensus gate is
+blocking, by accident, exactly the exposure the audit says is defective. No money rides the
+defect during collection. **This is luck, not design**: `consMinN` was set for small-sample
+discipline and knows nothing about the outs model.
+
+**COSTLY.** Every August measurement therefore describes **an engine without its largest
+disagreement source**. Concretely, computed over August:
+- the **winner's-curse ratio** loses the market with the 3.66× mix lift and the 0.83
+  within-market ratio — the term that pulls the pooled figure in *both* directions;
+- **CLV and the movement-slope regression** (Phase 2's headline) lose 46% of the legs where
+  the model most disagrees with the open, i.e. precisely the high-`|pModel − open|` end of
+  the regression's x-axis, which is where slope is identified;
+- **Discipline / ROI** describes a card whose market composition will never recur after 09-13.
+
+So an August fit is not a smaller version of the September engine — it is a fit on a
+different engine. **Any number computed in the window must state which markets were
+reachable when it was computed**, and no August result may be extrapolated across 09-13
+without re-measuring. This is the same class as the censored west-coast window: a
+restriction that is invisible in the output unless it is written next to it.

@@ -163,6 +163,40 @@ From `line-history` branch, `data/props/`, 12 days (2026-07-12 → 07-25), 11,07
   and the p90 offshore-book artifact (fat tail = coolbet, winamax_de, betfair_ex_eu, nordicbet,
   betclic_fr, betsson — not the US books).
 
+## Model quality — two open findings (measured 2026-07-26, nothing changed)
+
+**`pitcher_outs` has a confirmed defect. `docs/pitcher-outs-audit.md` is the record;
+`tools/outs_audit.py` reproduces every figure from any persisted board.**
+1. `of = shClamp(0.140/oo, 0.86, 1.12)` (L2258) divides **0.140** into `offense()`, which
+   returns **TB/AB — slugging, league ≈ 0.40**. `0.140` occurs **once in the whole engine**;
+   the same file uses `/0.40` for the bvp adjustment and `/0.235` for K/AB. Result: the factor
+   is **pinned at the 0.86 clamp floor on 35 of 35 rows** with a lineup read — reaching the
+   1.12 cap needs `oo ≤ 0.125` TB/AB, physically impossible. It is a **flag for "lineup
+   posted" worth a flat −14%**, not a factor.
+2. **No hook-timing / earned-workload term.** A 30-day IP/G mean shrunk toward
+   `Lipg ≈ 5.60` cannot project a 6+ IP start, so the shortfall grows with the line and
+   **survives** fix 1: corrected, −0.51 outs at lines ≤15.5 vs −2.57 at ≥16.5.
+
+Measured: **λ_model − λ_market = −2.48 outs (−0.83 IP), negative in 38/38**; raw model gap
+**−23.1 pp median, 0 of 38 above market** (the only 100%-one-sided market on the board);
+35/38 board rows and **17/17 selected legs are UNDERs**. Ledger corroborates at n=5: **0 for 5**
+at a stated 53.2%, the only market whose model Brier (0.285) is materially worse than the
+consensus (0.215). `Lipg` was the prime suspect and is **exonerated** — recovered in closed
+form as 5.59/5.59/5.58 from the three rows with no lineup read. Units are correct throughout
+(the outs-vs-innings ×3 is present and right).
+
+**Exposure is zero and the protection is accidental**: `consMinN` gates `pitcher_outs` until
+~09-13. Do not change either parameter mid-freeze — the frozen table is the drift detector.
+
+**Winner's curse is composition, not selection.** Pooled selected/board ratio **2.13**
+[1.75, 2.77] decomposes exactly as **AVAILABILITY 1.59 × MIX 1.34 × WITHIN 1.00** [0.90, 1.17].
+No market's own ratio exceeds 1.81 and **none has a CI excluding 1**; `pitcher_outs` runs
+**0.83**, so a global 1/2.13 shrink would *invert* on the market supplying 46% of legs.
+**Phase 3's band must be per-market**, replacing the original `shBand(nEff)` sample-size proxy —
+and on one board no per-market band is estimable, so the honest default is **no shrink**.
+`tools/selection_effect.py`. Denominator note: **37 distinct legs**, not the 46 leg *instances*
+first reported.
+
 ## Credits (The Odds API)
 1 credit **per market per region**; `/v4/sports` and `/events` are free; statsapi is keyless.
 A generate is **114–150 credits**, saturating at 150 (`slice(0,16)` caps the prop loop).
@@ -183,7 +217,28 @@ Vercel Hobby allows 2 crons and both are used (`/api/generate` `0 16 * * *`, `/a
 to **cron-job.org** (supports custom headers; free tier 100 executions/day, CLV job already uses
 96). `/api/generate` comes out of `vercel.json` only once those entries exist.
 
+## Reading the board JSON — traps that have each cost a wrong answer
+- **`categories` is one-sided.** "Top 50 per market ranked by win probability, ONE side per
+  line (the side the model favors)." `|pModel − implied|` is **side-invariant** so magnitudes
+  are valid there; **signs, rates and shares are not**. Use `propBoard` (both sides oriented to
+  the OVER, uncapped, `alt` = Caesars milestone ladders).
+- **`propBoard.pO` is the BLENDED probability**, not the model's — `modelBy` reads `r.p`, not
+  `r.pModel`. Divide by `wBlend` (0.35 props / 0.15 ml-rl) for the raw model gap, and recover
+  the factor by joining to `categories` rather than assuming it.
+- **The join key is `gkey|lkey`**, never `lkey` alone (ML/RL lkeys are the literals
+  `ml_home`/`ml_away`/`rl_home`/`rl_away`).
+- **Ticket legs repeat.** `d.parlays + d.parlaysMixed` gives leg *instances*; dedupe by
+  `gkey|lkey` before any per-leg statistic.
+- **Row `case` strings are the model's own inputs, verbatim** ("18.7 IP over 4 starts … → ~13.3
+  outs"), so factors can be backed out arithmetically instead of re-running the engine.
+- **A gap in probability confounds the mean with the line's position.** Invert the market fair
+  through the engine's own distribution (`shPOver` = `1 − PoisCdf(⌊line⌋, λ)`) to compare means
+  in the market's own units.
+
 ## Working rhythm with Josh
 Report before pushing; stop at every phase gate; measure rather than model; state the
 denominator of every number. He catches unreconciled tables — if two of your figures disagree
-on the same cell, that is the finding, not a rounding issue.
+on the same cell, that is the finding, not a rounding issue. Four standing methodology rules
+live in `docs/harness-substitutions.md`: diff two things that should be identical · anything
+that can return an identity value must be observable · **a filter chain must be RUN, not
+reconstructed** · **a directional claim needs a population that could have gone the other way**.
