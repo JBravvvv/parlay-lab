@@ -192,6 +192,20 @@ export type CalibrationSummary = {
     droppedTo: string | null;
     capped: boolean;
   };
+  /* 2026-07-27: WHEN EACH MARKET'S CONSENSUS GATE REOPENS, recomputed nightly from the
+     ACTUAL per-date graded counts. `mktN` under `consMinN` (100) forces every ticket in
+     that market to clear the de-vigged consensus as well, which is what a NO-PLAY day is
+     made of — so this is the date the card comes back, and it must move when accrual does.
+     `rateDays` is the denominator and is reported with it: a rate over 2 complete days is
+     not a rate over 7. */
+  reopen?: {
+    at: number;
+    need: number;
+    rateDays: number;
+    rateFrom: string | null;
+    rateTo: string | null;
+    markets: Record<string, { n: number; need: number; perDay: number; days: number | null; on: string | null }>;
+  };
   /* the same reading over EVERY eligible date, never sliding. The 45-day `summary` still
      trains the blend weights (widening that is a frozen-parameter call); this is what the
      freeze-exit reading — reliability, disagreement, per-market gaps — is computed from. */

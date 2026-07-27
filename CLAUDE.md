@@ -372,6 +372,24 @@ every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_D
 a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
 `tests/calibration-window.test.ts` pins all of it.
 
+## `mktN` — the gate that decides NO-PLAY
+`mktN[m] = summary.reliability[m].n`. Under `consMinN` (**100**, frozen) every ticket in that
+market must also clear the de-vigged consensus — that is what blocked all 18 tickets on
+2026-07-26. Eight inputs, audited 2026-07-27 (`docs/collection-period.md`): the window, the
+blob, `CAL_START` and `gradedFromBlob` are test-covered; **`boardToPredictions` row VOLUME has
+no assertion**, and **`GRADE_DAYS = 6`** + **`MAX_RECORDS 800`/`MAX_BYTES 3 MB`** have nothing
+at all — all three fail by producing a smaller `n` than reality, i.e. they push reopening dates
+out silently. (`hist` is capped at `HIST_MAX = 4`, so the four scheduler entries do not grow
+the blob without bound.)
+
+**Reopening dates are recomputed nightly** into `summary.reopen` and printed by
+`tools/gate_activity.py` with `rateDays` as its denominator. Measured 2026-07-27 (graded=70
+over 2 complete dates): ML/RL 08-08, **Total Bases 08-17**, Hits/HR/H+R+RBI 08-23, K's/Outs
+09-03. The docs previously said TB 08-06 and Hits 08-09 — **11–14 days optimistic**, projected
+once from an assumed rate. Never re-introduce a hand-projected date; `reopenDays()` returns
+`null` (not a far-future date) when a market accrues 0/day, because 0/day is a broken logging
+path, not a schedule.
+
 **`/api/generate` gate order** (fixed 2026-07-27): `ptToday` → **conditional skip** →
 `INCR` run cap → `K_LASTGEN` → arm → `collectSlate()`. The cap used to `INCR` *before* the
 skip, so a skipped fire spent budget it spent no credits on and a day with two skips plus a

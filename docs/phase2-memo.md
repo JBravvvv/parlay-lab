@@ -475,3 +475,81 @@ unsigned until this instrument reports. Its 20–50-leg figure is a textbook num
 measured on this data, and the clustered-SE question (`tools/icc.py`, reporting ~2026-07-31
 at game level and ~2026-08-15 at day level) applies to it exactly as it applies to the
 H+R+RBI amendment.
+
+---
+
+# PHASE 2 — THE CRITICAL PATH (2026-07-27)
+
+## Where it actually stands
+
+| piece | state |
+|---|---|
+| Series B (the 07-12 → 07-26 vintage, proportional de-vig) | ✅ **built** — `tools/phase2_series_b.py`, 3,637 of 6,535 open rows joining (56%), attrition compared, two caveats recorded |
+| the cadence question | ✅ **resolved** — Actions API, workflow `311636390`: `0 17` starts ~20:20Z (+3.3 h), `45 22` ~07:30Z next day (+8.75 h). Not a mystery, a queue |
+| close capture | ✅ **built** — `tools/snapshot_props.py` decides `kind: "close" \| "pre"` from the slate, 10 crons so some firing lands in the window |
+| **`fp` (per-book prices) and `kind` in the archive** | ⚠️ **not one snapshot yet.** The 2026-07-26 file has two snapshots, `kind: null` on both, and no `fp` on any row — both were written by the pre-self-pacing script. **Today's sweep is the first** |
+| Series A reader | ❌ **not built** |
+| the identification diagnostic | ❌ **not built** (agreed to ship *with* Series A's first report, not after) |
+| rung bucketing | ⚠️ **designed, not ported** — Series B buckets by `(market, line)`; Series A inherits the design but the file does not exist |
+
+## What remains to build for Series A
+
+1. **`tools/phase2_series_a.py`** — Series B's structure with three differences: de-vig each
+   snapshot's `fp` with **Shin** (the engine's own method) rather than proportional; select the
+   `kind: "close"` snapshot as the close instead of taking the last one; carry `bo`/`bu`/`czf`,
+   which exist in this vintage and did not in B's. **The two vintages are never pooled.**
+2. **Rung bucketing** — ported from B, not re-derived. Non-negotiable: H+R+RBI is +11.5 pp at
+   O0.5 and −1.4 pp at O1.5, and a market-level number that averages those two says nothing.
+3. **The intercept** — mandatory, and pre-committed. Rung drift is nearly collinear with a
+   one-signed gap in `pitcher_outs` (outs 15.5 moved −1.01 with 32% up; outs 17.5 −0.66 with
+   29% up), so a no-intercept fit would attribute pure drift to the model.
+4. **The identification diagnostic**, shipping in the first report: how much of the fitted
+   slope survives when the intercept absorbs rung drift, and what the gap/drift collinearity is
+   per rung. Without it a slope near zero is unreadable.
+5. **The rung sign-flip test from `docs/harness-substitutions.md`** — H+R+RBI's
+   `(pModel − open_fair)` must change sign between O0.5 and O1.5 for the ladder finding to
+   survive. It is **not** in the build as specced; it is one extra column on the per-rung table
+   (the gap's sign and its CI), so it goes in with #2 rather than later.
+
+## The sync phrase: what it blocks, and exactly when
+
+**Confirmed.** Everything accrues and computes publicly except one join:
+
+| half | source | key needed? |
+|---|---|---|
+| open/close prices, Shin de-vig, movement, rung buckets, attrition, the close-existence check | `data/props/*.json` on the **public** `line-history` branch | **no** |
+| `pModel` per `(date, market, player, line)` | `/api/predictions?date=` | **YES — sync phrase** |
+
+`/api/predictions` GET is gated by `syncAuthed`. Nothing else in Phase 2 is.
+
+**When it becomes the blocker: at the first rung-level slope fit, not before.** The headline is
+`move ~ (pModel − open_fair)`, which does not exist without `pModel` — but every validation
+step ahead of it does, and those are what the first days are for. Concretely, from Series B's
+observed per-day rung volumes:
+
+| rung | Series B rows/day | reaches `MIN_RUNG_N = 30` |
+|---|---|---|
+| `batter_hits` 0.5 | ~91 | **first close-day** |
+| `batter_total_bases` 1.5 | ~60 | first close-day |
+| `batter_hits_runs_rbis` 1.5 | ~59 | first close-day |
+| `pitcher_outs` 15.5 / 17.5 | ~3 each | **~2026-08-06** |
+| `pitcher_strikeouts` 3.5 | ~2.7 | ~2026-08-08 |
+
+So: **act on the key around 2026-07-29**, once two close-days exist and the fat rungs are
+already past `MIN_RUNG_N`. Before that there is nothing for it to unblock; after that the
+project is idling on it. The thin rungs — which include `pitcher_outs`, the positive control —
+are not readable until **~2026-08-06** whatever happens with the key.
+
+## Earliest dates
+
+| | date | what it is |
+|---|---|---|
+| first `fp` + `kind:"close"` rows | **2026-07-27** (tonight's sweep) | verify by re-reading `data/props/2026-07-27.json` for `kind` and `fp` |
+| first mechanical Series A output | **2026-07-28** | one day: attrition, close-existence, movement distribution. **No slope** |
+| **first rung-level slope** — the real first report | **~2026-07-29** | fat rungs only, and **this is where the sync phrase binds** |
+| `pitcher_outs` readable — the positive control | **~2026-08-06** | ~3 rows/day at 15.5 and 17.5 |
+| the ladder sign-flip test on H+R+RBI | **~2026-07-29** | O1.5 is a fat rung; O0.5 needs its own volume check on the first close-day |
+
+**The one thing that can move all of these earlier or later is close CAPTURE RATE**, not row
+volume — a day whose ten crons all miss the ~95-minute window yields a `pre` reading and no
+close. That is the number to watch first, and it is readable tomorrow.

@@ -15,6 +15,7 @@ import {
 import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } from "@/engine2/grade";
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { marketOf } from "@/lib/ledger-segments";
+import { reopenDays } from "@/lib/gate-rebuild";
 
 /* the slice of a synced ledger day the training loop reads */
 type LedgerDay = {
@@ -224,6 +225,7 @@ export async function GET(req: NextRequest) {
        declared, not remembered. */
     const graded: GradedPick[] = [];
     const gradedAll: GradedPick[] = [];
+    const perDay: { date: string; byMarket: Record<string, number>; n: number }[] = [];
     const inWindow = new Set(allDays.slice(-SUMMARY_DAYS));
     const usedDays: string[] = [];
     const allDaysUsed: string[] = [];
@@ -235,7 +237,14 @@ export async function GET(req: NextRequest) {
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
       allDaysUsed.push(date);
-      gradedAll.push(...gradedFromBlob(blob));
+      const dayRows = gradedFromBlob(blob);
+      gradedAll.push(...dayRows);
+      /* per-DATE counts, kept so the reopening projection below is measured from actual
+         accrual rather than assumed. Built here because this is the only loop that reads
+         every day blob. */
+      const byMarket: Record<string, number> = {};
+      for (const r of dayRows) byMarket[r.market] = (byMarket[r.market] ?? 0) + 1;
+      perDay.push({ date, byMarket, n: dayRows.length });
       if (!inWindow.has(date)) continue;
       usedDays.push(date);
       // ONE door into the training channel (Phase 1): settled rows only, superseded
@@ -338,6 +347,47 @@ export async function GET(req: NextRequest) {
       droppedTo: null,
       capped: false,
     };
+    /* WHEN DOES THE CONSENSUS GATE REOPEN? MEASURED NIGHTLY, NEVER PROJECTED ONCE.
+       `mktN` (= reliability[m].n) is the input to `consMinN` (frozen at 100). Under it, a
+       ticket must ALSO clear the de-vigged consensus — which is what blocked all 18 tickets
+       on 2026-07-26. So this number is currently the difference between NO-PLAY and a live
+       card, and its accrual rate sets the reopening date for every market.
+       The dates in the docs were projected ONCE from an assumed rate and are already wrong
+       (they said Total Bases ~08-06; measured accrual says two weeks later). A projection
+       that cannot move is a stale number that reads like a commitment, so it is recomputed
+       here from the actual per-date counts on every calibrate run. */
+    const CONS_MIN_N = 100; // SH_CFG.consMinN — frozen; see docs/collection-period.md
+    const RATE_DAYS = 7;
+    /* only COMPLETE dates set the rate: today is still grading, and including a
+       part-graded day drags the estimate down and pushes every date out. */
+    const complete = perDay.filter((d) => d.date < today);
+    const window7 = complete.slice(-RATE_DAYS);
+    const rateDen = window7.length;
+    const reopen: Record<string, { n: number; need: number; perDay: number; days: number | null; on: string | null }> = {};
+    for (const [m, f] of Object.entries(summary.reliability ?? {})) {
+      if (m === "all") continue;
+      const n = f?.n ?? 0;
+      const rate = rateDen ? window7.reduce((a, d) => a + (d.byMarket[m] ?? 0), 0) / rateDen : 0;
+      const days = reopenDays(n, rate, CONS_MIN_N);
+      reopen[m] = {
+        n,
+        need: CONS_MIN_N,
+        perDay: Math.round(rate * 100) / 100,
+        days,
+        on: days == null ? null : ptToday(new Date(Date.now() + days * 86_400_000)),
+      };
+    }
+    summary.reopen = {
+      at: now,
+      need: CONS_MIN_N,
+      /* the denominator, stated: a rate over two complete days is not a rate over seven,
+         and the retimed cron entries are about to change it */
+      rateDays: rateDen,
+      rateFrom: window7[0]?.date ?? null,
+      rateTo: window7[window7.length - 1]?.date ?? null,
+      markets: reopen,
+    };
+
     summary.full = full;
     await redisSetJson(K_SUMMARY, summary);
 

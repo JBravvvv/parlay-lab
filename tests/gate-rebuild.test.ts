@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gateRebuild, rebuildCounts, rebuildSentence, REBUILD_WINDOW_DAYS } from "@/lib/gate-rebuild";
+import { gateRebuild, rebuildCounts, rebuildSentence, reopenDays, REBUILD_WINDOW_DAYS } from "@/lib/gate-rebuild";
 import { CAL_START } from "@/engine2/calibration";
 
 /**
@@ -76,5 +76,46 @@ describe("gateRebuild", () => {
     const s = rebuildSentence(gateRebuild(N({ batter_hits_runs_rbis: 34 }), 100, "2026-07-26", ["batter_hits_runs_rbis"]).rows);
     expect(s).toContain("H+R+RBI 34/100");
     expect(s).toContain("not a model signal");
+  });
+});
+
+/**
+ * THE REOPENING DATE IS THE DATE BETTING RESUMES — so it is measured, not projected once.
+ *
+ * Under `consMinN` a market's tickets must ALSO clear the de-vigged consensus, which is what
+ * blocked all 18 tickets on 2026-07-26. The docs carried "Total Bases ~08-06, hits ~08-09",
+ * projected once from an assumed rate. Measured against the real per-date counts on
+ * 2026-07-27 (graded=70 over two complete dates) those are 08-17 and 08-23 — **eleven to
+ * fourteen days optimistic**. A projection that cannot move is a stale number wearing a
+ * commitment's clothes, so `/api/calibrate` now recomputes it nightly and the drift check
+ * prints it with its denominator.
+ */
+describe("reopenDays — the consMinN projection", () => {
+  it("returns 0 when the market is already open", () => {
+    expect(reopenDays(100, 3, 100)).toBe(0);
+    expect(reopenDays(140, 0, 100)).toBe(0); // open, and the rate is then irrelevant
+  });
+
+  it("returns null — not Infinity, not a huge number — when nothing is accruing", () => {
+    // a market at 0.0/day is a BROKEN LOGGING PATH, not a distant date. Rendering it as
+    // "2049-03-11" would read as a schedule; null forces the drift check to say "never".
+    expect(reopenDays(7, 0, 100)).toBeNull();
+    expect(reopenDays(7, -1, 100)).toBeNull();
+  });
+
+  it("rounds UP: a partial day is a day the gate is still shut", () => {
+    expect(reopenDays(99, 2, 100)).toBe(1);
+    expect(reopenDays(90, 3, 100)).toBe(4); // 10/3 = 3.33 -> 4
+  });
+
+  it("reproduces the measured 2026-07-27 accrual, and the docs' dates were optimistic", () => {
+    // n over two complete dates -> rate = n/2
+    expect(reopenDays(9, 4.5, 100)).toBe(21); // Total Bases: 07-27 + 21 = 2026-08-17
+    expect(reopenDays(7, 3.5, 100)).toBe(27); // Hits:        07-27 + 27 = 2026-08-23
+    expect(reopenDays(15, 7.5, 100)).toBe(12); // ML/RL:      07-27 + 12 = 2026-08-08
+    expect(reopenDays(5, 2.5, 100)).toBe(38); // K's / Outs:  07-27 + 38 = 2026-09-03
+    // the doc said 08-06 for Total Bases: 10 days of accrual, i.e. ~9.1/day — double the
+    // measured rate. That is the failure mode the nightly recompute exists to end.
+    expect(reopenDays(9, 9.1, 100)).toBe(10);
   });
 });

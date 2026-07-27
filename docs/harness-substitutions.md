@@ -829,3 +829,126 @@ confirmed by measurement — which is the whole point of running this.
 **Either way the SIGN result survives**, and that must not be conflated: λ_model − λ_market was
 negative on **38 of 38** rows, measured on a different population by a different method. A
 range finding and a bias finding can fail independently.
+
+### A DIFFERENT INSTRUMENT vs THE SAME INSTRUMENT RUN MORE TIMES
+
+**More data from the same instrument is precision, not independence.** They answer different
+questions and only one of them discharges the re-check rule:
+
+* **more runs** shrinks the interval around a number the instrument produces. If the
+  instrument is biased, twenty runs give a *tighter* wrong answer — and a tighter wrong answer
+  is more persuasive than a loose one, which is why this is dangerous rather than merely
+  useless;
+* **a different instrument** can disagree in a way the first one structurally cannot. That is
+  the only thing that can kill an artifact.
+
+The test is not "is this new data?" but **"could this have come out differently for a reason
+the first instrument cannot see?"** Twenty archived boards satisfy that for the clamp audit
+(one frozen fixture → real slates) and fail it for the range detector (one live board → twenty
+live boards, same statistic, same population definition, same orientation assumptions).
+
+When the answer is "no", say so and go find an actual second instrument — for the range
+detector that is Phase 2's rung-bucketed movement regression, below.
+
+## 📅 PRE-COMMITTED #2: Phase 2 is the range detector's independent instrument
+
+The 20-board series gives the range detector precision, not independence. Phase 2's
+rung-bucketed movement slope gives it independence, on all three axes at once:
+
+| axis | range detector | Phase 2 |
+|---|---|---|
+| method | dispersion ratio (IQR of λ) | OLS on closing movement |
+| quantity | **spread** | **drift** |
+| data | board prices at generation | **closing** prices from `data/props` |
+
+And it makes a **specific, falsifiable prediction**. If H+R+RBI carries a single λ across the
+ladder, the model is too high at O0.5 and too low at O1.5 — the measured +11.5 pp / −1.4 pp
+signature. In movement space that has to show up as **`(pModel − open_fair)` changing sign
+between the O0.5 and O1.5 buckets of the same market**, with the movement slope significantly
+positive at neither rung: the market is not moving toward a model whose disagreement is an
+artifact of its own ladder.
+
+| Phase 2 shows | reading |
+|---|---|
+| **`(pModel − open_fair)` flips sign O0.5 → O1.5, slope not significantly positive at either** | **the ladder finding is CONFIRMED independently.** Three axes of separation, and the same ±signature arrives from closing movement |
+| **no rung dependence** — the gap keeps its sign across rungs | **the ladder finding is RETRACTED**, regardless of what the 20-board median says. A single-λ model cannot produce a rung-invariant gap |
+| flips sign **and** the slope is significantly positive at both | the model is right at both rungs and the market comes to it — the ladder gap is real information, not an artifact. Least expected; written down anyway |
+
+**Pre-committed before the data, and the retraction branch binds even if the 20-board reading
+agrees with the original finding.** A confirmation from the same instrument does not outvote a
+disconfirmation from a different one — that is the whole point of the distinction above.
+
+## ⚠️ CAN THE 20-BOARD CLAMP COMPARISON EVEN RUN? — measured 2026-07-27
+
+Checked before 08-14, because the three-branch thresholds (≤2 / ≥5 of 25) are scaled to a
+population that has to exist. **It does not.** Only **5 of 25** executing clamp sites leave any
+trace on an archived board, and only **2 of those are measurements**:
+
+| site | what the board carries | kind |
+|---|---|---|
+| **L1615** `shPenQFShadow` | `gameInfo[*].shadow.penQAway/penQHome` = `{f, era, ip}` — the clamp's **output** | ✅ **measurement** |
+| **L1610** `shUmpKfShadow` | `gameInfo[*].shadow.umpKf` = `{kf, raw, g}` — output **and** input | ✅ measurement, **but null on 15 of 15 games** on 07-26 |
+| L2258 `pitcher_outs` | `case`: `"opposing lineup 0.412 TB/AB (…)"` — 57 rows | ⚠️ reconstruction |
+| L2280 opp K rate | `case`: `"opposing lineup K rate 22.4% (…)"` — 40 rows | ⚠️ reconstruction |
+| L2368 H+R+RBI PA | `case`: `"…(~4.1 AB vs 3.6 AB/g)"` — 48 rows | ⚠️ reconstruction |
+| **the other 20** | **nothing** | ❌ |
+
+**And the three reconstructions are disqualified by this project's own rule** — *a filter chain
+must be RUN, not reconstructed*, the rule written after the `consMinEv` error. Recomputing
+`shClamp(0.140/oo, 0.86, 1.12)` from a printed `oo` re-derives what the engine did instead of
+observing it; every rounding and every early-return in between is assumed rather than seen. So
+the honest count of sites the archive can *measure* is **1** today, not 8 or 12.
+
+The `≤2 / ≥5 of 25` thresholds are therefore **suspended, not rescaled.** Rescaling to n=1
+would be arithmetic dressed as a plan.
+
+### What did survive: a one-board preview, and it agrees
+
+L1615 is comparable right now, and both sides have n=30:
+
+| | n | pinned | 95% Wilson |
+|---|---|---|---|
+| fixture | 30 | 0.734 | [0.556, 0.858] |
+| **real board 2026-07-26** | **30** | **0.667** (11 low · 9 high · 10 in range) | — |
+
+0.667 sits **inside** the fixture's interval and differs by 6.7 pp — under the 10 pp bar. On
+the pre-committed criteria this site **agrees**. One site, one board, and it is the first
+evidence either way.
+
+### A second-order finding: the fixture has umpire context production does not
+
+`shadow.umpKf` is **null on 15 of 15 games** on the 07-26 board, while the fixture fires L1610
+fifteen times. Two candidate causes, and they have different consequences:
+
+* **timing** — the board was built 09:46 PT, before umpire assignments post. Then the retimed
+  22:00 UTC entries should show non-null `umpKf` within days;
+* **`SH_CTX.umpires` is empty or stale** — in which case `shUmpKf`'s "would otherwise self-arm
+  ~2026-08-04" line in `tools/gate_activity.py` is **also wrong**, because it projects from a
+  count that is not accruing.
+
+**Testable this week and cheap:** check `shadow.umpKf` on the first 22:00 UTC board. Recorded
+as a hypothesis with two branches, not a conclusion.
+
+### What the board would need to carry — proposed, not built
+
+Give `shClamp` an optional site id and let it count:
+
+```js
+function shClamp(v,lo,hi,id){ if(id)CLAMP_LOG(id,v,lo,hi); return v<lo?lo:v>hi?hi:v; }
+//                     ^ 4th arg added at each of the 30 static call sites: shClamp(x,.86,1.12,"2258")
+```
+
+then emit `data.clampActivity = {"2258":{n,lo,hi}, …}` beside `luCoverage`.
+
+| | |
+|---|---|
+| **arithmetic changed** | **none** — the return value is untouched, so this is additive exactly like `luCoverage.pctUnstarted` |
+| **parity procedure** | `data` minus the new key must be **byte-identical** against both `baseline43.json` and `baseline-armed-v1`, same as `pctUnstarted` |
+| **cost** | ~5,200 counter increments per board (the fixture's site totals sum to 5,183); board size **+~1 KB** on 1.36 MB |
+| **edit size** | 30 mechanical call-site edits in frozen engine code + one function body. Mechanical, but it is the engine, so it is a gated change |
+| **what it buys** | **25 of 25 sites measured**, not 1 — and measured, not reconstructed |
+
+**The deadline is the series, not 08-14.** Every day this waits is one board that cannot join
+the comparison. Landing it on 2026-07-27 gives 19 instrumented boards by 08-14 and 20 by 08-15;
+each day of delay moves the 20-board reading out by one day and leaves a permanent hole at the
+front of the series.

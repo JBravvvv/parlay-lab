@@ -26,6 +26,11 @@ rather than silently omitted — an unmeasured gate must not look like a passing
 """
 import argparse, json, sys, urllib.request
 
+# mirrors MKT_SHORT in src/lib/gate-rebuild.ts
+MKT_SHORT = {"ml": "ML", "rl": "RL", "batter_hits": "Hits", "batter_total_bases": "Total Bases",
+             "batter_home_runs": "HR", "batter_hits_runs_rbis": "H+R+RBI",
+             "pitcher_strikeouts": "K's", "pitcher_outs": "Outs"}
+
 BASE = "https://parlay-lab-six.vercel.app"
 
 
@@ -162,7 +167,32 @@ def main():
                     print(f"    {'':<24} progress: {json.dumps(v['progress'])}")
         print()
 
+    # ---- consMinN: the one D-category threshold with a DATE, recomputed nightly
+    # This gate is not a curiosity: under consMinN a market's tickets must also clear the
+    # de-vigged consensus, and that is what produced the NO-PLAY card. Its reopening date is
+    # therefore the date betting resumes per market — and it moves whenever accrual moves,
+    # which is exactly why it is read from the summary instead of a doc.
+    ro = summary.get("reopen") or {}
+    mk = ro.get("markets") or {}
+    print(f"consMinN({ro.get('need', 100)}) — THE GATE THAT DECIDES NO-PLAY, projected from measured accrual")
+    if not mk:
+        print("    no `reopen` block in the stored summary — the calibrate run predates it. "
+              "Re-run /api/calibrate before trusting any reopening date.\n")
+    else:
+        den = ro.get("rateDays") or 0
+        print(f"    rate measured over {den} COMPLETE date(s) "
+              f"{ro.get('rateFrom') or '—'} → {ro.get('rateTo') or '—'}"
+              f"{'   <-- THIN: this rate is not yet stable' if den < 5 else ''}")
+        for m, v in sorted(mk.items(), key=lambda kv: -(kv[1].get("n") or 0)):
+            n, need, per_d, on = v.get("n", 0), v.get("need", 100), v.get("perDay", 0), v.get("on")
+            state = "OPEN" if n >= need else (on or "never at this rate")
+            bar = "#" * int(20 * min(1, n / max(1, need)))
+            print(f"    {MKT_SHORT.get(m, m):<14} {n:>4}/{need}  [{bar:<20}] {per_d:>5.1f}/day  -> {state}")
+        print("    a market with 0.0/day is not accruing at all — check that /api/generate is")
+        print("    still logging rows for it, not that the market is quiet.\n")
+
     if a.json:
+        report["consMinN_reopen"] = ro
         json.dump(report, open(a.json, "w"), indent=2)
     return 0
 

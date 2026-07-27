@@ -2511,3 +2511,61 @@ So an August *ledger* number is not a smaller version of the September engine. A
 *close-graded* number is market-neutral in coverage and merely capped in the four big
 markets. **State which channel a figure came from** — that distinction is what the first
 version of this section collapsed.
+
+## mktN IS THE GATE THAT DECIDES NO-PLAY — every input audited (2026-07-27)
+
+`mktN[m]` = `summary.reliability[m].n` = graded legs in market *m*. Under `consMinN` (frozen
+at **100**) every ticket touching that market must ALSO clear the de-vigged consensus — which
+is what blocked all 18 tickets on 2026-07-26. So `mktN` is currently the difference between
+NO-PLAY and a live card, and its accrual rate sets the reopening date per market.
+
+### The chain, and what protects each link
+
+| # | input | what it does to `mktN` | protection |
+|---|---|---|---|
+| 1 | the **window**, `allDays.slice(-45)` | a wider window inflates `n` and silently opens the gate | ✅ **TEST** — `tests/arming-parity.test.ts`, three value tests where the two windows carry deliberately different `reliability`/`globalShrink`/`mktN`, plus a source scan |
+| 2 | the **source blob**, `pl:pred:{date}` | a prune would shrink `n` | ✅ **TEST** — `tests/calibration-window.test.ts` source-scans for `DEL`/`SREM`/`EXPIRE` on non-board keys |
+| 3 | **`CAL_START`** | excludes pre-restart rows | ✅ **TEST** — `tests/arming-parity.test.ts` ("excludes the two-generator window and admits everything after it") |
+| 4 | **`gradedFromBlob`** — the one door into the channel | settled rows only, superseded excluded, `hist` unreachable | ✅ **TEST** — `tests/prediction-idempotency.test.ts` |
+| 5 | **`boardToPredictions` row count/day** | **sets the accrual rate** | ⚠️ **BEHAVIOUR ONLY.** Six test files exercise it; **none asserts volume.** A pass that logs 40 rows instead of 300 is behaviourally correct and silently multiplies every reopening date by 7 |
+| 6 | **`GRADE_DAYS = 6`** | a row still `pending` after 6 days is never revisited | ❌ **NOTHING.** No test, no drift line. A calibrate outage longer than six days permanently strands those rows as ungraded — they stay in the store, they never reach `mktN` |
+| 7 | **`MAX_RECORDS` 800 / `MAX_BYTES` 3 MB** | a day blob over the limit is rejected **413** and the whole day is lost | ❌ **NOTHING.** `hist` is capped at `HIST_MAX = 4`, so the four scheduler entries do *not* grow it without bound — the risk is real but bounded, and unmonitored |
+| 8 | the **calibrate cron running at all** | nothing grades, `mktN` freezes | ⚠️ **PARTIAL** — `tools/gate_activity.py` prints the summary's `at` stamp and warns that category D reflects *that* run |
+
+**Links 6 and 7 are the third column: nothing watches them, and both fail by producing a
+smaller `n` than reality — i.e. they push the reopening dates out silently.** Neither is
+speculative; both are ordinary outage/size failures with no alarm attached.
+
+### The dates were stale, and by how much
+
+Recomputed from actual accrual on 2026-07-27 (`graded = 70` over the two complete dates
+2026-07-25 and 2026-07-26):
+
+| market | `n` | measured /day | projected | **doc said** |
+|---|---|---|---|---|
+| ML · RL | 15 | 7.5 | 2026-08-08 | — |
+| **Total Bases** | 9 | 4.5 | **2026-08-17** | **2026-08-06** |
+| **Hits** | 7 | 3.5 | **2026-08-23** | **2026-08-09** |
+| HR · H+R+RBI | 7 | 3.5 | 2026-08-23 | — |
+| K's · Outs | 5 | 2.5 | 2026-09-03 | — |
+
+**Eleven to fourteen days optimistic.** The doc's 08-06 for Total Bases implies ~9.1 legs/day,
+double what the store actually shows.
+
+**And the rate is about to change**, which is the argument for measuring it rather than fixing
+it: those two dates were priced by the old 16:00 UTC pass, and the four cron-job.org entries
+land 4–6 hours later with far more confirmed lineups. Expect the rate to rise and the dates
+to pull in. A projection that cannot move would have kept reading 08-06.
+
+### Now recomputed nightly and printed with its denominator
+
+`/api/calibrate` writes `summary.reopen` on every run — per market `n`, `need`, measured
+`perDay`, `days`, and the projected date — plus `rateDays` / `rateFrom` / `rateTo`, because a
+rate over two complete dates is not a rate over seven and must not read like one. Only
+**complete** dates set the rate; today is still grading and would drag it down.
+
+`tools/gate_activity.py` prints it under `consMinN`, flags `<-- THIN` below five dates, and
+says outright that a market at **0.0/day is a broken logging path, not a distant date** —
+`reopenDays` returns `null` there rather than a far-future date that would read like a
+schedule. `tests/gate-rebuild.test.ts` pins the arithmetic, including the measured 07-27 rates
+and the doc's implied 9.1/day.

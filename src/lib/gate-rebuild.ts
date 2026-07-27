@@ -67,6 +67,25 @@ export function gateRebuild(
   return { rebuilding: inWindow && rows.length > 0, rows, daysIn };
 }
 
+/**
+ * WHEN DOES A MARKET CLEAR `consMinN`? — measured, not projected once.
+ *
+ * The dates in the docs ("Total Bases ~08-06, hits ~08-09") were computed once from an
+ * assumed accrual rate and were already wrong by two weeks when checked against the real
+ * per-date counts. A projection that cannot move is a stale number wearing a commitment's
+ * clothes, so `/api/calibrate` recomputes this nightly from actual graded rows per date.
+ *
+ * @param n     graded legs in this market now (= mktN)
+ * @param rate  graded legs per COMPLETE date, over the trailing window
+ * @param need  consMinN
+ * @returns days remaining, 0 if already open, null if the rate is 0 (never, at this rate)
+ */
+export function reopenDays(n: number, rate: number, need: number): number | null {
+  if (n >= need) return 0;
+  if (!(rate > 0)) return null;
+  return Math.ceil((need - n) / rate);
+}
+
 /** "H+R+RBI 34/100 · Hits 51/100" */
 export function rebuildCounts(rows: RebuildRow[]): string {
   return rows.map((r) => `${MKT_SHORT[r.market] ?? r.market} ${r.n}/${r.need}`).join(" · ");
