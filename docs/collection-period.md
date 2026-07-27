@@ -3322,3 +3322,109 @@ not provide.
 it is derivable, it is one function call (`shPOver` → a binomial/`expAB`-aware form on 0.5
 lines), and it needs no new data. **It also touches every 0.5-line market priced by `shPOver`**,
 so its blast radius must be measured before it is proposed.
+
+# ⚠️ `shTbOver` PRICES A 0.5 LINE WITH THE 1.5 FORMULA — a definite bug (2026-07-27)
+
+```js
+function shTbOver(line,lamH,s1,s2){
+  var P0=shPoisPmf(0,lamH),P1=shPoisPmf(1,lamH),P2=shPoisPmf(2,lamH);
+  if(line<2)return 1-(P0+P1*s1);   /* 1.5: ≤1 TB = 0 hits, or 1 single */
+```
+
+**The comment says the branch is for 1.5. `line<2` also catches 0.5.** `1−(P0+P1·s1)` subtracts
+the probability that the batter's one hit was a single — correct for "≤1 total base", i.e.
+**P(TB ≥ 2)**. Applied to an O0.5 line it answers the wrong question: **P(TB ≥ 1) is just
+`1 − P0`**, because a single *is* one total base.
+
+## Proven WITHOUT the market having to be right
+
+**TB O0.5 and hits O0.5 are the same event** — at least one total base ⟺ at least one hit. So the
+model's two prices for it must agree. Joined on the same player, **127 rows** on the real
+2026-07-26 board:
+
+| | model | market |
+|---|---|---|
+| **TB O0.5** | **33.6%** | 57.1% |
+| **hits O0.5** | **58.1%** | 57.2% |
+| **self-consistency** | **−24.4 pp** | **−0.1 pp** |
+
+> **The market agrees with itself to 0.1 pp. The model disagrees with itself by 24.4 pp.**
+> This is an internal-consistency failure: it needs no external reference, no assumption that the
+> market is correct, and no fixture. `1 − P0` for a typical hitter is ~57%; `1 − (P0 + P1·s1)` is
+> ~34%. That is the whole gap.
+
+**Scope: 150 TB O0.5 rows on `propBoard` (5 reached `categories`, all shown as UNDER — which is
+what a model saying 33.6% against a market at 57.1% must do).**
+
+**The fix is one comparison**: `if(line<1) return 1-P0;` before the existing branch. Frozen —
+this is a freeze-exit amendment (**M8**), not a collection-period edit.
+
+## It probably collapses the TB over-dispersion finding
+
+`batter_total_bases` carries an open **2.30 ladder-drift ratio** — the model's implied λ moving
+2.3× the market's across rungs. **A rung priced as if it were the next one up is exactly what
+produces that**: the O0.5 implied λ is far too low, so the apparent drift from O0.5 to O1.5 is
+inflated. **The over-dispersion may be this bug and nothing else.**
+
+Recorded as the leading candidate, **not confirmed** — the ratio was measured across rungs
+including 1.5→2.5 pairs, and only the 0.5 rung is mis-mapped. Re-running the ladder test with the
+0.5 rung excluded is the check, and it is cheap.
+
+
+# M7 — DERIVABLE, BUT NOT OBSERVED IN PRODUCTION (2026-07-27)
+
+M7's arithmetic stands: `(1−p)^n < e^{−np}` always, so Poisson understates `P(≥1)`. Its **rung
+signature** follows, and it is the flip that was predicted:
+
+| n=4, p=0.24, λ=0.96 | Poisson | binomial | **Poisson − binomial** |
+|---|---|---|---|
+| O0.5 | 61.7% | 66.6% | **−4.9 pp** — model LOW |
+| O1.5 | 25.0% | 24.5% | **+0.5 pp** — model HIGH |
+| O2.5 | 7.3% | 4.5% | **+2.8 pp** — model HIGH, a 62% relative overstatement |
+
+**Signature: − → +**, flipping between the first and second rung and growing sharply after it.
+
+## The production check says it is not happening
+
+On the real 2026-07-26 board, `propBoard`, **both sides, unselected**, model-minus-market on the
+over:
+
+| | n | median | under-has-edge |
+|---|---|---|---|
+| `batter_hits` **O0.5** | 232 | **+0.3 pp** | **47%** |
+| `batter_hits` O1.5 | 35 | −0.3 pp | 51% |
+| **all 0.5 lines through `shPOver`** | 535 | **+0.6 pp** | **46%** |
+| all higher rungs | 311 | +1.1 pp | 46% |
+
+**M7 predicts −4.9 pp and a strong under skew at 0.5. Neither appears.** No level bias, no rung
+flip, no side skew.
+
+> ### ⚠️ AND THE −4.3 pp THAT MOTIVATED M7 WAS A FIXTURE ARTIFACT
+> The `batter_hits` closed-form undershoot was measured on the **armed fixture**. The real board
+> gives **+0.3 pp** on the same statistic. **The fixture and production disagree by 4.6 pp on the
+> quantity M7 was built to explain** — which is the fixture-representativeness question arriving
+> early, and unasked.
+>
+> **M7 is demoted from "rank 1 on hits" to DERIVABLE-BUT-DORMANT.** The arithmetic is not wrong;
+> the net model output is evidently calibrated such that the family error does not surface. Fixing
+> it in isolation would move 617 rows off a level they currently hit.
+
+## The side-bias check nearly went wrong the same way
+
+The first cut used `categories` and read **118 of 118 rows OVER at 0.5 lines, 0% unders** —
+apparently a violent refutation. It is not evidence at all: `categories` is *"top 50 per market
+ranked by win probability, one side per line"*, and at a 0.5 line the over is simply the
+higher-probability side. **The fourth time that population has produced a confident wrong
+reading.** The unselected `propBoard` numbers above are the answer.
+
+## Blast radius, counted
+
+| function | rows (propBoard, 07-26) |
+|---|---|
+| **`shPOver`** | **2,026** — of which **617 (30%) are 0.5 lines** |
+| `shTbOver` | 391 — of which **150 are the mis-mapped 0.5 branch** |
+
+**M7 sits BELOW M1 in the bundle**: 617 rows at an effect that production says is ~0, against
+M1's per-row park error of up to 14.5% on HR across every closed-form row. **M8 — the `shTbOver`
+0.5 branch — outranks both**: 150 rows, a definite bug, a one-line fix, and a 24.4 pp
+self-inconsistency.

@@ -33,7 +33,8 @@ Ranking all nine on "effect on model-minus-market" would put four at exactly zer
 | **M3** | **H+R+RBI λ conditioning** (mass-weighted blend of `hF`/`tbF`, not a product) | closed-form λ is `rate × power` on a non-Coors slate — **zero site variation** against a market rung-drift of **+0.479**. Recovers ~0.12 of spread on its own; more with M1 | M1 for the park term. Weights need fitting | scoped |
 | **M4** | sim routing, **TB and HR only** | vs market: TB sim **5.7** vs closed form **6.3** mean-abs; HR **3.5 vs 3.5**, sim better centred (+0.4 vs −1.1) | archive-series confirmation — fixture margins are thin | **conditional** |
 | ~~M5~~ | ~~sim routing for `batter_hits`~~ | **REFUTED.** Sim overshoots market **+5.0**, closed form undershoots **−4.3**, and the sim's mean-abs error is **worse: 7.1 vs 5.6** | — | **rejected on evidence** |
-| **M7** | **`shPOver` uses POISSON on 0.5 lines where the process is BINOMIAL** | **derived**: `(1−p)^n < e^{−np}` always, so `P(≥1)` is always understated. **+4.9 pp** median on a realistic grid, **+6.3 pp** re-priced on the board's own 36 hits O0.5 rows. Measured `batter_hits` cf−market: **−4.3 pp** — the family error accounts for the whole level miss. **Cross-market check passes**: predicted +0.3 pp for HR (tiny per-AB p), measured −1.1 | nothing. One function | **new, rank 1 on hits** |
+| **M8** | **`shTbOver` prices a 0.5 line with the 1.5 formula** — `if(line<2)` catches both, and `1−(P0+P1·s1)` is `P(TB≥2)` | **a DEFINITE bug, proven with no external reference.** TB O0.5 and hits O0.5 are the same event; the market prices them **0.1 pp** apart and the model **24.4 pp** apart (33.6% vs 58.1%), on 127 joined rows of the real board | nothing. **One comparison**: `if(line<1)return 1-P0;` | **RANK 1 — a bug, not a calibration** |
+| **M7** | `shPOver` uses Poisson on 0.5 lines where the process is binomial | **derivation stands, production says DORMANT.** Rung signature **−4.9 / +0.5 / +2.8 pp** at O0.5/1.5/2.5 — a **− → +** flip. But on the real board `batter_hits` O0.5 reads **+0.3 pp** median with **47%** under-has-edge: no level bias, no flip, no skew. ⚠️ **The −4.3 pp that motivated it was a FIXTURE artifact** | nothing | **demoted — derivable but dormant** |
 | **M6** | `pitcher_strikeouts` → sim (sixth PA outcome) | K's are **169 rows**, core-eligible, priced with **no simulation of the quantity they are about** | the second-RNG-stream design (below) | **sized, see next section** |
 
 **M1 is now the largest model amendment.** It was ranked third when sim routing looked like it
@@ -81,9 +82,10 @@ if A1 ships, so applying both without re-measuring would be acting on a stale nu
 
 | open item | why it is not in the bundle |
 |---|---|
-| ~~`batter_hits` −4.3 pp undershoot~~ | **RESOLVED same day — see M7.** The Poisson-vs-binomial family error is +4.9 pp derived / +6.3 pp re-priced on the board, which accounts for the whole miss. Cross-market check passes |
+| ~~`batter_hits` −4.3 pp undershoot~~ | **WITHDRAWN — it was a fixture artifact.** The real board reads **+0.3 pp** on the same statistic. There is no hits level error in production to explain |
+| **`batter_total_bases` 2.30 over-dispersion** | **likely collapses into M8** — a rung priced as the next one up inflates apparent λ-drift. Re-run the ladder test with the 0.5 rung excluded to confirm |
 | **the sim's +5.0 hits OVERSHOOT** | leading candidate is the **endogenous PA count** — a batter's plate appearances depend on how the lineup performs, so a hot offence raises `P(≥1)` twice over. Traced to the mechanism, **not measured** |
-| `batter_total_bases` **2.30 over-dispersion** | mechanism candidate is M1 (`tbF` cannot distinguish 29 of 30 parks) but unconfirmed |
+
 | HRR residual beyond the PA clamp | M3 is the leading traced candidate; **still a hypothesis until Phase 2's rung test** |
 | `shUmpKf` / `shPenQF` activation | both pinned; `shUmpKf`'s input was being destroyed nightly until 2026-07-27, so its shadow log has no usable history yet |
 

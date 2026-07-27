@@ -582,16 +582,32 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ `shPOver` USES POISSON ON 0.5 LINES WHERE THE PROCESS IS BINOMIAL — derived, not guessed
+for `return 1` finds one spelling; match the CONTRACT. ## 🐛 `shTbOver` PRICES A 0.5 LINE WITH THE 1.5 FORMULA — a definite bug (M8, rank 1)
+`if(line<2)return 1-(P0+P1*s1);` — the comment says the branch is for 1.5, and `line<2` catches
+0.5 too. That expression is **P(TB≥2)**; P(TB≥1) is just `1−P0`, because a single IS one total
+base. **Proven with NO external reference**: TB O0.5 and hits O0.5 are the same event, and on 127
+joined rows of the real board the **market prices them 0.1 pp apart while the model prices them
+24.4 pp apart** (33.6% vs 58.1%). 150 rows on `propBoard`. Fix is one comparison:
+`if(line<1)return 1-P0;`. **Likely collapses the open TB 2.30 over-dispersion** — a rung priced as
+the next one up inflates apparent λ-drift; confirm by re-running the ladder test without the 0.5
+rung. Frozen: freeze-exit amendment.
+
+## M7 — DERIVABLE BUT DORMANT (demoted same day)
 `shPOver(0.5, λ) = 1 − e^{−λ}` with `λ = rate × expAB × hF`. But λ is a MEAN COUNT over n at-bats
 at per-AB rate p, and **`(1−p)^n < e^{−np}` for every p ∈ (0,1)** — Poisson spends mass on
 two-or-more hits *in one at-bat*, which cannot happen, and it comes straight out of `P(≥1)`.
-**+4.9 pp median** on a realistic grid; **+6.3 pp** re-priced on the board's own 36 hits O0.5 rows
-by inverting the engine's own λ. **Measured `batter_hits` closed-form-minus-market: −4.3 pp** —
-the family error accounts for the whole level miss.
-**Cross-market check PASSES**: the error scales with per-AB p, so it predicts +4.9 pp for hits and
-**+0.3 pp for HR** (p≈0.04); measured −4.3 and −1.1. Ordering and magnitude both match, on a
-prediction made from arithmetic rather than fitted.
+Rung signature: **−4.9 / +0.5 / +2.8 pp** at O0.5 / O1.5 / O2.5 — a **− → +** flip growing sharply
+after the first rung.
+⚠️ **BUT PRODUCTION SAYS IT IS NOT HAPPENING.** On the real board, `propBoard`, both sides
+unselected: `batter_hits` O0.5 median **+0.3 pp**, under-has-edge **47%**; all 0.5 lines **+0.6 pp
+/ 46%**; higher rungs **+1.1 / 46%**. No level bias, no flip, no side skew.
+⚠️ **The −4.3 pp that motivated M7 was a FIXTURE ARTIFACT** — the real board reads +0.3 on the
+same statistic. Fixture and production disagree by 4.6 pp on the exact quantity M7 explains.
+**Demoted to derivable-but-dormant.** Blast radius 617 rows of 2,026 through `shPOver`.
+⚠️ **The side-bias check nearly went wrong the same way:** the first cut used `categories` and read
+118/118 OVER at 0.5 lines — meaningless, because `categories` ranks by win probability and the
+over IS the likelier side at 0.5. **Fourth time that population has produced a confident wrong
+reading.**
 **The two paths bracket the market for DIFFERENT reasons**: the closed form has the wrong
 distributional family; the sim uses the right one and overshoots +5.0, leading candidate being the
 **endogenous PA count** (a batter's PAs depend on how the lineup performs, so a hot offence raises
