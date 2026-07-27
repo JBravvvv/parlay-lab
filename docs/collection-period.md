@@ -2686,3 +2686,106 @@ and fewer projected-lineup voids, so accrual should **rise** and the dates pull 
 **Measure it, do not project it** — projecting is the mistake being corrected here. Re-read
 `summary.reopen` on or after **2026-08-03**, once seven complete dates exist under the new
 schedule, and revise this table from that reading.
+
+# CONSENSUS DEPTH IS A FUNCTION OF TIME-TO-FIRST-PITCH (2026-07-27)
+
+The snapshot-1-vs-snapshot-2 relabel (mean `n` 1.40 → 1.66, `czf` 2.2% → 0.3%) implied depth
+grows as first pitch approaches. Measured directly across the props archive, 13 days, every
+snapshot × every row, bucketed by hours-to-first-pitch:
+
+| h to first pitch | rows | mean `n` | median | **`n ≤ 1`** | `czf` |
+|---|---|---|---|---|---|
+| 18–20 | 511 | 1.23 | 1.0 | **67%** | 0.0% |
+| 16–18 | 1,156 | 1.23 | 1.0 | 65% | 0.0% |
+| 14–16 | 3,169 | 1.41 | 1.0 | 57% | 0.8% |
+| 12–14 | 2,385 | 1.48 | 1.0 | 54% | 1.3% |
+| 10–12 | 1,757 | 1.41 | 1.0 | 56% | 3.5% |
+| 8–10 | 2,053 | 1.39 | 1.0 | 56% | **6.3%** |
+| 6–8 | 331 | 1.43 | 1.0 | 54% | 0.0% |
+| 4–6 | 1,920 | 1.57 | 1.0 | 54% | 0.0% |
+| **2–4** | 6,724 | **1.70** | 1.0 | 54% | 0.4% |
+| 0–2 | 2,546 | 1.62 | 1.0 | 55% | 0.0% |
+
+**Depth rises — 1.23 → 1.70, about +38% — but not monotonically** (a dip at 6–12 h, and 0–2 h
+sits below 2–4 h). Directionally the hypothesis holds; "monotonic" does not, and the flat
+`median n = 1.0` at every horizon is the number that matters more than the mean.
+
+## What the retime actually buys, counted
+
+A 16:00 UTC board against a 23:15 median first pitch is **~7 h out**; a 22:00 board is **~1.25 h
+out**. Reading the table across that move:
+
+| | 16:00 board (~7 h) | 22:00 board (~1.25 h) | change |
+|---|---|---|---|
+| mean books behind a fair | **1.43** | **1.62** | **+13%** |
+| rows with `n ≤ 1` | 54% | 55% | **none** |
+| `czf` — Caesars inside its own fair | 0–6% | ~0% | **effectively eliminated** |
+
+> **Two of these are real and one is not.** `czf` — the pathology where the "independent"
+> consensus check is a de-vigged Caesars price — is **a morning phenomenon**, peaking at 6.3%
+> eight to ten hours out and vanishing inside four. The retime removes it. Depth improves 13%.
+> **But `n ≤ 1` does not move at all: 54–55% of rows have one book or fewer at every horizon**,
+> so the retime reduces the thinness problem without touching its core.
+
+**Add to the retime's measured value: elimination of `czf`, +13% consensus depth. Do not claim
+it fixes thin consensus — it does not.**
+
+## `booksInd == 0` — baseline recorded, the comparison lands tomorrow
+
+On the 2026-07-26 board (built 16:46 UTC, ~6.5 h out): **54 of 303 rows at `booksInd == 0`
+(17.8%)**, carried by 16 of 196 tickets. Full distribution is long-tailed — 61 rows at 1, 66 at
+3, 13 at 31.
+
+**This cannot be compared across hours yet**: `booksInd` is a board field and exactly one board
+exists. The first 22:00 UTC board answers it directly, and the props table above predicts the
+rate should **fall** — but predicts it weakly, since `n ≤ 1` is flat. Recorded as a prediction
+so it can be wrong.
+
+# ⚠️ shUmpKf IS STRUCTURALLY INERT, NOT PENDING — and it is the SEVENTH instance of the scheduler defect
+
+Diagnosed 2026-07-27, and the answer is neither branch that was pre-committed.
+
+`public/model/context.json`, generated 2026-07-27T10:55:57Z: **`hpUmp` is null on 0 of 12
+games**, while `ump_db_games` is **171** — the historical umpire K database is healthy. The
+per-game *assignment* is what is missing, and `tools/build_context.py` L183 says why in its own
+comment: *"officials appear only near first pitch; try, never guess."*
+
+**So it is a timing failure — but not the one predicted.** The hypothesis was that the *board*
+was built too early (09:46 PT) and the 22:00 entries would fix it. Wrong: it is the **context
+job** that runs too early, and the generate retime cannot fix it, because the board reads a
+`context.json` that was already written without umpires.
+
+## And the context job has the same GitHub queueing defect, unmeasured until now
+
+Configured `0 17` and `30 22`. Measured from the Actions API (workflow `311571551`, 14 runs, all
+`event: schedule`):
+
+| configured | actually starts | delay |
+|---|---|---|
+| `0 17` | 20:16 – 20:55 Z | **+3.3 to +3.9 h** |
+| `30 22` | 06:38 – 07:48 Z **next day** | **+8.2 to +9.3 h** |
+
+Identical to the props-history pattern. **The `30 22` run — the one whose comment reads "3:30pm
+PT — night slate weather/umps firm up" — executes at ~07:45 UTC the following morning**, by
+which time `sched(today)` returns the *new* day's schedule, whose officials are not posted
+either. It has never once run near a first pitch.
+
+> ### The reclassification
+>
+> `tools/gate_activity.py` lists `shUmpKf` under **B PINNED** with "would otherwise self-arm
+> ~2026-08-04". **That projection is wrong.** It counts `ump_db_games` growth toward the `g ≥ 5`
+> gate, but the gate is never reached for a different reason: `hpUmp` is null on every game, so
+> `shUmpKf` returns `1` identically **even with the pin released**. It belongs in
+> **A STRUCTURAL — unreachable by arithmetic**, and the pin has been masking that.
+>
+> **The pin is not what makes this factor inert. Removing the pin would change nothing.**
+
+**Fix shape (not built):** `context.yml` needs the `snapshot_props.py` treatment — several
+crons across the evening, and a script that writes umpires only when it actually finds them
+rather than overwriting a good file with a null one. Today's 10:55 run overwrote whatever the
+previous day held. That is the sixth instance of *a component reporting success while
+discarding data*, and the first one found in the context pipeline.
+
+**This also means the shadow log has collected nothing for the entire collection period so far**,
+so the freeze-exit question it exists to answer — does the umpire factor earn activation — has
+no data behind it and will have none unless the cadence is fixed.

@@ -451,6 +451,34 @@ blob** — which only works because the script gzips with `mtime=0`. `2026-07-26
 (`1e77c9d`); **07-25 and 07-24 were already expired.** The ≥20-board threshold lands
 **2026-08-14** at the earliest.
 
+## ⚠️ shUmpKf IS STRUCTURALLY INERT — the pin is not what makes it so
+`public/model/context.json` carries **`hpUmp: null` on every game** (0 of 12 on 2026-07-27)
+while `ump_db_games` is 171 — the historical K database is fine, the per-game assignment is
+missing. `tools/build_context.py` L183: *"officials appear only near first pitch."* The context
+job's `30 22` run actually starts **06:38–07:48Z the NEXT day** (+8.2–9.3 h, Actions API,
+workflow `311571551`) — it has never run near a first pitch. So **`shUmpKf` returns 1
+identically even with `umpKFrozen` released**, and `gate_activity`'s "self-arms ~2026-08-04"
+was projecting off `ump_db_games` growth toward a gate that is unreachable for a different
+reason. Reclassified B PINNED → **A STRUCTURAL**. The shadow log has collected nothing all
+window. **Seventh instance of the GitHub scheduler defect; `context.yml` needs the
+`snapshot_props.py` treatment.**
+
+## Consensus depth rises toward first pitch — but thinness does not move
+Props archive, 13 days, by hours-to-first-pitch: mean `n` **1.23 (18–20 h out) → 1.70 (2–4 h)**,
+and `czf` (Caesars inside its own fair) peaks at **6.3% at 8–10 h** and is ~0 inside 4 h. So the
+16:00 → 22:00 retime buys **+13% depth and eliminates `czf`** — but **`n ≤ 1` is flat at 54–55%
+at every horizon**, so it does not fix thin consensus. `booksInd == 0` baseline on the 16:46 UTC
+board: **54 of 303 rows (17.8%)**, 16 of 196 tickets; the 22:00 comparison lands with the first
+retimed board.
+
+## Wed/Thu/Sat are BIMODAL, Sunday is SHIFTED — different fixes
+First pitch by DOW, 52 days, **hours wrapped at 12:00 UTC** (an unwrapped column makes Monday
+look 45% early when it is 1%): Mon/Tue/Fri are a single night block (1–4% started by 22:00);
+**Wed 35%, Thu 46%, Sat 51%** started by 22:00 with a getaway-day matinee block at ~17:12 plus a
+night block at ~23:00, separated by 1.1–2.4 h; **Sunday is 93% started by 22:00 in one tight
+block** (p10 17.6 → p90 20.2). One earlier sweep fixes Sunday; **Wed/Thu/Sat need a second
+sweep** — no single hour serves two blocks.
+
 ## The props archive is START-TIME SELECTED — check before using it
 `data/props` takes two readings; the later one fires ~20:08–20:55 UTC and games already
 underway are gone from the odds API. Kept games median first pitch **22.68 UTC** vs **18.18**

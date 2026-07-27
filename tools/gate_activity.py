@@ -105,6 +105,17 @@ def main():
     per = summary.get("perMarket") or {}
     report = {
         "A_structural": {
+            # RECLASSIFIED 2026-07-27 from B_pinned. It was listed as "would otherwise self-arm
+            # ~2026-08-04", projecting off ump_db_games growth toward the g>=5 gate. The gate is
+            # never reached for a different reason: context.json carries hpUmp=null on EVERY game
+            # (0 of 12 on 2026-07-27) because the context job's "umps firm up" run is configured
+            # 30 22 and actually starts 06:38-07:48Z the NEXT day (+8.2 to +9.3h, Actions API,
+            # workflow 311571551) -- it has never run near a first pitch. So shUmpKf returns 1
+            # identically EVEN WITH THE PIN RELEASED. The pin was masking structural inertness.
+            "shUmpKf": {"fired": False,
+                        "why": "hpUmp is null on every game: the context job's night run lands "
+                               "+8-9h late, after officials would have posted. Returns 1 with or "
+                               "without SH_CFG.umpKFrozen. NOT pending -- see docs/collection-period.md"},
             "slopeMults": {"fired": bool(cal.get("mults")),
                            "why": "needs slope + 1.96*se < 1; at measured within-market sigma_p that is a fitted slope below -0.54 to -3.45"},
             "hrr_slope_band": {"fired": None,
@@ -112,7 +123,7 @@ def main():
         },
         "B_pinned": {
             "shPenQF": {"fired": False, "why": "SH_CFG.penQFrozen — activation plan in docs/collection-period.md"},
-            "shUmpKf": {"fired": False, "why": "SH_CFG.umpKFrozen — would otherwise self-arm ~2026-08-04"},
+
         },
         "C_zeroed": {
             "mayAutoRun": {"fired": False, "why": "MAX_AUTO_RUNS_PER_DAY = 0, prompt-only by design"},

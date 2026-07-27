@@ -1027,3 +1027,44 @@ Applied concretely, and pre-committed: **if Phase 2 shows no rung dependence in 
 ladder finding is retracted even if the 20-board reading agrees with it.** The precedence is
 declared before the numbers so it cannot be re-argued once they land — which is the only time
 anyone ever wants to re-argue it.
+
+## THE FIXTURE IS THINNEST WHERE THE FINDINGS ARE — quantified 2026-07-27
+
+`propBoard` rows, armed fixture vs the real 2026-07-26 board:
+
+| market | fixture | real board | **ratio** | a finding rests on it? |
+|---|---|---|---|---|
+| `batter_home_runs` | **133** (46% of the fixture) | 768 | 5.8× | no — 100% one-sided, no `fair` |
+| `batter_hits` | 81 | 743 | 9.2× | no |
+| `batter_total_bases` | 42 | 391 | 9.3× | TB over-dispersion (2.30), open |
+| `pitcher_strikeouts` | 12 | 169 | 14.1× | no |
+| **`pitcher_outs`** | **7** | 42 | **6.0×** | **YES — the whole outs audit** |
+| **`batter_hits_runs_rbis`** | **14** | 304 | **21.7×** | **YES — the ladder finding** |
+| TOTAL | 289 | 2,417 | 8.4× | |
+| games | 6 | 15 | 2.5× | |
+
+**The fixture is 8.4× smaller overall and 21.7× smaller on H+R+RBI** — disproportionately thin
+in exactly the market that produced the ladder finding, and 46% of what it does have is the
+one market that cannot be priced two-sided.
+
+### The pre-commitment has to split, because the two instruments need different things
+
+The framing "if the real-board IQR ratios sit inside the fixture's CI" presumes a **fixture IQR
+ratio for H+R+RBI and outs**. There isn't one, and at 14 and 7 rows there cannot be — an IQR on
+7 rows is two order statistics. **The range detector has never run on the fixture and never can
+for these markets.** So:
+
+| instrument | fixture rows | comparison at 08-15 | what it tests |
+|---|---|---|---|
+| **clamp / shrink audits** | fires 5,183 times across 25 sites — *not* propBoard-limited | **fixture vs archive** | is the fixture representative? |
+| **range detector** (IQR ratios) | **cannot run** — 14 HRR / 7 outs rows | **board vs boards** (n=1 → n≈20) | is the one-board reading stable? |
+
+That is the different-instrument / more-runs distinction again, now resolved per market rather
+than in general. **The clamp thresholds (≤2 / ≥5 of 25) stand as reinstated. The range detector
+gets the separate pre-commitment already recorded** — median ≤ 0.70 with p10–p90 excluding 1.0
+confirms; median > 0.85 or straddling 1.0 retracts — and its independent check remains Phase 2's
+rung-dependence test, not the archive.
+
+**And the clamp audit's own exposure is now nameable:** L2258 (`pitcher_outs`) fires **6 times**
+on the fixture against 42 real outs rows. Its 95% Wilson interval is [0.61, 1.00]. That site,
+not the propBoard counts, is what the archive series has to clear.

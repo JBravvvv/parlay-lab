@@ -453,3 +453,53 @@ constant that would itself expire one day.
 **Still unshipped, and deliberately:** raising `SUMMARY_DAYS` itself. If it is ever raised it
 must land **before 2026-09-08**, not at freeze exit — landing it at exit would move the weights
 on the same day the exit reading is taken.
+
+# WED/THU ARE GETAWAY DAYS — the cause, not just the mechanism (2026-07-27)
+
+Keep rates of 43% (Wed) and 50% (Thu) against 93–100% Mon/Tue/Fri were labelled "start-time
+selection". That is the mechanism. **The cause is the schedule**, and it dictates a different
+fix from Sunday's.
+
+First pitch by day of week, 52 days (2026-06-05 → 07-26, 664 games). **Hours are wrapped at
+12:00 UTC** — a 00:40 UTC first pitch is a *late* game, and an unwrapped hour column makes
+Monday look 45% early when it is 1%:
+
+| dow | games | p10 | p25 | median | p75 | p90 | **started by 22:00 UTC** | shape |
+|---|---|---|---|---|---|---|---|---|
+| Mon | 67 | 22.7 | 23.1 | 23.7 | 25.6 | 25.8 | **1%** | single night block |
+| Tue | 92 | 22.7 | 22.8 | 23.7 | 24.7 | 25.7 | 2% | single night block |
+| **Wed** | 92 | **17.2** | 19.2 | 22.7 | 23.7 | 24.7 | **35%** | **BIMODAL**, gap 2.4 h |
+| **Thu** | 54 | **17.2** | 17.7 | 22.7 | 23.2 | 24.1 | **46%** | **BIMODAL**, gap 1.1 h |
+| Fri | 117 | 22.7 | 23.1 | 23.6 | 24.2 | 26.1 | 4% | single night block |
+| **Sat** | 121 | 18.2 | 20.1 | 20.2 | 23.2 | 25.7 | **51%** | **BIMODAL**, gap 1.9 h |
+| **Sun** | 121 | 17.6 | 17.7 | **18.2** | 19.2 | 20.2 | **93%** | **single early block** |
+
+**Confirmed: Wed and Thu are bimodal, Sunday is shifted.** Wednesday and Thursday carry a
+getaway-day matinee block at ~17:12 UTC *plus* a normal night block at ~23:00, separated by 2.4
+and 1.1 hours. Sunday has one block, 93% of it inside a 2.6-hour window (p10 17.6 → p90 20.2)
+and essentially no night games.
+
+## Which means the fixes are different, and only one of them is already scheduled
+
+| day | shape | fix |
+|---|---|---|
+| **Sunday** | one early block | **one earlier sweep catches everything** — the 17:00 UTC entry. Already scheduled, tested 08-02 |
+| **Wed · Thu · Sat** | **two blocks** | **a single sweep cannot catch both.** Earlier catches the matinees and loses the night games; later does the reverse. Needs a **second sweep** on those days |
+
+> **So the retime fully fixes Sunday and only half-fixes Wed/Thu/Sat**, and it half-fixes them
+> in the direction that keeps the *night* block — which is the larger one on Wed/Thu (65% and
+> 54%) but the smaller one on Saturday (49%).
+
+`tools/snapshot_props.py`'s self-pacing already handles this correctly **in principle**: it
+takes a close whenever the next unstarted first pitch is within 95 minutes, at most one per 40
+minutes, so a bimodal day should produce *two* closes. The ten crons span 17:00–01:00 UTC, which
+covers both blocks. **This has never been observed working, because no snapshot has yet carried
+`kind` at all.** The first bimodal day under the new cadence — **Wednesday 2026-07-29** — is the
+test, and it is a different test from Sunday 08-02:
+
+* **Wed 07-29**: does a bimodal day produce **two** closes, one per block? If it produces one,
+  `MIN_GAP_S` (40 min) or the window is wrong for split slates.
+* **Sun 08-02**: does a single-block day produce a close at all, and does the keep rate go from
+  6.7% to ≥90%?
+
+Both are printed by `tools/close_capture.py`.
