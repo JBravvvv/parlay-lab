@@ -1274,3 +1274,36 @@ This is why, across this phase, the choice has consistently been to **record and
 Each of those trades a visible gap for no gap at all, and refuses the trade in the other
 direction. **When the choice is between a hole and a lie, take the hole** — and make the tool
 that reports holes good enough that taking it costs little.
+
+## IS ANY BRANCH LOGICALLY IMPOSSIBLE? — a one-time pass over every pre-committed table
+
+**A path with strictly more information producing strictly less structure is a contradiction,
+not a finding.** So each pre-committed branch table was re-read asking whether any branch is
+*impossible* rather than merely *unexpected* — because an impossible branch is
+**diagnostic-of-the-instrument**, and reading it as diagnostic-of-the-world is how a broken tool
+gets promoted to a discovery.
+
+| table | branch | verdict |
+|---|---|---|
+| **HRR / TB rung signatures** | both markets flip the **same** way | ⚠️ **INSTRUMENT.** Two populations with *opposite measured dispersion* cannot share a rung signature. Read as instrument failure, not as a result about either market |
+| | both flip **opposite** to prediction | ✅ world — the dispersion measurements are sign-inverted. Findable, fixable |
+| **sim vs closed form** | rung dependence in **closed form only** | ⚠️ **INSTRUMENT (the sim).** More information producing less structure. Not impossible — the sim can be wrong — but it is a statement about the sim, never about the markets |
+| **clamp fixture-representativeness** | ≤2 / 3–4 / ≥5 disagree | all three possible; none diagnostic-of-instrument |
+| **range detector, 20 boards** | confirm / retract / straddle | all possible |
+| **08-02 scheduler** | punctual / offset / fat tail | mutually exclusive, all possible |
+| **Sunday keep rate** | ≥90% / 6–30% / between | all possible |
+| **Phase 2 slope** | negative **with** the identification diagnostic showing power | ✅ world |
+| | negative **without** power | ⚠️ **INSTRUMENT** — already marked as "no result, not a negative one" |
+
+**Three of nine branches are instrument-diagnostic, and all three were already marked.** The
+pass found no unmarked one — which is the useful outcome for a check like this, and cheaper to
+establish than to assume.
+
+### The rule
+
+**Before a branch table is committed, ask of each branch: could the world produce this?** If the
+answer is no, or only via a defect in the measuring apparatus, label it
+**diagnostic-of-the-instrument** in the table itself. Two failures this project has already had —
+the range detector's three wrong versions and the `.full` guard that never ran — were both
+instruments producing confident output, and in neither case did the output *look* impossible.
+Marking the branches in advance is the only moment when that judgement is cheap.

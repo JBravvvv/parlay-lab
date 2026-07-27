@@ -518,7 +518,23 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ THE SIM PRICES ONE MARKET — H+R+RBI, and only 33 of its 50 rows
+for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ THE SIM COMPUTES FOUR MARKETS AND THE LOOP READS ONE
+`SIM_STAT` (L2045) maps hits/TB/HR/HRR; legs are pushed for all four (L2138); `legP` is populated
+for all four; **L2394 reads only `mkt==="batter_hits_runs_rbis"`.** On the armed fixture `legP`
+holds **96 HR + 57 hits + 30 TB + 13 HRR — 183 of 196 batter legs simulated and discarded every
+run.** The sim also threads **starter outs** (`outsBySP*`) against the leash and discards them.
+It does **not** model strikeouts at all (an out is undifferentiated), so K's are re-architecture.
+**Sim minus closed-form `pModel`, same row, oriented:** hits **+9.2 pp median**, TB **+5.0**,
+HR +1.2, and **HRR 0.0 (control — it already takes the sim value, max 0.1 pp)**. The control
+validates the join. This says the paths DISAGREE, not that the closed form is wrong by 9.2 pp —
+sim-higher is as consistent with a sim bias, which is what the closed-form-only branch suspects.
+Fixture magnitudes (`SIM_PATHS_FIXTURE`), indicative only.
+**Amendment bundle is on TWO axes** (model in pp, allocation in bp) and the model ones OVERLAP —
+**sim routing subsumes `shParkF` routing** for any market it covers. Order in
+`docs/collection-period.md`; the outs constant swap stays the recommendation with sim routing as
+the strictly-better option, cost stated.
+
+## ⚠️ THE SIM PRICES ONE MARKET — H+R+RBI, and only 33 of its 50 rows
 L2393 applies the `sim` tag **only** inside `if(simP && mkt==="batter_hits_runs_rbis")`. Measured
 07-26: hits 0/50 sim, TB 0/50, HR 0/50, HRR 33/50, K's 0/35, outs 0/38. **84% of batter rows and
 100% of pitcher rows are closed-form**, so `shParkF`/`shPitIsoF`/`shPenF` reach **16.5% of batter

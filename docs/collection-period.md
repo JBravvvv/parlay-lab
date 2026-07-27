@@ -3036,7 +3036,12 @@ Quartiles and the median are unaffected.
 **The modal starter sits at 89.7 ppg, inside the dead zone, and the ENTIRE interquartile range
 (86.0 – 95.2) is inside it.** So the factor fires only outside the IQR.
 
-> **Verdict: this one is by design, and the design is roughly centred on today's population.**
+> **CLOSED — verdict, magnitude, and why it will not be re-raised.**
+**Magnitude: a −4% / +2% lever on 38% of starts, against a 23.5 pp gap.** That is an order of
+magnitude too small to be the `pitcher_outs` story even if it were miscalibrated, and it is not
+miscalibrated. Both halves are recorded so the closure is checkable rather than a verdict.
+
+**Verdict: by design, and the design is roughly centred on today's population.**
 > 84 sits at ~p17 and 97 at ~p78, so the band is close to symmetric — 17% below, 21% above. It
 > is **not** the `g >= 5` shape, where a threshold sat 7× below where the data had moved to.
 > Recorded as checked rather than assumed, which is the point of asking.
@@ -3047,3 +3052,114 @@ compression and the leash ceiling. Its lever is **−4% / +2% on 38% of starts.*
 gap that is not a candidate mechanism and should not be pursued as one. **It is a small,
 correctly-calibrated factor in a badly broken market**, and saying so closes it rather than
 leaving it on the list.
+
+# THE SIM COMPUTES FOUR MARKETS AND THE PRICING LOOP READS ONE (2026-07-27)
+
+**It is a one-line market filter, not missing machinery.** Confirmed against the code:
+
+```js
+var SIM_STAT={batter_hits:"h",batter_total_bases:"tb",batter_home_runs:"hr",batter_hits_runs_rbis:"hrr"};  // L2045
+...legs.push({key:shLegKey(row.p,mkt,row.ln),team,bat:bi,stat,ln:row.ln,base});                            // L2138
+...if(simP&&mkt==="batter_hits_runs_rbis"&&!simP.liveInit){var sp=simP.legP[...];}                          // L2394
+```
+
+Legs are built for **all four** markets. `legP` is populated for all four. **L2394 reads one.**
+
+## What the sim computes, and where each quantity goes
+
+| quantity | computed | surfaces into a price? |
+|---|---|---|
+| per-batter **hits** | `hA` accumulator, `halfInning` | **DISCARDED** — in `legP`, never read |
+| per-batter **total bases** | `tA` | **DISCARDED** |
+| per-batter **home runs** | `hrA` | **DISCARDED** |
+| per-batter **runs** | `rA` | feeds `hrr` only |
+| per-batter **RBI** | `rbiA` | feeds `hrr` only |
+| **H+R+RBI** | `legP[…hrr…]` | ✅ **read** — the only one |
+| **starter outs** | `outsBySPHome/Away`, threaded L1854–1871 against the leash | **DISCARDED** |
+| starter **PA / runs allowed** | `spPA`, `spRuns` | **DISCARDED** (used internally for the `V2` hook rule) |
+| bullpen entry (`vsBP`) | `spOuts >= leash` | internal only |
+| game runs / ML | `pHome` | ✅ read |
+| RL cover | via `mapCover` | ✅ read |
+| **strikeouts** | **not modelled at all** | — an out is undifferentiated |
+| **pitch count** | not modelled | — |
+
+**On the armed fixture, `legP` holds 96 HR, 57 hits, 30 TB and 13 H+R+RBI leg probabilities.
+183 of 196 batter legs are simulated and thrown away every run.**
+
+## How far apart the two paths actually are
+
+Sim probability minus the shipped closed-form `pModel`, same row, oriented to the row's own side:
+
+| market | n | **median** | p10 | p90 | mean abs | max abs |
+|---|---|---|---|---|---|---|
+| **`batter_hits`** | 38 | **+9.2 pp** | −0.3 | +12.8 | 8.4 | 14.3 |
+| **`batter_total_bases`** | 30 | **+5.0 pp** | −4.0 | +11.1 | 5.9 | 14.8 |
+| `batter_home_runs` | 37 | +1.2 | −2.5 | +5.2 | 2.4 | 7.6 |
+| **`batter_hits_runs_rbis` — CONTROL** | 13 | **0.0** | −0.1 | 0.0 | **0.0** | **0.1** |
+
+**The control is the point.** H+R+RBI rows already take the sim value, so sim − `pModel` must be
+zero there, and it is (max 0.1 pp, rounding). The join and the over/under orientation are
+therefore correct, and the other three rows are a real disagreement rather than a bookkeeping
+artifact.
+
+> ⚠️ **THIS SAYS THE PATHS DISAGREE. IT DOES NOT SAY THE CLOSED FORM IS WRONG BY 9.2 pp.**
+> The direction is consistently *sim-higher*, which is as consistent with a sim bias as with a
+> closed-form one — and the sim is exactly the path the closed-form-only branch of the rung
+> table exists to suspect. Measured on the **fixture** (`SIM_PATHS_FIXTURE`, not production
+> `simN`), so the magnitudes are indicative. **What is established is the size of the open
+> question, not its answer.**
+
+**Which makes the "why is the sim HRR-only" answer: a one-line filter.** The cost of routing the
+other three is not machinery — it is that every hits/TB/HR price moves by a median 1.2–9.2 pp,
+which is a freeze-class change needing its own validation, not a widening of a condition.
+
+# FREEZE-EXIT AMENDMENT BUNDLE — ordered by evidence (2026-07-27)
+
+## First: two axes, not one. Four amendments are not commensurable.
+
+| | amendments | axis |
+|---|---|---|
+| **MODEL** — change model-minus-market | `shParkF` routing · sim routing · HRR λ conditioning · the `pitcher_outs` constant | measured in **pp of probability** |
+| **ALLOCATION** — change what is bet, not what is believed | leg-equivalent EV floor · edge-aware base weight | measured in **bp of log-growth** |
+
+**The allocation pair does not move model-minus-market at all.** Ranking all four on that axis
+would have put two of them at zero and read as "no effect" rather than "wrong axis".
+
+## MODEL amendments — and they OVERLAP, so they cannot be summed
+
+> **Sim routing SUBSUMES `shParkF` routing for every market it covers.** A hits/TB/HR price that
+> goes through the sim gets `parkH`/`parkHR` automatically, along with platoon, xISO-against,
+> bullpen chains and teammate correlation. Adding park to the closed form and then routing the
+> same market to the sim would be two solutions to one problem.
+
+| rank | amendment | measured effect | reaches |
+|---|---|---|---|
+| **1** | **sim routing, batter markets** (widen the L2394 filter) | hits **+9.2 pp median**, TB **+5.0**, HR +1.2 (fixture; sign is disagreement, not error) | 150 of 200 batter rows |
+| **2** | **`pitcher_outs` → sim** (collect `outsBySP*`) | the closed form's gap is **23.5 pp**; the sim path already models the hook the closed form cannot use | 38 outs rows, 100% of them |
+| **3** | **`shParkF` → closed form** | hit rate **1.5% median / 3.5% max**; **HR rate 4.5% median / 11.0% p90 / 14.5% max** | **the residual after 1 and 2** — pitcher K's permanently, plus any market left closed-form |
+| **4** | **HRR λ conditioning** | closed-form λ has **zero** site variation on a non-Coors slate; recovers ~0.12 of spread against a market drift of +0.479 | 17 of 50 HRR rows (34%) |
+| **5** | `pitcher_outs` constant `0.140`→`0.400` | gap −23.3 → **−11.5 pp**, above-market 0/38 → 11/38 | 38 rows — **alternative to 2, not additional** |
+
+**Recommendation unchanged: the constant swap stays the shipped recommendation for outs** (small,
+verified, reversible). Sim routing is the strictly better option and is now in the bundle **with
+its cost stated** — every outs price moves, and it needs its own validation pass.
+
+## `shParkF` → closed form: the spec
+
+| | |
+|---|---|
+| **where** | L2326, the three closed-form factors. `hF` and `tbF` take **`parkH`**; `hrF` takes **`parkHR`** — the two are separate columns in `SH_PRIORS.parks[L\|R]` and must not be crossed |
+| **handedness** | the table is keyed `L`/`R` by **batter stand**, which the closed form already has (it passes `stand` to `shParkF` in the sim path at L2059) |
+| **⚠️ the Coors flag must be REMOVED in the same change** | `(coors?1.07:1)`, `(coors?1.10:1)`, `(coors?1.08:1)` are **park factors**. Coors Field is in the park table. Leaving both applies the venue twice — a **1.07 × 1.085 = 1.16 hit factor** where the table says 1.085. This is the double-counting check and it is not optional |
+| **H+R+RBI** | L2358 must take the blended factor from amendment 4, not a raw `parkH` — its λ is a per-**game** rate, and a per-**AB** park factor applied to it is a units error |
+| **projected effect** | closed-form batter rows move by the per-venue error above: hits ±1.5% median, HR ±4.5% median / 14.5% max. **Directionally it removes a known bias rather than adding an unknown one** — the current value is provably wrong at 29 of 30 parks |
+
+## ALLOCATION amendments — ranked on their own axis
+
+| rank | amendment | measured effect |
+|---|---|---|
+| 1 | **edge-aware base weight** (`base = max(ev,0)/(dec−1)` instead of `prob`) | log-growth **126.6 → 187.2 bp**; crossover **3.05 → 1.40 pp** |
+| 2 | leg-equivalent EV floor | **4 of 18 tickets (22%)** over-admitted today; crossover 3.05 → 3.50 pp |
+
+**Both stay unshipped and both are still gated on a positive Phase 2** — they are corrections to
+machinery that assumes an edge exists.
