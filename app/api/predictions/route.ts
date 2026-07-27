@@ -56,18 +56,45 @@ export async function PUT(req: NextRequest) {
   }
   const date = body.date ?? "";
   if (!DATE_RE.test(date)) return NextResponse.json({ error: "bad date" }, { status: 400 });
+  /* TRUNCATION IS NOW LOUD AND RECORDED (2026-07-27).
+     These `.slice()`s dropped the tail with no error, no log and no trace — the same shape
+     this project has now found six times: a component reporting success while discarding
+     data. It sits upstream of `mktN`, so a silent drop here moves every market's reopening
+     date and nothing would say why. The CONSTANT is not raised (frozen); the loss is simply
+     made visible, both at the moment it happens and afterwards in the store. */
+  const sentR = Array.isArray(body.records) ? body.records.length : 0;
+  const sentP = Array.isArray(body.parlays) ? body.parlays.length : 0;
   const records = Array.isArray(body.records) ? body.records.slice(0, MAX_RECORDS) : [];
   const parlays = Array.isArray(body.parlays) ? body.parlays.slice(0, MAX_PARLAYS) : [];
   const games = body.games && typeof body.games === "object" ? body.games : {};
+  const dropR = sentR - records.length;
+  const dropP = sentP - parlays.length;
+  if (dropR || dropP) {
+    console.warn(
+      `[predictions] TRUNCATED ${date}: records ${sentR}->${records.length} (dropped ${dropR}, cap ${MAX_RECORDS}), ` +
+        `parlays ${sentP}->${parlays.length} (dropped ${dropP}, cap ${MAX_PARLAYS})`,
+    );
+  }
 
   try {
     const now = Date.now();
     const cur = await redisGetJson<DayBlob>(dayKey(date));
     const { blob, written } = mergeDayBlob(cur, date, records, parlays, games, now);
+    /* recorded on the blob, not only in the log: a Vercel log line ages out, and the
+       question "was this day complete?" gets asked weeks later, at freeze exit. Absence of
+       `trunc` is the claim that nothing was dropped. */
+    if (dropR || dropP) {
+      blob.trunc = [...(blob.trunc ?? []), { at: now, sent: sentR, kept: records.length, dropped: dropR, droppedParlays: dropP }].slice(-10);
+    }
     if (JSON.stringify(blob).length > MAX_BYTES) return NextResponse.json({ error: "day blob too large" }, { status: 413 });
     await redisSetJson(dayKey(date), blob);
     await redis(["SADD", DAYS_SET, date]);
-    return NextResponse.json({ ok: true, written, total: Object.keys(blob.records).length });
+    return NextResponse.json({
+      ok: true,
+      written,
+      total: Object.keys(blob.records).length,
+      ...(dropR || dropP ? { truncated: { sent: sentR, kept: records.length, dropped: dropR, droppedParlays: dropP } } : {}),
+    });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }

@@ -2615,3 +2615,90 @@ projected-lineup voids, so accrual should **rise** and the dates should pull in.
 `summary.reopen` (printed by `tools/gate_activity.py` with `rateDays` as its denominator) on
 or after **2026-08-03**, once seven complete dates exist under the new schedule, and revise
 this table from that reading.
+
+## WHAT THE FREEZE IS NOW DESIGNED TO PRODUCE — the standing question, answered (2026-07-27)
+
+Asked plainly, so answered plainly. The freeze was set up to decide whether this engine has
+edge. The accrual arithmetic changed what will be in it. Here is what a decision on ~2026-09-22
+can and cannot rest on.
+
+### The two questions are not the same question, and only one will have data
+
+| question | instrument | n at exit |
+|---|---|---|
+| **Does the model's disagreement with the market predict closing movement?** | Phase 2 movement slope, board-wide | **full window** |
+| **Do the bets make money?** | ledger P/L, CLV-on-bets, Discipline | **≈ 0** |
+
+Phase 2 answers *"is there information in the disagreement"*. It does not answer *"does the
+selection-and-staking machine convert that information into money"* — and the second is a
+strictly harder question, because it also contains the +2% gate, `consMinEv`, the leg-equivalent
+floor, the edge-blind base weight, correlation handling and stake sizing. **Every one of those
+is untested by Phase 2**, and four of them are already on the freeze-exit amendment list.
+
+### What a POSITIVE Phase 2 licenses
+
+A significant positive movement slope, surviving the intercept and bucketed by rung, licenses
+exactly one conclusion:
+
+> **The model's disagreement carries information the closing market later confirms.**
+
+That is genuinely the load-bearing question — a model whose disagreement is noise cannot be
+rescued by any staking rule, so a negative result would end the project's premise. A positive
+result **does not** license: a bankroll increase, loosening `consMinN`, unfreezing parameters,
+or any claim about realised P/L. It licenses **proceeding to the bet-channel question with the
+premise established**, which is the thing that is currently unestablished.
+
+It also *does* license the specific amendments whose arithmetic is already written and whose
+only missing input was "is the model's edge real at all": the leg-equivalent EV floor, the
+`consMinEv` scaling, the edge-aware base weight, the H+R+RBI clamp. Those are corrections to
+machinery that assumes an edge exists; a positive Phase 2 is what makes them worth applying.
+
+### What a NEGATIVE Phase 2 licenses
+
+A slope indistinguishable from zero, **with the identification diagnostic showing the fit had
+power** (that qualifier is doing real work — an attenuated or collinear fit is not a negative
+result, it is no result), licenses:
+
+> **The disagreement is not information, and no staking rule fixes that.**
+
+Then the correct action is to stop tuning selection and staking and go back to the model — and
+the `pitcher_outs` positive control is what makes this readable: outs is *known* broken, so a
+negative on outs alongside a positive elsewhere is a working instrument, while a negative
+everywhere including markets with no known defect is a different and worse finding.
+
+### And yes — there is a reading where the right action at exit is KEEP COLLECTING
+
+Better to know its shape now than to arrive at it. It is the **most likely** outcome, not a
+failure mode:
+
+**"Keep collecting" is correct if the Phase 2 result is positive but the bet channel is empty.**
+That is precisely the state the reopening dates predict: Total Bases opens 08-17, K's and outs
+09-03, so at 09-22 the ledger holds a few weeks of prop bets on some markets and none on
+others. Phase 2 will have answered its question; the P/L question will not have been asked yet.
+
+In that state the honest exit reading is:
+
+1. **the premise is established** (or not) by Phase 2 — a real, dated answer;
+2. **the bet channel needs its own window**, and the natural length is the same `consMinN = 100`
+   logic applied to *bets* rather than graded legs;
+3. so the freeze **exits on schedule for parameters** — the amendment bundle applies, the
+   collection-period pins come off — while the **P/L question stays open with a new date**.
+
+**Those are two separate exits and they were conflated.** The parameter freeze can end on
+09-22 because Phase 2 will have supplied what it was waiting for. The bankroll decision cannot,
+because nothing will have measured it. Deciding both on one date would mean deciding the second
+one on n≈0 — which is exactly the failure this freeze exists to prevent, arriving from the
+other direction.
+
+### The concrete answer
+
+> **At ~2026-09-22 you can decide whether the model has edge, and you can apply the frozen
+> parameter amendments. You cannot decide bankroll or sizing, and you should not try.**
+>
+> **The cost of that is one number: the close-capture rate.** Phase 2 is the entire evidence
+> base for the first decision, so a day without a close is not a gap in a redundant record —
+> it is a permanent subtraction from the only channel that will have anything in it. Watch
+> `tools/close_capture.py` daily; that is the whole health story now.
+
+This was not the design. It is what the accrual arithmetic produced, and stating it beats
+arriving at it on 09-22 with four readings of which three are empty.

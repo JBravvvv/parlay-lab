@@ -375,7 +375,7 @@ The ≥20-board threshold now has a **date** instead of a hope.
 
 | board dates | count | 20th board |
 |---|---|---|
-| 07-26 backfill + 07-27 → 08-14 | 20 | **2026-08-14** (archived 08-15) |
+| 07-26 backfill + 07-27 → 08-14 | 20 | 2026-08-14 (archived 08-15) — **superseded, see below** |
 | without the backfill, 07-27 → 08-15 | 20 | 2026-08-15 |
 
 Both are **floors**, and they assume a board is generated and stored every day. A day where
@@ -383,7 +383,12 @@ the generation fails, or an off-day with no slate, pushes the date out one for o
 archive prints `BOARD SERIES n = <k>` on every run, so `n` is read off the run rather than
 counted forward from an assumption.
 
-On **2026-08-14** these become answerable for the first time on more than one board:
+**REVISED 2026-07-27 — the threshold is 2026-08-15.** The 07-26 backfill was archived before
+`clampActivity` shipped, so it carries no clamp data and cannot join the comparison series.
+Counting instrumented boards only: **19 by 08-14, 20 by 08-15**. The crossover doctrine's review
+date moves with it.
+
+On **2026-08-15** these become answerable for the first time on more than one board:
 
 | currently resting on | what n=20 changes |
 |---|---|

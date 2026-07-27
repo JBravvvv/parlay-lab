@@ -66,13 +66,34 @@ describe("prediction accrual volume — the rate that sets every reopening date"
     expect(bytes).toBeGreaterThan(50_000); // ...and a suspiciously SMALL blob is also a failure
   }, 120_000);
 
-  it("MAX_RECORDS truncates SILENTLY on the client path — pinned so it is not forgotten", () => {
+  it("MAX_RECORDS truncation is LOUD and RECORDED — no longer silent", () => {
     const MAX_RECORDS = Number(/const MAX_RECORDS = (\d+);/.exec(ROUTE)?.[1]);
-    expect(MAX_RECORDS).toBe(800);
-    // `.slice(0, MAX_RECORDS)` drops the tail with no error and no log. /api/generate does
-    // NOT slice, so only the client PUT path can lose rows this way — at 4x today's volume.
+    expect(MAX_RECORDS).toBe(800); // NOT raised: frozen. Only the loss is made visible.
     expect(ROUTE).toContain("body.records.slice(0, MAX_RECORDS)");
-    expect(ROUTE).not.toContain("records.length > MAX_RECORDS"); // no guard exists; pinned as fact
+    // 1. it logs, with the dropped count
+    expect(ROUTE).toMatch(/console\.warn\(\s*`\[predictions\] TRUNCATED/);
+    expect(ROUTE).toContain("const dropR = sentR - records.length");
+    // 2. it lands on the day blob, so the loss survives the log's retention
+    expect(ROUTE).toContain("blob.trunc = [");
+    // 3. and it comes back in the response, so the caller knows too
+    expect(ROUTE).toContain("truncated: { sent: sentR");
+  });
+
+  it("/api/generate NEVER slices — asserted, because the cron path is what feeds mktN", () => {
+    const GEN = fs.readFileSync(path.join(__dirname, "..", "app", "api", "generate", "route.ts"), "utf8");
+    /* This was stated as fact in a report before it was checked. A truncation on the CRON
+       path would move every market's reopening date with nothing to show for it — the client
+       path at least has a human watching a response. So: no slice, cap or take anywhere
+       between boardToPredictions and mergeDayBlob. */
+    const from = GEN.indexOf("boardToPredictions(data");
+    const to = GEN.indexOf("redisSetJson(dayKey(date)");
+    expect(from).toBeGreaterThan(0);
+    expect(to).toBeGreaterThan(from);
+    const span = GEN.slice(from, to);
+    expect(span).not.toMatch(/\.slice\(/);
+    expect(span).not.toMatch(/MAX_RECORDS|MAX_PARLAYS/);
+    // the records it merges are exactly the ones the board produced
+    expect(span).toMatch(/mergeDayBlob\(cur, date, records, parlays, games, now/);
   });
 
   it("repeated passes do not grow the blob without bound — hist is capped", () => {

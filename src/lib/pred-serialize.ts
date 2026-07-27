@@ -129,6 +129,12 @@ export type DayBlob = {
   games: DayGames;
   /** one entry per generation pass, newest last; join on PredRecord.at */
   gens?: GenStamp[];
+  /** 2026-07-27 — set ONLY when a PUT was truncated by MAX_RECORDS/MAX_PARLAYS.
+   *  Its ABSENCE is the claim that nothing was dropped on this date, which is the question
+   *  asked weeks later at freeze exit, long after a Vercel log line has aged out. Written
+   *  by /api/predictions (the client path); /api/generate does not slice at all — asserted
+   *  in tests/accrual-volume.test.ts, because the cron path is what feeds `mktN`. */
+  trunc?: { at: number; sent: number; kept: number; dropped: number; droppedParlays: number }[];
 };
 
 const oddsNum = (v: unknown): number | null => {

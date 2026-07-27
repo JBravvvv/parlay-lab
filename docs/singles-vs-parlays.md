@@ -190,20 +190,24 @@ quantity Phase 2 and the calibration channel exist to produce. Re-run this table
 > the doctrine; **this** is, and the recommendation ("don't re-spec Phase 4") is what it
 > implies while the quantity is unmeasured.
 
-> ### 📅 REVIEW DATE — 2026-08-14
+> ### 📅 REVIEW DATE — 2026-08-15
 >
 > The rule rests on **one board**. It is not allowed to rest on one board indefinitely, so it
 > carries a date rather than an intention.
 >
 > The board archive (`data/boards/` on `line-history`, built 2026-07-27) began accruing on
-> 2026-07-27 with 2026-07-26 backfilled. The **20th board date is 2026-08-14** — 07-26 plus
-> 07-27 → 08-14 — archived on 08-15. That is a **floor**: a failed generation or a slate-less
-> day pushes it out one for one, and `tools/archive_boards.py` prints `BOARD SERIES n = <k>`
-> on every run so `n` is read off the run rather than counted forward.
+> 2026-07-27 with 2026-07-26 backfilled. **Revised 2026-07-27:** the 07-26 backfill predates
+> the `clampActivity` instrumentation, so it cannot join the comparison series. Counting only
+> instrumented boards, **07-27 → 08-15 is the 20th** — 19 by 08-14. The honest date is
+> **2026-08-15**, one day later than first stated, and the reason is on the record.
+>
+> That is still a **floor**: a failed generation or a slate-less day pushes it out one for one,
+> and `tools/archive_boards.py` prints `BOARD SERIES n = <k>` on every run so `n` is read off
+> the run rather than counted forward.
 >
 > On that date the crossover becomes a **distribution** instead of a point, and the ≥20-board
 > reading Phase 3 deferred its no-shrink default to (`WITHIN 1.00 [0.90, 1.17]`, n=37 legs)
-> becomes available on the same series. Before 2026-08-14 the rule stands as written; the
+> becomes available on the same series. Before 2026-08-15 the rule stands as written; the
 > number in it does not.
 
 Running estimate of the crossover, one row per board:

@@ -553,3 +553,74 @@ are not readable until **~2026-08-06** whatever happens with the key.
 **The one thing that can move all of these earlier or later is close CAPTURE RATE**, not row
 volume — a day whose ten crons all miss the ~95-minute window yields a `pre` reading and no
 close. That is the number to watch first, and it is readable tomorrow.
+
+---
+
+# SERIES B's DAY-LEVEL VOLUME — diagnosed 2026-07-27, and the answer inverts the worry
+
+The suspicion was that 14 rows on 07-14 and 210 on 07-16 against 3,259 on 07-20 meant the
+archive had failed on those days, which would make Series B selected on
+days-the-archive-worked — a selection nobody had bounded. **It is not that.**
+
+| day | events in snapshot 1 | **MLB slate** | verdict |
+|---|---|---|---|
+| 2026-07-14 | 1 | **1** | All-Star break — captured 1 of 1 |
+| 2026-07-16 | 1 | **1** | break day — 1 of 1 |
+| 2026-07-23 | 5 | **5** | 5 of 5 |
+| every other day | 13–15 | 15–17 | |
+
+**The snapshot ran on all 13 days and captured every game on the slate in its first reading.**
+The near-empty days are near-empty slates. **There is no day-level archive selection, and that
+caveat is disconfirmed rather than added.**
+
+## But a much sharper selection is in the SECOND reading, and nobody had it either
+
+The second snapshot fires ~20:08–20:55 UTC. Games that have already started are gone from the
+odds API, so the "close" half keeps only games that had not started yet:
+
+| | n | median first pitch (UTC) | p10 | p90 |
+|---|---|---|---|---|
+| **KEPT** into snapshot 2 | 88 | **22.68** | 0.10 | 23.27 |
+| **DROPPED** | 65 | **18.18** | 17.18 | 20.13 |
+
+**4.5 hours apart.** And the structure is day-of-week, because that is what sets first pitch:
+
+| | games surviving into snapshot 2 |
+|---|---|
+| Mon | 15/15 = **100%** |
+| Tue | 15/16 = 94% |
+| Fri | 27/29 = 93% |
+| Sat | 19/28 = 68% |
+| Thu | 3/6 = 50% |
+| Wed | 6/14 = 43% |
+| **Sun** | **3/45 = 6.7%** |
+
+**2026-07-19 kept 0 of 15** — that Sunday contributes nothing at all to Series B's movement
+set. 07-12 kept 2 of 15; 07-26 kept 1 of 15.
+
+> **Series B's movement population is night games.** The "56% of open rows join" figure is not
+> 56% of a representative sample — it is *"we kept the ones that started late"*, and **Sunday is
+> effectively absent**. Wednesday day games are half gone.
+
+## What that costs Series B — two caveats, but the second one is bigger than stated
+
+| caveat | status |
+|---|---|
+| **no true close** — the later reading is T-2.5 h or earlier, so any slope is attenuated toward 0 | unchanged |
+| ~~day-level archive selection~~ | **disconfirmed** — the archive captured every game every day |
+| **row attrition** | **restated and worse than "44%":** the surviving set is selected on **first-pitch time**, not missing at random. Sunday 6.7%, Wednesday 43%, Monday 100% |
+| `bo`/`bu`/`czf` postdate the vintage | unchanged |
+
+So the count is **still two substantive caveats**, not three — but "attrition" has to be
+described as a **start-time selection** rather than a rate. A per-day-of-week breakdown is
+mandatory in any Series B reading; a pooled Series B number is a number about night games.
+
+## The new cadence is aimed exactly at this, which is checkable
+
+The ten-cron schedule plus `_snapshot_kind`'s 95-minute window means a Sunday's close is taken
+by the **17:00 UTC** firing, before the 17:35 bulk starts — which is the hole above. So:
+
+**Series A's first Sunday (2026-08-02) is the test.** If the Sunday keep rate goes from 6.7% to
+near 100%, the retime fixed the selection and Series A is not merely un-attenuated but
+un-selected. If it does not, the two series share the defect and neither supports a pooled
+movement claim. `tools/close_capture.py --dir data/props` reports it per day.

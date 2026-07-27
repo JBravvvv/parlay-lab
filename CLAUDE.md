@@ -372,6 +372,27 @@ every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_D
 a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
 `tests/calibration-window.test.ts` pins all of it.
 
+## ⚠️ WHAT THE PARITY BASELINES ACTUALLY COVER
+`digest()` (`tests/helpers/fixture-env.ts`) serialises **`categories`, `categoriesLive`,
+`parlays`, `parlaysMixed`, `parlaysLive`** and nothing else. So `baseline43.json` and
+`baseline-armed-v1` say nothing about **`gameInfo`, `propBoard`, `simMarkets`, `luCoverage`,
+`overview`, `liveGames`, `trap`, `passes`** — a change to any of them passes both baselines
+untouched. `propBoard` alone is 35% of the blob and is the population the ladder test and the
+range detector run on. **Every "parity is byte-identical" claim in this phase is a claim about
+picks and tickets, not about the board.** Only `tests/clamp-instrumentation.test.ts` hashes the
+whole object.
+
+## What the freeze produces at ~2026-09-22
+Reopening dates put Total Bases at 08-17 and K's/Outs at 09-03, so **P/L, CLV-on-bets and
+Discipline all reach exit at n≈0 and Phase 2 is effectively the entire evidence base.** Two
+separate exits, and conflating them is the trap: the **parameter** freeze can end on schedule
+(Phase 2 answers whether the disagreement is information, which is what the amendment bundle was
+waiting for), but the **bankroll/sizing** decision cannot — nothing will have measured it, and
+deciding it on n≈0 is the failure this freeze exists to prevent, arriving from the other
+direction. A positive Phase 2 licenses proceeding and applying the amendments; it licenses
+nothing about realised P/L. Full reasoning in `docs/collection-period.md`.
+**Consequence: the close-capture rate is the whole health story.** `tools/close_capture.py`.
+
 ## `clampActivity` — the board carries its own clamp audit (2026-07-27)
 `shClamp(v,lo,hi,id)` takes a 4th arg = **the call site's LINE NUMBER**, so the ids aggregate
 exactly as `tests/clamp-activity.test.ts`'s stack-based instrument does and the two can be
