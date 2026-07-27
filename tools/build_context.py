@@ -172,6 +172,35 @@ def update_pen_db(today):
     return out
 
 
+def merge_prior(out, prior):
+    """Preserve populated fields the current run failed to resolve. Returns the count kept.
+
+    SCOPED TO THE SAME DATE, deliberately: carrying yesterday's umpire onto today's game
+    would be a FABRICATED input, which is worse than a missing one.
+    """
+    if not prior or prior.get("date") != out.get("date"):
+        return 0
+    pri = {(g.get("away"), g.get("home")): g for g in (prior.get("games") or [])}
+    kept = 0
+    for g in out.get("games") or []:
+        old_g = pri.get((g.get("away"), g.get("home")))
+        if g.get("hpUmp") is None and old_g and old_g.get("hpUmp"):
+            g["hpUmp"] = old_g["hpUmp"]
+            kept += 1
+    # bullpen_last3 feeds shPenF, which is 100% LIVE in production — a null-overwrite there
+    # silently disables a working factor with no symptom anywhere.
+    for k in ("bullpen_last3", "pen_quality"):
+        if not out.get(k) and prior.get(k):
+            out[k] = prior[k]
+            print(f"  kept prior {k} ({len(prior[k])} entries) — this run resolved none")
+    if out.get("league_k_per_game") is None and prior.get("league_k_per_game") is not None:
+        out["league_k_per_game"] = prior["league_k_per_game"]
+    resolved = sum(1 for g in out.get("games") or [] if g.get("hpUmp"))
+    print(f"  hpUmp: {resolved}/{len(out.get('games') or [])} resolved"
+          + (f" ({kept} preserved from the prior run — officials not yet posted)" if kept else ""))
+    return kept
+
+
 def main():
     today = datetime.now(timezone.utc).date().isoformat()
     db = update_ump_db(today)
@@ -228,6 +257,23 @@ def main():
         "pen_quality": update_pen_db(today),
     }
     path = sys.argv[1] if len(sys.argv) > 1 else "public/model/context.json"
+
+    """MERGE, DO NOT REPLACE (2026-07-27) — this write was destroying good data daily.
+
+    `officials` are published by statsapi only near first pitch, so the morning run resolves
+    `hpUmp: null` for every game while the evening run resolves 11-15 of them. Both wrote a
+    freshly-built object over the file, so **every morning erased the previous evening's
+    umpires**. Measured over git history: 20:xx commits carry 15/15, 14/15, 14/15, 5/5,
+    14/17...; the 07:xx commit that follows each one carries 0/N.
+
+    Nothing here was ever "missing" — it was overwritten. Same principle as `mergeDayBlob`
+    and the append-only ledger: a run that resolves nothing must leave the prior value alone
+    and say so, never replace a populated field with a null one.
+
+    Scoped to the SAME DATE. Carrying yesterday's umpire onto today's game would be a
+    fabricated input, which is worse than a missing one."""
+    merge_prior(out, load_json(path, {}))
+
     with open(path, "w") as f:
         json.dump(out, f, separators=(",", ":"))
     print(f"context.json: {len(games)} games, bullpen teams {len(out['bullpen_last3'])}, "

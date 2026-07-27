@@ -1,5 +1,40 @@
 # H+R+RBI recalibration audit (fix-file Phase 2, 2026-07-24)
 
+> # ⚠️ THE LADDER FINDING HAS EXACTLY ONE CONFIRMATION PATH, AND IT IS WEEKS OUT
+>
+> **Status as of 2026-07-27: ONE INSTRUMENT, ONE BOARD. Not settled fact.**
+>
+> The single-λ ladder result — the model drifts **+0.001** across O0.5 → O1.5 in closed form
+> against the market's **+0.479** (n=5 pairs), and +0.356 vs +0.468 on the sim path (n=15) — is
+> currently the strongest model-defect claim in this project. It rests on **one board**
+> (2026-07-26), through **one instrument** (the ladder test on `propBoard`).
+>
+> **It cannot be checked on the fixture, ever.** The armed fixture's `propBoard` carries **14
+> H+R+RBI rows against 304 on a real board — 21.7×** thin, and 133 of its 289 total rows are
+> `batter_home_runs`. An IQR or a rung-drift comparison on 14 rows is not a measurement.
+>
+> **The archive series does not confirm it either.** Twenty boards give the same instrument
+> twenty runs — precision, not independence. By this repo's own rule that is not a re-check.
+>
+> | the only independent test | Phase 2's rung-bucketed movement regression |
+> |---|---|
+> | why it is independent | different method (OLS on closing movement), different quantity (drift, not dispersion), different data (closing prices, not board prices) |
+> | its prediction | `(pModel − open_fair)` must **change sign** between the O0.5 and O1.5 buckets, with the movement slope significantly positive at neither |
+> | **needs the sync phrase** | **~2026-07-29** — and real close accrual after that |
+> | **earliest readable** | **~2026-07-29** for O1.5 (a fat rung); O0.5 needs its own volume check on the first close-day |
+>
+> **Pre-committed and binding: no rung dependence in Phase 2 RETRACTS this finding, regardless
+> of what the 20-board reading says.** A confirmation from the same instrument never outvotes a
+> disconfirmation from a different one.
+>
+> **Until that date, every statement of this finding carries "one board, one instrument."** It
+> is written here, beside the finding, specifically so it cannot harden into settled fact by
+> repetition while its only test is pending.
+>
+> **`batter_total_bases` over-dispersion (ratio 2.30, n=108 pairs) sits under the same warning
+> and is thinner still relative to production: 42 fixture rows against 391 real (9.3×).** It has
+> the larger n of the two and no independent test scheduled at all.
+
 ## Why this market is suspended above O0.5
 Graded ledger, 2026-07-17 → 07-22: H+R+RBI legs hit **46.3% vs 59.2% implied** overall,
 and **32% on O1.5+ alternate lines** specifically. Reliability slope (nightly calibration,

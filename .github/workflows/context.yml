@@ -6,6 +6,14 @@ on:
   schedule:
     - cron: "0 17 * * *"  # 10am PT — day games + ump db increment
     - cron: "30 22 * * *" # 3:30pm PT — night slate weather/umps firm up
+    # 2026-07-27: the two crons above land ~20:16-20:55Z and ~06:19-08:30Z NEXT DAY (measured,
+    # Actions API workflow 311571551, +3.1-3.9h and +7.8-10h). 20:3x is ~2.5h before a weekday
+    # 23:15 first pitch, which is why the evening file resolves 11-15 of 15 umpires. But
+    # Sat/Sun first pitches are 18:00-20:10Z, so BOTH runs land after those games start and the
+    # weekend never resolves an umpire at all. This one is aimed at 15:20-16:00Z.
+    # Safe to add only because the write MERGES now: a run that resolves nothing leaves the
+    # prior file intact (tools/build_context.py merge_prior, tools/test_build_context.py).
+    - cron: "0 12 * * *"  # ~15:20-16:00Z after queueing — before weekend first pitches
   workflow_dispatch:
 
 permissions:

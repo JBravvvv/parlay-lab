@@ -451,17 +451,33 @@ blob** — which only works because the script gzips with `mtime=0`. `2026-07-26
 (`1e77c9d`); **07-25 and 07-24 were already expired.** The ≥20-board threshold lands
 **2026-08-14** at the earliest.
 
-## ⚠️ shUmpKf IS STRUCTURALLY INERT — the pin is not what makes it so
-`public/model/context.json` carries **`hpUmp: null` on every game** (0 of 12 on 2026-07-27)
-while `ump_db_games` is 171 — the historical K database is fine, the per-game assignment is
-missing. `tools/build_context.py` L183: *"officials appear only near first pitch."* The context
-job's `30 22` run actually starts **06:38–07:48Z the NEXT day** (+8.2–9.3 h, Actions API,
-workflow `311571551`) — it has never run near a first pitch. So **`shUmpKf` returns 1
-identically even with `umpKFrozen` released**, and `gate_activity`'s "self-arms ~2026-08-04"
-was projecting off `ump_db_games` growth toward a gate that is unreachable for a different
-reason. Reclassified B PINNED → **A STRUCTURAL**. The shadow log has collected nothing all
-window. **Seventh instance of the GitHub scheduler defect; `context.yml` needs the
-`snapshot_props.py` treatment.**
+## context.json MERGES — never replace a populated field with null
+`tools/build_context.py` used to write a fresh object over the file. `officials` post only near
+first pitch, so the **evening** run resolves 11–15 of 15 umpires and the **next morning's** run
+overwrote them with nulls — every day. Git history: 20:xx commits carry 15/15, 14/15, 5/5,
+14/17…; each following 07:xx commit carries 0/N. **The input was never missing; the write was
+destroying it.** Fixed by `merge_prior()` — populated never replaced by null, **scoped to the
+same `date`** (carrying yesterday's umpire onto today's game would be a *fabricated* input,
+worse than a missing one), covering `bullpen_last3`/`pen_quality` too because **`shPenF` is
+100% live in production**. `tools/test_build_context.py` — 7/7. The whole window is recoverable
+from the 20:xx commit of each date; no backfill run yet.
+Under the new schedule **Mon–Fri 22:00 and Sun 22:30 read a populated context; Sat 18:00 and
+Sun 17:00 do not** — hence the added `0 12` cron. `shUmpKf` stays **B PINNED** (I briefly and
+wrongly reclassified it A STRUCTURAL off the morning file).
+Write-path audit: `data/ump_k.json` is an accumulator with two idempotence guards (**safe**);
+`data/pen_quality.json` merges per day but **replaces same-day** (bounded, recorded, unfixed).
+
+## ⚠️ EVERY CRON IS LATE, AND HOURLY ONES ARE DROPPED
+Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not
+one:** low-frequency schedules (2/day — `context`, `props-history`) fire **every tick** but
+**+3.1–3.9 h** on the daytime cron and **+7.8–10.0 h** on the late one; the **hourly**
+`line-history` (`12 * * * *`) actually runs **3–5 times a day — ~17% of ticks**, minute ignored.
+`model` (`30 9`) lands 12:09–17:24. **The configured hour has never been the observed hour on
+any workflow** — any analysis using a cron time as a timestamp is wrong by +3 to +10 h.
+`board-archive` is 2/day and window-based (targets PT yesterday + 2), so lateness is absorbed
+by construction; the thing to verify is that it **ran at all**. `props-history` just went 2/day
+→ 10/day and is untested against the dropping property — **expect 10 runs, under ~7 means the
+redundancy is being eaten.**
 
 ## Consensus depth rises toward first pitch — but thinness does not move
 Props archive, 13 days, by hours-to-first-pitch: mean `n` **1.23 (18–20 h out) → 1.70 (2–4 h)**,

@@ -503,3 +503,56 @@ test, and it is a different test from Sunday 08-02:
   6.7% to ≥90%?
 
 Both are printed by `tools/close_capture.py`.
+
+# EVERY SCHEDULED WORKFLOW, MEASURED (2026-07-27)
+
+Two workflows showing +3–10 h is not incidental queueing. All six were pulled from the Actions
+API, `event: schedule` only, 14+ days.
+
+| workflow | configured (UTC) | observed start | delay / fire rate |
+|---|---|---|---|
+| **`line-history`** | `12 * * * *` — **hourly, 24/day** | **3–5 runs/day** | ⚠️ **~17% OF TICKS FIRE AT ALL.** Minute `:12` not respected either (observed :06–:57) |
+| `props-history` | `0 17` · `45 22` | 20:08–20:55 · 07:27–07:58 **next day** | **+3.1 to +3.9 h** · **+8.7 to +9.2 h** |
+| `context` | `0 17` · `30 22` | 20:08–20:55 · 06:19–08:30 **next day** | **+3.1 to +3.9 h** · **+7.8 to +10.0 h** |
+| `model` | `30 9` | 12:09–17:24, median ~15:1x | **+2.6 to +7.9 h**, median **+5.7 h** |
+| `hr-overround` | `0 15 * * 0` | 18:16 (n=1) | +3.3 h |
+| `board-archive` | `0 12` · `0 19` | **no runs yet** | pushed to `main` today; first tick not yet due |
+
+## The systematic property, and it is TWO properties not one
+
+> ### 1. Low-frequency schedules fire RELIABLY BUT LATE
+> `context` and `props-history` (2 crons/day) fired **every scheduled tick** on every day
+> 07-18 → 07-26 — 18 of 18 each. The delay is large and bimodal (~+3.5 h on the daytime cron,
+> ~+8.5 h on the late one) but the run always happens.
+>
+> ### 2. High-frequency schedules get DROPPED
+> `line-history` is configured hourly and runs **3–5 times a day**. GitHub is not delaying
+> those ticks, it is discarding them.
+
+**Both were invisible.** The delay broke `context`'s umpires (write-path interaction) and
+`props-history`'s close capture. The dropping means the hourly line-history archive is ~1/5 the
+density anyone reading it would assume — and the `lockMaxAgeMin` movement percentiles were fit
+on it. Those percentiles are still valid (the pairs that exist are real, and coverage is flat
+across first-pitch hour) but the *cadence* they were described with was wrong.
+
+## Consequences, ranked
+
+1. **Every cron-based measurement in this project carries a systematic time offset.** Not
+   "sometimes late" — the configured hour has never been the observed hour on any workflow. Any
+   analysis that used a configured cron time as a timestamp is wrong by +3 to +10 h.
+2. **`props-history`'s new 10-cron schedule is untested against property 2.** It went from 2/day
+   to 10/day today, which is between `context`'s reliable 2 and `line-history`'s dropped 24. If
+   10/day also gets thinned, the self-pacing plan degrades. **Check the fire count tomorrow —
+   expected 10, and anything under ~7 means the redundancy is being eaten.**
+3. **`board-archive`'s design holds, and here is why.** It is 2 crons/day — property 1, the
+   reliable band. Its capture-after-the-day design never assumed punctuality: it targets PT
+   *yesterday and the two days before*, so the +3–10 h delay is absorbed by construction and
+   each date still gets six chances inside the 3-day TTL. It has not yet run — first tick is
+   due today — but nothing about it depends on running on time. **The one thing to verify
+   tomorrow is that it ran at all**, since that is property 2's failure mode, not property 1's.
+4. **The near-pitch self-pacing pattern belongs in every job whose value depends on WHEN it
+   ran**, not just the two already fixed. By that test: `props-history` (done), `context`
+   (partly — the `0 12` addition, plus `merge_prior` which makes lateness harmless rather than
+   destructive), `board-archive` (not needed — window-based). `model` and `hr-overround` are
+   time-insensitive: a priors rebuild or a weekly overround reading is the same answer at 12:09
+   or 17:24.

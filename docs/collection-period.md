@@ -2741,51 +2741,97 @@ exists. The first 22:00 UTC board answers it directly, and the props table above
 rate should **fall** — but predicts it weakly, since `n ≤ 1` is flat. Recorded as a prediction
 so it can be wrong.
 
-# ⚠️ shUmpKf IS STRUCTURALLY INERT, NOT PENDING — and it is the SEVENTH instance of the scheduler defect
+# ⚠️ CORRECTION — shUmpKf IS NOT STRUCTURALLY INERT. THE WRITE PATH WAS ERASING ITS INPUT.
 
-Diagnosed 2026-07-27, and the answer is neither branch that was pre-committed.
+**Retracted, same day.** The earlier entry read `hpUmp: null` on 0 of 12 games in the current
+`context.json` and concluded the factor was unreachable. That file was written by the **morning**
+run. Git history says the opposite:
 
-`public/model/context.json`, generated 2026-07-27T10:55:57Z: **`hpUmp` is null on 0 of 12
-games**, while `ump_db_games` is **171** — the historical umpire K database is healthy. The
-per-game *assignment* is what is missing, and `tools/build_context.py` L183 says why in its own
-comment: *"officials appear only near first pitch; try, never guess."*
+| commit | hpUmp resolved | commit | hpUmp resolved |
+|---|---|---|---|
+| 07-26 **20:32** | **15/15** | 07-27 07:48→10:55 | 0/12 |
+| 07-25 **20:16** | **14/15** | 07-25 06:38 | 0/15 |
+| 07-24 **20:50** | **14/15** | 07-24 07:42 | 0/15 |
+| 07-23 **20:40** | **5/5** | 07-23 07:45 | 0/5 |
+| 07-22 **20:49** | **14/17** | 07-22 07:43 | 0/17 |
+| 07-21 **20:49** | 7/15 | 07-21 07:43 | 0/15 |
+| 07-20 **20:55** | 11/15 | 07-20 08:30 | 0/15 |
+| 07-19 **20:12** | **15/16** | 07-19 07:35 | 0/16 |
 
-**So it is a timing failure — but not the one predicted.** The hypothesis was that the *board*
-was built too early (09:46 PT) and the 22:00 entries would fix it. Wrong: it is the **context
-job** that runs too early, and the generate retime cannot fix it, because the board reads a
-`context.json` that was already written without umpires.
+**Every evening run resolved 11–15 of 15 umpires. Every following morning run overwrote them
+with nulls.** The input was never missing — it was being destroyed daily, and the reading that
+called it "structurally inert" was taken from the wreckage.
 
-## And the context job has the same GitHub queueing defect, unmeasured until now
+Two errors in one, and they are different in kind: reading a **single artifact** instead of the
+series, and then attributing to *arithmetic* a failure that was *a write*. The second is the
+worse one — "unreachable by arithmetic" is a claim that no schedule change can fix, and it
+would have closed the thread.
 
-Configured `0 17` and `30 22`. Measured from the Actions API (workflow `311571551`, 14 runs, all
-`event: schedule`):
+## The defect: replace, not merge
 
-| configured | actually starts | delay |
+`tools/build_context.py` built a fresh object and wrote it over the file. `officials` are
+published by statsapi only near first pitch (its own comment says so), so a run at 07:4x
+resolves nothing and a run at 20:3x resolves nearly everything — and the loser was whichever
+ran last.
+
+**Fixed 2026-07-27 — `merge_prior()`, and the order was deliberate: the merge FIRST, the
+cadence second.** Self-pacing alone would still leave a run that fails to resolve wiping good
+data; a merge alone leaves the data safe even if every schedule change fails.
+
+| rule | why |
+|---|---|
+| a populated field is never replaced by null | the actual defect |
+| **scoped to the same `date`** | carrying yesterday's umpire onto today's game is a **fabricated** input, which is worse than a missing one |
+| a run that DOES resolve always wins | otherwise the first reading of the day would freeze |
+| `bullpen_last3` / `pen_quality` covered too | **`shPenF` is 100% live in production** — a null-overwrite there disables a working factor with no symptom anywhere |
+| it logs what it preserved | "0 resolved, 15 preserved" and "0 resolved, 0 preserved" are different events |
+
+`tools/test_build_context.py` — **7/7**, fixtured on the real 07-26 20:32 context.
+
+## Nothing is unrecoverable — the whole window is in git
+
+Every day from **2026-07-16** onward has one commit per day carrying resolved umpires. The
+shadow log's collection window is fully reconstructible from `git log -- public/model/context.json`
+by taking the **20:xx commit of each date**. No backfill has been run; recorded as available.
+
+## What the schedule actually delivers, per day
+
+The evening run lands 20:16–20:55Z — about 2.5 h before a weekday 23:15 first pitch, which is
+why it resolves. Against the generate entries:
+
+| generate entry | context it reads | umpires? |
 |---|---|---|
-| `0 17` | 20:16 – 20:55 Z | **+3.3 to +3.9 h** |
-| `30 22` | 06:38 – 07:48 Z **next day** | **+8.2 to +9.3 h** |
+| **Mon–Fri 22:00** | evening (committed 20:16–20:55) | **YES** |
+| **Sun 22:30** | evening | **YES** |
+| Sat 18:00 | morning | **no** |
+| Sun 17:00 | morning | **no** |
 
-Identical to the props-history pattern. **The `30 22` run — the one whose comment reads "3:30pm
-PT — night slate weather/umps firm up" — executes at ~07:45 UTC the following morning**, by
-which time `sched(today)` returns the *new* day's schedule, whose officials are not posted
-either. It has never once run near a first pitch.
+Weekend first pitches are 18:00–20:10Z, so *both* existing runs land after those games start.
+Added `0 12 * * *` (≈15:20–16:00Z after queueing) to cover them — safe to add only because the
+write merges now. **This is shadow-log completeness, not pricing: `shUmpKf` remains pinned off,
+so none of it changes a price today. It changes whether the freeze-exit activation question has
+data behind it.**
 
-> ### The reclassification
->
-> `tools/gate_activity.py` lists `shUmpKf` under **B PINNED** with "would otherwise self-arm
-> ~2026-08-04". **That projection is wrong.** It counts `ump_db_games` growth toward the `g ≥ 5`
-> gate, but the gate is never reached for a different reason: `hpUmp` is null on every game, so
-> `shUmpKf` returns `1` identically **even with the pin released**. It belongs in
-> **A STRUCTURAL — unreachable by arithmetic**, and the pin has been masking that.
->
-> **The pin is not what makes this factor inert. Removing the pin would change nothing.**
 
-**Fix shape (not built):** `context.yml` needs the `snapshot_props.py` treatment — several
-crons across the evening, and a script that writes umpires only when it actually finds them
-rather than overwriting a good file with a null one. Today's 10:55 run overwrote whatever the
-previous day held. That is the sixth instance of *a component reporting success while
-discarding data*, and the first one found in the context pipeline.
+# THE CONTEXT PIPELINE'S THREE WRITE PATHS — audited 2026-07-27
 
-**This also means the shadow log has collected nothing for the entire collection period so far**,
-so the freeze-exit question it exists to answer — does the umpire factor earn activation — has
-no data behind it and will have none unless the cadence is fixed.
+`context.yml` produces three files. The `context.json` defect prompted the question of whether
+the other two share it.
+
+| file | pattern | verdict |
+|---|---|---|
+| **`data/ump_k.json`** | `load_json` → `db["league"]["g"] += 1`, `db["umps"].setdefault(...)`, guarded by `if y in db["days"]: return db` and a 600-deep `pks` dedupe | ✅ **ACCUMULATOR — safe.** Append-only with two independent idempotence guards. A failed run adds nothing and destroys nothing. This is why `ump_db_games` reached 171 while `hpUmp` read 0 — the database was never the problem |
+| **`data/pen_quality.json`** | `load_json` → `db["days"][y] = day` → keep last 30 | ⚠️ **PER-DAY MERGE, but same-day REPLACE.** Other days are safe. A re-run of the *same* day writes a fresh `day` over the old one — and the boxscore loop `continue`s on any fetch failure, so a partially-failing re-run replaces a complete day with a partial one. **Bounded to one day and never observed** (`pen_quality` went 0 → 27 → 29 → 31 over the window, monotone), but it is the same shape |
+| **`public/model/context.json`** | fresh object written over the file | ❌ **WAS REPLACE — fixed.** `merge_prior()` |
+
+**`bullpen_last3` was the live exposure and it never fired.** It feeds `shPenF`, which is 100%
+production-active — unlike `shPenQF`/`shUmpKf`, it is not pinned. A null-overwrite there would
+have silently zeroed a working factor. Measured across 18 context commits: **30 teams on every
+single one**, never empty. It is now covered by `merge_prior` regardless.
+
+**`pen_quality` same-day replace: recorded, not fixed.** The fix is to merge the per-team dict
+instead of assigning the day, and the reason to hold is that a *partial* day and a *complete*
+day are not distinguishable after the fact — merging them would silently double-count outs.
+The correct fix is to write the day only when the boxscore loop had no failures, which needs a
+failure counter the loop does not currently keep. Scoped, low priority: it needs a same-day
+re-run *and* a fetch failure to bite, and the job runs 2–3× a day.

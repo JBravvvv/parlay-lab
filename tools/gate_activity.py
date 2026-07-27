@@ -105,17 +105,6 @@ def main():
     per = summary.get("perMarket") or {}
     report = {
         "A_structural": {
-            # RECLASSIFIED 2026-07-27 from B_pinned. It was listed as "would otherwise self-arm
-            # ~2026-08-04", projecting off ump_db_games growth toward the g>=5 gate. The gate is
-            # never reached for a different reason: context.json carries hpUmp=null on EVERY game
-            # (0 of 12 on 2026-07-27) because the context job's "umps firm up" run is configured
-            # 30 22 and actually starts 06:38-07:48Z the NEXT day (+8.2 to +9.3h, Actions API,
-            # workflow 311571551) -- it has never run near a first pitch. So shUmpKf returns 1
-            # identically EVEN WITH THE PIN RELEASED. The pin was masking structural inertness.
-            "shUmpKf": {"fired": False,
-                        "why": "hpUmp is null on every game: the context job's night run lands "
-                               "+8-9h late, after officials would have posted. Returns 1 with or "
-                               "without SH_CFG.umpKFrozen. NOT pending -- see docs/collection-period.md"},
             "slopeMults": {"fired": bool(cal.get("mults")),
                            "why": "needs slope + 1.96*se < 1; at measured within-market sigma_p that is a fitted slope below -0.54 to -3.45"},
             "hrr_slope_band": {"fired": None,
@@ -123,7 +112,16 @@ def main():
         },
         "B_pinned": {
             "shPenQF": {"fired": False, "why": "SH_CFG.penQFrozen — activation plan in docs/collection-period.md"},
-
+            # CORRECTION 2026-07-27: briefly moved to A_structural on the reading that hpUmp was
+            # null on every game. WRONG -- that read the file written by the MORNING run. Git
+            # history shows every 20:xx commit carries 11-15 of 15 umpires resolved; the morning
+            # run then overwrote them with nulls. The input exists, the write path was destroying
+            # it. Fixed by merge_prior; this stays PINNED, which is what it always was.
+            "shUmpKf": {"fired": False,
+                        "why": "SH_CFG.umpKFrozen. Input restored 2026-07-27: the morning context "
+                               "run was overwriting the evening's resolved umpires with nulls. "
+                               "Under the new schedule Mon-Fri 22:00 and Sun 22:30 boards read a "
+                               "populated context; Sat 18:00 / Sun 17:00 need the 0 12 cron"},
         },
         "C_zeroed": {
             "mayAutoRun": {"fired": False, "why": "MAX_AUTO_RUNS_PER_DAY = 0, prompt-only by design"},
