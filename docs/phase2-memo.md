@@ -172,7 +172,34 @@ denominator fix as a pre/post split with an expected slope improvement — but t
 `tools/phase2_series_b.py --dir data/props`. Everything except the `pModel` join, which needs
 the sync phrase. Emits a join-ready table keyed `(date, market, player, line)`.
 
-### 1. ⚠️ THERE IS NO CLOSE IN THE ARCHIVE
+### 0. RESOLVED, AND FIXED THE SAME DAY — the cadence
+
+**The Actions API answers it directly** (`/actions/workflows/311636390/runs`, 30 runs):
+every run is `event: schedule`, and `run_started_at` matches the archive's `t` exactly. So
+the timestamps ARE run times, and **GitHub is starting the scheduled workflow hours after
+its cron**: `0 17` → ~20:20Z (**+3.3h**), `45 22` → ~07:30Z the **next day** (**+8.75h**).
+Consistent across 15 days. Both branches have only ever had those two crons (`73087db` /
+`ea520c6`, 2026-07-12), so nothing was misconfigured.
+
+**The "near-close" sweep was landing nine hours late — after the games it was meant to price
+had been played.** The 07:30 reading in each day file is the *previous* night's 22:45 cron,
+arriving in time to be that day's *opener*.
+
+> **A third cron would inherit the same queueing delay.** The trigger cannot be trusted, so
+> the decision moves into the script — the `/api/clv` pattern.
+
+**SHIPPED 2026-07-26:** `tools/snapshot_props.py` now decides from the slate.
+`_snapshot_kind()` returns `close` when the next unstarted first pitch is within **95 min**
+(at most one per **40 min**), `pre` otherwise, and `None` when every game has started. Each
+snapshot carries `kind`. `props-history.yml` fires **hourly from 17:00Z through 01:00Z**, so
+some firing lands in the window whatever the delay does. Unit-tested on six cases.
+
+**Consequence for the vintages:** Series B (07-12 → 07-26) is **T−2.5h attenuated** and
+labelled so. Series A (from 07-27) carries `kind: "close"` on true closes. The existing
+never-pool rule already covers the difference; **this is now the biggest reason for it**,
+larger than the de-vig change.
+
+### 1. ⚠️ THERE WAS NO CLOSE IN THE ARCHIVE (Series B, permanently)
 
 Snapshots land at **~07:30 and ~20:16 UTC**; first pitches run **22:40–23:20 UTC**. Every
 "close" is a **T−2.5h reading at best**. The field is named `late_fair`, never `close_fair`.
@@ -191,11 +218,26 @@ is its own defect. Either way it must be settled by reading the log, not inferre
 
 ### 2. 44% attrition, and it is not yet shown to be random
 
-**3,637 of 6,535 open rows (56%) have a later reading.** Uniform across markets (52–56%), so
-it is not market-driven. Surviving rows have `open_fair` p10 0.392 / median 0.514 / p90 0.631.
-**The lost rows' fairs are in the same file and the comparison has not been run** — until it
-is, the movement distribution is a *selected* population and every rule in
-`docs/harness-substitutions.md` applies to it. Listed as the first thing to do before fitting.
+**3,637 of 6,535 open rows (56%) have a later reading.** Uniform across markets (52–56%).
+**The comparison has now been run** — joined vs lost, on every dimension this vintage can
+support:
+
+| field | joined | lost | diff | ratio |
+|---|---|---|---|---|
+| books behind the fair | 2.2035 | 2.1636 | +0.040 | 1.018 |
+| open fair (prob) | 0.5111 | 0.5042 | +0.007 | 1.014 |
+| \|fair − 0.5\| (extremity) | 0.0770 | 0.0815 | −0.0045 | 0.945 |
+| overround | — | — | — | **UNMEASURABLE** |
+| Caesars-in-fair (`czf`) | — | — | — | **UNMEASURABLE** |
+
+**Benign on what is measurable** — 1.8% more books, 1.4% higher fair, 5.5% less extreme.
+None of that is large enough to make the movement distribution a different population.
+
+**But two of the four requested dimensions cannot be checked at all**: `bo`/`bu` (overround)
+and `czf` were added to `snapshot_props.py` on 2026-07-25/26 and are absent from this
+vintage, so those columns read as zeros rather than as measurements. **Series B's selection
+is therefore bounded, not cleared** — a caveat to carry, not a clean bill. Series A has all
+four fields and can be checked properly.
 
 `batter_home_runs` is absent entirely, by construction: quoted one-sided, `fair` null on 100%
 of rows.

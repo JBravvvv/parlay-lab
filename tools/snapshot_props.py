@@ -115,15 +115,62 @@ def compact(eventodds):
             }
     return out
 
+# ---- near-close capture (2026-07-26) --------------------------------------------
+# THE ARCHIVE HAD NO CLOSE, AND IT WAS NOT A CADENCE BUG. Measured from the Actions API
+# over 15 days: the `0 17` cron starts at ~20:20Z (+3.3h) and the `45 22` cron at ~07:30Z
+# (+8.75h) the NEXT morning. Both are `event: schedule`; GitHub queues scheduled runs and
+# the delay is systematic, not random. So the 22:45 "near-close" sweep was landing ~9 hours
+# late, by which time the games it was meant to price had been played — every archived
+# "close" was really T-2.5h or earlier.
+#
+# THE FIX CANNOT BE ANOTHER CRON: a new schedule entry inherits the same queueing delay.
+# It has to be SELF-PACING, the pattern /api/clv already uses — fire often, and let the
+# SCRIPT decide from the slate whether this firing is close enough to first pitch to be
+# worth a capture. That is robust to a trigger arriving hours off its nominal time, which
+# is the only property that matters here.
+#
+# A close not captured during the window is unrecoverable — the same rule that governs CLV.
+CLOSE_WINDOW_S = 95 * 60   # a firing this close to the next unstarted first pitch is a CLOSE
+MIN_GAP_S      = 40 * 60   # ...and we take at most one close capture per 40 min
+
+def _snapshot_kind(events, now, day):
+    """'close' | 'pre' | None(skip) — decided from the slate, not from the clock alone."""
+    starts = [datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) for e in events]
+    ahead = sorted(s for s in starts if s > now)
+    if not ahead:
+        return None
+    lead = (ahead[0] - now).total_seconds()
+    prior = day.get("snapshots") or []
+    last_close = None
+    for sn in prior:
+        if sn.get("kind") == "close":
+            last_close = datetime.fromisoformat(sn["t"])
+    if lead <= CLOSE_WINDOW_S:
+        if last_close and (now - last_close).total_seconds() < MIN_GAP_S:
+            return None            # already have a close this close to the pitch
+        return "close"
+    return "pre"
+
+
 def main():
     events = fetch("https://api.the-odds-api.com/v4/sports/baseball_mlb/events")
     if events is None:
         print("skipped: proxy unreachable")
         return
     now = datetime.now(timezone.utc)
+    path_probe = f"data/props/{now.date().isoformat()}.json"
+    day_probe = {"snapshots": []}
+    if os.path.exists(path_probe):
+        with open(path_probe) as f:
+            day_probe = json.load(f)
+    kind = _snapshot_kind(events, now, day_probe)
+    if kind is None:
+        print("skipped: no unstarted games, or a close was already captured within the gap")
+        return
+    print(f"snapshot kind={kind}")
     todays = [e for e in events
               if 0 < (datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) - now).total_seconds() < 20 * 3600]
-    snap = {"t": now.isoformat(timespec="seconds"), "events": []}
+    snap = {"t": now.isoformat(timespec="seconds"), "kind": kind, "events": []}
     for e in todays[:16]:
         od = fetch(f'https://api.the-odds-api.com/v4/sports/baseball_mlb/events/{e["id"]}/odds'
                    f"?regions=us&oddsFormat=american&markets={MARKETS}")

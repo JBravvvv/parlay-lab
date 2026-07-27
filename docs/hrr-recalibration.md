@@ -219,7 +219,35 @@ Two pricing paths exist:
   > the ~1/3 of rows that fall back to closed form** — the games with no confirmed lineup, so
   > no sim. The fix is to give those rows a dispersion-aware price, not to replace the family.
   >
-  > Scoped and unbuilt. It is a bigger change than a constant and it belongs after Phase 2.
+  > ### AND THE FIX IS A SCHEDULING CHANGE, NOT A MODELLING ONE — measured
+  >
+  > The sim needs **both** lineups (`legacy/index.html` L2107: `lineup_away >= 9 && lineup_home
+  > >= 9`), so its coverage is a property of the GAME, not the player. Confirmed on the
+  > 2026-07-26 board:
+  >
+  > | | |
+  > |---|---|
+  > | games with **ALL** H+R+RBI rows sim-priced | **9** |
+  > | games with **NONE** sim-priced | **3** |
+  > | games **partially** sim-priced | **0** |
+  >
+  > **All-or-nothing per game, exactly as a game-level gate predicts.** The rows split
+  > 33 sim (every one `lu=confirmed`) / 13 `lu=projected` / 4 `lu=confirmed` but unsimmed —
+  > those last 4 are players whose *own* lineup was posted while their opponent's was not,
+  > which is the difference between `lu` (the player's lineup) and the sim's requirement
+  > (both lineups).
+  >
+  > **One game carries the defect.** `newyorkyankees@philadelphiaphillies` alone supplies
+  > **11 of the 17** closed-form rows — 65% of the exposure is a single late-lineup game.
+  >
+  > `luCoverage` on this board was **13 of 15 games confirmed (86.7%)**. **A board generated
+  > after all lineups post would carry the sim price on essentially every H+R+RBI row**, and
+  > the ladder defect would disappear from the board without one line of model change.
+  >
+  > **So the H+R+RBI ladder fix is board TIMING, and it is worth more than the coverage
+  > tables ever suggested.** `docs/board-timing.md` treats lineup coverage as a data-quality
+  > metric; it is also the switch between a distribution that reproduces 76% of the market's
+  > ladder dispersion and one that reproduces 0%. Scoped, unbuilt, and now cheap.
   >
   > ### AND IT IS NOT A CLASS DEFECT — total bases shows the OPPOSITE
   > `batter_total_bases` is also a correlated sum (1B + 2·2B + 3·3B + 4·HR), so it was the
