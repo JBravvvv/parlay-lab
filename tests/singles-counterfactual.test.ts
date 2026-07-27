@@ -360,6 +360,150 @@ describe("singles-vs-parlays counterfactual (analysis harness, report only)", ()
       console.log(`   -${dpp} pp`.padEnd(12) + cells.join(""));
     }
 
+    // ======================================================================
+    // 5. THE CROSSOVER IS THE DECISION VARIABLE — its own sensitivity
+    // ======================================================================
+    // Everything about card structure reduces to: is per-leg edge overstated by more or
+    // less than the crossover? That scalar decides a 2.3x growth difference, so it is
+    // reported with its sensitivity to the two assumptions it rests on: the Kelly fraction
+    // and whether the error is common across legs or independent.
+    const crossover = (
+      cards: { pl: Row; stake: number }[][],
+      shadeFn: (c: { pl: Row; stake: number }[], d: number) => { pl: Row; stake: number }[],
+    ) => {
+      // finest resolution that stays honest about the inputs: 0.05 pp
+      for (let d = 0; d <= 12.0001; d += 0.05) {
+        const g = cards.map((c) => growth(shadeFn(c, d)) ?? -Infinity);
+        if (g[1] <= g[0]) return d;
+      }
+      return null;
+    };
+
+    /* CORRELATED (the default, and what section 4 already modelled): one common bias --
+       every leg's true probability is d points lower. A model that is optimistic is
+       optimistic about everything at once.
+       INDEPENDENT: the SAME mean bias d, but delivered as a per-leg random draw. Because
+       E[prod(p_i - e_i)] = prod(p_i - d) under independence, the ticket's EXPECTED
+       probability is identical -- the two differ only in the dispersion the log sees, which
+       is exactly why it has to be simulated rather than argued. */
+    const shadeCorr = shaded;
+    const mulberry = (seed: number) => () => {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const growthIndep = (card: { pl: Row; stake: number }[], dpp: number, draws = 4000) => {
+      if (!card.length) return null;
+      let acc = 0;
+      for (let s = 0; s < draws; s++) {
+        const rng = mulberry(s * 2654435761);
+        const shadedCard = card.map((c) => {
+          const legs = (c.pl.legs as Row[]) ?? [];
+          let a = 1, b = 1;
+          for (const l of legs) {
+            const p = Number(l.prob) / 100;
+            // mean-preserving per-leg draw: uniform on [0, 2d]
+            const e = 2 * dpp * rng() / 100;
+            a *= p;
+            b *= Math.max(0.001, p - e);
+          }
+          return { ...c, pl: { ...c.pl, prob: Number(c.pl.prob) * (a > 0 ? b / a : 0) } };
+        });
+        const g = growth(shadedCard);
+        if (g == null || !isFinite(g)) return null;
+        acc += g;
+      }
+      return acc / draws;
+    };
+
+    const kellyFractions = [0.125, 0.25, 0.5] as const;
+    const origKF = eng.get<(pl: Row) => number | null>("shKellyFrac");
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n5. CROSSOVER SENSITIVITY — the per-leg overconfidence at which singles overtake parlays\n` +
+        `${"Kelly".padEnd(10)}${"singles $".padStart(11)}${"parlay $".padStart(10)}` +
+        `${"g_singles".padStart(12)}${"g_parlay".padStart(11)}${"CROSSOVER".padStart(12)}${"  (correlated bias)"}`,
+    );
+    const kellyRows: Record<string, number | null> = {};
+    for (const kf of kellyFractions) {
+      // shKellyFrac is min(0.25*kelly, 0.02) — swap ONLY the fraction, keep the 2% cap
+      eng.set("shKellyFrac", function (pl: Row) {
+        const decK = Number(pl.czDec);
+        const p = Number(pl.prob) / 100;
+        if (!isFinite(decK) || decK <= 1 || !isFinite(p)) return null;
+        const bK = decK - 1;
+        const k = Math.max(0, (bK * p - (1 - p)) / bK);
+        return Math.max(0, Math.min(kf * k, 0.02));
+      });
+      const sC = cardOf(alloc(mkPool(playable) as unknown[], DAILY, cfgOpen));
+      const pC = cardOf(alloc(parlays.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen));
+      const x = crossover([sC, pC], shadeCorr);
+      kellyRows[String(kf)] = x;
+      // eslint-disable-next-line no-console
+      console.log(
+        `${("1/" + Math.round(1 / kf)).padEnd(10)}` +
+          `${String(sC.reduce((a, c) => a + c.stake, 0)).padStart(11)}` +
+          `${String(pC.reduce((a, c) => a + c.stake, 0)).padStart(10)}` +
+          `${((growth(sC) ?? 0) * 10000).toFixed(1).padStart(12)}` +
+          `${((growth(pC) ?? 0) * 10000).toFixed(1).padStart(11)}` +
+          `${(x == null ? "none <=12" : x.toFixed(2) + " pp").padStart(12)}`,
+      );
+    }
+    eng.set("shKellyFrac", origKF);
+
+    const sC0 = cardOf(alloc(mkPool(playable) as unknown[], DAILY, cfgOpen));
+    const pC0 = cardOf(alloc(parlays.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen));
+    let xInd: number | null = null;
+    for (let dd = 0; dd <= 12.0001; dd += 0.1) {
+      const gs = growthIndep(sC0, dd), gp = growthIndep(pC0, dd);
+      if (gs == null || gp == null) break;
+      if (gp <= gs) { xInd = dd; break; }
+    }
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n  same MEAN bias delivered INDEPENDENTLY per leg (uniform [0, 2d], 4000 draws):` +
+        `  crossover ${xInd == null ? "none <=12 pp" : xInd.toFixed(2) + " pp"}` +
+        `\n  (E[prod(p-e)] = prod(p-d) under independence, so the ticket's expected probability` +
+        `\n   is unchanged; only the dispersion the log sees differs)`,
+    );
+
+    // ======================================================================
+    // 6. THE EV FLOOR MIS-SCALED BY LEG COUNT — sized for a freeze-exit decision
+    // ======================================================================
+    // eslint-disable-next-line no-console
+    console.log(`\n6. FIXED +2% FLOOR vs LEG-EQUIVALENT FLOOR (1.02^n - 1), by leg count`);
+    // eslint-disable-next-line no-console
+    console.log(
+      `${"legs".padEnd(6)}${"floor".padStart(9)}${"in pool".padStart(9)}` +
+        `${"pass fixed".padStart(12)}${"pass leg-eq".padStart(13)}${"over-admitted".padStart(15)}`,
+    );
+    const byLegs = new Map<number, Row[]>();
+    for (const p of parlays.filter(core)) {
+      const n = ((p.legs as Row[]) ?? []).length;
+      byLegs.set(n, [...(byLegs.get(n) ?? []), p]);
+    }
+    for (const n of [...byLegs.keys()].sort()) {
+      const v = byLegs.get(n)!;
+      const fl = (Math.pow(1.02, n) - 1) * 100;
+      const pf = v.filter((p) => Number(p.czEv ?? -99) >= 2).length;
+      const pl2 = v.filter((p) => Number(p.czEv ?? -99) >= fl).length;
+      // eslint-disable-next-line no-console
+      console.log(
+        `${String(n).padEnd(6)}${("+" + fl.toFixed(2) + "%").padStart(9)}${String(v.length).padStart(9)}` +
+          `${String(pf).padStart(12)}${String(pl2).padStart(13)}${String(pf - pl2).padStart(15)}`,
+      );
+    }
+    const aLE2 = alloc(legEquiv.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen);
+    const leCard2 = cardOf(aLE2);
+    const xLE = crossover([sC0, leCard2], shadeCorr);
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n  crossover vs the FIXED-floor parlay card      ${(crossover([sC0, pC0], shadeCorr) ?? 0).toFixed(2)} pp` +
+        `\n  crossover vs the LEG-EQUIVALENT parlay card  ${xLE == null ? "none <=12" : xLE.toFixed(2) + " pp"}` +
+        `   <-- does fixing the floor move the decision variable?`,
+    );
+
     // ---- the per-leg consensus bar, stated directly -------------------------
     // `consCzEv` is null when the leg has no Caesars quote. Number(null) === 0, which would
     // silently count every unquoted leg as sitting exactly ON the bar — filter BEFORE casting.

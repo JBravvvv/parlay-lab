@@ -1,5 +1,25 @@
 # Harness substitutions — what the test sandbox replaces (2026-07-25)
 
+> # THE FAILURE MODE ESCALATES AS THE TOOL IMPROVES
+>
+> The range-compression detector was wrong three times. v1 and v2 were caught within
+> minutes, because a **known-bad market** sat in the output and read the wrong way. v3 got
+> that market *right* — and was confidently wrong about a different market, one with no
+> control behind it. It survived review, went into three documents, and was only killed by
+> asking whether the statistic was stable under a change that should not have mattered.
+>
+> **A tool's early errors announce themselves. Its late errors are indistinguishable from
+> results.** So the checks have to get *stronger* as a tool starts working, not weaker:
+>
+> - **When a detector agrees with your control, that validates the control's row — not the
+>   table.** Every other row is still unverified.
+> - **Before believing an uncontrolled row, perturb something that should not matter** (the
+>   sample, the ordering, a nuisance cut) and require the number to hold.
+> - **Confidence in a tool is not transitive across its outputs.**
+>
+> This sits at the top of this file because it generalises past the harness: it is the reason
+> to distrust the moment a measurement starts confirming things.
+
 ## Why this file exists
 
 339 tests passed, the parity digest was byte-identical, and a **24% hole in every
@@ -571,7 +591,26 @@ was stable under a change that should not have mattered. **When a detector agree
 control, that validates the control's row, not the table.** Add a stability check against a
 nuisance parameter before believing an uncontrolled row.
 
-**(c) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
+**(c) SIXTH METHODOLOGY RULE — a statistic computed on a SELECTED population measures the
+selection, unless the selection is on a variable independent of the statistic.**
+
+This is the third time selection has produced a false reading, and the three look nothing
+alike from the inside:
+
+| # | selected population | selected on | false reading it produced |
+|---|---|---|---|
+| 1 | `categories` rows | one side per line (the side the model favours) | "100% of prop markets are model-high" |
+| 2 | the parity fixture | `coreNoHR` and the leg/odds caps upstream of the gate | "2 non-HR tickets reach the `booksInd` gate" (real answer: 0) |
+| 3 | `categories` rows | top 50 by win **probability** — a function of `pModel` | "H+R+RBI λ range is half the market's" (real answer: 1.78× wider) |
+
+The test is mechanical and takes one line of thought: **name the variable the population was
+selected on, and ask whether the statistic is a function of it.** Side selection is a
+function of `sign(pModel − implied)` → signs invalid, magnitudes fine. Probability-rank
+selection is a function of `pModel` → anything comparing `pModel`'s distribution to
+something else is invalid. Chain-position selection is a function of the upstream filters →
+any "N reach gate X" claim is invalid without running the chain.
+
+**(d) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
 is genuinely side-invariant, which is why the magnitudes measured on `categories` stand. The
 spread ratio is not, and neither is anything conditioned on probability rank. Establishing
 that a population is safe for one statistic says nothing about the next one computed on it.

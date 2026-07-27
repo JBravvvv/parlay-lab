@@ -27,6 +27,73 @@ Two pricing paths exist:
   hardest on O1.5+ where the tail matters (O0.5 ≈ P(X≥1) saturates and mostly survives
   the error).
 
+  > ## ⚠️ 2026-07-26 — THE PA FIX DOES NOT EXPLAIN THE MISS, AND ON A REAL BOARD IT RUNS
+  > ## THE WRONG WAY. A SECOND DEFECT EXISTS.
+  >
+  > The range-compression hypothesis for H+R+RBI was retracted (see
+  > `docs/pitcher-outs-audit.md`), which left the PA-conditioning defect as the *only*
+  > identified mechanism for a 46.3%-vs-59.2% miss. It does not carry that weight.
+  >
+  > **The fix** is `lam *= shClamp(expAB/abG, 0.85, 1.15)` (`legacy/index.html` L2368), where
+  > `expAB` is slot-implied ABs and `abG = ab30/g30` is the player's actual ABs per game
+  > *played* over 30 days. Both terms are recoverable from the board's own `case` string
+  > ("H+R+RBI rate re-based to #N spot PA (~X AB vs Y AB/g)"), so the correction it applied
+  > can be read off directly — **44 of 50 rows** on the 2026-07-26 board.
+  >
+  > ### It is an UPWARD correction on 86% of rows
+  >
+  > | | |
+  > |---|---|
+  > | correction factor | min 0.850 · **median 1.144** · max 1.150 |
+  > | at the **high** clamp (1.15) | **22 of 44** |
+  > | at the low clamp (0.85) | **1 of 44** |
+  > | factors **> 1** (fix RAISES the model's probability) | **38 of 44 (86%)** |
+  > | factors < 1 (fix lowers it) | 3 of 44 |
+  >
+  > **Mechanism — a denominator mismatch.** `expAB` is "ABs in a game he *starts*"; `abG` is
+  > "ABs per game *appeared in*", which includes partial appearances and pinch-hit games and
+  > is therefore systematically lower. The ratio is biased above 1 for essentially every
+  > everyday starter (typical 4.4 / 3.4 = 1.29, clamped to 1.15). The intended correction —
+  > scale a #8 hitter down relative to a leadoff hitter — is real, but it is riding on top of
+  > a systematic upward bias in the reference quantity.
+  >
+  > ### Effect on stated probabilities, by line
+  >
+  > | line | n | median correction | median p_pre-fix | median p_post-fix | **median effect** | range |
+  > |---|---|---|---|---|---|---|
+  > | O0.5 | 28 | 1.150 | 67.5% | 69.8% | **+4.8 pp** | −5.9 … +5.1 |
+  > | O1.5 | 13 | 1.098 | 32.4% | 38.6% | **+4.7 pp** | −1.3 … +6.3 |
+  > | O2.5 | 3 | 1.026 | 32.9% | 37.3% | +1.4 pp | −1.4 … +4.4 |
+  >
+  > ### The bound that settles it, without needing the ledger
+  >
+  > At its **maximum downward setting** (the 0.85 clamp floor, reached on 1 of 44 rows) the
+  > fix can reduce a stated probability by at most **5.9 pp on O0.5** and **7.2 pp on O1.5**.
+  > The observed miss is **12.9 pp overall** and **27 pp on O1.5+** (59.2% implied vs 32%
+  > realised).
+  >
+  > **So the fix could not account for the miss even if it ran at full strength in the right
+  > direction on every row — and it runs the other way on 86% of them. A second defect
+  > exists, and the O1.5+ suspension is protecting against something that has not been
+  > identified.**
+  >
+  > ### And the fix injected confidence into the one line still taking money
+  >
+  > Model-minus-market on the same rows: **O0.5 +11.5 pp**, O1.5 **−1.4 pp**, O2.5 −4.2 pp.
+  > O1.5+ is suspended by `hrrAltMax`; **O0.5 is active and tagged `watch`** — and the PA fix
+  > added a median **+4.8 pp** there. A repair aimed at O1.5+ overconfidence moved confidence
+  > into O0.5, where the money still flows.
+  >
+  > **Two caveats, stated.** (1) This is one board and it is *post*-fix; the graded legs that
+  > produced 46.3%/59.2% are pre-fix and sit behind the sync phrase, so the direct
+  > recomputation the owner asked for — replay each graded leg through the PA-conditioned
+  > model — **cannot be run without his key** and is listed as owner-executable below. (2) The
+  > *mechanism* (an `expAB`/`abG` denominator mismatch) is board-independent; the magnitudes
+  > are not. **Reproduce with `python3 tools/hrr_pa_audit.py <board>`.**
+  >
+  > **Nothing changed.** Frozen parameter, and `hrrAltMax` stays exactly where it is — this
+  > finding strengthens the case for the suspension rather than weakening it.
+
   **Status: fixed 2026-07-22** (before this phase was formalized, under the owner's
   direct instruction): the closed-form λ is now re-based by `expAB / (last-30 AB per
   game)`, clamped ±15%, SH_V2-gated (parity-neutral when v2 is off), disclosed in the

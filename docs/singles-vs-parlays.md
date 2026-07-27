@@ -182,6 +182,121 @@ quantity Phase 2 and the calibration channel exist to produce. Re-run this table
 
 ---
 
+## THE STANDING RULE
+
+> # Parlays win if per-leg overconfidence is under ~3 pp.
+>
+> Everything else about card structure follows from that sentence. The recommendation is not
+> the doctrine; **this** is, and the recommendation ("don't re-spec Phase 4") is what it
+> implies while the quantity is unmeasured.
+
+Running estimate of the crossover, one row per board:
+
+| board | Kelly | crossover (correlated) | crossover (independent) | notes |
+|---|---|---|---|---|
+| 2026-07-26 | ¼ | **3.05 pp** | 3.10 pp | first measurement, n=1 |
+
+## Crossover sensitivity — it is stable
+
+### To the Kelly fraction
+
+| Kelly | singles staked | parlay staked | g_singles | g_parlay | **crossover** |
+|---|---|---|---|---|---|
+| **1/8** | $250 | $250 | 55.3 bp | 133.0 bp | **3.35 pp** |
+| **1/4** (production) | $250 | $250 | 55.3 bp | 126.6 bp | **3.05 pp** |
+| **1/2** | $250 | $250 | 55.3 bp | 126.6 bp | **3.05 pp** |
+
+**The crossover moves 0.30 pp across a 4× range of Kelly fraction. The two settings are not
+materially coupled** — which was the thing worth checking, since ¼-Kelly was chosen for
+parameter uncertainty and this shade models the same uncertainty.
+
+**Two things fell out that were not asked for:**
+
+1. **¼ and ½ Kelly are IDENTICAL.** Above roughly ¼ Kelly the Kelly ceiling stops binding
+   and `perParlayCap` takes over: `kellyStakeMult × bankroll × 0.02` = 4 × 2500 × 0.02 =
+   **$200**, far above `perParlayCap × daily` = 0.25 × 250 = **$62.50**. **The ¼-Kelly
+   setting is load-bearing only on the downside** — raising it changes nothing at this
+   bankroll/daily ratio.
+2. **1/8 Kelly gives the parlay card HIGHER growth** (133.0 vs 126.6 bp) at the same $250
+   total. The allocator always places the full daily, so a tighter ceiling only makes the
+   split more even — and more even is better here. **The parlay card is over-concentrated at
+   ¼ Kelly relative to growth-optimal**, which is a separate observation from the crossover
+   and is not a change request.
+
+### To whether the bias is correlated or independent
+
+**Correction to the premise: the original table was already the CORRELATED case.** Section 4
+subtracts the same δ from every leg deterministically — one common optimism bias, which is
+the harder case for parlays. The independent case had not been modelled.
+
+Running it anyway, with the same **mean** bias delivered as an independent per-leg draw
+(uniform on [0, 2δ], 4000 draws):
+
+| | crossover |
+|---|---|
+| correlated (common δ, deterministic) | **3.05 pp** |
+| independent (per-leg draw, same mean) | **3.10 pp** |
+
+**Identical to within 0.05 pp, and that is algebra rather than luck:** under independence
+`E[Π(pᵢ − εᵢ)] = Π(pᵢ − δ)`, so the ticket's *expected* probability is the same either way.
+Only the dispersion the log sees differs, and at these leg counts that is second-order.
+**Correlated bias does not hit parlays harder than independent bias of the same mean.**
+
+## PROPOSED POST-FREEZE AMENDMENT — scale the EV floor by leg count
+
+**Not a change request. Frozen. This is the arithmetic laid out so freeze exit is a signed
+decision rather than a rediscovery.**
+
+### The defect
+
+`coreEvMin` is a **fixed** ticket-level floor of +2%. Ticket EV compounds, so the implied
+per-leg bar *falls* as legs are added, while `consMinEv` — being multiplicative — *rises*:
+
+| legs | `coreEvMin` implied per-leg bar | `consMinEv` implied per-leg bar |
+|---|---|---|
+| 1 | +2.00% | −1.000% |
+| 2 | +1.00% | −0.501% |
+| 3 | **+0.66%** | **−0.334%** |
+
+**Two gates, opposite directions, on the same axis. Neither was designed with the other in
+mind.** A floor that means a different thing at each leg count is a defect independent of
+which way the EV comparison lands.
+
+### Measured over-admission, board 2026-07-26
+
+| legs | leg-equivalent floor `1.02ⁿ−1` | core-eligible in pool | pass fixed +2% | pass leg-equivalent | **over-admitted** |
+|---|---|---|---|---|---|
+| 2 | +4.04% | 28 | 8 | 7 | **1** (12.5%) |
+| 3 | +6.12% | 19 | 10 | 7 | **3** (30.0%) |
+| **total** | | **47** | **18** | **14** | **4 (22%)** |
+
+**Over-admission scales with leg count exactly as the arithmetic predicts** — 12.5% at two
+legs, 30% at three.
+
+### What the amendment would do to the card, and to the decision variable
+
+| | picks | staked | stake-wtd EV | E[ln(B′/B)] | **crossover** |
+|---|---|---|---|---|---|
+| fixed +2% floor | 6 | $250 | 15.08% | +126.6 bp | **3.05 pp** |
+| **leg-equivalent floor** | 6 | $250 | **16.45%** | **+139.1 bp** | **3.50 pp** |
+
+**The amendment improves the card on every axis and raises the crossover by 0.45 pp** — i.e.
+it makes the parlay-first conclusion *more* robust to overconfidence, not less. That is the
+opposite of what a tightening usually does, and it is because the tickets it removes are the
+ones carrying sub-par legs.
+
+### Proposed amendment text (unsigned)
+
+> Replace the scalar `coreEvMin` comparison in `shAllocate` with a leg-count-scaled floor:
+> `selEv >= (Math.pow(1 + coreEvMin/100, pl.legs.length) - 1) * 100`. At one leg this is
+> identical to today's behaviour, so singles are unaffected. `coreEvMin` keeps its meaning as
+> *the required EV per leg*, which is what it reads as and has never been.
+
+**Not to be applied during the freeze**: it would move ticket selection, and the frozen
+parameter table is the drift detector. **Sign at freeze exit or reject explicitly.**
+
+---
+
 ## B. INFORMATION YIELD — the premise needs correcting
 
 The question assumed 46 unconfounded leg results vs 18 confounded ticket results, feeding the

@@ -216,6 +216,18 @@ NOT close the winner's-curse question**: it measures *gap-based* selection, whil
 clears +2%. Phase 2's movement slope tests the real quantity. `tools/selection_effect.py`.
 Denominator note: **37 distinct legs**, not the 46 leg *instances* first reported.
 
+> ### STANDING RULE: parlays win if per-leg overconfidence is under ~3 pp.
+> Crossover **3.05 pp** (board 2026-07-26, ¼-Kelly, correlated bias). **Stable**: 3.35/3.05/3.05
+> at 1/8, 1/4, 1/2 Kelly; **3.10 pp** with the same mean bias delivered independently per leg
+> (they agree because `E[Π(pᵢ−εᵢ)] = Π(pᵢ−δ)`, so correlated bias does NOT hit parlays harder).
+> Under a leg-equivalent floor the crossover rises to **3.50 pp**. Running estimate lives in
+> `docs/singles-vs-parlays.md`; add a row per board.
+>
+> Two by-products: **¼ and ½ Kelly are identical** — above ~¼ the Kelly ceiling stops binding
+> and `perParlayCap` ($62.50) takes over from the 2% cap ($200), so the ¼ setting is
+> load-bearing only downward; and **1/8 Kelly gives the parlay card HIGHER growth** (133.0 vs
+> 126.6 bp), i.e. it is over-concentrated at ¼ relative to growth-optimal.
+
 **Parlays beat singles on log-growth — conditional on calibration, with a stated threshold.**
 At the model's own probabilities: **+126.6 bp vs +55.3 bp** (exact over 2⁶ card outcomes, ¼-Kelly
 stakes, $2,500 bankroll), and the advantage **survives a leg-equivalent floor** (`1.02^n − 1` →
@@ -226,6 +238,24 @@ per-leg overconfidence** (−3: +8.2 vs +7.9; −5: −67.3 vs −23.7, parlays 
 the parlay card is **79× more likely to go 0-for-6** (9.5% vs 0.12%). **Do not re-spec Phase 4
 on this** — it reduces to one unmeasured calibration parameter with a threshold Phase 2 and the
 calibration channel exist to produce.
+
+**PROPOSED POST-FREEZE AMENDMENT (unsigned): scale the EV floor by leg count.** `coreEvMin`
+is a fixed +2% ticket floor, so the implied per-leg bar FALLS with legs (+2.00 / +1.00 /
++0.66%) while `consMinEv` RISES (−1.000 / −0.501 / −0.334%). Measured over-admission scales
+as predicted: **1 of 8 at 2 legs (12.5%), 3 of 10 at 3 legs (30%), 4 of 18 total**. Replacing
+the scalar test with `selEv >= ((1+coreEvMin/100)^nlegs − 1)*100` is identity-preserving at
+one leg and improves the card on every axis (EV 15.08→16.45%, growth +126.6→+139.1 bp,
+crossover 3.05→**3.50 pp**). **Not during the freeze.** Sign or reject at exit —
+`docs/singles-vs-parlays.md`.
+
+**H+R+RBI: the PA fix does NOT explain the miss, and runs the wrong way.** Recoverable from
+the board's `case` string: `clamp(expAB/abG, 0.85, 1.15)` has median **1.144**, sits at the
+HIGH clamp on 22 of 44 rows and the low clamp on 1, and is **upward on 38 of 44 (86%)** —
+because `expAB` is ABs-in-a-game-started while `abG = ab30/g30` is ABs-per-game-*appeared*,
+a systematically smaller denominator. Max possible downward effect **5.9 pp (O0.5) / 7.2 pp
+(O1.5)** against a **27 pp** miss on O1.5+. **A second defect exists and is unidentified.**
+Worse: the fix added a median **+4.8 pp** to O0.5 — the one line still active and taking
+money. `hrrAltMax` stays. Replaying graded legs needs the sync phrase (owner-executable).
 
 **`consMinEv` is a STRUCTURE filter wearing a quality filter's name.** `consCzEv` is
 multiplicative — `Π(1+cᵢ)−1` — so the per-leg bar *tightens* with leg count: −1.000% at 1 leg,
@@ -260,7 +290,8 @@ every case the constants still read the same:
 | `tools/gate_activity.py` | a threshold that can't be reached | 5 inert protections |
 | `tests/clamp-activity.test.ts` | a clamp pinned at a bound | L2258 100% low |
 | `tests/shrink-activity.test.ts` | `k` too large for the `n` available | L2066 weight 0.349 |
-| `tools/range_compression.py` | output range narrower than the market's | outs 0.51, HRR 0.50 |
+| `tools/range_compression.py` | output range narrower than the market's | **outs 0.50, and nothing else** |
+| `tools/hrr_pa_audit.py` | a "fix" that runs the wrong way | HRR PA correction upward on 86% of rows |
 
 **`shShrink` k values are the SIXTH unexamined-constant entry** (after `simN`/`simNHR`,
 `1.06`, props-`regions`, ump `g>=5`, `GAP_BUCKET_MIN_N`). 7 of 9 sites sit below 0.6
