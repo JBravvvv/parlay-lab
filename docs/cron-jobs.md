@@ -88,6 +88,59 @@ why it *would* have been correctable, had anyone measured it.
 **This is dated so it cannot become permanent by inattention.** An unrevisited "temporary"
 choice is how the 22:45 sweep spent fifteen days landing at 07:30.
 
+#### PRE-COMMITTED: what happens if 08-02 shows a fat tail
+
+The third row above was a diagnosis with no response attached. Scoped 2026-07-27 so the 08-02
+decision is a choice, not the start of a research project.
+
+**First, how much damage is even left.** The non-destructive board store (`fbbcbb0`) already
+absorbed most of it: a late thin pass no longer overwrites the fat one, it lands beside it and
+`gen=best` still returns the fat board. So a fat tail can no longer destroy an artifact. What
+it can still do is make **`latest` — the board Josh actually bets from — be the late thin
+one**. That is the whole remaining exposure, and it narrows the response considerably.
+
+**Not the answer: refusing the fire.** `/api/generate` already carries the argument against it
+in a comment at the `gen` stamp — *"Refusing here would trade a visible defect for an
+invisible one."* A refused fire leaves no board and no label; a late one leaves a labelled
+board that `best` correctly demotes. Keep recording, keep not enforcing.
+
+**The answer is redundancy, for the same reason `snapshot_props.py` got ten crons.** Against a
+fat tail, the only lever that raises P(*some* fire lands in the window) is more independent
+fires. Duplicate each entry at **+20 and +40 minutes** — 3 fires per slot instead of 1.
+
+**And redundancy is nearly free, which is the measured property that makes it the answer.** A
+redundant fire that adds nothing returns from the conditional skip *before* any Odds call:
+`slateStarts()` is keyless statsapi, the stored-board read is Redis, and `eng.collectSlate()`
+— the ~120-credit part — is downstream of the skip. A no-op fire costs one statsapi request.
+
+**⚠️ One blocker must be fixed first, and it is three lines.** `MAX_RUNS_PER_DATE` counts
+*requests*, not *generations*:
+
+```ts
+const runs = Number(await redis(["INCR", runsKey])) || 0;   // line ~137
+if (runs > MAX_RUNS_PER_DATE) return 429;
+...
+if (cov.skip) return { skipped: cov.reason };               // line ~160 — AFTER the INCR
+```
+
+So a skipped fire spends budget. Under the redundancy plan a Sunday would fire six times
+against a cap of three, and **the 4th would 429 even if the first three all skipped** — the
+punctual fire could be refused because three late no-ops preceded it. Redundancy is not merely
+ineffective until this is fixed, it is *harmful*.
+
+Fix: move the `INCR` below the skip block so the cap counts work done. The credit bound the cap
+exists for is preserved — every counted run is a run that reaches `collectSlate()` — and the
+45-minute `K_LASTGEN` limiter, which is already set only after the skip, is on the same basis.
+Cheap to write, but it is a live behaviour change to a gated endpoint, so it ships with the
+08-02 decision rather than ahead of it.
+
+| if 08-02 shows | do |
+|---|---|
+| median ≈ 0, tight | move Sunday to `30 17 * * 0`. Nothing else changes |
+| median large, tight | shift **every** entry earlier by the observed median |
+| **median ≈ 0, fat tail** | **fix the run cap to count generations, then triple every entry at +20/+40 min.** Do **not** shift the hours — a shift moves the median onto the wrong side and the tail still misses |
+| large median **and** fat tail | both: shift by the median first, then triple |
+
 ## What the Sunday 22:30 entry actually buys — and what it costs
 
 At 22:30 on a Sunday, **14.1 of 15.1 games are already started** and **1.0 is unstarted and
@@ -209,9 +262,18 @@ range detector, the ladder test and the 2.28 decomposition all read persisted bo
 | store | key | retention | keeps |
 |---|---|---|---|
 | board | `pl:board:{date}` + `:{at}` + `:gens` | **3 days** | the whole board, all generations |
-| prediction store | `pl:pred:{date}` (indexed by `pl:pred:days`) | **no TTL**; `/api/calibrate` prunes at `SUMMARY_DAYS = 45` | per-row `p`, `pModel`, `pMkt`, `w`, `edge`, `ev`, `odds`, `cz`, `czEv`, `lu`, `tags`, `ln`, `hist`, `at` — and now `gens[]` |
+| prediction store | `pl:pred:{date}` (indexed by `pl:pred:days`) | **permanent — nothing is ever pruned** ¹ | per-row `p`, `pModel`, `pMkt`, `w`, `edge`, `ev`, `odds`, `cz`, `czEv`, `lu`, `tags`, `ln`, `hist`, `at` — and now `gens[]` |
 | `line-history` branch | `data/props/*.json` | **permanent (git)** | prop **market** rows only: `fair`, `n`, `fb`, `fp`, `czf`, `bo`, `bu`, `no`, `cz` |
 | ledger | `pl:ledger:v1` | permanent | locked bets only — dark all window |
+| board archive | `data/boards/*.json.gz` on `line-history` | **permanent (git)** — built 2026-07-27 | the whole board, `best` and `latest`, gzipped |
+
+¹ **CORRECTION (2026-07-27): "prunes at `SUMMARY_DAYS = 45`" was wrong.** `SUMMARY_DAYS` is
+a **read window**, not a prune. `pl:pred:{date}` is written with a plain `SET` — no TTL — and
+no code path issues `DEL` against it or `SREM` against `pl:pred:days`. Every prediction row
+ever logged is still in the store, and `tests/calibration-window.test.ts` pins that by source
+scan. The real defect the wrong wording was pointing at is one order milder and is written up
+under *THE READING WINDOW SLIDES* below: nothing is lost, but the **summary** silently stops
+covering the start of the collection period around **2026-09-08**.
 
 ## So what becomes unreproducible after 3 days
 
@@ -232,20 +294,135 @@ already done:
 > hours.** They were all taken off a live or freshly-persisted board. The 20-board threshold
 > for the crossover is not reachable at all under a 3-day TTL.
 
-## Cheapest durable path — SCOPED, NOT BUILT
+## ✅ BUILT — 2026-07-27
 
-Archive one board per day to the `line-history` branch, beside `data/props/`.
+`tools/archive_boards.py` + `.github/workflows/board-archive.yml` → `data/boards/` on
+`line-history`.
 
 | | |
 |---|---|
-| **what** | `GET /api/board?date=<PT date>&gen=best` — the most complete generation, plus `&gen=list` for the index |
-| **where** | `data/boards/YYYY-MM-DD.json.gz` on `line-history` |
+| **what** | `GET /api/board?date=<PT date>&gen=best` **and** `&gen=latest`, plus `&gen=list` for the index |
+| **where** | `data/boards/YYYY-MM-DD.best.json.gz`, `.latest.json.gz`, `index.json` on `line-history` |
 | **cost** | **zero Odds credits** — it reads what the pass already paid for. `/api/board` is deliberately ungated, so the workflow needs **no secret** |
-| **size** | ~539 KB raw → ~62 KB gzipped ≈ **23 MB/year**. Comfortable for git |
-| **when** | once daily, after the last generation — e.g. `0 2 * * *` UTC |
-| **delay tolerance** | **the 3-day TTL gives 72 h of slack**, so even GitHub's measured +8.75 h queueing is harmless. This is the one archive job that does *not* need the self-pacing treatment |
-| **not needed** | a second fetch of `latest` — `best` and `list` together let any later analysis reconstruct which pass it is reading |
+| **size** | **1.36 MB raw → 150 KB gzipped**, measured on the real 07-26 board |
+| **when** | `0 12` and `0 19` UTC daily, targeting PT **yesterday** and the two days before |
+| **delay tolerance** | the 3-day TTL × 2 crons × a 3-date window = **six independent chances per date**. No individual firing has to be punctual |
 
-**One design note if it is built:** archive `gen=best`, not `gen=latest`. On a Sunday with the
-22:30 entry, `latest` is the ~1-game board — archiving it would reintroduce, permanently and
-in git, exactly the loss the non-destructive store was built to prevent.
+### Both generations, and why that is nearly free
+
+The original scope said `best` alone. Josh's correction: `latest` is what a bet was actually
+placed from, so any bet-reconstruction question needs it, and the two differ on exactly the
+days that matter — Sunday, and any day with a late fire.
+
+Naively that is two files a day. It is not, because **git content-addresses blobs**: on a day
+with one generation the two files are byte-identical and cost **one** blob plus a tree entry.
+Verified on the backfill commit — `4a5e96c0…` appears twice in `git ls-tree`, 4 entries, 3
+unique blobs. This only works because the archive gzips with `mtime=0` and no filename header;
+default `gzip` stamps the current time into the header and would make every day two distinct
+blobs *and* make re-archiving an unchanged board churn a fresh 150 KB. So:
+
+* days with one generation → **150 KB**
+* days where `best ≠ latest` (Sundays, late fires) → **300 KB**
+* ≈ **55–60 MB/year**, not the 23 MB first estimated — the original 62 KB figure was **2.4×
+  low**, taken from a guess rather than from a board.
+
+Writing both filenames unconditionally is deliberate: a missing file then always means "the
+archive failed", never "the two happened to agree".
+
+### Capture is after the day, not racing it
+
+The default target is PT **yesterday** and the two days before — never today, which is still
+being generated. The last generation of PT day D is the Sunday 22:30 UTC entry (15:30 PT on
+D); the `0 12` UTC run on D+1 is 05:00 PT, **13.5 hours later**. Even at GitHub's measured
++8.75 h that run lands ~20:45 UTC and still resolves PT-yesterday to D. The three-date window
+is what makes the schedule non-load-bearing rather than the clock.
+
+### Backfill
+
+`2026-07-26` archived (`1e77c9d` on `line-history`) — the board every current finding rests
+on. **`2026-07-25` and `2026-07-24` were already gone**: `/api/board` returns
+`no-board-for-date` for both. The TTL had already taken them, which is the concrete version of
+the claim above rather than the projected one.
+
+That board's stamp: `at` = 2026-07-26T16:46:16Z (09:46 PT), `gen: null` — it predates the
+`gen` stamp, so the series' first entry is unlabelled and every later one is not.
+
+### What the archive unblocks, and when
+
+The ≥20-board threshold now has a **date** instead of a hope.
+
+| board dates | count | 20th board |
+|---|---|---|
+| 07-26 backfill + 07-27 → 08-14 | 20 | **2026-08-14** (archived 08-15) |
+| without the backfill, 07-27 → 08-15 | 20 | 2026-08-15 |
+
+Both are **floors**, and they assume a board is generated and stored every day. A day where
+the generation fails, or an off-day with no slate, pushes the date out one for one. The
+archive prints `BOARD SERIES n = <k>` on every run, so `n` is read off the run rather than
+counted forward from an assumption.
+
+On **2026-08-14** these become answerable for the first time on more than one board:
+
+| currently resting on | what n=20 changes |
+|---|---|
+| **crossover 3.05 pp** — one board, 218 tickets | a distribution instead of a point. The standing rule *"parlays win if per-leg overconfidence is under ~3 pp"* gets a **review date of 2026-08-14** rather than resting on 2026-07-26 indefinitely |
+| the **2.28 → 2.13 decomposition** — `WITHIN 1.00 [0.90, 1.17]` at n=37 legs | the Phase 3 no-shrink default was explicitly deferred to ≥20 boards. This is that reading |
+| **range-compression detector** — runs on `propBoard`, currently the fixture | re-run over the archive series and report **whether the fixture was representative**. `pitcher_outs` read 0.50 on the live board; if the fixture disagrees, the fixture is the thing that is wrong |
+| **clamp / shrink activity audits** — `tests/clamp-activity.test.ts`, `tests/shrink-activity.test.ts`, both fixture-based | same question, higher stakes: **25 of 30 clamp sites execute on the fixture**, and the five cold ones were classified as harness limitations from reasoning, not from a second population. Twenty real boards is that second population |
+
+The fixture-vs-archive comparison is the point, not a formality: every clamp and shrink number
+in the frozen table came from one armed fixture. A rule this project has already paid for
+twice — *the re-check must come from a different instrument* — says those numbers are
+single-instrument until 08-14.
+
+## THE READING WINDOW SLIDES — the same problem one order slower (2026-07-27)
+
+**Nothing is pruned.** Corrected above: `pl:pred:{date}` is a plain `SET`, no TTL, no `DEL`,
+no `SREM`. What moves is `allDays.slice(-SUMMARY_DAYS)` in `/api/calibrate`.
+
+| | |
+|---|---|
+| collection period | `CAL_START` 2026-07-25 → freeze exit ~2026-09-22 = **60 logged dates** |
+| `SUMMARY_DAYS` | **45** |
+| window first caps | **2026-09-08** (`CAL_START` + 45) |
+| window at freeze exit | **2026-08-09 → 2026-09-22** — the first **15** logged dates, 2026-07-25 → 2026-08-08, are outside it |
+
+So the exit reading — reliability slopes, the disagreement panel, per-market gaps,
+`globalShrink` — would have been computed over three quarters of the period the freeze exists
+to collect, and nothing in the payload said which quarters. Josh's guess of "08-08" was one
+day off in the safe direction: 08-08 is the last **excluded** date.
+
+`docs/collection-period.md` already recorded the *mechanism* — "`CAL_START` goes inert around
+2026-09-08" — and stopped one step short of the *consequence*. Same shape as the
+coverage-denominator series, and the same lesson.
+
+**One further caveat: `allDays` counts LOGGED dates, not calendar days.** A missed slate or a
+failed cron pushes the cap date later in calendar terms while the window still holds exactly
+45 entries. 2026-09-08 is the earliest it can bite, not a fixed date.
+
+### Fix shipped — two windows, and the reading is the wider one
+
+Widening the window that feeds `applyWeeklyAdjustment` would change the model's blend weights.
+That is a frozen-parameter decision and Josh's to sign off, so the two consumers were separated
+instead of merged:
+
+| channel | window | consumer | behaviour |
+|---|---|---|---|
+| `summary` | last 45 logged dates | `applyWeeklyAdjustment` → blend weights | **unchanged, byte-identical** |
+| `summary.full` | **every eligible date, never sliding** | the exit reading | new |
+
+Both stamp their own bounds in `.window` — `from`, `to`, `days`, `limit`, `eligibleLogged`,
+`dropped`, `droppedFrom/To`, `capped` — because a window is a denominator, and the standing
+rule is that a denominator is declared, not remembered. `summary.full` is computed and attached
+**always**, not only once `dropped > 0`: it is identical to `summary` until ~09-08, which is
+exactly the point — the plumbing is exercised for six weeks before it first matters, rather
+than appearing untested on the day it first diverges.
+
+`tests/calibration-window.test.ts` (6 tests) pins the no-prune claim by source scan, the 60 >
+45 arithmetic, the 09-08 and 08-09 dates, that only the narrow window reaches the weight
+adjuster, and that the wide channel is unwindowed by `limit: null` rather than by a larger
+constant that would itself expire one day.
+
+**Still unshipped, and deliberately:** raising `SUMMARY_DAYS` itself. If it is ever raised it
+must land **before 2026-09-08**, not at freeze exit — landing it at exit would move the weights
+on the same day the exit reading is taken.

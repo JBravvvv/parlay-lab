@@ -672,6 +672,15 @@ The coverage-denominator series has four instances, and **how each was found is 
 | 2 | the staleness gate | **a consequence** — same wrong number, next reader | yes |
 | 3 | `achievableCoverage` | **testing a recommendation before making it** — the Sunday 22:30 entry would have been a silent no-op | **no.** It would have looked like the entry simply never helping |
 | 4 | `luCoverage.pct` (engine) | **an audit that existed only because #3 did** | **never.** It is display-only, so no consequence exists to surface it |
+| 5 | `SUMMARY_DAYS` — the calibration **read window** (2026-07-27) | **an audit of the same class, one level up**: a window is a denominator over dates | **not before 2026-09-08**, and then only as a number quietly covering ¾ of the collection period |
+
+**Instance 5 is the sharpest case of the corollary yet**, because the mechanism was *already
+written down*. `docs/collection-period.md` recorded "`CAL_START` goes inert around 2026-09-08"
+— correct, and one step short. Nobody carried it forward to "…therefore the freeze-exit
+reading starts on 2026-08-09 and drops the first fifteen days of the period the freeze exists
+to collect." **Recording a mechanism is not auditing it.** The consequence was still six weeks
+away, so nothing was going wrong yet, which by the corollary is exactly when it was worth the
+most to look.
 
 **Instances 1 and 2 cost something before they were found. Instances 3 and 4 cost nothing,
 because the audit ran first — and #4 could not have been found any other way**, since a

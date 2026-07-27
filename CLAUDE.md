@@ -339,10 +339,49 @@ upgrade a paid plan or buy anything for him. `/api/generate` and `/api/calibrate
 (`X-Cron-Key`). `/api/board` (GET) is deliberately **not** sync-phrase gated.
 
 ## Scheduling
-Vercel Hobby allows 2 crons and both are used (`/api/generate` `0 16 * * *`, `/api/calibrate`
-`30 9 * * *`). The day-of-week generate split (weekday 22:00 / Sat 18:00 / Sun 17:00 UTC) moves
-to **cron-job.org** (supports custom headers; free tier 100 executions/day, CLV job already uses
-96). `/api/generate` comes out of `vercel.json` only once those entries exist.
+`/api/generate` is **out of `vercel.json`** (as of `3a6ce68`); `/api/calibrate` `30 9 * * *`
+remains. The generate split lives on **cron-job.org** (custom headers; free tier 100/day, CLV
+job uses 96): weekday `0 22 * * 1-5`, Sat `0 18 * * 6`, Sun `0 17 * * 0`, Sun `30 22 * * 0`.
+Josh creates and owns those entries — he types `CRON_SECRET` into the `x-cron-key` header
+himself. Full rationale, hour-by-hour schedule sample and the dated revisit item:
+`docs/cron-jobs.md`.
+
+**GitHub Actions schedules are unreliable and it is measured, not suspected.** Over 15 days
+via the Actions API (workflow `311636390`, 30 runs, all `event: schedule`): `0 17` actually
+started ~20:20Z (**+3.3 h**) and `45 22` ~07:30Z the *next day* (**+8.75 h**). Single ticks are
+also sometimes skipped. Any GitHub-scheduled job that must land in a window needs either
+script-side self-pacing (`tools/snapshot_props.py`) or a window wide enough that punctuality
+does not matter (`tools/archive_boards.py`). Never assume a cron fired when it says.
+
+## Retention — what survives, and for how long
+| store | retention |
+|---|---|
+| `pl:board:{date}` / `:{at}` / `:gens` | **3 days** (`EX 259200`) |
+| `pl:pred:{date}` (index `pl:pred:days`) | **permanent — nothing is ever pruned** |
+| `line-history` branch (git) | permanent |
+| `pl:ledger:v1` | permanent |
+
+**`SUMMARY_DAYS = 45` is a READ window, not a prune** — an earlier note in this file said
+"prunes at 45 days" and that was wrong. `pl:pred:{date}` is a plain `SET` with no TTL; nothing
+`DEL`s it or `SREM`s the day set. What slides is `allDays.slice(-45)` in `/api/calibrate`.
+Collection period = 60 logged dates (`CAL_START` 2026-07-25 → freeze exit ~2026-09-22), so from
+**2026-09-08** the summary stops covering the start of the period, and at exit it would read
+**2026-08-09 → 09-22**, dropping 15 dates. Fixed 2026-07-27 by splitting the channels:
+`summary` (45 dates) still trains the blend weights, byte-identical; **`summary.full`** covers
+every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_DAYS` itself is
+a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
+`tests/calibration-window.test.ts` pins all of it.
+
+**Board archive** (`tools/archive_boards.py` + `.github/workflows/board-archive.yml`, built
+2026-07-27) → `data/boards/YYYY-MM-DD.{best,latest}.json.gz` + `index.json` on `line-history`.
+Runs `0 12` / `0 19` UTC targeting PT **yesterday and the two days before** — the 3-date window
+is the delay tolerance, not the clock. Zero Odds credits, no secret (`/api/board` is ungated).
+**1.36 MB raw → 150 KB gzipped** per board (an earlier 62 KB estimate was 2.4× low). Both
+generations are archived because `latest` is what a bet was placed from and `best` is what
+analysis needs; on single-generation days the two files are byte-identical and **git stores one
+blob** — which only works because the script gzips with `mtime=0`. `2026-07-26` backfilled
+(`1e77c9d`); **07-25 and 07-24 were already expired.** The ≥20-board threshold lands
+**2026-08-14** at the earliest.
 
 ## Reading the board JSON — traps that have each cost a wrong answer
 - **`categories` is one-sided.** "Top 50 per market ranked by win probability, ONE side per
@@ -369,7 +408,18 @@ on the same cell, that is the finding, not a rounding issue. Five standing metho
 live in `docs/harness-substitutions.md`: diff two things that should be identical · anything
 that can return an identity value must be observable · **a filter chain must be RUN, not
 reconstructed** · **a directional claim needs a population that could have gone the other way** ·
-**the test count comes from that run's output, and a red suite is reported first**.
+**the test count comes from that run's output, and a red suite is reported first** · a statistic
+on a SELECTED population measures the selection · **check a ratio's numerator and denominator
+describe the same population before inferring from its sign** · **a mechanism is a hypothesis
+until traced to a line, and the re-check must come from a DIFFERENT instrument**.
+
+**Run the audit after every confirmed INSTANCE, not after every consequence.** The
+coverage-denominator series has five instances; #4 (`luCoverage.pct`) is display-only and no
+consequence would ever have surfaced it, and #5 (`SUMMARY_DAYS`) had its *mechanism* already
+written down in `docs/collection-period.md` with the consequence never drawn. Corollary:
+**the value of an audit is highest exactly where nothing is going wrong yet** — the opposite of
+how attention allocates. Encode invariants as tests, not as comments: `board-coverage.ts`'s own
+header warned about the denominator trap and instance #3 was one function below the warning.
 
 **Test reporting:** run the suite, quote that run's numbers, and if anything is red say so at
 the top of the message before any finding. Never loosen a strict assertion to make it pass —

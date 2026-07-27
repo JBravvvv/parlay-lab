@@ -174,6 +174,28 @@ export type CalibrationSummary = {
      model that is fine on the board and wrong where it is actually bet. */
   disagreement?: EvFit[];
   globalShrink?: { s: number; n: number; slopeBefore: number | null; slopeAfter: number | null };
+  /* 2026-07-27: WHICH DATES THIS SUMMARY IS OVER. `SUMMARY_DAYS` (45) is a read window,
+     not a prune — no row is ever deleted — but it SLIDES, and the collection period is
+     60 logged dates (CAL_START 2026-07-25 -> freeze exit ~2026-09-22). From ~2026-09-08
+     the training window stops containing the start of the period the freeze exists to
+     collect, and nothing in the payload said so. A window is a denominator; it declares
+     itself. `capped` is the tripwire. */
+  window?: {
+    from: string | null;
+    to: string | null;
+    days: number;
+    limit: number | null; // null = unwindowed
+    calStart: string;
+    eligibleLogged: number; // eligible dates that exist in the store
+    dropped: number; // ...minus the ones this window can see
+    droppedFrom: string | null;
+    droppedTo: string | null;
+    capped: boolean;
+  };
+  /* the same reading over EVERY eligible date, never sliding. The 45-day `summary` still
+     trains the blend weights (widening that is a frozen-parameter call); this is what the
+     freeze-exit reading — reliability, disagreement, per-market gaps — is computed from. */
+  full?: Omit<CalibrationSummary, "full">;
 };
 
 export function computeCalibration(picks: GradedPick[]): CalibrationSummary {

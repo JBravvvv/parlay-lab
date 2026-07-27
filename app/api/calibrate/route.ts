@@ -183,16 +183,43 @@ export async function GET(req: NextRequest) {
       if (changed) await redisSetJson(dayKey(date), blob);
     }
 
-    // 3C: rolling summary over the graded window (pMkt rides along so the summary
-    // can score the model against the consensus-only baseline — upgrade 03)
+    /* 3C: rolling summary over the graded window (pMkt rides along so the summary
+       can score the model against the consensus-only baseline — upgrade 03)
+
+       TWO WINDOWS, DELIBERATELY, AND THE READING IS THE WIDER ONE (2026-07-27).
+       `SUMMARY_DAYS` is a READ window, not a prune: `pl:pred:{date}` is written with a
+       plain SET, no TTL, and nothing ever DELs it or SREMs `pl:pred:days`. Every row
+       ever logged is still there. But `allDays.slice(-45)` slides, and the collection
+       period is 60 logged dates (CAL_START 2026-07-25 -> freeze exit ~2026-09-22), so
+       from ~2026-09-08 the summary silently stops containing the first two weeks of the
+       very period the freeze exists to collect. On 09-22 the 45-date window starts at
+       2026-08-09 and the exit reading — reliability, disagreement, per-market gaps —
+       would have been computed over 3/4 of the sample without saying so.
+
+       Widening the window that feeds `applyWeeklyAdjustment` would change the model's
+       blend weights, which is a frozen-parameter decision and Josh's to sign off. So the
+       two consumers are separated instead: `graded` keeps the 45-date window and still
+       trains the channel exactly as before (weights byte-identical), while `gradedAll`
+       covers every eligible date and produces `summary.full` — the reading. Both stamp
+       their own bounds in `summary.window` / `summary.full.window`, because a window is a
+       denominator and the rule in docs/harness-substitutions.md is that a denominator is
+       declared, not remembered. */
     const graded: GradedPick[] = [];
-    for (const date of allDays.slice(-SUMMARY_DAYS)) {
+    const gradedAll: GradedPick[] = [];
+    const inWindow = new Set(allDays.slice(-SUMMARY_DAYS));
+    const usedDays: string[] = [];
+    const allDaysUsed: string[] = [];
+    for (const date of allDays) {
       // Phase 0.5 date cutoff: rows written while two generators ran different
       // selection policies are still stored and still graded above — they just
       // don't train the channel. See CAL_START in engine2/calibration.
       if (!calibrationEligible(date)) continue;
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
+      allDaysUsed.push(date);
+      gradedAll.push(...gradedFromBlob(blob));
+      if (!inWindow.has(date)) continue;
+      usedDays.push(date);
       // ONE door into the training channel (Phase 1): settled rows only, superseded
       // statements excluded, `hist` structurally unreachable. See gradedFromBlob.
       graded.push(...gradedFromBlob(blob));
@@ -227,7 +254,7 @@ export async function GET(req: NextRequest) {
             // a ledger leg's line is in its lkey; `susp` is left unset rather than
             // inferred — a leg that was BET was by definition not suspended, and the
             // suspension state at lock isn't recorded anywhere to check against
-            graded.push({
+            const pick: GradedPick = {
               market: marketOf(l.lkey),
               p: Number(l.est),
               edge: null,
@@ -235,7 +262,12 @@ export async function GET(req: NextRequest) {
               res,
               pMkt: null,
               ln: lineOf(l.lkey),
-            });
+            };
+            graded.push(pick);
+            // the ledger join is already date-cut at SUMMARY_DAYS above, so these legs
+            // belong to both windows — the wider reading must not be MISSING rows the
+            // narrower training window has
+            gradedAll.push(pick);
           }
         }
       }
@@ -251,6 +283,44 @@ export async function GET(req: NextRequest) {
     // are the bet population and those below are the rows passed over — see fitByEv.
     summary.disagreement = fitByEv(graded);
     summary.globalShrink = fitGlobalShrink(graded);
+
+    /* THE WINDOW DECLARES ITSELF. `dropped` is the count of eligible logged dates the
+       training window can no longer see; it is 0 until ~2026-09-08 and then climbs by one
+       a day. `capped` is the tripwire: once true, the number that trains the blend weights
+       and the number in the exit reading are answers to different questions. */
+    const dropped = allDaysUsed.filter((d) => !inWindow.has(d));
+    summary.window = {
+      from: usedDays[0] ?? null,
+      to: usedDays[usedDays.length - 1] ?? null,
+      days: usedDays.length,
+      limit: SUMMARY_DAYS,
+      calStart: CAL_START,
+      eligibleLogged: allDaysUsed.length,
+      dropped: dropped.length,
+      droppedFrom: dropped[0] ?? null,
+      droppedTo: dropped[dropped.length - 1] ?? null,
+      capped: usedDays.length >= SUMMARY_DAYS,
+    };
+    /* the reading channel: every eligible date, never sliding. Identical to `summary`
+       until the window caps — which is the point, it proves the plumbing before it
+       matters rather than appearing untested on the day it first diverges. */
+    const full = computeCalibration(gradedAll);
+    full.reliability = fitReliability(gradedAll);
+    full.disagreement = fitByEv(gradedAll);
+    full.globalShrink = fitGlobalShrink(gradedAll);
+    full.window = {
+      from: allDaysUsed[0] ?? null,
+      to: allDaysUsed[allDaysUsed.length - 1] ?? null,
+      days: allDaysUsed.length,
+      limit: null,
+      calStart: CAL_START,
+      eligibleLogged: allDaysUsed.length,
+      dropped: 0,
+      droppedFrom: null,
+      droppedTo: null,
+      capped: false,
+    };
+    summary.full = full;
     await redisSetJson(K_SUMMARY, summary);
 
     // 3D: weekly, capped, shrink-only, significance-gated
