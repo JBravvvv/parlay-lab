@@ -216,6 +216,23 @@ this from the Actions run log before Series A's close definition is trusted**; i
 really are at 22:45, that is a near-close and the archive's `t` field is wrong instead, which
 is its own defect. Either way it must be settled by reading the log, not inferred.
 
+### 1b. THE 07-17 → 07-22 ATTENUATION BOUND — worth having, and NOT a correction factor
+
+The only population with both a T−2.5h archive price and a true ~45-min pre-pitch CLV
+sighting is the **07-17 → 07-22 locked legs**. Running `movement open→T−2.5h` against
+`movement open→true close` on those legs gives the attenuation factor per market, which
+would let Series B be *bounded* rather than discarded, and would also say how much of the
+day's move happens in the final 2.5 hours — directly useful for the lock-guard threshold.
+
+**Needs the ledger, so it is owner-executable.** And when it runs, it must be labelled:
+
+> **That population is pre-`CAL_START`, pre-`booksInd`, pre-timezone-fix, and priced by a
+> board generated at 16:00 UTC.** The ratio it produces describes *that* engine at *that*
+> generation hour. Boards generated at 22:00 UTC (the new cron-job.org schedule, see
+> `docs/cron-jobs.md`) sit a different distance from the close and will have a different
+> attenuation. **It is a bound, not a standing correction factor**, and must never be applied
+> to a 22:00-generated board.
+
 ### 2. 44% attrition, and it is not yet shown to be random
 
 **3,637 of 6,535 open rows (56%) have a later reading.** Uniform across markets (52–56%).
@@ -235,9 +252,23 @@ None of that is large enough to make the movement distribution a different popul
 
 **But two of the four requested dimensions cannot be checked at all**: `bo`/`bu` (overround)
 and `czf` were added to `snapshot_props.py` on 2026-07-25/26 and are absent from this
-vintage, so those columns read as zeros rather than as measurements. **Series B's selection
-is therefore bounded, not cleared** — a caveat to carry, not a clean bill. Series A has all
-four fields and can be checked properly.
+vintage, so those columns read as zeros rather than as measurements.
+
+> ### SERIES B CARRIES TWO CAVEATS, NOT ONE
+> 1. **Attenuated close** — every reading is T−2.5h or earlier, so any slope is biased toward
+>    zero and "slope ≈ 0" is uninterpretable in this vintage.
+> 2. **Partially unbounded selection** — attrition is bounded on *books-behind-fair* and *fair
+>    level* (both benign, ratios 1.018 and 1.014) and **unbounded on overround and Caesars
+>    participation**.
+>
+> **The second caveat is worse than it looks, because `czf` IS the `booksInd` dimension.**
+> Series B cannot rule out that its joined rows are systematically the ones where **Caesars
+> quoted** — and Caesars participation is a variable this project has already measured as
+> mattering (`docs/collection-period.md`: total bases 56.5% Caesars-in-fair, H+R+RBI 83.8%,
+> hits and K's 0%). A selection on that variable is not a hypothetical.
+>
+> **Every Series B figure carries both labels.** Series A has all four fields plus a true
+> close and can be checked properly — which is the third reason the vintages are never pooled.
 
 `batter_home_runs` is absent entirely, by construction: quoted one-sided, `fair` null on 100%
 of rows.
@@ -292,6 +323,25 @@ rung table and is explicitly secondary.
 > Committed before the data exists. `docs/hrr-recalibration.md` already shows what the second
 > branch looks like when it fires: market λ drift +0.474 against a closed-form model drift of
 > **+0.001**.
+
+### The identification diagnostic ships WITH the first report, not after
+
+A β whose SE nobody looked at is the exact shape of the `significant: true` at n=5 defect —
+a number that reads as a result because nothing beside it says otherwise. So the first Series
+A report carries, **per (market × rung) cell**:
+
+| column | why |
+|---|---|
+| n | the cell's size |
+| **spread of the regressor** (`pModel − open_fair`: p10/p90, SD) | β is identified only by *variance* in the gap; a cell where every row sits at a similar gap cannot identify it at any n |
+| **corr(regressor, constant) after centring** | measures the collinearity the `pitcher_outs` one-signed drift creates |
+| α and its SE | unconditional drift, which on outs is nearly collinear with the gap's sign |
+| β and its SE | the slope |
+| **`identified: yes/no`** | an explicit verdict |
+
+> **A cell that cannot identify β reports "cannot identify" — not a number.** Same rule as
+> the rung minimum below: a figure that will be quoted must not be produced when the data
+> cannot support it.
 
 **Minimum n per rung before a rung slope is read: 30.** Below that the rung is listed with its
 count and no slope, rather than a slope with a wide interval that will be quoted anyway.
