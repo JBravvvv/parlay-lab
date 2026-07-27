@@ -120,6 +120,70 @@ The quant engine runs **verbatim** inside a sandbox facade: `legacy/index.html` 
 requires re-running the extractor and the full suite** (`npx vitest run --no-file-parallelism`;
 Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 
+# ⏱️ CURRENT STATE — read this first (as of 2026-07-27)
+
+## Where the code is
+| branch | state |
+|---|---|
+| `frontend-rebuild` (production) | **`e0e1ae1` committed, NOT pushed** — everything before it is pushed |
+| `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
+| `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
+| `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
+
+Nightly bots push to `frontend-rebuild` (`context.yml`, `model.yml`). **Expect to rebase before
+pushing**; that has happened three times.
+
+## cron-job.org entries — Josh creates them, Josh types `CRON_SECRET`
+| # | when (UTC) | target | status |
+|---|---|---|---|
+| 1–4 | `0 22 * * 1-5` · `0 18 * * 6` · `0 17 * * 0` · `30 22 * * 0` | `/api/generate` | **created** |
+| 5–6 | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** | `/api/propsnap` | **being created** — these REPLACE the `0 16` I first gave, which measured 14.9% vs 52.9% |
+
+**Free tier is 100/day and `/api/clv` uses 96.** Sunday = 2 generate + 2 propsnap = **exactly
+100**. A third propsnap entry does not fit.
+
+## ⚠️ FIRST CHECKS TOMORROW (2026-07-28)
+1. **Did `board-archive` run at all?** It has never fired. 2 crons/day, and "designed sound" and
+   "ran" are different claims. `data/boards/` on `line-history`.
+2. **`props-history` fire count.** It is now **4 crons** (`0 17` with `--wait`, `0 13`, `0 23`
+   fallbacks, `0 3` fold-only), down from 10. Expect 4; fewer means the queue is thinning them.
+3. **Does `data/props/2026-07-27.json` carry `kind` and `fp`?** No snapshot has ever carried
+   either. `python3 tools/close_capture.py --dir data/props`.
+4. **Did `--wait` actually hold the runner?** The Actions log should show `waiting N min`.
+5. **`shadow.umpKf` on the first 22:00 board** — non-null means `merge_prior` + the cadence
+   worked; null means the context job still is not resolving umpires.
+
+## Dated open items
+| date | item |
+|---|---|
+| **2026-07-29** | first bimodal-day close test (Wed). Does a split slate produce **two** closes? |
+| **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
+| **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
+| **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
+| **2026-08-06** | `pitcher_outs` first readable in Phase 2 (~3 rows/day) |
+| **2026-08-09** | first HR-overround reading |
+| **2026-08-14 / 15** | **20-board archive series.** Clamp fixture-representativeness, range detector, ten-factor share table, crossover doctrine review |
+| **2026-08-15** | ICC day-level report; the HRR amendment stays **UNSIGNED** until it lands |
+| **~2026-09-08** | `SUMMARY_DAYS` window first caps — any raise must land BEFORE this |
+| **~2026-09-22** | parameter exit. **Bankroll exit is unscheduled and cannot be dated yet** |
+
+## Deferred, written up, NOT shipped
+`pitcher_outs` `0.140`→`0.400` · everything in `docs/freeze-exit-bundle.md` · the board-archive
+`gen=best`+`latest` is BUILT and running · `pen_quality` same-day replace (bounded, recorded) ·
+`repository_dispatch` PAT route (**not needed** — `/api/propsnap` solved it).
+
+## The docs, and what each is for
+| file | holds |
+|---|---|
+| `docs/freeze-exit-bundle.md` | **the 09-22 deliverable, in draft.** 6 model + 4 allocation amendments, each with measured effect, axis, dependencies; plus closed-with-magnitude |
+| `docs/collection-period.md` | the frozen parameter table, the two exits, `mktN`, the sim/closed-form split, factor consumer table |
+| `docs/harness-substitutions.md` | **the methodology rules.** Negative assertions, whole-symbol matching, guard-testing, detector blind spots, impossible branches |
+| `docs/hrr-recalibration.md` | the H+R+RBI thread and its one-board/one-instrument warning |
+| `docs/phase2-memo.md` | Series A/B, close quality, rung + day/night splits |
+| `docs/cron-jobs.md` | every scheduler entry, the measured delays, the weekend route |
+| `docs/pitcher-outs-audit.md` · `docs/singles-vs-parlays.md` | the two completed audits |
+
+
 ## The collection-period FREEZE (through ~2026-09-22)
 Parameters are frozen; the frozen-parameter table in `docs/collection-period.md` is a drift
 detector. Standing rules, learned the hard way: **never rebaseline a parity digest to silence
@@ -654,24 +718,48 @@ later reading **understates** the thinness, so that finding is conservative, not
 
 ## Working rhythm with Josh
 Report before pushing; stop at every phase gate; measure rather than model; state the
-denominator of every number. He catches unreconciled tables — if two of your figures disagree
-on the same cell, that is the finding, not a rounding issue. Five standing methodology rules
-live in `docs/harness-substitutions.md`: diff two things that should be identical · anything
-that can return an identity value must be observable · **a filter chain must be RUN, not
-reconstructed** · **a directional claim needs a population that could have gone the other way** ·
-**the test count comes from that run's output, and a red suite is reported first** · a statistic
-on a SELECTED population measures the selection · **check a ratio's numerator and denominator
-describe the same population before inferring from its sign** · **a mechanism is a hypothesis
-until traced to a line, and the re-check must come from a DIFFERENT instrument**.
+denominator of every number. He catches unreconciled tables — if two of your figures disagree on
+the same cell, that is the finding, not a rounding issue. **Each turn opens with "Push `<sha>`"**;
+he pushes the previous commit, so commit and hold rather than pushing unasked.
 
-**Run the audit after every confirmed INSTANCE, not after every consequence.** The
-coverage-denominator series has five instances; #4 (`luCoverage.pct`) is display-only and no
-consequence would ever have surfaced it, and #5 (`SUMMARY_DAYS`) had its *mechanism* already
-written down in `docs/collection-period.md` with the consequence never drawn. Corollary:
-**the value of an audit is highest exactly where nothing is going wrong yet** — the opposite of
-how attention allocates. Encode invariants as tests, not as comments: `board-coverage.ts`'s own
-header warned about the denominator trap and instance #3 was one function below the warning.
-
-**Test reporting:** run the suite, quote that run's numbers, and if anything is red say so at
-the top of the message before any finding. Never loosen a strict assertion to make it pass —
+**Test reporting:** run the suite, quote that run's numbers, and if anything is red say so at the
+top of the message before any finding. Never loosen a strict assertion to make it pass —
 `toEqual` catching an added field is the assertion working.
+
+**Close an item with a VERDICT AND A MAGNITUDE, never a verdict alone.** A verdict cannot be
+re-checked and this project has reopened three closed threads. `docs/freeze-exit-bundle.md` keeps
+the closed list in that format.
+
+## The methodology rules — full text in `docs/harness-substitutions.md`
+1. **A negative assertion that matches nothing passes silently.** Positive assertions
+   self-correct; negative ones do not. Anchor every symbol; guard every loop for non-emptiness
+   IN PLACE. *(This is the top rule — it explains a whole class.)*
+2. Diff two things that should be identical.
+3. Anything that can return an identity value must be observable.
+4. **A filter chain must be RUN, not reconstructed.**
+5. **A directional claim needs a population that could have gone the other way.**
+6. The test count comes from that run's output, and a red suite is reported first.
+7. **A statistic on a SELECTED population measures the selection.**
+8. Check a ratio's numerator and denominator describe the same population before reading its sign.
+9. **A mechanism is a hypothesis until traced to a line — and the re-check must come from a
+   DIFFERENT instrument.** More runs of the same instrument is precision, not independence.
+10. **A confirmation from the same instrument never outvotes a disconfirmation from a different
+    one.**
+11. **Recording a mechanism is not auditing it.** Enumerate the consequences in the same sitting.
+12. **Reading one artifact is not reading the series** — and never attribute to arithmetic what
+    was a write.
+13. **Run the audit after every confirmed INSTANCE, not every consequence.** The value of an
+    audit is highest exactly where nothing is going wrong yet.
+14. **A new guard's first test is whether it FAILS when it should.** Break it on purpose.
+15. **A guard that scans source matches whole symbols and function bodies**, never substrings or
+    line offsets. Match the CONTRACT, not the text.
+16. **When the choice is between a hole and a lie, take the hole.** Record, do not enforce.
+17. **Ask of every pre-committed branch: could the world produce this?** If not, label it
+    diagnostic-of-the-instrument in the table itself.
+18. **A narrow detector is indistinguishable from an absent one in its output.** Ask what shape
+    of violation it structurally cannot see.
+19. **When a population turns out to be selected, recompute the statistics on both sides** rather
+    than caveating them — most are invariant, and the ones that move tell you the direction.
+20. **A magnitude is not a direction of correctness.** Two paths disagreeing by 9.2 pp says
+    nothing about which is right; check against something external.
+
