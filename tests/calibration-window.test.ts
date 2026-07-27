@@ -77,7 +77,7 @@ describe("the calibration window declares itself, and the exit reading is not th
     expect(ROUTE).toContain("summary.full = full");
     // ...and the weight adjuster still sees only the 45-date summary
     expect(ROUTE).toContain("applyWeeklyAdjustment(summary, weights, now)");
-    expect(ROUTE).not.toContain("applyWeeklyAdjustment(full");
+    expect(ROUTE).not.toMatch(/applyWeeklyAdjustment\(\s*full\b/);
     // both stamp their bounds
     expect(ROUTE).toContain("summary.window = {");
     expect(ROUTE).toContain("full.window = {");

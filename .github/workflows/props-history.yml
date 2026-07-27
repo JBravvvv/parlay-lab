@@ -35,6 +35,9 @@ on:
     # still record a `pre` so the day is not blank. They do not wait and cannot take a close.
     - cron: "0 13 * * *"
     - cron: "0 23 * * *"
+    # ...and one fold-only tick so a Vercel-captured weekend close reaches git the same day
+    # even when every sweep tick is dropped. Costs no Odds credits: it only reads /api/propsnap.
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -56,7 +59,7 @@ jobs:
           git checkout origin/frontend-rebuild -- tools/snapshot_props.py
       - name: Snapshot props
         # --wait only on the tick that can reach a window; the fallbacks record a `pre` and exit
-        run: python3 tools/snapshot_props.py ${{ github.event.schedule == '0 17 * * *' && '--wait' || '' }}
+        run: python3 tools/snapshot_props.py ${{ github.event.schedule == '0 17 * * *' && '--wait' || github.event.schedule == '0 3 * * *' && '--fold-only' || '' }}
       - name: Commit
         run: |
           git config user.name "engine-v2-bot"

@@ -1120,3 +1120,44 @@ produces. So:
 
 This generalises the convergence rule to guards: *a finding supported by one instrument is a
 hypothesis*. A guard whose only evidence is its own green run is the same thing.
+
+## A GUARD THAT SCANS SOURCE MATCHES WHOLE SYMBOLS AND FUNCTION BODIES — NEVER SUBSTRINGS OR LINE OFFSETS
+
+**Three defects, one root cause: matching on text position instead of on structure.**
+
+| defect | the match | how it failed |
+|---|---|---|
+| `workflow-timing` guard symbol | `src.includes("def _snapshot_kind")` | a **substring** of `"def _snapshot_kind_RENAMED("` — renaming the guard passed |
+| `factor-classification` body scan | a flat **8-line window** from the declaration | bled into the next function and falsely flagged `shPitIsoF` |
+| `factor-classification` identity test | `/return 1[;,)]/` | **missed `shParkF` and `shPitIsoF` entirely** — their identity lives at the CALL SITE (`pk?pk.h:(coors?1.07:1)`), not in the function. Seven became eight became **ten** |
+
+The third is the sharpest: a substring rule did not just admit a false positive, it **hid two
+real factors for the entire life of the drift check**.
+
+### The rule
+
+1. **Anchor every symbol match.** `\bname\s*\(` or `\bname\b`, never a bare `includes`. When a
+   registry stores a symbol string, store the trailing `(` or `= ` with it.
+2. **Bound a function body at the next declaration**, never at a line count.
+3. **Whitespace-tolerate every NEGATIVE assertion.** `not.toContain("f(x")` passes on `f( x`,
+   and a negative that passes wrongly is silent. All source-scanning negatives in this repo are
+   now `not.toMatch(/\bf\s*\(\s*x\b/)` form.
+4. **Match the CONTRACT, not the text.** A factor's identity fallback is "its contribution
+   disappears when the input is missing" — `return 1`, `return null` with a call-site default,
+   or a ternary all satisfy that. Scanning for one spelling finds one spelling.
+
+### The audit, 2026-07-27
+
+| guard | matched on | verdict |
+|---|---|---|
+| `workflow-timing` | symbol + trailing `(`/`= ` | ✅ fixed |
+| `factor-classification` | anchored `^function`, body to next declaration, `return 1\|null` | ✅ fixed |
+| `calibration-window` (stale-summary + SYNCED-WINDOW) | one whitespace-defeatable negative | ✅ fixed |
+| `arming-parity` | four defeatable negatives (`slopeMults(`, `weights?.mults`, two `full` checks) | ✅ fixed |
+| `accrual-volume` | `.slice(` and `MAX_RECORDS` in a span | ✅ fixed |
+| `coverage-denominator` | already `\b(name)\s*\(` | ✅ was correct |
+| `lid-coupling`, `books-ind-gate`, `calibration`, `engine-units` | assert on RUNTIME VALUES, not source | ✅ not in scope |
+
+**Positive assertions are self-correcting — a missed substring fails loudly. Negative ones are
+not: a missed substring passes silently.** That asymmetry is why every `not.toContain` on source
+was worth converting and every `toContain` was left alone.

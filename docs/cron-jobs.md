@@ -604,3 +604,48 @@ only call a URL. The route is a **`repository_dispatch`** fired by cron-job.org 
 Sat/Sun, which needs a fine-grained PAT — **a secret Josh would create and type himself**. Until
 then, Saturday and Sunday yield `pre` readings only, and `close_capture.py`'s day-of-week table
 is where that shows up rather than being assumed.
+
+## ✅ THE WEEKEND CLOSE — THE CHEAP ROUTE WORKS, NO PAT NEEDED (2026-07-27)
+
+Eliminated before proposing the expensive one, as asked.
+
+### What the close capture actually needs to write
+
+The unrecoverable part is **the prices**, nothing else. Everything downstream — the de-vig, the
+`fair`/`n`/`fb`/`fp`/`czf`/`bo`/`bu`/`cz` fields — is computed from them by `compact()` in
+`tools/snapshot_props.py`, and can be computed at any later time.
+
+### Can a Vercel route produce it — yes, and it produces LESS, on purpose
+
+`app/api/propsnap/route.ts`:
+
+| | |
+|---|---|
+| **write** | `cronHeaderAuthed` — the **existing `CRON_SECRET`**, which cron-job.org already sends on four entries. **No new secret, no new auth surface** |
+| **what it stores** | the **RAW** odds payload per event → `pl:propsnap:{date}`, 4-day TTL, last 6 snapshots |
+| **what it does NOT do** | **de-vig anything.** A TypeScript re-implementation would be two versions of one calculation drifting apart — the `slopeMults` failure, repeated. |
+| **read** | `GET /api/propsnap?date=` — **ungated**, on exactly the reasoning that leaves `/api/board` open: market prices, no stakes, nothing personal. Gating it would put a secret in the workflow that reads it, which is the cost this route exists to avoid |
+| **credits** | identical to the GitHub sweep — it is the same request |
+
+### The handoff to git
+
+`python3 tools/snapshot_props.py --fold-only` (a 4th, credit-free cron at `0 3`) reads
+`/api/propsnap?date=`, runs the **same `compact()`** over each stored raw payload, and appends
+to `data/props/{date}.json` with `src: "vercel"` so the capture route is on the record.
+
+Verified locally against a realistic two-book payload: folds once (`fair 0.603, n 2, czf true,
+bo −175, bu 140`), and **re-running adds nothing** — idempotent on `t`.
+
+### What Josh creates — one entry, no secret beyond the one already in use
+
+| field | value |
+|---|---|
+| **URL** | `https://parlay-lab-six.vercel.app/api/propsnap` |
+| **Method** | `GET` |
+| **Header** | `x-cron-key` = the same `CRON_SECRET` already on the other four entries — **paste it yourself** |
+| **When** | `0 16 * * 0,6` (Sat/Sun 16:00 UTC — ~95 min before the 17:35 weekend bulk) |
+| **Also worth adding** | `0 15 * * 3,4` (Wed/Thu 15:00 UTC) — the getaway-day **matinee** block is lost to the same gap, and it is 35–46% of those days |
+
+**The PAT route is not needed.** `repository_dispatch` would add a fine-grained token, a second
+auth surface, and a secret with repo write scope, to solve a problem one existing secret already
+solves.

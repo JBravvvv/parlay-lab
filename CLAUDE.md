@@ -489,9 +489,19 @@ SENSITIVE: `props-history` (`_snapshot_kind`), `context` (`merge_prior`), `board
 it a rename still substring-matches and the check silently passes (found by testing the test).
 **`props-history` is now 3 crons, not 10**: `0 17` runs `--wait` and holds the runner until the
 close window opens (`MAX_WAIT_S` 300 min vs GitHub's 360-min job ceiling; `timeout-minutes: 330`).
-**Weekend closes are structurally unreachable from Actions** — their windows open 16:00–18:35Z,
-between the two observed batches, and the wait exceeds the job ceiling. Route is a
-`repository_dispatch` from cron-job.org with a PAT Josh would create; scoped, not built.
+**Weekend closes are unreachable from Actions** — windows open 16:00–18:35Z, between the two
+batches, and the wait exceeds the job ceiling. **Solved without a PAT:** `/api/propsnap` stores
+the RAW odds payload (cron-key gated, existing `CRON_SECRET`) and `snapshot_props.py --fold-only`
+de-vigs it later through the SAME `compact()` — one implementation, not two. Read path ungated
+like `/api/board`. Josh adds `0 16 * * 0,6` (and ideally `0 15 * * 3,4` for the Wed/Thu matinees).
+**Close coverage from the single 20:30Z fire is 64% of all games** — Mon/Tue/Fri 96–99%, Wed 65%,
+Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is **36% of games, not
+29% of days**. The 300-min wait cap never binds; every loss is a game already started at fire time.
+**Phase 2 buckets every row by `kind` (close/pre) and never pools across it.**
+
+**TEN identity-fallback factors, not seven** — `shPriorKf` (returns 1, **87% live**), plus
+`shParkF` and `shPitIsoF`, which return **null** and let the CALL SITE supply identity
+(`pk?pk.h:(coors?1.07:1)`). A scan for `return 1` finds one spelling; match the CONTRACT.
 
 Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not
 one:** low-frequency schedules (2/day — `context`, `props-history`) fire **every tick** but

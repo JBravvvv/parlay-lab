@@ -4,11 +4,12 @@
 WHY THIS EXISTS (2026-07-25)
 ----------------------------
 The frozen-parameter table in docs/collection-period.md tracks parameter VALUES.
-EIGHT engine factors are not parameters at all — they are data-availability
+TEN engine factors are not parameters at all — they are data-availability
 outcomes, each returning an identity value (1.0) when its input is missing, stale,
 or under a guard threshold:
 
     shUmpKf  shTempF  shPitPctF  shOppWhiffF  shPenF  shLaborF  shPenQF  shPriorKf
+    shParkF  shPitIsoF   <- these two return NULL and the CALL SITE supplies identity
 
 So an input can go inert -> live or live -> inert mid-freeze with no frozen value
 changing, and the drift detector reports clean. That is exactly how shPenQF spent
@@ -33,7 +34,7 @@ API = "https://statsapi.mlb.com/api/v1"
 # k_pct is missing, and it appeared in no registry, no doc and no drift check.
 # Keep this list equal to REGISTRY in that test — the test enforces it in both directions.
 FACTORS = ["shUmpKf", "shTempF", "shPitPctF", "shOppWhiffF", "shPenF", "shLaborF", "shPenQF",
-           "shPriorKf"]
+           "shPriorKf", "shParkF", "shPitIsoF"]
 
 
 def get(u):
@@ -103,6 +104,11 @@ def main():
         except (TypeError, ValueError):
             t = None
         bump("shTempF", t is not None and abs(t - 70) > 1e-9)
+        # shParkF — returns null (caller falls back to 1, or 1.07/1.08 at Coors) unless the
+        # venue is in SH_PRIORS.parks. Checked against both handedness tables, as the engine does.
+        ven = pn((g.get("venue") or {}).get("name"))
+        parks = pri.get("parks") or {}
+        bump("shParkF", any(pn(k) == ven for side in ("L", "R") for k in (parks.get(side) or {})))
 
         for side in ("away", "home"):
             team = g["teams"][side]["team"]["name"]
@@ -110,6 +116,13 @@ def main():
             if pid:
                 pc = (PIT.get(str(pid)) or {}).get("pct") or {}
                 bump("shPitPctF", pc.get("xwoba") is not None or pc.get("xera") is not None)
+                # shPriorKf (registered 2026-07-27) — needs the pitcher's k_pct AND the league's.
+                # Engine: `if(!pr||pr.k_pct==null||!lg||!lg.k_pct)return 1` (legacy L1592-1594).
+                lgk = (pri.get("league") or {}).get("k_pct")
+                bump("shPriorKf", (PIT.get(str(pid)) or {}).get("k_pct") is not None and bool(lgk))
+                # shPitIsoF — returns null (caller skips the ISO refinement) unless BOTH are present
+                pr_ = PIT.get(str(pid)) or {}
+                bump("shPitIsoF", pr_.get("xslg") is not None and pr_.get("xba") is not None)
                 s = season.get(pid) or {}
                 np_, gsn = s.get("np"), s.get("gsn")
                 ppg = (np_ / gsn) if (np_ and gsn and gsn >= 3) else None

@@ -139,9 +139,9 @@ describe("arming call sites (structural, not value-based)", () => {
     // the pre-Phase-0.5 bug: /api/calibration merged slopeMults inline and
     // /api/generate read pl:cal:weights raw, so the cron silently ran without
     // the nightly slope fit
-    expect(src(CAL)).not.toMatch(/slopeMults\(/);
-    expect(src(GEN)).not.toMatch(/slopeMults\(/);
-    expect(src(GEN)).not.toMatch(/weights\?\.mults/);
+    expect(src(CAL)).not.toMatch(/\bslopeMults\s*\(/);
+    expect(src(GEN)).not.toMatch(/\bslopeMults\s*\(/);
+    expect(src(GEN)).not.toMatch(/\bweights\s*\?\.\s*mults\b/);
   });
 
   it("the cron sets the frozen selection mode explicitly", () => {
@@ -175,8 +175,8 @@ describe("arming call sites (structural, not value-based)", () => {
   it("only /api/calibrate builds the full window, and it never feeds the adjuster", () => {
     const CALIBRATE = src("app/api/calibrate/route.ts");
     expect(CALIBRATE).toMatch(/applyWeeklyAdjustment\(summary, weights, now\)/);
-    expect(CALIBRATE).not.toMatch(/applyWeeklyAdjustment\(full/);
-    expect(CALIBRATE).not.toMatch(/effectiveCalibration\(.*full/);
+    expect(CALIBRATE).not.toMatch(/applyWeeklyAdjustment\(\s*full\b/);
+    expect(CALIBRATE).not.toMatch(/effectiveCalibration\([^)]*\bfull\b/);
     // ...and the object handed to the adjuster is the one built from `graded`, not `gradedAll`
     expect(CALIBRATE).toMatch(/const summary = computeCalibration\(graded\)/);
     expect(CALIBRATE).toMatch(/const full = computeCalibration\(gradedAll\)/);

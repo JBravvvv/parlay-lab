@@ -195,7 +195,69 @@ def _wait_for_window(events, now):
     return datetime.now(timezone.utc)
 
 
+def fold_vercel(day_iso=None):
+    """Fold any Vercel-captured close snapshots into data/props/<date>.json.
+
+    /api/propsnap stores the RAW odds payload and de-vigs nothing, so the same `compact()` that
+    every other snapshot went through runs here. One implementation of the de-vig, not two — the
+    archive stays byte-comparable across capture routes, and the `src` field says which one.
+
+    Idempotent: a snapshot already folded (same `t`) is skipped, so re-running is free.
+    """
+    from datetime import date as _date
+    day_iso = day_iso or datetime.now(timezone.utc).astimezone().date().isoformat()
+    url = f"https://parlay-lab-six.vercel.app/api/propsnap?date={day_iso}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            payload = json.loads(r.read().decode())
+    except Exception as e:
+        print(f"fold: /api/propsnap unreachable ({e}) — nothing folded")
+        return 0
+    stored = payload.get("snapshots") or []
+    if not stored:
+        print(f"fold: no Vercel captures for {day_iso}")
+        return 0
+
+    path = f"data/props/{day_iso}.json"
+    day = {"snapshots": []}
+    if os.path.exists(path):
+        with open(path) as f:
+            day = json.load(f)
+    have = {sn.get("t") for sn in day["snapshots"]}
+    added = 0
+    for sn in stored:
+        if sn.get("t") in have:
+            continue
+        evs = []
+        for e in sn.get("events", []):
+            raw = e.get("raw")
+            if not raw or not raw.get("bookmakers"):
+                continue
+            evs.append({"id": e["id"], "away": e["away"], "home": e["home"],
+                        "start": e["start"], "markets": compact(raw)})
+        if not evs:
+            continue
+        day["snapshots"].append({"t": sn["t"], "kind": sn.get("kind", "close"),
+                                 "src": sn.get("src", "vercel"), "events": evs})
+        added += 1
+    if not added:
+        print(f"fold: {len(stored)} Vercel capture(s) already present")
+        return 0
+    day["snapshots"].sort(key=lambda x: x.get("t", ""))
+    os.makedirs("data/props", exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(day, f, separators=(",", ":"))
+    print(f"fold: +{added} Vercel snapshot(s) -> {path} ({len(day['snapshots'])} total)")
+    return added
+
+
 def main():
+    # the weekend/matinee half: closes Actions cannot reach, captured by /api/propsnap and
+    # folded in here. Runs FIRST so a sweep that then skips still leaves the folded close.
+    fold_vercel()
+    if "--fold-only" in sys.argv:
+        return
     wait = "--wait" in sys.argv
     events = fetch("https://api.the-odds-api.com/v4/sports/baseball_mlb/events")
     if events is None:

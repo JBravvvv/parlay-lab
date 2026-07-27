@@ -90,8 +90,8 @@ describe("prediction accrual volume — the rate that sets every reopening date"
     expect(from).toBeGreaterThan(0);
     expect(to).toBeGreaterThan(from);
     const span = GEN.slice(from, to);
-    expect(span).not.toMatch(/\.slice\(/);
-    expect(span).not.toMatch(/MAX_RECORDS|MAX_PARLAYS/);
+    expect(span).not.toMatch(/\.\s*slice\s*\(/);
+    expect(span).not.toMatch(/\b(MAX_RECORDS|MAX_PARLAYS)\b/);
     // the records it merges are exactly the ones the board produced
     expect(span).toMatch(/mergeDayBlob\(cur, date, records, parlays, games, now/);
   });

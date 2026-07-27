@@ -10,9 +10,13 @@ import path from "node:path";
  * That is how `shPenQF` spent its whole life returning 1.0, and how `shUmpKf` looked
  * "structurally inert" when its input was actually being overwritten nightly.
  *
- * Seven were found by audit. **This test found the eighth**: `shPriorKf` (L1592) returns 1 when
- * priors are missing and appeared in no registry, no doc, and no drift check. It was found
- * because the build asked — which is the whole argument for asking in the build.
+ * Seven were found by audit. **This test found three more.** `shPriorKf` (L1592) returns a literal
+ * 1 when priors are missing. `shParkF` (L1643) and `shPitIsoF` (L1656) return NULL and let the
+ * CALL SITE supply identity — `pk?pk.h:(coors?1.07:1)` at L2060, `if(isoF!=null)` at L2086 — so
+ * the first version of this scan, which matched only `return 1`, missed both. Ten, not seven.
+ *
+ * That miss is itself the lesson: matching on TEXT POSITION rather than on the factor's contract.
+ * See "a guard that scans source matches whole symbols" in docs/harness-substitutions.md.
  *
  * A new factor with an identity fallback fails here until it is classified. The classification
  * is the question this project has learned to ask:
@@ -47,6 +51,17 @@ const REGISTRY: Record<string, { kind: Kind; why: string }> = {
   shPitPctF: { kind: "DATA-DEPENDENT", why: "needs Savant pitcher percentiles (xwOBA/xERA) for the starter" },
   shOppWhiffF: { kind: "DATA-DEPENDENT", why: "needs priors plus at least 5 lineup batters carrying whiff_percent" },
   shLaborF: { kind: "DATA-DEPENDENT", why: "needs the sim armed and a pitches-per-start estimate" },
+  shParkF: {
+    kind: "DATA-DEPENDENT",
+    why: "needs SH_PRIORS.parks[L|R] to carry the venue. Returns NULL, and the CALLER supplies " +
+      "identity: L2060 `pk?pk.h:(coors?1.07:1)`. REGISTERED 2026-07-27 — missed by the first " +
+      "scan because it never writes `return 1`.",
+  },
+  shPitIsoF: {
+    kind: "DATA-DEPENDENT",
+    why: "needs the starter's xslg and xba in priors. Returns NULL, and L2086 `if(isoF!=null)` " +
+      "simply skips the ISO refinement of hrF. Same call-site identity as shParkF.",
+  },
   shPriorKf: {
     kind: "DATA-DEPENDENT",
     why: "needs SH_PRIORS.pitchers[id].k_pct AND the league k_pct. REGISTERED 2026-07-27 — it was " +
@@ -71,7 +86,14 @@ function identityFallbackFactors(): string[] {
     if (!m) continue;
     let j = i + 1;
     while (j < lines.length && !/^function /.test(lines[j])) j++;
-    if (/return 1[;,)]/.test(lines.slice(i, j).join("\n"))) out.push(m[1]);
+    const body = lines.slice(i, j).join("\n");
+    /* `return null` counts. THE IDENTITY CAN LIVE AT THE CALL SITE: shParkF returns null and
+       L2060 does `pk?pk.h:(coors?1.07:1)`; shPitIsoF returns null and L2086 does
+       `if(isoF!=null)hrF=...`. Both silently remove their contribution when the input is
+       missing — the same defect, expressed one line further out. Matching only on `return 1`
+       is matching on TEXT POSITION rather than on the factor's contract, which is the exact
+       mistake tests/harness-substitutions.md's whole-symbol rule exists to stop. */
+    if (/return (1[;,)]|null;)/.test(body)) out.push(m[1]);
   }
   return [...new Set(out)].sort();
 }
@@ -80,7 +102,7 @@ describe("identity-fallback factors are classified, and the build asks", () => {
   const found = identityFallbackFactors();
 
   it("finds the factors at all — a scan that matches nothing would pass vacuously", () => {
-    expect(found.length).toBeGreaterThanOrEqual(8);
+    expect(found.length).toBeGreaterThanOrEqual(10);
   });
 
   it("EVERY identity-fallback factor is in the registry", () => {

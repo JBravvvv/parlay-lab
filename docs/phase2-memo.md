@@ -683,3 +683,50 @@ markets are read at once and are indistinguishable with one:
 
 This costs one extra column on the per-rung table (the gap's sign and its CI) and no extra data:
 TB carries alternate lines, so its rungs are already in the bucketing.
+
+## CLOSE QUALITY IS A ROW STAMP, AND PHASE 2 NEVER POOLS ACROSS IT (2026-07-27)
+
+Until `/api/propsnap` has a cron-job.org entry, Saturday and Sunday yield `pre` readings while
+Mon/Tue/Fri yield true closes — a **day-of-week selection in close QUALITY**, on slates that
+already differ (early-heavy, different game mix, different liquidity). Same rule as Series A vs B:
+**never pooled**, and for the same reason.
+
+### The three qualities
+
+| stamp | meaning |
+|---|---|
+| **`close`** | captured inside `CLOSE_WINDOW_S` (95 min) of the next unstarted first pitch |
+| **`pre`** | a real reading, but hours out — **attenuates any slope toward zero** |
+| **absent** | no capture. Not a zero, not a null: the row does not exist |
+
+`snapshot_props.py` already writes `kind` per snapshot, and the fold-in carries `src` as well, so
+the stamp is on the data rather than inferred from the date. **Every Phase 2 table is bucketed by
+`kind`, and a pooled slope is not reported at all** when the buckets disagree — the same rule the
+memo already applies to rungs.
+
+### How much of the window this is — measured, not assumed
+
+Expected close coverage from a single 20:30Z fire, against the 52-day first-pitch distribution:
+
+| dow | games | started before the fire | **true close reachable** | read |
+|---|---|---|---|---|
+| Mon | 67 | 1% | **99%** | true close |
+| Tue | 92 | 2% | **98%** | true close |
+| Fri | 117 | 4% | **96%** | true close |
+| **Wed** | 92 | 35% | **65%** | night block only |
+| **Thu** | 54 | 44% | **56%** | night block only |
+| **Sat** | 121 | 51% | **49%** | night block only |
+| **Sun** | 121 | 93% | **7%** | `pre` only |
+| **POOLED** | 664 | | **64%** | |
+
+> ### ⚠️ "Mon–Fri = true close" IS WRONG, and that was my framing
+> Only **Mon/Tue/Fri** are near-total. **Wed and Thu lose their matinee block** exactly as the
+> weekend does — 35% and 44% of their games have already started when the fire lands. So the
+> gap is not "2 of 7 days ≈ 29%"; it is **36% of all games**, spread across four days.
+>
+> **And 0% is lost to the 300-minute wait cap.** The cap never binds on any day. Every loss is a
+> game that had already started before the fire — so the constraint is the FIRE TIME, not the
+> wait. An earlier batch would fix it; there isn't one, which is what `/api/propsnap` is for.
+
+**With the Sat/Sun entry, coverage goes 64% → ~90%. With Wed/Thu as well, ~99%.** Both are one
+cron-job.org entry each and no new secret.
