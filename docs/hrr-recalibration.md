@@ -864,19 +864,24 @@ the same player's O0.5, t ≈ 3.6 (n=18 pairs)** — model increasingly HIGH up 
 **− → + family, opposite in sign to HRR's + → −**, and it is *derived* (the Poisson tail) rather
 than hypothesised, which is what TB's arm never was.
 
-Two arms now exist, with different jobs:
+Two arms now exist, with different jobs — **and they are NOT equal. The M10 arm leads.**
 
-| arm | signature | magnitude | powered by exit? |
-|---|---|---|---|
-| **hits rung arm** (M7-family) | − → + vs HRR's + → − — the instrument-validation pair is BACK | **+1.4–2.0 pp at O1.5** | **borderline**: ~35 model-priced O1.5 rows/day → ~2,030 graded by 09-22 → SE ≈ 0.96 pp → **2.1σ at +2.0, weaker at +1.4**. Confirmable as *market structure* from the board archive within weeks; thin as *graded truth* |
-| **expAB-gradient arm** (M10) | same-signed in hits and closed-form HRR, ABSENT in sim-priced HRR — the diverse-lens check | **+7.39 pp/AB** (SE 1.73) → ≈ 6.3 pp between extreme expAB terciles | **yes, early**: 135 expAB-covered graded rows/day → **3σ by ~08-20**, ~4.7σ by exit |
+| rank | arm | signature | magnitude | powered by exit? |
+|---|---|---|---|---|
+| **1** | **expAB-gradient arm** (M10) | same-signed in hits and closed-form HRR, ABSENT in sim-priced HRR — the diverse-lens check | **+7.39 pp/AB** (SE 1.73) → ≈ 6.3 pp between extreme expAB terciles | **yes, early**: 135 expAB-covered graded rows/day → **3σ by ~08-20**, ~4.7σ by exit |
+| 2 | hits rung arm (M7-family) | − → + vs HRR's + → − — the instrument-validation pair is BACK | **+1.4–2.0 pp at O1.5** | **borderline**: ~35 model-priced O1.5 rows/day → ~2,030 graded by 09-22 → SE ≈ 0.96 pp → **2.1σ at +2.0, weaker at +1.4**. Confirmable as *market structure* from the board archive within weeks; thin as *graded truth* |
 
-So the five-branch table's branches 2–4 are **reachable again** via the hits arm, at its
-*measured* magnitude (+1.4–2.0 — NOT the +5.7 the uniform interlock predicted; that
-characterisation is refuted at t = 11.1, see `docs/collection-period.md`). And the arm that
-actually decides something on a useful date is the expAB gradient: it has the magnitude the
-rung arm lacks, a truth adjudication inside August, and its own instrument check (two pricing
-paths, one showing the gradient, one not).
+> ### ⚠️ FOR THE SEPTEMBER READER: weigh these arms unequally (2026-07-27)
+>
+> **The M10 arm is the one that decides something on a date inside the freeze** — 3σ by
+> ~08-20, its own two-path instrument check, and a magnitude that survives its SEs.
+> **The rung arm's job is validating the instrument** (it restores branches 2–4 of the
+> five-branch table via an opposite predicted signature), and at its *measured* magnitude
+> (+1.4–2.0, NOT the +5.7 the uniform interlock predicted — refuted at t = 11.1, see
+> `docs/collection-period.md`) it is ~2σ at exit as graded truth. A September reading that
+> treats them as two equal arms is over-weighting the rung arm by roughly the ratio of
+> their powers. If only one arm resolves, it will be M10's — and that is the expected and
+> acceptable outcome, not a failure of the design.
 
 **The prior conclusion — "none of the three gives an opposite arm before freeze exit" — was
 wrong within hours, and the reason is worth keeping: it was reached from a pooled median over a

@@ -1760,7 +1760,7 @@ separate "calibrated" from "worthless". Passing it is near-meaningless evidence 
 calibration — which is a worse defect than the failure rate, and the reason the criterion has
 to be replaced rather than loosened.
 
-### AND I WAS WRONG THAT THE SLOPE GATES NOTHING
+### AND I WAS WRONG THAT THE SLOPE GATES NOTHING (2026-07-26)
 
 An earlier report said *"fitReliability is computed and reported but never gates a weight."*
 **False.** `slopeMults` (`src/engine2/calibration.ts:457–462`) reaches production: it is
@@ -1856,7 +1856,7 @@ calibration gaps **is the winner's curse in probability points**.
 under `GAP_BUCKET_MIN_N` — an unmeasured curse must never be silently treated as zero,
 which is the same rule as the band's own "absent evidence is not certainty".
 
-### CORRECTION 1 — my accrual projection was ~6× too fast
+### CORRECTION 1 (2026-07-26) — my accrual projection was ~6× too fast
 
 The first real calibrate run since `CAL_START` landed: **`graded: 70`**, not the ~180 I
 projected from 203 board rows. Per market: `ml` 15 · `rl` 15 · `batter_total_bases` 9 ·
@@ -1878,7 +1878,7 @@ I projected from **board row counts** and applied a guessed 10% attrition. Real 
 **The `booksInd` urgency I asserted was overstated** — total bases crosses in ~11 days, not
 3. The rule still shipped correctly and early; the deadline was simply not what I said.
 
-### CORRECTION 2 — the weekly adjuster has NEVER fired
+### CORRECTION 2 (2026-07-26) — the weekly adjuster has NEVER fired
 
 `/api/calibration` returns **`log: []`** and **`mults: {}`**. The adjustment log is
 append-only in `pl:cal:weights` and survives `CAL_START`, so this is the lifetime record:
@@ -2210,7 +2210,7 @@ whole `mktN` rebuild, projected to clear around **2026-08-06** (total bases) to
 10-game slate changes nothing while this gate is universal — the binding constraint is
 `mktN`, not slate size.
 
-### CORRECTION to my own booksInd count
+### CORRECTION to my own booksInd count (2026-07-26)
 
 Last report I said 2 non-HR tickets carrying a `booksInd = 0` leg "reach the gate and are
 blocked." **The real allocator run says `booksInd` blocks zero today.** I counted those 2
@@ -2741,7 +2741,7 @@ exists. The first 22:00 UTC board answers it directly, and the props table above
 rate should **fall** — but predicts it weakly, since `n ≤ 1` is flat. Recorded as a prediction
 so it can be wrong.
 
-# ⚠️ CORRECTION — shUmpKf IS NOT STRUCTURALLY INERT. THE WRITE PATH WAS ERASING ITS INPUT.
+# ⚠️ CORRECTION (2026-07-27) — shUmpKf IS NOT STRUCTURALLY INERT. THE WRITE PATH WAS ERASING ITS INPUT.
 
 **Retracted, same day.** The earlier entry read `hpUmp: null` on 0 of 12 games in the current
 `context.json` and concluded the factor was unreachable. That file was written by the **morning**
@@ -3134,7 +3134,7 @@ would have put two of them at zero and read as "no effect" rather than "wrong ax
 
 | rank | amendment | measured effect | reaches |
 |---|---|---|---|
-| ~~1~~ | ~~sim routing, batter markets~~ | **SUPERSEDED — see the external check below.** Refuted for `batter_hits` (sim mean-abs error 7.1 vs closed form 5.6); survives marginally for TB and HR | TB + HR only |
+| ~~1~~ | ~~sim routing, batter markets~~ | **SUPERSEDED 2026-07-27 — see the external check below.** Refuted for `batter_hits` (sim mean-abs error 7.1 vs closed form 5.6); survives marginally for TB and HR | TB + HR only |
 | **2** | **`pitcher_outs` → sim** (collect `outsBySP*`) | the closed form's gap is **23.5 pp**; the sim path already models the hook the closed form cannot use | 38 outs rows, 100% of them |
 | **3** | **`shParkF` → closed form** | hit rate **1.5% median / 3.5% max**; **HR rate 4.5% median / 11.0% p90 / 14.5% max** | **the residual after 1 and 2** — pitcher K's permanently, plus any market left closed-form |
 | **4** | **HRR λ conditioning** | closed-form λ has **zero** site variation on a non-Coors slate; recovers ~0.12 of spread against a market drift of +0.479 | 17 of 50 HRR rows (34%) |
@@ -3619,3 +3619,122 @@ adjudicates the avg30 gradient with the same rows.
 
 Indexed as **M10** (closed-form expAB over-steepness) and **M11** (hot-form under-shrinkage)
 in `CLAUDE.md` — both PROVISIONAL until (a) or (b) lands.
+
+## M10'S MECHANISM: ERRORS-IN-VARIABLES IN `bbr`, three convergent signatures (2026-07-27)
+
+`bbr` is `shBlend(st, bb, "ab", 10)` — the .25/.35/.40 recency blend with a 10-AB minimum per
+window — so it carries large sampling noise, and `expAB = pa(spot)·(1−0.9·bbr)` inherits it.
+Rows landing at high expAB are disproportionately rows where bbr was UNDERestimated, so λ is
+too high exactly where expAB is high: a positive residual slope manufactured by measurement
+error with the 0.9 coefficient perfectly correct. Discriminating prediction: the slope shrinks
+as the bbr denominator grows; a wrong coefficient is denominator-invariant.
+
+Measured (`tools/m10_eiv.py`, 128 hits O0.5 rows with spot+expAB+ab30; 15 players at the 0.09
+default excluded from walk-dimension inference — zero bbr variance):
+
+| ab30 quartile | n | **SD(bbr)** | walk-dim slope (per 0.1 wf) | pa-dim (pp/AB) |
+|---|---|---|---|---|
+| 26–53 | 28 | **0.0908** | **+4.91 (SE 1.98)** | −7.11 (SE 6.11) |
+| 57–74 | 28 | 0.0733 | +4.87 (SE 2.42) | +11.15 (SE 5.87) |
+| 75–85 | 28 | 0.0622 | +2.44 (SE 2.11) | +18.72 (SE 8.23) |
+| 85–104 | 29 | **0.0545** | **+2.84 (SE 2.33)** | +2.70 (SE 5.22) |
+
+1. **SD(bbr) declines monotonically with the denominator** — the variance signature of noise
+   leaving. 2. **The walk-dimension slope roughly halves** thin→thick (~+4.9 → ~+2.6), though
+   that decline alone is ~1σ. 3. **The magnitudes close**: the full-noise EIV slope is
+   `e^{−λ}·λ/expAB` = **+9.4 pp/AB** at the board's λ=0.930/expAB=3.9, so the measured pooled
+   +7.39 implies a ~79% noise share — consistent with the SD-derived shares (63–87% at a
+   plausible true walk-rate spread ≈0.033). The pa-dimension bounces −7 to +19 with SEs 5–8:
+   no stable slot effect anywhere.
+
+**Verdict: EIV favoured on three convergent readings, not proven** — the quartile slope decline
+is not individually significant, but the invariance alternative must call the SD decline a
+coincidence. ⚠️ **The "flat at 200 AB" limb of the prediction is untestable BY CONSTRUCTION:
+the blend has no window longer than 30 days.** ab30 caps at ~104, effective n never exceeds
+~60, so the noise floor is structural and permanent for every player — even a perfectly
+correct 0.9 guarantees a gradient with this estimator.
+
+**The fix, if EIV holds: shrink `bbr` toward league before it enters expAB** —
+`shShrink(bbr, n, k≈75, lgBB)` (k = binomial noise / true spread = 0.09·0.91/0.033²), the same
+call shape the hit rate already goes through. An INPUT shrink, not a formula change; 0.9
+untouched. Blast radius: expAB's four consumers (hits λ, TB lamH, HR λ, the HRR re-base
+clamp) — every closed-form batter row, through one input line.
+
+## M11 IS A BUG — the comment forbids what the code does (2026-07-27)
+
+`shShrink`'s own comment (L1189): *"empirical-Bayes shrinkage (doc 3A): pull a small-sample
+rate toward the league mean. **No hot-streak chasing.**"* The measurement says the model
+diverges from the market on recency at t≈9 while carrying nothing on skill. The comment and
+the behaviour cannot both be right, and reading the chain settles which:
+
+| stage | what it does | k |
+|---|---|---|
+| 1 — `shBlendN(st, h, "ab", 10)` | its own comment: *"recency-weighted rate across 7/15/30-day windows"*, weights **.25/.35/.40**, min 10 AB per window, **no season window at all** | none |
+| 2 — the same call's `n` | reports the **largest window's raw denominator** (last-30 AB) | — |
+| 3 — `shShrink(bn.r, bn.n, 60, shPriorH)` | ONE shrink, applied to the **blended** rate, toward the player's **xBA skill prior** (v2 — the "league mean" of the comment is itself stale) | **60** (hits; HR uses 150) |
+| 4 — `bvpRate` | BvP adjustment after the shrink | — |
+
+Three compounding effects, all arithmetic:
+
+1. **The windows are nested, so recency is double-loaded**: at the board's typical
+   17/37/75 AB windows, a last-7-days AB carries **~5.5×** the per-AB weight of a
+   day-16-to-30 AB (0.0295 vs 0.0053) — and 100% of the estimator is the last 30 days.
+2. **`n` is overstated ~1.5×**: the blend's effective sample
+   (Σw)²/Σw² ≈ **49** where `shBlendN` reports 75 — so the shrink under-shrinks even on its
+   own terms.
+3. **The shrink is pointed at the wrong problem.** Recency contamination lives in the
+   estimator's *expectation*, not its variance — shrinking a recency-loaded estimate toward
+   xBA yields a convex mix of "hot streak" and "skill", never "season rate". k=60 leaves
+   ~56% of stage 1 in the price (would be ~45% at the honest n). That is exactly the
+   measured shape: model≈market on xwOBA (both anchor on skill), +0.79 pp/10pts divergence
+   on last-30 form.
+
+**Verdict: the comment states the design intent and the implementation misses it — M11 is a
+BUG by the intent-vs-behaviour standard, not a calibration.** Fourth instance of the class,
+after `base = prob`, `shPitIsoF` and `shParkF`. The fix is not "raise k" (that just erases
+recent-form signal into xBA); it is giving the estimator a season term and an honest `n`,
+with the graded avg30-tercile test saying how much form the market actually prices.
+
+## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
+
+The sim was instrumented directly (temporary same-line-count counters in `halfInning`,
+reverted after one run; counters consume **no** rng() draws, so the primary stream was never
+touched): 22,000 fresh sims / 44,000 team-games on the armed fixture slate. Both compared
+objects — the sim's slot mechanics and the pa formula — are slate-independent structure.
+
+| slot | sim PA/g | sim BB/g | sim AB/g | pa(spot) | closed-form expAB (same slate) |
+|---|---|---|---|---|---|
+| #1 | 4.817 | 0.480 | 4.337 | 4.68 | 4.17 |
+| #5 | 4.385 | 0.447 | 3.938 | 4.24 | 3.79 |
+| #9 | 3.936 | 0.350 | 3.587 | 3.80 | 3.47 |
+
+- **The sim's slot slope is −0.110 PA/slot — the formula's −0.11 exactly.** Full 9-slot table
+  in the tool run; every slot's Δ vs formula sits in +0.136…+0.148.
+- **The divergence is a uniform level, concentrated at NO slot**: sim runs 39.43 PA/g
+  (+0.14/slot ≈ +3% — the known endogenous-PA overshoot, the open sim-hits item), and sim
+  AB/g sits ~+0.12 above closed-form expAB at every slot with the same shape.
+
+So the slot mapping needs no fix, and the only per-player volume input left is the walk
+discount — converging with the EIV finding above from an independent direction.
+
+**Could the closed form consume the sim's volume where a sim exists?** Mechanically yes, and
+parity-safely: per-batter PA/AB tallies are one array increment each inside `halfInning`
+(additive, zero rng() draws — the second-stream rule is not even engaged), exported like
+`legP`, consumed behind the same `simP && !liveInit` filter the HRR marginal uses. Reach:
+**13 of 15 games, 1,916 of 2,206 batter rows (87%)** on 2026-07-26. **Ranked BELOW the bbr
+shrink**: the sim's volume runs +3% hot, so routing volume through it imports a known level
+bias to fix a noise problem. Order — bbr shrink first; sim-volume routing only after the
+sim's PA level is itself validated.
+
+## THE M7/M9 REFERENCE MEASUREMENT IS REACHABLE — scoped, not run (2026-07-27)
+
+Re-derivation needs the truth distribution as an output: empirical `P(hits ≥ 2 | market-λ
+band)` against the Poisson and binomial families, where market λ comes from the de-vigged
+close and outcomes from boxscores. **Every input is public and already accruing**:
+`line-history data/props` carries the close fair for hits rungs (~267 hits rows/day, 13+ days
+archived ≈ 3,500 rows), and statsapi boxscores are permanent. No model, no secrets, no
+prediction store. Power: ~800–1,000 rows per λ band resolves the ~5 pp Poisson-vs-binomial
+tail gap at SE ≈ 1.5 pp; three bands ≈ 3,000 rows — **met on the archive already; the banded
+version is runnable this week (~2026-08-01), not at exit.** The interlock therefore does NOT
+stay unshipped for want of a reference — it stays unshipped only until this measurement and
+the graded expAB terciles say what the compensator actually is.

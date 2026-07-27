@@ -594,7 +594,7 @@ the model sees the opposing starter as one of two values with no gradation.
 tell: `contact` is `whip/1.30`, a single ratio, while `power` averages two ratios and so
 inherits the wider of the two spreads without a wider clamp.
 
-**Accounted for, and NOT downstream-confirmed.** An earlier version of this section claimed
+**Accounted for, and NOT downstream-confirmed (2026-07-26).** An earlier version of this section claimed
 `power`'s saturation was the mechanism behind an H+R+RBI range compression of 0.50. **That
 compression was an artifact and is retracted** (see below and `docs/pitcher-outs-audit.md`);
 on the uncapped population H+R+RBI reads 1.78, *wider* than the market. So `power`'s 60%
@@ -931,7 +931,7 @@ ladder, the model is too high at O0.5 and too low at O1.5 — the measured +11.5
 signature. In movement space that has to show up as **`(pModel − open_fair)` changing sign
 between the O0.5 and O1.5 buckets of the same market**, with the movement slope significantly
 positive at neither rung: the market is not moving toward a model whose disagreement is an
-artifact of its own ladder.
+artifact of its own ladder. Pre-committed 2026-07-27, before any Phase 2 number exists:
 
 | Phase 2 shows | reading |
 |---|---|

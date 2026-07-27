@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`f33583e`** (2026-07-27). **494 passing (55 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`f543b11`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -160,6 +160,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
+| **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
 | **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
 | **2026-08-06** | `pitcher_outs` first readable in Phase 2 (~3 rows/day) |
@@ -180,8 +181,8 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | ~~M5~~ | sim routing for hits | **refuted** — sim mean-abs 7.1 vs closed form 5.6 |
 | **M6** | K's → sim, a sixth PA outcome | contained IF the second RNG stream is used |
 | **M7+M9** | Poisson-where-binomial + its compensator | ⚠️ **INTERLOCKED — never ship separately.** M9-as-uniform-λ **REFUTED 2026-07-27** (predicted +5.7 at hits O1.5, measured +1.4–2.0, shortfall t=11.1); the fixed-n binomial reference fails with it. Real rung structure **+1.4–2.0 pp**. Needs re-derivation; demoted below M10 |
-| **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board.** Grading by expAB tercile: 3σ ~08-20 |
-| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill; candidate `shShrink` k=60 | **PROVISIONAL — one board.** Same graded rows adjudicate |
+| **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board. Mechanism traced (2026-07-27): errors-in-variables in `bbr`** — SD(bbr) falls 0.0908→0.0545 with the denominator, full-noise slope +9.4 vs measured +7.39 (`tools/m10_eiv.py`). Fix specified: shrink `bbr` toward league (k≈75) before expAB; 0.9 untouched. Sim slot curve = pa(spot) exactly (−0.110 vs −0.11/slot), so the slot mapping is vindicated. Grading: 3σ ~08-20 |
+| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **a BUG (2026-07-27), fourth intent-vs-behaviour instance**: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). Fix = season term + honest n, not raise-k. Magnitude adjudicated by the same graded rows |
 | **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
 
 ## Deferred, written up, NOT shipped
@@ -193,6 +194,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | file | holds |
 |---|---|
 | `tools/self_consistency.py` | **the independent instrument.** Logical identities on any board or the whole archive — a violation is a PROOF |
+| `tools/m10_eiv.py` | the errors-in-variables stratification for M10 (slope + SD(bbr) by denominator quartile) |
 | `tools/rung_signature.py` | **the rung/gradient instrument.** Un-blends any archived board (`pModel = (pO−0.65·fO)/0.35`, validated to 0.29 pp), recovers each row's λ̂, parses expAB/avg30/xwOBA from case strings, and reports the M7+M9 rung test + the M10/M11 gradients. Re-run on every archived board |
 | `docs/freeze-exit-bundle.md` | **the 09-22 deliverable, in draft.** 6 model + 4 allocation amendments, each with measured effect, axis, dependencies; plus closed-with-magnitude |
 | `docs/collection-period.md` | the frozen parameter table, the two exits, `mktN`, the sim/closed-form split, factor consumer table |
@@ -569,7 +571,10 @@ that fails) or a measured check (a number that must be produced).** The rules 1�
 diagnosis speed; a finding is only CLOSED when it names its test or its measured number. Full
 statement at the top of `docs/harness-substitutions.md`.
 
-## Three build-enforced guardrails — the build refuses unanswered questions
+## Four build-enforced guardrails — the build refuses unanswered questions
+`tests/retraction-markers.test.ts` (every retraction-marked paragraph in the five finding docs
+carries a YYYY-MM-DD; the naive scan was 65% false positives, the enforced narrowed rule was
+measured clean; 12 pre-existing undated retractions were dated from `git log -S`) ·
 `tests/workflow-timing.test.ts` (every scheduled workflow classified SENSITIVE/INSENSITIVE with
 a named, existing guard) · `tests/factor-classification.test.ts` (every identity-fallback factor
 classified PINNED/DATA-DEPENDENT/STRUCTURAL, registry kept equal to `factor_activity.py`'s

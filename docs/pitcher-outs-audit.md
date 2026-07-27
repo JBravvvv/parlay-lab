@@ -307,7 +307,7 @@ own Poisson at each row's own `ln`):
 > **`pitcher_outs` is the ONLY compressed market** — its λ spread is half the market's, which
 > is defect 3 measured directly and independently of the `case`-string arithmetic in §8.
 
-### ⚠️ RETRACTED: the H+R+RBI compression finding
+### ⚠️ RETRACTED (2026-07-26): the H+R+RBI compression finding
 
 An earlier version of this table read **H+R+RBI at 0.50** and treated it as a second market
 with the same pathology, attributed to the 60%-saturated `power` clamp. **That was an
