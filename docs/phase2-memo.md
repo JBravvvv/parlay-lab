@@ -671,10 +671,15 @@ its branch is pre-committed alongside HRR's in `docs/hrr-recalibration.md`.
 | `batter_hits_runs_rbis` | under-dispersed (single λ) | **+ → −** |
 | `batter_total_bases` | over-dispersed (ratio 2.30, n=108) | **− → +** |
 
-**Both signatures must appear, in opposite directions, or the reading is not clean.** If both
-flip the same way the *instrument* is at fault, not the markets — two populations with opposite
-measured dispersion cannot share a rung signature. That branch is written down because without
-it, agreement would read as confirmation.
+**Both signatures must appear, in opposite directions, or the reading is not clean.** Five
+branches, pre-committed in `docs/hrr-recalibration.md`. Two of them exist only because two
+markets are read at once and are indistinguishable with one:
+
+* **both flip the SAME way** → the *instrument* is at fault, not the markets. Without this
+  branch, agreement would read as confirmation.
+* **both flip OPPOSITE to prediction** → the instrument is *sound* and both dispersion
+  measurements are **sign-inverted**. Back to source, not retracted. Without this branch it
+  would be misfiled as "neither flipped" and thrown away.
 
 This costs one extra column on the per-rung table (the gap's sign and its CI) and no extra data:
 TB carries alternate lines, so its rungs are already in the bucketing.

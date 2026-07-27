@@ -22,16 +22,19 @@ name: engine-v2-props-history
 #   lands inside the 95-minute window whatever the queue delay does.
 on:
   schedule:
-    - cron: "0 17 * * *"   # nominal 10am PT — the day's opener
-    - cron: "0 20 * * *"
-    - cron: "0 21 * * *"
-    - cron: "0 22 * * *"
-    - cron: "30 22 * * *"
+    # 2026-07-27 — TEN CRONS REPLACED BY ONE THAT WAITS.
+    # Measured on this account, every scheduled workflow lands in one of two batches: ~20:00-21:00Z
+    # or ~06:00-08:30Z the NEXT morning. Of the ten configured firings only the early one ever
+    # arrived usefully; the rest queued into the next morning, after the games. Ten fires inside a
+    # 95-minute window was not redundancy, it was a lottery drawing on the same throttled queue
+    # that drops 19 of 24 line-history ticks.
+    # `--wait` makes the SCRIPT hold the runner until the window opens (tools/snapshot_props.py,
+    # _wait_for_window), so one tick is deterministic where ten were not.
+    - cron: "0 17 * * *"   # lands ~20:1x-20:5x, then waits ~70 min -> close at ~21:4x for a 23:15 FP
+    # two cheap unwaiting fallbacks: if the 17:00 tick is dropped outright (property 2), these
+    # still record a `pre` so the day is not blank. They do not wait and cannot take a close.
+    - cron: "0 13 * * *"
     - cron: "0 23 * * *"
-    - cron: "30 23 * * *"
-    - cron: "0 0 * * *"
-    - cron: "30 0 * * *"
-    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
@@ -40,6 +43,9 @@ permissions:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    # explicit, and UNDER GitHub's 360-minute hosted-runner ceiling so a timeout is ours rather
+    # than a mid-sweep kill. MAX_WAIT_S (300 min) + the sweep (~5 min for a 15-game slate) fits.
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,7 +55,8 @@ jobs:
           git fetch --depth 1 origin frontend-rebuild
           git checkout origin/frontend-rebuild -- tools/snapshot_props.py
       - name: Snapshot props
-        run: python3 tools/snapshot_props.py
+        # --wait only on the tick that can reach a window; the fallbacks record a `pre` and exit
+        run: python3 tools/snapshot_props.py ${{ github.event.schedule == '0 17 * * *' && '--wait' || '' }}
       - name: Commit
         run: |
           git config user.name "engine-v2-bot"

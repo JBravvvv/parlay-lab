@@ -174,6 +174,10 @@ export type CalibrationSummary = {
      model that is fine on the board and wrong where it is actually bet. */
   disagreement?: EvFit[];
   globalShrink?: { s: number; n: number; slopeBefore: number | null; slopeAfter: number | null };
+  /* 2026-07-27: the 7-char commit sha of the code that produced this summary ("local" off
+     Vercel). `at` answers WHEN it was written; this answers WHAT wrote it, which is the
+     question a stale artifact cannot otherwise be asked. */
+  rev?: string;
   /* 2026-07-27: WHICH DATES THIS SUMMARY IS OVER. `SUMMARY_DAYS` (45) is a read window,
      not a prune — no row is ever deleted — but it SLIDES, and the collection period is
      60 logged dates (CAL_START 2026-07-25 -> freeze exit ~2026-09-22). From ~2026-09-08
@@ -621,6 +625,9 @@ export function calibrationEligible(date: string): boolean {
 /* ---------- 3D: weight adjustment (shrink-only, capped, weekly) ---------- */
 
 export type WeightState = {
+  /** when this state was last written, and by which commit — see CalibrationSummary.rev */
+  at?: number;
+  rev?: string;
   mults: Record<string, number>; // per-market multiplier on the MODEL blend weight
   lastAdjust: number; // ms epoch of the last applied cycle
   log: {

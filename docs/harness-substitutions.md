@@ -1093,3 +1093,30 @@ Two errors, and the second is the expensive one:
 **The rule: before calling an input missing, check whether it was ever present.** For any file a
 job rewrites, that is one command. And reserve *structural* for a claim you can derive — an
 arithmetic bound like `0.140/oo` never reaching 1.12 — never for one observed value.
+
+## A NEW GUARD'S FIRST TEST IS WHETHER IT FAILS WHEN IT SHOULD
+
+Three times now a test has been found not to test.
+
+| guard | how it was defeated | found by |
+|---|---|---|
+| `tests/workflow-timing.test.ts` | the guard symbol was `"def _snapshot_kind"`, a **substring** of the renamed `"def _snapshot_kind_RENAMED("`. Renaming the guard passed cleanly | renaming it on purpose |
+| `tests/factor-classification.test.ts` | the function-body scan took a flat 8-line window and bled into the next function, reporting `shPitIsoF` — which returns `null`, not `1` | reading the first failure instead of accepting it |
+| `tests/autopsy-floors.test.ts` | red for two commits while "418 passing" was reported | running the suite and reading its output |
+
+**A guard that has never failed is a guard that has never been tested.** Green on a correct
+codebase is the *weakest* possible evidence — it is exactly what a guard that does nothing also
+produces. So:
+
+1. **Break the thing on purpose and watch the guard fire.** Rename the symbol, delete the
+   marker, change the constant. Restore afterwards.
+2. **Read the failure message.** If it does not say what to do, it will not be acted on at 2am
+   six weeks from now.
+3. **A false positive is the same class of defect as a silent pass** — both mean the guard is
+   not measuring what its name claims. `shPitIsoF` firing was not "the test being cautious", it
+   was the scan being wrong.
+4. **Watch for substring and prefix matching.** Two of the three above were exactly that; a
+   trailing `(` or `= ` is the difference between a check and a decoration.
+
+This generalises the convergence rule to guards: *a finding supported by one instrument is a
+hypothesis*. A guard whose only evidence is its own green run is the same thing.

@@ -152,12 +152,58 @@ def _snapshot_kind(events, now, day):
     return "pre"
 
 
+# ---- SELF-PACED WAIT (2026-07-27) ----------------------------------------------------------
+# Ten crons inside a 95-minute window is not redundancy, it is a lottery — and it draws on the
+# same throttled queue that drops 19 of 24 line-history ticks. Measured on this account:
+# afternoon crons all land in a ~20:00-21:00Z batch and evening ones land 06:00-08:30Z the NEXT
+# morning, so of ten configured firings only the early one arrives usefully at all.
+#
+# So: fire ONCE, early, and WAIT INSIDE THE RUNNER until the window opens. Deterministic,
+# one tick, and it does not care what the queue does with the other nine.
+#
+# THE CEILING IS REAL. A GitHub-hosted job is killed at 360 minutes. MAX_WAIT_S leaves ~60 for
+# the sweep itself (a 15-game slate is ~90 proxy calls), and the workflow sets an explicit
+# `timeout-minutes` under the ceiling so the kill is ours, not GitHub's.
+# If the window opens beyond the cap, we do NOT wait: we take the `pre` reading and exit, which
+# leaves an honest hole that tools/close_capture.py reports rather than a job killed mid-sweep.
+MAX_WAIT_S = 300 * 60      # 5h — under the 360-minute hosted-runner job ceiling, with headroom
+WAIT_TICK_S = 5 * 60       # log progress so a waiting runner is visibly alive, not hung
+
+
+def _wait_for_window(events, now):
+    """Sleep until the next unstarted first pitch is within CLOSE_WINDOW_S. Returns the new
+    `now`. Never sleeps past MAX_WAIT_S — the caller then records a `pre` instead."""
+    starts = sorted(datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) for e in events)
+    ahead = [s for s in starts if s > now]
+    if not ahead:
+        return now
+    need = (ahead[0] - now).total_seconds() - CLOSE_WINDOW_S
+    if need <= 0:
+        print(f"  already inside the window ({(ahead[0]-now).total_seconds()/60:.0f} min to first pitch)")
+        return now
+    if need > MAX_WAIT_S:
+        print(f"  window opens in {need/60:.0f} min, past the {MAX_WAIT_S/60:.0f}-min cap — "
+              f"NOT waiting; a `pre` reading will be recorded and the close left to a later run")
+        return now
+    print(f"  waiting {need/60:.0f} min for the close window (first pitch {ahead[0].isoformat()})")
+    waited = 0
+    while waited < need:
+        chunk = min(WAIT_TICK_S, need - waited)
+        time.sleep(chunk)
+        waited += chunk
+        print(f"    +{waited/60:.0f}/{need/60:.0f} min", flush=True)
+    return datetime.now(timezone.utc)
+
+
 def main():
+    wait = "--wait" in sys.argv
     events = fetch("https://api.the-odds-api.com/v4/sports/baseball_mlb/events")
     if events is None:
         print("skipped: proxy unreachable")
         return
     now = datetime.now(timezone.utc)
+    if wait:
+        now = _wait_for_window(events, now)
     path_probe = f"data/props/{now.date().isoformat()}.json"
     day_probe = {"snapshots": []}
     if os.path.exists(path_probe):

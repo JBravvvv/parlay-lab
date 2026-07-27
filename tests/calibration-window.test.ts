@@ -143,3 +143,43 @@ describe("the calibration window declares itself, and the exit reading is not th
     expect(ROUTE).toMatch(/summary\.window = \{[\s\S]*?limit: SUMMARY_DAYS/);
   });
 });
+
+/**
+ * THE STALE-SUMMARY CLASS — every persisted aggregate says WHEN and WHAT wrote it.
+ *
+ * `at` alone answers "when", and that is not enough: `tools/gate_activity.py` once read
+ * `significant: true` out of a summary written BEFORE `SIG_MIN_N = 50` shipped, and a stale
+ * artifact is indistinguishable from a live gate unless the code version is on it. Added 2026-07-27:
+ * `rev` = the 7-char commit sha (`"local"` off Vercel).
+ *
+ * This is the same guardrail shape as tests/workflow-timing.test.ts and
+ * tests/factor-classification.test.ts — the build refuses work that has not answered a question
+ * this project has already learned to ask.
+ */
+describe("every persisted aggregate carries a timestamp AND a code stamp", () => {
+  it("the calibration summary is stamped with both", () => {
+    expect(ROUTE).toContain("summary.rev = process.env.VERCEL_GIT_COMMIT_SHA");
+    expect(ROUTE).toMatch(/summary\.window = \{/); // `at` rides on the summary root, already pinned
+    expect(ROUTE).toContain('?? "local"'); // a local run says so rather than reading as unstamped
+  });
+
+  it("the weight state is stamped too — it is the thing the summary MOVES", () => {
+    expect(ROUTE).toContain("weights.rev = summary.rev");
+    expect(ROUTE).toContain("weights.at = now");
+  });
+
+  it("SOURCE SCAN: no persisted aggregate is written without a stamp", () => {
+    // every redisSetJson to a pl:cal:* key must have a rev assignment within 6 lines above it
+    const lines = ROUTE.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const m = /redisSetJson\((K_SUMMARY|K_WEIGHTS)/.exec(lines[i]);
+      if (!m) continue;
+      const above = lines.slice(Math.max(0, i - 6), i).join("\n");
+      expect(
+        /\.rev\s*=/.test(above),
+        `${m[1]} is persisted at line ${i + 1} without a \`rev\` stamp within 6 lines above — ` +
+          `a summary that cannot say which code wrote it is unreadable once the code changes.`,
+      ).toBe(true);
+    }
+  });
+});

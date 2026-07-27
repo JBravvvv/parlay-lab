@@ -4,11 +4,11 @@
 WHY THIS EXISTS (2026-07-25)
 ----------------------------
 The frozen-parameter table in docs/collection-period.md tracks parameter VALUES.
-Seven engine factors are not parameters at all — they are data-availability
+EIGHT engine factors are not parameters at all — they are data-availability
 outcomes, each returning an identity value (1.0) when its input is missing, stale,
 or under a guard threshold:
 
-    shUmpKf  shTempF  shPitPctF  shOppWhiffF  shPenF  shLaborF  shPenQF
+    shUmpKf  shTempF  shPitPctF  shOppWhiffF  shPenF  shLaborF  shPenQF  shPriorKf
 
 So an input can go inert -> live or live -> inert mid-freeze with no frozen value
 changing, and the drift detector reports clean. That is exactly how shPenQF spent
@@ -28,7 +28,12 @@ import argparse, json, re, sys, unicodedata, urllib.request
 from datetime import datetime, timezone
 
 API = "https://statsapi.mlb.com/api/v1"
-FACTORS = ["shUmpKf", "shTempF", "shPitPctF", "shOppWhiffF", "shPenF", "shLaborF", "shPenQF"]
+# shPriorKf ADDED 2026-07-27 — it was the EIGHTH, found by tests/factor-classification.test.ts
+# rather than by a consequence. It returns 1 whenever SH_PRIORS.pitchers[id].k_pct or the league
+# k_pct is missing, and it appeared in no registry, no doc and no drift check.
+# Keep this list equal to REGISTRY in that test — the test enforces it in both directions.
+FACTORS = ["shUmpKf", "shTempF", "shPitPctF", "shOppWhiffF", "shPenF", "shLaborF", "shPenQF",
+           "shPriorKf"]
 
 
 def get(u):

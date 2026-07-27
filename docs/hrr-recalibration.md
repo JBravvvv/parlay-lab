@@ -52,12 +52,23 @@
 >
 > ### The pre-commitment, written before the data
 >
-> | Phase 2 returns | reading |
-> |---|---|
-> | **HRR flips + → −, TB flips − → +** | **BOTH findings confirmed, and the instrument is validated** — a regression that reproduces two opposite signatures on two markets is not producing them by construction. This is the strongest available outcome and it is stronger than either finding alone |
-> | one flips as predicted, the other does not | the flipping one is confirmed; the other is **retracted**. No partial credit, no "directionally consistent" |
-> | **both flip the SAME way** | **the instrument is suspect, not the findings.** Two markets with opposite measured dispersion cannot share a signature. Report it as an instrument failure and do not read either market from it |
-> | neither flips | both retracted. A single-λ model cannot produce a rung-invariant gap, and neither can an over-dispersed one |
+> | # | Phase 2 returns | reading |
+> |---|---|---|
+> | 1 | **HRR flips + → −, TB flips − → +** | **BOTH findings confirmed, and the instrument is validated** — a regression that reproduces two opposite signatures on two markets is not producing them by construction. The strongest available outcome, and stronger than either finding alone |
+> | 2 | one flips as predicted, the other does not | the flipping one is confirmed; the other is **retracted**. No partial credit, no "directionally consistent" |
+> | 3 | **both flip the SAME way** | **the instrument is suspect, not the findings.** Two markets with opposite measured dispersion cannot share a signature. Report it as an instrument failure and read neither market from it |
+> | 4 | **HRR flips − → +, TB flips + → −** — *both opposite to prediction* | **THE INSTRUMENT IS SOUND AND BOTH DIAGNOSES ARE SIGN-INVERTED.** Rung dependence is real, per-market, and opposite in the two markets — everything the instrument must show — with the signs the wrong way round. That is not a retraction: it says the *dispersion measurements* (`shTbOver`'s 2.30, the single-λ drift) have a sign error, and both go **back to source** rather than being dropped |
+> | 5 | neither flips | both retracted. A single-λ model cannot produce a rung-invariant gap, and neither can an over-dispersed one |
+>
+> **Branch 4 is the one that would otherwise be misfiled.** Under a four-branch table it reads as
+> "neither flipped as predicted" and lands in branch 5 — retraction — when it is nearly the
+> opposite: a clean, informative result carrying a specific, findable defect. A retraction throws
+> away a sign error that a re-derivation would fix in an afternoon.
+>
+> **Branches 3 and 4 are the pair that makes this worth doing.** Branch 3 says the instrument
+> failed; branch 4 says the instrument worked and the inputs are inverted. They are
+> distinguishable only because two markets with *opposite* predictions are being read at once —
+> with one market, both look identical.
 >
 > **Row 3 is the one worth having written down in advance.** Without it, "both markets show the
 > same rung dependence" reads as a *strong confirmation* rather than what it is — evidence that

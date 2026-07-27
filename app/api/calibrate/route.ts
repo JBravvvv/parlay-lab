@@ -436,6 +436,11 @@ export async function GET(req: NextRequest) {
     };
 
     summary.full = full;
+    /* WHICH CODE PRODUCED THIS SUMMARY (2026-07-27). `at` said WHEN, never WHAT. The gap is the
+       stale-summary class, and it has already bitten once: tools/gate_activity.py read
+       `significant: true` from a summary written BEFORE SIG_MIN_N=50 shipped, and a stale
+       artifact is indistinguishable from a live gate unless the code version is on it. */
+    summary.rev = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
     await redisSetJson(K_SUMMARY, summary);
 
     // 3D: weekly, capped, shrink-only, significance-gated
@@ -445,6 +450,8 @@ export async function GET(req: NextRequest) {
       const next = applyWeeklyAdjustment(summary, weights, now);
       if (next !== weights) {
         weights = next;
+        weights.rev = summary.rev;
+        weights.at = now;
         await redisSetJson(K_WEIGHTS, weights);
       }
     }

@@ -556,3 +556,51 @@ across first-pitch hour) but the *cadence* they were described with was wrong.
    destructive), `board-archive` (not needed — window-based). `model` and `hr-overround` are
    time-insensitive: a priors rebuild or a weekly overround reading is the same answer at 12:09
    or 17:24.
+
+## ONE SELF-PACED RUN REPLACES TEN QUEUED ONES (2026-07-27)
+
+Built now rather than after tomorrow's count, because the count decides whether it was urgent —
+not whether it was correct.
+
+`tools/snapshot_props.py --wait` holds the runner until the next unstarted first pitch is within
+`CLOSE_WINDOW_S` (95 min), then sweeps. `props-history.yml` drops from **10 crons to 3**: one
+`0 17` that waits, and two cheap non-waiting fallbacks that record a `pre` if the primary tick is
+dropped outright.
+
+| case | behaviour | verified |
+|---|---|---|
+| fires 20:30, first pitch 23:15 | waits **70 min**, closes at ~21:40 | ✅ |
+| fires 20:30, first pitch 21:00 | already inside — sweeps immediately | ✅ |
+| **fires 08:00, first pitch 23:15** | 820 min out, **past the cap — does NOT wait**, records a `pre` | ✅ |
+| all games started | no wait; the caller skips | ✅ |
+| **bimodal Wed** — matinee done, night block 23:00 | waits **55 min** to the *night* block's window | ✅ |
+
+### The job ceiling, checked
+
+GitHub-hosted jobs are killed at **360 minutes**. `MAX_WAIT_S = 300 min` leaves 60 for the sweep
+(~90 proxy calls on a 15-game slate, a few minutes), and `timeout-minutes: 330` is set explicitly
+so a timeout is *ours* rather than a mid-sweep kill.
+
+**If the window opens beyond the cap, it does not wait** — it records the `pre` and exits, which
+leaves an honest hole that `tools/close_capture.py` reports. That is strictly better than a job
+killed at 360 minutes having written nothing.
+
+### ⚠️ AND THIS EXPOSES A LIMIT GITHUB CANNOT CLEAR: WEEKEND CLOSES
+
+The two observed batch windows are **~06:00–08:30Z** and **~20:00–21:00Z**. Weekend first
+pitches are **17:35–20:10Z**, so their close windows open **16:00–18:35Z** — between the batches.
+
+| batch | to a 17:35Z weekend first pitch | reachable? |
+|---|---|---|
+| 06:00–08:30Z | close window opens 16:00Z → **7.5–10 h wait** | **NO — past the 360-min job ceiling** |
+| 20:00–21:00Z | the games started hours ago | **NO** |
+
+**Weekend closes are structurally unreachable from GitHub Actions on this account**, and no
+amount of cron tuning fixes it — the wait needed exceeds the platform's job limit. This is a
+derived bound, not one observation, so *structural* is the right word here.
+
+**Scoped, not built.** `snapshot_props.py` commits to git, so it needs a runner; cron-job.org can
+only call a URL. The route is a **`repository_dispatch`** fired by cron-job.org at ~16:00Z on
+Sat/Sun, which needs a fine-grained PAT — **a secret Josh would create and type himself**. Until
+then, Saturday and Sunday yield `pre` readings only, and `close_capture.py`'s day-of-week table
+is where that shows up rather than being assumed.

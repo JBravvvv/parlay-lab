@@ -467,6 +467,17 @@ wrongly reclassified it A STRUCTURAL off the morning file).
 Write-path audit: `data/ump_k.json` is an accumulator with two idempotence guards (**safe**);
 `data/pen_quality.json` merges per day but **replaces same-day** (bounded, recorded, unfixed).
 
+## Three build-enforced guardrails — the build refuses unanswered questions
+`tests/workflow-timing.test.ts` (every scheduled workflow classified SENSITIVE/INSENSITIVE with
+a named, existing guard) · `tests/factor-classification.test.ts` (every identity-fallback factor
+classified PINNED/DATA-DEPENDENT/STRUCTURAL, registry kept equal to `factor_activity.py`'s
+`FACTORS`) · the stale-summary stamp in `tests/calibration-window.test.ts` (every persisted
+aggregate carries `at` **and** `rev` = the commit sha). **The factor guard found the eighth
+factor on its first run — `shPriorKf`, absent from every registry, doc and drift check.**
+**When adding a guard, break the thing on purpose and watch it fire** — two of these three
+initially passed against a deliberately broken input (substring matching, and a line-window
+scan bleeding into the next function).
+
 ## ⚠️ EVERY CRON IS LATE, AND HOURLY ONES ARE DROPPED — enforced by test
 Every scheduled workflow carries a `# TIMING: SENSITIVE|INSENSITIVE` marker;
 `tests/workflow-timing.test.ts` fails the build if one is missing, if a SENSITIVE workflow names
@@ -476,6 +487,11 @@ SENSITIVE: `props-history` (`_snapshot_kind`), `context` (`merge_prior`), `board
 (`WINDOW_DAYS`). INSENSITIVE with stated reasons: `line-history`, `model`, `hr-overround`,
 `ufc`. When adding a guard symbol to the registry, **include the trailing `(` or `= `** — without
 it a rename still substring-matches and the check silently passes (found by testing the test).
+**`props-history` is now 3 crons, not 10**: `0 17` runs `--wait` and holds the runner until the
+close window opens (`MAX_WAIT_S` 300 min vs GitHub's 360-min job ceiling; `timeout-minutes: 330`).
+**Weekend closes are structurally unreachable from Actions** — their windows open 16:00–18:35Z,
+between the two observed batches, and the wait exceeds the job ceiling. Route is a
+`repository_dispatch` from cron-job.org with a PAT Josh would create; scoped, not built.
 
 Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not
 one:** low-frequency schedules (2/day — `context`, `props-history`) fire **every tick** but
