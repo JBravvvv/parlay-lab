@@ -20,6 +20,23 @@
 > This sits at the top of this file because it generalises past the harness: it is the reason
 > to distrust the moment a measurement starts confirming things.
 
+> ## ⚠️ EVERY "BYTE-IDENTICAL PARITY" CLAIM IN THIS PHASE WAS ABOUT PICKS AND TICKETS ONLY
+>
+> `digest()` serialises **`categories`, `categoriesLive`, `parlays`, `parlaysMixed`,
+> `parlaysLive`** — and nothing else. So `baseline43.json` and, until 2026-07-27,
+> `baseline-armed-v1` said nothing whatsoever about **`gameInfo`, `propBoard`, `simMarkets`,
+> `luCoverage`, `overview`, `liveGames`, `trap`, `passes`**. A change to any of them passed
+> both baselines untouched.
+>
+> **`propBoard` alone is 35% of the blob, and it is the population BOTH instruments behind the
+> H+R+RBI ladder finding run on.** The two things that produced that finding sat on the one
+> large object nothing verified.
+>
+> Closed 2026-07-27: `propBoard` now has a hashed section in `baseline-armed-v1` (additive —
+> 94,897 → 95,118 bytes, +221, nothing else changed), and
+> `tests/clamp-instrumentation.test.ts` hashes the whole board object. **Read every parity
+> claim in this repo dated before 2026-07-27 with that scope attached.**
+
 ## Why this file exists
 
 339 tests passed, the parity digest was byte-identical, and a **24% hole in every

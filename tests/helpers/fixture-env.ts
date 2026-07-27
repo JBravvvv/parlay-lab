@@ -5,6 +5,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { createEngine, type Engine } from "@/engine";
 
 const FIX = path.join(__dirname, "..", "fixtures");
@@ -173,7 +174,48 @@ export function armedDigest(d: Record<string, unknown>, eng: Engine) {
       sum: fun.sum,
       picks: (fun.picks as Record<string, unknown>[]).map((p) => [p.id, p.amt ?? p.amount]),
     },
+    /* ---- propBoard, ADDED 2026-07-27 ----
+       35% of the board blob, and NO parity check had ever covered it — while being the
+       population both instruments behind the H+R+RBI ladder finding run on (the ladder
+       test and tools/range_compression.py). A hash rather than the rows themselves: the
+       object is ~481 KB and the baseline is 95 KB, so inlining it would make the file
+       unreadable for the sake of a comparison a digest already makes. Counts ride along
+       so a failure localises to a game or a market instead of reporting one opaque
+       mismatch. */
+    propBoard: propBoardDigest(d.propBoard),
   };
+}
+
+type PbGame = { gkey?: string; markets?: Record<string, unknown[]> };
+
+/** {games, rows, byMarket, md5} — small, but any byte change in propBoard moves the md5. */
+export function propBoardDigest(pb: unknown) {
+  const games = Array.isArray(pb) ? (pb as PbGame[]) : [];
+  const byMarket: Record<string, number> = {};
+  let rows = 0;
+  for (const g of games) {
+    for (const [m, v] of Object.entries(g.markets ?? {})) {
+      const n = Array.isArray(v) ? v.length : 0;
+      byMarket[m] = (byMarket[m] ?? 0) + n;
+      rows += n;
+    }
+  }
+  return { games: games.length, rows, byMarket: sortedObj(byMarket), md5: stableHash(games) };
+}
+
+function sortedObj(o: Record<string, number>) {
+  return Object.fromEntries(Object.keys(o).sort().map((k) => [k, o[k]]));
+}
+
+/** key order is not guaranteed across engine edits, so sort every level before hashing */
+export function stableHash(v: unknown): string {
+  const sort = (x: unknown): unknown =>
+    Array.isArray(x)
+      ? x.map(sort)
+      : x && typeof x === "object"
+        ? Object.fromEntries(Object.keys(x as object).sort().map((k) => [k, sort((x as Record<string, unknown>)[k])]))
+        : x;
+  return createHash("md5").update(JSON.stringify(sort(v))).digest("hex");
 }
 
 /** The exact digest from tests/legacy-harness/baseline40.js. */

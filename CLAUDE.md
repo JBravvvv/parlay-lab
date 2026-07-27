@@ -372,6 +372,19 @@ every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_D
 a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
 `tests/calibration-window.test.ts` pins all of it.
 
+## The freeze has TWO exits — do not conflate them
+**Exit 1, the PARAMETER exit, ~2026-09-22, on schedule.** Decided by Phase 2's rung-bucketed
+movement slope (board-wide, close-graded, needs no bet). A positive result licenses the
+amendment bundle — leg-equivalent EV floor, `consMinEv` scaling, edge-aware base weight, HRR
+clamp — and **nothing about P/L, bankroll or `consMinN`**. Binding qualifier: **an attenuated or
+collinear fit is NO RESULT, not a negative one**; only a negative *with the identification
+diagnostic showing power* licenses stopping.
+**Exit 2, the BANKROLL exit, UNSCHEDULED.** Needs the ledger (P/L, CLV-on-bets, Discipline),
+which reaches 09-22 at **n≈0** because markets reopen 08-08 → 09-03. Cannot be dated until the
+post-reopening bet rate is observable, mid-September at the earliest. **Deciding both on one
+date means deciding the second on n=0 — the exact error this freeze exists to prevent.**
+Consequence: **close-capture rate is the whole health story.** `tools/close_capture.py`.
+
 ## ⚠️ WHAT THE PARITY BASELINES ACTUALLY COVER
 `digest()` (`tests/helpers/fixture-env.ts`) serialises **`categories`, `categoriesLive`,
 `parlays`, `parlaysMixed`, `parlaysLive`** and nothing else. So `baseline43.json` and
@@ -381,17 +394,6 @@ untouched. `propBoard` alone is 35% of the blob and is the population the ladder
 range detector run on. **Every "parity is byte-identical" claim in this phase is a claim about
 picks and tickets, not about the board.** Only `tests/clamp-instrumentation.test.ts` hashes the
 whole object.
-
-## What the freeze produces at ~2026-09-22
-Reopening dates put Total Bases at 08-17 and K's/Outs at 09-03, so **P/L, CLV-on-bets and
-Discipline all reach exit at n≈0 and Phase 2 is effectively the entire evidence base.** Two
-separate exits, and conflating them is the trap: the **parameter** freeze can end on schedule
-(Phase 2 answers whether the disagreement is information, which is what the amendment bundle was
-waiting for), but the **bankroll/sizing** decision cannot — nothing will have measured it, and
-deciding it on n≈0 is the failure this freeze exists to prevent, arriving from the other
-direction. A positive Phase 2 licenses proceeding and applying the amendments; it licenses
-nothing about realised P/L. Full reasoning in `docs/collection-period.md`.
-**Consequence: the close-capture rate is the whole health story.** `tools/close_capture.py`.
 
 ## `clampActivity` — the board carries its own clamp audit (2026-07-27)
 `shClamp(v,lo,hi,id)` takes a 4th arg = **the call site's LINE NUMBER**, so the ids aggregate
@@ -448,6 +450,22 @@ analysis needs; on single-generation days the two files are byte-identical and *
 blob** — which only works because the script gzips with `mtime=0`. `2026-07-26` backfilled
 (`1e77c9d`); **07-25 and 07-24 were already expired.** The ≥20-board threshold lands
 **2026-08-14** at the earliest.
+
+## The props archive is START-TIME SELECTED — check before using it
+`data/props` takes two readings; the later one fires ~20:08–20:55 UTC and games already
+underway are gone from the odds API. Kept games median first pitch **22.68 UTC** vs **18.18**
+for dropped. Keep rate by day: Mon 100%, Tue 94%, Fri 93%, Sat 68%, Thu 50%, Wed 43%,
+**Sun 3/45 = 6.7%** (2026-07-19 kept 0 of 15). **Series B's movement population is night games
+and Sunday is effectively absent.** The near-empty days (07-14, 07-16, 07-23) are real
+All-Star-break slates, not archive failures — snapshot 1 captured every game every day.
+
+**Recompute a statistic on both populations before caveating it.** Measured: the 1.071
+overround is invariant (1.0713 vs 1.0713), the `lockMaxAgeMin` movement percentiles come from
+the denser game-lines archive and are unselected, the 0.26 pp recovery error is board-derived.
+Only consensus depth moves — mean `n` 1.40 → 1.66, `czf` 2.2% → 0.3% — and it moves so that the
+later reading **understates** the thinness, so that finding is conservative, not overstated.
+2026-08-02 is the pre-committed test of whether the retime fixes Sunday
+(`tools/close_capture.py` prints the branches).
 
 ## Reading the board JSON — traps that have each cost a wrong answer
 - **`categories` is one-sided.** "Top 50 per market ranked by win probability, ONE side per

@@ -624,3 +624,39 @@ by the **17:00 UTC** firing, before the 17:35 bulk starts — which is the hole 
 near 100%, the retime fixed the selection and Series A is not merely un-attenuated but
 un-selected. If it does not, the two series share the defect and neither supports a pooled
 movement claim. `tools/close_capture.py --dir data/props` reports it per day.
+
+## WHICH EXISTING NUMBERS ARE NIGHT-GAME STATISTICS — measured, not inferred (2026-07-27)
+
+The second-reading population is selected on first-pitch time (Sunday 6.7%, Wednesday 43%,
+median first pitch 22.68 UTC kept vs 18.18 dropped). That does **not** make every archive-derived
+number a night-game statistic — only the ones whose value correlates with start time. So each
+was **recomputed on both populations** rather than reasoned about from provenance.
+
+| statistic | population | night-game selected? |
+|---|---|---|
+| **Caesars overround 1.071** | `data/props`, rows with two Caesars sides | **NO.** Snapshot 1 vs snapshot 2: H+R+RBI **1.0713 / 1.0713**, TB 1.0708 / 1.0709, outs 1.0717 / 1.0725 (n=152). Invariant to three decimal places — a book's margin policy does not depend on first pitch |
+| **movement percentiles behind `lockMaxAgeMin`** | `line-history` **game lines** (`data/*.json`), 4–5 snapshots/day 06:00–22:00 UTC | **NO.** Pair coverage is flat across first-pitch hour: mean readings 2.2–3.3, mean span 4.2–9.6 h, ≥6 h span 33–65% with no start-time gradient (hour 17 is 65%, hour 23 is 52%). A denser cadence starting at 06:00 reaches early games before they start |
+| **0.26 pp w-recovery error** (range detector) | a live board's `propBoard` | **NO.** Not from the props archive at all |
+| **consensus depth / `czf`** — "the de-vigged consensus behind a prop row is often thin" | `data/props` | **YES — relabelled.** Snapshot 1: mean `n` **1.40**, `czf` **2.2%**. Snapshot 2: mean `n` **1.66**, `czf` **0.3%** |
+
+### The one that moves, and which way
+
+**The later reading is DEEPER, not thinner** — 1.66 books vs 1.40, and `czf` (settlement book
+inside its own consensus) falls 2.2% → 0.3%. So a thinness figure computed on the second reading
+**understates** the problem:
+
+> **The "consensus is often thin" finding is CONSERVATIVE, not overstated.** Measured on the
+> whole-slate population the consensus is thinner and the settlement book is inside its own
+> consensus **seven times more often**. Relabelled with its population, not retracted — and the
+> direction means no decision built on it needs revisiting, because every one of them was made
+> against the *smaller* version of the problem.
+
+**Three of four cleared, one relabelled with a direction.** That is the point of measuring
+instead of relabelling everything: a selection that exists does not bias every statistic drawn
+through it, and blanket caveats destroy information as surely as missing ones do.
+
+**This is the third time selection has produced a mislabelled number** (`categories`' probability
+rank, the winner's-curse availability term, and now start time). The pattern is stable enough to
+state as a habit: **when a population turns out to be selected, recompute the statistics on both
+sides of the selection rather than caveating them** — most will be invariant, and the ones that
+are not tell you which direction they were wrong in.

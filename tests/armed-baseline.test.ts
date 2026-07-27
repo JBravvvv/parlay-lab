@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { ARMED_DAILY, ARMED_FUN, FROZEN_NOW, armedDigest, armedFixtureEngine, digest, fixtureEngine } from "./helpers/fixture-env";
 
 /**
@@ -40,6 +41,52 @@ import { ARMED_DAILY, ARMED_FUN, FROZEN_NOW, armedDigest, armedFixtureEngine, di
  * `createEngine({ today })` under fake timers.
  */
 describe("baseline-armed-v1 — the armed regression net", () => {
+  /**
+   * `propBoard` JOINED THE BASELINE ON 2026-07-27, ADDITIVELY.
+   *
+   * It is 35% of the board blob and no parity check had ever covered it — while being the
+   * population BOTH instruments behind the H+R+RBI ladder finding run on (the ladder test
+   * and tools/range_compression.py). So the two things that produced the finding sat on the
+   * one large object nothing verified.
+   *
+   * The addition is provably additive: the regenerated file is the previous file with 221
+   * bytes appended and not one byte changed.
+   *
+   *   BEFORE  53b2424b80a72b6a056e2b4fa264925e   94,897 bytes
+   *   AFTER   418125e2acb4afbae90c6344f48b8888   95,118 bytes  (+221)
+   *
+   * ⚠️ COVERAGE IS NOT REPRESENTATIVENESS. The fixture's propBoard is **6 games / 289 rows**,
+   * and **133 of those rows are `batter_home_runs`** — the market that is 100% one-sided and
+   * carries no `fair`. `pitcher_outs` has **7 rows** and H+R+RBI **14**: the two markets whose
+   * findings depend on propBoard are its thinnest. This baseline now catches MOVEMENT in
+   * propBoard. It does not make the fixture a sample of it. That is what the 20-board archive
+   * series is for.
+   */
+  const BASELINE_BEFORE_PROPBOARD = "53b2424b80a72b6a056e2b4fa264925e";
+
+  it("the propBoard section was appended, not merged into anything", () => {
+    const raw = fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v1.json"), "utf8");
+    const cut = raw.lastIndexOf(',"propBoard":');
+    expect(cut, "propBoard section missing from the armed baseline").toBeGreaterThan(0);
+    // the file with the appended section removed must hash to the pre-addition baseline
+    const prior = raw.slice(0, cut) + "}";
+    expect(createHash("md5").update(prior).digest("hex")).toBe(BASELINE_BEFORE_PROPBOARD);
+  });
+
+  it("propBoard is hashed, counted, and thin exactly where it matters", async () => {
+    vi.setSystemTime(FROZEN_NOW);
+    const eng = armedFixtureEngine();
+    const d = eng.analyze(await eng.collectSlate()) as unknown as Record<string, unknown>;
+    const pb = armedDigest(d, eng).propBoard;
+    expect(pb.md5).toBe("c8c520787986e7297f9136e143cbf693");
+    expect(pb.games).toBe(6);
+    expect(pb.rows).toBe(289);
+    // pinned so the thinness is a stated fact rather than a discovery on 08-15
+    expect(pb.byMarket.batter_home_runs).toBe(133); // 46% of the rows, and unpriceable
+    expect(pb.byMarket.pitcher_outs).toBe(7);
+    expect(pb.byMarket.batter_hits_runs_rbis).toBe(14);
+  }, 300_000);
+
   it("armed board + card path match the stored armed baseline", async () => {
     vi.setSystemTime(FROZEN_NOW);
     const eng = armedFixtureEngine();

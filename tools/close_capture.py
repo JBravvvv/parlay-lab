@@ -109,8 +109,60 @@ def main():
         print("  a day without a close is a permanent hole — the price cannot be re-fetched.")
     else:
         print(f"\nNo Series A days yet (nothing on or after {VINTAGE_A}).")
+    # ---- KEEP RATE BY DAY OF WEEK — the second-reading selection, reported weekly
+    # Series B kept only games that had not started when the later snapshot fired, so its
+    # movement population is night games: Sun 3/45 = 6.7%, Wed 6/14 = 43%, Mon 15/15 = 100%,
+    # median first pitch 22.68 UTC for kept vs 18.18 for dropped. Whether the retimed cadence
+    # fixes that is the 2026-08-02 test, and Wednesday and Thursday need watching too --
+    # 43% and 50% are nearly as bad as Sunday and nobody had looked at them.
+    DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    by = {}
+    for f in files:
+        day = os.path.basename(f)[:10]
+        d = json.load(open(f))
+        ss = d.get("snapshots") or []
+        if len(ss) < 2:
+            continue
+        first = {e["id"]: parse_t(e.get("start")) for e in ss[0].get("events", [])}
+        # the CLOSE if one exists, else the last reading -- the question is what the
+        # movement half actually sees, not what an ideal one would
+        close = next((s for s in reversed(ss) if s.get("kind") == "close"), ss[-1])
+        later = {e["id"] for e in close.get("events", [])}
+        dw = DOW[datetime.strptime(day, "%Y-%m-%d").weekday()]
+        b = by.setdefault(dw, [0, 0])
+        b[0] += len(first)
+        b[1] += sum(1 for k in first if k in later)
+
+    print("\nKEEP RATE BY DAY OF WEEK — games surviving into the close/last reading")
+    print("  (Series B baseline: Mon 100%, Tue 94%, Fri 93%, Sat 68%, Thu 50%, Wed 43%, SUN 6.7%)")
+    for dw in DOW:
+        if dw not in by:
+            continue
+        n, k = by[dw]
+        pct = 100 * k / max(1, n)
+        flag = ""
+        if dw == "Sun":
+            flag = ("  <-- RETIME CONFIRMED" if pct >= 90 else
+                    "  <-- STRUCTURAL: the cadence is the problem, not the hour" if pct <= 30 else
+                    "  <-- partial; read the note below")
+        elif pct < 70:
+            flag = "  <-- start-time selection, same mechanism as Sunday"
+        print(f"    {dw}  {k:>3}/{n:<3} = {pct:>5.1f}%{flag}")
+
+    print("""
+  2026-08-02 IS THE PRE-COMMITTED TEST (Series A's first Sunday):
+    Sunday keep rate >= 90%  -> the 17:00 UTC firing takes the close before the 17:35 bulk.
+                                The schedule solved it; both series' Sundays are usable.
+    Sunday keep rate 6-30%   -> the SNAPSHOT CADENCE is the problem, not the generate hour.
+                                The near-pitch sweep must fire on Sundays independently of
+                                the generate schedule, and until it does Sunday is unusable
+                                in BOTH series.
+    anything between         -> partial; report per-game rather than pooling.
+  Re-read this table WEEKLY, not once: Wed 43% and Thu 50% are nearly as bad as Sunday and
+  have never been looked at.""")
+
     if a.json:
-        json.dump(out, open(a.json, "w"), indent=1)
+        json.dump({"days": out, "byDow": by}, open(a.json, "w"), indent=1)
     return 0
 
 

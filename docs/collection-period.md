@@ -2570,135 +2570,119 @@ says outright that a market at **0.0/day is a broken logging path, not a distant
 schedule. `tests/gate-rebuild.test.ts` pins the arithmetic, including the measured 07-27 rates
 and the doc's implied 9.1/day.
 
-## ⚠️ WHAT "DONE" ACTUALLY LOOKS LIKE AT FREEZE EXIT — revised 2026-07-27
+# THE FREEZE HAS TWO EXITS, NOT ONE (2026-07-27)
 
-The measured reopening dates supersede every earlier projection in this file, and they change
-what the freeze will *contain*, not merely when it ends.
+This replaces the earlier "what done looks like", which listed four exit readings without
+saying that three of them will be empty. The accrual arithmetic changed what the freeze will
+contain, and the honest structure is a **split**, not a list.
 
-| market | opens | freeze exit |
-|---|---|---|
-| ML · RL | 2026-08-08 | |
-| Total Bases | **2026-08-17** | |
-| Hits · HR · H+R+RBI | **2026-08-23** | ~2026-09-22 |
-| K's · Outs | **2026-09-03** | |
+| market | consensus gate reopens |
+|---|---|
+| ML · RL | 2026-08-08 |
+| **Total Bases** | **2026-08-17** |
+| Hits · HR · H+R+RBI | **2026-08-23** |
+| K's · Outs | **2026-09-03** |
 
-**The card stays dark through most of August.** Prop markets reopen with three to five weeks of
-the collection window left, and `pitcher_outs` — the positive control — with under three.
+Measured from actual accrual (`summary.reopen`, recomputed nightly). The card stays dark
+through most of August; `pitcher_outs` — the positive control — reopens with under three weeks
+of the window left.
 
-### Three of the four exit readings will have negligible n
-
-| exit reading | source | state at 2026-09-22 |
-|---|---|---|
-| **P/L** | the ledger — locked bets only | **near-empty.** Bets can only exist after a market reopens, so the ledger covers roughly the last third of the window and none of the first |
-| **CLV on bets** | `/api/clv`, sights **locked legs only** | **near-empty**, and for the same reason. It has been dark all window already |
-| **Discipline** (override rate, sizing) | the ledger | **near-empty** — no bets, no overrides to count. Its instrument value is intact, its sample is not |
-| **Phase 2** — movement slope, board-wide, close-graded | `data/props` + the prediction store | **full window.** It does not need a bet to exist; every priced row counts |
-
-> **Phase 2 is effectively the entire evidence base for the freeze.** That was not the design —
-> it is what the accrual arithmetic produces — and it raises the cost of a missed close
-> proportionally. The close-capture rate (`tools/close_capture.py`) is therefore the health
-> metric for the whole collection period, not just for Series A.
-
-**This is not an argument to reopen the gate early.** `consMinN` is doing exactly its job: a
-market under 100 graded legs has not earned an unchecked model probability, and the Phase 0.5
-restart is why the count is low. The consequence is simply that the freeze's answer will come
-from the board-wide channel rather than the bet channel, and the exit reading must say so
-rather than presenting four numbers of which three rest on n≈0.
-
-### Recompute after seven days of the new schedule
-
-The rates above are over **two complete dates**, both priced by the old 16:00 UTC pass. The
-four cron-job.org entries fire four to six hours later, with more confirmed lineups and fewer
-projected-lineup voids, so accrual should **rise** and the dates should pull in.
-
-**Measure it, do not project it** — that is the mistake being corrected here. Re-read
-`summary.reopen` (printed by `tools/gate_activity.py` with `rateDays` as its denominator) on
-or after **2026-08-03**, once seven complete dates exist under the new schedule, and revise
-this table from that reading.
-
-## WHAT THE FREEZE IS NOW DESIGNED TO PRODUCE — the standing question, answered (2026-07-27)
-
-Asked plainly, so answered plainly. The freeze was set up to decide whether this engine has
-edge. The accrual arithmetic changed what will be in it. Here is what a decision on ~2026-09-22
-can and cannot rest on.
-
-### The two questions are not the same question, and only one will have data
-
-| question | instrument | n at exit |
-|---|---|---|
-| **Does the model's disagreement with the market predict closing movement?** | Phase 2 movement slope, board-wide | **full window** |
-| **Do the bets make money?** | ledger P/L, CLV-on-bets, Discipline | **≈ 0** |
-
-Phase 2 answers *"is there information in the disagreement"*. It does not answer *"does the
-selection-and-staking machine convert that information into money"* — and the second is a
-strictly harder question, because it also contains the +2% gate, `consMinEv`, the leg-equivalent
-floor, the edge-blind base weight, correlation handling and stake sizing. **Every one of those
-is untested by Phase 2**, and four of them are already on the freeze-exit amendment list.
-
-### What a POSITIVE Phase 2 licenses
-
-A significant positive movement slope, surviving the intercept and bucketed by rung, licenses
-exactly one conclusion:
-
-> **The model's disagreement carries information the closing market later confirms.**
-
-That is genuinely the load-bearing question — a model whose disagreement is noise cannot be
-rescued by any staking rule, so a negative result would end the project's premise. A positive
-result **does not** license: a bankroll increase, loosening `consMinN`, unfreezing parameters,
-or any claim about realised P/L. It licenses **proceeding to the bet-channel question with the
-premise established**, which is the thing that is currently unestablished.
-
-It also *does* license the specific amendments whose arithmetic is already written and whose
-only missing input was "is the model's edge real at all": the leg-equivalent EV floor, the
-`consMinEv` scaling, the edge-aware base weight, the H+R+RBI clamp. Those are corrections to
-machinery that assumes an edge exists; a positive Phase 2 is what makes them worth applying.
-
-### What a NEGATIVE Phase 2 licenses
-
-A slope indistinguishable from zero, **with the identification diagnostic showing the fit had
-power** (that qualifier is doing real work — an attenuated or collinear fit is not a negative
-result, it is no result), licenses:
-
-> **The disagreement is not information, and no staking rule fixes that.**
-
-Then the correct action is to stop tuning selection and staking and go back to the model — and
-the `pitcher_outs` positive control is what makes this readable: outs is *known* broken, so a
-negative on outs alongside a positive elsewhere is a working instrument, while a negative
-everywhere including markets with no known defect is a different and worse finding.
-
-### And yes — there is a reading where the right action at exit is KEEP COLLECTING
-
-Better to know its shape now than to arrive at it. It is the **most likely** outcome, not a
-failure mode:
-
-**"Keep collecting" is correct if the Phase 2 result is positive but the bet channel is empty.**
-That is precisely the state the reopening dates predict: Total Bases opens 08-17, K's and outs
-09-03, so at 09-22 the ledger holds a few weeks of prop bets on some markets and none on
-others. Phase 2 will have answered its question; the P/L question will not have been asked yet.
-
-In that state the honest exit reading is:
-
-1. **the premise is established** (or not) by Phase 2 — a real, dated answer;
-2. **the bet channel needs its own window**, and the natural length is the same `consMinN = 100`
-   logic applied to *bets* rather than graded legs;
-3. so the freeze **exits on schedule for parameters** — the amendment bundle applies, the
-   collection-period pins come off — while the **P/L question stays open with a new date**.
-
-**Those are two separate exits and they were conflated.** The parameter freeze can end on
-09-22 because Phase 2 will have supplied what it was waiting for. The bankroll decision cannot,
-because nothing will have measured it. Deciding both on one date would mean deciding the second
-one on n≈0 — which is exactly the failure this freeze exists to prevent, arriving from the
-other direction.
-
-### The concrete answer
-
-> **At ~2026-09-22 you can decide whether the model has edge, and you can apply the frozen
-> parameter amendments. You cannot decide bankroll or sizing, and you should not try.**
+> ## ⚠️ THE FAILURE MODE THIS SPLIT PREVENTS
 >
-> **The cost of that is one number: the close-capture rate.** Phase 2 is the entire evidence
-> base for the first decision, so a day without a close is not a gap in a redundant record —
-> it is a permanent subtraction from the only channel that will have anything in it. Watch
-> `tools/close_capture.py` daily; that is the whole health story now.
+> **Deciding both exits on one date means deciding the second on n=0 — which is the exact
+> error this freeze exists to prevent.** It arrives from the other direction than expected:
+> not by acting on too little data because nobody waited, but by acting on too little data
+> because a *calendar date* was mistaken for a *sample*.
+
+---
+
+## EXIT 1 — THE PARAMETER EXIT · ~2026-09-22, on schedule
+
+**Decides:** whether the model's disagreement with the market carries information, and
+therefore whether the frozen parameter amendments should be applied.
+
+**Evidence it needs:** Phase 2's rung-bucketed movement slope. Board-wide, close-graded, and
+it does **not** require a bet to exist — every priced row counts. This is the only channel that
+will have a full window in it.
+
+**What a POSITIVE result licenses:**
+
+> The model's disagreement carries information the closing market later confirms.
+
+and, concretely, the freeze-exit amendment bundle — the leg-equivalent EV floor, the
+`consMinEv` scaling, the edge-aware base weight, the H+R+RBI clamp. Those are corrections to
+machinery that *assumes* an edge exists; a positive Phase 2 is what makes applying them
+worthwhile rather than premature.
+
+**What it explicitly does NOT license:** a bankroll increase · loosening `consMinN` ·
+unfreezing anything not in the bundle · any claim about realised P/L. Phase 2 does not test
+the +2% gate, `consMinEv`, the leg-equivalent floor, the edge-blind base weight, correlation
+handling or stake sizing — **and four of those six are themselves on the amendment list.**
+
+**What a NEGATIVE result licenses:**
+
+> The disagreement is not information, and no staking rule fixes that.
+
+Stop tuning selection and staking; go back to the model. `pitcher_outs` is what makes this
+readable — it is *known* broken, so negative-on-outs alongside positive elsewhere is a working
+instrument, while negative everywhere including markets with no known defect is a different
+and worse finding.
+
+> ### 🔒 THE QUALIFIER IS BINDING, NOT A HEDGE
+>
+> **An attenuated or collinear fit is NO RESULT, not a negative one.** Only a negative slope
+> **accompanied by the identification diagnostic showing the fit had power** licenses the
+> stopping conclusion. Series B already demonstrates why: its later reading is T-2.5 h or
+> earlier, which attenuates any slope toward zero, and rung drift in `pitcher_outs` is nearly
+> collinear with a one-signed gap. Either one manufactures a "negative" out of nothing.
+>
+> If the diagnostic shows the fit lacked power, the correct action is **Exit 1 does not
+> happen yet** — not "the model failed".
+
+---
+
+## EXIT 2 — THE BANKROLL EXIT · UNSCHEDULED, and cannot be dated yet
+
+**Decides:** whether the bets make money — sizing, bankroll, whether to keep betting at all.
+
+**Evidence it needs:** the ledger channel. P/L, CLV-on-bets, Discipline (override rate,
+sizing adherence). All three are ledger-derived, and the ledger only fills once a market
+reopens **and** a card is actually locked.
+
+**State at 2026-09-22:** ≈ **n = 0**. Total Bases will have ~5 weeks of possible bets, K's and
+outs under 3, and several markets none at all. CLV-on-bets sights *locked legs only* and has
+been dark the entire window.
+
+**What it explicitly does NOT license — today:** any conclusion at all. There is no reading of
+an empty ledger, and "no bets lost money" is not a result.
+
+**When it can be dated:** it cannot, yet. The natural rule is the one already in the codebase:
+apply `consMinN`-style logic to *bets* rather than graded legs, and set the date once the
+post-reopening bet rate is observable — which is first measurable in mid-September, after the
+markets reopen. **Do not pick a date before then.** Picking one now would be the same error in
+a new place.
+
+---
+
+## What the two exits share, and the one number they both cost
+
+Exit 1 exits **the parameter freeze**: the collection-period pins come off, the amendment
+bundle applies, `docs/collection-period.md`'s frozen table stops being load-bearing. Exit 2
+exits **nothing about parameters** — it is a capital decision on a separate clock.
+
+> **Because Phase 2 is the entire evidence base for Exit 1, a day without a close is not a gap
+> in a redundant record — it is a permanent subtraction from the only channel with anything in
+> it.** `tools/close_capture.py`, read daily. That is the whole health story now.
 
 This was not the design. It is what the accrual arithmetic produced, and stating it beats
-arriving at it on 09-22 with four readings of which three are empty.
+arriving at 09-22 with four readings of which three are empty.
+
+## Recompute the rates after seven days of the new schedule
+
+The reopening dates above rest on **two complete dates**, both priced by the old 16:00 UTC
+pass. The four cron-job.org entries fire four to six hours later with more confirmed lineups
+and fewer projected-lineup voids, so accrual should **rise** and the dates pull in.
+
+**Measure it, do not project it** — projecting is the mistake being corrected here. Re-read
+`summary.reopen` on or after **2026-08-03**, once seven complete dates exist under the new
+schedule, and revise this table from that reading.
