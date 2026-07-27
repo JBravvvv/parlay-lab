@@ -3,6 +3,7 @@ name: ufc-rankings
 # official rankings roughly weekly (Tuesdays, after the weekend card settles),
 # so we refresh public/model/ufc.json twice a week. Commits trigger a Vercel
 # redeploy of the static file. Stdlib-only tool — no pip install needed.
+# TIMING: INSENSITIVE — rankings move weekly at most; a few hours of start drift is immaterial.
 on:
   schedule:
     - cron: "0 15 * * 3"  # Wednesday 15:00 UTC — after Tuesday ranking updates

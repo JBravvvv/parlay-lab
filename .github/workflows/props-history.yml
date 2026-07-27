@@ -17,6 +17,9 @@ name: engine-v2-props-history
 #
 # The reliable long-term trigger is cron-job.org (already running the CLV job 96x/day),
 # which does not queue. These crons are the delay-tolerant fallback.
+# TIMING: SENSITIVE — guard: _snapshot_kind (tools/snapshot_props.py) — the script decides `close`
+#   vs `pre` from the next unstarted first pitch, never from the clock. Ten crons so some firing
+#   lands inside the 95-minute window whatever the queue delay does.
 on:
   schedule:
     - cron: "0 17 * * *"   # nominal 10am PT — the day's opener

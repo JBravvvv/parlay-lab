@@ -660,3 +660,21 @@ rank, the winner's-curse availability term, and now start time). The pattern is 
 state as a habit: **when a population turns out to be selected, recompute the statistics on both
 sides of the selection rather than caveating them** — most will be invariant, and the ones that
 are not tell you which direction they were wrong in.
+
+## RUNG DIMENSION — TWO MARKETS, NOT ONE (2026-07-27)
+
+The rung bucketing was specced for H+R+RBI. **`batter_total_bases` is added explicitly**, and
+its branch is pre-committed alongside HRR's in `docs/hrr-recalibration.md`.
+
+| market | measured defect | predicted `(pModel − open_fair)` sign, low rung → high rung |
+|---|---|---|
+| `batter_hits_runs_rbis` | under-dispersed (single λ) | **+ → −** |
+| `batter_total_bases` | over-dispersed (ratio 2.30, n=108) | **− → +** |
+
+**Both signatures must appear, in opposite directions, or the reading is not clean.** If both
+flip the same way the *instrument* is at fault, not the markets — two populations with opposite
+measured dispersion cannot share a rung signature. That branch is written down because without
+it, agreement would read as confirmation.
+
+This costs one extra column on the per-rung table (the gap's sign and its CI) and no extra data:
+TB carries alternate lines, so its rungs are already in the bucketing.

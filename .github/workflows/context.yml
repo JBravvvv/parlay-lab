@@ -2,6 +2,9 @@ name: engine-v2-context
 # Daily context: weather (park-relative wind strings), HP umpires + growing
 # K-factor database, bullpen fatigue. Runs twice so the night slate gets fresh
 # weather/ump postings; commits trigger a Vercel redeploy of context.json.
+# TIMING: SENSITIVE — guard: merge_prior (tools/build_context.py) — statsapi posts `officials` only
+#   near first pitch, so a late or early run resolves nothing. The guard makes lateness HARMLESS
+#   rather than timed: a run that resolves nothing leaves the prior file intact instead of nulling it.
 on:
   schedule:
     - cron: "0 17 * * *"  # 10am PT — day games + ump db increment

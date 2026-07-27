@@ -2,6 +2,9 @@ name: engine-v2-line-history
 # Hourly odds snapshots (MLB h2h/totals/spreads, us+eu incl. Pinnacle) into the
 # line-history branch — the open-to-close archive the backtest harness reads.
 # ~6 API credits per run through the app's own proxy; no secrets needed.
+# TIMING: INSENSITIVE — every snapshot stamps its own `t`, and every downstream analysis reads that
+#   observed timestamp, never the cron hour. Queue drops thin the DENSITY (measured: 3-5 of 24 ticks
+#   run) but cannot mis-timestamp a reading. Density is a coverage question, not a timing one.
 on:
   schedule:
     - cron: "12 * * * *" # hourly; slate-hours gating happens in the script's data (empty slates are tiny)

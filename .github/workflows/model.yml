@@ -1,6 +1,8 @@
 name: engine-v2-priors
 # Nightly data spine: rebuild Statcast skill priors and publish them through
 # the app (public/model/priors.json -> Vercel redeploy on push).
+# TIMING: INSENSITIVE — a daily priors rebuild whose only requirement is `after Savant's overnight
+#   refresh`. Observed starts 12:09-17:24Z clear that by hours and all land before the 22:00 board.
 on:
   schedule:
     - cron: "30 9 * * *" # 09:30 UTC = 2:30am PT, after Savant's overnight refresh

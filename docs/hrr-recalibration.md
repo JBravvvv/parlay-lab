@@ -35,6 +35,39 @@
 > and is thinner still relative to production: 42 fixture rows against 391 real (9.3×).** It has
 > the larger n of the two and no independent test scheduled at all.
 
+> ## 🔬 TWO MARKETS, OPPOSITE PREDICTED SIGNATURES, ONE INSTRUMENT
+>
+> `batter_total_bases` had **no independent test scheduled at all** — a worse position than
+> H+R+RBI's. Phase 2's rung bucketing already covers every market carrying alternate lines, and
+> TB has them, so adding it is free. Adding it also converts Phase 2 from a test of two findings
+> into **a test of the instrument as well**, because the two markets predict *opposite* things.
+>
+> | | **H+R+RBI** | **`batter_total_bases`** |
+> |---|---|---|
+> | measured defect | **UNDER-dispersed** — model drift +0.001 vs market +0.479 across O0.5 → O1.5 (closed form, n=5); +0.356 vs +0.468 (sim, n=15) | **OVER-dispersed** — ratio **2.30**, n=108 pairs |
+> | mechanism | a single λ across the ladder: it cannot reach the tail | too much spread across the ladder: it overshoots the tail |
+> | **low rung** | model **HIGH** (measured +11.5 pp at O0.5) | model **LOW** |
+> | **high rung** | model **LOW** (measured −1.4 pp at O1.5) | model **HIGH** |
+> | `(pModel − open_fair)` sign, low → high rung | **+ → −** | **− → +** |
+>
+> ### The pre-commitment, written before the data
+>
+> | Phase 2 returns | reading |
+> |---|---|
+> | **HRR flips + → −, TB flips − → +** | **BOTH findings confirmed, and the instrument is validated** — a regression that reproduces two opposite signatures on two markets is not producing them by construction. This is the strongest available outcome and it is stronger than either finding alone |
+> | one flips as predicted, the other does not | the flipping one is confirmed; the other is **retracted**. No partial credit, no "directionally consistent" |
+> | **both flip the SAME way** | **the instrument is suspect, not the findings.** Two markets with opposite measured dispersion cannot share a signature. Report it as an instrument failure and do not read either market from it |
+> | neither flips | both retracted. A single-λ model cannot produce a rung-invariant gap, and neither can an over-dispersed one |
+>
+> **Row 3 is the one worth having written down in advance.** Without it, "both markets show the
+> same rung dependence" reads as a *strong confirmation* rather than what it is — evidence that
+> the regression is picking up something common to the board rather than something per-market.
+>
+> **Fixture ratios, for the record:** TB **42 rows vs 391 real (9.3×)**; H+R+RBI **14 vs 304
+> (21.7×)**. Neither can be checked on the fixture. TB has the larger n (108 pairs vs 5/15) and
+> the thinner fixture ratio is HRR's — they are weak in different ways, which is another reason
+> a shared instrument reading them oppositely is worth more than either alone.
+
 ## Why this market is suspended above O0.5
 Graded ledger, 2026-07-17 → 07-22: H+R+RBI legs hit **46.3% vs 59.2% implied** overall,
 and **32% on O1.5+ alternate lines** specifically. Reliability slope (nightly calibration,

@@ -467,7 +467,16 @@ wrongly reclassified it A STRUCTURAL off the morning file).
 Write-path audit: `data/ump_k.json` is an accumulator with two idempotence guards (**safe**);
 `data/pen_quality.json` merges per day but **replaces same-day** (bounded, recorded, unfixed).
 
-## ⚠️ EVERY CRON IS LATE, AND HOURLY ONES ARE DROPPED
+## ⚠️ EVERY CRON IS LATE, AND HOURLY ONES ARE DROPPED — enforced by test
+Every scheduled workflow carries a `# TIMING: SENSITIVE|INSENSITIVE` marker;
+`tests/workflow-timing.test.ts` fails the build if one is missing, if a SENSITIVE workflow names
+no guard, or if the named guard no longer exists in the file it claims. **A new scheduled
+workflow fails until classified** — the fifteen-day miss happened because nobody was asked.
+SENSITIVE: `props-history` (`_snapshot_kind`), `context` (`merge_prior`), `board-archive`
+(`WINDOW_DAYS`). INSENSITIVE with stated reasons: `line-history`, `model`, `hr-overround`,
+`ufc`. When adding a guard symbol to the registry, **include the trailing `(` or `= `** — without
+it a rename still substring-matches and the check silently passes (found by testing the test).
+
 Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not
 one:** low-frequency schedules (2/day — `context`, `props-history`) fire **every tick** but
 **+3.1–3.9 h** on the daytime cron and **+7.8–10.0 h** on the late one; the **hourly**

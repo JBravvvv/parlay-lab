@@ -1068,3 +1068,28 @@ rung-dependence test, not the archive.
 **And the clamp audit's own exposure is now nameable:** L2258 (`pitcher_outs`) fires **6 times**
 on the fixture against 42 real outs rows. Its 95% Wilson interval is [0.61, 1.00]. That site,
 not the propBoard counts, is what the archive series has to clear.
+
+## READING ONE ARTIFACT IS NOT READING THE SERIES — and never attribute to arithmetic what was a write
+
+Same class as *a filter chain must be RUN, not reconstructed*, on a different surface.
+
+**What happened (2026-07-27).** `context.json` was read once, showed `hpUmp: null` on 0 of 12
+games, and the conclusion drawn was **"`shUmpKf` is unreachable by arithmetic"** — category A,
+STRUCTURAL. Git history of the same file showed every evening commit carrying 11–15 of 15
+umpires resolved, and every following morning commit carrying 0/N. The input existed. **The
+write path was destroying it daily**, and the file that was read was the wreckage.
+
+Two errors, and the second is the expensive one:
+
+1. **A file is one sample of a series.** Anything a scheduled job rewrites has a history, and
+   `git log -- <path>` is the population. Reading the current version and generalising is the
+   same mistake as reading `categories` and generalising to the board — a selected sample, with
+   the selection being *whichever run wrote last*.
+2. **"Unreachable by arithmetic" is a terminal claim.** It says no schedule change, no
+   configuration, nothing but a code change can fix this — so it CLOSES the thread. A write-path
+   defect is fixed by a merge and a cron. Mis-categorising the second as the first would have
+   retired a working factor.
+
+**The rule: before calling an input missing, check whether it was ever present.** For any file a
+job rewrites, that is one command. And reserve *structural* for a claim you can derive — an
+arithmetic bound like `0.140/oo` never reaching 1.12 — never for one observed value.
