@@ -132,16 +132,35 @@ describe("clamp degeneracy — a clamp pinned at a bound is a constant, not a si
                   states. Still carries information, but far less than it appears to.
        Reported together because a single "% pinned" column would merge them. */
     const flagged = rows.filter((r) => Math.max(r.pLo, r.pHi) >= PIN_FLAG);
+    /* HOW MANY CALLS IS THAT PERCENTAGE OVER? (2026-07-27)
+       `PIN_FLAG` was applied to a point estimate with no minimum n, and the fixture's
+       per-site counts are thin: 12 of 25 sites fire <=30 times, 6 fire <=10, and the ONE
+       flagged site — L2258, the pitcher_outs offset — fires exactly SIX times. Six-for-six
+       is a 95% Wilson interval of [0.61, 1.00]: the fixture cannot separate "always pinned"
+       from "pinned 61% of the time". The finding stands on the LIVE-BOARD case strings
+       (35 of 35 rows), not on this; the fixture only agrees with it.
+       Reported, not enforced — a minimum-n rule here would unflag the positive control and
+       the flag is not what is uncertain, the PRECISION is. Same rule as Phase 2's
+       MIN_RUNG_N and GAP_BUCKET_MIN_N: below the bar, print the count, not a settled number. */
+    const MIN_N = 30;
+    const wilsonLo = (k: number, n: number, z = 1.96) => {
+      if (!n) return 0;
+      const p = k / n, d = 1 + (z * z) / n;
+      return Math.max(0, ((p + (z * z) / (2 * n)) - z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d);
+    };
     const table = rows.map((r) => {
       const tot = r.pLo + r.pHi;
+      const lo95 = wilsonLo(Math.round(tot * r.n), r.n);
       const cls =
         Math.max(r.pLo, r.pHi) >= PIN_FLAG ? "   <-- OFFSET, pinned at one bound"
         : tot >= 0.6 && Math.min(r.pLo, r.pHi) > 0.05 ? "   <-- saturated (both bounds)"
         : "";
+      const power = r.n < MIN_N ? `  [UNDERPOWERED n<${MIN_N}]` : "";
       return (
         `L${r.line.padEnd(5)} ${r.bounds.padEnd(16)} n=${String(r.n).padStart(6)}  ` +
         `low ${(100 * r.pLo).toFixed(0).padStart(3)}%  high ${(100 * r.pHi).toFixed(0).padStart(3)}%  ` +
-        `in ${(100 * r.pMid).toFixed(0).padStart(3)}%  pinned ${(100 * tot).toFixed(0).padStart(3)}%${cls}`
+        `in ${(100 * r.pMid).toFixed(0).padStart(3)}%  pinned ${(100 * tot).toFixed(0).padStart(3)}% ` +
+        `(95% lo ${(100 * lo95).toFixed(0).padStart(3)}%)${cls}${power}`
       );
     });
     /* A site that never EXECUTES is the other half of the finding: the static call sites

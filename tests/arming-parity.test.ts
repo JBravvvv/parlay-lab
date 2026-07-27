@@ -153,6 +153,71 @@ describe("arming call sites (structural, not value-based)", () => {
   it("the cron stamps provenance on what it logs", () => {
     expect(src(GEN)).toMatch(/boardToPredictions\(data,\s*\{\s*src:\s*"cron"/);
   });
+
+  /* 2026-07-27 — THE WEIGHTS CHANNEL READS THE 45-DAY WINDOW. ASSERTED, NOT COMMENTED.
+     `summary.full` (every eligible date, never sliding) now ships beside `summary` (the
+     last SUMMARY_DAYS=45 logged dates). The 45-day one is the frozen input to the blend
+     weights; the full one is the freeze-exit reading. If any armer ever picks up `.full`
+     that is a SILENT WIDENING of a frozen parameter's input — the weights would move
+     because the sample grew, with no parameter changed and nothing for a drift check to
+     see. Cheapest possible guard, so it exists. */
+  it("no arming path touches summary.full", () => {
+    for (const f of [GEN, CAL, "src/engine2/calibration.ts", "src/lib/engine-client.ts", "src/lib/gate-rebuild.ts"]) {
+      for (const line of src(f).split("\n")) {
+        if (!/\.full\b/.test(line)) continue;
+        const isComment = /^\s*(\*|\/\/|\/\*)/.test(line);
+        const isTheWriter = /summary\.full = full|full\?: Omit</.test(line);
+        expect(isComment || isTheWriter, `${f} READS summary.full: ${line.trim()}`).toBe(true);
+      }
+    }
+  });
+
+  it("only /api/calibrate builds the full window, and it never feeds the adjuster", () => {
+    const CALIBRATE = src("app/api/calibrate/route.ts");
+    expect(CALIBRATE).toMatch(/applyWeeklyAdjustment\(summary, weights, now\)/);
+    expect(CALIBRATE).not.toMatch(/applyWeeklyAdjustment\(full/);
+    expect(CALIBRATE).not.toMatch(/effectiveCalibration\(.*full/);
+    // ...and the object handed to the adjuster is the one built from `graded`, not `gradedAll`
+    expect(CALIBRATE).toMatch(/const summary = computeCalibration\(graded\)/);
+    expect(CALIBRATE).toMatch(/const full = computeCalibration\(gradedAll\)/);
+  });
+});
+
+/* The structural tests above cannot see a consumer that reaches `.full` through a
+   variable. These do: the two windows are given DIFFERENT numbers, and every armed
+   value must come from the 45-day one. */
+describe("the two windows are separable, and arming takes the narrow one", () => {
+  const narrow = summary();
+  const wide = {
+    ...summary(),
+    reliability: {
+      all: rel(9999, 0.5, 0.05),
+      batter_hits: rel(9999, 0.2, 0.02), // far more shrink than the narrow window asks for
+      batter_home_runs: rel(9999, 0.3, 0.02),
+    },
+    globalShrink: { s: 0.10, n: 9999, slopeBefore: 3, slopeAfter: 1 },
+  } as CalibrationSummary;
+  const split = { ...narrow, full: wide } as CalibrationSummary;
+
+  it("mults come from the 45-day window even when .full disagrees", () => {
+    const a = effectiveCalibration(narrow, weights({}), "on");
+    const b = effectiveCalibration(split, weights({}), "on");
+    expect(b.mults).toEqual(a.mults);
+    expect(b.mults.batter_hits).not.toBe(effectiveCalibration(wide, weights({}), "on").mults.batter_hits);
+  });
+
+  it("calG comes from the 45-day window", () => {
+    expect(effectiveCalibration(split, weights({}), "on").globalS).toBe(0.85);
+    expect(effectiveCalibration(split, weights({}), "on").globalS).not.toBe(0.1);
+  });
+
+  it("mktN — the consensus gate's input — comes from the 45-day window", () => {
+    // this is the one that would silently PASS markets: a wider window inflates n,
+    // and n over consMinN is what stops the small-sample consensus gate applying
+    const m = effectiveCalibration(split, weights({}), "on").mktN!;
+    expect(m.batter_hits).toBe(400);
+    expect(m.batter_hits).not.toBe(9999);
+  });
 });
 
 /* Phase 0.6: line + suspension capture. Neither threshold in the freeze docs is

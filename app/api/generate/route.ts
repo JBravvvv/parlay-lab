@@ -124,29 +124,23 @@ export async function GET(req: NextRequest) {
     if (!force && now - lastRun < 45 * 60_000) {
       return NextResponse.json({ ok: true, skipped: "ran recently" });
     }
-    /* (b) PER-DATE RUN CAP — the real protection. The secret stops a stranger; this
-       stops a LEAK from draining the month: each run costs ~120 Odds credits, so a
-       hard ceiling of MAX_RUNS_PER_DATE bounds the damage at ~480 no matter how hard
-       the endpoint is hit. Counted BEFORE the work, incremented for every authorized
-       caller (scheduled and manual alike), expires with the date. */
     /* PACIFIC, not server-local. On a UTC host every run after 00:00 UTC used to key
        the run cap, the stored board and the prediction rows to TOMORROW — so a Pacific
        client asking /api/board for today got a miss and paid to generate its own. */
     const dateNow = ptToday();
     const runsKey = `${K_RUNS}${dateNow}`;
-    const runs = Number(await redis(["INCR", runsKey])) || 0;
-    if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
-    if (runs > MAX_RUNS_PER_DATE) {
-      console.warn(`[generate] run cap hit: ${runs} attempts on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
-      return NextResponse.json(
-        { error: "run cap reached for this date", runs, cap: MAX_RUNS_PER_DATE },
-        { status: 429 },
-      );
-    }
     /* CONDITIONAL SKIP: a good board for this date already exists, so don't buy a
        second one. Coverage is measured over games that have NOT started — a morning
        board can read high coverage with all of it already underway. Manual callers
-       with ?force=1 bypass this; the cron never does. */
+       with ?force=1 bypass this; the cron never does.
+
+       THIS NOW RUNS BEFORE THE RUN CAP (2026-07-27). It used to run after, so a skipped
+       fire spent budget it had not spent a credit of. With four scheduler entries live
+       that was already wrong today, with no redundancy needed to trigger it: a day with
+       two skips — a dead slate and a covered slate — plus one manual regenerate leaves
+       the third legitimate fire hitting 429 and no board getting built. A cap named for
+       spend must count spend. Everything below this point is free: `slateStarts` is
+       keyless statsapi and the stored-board read is Redis. */
     if (!force) {
       const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
       /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
@@ -164,6 +158,28 @@ export async function GET(req: NextRequest) {
           pct: cov.pct,
         });
       }
+    }
+
+    /* (b) PER-DATE RUN CAP — the real protection. The secret stops a stranger; this
+       stops a LEAK from draining the month: each run costs ~120 Odds credits, so a
+       hard ceiling of MAX_RUNS_PER_DATE bounds the damage at ~480 no matter how hard
+       the endpoint is hit. Expires with the date.
+
+       COUNTED HERE, AT THE POINT OF COMMITMENT — past every free exit, immediately
+       before the work that spends. Not *after* `collectSlate()`, which is the reading
+       "count spend" invites: `collectSlate()` fetches for ~15 games × 6 markets against
+       a 60 s `maxDuration`, so a timeout or an upstream 5xx spends the credits and
+       throws. Incrementing afterwards would count zero for every such run and leave the
+       ceiling unbounded exactly when it is needed. `K_LASTGEN` (the 45-minute limiter)
+       is set on the same line for the same reason — both are pessimistic on purpose. */
+    const runs = Number(await redis(["INCR", runsKey])) || 0;
+    if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
+    if (runs > MAX_RUNS_PER_DATE) {
+      console.warn(`[generate] run cap hit: ${runs} spending runs on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
+      return NextResponse.json(
+        { error: "run cap reached for this date", runs, cap: MAX_RUNS_PER_DATE },
+        { status: 429 },
+      );
     }
     await redis(["SET", K_LASTGEN, String(now)]);
 

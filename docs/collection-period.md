@@ -333,6 +333,35 @@ deliberately kept, still stored and still graded — and the training set, shoul
 lengthen. A constant that filters zero rows in September is doing its job, not
 loitering. Deleting it re-admits a two-policy sample the moment anything widens.
 
+#### ⚠️ …AND THE CONSEQUENCE THAT PARAGRAPH STOPPED ONE INFERENCE SHORT OF (2026-07-27)
+
+"`CAL_START` goes inert around 2026-09-08" is correct and was written six weeks early. What
+was never carried forward: **if the window start passes `CAL_START`, the summary stops
+covering the beginning of the collection period.** At freeze exit it would read
+**2026-08-09 → 09-22** — three quarters of the sample, presented as the freeze, with nothing
+in the payload saying so. Recording a mechanism is not auditing it.
+
+**Fixed by splitting the consumers, not by widening a frozen input.** `summary` keeps the
+45-date window and still trains the blend weights (byte-identical, asserted in
+`tests/arming-parity.test.ts`); **`summary.full`** covers every eligible date, never slides,
+and is what the exit reading uses. Both stamp `.window`.
+
+<!-- SYNCED-WINDOW: parsed by tests/calibration-window.test.ts and checked against
+     SUMMARY_DAYS in app/api/calibrate/route.ts. Change the constant and this table must be
+     recomputed in the same commit — the build breaks otherwise. Do not hand-edit one side. -->
+
+| `SUMMARY_DAYS` | first caps | window start at freeze exit | logged dates dropped |
+|---|---|---|---|
+| 45 | 2026-09-08 | 2026-08-09 | 15 |
+
+`allDays` counts **logged dates, not calendar days**, so a missed slate pushes "first caps"
+later in calendar terms while the window still holds exactly `SUMMARY_DAYS` entries. The date
+above is the earliest it can bite, not a fixed one.
+
+**This is encoded rather than cautioned because a cautioned invariant is the failure mode
+this project has now hit five times** — a warning in prose, sitting one function or one
+paragraph away from the thing that ignored it.
+
 ### ⚠️ DO NOT "PASS UNGATED" TO PAD A THIN CARD (2026-07-25)
 
 Measured: the "de-vigged multi-book consensus" behind a prop row is often thin, and on some

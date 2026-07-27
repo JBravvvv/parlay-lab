@@ -28,7 +28,10 @@ exists") would make every one of them a no-op. There must be no window with both
 | 4 | **Sunday** | `30 22 * * 0` | the national night game (23:20 UTC / 19:20 ET) is 5 h 45 m after the bulk, and no single Sunday hour serves both. On 2026-07-26 that one game carried **11 of the 17** closed-form H+R+RBI rows — **65% of the ladder-defect exposure** |
 
 **Two Sunday fires stay inside the per-date cap** (`MAX_RUNS_PER_DATE = 3`,
-`app/api/generate/route.ts`), leaving one spare for a manual regenerate.
+`app/api/generate/route.ts`), leaving one spare for a manual regenerate — **and since
+2026-07-27 the cap counts SPENDING runs, not requests**, so a fire that the conditional skip
+turns away costs nothing and leaves the margin intact. Before that fix a Sunday with two skips
+plus a manual regenerate would have refused the third real fire with a 429.
 
 ## The hours, checked against a 50-day schedule sample (2026-06-05 → 07-26, 664 games)
 
@@ -113,33 +116,52 @@ redundant fire that adds nothing returns from the conditional skip *before* any 
 `slateStarts()` is keyless statsapi, the stored-board read is Redis, and `eng.collectSlate()`
 — the ~120-credit part — is downstream of the skip. A no-op fire costs one statsapi request.
 
-**⚠️ One blocker must be fixed first, and it is three lines.** `MAX_RUNS_PER_DATE` counts
-*requests*, not *generations*:
+**✅ The blocker is fixed (2026-07-27), and it was a correctness bug on its own.** The run cap
+used to `INCR` *before* the conditional skip, so a skipped fire spent budget it had not spent a
+credit of — wrong today, with no redundancy needed to trigger it. A day with two skips (a dead
+slate and a covered slate) plus one manual regenerate left **the third legitimate fire hitting
+429 and no board getting built**, and with four entries live a normal Sunday already sat at 3
+of 3. A cap named for spend must count spend.
 
-```ts
-const runs = Number(await redis(["INCR", runsKey])) || 0;   // line ~137
-if (runs > MAX_RUNS_PER_DATE) return 429;
-...
-if (cov.skip) return { skipped: cov.reason };               // line ~160 — AFTER the INCR
-```
+The skip now runs first; the `INCR` sits immediately below it.
 
-So a skipped fire spends budget. Under the redundancy plan a Sunday would fire six times
-against a cap of three, and **the 4th would 429 even if the first three all skipped** — the
-punctual fire could be refused because three late no-ops preceded it. Redundancy is not merely
-ineffective until this is fixed, it is *harmful*.
+> **Placement note — immediately BEFORE `collectSlate()`, not after it.** "Count the spend"
+> invites moving it past the work, and that is wrong in the other direction: `collectSlate()`
+> fetches ~15 games × 6 markets against a 60 s `maxDuration`, so a timeout or an upstream 5xx
+> **spends the credits and throws**. Incrementing afterwards would count zero for every such
+> run and leave the ceiling unbounded exactly when it is needed. Counting at the point of
+> commitment is pessimistic on purpose, and `K_LASTGEN` (the 45-minute limiter) is set on the
+> same line for the same reason.
 
-Fix: move the `INCR` below the skip block so the cap counts work done. The credit bound the cap
-exists for is preserved — every counted run is a run that reaches `collectSlate()` — and the
-45-minute `K_LASTGEN` limiter, which is already set only after the skip, is on the same basis.
-Cheap to write, but it is a live behaviour change to a gated endpoint, so it ships with the
-08-02 decision rather than ahead of it.
+With that in, redundancy is a clean separate decision at 08-02.
+
+### The 08-02 redundancy question, specified
+
+Not "should we add fires" but: **what does a 2×-redundant fire buy against the delay
+distribution we will actually have measured by then?**
+
+By 08-02 there are ~7 days of `gen.at` stamps against four configured entries. That gives an
+empirical delay CDF, `F`. For a slot at hour *h* with a usable window *W* (the interval where a
+pass still prices a materially better board — from the schedule sweep, roughly the 90 minutes
+before the day's bulk first pitch):
+
+* **1 fire** lands in-window with probability `F(W)`;
+* **2 fires** at *h* and *h+Δ* land at least once with `1 − (1 − F(W))(1 − F(W − Δ))` **only if
+  the delays are independent**. They are almost certainly *not* — a queue backlog delays every
+  job in it — so the honest estimate uses the observed **joint** behaviour of the four entries
+  on the same day, not a product of marginals.
+
+That correlation is the whole question, it is measurable from the same 7 days, and it decides
+the answer: **redundancy buys nearly nothing against a common-mode queue and a great deal
+against independent jitter.** Report the marginal gain in P(in-window) per added fire, and the
+cost in redundant no-op fires against the 100/day cron-job.org free tier.
 
 | if 08-02 shows | do |
 |---|---|
 | median ≈ 0, tight | move Sunday to `30 17 * * 0`. Nothing else changes |
 | median large, tight | shift **every** entry earlier by the observed median |
-| **median ≈ 0, fat tail** | **fix the run cap to count generations, then triple every entry at +20/+40 min.** Do **not** shift the hours — a shift moves the median onto the wrong side and the tail still misses |
-| large median **and** fat tail | both: shift by the median first, then triple |
+| **median ≈ 0, fat tail** | run the redundancy calculation above on the observed joint delays. Add fires only if the measured marginal gain justifies them. Do **not** shift the hours — a shift moves the median onto the wrong side and the tail still misses |
+| large median **and** fat tail | shift by the median first, then re-run the redundancy calculation on the residual |
 
 ## What the Sunday 22:30 entry actually buys — and what it costs
 

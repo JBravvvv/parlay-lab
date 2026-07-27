@@ -45,7 +45,25 @@ const K_AUTO = "pl:cal:auto";
 const K_LASTRUN = "pl:cal:lastRun";
 
 const GRADE_DAYS = 6; // grade the most recent N days per run
-const SUMMARY_DAYS = 45; // rolling window feeding the calibration summary
+/** Rolling window feeding the calibration summary — the input to the blend weights.
+ *
+ *  ⚠️ CHANGING THIS NUMBER IS DATED, NOT FREE. It is a READ window (nothing is pruned —
+ *  see tests/calibration-window.test.ts), but it SLIDES, and the collection period is 60
+ *  logged dates: CAL_START 2026-07-25 -> freeze exit ~2026-09-22 against a 45-date window.
+ *
+ *    * from 2026-09-08 the window stops reaching CAL_START;
+ *    * at freeze exit it would read 2026-08-09 -> 09-22, dropping the first 15 dates.
+ *
+ *  If it is ever raised it must land BEFORE 2026-09-08 — raising it at freeze exit moves
+ *  the blend weights on the same day the exit reading is taken, which is the one day the
+ *  two must not move together.
+ *
+ *  The freeze-exit reading does NOT depend on this: `summary.full` covers every eligible
+ *  date and never slides. Widen this only to change the MODEL, never to fix a report.
+ *
+ *  docs/collection-period.md carries a SYNCED-WINDOW table that this constant is checked
+ *  against; change one and the test demands the other in the same commit. */
+const SUMMARY_DAYS = 45;
 const MAX_BOX_FETCHES = 14;
 
 function authed(req: NextRequest): boolean {

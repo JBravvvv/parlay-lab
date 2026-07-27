@@ -91,6 +91,51 @@ describe("the calibration window declares itself, and the exit reading is not th
     expect(ROUTE).toContain("gradedAll.push(pick);");
   });
 
+  /**
+   * THE CONSTANT AND THE DOC MOVE TOGETHER, OR THE BUILD BREAKS.
+   *
+   * "If SUMMARY_DAYS is ever raised it must land before 2026-09-08" was a caution in prose,
+   * which is the exact failure mode this project has now hit five times. So the dates are
+   * DERIVED from the constant and checked against the SYNCED-WINDOW table in
+   * docs/collection-period.md: change 45 to anything else and this test fails until the
+   * table is recomputed — which forces whoever changes it to look at the cap date.
+   *
+   * Same shape as tests/lid-coupling.test.ts: the invariant breaks the build, it does not
+   * sit beside the code hoping to be read.
+   */
+  it("SYNCED-WINDOW: the doc's table is derived from the code constant", () => {
+    const doc = fs.readFileSync(path.join(__dirname, "..", "docs", "collection-period.md"), "utf8");
+    const marker = doc.indexOf("SYNCED-WINDOW");
+    expect(marker, "the SYNCED-WINDOW block is gone from docs/collection-period.md").toBeGreaterThan(0);
+
+    const row = /\|\s*(\d+)\s*\|\s*(\d{4}-\d{2}-\d{2}|never)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*(\d+)\s*\|/.exec(
+      doc.slice(marker),
+    );
+    expect(row, "the SYNCED-WINDOW table row is missing or malformed").not.toBeNull();
+    const [, docDays, docCaps, docStart, docDropped] = row!;
+
+    // every figure recomputed from the constant — clamped, so the table stays checkable
+    // if the window is ever widened past the whole collection period
+    const logged = dayNum(FREEZE_END) - dayNum(CAL_START) + 1;
+    const caps = addDays(CAL_START, SUMMARY_DAYS);
+    const start = SUMMARY_DAYS >= logged ? CAL_START : addDays(FREEZE_END, -(SUMMARY_DAYS - 1));
+    const dropped = Math.max(0, dayNum(start) - dayNum(CAL_START));
+
+    expect(Number(docDays), "SYNCED-WINDOW: SUMMARY_DAYS in the doc != the code").toBe(SUMMARY_DAYS);
+    expect(docCaps, "SYNCED-WINDOW: recompute the first-caps date").toBe(caps);
+    expect(docStart, "SYNCED-WINDOW: recompute the freeze-exit window start").toBe(start);
+    expect(Number(docDropped), "SYNCED-WINDOW: recompute the dropped-dates count").toBe(dropped);
+  });
+
+  it("the constant carries the date and the reason at its declaration", () => {
+    // a test can only fire when it is run; the comment is what the next person editing
+    // the line actually sees. Both, not either.
+    const decl = ROUTE.slice(0, ROUTE.indexOf("const SUMMARY_DAYS"));
+    expect(decl).toContain("2026-09-08");
+    expect(decl).toContain("BEFORE 2026-09-08");
+    expect(decl).toContain("SYNCED-WINDOW");
+  });
+
   it("the reading channel is unwindowed by construction, not by a bigger number", () => {
     // `limit: null` is the claim "no window", and it must not be a larger constant that
     // would itself expire — the failure mode this whole test file exists to prevent

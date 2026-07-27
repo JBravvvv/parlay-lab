@@ -723,3 +723,109 @@ and the moment a second (the fixture stage-decomposition, `tests/hrr-compression
 1.62× *wider*) and a third (the uncapped population, 1.78× wider) were applied, it did not
 survive. **Convergence is only evidence when the instruments could have disagreed** — which
 is exactly why the retraction matters as much as the confirmation.
+
+## RECORDING A MECHANISM IS NOT AUDITING IT
+
+**A written-down mechanism discharges nothing.** It is a hypothesis that has been typed. The
+audit is the separate act of asking *what follows from it*, and it has to be performed, not
+implied by the fact that someone once understood the thing.
+
+`docs/collection-period.md` recorded "`CAL_START` goes inert around 2026-09-08" — correct,
+six weeks early, and one inference short of "…therefore the freeze-exit reading starts on
+2026-08-09 and drops the first fifteen days of the period the freeze exists to collect."
+`src/lib/board-coverage.ts` carried a header warning about denominator confusion, and the
+third instance of exactly that confusion was **one function below the warning**.
+
+The failure is not ignorance; in both cases the mechanism was in the file. It is that
+*writing it down feels like handling it*. So:
+
+* a mechanism worth recording is worth **enumerating the consequences of, in the same sitting**;
+* a caution worth writing in prose is worth **encoding as a test** — prose does not run;
+* and "we already know about that" is the sentence to distrust most, because it is exactly
+  what a recorded-but-unaudited mechanism sounds like from the inside.
+
+## 📅 PRE-COMMITTED: the fixture-representativeness reading, 2026-08-14
+
+Written **before** the data. The archive series (`data/boards/` on `line-history`) reaches 20
+boards on 2026-08-14 at the earliest, and that is the first opportunity to ask whether the
+frozen fixture is representative. Both branches are fixed now so the answer cannot be chosen
+after the fact — same construction as leaving `pitcher_outs` broken as Phase 2's positive
+control.
+
+### First, a correction to the framing: these are single-instrument in TWO different ways
+
+| audit | population today | what 20 boards actually gives it |
+|---|---|---|
+| `tests/clamp-activity.test.ts` | **one frozen armed fixture slate** | **a genuinely different instrument** — real slates, real pitchers, real lineups. This is the independent re-check the rule demands |
+| `tests/shrink-activity.test.ts` | the same fixture | same |
+| `tools/range_compression.py` | **one live board** (`propBoard`, 2026-07-26) | **sample size, not independence.** It is the same instrument run 20 times |
+
+That distinction is load-bearing and it was blurred in the framing that opened this. Twenty
+boards **does not** satisfy "the re-check comes from a different instrument" for the range
+detector — it makes an n=1 point into a distribution, which is worth having and is a different
+claim. The detector's independent check remains `--truncation-check` plus the
+fixture-stage-decomposition (`tests/hrr-compression.test.ts`), both of which have already been
+applied and already killed one finding.
+
+### Second, a finding from today that changes what the fixture can support
+
+"25 of 30 clamp sites execute" understates how thin it is. Per-site call counts on the fixture:
+
+| | |
+|---|---|
+| sites executing | 25 of 30 |
+| **firing fewer than 30 times** | **11 of 25** |
+| firing 10 times or fewer | 6 |
+| median calls per site | 161 |
+| **L2258 — the one flagged site, the `pitcher_outs` offset** | **6 calls**, 6 of 6 pinned low, **95% Wilson [0.61, 1.00]** |
+
+So the fixture cannot separate "L2258 is always pinned" from "L2258 is pinned 61% of the
+time." **The finding does not rest on that** — it rests on the live board's `case` strings, 35
+of 35 rows with a lineup read, plus the closed-form arithmetic that `0.140/oo` cannot reach the
+1.12 cap for any real `oo`. The fixture only *agrees*. `PIN_FLAG = 0.8` is applied to a point
+estimate with no minimum n, which is the same gap `MIN_RUNG_N` and `GAP_BUCKET_MIN_N` exist to
+close elsewhere. Now reported with its Wilson lower bound and an `[UNDERPOWERED n<30]` label —
+reported, deliberately not enforced, because a minimum-n rule would unflag the positive control
+and the flag is not what is uncertain, the **precision** is.
+
+### The comparison, specified
+
+Pool all clamp calls across the 20 archived boards, per site. Then per site:
+
+* **disagrees** if the archive's pinned fraction falls **outside the fixture's 95% Wilson
+  interval** *and* differs by **more than 10 pp**. Two conditions, because a 792-call site has
+  a ±3 pp interval that a trivial difference would escape;
+* **disagrees regardless** if the class changes — healthy ↔ SATURATED (both bounds) ↔ OFFSET
+  (one bound);
+* **no statistic** if the archive pools fewer than 30 calls at that site: print the count.
+
+### The three branches — all three are real outcomes
+
+| result | reading | what follows |
+|---|---|---|
+| **≤ 2 of 25 disagree**, and L2258 stays OFFSET at ≥ 0.90 | **FIXTURE VALIDATED** | The frozen table's clamp and shrink numbers are promoted from single-instrument to confirmed. Future audits may use the fixture without the caveat — worth knowing on its own, and the cheap outcome |
+| **≥ 5 of 25 disagree**, or L2258 changes class | **FIXTURE UNREPRESENTATIVE** | Every fixture-derived finding becomes provisional and three get re-run on the archive: the `pitcher_outs` clamp count, the H+R+RBI clamp-protection table (@1.15 / @1.40 / unclamped), and the `shShrink` k table — whose "typical n" column is *itself* a fixture quantity, so all nine own-sample weights (0.349 … 0.722) move with it |
+| **3–4 disagree** | **AMBIGUOUS — and that is a result** | Report site by site, no global verdict. Pre-committed because the pull will be to round it into one of the other two |
+
+### The five cold sites are their own pre-committed test, with three different meanings
+
+| site | if it FIRES on a real board |
+|---|---|
+| **L1605 `shUmpKf`**, **L1696 `shPenQF`** | **a FREEZE BREACH.** Both are pinned off by `umpKFrozen` / `penQFrozen`. This outranks the representativeness question entirely and is reported first |
+| **L1617 `shTempF`** | **confirms** the harness-limitation diagnosis — the fixture carries no `g.weather.temp`. A known deficiency, correctly classified, and a positive result for the classification |
+| **L2175** (ML closed form), **L2402** (live sim) | says something about **arming and live coverage**, not about the fixture. L2175 firing means a game had no sim; L2402 firing means a board was built mid-game |
+
+If all five stay cold across 20 real boards, the classifications made from reasoning are
+confirmed by measurement — which is the whole point of running this.
+
+### And for the range detector, over the same 20 boards
+
+| pre-committed | threshold |
+|---|---|
+| `pitcher_outs` compression **CONFIRMED** | 20-board median ratio ≤ **0.70** and the p10–p90 band excludes 1.0 |
+| **RETRACTED** as a board-specific artifact | median > **0.85**, or the distribution straddles 1.0 |
+| the "**only** market below 1.0" claim | retracts if any second market's median falls below 1.0. Fixture-free baselines from 2026-07-26: outs 0.50, hits 1.32, HR 1.35, K's 1.72, HRR 1.78 |
+
+**Either way the SIGN result survives**, and that must not be conflated: λ_model − λ_market was
+negative on **38 of 38** rows, measured on a different population by a different method. A
+range finding and a bias finding can fail independently.

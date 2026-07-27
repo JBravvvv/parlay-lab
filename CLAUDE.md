@@ -372,6 +372,14 @@ every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_D
 a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
 `tests/calibration-window.test.ts` pins all of it.
 
+**`/api/generate` gate order** (fixed 2026-07-27): `ptToday` → **conditional skip** →
+`INCR` run cap → `K_LASTGEN` → arm → `collectSlate()`. The cap used to `INCR` *before* the
+skip, so a skipped fire spent budget it spent no credits on and a day with two skips plus a
+manual regenerate 429'd the third real fire. The `INCR` sits immediately **before**
+`collectSlate()`, never after — `collectSlate()` can spend credits and then throw (60 s
+`maxDuration`, ~15 games × 6 markets), so counting afterwards would leave the ceiling unbounded
+exactly when it is needed. Both counters are pessimistic on purpose.
+
 **Board archive** (`tools/archive_boards.py` + `.github/workflows/board-archive.yml`, built
 2026-07-27) → `data/boards/YYYY-MM-DD.{best,latest}.json.gz` + `index.json` on `line-history`.
 Runs `0 12` / `0 19` UTC targeting PT **yesterday and the two days before** — the 3-date window
