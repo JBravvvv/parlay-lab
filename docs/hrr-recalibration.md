@@ -812,3 +812,45 @@ that also reaches `batter_hits` (which the external check says must stay closed-
 `pitcher_strikeouts` (which the sim cannot price at all) and every game the sim misses. The
 "residual after 1 and 2" label was right for the wrong reason: it is a residual because the other
 two are partial, not because it is small.
+
+### ⚠️ TB'S COLLAPSE VOIDS THE OPPOSITE-SIGNATURE ARM — Phase 2 no longer validates itself
+
+The five-branch table's value came from **two markets predicting opposite signatures**, which made
+Phase 2 a test of the instrument as well as of the findings. **If M8 explains TB's 2.30
+over-dispersion, that arm is gone**: an artifact of one rung sharing a probability with the next
+is not a model dispersion property, and it predicts nothing about closing movement.
+
+| | before | after M8 |
+|---|---|---|
+| HRR arm | + → − (single λ, cannot reach the tail) | **unchanged** |
+| **TB arm** | **− → +** (over-dispersed, ratio 2.30) | ⚠️ **VOIDED pending the re-run** |
+| what the pair bought | a regression reproducing two *opposite* signatures is not producing them by construction | **gone** |
+
+**Stated plainly: with the TB arm gone, HRR's rung test is a SINGLE-ARM result again**, and
+branches 3 and 4 of the five-branch table — the two that distinguish an instrument failure from a
+world result — **are unreachable, because both require two markets.**
+
+## What replaces it — three candidates, none free
+
+| candidate | opposite signature? | cost |
+|---|---|---|
+| **TB after the M8 fix** | **unknown** — re-run the ladder test post-fix. If a genuine over-dispersion survives, the arm comes back intact | one re-run, but **the fix is frozen** — so not before exit |
+| `batter_hits` | **no** — the +0.3 pp production reading shows no rung structure to predict | — |
+| **`pitcher_outs`** | **yes, plausibly** — the 0.140 defect pins the factor at the clamp floor on 35/35 rows, and its λ under-varies. Predicted **+ → −**, the same direction as HRR | **not opposite**, so it doubles the HRR arm rather than balancing it |
+
+> **None of the three gives an opposite arm before freeze exit.** The honest position is that
+> **Phase 2 tests the findings but no longer tests itself**, and the five-branch table drops to
+> three reachable branches:
+>
+> | # | branch | status |
+> |---|---|---|
+> | 1 | HRR flips + → − | ✅ confirms the ladder finding |
+> | ~~2~~ | one flips, one does not | **unreachable — needs two markets** |
+> | ~~3~~ | both flip the same way (instrument suspect) | **unreachable** |
+> | ~~4~~ | both flip opposite to prediction (signs inverted) | **unreachable** |
+> | 5 | HRR does not flip | ✅ retracts it |
+>
+> **Not quietly dropped: recorded as a capability the project HAD and lost to a bug fix.** The
+> instrument-validation branches return the moment a second market with a *predicted, opposite*
+> rung signature exists — and the first place to look is TB after M8, which is a re-run, not a
+> new instrument.

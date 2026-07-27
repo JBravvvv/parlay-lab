@@ -3428,3 +3428,108 @@ reading.** The unselected `propBoard` numbers above are the answer.
 M1's per-row park error of up to 14.5% on HR across every closed-form row. **M8 — the `shTbOver`
 0.5 branch — outranks both**: 150 rows, a definite bug, a one-line fix, and a 24.4 pp
 self-inconsistency.
+
+# THE SELF-CONSISTENCY SUITE — the independent instrument this project kept not having (2026-07-27)
+
+`tools/self_consistency.py` + `tests/self-consistency.test.ts`. **A violation is a proof, not
+evidence** — these are logical identities between two prices the model itself emits, so no
+market, no fixture, no accrual and no assumption that the market is right.
+
+## Results on the real 2026-07-26 board
+
+| constraint | n | **MODEL bad** | med Δ | MARKET bad | med Δ |
+|---|---|---|---|---|---|
+| **TB ≥ 1 == H ≥ 1** | 127 | **118** | **−23.4** | 48 | **−0.5** |
+| H ≥ 1 ≥ HR ≥ 1 | 229 | 0 | +46.9 | 0 | +46.4 |
+| HRR ≥ 1 ≥ H ≥ 1 | 57 | 0 | +10.3 | 0 | +4.7 |
+| HRR ≥ 1 ≥ HR ≥ 1 | 56 | 0 | +54.1 | 0 | +43.8 |
+| HRR ≥ 3 ≥ HR ≥ 1 | 16 | 0 | +24.9 | 0 | +22.5 |
+| TB ≥ 2 ≥ H ≥ 2 | 34 | 0 | +12.6 | 0 | +12.9 |
+| monotone (all 6 markets) | 170 | **0** | — | 0 | — |
+
+**One violation, and it is M8.** The market's 48 "violations" on the identity sit at a **−0.5 pp**
+median — de-vig noise against a 1.0 pp tolerance — against the model's **−23.4**. Everything else
+is clean on both sides, which is what makes the one hit meaningful rather than a detector that
+flags everything.
+
+### The cleanest statement of M8, from `monotone bases` reading exactly +0.0
+
+On **108 players carrying both TB rungs**, the model's `P(TB≥1) − P(TB≥2)` is **+0.0** while the
+market's is **+23.5 pp**. `if(line<2)` catches 0.5 *and* 1.5, so both evaluate `1−(P0+P1·s1)`:
+
+> **`shTbOver` emits ONE NUMBER for TWO DIFFERENT QUESTIONS.**
+
+That fully explains the open **2.30 ladder-drift ratio** — two rungs sharing a probability make
+the inverted λ move absurdly between them. Confirm by re-running the ladder test after the fix.
+
+## The boundary scan — complete, and it found exactly one
+
+Every rung comparison in the pricing path:
+
+| line | comparison | comment says | correct? |
+|---|---|---|---|
+| **L1548** | `if(line<2)` | **"1.5"** | ❌ **also catches 0.5 — M8** |
+| L1549 | `if(line<3)` | "2.5" | ✅ 0.5/1.5 already returned above |
+| L2241 | `row.ln!==0.5` | HR anytime only | ✅ exact equality |
+
+**One mismatch in the whole pricing path, and it is the one found.** The scan is bounded and
+complete rather than a sample.
+
+## ⚠️ Encoding it caught the vacuous-pass rule catching ITSELF
+
+The first version asserted the identity across the fixture's players. It **passed vacuously**:
+**99 players, ZERO carrying both TB O0.5 and hits O0.5.** A loop over an empty intersection
+asserts nothing and reports green — the exact defect the top rule in
+`docs/harness-substitutions.md` describes, reproduced **one turn after writing it**.
+
+Fixed by asserting on the **pure function** instead — `shTbOver` needs no board, no overlap and
+no slate. `tools/self_consistency.py` runs the board-level version where the rows do exist.
+
+**And the test now PINS THE DEFECT, not the fix.** M8 is unfixed under the freeze, so the suite
+asserts current behaviour (`shTbOver(0.5) === shTbOver(1.5)` exactly, gap > 0.15) with the correct
+assertions written beside it, commented. Same treatment `pitcher_outs` gets. **When M8 ships the
+test fails, and that is the point.**
+
+# M7's COMPENSATOR EXISTS BUT CANNOT BE LOCALISED YET — M9, interlocked (2026-07-27)
+
+**The family error is real at the OBSERVED parameters, not just on a grid.** `expAB` recovered
+from 45 hits `case` strings: min 3.5, **median 4.1**, p75 4.2, max 4.5. At λ = 0.958 and n = 4.1
+the Poisson-vs-binomial error is **+4.8 pp** — my grid was right, so "wrong parameters" is
+eliminated.
+
+**Production reads +0.3 pp. So an offsetting term of ≈ +4.5 pp exists.** Expressed as λ: to make
+Poisson emit the binomial answer at n=4.1, λ would have to be **1.092 instead of 0.958 — inflated
+by +13.9%**.
+
+## ⚠️ The obvious measurement is CIRCULAR and does not locate it
+
+Backing λ out of both sides gives model **0.941** vs market **0.958** — model *low* by 1.8%,
+apparently refuting the compensator. **That reading is worthless:** `λ = −ln(1−P)` is a monotone
+transform of `P`, so "model λ minus market λ" is just "model P minus market P" in different
+units. Both were converted through the *same* Poisson. The comparison cannot detect a family
+error by construction.
+
+**Recorded because it looked like a result for several minutes.** It is the same shape as
+reconstructing a filter chain instead of running it.
+
+## What can and cannot be said
+
+| | |
+|---|---|
+| **established** | the family error is +4.8 pp at real parameters; the net error is +0.3 pp; therefore **≈ +4.5 pp of compensation exists somewhere in `λ = rate × expAB × hF`** |
+| **not established** | which term. `rate`'s EB prior, `hF`'s multiplier chain, or `expAB` — the market gives a **probability**, not a mean, so no external estimate of true expected hits exists today |
+| **what would localise it** | **graded outcomes.** The prediction store logs the stated `p` and the result, so realised hits-per-AB is measurable once hits rows accrue. That is the only non-circular reference |
+
+> ### M7 AND M9 ARE AN INTERLOCKED PAIR — they ship together or not at all
+>
+> **Fixing either alone moves 617 rows about five points in the wrong direction.** Fix M7 and the
+> output jumps +4.8 pp with the inflated λ still in place; fix M9 and the output drops ~4.5 pp
+> with Poisson still understating.
+>
+> **And the cancellation is only known to hold over the observed λ and `expAB` range** — λ ≈ 0.96,
+> `expAB` 3.5–4.5. The family error runs +5.7 pp at n=3.5 and +4.3 pp at n=4.5, so the offset is
+> *not* flat in `expAB`; two defects cancelling to within 0.3 pp across that range is either
+> calibration having absorbed it, or luck at the current parameters. Either way it is **fragile in
+> a way one defect would not be.**
+>
+> Marked in `docs/freeze-exit-bundle.md` as **M7+M9, interlocked. Never separately.**

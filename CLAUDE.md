@@ -582,7 +582,27 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. ## 🐛 `shTbOver` PRICES A 0.5 LINE WITH THE 1.5 FORMULA — a definite bug (M8, rank 1)
+for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ THE FIXTURE HAS ALREADY FAILED — relabel now, not on 08-15
+`batter_hits` cf−market reads **−4.3 pp on the fixture** and **+0.3 pp on the real board** — a
+4.6 pp disagreement on the exact quantity M7 was built to explain. Fixture propBoard vs real:
+HR 5.8× · **outs 6.0×** · hits 9.2× · TB 9.3× · K's 14.1× · **HRR 21.7×** thin.
+**PROVISIONAL (fixture-measured):** the sim-vs-closed-form disagreement, **the external check that
+killed M5 and set M4**, the clamp audit, the shrink k audit.
+**NOT provisional (real board):** M8, the ladder finding, the outs audit, the park and factor
+consumer tables, `expAB` median 4.1. **Parity/byte claims are unaffected** — determinism is not
+representativeness. The dividing line is *does the CONCLUSION depend on the fixture resembling
+production*, not *was a fixture involved*.
+
+## ⚠️ PHASE 2 NO LONGER VALIDATES ITSELF
+M8 voids TB's over-dispersion, which was the **opposite-signature arm** that made the rung test a
+test of the instrument. Branches 2–4 of the five-branch table are **unreachable — all three need
+two markets**. Only "HRR flips + → −" (confirms) and "does not flip" (retracts) remain.
+Candidates to restore it: **TB re-run after the M8 fix** (frozen, so post-exit), `batter_hits`
+(no — +0.3 pp, no rung structure), `pitcher_outs` (predicts + → −, the SAME direction as HRR, so
+it doubles the arm rather than balancing it). **Recorded as a capability the project had and lost
+to a bug fix**, not quietly dropped.
+
+## 🐛 `shTbOver` PRICES A 0.5 LINE WITH THE 1.5 FORMULA — a definite bug (M8, rank 1)
 `if(line<2)return 1-(P0+P1*s1);` — the comment says the branch is for 1.5, and `line<2` catches
 0.5 too. That expression is **P(TB≥2)**; P(TB≥1) is just `1−P0`, because a single IS one total
 base. **Proven with NO external reference**: TB O0.5 and hits O0.5 are the same event, and on 127
@@ -592,7 +612,20 @@ joined rows of the real board the **market prices them 0.1 pp apart while the mo
 the next one up inflates apparent λ-drift; confirm by re-running the ladder test without the 0.5
 rung. Frozen: freeze-exit amendment.
 
-## M7 — DERIVABLE BUT DORMANT (demoted same day)
+## 🔬 SELF-CONSISTENCY — the independent instrument, and it is free
+`tools/self_consistency.py` + `tests/self-consistency.test.ts`. Logical identities between two
+prices the model itself emits: **TB≥1 == H≥1** · HRR≥1 ≥ H≥1 · HRR≥1 ≥ HR≥1 · **HRR≥3 ≥ HR≥1** ·
+H≥1 ≥ HR≥1 · TB≥2 ≥ H≥2 · ladder monotonicity in all six markets. **A violation is a PROOF, not
+evidence** — no market, no fixture, no accrual. On the real board: **one violation, and it is M8**
+(118 of 127 at −23.4 pp model vs −0.5 market); everything else clean on both sides.
+**Boundary scan complete: ONE mismatch in the whole pricing path** — L1548 `if(line<2)` with a
+comment saying 1.5. L1549 and L2241 are correct.
+⚠️ **Encoding it reproduced the vacuous-pass defect one turn after writing the rule** — the first
+version looped over fixture players and found **99 players, ZERO with both rows**. Fixed by
+asserting on the pure function. **The test PINS THE DEFECT, not the fix** (M8 is frozen), with the
+correct assertions commented beside it — same treatment `pitcher_outs` gets.
+
+## M7+M9 — AN INTERLOCKED PAIR, never ship separately
 `shPOver(0.5, λ) = 1 − e^{−λ}` with `λ = rate × expAB × hF`. But λ is a MEAN COUNT over n at-bats
 at per-AB rate p, and **`(1−p)^n < e^{−np}` for every p ∈ (0,1)** — Poisson spends mass on
 two-or-more hits *in one at-bat*, which cannot happen, and it comes straight out of `P(≥1)`.
@@ -603,7 +636,14 @@ unselected: `batter_hits` O0.5 median **+0.3 pp**, under-has-edge **47%**; all 0
 / 46%**; higher rungs **+1.1 / 46%**. No level bias, no flip, no side skew.
 ⚠️ **The −4.3 pp that motivated M7 was a FIXTURE ARTIFACT** — the real board reads +0.3 on the
 same statistic. Fixture and production disagree by 4.6 pp on the exact quantity M7 explains.
-**Demoted to derivable-but-dormant.** Blast radius 617 rows of 2,026 through `shPOver`.
+`expAB` recovered from 45 `case` strings: median **4.1** (3.5–4.5), so the +4.8 pp error is at REAL
+parameters, not a grid artifact. Net output +0.3 ⟹ **≈+4.5 pp of compensation exists**; as λ that
+is **+13.9% inflation** — **M9**. ⚠️ **The obvious check is CIRCULAR**: `λ = −ln(1−P)` is a monotone
+transform of P, so "model λ − market λ" is just "model P − market P" restated, and it read −1.8%
+looking like a refutation. **M9 cannot be localised until graded hits accrue** — the market gives a
+probability, not a mean. **M7 and M9 ship together or not at all**: fixing either alone moves 617
+rows ~5 pp the wrong way, and the cancellation is only known over λ≈0.96, expAB 3.5–4.5 (the error
+runs +5.7 at n=3.5, +4.3 at n=4.5 — not flat).
 ⚠️ **The side-bias check nearly went wrong the same way:** the first cut used `categories` and read
 118/118 OVER at 0.5 lines — meaningless, because `categories` ranks by win probability and the
 over IS the likelier side at 0.5. **Fourth time that population has produced a confident wrong

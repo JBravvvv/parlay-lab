@@ -1307,3 +1307,40 @@ answer is no, or only via a defect in the measuring apparatus, label it
 the range detector's three wrong versions and the `.full` guard that never ran — were both
 instruments producing confident output, and in neither case did the output *look* impossible.
 Marking the branches in advance is the only moment when that judgement is cheap.
+
+## ⚠️ THE FIXTURE HAS ALREADY FAILED — every fixture-measured finding is provisional NOW
+
+The 2026-08-15 fixture-representativeness check was **answered early and in the negative**, on a
+measured quantity: `batter_hits` closed-form-minus-market reads **−4.3 pp on the fixture** and
+**+0.3 pp on the real board** — a **4.6 pp disagreement on the exact quantity M7 was built to
+explain**, which is what caused M7 to be ranked first and then demoted the same day.
+
+**So the relabelling happens now, not on 08-15.** Fixture `propBoard` row counts against the real
+2026-07-26 board:
+
+| market | fixture | real | **ratio** | findings resting on the fixture |
+|---|---|---|---|---|
+| `batter_home_runs` | 133 | 768 | 5.8× | — |
+| **`pitcher_outs`** | **7** | 42 | **6.0×** | the clamp/shrink audits' outs rows |
+| `batter_hits` | 81 | 743 | 9.2× | **the −4.3 pp that was already wrong** |
+| `batter_total_bases` | 42 | 391 | 9.3× | — |
+| `pitcher_strikeouts` | 12 | 169 | 14.1× | — |
+| **`batter_hits_runs_rbis`** | **14** | 304 | **21.7×** | **the ladder finding's market** |
+
+## Relabelled PROVISIONAL — measured on the fixture, not a real board
+
+| finding | fixture basis | status |
+|---|---|---|
+| **sim vs closed-form disagreement** (hits +9.2, TB +5.0, HR +1.2 pp) | fixture at `SIM_PATHS_FIXTURE` | **PROVISIONAL** — and the external check already reversed its conclusion |
+| **the external check itself** (sim/closed form vs market) | same fixture | **PROVISIONAL** — it decided M4 and killed M5 on 57/30/61 rows |
+| **clamp audit**, 25 of 30 sites, L2258 flagged | fixture, **L2258 fires 6 times** (95% Wilson [0.61, 1.00]) | **PROVISIONAL** — already carried this caveat |
+| **shrink-activity k audit**, own-sample weights 0.349–0.722 | fixture — the "typical n" column IS a fixture quantity | **PROVISIONAL** |
+| `clampActivity` byte-parity, whole-board hashes | fixture | ✅ **not affected** — a parity claim is about determinism, not representativeness |
+| **M8**, the ladder finding, the outs audit, the park/consumer tables, `expAB` median 4.1 | **REAL BOARD** | ✅ **not provisional** |
+
+**The dividing line is not "was a fixture involved" but "does the CONCLUSION depend on the
+fixture resembling production".** A parity digest does not; a measured gap does.
+
+**And the archive series still matters** — it is what turns these provisional labels into
+verdicts. What changed is that the label attaches today rather than being deferred to a date that
+has already been overtaken by evidence.
