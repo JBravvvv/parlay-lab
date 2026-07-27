@@ -341,6 +341,20 @@ parameter uncertainty and this shade models the same uncertainty.
 > document**, so it belongs in the same signature as the leg-equivalent floor and `consMinEv`
 > — and it should be made *after* Phase 2 reports, not at freeze exit by default.
 >
+> ### WHY THIS IS THE HIGHEST-VALUE DECISION PHASE 2 INFORMS
+> The two options are not independent of the movement slope — they are **opposite bets on it**:
+>
+> | if Phase 2 says | then | because |
+> |---|---|---|
+> | **the edge is real** (slope → 1) | take **edge-aware**: 149.7 / 187.2 bp | concentrating into the highest-edge tickets is correct when the edge estimate is trustworthy, and 1.40 pp of tolerance is enough |
+> | **the edge is noise** (slope → 0) | **keep `prob`**, and the 2026-07-17 spec was accidentally right | edge-aware concentrates stake into exactly the tickets whose edge is most overstated; 3.05 pp of tolerance is doing real work |
+>
+> **Edge-aware weighting concentrates into high-edge tickets, which is precisely where
+> overconfidence bites hardest — which is why it halves the crossover.** So this is not a free
+> 2.7×; it is a leveraged bet on the model's calibration, and the movement slope is the
+> measurement of exactly that. **Sequence: Phase 2 first, then this.** Nothing else on the
+> amendment list has a payoff this large or a dependency this direct.
+>
 > **Fix the comment at L2934 regardless.** It is the only part of this that is unambiguously
 > wrong, and it cost three attempts at characterising the code beneath it.
 

@@ -662,6 +662,16 @@ hypothesis until a file and line number are attached; and when a mechanism dies,
 whether the *measurement* dies with it — sometimes it does, and that is the case that
 matters most (row 3 above).
 
+**And the re-check has to come from a DIFFERENT instrument than the one that produced the
+artifact.** Row 3 was not caught by re-reading the range detector or by re-running it; it was
+caught by the **truncation check**, a separate probe asking whether the statistic was stable
+under a change that should not have mattered. An instrument cannot audit itself — its
+artifacts live in its own assumptions, which it applies identically on every re-run. The same
+pattern held elsewhere in this phase: the H+R+RBI ladder claim was scoped by the **sim/closed-
+form split**, not by re-running the ladder test; the `booksInd` count was corrected by
+**executing the chain**, not by re-reading the reconstruction. **Independence of the checking
+instrument is the load-bearing property, not the number of checks.**
+
 **(f) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
 is genuinely side-invariant, which is why the magnitudes measured on `categories` stand. The
 spread ratio is not, and neither is anything conditioned on probability rank. Establishing

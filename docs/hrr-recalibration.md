@@ -193,7 +193,55 @@ Two pricing paths exist:
   > The model is fine on the first and structurally incapable on the second. **The compression
   > is in the ladder, not the level** — the owner's framing, confirmed.
   >
-  > **Caveats:** n = 5 players with both rungs on one board, so the *magnitude* is thin. The
+  > ## SCOPED 2026-07-26 (same day): THE FINDING IS THE CLOSED FORM, NOT THE MODEL CLASS
+  >
+  > The n=5 measurement above is **correct and it held** — but it was a *subset*, and I
+  > presented it as H+R+RBI-wide. **33 of 50 H+R+RBI rows carry the `sim` tag**: the sim
+  > marginal replaces `pO` pregame for this market and only this market. Those 5 players were
+  > exactly the ones the sim did not reach.
+  >
+  > Re-run on the uncapped `propBoard`, split by pricing path (`tools/hrr_ladder_audit.py`,
+  > `tools/ladder_drift.py`):
+  >
+  > | path | pairs | market λ drift | model λ drift | **ratio** |
+  > |---|---|---|---|---|
+  > | **SIM marginal** | 15 | +0.468 | **+0.356** | **0.76** |
+  > | **closed form (Poisson)** | 5 | +0.479 | **+0.001** | **0.00** |
+  > | all | 20 | +0.474 | +0.317 | 0.67 |
+  >
+  > **The sim already reproduces 76% of the market's ladder dispersion. The closed form
+  > reproduces 0% of it, exactly as a one-parameter family must.**
+  >
+  > ### So the fix shape is NOT a new distribution — it is routing
+  > Negative binomial and a compound distribution were the candidates if this were a
+  > model-class error. **It is not.** The engine already has a distribution that matches the
+  > market's dispersion, and it already uses it for two thirds of H+R+RBI rows. **The defect is
+  > the ~1/3 of rows that fall back to closed form** — the games with no confirmed lineup, so
+  > no sim. The fix is to give those rows a dispersion-aware price, not to replace the family.
+  >
+  > Scoped and unbuilt. It is a bigger change than a constant and it belongs after Phase 2.
+  >
+  > ### AND IT IS NOT A CLASS DEFECT — total bases shows the OPPOSITE
+  > `batter_total_bases` is also a correlated sum (1B + 2·2B + 3·3B + 4·HR), so it was the
+  > natural place to look for the same signature. It is not there:
+  >
+  > | market | pairs | market drift | model drift | ratio | verdict |
+  > |---|---|---|---|---|---|
+  > | **TB** | 108 | +0.341 | **+0.785** | **2.30** | model MORE dispersed than market |
+  > | HRR | 24 | +0.474 | +0.355 | 0.75 | partial (see split above) |
+  > | hits | 18 | −0.035 | −0.001 | 0.04 | **uninterpretable — market drift ≈ 0** |
+  > | K's | 8 | +0.162 | +0.002 | 0.01 | under-dispersed, but n=8 |
+  > | outs | 12 | −0.005 | +0.010 | −1.91 | **uninterpretable — both drifts ≈ 0** |
+  >
+  > **TB's compound `shTbOver` over-disperses (2.30×), it does not under-disperse.** hits and
+  > outs have market drift indistinguishable from zero, so their ratios have a near-zero
+  > denominator and **must not be read** — flagged rather than reported as findings. K's is
+  > suggestive at n=8 and is the only other candidate worth re-running.
+  >
+  > **Conclusion: this is an H+R+RBI closed-form defect, not a class defect across correlated
+  > sums.** The scoping matters — a class defect would have implied a rewrite.
+  >
+  > **Caveats:** the closed-form arm is n = 5 pairs on one board, so the *magnitude* is thin. The
   > *mechanism* is not statistical — a one-parameter family cannot fit two rungs, and 5 of 5
   > in the same direction with a +0.48 λ shift is not a coin-flip. Re-run on ≥ 3 boards.
   > `hrrAltMax` stays at 0.5, and this makes the case for it stronger, not weaker: the

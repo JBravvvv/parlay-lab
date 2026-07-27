@@ -167,6 +167,97 @@ denominator fix as a pre/post split with an expected slope improvement — but t
 **retracted before shipping** (the term is algebraically correct; see
 `docs/hrr-recalibration.md`). No fix will land, so there is no post-fix population to compare.
 
+## SERIES B IS BUILT — and three things it found before any slope was fit
+
+`tools/phase2_series_b.py --dir data/props`. Everything except the `pModel` join, which needs
+the sync phrase. Emits a join-ready table keyed `(date, market, player, line)`.
+
+### 1. ⚠️ THERE IS NO CLOSE IN THE ARCHIVE
+
+Snapshots land at **~07:30 and ~20:16 UTC**; first pitches run **22:40–23:20 UTC**. Every
+"close" is a **T−2.5h reading at best**. The field is named `late_fair`, never `close_fair`.
+
+**This attenuates any slope toward zero**, which is decisive because *slope ≈ 0 is a
+pre-committed reading*. **A slope near 0 in Series B cannot be read as "no edge"** — it is
+confounded with the fraction of the day's move that happens after 20:16. Only a genuine
+close can support that branch.
+
+**And the cadence is unexplained.** The configured cron is `0 17 * * *` and `45 22 * * *` on
+**both** `main` and `frontend-rebuild` — unchanged since `73087db` (2026-07-12) — and the
+observed timestamps match neither. Actions crons run *late*, not 9 hours early. **Resolve
+this from the Actions run log before Series A's close definition is trusted**; if the runs
+really are at 22:45, that is a near-close and the archive's `t` field is wrong instead, which
+is its own defect. Either way it must be settled by reading the log, not inferred.
+
+### 2. 44% attrition, and it is not yet shown to be random
+
+**3,637 of 6,535 open rows (56%) have a later reading.** Uniform across markets (52–56%), so
+it is not market-driven. Surviving rows have `open_fair` p10 0.392 / median 0.514 / p90 0.631.
+**The lost rows' fairs are in the same file and the comparison has not been run** — until it
+is, the movement distribution is a *selected* population and every rule in
+`docs/harness-substitutions.md` applies to it. Listed as the first thing to do before fitting.
+
+`batter_home_runs` is absent entirely, by construction: quoted one-sided, `fair` null on 100%
+of rows.
+
+### 3. AN INTERCEPT IS MANDATORY — unconditional drift is collinear with the model gap on outs
+
+Measured unconditional movement by rung (signed, pp):
+
+| market | rung | n | median move | % up |
+|---|---|---|---|---|
+| `batter_hits` | 0.5 | 1187 | +0.05 | 51% |
+| `batter_hits_runs_rbis` | 1.5 | 762 | +0.16 | 54% |
+| `batter_total_bases` | 1.5 | 782 | +0.21 | 54% |
+| **`pitcher_outs`** | 15.5 | 38 | **−1.01** | **32%** |
+| **`pitcher_outs`** | 17.5 | 45 | **−0.66** | **29%** |
+| **`pitcher_strikeouts`** | 3.5 | 35 | **−0.63** | **31%** |
+
+Batter markets drift ~0. **`pitcher_outs` drifts systematically DOWN** — and the model's outs
+gap is **one-signed on 100% of rows** (0 of 38 above market). A constant downward drift is
+therefore nearly collinear with `sign(pModel − open_fair)` on that market, and **a regression
+through the origin would attribute pure drift to the model.**
+
+> **Fit `move = α + β·(pModel − open_fair)` with the intercept free, per market × rung, and
+> report α alongside β.** The slope is identified only by *magnitude* variation in the gap,
+> not its sign. **If α is significant and β is not, the market is drifting for reasons that
+> have nothing to do with the model** — which on the positive control would otherwise read as
+> the very edge the control exists to rule out.
+
+This is recorded before the numbers exist, like the other branches.
+
+## RUNG IS A DIMENSION, NOT A DETAIL — bucket Series A by ladder rung
+
+**The H+R+RBI error is +11.5 pp at O0.5 and −1.4 pp at O1.5 — opposite signs inside one
+market.** A market-level movement slope averages those toward zero and reports a well-behaved
+market. That is the same pooling failure that has now produced three false readings in this
+phase (side-selected signs, chain-position counts, probability-rank truncation), and here it
+would hide the defect the ledger had to discover by losing money.
+
+**Series A reports `slope × (market, rung)` wherever a market has alternate lines** — H+R+RBI,
+TB, K's, outs, hits — each with its own `n`. The market-level number is reported *after* the
+rung table and is explicitly secondary.
+
+> ### PRE-COMMITTED INTERPRETATION — rung dimension
+> - **rungs agree in sign and magnitude** → level effect. The pooled market slope is
+>   interpretable and is the number to read.
+> - **rungs have OPPOSITE-SIGNED slopes** → **distributional defect, and the pooled number for
+>   that market is UNINTERPRETABLE.** Do not report it, do not average it, do not include that
+>   market in any cross-market aggregate. Report the rungs.
+> - **rungs agree in sign but differ ≥2× in magnitude** → partial dispersion error; pooled
+>   number is reported with the ratio beside it.
+>
+> Committed before the data exists. `docs/hrr-recalibration.md` already shows what the second
+> branch looks like when it fires: market λ drift +0.474 against a closed-form model drift of
+> **+0.001**.
+
+**Minimum n per rung before a rung slope is read: 30.** Below that the rung is listed with its
+count and no slope, rather than a slope with a wide interval that will be quoted anyway.
+
+**This is plausibly the most valuable thing Phase 2 produces.** It is exactly the shape the
+ledger caught on H+R+RBI *after* it cost money — model too high at the near rung, fine or low
+at the far one — and the rung dimension catches it before a stake is placed.
+
 ## POPULATION STAMPS — H+R+RBI is already split, and it is not the only one
 
 `CAL_START` taught this once: a cutoff mid-window splits a population silently, and the split
