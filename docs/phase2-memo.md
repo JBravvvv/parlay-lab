@@ -772,3 +772,27 @@ vintages are labelled and never pooled.**
 toward zero and is a known, statable bias. The second measures *which games are in the sample at
 all*, and no amount of care with the first fixes it. **A pooled slope is not reported while the
 day-game bucket is under-covered** — the memo's existing rung rule, applied to a second axis.
+
+## CLOSE QUALITY IS NOW COMPUTED, NOT ASSERTED (2026-07-27)
+
+`/api/propsnap`'s first version wrote `kind: "close"` unconditionally. A 16:00Z fire against a
+20:10Z first pitch — **four hours out** — would have entered Phase 2's close bucket labelled as
+a close.
+
+> **A mislabelled close is worse than a missing one.** A missing close leaves a hole that
+> `tools/close_capture.py` reports. A mislabelled one enters the bucket that is supposed to be
+> clean and attenuates the slope **from inside it**, where no split by `kind` can find it —
+> because it is on the right side of the split.
+
+Both capture routes now derive `kind` from the slate:
+
+| route | rule |
+|---|---|
+| `tools/snapshot_props.py` | `_snapshot_kind` — `close` only when the next unstarted first pitch is within `CLOSE_WINDOW_S` (95 min), at most one per 40 min |
+| `app/api/propsnap` | the same 95-minute span, computed from `min(event.start) − now` |
+
+**Vintage note:** no row with an *asserted* `kind` was ever written — the route had not been
+deployed when the defect was found, and `snapshot_props.py` has computed `kind` from the slate
+since it was introduced. **There is no contaminated vintage to exclude.** Recorded because the
+absence of one is itself the fact worth having on the record, and because the next person to add
+a capture route needs to know this is a computed field, not a caller-supplied one.

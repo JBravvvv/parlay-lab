@@ -666,3 +666,96 @@ So the true statement is a **path** split, not a **component** split, and the ac
 recorded without knowledge of a **92%-live, unmonitored `shParkF`** that reaches one path and
 not the other. The acceptance is not thereby wrong — the sim prices most HRR rows — but it was
 made against an input nobody had measured.
+
+## THE CORRECTED λ — arithmetic only, freeze-exit amendment (2026-07-27)
+
+### First, the sharpest version of the defect
+
+**Colorado played AWAY at Milwaukee on 2026-07-26, so `coors` was `false` on all 15 games and
+`(coors?1.08:1)` was exactly `1.00` everywhere.** The closed-form H+R+RBI λ that day was:
+
+```
+λ = rate × power
+```
+
+`power = shClamp((era2/4.20 + whip/1.30)/2, 0.85, 1.18)` varies **by opposing starter and by
+nothing else**. So the λ had **zero site variation — not little, none.** On any non-Coors slate,
+which is 29 parks in 30, that is the whole expression.
+
+### What is sitting unused beside it
+
+| available at L2326 | carries |
+|---|---|
+| `hF = contact*pq*(coors?1.07:1)*luckF` | pitcher contact quality, percentile, luck |
+| `tbF = power*pq*(wind.f>1?1.05:…)*(coors?1.10:1)*luckF` | + coarse wind |
+| `hrF = power*pq*wind.f*(coors?1.08:1)*luckF` | + full wind |
+
+**And what is NOT available anywhere in the closed form: `shParkF`.** Its spread across the 29
+parks in the priors is real and material:
+
+| | min | median | max | **spread** |
+|---|---|---|---|---|
+| `parkH` (RHB) | 0.940 | 0.995 | 1.085 | **0.145** |
+| `parkHR` (RHB) | 0.855 | 1.010 | 1.160 | **0.305** |
+
+A ±14.5% hit-rate and ±30.5% HR-rate venue term, 92% populated, **reaching only the sim**.
+
+### Mapping the components, and the double-counting constraint
+
+| HRR component | share of mass¹ | natural factor |
+|---|---|---|
+| **H** | ~0.48 | `hF` — direct |
+| **RBI** | ~0.26 | `tbF` — RBI tracks extra-base production, not hit count |
+| **R** | ~0.26 | mostly `hF` (reaching base) + teammate context the model has no term for |
+
+¹ league-typical ≈ 1.00 H / 0.55 R / 0.55 RBI per game.
+
+> **⚠️ THEY CANNOT BE MULTIPLIED.** `power` and `pq` appear in all three, so `hF × tbF × hrF`
+> **cubes the pitcher-quality term**. And `rate` is already a per-game H+R+RBI rate from the
+> player's own history, which embeds his season-average park and lineup context — so any factor
+> applied to it must be a **relative-to-his-average** adjustment, not an absolute one.
+>
+> The correct shape is **one mass-weighted blend**, e.g. `wH·hF + wRBI·tbF + wR·hF`, with the
+> pitcher terms entering once. Not a product. The exact weights are a fitting question and this
+> is arithmetic only — the point here is that the naive fix is wrong in a specific, statable way.
+
+### The spread this would recover, and the honest limit
+
+**Using the existing components is necessary and NOT sufficient.** All three carry only the Coors
+flag for park, so blending them adds `pq`, `wind.f`, `contact` and `luckF` — pitcher quality,
+weather, luck — and **still no venue term**. Against a market rung-drift of **+0.479**, the
+achievable model drift from those alone is bounded by their own spread, which is small: `pq` is
+clamped to [0.94, 1.06] and the wind term to [0.96, 1.05].
+
+**Routing `shParkF` into the closed form is the part that actually adds site variation** — a
+0.145–0.305 spread against the ~0.12 the blended existing components can supply. Two amendments,
+and the second is the larger one.
+
+### Does this SUPERSEDE the single-λ ladder diagnosis, or sit underneath it?
+
+**Underneath — and it is the larger term.** They are different defects with different fixes:
+
+| | single-λ ladder | **λ conditioning** |
+|---|---|---|
+| claim | one λ per player-game, so O0.5 and O1.5 are both Poisson transforms of it — the two rungs cannot be set independently | that λ **barely varies by site**; on a non-Coors slate it is `rate × power` |
+| kind | **distributional family** — inherent to any single-λ Poisson model | **mis-conditioning** — the λ is wrong before the family is consulted |
+| fix | a different distribution, or per-rung calibration | route the existing conditioned components + `shParkF` in |
+
+A correctly-conditioned single λ would still be Poisson-constrained and would still produce
+*some* rung drift — just possibly the wrong amount. **The measured closed-form drift was +0.001,
+i.e. essentially zero**, which is what a λ with no site variation produces and is *not* what a
+family limitation alone produces. So conditioning dominates on the evidence available.
+
+### Which Phase 2 branch distinguishes them
+
+Phase 2's rung test already buckets by market and rung. **Add the sim/closed-form tag as a third
+bucket** — it is already on every row — and the two defects separate cleanly:
+
+| Phase 2 shows | reading |
+|---|---|
+| **rung dependence in SIM rows, none in closed-form rows** | **conditioning is the story.** The closed form is flat because its λ is flat; the sim, which has park/platoon/iso, behaves |
+| **rung dependence in BOTH** | the **family** limitation is real and independent of conditioning — a correctly-conditioned λ still cannot set two rungs |
+| **rung dependence in NEITHER** | both retracted, per the standing five-branch table |
+| closed-form only, not sim | neither diagnosis; something is wrong with the sim instead |
+
+**Nothing changed. No parameter touched.** Both amendments are freeze-exit.

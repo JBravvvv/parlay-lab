@@ -2875,3 +2875,49 @@ now does for all ten.
 comparison. A factor at 100% or 0% on the fixture and materially different across twenty real
 boards is the same finding as a clamp whose pinned fraction moves — and the fixture cannot
 answer it, for exactly the reason the clamp comparison could not.
+
+# WHICH PATH CONSUMES EACH FACTOR — traced once, 2026-07-27
+
+The liveness gap, stated once and bounded: `tools/factor_activity.py` measures whether a factor
+**returns a real value**, never whether that value **reaches a price**. `shParkF` would read 92%
+live on the day the closed form stopped consulting it. So, for all ten, from the call sites:
+
+| factor | call site | **consumed by** | live share |
+|---|---|---|---|
+| **`shParkF`** | L2059 → `parkH`/`parkHR` → L2062 `batVec` | **SIM ONLY** | 92% |
+| **`shPitIsoF`** | L2085 → L2086 `batVec` | **SIM ONLY** | 100% |
+| **`shPenF`** | L2114 → `penH`/`penA` → `bpF` arg of `batVec` | **SIM ONLY** | — |
+| `shPenQF` | L2114, same expression | **SIM ONLY** (pinned off) | 0% |
+| **`shPitPctF`** | L2061 (`batVec`) **and** L2326 (closed form) | **BOTH** | 100% |
+| **`shTempF`** | L2024 `windNote` → L2111 (sim) **and** L2237 (closed form) | **BOTH** | — |
+| **`shPriorKf`** | L2274 — K's closed form | **CLOSED FORM ONLY** | 87% |
+| **`shOppWhiffF`** | L2282 — K's closed form | **CLOSED FORM ONLY** | — |
+| `shUmpKf` | L2282, same expression | **CLOSED FORM ONLY** (pinned off) | 0% |
+| **`shLaborF`** | L2262 — `pitcher_outs` closed form | **CLOSED FORM ONLY** | 30% |
+
+## What the table says, beyond HRR
+
+**Only two of ten reach both paths.** The rest are path-exclusive, and the split is not arbitrary
+— it follows the market:
+
+* **Hitting markets are priced twice.** The sim gets park, platoon, xISO-against and bullpen
+  fatigue; the closed form gets none of those. **Two prices for one market, built from
+  materially different information**, and which one a row gets depends on whether its game had
+  two confirmed lineups (measured: 9 of 12 games all-sim, 3 none).
+* **Pitcher markets are priced once.** K's and outs never enter the sim, so `shPriorKf`,
+  `shOppWhiffF`, `shUmpKf` and `shLaborF` being closed-form-only is correct rather than a gap.
+
+> ### The finding generalises beyond H+R+RBI
+>
+> **`shParkF` and `shPitIsoF` — the two factors with the highest live shares, 92% and 100% — are
+> both sim-only. Every closed-form hitting price is built without a venue term.** That is
+> `batter_hits`, `batter_total_bases` and `batter_home_runs` as well as H+R+RBI, on whatever
+> fraction of rows the sim does not cover.
+>
+> **`batter_total_bases` is the one to watch**: it carries the open 2.30 over-dispersion, and
+> `tbF` uses only the Coors flag and a coarse three-valued wind term. A market whose closed-form
+> factor cannot distinguish 29 of 30 parks, over-dispersing, is a coherent pairing — and it is
+> now a second traced candidate sitting under a second open finding.
+
+**Nothing changed.** `shLaborF` at 30% live is the only other number worth flagging: an
+`pitcher_outs` factor inert on 70% of starts, in the market with the known 0.86-clamp defect.

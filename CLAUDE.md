@@ -518,11 +518,22 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. **Both are SIM-ONLY** — `parkH`/`parkHR` appear
+for `return 1` finds one spelling; match the CONTRACT. **Ten factors, and only TWO reach both pricing paths** (`shPitPctF`, `shTempF`). SIM-ONLY:
+`shParkF` 92%, `shPitIsoF` 100%, `shPenF`, `shPenQF`. CLOSED-FORM-ONLY: `shPriorKf` 87%,
+`shOppWhiffF`, `shUmpKf`, `shLaborF` 30%. **Every closed-form HITTING price is built without a
+venue term** — hits, TB, HR and HRR alike — and `batter_total_bases` (open 2.30 over-dispersion)
+has a `tbF` that cannot distinguish 29 of 30 parks. `factor_activity` measures whether a factor
+RETURNS a value, never whether it REACHES a price; that gap is the fifth blind-spot instance.
+**Both are SIM-ONLY** — `parkH`/`parkHR` appear
 at exactly one place, L2062 inside `batVec`. **The CLOSED FORM has no real park factor at all**
 (L2326: only a binary Coors flag), and **H+R+RBI's closed-form λ is `rate × coorsFlag × power`**
-— no park, no wind, no platoon, not even the `hF`/`hrF`/`tbF` its siblings use. That is a traced
-mechanism for BOTH open HRR findings: it predicts the measured closed-form ladder drift of +0.001
+— no park, no wind, no platoon, not even the `hF`/`hrF`/`tbF` its siblings use. On 2026-07-26 Colorado played AWAY, so `coors` was false on
+all 15 games and the closed-form HRR λ was exactly **`rate × power`** — `power` varies by
+opposing starter and by NOTHING else, so the λ had **zero** site variation. `shParkF`'s unused
+spread is 0.145 (hits) / 0.305 (HR). The conditioning defect sits **underneath** the single-λ
+ladder diagnosis and is the larger term — a family limitation produces *some* drift, a flat λ
+produces the measured +0.001. Phase 2 separates them by bucketing on the sim/closed-form tag.
+That is a traced mechanism for BOTH open HRR findings: it predicts the measured closed-form ladder drift of +0.001
 vs the market's +0.479, and the +11.5 pp / −1.4 pp rung signature. 17 of 50 HRR rows (34%) are
 closed-form. Hypothesis until Phase 2's rung test; nothing changed.
 **Correction: `shPitIsoF` does NOT discard park/wind** — L2086 keeps `wind.f*parkHR*pl.hr` and
