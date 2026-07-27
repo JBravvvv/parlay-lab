@@ -295,4 +295,58 @@ describe("coverage floor", () => {
     expect(achievableCoverage(MONDAY, at(21))).toBeGreaterThan(MIN_ACHIEVABLE);
     expect(achievableCoverage([], at(21))).toBe(0);
   });
+
+  /* THE SECOND SUNDAY PASS (2026-07-26). Sunday splits: an afternoon bulk and one
+     national night game 5h45m later. The 17:00Z entry serves the bulk; the 22:30Z entry
+     exists ONLY for the night game, which carried 11 of 17 closed-form H+R+RBI rows —
+     65% of the ladder-defect exposure (docs/hrr-recalibration.md).
+
+     achievableCoverage divided `ready` by the WHOLE DAY's games, so at 22:30 the one
+     remaining game scored 1/15 = 0.067 and the pass was refused as "low-ceiling" — the
+     guard against a mis-scheduled cron firing on a slate it cannot reach. The denominator
+     is the bug: this is exactly the whole-day-denominator failure board-coverage.ts's own
+     header warns about for luCoverage.pct, left unfixed one function below it. */
+  const SUNDAY = [
+    Date.parse("2026-07-26T16:15:00Z"),
+    ...[0, 1, 2].map(() => Date.parse("2026-07-26T17:35:00Z")),
+    ...[0, 1, 2].map(() => Date.parse("2026-07-26T17:40:00Z")),
+    ...[0, 1, 2].map(() => Date.parse("2026-07-26T18:10:00Z")),
+    Date.parse("2026-07-26T18:15:00Z"),
+    Date.parse("2026-07-26T18:35:00Z"),
+    Date.parse("2026-07-26T20:05:00Z"),
+    Date.parse("2026-07-26T23:20:00Z"), // Sunday Night Baseball
+  ];
+  const sun = (h: number, m = 0) =>
+    Date.parse(`2026-07-26T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`);
+
+  it("the 22:30 Sunday pass is NOT refused: the ceiling is over games still bettable", () => {
+    // one game left (23:20), and it is past its lineup window -> the pass can reach 100%
+    expect(achievableCoverage(SUNDAY, sun(22, 30))).toBe(1);
+    expect(achievableCoverage(SUNDAY, sun(22, 30))).toBeGreaterThan(MIN_ACHIEVABLE);
+    expect(liveCoverage(null, sun(22, 30), SUNDAY).skip).toBe(false);
+  });
+
+  it("...and the 17:00 board does not suppress it — the night game is unconfirmed", () => {
+    // the 17:00 board covers the afternoon; at 22:30 those are started and excluded,
+    // leaving one unstarted game whose lineup was NOT posted when that board was built
+    const b = board({
+      bulk: { start: "2026-07-26T17:35:00Z", lu: true },
+      night: { start: "2026-07-26T23:20:00Z", lu: false },
+    });
+    const v = liveCoverage(b, sun(22, 30), SUNDAY);
+    expect(v.live).toBe(1);
+    expect(v.confirmed).toBe(0);
+    expect(v.skip).toBe(false);
+    expect(v.reason).toBe("thin");
+  });
+
+  it("the guard it was protecting still fires: a 16:00 Monday reaches almost nothing", () => {
+    expect(achievableCoverage(MONDAY, at(16))).toBeLessThan(MIN_ACHIEVABLE);
+    expect(liveCoverage(null, at(16), MONDAY).reason).toBe("low-ceiling");
+  });
+
+  it("and a dead Sunday slate is still dead, not 100%", () => {
+    expect(achievableCoverage(SUNDAY, Date.parse("2026-07-27T04:00:00Z"))).toBe(0);
+    expect(liveCoverage(null, Date.parse("2026-07-27T04:00:00Z"), SUNDAY).reason).toBe("dead-slate");
+  });
 });

@@ -244,6 +244,21 @@ Two pricing paths exist:
   > after all lineups post would carry the sim price on essentially every H+R+RBI row**, and
   > the ladder defect would disappear from the board without one line of model change.
   >
+  > ### THE DEFECT HAS THREE SOURCES, NOT ONE
+  > The retime addresses the first. The other two survive it and are separable:
+  >
+  > | source | example on 2026-07-26 | rows | reached by the retime? |
+  > |---|---|---|---|
+  > | **late lineups** | NYY@PHI, 6 h 34 m out at generation | 11 | **yes** — the 22:30 Sunday entry |
+  > | **one-sided lineups** | 4 rows `lu=confirmed` but unsimmed — the player's own lineup posted, the opponent's had not; the sim needs **both** (L2107) | 4 | **partly** — a later fire raises the odds both are up, but never guarantees it |
+  > | **live games** | CLE@TB was already in progress; the sim **ran**, as a *live* sim, and the H+R+RBI pregame marginal requires `!liveInit` | 3 | **no** — a later board makes this WORSE, not better |
+  >
+  > **The third is the interesting one and it cuts against the retime.** An in-progress game
+  > silently loses ladder dispersion: the live sim exists and is arguably *better* informed
+  > than the pregame one, and the H+R+RBI branch declines it on a flag. Every hour the board
+  > moves later, more of the slate is live and more rows fall into this case. Not urgent —
+  > 3 rows here — but it is the one source the retime cannot fix and can aggravate.
+  >
   > **So the H+R+RBI ladder fix is board TIMING, and it is worth more than the coverage
   > tables ever suggested.** `docs/board-timing.md` treats lineup coverage as a data-quality
   > metric; it is also the switch between a distribution that reproduces 76% of the market's

@@ -48,19 +48,33 @@ export function deadSlate(starts: number[], now: number): boolean {
 export const LINEUP_LEAD_MS = 3 * 3600_000;
 
 /**
- * ACHIEVABLE coverage at a moment, from the SCHEDULE alone — the share of the day's
- * games that are both still unstarted and past their lineup-posting window. It needs
- * no board and no odds call, so it can be asked before deciding to spend.
+ * ACHIEVABLE coverage at a moment, from the SCHEDULE alone — of the games STILL
+ * BETTABLE, the share that are also past their lineup-posting window. It needs no
+ * board and no odds call, so it can be asked before deciding to spend.
  *
  * This is the guard against a mis-scheduled pass: a 16:00 UTC run on a Monday can
  * reach ~1% of the slate no matter how well the engine works, because nothing is
  * posted yet. Independent of whether the day-of-week split is right.
+ *
+ * DENOMINATOR IS UNSTARTED GAMES, NOT THE WHOLE DAY (fixed 2026-07-26).
+ * It used to divide by every game on the schedule, which is the exact whole-day
+ * denominator failure this file's own header warns about for `luCoverage.pct` — left
+ * unfixed one function below it. The cost was concrete: on Sunday 2026-07-26 a 22:30
+ * pass could reach the ONE remaining game (the 23:20 national game, lineup long since
+ * posted) and scored 1/15 = 0.067, so it was refused as "low-ceiling". That game
+ * carried 11 of the 17 closed-form H+R+RBI rows — 65% of the ladder-defect exposure
+ * the retime exists to remove (docs/hrr-recalibration.md).
+ *
+ * Dividing by unstarted games asks the question the guard was always for — "of what I
+ * can still price, how much is ready?" — and the guard it was protecting is unchanged:
+ * a 16:00 Monday still has ~15 unstarted games and ~0 ready, so it still reads ~0.
  */
 export function achievableCoverage(starts: number[], now: number): number {
   const valid = starts.filter((s) => isFinite(s));
-  if (!valid.length) return 0;
-  const ready = valid.filter((s) => s > now && s - LINEUP_LEAD_MS <= now).length;
-  return Math.round((ready / valid.length) * 1000) / 1000;
+  const unstarted = valid.filter((s) => s > now);
+  if (!unstarted.length) return 0;
+  const ready = unstarted.filter((s) => s - LINEUP_LEAD_MS <= now).length;
+  return Math.round((ready / unstarted.length) * 1000) / 1000;
 }
 
 /**

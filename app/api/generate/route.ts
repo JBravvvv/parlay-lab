@@ -3,6 +3,7 @@ import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-serialize";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
+import { achievableCoverage, liveCoverageOf } from "@/lib/board-coverage";
 import { BOARD_KEY, decodeBoard, encodeBoard, liveCoverage } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
 
@@ -226,6 +227,41 @@ export async function GET(req: NextRequest) {
        ~120 credits to rebuild the same day. Storing it is what makes retiming the cron
        a saving instead of a doubling. Best-effort: a failure here must never cost the
        run, because the records below are the part that cannot be regenerated later. */
+    /* GENERATION-TIME STANDING (2026-07-26). /api/clv refuses to sight a started game;
+       this route had no equivalent, so a DELAYED fire built a board that priced games
+       already underway and looked completely normal — the silent-no-op shape, traceable
+       only by re-deriving coverage from `at` after the fact. GitHub Actions delayed the
+       props sweep by up to 8.75h for fifteen days before anyone noticed; cron-job.org's
+       punctuality at these hours is unverified (docs/cron-jobs.md), so the first delayed
+       fire must produce a LABELLED board rather than a quietly wrong one.
+       Recorded, never enforced: the board is still written. Refusing here would trade a
+       visible defect for an invisible one. */
+    const stampGi = (data.gameInfo ?? {}) as Record<string, { start?: string | null; lu?: boolean }>;
+    const stampCov = liveCoverageOf(stampGi, now);
+    const startsAll = Object.values(stampGi)
+      .map((g) => (g?.start ? Date.parse(g.start) : NaN))
+      .filter((t) => isFinite(t));
+    const started = startsAll.filter((t) => t <= now);
+    const gen = {
+      at: now,
+      /* how far past the EARLIEST first pitch this fire landed. Positive = the board
+         priced a slate already underway; that is the number a delay makes move. */
+      lateMs: startsAll.length ? now - Math.min(...startsAll) : null,
+      /* ...and how close to the NEXT one, which is what lineup coverage turns on */
+      leadMs: startsAll.some((t) => t > now) ? Math.min(...startsAll.filter((t) => t > now)) - now : null,
+      games: startsAll.length,
+      started: started.length,
+      live: stampCov.live,
+      luConfirmed: stampCov.confirmed,
+      luPct: stampCov.pct,
+      achievable: achievableCoverage(startsAll, now),
+    };
+    if (gen.live === 0) {
+      console.warn(`[generate] board built with NO unstarted games — every row is post-start. at=${new Date(now).toISOString()}`);
+    } else if (gen.leadMs != null && gen.leadMs > 6 * 3600_000) {
+      console.warn(`[generate] board built ${(gen.leadMs / 3600_000).toFixed(1)}h before the next first pitch — lineups likely unposted`);
+    }
+    (data as Record<string, unknown>).gen = gen;
     const enc = encodeBoard({ date, at: now, data });
     if ("error" in enc) {
       console.warn(`[generate] board not stored: ${enc.error}`);
@@ -257,6 +293,7 @@ export async function GET(req: NextRequest) {
       written,
       total: Object.keys(blob.records).length,
       overview: String(data.overview ?? "").slice(0, 160),
+      gen,
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

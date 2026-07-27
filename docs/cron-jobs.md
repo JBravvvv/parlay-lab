@@ -25,6 +25,10 @@ exists") would make every one of them a no-op. There must be no window with both
 | 1 | **Mon–Fri** | `0 22 * * 1-5` | weekday first pitches cluster 23:05–23:40 UTC (7:05–7:40 ET); 22:00 is ~1–1.5 h out, after lineups post |
 | 2 | **Saturday** | `0 18 * * 6` | Saturday is split early/late; 18:00 serves the afternoon bulk |
 | 3 | **Sunday** | `0 17 * * 0` | Sunday bulk is 17:35 UTC (1:35 ET) — 17:00 is 35 min out |
+| 4 | **Sunday** | `30 22 * * 0` | the national night game (23:20 UTC / 19:20 ET) is 5 h 45 m after the bulk, and no single Sunday hour serves both. On 2026-07-26 that one game carried **11 of the 17** closed-form H+R+RBI rows — **65% of the ladder-defect exposure** |
+
+**Two Sunday fires stay inside the per-date cap** (`MAX_RUNS_PER_DATE = 3`,
+`app/api/generate/route.ts`), leaving one spare for a manual regenerate.
 
 **The hours are unchanged from your spec.** The GitHub delay finding does **not** move them,
 because it is specific to GitHub Actions' scheduled-workflow queue and does not apply to a
@@ -38,10 +42,39 @@ fires on time.** The ledger has been dark since the NO-PLAY window opened — `/
 late and **nothing downstream would look different.** The record shows the job runs, not that
 it runs when it says.
 
-**What would be evidence: cron-job.org's own execution history**, which shows actual fire
-times per job. Check it after the first week and compare against the configured hour — the
-same check that resolved the GitHub question, applied to the new scheduler before it is
-trusted.
+**cron-job.org's timing at these hours is UNVERIFIED.** Treat it as unknown until measured,
+exactly as GitHub's was for fifteen days.
+
+**Two checks, either of which settles it:**
+1. **cron-job.org's own execution history** — actual fire times per job.
+2. **The board's own `gen.at` stamp** (added 2026-07-26, below) against the configured hour.
+   This needs nothing but `/api/board`, and it is the one that keeps working after the first
+   week.
+
+**If cron-job.org also queues, the entries move EARLIER by the observed delay** — which is
+precisely the correction GitHub needed and nobody made for fifteen days. Do not assume the
+configured hour is the effective hour for any scheduler until its own record says so.
+
+## The board now says where it landed — `gen`
+
+`/api/generate` stamps every board it writes:
+
+| field | meaning |
+|---|---|
+| `gen.at` | fire time (ms) |
+| **`gen.lateMs`** | how far **past the earliest first pitch** — positive means the board priced a slate already underway |
+| **`gen.leadMs`** | how far **before the next** first pitch — what lineup coverage turns on |
+| `gen.games` / `gen.started` / `gen.live` | slate size, started, still bettable |
+| `gen.luConfirmed` / `gen.luPct` | lineup coverage **over unstarted games only** |
+| `gen.achievable` | schedule-only ceiling at that moment |
+
+It also logs a warning when the board has **no unstarted games**, or when the next first
+pitch is **more than 6 h out** (lineups almost certainly unposted).
+
+**Recorded, never enforced — the board is still written.** Refusing to build on a late fire
+would trade a visible defect for an invisible one: no board at all, and no record of why.
+`/api/clv` can refuse because a missed sighting is unrecoverable; a late board is merely
+worse, and a labelled worse board is strictly better than none.
 
 **And `/api/generate` has no self-pacing.** `tools/snapshot_props.py` was made delay-tolerant
 (it reads the slate and decides), but `/api/generate` generates whenever it is called. A
