@@ -69,12 +69,35 @@ export function bestGen(index: GenIndexEntry[]): GenIndexEntry | null {
   return index.reduce((a, b) => (b.priced > a.priced || (b.priced === a.priced && b.at > a.at) ? b : a));
 }
 
-/** Newest first, de-duped by `at`, capped. Pure so the route and the tests share it. */
+/**
+ * Newest first, de-duped by `at`, capped — but eviction is BY RANK, NOT BY AGE.
+ *
+ * A plain `slice(0, MAX)` evicts the oldest, and on a Sunday the oldest is the 17:00 pass —
+ * the fat one, the one `bestGen` wants to return. Thin late passes accumulating would then
+ * delete exactly the generation the whole non-destructive store exists to protect, and the
+ * index would still look healthy.
+ *
+ * So two generations are never evicted: the LATEST (what `/api/board` serves, and what a
+ * bet needs) and the current BEST (what analysis needs). Everything else is dropped
+ * lowest-`priced` first, oldest breaking ties. The cap is then safe against any firing
+ * pattern, including one that fires twenty times.
+ */
 export function mergeGenIndex(prev: GenIndexEntry[], entry: GenIndexEntry): GenIndexEntry[] {
   const out = prev.filter((g) => g.at !== entry.at);
   out.push(entry);
-  out.sort((a, b) => b.at - a.at);
-  return out.slice(0, MAX_GENS_PER_DATE);
+  out.sort((a, b) => b.at - a.at); // newest first
+  while (out.length > MAX_GENS_PER_DATE) {
+    const latest = out[0];
+    const best = bestGen(out);
+    const evictable = out.filter((g) => g !== latest && g !== best);
+    if (!evictable.length) break; // cannot happen at MAX >= 2, but never loop forever
+    // lowest bettable-game count first; oldest breaks the tie
+    const drop = evictable.reduce((a, b) =>
+      b.priced < a.priced || (b.priced === a.priced && b.at < a.at) ? b : a,
+    );
+    out.splice(out.indexOf(drop), 1);
+  }
+  return out;
 }
 
 export type StoredBoard = { date: string; at: number; data: BoardData };

@@ -68,9 +68,22 @@ and Saturday is structurally hard because its games spread across the whole day.
 |---|---|
 | **measurement** | observed `gen.at` against the configured hour, on all three entries, over 7 days |
 | **source** | `/api/board?date=<d>&gen=list` returns the generation index; `gen.at` is also on every prediction-store day blob as `gens[]` |
+| **record** | **median delay AND its spread** (p10/p90, or IQR) — see below |
 | **trigger** | **median delay under ~3 minutes → move Sunday to `30 17 * * 0`** |
-| **if the median delay exceeds ~3 min** | leave Sunday at 17:00 **and shift every entry earlier by the observed median**, the correction GitHub needed and nobody made for fifteen days |
+| **if the median delay exceeds ~3 min** | **shift EVERY entry earlier by the observed median** — this is the DEFAULT response, not a fallback for Sunday. It is the correction GitHub needed and nobody made for fifteen days |
 | **worth** | +2.0 lineup-ready games per Sunday (13.0 vs 11.0 of 15.1) |
+
+**Record the SPREAD, not just the median — they call for opposite responses.**
+
+| observed | diagnosis | response |
+|---|---|---|
+| median ≈ 0, tight spread | punctual | move Sunday to 17:30 |
+| **median large, tight spread** | **a consistent offset** | **shift every entry earlier by the median — correctable** |
+| median ≈ 0, **fat tail** | intermittent queueing | **NOT correctable by shifting.** A shift moves the median onto the wrong side and the tail still misses. Needs the self-pacing treatment `snapshot_props.py` got, or a different scheduler |
+
+A punctual median with a fat tail and a consistent offset look identical in the median alone,
+and only the second can be fixed by moving the hour. GitHub's was the second kind — which is
+why it *would* have been correctable, had anyone measured it.
 
 **This is dated so it cannot become permanent by inattention.** An unrevisited "temporary"
 choice is how the 22:45 sweep spent fifteen days landing at 07:30.
@@ -182,3 +195,57 @@ timing, plus one live-sim branch that does not feed the H+R+RBI marginal.
 > **No single Sunday hour serves both.** If the Sunday-night game matters, it needs a *second*
 > Sunday entry near **22:30 UTC** — cheap on cron-job.org, and it would run into the per-date
 > cap of 3 only if something else already fired twice. Listed as a decision, not added.
+
+
+---
+
+# BOARD-LEVEL HISTORY DOES NOT SURVIVE 72 HOURS (2026-07-26)
+
+**Scoped, not built.** Asked because the crossover estimate needs **≥ 20 boards**, and the
+range detector, the ladder test and the 2.28 decomposition all read persisted boards.
+
+## What each store actually retains
+
+| store | key | retention | keeps |
+|---|---|---|---|
+| board | `pl:board:{date}` + `:{at}` + `:gens` | **3 days** | the whole board, all generations |
+| prediction store | `pl:pred:{date}` (indexed by `pl:pred:days`) | **no TTL**; `/api/calibrate` prunes at `SUMMARY_DAYS = 45` | per-row `p`, `pModel`, `pMkt`, `w`, `edge`, `ev`, `odds`, `cz`, `czEv`, `lu`, `tags`, `ln`, `hist`, `at` — and now `gens[]` |
+| `line-history` branch | `data/props/*.json` | **permanent (git)** | prop **market** rows only: `fair`, `n`, `fb`, `fp`, `czf`, `bo`, `bu`, `no`, `cz` |
+| ledger | `pl:ledger:v1` | permanent | locked bets only — dark all window |
+
+## So what becomes unreproducible after 3 days
+
+The prediction store keeps **rows**, not the board. Missing from it, and needed by the work
+already done:
+
+| finding | needed | in the prediction store? |
+|---|---|---|
+| `pitcher_outs` audit (§1–8) | the row **`case`** strings — `"18.7 IP over 4 starts … ~13.3 outs"` | **NO** — every factor was backed out of those strings |
+| H+R+RBI PA audit | `case` — `"re-based to #N spot PA (~X AB vs Y AB/g)"` | **NO** |
+| ladder / dispersion tests | **`propBoard`** (`pO`, `fO`, `ln`, uncapped, both sides) | **NO** |
+| range-compression detector | `propBoard` | **NO** |
+| 2.28 decomposition | ticket `czEv`/`bsEv`/`consCzEv` to run the +2% chain | **NO** — `ParlayPred` keeps only `{name, type, prob, czDec, czOdds, legs[{label, prop, lkey, gkey, prob}]}` |
+| sim-coverage measurement | row `tags` + `gameInfo.start` | **partly** — tags are kept, sliced to 8 |
+| clamp / shrink audits | nothing persisted (they run on the fixture) | **n/a — unaffected** |
+
+> **Most of this project's board-level findings are currently unreproducible after 72
+> hours.** They were all taken off a live or freshly-persisted board. The 20-board threshold
+> for the crossover is not reachable at all under a 3-day TTL.
+
+## Cheapest durable path — SCOPED, NOT BUILT
+
+Archive one board per day to the `line-history` branch, beside `data/props/`.
+
+| | |
+|---|---|
+| **what** | `GET /api/board?date=<PT date>&gen=best` — the most complete generation, plus `&gen=list` for the index |
+| **where** | `data/boards/YYYY-MM-DD.json.gz` on `line-history` |
+| **cost** | **zero Odds credits** — it reads what the pass already paid for. `/api/board` is deliberately ungated, so the workflow needs **no secret** |
+| **size** | ~539 KB raw → ~62 KB gzipped ≈ **23 MB/year**. Comfortable for git |
+| **when** | once daily, after the last generation — e.g. `0 2 * * *` UTC |
+| **delay tolerance** | **the 3-day TTL gives 72 h of slack**, so even GitHub's measured +8.75 h queueing is harmless. This is the one archive job that does *not* need the self-pacing treatment |
+| **not needed** | a second fetch of `latest` — `best` and `list` together let any later analysis reconstruct which pass it is reading |
+
+**One design note if it is built:** archive `gen=best`, not `gen=latest`. On a Sunday with the
+22:30 entry, `latest` is the ~1-game board — archiving it would reintroduce, permanently and
+in git, exactly the loss the non-destructive store was built to prevent.

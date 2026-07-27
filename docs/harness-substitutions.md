@@ -662,6 +662,30 @@ hypothesis until a file and line number are attached; and when a mechanism dies,
 whether the *measurement* dies with it — sometimes it does, and that is the case that
 matters most (row 3 above).
 
+### RUN THE AUDIT AFTER EVERY CONFIRMED INSTANCE, NOT AFTER EVERY CONSEQUENCE
+
+The coverage-denominator series has four instances, and **how each was found is the argument**:
+
+| # | site | found by | would a consequence have surfaced it? |
+|---|---|---|---|
+| 1 | `bestBoard` whole-day comparison | **a consequence** — a 9am board winning against the evening board | yes, and it did |
+| 2 | the staleness gate | **a consequence** — same wrong number, next reader | yes |
+| 3 | `achievableCoverage` | **testing a recommendation before making it** — the Sunday 22:30 entry would have been a silent no-op | **no.** It would have looked like the entry simply never helping |
+| 4 | `luCoverage.pct` (engine) | **an audit that existed only because #3 did** | **never.** It is display-only, so no consequence exists to surface it |
+
+**Instances 1 and 2 cost something before they were found. Instances 3 and 4 cost nothing,
+because the audit ran first — and #4 could not have been found any other way**, since a
+mislabelled number nobody reads produces no symptom, until the day someone reads it.
+
+**The rule: a confirmed instance is the trigger for a full audit of its class, immediately,
+across every call site — not a note to check the others when they misbehave.** The audit is
+cheap (one grep and one afternoon); the class is not. And it must enumerate sites that
+*cannot* misbehave today, because those are precisely the ones no consequence will ever
+report.
+
+Corollary to the eighth rule: **the value of an audit is highest exactly where nothing is
+going wrong yet.** That is the opposite of how attention naturally allocates.
+
 **And the re-check has to come from a DIFFERENT instrument than the one that produced the
 artifact.** Row 3 was not caught by re-reading the range detector or by re-running it; it was
 caught by the **truncation check**, a separate probe asking whether the statistic was stable

@@ -395,10 +395,50 @@ describe("board generations are kept, not overwritten", () => {
     expect(bestGen([])).toBe(null);
   });
 
-  it("a generation that falls off the cap is no longer reachable as best", () => {
-    let idx: GenIndexEntry[] = [g(1, 99)]; // the fattest board, but oldest
-    for (let i = 2; i <= MAX_GENS_PER_DATE + 1; i++) idx = mergeGenIndex(idx, g(i, 1));
-    expect(idx.some((e) => e.at === 1)).toBe(false);
-    expect(bestGen(idx)!.priced).toBe(1); // and best cannot point at a deleted key
+  /* EVICTION IS BY RANK, NOT BY AGE. A plain slice() would drop the oldest, and on a
+     Sunday the oldest is the FAT 17:00 pass — the one bestGen exists to return. Thin late
+     passes accumulating would then delete exactly what the non-destructive store protects,
+     while the index still looked healthy. */
+  it("the FAT oldest generation survives any number of thin later ones", () => {
+    let idx: GenIndexEntry[] = [g(1, 99)]; // fattest board, oldest
+    for (let i = 2; i <= MAX_GENS_PER_DATE + 8; i++) idx = mergeGenIndex(idx, g(i * 10, 1));
+    expect(idx.length).toBe(MAX_GENS_PER_DATE);
+    expect(idx.some((e) => e.at === 1)).toBe(true); // NOT evicted
+    expect(bestGen(idx)!.priced).toBe(99); // and still the best
+  });
+
+  it("the LATEST is never evicted either — it is what /api/board serves", () => {
+    let idx: GenIndexEntry[] = [g(1, 99)];
+    for (let i = 2; i <= MAX_GENS_PER_DATE + 8; i++) idx = mergeGenIndex(idx, g(i * 10, 1));
+    const newest = Math.max(...idx.map((e) => e.at));
+    expect(idx[0].at).toBe(newest);
+  });
+
+  it("eviction drops the lowest bettable count first, oldest breaking the tie", () => {
+    // fill to the cap with a clear ranking, then push one more
+    let idx: GenIndexEntry[] = [];
+    for (const [at, priced] of [[10, 9], [20, 2], [30, 8], [40, 3], [50, 7], [60, 6]] as const) {
+      idx = mergeGenIndex(idx, g(at, priced));
+    }
+    expect(idx.length).toBe(MAX_GENS_PER_DATE);
+    idx = mergeGenIndex(idx, g(70, 5)); // over cap -> evict
+    expect(idx.length).toBe(MAX_GENS_PER_DATE);
+    expect(idx.some((e) => e.at === 20)).toBe(false); // priced 2, the weakest
+    expect(idx.some((e) => e.at === 10)).toBe(true); // priced 9 = best, protected
+    expect(idx.some((e) => e.at === 70)).toBe(true); // latest, protected
+  });
+
+  /* `priced` is computed at each generation's OWN gen.at (pricedGames filters to games
+     unstarted at that moment), so a pass that fires four hours late scores only what was
+     still bettable when IT ran. Verified on the real 2026-07-26 board: it scores 14 of 15
+     — the live game is excluded from its own count — and the same rows fired at 20:00
+     would have scored 2. The guard is structural; this pins it so a later refactor cannot
+     pass Date.now() instead. */
+  it("a late generation cannot out-rank a punctual one on raw game count", () => {
+    const punctual = g(1000, 14); // 14 still bettable when it ran
+    const late = g(9000, 2); //  same slate, 4h later: only 2 still bettable
+    const idx = mergeGenIndex(mergeGenIndex([], punctual), late);
+    expect(bestGen(idx)!.at).toBe(1000);
+    expect(idx[0].at).toBe(9000); // ...and it is still the latest, for betting
   });
 });
