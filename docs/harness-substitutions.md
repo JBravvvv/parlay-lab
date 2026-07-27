@@ -475,3 +475,73 @@ entirely pregame.
 `tests/armed-baseline.test.ts`. The cross-check that it is not merely internally consistent:
 **L2258 reads 100% low-pinned here and was independently measured at 35 of 35 low-pinned on
 the real 2026-07-26 board** by `tools/outs_audit.py`.
+
+### The two saturated sites, classified explicitly
+
+**L2055 (sim) and L2319 (closed form) are the SAME expression twice** — the `power` factor:
+
+```js
+power = shClamp((eraQ/4.20 + (whip!=null ? whip/1.30 : 1))/2, .85, 1.18)
+```
+
+L2055 lives in `batVec`, feeding the **sim's** batter-vs-starter rates; L2319 is the
+**closed-form** batter branch, feeding `hrF`, `tbF`, `hF` and — directly — H+R+RBI's λ
+(`lam = rate * (coors?1.08:1) * power`, L2359). The v2 version blends FIP into `eraQ`; the
+sim version uses raw ERA.
+
+| site | low | high | in range | **pinned** |
+|---|---|---|---|---|
+| L2055 `power` (sim) | 36% | 27% | 36% | **64%** |
+| L2319 `power` (closed form) | 40% | 20% | 40% | **60%** |
+| L2054 `contact` (sim) | 14% | 23% | 64% | 36% |
+| L2318 `contact` (closed form) | 0% | 9% | 91% | 9% |
+
+**Verdict: SATURATED, not OFFSET, and it is not benign.** The input is a pitcher-quality
+index centred at 1.0 by construction (4.20 ERA and 1.30 WHIP are the league values), and it
+*straddles* both bounds — so the neutral point is right and this is not the L2258 pathology.
+But the input's real range is roughly **0.68–1.33** (a 2.50 ERA / 1.00 WHIP ace prices at
+0.68; a 6.00 / 1.60 starter at 1.33) against a clamp admitting **0.85–1.18**. The clamp
+compresses a ±33% real spread into ±17%, and binds on ~60% of calls — so for most matchups
+the model sees the opposing starter as one of two values with no gradation.
+
+**`contact` is fine** (9–36% pinned); only `power` saturates. The asymmetry is itself the
+tell: `contact` is `whip/1.30`, a single ratio, while `power` averages two ratios and so
+inherits the wider of the two spreads without a wider clamp.
+
+**This is the same range-compression pathology as `pitcher_outs` defect 3, in a different
+mechanism**, and `tools/range_compression.py` independently flags H+R+RBI — whose λ is
+`rate × coors × power` — at an IQR ratio of **0.50**, matching `pitcher_outs`'s 0.51. Not
+proposed for change: frozen, and the owner signs off.
+
+---
+
+## THE RANGE-COMPRESSION DETECTOR — the fourth check, and it failed twice before it worked
+
+`tools/range_compression.py`. A model can be **centred correctly and still unable to reach
+the tails**; a bias check reports that as a small mean error, and nothing named it.
+
+**Both failures are recorded because each produced a plausible table.**
+
+1. **Probability space is the wrong space.** The first version compared the spread of
+   `pModel` against the spread of `implied` and reported `pitcher_outs` as **1.20× WIDER**
+   than the market — the exact opposite of the defect it was written to find. Probability is
+   a transform of *(λ, LINE)*, and the lines differ across rows, so a model whose λ range is
+   too narrow can still read wide simply by sitting at varying distances from varying lines.
+   Fixed by inverting both sides through the engine's own Poisson into **λ space**.
+2. **Then the side orientation was wrong.** `categories` carries one side per line and it is
+   the UNDER for 35 of 38 outs rows; inverting P(under) through an OVER cdf prices a
+   different event. It read **2.32× wider**. This is the fourth methodology rule biting a
+   second time inside one tool, on a statistic I had already declared side-invariant — and it
+   *is* side-invariant for `|gap|`, which is why the earlier claim stands and this one still
+   broke. **Side-invariance is a property of a statistic, not of a population.**
+
+Only after both fixes does the tool report what three other instruments independently
+support: **`pitcher_outs` 0.51 and H+R+RBI 0.50** — model λ spread half the market's.
+
+**The general lesson, and why this belongs in this file:** a detector that returns a
+confident number on its first run is not thereby working. Both broken versions produced
+ranked tables with plausible verdicts, and the only reason either was caught is that a
+**known-bad market** was in the output and read the wrong way. **Build a detector against a
+case whose answer you already know, and treat disagreement with that case as a bug in the
+detector until proven otherwise.** `pitcher_outs` served as the positive control for the
+instrument before it became one for Phase 2.

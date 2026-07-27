@@ -267,6 +267,51 @@ measurement says the dominant mechanism is the 50/50 shrinkage. The hook remains
 absent, and §9 shows it is *also* not the fix — but it is not what the tail number is
 measuring.
 
+### Defect 3 generalises — and it is confirmed by two independent instruments
+
+**`tests/shrink-activity.test.ts`** audits every `shShrink` call site. **All 9 execute, and
+7 of 9 shrink below 0.6 own-sample weight:**
+
+| line | k | typical n | own-sample weight | what it shrinks |
+|---|---|---|---|---|
+| L2066 | **150** | 80.5 | **0.349** | HR rate/AB (closed form) |
+| L2357 | **150** | 89 | **0.372** | HR rate/AB (sim `batVec`) |
+| **L2253** | **4** | **5** | **0.556** | **`pitcher_outs` IP/start — defect 3** |
+| L2099 | 4 | 5 | 0.556 | **`leashOf` — the sim's copy of the same** |
+| L2274 | 4 | 5 | 0.556 | K's per start |
+| L2065 | 60 | 80 | 0.571 | hits rate/AB (closed form) |
+| L2349 | 60 | 80 | 0.586 | hits rate/AB (sim) |
+| L2351 | 60 | 95 | 0.613 | hits rate/AB (sim, no-starter path) |
+| L2359 | 10 | 26 | 0.722 | H+R+RBI per game |
+
+**Not all seven are equally suspect, and the flag alone does not distinguish them.** A large
+`k` on a *rate* estimator is statistically defensible: HR/AB has enormous per-AB variance, so
+`k = 150` at n≈80 is a deliberate choice about a rare event. `pitcher_outs` is different in
+kind — `ipg` is an average of ~5.3 innings with small across-start variance, and there is no
+variance argument for discarding half of a starter's own workload. **The flag is a prompt to
+justify each `k`, not a verdict that all seven are wrong.** None of the nine is justified
+anywhere in the repo.
+
+**`tools/range_compression.py`** confirms the consequence independently, in the market's own
+units (both sides inverted through the engine's own Poisson at each row's line):
+
+| market | IQR(λ_model) | IQR(λ_market) | ratio | p10–90 ratio | verdict |
+|---|---|---|---|---|---|
+| **H+R+RBI** | 0.27 | 0.55 | **0.50** | 1.21 | **COMPRESSED** |
+| **`pitcher_outs`** | 1.14 | 2.26 | **0.51** | **0.55** | **COMPRESSED** |
+| HR | 0.08 | 0.06 | 1.35 | 1.11 | ok |
+| K's | 1.90 | 1.11 | 1.72 | 0.97 | ok |
+| hits | 0.19 | 0.06 | 2.96 | 2.89 | wider than market |
+
+**`pitcher_outs`'s λ spread is half the market's — defect 3 measured directly.** And a second
+market falls out: **H+R+RBI is equally compressed at 0.50**, but *not* through `shShrink` —
+its site (L2359, k=10) has the best weight in the table. Its λ is
+`rate × coors × power` (L2359), and **`power` is the clamp measured at 60% saturated**
+(L2319, `tests/clamp-activity.test.ts`). Same pathology, different mechanism.
+
+Three instruments, built for three different purposes, converging on the same two markets is
+the evidence that the pathology is real and not an artifact of any one of them.
+
 ---
 
 ## 9. WOULD ROUTING OUTS THROUGH THE SIM FIX IT? Partly — and NOT the tail
@@ -329,12 +374,22 @@ So the +0.03 / −1.68 row in §8 is the sim's **best possible case**, not its e
 - at the deep end it is still **−1.68 outs** short before any early-hook mass is subtracted;
 - and the realised sim mean is below that by however often the two early hooks fire.
 
-**Verdict on the sim route.** It fixes defect 1 for free and improves the tail from −2.57 to
-at best −1.68, but it **cannot fix defect 3, because it shares the estimator**. Routing outs
-through the sim is worth doing for the hook realism, but *on its own it is not the fix* — and
-the framing "the sim models the hook, so it should project the 6+ IP starts the closed form
-can't" does not survive contact with `leashOf`. **The shrinkage weight has to change on both
-paths regardless.**
+> ### VERDICT: THE SIM ROUTE IS CLOSED AS A FIX FOR THE TAIL
+> The hypothesis — *"the sim models the hook explicitly, so it should project the 6+ IP
+> starts a 30-day mean shrunk toward `Lipg` cannot"* — is **DISCONFIRMED**, on two
+> independent grounds:
+>
+> 1. **`leashOf` recomputes the same estimator verbatim.** Same `ip30/g30`, same
+>    `shShrink(·, ·, 4, Lipg)`, same `×3`. The sim inherits **defect 3 exactly**.
+> 2. **The leash is a ceiling, not a centre.** `vsBP = spOuts >= leash` is a one-way early
+>    exit and `spRuns>=6` / `spPA>=29` only ever pull the starter sooner, so simulated
+>    starter outs are **bounded above by the same compressed estimator**. The closed form's
+>    Poisson at least has an unbounded right tail; the sim would not.
+>
+> **Routing `pitcher_outs` through the sim does NOT fix the tail.** It fixes defect 1 for
+> free (no `of` on that path) and improves the tail from −2.57 to at best −1.68 outs, but the
+> residual is structural to the shared estimator. **The fix has to change the estimator on
+> both paths.** The sim route remains worth doing for hook realism; it is not the repair.
 
 **One number is missing and cannot be derived from a board:** the realised mean of
 `outsBySP*`, i.e. how far below the leash the early hooks pull it. That needs an instrumented

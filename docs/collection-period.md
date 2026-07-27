@@ -125,6 +125,33 @@ drift, even when both values look reasonable on their own.
 | **ump kFactor clamp** | `[0.92, 1.08]` (`shUmpKf`) | ±8% cap on the umpire K adjustment. **No stated rationale; narrower than the sampling noise the gate admits.** |
 | **`GAP_BUCKET_MIN_N`** | `150` | rows needed in a disagreement bucket before its calibration gap is read. **Fifth entry of the unexamined-constant class — and the only one with its arithmetic stated up front:** at n=150 SE(gap)=4.1 points, so the 12.9-point H+R+RBI miscalibration reads at 3.2σ. |
 
+### `shShrink` k values — the SIXTH entry of the unexamined-constant class (added 2026-07-26)
+
+`shShrink(rate, n, k, prior)` returns `(n*rate + k*prior)/(n+k)`, so **`k` is the number of
+prior observations the estimator pretends to have** and the own-sample weight is `n/(n+k)`.
+**Not one of these nine values is justified anywhere in the repo.** Own-sample weight is
+measured at the `n` actually seen — `tests/shrink-activity.test.ts`, which snapshots them so
+a change fails.
+
+| line | k | typical n | own-sample weight | what it shrinks |
+|---|---|---|---|---|
+| L2066 | **150** | 80.5 | **0.349** | HR rate/AB (closed form) |
+| L2357 | **150** | 89 | **0.372** | HR rate/AB (sim `batVec`) |
+| **L2253** | **4** | **5** | **0.556** | **`pitcher_outs` IP/start — defect 3** |
+| L2099 | 4 | 5 | 0.556 | `leashOf` — the sim's copy of the same estimator |
+| L2274 | 4 | 5 | 0.556 | K's per start |
+| L2065 | 60 | 80 | 0.571 | hits rate/AB (closed form) |
+| L2349 | 60 | 80 | 0.586 | hits rate/AB (sim) |
+| L2351 | 60 | 95 | 0.613 | hits rate/AB (sim, no-starter path) |
+| L2359 | 10 | 26 | 0.722 | H+R+RBI per game |
+
+**Seven of nine sit below 0.6 own-sample weight, and the flag is a prompt, not a verdict.**
+A large `k` on a *rate* is defensible — HR/AB has enormous per-AB variance, so `k = 150` at
+n≈80 is a real choice about a rare event. `pitcher_outs` is different in kind: `ipg` averages
+~5.3 innings with small across-start variance, and no variance argument supports discarding
+half of a starter's own workload. Justify each `k` on its own estimator; do not treat the
+column as a list of bugs. Frozen; see `docs/pitcher-outs-audit.md` §8.
+
 ### Structure caps
 | parameter | value | meaning |
 |---|---|---|

@@ -216,6 +216,16 @@ NOT close the winner's-curse question**: it measures *gap-based* selection, whil
 clears +2%. Phase 2's movement slope tests the real quantity. `tools/selection_effect.py`.
 Denominator note: **37 distinct legs**, not the 46 leg *instances* first reported.
 
+**Singles do not solve NO-PLAY, and structure barely matters** (`docs/singles-vs-parlays.md`,
+`tests/singles-counterfactual.test.ts`). **1 of 205** playable rows clears `consMinEv` as a
+single (best −0.60%), and **none of the wall is compounding** — 24 of 24 gate-reaching singles
+are blocked. `maxCoreTickets = 6` binds either way, so a 276-row singles pool and a 67-ticket
+parlay pool both produce **6 picks / $250**. `buildParlaySet` refuses `legs.length < 2`, so a
+single is *unconstructible* today, not merely unselected. Correlation justifies a parlay in
+**4 of 218** tickets (max +19.2%), and **2 tickets are negatively correlated at 0.564 — the
+engine detects `negCorr`, discloses it, and builds them anyway.** Singles-first would
+*concentrate* the outs defect (Valdez is the top stake), so it must sequence after the fix.
+
 **Gates do NOT reach the prediction store.** `consMinN`/`consMinEv` gate tickets inside
 `shAllocate` at card time. `finalizeCats` → `boardToPredictions` → `mergeDayBlob` consult no
 gate (they drop only `all`, live rows, dupes, and started games), and `snapshot_props.py`
@@ -223,6 +233,28 @@ never sees the board. Proof: `/api/calibration` shows `pitcher_outs n=5` graded 
 locked cards ever**. So Phase 2 keeps its full x-axis; the restricted-market window binds the
 **ledger channel only**. The real limit on the close-graded channel is that `categories` caps
 at **top 50/market** — outs (38) and K's (35) are complete, TB/hits/HR/HRR are truncated.
+
+**Four drift checks now, all catching things a parameter table cannot show** — because in
+every case the constants still read the same:
+| check | catches | worst finding |
+|---|---|---|
+| `tools/factor_activity.py` | an input gone missing | 7 identity-returning factors |
+| `tools/gate_activity.py` | a threshold that can't be reached | 5 inert protections |
+| `tests/clamp-activity.test.ts` | a clamp pinned at a bound | L2258 100% low |
+| `tests/shrink-activity.test.ts` | `k` too large for the `n` available | L2066 weight 0.349 |
+| `tools/range_compression.py` | output range narrower than the market's | outs 0.51, HRR 0.50 |
+
+**`shShrink` k values are the SIXTH unexamined-constant entry** (after `simN`/`simNHR`,
+`1.06`, props-`regions`, ump `g>=5`, `GAP_BUCKET_MIN_N`). 7 of 9 sites sit below 0.6
+own-sample weight. **The flag is a prompt to justify each k, not a verdict** — `k=150` on
+HR/AB is defensible for a rare event; `k=4` on `ipg` at n≈4 is not.
+
+**Range compression is a distinct pathology from bias** — a model centred right that can't
+reach the tails. Measure it in **λ space, not probability** (probability transforms *(λ,
+line)* and lines vary), and **orient to the over first**. Both versions of that tool produced
+confident, plausible, wrong tables before it worked; `pitcher_outs` was the known-bad control
+that caught them. Result: outs λ-IQR ratio **0.51**, HRR **0.50** — and HRR's cause is not
+`shShrink` but the 60%-saturated `power` clamp, since HRR's λ is `rate × coors × power`.
 
 **Third drift check: `tests/clamp-activity.test.ts`.** Factor activity catches a missing
 input, gate activity a threshold that can't be reached, and this a **clamp pinned at a bound**
