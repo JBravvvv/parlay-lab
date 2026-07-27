@@ -777,3 +777,38 @@ was: without it, "the closed form showed rung dependence" reads as a partial con
 instead of as evidence against the richer path. And the sim currently prices **33 of 50 H+R+RBI
 rows and nothing else on the board**, so an error in it is concentrated in exactly the market
 under investigation.
+
+### ⚠️ THE 0.0 HRR GAP IS A TAUTOLOGY, NOT EVIDENCE ABOUT THE SIM
+
+A reasonable reading of *"sim − closed-form = 0.0 on H+R+RBI"* is that **the sim reproduces the
+same flat λ**, and therefore that routing HRR through the sim would not fix its park problem.
+**That inference does not hold, and the number cannot support it either way.**
+
+`pO` for an H+R+RBI row **already is** the sim value (L2394 overwrites it). So `sim − pModel` is
+`x − x`. The 0.0 is the **control that validates the join**, not a comparison — the closed-form
+λ for those rows is computed and then overwritten, and was never in the comparison at all.
+
+**What the evidence actually says, from the ladder measurement:**
+
+| path | rung drift O0.5 → O1.5 | vs market +0.479 |
+|---|---|---|
+| **sim** (n=15 pairs) | **+0.356** | ratio **0.76** |
+| **closed form** (n=5 pairs) | **+0.001** | ratio **0.00** |
+
+**The sim has site and rung structure; the closed form has none.** That is consistent with
+`batVec` carrying `parkH`/`parkHR`, platoon and xISO-against while the closed form carries
+`rate × coorsFlag × power`. **So sim routing DOES address HRR's site variation** — for the 66%
+of rows it already covers, it has been addressing it all along.
+
+### Which separates the two amendments cleanly
+
+| rows | what fixes their site variation |
+|---|---|
+| **33 of 50 (66%) — already sim-priced** | **nothing to fix.** They have park, platoon and xISO today |
+| **17 of 50 (34%) — closed-form** | **either** a retime (get their lineups confirmed so the sim covers them) **or** `shParkF` + λ conditioning in the closed form |
+
+**They are alternatives for those 17 rows, not complements** — and `shParkF` routing is the one
+that also reaches `batter_hits` (which the external check says must stay closed-form),
+`pitcher_strikeouts` (which the sim cannot price at all) and every game the sim misses. The
+"residual after 1 and 2" label was right for the wrong reason: it is a residual because the other
+two are partial, not because it is small.

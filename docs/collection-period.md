@@ -3134,7 +3134,7 @@ would have put two of them at zero and read as "no effect" rather than "wrong ax
 
 | rank | amendment | measured effect | reaches |
 |---|---|---|---|
-| **1** | **sim routing, batter markets** (widen the L2394 filter) | hits **+9.2 pp median**, TB **+5.0**, HR +1.2 (fixture; sign is disagreement, not error) | 150 of 200 batter rows |
+| ~~1~~ | ~~sim routing, batter markets~~ | **SUPERSEDED — see the external check below.** Refuted for `batter_hits` (sim mean-abs error 7.1 vs closed form 5.6); survives marginally for TB and HR | TB + HR only |
 | **2** | **`pitcher_outs` → sim** (collect `outsBySP*`) | the closed form's gap is **23.5 pp**; the sim path already models the hook the closed form cannot use | 38 outs rows, 100% of them |
 | **3** | **`shParkF` → closed form** | hit rate **1.5% median / 3.5% max**; **HR rate 4.5% median / 11.0% p90 / 14.5% max** | **the residual after 1 and 2** — pitcher K's permanently, plus any market left closed-form |
 | **4** | **HRR λ conditioning** | closed-form λ has **zero** site variation on a non-Coors slate; recovers ~0.12 of spread against a market drift of +0.479 | 17 of 50 HRR rows (34%) |
@@ -3163,3 +3163,89 @@ its cost stated** — every outs price moves, and it needs its own validation pa
 
 **Both stay unshipped and both are still gated on a positive Phase 2** — they are corrections to
 machinery that assumes an edge exists.
+
+# ⚠️ THE EXTERNAL CHECK INVERTS RANK 1 — sim routing is REFUTED for hits (2026-07-27)
+
+`+9.2 pp` was a magnitude with no direction of correctness. Checked against the only external
+reference available — the market's own de-vigged fair — on **`propBoard`** (both sides,
+uncapped, not the ranked `categories` population):
+
+| market | n | **sim − market** med / meanAbs | **closed form − market** med / meanAbs | closer to market |
+|---|---|---|---|---|
+| **`batter_hits`** | 57 | **+5.0 / 7.1** | **−4.3 / 5.6** | **CLOSED FORM** |
+| `batter_total_bases` | 30 | **+1.0** / 5.7 | −2.6 / **6.3** | **SIM**, marginally |
+| `batter_home_runs` | 61 | **+0.4** / 3.5 | −1.1 / 3.5 | **tie on error, sim better centred** |
+| **HRR — CONTROL** | 13 | +5.7 / 5.4 | +5.7 / 5.4 | **identical, as it must be** |
+
+The control is again the validation: HRR's `pO` *is* the sim value, so recovering the
+closed-form model from `pO = W·pModel + (1−W)·fO` returns the sim. Identical columns prove the
+recovery arithmetic, and the other three rows are real.
+
+> ### THE EXACT FAILURE MODE THAT WAS ASKED ABOUT
+>
+> **On hits the closed form UNDERSHOOTS the market by −4.3 and the sim OVERSHOOTS it by +5.0.**
+> Routing swaps one error for another **and makes it larger** — mean absolute error 5.6 → 7.1.
+>
+> **Rank 1 does not stand for `batter_hits`.** It survives, marginally, for TB (5.7 vs 6.3) and
+> HR (tied at 3.5, better centred). The +9.2 pp figure measured the size of a disagreement and
+> said nothing about who was right; against an external reference the closed form wins the
+> largest of the three markets.
+
+**Revised: sim routing is a per-market amendment, not a blanket one.** TB and HR only, and both
+on thin margins from a fixture. Hits stays closed-form and its −4.3 undershoot becomes its own
+open question — a bias the sim would not have fixed.
+
+**Caveats, stated:** fixture slate at `SIM_PATHS_FIXTURE`; the market fair is the engine's own
+de-vig, so it is not an independent instrument in the strict sense — it is simply the only
+external one there is. Neither justifies acting on the margins in TB and HR without the archive
+series behind them.
+
+# SIZING `pitcher_strikeouts` → SIM: contained, with one trap (2026-07-27)
+
+Read from the PA draw at L1918–1969. **Not building it; sizing it.**
+
+## The logic is a SPLIT of a branch that already exists
+
+The draw is one `u = rng()` against the cumulative vector `v = [BB, 1B, 2B, 3B, HR]`, then a
+`rng() < SH_ADV.roe` for reached-on-error, and everything remaining falls into:
+
+```js
+}else{ /* out in play: sac fly scores R3 (<2 outs); GIDP with R1 (<2 outs) */
+  if(b3>=0&&outs<2&&rng()<SH_ADV.sacFly){...}
+  else if(b1>=0&&outs<2&&rng()<SH_ADV.gidp){...}
+  outs++;if(!vsBP)spOuts++;
+}
+```
+
+A strikeout is an out **with no ball in play**, so it splits that branch cleanly:
+
+| | |
+|---|---|
+| **no sixth element in `v`** | K is conditional on "out": `pK_given_out = pK / (1 − Σv − roe)` |
+| **semantically it FIXES a small existing error** | the branch currently lets a strikeout produce a **sac fly or a GIDP**. Both require contact |
+| **the leg is on the PITCHER, not the batter** | accumulate `kBySPHome/Away` exactly as `outsBySPHome/Away` is already threaded |
+| **inputs exist** | `kps` (the closed form's per-start K rate, L2274) and `shOppWhiffF`'s lineup whiff percentiles |
+| **no cascade** | `spOuts`, `spPA`, `spRuns`, the leash, the V2 hook and the bullpen chain are all untouched — a K increments `outs`/`spOuts` exactly as any other out does |
+
+**Size: ~10 lines in `halfInning`, one accumulator, one `SIM_STAT` entry, one leg-builder case.**
+
+## ⚠️ The trap: RNG stream consumption
+
+`rng` is `shMulberry`, seeded per game. **Inserting an `rng()` call inside the out-branch shifts
+every subsequent draw**, so every existing sim number moves and **both baselines break** — a
+change that looks like ten lines would rebaseline the entire sim.
+
+**The fix makes it additive instead:** draw the K decision from a **second, independently seeded
+generator**. The primary stream's consumption pattern is then untouched, existing sim outputs are
+byte-identical, and K's arrive as a pure addition — **the same shape as `clampActivity`**, which
+was proven byte-identical against both baselines by hashing the whole board minus the new key.
+
+## Verdict
+
+> **It belongs in the bundle, not in a post-freeze project — PROVIDED the second-stream design is
+> used.** With it: contained, parity-checkable, ~10 lines. Without it: a full sim rebaseline, and
+> then it is a post-freeze project.
+>
+> **The distinction is entirely in the RNG design, not in the modelling.** That is worth stating
+> plainly, because "re-architecture" was the right word for what a naive implementation costs and
+> the wrong word for what the change actually is.

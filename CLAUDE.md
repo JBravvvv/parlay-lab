@@ -524,11 +524,23 @@ for all four; **L2394 reads only `mkt==="batter_hits_runs_rbis"`.** On the armed
 holds **96 HR + 57 hits + 30 TB + 13 HRR — 183 of 196 batter legs simulated and discarded every
 run.** The sim also threads **starter outs** (`outsBySP*`) against the leash and discards them.
 It does **not** model strikeouts at all (an out is undifferentiated), so K's are re-architecture.
-**Sim minus closed-form `pModel`, same row, oriented:** hits **+9.2 pp median**, TB **+5.0**,
-HR +1.2, and **HRR 0.0 (control — it already takes the sim value, max 0.1 pp)**. The control
-validates the join. This says the paths DISAGREE, not that the closed form is wrong by 9.2 pp —
-sim-higher is as consistent with a sim bias, which is what the closed-form-only branch suspects.
-Fixture magnitudes (`SIM_PATHS_FIXTURE`), indicative only.
+**Sim minus closed-form `pModel`:** hits +9.2 pp median, TB +5.0, HR +1.2, HRR 0.0 (control).
+⚠️ **THE EXTERNAL CHECK INVERTS THIS.** Against the market fair on `propBoard` (both sides):
+`batter_hits` sim **+5.0 / meanAbs 7.1** vs closed form **−4.3 / 5.6** → **CLOSED FORM CLOSER,
+sim routing REFUTED for hits.** TB: sim 5.7 vs cf 6.3 (sim, marginal). HR: 3.5 vs 3.5, sim better
+centred. **A magnitude is not a direction of correctness** — the closed form undershoots market
+and the sim overshoots, so routing swaps one error for a larger one on the biggest market.
+**The 0.0 HRR gap is a TAUTOLOGY** (`pO` already IS the sim value), not evidence the sim
+reproduces the flat λ — the ladder split (sim 0.76, closed form 0.00) says the opposite.
+**`pitcher_strikeouts` → sim is CONTAINED, not re-architecture** — a split of the existing
+out-branch (`pK_given_out = pK/(1−Σv−roe)`, no sixth vector element), and it *fixes* a small
+existing error (a K currently can produce a sac fly or GIDP). ~10 lines, no cascade into
+leash/hook/bullpen. **The trap is RNG stream consumption**: a naive `rng()` inside that branch
+shifts every downstream draw and rebaselines the whole sim. Use a **second independently seeded
+generator** and it is additive and parity-checkable like `clampActivity`.
+**Full draft bundle: `docs/freeze-exit-bundle.md`** — 6 model + 4 allocation items, each with
+measured effect, axis and dependencies, plus the closed-with-magnitude list.
+
 **Amendment bundle is on TWO axes** (model in pp, allocation in bp) and the model ones OVERLAP —
 **sim routing subsumes `shParkF` routing** for any market it covers. Order in
 `docs/collection-period.md`; the outs constant swap stays the recommendation with sim routing as
