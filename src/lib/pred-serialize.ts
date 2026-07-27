@@ -89,12 +89,46 @@ export type DayGames = Record<
 >;
 
 /** One stored day of predictions (the /api/predictions blob shape). */
+/**
+ * WHERE THE GENERATING PASS LANDED (2026-07-26).
+ *
+ * A board stamped at generation but unlabelled in the STORE means the calibration
+ * channel cannot distinguish a punctual board from a four-hour-late one — a population
+ * split nobody would ever see. `/api/generate` computes this standing; without it here
+ * it dies with the HTTP response.
+ *
+ * The join key already exists: every `PredRecord` carries `at` = the pass that last
+ * restated it (generation-scoped replacement), so a row joins to its pass by `at`.
+ * Phase 2 can therefore filter or condition on lateness per ROW, not per day.
+ *
+ * Capture during the window or lose it — the same rule as every other field here.
+ */
+export type GenStamp = {
+  at: number;
+  /** ms past the EARLIEST first pitch; positive = the slate was already underway */
+  lateMs: number | null;
+  /** ms before the NEXT first pitch — what lineup coverage turns on */
+  leadMs: number | null;
+  games: number;
+  started: number;
+  /** games not yet started at generation */
+  live: number;
+  luConfirmed: number;
+  /** confirmed / live — DENOMINATOR IS UNSTARTED GAMES, never the whole slate */
+  luPct: number;
+  /** schedule-only ceiling at that moment, same denominator */
+  achievable: number;
+  src?: string;
+};
+
 export type DayBlob = {
   date: string;
   at: number;
   records: Record<string, PredRecord>;
   parlays: Record<string, ParlayPred>;
   games: DayGames;
+  /** one entry per generation pass, newest last; join on PredRecord.at */
+  gens?: GenStamp[];
 };
 
 const oddsNum = (v: unknown): number | null => {
@@ -240,8 +274,15 @@ export function mergeDayBlob(
   parlays: ParlayPred[],
   games: DayGames,
   now: number,
+  gen?: GenStamp,
 ): { blob: DayBlob; written: number } {
   const blob: DayBlob = cur ?? { date, at: 0, records: {}, parlays: {}, games: {} };
+  /* append this pass's standing, de-duped by `at` so a retry cannot double-count */
+  if (gen && isFinite(gen.at)) {
+    const gens = (blob.gens ?? []).filter((g) => g.at !== gen.at);
+    gens.push(gen);
+    blob.gens = gens.slice(-12);
+  }
   blob.games = { ...blob.games, ...games };
   const started = (gkey: string | null) => {
     if (!gkey) return false;

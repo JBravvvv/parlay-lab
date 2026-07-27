@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEngine, type BoardData } from "@/engine";
-import { boardToPredictions, mergeDayBlob, type DayBlob } from "@/lib/pred-serialize";
+import { boardToPredictions, mergeDayBlob, type DayBlob, type GenStamp } from "@/lib/pred-serialize";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { achievableCoverage, liveCoverageOf } from "@/lib/board-coverage";
@@ -278,7 +278,7 @@ export async function GET(req: NextRequest) {
     }
 
     const cur = await redisGetJson<DayBlob>(dayKey(date));
-    const { blob, written } = mergeDayBlob(cur, date, records, parlays, games, now);
+    const { blob, written } = mergeDayBlob(cur, date, records, parlays, games, now, { ...gen, src: "cron" });
     if (JSON.stringify(blob).length > MAX_BYTES) {
       return NextResponse.json({ error: "day blob too large" }, { status: 413 });
     }

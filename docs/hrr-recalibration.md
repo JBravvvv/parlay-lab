@@ -259,6 +259,13 @@ Two pricing paths exist:
   > moves later, more of the slate is live and more rows fall into this case. Not urgent —
   > 3 rows here — but it is the one source the retime cannot fix and can aggravate.
   >
+  > **THE HONEST CLAIM IS "REMOVES ~65% OF THE LADDER-DEFECT EXPOSURE", NOT "ELIMINATES IT".**
+  > Of the 18 rows (17 closed-form + the boundary case): the retime **fully solves 11**,
+  > **partly solves 4** (one-sided lineups — a later fire raises the odds both are posted but
+  > never guarantees it), and **worsens 3** (live games — every hour later, more of the slate
+  > is in progress and more rows fall into the `!liveInit` branch). One-sided lineups and live
+  > games stay open items with their own fixes.
+  >
   > **So the H+R+RBI ladder fix is board TIMING, and it is worth more than the coverage
   > tables ever suggested.** `docs/board-timing.md` treats lineup coverage as a data-quality
   > metric; it is also the switch between a distribution that reproduces 76% of the market's

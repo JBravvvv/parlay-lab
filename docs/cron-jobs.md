@@ -30,6 +30,63 @@ exists") would make every one of them a no-op. There must be no window with both
 **Two Sunday fires stay inside the per-date cap** (`MAX_RUNS_PER_DATE = 3`,
 `app/api/generate/route.ts`), leaving one spare for a manual regenerate.
 
+## The hours, checked against a 50-day schedule sample (2026-06-05 → 07-26, 664 games)
+
+`ready` = games both **unstarted** and past their 3 h lineup window at that moment — what a
+pass can actually price pregame with a real lineup.
+
+| day type | hour | started | unstarted | **ready/day** | % of day |
+|---|---|---|---|---|---|
+| **Mon–Fri** | 21:00 | 1.9 | 10.5 | 6.4 | 52% |
+| **Mon–Fri** | 21:30 | 1.9 | 10.5 | 7.8 | 63% |
+| **Mon–Fri** | **22:00** | 1.9 | 10.5 | **8.2** | **66%** ← best |
+| Mon–Fri | 23:00 | 4.3 | 8.1 | 7.4 | 60% |
+| **Saturday** | 17:00 | 0.2 | 14.9 | 2.8 | 18% |
+| **Saturday** | **18:00** | 1.2 | 13.9 | **6.5** | **43%** ← best |
+| Saturday | 20:00 | 3.0 | 12.1 | 5.4 | 36% |
+| **Sunday** | **17:00** | 0.9 | 14.2 | 11.0 | 73% |
+| **Sunday** | **17:30** | 1.0 | 14.1 | **13.0** | **86%** ← best on paper |
+| Sunday | 18:00 | 6.5 | 8.6 | 7.6 | 50% |
+
+**Mon–Fri 22:00 and Saturday 18:00 are already optimal** — both are the peak of their sweep,
+and Saturday is structurally hard because its games spread across the whole day.
+
+> ### Sunday 17:30 beats 17:00 by ~2 games/day — and I still recommend 17:00 for now
+> 13.0 vs 11.0 lineup-ready games. But the Sunday bulk starts at **17:35**, so a 17:30 fire
+> has **five minutes** of delay tolerance on the largest block of the slate, against 35
+> minutes at 17:00. **cron-job.org's punctuality at these hours is unverified**, and GitHub
+> just demonstrated what an unverified scheduler can do (+8.75 h for fifteen days).
+>
+> **Take 17:00 now; move to 17:30 once the `gen.at` stamps show the scheduler is punctual.**
+> That is the delay lesson applied rather than restated.
+
+## What the Sunday 22:30 entry actually buys — and what it costs
+
+At 22:30 on a Sunday, **14.1 of 15.1 games are already started** and **1.0 is unstarted and
+lineup-ready**. So the pass reaches **one game**.
+
+**It cannot damage the other fourteen.** `mergeDayBlob` filters incoming rows by
+`!started(r.gkey)` and freezes any stored row whose game has begun
+(`if (prev && started(prev.gkey)) continue`). The 17:00 pass's rows for the afternoon slate
+are **frozen before the 22:30 pass runs**, so the second entry is purely additive to the
+prediction store. **The "trades one ladder-defect source for another" worry does not
+materialise** — the live-game exposure is in games whose rows were already captured pregame.
+
+**The real cost is elsewhere: it overwrites the stored BOARD.** `/api/generate` does an
+unconditional `SET BOARD_KEY(date)`, so after 22:30 the persisted board for that Sunday is
+the thin one — `categories` carrying essentially the night game alone. Consequences:
+
+| surface | effect |
+|---|---|
+| prediction store / calibration / Phase 2 | **none** — records merge and freeze correctly |
+| `/api/board` for that date, and any later analysis of it | **the fat 15-game Sunday board is gone**, replaced by a ~1-game board |
+| the client | fine — `bestBoard` prefers the board that prices more still-bettable games, and at 22:30 both price one |
+
+Every board-level measurement in this project was taken from a persisted board. **On Sundays
+that artifact would become the 22:30 one.** Not a reason to skip the entry — the ladder
+exposure it removes is worth more — but it is the trade, and a non-destructive board store
+(keep the better board rather than the latest) is the obvious follow-up.
+
 **The hours are unchanged from your spec.** The GitHub delay finding does **not** move them,
 because it is specific to GitHub Actions' scheduled-workflow queue and does not apply to a
 dedicated HTTP scheduler.
