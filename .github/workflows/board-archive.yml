@@ -1,0 +1,66 @@
+name: board-archive
+# Pull each day's finished board out of Redis -> line-history branch (data/boards/).
+#
+# 2026-07-27 — WHY. `pl:board:{date}` is written `EX 259200`. Three days. Every board-level
+# finding this project has produced — the 2.28 winner's-curse decomposition, the pitcher_outs
+# audit, the H+R+RBI ladder test, the range-compression detector, the sim-coverage table —
+# was computed from a live board and is unreproducible 72 hours later. The prediction store
+# keeps ROWS, not boards, and it does not keep `propBoard`, the row `case` strings, or ticket
+# czEv/bsEv/consCzEv. So Phase 3's >=20-board threshold was unreachable by construction:
+# boards 2..20 expire before board 20 exists.
+#
+# Zero Odds credits (/api/board serves what the generate cron already paid for) and no
+# secret (/api/board is deliberately ungated). ~150 KB gzipped per board.
+#
+# CAPTURES AFTER THE DAY, NEVER RACES IT. The script targets PT **yesterday** and the two
+# days before it — never today, which is still being generated. The last generation of PT
+# day D is the Sunday 22:30 UTC entry (15:30 PT on D); this fires 12:00 UTC on D+1, i.e.
+# 05:00 PT, 13.5 hours later.
+#
+# DELAY TOLERANCE IS THE THREE-DAY WINDOW, NOT THE CLOCK. Measured over 15 days, GitHub
+# starts these schedules +3.3h to +8.75h late and sometimes skips a tick outright
+# (docs/cron-jobs.md). Two crons x a 3-date window means each date gets six independent
+# chances inside its TTL, so no individual firing has to be punctual — the same reasoning
+# as tools/snapshot_props.py's self-pacing, reached with a cheaper mechanism because a
+# board, unlike a close, is still sitting there hours later.
+on:
+  schedule:
+    - cron: "0 12 * * *"
+    - cron: "0 19 * * *"
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: "explicit dates to archive (space-separated); blank = PT yesterday + 2"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: line-history-writes
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: line-history
+      - name: Fetch archive script from the app branch
+        run: |
+          git fetch --depth 1 origin frontend-rebuild
+          git checkout origin/frontend-rebuild -- tools/archive_boards.py
+      - name: Archive boards
+        run: python3 tools/archive_boards.py ${{ github.event.inputs.dates && format('--dates {0}', github.event.inputs.dates) || '' }}
+      - name: Commit
+        run: |
+          git config user.name "engine-v2-bot"
+          git config user.email "noreply@github.com"
+          git add data/boards
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "board archive: $(date -u +%Y-%m-%dT%H:%MZ)"
+          # props-history writes the same branch on its own schedule; a delayed run of
+          # either can land on top of the other
+          git pull --rebase origin line-history
+          git push
