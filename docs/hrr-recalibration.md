@@ -481,7 +481,10 @@ bullpen chains). Residual gap accepted for the closed form; the sim is the prima
 **(c) Park factors for the run/RBI components — partially conditioned.**
 The closed form applies a Coors bump (×1.08) and the shared park×handedness factor
 enters through the hit channel, but the **run/RBI components** have no dedicated
-park-scoring term in the closed form. The sim path prices runs/RBI through actual
+park-scoring term in the closed form. ⚠️ **SUPERSEDED 2026-07-27 — see "THE CLOSED FORM HAS NO
+PARK FACTOR AT ALL" at the end of this file. The closed form has no real park term for ANY
+component (only the Coors flag), and `shParkF` — 92% live — is sim-only. This wording was
+written without knowledge that the factor existed.** The sim path prices runs/RBI through actual
 run-scoring dynamics in the simulated park environment. Residual gap accepted for the
 closed form; documented here rather than papered over.
 
@@ -582,3 +585,84 @@ observed 12.9-point H+R+RBI miss reads at ~2.7σ.
    same-slate legs are correlated; at ρ ≈ 0.05 the 12.9-point gap falls from ~2.7σ to
    **~1.1σ**. **Before this criterion is relied on, the gap should be re-tested with
    clustered standard errors.** Not yet done, and it could change the verdict.
+
+# ⚠️ TRACED: THE CLOSED FORM HAS NO PARK FACTOR AT ALL (2026-07-27)
+
+**Two corrections first, both mine.**
+
+1. **`shPitIsoF` does NOT discard park and wind.** L2086 is
+   `hrF = isoF*wind.f*parkHR*pl.hr` — `wind.f`, `parkHR` and the platoon term are all
+   **retained**. What drops is `power`, `pq` and `bpF`, and L2076–2078 says why in the engine's
+   own words: *"the pitcher's xBA-against enters through log5 (so the WHIP/percentile proxies
+   come OFF the hit channel — no double counting); xISO-against replaces the power proxy."*
+   **Documented, intentional, not a defect.** My "dead branch" framing was wrong.
+2. **`shParkF` is 92% live but it is SIM-ONLY.** `parkH`/`parkHR` appear at exactly one place —
+   **L2062, inside `batVec`.** They reach no closed-form price.
+
+**And tracing that produced the actual finding.**
+
+## The closed form's factors, L2326
+
+```js
+var pq=shPitPctF(pst);
+var hrF = power*pq*wind.f*(coors?1.08:1)*luckF,
+    tbF = power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1)*luckF,
+    hF  = contact*pq*(coors?1.07:1)*luckF
+```
+
+**There is no `shParkF` here. Park enters the closed form as a BINARY COORS FLAG and nothing
+else** — every non-Coors venue is treated identically, and `SH_PRIORS.parks[L|R]`, which is 92%
+populated, is not consulted.
+
+| channel | park | wind | platoon |
+|---|---|---|---|
+| **sim** (`batVec` L2062 / L2086) | **`parkH`/`parkHR`** — real per-venue × handedness | `wind.f` | `pl.h` / `pl.hr` |
+| closed form — hits (`hF`) | Coors flag only (×1.07) | **none** | **none** |
+| closed form — TB (`tbF`) | Coors flag only (×1.10) | coarse (1.05 / 0.96) | **none** |
+| closed form — HR (`hrF`) | Coors flag only (×1.08) | `wind.f` | **none** |
+| **closed form — H+R+RBI** (L2358) | **Coors flag only (×1.08)** | **none** | **none** |
+
+## H+R+RBI is thinner still: it does not even use `hF`/`hrF`/`tbF`
+
+```js
+lam = rate * (coors?1.08:1) * power      // L2358, and that is the whole thing
+```
+
+Its siblings at least carry `pq` and `luckF`. **H+R+RBI's closed-form λ is a per-game rate times
+a binary Coors flag times `power`** — and `power` is the crude ERA/WHIP proxy that the sim path
+deliberately *replaces* with xISO-against as inadequate (L2077).
+
+> ### THIS IS A MECHANISM FOR BOTH OPEN HRR FINDINGS, TRACED TO A LINE
+>
+> **The ladder split.** Measured: closed-form drift across O0.5 → O1.5 was **+0.001** against a
+> market drift of **+0.479** (ratio **0.00**, n=5); the sim path moved +0.356 against +0.468
+> (ratio 0.76, n=15). A λ built from `rate × coorsFlag × power` has almost **no game-specific
+> variation to move with** — no park, no wind, no platoon. It is not that the closed form
+> under-disperses; it is that there is nearly nothing in it that could disperse.
+>
+> **The signature.** A λ that under-varies is too high where the market is low and too low where
+> the market is high — which is exactly the measured **+11.5 pp at O0.5 / −1.4 pp at O1.5**.
+>
+> **The share.** On the 2026-07-26 board, **17 of 50 H+R+RBI rows (34%) were closed-form**, and
+> NYY@PHI alone supplied 11 of those 17.
+
+**This now outranks the PA-conditioning clamp as the leading candidate for the HRR residual.**
+It is traced to lines, it predicts the sim/closed-form split that was already measured, and it
+predicts the rung signature. It is still **a hypothesis until Phase 2's rung test** — the
+standing rule is unchanged, and it stays inside the box at the top of this file.
+
+**Nothing changed. No parameter touched.** The closed form is frozen and the fix shape (route
+`shParkF` into the closed-form factors, give H+R+RBI the same `hF`/`tbF` treatment as its
+siblings) is a freeze-exit amendment, not a collection-period edit.
+
+## The doc's acceptance was half-right, and written without knowing the factor existed
+
+The residual-gap acceptance below says *"no dedicated park-scoring term for the run/RBI
+components."* **Corrected:** in the **closed form** there is no real park term for **any** H+R+RBI
+component — hits and HR included — only the Coors flag. In the **sim** path all three components
+get the full per-venue park factor through `batVec`.
+
+So the true statement is a **path** split, not a **component** split, and the acceptance was
+recorded without knowledge of a **92%-live, unmonitored `shParkF`** that reaches one path and
+not the other. The acceptance is not thereby wrong — the sim prices most HRR rows — but it was
+made against an input nobody had measured.

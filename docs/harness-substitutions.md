@@ -1208,3 +1208,43 @@ would this miss?"** — and that question has to be asked against the *contract*
 claims to enforce, not against the examples that prompted it. `return 1` was the example.
 "Its contribution disappears when the input is missing" is the contract, and it admits at least
 three spellings.
+
+## "WHAT SHAPE WOULD THIS MISS?" — asked once, of every detector (2026-07-27)
+
+Asked against each detector's **contract**, not against the examples that prompted it. Four
+confirmed instances of a narrow rule creating its own blind spot say a fifth exists; this is the
+whole surface, so the choice of what to close is informed rather than reactive. **Nothing here is
+fixed yet.**
+
+| detector | contract, in one line | what it structurally CANNOT see |
+|---|---|---|
+| **`factor_activity.py`** | every identity-fallback factor's live share on a real slate | **a factor whose live share is high but whose OUTPUT is inert** — `shParkF` reads 92% live and reaches only the sim path. Share ≠ influence, and nothing measures influence |
+| **`gate_activity.py`** | every threshold's category (structural/pinned/zeroed/pending/firing) | **a gate that fires on the WRONG rows.** It counts fires, never asks whether the population it fired on was the intended one — the winner's-curse selection would read as healthy |
+| **`clamp-activity`** | every `shClamp` site's pinned fraction | **a clamp whose BOUNDS are wrong but never reached.** 0% pinned reads as healthy; a factor clamped to [0.5, 2.0] when the real range is [0.9, 1.1] is invisible |
+| **`range_compression.py`** | model dispersion vs market dispersion in λ space | **a model correctly dispersed but mis-CENTRED**, and vice versa. Two orthogonal failures, one number — which is why the outs sign result had to be measured separately |
+| **`coverage-denominator`** | every coverage ratio declares its denominator | **a ratio whose denominator is right and whose NUMERATOR is wrong.** The registry checks the divisor only |
+| **`workflow-timing`** | every scheduled workflow is classified, and named guards exist | **a guard that exists and does not work.** It checks the symbol is present, never that it fires — `_snapshot_kind` could return a constant and pass |
+| **`factor-classification`** | every identity-fallback factor is classified | **a factor with no identity fallback that is nonetheless inert** — one that returns a computed value which happens to always be 1. No `return 1`, no `return null`, invisible |
+| **stale-summary (`rev`)** | every persisted aggregate says when and what wrote it | **a summary that is fresh and WRONG.** A stamp proves provenance, never correctness |
+| **`lid-coupling`** | engine and TS build the leg id from the same fields | **a third site building lids that neither file knows about.** The registry is two paths, hand-listed |
+| **`arming-parity`** | both generators arm from one computation | **a divergence INSIDE `effectiveCalibration`** — one shared function called twice is checked; a bug in the function itself is invisible to a parity check by construction |
+| **`parity` / `armed-baseline`** | the board is byte-identical to a stored digest | **anything the digest omits** — was `propBoard`/`gameInfo`/`simMarkets`/`luCoverage` until 2026-07-27, and is still `overview`, `liveGames`, `trap`, `passes` |
+| **`snapshot_props` self-pacing** | a close is taken inside 95 min of first pitch | **games already started when the runner fires** — 36% of them, and no wait fixes it. Measured, and the reason `/api/propsnap` exists |
+| **`close_capture.py`** | did a close land, and how far out | **whether the close's PRICES are any good.** A close from one book at n=1 counts identically to one from six |
+
+### The two most valuable rows
+
+> **`factor_activity`: share ≠ influence.** It would report `shParkF` at 92% live on the day the
+> closed form stopped consulting it entirely — because the factor *is* being called and *is*
+> returning a real value, into a path that prices 34% of H+R+RBI rows without it. **A liveness
+> detector cannot see a routing defect**, and the H+R+RBI residual traced today is exactly that.
+>
+> **`arming-parity`: a parity check cannot audit the thing both sides share.** It was built after
+> two call sites diverged, so it enforces convergence — and convergence on a wrong value passes.
+> The whole class of "both generators are identically wrong" is outside its contract by
+> construction, not by oversight.
+
+**The pattern across the table: every detector checks that a mechanism EXISTS and none checks
+that it is CONNECTED TO THE RIGHT THING.** Liveness, presence, classification, byte-identity —
+all structural. Routing, population and correctness are unmeasured, and all four confirmed
+blind-spot instances sit in that gap.

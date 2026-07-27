@@ -504,6 +504,12 @@ batches, and the wait exceeds the job ceiling. **Solved without a PAT:** `/api/p
 the RAW odds payload (cron-key gated, existing `CRON_SECRET`) and `snapshot_props.py --fold-only`
 de-vigs it later through the SAME `compact()` — one implementation, not two. Read path ungated
 like `/api/board`. Josh adds `0 16 * * 0,6` (and ideally `0 15 * * 3,4` for the Wed/Thu matinees).
+⚠️ **`0 16 * * 0,6` was the WRONG placement** — measured 14.9% of weekend games. One fire covers
+95 min; a weekend slate spreads 2.6 h. Correct entries: **`0 17` + `30 18` Sat/Sun = 52.9%**,
+pooled 64% → **77%** (not the ~99% first projected). A third fire would exceed cron-job.org's
+100/day free tier — CLV uses 96, Sunday's 2 generate + 2 propsnap = exactly 100.
+`/api/propsnap` decides `kind` from the slate; the first version hardcoded `"close"`, which
+would have put a 4-hour-out capture in Phase 2's clean bucket.
 **Close coverage from the single 20:30Z fire is 64% of all games** — Mon/Tue/Fri 96–99%, Wed 65%,
 Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is **36% of games, not
 29% of days**. The 300-min wait cap never binds; every loss is a game already started at fire time.
@@ -512,10 +518,15 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. **`shParkF` multiplies the hit AND HR
-rates** and therefore sits under the open H+R+RBI park-conditioning residual; **`shPitIsoF`
-REPLACES `hrF` outright**, so at 100% live the `power*pq*...` branch is dead on every row with a
-starter. Neither has ever been audited. The ten-factor share table joins the 2026-08-15 archive
+for `return 1` finds one spelling; match the CONTRACT. **Both are SIM-ONLY** — `parkH`/`parkHR` appear
+at exactly one place, L2062 inside `batVec`. **The CLOSED FORM has no real park factor at all**
+(L2326: only a binary Coors flag), and **H+R+RBI's closed-form λ is `rate × coorsFlag × power`**
+— no park, no wind, no platoon, not even the `hF`/`hrF`/`tbF` its siblings use. That is a traced
+mechanism for BOTH open HRR findings: it predicts the measured closed-form ladder drift of +0.001
+vs the market's +0.479, and the +11.5 pp / −1.4 pp rung signature. 17 of 50 HRR rows (34%) are
+closed-form. Hypothesis until Phase 2's rung test; nothing changed.
+**Correction: `shPitIsoF` does NOT discard park/wind** — L2086 keeps `wind.f*parkHR*pl.hr` and
+drops only `power`/`pq`/`bpF`, which L2077 documents as deliberate anti-double-counting. The ten-factor share table joins the 2026-08-15 archive
 reading — the fixture cannot answer it.
 
 Measured across all six scheduled workflows (Actions API, 14+ days). **Two properties, not

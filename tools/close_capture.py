@@ -133,6 +133,37 @@ def main():
         b[0] += len(first)
         b[1] += sum(1 for k in first if k in later)
 
+    # ---- DAY-GAME vs NIGHT-GAME COVERAGE — the split that decides whether 36% attenuation is a
+    # precision problem or a selection. Both stamps already exist AT WRITE TIME: `kind` per
+    # snapshot, and `start` per event in the same snapshot. Nothing here is inferred after the
+    # fact; this only makes the boundary legible.
+    DAY_CUT = 21.0  # UTC hour; below this is a day game (matinee blocks sit at ~17:12)
+    dn = {"day": [0, 0], "night": [0, 0]}
+    for f in files:
+        d = json.load(open(f))
+        ss = d.get("snapshots") or []
+        if not ss:
+            continue
+        closes = [s for s in ss if s.get("kind") == "close"]
+        for e in ss[0].get("events", []):
+            t = parse_t(e.get("start"))
+            if not t:
+                continue
+            b = dn["day" if (t.hour + t.minute / 60) < DAY_CUT else "night"]
+            b[0] += 1
+            # a true close for THIS game = a close snapshot inside 95 min before its first pitch
+            if any(0 <= (t - parse_t(s["t"])).total_seconds() <= CLOSE_WINDOW_S for s in closes):
+                b[1] += 1
+    print("\nDAY vs NIGHT — which games actually got a true close")
+    for k in ("day", "night"):
+        n, c = dn[k]
+        if not n:
+            continue
+        print(f"    {k:<6} {c:>4}/{n:<4} = {100*c/n:>5.1f}%"
+              + ("   <-- the selection axis; a pooled slope is not reported while this is thin" if k == "day" else ""))
+    print("    (day = first pitch before 21:00 UTC. Phase 2 splits on this AND on `kind`;")
+    print("     36% attenuation spread evenly is precision, concentrated on day games it is selection.)")
+
     print("\nKEEP RATE BY DAY OF WEEK — games surviving into the close/last reading")
     print("  (Series B baseline: Mon 100%, Tue 94%, Fri 93%, Sat 68%, Thu 50%, Wed 43%, SUN 6.7%)")
     for dw in DOW:

@@ -38,7 +38,10 @@ const MAX_EVENTS = 16;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 type OddsEvent = { id: string; away_team: string; home_team: string; commence_time: string };
-type Stored = { t: string; kind: "close"; src: "vercel"; events: { id: string; away: string; home: string; start: string; raw: unknown }[] };
+/** CLOSE_WINDOW_S in tools/snapshot_props.py — the same 95 minutes, deliberately duplicated as a
+ *  constant rather than a second implementation of the decision. */
+const CLOSE_WINDOW_MS = 95 * 60_000;
+type Stored = { t: string; kind: "close" | "pre"; src: "vercel"; events: { id: string; away: string; home: string; start: string; raw: unknown }[] };
 
 async function oddsFetch<T>(path: string): Promise<T | null> {
   const key = process.env.ODDS_API_KEY;
@@ -100,7 +103,14 @@ export async function GET(req: NextRequest) {
   if (!out.length) return NextResponse.json({ ok: true, date: today, stored: 0, note: "no props quoted" });
 
   const prev = (await redisGetJson<Stored[]>(KEY(today))) ?? [];
-  const snap: Stored = { t: new Date(now).toISOString(), kind: "close", src: "vercel", events: out };
+  /* DECIDE THE KIND FROM THE SLATE, never assume it (2026-07-27). The first version hardcoded
+     `kind: "close"`, which would have labelled a 16:00Z fire against a 20:10Z first pitch — four
+     hours out — as a close, and Phase 2 buckets on this field. A mislabelled close is worse than
+     a missing one: it enters the close bucket and attenuates the slope invisibly. Same rule the
+     python already follows in `_snapshot_kind`. */
+  const lead0 = Math.min(...out.map((e) => Date.parse(e.start))) - now;
+  const kind: Stored["kind"] = lead0 <= CLOSE_WINDOW_MS ? "close" : "pre";
+  const snap: Stored = { t: new Date(now).toISOString(), kind, src: "vercel", events: out };
   await redisSetJson(KEY(today), [...prev, snap].slice(-6));
   await redis(["EXPIRE", KEY(today), TTL]);
 
@@ -109,6 +119,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     date: today,
     stored: out.length,
+    kind,
     snapshots: prev.length + 1,
     leadMin: Math.round(lead / 60_000),
   });

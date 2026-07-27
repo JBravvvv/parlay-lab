@@ -649,3 +649,61 @@ bo −175, bu 140`), and **re-running adds nothing** — idempotent on `t`.
 **The PAT route is not needed.** `repository_dispatch` would add a fine-grained token, a second
 auth surface, and a secret with repo write scope, to solve a problem one existing secret already
 solves.
+
+## ⚠️ CORRECTION — `0 16 * * 0,6` IS THE WORST PLACEMENT, AND ~99% WAS WRONG (2026-07-27)
+
+I projected "~90% with the weekend entry, ~99% with Wed/Thu" without measuring the placement.
+Measured against the 52-day first-pitch distribution, with cron-job.org firing punctually and
+`/api/propsnap` covering `[FP − 95 min, FP]`:
+
+| entries | weekend games with a true close |
+|---|---|
+| **`0 16 * * 0,6`** — what I first proposed | **14.9%** |
+| `0 17 * * 0,6` | 38.0% |
+| **`0 17` + `30 18`** | **52.9%** |
+| `0 17` + `30 18` + `0 20` | 69.0% |
+| Wed/Thu matinee `0 16 * * 3,4` | 17.8% of those days |
+
+**One instantaneous fire covers 95 minutes. A weekend slate spreads first pitches across ~2.6
+hours (Sun p10 17:36 → p90 20:12).** One entry cannot cover it, and 16:00 is *ahead* of the
+window for everything but the very earliest game — which is why it scores worst.
+
+### Corrected pooled projection
+
+| | pooled true close |
+|---|---|
+| today, one 20:30Z GitHub fire | **64%** |
+| **+ `0 17` and `30 18` Sat/Sun** | **77%** |
+| + Wed/Thu matinee | 80% |
+
+**Not ~99%.** The earlier figure assumed a fire recovers a whole day; it recovers a 95-minute
+slice of one.
+
+### And the free tier binds at exactly two
+
+cron-job.org free tier is **100 executions/day** and `/api/clv` already uses **96**.
+
+| day | generate entries | propsnap | total |
+|---|---|---|---|
+| Mon–Fri | 1 | 0 | 97 |
+| Saturday | 1 | 2 | 99 |
+| **Sunday** | **2** (17:00, 22:30) | **2** | **100 — at the cap** |
+
+**So two weekend entries is what fits, and it is also where the marginal return is.** A third
+(`0 20`) would add 16 pp of weekend coverage and **exceed the daily cap on Sunday**. Wed/Thu
+would too, for ~3 pp pooled.
+
+> ### The two entries to create — replacing the `0 16` I gave earlier
+>
+> | | |
+> |---|---|
+> | **URL** | `https://parlay-lab-six.vercel.app/api/propsnap` · `GET` · header `x-cron-key` = the existing `CRON_SECRET` |
+> | **When** | **`0 17 * * 0,6`** and **`30 18 * * 0,6`** (UTC) |
+>
+> If a `0 16` entry already exists, **move it to `0 17`** — same job, 2.5× the coverage.
+
+**`/api/propsnap` no longer hardcodes `kind: "close"`.** The first version labelled every capture
+a close, so a 16:00 fire against a 20:10 first pitch would have entered Phase 2's close bucket
+four hours out. It now decides from the slate exactly as `_snapshot_kind` does — **a mislabelled
+close is worse than a missing one**, because it attenuates the slope from inside the bucket that
+is supposed to be clean.
