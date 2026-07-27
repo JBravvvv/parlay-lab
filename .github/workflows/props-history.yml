@@ -1,11 +1,34 @@
 name: engine-v2-props-history
 # Player-prop line snapshots -> line-history branch (data/props/).
-# Two sweeps: post-lineup morning read + a near-close read before the evening
-# slate. The scoreboard's "close" = last snapshot before each game's start.
+#
+# 2026-07-26 — WHY THIS IS NOW MANY CRONS INSTEAD OF TWO.
+# The two-cron version never captured a close. Measured from the Actions API over 15 days,
+# `0 17` actually starts at ~20:20Z (+3.3h) and `45 22` at ~07:30Z the NEXT day (+8.75h);
+# both are event:schedule, so GitHub is queueing them and the delay is systematic. The
+# "near-close" sweep was landing nine hours late, after the games it was meant to price had
+# been played. Every archived close was really T-2.5h or earlier — see docs/phase2-memo.md.
+#
+# A THIRD CRON WOULD INHERIT THE SAME DELAY. The trigger cannot be trusted to arrive on
+# time, so the SCRIPT decides: tools/snapshot_props.py takes a `close` capture only when the
+# next unstarted first pitch is within ~95 min, at most one per 40 min, and otherwise writes
+# a cheap `pre` reading. Firing hourly across the whole evening means SOME firing lands in
+# the window whatever the queueing delay does. Same self-pacing pattern as /api/clv, and for
+# the same reason: a close not captured during the window is unrecoverable.
+#
+# The reliable long-term trigger is cron-job.org (already running the CLV job 96x/day),
+# which does not queue. These crons are the delay-tolerant fallback.
 on:
   schedule:
-    - cron: "0 17 * * *"  # 10am PT
-    - cron: "45 22 * * *" # 3:45pm PT
+    - cron: "0 17 * * *"   # nominal 10am PT — the day's opener
+    - cron: "0 20 * * *"
+    - cron: "0 21 * * *"
+    - cron: "0 22 * * *"
+    - cron: "30 22 * * *"
+    - cron: "0 23 * * *"
+    - cron: "30 23 * * *"
+    - cron: "0 0 * * *"
+    - cron: "30 0 * * *"
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
