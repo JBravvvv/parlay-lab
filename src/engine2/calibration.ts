@@ -206,6 +206,20 @@ export type CalibrationSummary = {
     rateTo: string | null;
     markets: Record<string, { n: number; need: number; perDay: number; days: number | null; on: string | null }>;
   };
+  /* 2026-07-27: DATES THAT STILL HOLD UNGRADED ROWS. `GRADE_DAYS` was a cliff — a row that
+     aged out of the last 6 logged dates was never revisited by any code path, so a calibrate
+     outage longer than six days stranded every row inside it permanently. `outsideWindow` is
+     the alarm: >0 means rows were unreachable and are now on the retry rotation, and a figure
+     that stops falling is a stuck set rather than a backlog. */
+  stranded?: {
+    at: number;
+    rows: number;
+    outsideWindow: number;
+    gradeDays: number;
+    retryPerRun: number;
+    retried: string[];
+    dates: { date: string; rows: number; inWindow: boolean }[];
+  };
   /* the same reading over EVERY eligible date, never sliding. The 45-day `summary` still
      trains the blend weights (widening that is a frozen-parameter call); this is what the
      freeze-exit reading — reliability, disagreement, per-market gaps — is computed from. */

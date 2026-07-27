@@ -219,6 +219,14 @@ export async function GET(req: NextRequest) {
       simN: 10000,
       simNHR: 20000,
       projLineup: true,
+      /* ARMED ONLY HERE (2026-07-27), not in the app. These are the boards the archive
+         keeps, and `data.clampActivity` is what makes the 20-board clamp comparison a
+         MEASUREMENT instead of a reconstruction from `case` strings — 25 of 25 sites
+         instead of the 1 an archived board could otherwise support. Additive: the clamp
+         return value is untouched, proven byte-for-byte against both baselines by
+         tests/clamp-instrumentation.test.ts. Leaving the app off keeps its board
+         identical to today's. */
+      clampLog: true,
       calW: armed.mults,
       calG: armed.globalS,
     });

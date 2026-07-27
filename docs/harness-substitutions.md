@@ -899,8 +899,19 @@ must be RUN, not reconstructed*, the rule written after the `consMinEv` error. R
 observing it; every rounding and every early-return in between is assumed rather than seen. So
 the honest count of sites the archive can *measure* is **1** today, not 8 or 12.
 
-The `≤2 / ≥5 of 25` thresholds are therefore **suspended, not rescaled.** Rescaling to n=1
-would be arithmetic dressed as a plan.
+The `≤2 / ≥5 of 25` thresholds were therefore **suspended, not rescaled.** Rescaling to n=1
+would have been arithmetic dressed as a plan.
+
+> ### ✅ REINSTATED THE SAME DAY — `clampActivity` shipped 2026-07-27
+> The population now exists: every archived board from 2026-07-27 carries `data.clampActivity`
+> with `{bounds, n, lo, hi, mid}` for all **25 of 25** executing sites, measured inside
+> `shClamp` rather than reconstructed from `case` strings. **The `≤2 / ≥5 of 25` thresholds
+> stand at their original scaling**, and the 3–4 ambiguous branch with them.
+>
+> One amendment to the series, stated rather than absorbed: the **2026-07-26 backfill has no
+> `clampActivity`** — it was built before the instrumentation. The comparison series therefore
+> runs 07-27 onward, so **19 instrumented boards by 08-14 and 20 by 08-15**. The threshold date
+> moves by one day and the reason is on the record.
 
 ### What did survive: a one-board preview, and it agrees
 
@@ -952,3 +963,49 @@ then emit `data.clampActivity = {"2258":{n,lo,hi}, …}` beside `luCoverage`.
 the comparison. Landing it on 2026-07-27 gives 19 instrumented boards by 08-14 and 20 by 08-15;
 each day of delay moves the 20-board reading out by one day and leaves a permanent hole at the
 front of the series.
+
+### `clampActivity` — what shipped, and the parity evidence
+
+30 mechanical edits at the call sites (33 calls; L2069, L2089 and L2114 carry two each), plus
+three in-place edits: the `shClamp` definition, `shAnalyzeLocal`'s entry, and the returned
+object. **No lines were added anywhere at or above the last clamp site**, so `legacy/index.html`
+is 4,205 lines before and after and every site keeps its line number — which is why the
+existing `clamp-activity-v1` snapshot still matches. The id **is** the line number, so the two
+instruments aggregate identically and can be diffed.
+
+| check | result |
+|---|---|
+| `baseline43.json` (v2-DORMANT) generation digest | **identical** |
+| `baseline-armed-v1` armed board + card path | **identical** |
+| **whole board minus `clampActivity`, v2-DORMANT** | `942ab102372e369cff0e35bd729a6147` → **unchanged** |
+| **whole board minus `clampActivity`, ARMED** | `935704d7c8656aa667b015b804b0778f` → **unchanged** |
+| inert with the flag off | `clampActivity` **absent from the JSON entirely**, not present-and-empty |
+| the two instruments | **agree on all 25 sites**, every `n`/`lo`/`hi`, and `lo+hi+mid == n` at each |
+
+The whole-board hashes are the load-bearing ones. `digest()` covers only
+`categories`/`categoriesLive`/`parlays*` — a change to `gameInfo`, `propBoard`, `simMarkets`,
+`luCoverage` or `overview` would pass both baselines untouched. The two md5s were captured from
+the pre-change engine through the identical code path before a single call site was edited, and
+are pinned in `tests/clamp-instrumentation.test.ts`.
+
+**Armed in `/api/generate` only, not in the app** — those are the boards the archive keeps, and
+leaving the app unarmed keeps its board byte-identical to yesterday's.
+
+## STANDING PRECEDENCE: a disconfirmation from a different instrument outranks a confirmation from the same one
+
+Beside the tighter-wrong-answer line, and it follows from it. When two readings conflict, the
+tie is **not** broken by which has more data, more runs, or a tighter interval:
+
+> **A confirmation from the same instrument never outvotes a disconfirmation from a different
+> one.**
+
+More runs of an instrument cannot detect that instrument's own artifact — that is what makes it
+the same instrument. So a twenty-board range-detector median agreeing with the one-board reading
+is *precision about a number that may still be an artifact*, while a single rung-dependence
+result from Phase 2's movement regression is *evidence the artifact does or does not exist*.
+Those are not two votes on one question.
+
+Applied concretely, and pre-committed: **if Phase 2 shows no rung dependence in H+R+RBI, the
+ladder finding is retracted even if the 20-board reading agrees with it.** The precedence is
+declared before the numbers so it cannot be re-argued once they land — which is the only time
+anyone ever wants to re-argue it.

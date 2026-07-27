@@ -372,6 +372,25 @@ every eligible date and is the reading. Both stamp `.window`. Raising `SUMMARY_D
 a frozen-parameter call and, if ever taken, must land **before 09-08**, not at exit.
 `tests/calibration-window.test.ts` pins all of it.
 
+## `clampActivity` — the board carries its own clamp audit (2026-07-27)
+`shClamp(v,lo,hi,id)` takes a 4th arg = **the call site's LINE NUMBER**, so the ids aggregate
+exactly as `tests/clamp-activity.test.ts`'s stack-based instrument does and the two can be
+diffed (they agree on all 25 sites, every count). Inert unless `SH_V2.clampLog` — armed in
+**`/api/generate` only**, so the app's board is unchanged. Emitted as `data.clampActivity =
+{lineNo: {bounds,n,lo,hi,mid}}`.
+
+**Never add or remove a line at or above `legacy/index.html` L2402** without re-baselining
+`tests/fixtures/clamp-activity-v1.json` — the site keys ARE line numbers. All three structural
+edits (L1540 `shClamp`, L2004 `shAnalyzeLocal`, L2880 the return object) were made **in place**;
+the file is 4,205 lines before and after.
+
+**Parity evidence** (`tests/clamp-instrumentation.test.ts`): `baseline43` and
+`baseline-armed-v1` both identical, plus whole-board md5s minus the new key —
+`942ab102372e369cff0e35bd729a6147` (dormant) / `935704d7c8656aa667b015b804b0778f` (armed),
+captured from the pre-change engine. Those are the load-bearing ones: `digest()` covers only
+`categories`/`categoriesLive`/`parlays*`, so a change to `gameInfo`/`propBoard`/`simMarkets`/
+`luCoverage`/`overview` would pass both baselines untouched.
+
 ## `mktN` — the gate that decides NO-PLAY
 `mktN[m] = summary.reliability[m].n`. Under `consMinN` (**100**, frozen) every ticket in that
 market must also clear the de-vigged consensus — that is what blocked all 18 tickets on

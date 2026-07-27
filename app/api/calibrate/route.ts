@@ -9,6 +9,7 @@ import {
   computeCalibration,
   fitGlobalShrink,
   fitReliability,
+  type CalibrationSummary,
   type GradedPick,
   type WeightState,
 } from "@/engine2/calibration";
@@ -45,7 +46,10 @@ const K_WEIGHTS = "pl:cal:weights";
 const K_AUTO = "pl:cal:auto";
 const K_LASTRUN = "pl:cal:lastRun";
 
-const GRADE_DAYS = 6; // grade the most recent N days per run
+const GRADE_DAYS = 6; // grade the most recent N logged dates per run
+/** ...PLUS this many older dates that still hold pending rows. Without it `GRADE_DAYS` is a
+ *  cliff: a row that ages out of the window is never revisited by any code path. */
+const STRANDED_PER_RUN = 3;
 /** Rolling window feeding the calibration summary — the input to the blend weights.
  *
  *  ⚠️ CHANGING THIS NUMBER IS DATED, NOT FREE. It is a READ window (nothing is pruned —
@@ -129,7 +133,27 @@ export async function GET(req: NextRequest) {
     let boxFetches = 0;
     let newlyGraded = 0;
 
-    for (const date of allDays.slice(-GRADE_DAYS)) {
+    /* GRADE_DAYS WAS A PERMANENT-LOSS PATH (fixed 2026-07-27).
+       `allDays.slice(-GRADE_DAYS)` is a hard window: a row still `pending` when its date fell
+       out of the last six LOGGED dates was never revisited by anything, ever. A calibrate
+       outage longer than six days therefore stranded every row inside it — captured, stored,
+       and then silently never graded. Same class as the no-backfill rule, and it sits on the
+       input to `mktN`, which decides when a market can be bet at all.
+       Now self-draining: the previous run's summary lists the dates that still hold pending
+       rows, and up to STRANDED_PER_RUN of them are re-graded alongside the window, worst
+       backlog first. One run of latency, no extra blob reads (the summary loop already reads
+       every eligible date), and `MAX_BOX_FETCHES` still bounds the work per run. */
+    const prevSummary = await redisGetJson<CalibrationSummary>(K_SUMMARY);
+    const retry = (prevSummary?.stranded?.dates ?? [])
+      .slice() // most rows first: a real outage day holds many, a permanently-ungradable
+      .sort((a, b) => b.rows - a.rows) // residue holds few, so backlogs drain before dregs
+      .slice(0, STRANDED_PER_RUN)
+      .map((d) => d.date);
+    const gradeWindow = allDays.slice(-GRADE_DAYS);
+    const inGradeWindow = new Set(gradeWindow);
+    const toGrade = [...new Set([...gradeWindow, ...retry])].sort();
+
+    for (const date of toGrade) {
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
       const pending = Object.values(blob.records).filter((r) => !r.res || r.res === "pending");
@@ -226,6 +250,7 @@ export async function GET(req: NextRequest) {
     const graded: GradedPick[] = [];
     const gradedAll: GradedPick[] = [];
     const perDay: { date: string; byMarket: Record<string, number>; n: number }[] = [];
+    const strandedDates: { date: string; rows: number; inWindow: boolean }[] = [];
     const inWindow = new Set(allDays.slice(-SUMMARY_DAYS));
     const usedDays: string[] = [];
     const allDaysUsed: string[] = [];
@@ -237,6 +262,13 @@ export async function GET(req: NextRequest) {
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
       allDaysUsed.push(date);
+      /* which dates still hold ungraded rows, so the next run can go back for them and an
+         outage is visible instead of silent. Only settled-by-now dates count: today's rows
+         are pending because the games are still being played. */
+      if (date < today) {
+        const pend = Object.values(blob.records).filter((r) => !r.res || r.res === "pending").length;
+        if (pend) strandedDates.push({ date, rows: pend, inWindow: inGradeWindow.has(date) });
+      }
       const dayRows = gradedFromBlob(blob);
       gradedAll.push(...dayRows);
       /* per-DATE counts, kept so the reopening projection below is measured from actual
@@ -386,6 +418,21 @@ export async function GET(req: NextRequest) {
       rateFrom: window7[0]?.date ?? null,
       rateTo: window7[window7.length - 1]?.date ?? null,
       markets: reopen,
+    };
+
+    /* the outage alarm. `outsideWindow` is the number that matters: rows in the window are
+       simply waiting for their box score, rows outside it were unreachable before today's fix
+       and are now on the retry rotation. A number that stops falling is a stuck set, not a
+       backlog — the report says which dates so it can be looked at rather than guessed. */
+    const outside = strandedDates.filter((d) => !d.inWindow);
+    summary.stranded = {
+      at: now,
+      rows: strandedDates.reduce((a, d) => a + d.rows, 0),
+      outsideWindow: outside.reduce((a, d) => a + d.rows, 0),
+      gradeDays: GRADE_DAYS,
+      retryPerRun: STRANDED_PER_RUN,
+      retried: retry,
+      dates: strandedDates.sort((a, b) => (a.date < b.date ? -1 : 1)),
     };
 
     summary.full = full;

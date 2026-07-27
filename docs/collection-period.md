@@ -2569,3 +2569,49 @@ says outright that a market at **0.0/day is a broken logging path, not a distant
 `reopenDays` returns `null` there rather than a far-future date that would read like a
 schedule. `tests/gate-rebuild.test.ts` pins the arithmetic, including the measured 07-27 rates
 and the doc's implied 9.1/day.
+
+## ⚠️ WHAT "DONE" ACTUALLY LOOKS LIKE AT FREEZE EXIT — revised 2026-07-27
+
+The measured reopening dates supersede every earlier projection in this file, and they change
+what the freeze will *contain*, not merely when it ends.
+
+| market | opens | freeze exit |
+|---|---|---|
+| ML · RL | 2026-08-08 | |
+| Total Bases | **2026-08-17** | |
+| Hits · HR · H+R+RBI | **2026-08-23** | ~2026-09-22 |
+| K's · Outs | **2026-09-03** | |
+
+**The card stays dark through most of August.** Prop markets reopen with three to five weeks of
+the collection window left, and `pitcher_outs` — the positive control — with under three.
+
+### Three of the four exit readings will have negligible n
+
+| exit reading | source | state at 2026-09-22 |
+|---|---|---|
+| **P/L** | the ledger — locked bets only | **near-empty.** Bets can only exist after a market reopens, so the ledger covers roughly the last third of the window and none of the first |
+| **CLV on bets** | `/api/clv`, sights **locked legs only** | **near-empty**, and for the same reason. It has been dark all window already |
+| **Discipline** (override rate, sizing) | the ledger | **near-empty** — no bets, no overrides to count. Its instrument value is intact, its sample is not |
+| **Phase 2** — movement slope, board-wide, close-graded | `data/props` + the prediction store | **full window.** It does not need a bet to exist; every priced row counts |
+
+> **Phase 2 is effectively the entire evidence base for the freeze.** That was not the design —
+> it is what the accrual arithmetic produces — and it raises the cost of a missed close
+> proportionally. The close-capture rate (`tools/close_capture.py`) is therefore the health
+> metric for the whole collection period, not just for Series A.
+
+**This is not an argument to reopen the gate early.** `consMinN` is doing exactly its job: a
+market under 100 graded legs has not earned an unchecked model probability, and the Phase 0.5
+restart is why the count is low. The consequence is simply that the freeze's answer will come
+from the board-wide channel rather than the bet channel, and the exit reading must say so
+rather than presenting four numbers of which three rest on n≈0.
+
+### Recompute after seven days of the new schedule
+
+The rates above are over **two complete dates**, both priced by the old 16:00 UTC pass. The
+four cron-job.org entries fire four to six hours later, with more confirmed lineups and fewer
+projected-lineup voids, so accrual should **rise** and the dates should pull in.
+
+**Measure it, do not project it** — that is the mistake being corrected here. Re-read
+`summary.reopen` (printed by `tools/gate_activity.py` with `rateDays` as its denominator) on
+or after **2026-08-03**, once seven complete dates exist under the new schedule, and revise
+this table from that reading.
