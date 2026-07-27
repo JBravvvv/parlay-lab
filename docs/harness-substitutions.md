@@ -57,6 +57,7 @@ entry here.
 
 | substitution | when | diverges from production by | what can hide behind it |
 |---|---|---|---|
+| **a COMMENT describing a branch production never takes** | `legacy/index.html` L2934 | the comment says *"stake weight = ¼-Kelly-proportional fraction: edge ÷ odds"*; L2999 sets `base = prob` in every disciplined mode, and the `edge ÷ odds` branch runs only in legacy `caesars_ev` | **PROVEN: three consecutive wrong characterisations of the allocator.** Not a code substitution but the same failure shape — the documented behaviour and the executed behaviour are different, and the doc is what gets read. Deliberate per `2292b85`; the comment was simply never updated |
 | `obFetchJson` → `deps.fetchJson` | always | no real HTTP: no headers, quota, retries, redirects, or error shapes | wrong URL construction (the fixture router matches on substrings, so a malformed query can still route); quota/429 handling; partial-response handling |
 | `shToday` → `() => today` | only when `today` is pinned | production derives the date from the **host local clock** | every TZ-dependent date decision — the server's day and the phone's day are not the same day for ~7 hours of every 24 |
 | `obSameDay` → `iso.slice(0,10) === today` | only when `today` is pinned | production compares **host-local calendar dates** | **PROVEN: the 24% slate hole.** Fixed 2026-07-25 by removing `obSameDay` from the engine path entirely; the substitution remains for other pinned-date tests |
@@ -636,7 +637,32 @@ direction (86% upward) off a real measurement and supplied a mechanism for it wi
 checking the mechanism. The population could not have gone the other way — `expAB > abG` is
 the normal case for an everyday starter — so the 86% was never evidence of anything.
 
-**(e) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
+**(e) EIGHTH RULE — a mechanism is a hypothesis until it is traced to a line. A measurement
+that survives a wrong mechanism is still a measurement.**
+
+The record for this phase, both sides:
+
+| measurement | first mechanism offered | verdict on the mechanism | did the measurement survive? |
+|---|---|---|---|
+| outs factor 100% low-pinned | `0.140` is the wrong TB/AB constant | **held** | yes |
+| outs tail −2.57 outs | "no hook-timing term" | **wrong** — it is the `k=4` shrinkage | **yes** |
+| H+R+RBI λ IQR 0.50 | `power` clamp saturation | **wrong** — it was the top-50 cap; finding retracted | **no — the measurement itself was the artifact** |
+| PA factor upward on 86% | denominator mismatch | **wrong** — the algebra cancels | **yes** |
+| 1/8 Kelly +6.4 bp | over-concentration | **wrong** — it is edge-blind base weighting | **yes** |
+| `base = prob` | production diverging from intent | **wrong** — deliberate, spec'd in `2292b85` | **yes** |
+| H+R+RBI +11.5/−1.4 split | `expAB` full-start assumption | **wrong** — no part-timer concentration | **yes** |
+
+**Seven mechanisms offered, five wrong, and the measurement survived every time except the
+one where the measurement was itself the artifact.** That asymmetry is the rule: numbers
+computed from a defensible population outlive the stories told about them, and the stories
+are where both of us have been wrong at roughly the same rate.
+
+**Practically:** state the measurement first and separately; label the mechanism as a
+hypothesis until a file and line number are attached; and when a mechanism dies, re-check
+whether the *measurement* dies with it — sometimes it does, and that is the case that
+matters most (row 3 above).
+
+**(f) Side-invariance is a property of a STATISTIC, not of a population.** `|pModel − implied|`
 is genuinely side-invariant, which is why the magnitudes measured on `categories` stand. The
 spread ratio is not, and neither is anything conditioned on probability rank. Establishing
 that a population is safe for one statistic says nothing about the next one computed on it.

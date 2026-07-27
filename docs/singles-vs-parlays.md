@@ -289,20 +289,60 @@ parameter uncertainty and this shade models the same uncertainty.
 > Singles show +0.0 because they sit in a narrow band on *both* axes (probability 63.5–70.7%,
 > edge 2.1–13.5%), so probability-weighting and edge-weighting agree.
 >
-> ### PROPOSED POST-FREEZE AMENDMENT (unsigned): make the base weight edge-aware
+> ### ⚠️ base = prob IS DELIBERATE, NOT DRIFT — `2292b85`, 2026-07-17
+> Git says so, and the commit message states the rationale outright:
 >
-> Use the ¼-Kelly-proportional weight the comment already claims — `max(ev,0)/(dec−1)` — in
-> the disciplined modes, so edge drives the allocation and the Kelly ceiling returns to being
-> a risk limit rather than the only edge signal. **Do not change the Kelly fraction**: the
-> ~5–6 bp/day is a weighting artifact, and moving a global bankroll-risk parameter to fix a
-> weighting bug treats the symptom.
+> > *"Update 1 — **selection_mode (default: probability)**: Sharp plays + Builder card
+> > selection rank by engine true % anchored to the multi-book consensus; **Caesars prices
+> > and sizes, never chooses**; `caesars_ev` legacy ranking selectable in Settings."*
 >
-> Candidate forms considered and rejected: an **odds-scaled per-ticket cap** and a
-> **card-level variance budget** both target concentration, which measurement (a) shows is
-> not the problem. **Argue for the base-weight change.**
+> **So the code follows a written spec (`update-calibration-and-selection`) and the COMMENT
+> at L2934 is the stale artifact** — it describes the pre-2026-07-17 default, which is now a
+> Settings option. This downgrades the finding from "production diverging from its documented
+> intent" to "a deliberate design decision with a stale comment above it, whose growth cost
+> was never measured".
 >
-> **Measured on this board only, and the parlay pool exhausts at 9 picks**, so card sizes
-> above 9 are untested. Re-run on the next board before signing.
+> ### Measured cost of that decision — and it is not 5–6 bp
+>
+> `shAllocate`'s source patched at **exactly one expression** and re-evaluated in the sandbox
+> scope, so every other line — gates, greedy pass, caps, rounding — is production code.
+> (Switching `selMode` to `caesars_ev` would also give the edge weight but disables the EV
+> floor and consensus gate at the same time, which confounds it.)
+>
+> | base weight | singles | parlays | mixed | **crossover** |
+> |---|---|---|---|---|
+> | **`prob`** (production) | 55.3 bp | 126.6 bp | 55.3 bp | **3.05 pp** |
+> | `max(ev,0)/(dec−1)` | **149.7 bp** | **187.2 bp** | **149.7 bp** | **1.40 pp** |
+> | `ev/(dec−1)` signed | 149.7 bp | 187.2 bp | 149.7 bp | 1.40 pp |
+>
+> Edge-aware weighting is worth **2.7× on singles** and **1.48× on parlays** — an order of
+> magnitude more than the ~5–6 bp/day the Kelly-fraction observation suggested. Signed and
+> clamped variants are identical because every selected ticket already has `ev > 0`.
+>
+> ### ⚠️ AND IT HALVES THE ROBUSTNESS — the owner's prediction, confirmed
+>
+> **The crossover falls from 3.05 pp to 1.40 pp.** Edge-aware weighting concentrates stake
+> into the highest-edge tickets, which is exactly where overconfidence bites hardest. Against
+> a board-wide raw model gap of **7.6 pp**, a 1.40 pp tolerance is a materially more fragile
+> position than 3.05.
+>
+> **This reframes the 2026-07-17 decision as defensible.** "Rank by probability, let price
+> size" buys robustness to model error at a large cost in face-value growth — and robustness
+> to model error is the concern that motivated the entire freeze. The spec did not state that
+> tradeoff, and now it is quantified in both directions.
+>
+> ### PROPOSED POST-FREEZE AMENDMENT (unsigned): decide the tradeoff explicitly
+>
+> Not "switch to edge-aware". The amendment is to **choose knowingly** between:
+> - **`prob`** — 55.3/126.6 bp, tolerates 3.05 pp of per-leg overconfidence;
+> - **`max(ev,0)/(dec−1)`** — 149.7/187.2 bp, tolerates 1.40 pp.
+>
+> **The right choice depends on the same unmeasured scalar as everything else in this
+> document**, so it belongs in the same signature as the leg-equivalent floor and `consMinEv`
+> — and it should be made *after* Phase 2 reports, not at freeze exit by default.
+>
+> **Fix the comment at L2934 regardless.** It is the only part of this that is unambiguously
+> wrong, and it cost three attempts at characterising the code beneath it.
 
 **Kelly fraction stays frozen at ¼.** This is specified, not proposed.
 

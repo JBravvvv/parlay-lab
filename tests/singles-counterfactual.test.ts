@@ -562,6 +562,52 @@ describe("singles-vs-parlays counterfactual (analysis harness, report only)", ()
     eng.set("shKellyFrac", origKF);
 
     // ======================================================================
+    // 5e. BASE WEIGHT: prob (production) vs edge-aware
+    // ======================================================================
+    // `base` is computed INSIDE shAllocate, so it cannot be swapped with eng.set. Instead
+    // the function's own source is patched at exactly one expression and re-evaluated IN
+    // THE SANDBOX SCOPE (eng.get evals an arbitrary expression there), so every other line
+    // -- the gates, the greedy pass, the caps, the rounding -- is the production code.
+    // Switching selMode to "caesars_ev" would ALSO have given the edge weight, but it
+    // disables the EV floor and the consensus gate at the same time, which confounds it.
+    const allocSrc = eng.get<string>("shAllocate.toString()");
+    const TARGET = "base:probMode?prob:";
+    const weightings: Record<string, (ev: number, prob: number, dec: number) => number> = {
+      "prob (production)": (_e, p) => p,
+      "max(ev,0)/(dec-1)": (e, _p, dc) => (dc > 1 ? Math.max(e, 0) / (dc - 1) : 0),
+      "ev/(dec-1) signed": (e, _p, dc) => (dc > 1 ? e / (dc - 1) : 0),
+    };
+    const patched = allocSrc.includes(TARGET)
+      ? allocSrc.replace(TARGET, "base:probMode?__W(ev,prob,dec):")
+      : null;
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n5e. BASE WEIGHT — production prob vs edge-aware  (1/4 Kelly, everything else production)\n` +
+        (patched ? "" : "  [FAILED to locate the base expression — reporting nothing]"),
+    );
+    if (patched) {
+      const allocV = eng.get<(p: unknown[], a: number, c: unknown) => Record<string, unknown>>(`(${patched})`);
+      // eslint-disable-next-line no-console
+      console.log(`${"weighting".padEnd(22)}${"singles".padStart(12)}${"parlays".padStart(12)}${"mixed".padStart(12)}${"  crossover"}`);
+      for (const [name, fn] of Object.entries(weightings)) {
+        eng.set("__W", fn);
+        const cards = [
+          cardOf(allocV(mkPool(playable) as unknown[], DAILY, cfgOpen)),
+          cardOf(allocV(parlays.map((pl, idx) => ({ pl, src: "p", idx })) as unknown[], DAILY, cfgOpen)),
+          cardOf(allocV(mixedPool as unknown[], DAILY, cfgOpen)),
+        ];
+        const x = crossover([cards[0], cards[1]], shadeCorr);
+        // eslint-disable-next-line no-console
+        console.log(
+          name.padEnd(22) +
+            cards.map((c) => ((growth(c) ?? 0) * 10000).toFixed(1) + " bp").map((t) => t.padStart(12)).join("") +
+            `  ${x == null ? "none <=12" : x.toFixed(2) + " pp"}`,
+        );
+      }
+      eng.set("__W", null);
+    }
+
+    // ======================================================================
     // 6. THE EV FLOOR MIS-SCALED BY LEG COUNT — sized for a freeze-exit decision
     // ======================================================================
     // eslint-disable-next-line no-console
