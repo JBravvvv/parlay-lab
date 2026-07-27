@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { decodeBoard, encodeBoard, liveCoverage, MIN_ACHIEVABLE, SKIP_COVERAGE, type StoredBoard } from "@/lib/server/board-store";
 import type { BoardData } from "@/engine";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
+import { MAX_GENS_PER_DATE, bestGen, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 
 /**
  * SERVER BOARD DELIVERY + THE CONDITIONAL SKIP (Phase 1, 2026-07-25)
@@ -348,5 +349,56 @@ describe("coverage floor", () => {
   it("and a dead Sunday slate is still dead, not 100%", () => {
     expect(achievableCoverage(SUNDAY, Date.parse("2026-07-27T04:00:00Z"))).toBe(0);
     expect(liveCoverage(null, Date.parse("2026-07-27T04:00:00Z"), SUNDAY).reason).toBe("dead-slate");
+  });
+});
+
+/**
+ * NON-DESTRUCTIVE BOARD STORE (2026-07-26).
+ *
+ * `/api/generate` used an unconditional SET, so a later pass replaced an earlier one
+ * permanently. The Sunday 22:30 entry reaches ~1 unstarted game, so it would have
+ * overwritten a 15-game board with a 1-game board — discarding captured data, which this
+ * project has already ruled is strictly worse than failing to capture it. Not hypothetical:
+ * the 2.28 decomposition, the pitcher_outs audit, the H+R+RBI ladder test and the
+ * sim-coverage measurement all came off persisted boards.
+ */
+describe("board generations are kept, not overwritten", () => {
+  const g = (at: number, priced: number): GenIndexEntry => ({ at, priced, live: priced, luPct: 1, bytes: 1 });
+
+  it("de-dupes by `at` so a retry cannot double-count a generation", () => {
+    const idx = mergeGenIndex(mergeGenIndex([], g(100, 15)), g(100, 15));
+    expect(idx.length).toBe(1);
+  });
+
+  it("keeps newest first and caps the retained set", () => {
+    let idx: GenIndexEntry[] = [];
+    for (let i = 1; i <= MAX_GENS_PER_DATE + 3; i++) idx = mergeGenIndex(idx, g(i * 100, i));
+    expect(idx.length).toBe(MAX_GENS_PER_DATE);
+    expect(idx[0].at).toBeGreaterThan(idx[idx.length - 1].at); // newest first
+    expect(idx.some((e) => e.at === 100)).toBe(false); // oldest dropped
+  });
+
+  it("BEST is the most complete board, NOT the latest — the whole point", () => {
+    // the real Sunday shape: a fat 17:00 pass, then a thin 22:30 one
+    const idx = mergeGenIndex(mergeGenIndex([], g(1700, 15)), g(2230, 1));
+    expect(idx[0].at).toBe(2230); // latest
+    expect(bestGen(idx)!.at).toBe(1700); // most priced
+    expect(bestGen(idx)!.priced).toBe(15);
+  });
+
+  it("ties go to the later pass — same coverage, fresher prices", () => {
+    const idx = mergeGenIndex(mergeGenIndex([], g(1700, 12)), g(2200, 12));
+    expect(bestGen(idx)!.at).toBe(2200);
+  });
+
+  it("an empty index has no best, and never throws", () => {
+    expect(bestGen([])).toBe(null);
+  });
+
+  it("a generation that falls off the cap is no longer reachable as best", () => {
+    let idx: GenIndexEntry[] = [g(1, 99)]; // the fattest board, but oldest
+    for (let i = 2; i <= MAX_GENS_PER_DATE + 1; i++) idx = mergeGenIndex(idx, g(i, 1));
+    expect(idx.some((e) => e.at === 1)).toBe(false);
+    expect(bestGen(idx)!.priced).toBe(1); // and best cannot point at a deleted key
   });
 });

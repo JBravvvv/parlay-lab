@@ -2863,6 +2863,17 @@ function shAnalyzeLocal(slate){
   var luCoverage={confirmed:luConf,eligible:luDen,
     pct:luDen?Math.round((luConf/luDen)*1000)/1000:0,
     unstarted:luUnstarted,
+    /* ADDITIVE, 2026-07-26. `pct` above counts a numerator that SKIPS started games over
+       a denominator of every game on the slate, so it understates by exactly the started
+       fraction — and `observedPct` is the same expression again, not the unstarted version
+       its name implies. `luUnstarted` was already computed and thrown away.
+       Neither of those is changed: they are frozen, and no decision path reads them (the
+       lock guard, the conditional skip and the board comparison all go through
+       liveCoverageOf(gameInfo) instead — asserted by tests/coverage-denominator.test.ts).
+       This adds the CORRECT number beside them so archived boards carry it going forward
+       and a future reader finds two clearly-named values instead of one mislabelled one.
+       Fourth instance in the coverage-denominator series. */
+    pctUnstarted:luUnstarted?Math.round((luConf/luUnstarted)*1000)/1000:0,
     modelled:luModel,modelledPct:luDen?Math.round((luModel/luDen)*1000)/1000:0,
     observedPct:luDen?Math.round((luConf/luDen)*1000)/1000:0,
     leadMs:LU_LEAD};

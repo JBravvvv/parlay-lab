@@ -3,8 +3,8 @@ import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob, type GenStamp } from "@/lib/pred-serialize";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
-import { achievableCoverage, liveCoverageOf } from "@/lib/board-coverage";
-import { BOARD_KEY, decodeBoard, encodeBoard, liveCoverage } from "@/lib/server/board-store";
+import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
+import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
 
 /**
@@ -267,7 +267,32 @@ export async function GET(req: NextRequest) {
       console.warn(`[generate] board not stored: ${enc.error}`);
     } else {
       try {
-        await redis(["SET", BOARD_KEY(date), enc.blob, "EX", String(3 * 86_400)]);
+        const TTL = String(3 * 86_400);
+        /* per-generation copy FIRST: if the process dies between these writes the day
+           keeps the new board under its own key and the old `latest` intact. Writing
+           `latest` first would leave a window where the fat board is already gone. */
+        await redis(["SET", BOARD_GEN_KEY(date, now), enc.blob, "EX", TTL]);
+        const priced = pricedGames(
+          data.categories as unknown as Record<string, { gkey?: string | null }[]>,
+          stampGi,
+          now,
+        );
+        const prevIdx =
+          ((await redisGetJson<GenIndexEntry[]>(BOARD_GENS_KEY(date))) ?? []).filter(
+            (g) => g && isFinite(g.at),
+          );
+        const idx = mergeGenIndex(prevIdx, {
+          at: now, priced, live: gen.live, luPct: gen.luPct, bytes: enc.bytes,
+        });
+        await redisSetJson(BOARD_GENS_KEY(date), idx);
+        await redis(["EXPIRE", BOARD_GENS_KEY(date), TTL]);
+        /* drop generations that fell off the cap, so they expire with their key rather
+           than lingering unreferenced for the full TTL */
+        for (const g of prevIdx) {
+          if (!idx.some((k) => k.at === g.at)) await redis(["DEL", BOARD_GEN_KEY(date, g.at)]).catch(() => null);
+        }
+        // `latest` last — the read path and the client are unchanged
+        await redis(["SET", BOARD_KEY(date), enc.blob, "EX", TTL]);
       } catch (e) {
         console.warn(`[generate] board store failed: ${(e as Error).message}`);
       }

@@ -24,8 +24,58 @@ import { achievableCoverage, deadSlate, liveCoverageOf } from "@/lib/board-cover
  */
 
 export const BOARD_KEY = (date: string) => `pl:board:${date}`;
+/**
+ * ONE KEY PER GENERATION (2026-07-26). `BOARD_KEY` used to be written with an
+ * unconditional SET, so a later pass REPLACED an earlier one permanently. On a Sunday the
+ * 22:30 pass reaches ~1 unstarted game, so it would have overwritten a 15-game board with
+ * a 1-game board and the fat board would be gone.
+ *
+ * That is DISCARDING CAPTURED DATA, which this project has already ruled is strictly worse
+ * than failing to capture it — and it is not a hypothetical loss: the 2.28 winner's-curse
+ * decomposition, the `pitcher_outs` audit, the H+R+RBI ladder test and the sim-coverage
+ * measurement were every one of them taken off a persisted board.
+ *
+ * So every generation is kept. `BOARD_KEY` remains the LATEST (the read path and the client
+ * are unchanged, and freshest prices is what a bet needs); `BOARD_GEN_KEY` holds each pass
+ * and `BOARD_GENS_KEY` indexes them. "Latest" and "most complete" are different questions
+ * and both now have answers.
+ */
+export const BOARD_GEN_KEY = (date: string, at: number) => `pl:board:${date}:${at}`;
+export const BOARD_GENS_KEY = (date: string) => `pl:board:${date}:gens`;
+/** generations retained per date; 3-day TTL, ~104KB each at a full slate */
+export const MAX_GENS_PER_DATE = 6;
 /** Refuse to store anything absurd rather than silently truncating a board. */
 export const MAX_STORED_BYTES = 2_000_000;
+
+/** One entry in the per-date generation index. Small enough to keep as plain JSON. */
+export type GenIndexEntry = {
+  at: number;
+  /** still-bettable games this pass priced any row for — the "most complete" key */
+  priced: number;
+  /** games not yet started at generation */
+  live: number;
+  /** confirmed / live, UNSTARTED denominator (see tests/coverage-denominator.test.ts) */
+  luPct: number;
+  bytes: number;
+};
+
+/**
+ * Which generation answers "the most complete board for this date"? Not the latest —
+ * a 22:30 Sunday pass is the freshest and prices one game. Ranked by games priced,
+ * ties to the later pass (fresher prices for the same coverage).
+ */
+export function bestGen(index: GenIndexEntry[]): GenIndexEntry | null {
+  if (!index.length) return null;
+  return index.reduce((a, b) => (b.priced > a.priced || (b.priced === a.priced && b.at > a.at) ? b : a));
+}
+
+/** Newest first, de-duped by `at`, capped. Pure so the route and the tests share it. */
+export function mergeGenIndex(prev: GenIndexEntry[], entry: GenIndexEntry): GenIndexEntry[] {
+  const out = prev.filter((g) => g.at !== entry.at);
+  out.push(entry);
+  out.sort((a, b) => b.at - a.at);
+  return out.slice(0, MAX_GENS_PER_DATE);
+}
 
 export type StoredBoard = { date: string; at: number; data: BoardData };
 

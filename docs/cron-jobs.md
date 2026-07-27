@@ -60,6 +60,21 @@ and Saturday is structurally hard because its games spread across the whole day.
 > **Take 17:00 now; move to 17:30 once the `gen.at` stamps show the scheduler is punctual.**
 > That is the delay lesson applied rather than restated.
 
+### ⏳ DATED OPEN ITEM — revisit Sunday 17:00 → 17:30
+
+**Opened 2026-07-26. Decide on or after 2026-08-02.**
+
+| | |
+|---|---|
+| **measurement** | observed `gen.at` against the configured hour, on all three entries, over 7 days |
+| **source** | `/api/board?date=<d>&gen=list` returns the generation index; `gen.at` is also on every prediction-store day blob as `gens[]` |
+| **trigger** | **median delay under ~3 minutes → move Sunday to `30 17 * * 0`** |
+| **if the median delay exceeds ~3 min** | leave Sunday at 17:00 **and shift every entry earlier by the observed median**, the correction GitHub needed and nobody made for fifteen days |
+| **worth** | +2.0 lineup-ready games per Sunday (13.0 vs 11.0 of 15.1) |
+
+**This is dated so it cannot become permanent by inattention.** An unrevisited "temporary"
+choice is how the 22:45 sweep spent fifteen days landing at 07:30.
+
 ## What the Sunday 22:30 entry actually buys — and what it costs
 
 At 22:30 on a Sunday, **14.1 of 15.1 games are already started** and **1.0 is unstarted and

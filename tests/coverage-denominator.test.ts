@@ -83,6 +83,11 @@ const REGISTRY: { site: string; declares: Den; question: string }[] = [
     declares: "mixed",
     question: "(numerator counts unstarted games, denominator is ALL games — see below)",
   },
+  {
+    site: "luCoverage.pctUnstarted (legacy/index.html) — additive, 2026-07-26",
+    declares: "unstarted",
+    question: "of the games still bettable, how many had both lineups when this board was built?",
+  },
 ];
 
 describe("coverage ratios declare their denominator, and the declaration is checked", () => {
@@ -179,6 +184,9 @@ describe("coverage ratios declare their denominator, and the declaration is chec
     const obsExpr = /observedPct:luDen\?Math\.round\(\(luConf\/luDen\)\*1000\)\/1000:0/;
     expect(pctExpr.test(src)).toBe(true);
     expect(obsExpr.test(src)).toBe(true);
+    // the CORRECT number now ships beside the wrong one (additive; parity verified
+    // byte-identical against both baseline43 and baseline-armed-v1 before shipping)
+    expect(src).toContain("pctUnstarted:luUnstarted?Math.round((luConf/luUnstarted)*1000)/1000:0");
     // and it is read by NO decision path — only comments mention it outside the engine
     for (const f of ["src/lib/board-stale.ts", "src/lib/server/board-store.ts", "src/lib/engine-client.ts"]) {
       const t = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
@@ -198,5 +206,7 @@ describe("coverage ratios declare their denominator, and the declaration is chec
     }
     // exactly one known mismatch; a second means something regressed
     expect(REGISTRY.filter((r) => r.declares !== "unstarted").length).toBe(1);
+    // ...and the mismatch now ships beside a correctly-named alternative
+    expect(REGISTRY.some((r) => r.site.includes("pctUnstarted") && r.declares === "unstarted")).toBe(true);
   });
 });
