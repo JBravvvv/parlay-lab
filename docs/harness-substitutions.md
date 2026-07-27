@@ -1248,3 +1248,29 @@ fixed yet.**
 that it is CONNECTED TO THE RIGHT THING.** Liveness, presence, classification, byte-identity —
 all structural. Routing, population and correctness are unmeasured, and all four confirmed
 blind-spot instances sit in that gap.
+
+## SILENT CORRUPTION OUTRANKS VISIBLE ABSENCE
+
+> **A missing close leaves a hole the tool reports. A mislabelled one enters the bucket that is
+> supposed to be clean and attenuates the slope from inside it — where no split can find it,
+> because it is on the right side of the split.**
+
+The general form: **a wrong value that claims to be a right one is worse than no value**, because
+every downstream defence is organised around the label. Splitting by `kind` protects a clean
+bucket from a dirty one; it cannot protect a bucket from a row that lied about which bucket it
+belonged in.
+
+This is why, across this phase, the choice has consistently been to **record and not enforce**:
+
+* `/api/generate` stamps `gen.lateMs` and still writes the board — a refused fire leaves no
+  board *and* no label;
+* `MAX_RECORDS` truncation is logged and lands on the blob rather than being silently sliced;
+* `luCoverage.pctUnstarted` was **added beside** the mixed-denominator `pct` rather than
+  replacing it;
+* `merge_prior` preserves a prior value instead of writing a null that would read as "resolved
+  nothing";
+* `kind` is **computed** at both capture routes, never asserted by the caller.
+
+Each of those trades a visible gap for no gap at all, and refuses the trade in the other
+direction. **When the choice is between a hole and a lie, take the hole** — and make the tool
+that reports holes good enough that taking it costs little.

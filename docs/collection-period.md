@@ -2921,3 +2921,129 @@ live on the day the closed form stopped consulting it. So, for all ten, from the
 
 **Nothing changed.** `shLaborF` at 30% live is the only other number worth flagging: an
 `pitcher_outs` factor inert on 70% of starts, in the market with the known 0.86-clamp defect.
+
+# THE SIM PRICES ONE MARKET. EVERYTHING ELSE IS CLOSED-FORM. (2026-07-27)
+
+Measured on the 2026-07-26 board — a row is sim-priced iff it carries the `sim` tag, which
+L2393 applies **only** inside `if(simP && mkt==="batter_hits_runs_rbis")`:
+
+| market | rows | sim | **closed form** |
+|---|---|---|---|
+| `batter_hits` | 50 | **0** | **100%** |
+| `batter_total_bases` | 50 | **0** | **100%** |
+| `batter_home_runs` | 50 | **0** | **100%** |
+| `batter_hits_runs_rbis` | 50 | 33 | 34% |
+| `pitcher_strikeouts` | 35 | **0** | **100%** |
+| `pitcher_outs` | 38 | **0** | **100%** |
+| **batter total** | 200 | 33 | **84%** |
+
+> **The sim overrides exactly one market.** `shParkF` (92% live), `shPitIsoF` (100% live),
+> `shPenF` and `shPenQF` reach **33 of 200 batter rows — 16.5%** — and no pitcher row ever.
+> I had described this as "whatever fraction the sim does not cover"; the fraction is 84%.
+
+## The magnitude, per venue, on that slate
+
+A closed-form row uses `1.000` for park (no Coors game on 07-26). The park table matched all
+15 venues:
+
+| | median | p90 | max |
+|---|---|---|---|
+| **hit-rate error** | **1.5%** | 2.5% | 3.5% (Globe Life) |
+| **HR-rate error** | **4.5%** | **11.0%** | **14.5%** (PNC Park) |
+
+Worst single rows: PNC **−14.5%** HR, Busch **−11.0%**, loanDepot **−10.0%**, Oracle −8.5%,
+Tropicana **+7.0%**.
+
+**Which market bleeds most:** `batter_home_runs` — 100% closed-form, and HR is the channel with
+the 4.5% median / 14.5% max error. `batter_total_bases` is next (a home run is 4 bases, so the
+HR error propagates into TB) and it carries the open **2.30 over-dispersion**. Hits bleed least
+in percentage terms (1.5% median) but on the most rows.
+
+## Does the retime fix it? No — and this is the part that changes the amendment's size
+
+**The closed-form share is NOT "the rows where lineups weren't confirmed."** `luCoverage` on
+07-26 was **13 of 15 games with both lineups confirmed** and hits/TB/HR were *still* 100%
+closed-form. The sim ran — 33 HRR rows prove it — and simply does not produce prices for those
+markets.
+
+| | today | after a perfect retime |
+|---|---|---|
+| batter rows closed-form | 84% | **~68%** (HRR's 17 unsimmed rows recovered; hits/TB/HR unchanged at 100%) |
+| **pitcher rows closed-form** | **100%** | **100% — permanently** |
+
+**So the retime is a small part of this fix, not most of it.** It recovers H+R+RBI's unsimmed
+third and touches nothing else. Routing `shParkF` into the closed-form factors is the whole
+remainder, and it is the only thing that reaches hits, TB, HR and every pitcher row.
+
+# CAN PITCHER MARKETS BE ROUTED THROUGH THE SIM? — split answer (2026-07-27)
+
+## `pitcher_outs`: **PLUMBING. The distribution already exists and is discarded.**
+
+`halfInning` threads `outsBySPHome` / `outsBySPAway` through every half-inning of every
+simulated game (L1854–1855 init, L1864–1871 carried), against `ctx.homeLeash` / `ctx.awayLeash`.
+**The sim already simulates how many outs each starter records, `n` times per game, and the
+value is never surfaced.**
+
+Collecting it is the same shape as the existing `legP` map: accumulate per sim, emit
+`P(outs > line)`. **No new simulation work, no new model.**
+
+That matters because `pitcher_outs` carries four defects — the `0.140` constant, the `k=4`
+compression, the leash ceiling and the 23.5 pp gap — all in a closed form that structurally
+cannot use the leash machinery built to model exactly this. **The sim path already models the
+hook.** It has been running all along and its answer is thrown away.
+
+## `pitcher_strikeouts`: **RE-ARCHITECTURE. There is no K in the model.**
+
+`batVec` returns `[pBB, p1·abFrac, p2·abFrac, p3·abFrac, hr·abFrac]` — walks, singles, doubles,
+triples, home runs. **An out is whatever is left over, undifferentiated.** `halfInning` returns
+`{runs, next, spOuts, spPA, spRuns}` and no strikeout count anywhere.
+
+Routing K's through the sim needs a **sixth outcome** in the batter vector, a per-batter K rate
+against the specific pitcher, and re-validation that the outcome probabilities still sum
+correctly — every existing sim-priced number moves. That is model work under a freeze, not
+plumbing.
+
+> ### The correction this makes to the outs plan
+>
+> The `pitcher_outs` fix has been treated as a constant swap (`0.140` → `0.400`). **The constant
+> swap repairs the closed form. Routing outs through the sim replaces it** — and the sim already
+> has the answer. Those are alternative amendments, not sequential ones, and the second is
+> cheaper than it looks and strictly better conditioned.
+>
+> **Both stay unshipped.** But the freeze-exit choice is now between two known options rather
+> than one, and the one nobody had costed is the smaller change.
+
+# `shLaborF`'s DEAD ZONE — checked against today's population (2026-07-27)
+
+`function shLaborF(pst){if(!shV2Sim())return 1;var ppg=shLaborPpg(pst);
+if(ppg==null)return 1;if(ppg>=97)return 0.96;if(ppg<=84)return 1.02;return 1;}`
+
+Pitches-per-start over **141 distinct probable starters** (`gs >= 3`), 2026-07-21 → 07-26:
+
+| min | p10 | p25 | **median** | p75 | p90 | max |
+|---|---|---|---|---|---|---|
+| 51.2 | 82.1 | **86.0** | **89.7** | **95.2** | 115.9 | 231.7¹ |
+
+| band | factor | share |
+|---|---|---|
+| ≤ 84 | 1.02 | 17% |
+| **84 – 97** | **1.00 — inert** | **62%** |
+| ≥ 97 | 0.96 | 21% |
+
+¹ the tail is dirty (231.7 ppg is impossible; a swingman with few starts clearing `gs>=3`).
+Quartiles and the median are unaffected.
+
+**The modal starter sits at 89.7 ppg, inside the dead zone, and the ENTIRE interquartile range
+(86.0 – 95.2) is inside it.** So the factor fires only outside the IQR.
+
+> **Verdict: this one is by design, and the design is roughly centred on today's population.**
+> 84 sits at ~p17 and 97 at ~p78, so the band is close to symmetric — 17% below, 21% above. It
+> is **not** the `g >= 5` shape, where a threshold sat 7× below where the data had moved to.
+> Recorded as checked rather than assumed, which is the point of asking.
+
+**What is worth flagging is its SIZE, not its inertness.** `shLaborF` is closed-form-only and
+lives in `pitcher_outs` — the market with a 23.5 pp gap, the `0.140` constant, the `k=4`
+compression and the leash ceiling. Its lever is **−4% / +2% on 38% of starts.** Against a 23.5 pp
+gap that is not a candidate mechanism and should not be pursued as one. **It is a small,
+correctly-calibrated factor in a badly broken market**, and saying so closes it rather than
+leaving it on the list.

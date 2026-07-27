@@ -759,3 +759,21 @@ bucket** — it is already on every row — and the two defects separate cleanly
 | closed-form only, not sim | neither diagnosis; something is wrong with the sim instead |
 
 **Nothing changed. No parameter touched.** Both amendments are freeze-exit.
+
+### The five-branch table's third bucket, and the asymmetry it implies
+
+`sim` / `closed form` joins market and rung as a bucketing dimension. The two directions are
+**not** symmetric, and that is worth having written down before the numbers land:
+
+| observed | expected? | reading |
+|---|---|---|
+| **rung dependence in SIM rows, none in closed form** | **yes — this is the predicted result** | The sim carries park, platoon, xISO and bullpen; the closed form carries `rate × power`. Structure appearing where the inputs are and vanishing where they aren't is the conditioning defect confirming itself |
+| **rung dependence in BOTH** | plausible | the single-λ **family** limitation is real and independent of conditioning |
+| **rung dependence in CLOSED FORM ONLY** | **no — nobody would predict this** | **the SIM is wrong.** A path with strictly more information producing strictly less structure than one with almost none is not a conditioning story at all; it says the sim's joint machinery is introducing an error the flat closed form avoids by having nothing to get wrong |
+| neither | — | both diagnoses retracted |
+
+**Row 3 is the one to write down in advance**, for the same reason branch 4 of the TB/HRR table
+was: without it, "the closed form showed rung dependence" reads as a partial confirmation
+instead of as evidence against the richer path. And the sim currently prices **33 of 50 H+R+RBI
+rows and nothing else on the board**, so an error in it is concentrated in exactly the market
+under investigation.

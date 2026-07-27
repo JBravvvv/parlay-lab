@@ -518,7 +518,30 @@ Thu 56%, Sat 49%, Sun 7% — so "Mon–Fri = true close" is wrong and the gap is
 **TEN identity-fallback factors, not seven.** `shPriorKf` returns 1 (**87% live**, K's rate);
 `shParkF` (**92% live**) and `shPitIsoF` (**100% live**) return **null** and let the CALL SITE
 supply identity, so no source scan could ever find them — only measured live share does. A scan
-for `return 1` finds one spelling; match the CONTRACT. **Ten factors, and only TWO reach both pricing paths** (`shPitPctF`, `shTempF`). SIM-ONLY:
+for `return 1` finds one spelling; match the CONTRACT. ## ⚠️ THE SIM PRICES ONE MARKET — H+R+RBI, and only 33 of its 50 rows
+L2393 applies the `sim` tag **only** inside `if(simP && mkt==="batter_hits_runs_rbis")`. Measured
+07-26: hits 0/50 sim, TB 0/50, HR 0/50, HRR 33/50, K's 0/35, outs 0/38. **84% of batter rows and
+100% of pitcher rows are closed-form**, so `shParkF`/`shPitIsoF`/`shPenF` reach **16.5% of batter
+rows and no pitcher row ever**. This is NOT a lineup-coverage problem — `luCoverage` was 13/15
+that day and hits/TB/HR were still 100% closed-form. **A perfect retime takes 84% → ~68% and
+leaves pitcher markets at 100%.** Implied park error on a closed-form row: hit rate median 1.5%
+/ max 3.5%; **HR rate median 4.5% / p90 11.0% / max 14.5% (PNC)**. `batter_home_runs` bleeds most.
+
+## `pitcher_outs` CAN BE ROUTED THROUGH THE SIM — the answer already exists and is discarded
+`halfInning` threads `outsBySPHome`/`outsBySPAway` through every half-inning against
+`ctx.homeLeash`/`ctx.awayLeash` (L1854–1855, L1864–1871) and **never surfaces them**. Collecting
+them is plumbing, the same shape as `legP`. **The sim already models the hook** — the machinery
+the outs closed form structurally cannot use. So the outs amendment is a CHOICE between the
+constant swap (`0.140`→`0.400`, repairs the closed form) and sim routing (replaces it), not a
+sequence. **`pitcher_strikeouts` is the opposite: re-architecture.** `batVec` returns
+`[pBB,p1,p2,p3,hr]` — an out is undifferentiated, there is no K anywhere, so K's would need a
+sixth outcome and full re-validation.
+
+**`shLaborF`'s dead zone is by design and correctly centred** — 141 starters, median 89.7 ppg,
+bands at ~p17/p78, 62% inert. Not the `g>=5` shape. Its lever is −4%/+2% on 38% of starts, which
+is too small to be an outs mechanism; checked and closed rather than left on the list.
+
+**Ten factors, and only TWO reach both pricing paths** (`shPitPctF`, `shTempF`). SIM-ONLY:
 `shParkF` 92%, `shPitIsoF` 100%, `shPenF`, `shPenQF`. CLOSED-FORM-ONLY: `shPriorKf` 87%,
 `shOppWhiffF`, `shUmpKf`, `shLaborF` 30%. **Every closed-form HITTING price is built without a
 venue term** — hits, TB, HR and HRR alike — and `batter_total_bases` (open 2.30 over-dispersion)
