@@ -2402,6 +2402,47 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(spL!=null){pO=shClamp(spL,0.001,0.999,"2402");tags.push("live-sim");
           bits.unshift(simP.n+" sims resumed from the live score/inning/base-out → "+(spL*100).toFixed(1)+"% to clear "+row.ln+" (current tally counted)");}
       }
+      /* ===== SHADOW PRICES (2026-07-27, signed off — docs/freeze-exit-bundle.md "shadow
+         series"): the four speccable amendments computed BESIDE the live path, never in it.
+         M8 = the TB 0.5 formula corrected; M11 = expected-metric-primary rate (windowed
+         weight 0.1, the measured branch-4 spec); M10 = bbr shrunk toward league (k=75)
+         before expAB; M1 = shParkF replacing the Coors flags (double-count removed by
+         construction). Additive + SH_V2-gated: the dormant board is byte-identical.
+         NULL ON ANY MISSING INPUT — the shadow.umpKf rule; "no reading" must stay
+         distinguishable from "reading of no effect". OUT OF SCOPE, by name: H+R+RBI (no
+         expected metric exists), pitcher rows (different stack, M2 ships as its own pair),
+         and the SIM PATH (a shadow there needs a second sim run — excluded rather than
+         bend the additive pattern). All insertions sit BELOW the last clamp site (L2402),
+         so clampActivity ids stay equal to their line numbers. */
+      var shdw=null;
+      if(SH_V2&&!isPitcher&&mkt!=="batter_hits_runs_rbis"&&st&&rate!=null&&lam!=null){
+        var sIsTB=(mkt==="batter_total_bases"),sIsHR=(mkt==="batter_home_runs");
+        var sRnd=function(x){return x!=null&&isFinite(x)?Math.round(x*10000)/100:null;};
+        var sPx=function(lm,fix){if(lm==null||!isFinite(lm)||lm<=0)return null;
+          if(!sIsTB)return sRnd(shPOver(row.ln,lm));
+          return sRnd((fix&&row.ln<1)?(1-shPoisPmf(0,lm)):shTbOver(row.ln,lm,s1,s2));};
+        var sTbAdj=sIsTB?(tbF>1?1.03:tbF<1?0.98:1):1;
+        var sLiveF=(sIsHR?hrF:hF)*sTbAdj;
+        var sPrSrc=(SH_PRIORS&&SH_PRIORS.batters&&st.id!=null)?SH_PRIORS.batters[st.id]:null;
+        var sPr=null;
+        if(sIsHR){if(sPrSrc&&sPrSrc.xslg!=null&&sPrSrc.xba!=null)sPr=shPriorHR(st,Lhr);}
+        else if(sPrSrc&&sPrSrc.xba!=null)sPr=sPrSrc.xba;
+        var sRx=null,sL30=st.last30||{},sAB30=Number(sL30.ab);
+        if(sPr!=null){var sR30=(isFinite(sAB30)&&sAB30>=(sIsHR?25:10))?(Number(sIsHR?sL30.hr:sL30.h)||0)/sAB30:null;
+          sRx=bvpRate((sR30!=null)?(0.9*sPr+0.1*sR30):sPr,bvp&&(sIsHR?bvp.hr:bvp.h));}
+        var sEx2=null,sBnb=shBlendN(st,function(x){return Number(x.bb);},"ab",10);
+        if(sBnb&&LH&&LH.ab>0){var sB2=shShrink(sBnb.r,sBnb.n,75,LH.bb/LH.ab);
+          sEx2=pa*(1-Math.max(0,Math.min(0.25,sB2))*0.9);}
+        var sPk=shParkF(g&&g.venue,shStands(st)),sF1=null;
+        if(sPk)sF1=(sIsHR?(power*pq*wind.f*sPk.hr*luckF):(contact*pq*sPk.h*luckF))*sTbAdj;
+        shdw={
+          m8:(sIsTB&&row.ln<1&&lam.lamH!=null)?sRnd(1-shPoisPmf(0,lam.lamH)):null,
+          m11:(sRx!=null)?sPx(sRx*expAB*sLiveF,false):null,
+          m10:(sEx2!=null)?sPx(rate*sEx2*sLiveF,false):null,
+          m1:(sF1!=null)?sPx(rate*expAB*sF1,false):null,
+          all:sPx(((sRx!=null)?sRx:rate)*((sEx2!=null)?sEx2:expAB)*((sF1!=null)?sF1:sLiveF),true)
+        };
+      }
       var iO=shImp(row.o),iU=shImp(row.u);
       var sd=null;
       /* consensus prior (median de-vig across books) + market-anchored blend.
@@ -2453,6 +2494,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         p:sd.p,imp:sd.imp,game:shGameLabel(g,matchup),live:!!(slate.props[matchup]&&slate.props[matchup].live),inning:(g&&g.inning)||0,bits:bits.slice(),
         books:row.books||0,booksInd:(row.booksInd!=null)?row.booksInd:0,
         risk:riskBits[0]||(sd.side==="U"?"One big game blows through the line.":"An early exit or a couple of empty ABs and it never gets there.")});
+      if(shdw)cats[mkt][cats[mkt].length-1].shdw=shdw;
     });});
   });
 
@@ -2543,7 +2585,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
   var modelBy={};
   SH_NAMED_CATS.forEach(function(k){cats[k].forEach(function(r){
     if(!r.lkey||!r.side)return;
-    modelBy[r.lkey]={pO:(r.side==="O")?r.p:1-r.p,lu:r.lu||"confirmed",noParlay:!!r.noParlay};});});
+    modelBy[r.lkey]={pO:(r.side==="O")?r.p:1-r.p,lu:r.lu||"confirmed",noParlay:!!r.noParlay};if(r.shdw)modelBy[r.lkey].sh=r.shdw;});});
   function shPropRow(mkt,row,isAlt){
     var lk=shLegKey(row.p,mkt,row.ln),md=modelBy[lk]||null,cz=row.cz||null;
     var oAm=(row.o!=null)?row.o:null,uAm=(row.u!=null)?row.u:null;
@@ -2556,7 +2598,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
       cz:(cz&&(cz.o!=null||cz.u!=null))?{o:(cz.o!=null?cz.o:null),u:(cz.u!=null?cz.u:null)}:null,
       pO:(md&&md.pO!=null)?Math.round(md.pO*1000)/10:null,
       fO:(fO!=null)?Math.round(fO*1000)/10:null,books:row.books||0};
-    if(md&&md.lu)out.lu=md.lu;
+    if(md&&md.lu)out.lu=md.lu;if(md&&md.sh)out.sh=md.sh;
     if(md&&md.noParlay)out.noParlay=true;
     if(isAlt)out.alt=true;
     return out;

@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`ff22578`** (2026-07-27); the vacuous-membership-sweep commit is held. **511 passing (58 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
+| `frontend-rebuild` (production) | pushed through **`a602906`** (2026-07-27); the SHADOW-PRICES commit is held — **it accrues no shadow data until pushed and deployed; every day unpushed is a day of shadow series lost**. **517 passing (59 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -189,6 +189,14 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **M7+M9** | Poisson-where-binomial + its compensator | ⚠️ **INTERLOCKED — never ship separately.** M9-as-uniform-λ **REFUTED 2026-07-27** (predicted +5.7 at hits O1.5, measured +1.4–2.0, shortfall t=11.1); the fixed-n binomial reference fails with it. Real rung structure **+1.4–2.0 pp**. Needs re-derivation; demoted below M10 |
 | **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board. Mechanism traced (2026-07-27): errors-in-variables in `bbr`** — SD(bbr) falls 0.0908→0.0545 with the denominator, full-noise slope +9.4 vs measured +7.39 (`tools/m10_eiv.py`). Fix specified: shrink `bbr` toward league (k≈75) before expAB; 0.9 untouched. Sim slot curve = pa(spot) exactly (−0.110 vs −0.11/slot), so the slot mapping is vindicated — but the sim's `pBB` consumes the SAME `bbr`, so the HRR-flat discriminator is narrowed (HRR ≈ walk-neutral) and sim-volume routing is no escape. Grading: 3σ ~08-20 |
 | **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
+
+## Shadow series (2026-07-27, signed off) — LIVE in the engine
+Every armed closed-form batter row carries `sh:{m8,m11,m10,m1,all}` (percent 2dp; null on any
+missing input; HRR/pitcher/sim-path OUT by name). Dormant board byte-identical (digest
+unchanged); armed digests re-pinned with documentation (whole-board `935704…`→`c06b3a…`,
+propBoard `c8c520…`→`135f58…`). The pre-committed three-branch reading is in the bundle —
+written before any shadow data existed. The archive carries `sh` from the first deployed
+armed board; Phase 2's exit comparison then runs both engines on the same rows, same closes.
 
 ## Deferred, written up, NOT shipped
 **the pitcher-blend audit — measured 2026-07-27** (cliffs wrong, season-primary; leash noise 36–53%; remaining half = re-price outs/K's with the corrected estimator) · `pitcher_outs` `0.140`→`0.400` · everything in `docs/freeze-exit-bundle.md` · the board-archive
@@ -717,7 +725,7 @@ Pinned by `tests/sim-rng-stream.test.ts`: **11 generators, 3,379,570 primary dra
 fixture. Verified to fire — a planted draw reported 5,114,365. The warning is also **on L1829
 itself**, edited IN PLACE (a test only fires when run; the comment is what the next editor sees).
 ⚠️ **Never add or remove a line at or above L2402** — `clampActivity` site ids ARE line numbers.
-`legacy/index.html` is 4,205 lines and every structural edit this phase kept it there.
+`legacy/index.html` was 4,205 lines through the audit phase; **4,247 as of 2026-07-27** (the shadow-price block). The REAL invariant is not the count: **never insert or remove a line at or above L2402** — clampActivity site ids ARE line numbers and the last site is L2402. Insertions strictly below it are safe and verified by the clamp tests.
 
 ## ⚠️ THE SIM COMPUTES FOUR MARKETS AND THE LOOP READS ONE
 `SIM_STAT` (L2045) maps hits/TB/HR/HRR; legs are pushed for all four (L2138); `legP` is populated

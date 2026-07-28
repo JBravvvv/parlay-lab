@@ -45,6 +45,32 @@ M11, whose estimator reaches every batter price in both paths). It was ranked th
 routing looked like it would subsume it; the external check removed hits from sim routing, so
 `shParkF` is the only amendment that reaches hits, K's, outs and every game the sim misses.
 
+## THE SHADOW SERIES — running, with the reading PRE-COMMITTED before any data (2026-07-27)
+
+Signed off: Phase 2 first, bundle at exit, shadow prices in between. LIVE in the engine from
+this commit: every armed closed-form batter row carries `sh:{m8,m11,m10,m1,all}` (percent,
+2dp) — M8's corrected TB 0.5, M11's expected-metric-primary rate (windowed weight 0.1, the
+measured branch-4 spec), M10's bbr-shrunk volume (k=75), M1's park factors, and `all` = the
+four together, the bundle engine's price. The archive carries them from the first armed board
+after deploy, so at exit the comparison is close-graded on BOTH engines over the same rows,
+same closes, **no vintage split**.
+
+Conditions honoured, verifiably: additive and SH_V2-gated (the dormant board is
+byte-identical — dormant whole-board digest UNCHANGED at `942ab102…`; armed re-pinned
+`935704d7…` → `c06b3afe…`, armed baseline propBoard `c8c520…` → `135f58…`, all documented at
+the pin sites); **null on any missing input** — the `shadow.umpKf` rule, so "no reading"
+stays distinguishable from "reading of no effect". OUT OF SCOPE BY NAME rather than bent
+into the pattern: **H+R+RBI** (no expected metric), **pitcher rows** (M2 ships as its own
+pair), and **the sim path** (a shadow there requires a second sim run).
+
+> ### THE PRE-COMMITTED READING — written before a single shadow row exists
+>
+> | at exit, close-graded on the same rows | reading |
+> |---|---|
+> | shadow predicts the close BETTER than live | **confirms the bundle** — ship with validation in hand |
+> | equally well | the amendments are **neutral on this axis**; their case rests on the defect arguments alone (M8 is still arithmetic, M11 still contradicts its comment) — shipping is a judgment call, not a validated upgrade |
+> | **WORSE than live** | **something in the bundle is wrong and was found BEFORE it shipped** — the whole point of running the series. Back to source, amendment by amendment, using the per-amendment columns (`m8`/`m11`/`m10`/`m1`) to localise which one |
+
 ## MEASUREMENT VINTAGE AND DEPENDENCY ORDER (2026-07-27)
 
 Every magnitude below was asked one question: *was it measured on boards priced by the

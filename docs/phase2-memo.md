@@ -11,8 +11,8 @@ It binds in exactly one place, and less than has been assumed:
 |---|---|---|
 | **inputs accruing** (`fp`, `fair`, `cz` in `props-history`) | **NO** | a GitHub Actions archive on the `line-history` branch, public |
 | **computing the close fair** for every board row | **NO** | pure arithmetic over that archive |
-| **joining close → model `p`** | **YES** | `p` lives behind `/api/predictions`, sync-gated |
-| **the panel that displays it** | **YES** | reads the joined result |
+| ~~**joining close → model `p`**~~ | ~~YES~~ **NO (2026-07-27)** | ~~`p` lives behind `/api/predictions`, sync-gated~~ — the board archive carries `pO`/`fO` publicly; superseded, see below |
+| ~~**the panel that displays it**~~ | ~~YES~~ **NO for the report** | the report reads public archives; only the in-app panel would need the phrase |
 
 **So the instrument accumulates whether or not the owner acts, and only reporting requires
 his key.** Nothing is lost by not running it; nothing accrues faster by running it. That is
@@ -36,11 +36,24 @@ no code has been written for any of them (this memo's own status line).**
 
 | # | critical-path item | state |
 |---|---|---|
-| 1 | **`board-archive` must fire** — it never has. ⚠️ `pl:board:{date}` carries a **3-day TTL**: if the workflow did not run on 07-27, a manual backfill by **07-30** is the difference between Series A starting 07-27 and starting whenever the workflow is fixed. This is tomorrow's check #1, now with a deadline attached | **pending 07-28** |
-| 2 | close fairs per board row from the `kind="close"` snapshot (Shin de-vig over the archived odds — arithmetic that exists in the devig module, not yet applied to this join) | build |
+| 1 | ~~`board-archive` must fire~~ **RESOLVED same day**: fired on its own, twice, both green (17:59Z, 22:38Z). 07-27's absence is BY DESIGN — targets are "PT yesterday and the 2 before, never today", so 07-27 archives on 07-28's runs with three attempts inside the TTL. Tomorrow's check reduces to "did 07-27.best/.latest land" | **✅ fires; capture pending 07-28** |
+| 2 | close fairs per board row — `tools/close_fair.py`, keyed as board lkeys with `mins`-to-pitch and day/night stamps; **spot-checked**: stored fair = recomputed median de-vig to 4dp on all samples (07-27: 6 events, 434 rows, 0 post-pitch) | **✅ built + spot-checked** |
 | 3 | `tools/phase2_slope.py`: join archived board (open + pModel) × close fair by lkey+date; WLS of (close−open) on (pModel−open), rung-bucketed, per market, **two vintages never pooled** (vintage 1 = the 16:xx-era board, 07-26 only; vintage 2 = the 4-cron era, 07-27→) | build |
 | 4 | the first report: slope + SE + n per market × rung, **signed direction and the sign-flip column**, close-quality (`kind`) and day/night stamps, **the identification diagnostic in the same table** (x-spread, collinearity, attenuation — an attenuated or collinear fit is NO RESULT, the binding qualifier) | build |
 | 5 | readings: the five-branch HRR table (hits rung arm restored, branches 1–5 reachable), **outs as the pre-committed positive control with its five branches**, the row-3 asymmetry table, **the M10 arm leading the rung arm per the power split** (3σ ~08-20 vs ~2σ at exit) | pre-committed, on disk |
+
+**The un-blend error is NOT a measurement floor worth a term in the diagnostic — bounded
+(2026-07-27):** worst-case 0.29 pp (typical ~0.1) on `pModel` against an x-spread of ~6–7 pp
+gives attenuation < 0.1% of the slope — three orders below the slope SE at any usable n. It
+is listed in the identification diagnostic as a stated floor with this bound, beside
+collinearity, so nobody re-derives it.
+
+**Build item 2 is DONE and spot-checked (2026-07-27)**: `tools/close_fair.py` extracts
+per-row close fairs keyed as board lkeys, with `mins`-to-first-pitch and day/night stamps.
+On 07-27's close snapshot (23:41Z, 6 events, 434 rows, none captured after first pitch):
+stored `fair` equals the median per-book de-vig recomputed from the stored raw prices to
+four decimals on all sampled rows (n=2–7 books, three markets). The join
+(`tools/phase2_slope.py`) is the remaining build.
 
 **Earliest dates**: first joinable date = **07-27** (the day `fp`/`kind` began — if its board
 survives the TTL). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report

@@ -78,7 +78,11 @@ describe("baseline-armed-v1 — the armed regression net", () => {
     const eng = armedFixtureEngine();
     const d = eng.analyze(await eng.collectSlate()) as unknown as Record<string, unknown>;
     const pb = armedDigest(d, eng).propBoard;
-    expect(pb.md5).toBe("c8c520787986e7297f9136e143cbf693");
+    /* re-pinned 2026-07-27: shadow prices (`sh` per closed-form batter row) joined the
+       armed propBoard — c8c520787986e7297f9136e143cbf693 → 135f586f441efe59b35a54f31488e571.
+       The baseline file's delta is exactly the 32-char hash value (same byte count), so the
+       additive-structure proof against BEFORE_PROPBOARD is untouched. */
+    expect(pb.md5).toBe("135f586f441efe59b35a54f31488e571");
     expect(pb.games).toBe(6);
     expect(pb.rows).toBe(289);
     // pinned so the thinness is a stated fact rather than a discovery on 08-15

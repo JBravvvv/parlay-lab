@@ -96,6 +96,14 @@
 > | retraction-markers | **closed vocabulary BY MEASURED DESIGN** (the open scan was 65% false positives) | ❌ accepted residual: a retraction phrased outside the caps vocabulary is invisible; the convention is the mitigation, stated here |
 > | server-date-basis | opened 2026-07-25 after the hardcoded 2-route list missed `/api/calibrate` — **the class's first instance, before it had a name** | ✓ |
 >
+> **Two discovery modes, and the audit one costs nothing (2026-07-27, owner's framing):**
+> `server-date-basis` was the class's first instance — found 07-25 **by consequence**
+> (a west-coast slate silently dropped), before the class had a name. `calibration-window`
+> was found today **by audit**, before any consequence, in minutes, because the class HAD a
+> name. Same provenance argument as the four coverage-denominator instances, now a pattern
+> with two independent confirmations: **a named class converts consequence-discovery into
+> audit-discovery.**
+>
 > **The shape that survives: open candidates, closed exceptions — never the reverse.**
 > Enumerate what is EXEMPT (with a justification each), never what is SCANNED.
 >

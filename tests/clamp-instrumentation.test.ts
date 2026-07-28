@@ -19,9 +19,14 @@ import { FROZEN_NOW, armedFixtureEngine, fixtureEngine } from "./helpers/fixture
  * the pre-change engine.
  */
 
-/* full-board digests captured 2026-07-27 on the PRE-INSTRUMENTATION engine */
+/* full-board digests captured 2026-07-27 on the PRE-INSTRUMENTATION engine.
+   ARMED re-pinned 2026-07-27 (same day, later): the SHADOW PRICES went in — signed off,
+   additive, SH_V2-gated. Armed rows gained `shdw`/`sh`; the dormant board is byte-identical
+   and its digest is UNCHANGED, which is the additive proof:
+     armed  935704d7c8656aa667b015b804b0778f → c06b3afe85b7216c58dd6008309fb038
+     dormant 942ab102372e369cff0e35bd729a6147 → unchanged */
 const BEFORE_DORMANT = "942ab102372e369cff0e35bd729a6147";
-const BEFORE_ARMED = "935704d7c8656aa667b015b804b0778f";
+const BEFORE_ARMED = "c06b3afe85b7216c58dd6008309fb038";
 
 function boardHash(d: Record<string, unknown>): string {
   const { clampActivity: _drop, ...rest } = d;
