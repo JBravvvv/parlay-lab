@@ -83,7 +83,15 @@ with every pre-committed column and the diagnostic: **~08-03**, aligned with the
 reopening-rate recompute. Outs control readable **~08-06**; the M10 grading arm reaches 3σ
 **~08-20**; the window's designed read-out stays **~09-22**.
 
-## SEQUENCING UNDER M11 — the recommendation, for sign-off (2026-07-27)
+> ⚠️ **THE SIGN-OFF BELOW WAS VOIDED THE SAME DAY IT WAS GIVEN (2026-07-27 night).** It
+> assumed shipping nothing cost nothing — true while the card was dark to ~09-22, false once
+> the live reopen read moved the batter markets to **07-29 (Wednesday)**. The re-derived
+> decision — with the 07-26 counterfactual card measured on the real allocator (4 tickets,
+> $64, **11 of 11 legs on defect-catalogued rows**, $50 of it HRR O0.5) — lives in
+> `docs/collection-period.md`, "THE REOPENING DECISION". Recommendation D: ship the
+> parameter-free bug (M8), suspend HRR O0.5, let the rest reopen; the bundle still waits.
+
+## SEQUENCING UNDER M11 — the recommendation, for sign-off (2026-07-27) — VOIDED, see above
 
 Phase 2 measures whether the CURRENT engine's disagreement predicts closing movement, and
 the bundle will change the engine structurally. The order question is real and it is the

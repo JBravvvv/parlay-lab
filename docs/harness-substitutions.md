@@ -96,6 +96,22 @@
 > | retraction-markers | **closed vocabulary BY MEASURED DESIGN** (the open scan was 65% false positives) | ❌ accepted residual: a retraction phrased outside the caps vocabulary is invisible; the convention is the mitigation, stated here |
 > | server-date-basis | opened 2026-07-25 after the hardcoded 2-route list missed `/api/calibrate` — **the class's first instance, before it had a name** | ✓ |
 >
+> **STANDING PRIOR — "unrecoverable" has been wrong every time it was tested (2026-07-27,
+> owner's rule):** three claims of permanent loss, three recoveries — the ump shadow data
+> (reconstructible from git history), the retraction ledger (fully on disk), and 07-27's
+> Series A row (already in the prediction store, client-logged pre-outcome). **A
+> permanent-loss claim requires a NAMED MISSING INPUT, not a conclusion** — "gone" must
+> read "gone because X is not stored anywhere", and X must survive the check that the git
+> history, the public archives, and the stores were actually searched.
+>
+> **The SIXTH date-reasoning instance (2026-07-27 night):** 07-27 was called Sunday from an
+> inference cascade (a 6-event close snapshot read as weekend thinness) — it was Monday,
+> verified by the system clock only after the owner challenged it. Consequences of the
+> error: the "next fire" instruction pointed a day late, and the entry-side 401 evidence
+> was ALREADY sitting in the cron dashboard while the instruction said to wait for it.
+> Day-of-week claims get the same rule as dates: **two commands, never inference** —
+> `date` and a weekday computation.
+>
 > **Two discovery modes, and the audit one costs nothing (2026-07-27, owner's framing):**
 > `server-date-basis` was the class's first instance — found 07-25 **by consequence**
 > (a west-coast slate silently dropped), before the class had a name. `calibration-window`

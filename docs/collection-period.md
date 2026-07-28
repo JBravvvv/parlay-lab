@@ -2687,6 +2687,80 @@ and fewer projected-lineup voids, so accrual should **rise** and the dates pull 
 `summary.reopen` on or after **2026-08-03**, once seven complete dates exist under the new
 schedule, and revise this table from that reading.
 
+# THE REOPENING DECISION — 2026-07-29 IS WEDNESDAY, AND IT OUTRANKS EVERYTHING (2026-07-27 night)
+
+**The mechanism runs backwards from safe, stated plainly: reopening IS the consensus gate
+turning off.** `consMinEv` applies only while `mktN < consMinN`; on 07-29 the batter markets
+cross 100 and the check that has blocked 100% of tickets stops applying to them. Nothing
+"turns on" — a guard expires.
+
+## The 07-26 card under 07-29's gate — measured with the REAL allocator, not projected
+
+The archived 07-26 board fed through `shCardPool` → `shAllocate` (the exact harness path),
+three configs. Validation first: **as-was reproduces reality exactly — NO-PLAY, 18 tickets
+blocked at `consensus`.**
+
+| config | tickets | staked | card EV | blocked |
+|---|---|---|---|---|
+| as-was (07-26 real) | 0 — NO-PLAY | $0 | — | 18 @ consensus |
+| **batters reopened (=07-29)** | **4** | **$64 of $250** | **+6.0%** | 14 (K's/outs/ml/rl still gated) |
+| reopened − TB suspended | 2 | $50 | +6.9% | 14 |
+
+**The card that forms: $33 + $17 on pure H+R+RBI O0.5 parlays (5 legs), $8 + $6 on TB
+parlays (6 legs, one at O0.5). Eleven legs, 100% on rows with a catalogued defect:**
+
+| legs | defect class |
+|---|---|
+| 5 | **HRR O0.5** — the k=10-toward-league shrink (weakest in the engine), the M12-sized sim residual (+10.0), the market whose O1.5+ is ALREADY suspended for losing |
+| 5 | TB O1.5 — inherits the hits estimator (M11) + M10's volume noise |
+| 1 | **TB O0.5 — M8 itself**: est 62.2 vs imp 55.6, a +6.6 pp "edge" computed from a P(TB≥2) masquerading as P(TB≥1), at Coors |
+
+**The gate does not select randomly from the board — it concentrates on the two
+worst-understood markets**, exactly the Phase 2 headline concern (the +2% gate sits 2.13×
+further from consensus than the board) arriving with real money attached. And suspending
+TB alone leaves a $50 card that is 100% HRR O0.5.
+
+## BUG vs CALIBRATION — the classification, per the freeze's own sanction rule
+
+Three grades, honest about where parameters live:
+
+| grade | items | fix parameter |
+|---|---|---|
+| **BUG, parameter-free** | **M8** | none — `if(line<1)return 1-P0;` |
+| **BUG / proven defect, measured-constant fix** | **M2-pair** (0.140 is a wrong league constant → 0.400 IS the league mean; the paired oo de-noise weight ≤0.1 is branch-4-measured; interlock enforced) · **M11** (intent-vs-behaviour proven; windowed weight ≤0.1 measured, CI includes 0 — the zero-parameter variant is "drop the window term") · **M10** (structural estimator noise; k=75 derived from the variance ratio) | measured, not tuned |
+| **CALIBRATION** | M1 (routing + dampening choice) · M3 (weights to fit) · M4 (validation-gated) · M6 (new build) · M7+M9 (re-derivation open) · M12 (per-term choices) · A1/A2/A4 (policy) · A3 (decided-no) | judgment required |
+
+**M8's ship-cost to Phase 2, itemised — the owner's read ("almost nothing") confirms, with
+one real cost named:**
+- the TB-O0.5 rung bucket splits into pre/post-ship vintages — **the rung-bucketed design
+  already isolates it** (≈24 close-joined TB rows/day, ~2 pre-ship days in that one bucket);
+- the shadow `m8` column carries the corrected price on BOTH sides of the ship date — the
+  per-row comparison never breaks;
+- the pinned-defect test swaps to its commented correct block — **failing at ship time is
+  its design**;
+- ⚠️ **the ONE real cost: `shTbOver` is pre-v2 shared code, so the fix changes the DORMANT
+  path — `baseline43` requires a documented regeneration** (the legitimate-regeneration
+  precedent; the alternative — gating arithmetic correctness behind SH_V2 — is rejected).
+
+## The options, costed. RECOMMENDATION FOR SIGN-OFF — nothing ships without it.
+
+| option | Phase 2 window | real-money exposure | cost |
+|---|---|---|---|
+| A: do nothing, reopen | clean | **$64/board-day, 100% defect legs, concentrated in HRR-O0.5** | ~8 weeks of bets the catalogue says are mispriced; the ledger channel fills with donations, not evidence |
+| B: ship the whole bundle | **mixed — both engines lose a clean window** | unvalidated amendments live | the original veto reason, unchanged |
+| C: suspend worst markets, rest reopens | clean (board rows accrue and close-grade regardless of locks — verified: prediction logging is board-wide) | ~$0 on THIS board's shape (the card was entirely HRR+TB) | the bankroll-exit channel stays dark; volume returns only where defects are small |
+| **D (recommended): ship the parameter-free bug + suspend the calibration-defect market** | clean except one self-isolating rung bucket | hits/HR/TB reopen under the +2% gate with M8 fixed; **HRR O0.5 joins its own market's existing suspension** (extend `hrrAltMax`'s pattern down — board-visible, never ticketed) | M8's itemised cost above; K's/outs decided by Friday (M2-pair is bug-grade and ready-once-paired — separate sign-off) |
+
+**The re-derived sequencing argument**: the original sign-off assumed shipping nothing cost
+nothing — true while the card was dark to ~09-22, false the moment reopening moved to
+Wednesday. The premise "one engine vintage per measurement window" still holds — which is
+why D ships ONLY the parameter-free bug whose vintage break self-isolates in one rung
+bucket, and handles every other defect by suspension (which costs Phase 2 nothing) rather
+than by amendment (which costs it the window). The full bundle still waits for the shadow
+series and exit. **A is the only option with an unbounded downside; B still burns the
+instrument; C is safe but leaves M8 mispricing a live market's board rows; D is C plus the
+one fix whose correctness is arithmetic.**
+
 # CONSENSUS DEPTH IS A FUNCTION OF TIME-TO-FIRST-PITCH (2026-07-27)
 
 The snapshot-1-vs-snapshot-2 relabel (mean `n` 1.40 → 1.66, `czf` 2.2% → 0.3%) implied depth

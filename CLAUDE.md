@@ -192,8 +192,12 @@ Genuinely gone, named: the 07-27 board blob, hence its shadow rows (impossible a
 that morning's client build predates the shadow deploy) and the 4 events absent from the
 pre snapshot.
 
-**ENTRY-SIDE PROOF (the curl proves the ROUTE; this proves the ENTRIES). Next scheduled
-fire: Monday 22:00 UTC = 3:00 PM PT 07-28.** Three checks, in order, after it:
+**ENTRY-SIDE PROOF (the curl proves the ROUTE; this proves the ENTRIES).**
+~~Next fire Monday 22:00 UTC 07-28~~ **CORRECTED 2026-07-27 night (the sixth date-reasoning
+instance — today IS Monday 07-27): Monday's 22:00Z entry ALREADY FIRED at 3:00 PM PT today
+and 401'd — the entry-side evidence is in cron-job.org's execution history RIGHT NOW, no
+waiting. Next fire: Tuesday 07-28, 22:00 UTC = 3:00 PM PT. The manual curl runs TUESDAY
+PT morning (builds 07-28). Reopening 07-29 = WEDNESDAY.** Three checks, in order:
 1. **cron-job.org execution history**, entry 1, ~3:05 PM PT: **200** = fired AND
    authenticated (rules out entry-disabled, wrong URL, missing/typo'd header — the route
    401s all of those). **401** = the entry's header (your curl already proved route+secret,
@@ -248,6 +252,7 @@ later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
 | **~2026-07-30** | Phase 2's first slope number (≥3 joined archive days); build order in phase2-memo's critical path |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule · **Phase 2's first full report** (all pre-committed columns + the identification diagnostic) |
 | **~2026-08-10** | re-run `tools/recency_weights.py` for ALL SIX regressions (`--market hits|tb|hr|p_h|p_k|p_outs`; 2026-07-27: form zero in all six; pitcher side season-primary at looser SEs) — cached, one command each |
+| **2026-07-29 (WEDNESDAY)** | ⚠️ **BATTER MARKETS REOPEN — the consensus gate expires.** The decision table, counterfactual card (4 tickets, $64, 11/11 defect legs, $50 HRR-O0.5) and recommendation D await sign-off in collection-period.md "THE REOPENING DECISION" |
 | **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
 | **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
