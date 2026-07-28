@@ -166,14 +166,56 @@ live), archives on 07-29's runs, and is Series A's first joinable date. Notes: t
 path is hour-free; 45-min rate cap (a second run inside it returns `skipped`); 3 spending
 runs/date. Then fix entries 1–4 with the same header and watch Monday 22:00Z fire on its own.
 
-**ACCRUAL OUTAGE, quantified**: last server board = **07-26 16:46Z** (the old Vercel cron's
-final run). Server-side accrual dark since. Every dark date shifts every reopening date
-**day-for-day**: ML/RL 08-08→**08-09**, TB 08-17→**08-18**, hits/HR/HRR 08-23→**08-24**,
-K's/outs 09-03→**09-04** (at one dark day; +1 more per additional). `consMinEv` keeps
-blocking everything until they clear. Client generates DO log prediction rows when the app
-was opened — whether 07-27 has partial client accrual is readable on the CALIBRATION panel
-(per-market n), not from outside. The 08-03 recompute now doubles as the outage damage
-report.
+~~ACCRUAL OUTAGE~~ **CORRECTED 2026-07-27 late, by reading the deployed summary — the
+accrual claim was WRONG twice over.** `/api/calibration` (public) shows `window.to =
+2026-07-27, eligibleLogged: 3`: **Josh's client generates DID log 07-27 — accrual never
+stopped**, so "no board ⇒ mktN frozen" was false, and the day-for-day shift applies only to
+a date with NO generation from EITHER surface (so far: zero such dates). And the projected
+reopening dates the shift was applied to were long stale — the LIVE `summary.reopen`
+(rate window 07-25→26, 2 complete days):
+
+| market | n | perDay | **reopens** |
+|---|---|---|---|
+| hits / TB / HR / HRR | 51–57 | 25.5–28.5 | **2026-07-29** |
+| K's / outs | 35–38 | 17.5–19 | **2026-07-31** |
+| ML / RL | 30 | 15 | **2026-08-01** |
+
+The NO-PLAY window ends THIS WEEK, not mid-August — the old 08-17/08-23/09-03 table was
+built on the first two thin dates. **The outage's real cost is the board artifacts: no
+archive row, no Series A board-side, no shadow rows — not mktN.**
+
+**07-27 IS RECOVERABLE FOR SERIES A** — "unrecoverable" was wrong a third time: the
+prediction store holds 07-27's client-logged rows (pre-outcome, honest) carrying `pModel`
+AND `pMkt` per row — exactly the join's two inputs — behind the sync phrase Josh holds.
+Fallback: archive reconstruction (the 20:56Z props snapshot covers 11 of 15 events).
+Genuinely gone, named: the 07-27 board blob, hence its shadow rows (impossible anyway —
+that morning's client build predates the shadow deploy) and the 4 events absent from the
+pre snapshot.
+
+**ENTRY-SIDE PROOF (the curl proves the ROUTE; this proves the ENTRIES). Next scheduled
+fire: Monday 22:00 UTC = 3:00 PM PT 07-28.** Three checks, in order, after it:
+1. **cron-job.org execution history**, entry 1, ~3:05 PM PT: **200** = fired AND
+   authenticated (rules out entry-disabled, wrong URL, missing/typo'd header — the route
+   401s all of those). **401** = the entry's header (your curl already proved route+secret,
+   so it localises there). **No execution row** = the entry never fired (schedule/enabled —
+   not the header).
+2. **Vercel log** (only if 401): the `[generate] unauthorized` line's `key=` field —
+   `header-bad` = header arrived, value mismatched (typo); `none` = no header arrived
+   (field not saved); `query-attempt` = it went in the query string, not a header.
+3. **Landed**: `/api/board?date=2026-07-28&gen=list` non-empty — catches what a 200 can
+   hide (rate-cap `skipped` if your manual curl ran within 45 min of 3:00 PM PT; run cap;
+   a mid-run 502).
+
+**MATCHED DATES for the manual pair**: `/api/generate` takes no date — it builds the PT
+date at the moment it runs, and returns it as `date` in its JSON. Run it **Monday PT
+morning (pre-slate, ~9–10 AM PT)** and verify with the `date` the response returns (it will
+be 2026-07-28). Do NOT run it late PT evening — it would build that PT date's mostly-started
+slate.
+
+**CREDIT ACCOUNTING (verified in code)**: 401s and rate-cap skips return BEFORE the run
+counter (L175) — **wrong-header retries are free**. An AUTHORIZED run consumes one of the
+**3 run-slots/date** at L175 *before* spending (~120 credits at `collectSlate`) — even if it
+later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
 
 ## ⚠️ FIRST CHECKS TOMORROW (2026-07-28) — updated order (Josh, 2026-07-27 late)
 1. `2026-07-27.best/.latest` landed in `data/boards/` (the workflow FIRES — verified twice

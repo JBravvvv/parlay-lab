@@ -68,8 +68,14 @@ distinguishes "header-bad" vs "none". ~~Bridge: an on-device generate writes the
 **RETRACTED 2026-07-27, same night, by trace — the exact trap this file's own 1a warning
 documented**: the only `pl:board:{date}` writer is `/api/generate` L319; the client path is
 localStorage + predictions only. **No server board without the header fix or a manual
-header-authed curl (in CLAUDE.md's outage block). Series A's first joinable date = the first
-date `/api/generate` actually runs.**
+header-authed curl (in CLAUDE.md's outage block).** ~~Series A's first joinable date = the
+first date `/api/generate` actually runs~~ **CORRECTED same night: 07-27 is joinable after
+all** — the prediction store holds its client-logged rows (pre-outcome, `pModel` + `pMkt`
+per row = the join's exact inputs) behind the owner's sync phrase, with the 20:56Z props
+snapshot (11/15 events) as the archive fallback. What 07-27 permanently lacks: a server
+board blob and therefore shadow rows (that build predates the shadow deploy anyway). The
+archive-covered no-phrase join starts with the first `/api/generate` board (earliest
+07-28).
 
 **Earliest dates**: first joinable date = ~~07-27~~ **the first date with BOTH a board and a
 close — earliest 07-28** (on-device morning generate, or the fixed 22:00Z entry). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report
