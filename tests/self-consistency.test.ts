@@ -86,11 +86,15 @@ describe("self-consistency — constraints the model must satisfy against itself
    * `tools/self_consistency.py` runs the board-level version, where the rows do exist — 127 of
    * them on 2026-07-26, at 24.4 pp.
    */
-  it("shTbOver PINS M8 — the defect is asserted, not the fix (frozen)", async () => {
-    /* The correct assertion is written below and COMMENTED. M8 is a real, unfixed bug under the
-       collection-period freeze, so the suite pins CURRENT behaviour — the same treatment
-       `pitcher_outs` gets as Phase 2's positive control. When M8 ships, swap the two blocks;
-       the test failing at that moment is the point. */
+  it("shTbOver satisfies the M8 identity — SHIPPED 2026-07-27, signed off; teeth retained by plant", async () => {
+    /* HISTORY: this test PINNED the defect from 2026-07-27 (morning) until the fix shipped
+       the same night under the reopening decision (docs/collection-period.md). It fired at
+       ship time exactly as designed. TEETH AFTER THE SHIP (the owner's question): the fixture
+       cannot see M8 at the board level (zero priced TB-0.5 rows), so the regression net is
+       THIS pure-function test plus the plant below — the plant evaluates the OLD defective
+       formula inline and proves these assertions would catch its reintroduction. Board-level
+       confirmation: tools/self_consistency.py's TB>=1 == H>=1 violations must read ZERO on
+       the first post-ship board (they read 118/127 before). */
     const eng = armedFixtureEngine();
     const tb = eng.get<(line: number, lamH: number, s1: number, s2: number) => number>("shTbOver")!;
     const pmf = eng.get<(k: number, lam: number) => number>("shPoisPmf")!;
@@ -99,22 +103,19 @@ describe("self-consistency — constraints the model must satisfy against itself
     for (const lamH of [0.6, 0.96, 1.4]) {
       const at05 = tb(0.5, lamH, s1, s2);
       const at15 = tb(1.5, lamH, s1, s2);
-      const truth05 = 1 - pmf(0, lamH); // P(TB ≥ 1) === P(≥1 hit), by definition
+      const P0 = pmf(0, lamH);
+      const P1 = pmf(1, lamH);
+      const truth05 = 1 - P0; // P(TB ≥ 1) === P(≥1 hit), by definition
 
-      // === CURRENT (DEFECTIVE) BEHAVIOUR — pinned ===
-      expect(
-        Math.abs(at05 - at15),
-        `shTbOver no longer returns the same number for 0.5 and 1.5 at λ=${lamH}. If M8 was ` +
-          `fixed, swap this block for the commented one below and update docs/freeze-exit-bundle.md.`,
-      ).toBeLessThan(1e-12); // ONE answer for TWO questions: `if(line<2)` catches both
-      expect(
-        truth05 - at05,
-        `the M8 gap changed size at λ=${lamH}. It is P(TB≥1) − P(TB≥2) and should be large.`,
-      ).toBeGreaterThan(0.15);
+      // === THE CORRECT ASSERTIONS — live since the ship ===
+      expect(Math.abs(at05 - truth05), `TB O0.5 must price P(TB≥1) exactly, λ=${lamH}`).toBeLessThan(1e-12);
+      expect(at05 - at15, `0.5 and 1.5 are different questions and must differ, λ=${lamH}`).toBeGreaterThan(0.05);
 
-      // === THE CORRECT ASSERTIONS, for when M8 ships ===
-      // expect(Math.abs(at05 - truth05)).toBeLessThan(0.005);   // P(TB≥1) === 1 − P0
-      // expect(Math.abs(at05 - at15)).toBeGreaterThan(0.01);    // 0.5 and 1.5 differ
+      // === PLANT: the OLD defective formula, evaluated inline — proof these assertions
+      // would FIRE on a reintroduction (`line<2` catching 0.5 again) ===
+      const oldBuggy05 = 1 - (P0 + P1 * s1); // what shTbOver(0.5) used to return
+      expect(Math.abs(oldBuggy05 - truth05), "the plant lost its teeth — the old bug no longer differs from truth?").toBeGreaterThan(0.15);
+      expect(Math.abs(oldBuggy05 - at15), "the plant lost its shape — old 0.5 must equal 1.5").toBeLessThan(1e-12);
     }
   }, 120_000);
 

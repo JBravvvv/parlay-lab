@@ -83,9 +83,9 @@
 Graded ledger, 2026-07-17 → 07-22: H+R+RBI legs hit **46.3% vs 59.2% implied** overall,
 and **32% on O1.5+ alternate lines** specifically. Reliability slope (nightly calibration,
 n=273): **1.74** — noisy, but the ledger's O1.5+ subset is where the dollars actually
-bled. O0.5 went 12/19 (63%) and stays active, tagged **watch**.
+bled. O0.5 went 12/19 (63%) and stayed active, tagged **watch** — ~~stays~~ **REVERSED 2026-07-27 (see the reversal note at the top of this file)**.
 
-`SH_CFG.hrrAltMax = 0.5` suspends every H+R+RBI line above O0.5 from all auto-built
+`SH_CFG.hrrAltMax = 0.5` ~~(now `-1`, 2026-07-27)~~ suspends every H+R+RBI line above O0.5 from all auto-built
 tickets in both disciplined selection modes, and Phase 2 renders those rows greyed with
 "Suspended — sim recalibration" on the Board; The Sharp and the manual slip exclude them
 outright. The suspension retires by raising/removing `hrrAltMax` once the market's
@@ -854,6 +854,18 @@ world result — **are unreachable, because both require two markets.**
 > instrument-validation branches return the moment a second market with a *predicted, opposite*
 > rung signature exists — and the first place to look is TB after M8, which is a re-run, not a
 > new instrument.
+
+### ⚠️ O0.5 SUSPENDED 2026-07-27 NIGHT — a REVERSAL of this file's own call, with cause
+
+This file kept H+R+RBI O0.5 **active** (tagged `watch`) on the 12/19 = 63% evidence and the
+saturation argument (O0.5 ≈ P(X≥1) mostly survives the PA error). That call is **reversed**
+— not quietly extended — under the reopening decision (`docs/collection-period.md`): the
+counterfactual 07-29 card put **$50 of $64 on HRR O0.5 parlays**, and the defects found
+since the original call (M11 whole-engine, M10, M12's +10.0 sim-priced residual) sit exactly
+on this market. `hrrAltMax: -1` implements it; the **retirement criterion** (close-graded
+board rows, ±3 pp over ≥300 rows/≥10 boards, post-repair) is beside the decision. The
+original evidence and reasoning stay above, unedited — they were right on the information
+they had.
 
 ### ⚠️ SUPERSEDED SAME DAY — the second arm came back, measured (2026-07-27, later turn)
 

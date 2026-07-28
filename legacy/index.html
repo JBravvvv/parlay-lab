@@ -1084,7 +1084,7 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
        than consMinN graded ledger legs also needs the de-vigged consensus itself to price it
        no worse than consMinEv% at the basis. mktN arrives from the calibration store at arm
        time; an unknown market counts as small — a market is never assumed proven. */
-  coreCzEvMin:0,coreMaxLegs:3,hrrAltMax:0.5,consMinN:100,consMinEv:-1,mktN:null,
+  coreCzEvMin:0,coreMaxLegs:3,hrrAltMax:-1/* 0.5→−1 2026-07-27, signed off: HRR O0.5 joins its own market's suspension until the retirement criterion in docs/collection-period.md */,consMinN:100,consMinEv:-1,mktN:null,
   /* FUN structure caps (Correction 2, 2026-07-23): FUN is exempt from the EV gate —
      a lottery ticket is never +EV, that's what makes it a lottery — so it is capped by
      structure instead: at most funMaxTickets per day (supplemental locks count toward
@@ -1545,7 +1545,7 @@ function shPOver(line,lam){return 1-shPoisCdf(Math.floor(line),lam);}
    (a lone double clears 1.5 TB; plain Poisson on TB understates that variance) */
 function shTbOver(line,lamH,s1,s2){
   var P0=shPoisPmf(0,lamH),P1=shPoisPmf(1,lamH),P2=shPoisPmf(2,lamH);
-  if(line<2)return 1-(P0+P1*s1);                     /* 1.5: ≤1 TB = 0 hits, or 1 single */
+  if(line<1)return 1-P0; /* 0.5: ≥1 TB ≡ ≥1 hit — M8 fix, signed off 2026-07-27 */ if(line<2)return 1-(P0+P1*s1); /* 1.5: ≤1 TB = 0 hits, or 1 single */
   if(line<3)return 1-(P0+P1*(s1+s2)+P2*s1*s1);       /* 2.5: adds 1 double, or 2 singles */
   return 1-(P0+P1+P2*(s1+s2)*(s1+s2));               /* 3.5+: rough — 0–1 hits, or 2 non-HR light hits */
 }

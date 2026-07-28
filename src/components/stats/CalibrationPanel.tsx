@@ -228,7 +228,7 @@ export function CalibrationPanel() {
             <b className="text-text">What &ldquo;board rows&rdquo; counts.</b> Every row the engine printed and later
             graded — played or not, both sides, every line, <b>including lines suspended from all tickets</b>. It is
             not a count of legs you bet. For <b>H+R+RBI</b> that matters most: on a typical board ~93% of its rows are
-            the O1.5+ alternates `hrrAltMax` bars from every ticket, so this market&apos;s slope and hot/cold read are
+            every H+R+RBI rung `hrrAltMax` bars from tickets (O0.5 joined 2026-07-27), so this market&apos;s slope and hot/cold read are
             dominated by lines you never wager. <b className="text-text">This is not the freeze-exit counter</b> —
             docs/collection-period.md exit 1 is written about O0.5 legs actually bet, which lives in the ledger.
             Line-level splits start accumulating from 2026-07-25; rows logged before that carry no line.

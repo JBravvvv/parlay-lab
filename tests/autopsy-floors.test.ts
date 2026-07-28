@@ -285,23 +285,24 @@ describe("Phase 2 — susp/watch tags on H+R+RBI rows", () => {
   };
   const line = (lkey?: string | null) => Number((lkey ?? "").split("|")[2]);
 
-  it("disciplined modes: O1.5+ rows are susp (and never badge as edges); O0.5 rows are watch", async () => {
+  it("disciplined modes: EVERY H+R+RBI rung is susp — O0.5 joined 2026-07-27 (signed off)", async () => {
+    /* HISTORY: O0.5 was `watch` (active) from 2026-07-24 until 2026-07-27, kept on the
+       12/19 evidence and the saturation argument. REVERSED under the reopening decision —
+       defects discovered since (M11/M10/M12, the +10.0 sim residual) — recorded as a
+       reversal with cause and a RETIREMENT CRITERION in docs/collection-period.md, never a
+       quiet extension. `hrrAltMax: -1` implements it. */
     for (const mode of ["ev_gated", "dk_fd"]) {
       const rows = await rowsOf(mode);
       const high = rows.filter((r) => line(r.lkey) > 0.5);
       const low = rows.filter((r) => line(r.lkey) <= 0.5);
       expect(high.length).toBeGreaterThan(0);
       expect(low.length).toBeGreaterThan(0);
-      for (const r of high) {
+      for (const r of [...high, ...low]) {
         expect(r.susp).toBe(true);
         expect(r.watch).toBeUndefined();
         expect(r.edgeBadge).toBe(false);
         expect(r.bsBadge).toBe(false);
         expect(r.czBadge).toBe(false);
-      }
-      for (const r of low) {
-        expect(r.susp).toBeUndefined();
-        expect(r.watch).toBe(true);
       }
     }
   });

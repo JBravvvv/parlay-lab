@@ -117,7 +117,7 @@ drift, even when both values look reasonable on their own.
 ### Suspensions (until recalibration earns them back)
 | parameter | value | meaning |
 |---|---|---|
-| `hrrAltMax` | `0.5` | H+R+RBI alternate lines above O0.5 suspended from all auto-selection |
+| `hrrAltMax` | ~~`0.5`~~ **`-1` (2026-07-27, signed off — reopening decision)** | ~~lines above O0.5~~ **every H+R+RBI rung** suspended from auto-selection; retirement criterion in THE REOPENING DECISION section |
 | `coreNoHR` | `true` | HR props never on core; HR-anytime parlays are FUN-only |
 | **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period — see KNOWN-INERT below. |
 | **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |
@@ -2750,6 +2750,71 @@ one real cost named:**
 | B: ship the whole bundle | **mixed — both engines lose a clean window** | unvalidated amendments live | the original veto reason, unchanged |
 | C: suspend worst markets, rest reopens | clean (board rows accrue and close-grade regardless of locks — verified: prediction logging is board-wide) | ~$0 on THIS board's shape (the card was entirely HRR+TB) | the bankroll-exit channel stays dark; volume returns only where defects are small |
 | **D (recommended): ship the parameter-free bug + suspend the calibration-defect market** | clean except one self-isolating rung bucket | hits/HR/TB reopen under the +2% gate with M8 fixed; **HRR O0.5 joins its own market's existing suspension** (extend `hrrAltMax`'s pattern down — board-visible, never ticketed) | M8's itemised cost above; K's/outs decided by Friday (M2-pair is bug-grade and ready-once-paired — separate sign-off) |
+
+## D EXECUTED — 2026-07-27 night, on the conditional approval. Every condition answered.
+
+**D's card, measured (item 1)**: 2 tickets, **$14, card EV +2.9%** — six TB-over legs. And the
+Castro premise INVERTED under scrutiny: M8 *understates* the over (prices P(≥2) as P(≥1)), so
+the +6.6 pp edge exists DESPITE the bug; the fix raises est ≥ 62.2 a fortiori and the leg
+strengthens. Castro's over is the ONLY TB-O0.5 leg in the whole 67-ticket pool — no unders
+exist to die. **D ≠ C: C is $0, D is $14 + the bug fixed.** Sold correctly: D's value is
+mostly the fix, plus a small real card.
+
+**The A2 number (item 5)**: under the leg-equivalent floor both D tickets die (+3.3%/+2.4%
+vs the 3-leg +6.12%) → **D+A2 = $0 on this board. The mis-scaling is worth exactly 2 tickets
+/ $14 on the first live board.** Noted for the reclassification argument — and A2 alone
+(without the suspension) would have KEPT the HRR tickets (+7.0% > 4.04%; +6.6% > 6.12%) while
+killing the TB ones: the floor and the suspension are complements, not substitutes.
+
+**SHIPPED (both same-line, zero insertions above L2402):**
+1. **M8**: `if(line<1)return 1-P0;` at L1548. The pinned-defect test fired at ship time as
+   designed and was swapped to the fix assertions **with a reintroduction plant** (item 4):
+   the old formula evaluated inline, proven to differ from truth by >0.15 and to equal the
+   1.5 price — the assertions demonstrably catch a `line<2` regression. The fixture cannot
+   see M8 at board level (zero priced TB-0.5 rows), so the pure-function test + plant IS the
+   regression net; board-level confirmation = `tools/self_consistency.py` reading **zero**
+   TB≥1==H≥1 violations on the first post-ship board (118/127 before).
+2. **HRR O0.5 suspension**: `hrrAltMax: 0.5 → -1` — every H+R+RBI rung now susp-tagged and
+   barred from tickets, board-visible. **Recorded as a REVERSAL, not an extension (item 2)**:
+   `docs/hrr-recalibration.md` kept O0.5 active on the 12/19 evidence and the saturation
+   argument; it is reversed on defects found since (M11, M10, M12, the +10.0 sim residual).
+   **Retirement criterion — named, measurable, dated**: the owner's proposed shadow-based
+   criterion cannot work (HRR carries NO shadow price — excluded by scope, no expected
+   metric). The measurable equivalent through Phase 2's channel, no bets needed:
+   > RETIRES when (a) the HRR pricing repair has shipped (M3 + the per-game estimator
+   > disposition), AND (b) over the trailing **≥300 close-joined HRR O0.5 board rows across
+   > ≥10 boards** (~25 close rows/day → ~2 weeks post-repair), **|median(pModel −
+   > close_fair)| ≤ 3 pp** and the sim-priced subset's median residual **≤ 3 pp** (today:
+   > +10.0). Review dated **08-15** alongside the ICC report either way.
+
+**The baseline statement (item 3, the insisted condition — and the event was cleaner than
+the plan)**: NEITHER change moved either baseline. `baseline43` is **byte-identical before
+and after — digest `e67eaad0ad34b99c5aa2050cdd27f2bc` both sides** (M8: the fixture prices
+no TB-0.5 row; suspension: no fixture ticket carried an HRR-0.5 leg). The armed baseline
+likewise. **Every prior "baseline43 unchanged" claim in this project was made against this
+same file and remains valid against it; there is NO vintage split in the parity record.**
+Had a regeneration been needed, the recorded conditions were: old+new digests, enumerated
+row diff, dated, cause-named, with the not-a-silenced-test language.
+
+**Outs (item 6, decision moved to WEDNESDAY)**: the full closed-form outs fix is three
+parts — the **M2 pair** (0.140→0.400 + the `offense()` xSLG de-noise; bug-grade, constants
+measured, the interlock guard enforces the pairing mechanically) and the **estimator
+restructure** (kill the last-30 cliff, season-anchored `shShrink(season_ipg, gs, ~3.4,
+Lipg)`; measured-constant grade). Correcting the item's premise: **k=4 is NOT one of the
+defects — it measured RIGHT (optimum 3.4)**; the cliff and the league target are the
+defects. The leash items are SIM-side only (the closed form never consumes `leashOf`) and
+belong to M2′, not this fix. Timeline: build Tuesday, test + any regeneration Wednesday
+(outs rows DO exist in the fixture, so baseline movement is expected there — the documented
+regeneration lands then), sign-off Thursday morning, deploy before Friday's reopen. **If
+Wednesday's review says not-ready, outs gets a suspension flag Thursday** on the HRR
+pattern (a new flag; half-day).
+
+**E, the zero-code option, and why it loses (item 7, recorded so the reasoning survives the
+owner)**: letting everything reopen and simply not locking costs nothing and requires no
+change — and it replaces a rule with a decision. This system exists to remove in-the-moment
+judgment; a suspension is a pre-commitment, "I'll just not bet" is the thing that fails on a
+Tuesday when the card looks good. D over E is the same argument as the discipline ledger's
+existence.
 
 **The re-derived sequencing argument**: the original sign-off assumed shipping nothing cost
 nothing — true while the card was dark to ~09-22, false the moment reopening moved to
