@@ -57,17 +57,29 @@ def load(args):
     return (d.get("board") or d).get("data") or d.get("data") or d
 
 
-def rows(data):
-    """{(player, market, line): (pModel, market_fair)} from propBoard — both sides, uncapped."""
+def rows(data, shadow=None):
+    """{(player, market, line): (p, market_fair)}. `shadow`: read the shadow engine's column
+    (m8|m11|m10|m1|all) instead of the un-blended live pModel — rows without a shadow value
+    are skipped, so HRR/pitcher/unpriced rows drop out by construction. On the shadow `all`
+    column TB>=1 == H>=1 is EXPECTED TO HOLD (the M8-corrected formula); on live it is the
+    known violation — the same table reads both."""
     out = {}
     for g in data.get("propBoard") or []:
         for mkt, rs in (g.get("markets") or {}).items():
             for r in rs:
-                if r.get("pO") is None or r.get("fO") is None:
+                if r.get("fO") is None:
                     continue
                 who = (r.get("lkey") or "|").split("|")[0]
-                cf = (r["pO"] - (1 - W_PROPS) * r["fO"]) / W_PROPS
-                out[(who, mkt, float(r["ln"]))] = (cf, r["fO"])
+                if shadow:
+                    sh = (r.get("sh") or {}).get(shadow)
+                    if sh is None:
+                        continue
+                    out[(who, mkt, float(r["ln"]))] = (sh, r["fO"])
+                else:
+                    if r.get("pO") is None:
+                        continue
+                    cf = (r["pO"] - (1 - W_PROPS) * r["fO"]) / W_PROPS
+                    out[(who, mkt, float(r["ln"]))] = (cf, r["fO"])
     return out
 
 
@@ -77,6 +89,8 @@ def main():
     ap.add_argument("--date")
     ap.add_argument("--archive")
     ap.add_argument("--json")
+    ap.add_argument("--shadow", nargs="?", const="all",
+                    help="run the constraints on the SHADOW engine's column (default: all)")
     a = ap.parse_args()
     if a.archive:
         files = sorted(glob.glob(os.path.join(a.archive, "*.best.json.gz")))
@@ -95,11 +109,11 @@ def main():
     if not (a.board or a.date):
         print("need --board, --date or --archive", file=sys.stderr)
         return 2
-    return run(load(a), a.date or os.path.basename(a.board)[:10], collections.Counter(), a.json)
+    return run(load(a), (a.date or os.path.basename(a.board)[:10]) + (f"  [SHADOW:{a.shadow}]" if a.shadow else ""), collections.Counter(), a.json, a.shadow)
 
 
-def run(data, label, tally, jout=None):
-    R = rows(data)
+def run(data, label, tally, jout=None, shadow=None):
+    R = rows(data, shadow)
     players = {p for (p, _, _) in R}
     checks = []
 
@@ -119,6 +133,7 @@ def run(data, label, tally, jout=None):
             ("HRR>=3 >= HR>=1", g(HRR, 2.5), g(HR, 0.5), False),
             ("H>=1 >= HR>=1", g(H, 0.5), g(HR, 0.5), False),
             ("TB>=2 >= H>=2", g(TB, 1.5), g(H, 1.5), False),
+            ("TB>=4 >= HR>=1", g(TB, 3.5), g(HR, 0.5), False),
         ]
         for name, x, y, ex in pairs:
             if x and y:
@@ -135,6 +150,11 @@ def run(data, label, tally, jout=None):
     for c in checks:
         by[c["c"]][c["side"]].append(c)
     print(f"{'constraint':<24}{'n':>5}{'MODEL bad':>11}{'med Δ':>9}{'  MARKET bad':>13}{'med Δ':>9}")
+    KNOWN = ["TB>=1 == H>=1", "HRR>=1 >= H>=1", "HRR>=1 >= HR>=1", "HRR>=3 >= HR>=1",
+             "H>=1 >= HR>=1", "TB>=2 >= H>=2", "TB>=4 >= HR>=1"]
+    for name in KNOWN:
+        if name not in by:
+            print(f"{name:<24}{0:>5}   — NO POPULATION on this board (absence shown, never silent)")
     for name in sorted(by):
         mo, mk = by[name]["model"], by[name]["market"]
         if not mo:

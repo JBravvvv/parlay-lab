@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`485c81f`** (2026-07-27) — **shadow prices DEPLOYED; the series starts with tonight's boards**. Held: the coverage-bound + clamp-separation commit. **517 passing (59 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
+| `frontend-rebuild` (production) | pushed through **`5de1ddf`** (2026-07-27) — shadow prices deployed, **but no 07-27 board was ever generated (see the outage block)**; the series starts with the first post-deploy generation. Held: the HR-keep + populations + outage-diagnosis commit. **517 passing (59 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -141,6 +141,16 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 
 **Free tier is 100/day and `/api/clv` uses 96.** Sunday = 2 generate + 2 propsnap = **exactly
 100**. A third propsnap entry does not fit.
+
+## 🚨 GENERATE OUTAGE (found 2026-07-27 late) — FIRST thing tomorrow
+**No 07-27 board exists.** The retime removed Vercel's 16:00Z generate cron; the route's
+scheduled path needs header **`x-cron-key: CRON_SECRET`** (`cronHeaderAuthed`, any hour) and
+the cron-job.org entries 1–4 are evidently not presenting it. JOSH: add the custom header to
+entries 1–4 (you type the secret); their execution history shows the failure mode (401 =
+header, no executions = entries off); Vercel logs print "header-bad" vs "none". Bridge: the
+normal morning app open generates on-device through the client path — starts the shadow
+series and the 07-28 board regardless. Series A's first join slips to the first date with
+BOTH board and close (earliest 07-28).
 
 ## ⚠️ FIRST CHECKS TOMORROW (2026-07-28) — updated order (Josh, 2026-07-27 late)
 1. `2026-07-27.best/.latest` landed in `data/boards/` (the workflow FIRES — verified twice

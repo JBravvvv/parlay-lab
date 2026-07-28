@@ -55,8 +55,21 @@ stored `fair` equals the median per-book de-vig recomputed from the stored raw p
 four decimals on all sampled rows (n=2–7 books, three markets). The join
 (`tools/phase2_slope.py`) is the remaining build.
 
-**Earliest dates**: first joinable date = **07-27** (the day `fp`/`kind` began — if its board
-survives the TTL). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report
+⚠️ **OUTAGE FOUND 2026-07-27 late: no 07-27 board exists — Series A's first joinable date
+slips.** The retime removed Vercel's 16:00Z generate cron; the route's scheduled path wants
+header `x-cron-key: CRON_SECRET` (any hour, rate-capped) — and every probe says the
+cron-job.org entries 1–4 are not presenting it (the deployed gate 401s correctly; 07-27 has
+zero generations). The board-archive lesson verbatim, on the other scheduler: **"created" is
+not "fires" — external entries get a next-day verification check the same as workflows.**
+Owner's checklist: cron-job.org → entries 1–4 → add custom header `x-cron-key` with the
+CRON_SECRET value (typed by the owner, never by Claude); the entry execution history shows
+response codes — 401s mean the header, zero executions mean the entries; the Vercel log line
+distinguishes "header-bad" vs "none". Bridge: an on-device generate (opening the Builder)
+writes the day's board through the client path, no gate — the shadow series and the 07-28
+board can start from the normal morning open regardless.
+
+**Earliest dates**: first joinable date = ~~07-27~~ **the first date with BOTH a board and a
+close — earliest 07-28** (on-device morning generate, or the fixed 22:00Z entry). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report
 with every pre-committed column and the diagnostic: **~08-03**, aligned with the
 reopening-rate recompute. Outs control readable **~08-06**; the M10 grading arm reaches 3σ
 **~08-20**; the window's designed read-out stays **~09-22**.

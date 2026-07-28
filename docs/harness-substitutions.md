@@ -107,6 +107,15 @@
 > **The shape that survives: open candidates, closed exceptions — never the reverse.**
 > Enumerate what is EXEMPT (with a justification each), never what is SCANNED.
 >
+> **The diff-two-things rule caught a FIX mid-repair (2026-07-27)** — a first for the class:
+> every prior two-instrument disagreement caught something already broken; this one caught a
+> repair being applied incompletely, in the same turn, before it landed. The shadow-traffic
+> mute was applied to the in-engine clamp log only; the stack-based instrument still counted
+> shadow calls, and the agreement test failed on exactly the three shared-helper sites. The
+> fix went through the flag BOTH instruments consult, and the proof of correctness was the
+> pre-shadow snapshot restored verbatim. Two instruments that share no mechanism disagree
+> exactly when one of them — or one HALF of a change — is wrong.
+>
 > **Fixture-population standard (2026-07-27, after the THIRD vacuity-by-thinness instance):**
 > the fixture is thin enough that emptiness is a REALISTIC state for most markets — a census
 > found the self-consistency suite's H+R+RBI≥3 constraint running on **n=0**, two more

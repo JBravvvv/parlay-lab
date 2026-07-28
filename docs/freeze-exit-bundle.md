@@ -82,6 +82,19 @@ is reported separately). Board-side 617/day (267 hits + 350 TB); close-side 280 
 **≈ 16–27k close-graded pairs by 09-22, thousands per market**. The first true same-date
 join (07-27 board × 07-27 close) is computable the moment tomorrow's archive run lands.
 
+**HR's shadow: KEEP, and here is the verified reason (2026-07-27, owner's question)**:
+~220 HR shadow rows/day have no two-sided close — but they are NOT inert. With HRR excluded,
+the shadow engine still enters three cross-market identities plus its own ladders:
+`H≥1 ≥ HR≥1` (n≈229/day on the real board — both sides shadowed), `TB≥4 ≥ HR≥1` (currently
+n=0 on real boards — TB 3.5 is never model-priced; the tool now prints that absence instead
+of omitting it), `TB≥2 ≥ H≥2`, and — the free win — **`TB≥1 == H≥1` must HOLD EXACTLY on the
+shadow `all` column** (the M8-corrected formula makes them the same number by construction),
+where the live engine carries its known 118/127 violation. A shadow-engine violation of any
+of these with the live engine clean is a bundle defect found pre-ship — the third branch's
+purpose, available daily, no external reference. The three HRR-involving constraints cannot
+run on the shadow engine and are stated as out. `tools/self_consistency.py --shadow [col]`
+runs the whole table per amendment column.
+
 > ### THE PRE-COMMITTED READING — written before a single shadow row exists
 >
 > | at exit, close-graded on the same rows | reading |
