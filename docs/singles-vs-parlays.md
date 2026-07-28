@@ -171,18 +171,71 @@ probability shaded down by δ, propagated through the ticket:
 **So this is not "parlays win". It is: parlays win iff per-leg overconfidence is under ~3
 points, and that quantity has not been measured.**
 
-> ### ADDENDUM (2026-07-28): TWO PLAYABLE BOOKS MOVE THE CROSSOVER TO ≈ −3.2/−3.3 — DEEPER
+> ### ADDENDUM (2026-07-28): TWO PLAYABLE BOOKS MOVE THE CROSSOVER — ⚠️ CORRECTED SAME DAY, TWICE, BELOW
 >
 > Every number above was computed in a one-book world. With PLAYABLE = {CZ, MGM}
 > (docs/multibook-memo.md): a single captures the full per-leg shopping gain (+1.01 pp per
 > dollar), a slip captures the max over its whole stake — **+1.42/+1.58/+1.74 pp per dollar
 > at 2/3/4 legs, MORE than singles, growing with legs** — because staking is per-dollar,
 > not per-leg (the per-leg forfeit +0.30/+0.48/+0.57 is real but is not the staking unit).
-> First-order on the table above: singles +10.1 bp, 3-leg parlays +15.8 bp → the crossover
-> moves from −3.0 to **≈ −3.2 (k=2) / −3.3 (k=3–4) pp, in the parlays' favor** — the
-> OPPOSITE direction from the per-leg-forfeit intuition. The doctrine statement stands,
-> annotated. First-order bp arithmetic (no Kelly restake, mean-shift); the exact two-book
-> re-run belongs to the first board+`fp` day, which is blocked on the generate pipeline. For scale, the board-wide raw model gap
+> ~~First-order on the table above: singles +10.1 bp, 3-leg parlays +15.8 bp → the crossover
+> moves from −3.0 to ≈ −3.2 (k=2) / −3.3 (k=3–4) pp, in the parlays' favor~~ — the
+> per-dollar capture facts stand; the crossover arithmetic is SUPERSEDED (2026-07-28) by the
+> in-frame recompute below.
+>
+> ### CORRECTION 1 of 2 (2026-07-28, owner's frame check): THE −3.2/−3.3 WAS COMPUTED IN A
+> ### DIFFERENT FRAME THAN THE DOCTRINE'S NUMBER, AND THE IN-FRAME ANSWER IS 3.15
+>
+> The doctrine's crossover is Kelly log-growth — exact E[ln(B′/B)] over 2⁶ outcomes at the
+> production allocator's stakes. The −3.2/−3.3 was flat-stake first-order EV-per-dollar
+> (ΔEV/card-$ × 250/2500 = +10.1 bp singles / +15.8 bp 3-leg slips): a DIFFERENT quantity,
+> and one that deletes the variance term where the singles' advantage lives. **It is hereby
+> filed under its own name — "flat-stake EV-per-dollar shift" — and retired from crossover
+> duty.** The recompute below is the doctrine's own frame.
+>
+> **Normalization (printed, per the owner's ask): equal TOTAL stake — $250 per card at the
+> production allocator's actual ¼-Kelly stakes, 6 tickets each side, bankroll $2,500** —
+> the doctrine's own construction, not one single vs one parlay. Stakes are held fixed
+> under the price improvement because the production allocator weights stakes by
+> PROBABILITY (L2999, `base = prob`), which prices do not enter, and the Kelly ceiling
+> ($200) stays far above the per-ticket cap ($62.50) — verified, not assumed.
+>
+> Harness validated first: the archived 07-26 board reproduces +55.3 / +126.6 / +139.1 bp,
+> the −5 row (−23.7 / −67.3 / −58.4) and the 3.05 crossover exactly. Two-book variants:
+> mean-shift (czDec + gain/p; +1.01 pp legs, +1.42/+1.58/+1.74 pp slips at k=2/3/4) and
+> dispersion (empirical gain draws from the 511-leg population, one-book-per-slip argmax,
+> 600 draws × exact 2⁶). Scratch: `xover2.py`; population: the §2b canonical-key stamp
+> applies here too.
+>
+> ### CORRECTION 2 of 2 (2026-07-28, owner's sign check): THE SENTENCE'S CONVENTION, FIXED
+> ### AND STAMPED — THE NUMBER SURVIVES, THE GLOSS WAS MIXING AXES
+>
+> The doctrine sentence states the threshold as a POSITIVE MAGNITUDE of overconfidence
+> ("under ~3 pp"); the −3.2/−3.3 was written on the shade-table's label axis (where −3 pp
+> means "3 pp overconfident"). Mixing them makes "+3.0 → −3.2" read as a narrowing. **The
+> convention is now fixed everywhere: the crossover is a positive magnitude, the tolerated
+> per-leg overconfidence** — which is how the harness itself prints it ("CROSSOVER 3.05
+> pp"). The four evaluation rows the owner required (his labels; d>0 = overconfident):
+>
+> | per-leg error | 1-book singles | 1-book parlay | 2-book singles | 2-book parlay | winner (2-book) |
+> |---|---|---|---|---|---|
+> | −5 pp (5 over) | −23.7 bp | −67.3 bp | −14.4 bp | −55.8 bp | **singles by 41.3** |
+> | −3.3 pp | +3.2 bp | −3.3 bp | +12.7 bp | +9.0 bp | **singles by 3.7** |
+> | 0 | +55.3 bp | +126.6 bp | +65.2 bp | +140.4 bp | **parlays by 75.2** |
+> | +3.0 pp (3 under) | +102.4 bp | +251.1 bp | +112.8 bp | +266.2 bp | **parlays by 153.5** |
+>
+> Parlays win at 0 and lose at −5 — the pre-committed branch that fires is "the sentence's
+> direction was fine; fix the convention and stamp it." Dispersion variant agrees with
+> mean-shift at every row (largest gap 0.3 bp) and on the root.
+>
+> ### THE NUMBER: TWO BOOKS MOVE THE CROSSOVER FROM 3.05 → **3.15 pp** OF TOLERATED
+> ### PER-LEG OVERCONFIDENCE (leg-equivalent card: 3.50 → 3.60)
+>
+> Still in the parlays' favor, still the opposite of the per-leg-forfeit intuition — but
+> **+0.10 pp, not the first-order +0.2/+0.3**: near the crossover the parlay g-curve is much
+> steeper, so a bp advantage buys fewer pp than flat-stake arithmetic assumed. That is the
+> variance term the first-order frame deleted, measured. The exact two-book re-run on real
+> per-leg card prices still belongs to the first board+`fp` day (blocked on the pipeline). For scale, the board-wide raw model gap
 is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
 rather than information, the crossover is breached. The global reliability slope is
 **1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the
