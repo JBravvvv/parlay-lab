@@ -169,7 +169,20 @@ probability shaded down by δ, propagated through the ticket:
 > two are equal. At 5 points **singles lose 24 bp and parlays lose 67 bp — 2.8× as much.**
 
 **So this is not "parlays win". It is: parlays win iff per-leg overconfidence is under ~3
-points, and that quantity has not been measured.** For scale, the board-wide raw model gap
+points, and that quantity has not been measured.**
+
+> ### ADDENDUM (2026-07-28): TWO PLAYABLE BOOKS MOVE THE CROSSOVER TO ≈ −3.2/−3.3 — DEEPER
+>
+> Every number above was computed in a one-book world. With PLAYABLE = {CZ, MGM}
+> (docs/multibook-memo.md): a single captures the full per-leg shopping gain (+1.01 pp per
+> dollar), a slip captures the max over its whole stake — **+1.42/+1.58/+1.74 pp per dollar
+> at 2/3/4 legs, MORE than singles, growing with legs** — because staking is per-dollar,
+> not per-leg (the per-leg forfeit +0.30/+0.48/+0.57 is real but is not the staking unit).
+> First-order on the table above: singles +10.1 bp, 3-leg parlays +15.8 bp → the crossover
+> moves from −3.0 to **≈ −3.2 (k=2) / −3.3 (k=3–4) pp, in the parlays' favor** — the
+> OPPOSITE direction from the per-leg-forfeit intuition. The doctrine statement stands,
+> annotated. First-order bp arithmetic (no Kelly restake, mean-shift); the exact two-book
+> re-run belongs to the first board+`fp` day, which is blocked on the generate pipeline. For scale, the board-wide raw model gap
 is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
 rather than information, the crossover is breached. The global reliability slope is
 **1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the

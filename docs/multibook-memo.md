@@ -41,6 +41,58 @@ both-priced rows, 07-27):**
 | per 3-leg SLIP, **one book per slip** (bootstrap 4,000 slips) | **+1.60 pp mean** (median +0.08 — tail value; p75 +2.66), **51% of slips improved**. The naive 3×-per-leg figure (+3.0) mixes books within a slip and is the WRONG number — stated in the headline because the per-leg number WILL be read as the ticket number by a skimmer |
 | the 07-26 ticket-level restriction | **uncomputable** — per-book prices (`fp`) begin 07-27, so MGM's 07-26 prices are unrecoverable. The DK/FD-basis ticket numbers below (+3.20 median, 10 new clears) are unplayable-basis artifacts. **Follow-up, dated: the first day carrying BOTH a board and `fp` (07-28 onward) computes the exact per-ticket argmax gains and the +2%-new-clears count over {CZ, MGM}** |
 
+## 2b. THE DECOMPOSITION, THE UNLOCK, AND THE CROSSOVER — measured (2026-07-28, later)
+
+**Per-market per-leg gain (max(CZ,MGM) − CZ)** — the gain is IN the ticket markets:
+
+| market | n | mean | improved |
+|---|---|---|---|
+| H+R+RBI | 257 | +0.87 | 107/257 |
+| total bases | 236 | **+1.15** | 106/236 |
+| outs | 18 | +1.14 | 10/18 |
+
+The mix-weighted slip bootstrap (the built card's 5 HRR : 6 TB mix) lands **+1.58 pp at
+k=3** — within noise of the uniform +1.60, because the both-priced population already WAS
+the ticket mix. The realizable slip gain on real tickets stands.
+
+**THE UNLOCK — a finding bigger than the price improvement**: the feed's Caesars
+(`williamhill_us`) is missing from **100% of hits rows (369/369) and 100% of K's rows
+(37/37)** in the archive (HR 42%, TB 44% partial). Whole markets cannot settle at CZ from
+the feed today — which is why hits legs never reach the pool. **Multi-book does not just
+improve prices; MGM settlement UNLOCKS hits and K's as ticketable markets.** (Feed subset ≠
+the physical book, per the ASG correction — but the pipeline can only settle what the feed
+quotes.)
+
+**THE CROSSOVER AT TWO BOOKS — the per-dollar arithmetic runs OPPOSITE the forfeit
+intuition (owner's item, answered with a sign flip):** the per-LEG forfeit is real and
+grows with leg count (per-leg-equivalent capture +0.71/+0.53/+0.44 at k=2/3/4 → forfeit
++0.30/+0.48/+0.57 vs the singles' +1.01). **But the staking unit is the dollar, not the
+leg**: a slip captures the max over its whole stake — +1.42/+1.58/+1.74 pp per dollar at
+k=2/3/4 — MORE than a single's +1.01, and growing with k. First-order on the doctrine's own
+table ($250/$2,500 → 1 pp ticket EV ≈ 10 bp): singles +10.1 bp, 3-leg parlays +15.8 bp →
+the −3 pp crossover moves to **≈ −3.2/−3.3 pp — DEEPER, in the parlays' favor** (k=2 ≈
+−3.2, k=4 ≈ −3.3). Dated addendum in `docs/singles-vs-parlays.md`; the doctrine's ~3 pp
+statement stands with the annotation. Caveats: first-order bp shift (no Kelly restake),
+mean-shift not full dispersion.
+
+**Three leg-count forces now exist, each decided alone** — shopping rewards legs per
+dollar (this memo), A2's leg-equivalent floor penalises them, `consMinEv`'s multiplicative
+structure rewards them — flagged for a JOINT review at exit rather than three independent
+knobs.
+
+**THE CLV COST, CORRECTED (owner's catch, verified in `clv-core`)**: the sighting computes
+`consensusFair` from all books and THEN discards everything on `if (cz == null) return
+null` — the fair-points CLV (the PRIMARY number per `docs/clv.md`) does not need the
+settlement book and is being thrown away with it. **As coded: a Circa/MGM-settled ticket
+loses its whole close. After a one-guard decoupling: it loses only the cents column.** The
+decoupling is necessary under multi-book anyway (every MGM-settled hits ticket would
+otherwise lose CLV) and it also covers Caesars quotes the feed happens to miss — which the
+unlock finding shows is whole markets, not edge cases.
+
+**⚠️ THE TICKET-LEVEL FOLLOW-UP IS BLOCKED, NOT SCHEDULED**: "the first day carrying both a
+board and `fp`" requires a board, and none exists until the cron header is fixed and the
+manual curl runs (CLAUDE.md's outage chain). Recorded as blocked-on-the-pipeline.
+
 ## 3-CIRCA. ONE PASTE DAY TO MEASURE, THEN DECIDE — spec only, nothing built (2026-07-28)
 
 - **What to paste**: the Circa app's MLB player-props listings per game (hits / TB / HRR /
