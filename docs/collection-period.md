@@ -2782,10 +2782,34 @@ killing the TB ones: the floor and the suspension are complements, not substitut
    criterion cannot work (HRR carries NO shadow price — excluded by scope, no expected
    metric). The measurable equivalent through Phase 2's channel, no bets needed:
    > RETIRES when (a) the HRR pricing repair has shipped (M3 + the per-game estimator
-   > disposition), AND (b) over the trailing **≥300 close-joined HRR O0.5 board rows across
+   > disposition) — ⚠️ **that repair is UNSPECCED as of 2026-07-27: no owner, no date.
+   > THE SPEC MUST EXIST BY 2026-08-08** (the A3 pattern — a decision must exist), informed
+   > by the 08-05 archive re-run; failing that, this suspension is **OPEN-ENDED pending
+   > it — stated plainly, not implied** — and the 08-15 review inherits the flag. AND (b) over the trailing **≥300 close-joined HRR O0.5 board rows across
    > ≥10 boards** (~25 close rows/day → ~2 weeks post-repair), **|median(pModel −
    > close_fair)| ≤ 3 pp** and the sim-priced subset's median residual **≤ 3 pp** (today:
    > +10.0). Review dated **08-15** alongside the ICC report either way.
+
+**ITEM-1 COMPLETENESS CHECK (2026-07-27, post-push): the suspension DOES reach FUN — via
+the pool, with one instructive scare.** `shFunPick` never consults `hrrAltMax` and never
+needs to: both its ticket sources (`parlays`, `parlaysMixed`) are built by `buildParlaySet`,
+where the bar removes HRR rows from the candidate set in both disciplined modes — no HRR
+ticket exists for either allocator to pick. **Empirically verified under production's
+`ev_gated`: pool 0 HRR legs, FUN 0.** The scare: the first scratch run showed 11 HRR legs in
+the pool and 4 in FUN — because the bare sandbox runs `selMode` UNDEFINED (the legacy/parity
+posture, where the bar intentionally does not apply). That posture is unreachable in
+production (armV2 and the cron both set `ev_gated`; `CRON_SEL_MODE` is test-asserted), and
+it is also exactly why the baselines never moved.One real edge, already covered:
+a pre-deploy cached board carries old parlays — `lockMaxAgeMin:30` forces a fresh
+new-engine board before any lock. Legacy modes remain unfiltered by design (parity posture,
+manual Settings selection only — which also bypasses every other discipline gate).
+
+**THE PARITY-GREEN CAVEAT (owner's item 3, recorded as instructed): the byte-identical
+baselines are ZERO evidence about this deployment.** The fixture is blind to both changes —
+no priced TB-0.5 row, no HRR ticket under its legacy posture. That is absence of coverage,
+not confirmation — the same blindness class as the project's three false greens. **The only
+real evidence is the verification chain in CLAUDE.md's outage block, and nothing locks
+Wednesday until it completes.**
 
 **The baseline statement (item 3, the insisted condition — and the event was cleaner than
 the plan)**: NEITHER change moved either baseline. `baseline43` is **byte-identical before

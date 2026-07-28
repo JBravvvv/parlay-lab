@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`485bc74`** (2026-07-27). **Held: the D-EXECUTION commit — M8 SHIPPED + HRR fully suspended. Neither is live until pushed AND deployed; Wednesday's reopen makes this the most time-sensitive push of the project.** 519 passing (59 files) + 7/7, build clean |
+| `frontend-rebuild` (production) | pushed through **`213e8e2`** (2026-07-27 night — D EXECUTED, deploying). Held: the FUN-trace + verification-chain commit. **519 passing (59 files)** + 7/7, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -153,7 +153,33 @@ has no POST and the client's `pl_board_r1` is localStorage, pull-only. An on-dev
 logs prediction rows (the phrase is set) but **persists NO server board: no archive row, no
 Series A board-side, no shadow carrier. The header fix is the ONLY path.**
 
-**THE IMMEDIATE REMEDY — one manual, verified run (Josh, Monday morning; ~120 odds credits):**
+**THE FULL VERIFICATION CHAIN (owner's rule: NOTHING LOCKS WEDNESDAY UNTIL IT COMPLETES).**
+Each step, what it proves, what it costs:
+1. ✅ **push 213e8e2** (done 2026-07-27 night) → Vercel auto-builds. Free.
+2. **Confirm the DEPLOYED sha carries both changes** — dashboard: latest production
+   deployment commit ≥ 213e8e2. Or from outside (proves the deploy, not the repo), grep the
+   served client bundle for the fix strings:
+   ```
+   curl -s https://parlay-lab-six.vercel.app/board | grep -oE '/_next/static/chunks/[^"]+\.js' | sort -u | while read c; do curl -s "https://parlay-lab-six.vercel.app$c"; done | grep -c 'line<1)return 1-P0'
+   ```
+   ≥1 = M8 deployed; repeat with `hrrAltMax:-1` for the suspension. Free.
+3. **Add header `x-cron-key` to entries 1–4** (you type the secret; today's 3:00 PM PT 401
+   in the execution history is the before-evidence). Free.
+4. **Manual generate curl, Tuesday ~9–10 AM PT** (below) — slot 1 of 3, ~120 credits →
+   response `{ok, date:"2026-07-28", gen}`. Builds the first post-fix board.
+5. **Landed**: `gen=list` non-empty for the response's own date. Free.
+6. **Board-level confirmation** (free): `python3 tools/self_consistency.py --date 2026-07-28`
+   → **TB>=1 == H>=1 MODEL bad = 0** (was 118/127) proves M8 live; zero HRR legs in the
+   board's `parlays`/`parlaysMixed` proves the suspension live; `sh` present on closed-form
+   batter rows proves the shadow series started.
+7. **Violations ≠ 0 → DIAGNOSIS-THEN-DECIDE, never reflex-rollback**: (i) step-2 grep = 0 →
+   stale deploy — redeploy, no engine question; (ii) deployed but violating → check the
+   tool's printed `wBlend` first (a changed blend weight breaks the un-blend, not the
+   engine); (iii) both clean and violations persist → a NEW defect surfaced — that is
+   information; hold Wednesday's locks and diagnose. The one-line revert exists but
+   arithmetic cannot violate its own identity — (iii) would implicate something else.
+
+**THE MANUAL RUN (step 4):**
 ```
 curl -s --max-time 320 "https://parlay-lab-six.vercel.app/api/generate" -H "x-cron-key: PASTE_CRON_SECRET"
 ```
