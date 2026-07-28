@@ -51,18 +51,22 @@ def season_batters():
     return out
 
 
-def game_log(pid):
+STAT_KEY = {"hits": "hits", "tb": "totalBases", "hr": "homeRuns"}
+
+
+def game_log(pid, market="hits"):
     d = fetch(f"{API}/people/{pid}/stats?stats=gameLog&group=hitting&season=2026", f"gl_{pid}")
-    by_date = defaultdict(lambda: [0, 0])  # date -> [H, AB]
+    by_date = defaultdict(lambda: [0, 0])  # date -> [numerator, AB]
     try:
         splits = d["stats"][0]["splits"]
     except (KeyError, IndexError):
         return {}
+    key = STAT_KEY[market]
     for sp in splits:
         dt = sp.get("date")
         st = sp.get("stat") or {}
         if dt:
-            by_date[dt][0] += int(st.get("hits") or 0)
+            by_date[dt][0] += int(st.get(key) or 0)
             by_date[dt][1] += int(st.get("atBats") or 0)
     return dict(by_date)
 
@@ -75,15 +79,22 @@ def prior_commits():
     return [(h, d) for h, d in pairs]  # newest first
 
 
-def xba_asof(commits, cache={}):
-    """date -> {player_id(str): xba} from the latest commit dated <= date."""
+def xba_asof(commits, field="xba", cache={}):
+    """date -> {player_id(str): <field>} from the latest commit dated <= date."""
     def load(h):
-        if h not in cache:
+        key = (h, field)
+        if key not in cache:
             raw = subprocess.run(["git", "show", f"{h}:public/model/priors.json"],
                                  capture_output=True, text=True, check=True).stdout
             j = json.loads(raw)
-            cache[h] = {k: v.get("xba") for k, v in (j.get("batters") or {}).items()}
-        return cache[h]
+            if field == "xiso":
+                # not stored — derived, exactly as the engine's shPriorHR does
+                cache[key] = {k: (v["xslg"] - v["xba"])
+                              for k, v in (j.get("batters") or {}).items()
+                              if v.get("xslg") is not None and v.get("xba") is not None}
+            else:
+                cache[key] = {k: v.get(field) for k, v in (j.get("batters") or {}).items()}
+        return cache[key]
 
     def get(day):
         for h, d in commits:  # newest first
@@ -117,18 +128,25 @@ def wls(X, y, w):
     return betas, [math.sqrt(max(s2 * inv[j][j], 0)) for j in range(k)]
 
 
-def main(start="2026-07-11", end="2026-07-26"):
+PRIOR_FIELD = {"hits": "xba", "tb": "xslg", "hr": "xiso"}
+
+
+def main(start="2026-07-11", end="2026-07-26", market="hits"):
     args = sys.argv[1:]
     if "--start" in args:
         start = args[args.index("--start") + 1]
     if "--end" in args:
         end = args[args.index("--end") + 1]
+    if "--market" in args:
+        market = args[args.index("--market") + 1]
+    print(f"market: {market}  (prior = {PRIOR_FIELD[market]}; xSLG IS expected TB/AB; "
+          f"xISO rescaled to HR/AB by the sample league ratio)")
     ids = season_batters()
     print(f"batters with ≥{MIN_ABSEA_POOL} season AB: {len(ids)}")
     commits = prior_commits()
     print(f"priors.json commits available: {len(commits)} "
           f"({commits[-1][1]} → {commits[0][1]})" if commits else "NO priors history")
-    getx = xba_asof(commits)
+    getx = xba_asof(commits, PRIOR_FIELD[market])
 
     d0 = date.fromisoformat(start)
     d1 = date.fromisoformat(end)
@@ -137,7 +155,7 @@ def main(start="2026-07-11", end="2026-07-26"):
     obs = []  # (r30, rSeason, xba, y, ab_weight)
     dropped = defaultdict(int)
     for n_i, pid in enumerate(ids):
-        gl = game_log(pid)
+        gl = game_log(pid, market)
         if n_i % 100 == 0:
             print(f"  …{n_i}/{len(ids)} players", file=sys.stderr)
         for D in days:
@@ -169,6 +187,14 @@ def main(start="2026-07-11", end="2026-07-26"):
         print("too thin — aborting")
         return
 
+    if market == "hr":
+        # xISO is expected (TB−H)/AB; rescale to HR/AB units via the sample ratio so the
+        # weights are share-comparable with the windowed rates
+        mS = sum(o[1] for o in obs) / len(obs)
+        mX = sum(o[2] for o in obs) / len(obs)
+        k = mS / mX
+        obs = [(a, b, c * k, d, e) for a, b, c, d, e in obs]
+        print(f"  xISO→HR/AB rescale: ×{k:.3f}")
     R30 = [o[0] for o in obs]
     RS = [o[1] for o in obs]
     XB = [o[2] for o in obs]

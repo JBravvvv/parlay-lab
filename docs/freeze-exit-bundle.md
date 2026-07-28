@@ -45,6 +45,36 @@ M11, whose estimator reaches every batter price in both paths). It was ranked th
 routing looked like it would subsume it; the external check removed hits from sim routing, so
 `shParkF` is the only amendment that reaches hits, K's, outs and every game the sim misses.
 
+## MEASUREMENT VINTAGE AND DEPENDENCY ORDER (2026-07-27)
+
+Every magnitude below was asked one question: *was it measured on boards priced by the
+contaminated rate estimator (M11) and the noisy volume input (M10), and does its number
+move when they ship?* The expectation being tested was "most of the model axis is
+downstream of M11 and the allocation axis isn't" — **partially confirmed, with corrections:
+about half the model axis is independent, and M2's blocker is the pitcher-side analogue,
+not M11 itself.**
+
+| item | pre-M10/M11 vintage? | verdict |
+|---|---|---|
+| M1 | park-factor tables — no rate input | **independent — speccable now** |
+| **M2 / M2′** | pitcher-side, so not downstream of the *batter* estimator — but the outs board rests on `shPitchBlend` (60/40 recency, no shrink), `leashOf` (k=4), and the `offense()` opp-lineup factor, which IS window-blended | ⚠️ **PROVISIONAL 2026-07-27 — blocked by the pitcher-blend audit, not by M11.** The −23.3/−11.5 gap and the 0.140→0.400 spec re-measure after that audit |
+| M3 | the zero-site-variation *diagnosis* is structural | diagnosis stands; **the weights spec waits for M11** (its inputs change) |
+| M4 | fixture-market prices riding M11's base + M12 | **PROVISIONAL — re-measure after M11 ships and M12 is dispositioned** |
+| ~~M5~~ | refuted on the same vintage | stays refuted (the refutation direction only strengthens post-M11) |
+| M8 | arithmetic identity | **independent — speccable now (one line)** |
+| M7+M9 | the rung structure (+1.4–2.0) is the *contaminated model's* shape | truth-dispersion reference (~08-01) is model-free and unaffected; **the rung numbers re-measure after M11** |
+| M10 | sibling of M11 (same input family) | the bbr-shrink spec (k≈75) is estimator arithmetic — **speccable now**; the +7.39 slope re-measures after M11 |
+| M11 | specced from the truth-side regression — **model-free by construction** | **specced, done** |
+| M12 | sim−cf, the shared base cancels | **independent of M11 by construction**; fixture magnitudes gate on the archive series |
+| M6 | a row count | independent; its *value* is contingent on M12's cleanup |
+| A1–A4 | log-growth measured on ticket sets built from contaminated probabilities | **structural comparisons are belief-generic and stand** (edge-aware > prob, floor scaling, concentration mechanism); **magnitudes are belief-dependent — re-measure post-M11 before applying**. A3 stays a decided-no |
+
+**Speccable now:** M8, M11, M10's bbr shrink, M1. **Must wait:** M4 and M3's weights (for
+M11), M7+M9's rung numbers (for M11 + the reference), M2's magnitude (for the pitcher-blend
+audit — a NEW open item this table created), every allocation magnitude (cheap re-runs
+post-M11). This ordering is what "assembled in draft so 09-22 is a decision" requires and
+did not previously carry.
+
 ### M1's double-counting check — not optional
 
 `(coors?1.07:1)`, `(coors?1.10:1)` and `(coors?1.08:1)` **are park factors**, and Coors Field is

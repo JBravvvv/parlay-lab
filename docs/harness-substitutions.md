@@ -40,6 +40,24 @@
 > enforcement is the closure — **a section that ends without naming its test or its measured
 > number is not closed.**
 
+> ## THE PRE-COMMIT GATE'S WORKED EXAMPLE — the fix for the intent-bug was itself an intent-bug (2026-07-27)
+>
+> M11's defect was a blend whose weights (.25/.35/.40) were chosen from intent. The first
+> fix shape — "a season term plus an honest n" — was **also chosen from intent**, in the
+> very repair of the defect that choosing-from-intent caused. It was gated on a measurement
+> before speccing (`tools/recency_weights.py`, with the four outcome branches pre-committed
+> before the number arrived), and the measurement returned **branch 4: the xBA prior carries
+> the weight (+0.73), the windowed form term is zero (+0.05 SE 0.08), and season is
+> redundant against xBA (corr 0.73)** — the intended season term would have been the wrong
+> structure again. Re-run per market: form is zero in hits, TB, **and HR** (−0.008 SE 0.084),
+> where recency was most plausible.
+>
+> **The general form: a fix designed for a measured defect inherits the defect's own failure
+> mode unless the fix's parameters are measured too.** The gate is the enforcement — a spec
+> whose parameters no measurement produced is not a spec, it is the next M11. This is the
+> strongest case in the project for pre-committing interpretation branches before the number
+> arrives: the branch that fired was the one nobody would have picked from intent.
+
 > ## ⚠️ EVERY "BYTE-IDENTICAL PARITY" CLAIM IN THIS PHASE WAS ABOUT PICKS AND TICKETS ONLY
 >
 > `digest()` serialises **`categories`, `categoriesLive`, `parlays`, `parlaysMixed`,

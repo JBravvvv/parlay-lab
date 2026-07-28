@@ -3886,6 +3886,50 @@ weight; the intercept absorbs the July pool drift (realized 0.237 vs trailing 0.
 **Re-run ~2026-08-10** (SE ≈ 0.07, cache makes it one command) and again at exit. Unshipped
 under the freeze either way.
 
+## PER MARKET: THE ANSWER IS ONE STRUCTURE — form is zero in all three (2026-07-27)
+
+The plausible counter was home runs: power is a stabler skill, xISO stabilises faster, so HR
+might carry a real recency term. Same leak-free design, same 3,061 player-dates (identical
+filters), matching Statcast prior per market — xSLG *is* expected TB/AB; xISO derived
+xslg−xba exactly as `shPriorHR` does, rescaled to HR/AB by the sample league ratio:
+
+| market | windowed last-30 | season | expected-metric prior |
+|---|---|---|---|
+| hits | +0.126 (SE 0.096); **+0.045 (SE 0.084)** with xBA present | −0.360 (0.207), collinear | **xBA +0.728 (0.218)** |
+| TB | **−0.002 (SE 0.089)** | −0.106 (0.209) | **xSLG +0.542 (0.196)** |
+| HR | **−0.008 (SE 0.084)** | +0.240 (0.201) | **xISO′ +0.436 (0.257)** |
+
+**The windowed form term is zero in every market, including HR** — the recency-for-power
+hypothesis is refuted at the same SE that killed it for hits. The skill block (prior +
+season) carries everything, with the expected metric the stronger half each time. **So the
+M11 fix is ONE structure, not per-market**: expected-metric-primary, a single un-nested
+last-30 term at weight ≤ ~0.1, per-market only in *which* prior anchors it. The ~08-10
+re-run covers all three markets in one command (`--market hits|tb|hr`).
+
+## M11'S REAL BLAST RADIUS — every `shBlendN`/`shBlend` call site (2026-07-27)
+
+The window structure is generic, so the fix is to the estimator's consumers, not one call
+site. The complete inventory (grep-complete, both functions):
+
+| site | quantity | shrink → prior | expected-metric prior available? |
+|---|---|---|---|
+| L2348 closed hits | hits/AB | k=60 → xBA | ✓ xba |
+| L2350 closed TB | **hits/AB — TB inherits the hits estimator wholesale**; only s1/s2 (last-30 XBH shares, unshrunk) are TB-specific | k=60 → xBA | ✓ xba; xslg available for the s1/s2 mix, unused |
+| L2356 closed HR | HR/AB | k=150 → xISO (derived) | ✓ |
+| L2358 closed HRR | (H+R+RBI)/**game**, min 3 g | **k=10 → league mean** — the weakest shrink in the engine, to the crudest prior | ✗ **no expected metric for R/RBI exists — needs its own answer** |
+| L2065 sim hits | hits/AB | k=60 → xBA | ✓ |
+| L2066 sim HR | HR/AB | k=150 → xISO | ✓ |
+| L2067 sim `pBB` | BB/AB | **none** | ✗ stored priors carry no expected walk metric; the percentile store has season `bb_percent` (stable, not "expected") — M10's k≈75 league shrink is the interim |
+| L2308 closed `bbr` → expAB | BB/AB | **none** | same as above |
+| L2158 `offense()` | **lineup-average TB/AB** | none | ✓ xslg — ⚠️ consumers are the RL/total context (L2172) **and the outs model's opp-offense factor (L2257)**: lineup-averaging diversifies the noise but NOT the recency loading, so **the window structure reaches `pitcher_outs` after all** — through a different door than the walk channel cleared earlier |
+| L2279 K's opp-lineup K rate | lineup-average K/AB | none (clamp .8–1.2) | ✓ k_percent / whiff_percent (note `shOppWhiffF` already consumes the Savant percentile separately — a fix here must not double-count) |
+
+Ten sites, six quantities, all four batter markets plus K's and outs. Two call sites cannot
+take the expected-metric-primary structure (HRR per-game, the walk channel) and are marked
+above with their own answers. **Not in this table and not audited: the pitcher's own rates —
+`shPitchBlend` (60/40 last-30/season, no shrink) and `leashOf`'s ipg (k=4). That is the
+pitcher-side analogue of M11 and it is an open audit, now blocking M2's vintage (below).**
+
 ## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
 
 The sim was instrumented directly (temporary same-line-count counters in `halfInning`,
