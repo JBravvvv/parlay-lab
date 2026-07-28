@@ -116,6 +116,18 @@
 > pre-shadow snapshot restored verbatim. Two instruments that share no mechanism disagree
 > exactly when one of them — or one HALF of a change — is wrong.
 >
+> **PHANTOM COVERAGE — doc-vs-code where the DOC is the more capable of the two (2026-07-27,
+> new instance class):** `tools/self_consistency.py`'s docstring promised `TB>=4 >= HR>=1`;
+> the code never implemented it. Every prior doc-vs-code instance was code diverging from a
+> comment describing INTENT (`base = prob`, the shShrink comment); this is a comment
+> describing COVERAGE that never existed — and an auditor reading the suite would have
+> counted it as covered. Swept the same day: every tool and guard docstring with an
+> enumerated check list verified against its implementation (`self_consistency` — the
+> instance, fixed; `doc-structure` A–E each mapped to a test; `rung_signature`, `m10_eiv`,
+> `recency_weights`, `close_fair`, `archive_boards`, the five guards — all implemented as
+> described). Enforcement, not prose: doc-structure's check F now parses the
+> self-consistency docstring's numeric constraints and fails if the code lacks one.
+>
 > **Fixture-population standard (2026-07-27, after the THIRD vacuity-by-thinness instance):**
 > the fixture is thin enough that emptiness is a REALISTIC state for most markets — a census
 > found the self-consistency suite's H+R+RBI≥3 constraint running on **n=0**, two more

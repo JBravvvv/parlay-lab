@@ -132,4 +132,29 @@ describe("doc structure — the memory is guarded like the code", () => {
   it("E: every dated open item has a date and a named trigger", () => {
     expect(datedItemViolations(readFileSync(CLAUDE, "utf8"))).toHaveLength(0);
   });
+
+  /* F — PHANTOM COVERAGE (2026-07-27): the self-consistency docstring promised a constraint
+     (TB>=4 >= HR>=1) the code never implemented — a doc describing coverage that never
+     existed reads as coverage to any auditor. This parses the docstring's numeric
+     constraints and demands each one in the code. */
+  function promisedConstraints(src: string): string[] {
+    const out: string[] = [];
+    for (const m of src.matchAll(/^\s{2}((?:TB|HRR|HR|H)>=\d+)\s+(==|>=)\s+((?:TB|HRR|HR|H)>=\d+)/gm)) {
+      out.push(`${m[1]} ${m[2]} ${m[3]}`);
+    }
+    return out;
+  }
+
+  it("F: the checker itself sees a promised-but-missing constraint", () => {
+    const doc = "  TB>=9  >=  H>=9          made up\n";
+    expect(promisedConstraints(doc)).toEqual(["TB>=9 >= H>=9"]);
+  });
+
+  it("F: every constraint the self-consistency docstring promises exists in its code", () => {
+    const src = readFileSync("tools/self_consistency.py", "utf8");
+    const promised = promisedConstraints(src);
+    expect(promised.length, "the docstring's constraint list vanished — rewrite this parser").toBeGreaterThanOrEqual(6);
+    const missing = promised.filter((c) => !src.includes(`("${c}"`) && !src.includes(`"${c}",`));
+    expect(missing, "promised in the docstring, absent from the code — phantom coverage").toHaveLength(0);
+  });
 });

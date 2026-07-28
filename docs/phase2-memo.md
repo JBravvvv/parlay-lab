@@ -64,9 +64,12 @@ not "fires" — external entries get a next-day verification check the same as w
 Owner's checklist: cron-job.org → entries 1–4 → add custom header `x-cron-key` with the
 CRON_SECRET value (typed by the owner, never by Claude); the entry execution history shows
 response codes — 401s mean the header, zero executions mean the entries; the Vercel log line
-distinguishes "header-bad" vs "none". Bridge: an on-device generate (opening the Builder)
-writes the day's board through the client path, no gate — the shadow series and the 07-28
-board can start from the normal morning open regardless.
+distinguishes "header-bad" vs "none". ~~Bridge: an on-device generate writes the day's board through the client path~~
+**RETRACTED 2026-07-27, same night, by trace — the exact trap this file's own 1a warning
+documented**: the only `pl:board:{date}` writer is `/api/generate` L319; the client path is
+localStorage + predictions only. **No server board without the header fix or a manual
+header-authed curl (in CLAUDE.md's outage block). Series A's first joinable date = the first
+date `/api/generate` actually runs.**
 
 **Earliest dates**: first joinable date = ~~07-27~~ **the first date with BOTH a board and a
 close — earliest 07-28** (on-device morning generate, or the fixed 22:00Z entry). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report

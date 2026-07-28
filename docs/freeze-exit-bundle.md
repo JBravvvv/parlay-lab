@@ -89,9 +89,16 @@ the shadow engine still enters three cross-market identities plus its own ladder
 n=0 on real boards — TB 3.5 is never model-priced; the tool now prints that absence instead
 of omitting it), `TB≥2 ≥ H≥2`, and — the free win — **`TB≥1 == H≥1` must HOLD EXACTLY on the
 shadow `all` column** (the M8-corrected formula makes them the same number by construction),
-where the live engine carries its known 118/127 violation. A shadow-engine violation of any
-of these with the live engine clean is a bundle defect found pre-ship — the third branch's
-purpose, available daily, no external reference. The three HRR-involving constraints cannot
+where the live engine carries its known 118/127 violation. **THE PRIMARY INTERNAL CHECK OF THE SHADOW SERIES — above the ladder constraints, stated
+as such (2026-07-27, owner's call): `TB≥1 == H≥1` on the shadow `all` column.** It is an
+exact identity, not an inequality; it needs no market, no grading, no accrual; the
+M8-corrected engine satisfies it **by construction** and the live engine violates it **118
+of 127 rows** on the same boards — a daily proof-of-correctness for the shadow pipeline from
+its first row, with the live violation as the standing contrast. If the shadow column ever
+breaks it, the shadow implementation (not the market, not the fixture) is wrong, localised
+to one formula. A shadow-engine violation of any of the other constraints with the live
+engine clean is a bundle defect found pre-ship — the third branch's purpose, available
+daily, no external reference. The three HRR-involving constraints cannot
 run on the shadow engine and are stated as out. `tools/self_consistency.py --shadow [col]`
 runs the whole table per amendment column.
 

@@ -147,10 +147,33 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 scheduled path needs header **`x-cron-key: CRON_SECRET`** (`cronHeaderAuthed`, any hour) and
 the cron-job.org entries 1–4 are evidently not presenting it. JOSH: add the custom header to
 entries 1–4 (you type the secret); their execution history shows the failure mode (401 =
-header, no executions = entries off); Vercel logs print "header-bad" vs "none". Bridge: the
-normal morning app open generates on-device through the client path — starts the shadow
-series and the 07-28 board regardless. Series A's first join slips to the first date with
-BOTH board and close (earliest 07-28).
+header, no executions = entries off); Vercel logs print "header-bad" vs "none". ~~Bridge: the normal morning app open generates on-device~~ **RETRACTED 2026-07-27, same
+night, by trace**: the ONLY writer of `pl:board:{date}` is `/api/generate` L319 — `/api/board`
+has no POST and the client's `pl_board_r1` is localStorage, pull-only. An on-device generate
+logs prediction rows (the phrase is set) but **persists NO server board: no archive row, no
+Series A board-side, no shadow carrier. The header fix is the ONLY path.**
+
+**THE IMMEDIATE REMEDY — one manual, verified run (Josh, Monday morning; ~120 odds credits):**
+```
+curl -s --max-time 320 "https://parlay-lab-six.vercel.app/api/generate" -H "x-cron-key: PASTE_CRON_SECRET"
+```
+then prove it LANDED (created → fires → landed, the whole chain):
+```
+curl -s "https://parlay-lab-six.vercel.app/api/board?date=2026-07-28&gen=list"
+```
+non-empty `gens` = the 07-28 board exists server-side, **with shadow columns** (the deploy is
+live), archives on 07-29's runs, and is Series A's first joinable date. Notes: the header
+path is hour-free; 45-min rate cap (a second run inside it returns `skipped`); 3 spending
+runs/date. Then fix entries 1–4 with the same header and watch Monday 22:00Z fire on its own.
+
+**ACCRUAL OUTAGE, quantified**: last server board = **07-26 16:46Z** (the old Vercel cron's
+final run). Server-side accrual dark since. Every dark date shifts every reopening date
+**day-for-day**: ML/RL 08-08→**08-09**, TB 08-17→**08-18**, hits/HR/HRR 08-23→**08-24**,
+K's/outs 09-03→**09-04** (at one dark day; +1 more per additional). `consMinEv` keeps
+blocking everything until they clear. Client generates DO log prediction rows when the app
+was opened — whether 07-27 has partial client accrual is readable on the CALIBRATION panel
+(per-market n), not from outside. The 08-03 recompute now doubles as the outage damage
+report.
 
 ## ⚠️ FIRST CHECKS TOMORROW (2026-07-28) — updated order (Josh, 2026-07-27 late)
 1. `2026-07-27.best/.latest` landed in `data/boards/` (the workflow FIRES — verified twice
