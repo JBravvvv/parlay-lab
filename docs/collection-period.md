@@ -117,7 +117,7 @@ drift, even when both values look reasonable on their own.
 ### Suspensions (until recalibration earns them back)
 | parameter | value | meaning |
 |---|---|---|
-| `hrrAltMax` | ~~`0.5`~~ **`-1` (2026-07-27, signed off — reopening decision)** | ~~lines above O0.5~~ **every H+R+RBI rung** suspended from auto-selection; retirement criterion in THE REOPENING DECISION section |
+| `hrrAltMax` | ~~`0.5`~~ **`-1` (2026-07-27, signed off — reopening decision)** | ~~lines above O0.5~~ **every H+R+RBI rung** suspended from auto-selection; retirement criterion in THE REOPENING DECISION section. ⚠️ **Effect CONDITIONAL on `selMode ∈ {ev_gated, dk_fd}`** — the legacy posture is unfiltered by design (parity stance); the coupling to the production arming modes is TEST-ENFORCED (`tests/hrr-suspension-coupling.test.ts`, with a plant proving the legacy world stays visible) |
 | `coreNoHR` | `true` | HR props never on core; HR-anytime parlays are FUN-only |
 | **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period — see KNOWN-INERT below. |
 | **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |

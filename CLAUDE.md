@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`213e8e2`** (2026-07-27 night — D EXECUTED, deploying). Held: the FUN-trace + verification-chain commit. **519 passing (59 files)** + 7/7, build clean |
+| `frontend-rebuild` (production) | pushed through **`5178476`** (2026-07-28 00:xx PT). Held: the PWA-answer + mode-coupling commit. **521 passing (60 files)** + 7/7, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -178,6 +178,28 @@ Each step, what it proves, what it costs:
    engine); (iii) both clean and violations persist → a NEW defect surfaced — that is
    information; hold Wednesday's locks and diagnose. The one-line revert exists but
    arithmetic cannot violate its own identity — (iii) would implicate something else.
+
+**THE DEVICE ANSWER (owner's item 1, traced in `public/sw.js`)**: a service worker EXISTS
+(`SwRegister.tsx`, production only). Strategy: **navigations are NETWORK-FIRST** — an online
+open always fetches the newest deploy's HTML — and static chunks are cache-first BUT
+content-hashed, so fresh HTML references new chunk URLs and stale cached chunks are never
+served to it. **A stale engine requires an OFFLINE open (explicit fallback) or the known iOS
+relaunch-from-memory quirk.** Device procedure, exact: close the app from the app switcher,
+reopen ONCE while online; do it twice to defeat the relaunch quirk. No reinstall, no cache
+clearing.
+**ON-DEVICE VISUAL PROOF (this is also the item-2 client-board check): Board → H+R+RBI —
+every O0.5 row greyed with the "Suspended" chip.** Config and code ship in ONE bundle, so a
+greyed O0.5 row proves the running bundle and therefore M8 too — they cannot ship
+separately. Optional M8-specific eyeball: any player carrying BOTH TB 0.5 and 1.5 rows —
+pre-fix the two showed the SAME model %, post-fix 0.5 sits clearly higher. The client board
+cannot be fed to `self_consistency` (localStorage, no export path) — the visual IS the
+client-side confirmation, and it closes the loop because SW-network-first + the step-2
+served-bundle grep + one fresh online open ⇒ the client engine equals the verified bundle.
+**STEP 6b (owner's item 3): repeat ALL THREE confirmations on WEDNESDAY'S OWN BOARD —
+`python3 tools/self_consistency.py --date 2026-07-29`, zero TB≥1==H≥1 model violations, zero
+HRR legs in built tickets, `sh` present — BEFORE any lock. Tuesday's board proves the
+engine; Wednesday's board is what forms the first live card. Nothing locks until the day's
+own board passes.**
 
 **THE MANUAL RUN (step 4):**
 ```
@@ -700,7 +722,11 @@ that fails) or a measured check (a number that must be produced).** The rules 1�
 diagnosis speed; a finding is only CLOSED when it names its test or its measured number. Full
 statement at the top of `docs/harness-substitutions.md`.
 
-## Six build-enforced guardrails — the build refuses unanswered questions
+## Seven build-enforced guardrails — the build refuses unanswered questions
+`tests/hrr-suspension-coupling.test.ts` (the suspension is MODE-CONDITIONAL: under every
+production-reachable arming mode — extracted from source, never hardcoded — the pool and FUN
+carry zero HRR legs; the PLANT proves the legacy posture still shows them, so the check can
+see a bar-less world) ·
 `tests/doc-structure.test.ts` (the docs ARE memory: every referenced amendment id has a bundle
 row + vintage stamp, every bundle row a measured effect, every rule reference resolves, every
 dated item a trigger. Its first scanner baked the valid ids into the regex and could not see a
