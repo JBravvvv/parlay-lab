@@ -353,6 +353,7 @@ armed board; Phase 2's exit comparison then runs both engines on the same rows, 
 | `docs/hrr-recalibration.md` | the H+R+RBI thread and its one-board/one-instrument warning |
 | `docs/phase2-memo.md` | Series A/B, close quality, rung + day/night splits |
 | `docs/cron-jobs.md` | every scheduler entry, the measured delays, the weekend route |
+| `docs/multibook-memo.md` | **the multi-book scoping memo (2026-07-28)**: feed census (only BetMGM of the five targets), the measured prize (+0.75–1.7 pp/leg option value, 10 new tickets clear), the sb schema, gate shape, freeze posture CONFIRMED-execution-change |
 | `docs/pitcher-outs-audit.md` · `docs/singles-vs-parlays.md` | the two completed audits |
 
 
