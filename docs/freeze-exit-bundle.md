@@ -57,7 +57,7 @@ not M11 itself.**
 | item | pre-M10/M11 vintage? | verdict |
 |---|---|---|
 | M1 | park-factor tables — no rate input | **independent — speccable now** |
-| **M2 / M2′** | pitcher-side, so not downstream of the *batter* estimator — but the outs board rests on `shPitchBlend` (60/40 recency, no shrink), `leashOf` (k=4), and the `offense()` opp-lineup factor, which IS window-blended | ⚠️ **PROVISIONAL 2026-07-27 — blocked by the pitcher-blend audit, not by M11.** The −23.3/−11.5 gap and the 0.140→0.400 spec re-measure after that audit |
+| **M2 / M2′** | pitcher-side, so not downstream of the *batter* estimator — but the outs board rests on `shPitchBlend` (60/40 recency, no shrink), `leashOf` (k=4), and the `offense()` opp-lineup factor, which IS window-blended | ⚠️ **PROVISIONAL — audit HALF-RESOLVED 2026-07-27.** Measured: the K's/outs recency cliffs are wrong (form zero, **season-primary** +0.81/+0.61; whiff prior adds nothing), and a 3–6 start ipg mean is **36–53% noise** with k=4 keeping 43–60%. ⚠️ **NEW HARD DEPENDENCY: `of` is a constant 0.860 today (0.140 pins the clamp) — shipping 0.140→0.400 alone un-pins it and injects ≈ ±11 pp of `offense()` noise into outs. The oo de-noise (lineup xSLG anchor) must land IN THE SAME CHANGE.** Gap re-measures after the corrected estimator re-prices |
 | M3 | the zero-site-variation *diagnosis* is structural | diagnosis stands; **the weights spec waits for M11** (its inputs change) |
 | M4 | fixture-market prices riding M11's base + M12 | **PROVISIONAL — re-measure after M11 ships and M12 is dispositioned** |
 | ~~M5~~ | refuted on the same vintage | stays refuted (the refutation direction only strengthens post-M11) |

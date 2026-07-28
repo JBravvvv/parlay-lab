@@ -3930,6 +3930,72 @@ above with their own answers. **Not in this table and not audited: the pitcher's
 `shPitchBlend` (60/40 last-30/season, no shrink) and `leashOf`'s ipg (k=4). That is the
 pitcher-side analogue of M11 and it is an open audit, now blocking M2's vintage (below).**
 
+## WHAT THE THREE-MARKET RESULT LICENSES — AND WHAT IT DOES NOT (2026-07-27)
+
+Three markets, zero recency, three priors carrying it, identical design, identical n: a
+structural finding about the estimator, not a per-market calibration. Stated as license so a
+clean result cannot over-generalise — this project has over-generalised twice from
+single-population readings (the fixture's −4.3 into M7, `categories` into four wrong
+findings):
+
+- **LICENSED**: replacing the window blend **wherever an expected-metric prior anchors it** —
+  hits, TB, HR, both pricing paths, ten call sites.
+- **NOT licensed**: assuming zero recency **where no prior exists**. Closed HRR keeps its
+  k=10-toward-league answer and the walk channel keeps its k≈75 league shrink — nothing has
+  measured them, and "the other markets measured zero" is not a measurement of these.
+- **NOT licensed, and now measured the other way**: exporting the batter structure to the
+  pitcher side. The pitcher regressions below return a DIFFERENT answer — season-primary,
+  with the expected-metric prior adding nothing for K's. Each estimator gets its own
+  measured weights.
+
+## THE PITCHER SIDE MEASURED — the cliff is wrong everywhere, and the answer DIFFERS (2026-07-27)
+
+The structures as read from source are stronger recency loadings than anything on the batter
+side: `kps` (K's, L2273) and `ipg` (outs, L2248) are **100/0 cliffs — last-30 exclusively
+whenever 3+ recent starts exist, season only as a fallback** — then shrunk at k=4 (a 3–6
+start mean keeps 43–60% weight). Same leak-free design, per-start outcomes, priors from the
+`pitchers` section of the same 20 as-of commits:
+
+| outcome | n | last-30 | season | expected-metric prior |
+|---|---|---|---|---|
+| hits allowed /BF | 265 | **−0.032 (SE 0.148)** | +0.196 (0.390) | xBA-against +0.264 (0.363) |
+| K's /BF | 264 | +0.150 (SE 0.144) | **+0.814 (SE 0.291)** | whiff′ **−0.199 (0.283) — nothing** |
+| outs /start | 266 | +0.083 (SE 0.151) | **+0.609 (SE 0.193)** | none exists (workload is managerial) |
+
+**Form is zero in all three — six regressions now (three batter, three pitcher), form zero
+in six.** But what replaces the cliff differs by side: for K's and outs the carrier is
+**season actual**, and the whiff prior is a forced fit that measured to nothing — the
+two-sites-can't-take-the-structure case, caught by measurement instead of assumption. The
+n≈265 SEs are 2–3× the batter runs' — the season-primary readings are 2.8–3.2σ, the
+form-zeros are consistent but individually looser; the ~08-10 re-run tightens all six.
+
+**`leashOf`'s k=4, measured (172 pitchers with ≥8 starts):** within-pitcher single-start
+outs SD **3.25**; between-pitcher season spread **1.76**. A 3–6 start ipg mean is therefore
+**36–53% noise**, and k=4 keeps 43–60% of it — the pitcher analogue of M10's
+estimator-noise problem, sitting directly under the outs leash ceiling. The regression says
+the shrink target should be season ipg (+0.61) rather than league, and the cliff should not
+exist.
+
+## THE THIRD DOOR IS CLOSED TODAY — AND SWINGS OPEN WITH M2 (2026-07-27)
+
+`of = shClamp(0.140/oo, 0.86, 1.12)` — and `oo` (lineup TB/AB) never drops below ~0.30, so
+`0.140/oo` can never exceed ~0.47. **Measured on the fixture: `of` = 0.860 on every lineup.
+The opp-offense factor is a constant today, and `offense()`'s noise has exactly 0.00 pp of
+effect on any outs price — the door is welded shut by the very 0.140 defect M2 exists to
+fix.** A defect masking a defect: the M7/M9 shape, now in the outs stack.
+
+Post-M2 (`0.400/oo`): measured on the six fixture lineups (mean 0.4223, SD 0.0489, range
+0.370–0.524), `of` spans **0.860–1.082** — fully live. The noise arithmetic: per-player
+TB/AB blend noise ≈ √(0.55/60) ≈ 0.096 → lineup-averaged idiosyncratic component ≈ 0.032 →
+**≈43% of the observed lineup spread is estimator noise**, and it maps to ±7.6% of λ ≈ ±1.2
+outs at λ = 16.2 → **≈ ±11 pp of pure noise on P(over) once M2 ships.**
+
+**Verdict: far over the 0.5 pp threshold — this JOINS M2's audit rather than sitting beside
+it.** M2's spec must de-noise the `oo` input **in the same change** (the anchor exists:
+lineup-average xSLG from the priors, or shrink each player's blend before averaging) — the
+same land-together rule as M1's Coors double-count. Shipping `0.140→0.400` alone converts a
+dead factor into an ±11 pp noise injector on the market with four known defects.
+
 ## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
 
 The sim was instrumented directly (temporary same-line-count counters in `halfInning`,

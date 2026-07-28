@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`7973a28`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`b7e2f0f`** (2026-07-27); the pitcher-side measurement commit is held for the next push. **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
