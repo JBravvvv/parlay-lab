@@ -23,7 +23,51 @@ min); staleness is bounded by the lock guard's 30-minute freshness; the bet itse
 manual either way (this system prices, the owner executes). Feed-`betmgm` is the national
 line — NV occasionally differs, which the existing at-lock confirm discipline covers.
 
-## 2. THE PRIZE — measured, and the shape is OPTION VALUE, not a better book
+## 2-CORRECTED (2026-07-28, owner's catch): THE ORIGINAL PRIZE WAS MEASURED OVER THE WRONG POPULATION
+
+**The +1.70/leg headline below is SUPERSEDED for the decision** — it maximized over
+{DK, FD, MGM, CZ}, and **DraftKings and FanDuel are not playable from Nevada**: verified,
+not assumed — DK has no NV book at all; FD's is a single in-person counter at the Fremont
+(no online), and both companies' NV licensing collapsed in Nov 2025 over prediction-market
+plans. Same class as the night-game and fixture-thinness selections: a measurement over a
+population the decision does not apply to. The original numbers stay below for the record.
+
+**THE PLAYABLE PRIZE — best-of-{CZ, MGM}, the set the owner can actually bet (n=511
+both-priced rows, 07-27):**
+
+| number | value |
+|---|---|
+| per LEG: max(CZ,MGM) − CZ | **+1.01 pp mean** (median +0.00, p75 +1.60), **44% of legs improved** — empirically confirming the owner's dispersion arithmetic (analytic ≈ +0.95): equal means with ±1.6 IQR is the textbook case where shopping pays. **The gain is dispersion, not a better book — realizable today with the existing MGM account** |
+| per 3-leg SLIP, **one book per slip** (bootstrap 4,000 slips) | **+1.60 pp mean** (median +0.08 — tail value; p75 +2.66), **51% of slips improved**. The naive 3×-per-leg figure (+3.0) mixes books within a slip and is the WRONG number — stated in the headline because the per-leg number WILL be read as the ticket number by a skimmer |
+| the 07-26 ticket-level restriction | **uncomputable** — per-book prices (`fp`) begin 07-27, so MGM's 07-26 prices are unrecoverable. The DK/FD-basis ticket numbers below (+3.20 median, 10 new clears) are unplayable-basis artifacts. **Follow-up, dated: the first day carrying BOTH a board and `fp` (07-28 onward) computes the exact per-ticket argmax gains and the +2%-new-clears count over {CZ, MGM}** |
+
+## 3-CIRCA. ONE PASTE DAY TO MEASURE, THEN DECIDE — spec only, nothing built (2026-07-28)
+
+- **What to paste**: the Circa app's MLB player-props listings per game (hits / TB / HRR /
+  K's / outs), both sides of every line, plain text — one paste per game or one bulk paste;
+  do it within ~15 minutes of a props snapshot hour so CZ/MGM comparisons are
+  contemporaneous.
+- **Storage**: `data/circa/<date>.txt` raw + a parsed JSON keyed exactly as the props
+  archive keys rows (`pnorm(player)|market|line` with over/under american prices) — a
+  lenient one-off parser (`tools/circa_sample.py`, ~an hour), NOT the app paste flow.
+- **The analysis reports** (the scripts already exist in this memo's lineage):
+  1. Circa's two-way hold per market vs Caesars' (per-line `iO + iU − 1`, median per
+     market; CZ's measured baseline is the 1.071 overround);
+  2. best-of-{CZ,MGM,Circa} vs best-of-{CZ,MGM} — Circa's marginal increment per leg and
+     per bootstrap slip;
+  3. Circa's coverage (which of the board's lines it posts at all).
+- **Pre-committed decision rule**: hold ≤ ~half of Caesars' OR marginal increment ≥
+  +0.5 pp/leg → the paste path earns its build. A wash → the memo simplifies to a
+  two-book design and Circa drops out.
+- ⚠️ **The CLV cost, flagged now and quantified by the same sample** (owner's addition): a
+  Circa-settled ticket gets NO automated close — a real cost against Exit 2's only
+  instrument. The sample day measures the share of slips where Circa is the argmax book;
+  that share of the ledger loses its close. If the half-hold claim is true, that share is
+  plausibly LARGE (a materially lower hold wins most argmaxes) — meaning the better the
+  Circa result, the bigger the instrument cost. **The build decision must price both sides
+  of the same measurement.**
+
+## 2-ORIGINAL (superseded for the decision, kept for the record). THE PRIZE — measured, and the shape is OPTION VALUE, not a better book
 
 **Head-to-head MGM vs CZ is a wash**: on 511 rows of 2026-07-27's props archive carrying
 both prices, per-leg EV(MGM) − EV(CZ) at the row's fair: **median +0.00 pp, mean +0.08**,
