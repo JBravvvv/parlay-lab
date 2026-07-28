@@ -156,13 +156,12 @@ Series A board-side, no shadow carrier. The header fix is the ONLY path.**
 **THE FULL VERIFICATION CHAIN (owner's rule: NOTHING LOCKS WEDNESDAY UNTIL IT COMPLETES).**
 Each step, what it proves, what it costs:
 1. ✅ **push 213e8e2** (done 2026-07-27 night) → Vercel auto-builds. Free.
-2. **Confirm the DEPLOYED sha carries both changes** — dashboard: latest production
-   deployment commit ≥ 213e8e2. Or from outside (proves the deploy, not the repo), grep the
-   served client bundle for the fix strings:
-   ```
-   curl -s https://parlay-lab-six.vercel.app/board | grep -oE '/_next/static/chunks/[^"]+\.js' | sort -u | while read c; do curl -s "https://parlay-lab-six.vercel.app$c"; done | grep -c 'line<1)return 1-P0'
-   ```
-   ≥1 = M8 deployed; repeat with `hrrAltMax:-1` for the suspension. Free.
+2. ✅ **Confirm the DEPLOYED sha carries both changes — DONE 2026-07-28 ~16:25 PT**: served
+   chunk `/_next/static/chunks/256-171aff5d10da160d.js` greps 1 for
+   `M8 fix, signed off 2026-07-27` AND 1 for `hrrAltMax:-1`. **The production client bundle
+   serves both the M8 fix and the HRR suspension.** (Proves the deploy only — steps 3–6
+   still gate everything downstream; a client device additionally needs its SW reopen,
+   step 6a.)
 3. **Add header `x-cron-key` to entries 1–4** (you type the secret; today's 3:00 PM PT 401
    in the execution history is the before-evidence). Free.
 4. **Manual generate curl, Tuesday ~9–10 AM PT** (below) — slot 1 of 3, ~120 credits →
