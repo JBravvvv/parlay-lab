@@ -3996,6 +3996,34 @@ lineup-average xSLG from the priors, or shrink each player's blend before averag
 same land-together rule as M1's Coors double-count. Shipping `0.140→0.400` alone converts a
 dead factor into an ±11 pp noise injector on the market with four known defects.
 
+**ENCODED 2026-07-27**: M2 is now an INTERLOCKED PAIR in the bundle (the M7+M9 treatment),
+enforced by `tests/m2-interlock.test.ts` — the 0.140 era is pinned; the moment the constant
+changes, the test demands de-noise evidence inside `offense()` itself. De-noised residual at
+the measured windowed weight (≤ ~0.1): **±1.2 pp**, under the 2 pp readiness bar.
+
+## OUTS WITHOUT A PRIOR — what measured shrinkage buys the worst market (2026-07-27)
+
+No expected metric exists for outs (workload is managerial), so the M1 structure cannot
+apply — outs is the one market that must live on its own history. What the measured
+variances license, exactly:
+
+| estimator | model spread vs true (1.76) | noise share |
+|---|---|---|
+| **current**: last-30 cliff (3–6 starts), k=4 → league | **63–75%** — compressed AND noisy at once | **36–53%** |
+| **proposed**: season ipg (n≈18–22 starts), k=3.4 → league | **92–93%** | **13–16%** |
+
+The surprise in the arithmetic: **the optimal per-start k is 3.4 — k=4 was numerically right
+all along.** The defects are the **cliff** (season discarded whenever 3 recent starts exist
+— and the regression reads season at +0.609, last-30 at +0.083 ± 0.151) and the **league
+target** where the carrier is the pitcher's own season. Honest bound: the last-30 CI
+(−0.21…+0.38) cannot exclude a modest form term; the ~08-10 re-run tightens it.
+
+**Verdict: outs is fixable inside the bundle — measured shrinkage (cliff removed,
+season-anchored, k≈3.4) plus the M2 pair. It does not need the sim it structurally cannot
+reach**; M2′ stays the strictly-better alternative, not a necessity, and outs is NOT a
+post-freeze project. The compression the leash ceiling masks closes from −25…37% to −7…8%
+by estimator repair alone.
+
 ## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
 
 The sim was instrumented directly (temporary same-line-count counters in `halfInning`,

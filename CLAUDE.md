@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`b7e2f0f`** (2026-07-27); the pitcher-side measurement commit is held for the next push. **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`c37c42e`** (2026-07-27); the M2-interlock commit is held. **502 passing (57 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -160,7 +160,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
-| **~2026-08-10** | re-run `tools/recency_weights.py` for ALL THREE markets (`--market hits|tb|hr`; ran 2026-07-27: form zero in all three — hits +0.05/0.084, TB −0.002/0.089, HR −0.008/0.084) — cache under scratch `rw_cache` makes it one command each |
+| **~2026-08-10** | re-run `tools/recency_weights.py` for ALL SIX regressions (`--market hits|tb|hr|p_h|p_k|p_outs`; 2026-07-27: form zero in all six; pitcher side season-primary at looser SEs) — cached, one command each |
 | **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
 | **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
@@ -174,11 +174,11 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 ## The model findings, one line each — full detail in `docs/freeze-exit-bundle.md`
 | id | what | status |
 |---|---|---|
-| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). **Fix SPECCED from measured weights (2026-07-27, branch 4)**: xBA-primary (+0.73/+0.49), windowed form **+0.05 SE 0.08** (zero), season redundant (corr 0.73 w/ xBA) — the nested blend and k=60 both go; the 'season term' shape was itself wrong. n=3,061 leak-free (`tools/recency_weights.py`); per-market re-run: form is zero in TB (−0.002) and **HR (−0.008)** too → ONE structure, expected-metric-primary (xBA/xSLG/xISO). Blast radius = **ten `shBlendN`/`shBlend` call sites, six quantities, all four batter markets + K's + outs-via-`offense()`** (see collection-period.md); HRR-per-game and the walk channel need their own answers; re-run ~08-10 |
+| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). **Fix SPECCED from measured weights (2026-07-27, branch 4)**: xBA-primary (+0.73/+0.49), windowed form **+0.05 SE 0.08** (zero), season redundant (corr 0.73 w/ xBA) — the nested blend and k=60 both go; the 'season term' shape was itself wrong. n=3,061 leak-free (`tools/recency_weights.py`); per-market re-run: form is zero in TB (−0.002) and **HR (−0.008)** too → ONE structure for batters, expected-metric-primary (xBA/xSLG/xISO). **Pitcher side (n≈265/outcome): form zero there too — SIX regressions, form zero in six — but the carrier is SEASON actual; each estimator gets its measured answer (licensing block, collection-period.md).** Blast radius = **ten `shBlendN`/`shBlend` call sites, six quantities, all four batter markets + K's + outs-via-`offense()`** (see collection-period.md); HRR-per-game and the walk channel need their own answers; re-run ~08-10 |
 | **M12** | the sim path's OWN rate heat, ablated: log5+park/wind **+2.70**, TTO +0.65, static factor-set +4.3, **dynamics −0.82 (endogenous-PA hypothesis REFUTED)**, volume +1.2 → ≈ **+8.8 vs cf** on 55 fixture legs | **NEW 2026-07-27.** Independent of M11 (shared base cancels in sim−cf). HRR's +10.0 sim residual is M12-sized. M4's gate must separate it |
 | **M8** | `shTbOver` prices a 0.5 line with the 1.5 formula — **one number for two questions** | **rank 2, a BUG** (demoted 2026-07-27 by M11's whole-engine reach; keeps the largest single-population magnitude). Pinned as a known defect by `tests/self-consistency.test.ts` |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
-| **M2 / M2′** | outs `0.140`→`0.400` **or** route outs through the sim (the answer is already computed and discarded) | a CHOICE, not a sequence. ⚠️ **PROVISIONAL 2026-07-27 — blocked by the pitcher-blend audit** (`shPitchBlend` 60/40 unshrunk + `offense()` window-blend reaching outs), not by M11 |
+| **M2 / M2′** | outs: ⚠️ **INTERLOCKED PAIR** — `0.140`→`0.400` AND the `offense()` xSLG de-noise, together or never (enforced: `tests/m2-interlock.test.ts`; `of` is a constant 0.860 today — a defect masking a defect, ±12 pp if shipped alone) | **ready once paired** (residual ±1.2 pp < 2 pp bar). Estimator specced from measured variances: cliff removed, season-anchored, **k=3.4 — k=4 was numerically right; the cliff and the league target were the defects**; spread 63–75% → 92–93% of true. Pitcher regressions (n≈265/outcome): form zero, SEASON-primary (K's +0.81, outs +0.61), whiff prior nothing. Outs needs no sim — NOT a post-freeze project; M2′ strictly-better, optional |
 | **M3** | HRR λ = `rate × coorsFlag × power` — **zero site variation** | scoped |
 | **M4** | sim routing, **TB and HR only** | conditional, fixture-thin |
 | ~~M5~~ | sim routing for hits | **refuted** — sim mean-abs 7.1 vs closed form 5.6 |
@@ -188,7 +188,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
 
 ## Deferred, written up, NOT shipped
-**the pitcher-blend audit** (`shPitchBlend` 60/40 no-shrink, `leashOf` k=4, `offense()`'s reach into outs — the pitcher-side analogue of M11; M2's vintage is blocked on it) · `pitcher_outs` `0.140`→`0.400` · everything in `docs/freeze-exit-bundle.md` · the board-archive
+**the pitcher-blend audit — measured 2026-07-27** (cliffs wrong, season-primary; leash noise 36–53%; remaining half = re-price outs/K's with the corrected estimator) · `pitcher_outs` `0.140`→`0.400` · everything in `docs/freeze-exit-bundle.md` · the board-archive
 `gen=best`+`latest` is BUILT and running · `pen_quality` same-day replace (bounded, recorded) ·
 `repository_dispatch` PAT route (**not needed** — `/api/propsnap` solved it).
 
@@ -574,7 +574,9 @@ that fails) or a measured check (a number that must be produced).** The rules 1�
 diagnosis speed; a finding is only CLOSED when it names its test or its measured number. Full
 statement at the top of `docs/harness-substitutions.md`.
 
-## Four build-enforced guardrails — the build refuses unanswered questions
+## Five build-enforced guardrails — the build refuses unanswered questions
+`tests/m2-interlock.test.ts` (M2 ships whole or not at all: the 0.140 era is pinned; a changed
+constant demands de-noise evidence inside `offense()` — the lid-coupling pattern) ·
 `tests/retraction-markers.test.ts` (every retraction-marked paragraph in the five finding docs
 carries a YYYY-MM-DD; the naive scan was 65% false positives, the enforced narrowed rule was
 measured clean; 12 pre-existing undated retractions were dated from `git log -S`) ·

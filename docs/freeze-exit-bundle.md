@@ -28,7 +28,7 @@ Ranking all nine on "effect on model-minus-market" would put four at exactly zer
 | # | amendment | measured effect | depends on | status |
 |---|---|---|---|---|
 | **M1** | **`shParkF` → the closed-form factors** | **VARIANCE, not level.** Per-row error today: hit rate 1.5% median / 3.5% max; **HR rate 4.5% median / 11.0% p90 / 14.5% max**. But across the 07-26 venues the **mean** `parkH` is **1.0013** and `parkHR` **0.9720** — so routing moves the hits LEVEL by **+0.13%** and the HR level by **−2.80%**. **The −4.3 pp hits level error survives essentially untouched**; M7 is what addresses it | nothing. Self-contained | **ready to spec** |
-| **M2** | **`pitcher_outs` constant `0.140` → `0.400`** | gap **−23.3 → −11.5 pp**; above-market rows **0/38 → 11/38**; median λ 13.7 → 15.3 | nothing | **the recommendation** |
+| **M2** | ⚠️ **INTERLOCKED PAIR — the constant AND the `offense()` de-noise, together or not at all** (see the block below; enforced by `tests/m2-interlock.test.ts`) | gap **−23.3 → −11.5 pp**; above-market rows **0/38 → 11/38**; median λ 13.7 → 15.3 — all PROVISIONAL pending the corrected pitcher estimator | **each other** — 0.140→0.400 alone injects ≈ ±12 pp of estimator noise into outs | **ready once paired** — de-noise residual ≈ ±1.2 pp, under the 2 pp bar |
 | M2′ | *alternative:* `pitcher_outs` → sim (surface `outsBySP*`) | the sim already models the hook the closed form structurally cannot use; distribution exists and is discarded | a validation pass — **every outs price moves** | strictly better, **not** additional to M2 |
 | **M3** | **H+R+RBI λ conditioning** (mass-weighted blend of `hF`/`tbF`, not a product) | closed-form λ is `rate × power` on a non-Coors slate — **zero site variation** against a market rung-drift of **+0.479**. Recovers ~0.12 of spread on its own; more with M1 | M1 for the park term. Weights need fitting | scoped |
 | **M4** | sim routing, **TB and HR only** | vs market: TB sim **5.7** vs closed form **6.3** mean-abs; HR **3.5 vs 3.5**, sim better centred (+0.4 vs −1.1) | archive-series confirmation — fixture margins are thin. ⚠️ 2026-07-27: these are fixture-market readings of prices riding the shared M11 rate estimator plus the sim-path additions (hits rate heat +3.8 to +8.3 pp depending on basis); the gate must separate market vintage from rate heat | **conditional** |
@@ -74,6 +74,42 @@ M11), M7+M9's rung numbers (for M11 + the reference), M2's magnitude (for the pi
 audit — a NEW open item this table created), every allocation magnitude (cheap re-runs
 post-M11). This ordering is what "assembled in draft so 09-22 is a decision" requires and
 did not previously carry.
+
+### ⚠️ M2 IS AN INTERLOCKED PAIR — a defect masking a defect (2026-07-27)
+
+`of = shClamp(0.140/oo, 0.86, 1.12)` is a **constant 0.860 today**: `oo` (lineup TB/AB)
+never drops below ~0.30, so the ratio can never escape the floor. **A defect masking a
+defect** — the 0.140 error welds shut the door its own noise would flood through. Measured:
+`of` = 0.860 on every fixture lineup; `offense()`'s noise has **exactly 0.00 pp** of effect
+on any outs price today.
+
+Ship `0.140→0.400` alone and the door opens: `of` spans 0.860–1.082 on the same lineups, and
+the `offense()` estimator noise (per-player TB/AB blend ≈ 0.096, lineup-averaged ≈ 0.032)
+maps to **≈ ±12 pp of pure noise on P(over)** at λ ≈ 16.2. A fix that makes the market worse
+— the third instance of the class (M11's first spec, the retime-without-server-boards), and
+the first one known IN ADVANCE.
+
+**The pair, specced:**
+1. the constant: `0.140 → 0.400` (league TB/AB);
+2. the de-noise, SAME change: `offense()` anchors each player on **xSLG** (expected TB/AB,
+   in priors) with the windowed term at weight ≤ ~0.1 — the weight the three-market
+   regression measured, not assumed. **Residual noise ≈ ±1.2 pp** — under the ~2 pp bar, so
+   M2 is ready once paired; above it, it would not have been ready regardless of the
+   constant.
+
+**Enforced, not noted**: `tests/m2-interlock.test.ts` pins the 0.140 era and, the moment the
+constant changes, demands de-noise evidence inside `offense()` itself — the lid-coupling
+pattern. A future session cannot ship half.
+
+**And the outs estimator itself, from the same measurement pass** (within-start SD 3.25,
+between-pitcher 1.76, n=172 pitchers): the optimal per-start k is **3.4 — k=4 was
+numerically right all along; the defects are the CLIFF (season discarded whenever 3 recent
+starts exist) and the LEAGUE shrink target** (the regression says season carries +0.61).
+Season-anchored `ipg = shShrink(season_ipg, gs, ~3.4, Lipg)`: model spread goes from
+**63–75% of true (36–53% noise)** to **92–93% of true (13–16% noise)** — the compression
+mostly closes by measured shrinkage alone. **Outs is fixable inside the bundle: measured
+shrinkage + this pair. It does not need the sim** — M2′ stays the strictly-better
+alternative, not a necessity, and outs is NOT a post-freeze project.
 
 ### M1's double-counting check — not optional
 

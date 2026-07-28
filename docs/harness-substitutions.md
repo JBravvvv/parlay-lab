@@ -58,6 +58,27 @@
 > strongest case in the project for pre-committing interpretation branches before the number
 > arrives: the branch that fired was the one nobody would have picked from intent.
 
+> ## THE LICENSING RULE'S WORKED EXAMPLE — the K's whiff prior, the project's best near-miss (2026-07-27)
+>
+> The batter result was as clean as results get: three markets, zero recency, three
+> expected-metric priors carrying the weight, identical design, identical n=3,061. The
+> obvious next move was portability — anchor the pitcher K's estimator on whiff% the way
+> hits anchors on xBA. **The licensing rule blocked the port until it was measured, and the
+> measurement came back −0.199 (SE 0.283): nothing, possibly negative.** Season actual
+> carries pitcher K's (+0.814, SE 0.291); the skill-forward prior that "obviously" should
+> transfer adds no predictive weight beyond it.
+>
+> A prior adopted from portability would have been wired into the K's model — 169
+> core-eligible rows, no sim path, reopening 09-03 — on the strength of a coefficient that
+> is indistinguishable from zero. Caught only because the rule forced the measurement first.
+> **Two worked examples now sit in this file, from the same day, from two different rules,
+> both from measurements that contradicted a reasonable prior**: the pre-commit gate caught
+> the season-term fix shape; the licensing rule caught the whiff prior.
+>
+> The honest caveat travels with it: at n≈265 the pitcher SEs are 2–3× the batter runs', so
+> "form is zero" is a weaker claim on the pitcher side than the batter side — and the ~08-10
+> re-run covers **all six regressions**, not just the batter three.
+
 > ## ⚠️ EVERY "BYTE-IDENTICAL PARITY" CLAIM IN THIS PHASE WAS ABOUT PICKS AND TICKETS ONLY
 >
 > `digest()` serialises **`categories`, `categoriesLive`, `parlays`, `parlaysMixed`,
