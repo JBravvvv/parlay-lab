@@ -78,6 +78,15 @@
 > The honest caveat travels with it: at n≈265 the pitcher SEs are 2–3× the batter runs', so
 > "form is zero" is a weaker claim on the pitcher side than the batter side — and the ~08-10
 > re-run covers **all six regressions**, not just the batter three.
+>
+> **Third instance, same day, OPPOSITE direction — `leashOf`'s k=4 measured RIGHT
+> (2026-07-27).** A plausible variance argument had filed k=4 as the pitcher analogue of
+> M10's noise problem. Measured, the optimal per-start k is **3.4 — the parameter was right
+> all along**; the real defects sat beside it (the last-30 cliff and the league target,
+> season carrying +0.61). So the discipline cuts both ways: it kills fixes that intent would
+> have adopted (season term, whiff prior) AND it saves parameters that a reasonable argument
+> had condemned. Three instances, one day: two priors that measured to nothing, one
+> "obviously wrong" constant that measured correct.
 
 > ## ⚠️ EVERY "BYTE-IDENTICAL PARITY" CLAIM IN THIS PHASE WAS ABOUT PICKS AND TICKETS ONLY
 >

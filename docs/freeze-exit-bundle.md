@@ -101,6 +101,11 @@ the first one known IN ADVANCE.
 constant changes, demands de-noise evidence inside `offense()` itself — the lid-coupling
 pattern. A future session cannot ship half.
 
+**And the leash ceiling was doing the same thing (2026-07-27)**: the outs compression it
+appeared to bound was an ESTIMATOR defect (the cliff + league target, model spread 63–75% of
+true), not a real ceiling effect — **the second instance of a defect masking a defect in
+this one market**. Estimator repair alone reopens the spread to 92–93%.
+
 **And the outs estimator itself, from the same measurement pass** (within-start SD 3.25,
 between-pitcher 1.76, n=172 pitchers): the optimal per-start k is **3.4 — k=4 was
 numerically right all along; the defects are the CLIFF (season discarded whenever 3 recent

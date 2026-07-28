@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`c37c42e`** (2026-07-27); the M2-interlock commit is held. **502 passing (57 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`c392df7`** (2026-07-27); the doc-audit commit is held. **508 passing (58 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -574,7 +574,11 @@ that fails) or a measured check (a number that must be produced).** The rules 1�
 diagnosis speed; a finding is only CLOSED when it names its test or its measured number. Full
 statement at the top of `docs/harness-substitutions.md`.
 
-## Five build-enforced guardrails — the build refuses unanswered questions
+## Six build-enforced guardrails — the build refuses unanswered questions
+`tests/doc-structure.test.ts` (the docs ARE memory: every referenced amendment id has a bundle
+row + vintage stamp, every bundle row a measured effect, every rule reference resolves, every
+dated item a trigger. Its first scanner baked the valid ids into the regex and could not see a
+planted unknown id — caught ONLY by the end-to-end break test, third guard to fail its teeth test) ·
 `tests/m2-interlock.test.ts` (M2 ships whole or not at all: the 0.140 era is pinned; a changed
 constant demands de-noise evidence inside `offense()` — the lid-coupling pattern) ·
 `tests/retraction-markers.test.ts` (every retraction-marked paragraph in the five finding docs
