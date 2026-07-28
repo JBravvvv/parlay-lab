@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`a602906`** (2026-07-27); the SHADOW-PRICES commit is held — **it accrues no shadow data until pushed and deployed; every day unpushed is a day of shadow series lost**. **517 passing (59 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
+| `frontend-rebuild` (production) | pushed through **`485c81f`** (2026-07-27) — **shadow prices DEPLOYED; the series starts with tonight's boards**. Held: the coverage-bound + clamp-separation commit. **517 passing (59 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -142,7 +142,16 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 **Free tier is 100/day and `/api/clv` uses 96.** Sunday = 2 generate + 2 propsnap = **exactly
 100**. A third propsnap entry does not fit.
 
-## ⚠️ FIRST CHECKS TOMORROW (2026-07-28)
+## ⚠️ FIRST CHECKS TOMORROW (2026-07-28) — updated order (Josh, 2026-07-27 late)
+1. `2026-07-27.best/.latest` landed in `data/boards/` (the workflow FIRES — verified twice
+   green; targeting is PT-yesterday by design, three TTL attempts).
+2. Shadow columns on tonight's real deployed board: `sh` non-null on closed-form batter
+   rows, null/absent where excluded (HRR, pitchers, unpriced rows).
+3. First `close_capture` keep rate under the four-cron shape.
+4. **Then the join build** (`tools/phase2_slope.py`) — first same-date join = 07-27 board ×
+   07-27 close.
+
+## ⚠️ superseded original list (kept for the trail)
 1. **Did `board-archive` run at all?** It has never fired. 2 crons/day, and "designed sound" and
    "ran" are different claims. `data/boards/` on `line-history`. ⚠️ **Now with a deadline:
    `pl:board:{date}` has a 3-day TTL — if 07-27 did not archive, a manual backfill by 07-30

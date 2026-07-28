@@ -1537,7 +1537,7 @@ function pullBvp(slate){
    recency-weighted per-AB/per-game rates, adjusted for opposing starter
    quality, lineup spot (expected ABs), park, and wind; edges are measured
    against vig-removed odds. All numbers real; nothing invented. */
-/* clamp instrumentation, ADDITIVE 2026-07-27: `id` is the call site's LINE NUMBER, so the ids aggregate exactly as tests/clamp-activity.test.ts's stack-based instrument does and the two can be diffed. Inert unless SH_V2.clampLog is armed; the return value is untouched in every case. */ var SH_CLAMP_LOG=null;function shClamp(v,lo,hi,id){if(SH_CLAMP_LOG&&id){var e=SH_CLAMP_LOG[id]||(SH_CLAMP_LOG[id]={bounds:[lo,hi],n:0,lo:0,hi:0,mid:0});e.n++;if(isFinite(v)){if(v<=lo)e.lo++;else if(v>=hi)e.hi++;else e.mid++;}}return Math.max(lo,Math.min(hi,v));}
+/* clamp instrumentation, ADDITIVE 2026-07-27: `id` is the call site's LINE NUMBER, so the ids aggregate exactly as tests/clamp-activity.test.ts's stack-based instrument does and the two can be diffed. Inert unless SH_V2.clampLog is armed; the return value is untouched in every case. */ var SH_CLAMP_LOG=null;var SH_SHADOW_EVAL=false;function shClamp(v,lo,hi,id){if(SH_CLAMP_LOG&&id&&!SH_SHADOW_EVAL){var e=SH_CLAMP_LOG[id]||(SH_CLAMP_LOG[id]={bounds:[lo,hi],n:0,lo:0,hi:0,mid:0});e.n++;if(isFinite(v)){if(v<=lo)e.lo++;else if(v>=hi)e.hi++;else e.mid++;}}return Math.max(lo,Math.min(hi,v));}
 function shPoisCdf(k,lam){if(lam<=0)return 1;var s=0,t=Math.exp(-lam);for(var i=0;i<=k;i++){s+=t;t=t*lam/(i+1);}return Math.min(1,s);}
 function shPoisPmf(k,lam){var t=Math.exp(-lam);for(var i=1;i<=k;i++)t=t*lam/i;return t;}
 function shPOver(line,lam){return 1-shPoisCdf(Math.floor(line),lam);}
@@ -2415,7 +2415,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
          bend the additive pattern). All insertions sit BELOW the last clamp site (L2402),
          so clampActivity ids stay equal to their line numbers. */
       var shdw=null;
-      if(SH_V2&&!isPitcher&&mkt!=="batter_hits_runs_rbis"&&st&&rate!=null&&lam!=null){
+      if(SH_V2&&!isPitcher&&mkt!=="batter_hits_runs_rbis"&&st&&rate!=null&&lam!=null){SH_SHADOW_EVAL=true;try{ /* shadow traffic is invisible to BOTH clamp instruments (the in-engine log via this flag inside shClamp, the stack wrapper by reading it): the degeneracy detector measures how often a clamp binds in PRODUCTION pricing, and shadow calls through shared helpers (shPriorHR 1591, shParkF 1647, bvpRate 2339) would dilute that meaning */
         var sIsTB=(mkt==="batter_total_bases"),sIsHR=(mkt==="batter_home_runs");
         var sRnd=function(x){return x!=null&&isFinite(x)?Math.round(x*10000)/100:null;};
         var sPx=function(lm,fix){if(lm==null||!isFinite(lm)||lm<=0)return null;
@@ -2441,7 +2441,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
           m10:(sEx2!=null)?sPx(rate*sEx2*sLiveF,false):null,
           m1:(sF1!=null)?sPx(rate*expAB*sF1,false):null,
           all:sPx(((sRx!=null)?sRx:rate)*((sEx2!=null)?sEx2:expAB)*((sF1!=null)?sF1:sLiveF),true)
-        };
+        };}finally{SH_SHADOW_EVAL=false;}
       }
       var iO=shImp(row.o),iU=shImp(row.u);
       var sd=null;

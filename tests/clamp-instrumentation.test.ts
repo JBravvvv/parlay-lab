@@ -92,8 +92,12 @@ describe("the in-engine counter agrees with the stack-based instrument", () => {
     // stack-based instrument, wrapped over the same run
     const seen = new Map<string, { n: number; lo: number; hi: number }>();
     const orig = eng.get<(v: number, lo: number, hi: number, id?: string) => number>("shClamp")!;
+    // shadow-price evaluation is invisible to the in-engine log (SH_SHADOW_EVAL inside
+    // shClamp), so this instrument must skip the same calls or the agreement test would
+    // fail on exactly the sites the shadow's shared helpers touch (1591/1647/2339).
+    const inShadow = eng.get<() => boolean>("(function(){return SH_SHADOW_EVAL;})")!;
     eng.set("shClamp", function (v: number, lo: number, hi: number, id?: string) {
-      if (id) {
+      if (id && !inShadow()) {
         const s = seen.get(id) ?? { n: 0, lo: 0, hi: 0 };
         s.n++;
         if (isFinite(v)) { if (v <= lo) s.lo++; else if (v >= hi) s.hi++; }

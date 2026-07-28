@@ -83,7 +83,12 @@ function instrument(eng: Engine) {
   const sites = new Map<string, Site>();
   const orig = eng.get<(v: number, lo: number, hi: number) => number>("shClamp");
   const off = scriptOffset();
+  // shadow-price evaluation is skipped — this instrument measures PRODUCTION pricing
+  // saturation, and the shadow's shared-helper calls (shPriorHR/shParkF/bvpRate) would
+  // dilute it (the in-engine log skips the same calls via SH_SHADOW_EVAL inside shClamp)
+  const inShadow = eng.get<() => boolean>("(function(){return SH_SHADOW_EVAL;})");
   eng.set("shClamp", function (v: number, lo: number, hi: number) {
+    if (inShadow && inShadow()) return orig(v, lo, hi);
     // frame 0 is this wrapper; the first frame inside the eval'd engine is the caller
     const st = (new Error().stack || "").split("\n");
     let line = "?";

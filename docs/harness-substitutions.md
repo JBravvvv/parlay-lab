@@ -107,6 +107,16 @@
 > **The shape that survives: open candidates, closed exceptions — never the reverse.**
 > Enumerate what is EXEMPT (with a justification each), never what is SCANNED.
 >
+> **Fixture-population standard (2026-07-27, after the THIRD vacuity-by-thinness instance):**
+> the fixture is thin enough that emptiness is a REALISTIC state for most markets — a census
+> found the self-consistency suite's H+R+RBI≥3 constraint running on **n=0**, two more
+> implications on n=1, and the ladder test with zero pairs in five of six markets, all green.
+> **Every fixture assertion that iterates a market or row population carries a population
+> pin by default, not by exception** — pinned to the measured census so a silently emptied
+> check FAILS, with 0-pinned checks stating where the real check lives
+> (`tools/self_consistency.py` on live boards). Instances: the original M8 empty
+> intersection, the shadow M8-gap test (caught by its non-empty guard), the census above.
+>
 > **Teeth-test standard, extended (required from 2026-07-27): every guard's plant set includes
 > a value that is INVALID BY VALUE, not just malformed by format.** Three of five guards
 > failed their first teeth test — the standard works, but the plant has to attack the

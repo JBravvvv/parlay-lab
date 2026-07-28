@@ -118,6 +118,21 @@ describe("self-consistency — constraints the model must satisfy against itself
     }
   }, 120_000);
 
+  /* ⚠️ POPULATION PINS (2026-07-27, the THIRD vacuity-by-thinness instance on this fixture,
+     after the original M8 empty-intersection and the shadow M8-gap test): a census found
+     H+R+RBI≥3 ≥ HR≥1 running on n=0, two more implications on n=1, and the ladder test with
+     ZERO pairs in five of six markets. Every fixture population is now PINNED — a check that
+     silently empties FAILS, and the 0/1-pinned checks are stated to be real only on live
+     boards via tools/self_consistency.py. Fixture emptiness is a REALISTIC state for most
+     markets here; the default is a population guard, not the exception. */
+  const FIXTURE_N: Record<string, number> = {
+    "hits ≥ 1 ≥ HR ≥ 1": 63,
+    "H+R+RBI ≥ 1 ≥ HR ≥ 1": 1,
+    "H+R+RBI ≥ 3 ≥ HR ≥ 1": 0, // VACUOUS HERE by fixture thinness — real on boards only
+    "H+R+RBI ≥ 1 ≥ hits ≥ 1": 1,
+    "TB ≥ 2 ≥ hits ≥ 2": 4,
+  };
+
   it("a home run implies a hit, a total base, and three H+R+RBI credits", () => {
     for (const [name, a, b] of [
       ["hits ≥ 1 ≥ HR ≥ 1", ["batter_hits", 0.5], ["batter_home_runs", 0.5]],
@@ -127,11 +142,13 @@ describe("self-consistency — constraints the model must satisfy against itself
       ["TB ≥ 2 ≥ hits ≥ 2", ["batter_total_bases", 1.5], ["batter_hits", 1.5]],
     ] as [string, [string, number], [string, number]][]) {
       const [n, bad] = implies(a, b, "model");
+      expect(n, `${name}: population shrank below its pin — the check went (more) vacuous`).toBeGreaterThanOrEqual(FIXTURE_N[name]);
       expect(bad, `${name}: ${bad} of ${n} players violate an implication that holds by definition`).toBe(0);
     }
   });
 
   it("every ladder is monotone — P(X ≥ a) ≥ P(X ≥ b) for a < b", () => {
+    let pairsChecked = 0; // census 2026-07-27: ONE ladder pair on the whole fixture (K's)
     for (const mkt of ["batter_hits", "batter_total_bases", "batter_home_runs",
                        "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"]) {
       const byPlayer = new Map<string, number[]>();
@@ -143,6 +160,7 @@ describe("self-consistency — constraints the model must satisfy against itself
       for (const [who, lns] of byPlayer) {
         lns.sort((a, b) => a - b);
         for (let i = 0; i < lns.length - 1; i++) {
+          pairsChecked++;
           const lo = get(who, mkt, lns[i])!;
           const hi = get(who, mkt, lns[i + 1])!;
           expect(
@@ -152,5 +170,8 @@ describe("self-consistency — constraints the model must satisfy against itself
         }
       }
     }
+    // the fixture supports exactly ONE ladder pair — pinned so this test cannot go fully
+    // vacuous unnoticed; the board-level ladder check lives in tools/self_consistency.py
+    expect(pairsChecked).toBeGreaterThanOrEqual(1);
   });
 });

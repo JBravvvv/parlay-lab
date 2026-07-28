@@ -63,6 +63,25 @@ stays distinguishable from "reading of no effect". OUT OF SCOPE BY NAME rather t
 into the pattern: **H+R+RBI** (no expected metric), **pitcher rows** (M2 ships as its own
 pair), and **the sim path** (a shadow there requires a second sim run).
 
+**Coverage, measured and bounded BEFORE the first report (2026-07-27, on the real 07-26
+board):** shadow-eligible = hits+TB+HR rows the closed form priced = **863/day = 76% of the
+1,134 priced batter rows** (the other 24% is H+R+RBI, excluded by name — 39% of the 2,206
+raw batter rows, most of which are unpriced ALT/no-model rows and were never in anyone's
+population). ⚠️ **The population is STABLE across the window, and here is why the
+start-time-selection concern does not bite**: routing is FROZEN — the sim only ever replaces
+H+R+RBI's price, so improving lineup coverage moves rows *within the already-excluded
+market*, never out of the shadow population. The path stamp is structural: **`sh` present ⟺
+the live price is closed-form** (enforced by `tests/shadow-prices.test.ts` — HRR and pitcher
+rows carry none). The one real generation-time effect (lineup posting deciding which batters
+get priced at all) hits live and shadow identically.
+
+**Expected n at exit, stated now**: close-gradeable shadow = hits+TB (**HR has no two-sided
+close fair** — one-sided market; its shadow series reads only against the /1.06 anchor and
+is reported separately). Board-side 617/day (267 hits + 350 TB); close-side 280 on the
+6-event Sunday sample, ~600–650/day at weekday coverage → intersection ~300–500/day →
+**≈ 16–27k close-graded pairs by 09-22, thousands per market**. The first true same-date
+join (07-27 board × 07-27 close) is computable the moment tomorrow's archive run lands.
+
 > ### THE PRE-COMMITTED READING — written before a single shadow row exists
 >
 > | at exit, close-graded on the same rows | reading |
