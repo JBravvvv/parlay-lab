@@ -98,7 +98,16 @@ function identityFallbackFactors(): string[] {
   return [...new Set(out)].sort();
 }
 
+const VALID_KINDS = ["PINNED", "DATA-DEPENDENT", "STRUCTURAL"];
+
 describe("identity-fallback factors are classified, and the build asks", () => {
+  it("every classification is a valid kind AT RUNTIME — esbuild strips the TS type", () => {
+    for (const [f, e] of Object.entries(REGISTRY)) {
+      expect(VALID_KINDS, `${f}: kind "${e.kind}" is not a valid classification`).toContain(e.kind);
+    }
+    // PLANT: an invalid-by-value kind must be visible to this check
+    expect(VALID_KINDS).not.toContain("WEIRD");
+  });
   const found = identityFallbackFactors();
 
   it("finds the factors at all — a scan that matches nothing would pass vacuously", () => {

@@ -55,10 +55,15 @@ const GUARDS: Record<string, { file: string; symbol: string; how: string }> = {
 
 type Row = { file: string; scheduled: boolean; sensitive: boolean | null; guard: string | null; reason: string };
 
+// the scanner, named so the teeth test can attack it with an INVALID VALUE (2026-07-27):
+// the enum is closed but absence-of-match FIRES (reported as "missing marker"), so an
+// invalid value is visible — the safe shape. The plant below pins that property.
+const TIMING_RE = /#\s*TIMING:\s*(SENSITIVE|INSENSITIVE)\s*[—-]\s*(.*)/;
+
 function classify(f: string): Row {
   const src = fs.readFileSync(path.join(DIR, f), "utf8");
   const scheduled = /^\s*schedule:/m.test(src) && /^\s*- cron:/m.test(src);
-  const m = /#\s*TIMING:\s*(SENSITIVE|INSENSITIVE)\s*[—-]\s*(.*)/.exec(src);
+  const m = TIMING_RE.exec(src);
   if (!m) return { file: f, scheduled, sensitive: null, guard: null, reason: "" };
   const sensitive = m[1] === "SENSITIVE";
   const g = /guard:\s*([A-Za-z_][A-Za-z0-9_]*)/.exec(m[2]);
@@ -68,6 +73,11 @@ function classify(f: string): Row {
 const rows = files.map(classify);
 
 describe("every scheduled workflow declares whether its value depends on WHEN it ran", () => {
+  it("PLANT: an invalid classification value is visible to the scanner", () => {
+    // "# TIMING: BANANA" must not parse — and a non-parse is reported as MISSING, which fails
+    expect(TIMING_RE.exec("# TIMING: BANANA — some reason")).toBeNull();
+    expect(TIMING_RE.exec("# TIMING: SENSITIVE — guard: x")).not.toBeNull();
+  });
   it("there is at least one scheduled workflow to check", () => {
     expect(rows.filter((r) => r.scheduled).length).toBeGreaterThanOrEqual(6);
   });

@@ -19,6 +19,69 @@ his key.** Nothing is lost by not running it; nothing accrues faster by running 
 the opposite posture from CLV, where the *capture* itself needed the phrase and a missed
 sighting was gone forever.
 
+> **SUPERSEDED IN THE ONE PLACE IT BOUND (2026-07-27): the sync phrase no longer binds at
+> all for archive-covered dates.** The board archive (`data/boards/*.best.json.gz`, public)
+> carries every row's `pO`/`fO` at generation time, and the un-blend
+> `pModel = (pO − 0.65·fO)/0.35` is exact (validated to 0.29 pp by `tools/rung_signature.py`'s
+> ladder self-consistency). The join is public arithmetic end to end. `/api/predictions`
+> stays the richer source (per-generation history), never the required one.
+
+## CRITICAL PATH — reported before building (2026-07-27)
+
+**What exists:** both input archives, public — boards (07-26 backfill; daily IF
+`board-archive` fires) and props snapshots (close-quality `kind` + first-pitch `fp` stamps
+since the 07-27 sweep). The close-coverage reader (`tools/close_capture.py`). Every
+pre-committed branch table. **What does not exist: the join, the slope fit, and the report —
+no code has been written for any of them (this memo's own status line).**
+
+| # | critical-path item | state |
+|---|---|---|
+| 1 | **`board-archive` must fire** — it never has. ⚠️ `pl:board:{date}` carries a **3-day TTL**: if the workflow did not run on 07-27, a manual backfill by **07-30** is the difference between Series A starting 07-27 and starting whenever the workflow is fixed. This is tomorrow's check #1, now with a deadline attached | **pending 07-28** |
+| 2 | close fairs per board row from the `kind="close"` snapshot (Shin de-vig over the archived odds — arithmetic that exists in the devig module, not yet applied to this join) | build |
+| 3 | `tools/phase2_slope.py`: join archived board (open + pModel) × close fair by lkey+date; WLS of (close−open) on (pModel−open), rung-bucketed, per market, **two vintages never pooled** (vintage 1 = the 16:xx-era board, 07-26 only; vintage 2 = the 4-cron era, 07-27→) | build |
+| 4 | the first report: slope + SE + n per market × rung, **signed direction and the sign-flip column**, close-quality (`kind`) and day/night stamps, **the identification diagnostic in the same table** (x-spread, collinearity, attenuation — an attenuated or collinear fit is NO RESULT, the binding qualifier) | build |
+| 5 | readings: the five-branch HRR table (hits rung arm restored, branches 1–5 reachable), **outs as the pre-committed positive control with its five branches**, the row-3 asymmetry table, **the M10 arm leading the rung arm per the power split** (3σ ~08-20 vs ~2σ at exit) | pre-committed, on disk |
+
+**Earliest dates**: first joinable date = **07-27** (the day `fp`/`kind` began — if its board
+survives the TTL). First slope *number* (≥3 joined days): **~07-30 – 08-01**. First report
+with every pre-committed column and the diagnostic: **~08-03**, aligned with the
+reopening-rate recompute. Outs control readable **~08-06**; the M10 grading arm reaches 3σ
+**~08-20**; the window's designed read-out stays **~09-22**.
+
+## SEQUENCING UNDER M11 — the recommendation, for sign-off (2026-07-27)
+
+Phase 2 measures whether the CURRENT engine's disagreement predicts closing movement, and
+the bundle will change the engine structurally. The order question is real and it is the
+owner's. The recommendation and its reasons:
+
+**Phase 2 first. The bundle at exit, not before. Shadow-log the specced amendments in
+between (itself gated on explicit sign-off — it is a code change under the freeze).**
+
+1. **The freeze's design premise is one engine vintage per measurement window.** Shipping
+   mid-window makes Phase 2 read a mixture — and then NEITHER engine has a clean window.
+   M11 does not weaken that argument; it is the argument.
+2. **Phase 2-first has option value in both directions; bundle-first has none.** A
+   negative-with-power kills the premise for any engine of this family — better learned
+   before shipping than after. A positive validates the channel and the market question,
+   which transfers; what does not transfer is the specific engine's calibration, and that
+   is what the shadow series covers.
+3. **The honest-record argument**: the current engine is the one that ran the season. Its
+   Phase 2 verdict is the record of what was deployed, whatever ships later.
+4. **The carve-out that removes most of the cost**: compute the speccable-now amendments
+   (M8, M11's estimator, M10's bbr shrink, M1) as dormant, parity-safe SHADOW prices logged
+   beside the live board — the `shadow.umpKf` pattern. By exit the amended engine has weeks
+   of its own close-graded series inside the current window without touching a price. Exit
+   then reads both: the designed evidence (current-engine Phase 2) and the bundle's
+   validation head start (the shadow series). If the shadow engine's disagreement predicts
+   the close WORSE than the live one, the bundle is wrong somewhere and it was caught
+   pre-ship.
+
+Costs stated: shadow pricing is engine-adjacent work under the freeze (additive and dormant,
+the clamp-instrumentation class, full parity discipline) and it is NOT free of M12-style
+risk if done sloppily. If the sign-off is no, the fallback is unchanged: bundle at exit,
+amended-engine validation runs 09-22 → mid-October on the accruing archive before real
+weight is placed on its prices.
+
 ## WHY THIS IS NOW LOAD-BEARING, NOT MERELY VALUABLE
 
 As of 2026-07-26 the card is **NO-PLAY**, and projected to stay that way until roughly

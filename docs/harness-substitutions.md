@@ -79,6 +79,32 @@
 > "form is zero" is a weaker claim on the pitcher side than the batter side — and the ~08-10
 > re-run covers **all six regressions**, not just the batter three.
 >
+> ## THE VACUOUS MEMBERSHIP CHECK — a scanner whose pattern presupposes the answer (2026-07-27)
+>
+> Distinct from the substring defeat and the negative-assertion class: **a membership check
+> whose scanner can only see members is vacuous** — baking the valid set into the capture
+> regex makes an invalid value invisible rather than flagged. Found by the doc-structure
+> guard's teeth test (a planted unknown id passed green), then swept across every guard:
+>
+> | guard | scanner | invalid-by-value visible? |
+> |---|---|---|
+> | doc-structure v1 | `M(?:[1-9]\|1[0-2])` — **the class instance** | ❌ → FIXED: open capture `M\d{1,3}` + plant |
+> | calibration-window v1 | `redisSetJson\((K_SUMMARY\|K_WEIGHTS)` — **the class instance**; a NEW aggregate was invisible | ❌ → FIXED: open capture on any target + enumerated, justified exemptions + plant |
+> | factor-classification | candidates open-by-contract ✓, but the kind enum was **TypeScript-only — esbuild strips it at runtime** | ⚠️ → runtime enum check + plant added |
+> | workflow-timing | enum closed BUT absence-of-match FIRES (reported "missing") — presence-required, the safe shape | ✓ pinned by a plant |
+> | m2-interlock | open constant capture, compares after | ✓ plant existed |
+> | retraction-markers | **closed vocabulary BY MEASURED DESIGN** (the open scan was 65% false positives) | ❌ accepted residual: a retraction phrased outside the caps vocabulary is invisible; the convention is the mitigation, stated here |
+> | server-date-basis | opened 2026-07-25 after the hardcoded 2-route list missed `/api/calibrate` — **the class's first instance, before it had a name** | ✓ |
+>
+> **The shape that survives: open candidates, closed exceptions — never the reverse.**
+> Enumerate what is EXEMPT (with a justification each), never what is SCANNED.
+>
+> **Teeth-test standard, extended (required from 2026-07-27): every guard's plant set includes
+> a value that is INVALID BY VALUE, not just malformed by format.** Three of five guards
+> failed their first teeth test — the standard works, but the plant has to attack the
+> scanner, not the content. A format plant proves the guard fires on garbage; only a
+> valid-looking-but-wrong plant proves the scanner can *see* wrongness.
+
 > **Third instance, same day, OPPOSITE direction — `leashOf`'s k=4 measured RIGHT
 > (2026-07-27).** A plausible variance argument had filed k=4 as the pitcher analogue of
 > M10's noise problem. Measured, the optimal per-start k is **3.4 — the parameter was right

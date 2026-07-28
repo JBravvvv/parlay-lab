@@ -174,18 +174,37 @@ describe("every persisted aggregate carries a timestamp AND a code stamp", () =>
     expect(ROUTE).toContain("weights.at = now");
   });
 
-  it("SOURCE SCAN: no persisted aggregate is written without a stamp", () => {
-    // every redisSetJson to a pl:cal:* key must have a rev assignment within 6 lines above it
-    const lines = ROUTE.split("\n");
+  /* OPENED 2026-07-27: the first version captured (K_SUMMARY|K_WEIGHTS) — the valid set baked
+     into the scanner, so a NEW persisted aggregate was invisible to it. Same class as the
+     doc-structure scanner that could not see a planted unknown id. Now: OPEN capture on any
+     redisSetJson target, with the exclusions enumerated and justified — open candidates,
+     closed exceptions, never the reverse. */
+  const STAMP_EXEMPT = new Set([
+    "dayKey", // per-day GRADING blob — data, not an aggregate; grading provenance rides the rows
+  ]);
+  function unstampedWrites(src: string): string[] {
+    const lines = src.split("\n");
+    const out: string[] = [];
     for (let i = 0; i < lines.length; i++) {
-      const m = /redisSetJson\((K_SUMMARY|K_WEIGHTS)/.exec(lines[i]);
-      if (!m) continue;
+      const m = /redisSetJson\((\w+)/.exec(lines[i]);
+      if (!m || STAMP_EXEMPT.has(m[1])) continue;
       const above = lines.slice(Math.max(0, i - 6), i).join("\n");
-      expect(
-        /\.rev\s*=/.test(above),
-        `${m[1]} is persisted at line ${i + 1} without a \`rev\` stamp within 6 lines above — ` +
-          `a summary that cannot say which code wrote it is unreadable once the code changes.`,
-      ).toBe(true);
+      if (!/\.rev\s*=/.test(above)) out.push(`${m[1]} at line ${i + 1}`);
     }
+    return out;
+  }
+
+  it("PLANT: a NEW unstamped aggregate is visible to the opened scanner", () => {
+    expect(unstampedWrites("x\nawait redisSetJson(K_NEWTHING, blob);\n")).toHaveLength(1);
+    expect(unstampedWrites("s.rev = REV;\nawait redisSetJson(K_NEWTHING, s);\n")).toHaveLength(0);
+    expect(unstampedWrites("await redisSetJson(dayKey(d), blob);\n")).toHaveLength(0); // exempt
+  });
+
+  it("SOURCE SCAN: no persisted aggregate is written without a stamp", () => {
+    expect(
+      unstampedWrites(ROUTE),
+      "persisted without a `rev` stamp within 6 lines above — a summary that cannot say " +
+        "which code wrote it is unreadable once the code changes",
+    ).toHaveLength(0);
   });
 });

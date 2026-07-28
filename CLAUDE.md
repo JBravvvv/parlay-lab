@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`c392df7`** (2026-07-27); the doc-audit commit is held. **508 passing (58 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
+| `frontend-rebuild` (production) | pushed through **`ff22578`** (2026-07-27); the vacuous-membership-sweep commit is held. **511 passing (58 files)** + 7/7 on `tools/test_build_context.py`, build clean. ⚠️ Doc-edit batches: write after EVERY successful sub, never at the end — the write-at-end pattern silently discarded five doc edits on an anchor mismatch, twice; full doc-state audit 2026-07-27 (74 checks) came back clean after repair |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -144,7 +144,9 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 
 ## ⚠️ FIRST CHECKS TOMORROW (2026-07-28)
 1. **Did `board-archive` run at all?** It has never fired. 2 crons/day, and "designed sound" and
-   "ran" are different claims. `data/boards/` on `line-history`.
+   "ran" are different claims. `data/boards/` on `line-history`. ⚠️ **Now with a deadline:
+   `pl:board:{date}` has a 3-day TTL — if 07-27 did not archive, a manual backfill by 07-30
+   is the difference between Phase 2's Series A starting 07-27 and starting late.**
 2. **`props-history` fire count.** It is now **4 crons** (`0 17` with `--wait`, `0 13`, `0 23`
    fallbacks, `0 3` fold-only), down from 10. Expect 4; fewer means the queue is thinning them.
 3. **Does `data/props/2026-07-27.json` carry `kind` and `fp`?** No snapshot has ever carried
@@ -157,9 +159,10 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | date | item |
 |---|---|
 | **2026-07-29** | first bimodal-day close test (Wed). Does a split slate produce **two** closes? |
-| **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
+| ~~2026-07-29~~ | ~~Phase 2's sync phrase becomes the blocker~~ — **SUPERSEDED 2026-07-27: the board archive makes the join fully public** (un-blend validated to 0.29 pp). See phase2-memo's critical path |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
-| **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
+| **~2026-07-30** | Phase 2's first slope number (≥3 joined archive days); build order in phase2-memo's critical path |
+| **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule · **Phase 2's first full report** (all pre-committed columns + the identification diagnostic) |
 | **~2026-08-10** | re-run `tools/recency_weights.py` for ALL SIX regressions (`--market hits|tb|hr|p_h|p_k|p_outs`; 2026-07-27: form zero in all six; pitcher side season-primary at looser SEs) — cached, one command each |
 | **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
