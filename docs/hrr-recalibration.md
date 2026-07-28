@@ -868,7 +868,7 @@ Two arms now exist, with different jobs — **and they are NOT equal. The M10 ar
 
 | rank | arm | signature | magnitude | powered by exit? |
 |---|---|---|---|---|
-| **1** | **expAB-gradient arm** (M10) | same-signed in hits and closed-form HRR, ABSENT in sim-priced HRR — the diverse-lens check | **+7.39 pp/AB** (SE 1.73) → ≈ 6.3 pp between extreme expAB terciles | **yes, early**: 135 expAB-covered graded rows/day → **3σ by ~08-20**, ~4.7σ by exit |
+| **1** | **expAB-gradient arm** (M10) | same-signed in hits and closed-form HRR, ABSENT in sim-priced HRR — the diverse-lens check. ⚠️ narrowed 2026-07-27: the sim's `pBB` consumes the same `bbr`, and HRR is ≈ walk-neutral by accounting, so the sim-flat reading discriminates less than it first appeared — the grading test carries the adjudication | **+7.39 pp/AB** (SE 1.73) → ≈ 6.3 pp between extreme expAB terciles | **yes, early**: 135 expAB-covered graded rows/day → **3σ by ~08-20**, ~4.7σ by exit |
 | 2 | hits rung arm (M7-family) | − → + vs HRR's + → − — the instrument-validation pair is BACK | **+1.4–2.0 pp at O1.5** | **borderline**: ~35 model-priced O1.5 rows/day → ~2,030 graded by 09-22 → SE ≈ 0.96 pp → **2.1σ at +2.0, weaker at +1.4**. Confirmable as *market structure* from the board archive within weeks; thin as *graded truth* |
 
 > ### ⚠️ FOR THE SEPTEMBER READER: weigh these arms unequally (2026-07-27)

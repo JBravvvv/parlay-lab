@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`f543b11`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`6b573ba`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -160,6 +160,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
+| **this week** | the recency-weight regression (M11's fix gate): realized per-AB hits ~ (last-30, season, xBA as-of) from statsapi game logs + priors.json git history; leak-free n≈4,000, weight SEs ±0.11–0.13 today |
 | **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
 | **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
@@ -173,7 +174,8 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 ## The model findings, one line each — full detail in `docs/freeze-exit-bundle.md`
 | id | what | status |
 |---|---|---|
-| **M8** | `shTbOver` prices a 0.5 line with the 1.5 formula — **one number for two questions** | **rank 1, a BUG.** Pinned as a known defect by `tests/self-consistency.test.ts` |
+| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). Fix SHAPE = season term + honest n; **weights GATED on the recency-weight regression — runnable this week, never specced from intent** |
+| **M8** | `shTbOver` prices a 0.5 line with the 1.5 formula — **one number for two questions** | **rank 2, a BUG** (demoted 2026-07-27 by M11's whole-engine reach; keeps the largest single-population magnitude). Pinned as a known defect by `tests/self-consistency.test.ts` |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
 | **M2 / M2′** | outs `0.140`→`0.400` **or** route outs through the sim (the answer is already computed and discarded) | a CHOICE, not a sequence |
 | **M3** | HRR λ = `rate × coorsFlag × power` — **zero site variation** | scoped |
@@ -181,8 +183,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | ~~M5~~ | sim routing for hits | **refuted** — sim mean-abs 7.1 vs closed form 5.6 |
 | **M6** | K's → sim, a sixth PA outcome | contained IF the second RNG stream is used |
 | **M7+M9** | Poisson-where-binomial + its compensator | ⚠️ **INTERLOCKED — never ship separately.** M9-as-uniform-λ **REFUTED 2026-07-27** (predicted +5.7 at hits O1.5, measured +1.4–2.0, shortfall t=11.1); the fixed-n binomial reference fails with it. Real rung structure **+1.4–2.0 pp**. Needs re-derivation; demoted below M10 |
-| **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board. Mechanism traced (2026-07-27): errors-in-variables in `bbr`** — SD(bbr) falls 0.0908→0.0545 with the denominator, full-noise slope +9.4 vs measured +7.39 (`tools/m10_eiv.py`). Fix specified: shrink `bbr` toward league (k≈75) before expAB; 0.9 untouched. Sim slot curve = pa(spot) exactly (−0.110 vs −0.11/slot), so the slot mapping is vindicated. Grading: 3σ ~08-20 |
-| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **a BUG (2026-07-27), fourth intent-vs-behaviour instance**: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). Fix = season term + honest n, not raise-k. Magnitude adjudicated by the same graded rows |
+| **M10** | closed-form hits residual climbs **+7.39 pp/AB of expAB** (SE 1.73); survives quality controls; **sim-priced HRR is flat** → defect locus is `λ = rate × expAB` | **PROVISIONAL — one board. Mechanism traced (2026-07-27): errors-in-variables in `bbr`** — SD(bbr) falls 0.0908→0.0545 with the denominator, full-noise slope +9.4 vs measured +7.39 (`tools/m10_eiv.py`). Fix specified: shrink `bbr` toward league (k≈75) before expAB; 0.9 untouched. Sim slot curve = pa(spot) exactly (−0.110 vs −0.11/slot), so the slot mapping is vindicated — but the sim's `pBB` consumes the SAME `bbr`, so the HRR-flat discriminator is narrowed (HRR ≈ walk-neutral) and sim-volume routing is no escape. Grading: 3σ ~08-20 |
 | **A1–A4** | edge-aware base weight · leg-equivalent floor · `consMinEv` · concentration | allocation axis, own units |
 
 ## Deferred, written up, NOT shipped
@@ -895,4 +896,14 @@ the closed list in that format.
     thing you are testing.** `λ = −ln(1−P)` makes "model λ − market λ" identical to
     "model P − market P", so it cannot detect a distributional error by construction. It read
     −1.8% and looked like a refutation.
+
+23. **Instrumenting a seeded simulation (the STANDING pattern, Josh's call 2026-07-27):
+    same-line-count appends only, counters that consume ZERO rng() draws, revert +
+    re-extract + verify the tree before commit.** Appends keep `clampActivity`'s
+    line-number ids valid; zero draws keeps the primary stream byte-identical (a counter is
+    additive; a draw is a rebaseline). Enforcement, not just rule: any added draw trips the
+    pinned draw count in `tests/sim-rng-stream.test.ts`, and a dirty tree shows in
+    `git status` before the commit. First use: the sim volume-by-slot measurement
+    (`docs/collection-period.md`, 44,000 team-games, five appended lines, reverted same
+    turn).
 

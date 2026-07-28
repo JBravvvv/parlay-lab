@@ -3649,10 +3649,22 @@ default excluded from walk-dimension inference — zero bbr variance):
 
 **Verdict: EIV favoured on three convergent readings, not proven** — the quartile slope decline
 is not individually significant, but the invariance alternative must call the SD decline a
-coincidence. ⚠️ **The "flat at 200 AB" limb of the prediction is untestable BY CONSTRUCTION:
-the blend has no window longer than 30 days.** ab30 caps at ~104, effective n never exceeds
-~60, so the noise floor is structural and permanent for every player — even a perfectly
-correct 0.9 guarantees a gradient with this estimator.
+coincidence.
+
+> ### ⚠️ THE STRONGER FINDING IS THE ONE THE TEST COULD NOT RUN (2026-07-27)
+>
+> The discriminating design asked for a flat slope at 200+ AB. **That stratum cannot exist:
+> the blend has no window longer than 30 days**, ab30 caps at ~104, and the estimator's
+> effective n never exceeds ~60. This is not a limitation of the test — it is a property of
+> the estimator: **`bbr` can never be measured well, by construction. Every player sits
+> permanently in the noisy regime.** The EIV case does not need the flat limb, because the
+> flat limb cannot exist — a perfectly correct 0.9 coefficient still produces the gradient,
+> every day, for every player, as long as this estimator feeds expAB.
+>
+> **The spec that follows from that, beside it so they are read together:**
+> `shShrink(bbr, n, k≈75, lgBB)` before expAB (k = binomial noise / true spread =
+> 0.09·0.91/0.033²). A September reader should read "untestable" as **"the defect is
+> permanent and structural"**, not as "unproven".
 
 **The fix, if EIV holds: shrink `bbr` toward league before it enters expAB** —
 `shShrink(bbr, n, k≈75, lgBB)` (k = binomial noise / true spread = 0.09·0.91/0.033²), the same
@@ -3691,9 +3703,92 @@ Three compounding effects, all arithmetic:
 
 **Verdict: the comment states the design intent and the implementation misses it — M11 is a
 BUG by the intent-vs-behaviour standard, not a calibration.** Fourth instance of the class,
-after `base = prob`, `shPitIsoF` and `shParkF`. The fix is not "raise k" (that just erases
-recent-form signal into xBA); it is giving the estimator a season term and an honest `n`,
-with the graded avg30-tercile test saying how much form the market actually prices.
+after `base = prob`, `shPitIsoF` and `shParkF`. The fix SHAPE is a season term and an honest
+`n` — **the weights are NOT specced; see the recency-weight measurement below.** Choosing
+them from intent is what produced the current blend, and "raise k just erases legitimate
+form signal" is itself an assumption that measurement tests.
+
+## M11 IS WHOLE-ENGINE — the sim's rate is the SAME estimator, verbatim (2026-07-27)
+
+The provenance question was asked and the answer is the strong form. `batVec` (L2065-2067),
+which builds the sim's per-PA outcome vectors `[BB, 1B, 2B, 3B, HR]`:
+
+```
+var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,shPriorH(st,Lh));
+var hrb=shBlendN(st,function(s){return Number(s.hr);},"ab",25);if(hrb)hrR=shShrink(hrb.r,hrb.n,150,shPriorHR(st,Lhr));
+bbAB=shBlend(st,function(s){return Number(s.bb);},"ab",10);
+```
+
+Compare the closed form (L2349, L2357): **identical calls — same `shBlendN`, same .25/.35/.40
+nested 7/15/30 windows, same overstated `n`, same k=60/150, same xBA/xISO priors.** Not
+analogous estimators — the same lines of arithmetic. The v2 log5 branch *starts from* the
+contaminated `hitR` (`hitR=shLog5(hitR,pBAx,lgXBA)`), so it reweights but never cleans it.
+
+Three consequences, in rank order:
+
+1. **M11 is not a closed-form defect — it contaminates every batter rate in BOTH pricing
+   paths, every batter market, every game.** The sim inherits it silently. Per the
+   pre-commitment made when the question was posed: **M11 outranks everything in the bundle,
+   including M8** — M8 remains the largest single-population magnitude (24.4 pp on 127 TB
+   rows); M11 has the largest *reach* (every batter price the engine emits, through either
+   path).
+2. **The sim's walk channel carries M10's noise too**: `pBB = clamp(bbAB/(1+bbAB)+0.010, …)`
+   consumes the same 10-AB-minimum `bbr` estimator that expAB does. ⚠️ **This narrows what
+   "sim-priced HRR is flat on expAB (+0.73)" proved**: H+R+RBI is nearly walk-neutral by
+   accounting (a walk costs an AB but feeds runs/RBI), so bbr noise largely self-cancels in
+   HRR — the one market where the two-path discriminator was run. The sim is clean on SLOT
+   volume (measured, −0.110 vs −0.11); it is NOT established clean on walk-rate noise for a
+   walk-sensitive market like hits.
+3. **"The sim agrees with the market" claims must now be scoped**: agreement was measured on
+   volume (slot curve) and on HRR (walk-neutral). On per-PA rate the sim runs the indicted
+   estimator plus its own additions on top.
+
+## THE SIM'S +5.0 HITS ERROR DECOMPOSED — volume is the minor term (2026-07-27)
+
+The proposed arithmetic verifies exactly: p=0.24/AB, 4.25 → 4.38 AB moves P(≥1) 0.6885 →
+0.6994 = **+1.1 pp**. On the board's own parameters (λ median 0.930, sim PA overshoot +3.1
+to +3.3%): **volume = e^{−λ}·λ·(ΔAB/AB) = +1.14 to +1.21 pp.**
+
+| basis | total sim−market | volume | rate (+ PA-rate covariance) |
+|---|---|---|---|
+| as measured (fixture market) | **+5.0** | +1.2 (24%) | **+3.8 (76%)** → λ hot ≈ +10% |
+| production-equivalent (sim−cf **+9.2** is market-free and stats-shared; + cf−market **+0.3** production) | **≈ +9.5** | +1.2 (13%) | **≈ +8.3 (87%)** → λ hot ≈ +23% |
+
+The two bases exist because the fixture's market carries the −4.3 cf artifact; the sim−cf
+bridge routes around it. **On either basis, rate dominates and volume is a quarter at most.**
+The "rate" bucket includes the PA-rate covariance (the endogenous-PA mechanism proper — a
+hot offence buys extra PAs *and* the extra PAs arrive in hot states), which a mean-shift
+volume estimate cannot capture. And item 1 above bounds where the rate heat lives: the base
+estimator is SHARED with the closed form, so it cancels in sim−cf — **the sim's excess rate
+error is in the sim-path additions** (log5 with park+wind retained, TTO boosts, the
+covariance), not in a different estimator.
+
+**Ranking consequence, stated as asked**: a uniform +3% PA level would have been one
+trivially correctable constant and no reason to rank sim-volume routing below the bbr
+shrink. That is the MINOR term. The dominant term is rate — a real reason. The ranking
+stands, now for the right reason. M4 (sim routing for TB/HR) inherits this caution: its
+favourable numbers are fixture-market measurements of prices that ride the same rate path;
+its archive-series gate now has one more thing to check.
+
+## THE RECENCY-WEIGHT MEASUREMENT — scoped like the interlock reference (2026-07-27)
+
+**Do not spec the M11 fix until this reports.** The regression: realized per-AB hit outcome
+on (last-30 rate, season rate, xBA as-of-date), per player-date. It returns the true
+predictive weight of each term — the number the .25/.35/.40 blend hard-codes from intent.
+
+| | |
+|---|---|
+| **inputs** | statsapi game logs (public, full season — any window reconstructable for any date); xBA as-of-date from `priors.json` **git history** (nightly `model.yml` commits since ~2026-07-11) |
+| **leak-free population** | player-dates 2026-07-11 → now: ~16 days × ~250 lineup hitters ≈ **4,000 obs**, growing ~250/day |
+| **power now** | weight SEs ≈ **±0.11–0.13** → distinguishes recency-weight 0 from the blend's ~0.5 at ~4σ today; 0 vs 0.3 at ~2.3σ |
+| **power ~08-10** | SE ≈ ±0.09 → 0 vs 0.3 at ~3σ |
+| **full-season variant** | ~20–25k obs, SE ≈ ±0.04 — decisive on every contrast, but uses current xBA for pre-07-11 dates (look-ahead; state it if used) |
+| **date** | runnable this week. The M11 fix spec is GATED on it, exactly as M7+M9's re-derivation is gated on the truth-dispersion measurement |
+
+If recency carries ~zero true weight — as the market's behaviour implies at t=9 divergence —
+the fix is *removing* the recency loading, not rebalancing it, and no form signal is erased
+because there was none to erase. If it carries real weight, the regression returns the
+coefficient to use. Either way the weights come out of a measurement, not out of intent.
 
 ## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
 
@@ -3722,9 +3817,12 @@ parity-safely: per-batter PA/AB tallies are one array increment each inside `hal
 (additive, zero rng() draws — the second-stream rule is not even engaged), exported like
 `legP`, consumed behind the same `simP && !liveInit` filter the HRR marginal uses. Reach:
 **13 of 15 games, 1,916 of 2,206 batter rows (87%)** on 2026-07-26. **Ranked BELOW the bbr
-shrink**: the sim's volume runs +3% hot, so routing volume through it imports a known level
-bias to fix a noise problem. Order — bbr shrink first; sim-volume routing only after the
-sim's PA level is itself validated.
+shrink, and the provenance finding hardened the reason (2026-07-27)**: the +3% PA level is
+one trivially correctable constant, but the sim's per-player AB derives from `pBB`, which
+consumes **the same noisy `bbr` estimator expAB does** — sim-volume routing re-imports the
+noise it was meant to escape. The bbr shrink fixes BOTH consumers (expAB and the sim's walk
+channel) at the one input line. Order — bbr shrink first, unconditionally; sim-volume
+routing is only worth revisiting after it, and after the sim's PA level is normalized.
 
 ## THE M7/M9 REFERENCE MEASUREMENT IS REACHABLE — scoped, not run (2026-07-27)
 
