@@ -125,7 +125,7 @@ Node via nvm: `export PATH="$HOME/.nvm/versions/node/v24.18.0/bin:$PATH"`).
 ## Where the code is
 | branch | state |
 |---|---|
-| `frontend-rebuild` (production) | pushed through **`6b573ba`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
+| `frontend-rebuild` (production) | pushed through **`30f7ccb`** (2026-07-27). **500 passing (56 files)** + 7/7 on `tools/test_build_context.py`, build clean |
 | `main` | `c2459c4` pushed — scheduler copy of `board-archive.yml` (schedules only fire from the default branch) |
 | `line-history` | `1e77c9d` pushed — the 2026-07-26 board backfill |
 | `emergency/minimal-credits` | `874b8f2`, pushed, unmerged — **do not merge** |
@@ -160,7 +160,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 | **2026-07-29** | Phase 2's sync phrase becomes the blocker — the first rung-level slope fit |
 | **2026-08-02** | Sunday keep rate: **≥90%** confirms the retime · **6–30%** means the cadence, not the hour · between = partial. Also the scheduler delay revisit (median **and spread**) |
 | **2026-08-03** | recompute reopening dates from 7 complete days of the new schedule |
-| **this week** | the recency-weight regression (M11's fix gate): realized per-AB hits ~ (last-30, season, xBA as-of) from statsapi game logs + priors.json git history; leak-free n≈4,000, weight SEs ±0.11–0.13 today |
+| **~2026-08-10** | re-run `tools/recency_weights.py` (ran 2026-07-27: branch 4, form weight +0.05 SE 0.08; SE tightens to ~0.07) — cache under scratch `rw_cache` makes it one command |
 | **~2026-08-01** | the M7/M9 reference measurement is runnable: `data/props` close fairs × statsapi boxscores → empirical `P(hits≥2 | λ band)` vs the Poisson/binomial families. ~3,500 rows already archived; no model, no secrets |
 | **~2026-08-05** | re-run `tools/rung_signature.py` across the archive series — are the M10/M11 gradients and the +1.4–2.0 rung structure stable across boards? |
 | **~2026-08-20** | expAB-tercile grading test reaches ~3σ (135 covered rows/day) — **decides who owns the M10 gradient** and doubles as M9's non-circular reference |
@@ -174,7 +174,8 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 ## The model findings, one line each — full detail in `docs/freeze-exit-bundle.md`
 | id | what | status |
 |---|---|---|
-| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). Fix SHAPE = season term + honest n; **weights GATED on the recency-weight regression — runnable this week, never specced from intent** |
+| **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). **Fix SPECCED from measured weights (2026-07-27, branch 4)**: xBA-primary (+0.73/+0.49), windowed form **+0.05 SE 0.08** (zero), season redundant (corr 0.73 w/ xBA) — the nested blend and k=60 both go; the 'season term' shape was itself wrong. n=3,061 leak-free (`tools/recency_weights.py`); re-run ~08-10 |
+| **M12** | the sim path's OWN rate heat, ablated: log5+park/wind **+2.70**, TTO +0.65, static factor-set +4.3, **dynamics −0.82 (endogenous-PA hypothesis REFUTED)**, volume +1.2 → ≈ **+8.8 vs cf** on 55 fixture legs | **NEW 2026-07-27.** Independent of M11 (shared base cancels in sim−cf). HRR's +10.0 sim residual is M12-sized. M4's gate must separate it |
 | **M8** | `shTbOver` prices a 0.5 line with the 1.5 formula — **one number for two questions** | **rank 2, a BUG** (demoted 2026-07-27 by M11's whole-engine reach; keeps the largest single-population magnitude). Pinned as a known defect by `tests/self-consistency.test.ts` |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
 | **M2 / M2′** | outs `0.140`→`0.400` **or** route outs through the sim (the answer is already computed and discarded) | a CHOICE, not a sequence |
@@ -196,6 +197,7 @@ pushing**; that has happened four times (`b538365` context, `ff2ad74` priors, an
 |---|---|
 | `tools/self_consistency.py` | **the independent instrument.** Logical identities on any board or the whole archive — a violation is a PROOF |
 | `tools/m10_eiv.py` | the errors-in-variables stratification for M10 (slope + SD(bbr) by denominator quartile) |
+| `tools/recency_weights.py` | **M11's fix gate, REPORTED**: AB-weighted WLS of realized per-AB hits on as-of (last-30, season, xBA); leak-free incl. doubleheaders; statsapi + priors git history |
 | `tools/rung_signature.py` | **the rung/gradient instrument.** Un-blends any archived board (`pModel = (pO−0.65·fO)/0.35`, validated to 0.29 pp), recovers each row's λ̂, parses expAB/avg30/xwOBA from case strings, and reports the M7+M9 rung test + the M10/M11 gradients. Re-run on every archived board |
 | `docs/freeze-exit-bundle.md` | **the 09-22 deliverable, in draft.** 6 model + 4 allocation amendments, each with measured effect, axis, dependencies; plus closed-with-magnitude |
 | `docs/collection-period.md` | the frozen parameter table, the two exits, `mktN`, the sim/closed-form split, factor consumer table |

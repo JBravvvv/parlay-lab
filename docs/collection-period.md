@@ -3790,6 +3790,102 @@ the fix is *removing* the recency loading, not rebalancing it, and no form signa
 because there was none to erase. If it carries real weight, the regression returns the
 coefficient to use. Either way the weights come out of a measurement, not out of intent.
 
+**REPORTED THE SAME DAY — see "THE RECENCY REGRESSION HAS REPORTED" below. Branch 4 fired.**
+
+## THE SIM'S RATE STACK, TERM BY TERM — and M12 (2026-07-27)
+
+Ablation runs on the armed fixture (rule-23 pattern, switch variant: same-line-count runtime
+switches `SH_ABL.tto` / `SH_ABL.log5`, reverted after four runs; ablations change downstream
+draw *alignment*, not the per-PA primary draw — irrelevant at 10k sims, MC noise ~0.07 pp on
+these medians). 55 hits O0.5 legs joined across all four runs + closed form + market:
+
+| term | median pp | mean pp |
+|---|---|---|
+| sim (baseline A) − market | +5.00 | +4.46 |
+| sim (A) − closed form | **+8.81** | +7.97 |
+| TTO boosts (A−B) | +0.65 | +0.36 |
+| **log5 branch with park+wind retained (A−C)** | **+2.70** | +2.15 |
+| interaction (A−B−C+D) | −0.65 | −0.43 |
+| stripped sim (D) − closed form | +4.79 | +5.03 |
+| — of which pure dynamics (D − static-price of D's own vectors) | **−0.82** | — |
+| — of which static factor-set gap (static(D) − cf, at sim volume) | **+5.48** | — |
+
+The stack reconciles: additions (+4.0) + factor-set-at-volume (+5.5) + dynamics (−0.8) ≈
+sim−cf (+8.8). Three verdicts:
+
+1. ⚠️ **THE ENDOGENOUS-PA HYPOTHESIS IS REFUTED (2026-07-27).** The dynamics term — the PA-rate
+   covariance plus hook/bullpen switching, everything emergent — reads **−0.82 pp**. The
+   bundle's open-item row carried it as the leading candidate for the sim's overshoot; it is
+   now measured, and it *costs* the sim rather than explaining it.
+2. **The heat is static, not dynamic**: the log5 branch (+2.70 — "no double counting" holds
+   for what it removes, yet the branch still nets hot vs the proxy channel it replaces) and
+   the factor-set gap (+4.3 after removing the +1.2 volume share: platoon, park-vs-Coors,
+   the missing `luckF`, clamp differences between `batVec` and the closed-form chain).
+3. **This is M12** — the sim path's OWN rate heat, ~+8 pp on top of the shared M11 base,
+   which cancels in sim−cf and is therefore none of this. **M11 at rank 1 does NOT assume
+   the sim additions are neutral anymore — they are measured non-neutral, and fixing the
+   base fixes both paths' shared term only.** M12 lives where HRR is priced: the sim-priced
+   HRR residual reads **+10.0** on the real board, which is M12-sized. The open HRR residual
+   now has a measured candidate. M4's gate must separate M12 heat from market vintage.
+
+## EVERY CONSUMER OF THE WALK CHANNEL — mapped and bounded (2026-07-27)
+
+The contaminated batter walk estimator `shBlend(st, bb, "ab", 10)` has exactly **two call
+sites**: L2308 (`bbr` → expAB, the closed form — M10) and L2067 (`bbAB` → `pBB`, the sim).
+`pBB`'s full downstream:
+
+| consumer | path | magnitude |
+|---|---|---|
+| batter AB counts, all sim prices | `v[0]` per-PA draw | first-order per player — M10's twin |
+| **manager hook + TTO thresholds** | walks count in `spPA` (L1967) → `spPA≥29` hook, `≥9/18` TTO | team-averaged noise σ ≈ 0.045/√9 ≈ 0.015 → ~±2% PA accrual — second-order |
+| team PA totals | walks extend innings | inside the dynamics term measured above (−0.8 net) |
+| **SGP joint pricing — LIVE in ticket construction** | sim bitsets → `jointAll`/Π marginals dependence ratio | common rate noise moves numerator and denominator together — cancels to first order; second-order residual |
+| simMarkets panel | display-only | — |
+
+**`pitcher_outs`: the contamination does NOT reach it today.** The sim's outs are discarded
+(`outsBySP*` never surfaced), `leashOf` consumes innings-per-game only, `shLaborF` consumes
+real pitch counts, and the pitcher stack's own walks enter through `shFip` — **season raw
+counts, a different estimator with no recency blend**. The fifth-defect direction exists
+only under M2′ (outs → sim), where it arrives through two doors (the `spPA` hook and inning
+length) at the team-averaged magnitude above — **≈ ±0.2 outs at the hook margin, an order
+below the 0.140 constant's −1.8 outs**. Recorded so M2′'s validation pass looks for it;
+nothing to fix today.
+
+## THE RECENCY REGRESSION HAS REPORTED — BRANCH 4 FIRES (2026-07-27)
+
+`tools/recency_weights.py`: realized per-AB hit rate on date D regressed (AB-weighted WLS) on
+the three as-of-D observables. **n = 3,061 player-dates**, 2026-07-11 → 07-26, 481 batters
+(≥40 season AB; 144 dropped thin-ab30, 27 thin-season), xBA from 20 nightly `priors.json`
+commits. Leak-free by construction: every window ends at D−1, and game logs are grouped by
+date first so a doubleheader's games leave every window together — the same-day case is
+excluded from **all** predictors, explicitly.
+
+| predictor | full fit | drop-season | drop-xBA |
+|---|---|---|---|
+| last-30 rate | +0.126 (SE 0.096) | **+0.045 (SE 0.084)** | +0.125 (SE 0.096) |
+| season rate | −0.360 (SE 0.207) | — | +0.082 (SE 0.159) |
+| xBA prior | **+0.728 (SE 0.218)** | **+0.486 (SE 0.168)** | — |
+
+corr(season, xBA) = 0.73 — season's negative raw coefficient is collinearity, not a signal.
+
+**The pre-committed branch that fires is BRANCH 4: the xBA prior carries most of the weight
+and the whole window blend is the wrong structure** — with branch 1's corollary attached:
+windowed form carries **+0.05 ± 0.08 with xBA present** (zero), so removing the recency
+loading erases nothing legitimate. The blend was measuring noise and calling it form.
+Even season adds nothing once xBA is in the model. The engine's effective weight on windowed
+form is ~0.56 — **4–11× the measured weight's upper bound**.
+
+**The fix, specced against the measured weights and nothing else:** the rate estimator is
+**xBA-primary**; the windowed-form term gets weight ≤ ~0.1 (point 0.05, 95% CI −0.12…+0.21)
+as a single un-nested last-30 term. The .25/.35/.40 nested blend and k=60 both go — as does
+the earlier "season term + honest n" fix shape, **which branch 4 shows was itself wrong**:
+season is redundant against xBA. In `shShrink` terms the equivalent is k ≥ ~675 at n ≈ 75.
+
+Caveats, pre-registered: 16 July days; SE 0.08 cannot exclude a small (<0.2) real form
+weight; the intercept absorbs the July pool drift (realized 0.237 vs trailing 0.248).
+**Re-run ~2026-08-10** (SE ≈ 0.07, cache makes it one command) and again at exit. Unshipped
+under the freeze either way.
+
 ## THE SIM'S VOLUME MODEL vs pa(spot) — the slot mapping is VINDICATED (2026-07-27)
 
 The sim was instrumented directly (temporary same-line-count counters in `halfInning`,
