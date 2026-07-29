@@ -2970,6 +2970,47 @@ nothing else can be reconstructed. The prospective fix (adding the three alt key
 sweep) is specced in the memo, guard-encoded as an OBSERVED-RED expected failure
 (`tests/sweep-covers-engine.test.ts`, flips with the fix), and awaits the owner's
 sign-off on the credit cost; the pre-fix days keep their canonical-key vintage forever.
+(2026-07-28, later: the cross-instrument join to production boards was RUN before this
+was restated — matched 36/27 hits/K's row keys on 07-26 and died on `fp` absent from
+0/1,229 archive rows that day; boards exist only for 07-26, `fp` only from 07-27 — zero
+days carry both. The join becomes feasible the first board+`fp` day. Memo §2c carries
+the printed query.)
+
+## THE CREDIT BUDGET DOES NOT REACH THE PARAMETER EXIT — collection-design defect (2026-07-28, owner's item)
+
+**Measured aggregate** (the odds proxy passes The Odds API's own headers through, read
+2026-07-28 evening): **2,317 remaining / 17,683 used** — a 20,000/cycle plan. The cycle's
+reset date is on the dashboard only; it is the single decisive unknown below.
+
+**Two burn derivations, printed because they contradict (the pre-committed branch):**
+- **A — projected, sweep-only**: the sweep script's own budget note (6 cr/event × ~15
+  events × 2 sweeps) ≈ **180/day**. This number was PROJECTED, never measured from a log,
+  and covers ONE instrument.
+- **B — aggregate-implied**: IF the cycle began 07-01, 17,683 over ~28 days ≈
+  **~630/day** average. The contradiction resolves as: A is one instrument's share; the
+  total includes `/api/generate` (~120/fire, up to 3 slots/day), game-lines sweeps, CLV
+  sightings (1–6 cr/sighted game), and client generates. **B is the honest basis and its
+  denominator (cycle start) is unverified from here.**
+
+**Per-call costs**: manual generate curl ≈ 120; each cron generate slot ≈ 120/fire;
+archive sweep ≈ 90–96/sweep; CLV sighting 1–6/game bounded by locked legs; the events
+list is free.
+
+**Runway**: the current cycle's 2,317 dies in **~3.7 days at rate B (~08-01)** or ~13
+days at rate A (~08-10). The freeze runs to ~09-22 (56 days): 10,080 needed at A,
+~35,000 at B — **the current cycle reaches neither; whether the PLAN does depends
+entirely on the reset date and a burn plan.** If the reset is calendar-monthly (08-01),
+the acute risk narrows to this week's overlap of reopen days with a near-empty cycle.
+
+**What breaks if collection stops mid-window**: Phase 2 Series A is the board×close
+join — a credit stop kills BOTH sides at once (no server boards, no close sweeps). The
+08-15 20-board fixture-representativeness bar and the HRR retirement criterion
+(≥300 rows/≥10 boards) slip 1:1 per dark day, per the standing floor rule; a partial
+series still gives direction at reduced power but does NOT clear the 20-board threshold
+as specced. **The alt-key sign-off is SUBORDINATE to a burn plan** — it was raised to
+inform collection and cannot be decided as if the instrument it extends were funded to
+exit. Owner inputs needed: the reset date, and which spenders to ration (generate slots
+vs sweeps vs CLV).
 
 ## What the schedule actually delivers, per day
 

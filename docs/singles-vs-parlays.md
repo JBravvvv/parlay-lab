@@ -285,9 +285,11 @@ points, and that quantity has not been measured.**
 > over the FIXED +2% floor (the floor's meaning changes when prices improve), and the
 > prob-weighted greedy (`base = prob`, L2999) then prefers the high-probability low-edge
 > newcomers, displacing higher-growth tickets. The fixed-card price channel is real and
-> stands — deduped, game-clustered CI on the fixed-card shift **+0.125 [+0.033, +0.247]**,
-> excludes zero, so +0.10/3.15 survives WITH its interval as a fixed-card statement — but
-> the operative frame is the allocator's, where the sign REVERSES. Magnitude caveat: the
+> stands — deduped, game-clustered CI on the fixed-card shift **+0.125 [+0.033, +0.247]
+> ⚠️ FEW-CLUSTER — 11 game-clusters (2026-07-28, owner's item 6: excluding zero on 11
+> clusters is not the claim it would be on 200)** — so +0.10/3.15 survives WITH its
+> few-cluster interval as a fixed-card statement — but the operative frame is the
+> allocator's, where the sign REVERSES. Magnitude caveat: the
 > uniform mean-shift bump admits every ticket within ~1.4–1.7 pp below the floor, while
 > the real gain distribution is ~56% zeros — the −2.50 is an upper bound on the collapse;
 > the dispersion-aware allocator re-run (~an hour) is the named follow-up.
@@ -296,7 +298,51 @@ points, and that quantity has not been measured.**
 > under the identical bump): scaling the floor with leg count keeps the admission bar's
 > meaning fixed as prices move. This is a NEW, two-book argument for the already-proposed
 > floor amendment, measured on its own table — it joins the amendment's exit sign-off, not
-> a freeze change. For scale, the board-wide raw model gap
+> a freeze change.
+>
+> ### CORRECTION 4 of 4 (2026-07-28, latest — owner's monotonicity control): THE COLLAPSE
+> ### IS NOT A TWO-BOOK FINDING. IT IS **M14 — THE ALLOCATOR IS NON-MONOTONE IN PRICE** —
+> ### AND CORRECTION 3'S ATTRIBUTION IS RETRACTED AS MIS-ATTRIBUTED
+>
+> "Every price weakly improves and E[ln] falls" is a self-consistency violation under any
+> allocator that optimizes what it selects for — a proof of a defect, not evidence about
+> books. The control ran (one book, identical uniform bump, allocator in loop, zero
+> credits):
+>
+> | uniform bump | parlay E[ln] | singles E[ln] |
+> |---|---|---|
+> | +0 pp | +126.6 bp | +55.3 bp |
+> | +0.25 | +129.0 | +57.7 |
+> | +0.5 | **+117.3 ⬇** | +58.6 |
+> | +1.0 | **+110.4 ⬇** | +61.1 |
+> | +1.5 | **+70.5 ⬇** | **+59.2 ⬇** |
+> | +2.0 | +74.4 | **+42.6 ⬇** |
+>
+> **Non-monotone at four of five steps, in ONE book, on both card types.** The
+> pre-committed branch fires: allocator defect, M-numbered (**M14**), and the memo's
+> collapse paragraph is retracted as mis-attributed — two books merely walked into it.
+> The mechanism, traced to lines rather than described: **admission** is the threshold
+> `czEv ≥ coreEvMin` (L3002; `coreEvMin: 2`, frozen, L1075) — better prices admit more
+> tickets; **ranking** is greedy on `eff = base/(1+0.5·sharedGames)` with `base = prob` in
+> every disciplined mode (L3055, L3076–3095) — **price never enters the ranking**; the
+> **objective of record** is log-growth (this doc's instrument; the allocator's own
+> comments claim "¼-Kelly sizing discipline", L1070/L3103). Ranking by probability while
+> admitting by price is two different quantities, and the gap is the defect: a
+> floor-admitted high-prob/low-edge newcomer (at +1.5 pp, a "Hits parlay" displacing the
+> top HRR ticket — visible in the card names) outranks higher-growth incumbents. The
+> at-1.5-pp singles drop shows the same displacement without any parlay structure.
+>
+> **The floor, named**: `coreEvMin = 2` is DISTINCT from `consMinEv` and does **not**
+> expire at the 07-29/07-31/08-01 reopens — those end `consMinEv`'s applicability, not
+> this. The admission channel persists; the measurement does not describe an expiring
+> configuration.
+>
+> **NO ALLOCATOR CHANGE SHIPS. Freeze.** M14 is a documented defect with a magnitude
+> (up to −56 bp of E[ln] from a +1.5 pp price improvement on this board), and the
+> multi-book adoption decision is downstream of M14, not of the books. Note A1
+> (edge-aware base) would make ranking price-aware and A2 (leg-equivalent floor) keeps
+> the admission bar's meaning fixed — the sweep is n=1 board evidence that the existing
+> amendment pair addresses M14's two halves; that observation joins their exit sign-off. For scale, the board-wide raw model gap
 is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
 rather than information, the crossover is breached. The global reliability slope is
 **1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the

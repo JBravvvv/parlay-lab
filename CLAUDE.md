@@ -169,6 +169,20 @@ preceded it is step 0, done 2026-07-27 night):
    a grep. **The instrument that closes the server half is step 5** (zero HRR legs in the
    server-built board's tickets). Until step 5, M8/suspension are "client-verified,
    server-inferred", not "live".
+   **HASH EVIDENCE (2026-07-28, owner's one-string check)**: the engine string EXTRACTED
+   from the served chunk ≡ the repo's `legacy-src.gen.ts` string — **sha256 `f6cf1513…`
+   both sides, 280,466 chars, three deterministic fetches** (`git diff 263184c..HEAD` on
+   the file is empty, so repo = deployed sha here). Extraction is BUILD-time (a committed
+   static file, statically imported — not a request-time read), so client/server cannot
+   diverge without a deploy; per the owner's rule identity is still NOT inferred from the
+   import graph — the server-RUNTIME hash is unobtainable without a code change. **The
+   change, named**: compute `sha256(LEGACY_SRC)` at module load, expose it in the
+   `/api/generate` response meta + the board archive (which currently echoes NO engine
+   config — verified: no `hrrAltMax`/`coreEvMin` anywhere in the archived 07-26 board), and
+   parity-check client-vs-server sha in `self_consistency.py`. One instrument note for the
+   record: the first hash comparison "found" a 2-char difference that was MY probe's bug
+   (Buffer coercion splitting multi-byte chars) — the instrument nearly manufactured "two
+   engines"; fixed with `setEncoding`, three clean fetches.
 2. **Add header `x-cron-key` to entries 1–4** (you type the secret; the Monday 3:00 PM PT
    401 in the execution history is the before-evidence). Free.
 3. **Manual generate curl** (below) — ~120 credits → response `{ok, date, gen}`. Builds the
@@ -324,7 +338,9 @@ later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
 |---|---|---|
 | **M11** | residual +0.79 pp / 10 pts of last-30 avg (t≈9), xwOBA carries nothing — recency not skill | **RANK 1 — WHOLE-ENGINE (2026-07-27). The sim's per-PA rate is the IDENTICAL `shBlendN`→`shShrink` chain (`batVec` L2065-67), so this reaches every batter price in BOTH paths** — the pre-committed condition for outranking M8. A BUG, fourth intent-vs-behaviour instance: `shShrink`'s comment forbids hot-streak chasing but its input blend is 100% last-30 with nested recency weights (last-week AB ≈ 5.5×) and `n` overstated ~1.5× (effective 49 vs reported 75). **Fix SPECCED from measured weights (2026-07-27, branch 4)**: xBA-primary (+0.73/+0.49), windowed form **+0.05 SE 0.08** (zero), season redundant (corr 0.73 w/ xBA) — the nested blend and k=60 both go; the 'season term' shape was itself wrong. n=3,061 leak-free (`tools/recency_weights.py`); per-market re-run: form is zero in TB (−0.002) and **HR (−0.008)** too → ONE structure for batters, expected-metric-primary (xBA/xSLG/xISO). **Pitcher side (n≈265/outcome): form zero there too — SIX regressions, form zero in six — but the carrier is SEASON actual; each estimator gets its measured answer (licensing block, collection-period.md).** Blast radius = **ten `shBlendN`/`shBlend` call sites, six quantities, all four batter markets + K's + outs-via-`offense()`** (see collection-period.md); HRR-per-game and the walk channel need their own answers; re-run ~08-10 |
 | **M12** | the sim path's OWN rate heat, ablated: log5+park/wind **+2.70**, TTO +0.65, static factor-set +4.3, **dynamics −0.82 (endogenous-PA hypothesis REFUTED)**, volume +1.2 → ≈ **+8.8 vs cf** on 55 fixture legs | **NEW 2026-07-27.** Independent of M11 (shared base cancels in sim−cf). HRR's +10.0 sim residual is M12-sized. M4's gate must separate it |
-| **M13** | the props ARCHIVE sweep (`tools/snapshot_props.py`) requests only the six canonical keys while Caesars posts its whole hits/K's ladders under `*_alternate` (incl. the main lines) — 14 archive days read 0/7,033 (hits) + 0/830 (K's) CZ-present and the multibook memo misread that as feed coverage ("the unlock", retracted same day) | **NEW 2026-07-28, COLLECTION defect, not engine** — the engine (L1366, `SH_PROP_ALT`, and CLAUDE.md §build-44) and `sightProp` both read the alternates already; only the archive is blind. Fix = add the 3 alt keys to the sweep (+~3 credits/event), fold same-line quotes, **vintage-stamp the archive change** — awaits owner sign-off. Guard candidate: sweep market list ⊇ engine's, extracted from source. Full chain: `docs/multibook-memo.md` §2c |
+| **M13** | the props ARCHIVE sweep (`tools/snapshot_props.py`) requests only the six canonical keys while Caesars posts its whole hits/K's ladders under `*_alternate` (incl. the main lines) — 14 archive days read 0/7,033 (hits) + 0/830 (K's) CZ-present and the multibook memo misread that as feed coverage ("the unlock", retracted same day) | **NEW 2026-07-28, COLLECTION defect, not engine** — the engine (L1366, `SH_PROP_ALT`, and CLAUDE.md §build-44) and `sightProp` both read the alternates already; only the archive is blind. Fix = add the 3 alt keys to the sweep (+~3 credits/event), fold same-line quotes, **vintage-stamp the archive change** — awaits owner sign-off. Guard: `tests/sweep-covers-engine.test.ts`, **observed-red, NOT-YET-ENFORCING** (`it.fails`; flips with the fix). Full chain: `docs/multibook-memo.md` §2c |
+| **M14** | **the allocator is NON-MONOTONE IN PRICE**: a uniform ONE-BOOK price improvement lowers card E[ln] (+126.6 → +70.5 bp at +1.5 pp; singles fall too) — admission is `czEv ≥ coreEvMin` (frozen `2`, does NOT expire at the reopens) while ranking is price-blind prob-greedy (L3055/L3076–95), so floor-admitted high-prob/low-edge newcomers displace higher-growth tickets | **NEW 2026-07-28, documented defect, NO SHIP (freeze)** — found via the two-book "collapse", which is re-attributed to this. Any fixed-card PRICE-response measurement inherits the failure mode (audit table in the bundle: exactly one family existed, the two-book shift, corrected in-loop same day). A1+A2 address its two halves — evidence joins their exit sign-off. The multi-book adoption decision is downstream of M14 |
+| **M15** | the multibook population "n=511" pooled pre+close snapshots as independent rows (362 unique, ~1.4× duplication) — TB−HRR's z≈1.9 was the artifact (deduped: 0.96); headline restates **+1.07 pre-vintage** [+0.88,+1.33] FEW-CLUSTER (11) | **NEW 2026-07-28, measurement defect, corrected same day.** Standing rule: archive populations state their snapshot-vintage rule (pre/close/dedupe) beside n. Pre = bet time (operative); close = CLV |
 | **M8** | `shTbOver` priced a 0.5 line with the 1.5 formula | ✅ **SHIPPED 2026-07-27 night** (bug-grade, sign-off D): `if(line<1)return 1-P0;` same-line at L1548; pinned test swapped WITH a reintroduction plant; `baseline43` byte-identical (`e67eaad0…` both sides — the fixture prices no TB-0.5 row). Confirm on the first post-ship board: TB≥1==H≥1 violations → 0 (were 118/127) |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
 | **M2 / M2′** | outs: ⚠️ **INTERLOCKED PAIR** — `0.140`→`0.400` AND the `offense()` xSLG de-noise, together or never (enforced: `tests/m2-interlock.test.ts`; `of` is a constant 0.860 today — a defect masking a defect, ±12 pp if shipped alone) | **ready once paired** (residual ±1.2 pp < 2 pp bar). Estimator specced from measured variances: cliff removed, season-anchored, **k=3.4 — k=4 was numerically right; the cliff and the league target were the defects**; spread 63–75% → 92–93% of true. Pitcher regressions (n≈265/outcome): form zero, SEASON-primary (K's +0.81, outs +0.61), whiff prior nothing. Outs needs no sim — NOT a post-freeze project; M2′ strictly-better, optional |
@@ -755,6 +771,14 @@ factor on its first run — `shPriorKf`, absent from every registry, doc and dri
 **When adding a guard, break the thing on purpose and watch it fire** — two of these three
 initially passed against a deliberately broken input (substring matching, and a line-window
 scan bleeding into the next function).
+
+**PLUS ONE NOT-YET-ENFORCING (2026-07-28, owner's classification — it is not the eighth
+guard yet)**: `tests/sweep-covers-engine.test.ts` (M13: sweep market list ⊇ engine's, both
+extracted from source). Status: **observed-red** (run as a plain `it` it fails printing the
+three missing alt keys) but committed as `it.fails` — it documents the open defect and does
+NOT fail the build on it. **The condition that flips it to enforcing: the alt-key fix
+commit edits `MARKETS` and flips `it.fails` → `it` in the same change** — which waits on
+the burn plan (collection-period.md), not on its own four prerequisites.
 
 ## ⚠️ EVERY CRON IS LATE, AND HOURLY ONES ARE DROPPED — enforced by test
 Every scheduled workflow carries a `# TIMING: SENSITIVE|INSENSITIVE` marker;

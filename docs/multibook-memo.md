@@ -88,6 +88,32 @@ The CLV probe's 38 lost-fair rows all came from the single canonical-keys event 
 construction). Two events is not a history; the CLV numbers are a one-day prospective
 probe and are labeled so above.
 
+**M15 (2026-07-28, owner's item — the duplication IS a measurement defect, not a cleanup
+note)**: the population that produced the ORIGINAL +1.01 / +1.60 / +1.58 and the §2b
+tables pooled the day's pre and close snapshots as if they were independent rows —
+**511 = 362 unique rows double-counted ~1.4×**. That is M-numbered (bundle) because it
+biased every CI computed on it (TB−HRR's z≈1.9 was a duplication artifact) and it is the
+same class of error as pooling vintages. **Bet-time vs close, measured separately per the
+owner's rule** (execution happens at lock, not at close):
+
+| vintage | n rows | games | headline gain | 95% CI (game-clustered) |
+|---|---|---|---|---|
+| **PRE (operative — bet time)** | 326 | 11 | **+1.07** | [+0.88, +1.33] ⚠️ FEW-CLUSTER (11) |
+| CLOSE (filed under CLV) | 185 | 6 | +0.90 | [+0.63, +1.17] ⚠️ FEW-CLUSTER (6) |
+
+Per-market pre: HRR +0.94 (168), TB +1.22 (146), outs +1.03 (12); close: HRR +0.74 (89),
+TB +1.02 (90), outs +1.38 (6). The close snapshot covers only 6 of 11 games, so the
+comparison is composition-confounded; within few-cluster intervals they agree, PRE is the
+operative headline, and slip figures restate on pre when re-measured post-M13.
+
+**⚠️ FEW-CLUSTER MARK (2026-07-28, owner's item 6 — applied to every interval in this
+section)**: all clustered CIs here rest on **≤11 game-clusters** — outs' demotion on 7,
+TB−HRR (z≈0.96) on 11, the pre/close split on 11/6, and the crossover-shift interval
+[+0.033, +0.247] on 11. The outs within-game correlation r=−0.37 rests on **5 pitcher
+pairs** (5 of 7 outs games carry two pitchers). An interval that excludes zero on 11
+clusters is not the claim it would be on 200; none of these intervals graduates past
+few-cluster until the multi-day series exists.
+
 **⚠️ POPULATION STAMP (2026-07-28, post-M13)**: every two-book number in this section —
 +1.01/leg, +1.42/+1.58/+1.74 per slip, this per-market table, and the crossover
 recompute — is measured over the **canonical-key archive population** (§2c): CZ priced at
@@ -130,10 +156,15 @@ empirical-dispersion variants agree. **CORRECTED AGAIN same day (Correction 3): 
 a FIXED-CARD statement only** — CI on the fixed-card shift +0.125 [+0.033, +0.247]
 (deduped, game-clustered; excludes zero) — but with the production ALLOCATOR in the loop
 the fixed +2% floor admits price-improved marginal tickets, the prob-weighted greedy
-displaces higher-growth ones, and **the fixed-floor crossover COLLAPSES 3.013 → 0.513
-(upper bound on the collapse; uniform-bump caveat), while the leg-equivalent floor's rises
-3.456 → 3.661**. Full three-correction chain and the four-row tables in
-`docs/singles-vs-parlays.md`.
+displaces higher-growth ones, and the fixed-floor crossover collapsed 3.013 → 0.513.
+**AND CORRECTED A FOURTH TIME (owner's monotonicity control): the collapse is NOT a
+two-book property — the identical uniform bump in ONE book produces the same non-monotone
+E[ln] curve (+126.6 → +129.0 → +117.3 → +110.4 → +70.5 → +74.4 bp at 0/+0.25/+0.5/+1.0/
++1.5/+2.0 pp), so this is M14, "allocator non-monotone in price" (threshold admission at
+`coreEvMin: 2` — which does NOT expire at the reopens — plus price-blind prob-greedy
+ranking), and Correction 3's two-book attribution is retracted as mis-attributed. The
+multi-book adoption decision is downstream of M14, not of the books.** Full
+four-correction chain in `docs/singles-vs-parlays.md`.
 
 **Three leg-count forces now exist, each decided alone** — shopping rewards legs per
 dollar (this memo), A2's leg-equivalent floor penalises them, `consMinEv`'s multiplicative
@@ -273,7 +304,10 @@ from source and asserting the sweep's list ⊇ the engine's — the archive exis
 engine and is currently blind to an input the engine uses.
 
 **SIGN-OFF PREREQUISITES, ALL FOUR MEASURED (2026-07-28, owner's item 7 — the sign-off is
-NOT granted this turn and stays open):**
+NOT granted this turn and stays open). SUPERSEDING CONDITION (2026-07-28, later): the
+sign-off now waits on the CREDIT BURN PLAN (`docs/collection-period.md`, "THE CREDIT
+BUDGET DOES NOT REACH THE PARAMETER EXIT"), not on these four prerequisites — the
+instrument the fix extends is not funded to exit, and that question outranks this one:**
 1. **Nothing the engine reads sits downstream of the sweep** — audited: `data/props`
    consumers are `ProScoreboard.tsx` (a DISPLAY-only CLV/calibration panel reading
    raw.githubusercontent, no writes back to anything the engine reads), four analysis
@@ -326,6 +360,34 @@ population — the archive post-M13-fix is the only one that will. Until then th
 key stamp is the population statement. Unlock-citation sweep: the retracted claim is cited
 nowhere outside §2b (retracted in place) and the M13 entries that cite it AS retracted —
 nothing load-bearing depends on it.
+
+**THE CROSS-INSTRUMENT JOIN — RUN, per the owner's "there is a visible join" item
+(2026-07-28, latest)**: production has CZ where the archive doesn't (hits/K's); the
+archive has MGM where production doesn't. The join ran on 07-26 (the only board day),
+key = `pnorm(player)|market|line`:
+
+| market | board rows | matched | line-mismatch | player-absent | archive keys | archive-side unmatched |
+|---|---|---|---|---|---|---|
+| hits | 50 | 36 | 5 | 9 | 251 | 215 (board = top-50 by rank) |
+| K's | 35 | 27 | 7 | 1 | 31 | 4 |
+
+**Both-priced joined rows: ZERO. The failing field, named: `fp`** — per-book prices were
+added to the sweep's `compact()` on 2026-07-26 but first appear in DATA on 07-27; the
+07-26 archive carries `fp` on **0 of 1,229 rows** (0/1,111 morning + 0/118 evening,
+printed from the archive itself). Boards exist for {07-26 only}; `fp` exists for
+{07-27, 07-28}; **the intersection is empty — zero fixture-days carry both instruments.**
+So "unrecoverable" is restated here ONLY with the failed join beside it, per the owner's
+rule — and it is a *today* statement, not a forever one: **the join becomes feasible on
+the first fixture-day with BOTH a server board and `fp`**, which is the day the header
+fix lands. On that day this exact query prices the retracted unlock's residual.
+
+**The residual, stated plainly (owner's item 4)**: production prices CZ on **24/36
+matched hits rows and 20/27 matched K's rows** (35/50 and 25/35 of all board rows) —
+CZ coverage on these markets is ~67–74%, not 100% and not 0%. **MGM's coverage argument
+on hits/K's is therefore reduced, not nil** — its magnitude is the joined two-book gain
+on the ~10–12 CZ-null matched rows plus the price increment on the CZ-priced ones, and
+it is **not measurable until the join day above**. The memo does not imply the residual
+is nil because the 100% was wrong.
 
 ## 3-CIRCA. ONE PASTE DAY TO MEASURE, THEN DECIDE — spec only, nothing built (2026-07-28)
 
