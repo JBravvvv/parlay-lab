@@ -228,14 +228,75 @@ points, and that quantity has not been measured.**
 > direction was fine; fix the convention and stamp it." Dispersion variant agrees with
 > mean-shift at every row (largest gap 0.3 bp) and on the root.
 >
+> **⚠️ TABLE LABEL — UPPER BOUND ON PARLAY FAVORABILITY (2026-07-28, owner's independence
+> check, measured)**: the 2⁶ enumeration is a PRODUCT MEASURE over the six tickets. On the
+> actual cards: singles — 0 same-game, 0 same-player legs (independence defensible);
+> **parlay and leg-equiv cards — 3 games each SPAN TWO TICKETS** (NYY@PHI on tickets 0+4,
+> SEA@TEX and COL@MIL on 3+5). Positive cross-ticket correlation raises card-outcome
+> variance, which concavity turns into LOWER true E[ln] — so the parlay columns (both
+> books) are overstated and the table is an upper bound on parlay favorability; the
+> singles column is not. The allocator prevents repeated players unconditionally
+> (L2674 `seenP`) and distinct games only WITHIN a ticket as a preference
+> (`preferDistinctGame`, falls back when short) — nothing prevents cross-ticket same-game,
+> so this is a persistent feature, not a one-board accident; magnitude unmeasured, sign
+> known. And this is **n=1 board**, below the 20-board series already calendared 08-15.
+>
+> **Harness identity, stated precisely (owner's check)**: the CARDS (pools, eligibility,
+> stakes, prices) come from the PRODUCTION functions — `shAllocate`/`shCoreEligible` called
+> directly in the extracted verbatim engine. The E[ln] instrument (`growth`/`shaded`/
+> `crossover`) is HARNESS-LOCAL — production computes no log-growth anywhere, so there is
+> no more-production path to re-run; this instrument DEFINES the doctrine number. The
+> 2026-07-28 recompute is an independent Python reimplementation of that instrument
+> (`xover2.py`) agreeing with the TS original to 0.1 bp on all validation rows — cross-
+> implementation agreement on shared inputs, NOT model-correctness validation, and it is
+> recorded as exactly that. Board: 293 rows → 276 playable; pools 276 singles / 67
+> parlays; six picks each side chosen by the production allocator (`maxCoreTickets` = 6
+> binds).
+>
 > ### THE NUMBER: TWO BOOKS MOVE THE CROSSOVER FROM 3.05 → **3.15 pp** OF TOLERATED
-> ### PER-LEG OVERCONFIDENCE (leg-equivalent card: 3.50 → 3.60)
+> ### PER-LEG OVERCONFIDENCE (leg-equivalent card: 3.50 → 3.60) — ⚠️ FIXED-CARD ONLY, SEE CORRECTION 3
 >
 > Still in the parlays' favor, still the opposite of the per-leg-forfeit intuition — but
 > **+0.10 pp, not the first-order +0.2/+0.3**: near the crossover the parlay g-curve is much
 > steeper, so a bp advantage buys fewer pp than flat-stake arithmetic assumed. That is the
 > variance term the first-order frame deleted, measured. The exact two-book re-run on real
-> per-leg card prices still belongs to the first board+`fp` day (blocked on the pipeline). For scale, the board-wide raw model gap
+> per-leg card prices still belongs to the first board+`fp` day (blocked on the pipeline).
+>
+> ### CORRECTION 3 of 3 (2026-07-28, latest — owner's ceiling check): "STAKES HELD FIXED"
+> ### WAS WRONG, AND THE ALLOCATOR-IN-THE-LOOP RECOMPUTE REVERSES THE SIGN THROUGH A
+> ### CHANNEL THE FIXED-CARD FRAME CANNOT SEE
+>
+> The Correction-1 normalization claimed the Kelly ceiling "stays slack — verified, not
+> assumed." **Measured per ticket, that was wrong**: the ceiling is
+> `min($62.50, 2500 × kelly(p, czDec))` per ticket, and on the 1-book parlay card ticket 5's
+> ceiling is **$28.0** (stake $24 — near-binding); at two-book prices ticket 2 **hard-binds
+> at $48**. (Stakes ARE δ-invariant — the allocator sizes at MODEL probabilities and the
+> shade is evaluation-only — so the four δ-rows share stakes; the price side is what moves.)
+> Per the pre-committed branch, the recompute ran WITH the production allocator in the loop
+> (pools re-gated and re-staked at bumped `czEv`/`czDec`, mean-shift +1.01/+1.42/+1.58/+1.74):
+>
+> | | 1-book | 2-book, allocator in loop |
+> |---|---|---|
+> | crossover vs fixed-floor parlay card | 3.013 | **0.513 (shift −2.50)** |
+> | crossover vs leg-equivalent card | 3.456 | **3.661 (shift +0.21)** |
+> | parlay card E[ln] at δ=0 | +126.6 bp | **+70.3 bp — LOWER at better prices** |
+>
+> **The mechanism is selection, not price**: better prices push previously-blocked tickets
+> over the FIXED +2% floor (the floor's meaning changes when prices improve), and the
+> prob-weighted greedy (`base = prob`, L2999) then prefers the high-probability low-edge
+> newcomers, displacing higher-growth tickets. The fixed-card price channel is real and
+> stands — deduped, game-clustered CI on the fixed-card shift **+0.125 [+0.033, +0.247]**,
+> excludes zero, so +0.10/3.15 survives WITH its interval as a fixed-card statement — but
+> the operative frame is the allocator's, where the sign REVERSES. Magnitude caveat: the
+> uniform mean-shift bump admits every ticket within ~1.4–1.7 pp below the floor, while
+> the real gain distribution is ~56% zeros — the −2.50 is an upper bound on the collapse;
+> the dispersion-aware allocator re-run (~an hour) is the named follow-up.
+>
+> **The leg-equivalent floor is robust where the fixed floor collapses** (+0.21 vs −2.50
+> under the identical bump): scaling the floor with leg count keeps the admission bar's
+> meaning fixed as prices move. This is a NEW, two-book argument for the already-proposed
+> floor amendment, measured on its own table — it joins the amendment's exit sign-off, not
+> a freeze change. For scale, the board-wide raw model gap
 is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
 rather than information, the crossover is breached. The global reliability slope is
 **1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the

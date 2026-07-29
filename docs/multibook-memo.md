@@ -53,8 +53,40 @@ both-priced rows, 07-27):**
 
 **CI reading (added 2026-07-28, owner's item)**: outs' CI at n=18 spans BOTH other means —
 **+1.14 is not distinguishable from +0.87 and does not sit in this table as a peer
-number**; it is a small-sample point estimate. TB−HRR = +0.28 with SE ≈ 0.15 (z ≈ 1.9) —
-suggestive, not conclusive at 95%.
+number**; it is a small-sample point estimate. ~~TB−HRR = +0.28 with SE ≈ 0.15 (z ≈ 1.9) —
+suggestive, not conclusive at 95%.~~ *(superseded same day by the dedup correction below)*
+
+**⚠️ CORRECTION (2026-07-28, later — owner's resampling-unit check): THE n=511 DOUBLE-
+COUNTED, AND EVERY CI ABOVE WAS ROW-RESAMPLED ON CLUSTERED DATA.** The "511 both-priced
+rows" pooled the day's TWO snapshots (pre + close), so the same physical row appears up to
+twice: **the unique population is 362 rows across 11 game-clusters** (dedupe = last
+snapshot wins). Corrected numbers, game-clustered bootstrap (cluster = odds-API event id,
+the definition printed per the pre-committed branch):
+
+| number | duplicated/unclustered (above) | deduped + game-clustered |
+|---|---|---|
+| per-leg mean | +1.01 | **+1.08** (n=362) |
+| slips k=2/3/4 | +1.42 / +1.58 / +1.74 | **+1.45 / +1.74 / +1.95** |
+| HRR | +0.87 [+0.68,+1.08] n=257 | **+1.00 [+0.74,+1.28]** n=181 |
+| TB | +1.15 [+0.94,+1.36] n=236 | **+1.13 [+0.88,+1.43]** n=169 |
+| outs | +1.14 [+0.58,+1.83] n=18 | **+1.55 [+0.80,+2.14]** n=12 — stays demoted, CI still spans HRR |
+| TB−HRR | +0.28, z≈1.9 ("suggestive") | **+0.13 [−0.13,+0.38], z≈0.96 — INDISTINGUISHABLE; the 1.9 was duplicate-inflated** |
+
+Outs' clustered CI is NARROWER than unclustered at the top end — investigated per the
+impossible branch rather than shrugged at: within-game outs pairs are negatively
+correlated (**r = −0.37 over 5 pairs** — both pitchers of one game), and negative
+within-cluster correlation legitimately tightens cluster resampling. The definition is
+right; the narrowing is measured structure. The 5:6 weights' claimed independence,
+measured as overlap (owner's rule): the counterfactual card's pool (the 07-26 board's 69
+HRR/TB parlay-pool leg keys) overlaps the 07-27 population **17% by exact row key, 46% by
+player** — distinct but not disjoint; only the "uninformative" marking survives.
+
+**Raw-payload census, stated exactly (owner's hygiene item)**: raw payloads on disk = **two
+events, ONE fixture-day** (PIT@AZ canonical-keys + NYY@CWS alt-keys, both 2026-07-28).
+The CLV probe's 38 lost-fair rows all came from the single canonical-keys event (PIT@AZ:
+199 rows / 134 discards / 38; NYY@CWS: 246 / 185 / 0 — its payload was alt-heavy by
+construction). Two events is not a history; the CLV numbers are a one-day prospective
+probe and are labeled so above.
 
 **⚠️ POPULATION STAMP (2026-07-28, post-M13)**: every two-book number in this section —
 +1.01/leg, +1.42/+1.58/+1.74 per slip, this per-market table, and the crossover
@@ -94,7 +126,13 @@ and mixed sign conventions besides. Recomputed IN the doctrine's frame (exact E[
 2⁶, production stakes, $250/card both sides, harness-validated): **crossover 3.05 → 3.15 pp
 of tolerated per-leg overconfidence (leg-equivalent card 3.50 → 3.60) — still in the
 parlays' favor, but +0.10 pp, a third of the first-order figure.** Mean-shift and
-empirical-dispersion variants agree. Full four-row evaluation table and both corrections in
+empirical-dispersion variants agree. **CORRECTED AGAIN same day (Correction 3): the 3.15 is
+a FIXED-CARD statement only** — CI on the fixed-card shift +0.125 [+0.033, +0.247]
+(deduped, game-clustered; excludes zero) — but with the production ALLOCATOR in the loop
+the fixed +2% floor admits price-improved marginal tickets, the prob-weighted greedy
+displaces higher-growth ones, and **the fixed-floor crossover COLLAPSES 3.013 → 0.513
+(upper bound on the collapse; uniform-bump caveat), while the leg-equivalent floor's rises
+3.456 → 3.661**. Full three-correction chain and the four-row tables in
 `docs/singles-vs-parlays.md`.
 
 **Three leg-count forces now exist, each decided alone** — shopping rewards legs per
@@ -194,7 +232,29 @@ not advocacy: CZ's hits/K's ladders are **Over-only milestone boards** (an Under
 leg still has no CZ price), and a one-sided quote can never make a row `czf` (two-sided
 fair) — CZ contributes a playable price there, never a fair.
 
-**The HR/TB partials have a different, benign shape — the separator is the LINE LADDER**
+**§2c SCOPE AND COUNTS (2026-07-28, owner's item — what n the inversion actually rests
+on)**: the fresh alternate-key evidence is **ONE event, ONE fixture-day** (NYY@CWS,
+2026-07-28; the other alt-key call, SEA@LAD ~29h out, returned no prop markets at all —
+props unposted, not CZ-specific). Per the pre-committed reading: **M13 stands as an
+existence proof that CZ appears under the alternates, NOT as a coverage rate**; the
+archive's 0/7,033 and 0/830 remain facts about the request list either way, and the
+production-side join above (24/36 hits, 20/27 K's cz-present on 07-26) supplies the
+multi-row, different-day corroboration through the engine's own alternate-reading path.
+Observed CZ outcome counts in the raw alt payload — counted, not inferred:
+`batter_hits_alternate` **48 Over / 0 Under** across **18 distinct players — 9 NYY + 9 CWS,
+both lineups, all 18 matched to the statsapi boxscore rosters**; `pitcher_strikeouts_alternate`
+**13 Over / 0 Under** across 2 pitchers (both probables). Over-only stands on observation.
+The one-sided-cannot-czf mechanism, cited: `tools/snapshot_props.py` L69–72 (`fb` is
+appended only inside the `"o" in pair and "u" in pair` branch) → L104 (`czf = CZ in fb`);
+engine-side `legacy/index.html` L1419 (`czAlt` is a ladder FALLBACK for the playable price
+only — "standard Caesars quote wins" — and never feeds fairs).
+
+**The Over-only ceiling the retracted claim was always under (uncounted at the time,
+counted now)**: the 07-26 counterfactual D-card contained **zero hits/K's legs** (its 11
+legs were 5 HRR + 6 TB), so the ceiling is stated on the emitted-parlay pool instead: of
+the 110 archived 07-26 parlays' hits/K's legs, **hits 68 O / 25 U, K's 25 O / 8 U — ~73–76%
+Over**. Even before the retraction, at most ~three-quarters of the "unlocked" legs were
+ever CZ-priceable (Over-only ladders); the ~26% Under side has no CZ price from any key.
 (07-27 population): HR — CZ present on **100% of 0.5 rows (305/305), 64% of 1.5, 0% of
 2.5**; TB — CZ posts **exactly one line per player** (267 one-line, 0 multi-line), and
 cz-absent rows carry median 1 book behind the fair vs 4 for cz-present (thin alt rungs).
@@ -211,6 +271,61 @@ archive change** so pre/post never pool (the script's own `n`-comparability prec
 Guard candidate for encoding WITH the fix: a test extracting `SH_PROP_MARKETS`/`SH_PROP_ALT`
 from source and asserting the sweep's list ⊇ the engine's — the archive exists to audit the
 engine and is currently blind to an input the engine uses.
+
+**SIGN-OFF PREREQUISITES, ALL FOUR MEASURED (2026-07-28, owner's item 7 — the sign-off is
+NOT granted this turn and stays open):**
+1. **Nothing the engine reads sits downstream of the sweep** — audited: `data/props`
+   consumers are `ProScoreboard.tsx` (a DISPLAY-only CLV/calibration panel reading
+   raw.githubusercontent, no writes back to anything the engine reads), four analysis
+   tools (`close_capture`, `close_fair`, `phase2_series_b`, `hr_overround`) and two
+   workflows. Calibration/`mktN` come from the prediction store, consensus from the live
+   feed, priors from the context pipeline — none touch the archive. **Instrument change,
+   not an engine change wearing a costume** — with one named visible seam: the scoreboard's
+   CLV display will show the vintage boundary (CZ hits/K's closes appearing post-fix).
+2. **Credits, read live** (proxy passes the Odds-API headers through): **2,317 remaining /
+   17,683 used** at 2026-07-28 evening. This turn's raw verification spent ~12. The fix
+   costs **+3/event ≈ +90–96/day** (15–16 events × 2 sweeps) on top of the sweep's current
+   ~180/day — at today's headroom that is ~8–9 days of quota unless the monthly reset
+   lands first; **the reset date is on the dashboard, not readable from here, and the
+   sign-off should price it**.
+3. **The guard exists and has been OBSERVED RED**: `tests/sweep-covers-engine.test.ts` —
+   run as a plain `it` it fails printing exactly the three missing alt keys; committed as
+   `it.fails` (documents the open defect, keeps the build green) with a PLANT proving the
+   check sees coverage where it exists. Flipping `it.fails` → `it` is part of the fix
+   commit, per the teeth-test standard.
+4. **The 14 archived days are UNRECOVERABLE for CZ hits/K's** — recorded in
+   `docs/collection-period.md` as a captured-field gap with its date range
+   (2026-07-12 → 2026-07-28; raw exists for two 07-28 events only).
+
+**§2c-ADDENDUM (2026-07-28, owner's item — ARCHIVE vs PRODUCTION, the diff RUN, not read):**
+the "only the archive is blind" sentence was a code read; here is the measurement. The
+production-side per-row record is the **board archive** (`data/boards/<date>.{best,latest}
+.json.gz`, `origin/line-history`, retention = git history; series began 07-27 with 07-26
+backfilled). It records per row the CZ price (`cz`/`czOdds`), the DK/FD basis, and a book
+COUNT (`books`) — **not book identities and no MGM price** (field census: `book, books,
+booksInd, bs, bsBook…`). Most recent fixture-day carrying both instruments = **2026-07-26**.
+Row-level join, key = `pnorm(player)|market|line`:
+
+| market | board rows | joined | production cz-present | archive cz-present |
+|---|---|---|---|---|
+| hits | 50 | 36 | **24** | **0** |
+| K's | 35 | 27 | **20** | **0** |
+
+**"Only the archive is blind" HOLDS, measured on the same fixture-day and the same rows.**
+The server path is confirmed by trace, not just the comment: `/api/generate` →
+`eng.collectSlate()` (route L245) evaluates the extracted engine (`src/engine/index.ts` L11
+→ `legacy-src.gen.ts`), which carries `SH_PROP_ALT` and the L1366 fetch — the deployed
+server generation requests the alternates; the 07-26 board above IS that path's output.
+
+**Population naming (owner's ask)**: +1.01 / +1.60 / +1.58 and the per-market
+decomposition were ALL computed from the **archive sweep** (`data/props/2026-07-27.json`,
+pooled snapshots) — none from the production log. The pre-committed "recompute from the
+production log" branch cannot execute: the production record retains **no MGM per-row
+price** (measured above), so no instrument currently on disk can price the true playable
+population — the archive post-M13-fix is the only one that will. Until then the canonical-
+key stamp is the population statement. Unlock-citation sweep: the retracted claim is cited
+nowhere outside §2b (retracted in place) and the M13 entries that cite it AS retracted —
+nothing load-bearing depends on it.
 
 ## 3-CIRCA. ONE PASTE DAY TO MEASURE, THEN DECIDE — spec only, nothing built (2026-07-28)
 

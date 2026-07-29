@@ -154,29 +154,38 @@ logs prediction rows (the phrase is set) but **persists NO server board: no arch
 Series A board-side, no shadow carrier. The header fix is the ONLY path.**
 
 **THE FULL VERIFICATION CHAIN (owner's rule: NOTHING LOCKS WEDNESDAY UNTIL IT COMPLETES).**
-Each step, what it proves, what it costs:
-1. ✅ **push 213e8e2** (done 2026-07-27 night) → Vercel auto-builds. Free.
-2. ✅ **Confirm the DEPLOYED sha carries both changes — DONE 2026-07-28 ~16:25 PT**: served
-   chunk `/_next/static/chunks/256-171aff5d10da160d.js` greps 1 for
-   `M8 fix, signed off 2026-07-27` AND 1 for `hrrAltMax:-1`. **The production client bundle
-   serves both the M8 fix and the HRR suspension.** (Proves the deploy only — steps 3–6
-   still gate everything downstream; a client device additionally needs its SW reopen,
-   step 6a.)
-3. **Add header `x-cron-key` to entries 1–4** (you type the secret; today's 3:00 PM PT 401
-   in the execution history is the before-evidence). Free.
-4. **Manual generate curl, Tuesday ~9–10 AM PT** (below) — slot 1 of 3, ~120 credits →
-   response `{ok, date:"2026-07-28", gen}`. Builds the first post-fix board.
-5. **Landed**: `gen=list` non-empty for the response's own date. Free.
-6. **Board-level confirmation** (free): `python3 tools/self_consistency.py --date 2026-07-28`
+Canonical numbering fixed 2026-07-28 (owner's item — the grep is STEP 1; the push that
+preceded it is step 0, done 2026-07-27 night):
+1. ⚠️ **Deployed-sha grep — CLIENT HALF DONE 2026-07-28, SERVER HALF NOT GREPPABLE**: served
+   chunk `/_next/static/chunks/256-171aff5d10da160d.js` carries both
+   `M8 fix, signed off 2026-07-27` and `hrrAltMax:-1` — **inside the engine SOURCE STRING**
+   (the engine ships as a string literal evaluated at runtime, which is why a "comment"
+   survived minification; string contents are data). `hrrAltMax` read sites, audited: BOTH
+   are engine-source — the display/grey tag (L2514) and the `buildParlaySet` ticket bar
+   (L2652) — one source string imported by BOTH the client (`engine-client.ts`) and the
+   server route (`app/api/generate/route.ts` → `@/engine`). So the grep proves the deployed
+   BUILD and the client half directly; **the server function's bundle is a named
+   ungreppable artifact** — same commit, same import, but that is same-build inference, not
+   a grep. **The instrument that closes the server half is step 5** (zero HRR legs in the
+   server-built board's tickets). Until step 5, M8/suspension are "client-verified,
+   server-inferred", not "live".
+2. **Add header `x-cron-key` to entries 1–4** (you type the secret; the Monday 3:00 PM PT
+   401 in the execution history is the before-evidence). Free.
+3. **Manual generate curl** (below) — ~120 credits → response `{ok, date, gen}`. Builds the
+   first post-fix server board.
+4. **Landed**: `gen=list` non-empty for the response's own date. Free.
+5. **Board-level confirmation** (free): `python3 tools/self_consistency.py --date <that day>`
    → **TB>=1 == H>=1 MODEL bad = 0** (was 118/127) proves M8 live; zero HRR legs in the
-   board's `parlays`/`parlaysMixed` proves the suspension live; `sh` present on closed-form
-   batter rows proves the shadow series started.
-7. **Violations ≠ 0 → DIAGNOSIS-THEN-DECIDE, never reflex-rollback**: (i) step-2 grep = 0 →
-   stale deploy — redeploy, no engine question; (ii) deployed but violating → check the
-   tool's printed `wBlend` first (a changed blend weight breaks the un-blend, not the
-   engine); (iii) both clean and violations persist → a NEW defect surfaced — that is
-   information; hold Wednesday's locks and diagnose. The one-line revert exists but
-   arithmetic cannot violate its own identity — (iii) would implicate something else.
+   board's `parlays`/`parlaysMixed` proves the suspension live SERVER-SIDE (closes step 1's
+   open half); `sh` present on closed-form batter rows proves the shadow series started.
+6. **App-switcher double reopen** (device procedure below — SW network-first).
+7. **On-device: HRR O0.5 rows PRESENT AND GREYED** with expected n from that day's board.
+Violations ≠ 0 at step 5 → **DIAGNOSIS-THEN-DECIDE, never reflex-rollback**: (i) step-1
+grep = 0 → stale deploy — redeploy, no engine question; (ii) deployed but violating →
+check the tool's printed `wBlend` first (a changed blend weight breaks the un-blend, not
+the engine); (iii) both clean and violations persist → a NEW defect surfaced — that is
+information; hold Wednesday's locks and diagnose. The one-line revert exists but
+arithmetic cannot violate its own identity — (iii) would implicate something else.
 
 **THE DEVICE ANSWER (owner's item 1, traced in `public/sw.js`)**: a service worker EXISTS
 (`SwRegister.tsx`, production only). Strategy: **navigations are NETWORK-FIRST** — an online
@@ -192,9 +201,9 @@ greyed O0.5 row proves the running bundle and therefore M8 too — they cannot s
 separately. Optional M8-specific eyeball: any player carrying BOTH TB 0.5 and 1.5 rows —
 pre-fix the two showed the SAME model %, post-fix 0.5 sits clearly higher. The client board
 cannot be fed to `self_consistency` (localStorage, no export path) — the visual IS the
-client-side confirmation, and it closes the loop because SW-network-first + the step-2
+client-side confirmation, and it closes the loop because SW-network-first + the step-1
 served-bundle grep + one fresh online open ⇒ the client engine equals the verified bundle.
-**STEP 6b (owner's item 3): repeat ALL THREE confirmations on WEDNESDAY'S OWN BOARD —
+**STEP 5b (owner's item 3; renumbered 2026-07-28): repeat ALL THREE confirmations on WEDNESDAY'S OWN BOARD —
 `python3 tools/self_consistency.py --date 2026-07-29`, zero TB≥1==H≥1 model violations, zero
 HRR legs in built tickets, `sh` present — BEFORE any lock. Tuesday's board proves the
 engine; Wednesday's board is what forms the first live card. Nothing locks until the day's

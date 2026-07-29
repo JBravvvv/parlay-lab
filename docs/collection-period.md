@@ -2957,6 +2957,20 @@ Every day from **2026-07-16** onward has one commit per day carrying resolved um
 shadow log's collection window is fully reconstructible from `git log -- public/model/context.json`
 by taking the **20:xx commit of each date**. No backfill has been run; recorded as available.
 
+## EXCEPT: one captured-field gap — CZ hits/K's alternate quotes (M13, recorded 2026-07-28)
+
+The heading above is true of the context pipeline and FALSE of the props archive: the
+archive stores PARSED rows from a request that never included the `*_alternate` market
+keys, and Caesars posts its entire hits and K's ladders (including the main lines) only
+under those keys. **Every Caesars hits/K's quote for the archived fixture-days
+2026-07-12 → 2026-07-28 is unrecoverable** — a field not captured is unrecoverable, the
+same rule as closes. Raw payloads exist for exactly TWO events, both 2026-07-28 (one
+canonical-keys, one alt-keys — the M13 evidence pair in `docs/multibook-memo.md` §2c);
+nothing else can be reconstructed. The prospective fix (adding the three alt keys to the
+sweep) is specced in the memo, guard-encoded as an OBSERVED-RED expected failure
+(`tests/sweep-covers-engine.test.ts`, flips with the fix), and awaits the owner's
+sign-off on the credit cost; the pre-fix days keep their canonical-key vintage forever.
+
 ## What the schedule actually delivers, per day
 
 The evening run lands 20:16–20:55Z — about 2.5 h before a weekday 23:15 first pitch, which is
