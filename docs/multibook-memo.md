@@ -29,6 +29,23 @@
 > hits/K's that CZ's Over-only ladders never price — and it is UNPRICED.** Every
 > per-leg/per-slip number below is a GROSS price fact; the memo prints the net wherever
 > adoption is discussed. n=1 board.
+>
+> **CORRELATION-BLINDNESS CHECK (2026-07-29, owner's item — the instrument charged, the
+> answer held)**: the E[ln] evaluator is a product measure ACROSS tickets (its own
+> comment; within-ticket same-game groups ride the stored `simJoint` prob). The
+> confound test: **EV-ranked cards carry FEWER cross-ticket same-game pairs than
+> prob-ranked cards** — bump 0: 2 vs 3; dispersed 200 seeds: mean 1.53 vs 2.36 — so
+> A1's +24.5 advantage is NOT the instrument failing to charge for correlation; the
+> counts are the reason, printed. Stress test (one-factor-per-game Gaussian copula on
+> legs, common random numbers across rankings, MC validated at ρ=0 to 1.0 bp): paired
+> difference **+22.7 / +23.4 / +22.8 at ρ = 0.05 / 0.10 / 0.20** — never crosses zero
+> in the tested range; **ρ=0.20-robust prints beside A1 wherever cited.** The damping
+> sweep under the same stress: damp=1.0 stays the peak at every ρ — the 40 bp is
+> selection quality, not blindness (pair counts across damp variants: 4/3/3/3).
+> Production: within-ticket dependence IS priced (`simJoint`, L2641–2712; 22 of 25
+> groups repriced, section C); **across-ticket dependence is priced NOWHERE — M16**,
+> measured magnitude ≤ ~4 bp at ρ ≤ 0.2 on this card (3 cross-ticket pairs; within MC
+> noise; card-shape dependent, n=1) — bundle row.
 
 Owner context: live BetMGM NV and Circa accounts exist. `PLAY_BOOKS` is a single-entry
 config from Phase 5. This memo reports feed reality, the measured prize, the schema
@@ -376,6 +393,22 @@ legs were 5 HRR + 6 TB), so the ceiling is stated on the emitted-parlay pool ins
 the 110 archived 07-26 parlays' hits/K's legs, **hits 68 O / 25 U, K's 25 O / 8 U — ~73–76%
 Over**. Even before the retraction, at most ~three-quarters of the "unlocked" legs were
 ever CZ-priceable (Over-only ladders); the ~26% Under side has no CZ price from any key.
+
+**⚠️ THAT SPLIT DESCRIBES CANDIDATES, NOT EMISSIONS (2026-07-29, owner's placeability
+item — a filter exists, printed with its miss rate)**: `buildParlaySet` computes ticket
+`czDec` under `czAll` — **one CZ-less leg nulls the ticket's `czEv`**
+(`legacy/index.html` L2724–2727, no partial product) — and the disciplined gates then
+block null (`ev_gated`: `selEv != null && >= evMin`, L3009; `dk_fd` additionally requires
+`czDec != null`, L3007). Census on the 07-26 pool: **110 CZ-less legs across 64 of 110
+pool tickets — filter misses: 0 of 64** (no CZ-less ticket carries a non-null czEv).
+Leg-level Over-only confirmed: **all 25 hits-Under and all 8 K's-Under legs lack CZ**
+(also TB-U 46, HRR-O 14, outs 9, RL 6); those legs price at the DK/FD basis (e.g.
+Perdomo Hits U 1.5 at DK −228). **The pool is the legacy-posture candidate set; the
+disciplined modes cannot emit an unplaceable ticket — no M-item.** The LEDGER join
+(owner's "38 tickets"): no 38-ticket record exists on disk (the only 38 here is "4 of 38
+core-eligible outs rows"); the ledger is `pl:ledger:v1`, sync-phrase-gated — the join
+runs with the same authed read as the predictions curl, and its branch is pre-committed:
+**a ledger ticket that settled an Under hits/K's leg at CZ retracts Over-only, dated.**
 (07-27 population): HR — CZ present on **100% of 0.5 rows (305/305), 64% of 1.5, 0% of
 2.5**; TB — CZ posts **exactly one line per player** (267 one-line, 0 multi-line), and
 cz-absent rows carry median 1 book behind the fair vs 4 for cz-present (thin alt rungs).

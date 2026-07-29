@@ -169,6 +169,32 @@ the engine string at HEAD hashes **`f6cf1513…` — identical to the served chu
 re-verified**. **Pushing the stack cannot change what production serves.** (Had any
 runtime file been touched, the push would be an engine change mid-window needing a
 vintage stamp and sign-off — it is not.)
+**THE CAPTURE, READY TO RUN (2026-07-29, owner's item 6 — wrapped around steps 3–4;
+"capture is a code change" was FALSE for the response body and the board):**
+```bash
+D=$(date +%F)
+curl -s -H "x-cron-key: $CRON_SECRET" "https://parlay-lab-six.vercel.app/api/generate" | tee "gen-$D.json"
+curl -s "https://parlay-lab-six.vercel.app/api/board?date=$D" > "board-$D.json"   # free, public — rows + the parlay POOL
+python3 - <<'PY'
+import json,datetime; d=json.load(open(f"gen-{datetime.date.today()}.json")); print(d.get("gen"))
+PY
+```
+Field-by-field, what the generate response body contains of the four missing captures:
+**picks NO · blocked-with-reasons NO · ranks NO · stakes-vs-ceilings NO** — it returns
+`{ok, date, priced, parlays: COUNT, written, total, overview[:160], gen}` (route
+L337–346), counts only. The board store/archive top-level keys: `{at, date, data:
+{categories, categoriesLive, gameInfo, liveGames, luCoverage, overview, parlays,
+parlaysLive, parlaysMixed, passes, propBoard, simMarkets, trap}}` — **`parlays` is the
+emitted POOL (ticket composition pre-allocation), NOT the allocated card**; and the
+prediction store DOES record leg-to-ticket membership for the pool (`ParlayPred.legs`
+with lkey/gkey, `pred-serialize.ts` L66–76). **Resolution of the pre-committed
+branches**: the POOL is persisted three ways (board KV, archive, ParlayPred) — so the
+admitted set and the whole allocation are RECONSTRUCTIBLE BY DETERMINISTIC REPLAY for
+any day that HAS a board; the four allocation fields themselves are genuinely
+uncaptured (the replay-vs-persisted diff — the two-allocators check — stays impossible
+until the sha/config-echo instrument ships). **Series-day currency: a dark day
+additionally destroys that day's M14 production check (no board → no pool → no replay)
+— the dark-gap cost rises to ~6–7 series-days per dark day.**
 **STEP-8 PRE-COMMIT — the 07-29 board's M14 reading (written before the board
 exists)**: what persists today: board ROWS and the parlay POOL (`categories`,
 `parlays`, archived). **What is NOT persisted: the allocation** — picks, blocked list
@@ -393,6 +419,11 @@ later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
    worked; null means the context job still is not resolving umpires.
 
 ## Dated open items
+
+> ⚠️ **CONDITIONAL STAMP (2026-07-29, owner's rule): every date below assumes collection
+> continues. Measured forward burn ends the current credit cycle ~07-31 and the reset
+> date is not established — until a reset lands, this calendar is ASPIRATIONAL.**
+> (Same stamp atop the collection doc; the no-reset contingency is spec'd there.)
 | date | item |
 |---|---|
 | **2026-07-29** | first bimodal-day close test (Wed). Does a split slate produce **two** closes? |
@@ -420,6 +451,7 @@ later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
 | **M13** | the props ARCHIVE sweep (`tools/snapshot_props.py`) requests only the six canonical keys while Caesars posts its whole hits/K's ladders under `*_alternate` (incl. the main lines) — 14 archive days read 0/7,033 (hits) + 0/830 (K's) CZ-present and the multibook memo misread that as feed coverage ("the unlock", retracted same day) | **NEW 2026-07-28, COLLECTION defect, not engine** — the engine (L1366, `SH_PROP_ALT`, and CLAUDE.md §build-44) and `sightProp` both read the alternates already; only the archive is blind. Fix = add the 3 alt keys to the sweep (+~3 credits/event), fold same-line quotes, **vintage-stamp the archive change** — awaits owner sign-off. Guard: `tests/sweep-covers-engine.test.ts`, **observed-red, NOT-YET-ENFORCING** (`it.fails`; flips with the fix). Full chain: `docs/multibook-memo.md` §2c |
 | **M14** | **the allocator is NON-MONOTONE IN PRICE — mechanism ISOLATED: RANKING (owner's two control rounds, same day)**: the composition-frozen sweep is an IDENTITY (excludes an instrument defect, locates nothing — owner's catch); cap sweep: survives uncapped (+136.2→+99.0) — cap innocent; **ranking swap (`base=max(ev,0)/(dec−1)`, cap held): non-monotonicity VANISHES (+187.2→+198.2)** — price-blind ranking is sufficient, admission supplies candidates; entrants ranked 1/2/6 vs deGrom/Freeland at 7 (displacement, not cap-promotion). Negative bumps, measured wording (correction to the owner's pre-committed sentence): all below base (+121.2/+117.8/+124.9), the rise LOCAL (−1.0→−1.5, +7.1 bp). **THE ADOPTION NUMBER at the measured +1.07 gain: net −15.0 bp (uniform) / −26.5 (empirical dispersion, same sign) — the second book is NEGATIVE under the shipped allocator on this board**; the sentence leads the multibook memo. `coreEvMin=2` unmeasured (`06d3cbc`); ~~interior peak ce=30, frozen 2 ~95 bp below optimum~~ **WITHDRAWN 07-29 as SELF-GRADED** (δ=0 peak collapses under shading: ce=30 → +24.0 at −3, −96.4 at −5; peak migrates to ce=20; ceilings were enforced throughout — one bind at ce=1). **07-29 re-measures**: adoption at 200 seeds **net −26.1 [−29.4, −22.7]** (clustered −24.9 [−28.2, −21.6]; uniform −15.0 outside the CI — sign-valid, ~11 bp short; β on realized gain −12.7 bp/pp, spread = composition lottery); **EV-ranking adoption +1.9 [−1.2, +5.0] — the cost vanishes under A1; blocked SPECIFICALLY behind A1, sequencing A1 → books**; but A1's own sweep **breaks at +2.0** (198.2 → 188.3) → narrowed to "sufficient at ≤+1.5 on one board" (bump-0: EV +187.2 > prob +126.6); shared-game damping **0.5 chosen, unmeasured-and-implicated** (prob-ranking range 40 bp across 0→1.0) — joined the frozen table | **NEW 2026-07-28, documented defect, NO SHIP (freeze)** — n=1 board, rerun gated on credits. Fixed-card PRICE-response measurements inherit the failure mode (bundle audit). **A1 at exit sign-off carries the narrowing; A2 innocent of M14**. Multi-book adoption blocked behind A1 |
 | **M15** | the multibook population "n=511" pooled pre+close snapshots as independent rows (362 unique, ~1.4× duplication) — TB−HRR's z≈1.9 was the artifact (deduped: 0.96); headline restates **+1.07 pre-vintage** [+0.88,+1.33] FEW-CLUSTER (11) | **NEW 2026-07-28, measurement defect, corrected same day.** Standing rule: archive populations state their snapshot-vintage rule (pre/close/dedupe) beside n. Pre = bet time (operative); close = CLV |
+| **M16** | **cross-ticket same-game dependence is priced NOWHERE in production** — within-ticket IS (`simJoint`, 22/25 groups); the sole compensation is the CHOSEN damping 0.5. Measured: **≤ ~4 bp at ρ ≤ 0.2** on the production card (3 cross-ticket pairs — small, card-shape dependent). The ρ-stress also charged the instruments: A1's paired advantage survives ρ=0.20 (+22.8), the damping peak stays at 1.0 — neither was blindness. **And on identical draws the two rankings correlate at r=+0.212: composition is CHAOTIC with respect to price** (M14 addendum 2 — every interval on this board is composition-noise-dominated) | **NEW 2026-07-29, documented, no ship** — n=1 card; re-measure on live cards when boards resume |
 | **M8** | `shTbOver` priced a 0.5 line with the 1.5 formula | ✅ **SHIPPED 2026-07-27 night** (bug-grade, sign-off D): `if(line<1)return 1-P0;` same-line at L1548; pinned test swapped WITH a reintroduction plant; `baseline43` byte-identical (`e67eaad0…` both sides — the fixture prices no TB-0.5 row). Confirm on the first post-ship board: TB≥1==H≥1 violations → 0 (were 118/127) |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
 | **M2 / M2′** | outs: ⚠️ **INTERLOCKED PAIR** — `0.140`→`0.400` AND the `offense()` xSLG de-noise, together or never (enforced: `tests/m2-interlock.test.ts`; `of` is a constant 0.860 today — a defect masking a defect, ±12 pp if shipped alone) | **ready once paired** (residual ±1.2 pp < 2 pp bar). Estimator specced from measured variances: cliff removed, season-anchored, **k=3.4 — k=4 was numerically right; the cliff and the league target were the defects**; spread 63–75% → 92–93% of true. Pitcher regressions (n≈265/outcome): form zero, SEASON-primary (K's +0.81, outs +0.61), whiff prior nothing. Outs needs no sim — NOT a post-freeze project; M2′ strictly-better, optional |

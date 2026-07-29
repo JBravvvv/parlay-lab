@@ -1,9 +1,11 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
-> ⚠️ **THE FREEZE IS HOLDING A VINTAGE ASSEMBLED LARGELY FROM UNMEASURED CHOICES
-> (2026-07-29, provenance census below): ~33 frozen parameters are CHOSEN — 14 with no
-> stated rationale at all — against 2 FITTED.** The parameter exit is therefore not a
-> tune-up of a measured system; it is the first measurement pass over most of it.
+> ⚠️ **THE FREEZE IS HOLDING A VINTAGE ASSEMBLED ALMOST ENTIRELY FROM UNMEASURED CHOICES
+> (census v2, 2026-07-29 — v1's numbers were wrong and are corrected below): of 39
+> frozen parameters, 0 were FITTED, 38 CHOSEN (11 with no stated rationale), 1 with
+> stated arithmetic; 7 have been measured since — one vindicated (k=4), four condemned
+> or weak.** The parameter exit is not a tune-up of a measured system; it is the first
+> measurement pass over most of it.
 
 > ⚠️ **THE PARAMETER EXIT DOES NOT FIT THIS CREDIT CYCLE (2026-07-28, measured):**
 > Phase 2 Series A's own floor (~246 credits/day: one board ~150 + one close sweep ~96;
@@ -23,6 +25,26 @@
 > reaches 20 sooner, but the vintage convention below says vintages never pool: **for
 > the parameter exit, the vintage convention is load-bearing and the 08-15 date is
 > not** — the review moves to the homogeneous-20 date; VINTAGE EVENTS census below.
+>
+> ✅ **DECIDED BY THE OWNER, 2026-07-29, BEFORE ANY FIXTURE-REPRESENTATIVENESS OUTPUT
+> EXISTED: THE BAR HOLDS AT 20; THE DATE MOVES.** (b) is out — an unmeasured threshold
+> is not lowered to fit a calendar; (c) does not rescue 08-15; (d) is (a) in costume.
+> **The test's unit IS written** (`docs/harness-substitutions.md`, "PRE-COMMITTED: the
+> fixture-representativeness reading" — the instruments are `clamp-activity`,
+> `shrink-activity` and the range detector, all ROW-level over the whole board's rows),
+> **and rows do not see the ticket-gate reopens** — the only row-level vintage boundary
+> is M8 (07-27 night), so the row-homogeneous series runs 07-29 → 20 boards on
+> **2026-08-17**. The allocation-level readings sharing the old date (the crossover
+> doctrine review) segment at the reopen boundaries → **2026-08-20**. The
+> harness-substitutions pre-commit's "2026-08-14 at the earliest" moves with this
+> (dated here; that doc's date was written when 20-by-08-14 was arithmetic).
+> **Both gating thresholds are CHOSEN and neither has computable power**: the 20-board
+> bar feeds the fixture-representativeness verdict — no power model is written, so
+> power-at-20 is as uncomputable as power-at-15 (said separately, per the rule); the
+> ≥10-board-day suspension threshold feeds the 08-15 HRR suspension review — it is the
+> retirement criterion's own board floor applied to shadow data, and no power statement
+> exists for it either. Both are recorded in the frozen table as unmeasured
+> calendar-gating parameters.
 
 The system is in a **data-collection freeze through at least late August 2026.**
 
@@ -171,18 +193,38 @@ a change fails.
 | L2351 | 60 | 95 | 0.613 | hits rate/AB (sim, no-starter path) |
 | L2359 | 10 | 26 | 0.722 | H+R+RBI per game |
 
-### PROVENANCE CENSUS — every frozen parameter: fitted, inherited, chosen, or unknown (2026-07-29, owner's item 6)
+### PROVENANCE CENSUS v2 — re-run 2026-07-29 after the owner caught v1 contradicting a recorded measurement
 
-| class | parameters | count |
+**The contradiction, resolved**: v1 copied the 07-26 sentence "not one of these nine
+values is justified anywhere" over all nine `shShrink` k's — but the project record says
+the condemned **k=4 was MEASURED on 2026-07-27 and found numerically right** ("k=4 was
+numerically right; the cliff and the league target were the defects" — the M2 row), and
+k=60 was measured WRONG (M11), k=10 measured weak (HRR). **The CENSUS was wrong** — it
+conflated provenance-at-birth with measurement-status-today. v2 separates them: BORN is
+permanent; MEASURED-SINCE is an overlay. v1's "~33 chosen vs 2 FITTED" was also wrong on
+both numbers: `wBlend`/`mktN` are DYNAMIC STATE, not frozen-table parameters — they leave
+the census.
+
+**Denominator: 39 frozen parameters** (Selection & gates 8 · Suspensions 7 · `shShrink`
+k's 9 · Structure caps 10 · Model blend & badges 5, counting `SH_W` and `SH_EDGE_MIN` as
+one each). By BORN provenance:
+
+| born | parameters | count |
 |---|---|---|
-| **FITTED** (from data, method on record) | `wBlend` per-market blend weights (calibration-fitted); `mktN` (measured counts — state, not a choice) | **2** |
-| **CHOSEN with stated arithmetic** | `GAP_BUCKET_MIN_N` 150 (SE arithmetic printed — the doc's own words: "the only one") | **1** |
-| **CHOSEN, rationale in comments, never fitted** | selMode default `ev_gated` (spec `2292b85`) · `coreEvMin` 2 (`06d3cbc`) · `coreCzEvMin` 0 · `consMinN` 100 · `consMinEv` −1 · `coreNoHR` · `coreMaxLegs` 3 · `coreMaxDec` 15 · `coreKsLegMax` 1 · `perParlayCap` 0.25 · `dailyBankrollCap` 0.10 · `kellyStakeMult` 4 · `maxCoreTickets` 6 · fun tiers/amounts/splits · `funMinProb` 0.1 · shared-game damping 0.5 · `hrrAltMax` −1 (signed decision; the VALUE −1 chosen) · `penQFrozen`/`umpKFrozen` (freeze decisions) · 20-board bar | **~19** |
-| **CHOSEN, no stated rationale (the doc's own "unexamined-constant class")** | ump `g ≥ 5` gate ("~7× too low") · ump clamp [0.92, 1.08] · **the NINE `shShrink` k values** (150, 150, 4, 4, 4, 60, 60, 60, 10 — "not one justified anywhere in the repo") · the `0.140` outs constant (M2's defect) · factor clamp bounds | **~14** |
-| **UNKNOWN** | none identified — everything above traces to a commit or a comment | 0 |
+| **FITTED** | none — nothing in the frozen table was fitted from data at birth | **0** |
+| **CHOSEN with stated arithmetic** | `GAP_BUCKET_MIN_N` 150 | **1** |
+| **CHOSEN, rationale in comments** | selMode · `coreEvMin` · damping 0.5 · 20-board bar · `coreCzEvMin` · `consMinN`/`consMinEv` · `dailyBankrollCap` · `hrrAltMax` (signed; value chosen) · `coreNoHR` · `penQFrozen`/`umpKFrozen` · `coreMaxLegs` · `coreMaxDec` · `maxCoreTickets`/`minCoreTickets` · `perParlayCap` · `funMaxTickets`/`funMaxLegs` · `FUN_DEFAULT` · `funMinProb` · `funTiers` · `SH_W` · `SH_EDGE_MIN` · `SH_OVER_LEAN` · Kelly ¼ + 2% cap | **27** |
+| **CHOSEN, no stated rationale** | ump `g ≥ 5` · ump clamp [0.92, 1.08] · the nine `shShrink` k's | **11** |
+| **INHERITED / UNKNOWN** | none in the table (the `0.140` outs constant is an ENGINE constant outside the frozen table — inherited, M2's defect; noted, not counted) | **0** |
 
-**Count: ~33 chosen (14 of them without stated rationale) vs 2 fitted.** The
-pre-committed branch fires — the sentence at the top of this doc.
+**MEASURED-SINCE overlay (7 of 39)**: k=4 ×3 — measured RIGHT (M2, the vindication v1
+erased) · k=60 ×3 — measured WRONG (M11) · k=10 — measured weak (HRR). Plus two
+n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and damping
+0.5 (40 bp, shade-robust).
+
+**Count: 0 fitted / 38 chosen (11 with no stated rationale) / 7 since-measured — of
+which one vindicated, four condemned or weak.** The sentence at the top of this doc now
+carries these numbers.
 
 ### `consMinEv` IS A STRUCTURE FILTER WEARING A QUALITY FILTER'S NAME (2026-07-26)
 
@@ -3107,6 +3149,37 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   Wednesday's manual generate curl (~150) gates the entire verification chain and
   produces the first board+`fp` day — NOT a rationing candidate.**
 
+> ⚠️ **CONDITIONAL STAMP ON EVERY DATE IN THIS DOC AND THE CALENDAR (2026-07-29, owner's
+> rule)**: 08-07, 08-08, 08-10, 08-15, 08-17, 08-20 and every reachability statement
+> assume collection continues — **measured forward burn ends the current credit cycle
+> ~07-31 and the reset date is not established. Until a reset lands, the calendar is
+> ASPIRATIONAL.** (Same stamp in CLAUDE.md's calendar.)
+
+## THE NO-RESET CONTINGENCY — one word when the owner reads the dashboard (2026-07-29, spec only)
+
+**Ordered shutdown list** (each row: stop it → credits saved/day → what it holes):
+1. **pre-sweep duplicates** (the MIN_GAP cadence, no sign-off needed to simply not fire
+   redundant crons): ~480/day → holes nothing (measured 3–5%/≤0.042 pp duplicates).
+2. **remaining pre sweeps** (keep close only): ~96–190/day → holes the pre-vintage
+   series and DESTROYS the pre↔close pairing (day-level).
+3. **line-history game sweeps**: ~24/day → holes the game-lines archive.
+4. **CLV sightings** (only spends once cards lock): ≤~30/day → holes Exit 2's only
+   instrument — LAST before boards.
+5. **boards below 1/day**: ~150/board → holes Series A + both suspension clocks + the
+   M14 production check, 1:1 — **the last thing to stop**.
+**Minimum cadence that keeps the suspension-review clock running: one board/day = ~150**
+(the clock counts BOARD-DAYS; closes are not required for the shadow-row count, though
+stopping closes kills Series A alongside). **One board/day vs the deduped sweep cadence:
+~150 vs ~192–286/day — the board is cheaper than the sweeps it is usually rationed
+against; the tradeoff number is 150 : 246 for board-only vs Series-A-complete.**
+**Does a board-day require the cron? NO — one manual curl per day writes
+`pl:board:{date}` exactly as the cron does and COUNTS for the ≥10 threshold. The header
+fix is on the critical path for CADENCE AND COST OF ATTENTION ONLY, not for the reviews'
+existence.** Minimum viable vs remaining quota: board-only ~150/day × 2,317 ≈ **15
+days** — reaches the ≥10-board suspension threshold (~08-07) but NOT the 08-17/08-20
+bars with closes; **Series-A-complete (~246/day) ≈ 9 days — reaches neither bar.** The
+aspirational-calendar stamp above is that sentence's consequence.
+
 ## THE BURN DECISION AS OPTIONS (2026-07-29, owner's item — priced, NOT decided; the owner holds the reset date and the plan)
 
 | option | credits saved/day | what it forecloses | which measurement dies |
@@ -3149,8 +3222,9 @@ board-dependent ones, one row per dark day.**
 **The 1:1 sentence with its exception inline**: board-dependent series are holed 1:1 —
 EXCEPT the pre↔close pairing, which a dark day DESTROYS at day level (the pairing is
 the unit, and a field not captured is unrecoverable). **Daily unrecoverable cost of
-going dark, the ration currency: ~5–6 series-days per dark day** (Series A + shadow +
-suspension accrual ×2 + pre series + the pair; + CLV once cards lock).
+going dark, the ration currency: ~6–7 series-days per dark day** (Series A + shadow +
+suspension accrual ×2 + pre series + the pair + **the M14 production check** — no board
+→ no pool → no replay, added 2026-07-29; + CLV once cards lock).
 
 ## VINTAGE EVENTS SINCE WINDOW START — the census, and the convention FIXED (2026-07-29, owner's item)
 
