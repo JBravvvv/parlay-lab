@@ -109,7 +109,7 @@ drift, even when both values look reasonable on their own.
 | parameter | value | meaning |
 |---|---|---|
 | selection mode default | `ev_gated` | EV-gated @ CZ (stored dk_fd / probability / caesars_ev respected) |
-| `coreEvMin` | `2` (percent) | core EV floor at the selection price |
+| `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER IN A DEFECT'S ADMISSION PATH (2026-07-28, M14)**: the value 2 was chosen (`06d3cbc`, "Raise the EV gate to +2%"), never fitted, no measurement on record; it is the admission valve of M14 (allocator non-monotone in price), does NOT expire at the reopens, and on the 07-26 board E[ln] is monotone INCREASING in it (1→+113.0, 4→+139.1 bp — n=1 board, no ship). Any fix designed against it inherits its unmeasured-ness |
 | `coreCzEvMin` | `0` | settlement floor — never lock a core ticket negative-EV at Caesars (override-proof) |
 | `consMinN` / `consMinEv` | `100` / `−1` (%) | markets under 100 graded legs also need consensus-fair EV ≥ −1% |
 | `dailyBankrollCap` | `0.10` | CORE+FUN day exposure ≤ 10% of the managed bankroll, enforced at lock |
@@ -3001,6 +3001,37 @@ days at rate A (~08-10). The freeze runs to ~09-22 (56 days): 10,080 needed at A
 ~35,000 at B — **the current cycle reaches neither; whether the PLAN does depends
 entirely on the reset date and a burn plan.** If the reset is calendar-monthly (08-01),
 the acute risk narrows to this week's overlap of reopen days with a near-empty cycle.
+
+**THE DARK-WINDOW BURN, MEASURED (2026-07-28 late — owner's item; the pre-committed
+"sweeps are the spender" branch fires):**
+- Two quota readings ~2.2 h apart (evening, both printed verbatim from the proxy's
+  passthrough): **2,317/17,683 → 2,317/17,683 — zero burn in that window**, and the
+  headers carry **no reset/period field** (full header set on record; reset date stays
+  PENDING, dashboard-only, nothing below depends on it). `/events` confirmed free (the
+  carrier calls themselves moved nothing).
+- The burn arrives in BATCHES, visible in the public Actions log (last ~29 h: props-history
+  **11 runs**, line-history 4, board-archive 2, context 2, priors 1 — all success) and
+  counted exactly in the archive: **2026-07-28 holds 9 snapshots / 123 event-sweeps ≈
+  ~738 credits in one day from the props sweeps alone** (vs 2 snapshots ≈ ~100/day on
+  07-26 and 07-27). Generate: 0 (dark, 401). CLV: free exits (no locked card). Client
+  generates: unknowable from here (device-side).
+- **The mechanism is a collection-cadence defect, not mystery spend**: the snapshot
+  clusters land at 08:02/08:05/08:07 and 10:04/10:14/10:16 — the redundant-cron lottery
+  now DELIVERS clusters, and `_snapshot_kind` rate-limits only `close` (`MIN_GAP_S`);
+  **a `pre` reading has NO gap — every landed tick pays a full ~16-event sweep** for
+  three-minutes-apart duplicates carrying nothing. (This same clustering is what M15's
+  duplication rode in on.)
+- **Forward rate, measured on 07-28's composition: ~740–760/day → 2,317 dies ~07-31,
+  BEFORE Friday's K's/outs reopen.** The aggregate-implied ~630/day reconciles as the
+  average over lighter days — no unknown spender; the impossible branch does not fire.
+- **The burn plan's first lever is information-free**: a `pre` MIN_GAP (mirror the
+  close gap) would have cut 07-28 from 9 snapshots to ~3–4 (~260/day incl. line-history)
+  with zero rows of information lost. A collection change — SPEC ONLY, owner's sign-off,
+  vintage note in the archive (snapshot cadence changes the day-file's shape, not row
+  schema). Per-fire generate cost, computed from its request URLs (no generate has fired
+  since 07-26, so computed not measured): game odds 3 mkts × 2 regions = 6 + props
+  (6+3 alt keys) × us × ~16 events ≈ 144 → **~150/fire; each of the 3 cron slots and the
+  manual curl cost the same ~150**.
 
 **What breaks if collection stops mid-window**: Phase 2 Series A is the board×close
 join — a credit stop kills BOTH sides at once (no server boards, no close sweeps). The

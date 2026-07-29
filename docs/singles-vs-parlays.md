@@ -342,7 +342,31 @@ points, and that quantity has not been measured.**
 > multi-book adoption decision is downstream of M14, not of the books. Note A1
 > (edge-aware base) would make ranking price-aware and A2 (leg-equivalent floor) keeps
 > the admission bar's meaning fixed — the sweep is n=1 board evidence that the existing
-> amendment pair addresses M14's two halves; that observation joins their exit sign-off. For scale, the board-wide raw model gap
+> amendment pair addresses M14's two halves; that observation joins their exit sign-off.
+>
+> ### ⚠️ THE TWO-BOOK CROSSOVER IS UNDETERMINED PENDING M14 (2026-07-28, owner's ruling)
+>
+> Both frames are unusable for the singles-vs-parlays decision under a second book:
+> - **fixed-card 3.15** (and the +0.10 shift): describes a composition-frozen allocator
+>   that is NOT the shipped one — retained, labeled **hypothetical-allocator only**;
+> - **in-loop 0.513**: produced by the shipped allocator THROUGH the M14 defect —
+>   retained, labeled **M14 evidence**, not a crossover measurement.
+>
+> **Neither number is operative and neither enters the exit sign-off as a decision
+> input.** The one-book doctrine numbers (3.05, and 3.50 under the leg-equivalent floor)
+> describe the shipped allocator at observed prices and stand as written. The two-book
+> crossover gets a real value only after M14's disposition (A1/A2 at exit, or an explicit
+> decision to keep the shipped behavior, measured then).
+>
+> **The +0.125 [+0.033, +0.247] shift interval carries BOTH marks**: it is (i)
+> FEW-CLUSTER (11) and (ii) a **fixed-card price-response quantity — the exact class M14
+> invalidates**. It survives only as a description of a hypothetical composition-frozen
+> allocator, not as a property of the system that will bet money. Robustness on its own
+> terms, for the record: leave-one-game-out jackknife range **[+0.071, +0.188]** (positive
+> at all 11 leave-outs); a sign-flip permutation is INAPPLICABLE to this quantity — the
+> per-leg gains are ≥ 0 by construction of the max operator, so no sign-symmetric null
+> exists; the cluster bootstrap (with its 11-cluster anti-conservatism) is the only
+> interval this quantity admits. TB−HRR's permutation p (0.308) lives in the memo. For scale, the board-wide raw model gap
 is 7.6 pp and selected legs sit 16.2 pp from market; if even a fifth of that is model error
 rather than information, the crossover is breached. The global reliability slope is
 **1.70 (SE 0.41, n=70)** — above 1, which would favour parlays — but that is n=70 with the

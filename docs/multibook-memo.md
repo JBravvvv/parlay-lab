@@ -114,6 +114,39 @@ pairs** (5 of 7 outs games carry two pitchers). An interval that excludes zero o
 clusters is not the claim it would be on 200; none of these intervals graduates past
 few-cluster until the multi-day series exists.
 
+**PERMUTATION CHECK (2026-07-28, latest — owner's anti-conservatism item): TB−HRR exact
+cluster sign-flip p = 0.308** (per-game difference of means, 11 games, all 2¹¹ flips) —
+noise, full stop; the demotion is now permutation-backed, not just CI-backed.
+
+**PRE vs CLOSE, PAIRED (owner's confounding fix — the only comparison isolating vintage
+from composition)**: restricted to the 6 games carrying both snapshots, paired within row
+key: **149 pairs, mean paired difference (close − pre) +0.082 pp, exact sign-flip p =
+0.875, clustered CI [−0.191, +0.433]** (6 clusters, FEW-CLUSTER). **Pre and close are
+indistinguishable on the shared population; the unpaired gap (+1.07 vs +0.90) was
+COMPOSITION and is not a signal.** The 36 close rows without a pre counterpart are NOT
+key instability: 22 existed pre and gained cz/MGM/fair coverage by close (coverage
+churn), 14 are newly-posted lines — the join key is stable and the impossible branch does
+not fire. Pre keeps the operative label by bet-time convention, not by measured
+difference.
+
+**THE SECOND PAIRING EXISTS — "unrecoverable" CONDITIONALLY WITHDRAWN, dated 2026-07-28
+(fourth claim, owner's catch again)**: the prediction store's `PredRecord` carries **`cz`
+per row** ("Caesars price if offered" — written by the ENGINE, which reads the
+alternates), plus `lkey` (`player|market|line`), `p`, `pMkt`, `src: cron|client`
+(`src/lib/pred-serialize.ts` L9–40). Client generates logged 2026-07-27. So
+**prediction-records × archive-`fp` plausibly joins on 07-27/07-28 TODAY** — the store is
+`pl:pred:<date>` behind `GET /api/predictions?date=` — **zero credits, only your sync
+phrase** (`x-pl-sync` header). The withdrawal is conditional on one authed read showing
+hits/K's rows with non-null `cz` in those blobs; the owner runs (typing his own secret):
+```bash
+curl -s -H "x-pl-sync: <sync phrase>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-27" > pred27.json
+```
+CLV sightings are NOT the pairing: they require a locked card (none) and live in the
+same-gated ledger. **The fp one-day gap is a DEPLOY ARTIFACT, resolved**: `fp` entered
+`compact()` in `28bbddf` at 2026-07-26 **21:39:41Z** — AFTER both of 07-26's sweeps
+(07:55Z, 20:32Z); a backfill was never possible (no raw payloads stored; propsnap empty
+— checked). Not an unrun backfill.
+
 **⚠️ POPULATION STAMP (2026-07-28, post-M13)**: every two-book number in this section —
 +1.01/leg, +1.42/+1.58/+1.74 per slip, this per-market table, and the crossover
 recompute — is measured over the **canonical-key archive population** (§2c): CZ priced at
