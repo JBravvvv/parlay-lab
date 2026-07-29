@@ -45,6 +45,20 @@
 > retirement criterion's own board floor applied to shadow data, and no power statement
 > exists for it either. Both are recorded in the frozen table as unmeasured
 > calendar-gating parameters.
+>
+> **POWER, NOW PARTLY COMPUTABLE (2026-07-29, owner's item 5 — for the owner's
+> re-decision; the original decision stays on the record with its date)**: the
+> within-board composition noise from price perturbation alone is **SD ≥ 24.3 bp** of
+> card E[ln] (200 seeds, one board) — a LOWER bound on across-board noise. At that
+> floor, the ALLOCATION-level review's minimum detectable effect (80% power, 5%
+> two-sided): **~15.2 bp at 20 boards, ~17.6 at 15; a 10 bp MDE needs ~46 boards.**
+> Against the known effect sizes: A1's level effect (+60.6 bp) is detectable even at
+> 15; the two-book adoption magnitude (~26 bp) is detectable at 20, marginal at 15;
+> anything under ~15 bp is invisible at either bar. **This prices the allocation-level
+> (08-20) review only** — the row-level fixture-representativeness test still has no
+> power model (its verdict is a census, not an effect estimate), so the 20-board bar
+> remains unmeasured for its primary consumer. If the owner re-decides, the numbers
+> above are the input; the 2026-07-29 bar-holds-at-20 decision stands dated either way.
 
 The system is in a **data-collection freeze through at least late August 2026.**
 
@@ -225,6 +239,23 @@ n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and
 **Count: 0 fitted / 38 chosen (11 with no stated rationale) / 7 since-measured — of
 which one vindicated, four condemned or weak.** The sentence at the top of this doc now
 carries these numbers.
+
+**WHAT THE PARAMETER EXIT CAN AND CANNOT LICENSE (2026-07-29, owner's paragraph — both
+halves stated)**: A positive Phase 2 result would establish that **this configuration's
+disagreement with the market carried information over this window, on these markets,
+under these 39 constants as set** — a valid, decision-relevant fact about the shipped
+thing, sufficient to justify continuing to run IT. It would **not** establish that the
+approach is sound in general, that any neighboring configuration (a different k, floor,
+ranking or damping) would show the same, that the chosen constants are near any optimum
+(the census says almost none was ever measured), or that the result transfers across
+markets or seasons. A negative result is likewise about this configuration — with the
+identification diagnostic as the binding qualifier either way. **The exit's own
+measurement path touches 9 of the 39 directly** — the nine `shShrink` k values, which
+shape `pModel` on every row the slope consumes (plus the pinned-off `penQ`/`umpK` pair
+that would touch it if armed, and `GAP_BUCKET_MIN_N` on the calibration instrument's
+side; the gates, caps, ranking and damping never reach `pModel`). **So the exit's answer
+depends on 9 unmeasured choices — a count, not an adjective — and one of the nine
+(k=60) is already measured wrong (M11), with its fix specced and frozen.**
 
 ### `consMinEv` IS A STRUCTURE FILTER WEARING A QUALITY FILTER'S NAME (2026-07-26)
 
@@ -3090,6 +3121,11 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   headers carry **no reset/period field** (full header set on record; reset date stays
   PENDING, dashboard-only, nothing below depends on it). `/events` confirmed free (the
   carrier calls themselves moved nothing).
+- **07-29 morning reading (owner's item 8): 1,676 / 18,324 — 641 spent since 05:15Z,
+  ZERO of it this session's** (everything ran on archived boards). Attribution closes
+  exactly: the 07-29 archive already holds 8 snapshots / 114 event-sweeps, 7 of them in
+  the 08:04–10:49Z cluster since the reading ≈ ~670 computed vs 641 measured — the
+  cadence defect, no unknown spender. **Runway at this rate: ~2.4 days (~07-31).**
 - The burn arrives in BATCHES, visible in the public Actions log (last ~29 h: props-history
   **11 runs**, line-history 4, board-archive 2, context 2, priors 1 — all success) and
   counted exactly in the archive: **2026-07-28 holds 9 snapshots / 123 event-sweeps ≈
@@ -3179,6 +3215,38 @@ existence.** Minimum viable vs remaining quota: board-only ~150/day × 2,317 ≈
 days** — reaches the ≥10-board suspension threshold (~08-07) but NOT the 08-17/08-20
 bars with closes; **Series-A-complete (~246/day) ≈ 9 days — reaches neither bar.** The
 aspirational-calendar stamp above is that sentence's consequence.
+
+## THE LEDGER IS OFF-DISK AND UNBACKED — two things depend on it (2026-07-29, owner's item 4)
+
+- **On-disk ledger artifacts: NONE EXIST.** The search hits are code and tests
+  (`app/ledger` UI, `app/api/ledger` route, sync libs, `int40ledger.js` harness) — no
+  rows, no export, anywhere in the repo or the scratch archives.
+- **The HRR suspension's basis, quoted** (`docs/hrr-recalibration.md` L83–86): *"Graded
+  ledger, 2026-07-17 → 07-22: H+R+RBI legs hit **46.3% vs 59.2% implied** overall, and
+  **32% on O1.5+ alternate lines** specifically … O0.5 went **12/19 (63%)**."* The
+  population behind those figures — the graded ledger rows of 07-17→07-22 — is
+  **off-disk** (`pl:ledger:v1`, Upstash, sync-phrase-gated). **The finding is recorded;
+  its data is not. Those are numbers we cannot re-examine**, and the 08-15 review says
+  so in advance.
+- **The 08-15 review compares TWO INSTRUMENTS, stated**: the baseline is graded-LEDGER
+  hit-rate-vs-implied (bet legs — gate-selected, dollars-weighted); the new evidence is
+  prediction-store SHADOW calibration (all board rows, unselected). Different
+  populations, different selection, different metric — the comparison carries that
+  caveat inline, not discovered later.
+- **Retention: NOT WRITTEN ANYWHERE in the repo** — no TTL/eviction config for the key
+  (only an app-level 3MB `MAX_BYTES`); Upstash's eviction policy is dashboard-side; **no
+  backup exists anywhere. Append-only is a policy the storage does not enforce, and the
+  bankroll exit rests on one unbacked key.** The pre-committed branch fires — **the
+  READ-ONLY EXPORT, spec'd and held for the owner's run (zero credits, sync phrase
+  only, no engine change)**:
+  ```bash
+  D=$(date +%F)
+  curl -s -H "x-pl-sync: <phrase>" "https://parlay-lab-six.vercel.app/api/ledger"      > "ledger-export-$D.json"
+  curl -s -H "x-pl-sync: <phrase>" "https://parlay-lab-six.vercel.app/api/predictions" > "pred-days-$D.json"
+  # then per day listed: /api/predictions?date=<day> -> pred-<day>.json
+  ```
+  Committed to the repo (or any owner-chosen location) they become the backup; re-run
+  cadence is the owner's call.
 
 ## THE BURN DECISION AS OPTIONS (2026-07-29, owner's item — priced, NOT decided; the owner holds the reset date and the plan)
 

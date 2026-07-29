@@ -456,7 +456,7 @@ where the six recovered ml/rl games land (89 → 94 tickets, 42 → 48 pool).
 | `c5d0594` timezone fix | slate membership | **+6 ml, +6 rl** — the control |
 | `68c5743` price-age lock guard | `shLockCard` | **none** |
 | `1d64f53` propBoard | additive board key | **none** |
-| `0870d53` booksInd | fields + `shAllocate` gate | **none** (no affected ticket reaches the gate on this fixture) |
+| `053ef21` booksInd | fields + `shAllocate` gate | **none** (no affected ticket reaches the gate on this fixture) |
 | `2ee13c5` penQFrozen | pinned factor | **exactly the pin**, HRR/ml/rl probabilities |
 | `29400d0` umpKFrozen | pinned factor | **exactly the pin**, K probabilities |
 

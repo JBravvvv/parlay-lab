@@ -153,16 +153,37 @@ has no POST and the client's `pl_board_r1` is localStorage, pull-only. An on-dev
 logs prediction rows (the phrase is set) but **persists NO server board: no archive row, no
 Series A board-side, no shadow carrier. The header fix is the ONLY path.**
 
-**⚠️ WEDNESDAY'S ORDER, FIXED BY THE OWNER (2026-07-29)**: 1. **push the held stack**
-(cleared below) → 2. **header fix** (owner) → 3. **curl** (~150, protected) → 4.
-`gen=list` → 5. `self_consistency` (zero TB≥1==H≥1 violations, zero HRR ticket legs,
-both population sizes printed) → 6. app-switcher double reopen → 7. HRR rows present
-AND greyed → 8. **the admitted/rejected/rank/stake dump** (pre-commit below). The outs
-go/no-go and the burn plan are the owner's and come AFTER the board reads clean.
-Nothing ships: MIN_GAP, sha+config echo, outs flag, `coreEvMin`, cap, A1, alt keys all
-spec-only.
-**STEP-1 CLEARANCE — THE HELD STACK IS DOC-AND-TEST ONLY (audited 2026-07-29)**: all
-eight commits (59f6ee7 → ce57af4) touch ONLY `CLAUDE.md`, `docs/*`, and two test files
+**⚠️ WEDNESDAY'S ORDER, FIXED BY THE OWNER (2026-07-29; step 0 added same day)**: 0.
+**post-push re-grep — CLEARED** (below) → 1. push — **DONE, landed `671aed9..33dd31b`
+after rebasing over two bot commits** → 2. **header fix** (owner) → 3. **curl** (~150,
+protected, item-6 capture wrapped) → 4. `gen=list` → 5. `self_consistency` (zero
+TB≥1==H≥1 violations, zero HRR ticket legs, both population sizes printed) → 6.
+app-switcher double reopen → 7. HRR rows present AND greyed → 8. **replay dump + the
+ParlayPred membership diff**. The outs go/no-go and the burn plan are the owner's and
+come AFTER the board reads clean. Nothing ships: MIN_GAP, sha+config echo, outs flag,
+`coreEvMin`, cap, A1, damping, alt keys, ledger export all spec-only.
+**STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
+chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
+string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =
+repo at HEAD = the recorded `f6cf1513…`. **Hash unchanged AND chunk name unchanged —
+step 1's client half survives the push; the curl proceeds.** (Chunk names are
+content-hashed, so future greps key on the STRING hash regardless.) The Vercel deploy
+LIST (timestamps × commit) needs the dashboard — not readable from here; the served
+artifact is the outside-observable evidence. **THE BOT, audited**: `engine-v2-bot` —
+`context.yml` (3 daily crons) + `model.yml` (1 daily cron), both `permissions:
+contents: write` to this branch; **15 commits since freeze start (daily, BY DESIGN —
+the shadow log depends on them); whole-window file census: exactly
+`public/model/context.json`, `public/model/priors.json`, `data/ump_k.json` — data
+inputs, zero code paths.** The two commits under the push (`925f1c6`, `671aed9`)
+touched 2+1 of those files. Per the owner's pre-committed branch this is still **M17**:
+an automated writer with branch write-access had NO path enforcement for the whole
+window — good behavior was inspection, not guard. **Now guarded:
+`tests/bot-path-whitelist.test.ts`** (whitelist ⊇ check on every bot commit since
+freeze start, with an invalid-by-value plant; green on the real history).
+**STEP-1 CLEARANCE — THE HELD STACK IS DOC-AND-TEST ONLY (audited 2026-07-29; shas
+rewritten same day after the rebase renamed them — the guard `tests/sha-references.test.ts`
+now fails the build on a dangling citation)**: all
+nine commits (b9ba57c → 33dd31b post-rebase) touch ONLY `CLAUDE.md`, `docs/*`, and two test files
 (`sweep-covers-engine`, `outs-suspension-coupling` — both `it.fails`-encoded);
 `git diff origin/frontend-rebuild..HEAD -- src/ app/ legacy/ public/ …` is EMPTY, and
 the engine string at HEAD hashes **`f6cf1513…` — identical to the served chunk,
@@ -451,7 +472,8 @@ later 502s. Manual curl (1) + Monday's cron (2) leaves one spare slot.
 | **M13** | the props ARCHIVE sweep (`tools/snapshot_props.py`) requests only the six canonical keys while Caesars posts its whole hits/K's ladders under `*_alternate` (incl. the main lines) — 14 archive days read 0/7,033 (hits) + 0/830 (K's) CZ-present and the multibook memo misread that as feed coverage ("the unlock", retracted same day) | **NEW 2026-07-28, COLLECTION defect, not engine** — the engine (L1366, `SH_PROP_ALT`, and CLAUDE.md §build-44) and `sightProp` both read the alternates already; only the archive is blind. Fix = add the 3 alt keys to the sweep (+~3 credits/event), fold same-line quotes, **vintage-stamp the archive change** — awaits owner sign-off. Guard: `tests/sweep-covers-engine.test.ts`, **observed-red, NOT-YET-ENFORCING** (`it.fails`; flips with the fix). Full chain: `docs/multibook-memo.md` §2c |
 | **M14** | **the allocator is NON-MONOTONE IN PRICE — mechanism ISOLATED: RANKING (owner's two control rounds, same day)**: the composition-frozen sweep is an IDENTITY (excludes an instrument defect, locates nothing — owner's catch); cap sweep: survives uncapped (+136.2→+99.0) — cap innocent; **ranking swap (`base=max(ev,0)/(dec−1)`, cap held): non-monotonicity VANISHES (+187.2→+198.2)** — price-blind ranking is sufficient, admission supplies candidates; entrants ranked 1/2/6 vs deGrom/Freeland at 7 (displacement, not cap-promotion). Negative bumps, measured wording (correction to the owner's pre-committed sentence): all below base (+121.2/+117.8/+124.9), the rise LOCAL (−1.0→−1.5, +7.1 bp). **THE ADOPTION NUMBER at the measured +1.07 gain: net −15.0 bp (uniform) / −26.5 (empirical dispersion, same sign) — the second book is NEGATIVE under the shipped allocator on this board**; the sentence leads the multibook memo. `coreEvMin=2` unmeasured (`06d3cbc`); ~~interior peak ce=30, frozen 2 ~95 bp below optimum~~ **WITHDRAWN 07-29 as SELF-GRADED** (δ=0 peak collapses under shading: ce=30 → +24.0 at −3, −96.4 at −5; peak migrates to ce=20; ceilings were enforced throughout — one bind at ce=1). **07-29 re-measures**: adoption at 200 seeds **net −26.1 [−29.4, −22.7]** (clustered −24.9 [−28.2, −21.6]; uniform −15.0 outside the CI — sign-valid, ~11 bp short; β on realized gain −12.7 bp/pp, spread = composition lottery); **EV-ranking adoption +1.9 [−1.2, +5.0] — the cost vanishes under A1; blocked SPECIFICALLY behind A1, sequencing A1 → books**; but A1's own sweep **breaks at +2.0** (198.2 → 188.3) → narrowed to "sufficient at ≤+1.5 on one board" (bump-0: EV +187.2 > prob +126.6); shared-game damping **0.5 chosen, unmeasured-and-implicated** (prob-ranking range 40 bp across 0→1.0) — joined the frozen table | **NEW 2026-07-28, documented defect, NO SHIP (freeze)** — n=1 board, rerun gated on credits. Fixed-card PRICE-response measurements inherit the failure mode (bundle audit). **A1 at exit sign-off carries the narrowing; A2 innocent of M14**. Multi-book adoption blocked behind A1 |
 | **M15** | the multibook population "n=511" pooled pre+close snapshots as independent rows (362 unique, ~1.4× duplication) — TB−HRR's z≈1.9 was the artifact (deduped: 0.96); headline restates **+1.07 pre-vintage** [+0.88,+1.33] FEW-CLUSTER (11) | **NEW 2026-07-28, measurement defect, corrected same day.** Standing rule: archive populations state their snapshot-vintage rule (pre/close/dedupe) beside n. Pre = bet time (operative); close = CLV |
-| **M16** | **cross-ticket same-game dependence is priced NOWHERE in production** — within-ticket IS (`simJoint`, 22/25 groups); the sole compensation is the CHOSEN damping 0.5. Measured: **≤ ~4 bp at ρ ≤ 0.2** on the production card (3 cross-ticket pairs — small, card-shape dependent). The ρ-stress also charged the instruments: A1's paired advantage survives ρ=0.20 (+22.8), the damping peak stays at 1.0 — neither was blindness. **And on identical draws the two rankings correlate at r=+0.212: composition is CHAOTIC with respect to price** (M14 addendum 2 — every interval on this board is composition-noise-dominated) | **NEW 2026-07-29, documented, no ship** — n=1 card; re-measure on live cards when boards resume |
+| **M16** | **cross-ticket same-game dependence is priced NOWHERE in production** — within-ticket IS (`simJoint`, 22/25 groups); the sole compensation is the CHOSEN damping 0.5. Measured **per pair, not as one number (owner's restatement)**: ~**1–1.5 bp per cross-ticket same-game pair at ρ≈0.1**, MC-noise-limited; the 07-26 card carries 3 pairs (≤ ~4 bp total) — the archived-board distribution is n=1 BOARD; today's board joins it. **And the damping constant does NOT compensate for dependence at all**: under ρ-stress the damp ordering is unchanged and pair counts barely move (4/3/3/3) — its 40 bp range is SELECTION quality; **its name and comment describe correlation protection it does not deliver — the recurring intent-vs-behavior shape, in the row as ordered.** A1's paired advantage survives ρ=0.20 (+22.8); on identical draws the rankings correlate at r=+0.212: composition is CHAOTIC with respect to price (M14 addendum 2) | **NEW 2026-07-29, documented, no ship** — n=1 card; re-measure on live cards when boards resume |
+| **M17** | **an automated writer (`engine-v2-bot`) held `contents: write` to the production branch for the entire freeze window with NO path enforcement** — 15 commits since 07-24 (daily, by design; the shadow log depends on them); whole-window census: exactly 3 data files, zero code — but that was inspection, not guard. A workflow bug or compromised action could have written engine code onto the branch Vercel builds | **NEW 2026-07-29, vintage-control defect per the owner's pre-committed branch — GUARDED same day**: `tests/bot-path-whitelist.test.ts` (bot commits ⊆ {context.json, priors.json, ump_k.json}, extracted from git, invalid-by-value plant; green on the real history). Companion: `tests/sha-references.test.ts` (doc-cited shas must resolve on origin — observed RED on 3 dangling refs the rebase left, fixed same commit) |
 | **M8** | `shTbOver` priced a 0.5 line with the 1.5 formula | ✅ **SHIPPED 2026-07-27 night** (bug-grade, sign-off D): `if(line<1)return 1-P0;` same-line at L1548; pinned test swapped WITH a reintroduction plant; `baseline43` byte-identical (`e67eaad0…` both sides — the fixture prices no TB-0.5 row). Confirm on the first post-ship board: TB≥1==H≥1 violations → 0 (were 118/127) |
 | **M1** | `shParkF` never reaches the closed form — **variance not level** (+0.13% / −2.80%) | ready to spec |
 | **M2 / M2′** | outs: ⚠️ **INTERLOCKED PAIR** — `0.140`→`0.400` AND the `offense()` xSLG de-noise, together or never (enforced: `tests/m2-interlock.test.ts`; `of` is a constant 0.860 today — a defect masking a defect, ±12 pp if shipped alone) | **ready once paired** (residual ±1.2 pp < 2 pp bar). Estimator specced from measured variances: cliff removed, season-anchored, **k=3.4 — k=4 was numerically right; the cliff and the league target were the defects**; spread 63–75% → 92–93% of true. Pitcher regressions (n≈265/outcome): form zero, SEASON-primary (K's +0.81, outs +0.61), whiff prior nothing. Outs needs no sim — NOT a post-freeze project; M2′ strictly-better, optional |
