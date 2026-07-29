@@ -19,7 +19,9 @@
 > **excludes zero**, paired SE narrower than the unpaired combination (1.80 vs 1.99).
 > **The evidence supports exactly this: A1 PROVABLY REMOVES THE M14 PENALTY AND PROVABLY
 > DOES NOT ESTABLISH A POSITIVE GAIN. The sequencing sentence is: A1 removes the
-> penalty; the residual gain is unmeasured.** (The earlier "+1.9 [−1.2, +5.0]" was 60
+> penalty; the residual gain is UNMEASURABLE — detecting +1.9 bp at 80% power needs
+> ~1,400 boards (retired, not pending; bundle). A1's case = penalty removal + restored
+> monotonicity (≤+1.5, one board) + the level effect (+60.6) + the floor.** (The earlier "+1.9 [−1.2, +5.0]" was 60
 > different seeds — superseded by the comparable 200.) A1's own narrowing travels with
 > it (breaks at +2.0, one board; bundle).
 > **THE STANDING DEDUCTION**: under the shipped engine multi-book is net −26.1; under A1

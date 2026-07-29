@@ -1,5 +1,16 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> ⚠️ **M18 (2026-07-29): THE FREEZE HAS HELD THE CODE VINTAGE AND FLOATED THE DATA
+> VINTAGE FOR THE ENTIRE WINDOW.** The engine reads `public/model/priors.json` and
+> `context.json` at REQUEST time on both surfaces, straight into the rate path
+> (`shPriorH/HR/Kf`, L1582–1626 → `pModel`), and the priors change **7,240–10,041
+> numeric fields per day** (mean |Δ| ~1.0, max ~30) — daily, BY DESIGN (live inputs,
+> the same class as statsapi stats). **Every cross-day comparison in this window is
+> cross-DATA-vintage, and 14 of 21 findings' measured effects sit downstream** (bundle,
+> M18). Data vintage is TRACKED per day via the bot's own commit log — attribution is
+> exact (e.g. the 07-26 board ran under priors `b75e905` + context `3e2b93c`) — never
+> frozen; cross-day claims state the axis from now on.
+
 > ⚠️ **THE FREEZE IS HOLDING A VINTAGE ASSEMBLED ALMOST ENTIRELY FROM UNMEASURED CHOICES
 > (census v2, 2026-07-29 — v1's numbers were wrong and are corrected below): of 39
 > frozen parameters, 0 were FITTED, 38 CHOSEN (11 with no stated rationale), 1 with
@@ -59,6 +70,19 @@
 > power model (its verdict is a census, not an effect estimate), so the 20-board bar
 > remains unmeasured for its primary consumer. If the owner re-decides, the numbers
 > above are the input; the 2026-07-29 bar-holds-at-20 decision stands dated either way.
+>
+> **EVERY CALENDARED REVIEW, POWERED OR NOT (2026-07-29, owner's item 5)**:
+> | review | written target effect | reachable boards (see runway) | MDE at that count |
+> |---|---|---|---|
+> | fixture-representativeness (→08-17) | none written | ≤11 board-only / ~2–3 with sweeps | no power model (census-type test) |
+> | crossover doctrine (→08-20) | none written | same | ~15–17 bp (allocation-level) |
+> | HRR retirement (repair+10) | **±3 pp over ≥300 rows/≥10 boards — the ONLY written target** | blocked on repair ship | binomial SE at n=300 ≈ 2.9 pp → **the ±3 pp bound is a ~1-SE statement — marginal by its own arithmetic** |
+> | HRR suspension review (≥10 board-days) | none beyond the row/board floor | 11 board-only | — |
+> | 08-10 six-regression re-run | SEs written per coefficient (licensing block) | board-independent | n/a |
+> **Only one calendared review has a written target effect size; power is unassessable
+> for the rest — the calendar is a schedule of unpowered checks** (the sentence, as
+> ordered). A1's adoption effect (+1.9) needs **~1,400 boards** at 80% power — retired
+> as UNMEASURABLE (bundle).
 
 The system is in a **data-collection freeze through at least late August 2026.**
 
@@ -3247,6 +3271,22 @@ aspirational-calendar stamp above is that sentence's consequence.
   ```
   Committed to the repo (or any owner-chosen location) they become the backup; re-run
   cadence is the owner's call.
+- **THE EXPORT'S READING, PRE-COMMITTED BEFORE THE OWNER RUNS IT (2026-07-29)**: headers
+  `x-pl-sync: <phrase>`; response shapes `{ledger: SyncEntry[], at}` and `{days:[...]}`
+  → per-day `{date, at, records, parlays, games}`; **zero credits** (redis reads only —
+  verified in both routes). To be USEFUL the ledger export must show: total ticket
+  count, date range, per-market LEG counts, and per-leg `{lkey, res, odds/cz, implied}`
+  — **the 46.3%/59.2% HRR population is reconstructible IFF legs carry result + implied
+  + market** (SyncEntry legs carry lkey/prop/cz/res via the grader). Branches:
+  reconstructible → "cannot re-examine" WITHDRAWS with a dated marker and the
+  suspension's basis becomes auditable; not → the absent fields get NAMED, not
+  adjectival; export ticket-count vs the owner's 38 → both printed if they disagree.
+- **APPEND-ONLY, MADE ENFORCEABLE — SPEC ONLY (2026-07-29)**: content-addressed export
+  snapshots (`ledger-export-<date>.json` + its sha256 in the filename or an index) plus
+  a guard test that fails the build when any row key present in an earlier committed
+  snapshot is absent from a later one (monotone-superset over `k`/ticket ids; plant: a
+  synthetic later-snapshot missing a planted earlier row). Encoded when the first two
+  snapshots exist; spec'd now.
 
 ## THE BURN DECISION AS OPTIONS (2026-07-29, owner's item — priced, NOT decided; the owner holds the reset date and the plan)
 
@@ -3339,6 +3379,27 @@ query returns ~0–3 rows today — the review is currently STARVED BY THE OUTAG
 the suspension**; it becomes non-vacuous the day boards generate. Checked before it
 runs, per the owner's rule: 08-15 arrives vacuous unless the header fix + credits
 deliver ~10+ board-days first.
+
+**THE SELECTED-vs-UNSELECTED MISMATCH — a NAMED LIMITATION of the review (2026-07-29,
+owner's item)**: the suspension was measured on SELECTED legs (graded-ledger 46.3% vs
+59.2% implied); shadow rows are EVERY HRR row, unselected — and selection is the whole
+mechanism under M14. **No counterfactual-selection field exists in the shadow record**
+(`PredRecord` carries `susp` only — checked). **THE FLAG, SPEC'D FOR SIGN-OFF BEFORE THE
+CURL (additive; reads live state, writes new fields, branches nothing)** — in
+`app/api/generate/route.ts` after `data` is built and before `boardToPredictions`:
+```ts
+// cfSel (2026-07-29): counterfactual selection under a lifted HRR bar — additive only
+const cfgSaved = eng.get<Record<string, unknown>>("SH_CFG");
+eng.set("SH_CFG", { ...cfgSaved, hrrAltMax: 99 });
+const cfPool = eng.get<(b: unknown) => PoolTicket[]>("shCardPool")(data);
+const cfAlloc = eng.get<AllocFn>("shAllocate")(cfPool, DAILY_DEFAULT, eng.get("SH_CFG"));
+eng.set("SH_CFG", cfgSaved);                       // restore before anything else runs
+// per suspended record: cfSel = { pool: row appears in any cfPool ticket,
+//                                 card: row appears in the cfAlloc picks }
+```
+`boardToPredictions` then stamps `...(r.susp ? { susp: true, cfSel } : {})`. Zero
+credits, CPU only; the LIVE pool/card are built exactly as today. **Held for the
+owner's sign-off — boards resume in hours and a field not captured is unrecoverable.**
 
 **THE NUMBERS AND THE THRESHOLDS, NAMED IN ADVANCE (2026-07-29, owner's item 3 — so
 08-15 is a check, not an interpretation)**: server-side accrual RESUMES with boards for
