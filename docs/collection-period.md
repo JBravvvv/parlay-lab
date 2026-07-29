@@ -3063,20 +3063,35 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
 - **Forward rate, measured on 07-28's composition: ~740–760/day → 2,317 dies ~07-31,
   BEFORE Friday's K's/outs reopen.** The aggregate-implied ~630/day reconciles as the
   average over lighter days — no unknown spender; the impossible branch does not fire.
-- **The burn plan's first lever — "zero-information" now MEASURED, not claimed
-  (2026-07-28, owner's item; corrects this bullet's first wording)**: on 07-28's own
-  snapshot pairs, the 3-minute cluster duplicates carry **3–5% changed rows at mean
-  |Δfair| 0.014–0.042 pp** (08:02→08:05: 4%/0.042; 08:05→08:07: 5%/0.014; 10:14→10:16:
-  3%/0.001) versus **20% / 0.214 pp across the 14-minute 07:48→08:02 gap** — negligible,
-  with the cost printed rather than asserted zero. **MIN_GAP spec (SPEC ONLY, owner's
-  sign-off)**: mirror `MIN_GAP_S` onto `pre` readings (~one pre per 40 min), cutting
-  07-28's 9 snapshots to ~3–4 (~260/day incl. line-history); **vintage-stamped, series
-  segmented pre/post the cadence change, no reinterpretation of prior snapshots under
-  the new cadence** — an instrument change inside a measurement window, the CLV
-  decoupling rule verbatim. Per-fire generate cost, computed from its request URLs (no
-  generate has fired since 07-26, so computed not measured): game odds 3 mkts × 2
-  regions = 6 + props (6+3 alt keys) × us × ~16 events ≈ 144 → **~150/fire; each of the
-  3 cron slots and the manual curl cost the same ~150**.
+- **MIN_GAP SHIPPED (2026-07-29 — the owner's SOLE authorized exception; supersedes the
+  spec-only wording that stood here; all four conditions met)**: (1) guard
+  `tests/min-gap.test.ts` observed RED before the script edit, GREEN after, same commit;
+  (2) **VINTAGE STAMP: the props-archive cadence segments pre/post this commit** —
+  snapshots before it were taken under the no-pre-gap cadence and are never
+  reinterpreted under the new one (the CLV-decoupling rule verbatim); (3) the measured
+  information cost, printed beside the change: the deduped 3-minute duplicates carried
+  **3–5% changed rows at mean |Δfair| 0.014–0.042 pp** (08:02→08:05: 4%/0.042;
+  08:05→08:07: 5%/0.014; 10:14→10:16: 3%/0.001) vs **20%/0.214 pp across the 14-minute
+  gap**; (4) **every cron entry stays** — redundancy is the reliability property;
+  MIN_GAP dedupes PAYMENT, not delivery (`_snapshot_kind` skips a `pre` within
+  `MIN_GAP_S` of any paid snapshot; the close branch runs first and is never blocked).
+  Replayed on 07-28's real firing times: **4 paid of 10**. **CONFIRMING INSTRUMENT,
+  pre-committed (created ≠ fires ≠ landed)**: the next morning cluster's day-file must
+  append **one paid snapshot per 40-minute window with the N−1 skips visible as
+  "skipped: pre within MIN_GAP" lines in the other runs' Actions logs — two paid sweeps
+  inside one 40-minute window means it did NOT land.** Per-fire generate cost, computed
+  from its request URLs (no generate since 07-26): ~**150/fire**; each cron slot and
+  the manual curl cost the same.
+- **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
+  (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
+  board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before
+  exhaustion: **~2–3 with sweeps running; ~11 board-only.** **Without a reset, the
+  ≥10-board-day suspension threshold is reachable ONLY under immediate board-only
+  rationing (11 > 10, barely — sacrificing Series A's close side and the pre series);
+  at any cadence that keeps the sweeps, the 08-15 HRR suspension review is UNREACHABLE
+  — written today, not discovered on 08-15.** The owner reads the reset date: reset →
+  restate runway, reprice the calendar; no reset → the ordered shutdown list executes
+  in its stated order and the parameter exit does not fit this cycle.
 - **THE FLOOR COMES FROM PHASE 2'S REQUIREMENT (owner's rule — derived, file and line
   cited)**: Series A = archived board (open + pModel) × close fair joined by lkey+date —
   **`docs/phase2-memo.md` L40–42** (build items 2–4); the 20-board bar for 08-15 is in

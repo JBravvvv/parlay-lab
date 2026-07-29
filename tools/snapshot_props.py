@@ -142,13 +142,28 @@ def _snapshot_kind(events, now, day):
     lead = (ahead[0] - now).total_seconds()
     prior = day.get("snapshots") or []
     last_close = None
+    last_any = None
     for sn in prior:
+        t = datetime.fromisoformat(sn["t"])
         if sn.get("kind") == "close":
-            last_close = datetime.fromisoformat(sn["t"])
+            last_close = t
+        if last_any is None or t > last_any:
+            last_any = t
     if lead <= CLOSE_WINDOW_S:
         if last_close and (now - last_close).total_seconds() < MIN_GAP_S:
             return None            # already have a close this close to the pitch
         return "close"
+    # MIN_GAP pre-dedupe (2026-07-29, signed): measured 07-28/29, cron clusters landed
+    # 3-minutes-apart pre sweeps, each paying ~96 credits for duplicates carrying 3-5%
+    # changed rows at mean |dfair| <= 0.042 pp (vs 20%/0.214 pp across 14 min). A pre
+    # within MIN_GAP_S of ANY paid snapshot is a duplicate: payment deduped, delivery
+    # redundancy retained (every cron entry stays; a close is never blocked by this —
+    # the close branch above runs first with its own gap). Vintage: the archive series
+    # segments pre/post this commit; prior snapshots are never reinterpreted under the
+    # new cadence (docs/collection-period.md, THE CREDIT BUDGET).
+    if last_any and (now - last_any).total_seconds() < MIN_GAP_S:
+        print(f"  skipped: pre within MIN_GAP ({(now - last_any).total_seconds()/60:.0f} min since last paid snapshot)")
+        return None
     return "pre"
 
 
