@@ -12,12 +12,23 @@
 > (1.28–2.04 pp) explain almost none of the spread (regression on realized gain: β
 > −12.7 bp/pp, residual SD 24.0 of raw 24.3 — the spread is composition lottery, and the
 > NEGATIVE β is M14 visible inside the draws: bigger price gains, worse cards).
-> **THE COUNTERFACTUAL THAT SETS SEQUENCING: under EV ranking (cap held), adoption is
-> +1.9 [−1.2, +5.0] — not negative.** So multi-book is **blocked specifically behind A1;
-> the sequencing is A1 → then books** — the operative sentence, with A1's own narrowing
-> carried beside it (A1 is monotone −1.5…+1.5 but breaks at +2.0 and is one board; see
-> the bundle). Every per-leg/per-slip number below is a GROSS price fact; the memo
-> prints the net wherever adoption is discussed. n=1 board.
+> **THE PAIRED RESULT (2026-07-29, owner's instrument — same 200 seeds, identical draws
+> verified, both rankings):** adoption under EV ranking **+1.3 [−0.7, +3.3]** uniform /
+> **−0.4 [−2.3, +1.5]** clustered — **includes zero**; the PAIRED difference (EV − prob,
+> seed-by-seed) **+27.4 [+23.8, +30.9]** uniform / **+24.5 [+21.1, +27.9]** clustered —
+> **excludes zero**, paired SE narrower than the unpaired combination (1.80 vs 1.99).
+> **The evidence supports exactly this: A1 PROVABLY REMOVES THE M14 PENALTY AND PROVABLY
+> DOES NOT ESTABLISH A POSITIVE GAIN. The sequencing sentence is: A1 removes the
+> penalty; the residual gain is unmeasured.** (The earlier "+1.9 [−1.2, +5.0]" was 60
+> different seeds — superseded by the comparable 200.) A1's own narrowing travels with
+> it (breaks at +2.0, one board; bundle).
+> **THE STANDING DEDUCTION**: under the shipped engine multi-book is net −26.1; under A1
+> it is a number whose interval includes zero. **Neither supports adopting a second book
+> on measurement, and nothing in this memo still argues for the MGM account on price
+> grounds. What survives is OPTIONALITY and TICKETABLE-MARKET ACCESS — the Under side of
+> hits/K's that CZ's Over-only ladders never price — and it is UNPRICED.** Every
+> per-leg/per-slip number below is a GROSS price fact; the memo prints the net wherever
+> adoption is discussed. n=1 board.
 
 Owner context: live BetMGM NV and Circa accounts exist. `PLAY_BOOKS` is a single-entry
 config from Phase 5. This memo reports feed reality, the measured prize, the schema

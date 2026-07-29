@@ -1,5 +1,10 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> ⚠️ **THE FREEZE IS HOLDING A VINTAGE ASSEMBLED LARGELY FROM UNMEASURED CHOICES
+> (2026-07-29, provenance census below): ~33 frozen parameters are CHOSEN — 14 with no
+> stated rationale at all — against 2 FITTED.** The parameter exit is therefore not a
+> tune-up of a measured system; it is the first measurement pass over most of it.
+
 > ⚠️ **THE PARAMETER EXIT DOES NOT FIT THIS CREDIT CYCLE (2026-07-28, measured):**
 > Phase 2 Series A's own floor (~246 credits/day: one board ~150 + one close sweep ~96;
 > requirement written at `docs/phase2-memo.md` L40–42) needs ~13.5k to 09-22 against
@@ -129,7 +134,8 @@ drift, even when both values look reasonable on their own.
 |---|---|---|
 | selection mode default | `ev_gated` | EV-gated @ CZ (stored dk_fd / probability / caesars_ev respected) |
 | `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER (2026-07-28, M14 items); the "~95 bp below optimum" claim was WITHDRAWN 2026-07-29 as a SELF-GRADED artifact (owner's shade test)**: the value 2 was chosen (`06d3cbc`), never fitted. Extended sweep (07-26 board, in loop): 12 values → 8 distinct cards, rising to ce=30 (+221.9 at δ=0) then empty at 50 — but the δ=0 peak **collapses under shading: ce=30 → +24.0 at −3 pp (peak migrates to ce=20) and −96.4 at −5, the worst tested value**. E[ln]-at-model-probs rewards concentration into the model's own favorites — the exact exposure the shade table tests. Restated as distance from the MODEL'S OWN optimum; **NOT a candidate amendment**. The allocator enforced its Kelly ceilings in every sweep card (one bind at ce=1; the ce=20/30 $83 stakes are capG-limited, ceilings above capG — no contradiction with the $28 low-edge ceiling). Recorded observation, n=1, self-graded caveat: ce≈10–20 dominated ce=2 at all tested shades |
-| shared-game damping `0.5` (in `eff = base/(1+0.5·sharedGames)`, L3082) | `0.5` | ⚠️ **UNMEASURED-AND-IMPLICATED (2026-07-29, owner's item — joins `coreEvMin`)**: chosen, not fitted; survives the A1 ranking swap; sweep 0/0.25/0.5/1.0 moves E[ln] MATERIALLY under prob ranking (+90.6/+122.0/+126.6/+130.5 — 40 bp range; EV ranking 11 bp, falling). n=1 board, no ship |
+| shared-game damping `0.5` (in `eff = base/(1+0.5·sharedGames)`, L3082) | `0.5` | ⚠️ **UNMEASURED-AND-IMPLICATED (2026-07-29, owner's item — joins `coreEvMin`)**: chosen, not fitted; survives the A1 ranking swap; sweep 0/0.25/0.5/1.0 moves E[ln] MATERIALLY under prob ranking (+90.6/+122.0/+126.6/+130.5 — 40 bp range; EV ranking 11 bp, falling). **Unlike the withdrawn `coreEvMin` claim, the 40 bp SURVIVES SHADING** (owner's test, same day): range 40.0 / 40.2 / 40.0 bp at δ = 0/−3/−5, damp=1.0 best at all three — shade-robust, does NOT demote. n=1 board, no ship |
+| **20-board fixture-representativeness bar** | `20` | ⚠️ **CHOSEN, not fitted (2026-07-29)** — the number fell out of the 07-27→08-15 calendar span; no power model exists to evaluate it at any other value. An unmeasured parameter gating a calendar decision (THE 08-15 DECISION table) |
 | `coreCzEvMin` | `0` | settlement floor — never lock a core ticket negative-EV at Caesars (override-proof) |
 | `consMinN` / `consMinEv` | `100` / `−1` (%) | markets under 100 graded legs also need consensus-fair EV ≥ −1% |
 | `dailyBankrollCap` | `0.10` | CORE+FUN day exposure ≤ 10% of the managed bankroll, enforced at lock |
@@ -164,6 +170,19 @@ a change fails.
 | L2349 | 60 | 80 | 0.586 | hits rate/AB (sim) |
 | L2351 | 60 | 95 | 0.613 | hits rate/AB (sim, no-starter path) |
 | L2359 | 10 | 26 | 0.722 | H+R+RBI per game |
+
+### PROVENANCE CENSUS — every frozen parameter: fitted, inherited, chosen, or unknown (2026-07-29, owner's item 6)
+
+| class | parameters | count |
+|---|---|---|
+| **FITTED** (from data, method on record) | `wBlend` per-market blend weights (calibration-fitted); `mktN` (measured counts — state, not a choice) | **2** |
+| **CHOSEN with stated arithmetic** | `GAP_BUCKET_MIN_N` 150 (SE arithmetic printed — the doc's own words: "the only one") | **1** |
+| **CHOSEN, rationale in comments, never fitted** | selMode default `ev_gated` (spec `2292b85`) · `coreEvMin` 2 (`06d3cbc`) · `coreCzEvMin` 0 · `consMinN` 100 · `consMinEv` −1 · `coreNoHR` · `coreMaxLegs` 3 · `coreMaxDec` 15 · `coreKsLegMax` 1 · `perParlayCap` 0.25 · `dailyBankrollCap` 0.10 · `kellyStakeMult` 4 · `maxCoreTickets` 6 · fun tiers/amounts/splits · `funMinProb` 0.1 · shared-game damping 0.5 · `hrrAltMax` −1 (signed decision; the VALUE −1 chosen) · `penQFrozen`/`umpKFrozen` (freeze decisions) · 20-board bar | **~19** |
+| **CHOSEN, no stated rationale (the doc's own "unexamined-constant class")** | ump `g ≥ 5` gate ("~7× too low") · ump clamp [0.92, 1.08] · **the NINE `shShrink` k values** (150, 150, 4, 4, 4, 60, 60, 60, 10 — "not one justified anywhere in the repo") · the `0.140` outs constant (M2's defect) · factor clamp bounds | **~14** |
+| **UNKNOWN** | none identified — everything above traces to a commit or a comment | 0 |
+
+**Count: ~33 chosen (14 of them without stated rationale) vs 2 fitted.** The
+pre-committed branch fires — the sentence at the top of this doc.
 
 ### `consMinEv` IS A STRUCTURE FILTER WEARING A QUALITY FILTER'S NAME (2026-07-26)
 
@@ -3099,6 +3118,25 @@ was logged — a dark day logs nothing server-side, so its rows never exist. CLV
 tickets: unrecoverable. **Series destroyed by a gap: none; series holed by a gap: all of
 board-dependent ones, one row per dark day.**
 
+**THE EXCEPTION, NAMED (2026-07-29, owner's item 5 — dependence census per series):**
+
+| series | depends on | a dark day removes PERMANENTLY | merely delays |
+|---|---|---|---|
+| Series A (board × close fair) | board + CLOSE | that day's row — both sides unrecoverable | the 20-count, 1:1 |
+| CLV on locked tickets | close sighting | that day's closes (the founding rule) | — |
+| shadow-price series (`sh` columns) | board | that day's shadow row | — |
+| HRR / outs suspension shadow accrual | board | that day's ~50 / ~37 shadow rows | the review thresholds, 1:1 |
+| two-book pre-vintage series | PRE sweep | that day's pre rows | — |
+| **pre↔close paired (vintage isolation, M15's instrument)** | **the PAIRing — both sweeps, same day** | **the day's PAIR — this series is DESTROYED at day level, not holed: no later day substitutes for a missing member of a pair** | — |
+| fixture-representativeness board count | any N homogeneous boards | nothing specific | the bar date, 1:1 |
+| six regressions (08-10) / context | statsapi / git | nothing | nothing |
+
+**The 1:1 sentence with its exception inline**: board-dependent series are holed 1:1 —
+EXCEPT the pre↔close pairing, which a dark day DESTROYS at day level (the pairing is
+the unit, and a field not captured is unrecoverable). **Daily unrecoverable cost of
+going dark, the ration currency: ~5–6 series-days per dark day** (Series A + shadow +
+suspension accrual ×2 + pre series + the pair; + CLV once cards lock).
+
 ## VINTAGE EVENTS SINCE WINDOW START — the census, and the convention FIXED (2026-07-29, owner's item)
 
 | date | event | class |
@@ -3144,6 +3182,38 @@ query returns ~0–3 rows today — the review is currently STARVED BY THE OUTAG
 the suspension**; it becomes non-vacuous the day boards generate. Checked before it
 runs, per the owner's rule: 08-15 arrives vacuous unless the header fix + credits
 deliver ~10+ board-days first.
+
+**THE NUMBERS AND THE THRESHOLDS, NAMED IN ADVANCE (2026-07-29, owner's item 3 — so
+08-15 is a check, not an interpretation)**: server-side accrual RESUMES with boards for
+both markets — cron generates log every category row (`src:"cron"`), so **the
+client-side handful is a bridge, not the design** (the sentence, as ordered). Rows per
+board at the current slate (07-26 board): **HRR ~50, outs ~35–38** — both markets'
+shadow rows arrive at full board rate under their suspensions. Projection at one
+board/day starting 2026-07-29 (counted): by 08-15 = 18 boards → **~900 HRR shadow rows /
+~650 outs rows** — row thresholds clear easily IF boards generate. **The named
+thresholds**: (i) the SUSPENSION-review half of 08-15 needs ≥300 rows/≥10 boards of
+SHADOW data → reachable by **~08-07** if boards resume 07-30; **vacuous if fewer than
+10 board-days exist by 08-15** — that is the number, stated before the date. (ii) the
+RETIREMENT half needs the same ≥300/≥10 **POST-REPAIR** — the repair spec is due 08-08
+and the re-run 08-10, so post-repair boards by 08-15 ≤ ~5 under every now-visible
+schedule: **the retirement half of 08-15 WILL be vacuous; it restates to
+first-repair-ship + 10 board-days.** Written before the review, per the rule.
+
+## THE 08-15 DECISION — FOUR RESOLUTIONS, PRICED FOR THE OWNER (2026-07-29; the owner decides this week)
+
+| option | what it costs | what it destroys / requires |
+|---|---|---|
+| **(a) move the review to 08-17 (hits-family) / 08-20 (whole-board)** | 2–5 days of delay, slipping 1:1 per dark day | destroys nothing — the date was already a floor. What else keys off 08-15: the ICC day-level report, the "HRR amendment stays UNSIGNED until it lands" note, the crossover doctrine review. **The HRR suspension review does NOT move with it** — its bar is its own (≥300/≥10 shadow, reachable ~08-07 per above); only the RETIREMENT half moves (to repair+10, later than either date) |
+| **(b) lower the bar below 20** | unknown — **the power of the fixture-representativeness test at 15 vs 20 boards is NOT computable from anything written** (no formal test model exists in the docs; the 20 counts boards, it does not state power) | per the pre-committed branch: **option (b) cannot be evaluated — the owner chooses among three, not four.** And **20 is CHOSEN, not fitted** (it fell out of the 07-27→08-15 calendar span) → recorded in the frozen table beside `coreEvMin` and `0.5` as an unmeasured parameter gating a calendar decision |
+| **(c) declare the 07-29 expiry a NON-VINTAGE for the row-level tests specifically** | the only option keeping 08-15 — and it has an ARGUMENT, not a preference: `consMinEv` blocks TICKETS in `shAllocate`; board ROWS (prices, clamps, factor activity) are computed upstream and gate-independent — **the clamp fixture-representativeness, range-detector and factor-share readings are row-level and cannot see the gate**. BUT: (i) the M8 fix WAS a row-level vintage (07-27 night), so the row-homogeneous series starts 07-29 anyway (no 07-27/28 boards exist) → **row-level 20 lands 08-17, not 08-15 — even (c) only rescues 18 by 08-15**; (ii) the CROSSOVER DOCTRINE REVIEW is allocation-level and segments regardless — it moves under every option | splits the 08-15 bundle: row-level tests at 18-by-08-15 / 20-on-08-17 with the argument recorded; allocation-level readings move to homogeneous-20 |
+| **(d) heterogeneous 20 with vintage as a covariate** | **not written anywhere** — no tool or memo has a vintage-covariate design; with segment sizes (2, 1, 15) the covariate ≈ dropping the 3 early boards, i.e. (a) wearing a statistics costume | requires a design addendum nobody has specced; honest label: not available this week |
+
+**Adjacent dates, checked (owner's ask)**: the **08-10 six-regression re-run** consumes
+statsapi player-dates (n≈3,061 leak-free), **no board requirement — unaffected**. The
+**08-08 HRR repair spec** consumes archive close-joined HRR rows (~25/day, sweep-based,
+**board-independent** — accrues on credits alone); its requirement is the sweep
+continuing, not boards. Each printed beside its input; neither shares the 15-vs-20
+arithmetic.
 
 **What breaks if collection stops mid-window**: Phase 2 Series A is the board×close
 join — a credit stop kills BOTH sides at once (no server boards, no close sweeps). The

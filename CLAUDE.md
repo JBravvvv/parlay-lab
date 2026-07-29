@@ -153,6 +153,40 @@ has no POST and the client's `pl_board_r1` is localStorage, pull-only. An on-dev
 logs prediction rows (the phrase is set) but **persists NO server board: no archive row, no
 Series A board-side, no shadow carrier. The header fix is the ONLY path.**
 
+**⚠️ WEDNESDAY'S ORDER, FIXED BY THE OWNER (2026-07-29)**: 1. **push the held stack**
+(cleared below) → 2. **header fix** (owner) → 3. **curl** (~150, protected) → 4.
+`gen=list` → 5. `self_consistency` (zero TB≥1==H≥1 violations, zero HRR ticket legs,
+both population sizes printed) → 6. app-switcher double reopen → 7. HRR rows present
+AND greyed → 8. **the admitted/rejected/rank/stake dump** (pre-commit below). The outs
+go/no-go and the burn plan are the owner's and come AFTER the board reads clean.
+Nothing ships: MIN_GAP, sha+config echo, outs flag, `coreEvMin`, cap, A1, alt keys all
+spec-only.
+**STEP-1 CLEARANCE — THE HELD STACK IS DOC-AND-TEST ONLY (audited 2026-07-29)**: all
+eight commits (59f6ee7 → ce57af4) touch ONLY `CLAUDE.md`, `docs/*`, and two test files
+(`sweep-covers-engine`, `outs-suspension-coupling` — both `it.fails`-encoded);
+`git diff origin/frontend-rebuild..HEAD -- src/ app/ legacy/ public/ …` is EMPTY, and
+the engine string at HEAD hashes **`f6cf1513…` — identical to the served chunk,
+re-verified**. **Pushing the stack cannot change what production serves.** (Had any
+runtime file been touched, the push would be an engine change mid-window needing a
+vintage stamp and sign-off — it is not.)
+**STEP-8 PRE-COMMIT — the 07-29 board's M14 reading (written before the board
+exists)**: what persists today: board ROWS and the parlay POOL (`categories`,
+`parlays`, archived). **What is NOT persisted: the allocation** — picks, blocked list
+with reasons, greedy ranks, stakes-vs-ceilings (named now, per the
+field-not-captured rule; adding capture is a code change and stays spec-only). The
+allocation is RECONSTRUCTIBLE deterministically: replay `shAllocate` on the archived
+pool via the harness — the replay IS the record, and the "board's own admitted set vs
+replay" diff cannot run until an admitted set is ever persisted (sha+config echo spec).
+The dump = replay on today's archived board: admitted set, blocked-with-reasons
+(`coreEvMin` binding count = the blocked-reason line), ranks (uncapped pick order),
+stakes vs ceilings. **The falsifiable Control-C prediction, numbers stated in advance
+(calibrated on 07-26, n=1)**: IF the cap binds, the prob-ranked 6 forgoes **≥ 30 bp**
+E[ln] vs the same pool's EV-ranked 6, and rank-7+ displaced tickets carry HIGHER czEv
+than same-rank entrants (07-26 signature: entrants ~2–4% czEv / ≥63% prob vs displaced
+~7%). Readings: cap binds + displaced-higher-EV → **M14 confirmed in production**
+(upgrades from n=1-archival); cap does not bind → **M14 unobserved in production, the
+sweep stays archival — said plainly, not treated as confirmation.**
+
 **THE FULL VERIFICATION CHAIN (owner's rule: NOTHING LOCKS WEDNESDAY UNTIL IT COMPLETES).**
 Canonical numbering fixed 2026-07-28 (owner's item — the grep is STEP 1; the push that
 preceded it is step 0, done 2026-07-27 night):
