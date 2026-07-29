@@ -6,6 +6,18 @@
 > **2,317 remaining** — the current cycle funds ~9 days at the floor and ~3 at the
 > current cadence. Both derivations printed in THE CREDIT BUDGET section below; whether
 > the PLAN fits depends on the reset date (pending, dashboard-only) and the burn plan.
+>
+> ⚠️ **AND THE 08-15 20-BOARD BAR IS NOT REACHABLE SEGMENTED (2026-07-29, restated now
+> rather than discovered on the date):** vintage boundaries land 07-29 (batter-market
+> `consMinEv` expiry), 07-31 (K's/outs) and 08-01 (ML/RL), so at one board/day starting
+> today the largest HOMOGENEOUS whole-board segment by 08-15 is **08-01→08-15 = 15
+> boards**, and even the hits-family market-level segment is **07-29→08-15 = 18** —
+> both under 20, under EVERY cadence, before credits are even counted. Earliest
+> homogeneous-20 dates: **08-17** (hits-family, counting from 07-29) / **08-20**
+> (whole-board, from 08-01) — each slipping 1:1 per dark day. The unsegmented count
+> reaches 20 sooner, but the vintage convention below says vintages never pool: **for
+> the parameter exit, the vintage convention is load-bearing and the 08-15 date is
+> not** — the review moves to the homogeneous-20 date; VINTAGE EVENTS census below.
 
 The system is in a **data-collection freeze through at least late August 2026.**
 
@@ -116,7 +128,8 @@ drift, even when both values look reasonable on their own.
 | parameter | value | meaning |
 |---|---|---|
 | selection mode default | `ev_gated` | EV-gated @ CZ (stored dk_fd / probability / caesars_ev respected) |
-| `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER, now with a measured distance from optimum (2026-07-28, M14 items; corrected same day — the first "monotone increasing" claim was four points hiding three cards)**: the value 2 was chosen (`06d3cbc`), never fitted. Extended sweep on the 07-26 board (in loop, δ=0, bump 0): the 12 tested values collapse to **8 distinct cards** — 1→+113.0 (6 tix) · {2,3}→+126.6 · {4,5,6}→+139.1 · 8→+161.7 · 10→+193.7 (5) · 15→+210.5 (4) · 20→+217.4 (3) · **30→+221.9 (3)** · 50→card EMPTY, E[ln] 0. **Interior peak ≥ ce=30: the frozen 2 sits ~95 bp below the board's optimum** — n=1 board, δ=0 only (a 3-ticket $83×3 card is far more shade-fragile than a 6-ticket card; the optimum-under-error is NOT measured), candidate amendment at exit, NO SHIP. The M14 ranking swap shows the floor is not M14's mechanism — this is a second, separate observation about the floor's own level |
+| `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER (2026-07-28, M14 items); the "~95 bp below optimum" claim was WITHDRAWN 2026-07-29 as a SELF-GRADED artifact (owner's shade test)**: the value 2 was chosen (`06d3cbc`), never fitted. Extended sweep (07-26 board, in loop): 12 values → 8 distinct cards, rising to ce=30 (+221.9 at δ=0) then empty at 50 — but the δ=0 peak **collapses under shading: ce=30 → +24.0 at −3 pp (peak migrates to ce=20) and −96.4 at −5, the worst tested value**. E[ln]-at-model-probs rewards concentration into the model's own favorites — the exact exposure the shade table tests. Restated as distance from the MODEL'S OWN optimum; **NOT a candidate amendment**. The allocator enforced its Kelly ceilings in every sweep card (one bind at ce=1; the ce=20/30 $83 stakes are capG-limited, ceilings above capG — no contradiction with the $28 low-edge ceiling). Recorded observation, n=1, self-graded caveat: ce≈10–20 dominated ce=2 at all tested shades |
+| shared-game damping `0.5` (in `eff = base/(1+0.5·sharedGames)`, L3082) | `0.5` | ⚠️ **UNMEASURED-AND-IMPLICATED (2026-07-29, owner's item — joins `coreEvMin`)**: chosen, not fitted; survives the A1 ranking swap; sweep 0/0.25/0.5/1.0 moves E[ln] MATERIALLY under prob ranking (+90.6/+122.0/+126.6/+130.5 — 40 bp range; EV ranking 11 bp, falling). n=1 board, no ship |
 | `coreCzEvMin` | `0` | settlement floor — never lock a core ticket negative-EV at Caesars (override-proof) |
 | `consMinN` / `consMinEv` | `100` / `−1` (%) | markets under 100 graded legs also need consensus-fair EV ≥ −1% |
 | `dailyBankrollCap` | `0.10` | CORE+FUN day exposure ≤ 10% of the managed bankroll, enforced at lock |
@@ -3059,6 +3072,78 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   ~16 events × 1–2 sweeps — not the 123-event-sweep figure). **PROTECTED SPEND:
   Wednesday's manual generate curl (~150) gates the entire verification chain and
   produces the first board+`fp` day — NOT a rationing candidate.**
+
+## THE BURN DECISION AS OPTIONS (2026-07-29, owner's item — priced, NOT decided; the owner holds the reset date and the plan)
+
+| option | credits saved/day | what it forecloses | which measurement dies |
+|---|---|---|---|
+| ration props sweeps to the floor (1 close/day) | **~640** (vs the 07-28 ~740) | pre-vintage rows | the bet-time two-book series and any pre-vs-close pairing going forward; Series A unharmed |
+| cut CLV sightings | ≤ ~30 (only once cards lock) | the automated close on locked tickets | **Exit 2's only instrument** — the CLV series; unrecoverable per its own rule |
+| drop the alt-key fix | +48–96 never spent | the archive stays CZ-blind on hits/K's | the playable-population re-measure; the memo's join stays archive-blocked |
+| shorten the window (exit before ~09-22) | ~246 × days cut | statistical power; the ~09-08 `SUMMARY_DAYS` cap note | Series A's n; the crossover distribution reading |
+| boards < 1/day | ~150 per skipped day | Series A rows 1:1 | each dark day pushes the 20-board bar 1:1 (already the floor rule) |
+
+**Minimum viable Series A — the memo does NOT derive one, said rather than invented**:
+`phase2-memo.md` specs the join, the WLS slope, and the binding qualifier (attenuated or
+collinear = NO RESULT), but states no minimum board count for the slope itself; the
+20-board bar is for FIXTURE-REPRESENTATIVENESS (a different question). A directional
+slope answer may arrive at fewer boards IF the identification diagnostic passes — that
+diagnostic, not a board count, is the written bar. Deriving a smaller design would be
+invention; declined.
+
+**Dark-gap recoverability (append-only rules applied)**: a dark day's server board is
+UNRECOVERABLE (generation is live-only) and its close sweep is UNRECOVERABLE (the close
+rule) — Series A simply loses those days and RESUMES (per-day join); the 20-board count
+slips 1:1. Context/umpires: recoverable from git. Prediction grading: grades whatever
+was logged — a dark day logs nothing server-side, so its rows never exist. CLV on locked
+tickets: unrecoverable. **Series destroyed by a gap: none; series holed by a gap: all of
+board-dependent ones, one row per dark day.**
+
+## VINTAGE EVENTS SINCE WINDOW START — the census, and the convention FIXED (2026-07-29, owner's item)
+
+| date | event | class |
+|---|---|---|
+| 07-24 | freeze start; Phase 0.5 provenance fields (`src`/`selMode`) | window start / instrument |
+| 07-26 ~21:39Z | `fp` per-book prices enter the sweep (`28bbddf`) | instrument |
+| 07-27 | board timing vintage 1 → 2 (16:xx era → 4-cron era; `phase2-memo.md` L41) | instrument/timing |
+| 07-27 night | **M8 fix + `hrrAltMax: -1`** ship (`213e8e2`) | engine (code+config) |
+| **07-29** | **`consMinEv` ceases to bind on hits/TB/HR/HRR** (`mktN` crosses `consMinN`) — behavior changes with NO code change | **engine (behavioral, date-conditional)** |
+| 07-31 | same expiry, K's/outs | engine (behavioral) |
+| 08-01 | same expiry, ML/RL | engine (behavioral) |
+| conditional | outs flag (Wednesday go/no-go) · MIN_GAP · alt keys · sha/config echo | engine (config) / instrument ×3 |
+
+**The convention, fixed (it covered code changes only — today's behavioral change was
+unstamped)**: a VINTAGE EVENT is any dated event that changes engine BEHAVIOR or
+instrument SHAPE — **code, config, OR a date-conditional gate crossing its threshold,
+OR a collection-cadence/schema change**. Every event above stamps a boundary; segments
+never pool. Series A's segmentation as WRITTEN (`phase2-memo.md` L41) lists only the
+TIMING vintages — the behavioral boundaries above are its needed extension (named here;
+the memo edit rides the next Phase 2 build turn). Per-segment board counts are NOT
+currently tracked (`tools/archive_boards.py` prints one unsegmented `BOARD SERIES n`);
+the impossible branch does not fire.
+
+## SUSPENSION SHADOW ACCRUAL — the reviews were designed non-vacuous; the OUTAGE is what starves them (2026-07-29, owner's item 2)
+
+**Design, cited to lines**: suspended-market rows are STILL priced and tagged (the board
+emits every category row with `suspRow`, `legacy/index.html` L2505–2514); STILL written
+to the archive (board-archive workflow → `data/boards/`, line-history); STILL logged to
+the prediction store WITH the marker (`boardToPredictions` serializes every pregame
+category row — `...(r.susp ? { susp: true } : {})`, `src/lib/pred-serialize.ts` L227 —
+the suspension bars TICKETS, never records); STILL settled (`/api/calibrate` grades
+every pending record board-wide, `gradePrediction`, route L193). **The outs flag as
+spec'd preserves accrual identically** (it edits the C2 ticket filter and the `suspRow`
+tag only). So the "suspension seals itself" defect does NOT exist in the design — no
+M-number.
+**The counts, printed beside the review dates (owner's rule)**: HRR rows accrued since
+the 07-27 suspension — **server-side 0** (no server board since 07-26 16:46Z);
+client-side ≤ a handful (07-27 client generates; exact count needs the sync-phrase read,
+same curl as the join). **The 08-15 HRR review reads**: graded HRR rows post-repair
+against the retirement criterion (±3 pp over ≥300 rows / ≥10 boards — this doc, THE
+REOPENING DECISION) via the prediction blob (`pl:pred:*`) / calibration buckets. **That
+query returns ~0–3 rows today — the review is currently STARVED BY THE OUTAGE, not by
+the suspension**; it becomes non-vacuous the day boards generate. Checked before it
+runs, per the owner's rule: 08-15 arrives vacuous unless the header fix + credits
+deliver ~10+ board-days first.
 
 **What breaks if collection stops mid-window**: Phase 2 Series A is the board×close
 join — a credit stop kills BOTH sides at once (no server boards, no close sweeps). The

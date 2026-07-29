@@ -539,3 +539,31 @@ M14 is unresolved (but M14 is allocation-side — orthogonal to this estimator f
 fix's own parameters ARE measured (k=3.4 from variances, season-primary from n≈265
 regressions, de-noise residual ±1.2 pp) — unlike `coreEvMin`, it does not inherit an
 unmeasured-parameter failure mode. The flag needs no parameters at all.
+
+## THE GO/NO-GO PAGE — the whole Wednesday basis, one place (2026-07-29, owner's item 7)
+
+- **Exact diff and files touched**: the three same-line appends above, all in
+  `legacy/index.html` (>L2402); then `tools/extract-engine.mjs` regenerates
+  `src/engine/legacy-src.gen.ts`; the guard flip edits
+  `tests/outs-suspension-coupling.test.ts` (`it.fails` → `it`). Three files, one commit.
+- **What it forecloses — and what it does NOT**: outs legs stop entering TICKETS in the
+  disciplined modes. **Accrual does NOT stop**: rows stay priced + tagged (L2505–2514),
+  archived (board-archive), logged to predictions WITH `susp:true`
+  (`pred-serialize.ts` L227), and graded board-wide (calibrate L193) — the same
+  non-vacuous design verified for HRR in `docs/collection-period.md` (SUSPENSION SHADOW
+  ACCRUAL). The flag does not seal itself.
+- **The evidence that would reverse it, as a query**: graded `pitcher_outs` rows
+  post-flag from the prediction blob / calibration buckets — the same instrument as
+  HRR's retirement criterion. **That query CAN return rows under the flag** (accrual
+  preserved); it returns nothing only while the OUTAGE persists — the reversal channel
+  is starved by credits/header, not by the flag.
+- **Vintage consequence**: a frozen-table item landing mid-window — a dated reversal
+  row in the frozen table (the `hrrAltMax` precedent), a VINTAGE EVENT in the census
+  (engine/config class), and a board-vintage boundary at the flag date: post-flag
+  boards never pool with pre-flag boards for outs-market readings.
+- **Credit cost on Wednesday: ZERO.** Config+code change, free deploy; testing rides
+  the ordinary board. It does not compete with the protected ~150 curl.
+- **Parameters**: the flag has NONE (a boolean and two conditionals). It cannot inherit
+  an unmeasured-parameter failure mode. (The M2 FIX's parameters are measured — k=3.4,
+  season-primary, ±1.2 pp residual — recorded above; that is the fix's virtue, not the
+  flag's.)

@@ -1,14 +1,23 @@
 # Multi-book execution — SCOPING MEMO (2026-07-28, measured; nothing built)
 
-> ## ⚠️ ADDING THE SECOND BOOK UNDER THE SHIPPED ALLOCATOR IS NEGATIVE ON THIS BOARD
-> (2026-07-28, owner's item — this sentence leads the memo, above every price number in it.)
-> M14's composition cost at the MEASURED gain exceeds the gain: uniform +1.07 pp/leg in
-> the loop lands E[ln] **+111.6 vs the no-second-book base +126.6 — net −15.0 bp**; the
-> empirical-dispersion bump (the real ~54%-zero gain distribution, 5 seeds) lands mean
-> +100.1 — **net −26.5 bp**, same sign. **Multi-book adoption is BLOCKED BEHIND A1/A2**
-> (M14's fix), not behind price measurement. Every per-leg/per-slip number below is a
-> GROSS price fact; **the net is negative until M14 is dispositioned, and this memo
-> prints the net, never the gross, wherever adoption is discussed.** n=1 board.
+> ## ⚠️ ADDING THE SECOND BOOK UNDER THE SHIPPED ALLOCATOR IS NEGATIVE ON THIS BOARD —
+> ## **net −26.1 bp, 95% CI [−29.4, −22.7], 200 seeds** — AND THE BLOCK IS SPECIFICALLY A1
+> (2026-07-28; re-measured at 200 seeds 2026-07-29, owner's seed-count standard — the
+> interval and seed count print inside the sentence, never bare.)
+> The 5-seed −26.5 was spread 3× its effect; at **200 seeds: mean E[ln] +100.5 vs base
+> +126.6 → net −26.1, SD 24.3, SE 1.72, CI [−29.4, −22.7]** — excludes zero;
+> game-clustered draws agree (**−24.9 [−28.2, −21.6]**). The uniform-bump −15.0 sits
+> OUTSIDE the CI: the uniform proxy is valid in SIGN and understates the dispersed cost
+> by ~11 bp — sweep figures are uniform-labeled where used. Per-seed realized gains
+> (1.28–2.04 pp) explain almost none of the spread (regression on realized gain: β
+> −12.7 bp/pp, residual SD 24.0 of raw 24.3 — the spread is composition lottery, and the
+> NEGATIVE β is M14 visible inside the draws: bigger price gains, worse cards).
+> **THE COUNTERFACTUAL THAT SETS SEQUENCING: under EV ranking (cap held), adoption is
+> +1.9 [−1.2, +5.0] — not negative.** So multi-book is **blocked specifically behind A1;
+> the sequencing is A1 → then books** — the operative sentence, with A1's own narrowing
+> carried beside it (A1 is monotone −1.5…+1.5 but breaks at +2.0 and is one board; see
+> the bundle). Every per-leg/per-slip number below is a GROSS price fact; the memo
+> prints the net wherever adoption is discussed. n=1 board.
 
 Owner context: live BetMGM NV and Circa accounts exist. `PLAY_BOOKS` is a single-entry
 config from Phase 5. This memo reports feed reality, the measured prize, the schema

@@ -154,6 +154,45 @@ not M11 itself.**
 
 **Count: one fixed-card price-response family existed, and it is the one that exposed M14.**
 
+### M14 ADDENDUM (2026-07-29, owner's items — the adoption number at 200 seeds, A1's own sweep, the damping parameter)
+
+- **Adoption at 200 seeds** (row-uniform draws): net **−26.1 bp, SD 24.3, SE 1.72, CI
+  [−29.4, −22.7]** — excludes zero; **game-clustered: −24.9 [−28.2, −21.6]** (both
+  printed). 200-seed mean sits inside the 5-seed range (generator stationary — the
+  impossible branch does not fire; mulberry32, seeds 7919·s). The uniform −15.0 lies
+  OUTSIDE the CI: uniform is a sign-valid, magnitude-understating proxy (~11 bp short).
+  Regression of E[ln] on realized per-seed gain: **β = −12.7 bp/pp** (residual SD 24.0
+  of 24.3) — magnitude variance explains almost nothing; the spread is composition
+  lottery, and the negative β is M14 inside the draws.
+- **A1 under its own microscope**: EV-ranking full sweep −1.5→+2.0:
+  175.1 / 179.4 / 183.1 / **187.2 (bump 0)** / 188.5 / 190.5 / 194.1 / 194.2 (+1.07) /
+  198.2 / **188.3 at +2.0 — NON-MONOTONE**. So per the pre-committed branch **A1 is NOT
+  sufficient everywhere; the claim narrows to "sufficient at ≤ +1.5 on one board."**
+  At bump 0 EV ranking is HIGHER than prob (+187.2 vs +126.6, +60.6 bp) — on the
+  observed board it is not a trade-down, but the +2.0 break and n=1 travel with the
+  number wherever A1 is cited. **EV-ranking dispersed adoption: +1.9 [−1.2, +5.0]** —
+  the M14 cost vanishes under EV ranking; multi-book is blocked SPECIFICALLY behind A1.
+- **The damping constant 0.5 in `eff = base/(1+0.5·sharedGames)` survives the ranking
+  swap and is CHOSEN, not fitted** — sweep at 0/0.25/0.5/1.0: prob ranking
+  **+90.6 / +122.0 / +126.6 / +130.5** (40 bp range — MATERIAL, monotone rising) vs EV
+  ranking +192.6 / +189.5 / +187.2 / +181.5 (11 bp, falling). Per the pre-committed
+  branch **0.5 joins `coreEvMin` in the frozen table as unmeasured-and-implicated**
+  (annotated there); under prob ranking the chosen value is ~4 bp below damp=1.0 on
+  this board. n=1 board throughout.
+- **The `coreEvMin` "95 bp below optimum" is WITHDRAWN as a candidate amendment —
+  self-graded artifact (owner's shade test)**: the δ=0 peak (ce=30, +221.9) collapses
+  under shading — **+24.0 at −3 pp (peak migrates to ce=20, +63.6) and −96.4 at −5
+  (worst of all tested values)**. E[ln] under the model's own probabilities rewards
+  concentration into the model's own favorite tickets — exactly what overconfidence
+  punishes. Restated as: distance from the MODEL'S OWN optimum, not from an optimum.
+  Ceiling census beside it: the allocator ENFORCED its ceilings in every sweep card
+  (they are its output); one bind at ce=1 ($35 vs $34.7); the ce=20/30 $83 stakes are
+  `capG = 250/3` limited with Kelly ceilings ABOVE capG — no contradiction with the
+  $28 ceiling, which belonged to a 3.3%-edge ticket absent from high-floor cards (both
+  derivations printed). Secondary observation, recorded not promoted: ce≈10–20
+  dominates ce=2 at every tested shade (0/−3/−5) on this board — n=1, self-graded
+  caveat applies to it too.
+
 ### LEVEL vs DERIVATIVE — every card/slip/bankroll-level number, classified (2026-07-28, owner's item; the distinction: LEVEL claims survive M14, PRICE-derivative claims do not)
 
 | number(s) | doc | class | frame | verdict under M14 |
