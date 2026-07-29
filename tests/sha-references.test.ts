@@ -27,8 +27,12 @@ const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 function originRefs(): string[] {
   try {
-    return execSync('git for-each-ref --format="%(refname)" refs/remotes/origin', { encoding: "utf8" })
+    const refs = execSync('git for-each-ref --format="%(refname)" refs/remotes/origin', { encoding: "utf8" })
       .split("\n").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
+    // HEAD is included so docs may cite the HELD stack (real commits, ancestors of the
+    // local branch, deliberately unpushed under the hold rhythm — docs/session-handoff.md
+    // records exactly those). A sha reachable from NEITHER origin nor HEAD is dangling.
+    return [...refs, "HEAD"];
   } catch { return []; }
 }
 
