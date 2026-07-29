@@ -1,5 +1,12 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> ⚠️ **THE PARAMETER EXIT DOES NOT FIT THIS CREDIT CYCLE (2026-07-28, measured):**
+> Phase 2 Series A's own floor (~246 credits/day: one board ~150 + one close sweep ~96;
+> requirement written at `docs/phase2-memo.md` L40–42) needs ~13.5k to 09-22 against
+> **2,317 remaining** — the current cycle funds ~9 days at the floor and ~3 at the
+> current cadence. Both derivations printed in THE CREDIT BUDGET section below; whether
+> the PLAN fits depends on the reset date (pending, dashboard-only) and the burn plan.
+
 The system is in a **data-collection freeze through at least late August 2026.**
 
 During the freeze, **no model weights, gate thresholds, market suspensions, structure
@@ -109,7 +116,7 @@ drift, even when both values look reasonable on their own.
 | parameter | value | meaning |
 |---|---|---|
 | selection mode default | `ev_gated` | EV-gated @ CZ (stored dk_fd / probability / caesars_ev respected) |
-| `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER IN A DEFECT'S ADMISSION PATH (2026-07-28, M14)**: the value 2 was chosen (`06d3cbc`, "Raise the EV gate to +2%"), never fitted, no measurement on record; it is the admission valve of M14 (allocator non-monotone in price), does NOT expire at the reopens, and on the 07-26 board E[ln] is monotone INCREASING in it (1→+113.0, 4→+139.1 bp — n=1 board, no ship). Any fix designed against it inherits its unmeasured-ness |
+| `coreEvMin` | `2` (percent) | core EV floor at the selection price. ⚠️ **UNMEASURED PARAMETER, now with a measured distance from optimum (2026-07-28, M14 items; corrected same day — the first "monotone increasing" claim was four points hiding three cards)**: the value 2 was chosen (`06d3cbc`), never fitted. Extended sweep on the 07-26 board (in loop, δ=0, bump 0): the 12 tested values collapse to **8 distinct cards** — 1→+113.0 (6 tix) · {2,3}→+126.6 · {4,5,6}→+139.1 · 8→+161.7 · 10→+193.7 (5) · 15→+210.5 (4) · 20→+217.4 (3) · **30→+221.9 (3)** · 50→card EMPTY, E[ln] 0. **Interior peak ≥ ce=30: the frozen 2 sits ~95 bp below the board's optimum** — n=1 board, δ=0 only (a 3-ticket $83×3 card is far more shade-fragile than a 6-ticket card; the optimum-under-error is NOT measured), candidate amendment at exit, NO SHIP. The M14 ranking swap shows the floor is not M14's mechanism — this is a second, separate observation about the floor's own level |
 | `coreCzEvMin` | `0` | settlement floor — never lock a core ticket negative-EV at Caesars (override-proof) |
 | `consMinN` / `consMinEv` | `100` / `−1` (%) | markets under 100 graded legs also need consensus-fair EV ≥ −1% |
 | `dailyBankrollCap` | `0.10` | CORE+FUN day exposure ≤ 10% of the managed bankroll, enforced at lock |
@@ -3024,14 +3031,34 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
 - **Forward rate, measured on 07-28's composition: ~740–760/day → 2,317 dies ~07-31,
   BEFORE Friday's K's/outs reopen.** The aggregate-implied ~630/day reconciles as the
   average over lighter days — no unknown spender; the impossible branch does not fire.
-- **The burn plan's first lever is information-free**: a `pre` MIN_GAP (mirror the
-  close gap) would have cut 07-28 from 9 snapshots to ~3–4 (~260/day incl. line-history)
-  with zero rows of information lost. A collection change — SPEC ONLY, owner's sign-off,
-  vintage note in the archive (snapshot cadence changes the day-file's shape, not row
-  schema). Per-fire generate cost, computed from its request URLs (no generate has fired
-  since 07-26, so computed not measured): game odds 3 mkts × 2 regions = 6 + props
-  (6+3 alt keys) × us × ~16 events ≈ 144 → **~150/fire; each of the 3 cron slots and the
-  manual curl cost the same ~150**.
+- **The burn plan's first lever — "zero-information" now MEASURED, not claimed
+  (2026-07-28, owner's item; corrects this bullet's first wording)**: on 07-28's own
+  snapshot pairs, the 3-minute cluster duplicates carry **3–5% changed rows at mean
+  |Δfair| 0.014–0.042 pp** (08:02→08:05: 4%/0.042; 08:05→08:07: 5%/0.014; 10:14→10:16:
+  3%/0.001) versus **20% / 0.214 pp across the 14-minute 07:48→08:02 gap** — negligible,
+  with the cost printed rather than asserted zero. **MIN_GAP spec (SPEC ONLY, owner's
+  sign-off)**: mirror `MIN_GAP_S` onto `pre` readings (~one pre per 40 min), cutting
+  07-28's 9 snapshots to ~3–4 (~260/day incl. line-history); **vintage-stamped, series
+  segmented pre/post the cadence change, no reinterpretation of prior snapshots under
+  the new cadence** — an instrument change inside a measurement window, the CLV
+  decoupling rule verbatim. Per-fire generate cost, computed from its request URLs (no
+  generate has fired since 07-26, so computed not measured): game odds 3 mkts × 2
+  regions = 6 + props (6+3 alt keys) × us × ~16 events ≈ 144 → **~150/fire; each of the
+  3 cron slots and the manual curl cost the same ~150**.
+- **THE FLOOR COMES FROM PHASE 2'S REQUIREMENT (owner's rule — derived, file and line
+  cited)**: Series A = archived board (open + pModel) × close fair joined by lkey+date —
+  **`docs/phase2-memo.md` L40–42** (build items 2–4); the 20-board bar for 08-15 is in
+  `docs/singles-vs-parlays.md` (REVIEW DATE) + the CLAUDE.md calendar. Requirement =
+  **one server board/day (~150) + one close-quality sweep/day (~96) ≈ 246/day → ~13.5k
+  to 09-22**. Pre sweeps are NOT a Series A requirement (bet-time vintage is the
+  multibook memo's need). **Both derivations printed**: at the ~246 floor, 2,317 dies
+  ~08-07; at the current ~740 cadence, ~07-31 — the cycle dies under EVERY cadence ≥
+  the floor; hence the sentence at the top of this doc. CLV sightings separately:
+  currently free exits (no locked card); a locked 6-ticket card ≈ 1–6 cr × ≤6 games ≈
+  **≤ ~30/day**. Alt-key marginal at the POST-dedupe cadence: **+48–96/day** (+3 keys ×
+  ~16 events × 1–2 sweeps — not the 123-event-sweep figure). **PROTECTED SPEND:
+  Wednesday's manual generate curl (~150) gates the entire verification chain and
+  produces the first board+`fp` day — NOT a rationing candidate.**
 
 **What breaks if collection stops mid-window**: Phase 2 Series A is the board×close
 join — a credit stop kills BOTH sides at once (no server boards, no close sweeps). The

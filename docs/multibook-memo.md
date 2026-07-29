@@ -1,5 +1,15 @@
 # Multi-book execution — SCOPING MEMO (2026-07-28, measured; nothing built)
 
+> ## ⚠️ ADDING THE SECOND BOOK UNDER THE SHIPPED ALLOCATOR IS NEGATIVE ON THIS BOARD
+> (2026-07-28, owner's item — this sentence leads the memo, above every price number in it.)
+> M14's composition cost at the MEASURED gain exceeds the gain: uniform +1.07 pp/leg in
+> the loop lands E[ln] **+111.6 vs the no-second-book base +126.6 — net −15.0 bp**; the
+> empirical-dispersion bump (the real ~54%-zero gain distribution, 5 seeds) lands mean
+> +100.1 — **net −26.5 bp**, same sign. **Multi-book adoption is BLOCKED BEHIND A1/A2**
+> (M14's fix), not behind price measurement. Every per-leg/per-slip number below is a
+> GROSS price fact; **the net is negative until M14 is dispositioned, and this memo
+> prints the net, never the gross, wherever adoption is discussed.** n=1 board.
+
 Owner context: live BetMGM NV and Circa accounts exist. `PLAY_BOOKS` is a single-entry
 config from Phase 5. This memo reports feed reality, the measured prize, the schema
 surface, the gate's shape, and the freeze posture. **Report only.**
@@ -146,6 +156,33 @@ same-gated ledger. **The fp one-day gap is a DEPLOY ARTIFACT, resolved**: `fp` e
 `compact()` in `28bbddf` at 2026-07-26 **21:39:41Z** — AFTER both of 07-26's sweeps
 (07:55Z, 20:32Z); a backfill was never possible (no raw payloads stored; propsnap empty
 — checked). Not an unrun backfill.
+
+**PRE-COMMITTED, ON DISK BEFORE THE OWNER RUNS THE CURL (2026-07-28, owner's item 6):**
+- **Substrate**: the one recorded contamination in this store is the two-generator /
+  six-day provenance ambiguity — rows written before Phase 0.5 (2026-07-24) carry
+  neither `src` nor `selMode`, and `CAL_START` excludes them (`src/lib/pred-serialize.ts`
+  L35–40). 07-27/07-28 records post-date that deploy, so they carry both fields — their
+  cleanliness on those axes is establishable FROM THE BLOB ITSELF when read. No recorded
+  prediction-vs-ledger disagreement or leg-count misread touching 07-27/28 was found on
+  disk (searched `misread`/`contaminat*` across the finding docs); beyond that, disk
+  cannot establish more — the blob read is the establishment.
+- **Vintage**: `cz` is the GENERATION-TIME price — merge rule is last-pre-start write
+  wins, frozen at first pitch (`pred-serialize` L324–331) — so it pairs with the
+  archive's **pre** snapshot. Anything else would be a vintage mismatch; none is named.
+- **The read** (zero credits — the route only reads redis; sync phrase only):
+  `curl -s -H "x-pl-sync: <phrase>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-27"`
+  → response `{date, at, records: {k: PredRecord}, parlays, games}`;
+  `records[k] = {k, label, sub, market, lkey, p, pModel, pMkt, cz, czEv, ln, susp, src, …}`.
+- **The branches, committed now**: (1) rows join carrying both `cz` and `fp` → the hits
+  two-book gain gets its first measured magnitude, **stamped one fixture-day +
+  pre-vintage**, and "unrecoverable" withdraws with a dated marker — fourth claim,
+  fourth outcome. (2) rows join but `cz` is null throughout hits/K's → **the field is
+  written and never populated — an M-item, not a join failure**. (3) zero rows → the
+  query and the keys actually present under `pl:pred:*` get printed (the same curl
+  without `date` returns the day list). (4) impossible branch: pred rows exist for
+  2026-07-26 → the boards={07-26} / fp={07-27,28} partition was wrong and the same-day
+  join was available two turns ago — print both. (The public `/api/calibration` is
+  aggregates-only and cannot pre-answer (4); the day-list read settles it.)
 
 **⚠️ POPULATION STAMP (2026-07-28, post-M13)**: every two-book number in this section —
 +1.01/leg, +1.42/+1.58/+1.74 per slip, this per-market table, and the crossover

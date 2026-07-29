@@ -501,3 +501,41 @@ of freeze exit, which is when a decision is actually required.
 **Re-measure on ≥ 2 more boards before acting.** The mechanisms (the clamp arithmetic, the
 `n/(n+k)` weight, `leashOf`'s shared estimator) are board-independent and need no
 confirmation; the magnitudes (−2.48 outs, −23.1 pp, −2.57 tail) are one board.
+
+# THE SUSPENSION FLAG — SPEC ONLY, held for the Wednesday go/no-go (2026-07-28, end of Tuesday)
+
+The calendar said: fix built Tuesday, tested Wednesday, deployed Thursday, else outs takes
+a suspension flag. **End of Tuesday: nothing is built** — the M2 pair is SPEC'D (measured
+k=3.4, season anchor, the `offense()` de-noise, interlock-enforced) but no implementation
+branch or commit exists; `0.140` still sits at L2258. Per the owner's pre-commitment the
+flag is prepared here as a spec — NOT applied, no rushed fix — and decided Wednesday.
+
+**Exact diff, three same-line appends (the hrrAltMax pattern, mode-conditional; all lines
+> L2402, no line insertions):**
+1. Config (L1087 region, same-line append after `hrrAltMax:-1…`):
+   `outsSusp:true/* 2026-07-2? Wednesday go: outs suspended pending the M2 pair — flag, not fix */,`
+2. Ticket bar (`buildParlaySet`'s C2 filter, the line carrying the HRR bar at ~L2657,
+   same-line append inside the same filter callback):
+   `if(lp[1]==="pitcher_outs"&&SH_CFG.outsSusp)return false;`
+3. Display tag (L2514, extend the `suspRow` expression):
+   `var suspRow=dscpM&&((hrrRow&&SH_CFG.hrrAltMax!=null&&Number(lpq[2])>SH_CFG.hrrAltMax)||(lpq[1]==="pitcher_outs"&&SH_CFG.outsSusp));`
+   (rows stay visible and greyed, never ticketed — the HRR precedent exactly.)
+
+**Guard**: `tests/outs-suspension-coupling.test.ts` — written 2026-07-28, **OBSERVED RED
+as a plain `it`** (ev_gated pool carried 10 outs legs), committed `it.fails` with a
+legacy-posture PLANT (passing). Flip `it.fails` → `it` in the flag's commit; if the go/no-go
+lands "no" because the M2 pair ships Thursday instead, DELETE the guard in that commit —
+the fix supersedes the flag.
+
+**Ship mechanics if "go"**: engine change → re-extract (`tools/extract-engine.mjs`),
+armed digests move (documented regeneration, the hrrAltMax precedent); `baseline43`
+expected untouched (legacy posture unfiltered by design — the plant pins it); parity +
+full suite before deploy.
+
+**The tradeoff, stated and NOT decided (owner's rule)**: outs is n=12 and demoted from
+peer status in the two-book table; the quota cliff lands ~07-31 (the flag itself costs 0
+credits; the FIX's test day competes for Wednesday credits only via the ordinary board);
+M14 is unresolved (but M14 is allocation-side — orthogonal to this estimator fix). The M2
+fix's own parameters ARE measured (k=3.4 from variances, season-primary from n≈265
+regressions, de-noise residual ±1.2 pp) — unlike `coreEvMin`, it does not inherit an
+unmeasured-parameter failure mode. The flag needs no parameters at all.

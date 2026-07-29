@@ -318,6 +318,25 @@ points, and that quantity has not been measured.**
 > | +1.5 | **+70.5 ⬇** | **+59.2 ⬇** |
 > | +2.0 | +74.4 | **+42.6 ⬇** |
 >
+> **⚠️ REFINEMENTS, 2026-07-28 later (owner's items — three corrections to this block's
+> first reading, numbers unchanged):** (1) the composition-frozen "Control A" carried the
+> bump=0 stakes, making it an IDENTITY — it excludes an arithmetic defect in the E[ln]
+> instrument and locates nothing; the localization rests on the in-loop curve, the
+> census, and the ranking swap below. (2) The mechanism is ISOLATED, not just localized:
+> non-monotonicity SURVIVES uncapped (+136.2 → +99.0 at cap ∞) and **VANISHES under
+> EV-ranking with the cap held (+187.2 → +198.2)** — price-blind RANKING is sufficient,
+> the cap is innocent, admission supplies the candidates; the +1.5 entrants sit at
+> uncapped ranks 1/2/6 with deGrom/Freeland at 7. **A1 is the M14 fix on this evidence;
+> A2 is innocent of M14** (its floor-scaling case stands separately). (3) The negative-bump
+> sentence is restated at its measured size (a correction to the owner's pre-committed
+> wording, which was broader than the numbers): base +126.6, then +121.2 / +117.8 /
+> +124.9 at −0.5/−1.0/−1.5 — every negative bump BELOW base, the rise LOCAL (−1.0 → −1.5,
+> +7.1 bp): *a locally worse price set produced a locally better card; worse-than-observed
+> never beat observed on this board.* **And the adoption number: at the MEASURED +1.07
+> pp/leg gain, in-loop E[ln] is +111.6 (uniform) / +100.1 (empirical dispersion mean, 5
+> seeds, same sign) vs base +126.6 — net −15.0 / −26.5 bp. The second book is NEGATIVE
+> under the shipped allocator on this board.**
+>
 > **Non-monotone at four of five steps, in ONE book, on both card types.** The
 > pre-committed branch fires: allocator defect, M-numbered (**M14**), and the memo's
 > collapse paragraph is retracted as mis-attributed — two books merely walked into it.
