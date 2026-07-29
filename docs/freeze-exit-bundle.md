@@ -190,6 +190,56 @@ inverts — it SURVIVES at −5**, unlike the coreEvMin peak, which migrated and
 sign under the same shade. Per the pre-committed reading: **the +60.6 is A1's
 OPERATIVE argument**, stamped one board (07-26) + one data vintage (priors `b75e905`
 + context `3e2b93c`), with the +2.0 break traveling beside it wherever it is cited.
+
+**FULL GRID REPRINT (same day — the owner read a sign flip into the curve; the
+record shows none)**: shade / g(prob) / g(EV) / gap, with card composition
+(tickets/legs/cross-ticket-pairs/within-ticket-groups) printed at EVERY step:
+−0: +126.6 / +187.2 / **+60.6** · −0.5: +106.5 / +164.4 / **+58.0** · −1: +86.5 /
++141.8 / **+55.4** · −2: +47.0 / +97.4 / **+50.4** · −3: +8.2 / +53.8 / **+45.5** ·
+−4: −29.9 / +11.1 / **+40.9** · −5: −67.3 / −30.8 / **+36.6**. Composition:
+**6/14/2/0 on BOTH cards at ALL seven steps** — constant BY CONSTRUCTION (both cards
+are built ONCE at shade 0; the shade is applied to an evaluation copy only — the
+admission gate, the ranking key and the prices are never shaded; instrument lines in
+`tests/a1-shade.test.ts`, the evaluation-of-chosen-stakes design of the M14-audit
+row) — and constant empirically, as printed. **The gap is monotone decreasing and
+never crosses zero; both LEVELS go negative between −3 and −5 while the gap stays
+positive** — the relayed "+52.8 at −1" and "−36.6 at −5" match no recorded value
+(nearest actuals: gap +55.4 at −1; gap **+36.6** — positive — at −5, where the
+LEVELS are −67.3/−30.8; the −3 point +45.5 sits exactly on the monotone path).
+Per the owner's own branch 3: shading is est-only, the curve is monotone → the
+coreEvMin withdrawal stands, this level claim stands, and the misread was the read,
+not the record. No step showed E[ln] rising under a worse shade (the impossible
+branch stayed silent on the run's own output).
+
+**WITHIN-TICKET PRICING MAGNITUDE, MEASURED ON THE 07-26 ARCHIVE (2026-07-29,
+owner's item 6 — the magnitude before the reopen, not the description)**:
+- **The pricing line**: naive product at legacy L2684–85; sim-joint rescale
+  L2686–2706 (clamped 0.25–4×) wherever `SIMS[gkey].jointAll` grades the group —
+  bare product ONLY where the sim lacks the game or a leg marginal.
+- **Share that scales it**: same-game tickets **25 of 218 emitted = 11.5%** (group
+  sizes: 2-leg ×14, 3 ×8, 4 ×2, 5 ×1).
+- **ρ-repricing of all 25** (first-order pairwise, ticket-level): adjustment
+  magnitude mean **1.17 / 2.33 / 4.67 pp**, max **2.32 / 4.64 / 9.27 pp** at
+  ρ = 0.05 / 0.10 / 0.20. Sign per pair is event-level and unmeasured without the
+  sim; where the sim DID grade (22 of 25), its own signed answer: emitted − naive
+  mean **−1.06 pp** (min −16.70, max +3.80; 2 of 22 negative — two large negative
+  repricings dominate the mean).
+- **THE GATE ANSWER (the pre-committed branch that fired: the gate uses a different
+  quantity)**: `czEv` is computed from the EMITTED prob — sim-adjusted wherever a
+  group was graded. Allocator pool census: 67 tickets, **3 same-game (all HR
+  parlays), ALL sim-graded, ZERO bare-product tickets in the pool** — on this board
+  the EV gate never read a naive same-game price, so the M14 admission channel was
+  NOT fed by this path here. The exposure class exists structurally (the ungraded
+  fallback inside a pool ticket) at **n = 0 on this board** — said rather than
+  reported as zero risk.
+- **The triplicate's channels**: `czDec`/`czEv`/`czOdds` all **null** — it cannot
+  enter the pool, the card, the EV math, or the ledger (`pred-serialize` skips
+  `parlaysLive`); display + manual slip-add only. Its bare product verified from its
+  own legs (63.9% × 57.0% = 36.4% as displayed); ρ-bound **+1.19 / +2.38 / +4.76 pp**
+  at ρ = 0.05/0.10/0.20 — an UNDERSTATEMENT if the two Unders are positively
+  correlated. Its number is **M19** (row above); no additional M-number is minted —
+  the gate-coupling branch did not fire.
+
 **A1's case rests on: penalty removal (paired +27.4/+24.5, ρ=0.20-robust), restored
 monotonicity (≤ +1.5, one board), the level effect (+60.6, detectable at 15 boards),
 and the floor (min +147.5 vs +27.1). The adoption effect size is OUT OF REACH, not

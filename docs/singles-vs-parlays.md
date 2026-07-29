@@ -408,6 +408,15 @@ quantity Phase 2 and the calibration channel exist to produce. Re-run this table
 
 > ### 📅 REVIEW DATE — 2026-08-15
 >
+> **(RE-SCOPED 2026-07-29, owner's order — this review's date had already moved to
+> 08-20 with the bar decision, and it is now an ARCHIVAL MECHANISM CHECK needing zero
+> boards: "does the leg-equivalent floor (A2) keep the crossover stable under
+> M14-class price shifts, where the fixed +2% floor does not?" — instrument = this
+> doc's own harness, sections 5–6, over archived boards; n=1 answer on record:
+> 3.013 → 0.513 fixed-floor vs 3.456 → 3.661 leg-equivalent. The DOCTRINE question
+> stays UNDETERMINED PENDING M14, as ruled below; its boards are freed to Series A.
+> Full block: `docs/collection-period.md`, THE 08-20 CROSSOVER REVIEW.)**
+>
 > The rule rests on **one board**. It is not allowed to rest on one board indefinitely, so it
 > carries a date rather than an intention.
 >

@@ -18,6 +18,36 @@
 > or weak.** The parameter exit is not a tune-up of a measured system; it is the first
 > measurement pass over most of it.
 
+> ⚠️ **REVIEW REACHABILITY WITHOUT A RESET (2026-07-29, owner's order — written above
+> the credit sentence so 08-15 is not discovered on 08-15). From 1,676 remaining,
+> reached-or-not per cadence:**
+>
+> | review | requirement | sweeps-only (~420/d · 4.0d · 0 boards) | board-only (~150/d · 11.2d · 11 boards) | both (~570/d · 2.9d · 2–3 boards) | Series-A-complete (~246/d · 6.8d · 6–7 boards) |
+> |---|---|---|---|---|---|
+> | **08-15 HRR suspension review** | ≥10 board-days by 08-15 | NOT reached | **REACHED (11, barely) — at the cost of Series A's close side and the pre↔close pairing** | NOT (2–3) | NOT (6–7) |
+> | **08-08 HRR repair SPEC** | a DECISION must exist (A3 pattern); input = the 08-05 archive re-run — archive on `line-history`, zero credits, zero boards | **reached on every cadence, including total dark** | same | same | same |
+> | **08-10 six-regression re-run** | board-independent (reviews table) | **reached everywhere** | same | same | same |
+> | **08-17 fixture bar (homogeneous-20)** | 20 boards | NOT (0) | NOT (11 < 20) | NOT | NOT |
+> | **08-20 crossover** | ~~20 boards~~ **RE-SCOPED 2026-07-29 to an archival mechanism check — ZERO boards** (block below) | reached (archival) | reached | reached | reached |
+>
+> **NO CADENCE REACHES BOTH the 08-15 suspension review AND keeps Series A alive** —
+> board-only reaches the review only by killing the sweeps Series A needs; every
+> sweep-keeping cadence fails the review. (The relayed "both-rationing reaches 14"
+> matches no recorded rate: both ≈ 2–3 board-days at ~570/day — the three real rates
+> stand in the table.) **IF NO RESET LANDS, what each starved review could become
+> (options printed, NOT chosen)**: 08-15 suspension → (a) run at 11 board-days,
+> board-only, as a floor check (no MDE exists for it — it is a threshold, not an
+> estimate); (b) restate to "first 10 board-days whenever reached" — date slips,
+> question intact, cost ~1,500 credits at ~150/board; (c) nothing — vacuous by its own
+> threshold. Fixture bar → (a) hold 20 and wait for a reset; (b) an owner-lowered n
+> with the MDE table attached (allocation-level ~15.2 bp at 20 / ~17.6 at 15 / ~20.5
+> at 11; the row-level census consumer has NO power model at ANY n — lowering is
+> unquantifiable for it); (c) nothing. **AND THE DIRECT ANSWER, PLAINLY: no cadence
+> completes Series A by 09-22 on the quota on hand** — the floor is ~246/day × ~55
+> days ≈ 13.5k against 1,676 (6.8 days). **Without a reset, the freeze's stated
+> purpose — one engine vintage per measurement window — has no window to accumulate
+> over.** Every dated review inherits this table; the ASPIRATIONAL stamp below stands.
+
 > ⚠️ **THE PARAMETER EXIT DOES NOT FIT THIS CREDIT CYCLE (2026-07-28, measured):**
 > Phase 2 Series A's own floor (~246 credits/day: one board ~150 + one close sweep ~96;
 > requirement written at `docs/phase2-memo.md` L40–42) needs ~13.5k to 09-22 against
@@ -114,6 +144,48 @@
 > covers exactly this class) AND a vintage event (a cadence change stamps a
 > boundary; the data axis would move from tracked-floating to frozen, a regime
 > boundary of its own). It is not governance housekeeping.**
+
+> **THE BOT PAUSE — DIFF READY, HELD FOR SIGN-OFF, NOTHING PAUSED (2026-07-29)**. The
+> owner ordered the pause; the owner's own pre-committed reading routes it here:
+> "pause is a freeze item → do not pause. Bring the diff and the sign-off request,
+> and the bar decision stays pending one turn." The classification above (same day)
+> is FREEZE ITEM + vintage event — so this is the diff and the request, and the bar
+> decision stays pending one turn.
+>
+> **What the workflows do (so the pause touches ONLY the two ordered paths)**:
+> `model.yml` = `priors.json` only (nightly 09:30Z) — disabling it IS the priors
+> pause, whole. `context.yml` = THREE functions: the `context.json` build+commit,
+> the **`data/ump_k.json` ACCUMULATOR** (the umpire-K database the ~08-04/08-08/08-13
+> self-arm clocks count on), and a `data/pen_quality.json` stage (historically never
+> materializes in a commit on this branch; `tests/bot-path-whitelist.test.ts` would
+> flag it the day it does). **Pausing context.json must not stop ump_k accumulation.**
+>
+> **The diff (one commit on `main` — the scheduler copies live there, default branch,
+> both files verified present on `origin/main`; the job checks out `frontend-rebuild`
+> so no run-side script changes; `main` has Vercel deploys disabled, so the push
+> deploys nothing)**:
+> 1. `model.yml`: comment out the `schedule:` block (equivalently `gh workflow
+>    disable engine-v2-priors` — zero-commit, reversible in one CLI call).
+> 2. `context.yml`, "Commit if changed" step: drop `public/model/context.json` from
+>    the `git add` line — `ump_k.json` keeps committing and accruing; production
+>    context freezes at its last committed artifact.
+>
+> Reversible in one commit (revert) or one CLI call (re-enable). **Stamps if signed
+> off**: the pause date = the homogeneous-window start on the DATA axis; **every
+> pre-pause board is PRE-PAUSE, CROSS-VINTAGE, and the homogeneous count starts at
+> ZERO on pause day — said out loud: the pre-pause boards (07-26 and everything
+> before the pause) never join the homogeneous series.** Reachable homogeneous-20
+> from a 07-30 pause: hits-family 20 on **08-18**; whole-board (code boundaries
+> 07-31/08-01 still segment) 20 on **08-20** — **and either needs a reset: the quota
+> caps boards at 11 board-only, so homogeneous-20 is credit-unreachable regardless
+> of the pause** (reachability table at the top). Staleness: the forgone drift stays
+> measurable at zero Odds credits (run the keyless builders uncommitted, diff against
+> the frozen artifacts); the consequence on prediction quality is unmeasurable
+> without fresh boards — **recorded as UNMEASURED, not zero**. The tension the
+> sign-off decides: the orthogonality block above argues the fixture bar does NOT
+> need data-vintage homogeneity (the pause moves neither 08-17 nor 08-20); what the
+> pause buys is one data vintage for the PARAMETER EXIT's cross-day re-measurement
+> paths (M18's fourteen downstream findings).
 >
 > **POWER, NOW PARTLY COMPUTABLE (2026-07-29, owner's item 5 — for the owner's
 > re-decision; the original decision stays on the record with its date)**: the
@@ -133,7 +205,7 @@
 > | review | written target effect | reachable boards (see runway) | MDE at that count |
 > |---|---|---|---|
 > | fixture-representativeness (→08-17) | none written | ≤11 board-only / ~2–3 with sweeps | no power model (census-type test) |
-> | crossover doctrine (→08-20) | none written | same | ~15–17 bp (allocation-level) |
+> | crossover doctrine (→08-20) | none written — **RE-SCOPED 2026-07-29 to an archival mechanism check, ZERO boards (block below); doctrine stays UNDETERMINED PENDING M14 as ruled** | ~~same~~ n/a — archival | was ~15–17 bp; n/a after re-scope |
 > | HRR retirement (repair+10) | **±3 pp over ≥300 rows/≥10 boards — the ONLY written target** | blocked on repair ship | binomial SE at n=300 ≈ 2.9 pp → **the ±3 pp bound is a ~1-SE statement — marginal by its own arithmetic** |
 > | HRR suspension review (≥10 board-days) | none beyond the row/board floor — **and the review carries the SELECTED-vs-UNSELECTED limitation recorded 2026-07-29: the suspension was measured on selected legs, shadow rows are every HRR row unselected; the `cfSel` stamp (SHIPPED same day, below) is what makes the two populations separable when the review runs** | 11 board-only | — |
 > | 08-10 six-regression re-run | SEs written per coefficient (licensing block) | board-independent | n/a |
@@ -144,6 +216,27 @@
 > 60-seed estimate — at the paired-200 uniform +1.3 the requirement is ~3,000 boards,
 > and the clustered point estimate is −0.4, NEGATIVE — sign not established at the
 > clustered instrument. Retirement STRENGTHENED; bundle carries the arithmetic.)**
+
+> **THE 08-20 CROSSOVER REVIEW — RE-SCOPED, DATED (2026-07-29, owner's order: cancel
+> or re-scope the one review with no written target).** What it was designed to
+> compare: singles-first vs parlays-first at the same dollars, decided by the
+> crossover scalar (the per-leg overconfidence at which singles overtake) against 20
+> boards' worth of card outcomes. Its board cost: it rode Series A's boards (no own
+> credits) but REQUIRED 20 to exist — unreachable (11 max, table at top). What it
+> could conclude at the reachable count: an allocation-level estimate at MDE ~20.5 bp
+> (n=11) of a question **already ruled UNDETERMINED PENDING M14** — and M14's fix
+> (A1) is exit-gated, so at ANY reachable count it would re-measure a question frozen
+> behind M14. **It IS re-scopable to a mechanism check needing zero boards → per the
+> pre-committed reading it is RE-SCOPED, not struck.** The new question: **"does the
+> leg-equivalent floor (A2) keep the crossover stable under M14-class price shifts,
+> where the fixed +2% floor does not?"** Instrument:
+> `tests/singles-counterfactual.test.ts` sections 5–6 over archived boards
+> (`PL_BOARD`, zero credits) — and the n=1 answer is already on the record:
+> fixed-floor crossover **3.013 → 0.513** under the +1.07 shift; leg-equivalent
+> **3.456 → 3.661** (`docs/singles-vs-parlays.md` table). The re-scope extends that
+> across archived boards as they accumulate; **no board is spent for it; its boards
+> are freed to Series A.** The doctrine question keeps its ruling: undetermined
+> pending M14.
 
 The system is in a **data-collection freeze through at least late August 2026.**
 

@@ -187,6 +187,34 @@ turn**: chunk `256-171aff5d10da160d.js` still referenced; served engine string
 280,466 chars, sha256 `f6cf1513…` = repo — **step-0 clearance HOLDS**. Still
 spec-only: sha+config echo, `coreEvMin`, cap, A1, damping, alt keys, ledger export.
 **NEXT BLOCKING STEP: 2 — the header fix (owner's).**
+**ITEM-1 ANSWERS + THE PUSH GAP (2026-07-29, second post-compaction turn — said
+BEFORE the board exists)**: the served artifact IS readable this session by plain
+HTTPS, no Vercel API — re-fetched live: chunk `256-171aff5d10da160d.js` still
+referenced, engine string 280,466 chars, sha256 `f6cf1513…` = repo, IDENTICAL —
+step-0 clearance re-verified, not stale; the impossible branch (sha changed) did not
+fire. **cfSel is ROUTE code (`src/lib/cfsel.ts` + `app/api/generate/route.ts`), NOT
+in the engine string — the string's hash CANNOT detect it; the server function
+bundle is not publicly readable; the ONLY outside instrument is the `cfSel` field on
+the board's suspended prediction rows (+ the response's counts as the fires-half).
+AND THE GAP: cfSel sits in the HELD stack (unpushed, ahead of origin) — Vercel
+builds from origin/frontend-rebuild, so the field CANNOT appear on tonight's board
+unless the owner orders the push first. Running the curl without pushing makes the
+pre-committed absent→did-not-land reading fire VACUOUSLY (not-pushed is a different
+claim than pushed-and-did-not-land). The push decision is the owner's, before the
+curl — pushing the stack deploys the route change (signed off, guard-proven
+byte-identical) and cannot change the engine string (parity + the content-hashed
+chunk name are the check).** MIN_GAP is GitHub-Actions-side only
+(`props-history.yml` pulls `tools/snapshot_props.py` from origin/frontend-rebuild,
+workflow L59) — NO Vercel dependence; its confirmation stands on the cluster
+instrument alone; **owner's committed first window: 08:02–08:07Z, 2026-07-30.**
+Deploy state since the handoff: origin head `1617d1b`; the Vercel deploy LIST stays
+dashboard-only (unobservable here); the served artifact above is the outside
+evidence. **THE CURL ORDER IS THE OWNER'S ITEM-7 LIST (1 curl+captures → 2 gen=list
+→ 3 self_consistency → 4 cfSel stamps → 5 double reopen → 6 HRR greyed → 7 replay +
+ParlayPred diff → 8 Control-C production reading → 9 ticket counts), quota read
+before AND after, each result written to a dated path.** The 08-20 crossover review
+is RE-SCOPED (archival, zero boards — collection-period); the bot pause is DIFF-READY,
+HELD FOR SIGN-OFF (freeze item, owner's own pre-committed branch — nothing paused).
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =

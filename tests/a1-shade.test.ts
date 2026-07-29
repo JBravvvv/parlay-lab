@@ -150,22 +150,63 @@ describe("A1 level-gap shade test (analysis harness, report only)", () => {
     show("prob card (production base)", probCard);
     show("EV card (edge-aware base, max(ev,0)/(dec-1))", evCard);
 
+    /* WHAT THE SHADE TOUCHES, STATED ON THE OUTPUT (2026-07-29, owner's item 2):
+       both cards are built ONCE, above, at shade 0 — `alloc`/`allocEv` never see a
+       shaded probability. The shade is applied to an EVALUATION COPY only (`shaded()`
+       maps the card; the admission gate, the ranking key, and the prices are never
+       shaded). This is the evaluation-of-chosen-stakes design (bundle, M14 audit row) —
+       composition CANNOT move across shade steps by construction, and the printed
+       composition columns prove it empirically. */
+    const comp = (card: { pl: Row; stake: number }[]) => {
+      const tickets = card.length;
+      const legs = card.reduce((a, c) => a + (((c.pl.legs as Row[]) ?? []).length), 0);
+      const gamesOf = (c: { pl: Row }) =>
+        new Set(((c.pl.legs as Row[]) ?? []).map((l) => String(l.gkey)));
+      let xPairs = 0; // cross-ticket same-game pairs (M16's unit)
+      for (let i = 0; i < card.length; i++)
+        for (let j = i + 1; j < card.length; j++) {
+          const a = gamesOf(card[i]);
+          for (const g of gamesOf(card[j])) if (a.has(g)) { xPairs++; break; }
+        }
+      let inGroups = 0; // within-ticket same-game groups (>=2 legs, one gkey)
+      for (const c of card) {
+        const cnt: Record<string, number> = {};
+        for (const l of (c.pl.legs as Row[]) ?? []) cnt[String(l.gkey)] = (cnt[String(l.gkey)] ?? 0) + 1;
+        if (Math.max(0, ...Object.values(cnt)) >= 2) inGroups++;
+      }
+      return { tickets, legs, xPairs, inGroups };
+    };
+
     // eslint-disable-next-line no-console
     console.log(
-      `\n  ${"shade".padEnd(10)}${"g(prob)".padStart(12)}${"g(EV)".padStart(12)}${"gap EV-prob".padStart(14)}`,
+      `\n  ${"shade".padEnd(9)}${"g(prob)".padStart(11)}${"g(EV)".padStart(11)}${"gap".padStart(10)}` +
+        `${"prob card (tix/legs/xpairs/ingrp)".padStart(36)}${"EV card (same)".padStart(24)}`,
     );
-    const gaps: Record<number, { gp: number | null; ge: number | null }> = {};
-    for (const dpp of [0, 3, 5]) {
+    let prevGp = Infinity;
+    let prevGe = Infinity;
+    for (const dpp of [0, 0.5, 1, 2, 3, 4, 5]) {
       const gp = growth(shaded(probCard, dpp));
       const ge = growth(shaded(evCard, dpp));
-      gaps[dpp] = { gp, ge };
+      const cp = comp(shaded(probCard, dpp));
+      const ce = comp(shaded(evCard, dpp));
       const f = (x: number | null) =>
-        x == null ? "—" : ((x >= 0 ? "+" : "") + (x * 10000).toFixed(1) + " bp").padStart(12);
+        x == null ? "—".padStart(11) : ((x >= 0 ? "+" : "") + (x * 10000).toFixed(1)).padStart(11);
       // eslint-disable-next-line no-console
       console.log(
-        `  ${("-" + dpp + " pp").padEnd(10)}${f(gp)}${f(ge)}` +
-          `${(gp != null && ge != null ? ((ge - gp >= 0 ? "+" : "") + ((ge - gp) * 10000).toFixed(1) + " bp") : "—").padStart(14)}`,
+        `  ${("-" + dpp).padEnd(9)}${f(gp)}${f(ge)}` +
+          `${(gp != null && ge != null ? ((ge - gp >= 0 ? "+" : "") + ((ge - gp) * 10000).toFixed(1)) : "—").padStart(10)}` +
+          `${`${cp.tickets}/${cp.legs}/${cp.xPairs}/${cp.inGroups}`.padStart(36)}` +
+          `${`${ce.tickets}/${ce.legs}/${ce.xPairs}/${ce.inGroups}`.padStart(24)}`,
       );
+      // impossible branch (owner's item 2): E[ln] rising under a worse shade
+      if (gp != null && gp > prevGp + 1e-12)
+        // eslint-disable-next-line no-console
+        console.log(`  ⚠️ IMPOSSIBLE BRANCH: prob E[ln] ROSE under a worse shade at -${dpp}`);
+      if (ge != null && ge > prevGe + 1e-12)
+        // eslint-disable-next-line no-console
+        console.log(`  ⚠️ IMPOSSIBLE BRANCH: EV E[ln] ROSE under a worse shade at -${dpp}`);
+      prevGp = gp ?? prevGp;
+      prevGe = ge ?? prevGe;
     }
     expect(true).toBe(true);
   }, 300_000);
