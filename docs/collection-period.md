@@ -56,6 +56,64 @@
 > retirement criterion's own board floor applied to shadow data, and no power statement
 > exists for it either. Both are recorded in the frozen table as unmeasured
 > calendar-gating parameters.
+
+> **M18 vs THE BAR — DATA VINTAGE IS ORTHOGONAL TO THE FIXTURE-REPRESENTATIVENESS
+> TEST, ARGUED NOT ASSUMED (2026-07-29, owner's item 3; the bar decision above
+> stands, now with its reason written out).** The test's unit is clamp CALLS pooled
+> PER SITE across the archived boards, compared against the frozen fixture's 95%
+> Wilson intervals (`docs/harness-substitutions.md` L985–994; instruments
+> `clamp-activity`, `shrink-activity`, the range detector). The question it answers
+> is "is the frozen fixture — ONE static data snapshot (`fix45`) — representative of
+> PRODUCTION boards?" — and production reads priors/context live at request time BY
+> DESIGN (M18: tracked, never frozen). **The population the fixture must represent
+> is therefore intrinsically data-vintage-mixed; day-to-day prior drift is part of
+> the measurand, not a nuisance variable.** Drift adds VARIANCE to the pooled
+> per-site pinned-fractions — which the disagreement criteria already price (outside
+> the Wilson interval AND >10 pp, or a class change) — and no mechanism is on record
+> by which nightly Statcast-percentile refreshes would BIAS archive fractions toward
+> or away from a fixture built from one of them. Freezing the data vintage would
+> validate the fixture against a single vintage — a WEAKER claim, not a cleaner one.
+> What the bar does need homogeneous is row-level CODE behavior, and the only
+> row-level boundary is M8 (07-27) — exactly as the decision above recorded.
+> **→ ORTHOGONAL; the bar survives at 08-17 (hits-family) / 08-20 (whole-board) as
+> decided.** The vintage convention below is untouched: vintage EVENTS are code,
+> config, gate-crossings, cadence — the data axis is deliberately not in that class.
+>
+> **Maximum homogeneous board count, both regimes (the number for any re-decision)**:
+> (a) **bot floating + data-vintage-as-segmentation** (the counterfactual convention,
+> NOT adopted): boards are homogeneous only within one day — max homogeneous count
+> **= 1** (context commits 2×/day at 17:00 + 22:30 UTC can even split two same-day
+> generates) — the 20-bar would be unreachable at every count and every date,
+> permanently. (b) **bot paused today**: the data axis freezes and stops
+> constraining; the binding boundaries revert to the behavioral ones (07-31
+> K's/outs, 08-01 ML/RL) → homogeneous-20 lands **08-17 / 08-20 — identical to the
+> decided dates. Pausing buys the bar NOTHING and costs staleness.**
+>
+> **Which archived measurements survive M18 with a stamp (the distinction, stated
+> plainly)**: everything internally consistent WITHIN one board and one data vintage
+> survives stamped — the whole 07-26-board family (M14 sweeps + controls, A1
+> level/floor/percentiles/shade, M16 per-pair, M19 emission census, placeability
+> 0/64, range baselines), each under priors `b75e905` + context `3e2b93c`. What does
+> NOT survive unstated: cross-day comparisons — M15's pooled populations (restated
+> already), the 14-day CZ census (M13 — canonical-key AND cross-vintage stamped),
+> Series A joins, the pre↔close pairing series, mktN/calibration accrual trends —
+> these state the axis or segment, per M18's convention.
+>
+> **PAUSE INPUTS (no decision — the owner asked for inputs only)**: pausing stops
+> `model.yml` (priors, nightly 09:30Z) and `context.yml` (context 2×/day; ump_k
+> feeds it). Staleness bite: `pModel` consumes Savant percentiles + league rates —
+> the DRIFT the bot would have applied stays measurable at ZERO Odds-credit cost
+> (`tools/build_priors.py`/`build_context.py` run keyless off statsapi/Savant — run
+> them without committing and diff against the frozen artifacts), but the EFFECT on
+> prediction quality is NOT measurable without fresh boards (no rows to grade).
+> Other consumers of the three paths: both live surfaces only (`armV2` →
+> `SH_PRIORS`/`SH_CTX`; route L191–92); tests deliberately read the fix45 static
+> snapshots, never the live artifacts; `tools/gate_activity.py` projections (ump
+> self-arm ~08-04) assume accrual and stall under a pause. **Classification: a
+> pause is a FREEZE ITEM (sign-off required — the MIN_GAP sole-exception precedent
+> covers exactly this class) AND a vintage event (a cadence change stamps a
+> boundary; the data axis would move from tracked-floating to frozen, a regime
+> boundary of its own). It is not governance housekeeping.**
 >
 > **POWER, NOW PARTLY COMPUTABLE (2026-07-29, owner's item 5 — for the owner's
 > re-decision; the original decision stays on the record with its date)**: the
@@ -77,12 +135,15 @@
 > | fixture-representativeness (→08-17) | none written | ≤11 board-only / ~2–3 with sweeps | no power model (census-type test) |
 > | crossover doctrine (→08-20) | none written | same | ~15–17 bp (allocation-level) |
 > | HRR retirement (repair+10) | **±3 pp over ≥300 rows/≥10 boards — the ONLY written target** | blocked on repair ship | binomial SE at n=300 ≈ 2.9 pp → **the ±3 pp bound is a ~1-SE statement — marginal by its own arithmetic** |
-> | HRR suspension review (≥10 board-days) | none beyond the row/board floor | 11 board-only | — |
+> | HRR suspension review (≥10 board-days) | none beyond the row/board floor — **and the review carries the SELECTED-vs-UNSELECTED limitation recorded 2026-07-29: the suspension was measured on selected legs, shadow rows are every HRR row unselected; the `cfSel` stamp (SHIPPED same day, below) is what makes the two populations separable when the review runs** | 11 board-only | — |
 > | 08-10 six-regression re-run | SEs written per coefficient (licensing block) | board-independent | n/a |
 > **Only one calendared review has a written target effect size; power is unassessable
 > for the rest — the calendar is a schedule of unpowered checks** (the sentence, as
 > ordered). A1's adoption effect (+1.9) needs **~1,400 boards** at 80% power — retired
-> as UNMEASURABLE (bundle).
+> as UNMEASURABLE (bundle). **(RE-DERIVED 2026-07-29: the +1.9 was the superseded
+> 60-seed estimate — at the paired-200 uniform +1.3 the requirement is ~3,000 boards,
+> and the clustered point estimate is −0.4, NEGATIVE — sign not established at the
+> clustered instrument. Retirement STRENGTHENED; bundle carries the arithmetic.)**
 
 The system is in a **data-collection freeze through at least late August 2026.**
 
@@ -3194,6 +3255,35 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   — written today, not discovered on 08-15.** The owner reads the reset date: reset →
   restate runway, reprice the calendar; no reset → the ordered shutdown list executes
   in its stated order and the parameter exit does not fit this cycle.
+
+- **THE RATIONING TABLE, PRINTED FOR THE OWNER'S CHOICE (2026-07-29, from 1,676
+  remaining; every denominator recorded above)**:
+
+  | cadence | credits/day | days to exhaustion | board-days banked | reviews reachable | series holed vs destroyed |
+  |---|---|---|---|---|---|
+  | sweeps-only | ~420 | **4.0** | 0 | none board-dependent; 08-10 six regressions unaffected (board-independent) | pre series + **pre↔close pairing ALIVE** while it lasts; every board-dependent series holed 1:1 daily (Series A row, shadow, BOTH suspension clocks, the M14 production check — ~6–7 series-days per dark day) |
+  | board-only | ~150 | **11.2** | **11** | **HRR suspension review (≥10) — reachable ~08-09, BARELY; the ONLY cadence that reaches it.** 08-17/08-20 bars NOT reachable (need 20) | pre series holed daily; **pre↔close pairing DESTROYED at day level, daily** (the pairing is the unit); Series A loses its close side (= the series); CLV sightings lost once cards lock |
+  | both | ~570 | **2.9** | ~2–3 | nothing reaches ≥10; everything else starved at ~3 days | all series alive ~3 days, then total dark — the worst of both |
+
+  Footnote: Series-A-complete (board + one close-quality sweep, ~246/day) runs **6.8
+  days ≈ 6–7 board-days** — misses the ≥10 threshold narrowly and both bars. And a
+  dated reconciliation: the earlier "board-only ×2,317 ≈ 15 days" sentence below was
+  computed at a prior quota reading; at the current 1,676 the figure is 11.2 — both
+  stand with their reading dates, per the append-only rule.
+
+- **MIN_GAP LANDING — THE CHAIN-DOC PRE-COMMIT RESTATED WITH ITS FIRST TEST NAMED
+  (2026-07-29)**: delivery mechanics verified from the workflow — `props-history.yml`
+  checks out `line-history` and pulls `tools/snapshot_props.py` from
+  **`origin/frontend-rebuild`** (workflow L59), so the shipped `1617d1b` governs the
+  next firing regardless of default-branch scheduling. **First test: the 07-30
+  morning cluster** (nominal crons queue-delayed by GitHub; measured arrival
+  08:04–10:49Z on 07-29). Read = the `data/props/2026-07-30.json` day-file plus the
+  runs' Actions logs: **one paid snapshot per 40-minute window with the N−1 "skipped:
+  pre within MIN_GAP" lines visible = LANDED; two paid sweeps inside one 40-minute
+  window = NOT landed and the ship reverts to a spec** (dated marker on the MIN_GAP
+  bullet, `created ≠ fires ≠ landed`). Today's remaining evening firings read only
+  the close path, which MIN_GAP exempts by design — the morning cluster stays the
+  committed test.
 - **THE FLOOR COMES FROM PHASE 2'S REQUIREMENT (owner's rule — derived, file and line
   cited)**: Series A = archived board (open + pModel) × close fair joined by lkey+date —
   **`docs/phase2-memo.md` L40–42** (build items 2–4); the 20-board bar for 08-15 is in
@@ -3345,7 +3435,9 @@ suspension accrual ×2 + pre series + the pair + **the M14 production check** �
 | **07-29** | **`consMinEv` ceases to bind on hits/TB/HR/HRR** (`mktN` crosses `consMinN`) — behavior changes with NO code change | **engine (behavioral, date-conditional)** |
 | 07-31 | same expiry, K's/outs | engine (behavioral) |
 | 08-01 | same expiry, ML/RL | engine (behavioral) |
-| conditional | outs flag (Wednesday go/no-go) · MIN_GAP · alt keys · sha/config echo | engine (config) / instrument ×3 |
+| **07-29** | **MIN_GAP ships** (`1617d1b`, pushed) — props-archive cadence segments pre/post | instrument |
+| **07-29** | **cfSel stamps ship** (held commit; additive `PredRecord.cfSel` on susp rows — prediction-record SCHEMA gains a field, live behavior unchanged, guard-proven byte-identical) | instrument |
+| conditional | outs flag (**decided 2026-07-29: deploys Thursday 07-30**, pitcher-outs-audit) · alt keys · sha/config echo | engine (config) / instrument ×2 |
 
 **The convention, fixed (it covered code changes only — today's behavioral change was
 unstamped)**: a VINTAGE EVENT is any dated event that changes engine BEHAVIOR or
@@ -3400,6 +3492,37 @@ eng.set("SH_CFG", cfgSaved);                       // restore before anything el
 `boardToPredictions` then stamps `...(r.susp ? { susp: true, cfSel } : {})`. Zero
 credits, CPU only; the LIVE pool/card are built exactly as today. **Held for the
 owner's sign-off — boards resume in hours and a field not captured is unrecoverable.**
+
+> ✅ **cfSel SHIPPED (2026-07-29 — owner's sign-off, same day, "ship it" with the
+> byte-identity guard as the condition). THE SPEC ABOVE WAS CORRECTED AT
+> IMPLEMENTATION — as written it was VACUOUS**: `hrrAltMax` has exactly two read
+> sites (display tag L2514; the C2 filter INSIDE `buildParlaySet`, L2652), both of
+> which run during `analyze` — re-running `shCardPool`+`shAllocate` over
+> already-built tickets can never resurrect an HRR leg, so the spec'd diff would have
+> stamped `{pool:false, card:false}` on every suspended row forever (the
+> field-written-never-populated class, §5.2's own branch). And
+> `buildParlaySet`/`omitCats` are closures inside `shAnalyzeLocal`, unreachable via
+> `eng.get`. **The shipped construction**: a full counterfactual `analyze` on a
+> DEEP-COPIED slate under a REPLACED `SH_CFG` binding (`{...saved, hrrAltMax: 99}`,
+> restored in `finally`; the live cfg object is never mutated), then
+> `shCardPool`+`shAllocate` at the `CFSEL_DAILY = 250` convention. Deterministic
+> (seeded sim), zero credits, CPU only; runs AFTER the board KV writes; kill switch
+> `PL_CFSEL=off`. Files: `src/lib/cfsel.ts` + `app/api/generate/route.ts` (insertion
+> after the board persist, stamp after `boardToPredictions`) + the additive
+> `PredRecord.cfSel` field. **Guard `tests/cfsel-guard.test.ts` — the owner's
+> condition, met**: live board AND live card byte-identical with the flag on/off
+> (both printed); reproduction (deep-copy + re-analyze) byte-identical; SH_CFG
+> restore asserted; **de-vacuization asserted** (fixture: 52 HRR legs in
+> counterfactual tickets, 10 reach the pool, cf card 4 tickets, all 14 suspended
+> rows stamped); no-restore and flipped-field plants both observed red-by-value.
+> The guard itself found two vacuities before going green: the armed fixture needed
+> the frozen clock (batter stats route by date) and route-mirrored arming
+> (`selMode`+`mktN`) — both discovered as red runs, recorded in the test header.
+> **THE FIELD'S READING, PRE-COMMITTED (created ≠ fires ≠ landed)**: on the first
+> post-fix board, **`cfSel` present on EVERY `susp:true` record in the day blob, or
+> the flag did not land** — the response's `cfSel` counts are the fires-half only;
+> the landed-half is the persisted records. A board whose susp rows carry no stamp
+> reads "did not land", never "no counterfactual selection".
 
 **THE NUMBERS AND THE THRESHOLDS, NAMED IN ADVANCE (2026-07-29, owner's item 3 — so
 08-15 is a check, not an interpretation)**: server-side accrual RESUMES with boards for

@@ -153,7 +153,10 @@ Nothing locks Wednesday until the chain completes (CLAUDE.md, owner's rule).
     `it.fails` → `it` in the flag's commit on "go"; DELETE the guard in the fix's commit
     on "no". Owner also ruled (this session): "if quota forces it, outs takes the flag
     and the fix waits for a cycle with headroom" — IN-CONTEXT-ONLY-UNVERIFIED (owner
-    message; now on disk here).
+    message; now on disk here). **(MARKER DISCHARGED 2026-07-29, same day: the owner
+    re-issued the ruling on the record in the post-compaction relay — "OUTS TAKES THE
+    FLAG", both branches pre-committed; the dated decision now lives in
+    `docs/pitcher-outs-audit.md`, DECIDED section.)**
 11. **Guard flips** (`tests/sweep-covers-engine.test.ts`, `tests/outs-suspension-coupling.test.ts`
     headers): each `it.fails` flips to `it` only in the commit that ships its fix/flag.
 

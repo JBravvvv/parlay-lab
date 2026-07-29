@@ -32,6 +32,10 @@ export type PredRecord = {
      game markets, which have no line. */
   ln: number | null;
   susp?: boolean;
+  /* cfSel (2026-07-29, additive): counterfactual selection under a lifted HRR bar —
+     would this suspended row have entered the ticket pool / the allocated card?
+     Stamped by app/api/generate/route.ts on susp rows only; see src/lib/cfsel.ts. */
+  cfSel?: { pool: boolean; card: boolean };
   /* provenance (Phase 0.5, 2026-07-24): which generator wrote the row and which
      selection mode was armed when it did. Two generators write this store; for
      six days they ran different policies and nothing recorded which was which.

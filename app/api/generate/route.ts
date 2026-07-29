@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob, type GenStamp } from "@/lib/pred-serialize";
+import { computeCfSel, type CfSelResult } from "@/lib/cfsel";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
@@ -321,7 +322,31 @@ export async function GET(req: NextRequest) {
         console.warn(`[generate] board store failed: ${(e as Error).message}`);
       }
     }
+    /* cfSel (2026-07-29, owner sign-off): counterfactual selection under a lifted HRR
+       bar. Runs AFTER the board KV writes above (the board blob `enc` was encoded at
+       its line and is already persisted), on a DEEP-COPIED slate with a REPLACED
+       SH_CFG binding restored in `finally` — the live cfg object is never mutated.
+       Nothing in the live path reads its output: it feeds only the additive `cfSel`
+       field stamped on suspended prediction rows below. Byte-identity of the live
+       board and live card, flag on/off, is enforced by tests/cfsel-guard.test.ts.
+       Kill switch: PL_CFSEL=off. Zero credits — CPU only (one extra analyze). */
+    let cfSel: CfSelResult | null = null;
+    if (process.env.PL_CFSEL !== "off") {
+      try {
+        cfSel = computeCfSel(eng, slate);
+        console.log(
+          `[generate] cfSel: cf tickets carry ${cfSel.cfHrrTicketLegs} HRR legs; pool ${cfSel.cfPoolTickets} tickets (${cfSel.cfHrrPoolLegs} HRR legs), card ${cfSel.cfCardTickets}`,
+        );
+      } catch (e) {
+        console.warn(`[generate] cfSel failed — stamps skipped, live path unaffected: ${(e as Error).message}`);
+      }
+    }
     const { records, parlays, games } = boardToPredictions(data, { src: "cron", selMode: CRON_SEL_MODE });
+    if (cfSel) {
+      for (const r of records) {
+        if (r.susp) r.cfSel = cfSel.stamps.get(`${r.gkey}|${r.lkey}`) ?? { pool: false, card: false };
+      }
+    }
     if (!records.length) {
       return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)" });
     }
@@ -343,6 +368,11 @@ export async function GET(req: NextRequest) {
       total: Object.keys(blob.records).length,
       overview: String(data.overview ?? "").slice(0, 160),
       gen,
+      /* additive (2026-07-29): the field's own landing evidence — created ≠ fires ≠
+         landed; the reading is on the persisted records, this is the fires-half */
+      cfSel: cfSel
+        ? { poolTickets: cfSel.cfPoolTickets, cardTickets: cfSel.cfCardTickets, hrrTicketLegs: cfSel.cfHrrTicketLegs }
+        : null,
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

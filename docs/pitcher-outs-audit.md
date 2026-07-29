@@ -567,3 +567,31 @@ unmeasured-parameter failure mode. The flag needs no parameters at all.
   an unmeasured-parameter failure mode. (The M2 FIX's parameters are measured — k=3.4,
   season-primary, ±1.2 pp residual — recorded above; that is the fix's virtue, not the
   flag's.)
+
+# ✅ DECIDED: OUTS TAKES THE FLAG (2026-07-29, owner's ruling — recorded BEFORE the
+# 07-29 board exists, per the owner's order)
+
+**The flag was chosen over the fix on quota and unmeasured-parameter grounds** — the
+calendar deadline is Thursday before the Friday reopen, the fix is not built, quota
+stands at 1,676, and the flag carries no parameters of its own while the fix carries
+k=3.4 from variances (a measured constant, but one whose live test day would compete
+for protected credits). **Both branches were pre-committed by the owner in the same
+ruling, so the board reading cannot flip the deploy**:
+
+- board reads clean today → **the flag deploys Thursday 07-30** (the three same-line
+  appends above; ship mechanics unchanged).
+- board does NOT read clean → **the flag STILL deploys Thursday.** The chain's failure
+  modes are about HRR and the engine string, not about outs — an unflagged market does
+  not ride into a reopen to preserve an option on an unbuilt fix.
+- the flag stops accrual → it would NOT ship — **TESTED THIS DAY AND FALSE, from code
+  structure**: the C2 filter (L2650–62) runs INSIDE `buildParlaySet`, while `suspRow`
+  tagging runs in `finalizeCats` (L2509–14) BEFORE ticket building, and prediction
+  logging iterates `d.categories` rows (`pred-serialize.ts` L199) regardless of any
+  ticket filter; grading (calibrate L193) is downstream of the records. Filtering a
+  market out of TICKETS cannot stop its rows, tags, predictions, or grades. Expected
+  accrual under the flag: **~35 pregame outs rows/board** (07-26 archive: 38 rows, 35
+  non-live — consistent with the recorded ~37/board).
+
+The `it.fails` → `it` flip on `tests/outs-suspension-coupling.test.ts` lands in the
+flag's Thursday ship commit, per the guard's own header — not today. Today's record is
+this decision, dated, before the board.
