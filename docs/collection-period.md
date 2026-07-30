@@ -20,6 +20,11 @@
 > 0.25–4× join — CHOSEN, no stated rationale → 40 parameters / 39 chosen (12 no
 > rationale) / 1 stated-arithmetic; 8 since-measured — the clamp measured
 > NEVER-BINDING on the 07-26 archive, 0.564–1.192 across 19 ratios, n=1 board.)**
+> **(v2.2, 2026-07-30: the `1/n` cap relax joins — CHOSEN, rationale stated
+> ("when the pool is tiny"), consequence measured (the 10%/5%/3.33%/2.5% ladder)
+> → 41 parameters / 40 chosen (12 no rationale) / 1 stated-arithmetic; 9
+> since-measured. The relax is the FOURTH unmeasured parameter with a measured
+> consequence, after `coreEvMin`, damping 0.5, and `SH_W`.)**
 
 > ⚠️ **REVIEW REACHABILITY WITHOUT A RESET (2026-07-29, owner's order — written above
 > the credit sentence so 08-15 is not discovered on 08-15). From 1,676 remaining,
@@ -3672,6 +3677,118 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   luPct ≈ 0.50, achievable ≈ 0.50, PASS; 22:45Z curl board → ≈ 0.83/0.83, PASS.**
   Per the owner's ruling and branch 2: **the guard has never been red on real
   data and stays SPEC-ONLY**; tomorrow's board is read against it either way.
+
+- **THE 1/n RELAX INVERTS THE CAP'S PURPOSE — RECORDED WITH ITS HISTOGRAM
+  (2026-07-30, owner's item 1; no change ships)**: `n` in `capG = max(perParlayCap,
+  1/n) × DAILY` is **`picked.length`** (L3107) — the CLEAR count, not a floored
+  count; `minCoreTickets = 4` (L1069) enters only as `minN = min(minCoreTickets,
+  scored.length)` (L3074), so n < 4 occurs exactly when the SCORED POOL is thin —
+  **the cap is largest precisely when the least corroboration exists.** The
+  clear-count distribution across everything on disk: **no real production card
+  exists** (allocation unpersisted — the recurring gap), so the histogram is
+  HARNESS cards, labeled as such: at the SHIPPED belief the one archived day
+  replays n=6 on both rankings; across the 36 stressed-belief counterfactual
+  cards (shade/shrink/blend sweeps): **n=6 ×20 · n=5 ×2 · n=4 ×2 · n=3 ×8 ·
+  NO-PLAY ×the rest — n ≤ 3 in 8 of 36 (22%), all under stressed beliefs.**
+  Tomorrow's projection at 6 eligible events with four markets newly live and
+  `coreEvMin = 2`: pool ≈ ~25 tickets, clears scaled from 07-26's 18-of-196 →
+  point estimate **n ≈ 4–6, with n ≤ 3 a REAL tail** on a 6-game evening slate —
+  **the exposure is OPERATIVE for tomorrow's card, and the owner's 2% operator
+  rule is the only thing standing between the engine's suggestion and the slip —
+  in those terms, as ordered.** No card on disk shows a stake above
+  `dailyBankrollCap` (the impossible branch is silent). **THE INTENT, TRACED**:
+  the relax comment reads "general cap relaxed to 1/n when the pool is tiny"
+  (L3105) and the product rule it serves is the LOCKED "exact-sum allocator"
+  (golden rules; the card note: "spreads it across the best N tickets — exact
+  dollars") — **the relax exists to SPEND THE DAILY BUDGET, not to size a bet:
+  the belief-free cap and the daily-deployment target are one knob doing two
+  jobs — the project's recurring shape.** And the sharper residue: the
+  DISCIPLINED path already half-retired exact-sum (hard Kelly ceilings leave
+  remainder unallocated, L3105–06) while the relax survived — a budget-spending
+  rule living inside a path that no longer promises to spend the budget. **The
+  relax is CHOSEN (rationale stated, never measured) — it joins `coreEvMin`, the
+  damping constant, and the blend weight as the FOURTH unmeasured parameter with
+  a measured consequence (the 10%/5%/3.33%/2.5% ladder). Census v2.2: 41
+  parameters / 0 fitted / 40 chosen (12 with no stated rationale) / 1
+  stated-arithmetic; 9 since-measured.**
+
+- **THE LINEUP GUARD, WITHDRAWN AS THE LINEUP GUARD (2026-07-30, owner's item 2 —
+  the third reading: NOT an identity, but the WRONG DIRECTION)**: the two
+  quantities have different inputs and CAN differ — `luPct` counts games with
+  **`lu === true`** (actual posted lineups, data; `liveCoverageOf` L25–42) while
+  `achievable` counts games past **FP−3h** (a schedule computation, L72–78); the
+  separating input is REAL POSTING TIME vs the model — lineups posting early
+  (luPct > achievable) or late (luPct < achievable) untie them. The 07-26 tie at
+  0.857/0.857 was postings matching the model exactly at that hour; my two
+  predicted ties were an artifact of MY projection (both quantities projected
+  from the same FP−3h model — no posting data exists for the future), not of the
+  guard. **BUT the owner's conclusion stands on the sharper ground: `luPct ≥
+  achievable − ε` detects FEED-LAG, not early generation — a 13:00Z board with
+  achievable = 0 and luPct = 0 PASSES while being maximally early. The condition
+  cannot detect the ranked defect it was spec'd for. It is WITHDRAWN as the
+  lineup guard and relabeled a feed-lag check (still useful, differently named).
+  The ranked defect — early board generation before lineup confirmation — REMAINS
+  WITHOUT A TESTABLE CONDITION.** The real detector, SPEC'D not shipped: **`gen.
+  achievable ≥ T`** — an ABSOLUTE capturability threshold at build time,
+  schedule-derived and compared against a constant rather than against its own
+  set; **T is a threshold that must be CHOSEN (owner's sign-off; candidate
+  anchor: the measured 22:00Z design point, 0.66)**. Tomorrow's board prints its
+  measured pair either way — and it CAN untie.
+
+- **TOMORROW'S CARD IS A CALIBRATION EXPERIMENT FUNDED WITH BANKROLL (2026-07-30,
+  owner's item 3 — the framing recorded before anything is placed)**: settled
+  outcome data on disk, per market: **HRR — the only prop market with any: 46.3%
+  vs 59.2% implied (populations off-disk); ML/RL — 15 settled legs re-verified in
+  `docs/settlement-audit.md` (a GRADING-correctness audit, not calibration, and
+  ML/RL are not among tomorrow's four); hits, TB, HR — ZERO settled rows anywhere
+  on disk** (whatever exists sits in the off-disk ledger, unread). **The
+  sentence: tomorrow's board deploys real money into three markets with zero
+  settled calibration on disk and one suspended market with a 12.9 pp measured
+  miss.** What the first N settled tickets would need to show: **no written
+  target exists for hits/TB/HR — N is underivable without choosing δ, and it is
+  not invented here.** The anchored conditionals only: at HRR's own retirement
+  standard (±3 pp, ≥300 rows) ≈ 6–10 board-days of settled legs at ~30–50
+  legs/board; a 12.9-sized miss would show at ~100–120 legs ≈ 2–4 board-days.
+
+- **force=1, THE FULL LIST (2026-07-30, owner's item 4 — three bypasses, not
+  two)**: `force` appears at exactly two branch sites (route L125–126, L146) and
+  the L146 block contains THREE protections — so force bypasses: **(1) the
+  45-minute rate cap; (2) the good-board skip; (3) the DEAD-SLATE refusal**
+  (`slateStarts` + `deadSlate` — the check that stops building on an
+  all-started/empty slate lives inside `if (!force)`). No lineup gate, staleness
+  gate, or market-availability gate exists anywhere in the route to bypass (the
+  board builds regardless; coverage is stamped, not gated); **the pricing and
+  allocation paths are untouched by force — the impossible branch is silent.**
+  `MAX_RUNS_PER_DATE` counts every SPENDING run via `INCR` at L177 — forced runs
+  count. **PROVENANCE GAP CONFIRMED, and wider than force**: the gen stamp
+  carries no force/manual field AND the route hardcodes `src: "cron"` into the
+  prediction records for every caller (L324) — a forced manual board is
+  indistinguishable from a scheduled one in the archive AND in the prediction
+  store. **THE MARK, SPEC'D TONIGHT (additive, zero credits, spec-only per the
+  owner's list): `gen.trigger = "cron-ua" | "header" | "manual" | "manual-forced"`
+  attached beside the existing gen fields, riding board + archive + echo; the
+  pred-store `src` gains the same value instead of the hardcoded "cron".**
+  OPERATIONALLY DISSOLVED FOR TOMORROW: a 401'd cron sets no `lastRun` (the SET
+  sits after auth), no good board exists, and the evening-6 are unstarted at
+  22:40–23:05Z — **the fallback curl needs NO force at all.**
+
+- **THE OWNER'S CRON DECISION, PRE-COMMITTED WITH ITS FAILURE BRANCHES
+  (2026-07-30, owner's item 5)**: he moves entry 1 to `45 22 * * 1-5` AND adds
+  the `x-cron-key` header to entries 1–4, one cron-job.org visit, by 3:30 PM PT.
+  Branches, on disk before the window: (a) **cron fires 22:45Z with the header →
+  the fourteen-step chain runs on its board — no curl, no force**; (b) cron
+  fires and 401s → header did not land → **curl 3:40–4:05 PM PT on the owner's
+  go/no-go, slate count printed first, NO force** (none is needed — above); (c)
+  cron fires, header good, board empty/malformed → **no second slot; report the
+  response and stop**; (d) no fire at 22:45Z → the entry edit did not take — a
+  cron-job.org fact, the owner's to check; (e) impossible: TWO boards for 07-30
+  → the old entry did not clear — print both; **the chain reads the 22:45Z board
+  (`latest` write wins at BOARD_KEY), `gen=list` shows both, and the day counts
+  as ONE board-day.** The ~55–60 credit figure is **PROJECTED, not computed** —
+  scaled from the measured ~150 at ~16 events (~8–9/event); the before/after
+  quota READS settle it tomorrow. If the slate shrinks below 6 by 22:45Z: the
+  board covers whatever unstarted remains and the slate count printed at the
+  go/no-go is the record; at zero unstarted → a THIRD no-board day, recorded.
 
 - **THE CLEAR-COUNT MIDDLE BRANCH, FIXED BEFORE THE BOARD EXISTS (2026-07-30,
   owner's item 5)**: clear count between 1 and 5 → **neither the gate nor the cap

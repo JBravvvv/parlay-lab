@@ -384,6 +384,37 @@ decomposition restates).** Close-out: header cutoff 2:45 PM PT (or 3:30 PM PT
 with the entry moved — the owner's choice in one visit); outs flag Thursday
 evening after the board; landing test 08:02–08:07Z three outcomes; bounded line
 extended (+the 22:00Z board's composition limits). Hold from `45c9f18`.
+**NINTH POST-COMPACTION TURN (2026-07-30Z)**: **THE OWNER DECIDED: entry 1 moves
+to `45 22 * * 1-5` + header on entries 1–4, ONE cron-job.org visit, by 3:30 PM
+PT — one board at 22:45Z (~83%), slot unspent, no curl, no force.** Five failure
+branches on disk (401→curl 3:40–4:05 NO-force — a 401'd cron sets no lastRun and
+the protections pass naturally; empty board→report-and-stop, no second slot; no
+fire→cron-job.org fact, owner's; two boards→latest wins, ONE board-day). ~55–60
+= PROJECTED from ~150@16 events; the quota READS settle it. **ITEM 1 — the 1/n
+relax: n = picked.length (L3107), thin pools real (n≤3 in 8 of 36 harness cards,
+22%, all stressed-belief; no real card persisted); tomorrow n≈4–6 with a REAL
+n≤3 tail → the exposure is OPERATIVE and the owner's 2% rule is the only thing
+between the suggestion and the slip (recorded in those terms); INTENT TRACED:
+budget-spending (exact-sum era) — one knob doing two jobs, surviving inside a
+path that no longer promises exact-sum; census v2.2: 41/40 chosen/9
+since-measured; the FOURTH unmeasured-with-measured-consequence.** **ITEM 2 —
+the third reading: NOT an identity (lu===true is data, FP−3h is schedule; real
+posting time separates them; my predicted ties were projection artifacts) BUT
+the condition detects FEED-LAG, not early generation (achievable=0, luPct=0
+passes at 13:00Z) → WITHDRAWN as the lineup guard, relabeled feed-lag check; the
+ranked defect remains without a testable condition; real detector spec'd:
+gen.achievable ≥ T, T owner-chosen (candidate 0.66).** **ITEM 3 — the sentence
+recorded: tomorrow's board deploys real money into three markets with ZERO
+settled calibration on disk and one suspended market with a 12.9 pp miss —
+a calibration experiment funded with bankroll; N underivable (no written
+target), anchored conditionals only (±3pp@300 rows ≈ 6–10 board-days;
+12.9-sized ≈ 2–4).** **ITEM 4 — force bypasses THREE protections (rate cap,
+good-board skip, DEAD-SLATE refusal); pricing/allocation untouched; MAX_RUNS
+counts forced runs; PROVENANCE GAP wider than force — src:'cron' hardcoded for
+every caller; the trigger mark spec'd (gen.trigger + pred src), additive,
+SPEC-ONLY.** Spec-only queue: +the forced-board/trigger mark, +the real lineup
+condition (achievable ≥ T); the old lineup guard withdrawn. Hold from
+`407fd5f`.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =
