@@ -6264,3 +6264,39 @@ hot-site-fidelity check will produce verdicts on sites that were not the reason
 the check existed, and the load-bearing site (L2258) remains unmeasured this
 cycle.* The re-scope is therefore **PARTIAL** — it is not a rescue of the
 20-board check.
+
+## DATED CORRECTION — THE STRAGGLER DID COMMIT, AND MY STEP-2 COMMAND READ THE WRONG BRANCH (2026-07-30 ~18Z)
+
+**The morning cold read's STEP 2 said "the straggler DID NOT COMMIT (no main
+commits since 05Z)". That verdict was produced by a command that could not have
+seen it.** Discovered when a push was REJECTED: origin/frontend-rebuild had
+moved to **`8f8e8c8` — author `engine-v2-bot`, 2026-07-30 07:43:07Z, "context:
+refresh (weather/umps/bullpen)"**. The bot commits to **`frontend-rebuild`**
+(main holds the workflow FILES; the job checks out the app branch to run) — my
+step-2 command read `origin/main`, where a bot commit can never appear.
+
+**What the straggler actually did — the reading that matters, unchanged in
+outcome**: the commit touches **`data/ump_k.json` ONLY** (1 file, 1 line).
+`public/model/context.json` is NOT in it. **The pause's git-add drop worked
+exactly as designed: ump_k keeps accruing (the ~08-04/08-08/08-13 self-arm
+clocks are intact), context.json stayed frozen.** So the pre-committed
+conditional resolves the same way it was written: **the homogeneous-window start
+stamp STANDS at the pause pair**
+(`00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e` /
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`) — the right
+answer, reached this time by evidence rather than by a blind command. Zero Odds
+credits (keyless builders) — the quota reconciliation is unaffected.
+
+**Two process consequences, recorded**:
+1. The handoff's step-2 command is CORRECTED in place (branch + read the FILES,
+   not the presence of a commit). A "none found" from a command pointed at the
+   wrong branch is indistinguishable from a real absence — the failure mode the
+   owner's "print the raw output beside the verdict" rule exists to catch, and
+   it caught it: the raw output was an empty log, which is what sent me looking.
+2. **The bot is an active writer on the branch this session pushes to** — every
+   push must expect a non-fast-forward. Today's held stack was REBASED onto
+   `8f8e8c8` (renaming it, exactly the event `tests/sha-references.test.ts` was
+   written for after the last rebase orphaned nine citations); the one doc
+   citation of a renamed id was updated in the same commit, and the guard is
+   green. The props-history workflow already carries a pull-rebase ×3 retry for
+   the same reason on `line-history`.

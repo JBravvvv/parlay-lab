@@ -168,11 +168,14 @@ time.
 each step maps to a labeled outcome, no interpretation)**:
 1. The landing test: run the `git fetch` + `git log` pair above → exactly one of
    **LANDED / NOT LANDED / STARVED** as defined above.
-2. The straggler: `git log origin/main --format='%h %ad %s' --date=iso
-   --since=2026-07-30T05:00:00Z -- public/model/context.json` (after
-   `git fetch origin main`) → a commit = the window-start stamp SHIFTS to its
-   context hash (pre-committed, pause block); none = the stamp stands at the
-   pause hashes.
+2. The straggler: **CORRECTED 2026-07-30 ~18Z — the bot commits to
+   `frontend-rebuild`, NOT `main`** (main holds the workflow files; the job
+   checks out the app branch). The command must be
+   `git fetch origin frontend-rebuild && git log origin/frontend-rebuild
+   --format='%h %an %ad %s' --date=iso --since=2026-07-30T05:00:00Z` — read the
+   FILES, not just the presence of a commit: `public/model/context.json`
+   touched → the window-start stamp SHIFTS to its hash; `data/ump_k.json` only
+   → the pause's git-add drop worked, the stamp STANDS.
 3. Nothing else fires a reading before the 3:30 PM PT visit — stop there; the
    quota read happens at the visit and stamps its own time.
 
@@ -348,8 +351,9 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
   carrying `315e0d4a56c0d287d79890a4ad34b8477a0390e2`. The earlier push the same
   night carried `e4e7bd1`+`8ca4d1b`, same standard.) Runtime-touchers this
   session remain: `0914eeb` cfSel, `9753fb9` echo, `4c036ba` mark. **HELD:
-  `6c0af0` (6-hex, unpushed — docs + the scope-by-diff guard extension, a test
-  file, not runtime) + the 07-30 morning-read commit on top of it.**
+  nothing — the held stack was REBASED onto the bot's `8f8e8c8` and pushed
+  2026-07-30 ~18Z (the rebase renamed it; the sha-reference guard exists for
+  exactly this, so no doc cites the pre-rebase ids).**
 - **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
   deploys nowhere — `vercel.json` `main: false`).
 - Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,
