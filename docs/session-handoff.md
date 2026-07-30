@@ -105,6 +105,58 @@ archive-derived +1.07 [+0.88, +1.33] — diff, never average**; zero both-price 
 failing field + fifth "unrecoverable" restatement; negative market → decomposition
 restates (multibook-memo, EXTENDED block).
 
+**OVERNIGHT — THE COLD-READ BLOCK (written 2026-07-30 ~05:1xZ, owner's item 5;
+read this after waking, nothing needs interpretation):**
+
+The two cron-job.org edits + the deadline, restated first: ONE visit by
+**3:30 PM PT** — (1) header `x-cron-key` onto entries 1–4; (2) entry 1
+`0 22 * * 1-5` → `45 22 * * 1-5`. If the visit happens after 3:00 PM PT (22:00Z),
+the unmoved entry 1 fires headerless at 22:00Z → 401, ZERO credits, no lastRun —
+harmless, already priced. Entries 2–4 are weekend-only (Sat/Sun,
+`docs/cron-jobs.md` table) — no weekday fire.
+
+**The 08:02–08:07Z landing test (fires ~06:30–09:30Z) — what to run and what each
+result looks like:**
+- `git fetch origin line-history`, then
+  `git log origin/line-history --format='%h %ad %s' --date=iso-strict
+  --since=2026-07-30T06:30:00Z --until=2026-07-30T09:30:00Z --
+  data/props/2026-07-30.json`
+- **LANDED** = exactly ONE commit in the window (the one paid snapshot; the other
+  cluster runs skip — their Actions logs print `skipped: pre within MIN_GAP (...)`
+  and they commit nothing). Ground truth inside the file:
+  `git show origin/line-history:data/props/2026-07-30.json` — exactly one
+  snapshot `t` in the window.
+- **NOT LANDED** = two-or-more commits inside any 40-min span (two+ paid), OR any
+  `engine-v2-props-history` Actions run whose Commit step shows a rejected push
+  after the ×3 rebase retry → MIN_GAP and the concurrency fix revert to spec
+  TOGETHER (the pre-committed pair).
+- **STARVED** = ZERO commits in the window → check
+  `gh run list --workflow=engine-v2-props-history --limit 10` for
+  queued/cancelled runs — "the queue starved the window" is its own line, not a
+  pass and not a fail of the fix.
+
+**Everything scheduled between this write and 22:30Z (3:30 PM PT), with credit
+cost** (props sweeps ≈ 6 credits × unstarted events; model/context jobs are
+KEYLESS — zero Odds credits):
+| nominal (UTC) | job | lands (measured delay) | Odds credits |
+|---|---|---|---|
+| queued from 07-29 22:30Z | context.yml straggler (pre-pause trigger) | ~06–08:30Z | 0 — keyless; may commit ONE context.json → the window-start stamp shifts to its hash (pre-committed) |
+| 07-29 23:00/23:30 + 07-30 00:00/00:30/01:00, queue-delayed +8–9h | props-history cluster | ~07:30–09:00Z — THE LANDING TEST | ~60 if landed (ONE paid pre at 10 events) |
+| 17:00 | context.yml | ~17–19Z | 0 — ump_k.json only (context.json dropped by the pause) |
+| 17:00 | props-history | 20:08–20:55Z (measured +3.1–3.9h) | ~36–60 (one paid; ~6 unstarted evening events by then) |
+| 20:00 | props-history | ~21:30Z–after-window | 0–36 (pays only if it lands before 22:30Z AND ≥40 min after the last paid) |
+| 21:00 / 22:00 | props-history | after 22:30Z on measured delays | 0 in-window |
+| 96×/day | cron-job.org CLV ticks | continuous | ~5–15 before 22:30Z (day-game closes from 16:10Z; full-day measured ~24) |
+| 22:00 (if entry 1 unmoved) | cron-job.org board entry 1, headerless | 22:00Z | 0 (401 precedes everything) |
+| — | model.yml | PAUSED (schedule commented) | 0 |
+
+**Expected quota at 3:30 PM PT (22:30Z), PROJECTED — one number: ≈ 1,325**
+remaining (band 1,290–1,360), from READ 1,461 − [~60 (08Z paid) + ~36–60
+(20:20Z paid) + 0–36 (a possible third paid) + ~5–15 (CLV)]. A read below ~1,290
+= un-designed spend (grep line-history commits + Actions); above ~1,360 = the
+sweeps starved (also a finding, not a relief). The 3:30 PM read stamps its own
+time.
+
 ## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 23)
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
@@ -137,6 +189,10 @@ restates (multibook-memo, EXTENDED block).
 15. Ledger export reading: reconstructible → "cannot re-examine" withdraws dated;
     not → absent fields NAMED; count vs the owner's "38" → both printed (the "38"
     remains IN-CONTEXT-ONLY-UNVERIFIED — no on-disk record; resolved by the export).
+    (ADDED 2026-07-30, fields confirmed on disk — LEDGER PER-MARKET RECOVERABILITY
+    block: the export additionally prints per-market legs/wins/implied-vs-hit and
+    per-entry `selMode` + `overrode`; per-leg results exist in `grading.legs`, so
+    the reconstructible branch is the expected one.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
     the ledger by hand (collection-period, export block).
 17. HRR suspension review: at the READ quota (1,461) board-only = 9.74 board-days —
@@ -159,9 +215,13 @@ restates (multibook-memo, EXTENDED block).
 
 ## 4. GIT AND ARTIFACT STATE
 
-- Branch `frontend-rebuild`: **pushed head `4c036ba`** (trigger mark; the push carried
-  the seven prior doc/test-only commits — runtime-touchers this session: `0914eeb`
-  cfSel, `9753fb9` echo, `4c036ba` mark). **HELD: `e4e7bd1`** (+ this file's commit).
+- Branch `frontend-rebuild`: **pushed head `8ca4d1b`** (2026-07-30 ~05:0xZ,
+  owner-authorized after the file audit: `e4e7bd1` = CLAUDE.md +
+  collection-period, `8ca4d1b` = this file — three files, all docs, zero
+  runtime-touching; the engine-echo guard re-run green immediately pre-push;
+  origin verified carrying `8ca4d1b4c1e1ccebda41d306131e09dc774ce7a3`).
+  Runtime-touchers this session remain: `0914eeb` cfSel, `9753fb9` echo,
+  `4c036ba` mark. **HELD: this turn's docs commit only.**
 - **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
   deploys nowhere — `vercel.json` `main: false`).
 - Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,

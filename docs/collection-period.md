@@ -5521,3 +5521,195 @@ tail gap at SE ≈ 1.5 pp; three bands ≈ 3,000 rows — **met on the archive a
 version is runnable this week (~2026-08-01), not at exit.** The interlock therefore does NOT
 stay unshipped for want of a reference — it stays unshipped only until this measurement and
 the graded expAB terciles say what the compensator actually is.
+
+## THE OUTS FLAG vs THE HOMOGENEOUS-20 BAR — THE ONE PAGE (2026-07-30, owner's item 2; arithmetic and options, NO decision taken)
+
+**The classification (cited, not assumed): suspensions ARE frozen-table items.**
+`hrrAltMax` sits IN the frozen table as a dated-reversal row (this doc's frozen
+table: "`hrrAltMax` | ~~0.5~~ −1 (2026-07-27, signed off)"), the freeze scope names
+"market suspensions" explicitly ("During the freeze, no model weights, gate
+thresholds, market suspensions, structure..."), and `docs/pitcher-outs-audit.md`
+(Vintage consequence) says it in one sentence: "a frozen-table item landing
+mid-window — a dated reversal row in the frozen table (the `hrrAltMax` precedent),
+a VINTAGE EVENT in the census (engine/config class), and a board-vintage boundary
+at the flag date: **post-flag boards never pool with pre-flag boards for
+outs-market readings**."
+
+**But the branch-1 consequence does NOT follow — the flag does not reset the bar,
+and the reason is the bar's own written unit, not an assumption.** The test's unit,
+both lines printed verbatim (the third time the unit has mattered):
+- The test spec itself (`docs/harness-substitutions.md` L987): "Pool all clamp
+  calls across the 20 archived boards, per site." — the spec line carries NO
+  vintage qualifier; the homogeneity requirement is imposed by this doc's vintage
+  convention ("the vintage convention below says vintages never pool").
+- The convention's unit line (this doc, the 07-29 bar decision): "the instruments
+  are `clamp-activity`, `shrink-activity` and the range detector, all ROW-level
+  over the whole board's rows ... and rows do not see the ticket-gate reopens —
+  the only row-level vintage boundary is M8 (07-27 night), so the row-homogeneous
+  series runs 07-29 → 20 boards on **2026-08-17**."
+So the bar needs the 20 boards to share a row-level ENGINE (code) vintage — NOT a
+data vintage (the orthogonality block above: "day-to-day prior drift is part of
+the measurand"; "vintage EVENTS are code, config, gate-crossings, cadence — the
+data axis is deliberately not in that class"). The outs FLAG is SELECTION-level by
+construction: "outs legs stop entering TICKETS in the disciplined modes. Accrual
+does NOT stop: rows stay priced + tagged" (pitcher-outs-audit). Rows price
+identically through the flag → the row-level instruments see no boundary. The
+boundary the flag stamps is scoped by its own doc to OUTS-MARKET READINGS, and its
+first post-flag board (07-31) coincides with the K's/outs reopen boundary already
+counted in the decided dates. **08-17 (hits-family, row-level, from 07-29) and
+08-20 (whole-board/allocation-level, from 08-01) both STAND.** Thursday's board is
+board 1 of the homogeneous window on every axis, and stays board 1 after the flag
+for every reading except outs-market ones (which have no post-pause pre-flag board
+to pool with anyway — the outs series simply starts at 07-31).
+
+**Vintage events since window start (the pause, signed 07-29; pushed 07-30 in
+`53d0076`), each dated**:
+| when (2026) | event | class | splits which series |
+|---|---|---|---|
+| 07-30 ~03–04Z | pushes `0914eeb` (cfSel) · `9753fb9` (echo) · `4c036ba` (trigger mark) | code, by the convention's letter | none — zero boards between them (window count 0), and each is behaviorally inert on the instruments' unit BY GUARD: cfSel byte-identity-proven on board+card, echo/mark additive fields |
+| 07-30 ~06–08:30Z (conditional) | the queued straggler context commit | DATA axis — not a vintage event under the convention | none; shifts the window-START stamp if it lands (pause block) |
+| 07-30 evening (decided) | outs flag | engine/config — frozen-table item | outs-market readings only (its own doc's scope); row-level series unaffected |
+| 07-31 | K's/outs reopen | gate-crossing | whole-board/allocation series (already counted in the decided dates) |
+| 08-01 | ML/RL reopen | gate-crossing | whole-board/allocation series (already counted; the last scheduled boundary) |
+
+**Longest run of consecutive boards under a single vintage achieved so far: 1.**
+The board archive holds exactly ONE board-day (`origin/line-history`
+`data/boards/index.json`: the single entry 2026-07-26, best ≡ latest). One board
+is a run of 1 under every definition; the post-pause homogeneous count is 0 (07-29
+produced no board). The impossible branch (run > 1) does not fire.
+
+**Pending vintage events under the spec-only queue (each stamps a boundary IF
+authorized): 7** — `coreEvMin`, the 1/n cap, A1 (monotonicity + penalty removal),
+damping 0.5, `SH_W`, the ungraded-group fix (legP/jointAll), the `achievable ≥ T`
+route gate. (Not boundaries: alt keys — archive-sweep tooling; the ledger
+invariant — guard-only; the per-market ledger read — reporting; the
+MIN_GAP/workflow-copy convergence — capture-cadence on the props axis, not the
+board axis.) Plus tonight's outs flag (decided) and the two scheduled
+gate-crossings above.
+
+**Maximum reachable homogeneous run this cycle — QUOTA BINDS BEFORE SHIPPING
+DOES.** At the READ quota (1,461): ~9.74 board-days at ~150/board (evening 6-event
+boards run ~55–60 PROJECTED, but the background burn — props sweeps + line-history
+ticks, ~190–215/day as measured 07-29→30 — drains the same pool). Row-level series
+(from 07-29): max = every board bought ≈ 9–10 ≪ 20. Whole-board series (from
+08-01): ≈ 7–8 ≪ 20. Each authorized ship can only shorten a segment further, but
+even a TOTAL SHIP FREEZE does not reach 20 — the premise inverts: the bar is
+unreachable this cycle because of QUOTA first; shipping cadence is a second,
+independent ceiling on top of it.
+
+**THE TWO OPTIONS, PRICED (printed for the owner's later decision; the standing
+07-29 decision "THE BAR HOLDS AT 20; THE DATE MOVES" is untouched tonight):**
+1. **Stop shipping entirely until 20 boards accumulate.** Cost: a reset is
+   required regardless — 20 evening boards ≈ ~1,100–1,200 credits alone
+   (PROJECTED, inside 1,461) but the background burn ~190–215/day × ~20 days ≈
+   3,800–4,300 buries it, and killing the background starves Series A and the
+   close/CLV record. Every spec-only boundary above (incl. the M19 ungraded-group
+   fix and A1) waits ~3 weeks; earliest 20 stays 08-17/08-20, slipping 1:1 per
+   dark day.
+2. **The bar cannot be the parameter exit's gate.** Cost: every fixture-derived
+   finding (the clamp census, the shrink k-table, the nine own-sample weights)
+   keeps its single-instrument caveat PERMANENTLY; the 08-17 review restates to
+   the starved-review options already printed above (run-at-N / date-slip /
+   vacuous); the parameter exit then rests entirely on the per-market ledger
+   series — ALSO unreachable this cycle (the TWO-EXITS sentence). Choosing 2 buys
+   no boards; it re-labels the gate.
+Neither option is chosen tonight. And the flag-specific finding stands on its own:
+even under option 1, tonight's outs flag is not a ship that resets anything
+row-level.
+
+## SELECTION-MODE CENSUS — WHERE THE KELLY CEILING LIVES AND DIES (2026-07-30, owner's item 3; every line read from source this turn)
+
+**The four modes** (`shAllocate`, legacy/index.html L2990–2998): `ev_gated`,
+`dk_fd` (ev_gated discipline priced at the DK/FD basis), `probability`,
+`caesars_ev` (the legacy ¼-Kelly-at-CZ ranking). Plus one orthogonal switch:
+`force` (the override), available on any mode.
+
+| mode | Kelly ceiling? | max single-ticket share of bankroll |
+|---|---|---|
+| `ev_gated` | ✓ — L3108 `disciplined=((mode==="ev_gated"||basisMode)&&!force)`, L3112–15 `min(capG, round(kMult×B×¼Kelly))` | min(ladder, Kelly): ≤ ~8% measured strongest ticket; realized max 2.48% |
+| `dk_fd` | ✓ — same `disciplined` term; Kelly computed at the basis price | same structure as ev_gated |
+| `probability` | ✗ | the ladder: 10% at n=1 (`capG=max(0.25,1/n)×amount`, L3107) |
+| `caesars_ev` | ✗ — the legacy exact-sum (L3105–06) | the ladder: 10% at n=1 |
+| any mode + `force` | ✗ — `&&!force` strips the ceiling; `overrode` stamped on the ledger entry (L3405) | the ladder: 10% at n=1 |
+
+**The absolute roof no mode escapes**: the LOCK blocks any card where CORE+FUN
+exceeds `dailyBankrollCap` (0.10) × bankroll (L3397–99) — 10% of bankroll is the
+hard ceiling in every mode; the ceiling-free modes reach it at n=1, the
+disciplined path stops at ~8% (measured) / 2.48% (realized).
+
+**How a mode is selected**: persisted DEVICE state — localStorage `pl_selmode`,
+written by the Settings page (`app/settings/page.tsx` `setSelectionMode`;
+`src/lib/engine-client.ts` L46–68), ~2 taps (Settings → mode). Default when unset
+or invalid: **`ev_gated`** (engine-client L49–52, comment "user rule 2026-07-22").
+The server route NEVER reads it: `CRON_SEL_MODE = "ev_gated"` pinned since
+`ca30d15` (2026-07-24 "restore frozen selection mode on the cron generator";
+value "ev_gated" at introduction, verified this turn) — the route comment states
+the serverless fn has "no localStorage to read pl_selmode from, so the frozen
+default is stated here."
+
+**Is the mode captured? YES — on every surface that records stakes or
+predictions; no new field is needed:**
+- server boards: the echo carries `selMode` (engine-echo.ts L79, shipped
+  `9753fb9`) AND the pred records carry `selMode: CRON_SEL_MODE` (route L380);
+- device cards: the LEDGER ENTRY carries `selMode` (legacy L3404 — "hardening
+  Phase 2: CLV report slices by the mode that picked the card") and `overrode`
+  (L3405) — every ceiling-free path that can touch money is stamped where the
+  money is recorded;
+- client prediction logs: `logBoardPredictions(..., getSelectionMode())`
+  (engine-client L379) — src:"client" records carry the device mode.
+
+**Boards/cards on disk built in a non-ev_gated mode: 0.** The archive holds one
+board (07-26), built by the pinned route (pin 07-24 precedes it) → ev_gated by
+pin-inference (M18's commit-log method; the board predates the echo, so this
+attribution is INFERRED — tomorrow's board is the first STAMPED one). No
+production card is persisted anywhere on disk (allocation unpersisted — the
+standing fact); the 10 measured harness cards were armed `selMode="ev_gated"`
+(route-mirrored arming, the cfSel-guard standard). Ledger cards are OFF-disk and
+each carries its own `selMode` → the export (reading 15) additionally prints
+selMode + overrode per entry. The impossible branch (a ceiling-free card on
+disk) does not fire — no card is on disk at all.
+
+**The pre-committed reading resolves on the middle path**: the mode IS
+device-reachable (~2 taps) AND already captured everywhere it matters — the
+branch-1 ship ("spec the mode into the echo tonight") was ALREADY SHIPPED as
+`9753fb9` before the question was asked; the branch-2 pin holds for every server
+board. The remaining exposure, stated exactly: a device user switching to
+`probability`/`caesars_ev` (or forcing any mode) removes the Kelly ceiling up to
+the 10% lock roof — stamped if locked, invisible if never locked — and the
+operator rule (no slip above 2% = $50) is the human backstop there, as designed.
+
+## LEDGER PER-MARKET RECOVERABILITY — THE IFF RESOLVES: RECOVERABLE (2026-07-30, owner's item 4; fields read from source this turn)
+
+**Each ledger leg carries its market; each ticket carries its legs; grading is
+PER LEG.** The fields, named (legacy/index.html):
+- ticket (`shTicketSnap`, L3365–73): `{id, bucket, name, type, tier, stake,
+  czOdds, czDec, prob, czEv, fair, bsOdds, bsDec, bsEv, confirmed, legs:[...]}`;
+- leg (L3372–73): `{label, prop, cz, game, gkey, lkey, est, bs, bsBook}` —
+  **`lkey` embeds the market** (`...|batter_total_bases|...`, `ml_home`, …) and
+  `cz` is the leg's own settled-book price → implied prob is arithmetic;
+- grading (L3673): `grading = {legs: legRes, tickets, done, v:2}` —
+  `grading.legs` is keyed `label|prop` → `{result, detail}` **per leg**
+  (`shGradeLeg` L3545; tickets are graded FROM it, L3605–07);
+- the entry besides: `selMode`, `overrode`, `bankroll`, `daily`, `fun`, `games`,
+  `clv`.
+
+**Therefore the pooling is a REPORTING choice, not a data gap.**
+`shLedgerStats(scope)` (L3862) slices ALL/CORE/FUN off `e.core`/`e.funT` and
+reads ONLY ticket-level results — it never consults `grading.legs` or `lkey`. A
+per-market read (join `legs[].lkey` × `grading.legs[label|prop].result` ×
+implied-from-`cz`) is available from the SAME rows whenever the export runs. **No
+new capture is needed before Thursday's board; nothing ships.** The 07-29
+"reconstructible IFF legs carry result + implied prob" line above (the export
+block) RESOLVES: they do — result per leg in `grading.legs`, implied from per-leg
+`cz`. The 46.3/59.2 figure's source is consistent with exactly this join
+(graded-ledger SELECTED HRR legs 07-17→07-22, `docs/hrr-recalibration.md` L83) —
+the impossible branch does not fire.
+
+**The bankroll exit's stated test**: as CODED it runs pooled only
+(`shLedgerStats` has no market axis). As DATA it can be run per-market at export
+time from the fields above. SPEC'D (no ship, no new capture): the export read
+(reading 15) additionally prints, per market: legs, wins, implied-vs-hit gap —
+and per entry: `selMode` + `overrode`. The exit's masking finding (one market's
+miss hidden by two clean ones) therefore has a zero-cost cure AT READ TIME; the
+POOLED test remains what the exit's sentence pre-committed, and any change to the
+exit's own criterion stays the owner's call.
