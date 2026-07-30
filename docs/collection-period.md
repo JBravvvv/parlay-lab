@@ -5713,3 +5713,123 @@ and per entry: `selMode` + `overrode`. The exit's masking finding (one market's
 miss hidden by two clean ones) therefore has a zero-cost cure AT READ TIME; the
 POOLED test remains what the exit's sentence pre-committed, and any change to the
 exit's own criterion stays the owner's call.
+
+## SCOPE BY DIFF — THE OUTS FLAG'S BOUNDARY, MEASURED NOT SELF-DECLARED (2026-07-30, owner's item 1)
+
+**The finding the owner's challenge exposed first: the flag is NOT YET IN THE
+ENGINE.** `outsSusp` exists only in the echo's field list, and the echo guard
+EXPECTS it null today (`tests/engine-echo.test.ts` L76); the two conditionals ship
+Thursday evening ("three same-line edits", pitcher-outs-audit). So tonight's
+on/off diff on the armed fixture slate (the coupling guard's substrate — the
+archived board stores analyze's OUTPUT rows, not its input slate, so the diff
+runs where analyze can run) prints the BASELINE, not the shipped scope:
+**flag-on vs flag-off, the full analyze output is byte-identical — rows, tickets,
+everything** (`outs-suspension-coupling.test.ts`, scope-by-diff invariant, run
+2026-07-30, 5/5). That identity is the guard's documented red state ("the flag as
+not yet applied"), NOT the owner's impossible branch — the impossible branch
+("tickets identical with the shipped flag on → the flag does nothing → it does
+not deploy") is now MECHANICAL: the ship commit must flip BOTH `it.fails` tests
+green, and a do-nothing flag cannot.
+
+**The scope, from the hrrAltMax precedent's own source (the mechanism the flag
+mirrors)**: suspension touches exactly FIVE emitted row fields — `susp`, `watch`,
+and the three badge booleans `bsBadge`/`czBadge`/`edgeBadge` (finalizeCats
+L2509–14, L2538–49: each badge `&& !suspRow`) — and ticket/FUN membership.
+Every pricing NUMBER (prob, implied, edge, ev, czEv, bsEv, kellyF, czKellyF,
+bsKellyF, pModel, wBlend, odds, cz, bs) is computed upstream and untouched.
+
+**Does any row-level instrument read a field the flag touches? NO — named:**
+- `clamp-activity` reads `SH_CLAMP_LOG` (per-site `{bounds,n,lo,hi,mid}` from
+  `shClamp` calls during pricing — L1540); pricing runs for suspended rows
+  (accrual preserved), so the call stream is untouched;
+- `shrink-activity` wraps `shShrink` calls (k, n distribution per site) — same;
+- the range detector (`tools/range_compression.py`) reads `pModel`, `lkey`,
+  `sub`, and propBoard `pO`/`fO`/`ln`/`alt` — no badge, no `susp`, no tickets.
+
+**Does the convention state who scopes a boundary? NO — the gap is real.** The
+convention's class line names WHAT is an event ("vintage EVENTS are code, config,
+gate-crossings, cadence — the data axis is deliberately not in that class") and
+never WHO establishes an event's scope. That gap is why the outs flag's boundary
+was arguable from its own doc. **THE ENCODED RULE (owner's order — encoded, not
+written)**: a boundary's scope is established by DIFF, not by the shipping
+component's doc — encoded in `tests/outs-suspension-coupling.test.ts`
+(scope-by-diff): (1) an invariant that must be green BEFORE and AFTER the ship —
+flag on/off byte-identical outside the five-field tag set on `pitcher_outs` rows
+only, over a verified non-empty outs population (zero-over-empty is not a pass);
+(2) a comparator PLANT proving a single pricing-field change is visible through
+the stripping; (3) the tag half `it.fails` until the ship commit flips it with
+the pool half. If Thursday's ship touches ANY row-level field outside the tag
+set, (1) goes red in the ship's own CI → the boundary is wider than claimed →
+the flag resets the row-level window too and the vintage consequence restates —
+the pre-committed wider-boundary branch, made mechanical. The narrow scope
+becomes a MEASURED FACT only when (1) passes against the shipped flag.
+
+## THE FIXTURE-REPRESENTATIVENESS CHECK — STRUCK AT 20 AS UNREACHABLE THIS CYCLE (2026-07-30, THE OWNER'S DECISION — neither priced option; the 08-20-review treatment)
+
+**The act, recorded in the owner's words**: the bar is NOT lowered. The check is
+RECORDED UNREACHABLE at 20 boards this cycle under every cadence and every
+shipping policy, quota binding before shipping does — dated 2026-07-30, before
+any fixture-representativeness output exists. The 07-29 "bar holds at 20; the
+date moves" decision stays on the record with its date; this supersedes the
+DATE's operational meaning the way the 08-20 crossover was re-scoped: the check
+as specced cannot run this cycle, and pretending a calendar date for it spends
+attention on an unpowered check.
+
+**The estimand, from the spec (`docs/harness-substitutions.md` L985–994)**: pooled
+clamp-call PINNED FRACTIONS per site (25 sites) across the archived boards,
+compared per site against the frozen fixture's fraction — disagreement = outside
+the fixture's 95% Wilson interval AND >10 pp, or a class change
+(healthy/SATURATED/OFFSET); a site pooling <30 calls prints its count, no
+statistic. **The decision it feeds (L998–1002)**: ≤2-of-25 → FIXTURE VALIDATED —
+the frozen table's clamp and shrink numbers promote from single-instrument to
+confirmed; ≥5-of-25 or L2258 class change → UNREPRESENTATIVE — three findings
+re-run on the archive (the pitcher_outs clamp count, the H+R+RBI clamp-protection
+table, the shShrink k table with its nine own-sample weights); 3–4 → AMBIGUOUS,
+per-site report, no global verdict.
+
+**What 20 buys that 9 does not — from the written criteria, not a power model**:
+the >10 pp condition is FIXED, so the check's sensitivity is floored near ~10 pp
+at EVERY board count; more boards shrink only the archive-side sampling noise
+toward that floor. The real purchase of more boards is the COLD SITES: the ≥30
+pooled-call minimum (L994) is what extra boards walk sites across. 20-vs-9 is
+therefore mostly a question of which sites qualify, not of a finer rate estimate
+at the sites that already do.
+
+**The MDE at 7, 9, and 20 boards: NOT COMPUTABLE — from what is written OR from
+disk, said plainly**: (i) written — "the row-level fixture-representativeness
+test still has no power model (its verdict is a census, not an effect estimate)"
+(POWER block, 07-29) and "NOT computable from anything written" (THE 08-15
+DECISION, option (b)); (ii) disk — the only archived board (07-26) PREDATES the
+clamp instrumentation (additive 2026-07-27) and carries NO `clampActivity`
+(verified on the gunzipped archive tonight), so the per-site per-board call rate
+K_s — the input an MDE needs — does not exist yet. It STARTS EXISTING tomorrow:
+the production route arms `clampLog: true` (route L244), so board 1 is the first
+to carry per-site counts, and the per-site MDE becomes arithmetic
+(≈ 10 pp + z·√(p(1−p)/(K_s·B)) + the fixture's Wilson half-width) as soon as K_s
+is measured. **The impossible branch (MDE at 9 already inside the check's needed
+range) CANNOT BE EVALUATED tonight — stated, not silent.**
+
+**The smaller question answerable at 9 boards, named, with its instrument —
+THE RE-SCOPE**: **HOT-SITE FIDELITY** — "at every site whose pooled archive
+calls reach ≥30 by board N, does the pooled pinned fraction sit inside the
+fixture's 95% Wilson interval ∪ ±10 pp?" Instrument: `clamp-activity`'s per-site
+log on real boards (now armed in the route) against the fixture's per-site table
+— the SAME criteria, the SAME instrument, sites qualified by the spec's OWN ≥30
+floor, cold sites printing counts exactly as L994 already mandates. Its MDE is
+COMPUTED per site from the accrued K_s (pre-committed: from counts, never
+assumed), not stated tonight. **This is a re-scope, not a weakening: the
+20-board check is STRUCK AS UNREACHABLE, dated; nothing about the criteria
+softened.** The freed difference: the 08-17 calendar expectation is released —
+the hot-site read runs whenever accrued boards qualify sites, opportunistically.
+
+**What the check gates — printed**: promotion of the fixture-derived findings
+(the clamp census, the shrink k-table, the nine own-sample weights) from
+single-instrument to confirmed, and the three-finding re-run on an
+UNREPRESENTATIVE verdict. It is NOT a listed condition of the parameter exit —
+the exit's own floor is Series A (~13.5k credits, phase2-memo L40–42). The
+honest one-sentence consequence: **the parameter exit was already
+credit-blocked; with the 20-board check struck, every fixture-derived number in
+the frozen table additionally stays single-instrument through this cycle** —
+both clauses together, as ordered. What the exit loses concretely: through this
+cycle no fixture-derived clamp/shrink figure gains the "confirmed" stamp, and
+every finding leaning on them keeps the caveat.

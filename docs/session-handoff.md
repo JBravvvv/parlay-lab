@@ -157,6 +157,18 @@ remaining (band 1,290–1,360), from READ 1,461 − [~60 (08Z paid) + ~36–60
 sweeps starved (also a finding, not a relief). The 3:30 PM read stamps its own
 time.
 
+**THE MORNING COLD READ, IN ORDER (added 2026-07-30 ~06Z, owner's item 5 —
+each step maps to a labeled outcome, no interpretation)**:
+1. The landing test: run the `git fetch` + `git log` pair above → exactly one of
+   **LANDED / NOT LANDED / STARVED** as defined above.
+2. The straggler: `git log origin/main --format='%h %ad %s' --date=iso
+   --since=2026-07-30T05:00:00Z -- public/model/context.json` (after
+   `git fetch origin main`) → a commit = the window-start stamp SHIFTS to its
+   context hash (pre-committed, pause block); none = the stamp stands at the
+   pause hashes.
+3. Nothing else fires a reading before the 3:30 PM PT visit — stop there; the
+   quota read happens at the visit and stamps its own time.
+
 ## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 23)
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
@@ -193,6 +205,21 @@ time.
     block: the export additionally prints per-market legs/wins/implied-vs-hit and
     per-entry `selMode` + `overrode`; per-leg results exist in `grading.legs`, so
     the reconstructible branch is the expected one.)
+    (ADDED 2026-07-30 late, owner's provenance ruling — "consistent with" is not
+    "sourced to": the export MUST REPRODUCE **46.3 and 59.2** from THE
+    PRE-REGISTERED JOIN, or the pair's provenance stands unestablished and the
+    HRR suspension rests on a number we cannot re-derive
+    (`docs/hrr-recalibration.md`, PROVENANCE-UNVERIFIED-PENDING-EXPORT). The
+    join: entries `e` with 2026-07-17 ≤ e.date ≤ 2026-07-22 AND e.locked; legs
+    `l` of every ticket in `e.core ∪ e.funT` with
+    `(l.lkey||"").split("|")[1] === "batter_hits_runs_rbis"`; grade
+    `r = e.grading.legs[l.label+"|"+l.prop]`, keep r.result ∈ {won, lost};
+    hit = won/(won+lost) → 46.3 ±0.05 pp; implied = mean of am→prob(`l.cz`) over
+    the same legs → 59.2 ±0.05 pp; subsets printed: rung 0.5 (12/19 = 63%
+    expected), rung ≥1.5 (32% expected). If the headline pair misses, try the
+    two written variants IN ORDER — core-only tickets; then won/lost/push
+    denominators — and print WHICH variant matched (a provenance RECOVERY,
+    labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
     the ledger by hand (collection-period, export block).
 17. HRR suspension review: at the READ quota (1,461) board-only = 9.74 board-days —
@@ -203,11 +230,29 @@ time.
     (collection-period).
 19. Outs flag ship Thursday evening; `outs-suspension-coupling.test.ts` `it.fails`
     flips → `it` in THAT commit (guard header; pitcher-outs-audit DECIDED).
+    (ADDED 2026-07-30 late, owner's item 1 — SCOPE BY DIFF encoded in the same
+    guard: BOTH `it.fails` halves (pool-zero + tag-every-outs-row) flip in the
+    ship commit; the byte-identity invariant (on/off identical outside
+    {susp, watch, bsBadge, czBadge, edgeBadge} on pitcher_outs rows, non-empty
+    population required) must stay green THROUGH the ship — red there = the
+    boundary is wider than the flag's doc claims → the flag resets the row-level
+    window too and the vintage consequence restates; a do-nothing flag cannot
+    flip the it.fails halves → does not deploy. Tonight's baseline printed:
+    on/off byte-identical everywhere, 5/5, flag not yet in the engine.)
 20. `sweep-covers-engine.test.ts` (M13) flips only in the alt-keys fix commit (guard
     header; alt keys spec-only behind the burn plan).
 21. Fixture-representativeness reading at 08-17: ≤2/≥5-of-25 branches, the five cold
     sites, the range-detector thresholds (harness-substitutions, PRE-COMMITTED
     section).
+    (SUPERSEDED IN DATE, 2026-07-30 — the owner's decision, neither priced
+    option: the 20-board check is STRUCK AS UNREACHABLE this cycle (quota binds
+    before shipping; dated before any fixture output), NOT weakened — criteria
+    and branches above intact. RE-SCOPED to HOT-SITE FIDELITY: same criteria,
+    same instrument (`clamp-activity`, now armed on production boards — route
+    L244), over the sites whose pooled archive calls reach ≥30 (the spec's own
+    L994 floor), cold sites print counts; per-site MDE computed from accrued
+    K_s, never assumed; runs opportunistically, no calendar date. THE
+    FIXTURE-REPRESENTATIVENESS CHECK — STRUCK block, collection-period.)
 22. Second-board-after-T-fail: requires force, OFF absent explicit in-the-moment
     authorization with the disabled protections stated (collection-period).
 23. The 22:00Z board's own coverage impossible branch: luPct > 50 → the projection
@@ -215,13 +260,14 @@ time.
 
 ## 4. GIT AND ARTIFACT STATE
 
-- Branch `frontend-rebuild`: **pushed head `8ca4d1b`** (2026-07-30 ~05:0xZ,
-  owner-authorized after the file audit: `e4e7bd1` = CLAUDE.md +
-  collection-period, `8ca4d1b` = this file — three files, all docs, zero
-  runtime-touching; the engine-echo guard re-run green immediately pre-push;
-  origin verified carrying `8ca4d1b4c1e1ccebda41d306131e09dc774ce7a3`).
-  Runtime-touchers this session remain: `0914eeb` cfSel, `9753fb9` echo,
-  `4c036ba` mark. **HELD: this turn's docs commit only.**
+- Branch `frontend-rebuild`: **pushed head `315e0d4`** (2026-07-30 ~05:5xZ,
+  owner-authorized after its own file audit: docs-only — collection-period +
+  this file; engine-echo guard green immediately pre-push; origin verified
+  carrying `315e0d4a56c0d287d79890a4ad34b8477a0390e2`. The earlier push the same
+  night carried `e4e7bd1`+`8ca4d1b`, same standard.) Runtime-touchers this
+  session remain: `0914eeb` cfSel, `9753fb9` echo, `4c036ba` mark. **HELD: this
+  turn's commit only (docs + the scope-by-diff guard extension — test file, not
+  runtime).**
 - **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
   deploys nowhere — `vercel.json` `main: false`).
 - Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,

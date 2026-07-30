@@ -85,6 +85,15 @@ and **32% on O1.5+ alternate lines** specifically. Reliability slope (nightly ca
 n=273): **1.74** — noisy, but the ledger's O1.5+ subset is where the dollars actually
 bled. O0.5 went 12/19 (63%) and stayed active, tagged **watch** — ~~stays~~ **REVERSED 2026-07-27 (see the reversal note at the top of this file)**.
 
+> **PROVENANCE-UNVERIFIED-PENDING-EXPORT (2026-07-30, owner's ruling —
+> "consistent with" is not "sourced to")**: the 46.3/59.2 pair has no on-disk
+> derivation — the population is off-disk (the ledger key) and the field-level
+> compatibility established 07-30 (legs carry `lkey`+`cz`, `grading.legs` holds
+> per-leg results) proves the join is POSSIBLE, not that it PRODUCED these
+> numbers. The export must REPRODUCE both from the per-market join (the exact
+> join: `docs/session-handoff.md` reading 15) or the figures' provenance stands
+> unestablished and the suspension rests on a number we cannot re-derive.
+
 > **THE λ* READING, CONFIRMED AND RECORDED (2026-07-30, owner's item 4 — a
 > bankroll-relevant statement available with no ledger read, scoped to HRR)**:
 > mapping the measured gap through the shrinkage instrument
