@@ -2,8 +2,10 @@ name: engine-v2-priors
 # Nightly data spine: rebuild Statcast skill priors and publish them through
 # the app (public/model/priors.json -> Vercel redeploy on push).
 on:
-  schedule:
-    - cron: "30 9 * * *" # 09:30 UTC = 2:30am PT, after Savant's overnight refresh
+  # schedule:                                # PAUSED 2026-07-29 (owner sign-off - the
+  #   - cron: "30 9 * * *"                   # data-vintage pause, M18/homogeneous window;
+  #                                          # docs/collection-period.md THE BOT PAUSE block.
+  #                                          # Reversible: uncomment this block, one commit.)
   workflow_dispatch:
 
 permissions:
