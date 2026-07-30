@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createEngine, type BoardData } from "@/engine";
 import { boardToPredictions, mergeDayBlob, type DayBlob, type GenStamp } from "@/lib/pred-serialize";
 import { computeCfSel, type CfSelResult } from "@/lib/cfsel";
+import { buildEcho, sha256Text } from "@/lib/engine-echo";
 import { effectiveCalibration, type CalibrationSummary, type WeightState } from "@/engine2/calibration";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
@@ -186,15 +187,28 @@ export async function GET(req: NextRequest) {
 
     // arm the same v2 stack the app arms (armV2 in engine-client)
     const base = selfBase();
-    const grab = (u: string) =>
-      fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const [priors, ctx, summary, weights, auto] = await Promise.all([
-      grab(`${base}/model/priors.json`),
-      grab(`${base}/model/context.json`),
+    /* echo (2026-07-29): the two model artifacts are fetched as TEXT so their content
+       hashes can be echoed — parse semantics unchanged (JSON.parse === r.json(), same
+       null-on-failure path as the old grab). */
+    const grabText = (u: string) =>
+      fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).catch(() => null);
+    const [priorsText, ctxText, summary, weights, auto] = await Promise.all([
+      grabText(`${base}/model/priors.json`),
+      grabText(`${base}/model/context.json`),
       redisGetJson<CalibrationSummary>("pl:cal:summary"),
       redisGetJson<WeightState>("pl:cal:weights"),
       redis(["GET", "pl:cal:auto"]).catch(() => null),
     ]);
+    const parseOrNull = (t: string | null) => {
+      if (t == null) return null;
+      try {
+        return JSON.parse(t);
+      } catch {
+        return null;
+      }
+    };
+    const priors = parseOrNull(priorsText);
+    const ctx = parseOrNull(ctxText);
     // identical computation to the one the app receives from /api/calibration
     const armed = effectiveCalibration(summary, weights, auto === "off" ? "off" : "on");
 
@@ -287,6 +301,18 @@ export async function GET(req: NextRequest) {
       console.warn(`[generate] board built ${(gen.leadMs / 3600_000).toFixed(1)}h before the next first pitch — lineups likely unposted`);
     }
     (data as Record<string, unknown>).gen = gen;
+    /* sha+config ECHO (2026-07-29, owner's authorization) — attached BEFORE the encode
+       so it rides the board KV and the archive; also returned in the response body
+       below. WRITE-ONLY: this assignment and the response field are the only two
+       appearances of `echo` in this route — nothing branches on it and no code path
+       reads it back (enforced: tests/engine-echo.test.ts source scan). */
+    const cfSelEnabled = process.env.PL_CFSEL !== "off";
+    const echo = buildEcho(eng.get<Record<string, unknown>>("SH_CFG") ?? null, {
+      priorsSha: priorsText != null ? sha256Text(priorsText) : null,
+      ctxSha: ctxText != null ? sha256Text(ctxText) : null,
+      cfSelEnabled,
+    });
+    (data as Record<string, unknown>).echo = echo;
     const enc = encodeBoard({ date, at: now, data });
     if ("error" in enc) {
       console.warn(`[generate] board not stored: ${enc.error}`);
@@ -373,6 +399,10 @@ export async function GET(req: NextRequest) {
       cfSel: cfSel
         ? { poolTickets: cfSel.cfPoolTickets, cardTickets: cfSel.cfCardTickets, hrrTicketLegs: cfSel.cfHrrTicketLegs }
         : null,
+      /* the sha+config echo, additive and write-only — the same object attached to the
+         board before encode; the first response body carrying this IS the
+         deployed-with-cfSel discriminator (no zero-credit probe exists) */
+      echo,
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });
