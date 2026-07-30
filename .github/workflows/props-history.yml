@@ -31,6 +31,15 @@ on:
     - cron: "0 1 * * *"
   workflow_dispatch:
 
+# MIN_GAP reads the last paid timestamp from the COMMITTED day-file, so overlapping
+# runners all see stale state and all pay (tools/snapshot_props.py L143-151; measured
+# trio 08:02/08:05/08:07Z). Queue-mode serialisation makes the committed state fresh
+# for each runner. cancel-in-progress stays FALSE: redundancy is the reliability
+# property — delivery is never cancelled, only serialised (the MIN_GAP conditions).
+concurrency:
+  group: props-history
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -54,4 +63,12 @@ jobs:
           git add data/
           git diff --cached --quiet && echo "no change" && exit 0
           git commit -m "prop history: $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push
+          # push with pull-rebase retry (2026-07-29, owner's authorization): a rejected
+          # pusher previously PAID for its sweep and LOST the snapshot (non-ff push, no
+          # retry) — strictly worse than the duplicate MIN_GAP replaced. Serialisation
+          # is the concurrency group above; this retry is the belt for anything that
+          # still overlaps. Queue, never cancel: every cron entry stays.
+          for i in 1 2 3; do
+            git push && break
+            git pull --rebase origin line-history
+          done
