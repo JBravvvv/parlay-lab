@@ -353,6 +353,37 @@ Tomorrow's board CANNOT support: archived-board vintage claims; the M14
 production reading if the cap does not bind (unobserved ≠ refuted); any HRR
 reading if the feed carries none (third vacuity); the join without the phrase.
 Hold from `44db680`.
+**EIGHTH POST-COMPACTION TURN (2026-07-30Z)**: **ITEM-1 RESOLVED — the cron CAN
+reach the window and the move is the OWNER'S**: edit cron-job.org entry 1 `0 22 *
+* 1-5` → `45 22 * * 1-5` in the same visit as the header, by 3:30 PM PT (fires
+3:45 PM PT at ~83% coverage, ~55–60 credits — one board does everything, slot
+unspent). Paths priced: moved-cron ~55–60 · two-board ~110–120 (22:00Z cron
+engine-half + 22:45Z curl `force=1` composition-half; force bypasses the 45-min
+cap, route L124–127; MAX_RUNS 3 fits) · curl-only 3:40–4:05 PM PT ~55–60 with
+slate count 6 printed first. **TWO BOARDS ONE DAY = ONE BOARD-DAY (the clock
+counts board-days) — reachability unchanged.** The 22:00Z board's split recorded
+(supports the engine half; cannot support composition/cap-binding). **ITEM-2 —
+the impossible branch FIRED: max emittable single-ticket = 10% of bankroll on a
+1-ticket card** (capG = max(perParlayCap, 1/n)·DAILY, L3107; minN relaxes with
+thin pools L3074; 5%/3.33%/2.5% at n=2/3/≥4); 4–6-leg tickets are FUN-only
+(~0.2%); caps enforced IN shAllocate ON-DEVICE (server builds no card; archived
+stakes are display tiers); replay governance 1-of-12 structural, 11 belief-layer.
+**⚑ OPERATOR RULE recorded, dated, distinct from engine parameters: NO SINGLE
+SLIP ABOVE 2% OF BANKROLL ($50) — binds below every engine cap and would have
+trimmed both replay cards' tops.** **ITEM-3 — the guard's first real observation
+is RETROACTIVE AND PASSES: 07-26 luPct 0.857 = achievable 0.857, margin +0.000
+(exact, ε=0); one archived day on disk; tomorrow's falsifiable predictions
+printed (50/50 PASS cron; 83/83 PASS curl); guard stays SPEC-ONLY per the
+ruling.** **ITEM-4 — Trammell and Chisholm are DIFFERENT GAMES (HOU@CWS 18:10Z
+vs NYY@PHI 23:20Z), same ticket, simJoint false because nothing is same-game: NO
+correlation exposure; the λ* mapping stands as computed.** **ITEM-5 — the join's
+full reading extended into the memo's pre-committed block (contents spec;
+per-market clustered gain vs +1.07 [+0.88,+1.33], both intervals, no averaging;
+zero-both-price → fifth 'unrecoverable' restatement; negative market →
+decomposition restates).** Close-out: header cutoff 2:45 PM PT (or 3:30 PM PT
+with the entry moved — the owner's choice in one visit); outs flag Thursday
+evening after the board; landing test 08:02–08:07Z three outcomes; bounded line
+extended (+the 22:00Z board's composition limits). Hold from `45c9f18`.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =

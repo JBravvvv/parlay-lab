@@ -227,6 +227,21 @@ same-gated ledger. **The fp one-day gap is a DEPLOY ARTIFACT, resolved**: `fp` e
   2026-07-26 → the boards={07-26} / fp={07-27,28} partition was wrong and the same-day
   join was available two turns ago — print both. (The public `/api/calibration` is
   aggregates-only and cannot pre-answer (4); the day-list read settles it.)
+- **EXTENDED 2026-07-30 (owner's item 5 — the reading on disk BEFORE the curl,
+  now that tomorrow is the first same-day pred×fp coexistence)**: what the join
+  must contain to be READABLE: total joined row count · per-market split · the
+  count of rows carrying BOTH a CZ price and an MGM `fp` price · the fixture-day
+  count (expected: 1 — 2026-07-30). The measurement: **the two-book gain on the
+  joined rows, per market, game-clustered, population named as ONE fixture-day,
+  PRE-vintage.** Then the comparison the instrument exists for: **against the
+  archive-derived +1.07 [+0.88, +1.33] — the same quantity by a different
+  instrument; diff two things that should be identical. Agrees inside the
+  interval → two instruments converge and the archive figure gains support (print
+  BOTH intervals). Disagrees → one instrument is wrong and the finding is WHICH —
+  do not average them.** Zero rows carry both prices → print the failing field,
+  and "unrecoverable" restates beside the failed join — the FIFTH time. Impossible
+  branch: the joined gain is NEGATIVE on any market → MGM prices worse than CZ
+  there and the market-level decomposition restates.**
 
 **⚠️ POPULATION STAMP (2026-07-28, post-M13)**: every two-book number in this section —
 +1.01/leg, +1.42/+1.58/+1.74 per slip, this per-market table, and the crossover

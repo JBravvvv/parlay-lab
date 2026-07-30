@@ -3604,6 +3604,75 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   reading — recorded with its reason (`docs/pitcher-outs-audit.md`, DECIDED) —
   Thursday EVENING, after the board's readings, per deadline 2 above.
 
+- **ITEM-1 RESOLUTION: THE CRON CAN REACH THE WINDOW, AND THE MOVE IS THE OWNER'S
+  (2026-07-30)**: the generate entries live on cron-job.org — the owner's account.
+  **The exact change: edit entry 1 from `0 22 * * 1-5` to `45 22 * * 1-5`** (or add
+  a one-day `45 22 * * 4`); cron-job.org edits take effect at the next evaluation —
+  no lead beyond saving; **do it in the same visit as the header fix, by 3:30 PM PT
+  (the moved entry fires 22:45Z = 3:45 PM PT), and one board does everything at
+  ~83% coverage for ~55–60 credits** (cost scales with the 6 eligible events —
+  cheaper than the ~150 full-slate figure). The three paths, priced: (a)
+  **moved-cron one-board** — ~55–60, slot unspent, the plan if the owner edits the
+  hour; (b) **two-board day** — 22:00Z cron (~55–60, engine-verification half:
+  echo, cfSel stamps, self_consistency, greyed rows, replay+join) + 22:45Z+ curl
+  with `force=1` (~55–60, composition half at 83%; `force` bypasses the 45-min
+  rate cap and the good-board skip, route L124–127; `MAX_RUNS_PER_DATE = 3`
+  accommodates both) ≈ **~110–120 total — the owner decides on this printed
+  cost**; (c) **curl-only** — 3:40–4:05 PM PT (22:40–23:05Z), slate count printed
+  first (expected: 6 unstarted with posted props), ~55–60. **TWO BOARDS ON ONE DAY
+  COUNT AS ONE BOARD-DAY against the ≥10 threshold — the clock counts BOARD-DAYS
+  (the no-reset contingency's own definition) — the reachability table does not
+  move.** The 22:00Z board's split, stated: at 50% coverage it SUPPORTS the echo,
+  the cfSel stamp reading, self_consistency, the greyed-row check, the replay +
+  ParlayPred diff, and the predictions×fp join; it CANNOT support the
+  high-coverage composition readings or a meaningful cap-binding test (a
+  3-confirmed-game pool is thin, and a non-binding cap is NOT evidence against
+  M14, as recorded). Impossible branch armed: the 22:00Z board's own `gen.luPct`
+  reads above 50 → the FP−3h projection was wrong and the window is wider — print
+  both.
+
+- **THE STAKE CAPS, MEASURED TO THEIR MAXIMUM — AND THE OWNER'S OPERATOR RULE
+  (2026-07-30, owner's item 2; no change ships)**: the per-ticket cap is
+  **`capG = max(perParlayCap, 1/n) × DAILY`** (L3107) and thin pools produce small
+  n (`minN = min(minCoreTickets, scored.length)`, L3074) — so **the maximum
+  emittable single-ticket share is NOT 2.5%: it is 10% of bankroll on a 1-ticket
+  card** (100% × $250, `dailyBankrollCap` exactly co-binding), **5% at n=2, 3.33%
+  at n=3, 2.5% only at n≥4** — the owner's impossible branch FIRED, and thin
+  cards are real (the in-loop shade sweep produced 3-ticket cards). By legs:
+  `coreMaxLegs = 3` → CORE tickets are 2–3 legs, both at the n-dependent cap
+  (`coreMaxDec = 15` caps ODDS, not stake); 4–6-leg tickets exist only in FUN,
+  bounded by the FUN budget (`pl_fun`, default $5 ≈ 0.2%). In the DISCIPLINED
+  path each ticket also carries a HARD belief-sized Kelly ceiling
+  (`kellyStakeMult` × ¼-Kelly; remainder stays unallocated) — it can only LOWER
+  the belief-free cap. Governance on the replay cards (12 tickets across both):
+  **1 of 12 structural-cap-bound** (the EV card's $62 top); the other 11 sit
+  under Kelly-proportional weights — the belief layer (weight-vs-ceiling binding
+  is not distinguishable from stakes alone; the harness can print it on demand).
+  **Enforcement locus**: the caps are enforced IN `shAllocate` — engine code, at
+  card computation, which runs ON-DEVICE for the real card; the server builds and
+  stores NO card, and the archived `stake` fields are display-tier suggestions.
+  So the engine enforces at computation; **the last mile — the slip at Caesars —
+  is the operator**, and the exposure fact stands with the 10%/5%/3.33%/2.5%
+  ladder beside it.
+  **⚑ OPERATOR RULE (2026-07-30, THE OWNER'S OWN — above the engine, NOT an
+  engine parameter, recorded so ledger readings can tell the operator's
+  constraint from the engine's): NO SINGLE SLIP ABOVE 2% OF BANKROLL ($50 at
+  $2,500), regardless of what the card suggests.** It binds BELOW every engine
+  cap and below both replay cards' top tickets ($59/$62 — the rule would have
+  trimmed both).
+
+- **THE LINEUP GUARD'S FIRST REAL OBSERVATION IS RETROACTIVE AND IT PASSES
+  (2026-07-30, owner's item 3)**: recomputed from `gameInfo` starts + `at` with
+  the route's own formula on the one archived day (07-26; `.best`, the session's
+  instrument): **unstarted 14, ready 12 → achievable 0.857; confirmed-lu among
+  unstarted 12 → luPct 0.857; condition PASSES with margin +0.000 — at ε = 0,
+  exactly** (the board captured exactly what was capturable at 16:46Z). Boards on
+  disk for this check: **one archived day** (two snapshots of it). Tomorrow's
+  falsifiable predictions, printed before any board exists: **22:00Z cron board →
+  luPct ≈ 0.50, achievable ≈ 0.50, PASS; 22:45Z curl board → ≈ 0.83/0.83, PASS.**
+  Per the owner's ruling and branch 2: **the guard has never been red on real
+  data and stays SPEC-ONLY**; tomorrow's board is read against it either way.
+
 - **THE CLEAR-COUNT MIDDLE BRANCH, FIXED BEFORE THE BOARD EXISTS (2026-07-30,
   owner's item 5)**: clear count between 1 and 5 → **neither the gate nor the cap
   is binding, and the reading IS the blocked-reason histogram over ALL pool
