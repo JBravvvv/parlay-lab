@@ -211,6 +211,60 @@ coreEvMin withdrawal stands, this level claim stands, and the misread was the re
 not the record. No step showed E[ln] rising under a worse shade (the impossible
 branch stayed silent on the run's own output).
 
+**⚠️ SHRINK-TO-MARKET TEST — THE UNIFORM-SHADE RESTORATION IS ITSELF WITHDRAWN
+(2026-07-29, same day, owner's item 3: "the shade test cannot see the overconfidence
+that would punish EV ranking" — CONFIRMED).** The uniform shade subtracts equally
+from high- and low-edge legs and is structurally blind to selection-on-edge; the
+non-blind instrument shrinks each leg's est toward its OWN market-implied
+probability (p′ = (1−λ)p + λ·imp — the correction proportional to the claimed edge;
+`tests/a1-shrink.test.ts`, archived board, free). **EVALUATION-ONLY (cards fixed —
+grading exposure)**: gap +60.6 / +51.9 / +38.4 / +18.3 / **−0.5 / −17.2** at
+λ = 0/.1/.25/.5/.75/1 — **crosses zero at λ ≈ 0.74**. **IN-LOOP (gate + ranking +
+Kelly read the shrunk belief — selection exposure)**: gap +59.7 / +43.9 / +10.6 /
+**+0.0 at λ=0.5, where both rankings CONVERGE TO THE IDENTICAL CARD** (composition
+columns equal), and the pool goes **NO-PLAY at λ ≥ 0.75** (`coreEvMin=2` clears
+nothing — the gate empties before the gap can invert; the two exposures do not
+disagree in sign, they end differently: grading inverts, selection converges then
+empties — both named, neither summarised by the other). λ=1 census printed on the
+run: 0 of 67 pool tickets carry czEv > 0 (max −5.5%) — at full agreement the
+remaining EVs are consensus-at-CZ (vig), the shrink target IS the market-implied
+probability, and the impossible branch does not fire. Context: leg est is ALREADY
+35% model / 65% consensus for props (`SH_W`) — λ composes on top; λ=1 ≡ pure
+consensus fair. The nine `shShrink` k's implement a DIFFERENT shrinkage — player
+RATES toward LEAGUE means, upstream of the est — none of them shrinks toward
+market-implied and none is in this path. (In-loop λ=0 reprints differ from the base
+instrument by ≤ 0.9 bp — the r1 re-rounding pass in the shrink wrapper; stated.)
+**PER THE PRE-COMMITTED BRANCH 1: the +60.6 is EDGE-FRAGILE; the uniform-shade
+retraction of the withdrawal is itself withdrawn; A1's case returns to restored
+monotonicity + penalty removal (price-axis results the shrink does not touch) —
+the LEVEL effect and the FLOOR/percentile argument are λ=0-conditional claims from
+here on. Both instruments stay on the record with their names: `a1-shade`
+(uniform, location) and `a1-shrink` (edge-proportional, selection).**
+
+**THE ENGINE'S OVERCONFIDENCE TOLERANCE, AND THE ONE MARKET WITH DATA (2026-07-29,
+owner's item 4)**: the evaluation-only zero crossings interpolate to **−3.2 pp/leg
+(prob ranking: +8.2 at −3 → −29.9 at −4)** and **−4.3 pp/leg (EV: +11.1 at −4 →
+−30.8 at −5)** — but an evaluation-side tolerance is NOT the engine's own, because
+real overconfidence also changes selection (the owner's branch fired). **The
+IN-LOOP tolerance — selection responding, tickets dropping 6→5→4→3 as the gate
+tightens — stays positive through the whole grid: prob +126.6 → +8.3 at −5,
+zero-crossing EXTRAPOLATED ≈ −5.4 pp/leg; EV ranking converges to the identical
+card from −3 on.** The calibration table, every settled per-leg gap on record:
+
+| market | measured gap | file:line | n / population |
+|---|---|---|---|
+| **H+R+RBI** | **46.3% hit vs 59.2% implied = −12.9 pp** (O1.5+ subset 32%; O0.5 12/19 = 63%) | `docs/hrr-recalibration.md` L83–86 | graded ledger 07-17→07-22, SELECTED legs; row count OFF-DISK (the ledger key) — an adversely-selected population, not per-leg-uniform |
+| pitcher outs | λ_model − λ_market **−2.48 outs (−0.83 IP) median, negative 38 of 38** | `docs/pitcher-outs-audit.md` L100 | 38 rows, one board — a RATE gap in outs units, sign-decisive, not convertible to prob-pp without the line distribution (not converted) |
+| every other market | **no settled calibration data exists** (server store starved: `eligibleLogged: 3`) | CLAUDE.md L420 | — |
+
+**HRR's −12.9 pp exceeds the in-loop tolerance (≈5.4) by ~2.4× and the
+evaluation-only one (≈3.2) by ~4× — a bankroll-exit-relevant fact visible today,
+from calibration data, with no ledger read. In the same breath: one market, small
+off-disk n, SUSPENDED, and a selected-legs population against a per-leg-uniform
+tolerance — the two are not directly commensurable and this entry does not answer
+the bankroll exit. And the sentence that stands beside it: THE ENGINE'S TOLERANCE
+IS UNTESTED ON EVERY MARKET THAT IS ABOUT TO REOPEN.**
+
 **WITHIN-TICKET PRICING MAGNITUDE, MEASURED ON THE 07-26 ARCHIVE (2026-07-29,
 owner's item 6 — the magnitude before the reopen, not the description)**:
 - **The pricing line**: naive product at legacy L2684–85; sim-joint rescale
@@ -239,11 +293,41 @@ owner's item 6 — the magnitude before the reopen, not the description)**:
   at ρ = 0.05/0.10/0.20 — an UNDERSTATEMENT if the two Unders are positively
   correlated. Its number is **M19** (row above); no additional M-number is minted —
   the gate-coupling branch did not fire.
+- **CLEAN REPRINT (2026-07-29, owner's item 6 — the earlier print mixed two
+  populations)**: emitted tickets **218**; tickets containing a within-ticket
+  same-game pair: **25**; same-game GROUPS: **25** (exactly one per ticket);
+  simJoint-graded: **22**; tickets containing an UNGRADED group: **3** (the
+  triplicate's entries). The "0" that sat beside "25" in the earlier line was the
+  allocated CARD's within-ticket group count (6 tickets, 0 groups, 2 cross-ticket
+  pairs) — a different population, now separated. **Sign convention restated**: the
+  ρ-repricing figures are adjustment MAGNITUDES |Δ| on the ticket probability
+  (mean 1.17/2.33/4.67 pp, max 2.32/4.64/9.27 pp at ρ=+0.05/+0.10/+0.20); with
+  positive event-level correlation the product UNDERSTATES the joint by Δ, with
+  negative it OVERSTATES by the same Δ; per-pair sign is unmeasured without the
+  sim. Where the sim graded, its signed answer is emitted − naive: mean −1.06 pp,
+  min −16.70, max +3.80, 2 of 22 negative.
+- **THE CLAMP (2026-07-29, owner's item 6)**: the simJoint rescale is clamped
+  **0.25–4×** (L2686–2706). On the 07-26 archive the realized factors span
+  **0.564–1.192** (quartiles 1.000/1.029/1.067; 19 usable ratios of the 22 graded —
+  3 HR-parlay tickets round `probNaive` to 0 and yield no ratio): **the clamp binds
+  ZERO times, in neither direction, on this board** (n=1 board). Provenance: the
+  bounds are **CHOSEN — no stated rationale in the comment** → they join the census:
+  **v2.1 restates 40 parameters / 0 fitted / 39 chosen (12 with no stated
+  rationale) / 1 stated-arithmetic** (frozen table row added,
+  `docs/collection-period.md`). **Spec'd, NOT shipped (owner's order — encodable
+  only while the class is at n=0)**: an invariant failing the build when a
+  POOL-ELIGIBLE ticket (czDec non-null, `parlays`/`parlaysMixed`, no live legs)
+  contains a same-game group `simJoint` did not grade — today that population is
+  empty, so the guard would encode the invariant rather than mask a defect.
 
 **A1's case rests on: penalty removal (paired +27.4/+24.5, ρ=0.20-robust), restored
 monotonicity (≤ +1.5, one board), the level effect (+60.6, detectable at 15 boards),
 and the floor (min +147.5 vs +27.1). The adoption effect size is OUT OF REACH, not
-awaiting boards** — stated wherever A1 is cited.
+awaiting boards** — stated wherever A1 is cited. **(RESTATED 2026-07-29, after the
+shrink test: the case is penalty removal + restored monotonicity — the price-axis
+pair the shrink does not touch. The level effect and the floor are λ=0-conditional:
+edge-fragile under shrink-to-market, gap zero-crossing at λ ≈ 0.74 eval-only,
+rankings convergent in-loop at λ = 0.5 — SHRINK block below.)**
 
 **M14 ADDENDUM 2 (2026-07-29, owner's variance decomposition — written into the row per
 the pre-committed branch)**: on 200 IDENTICAL draws, the two rankings' card outcomes

@@ -16,7 +16,10 @@
 > frozen parameters, 0 were FITTED, 38 CHOSEN (11 with no stated rationale), 1 with
 > stated arithmetic; 7 have been measured since — one vindicated (k=4), four condemned
 > or weak.** The parameter exit is not a tune-up of a measured system; it is the first
-> measurement pass over most of it.
+> measurement pass over most of it. **(v2.1, 2026-07-29: the `simJoint` clamp bounds
+> 0.25–4× join — CHOSEN, no stated rationale → 40 parameters / 39 chosen (12 no
+> rationale) / 1 stated-arithmetic; 8 since-measured — the clamp measured
+> NEVER-BINDING on the 07-26 archive, 0.564–1.192 across 19 ratios, n=1 board.)**
 
 > ⚠️ **REVIEW REACHABILITY WITHOUT A RESET (2026-07-29, owner's order — written above
 > the credit sentence so 08-15 is not discovered on 08-15). From 1,676 remaining,
@@ -186,6 +189,27 @@
 > need data-vintage homogeneity (the pause moves neither 08-17 nor 08-20); what the
 > pause buys is one data vintage for the PARAMETER EXIT's cross-day re-measurement
 > paths (M18's fourteen downstream findings).
+>
+> **EXECUTION STATUS (2026-07-29, owner's sign-off received)**: the pause commit is
+> BUILT — `a46c1f` on a local `main` worktree, exactly the diff above; the two
+> frozen-at hashes are IN ITS MESSAGE: priors
+> `00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e`, context
+> `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` (local ≡ origin
+> byte-identical at pause time — the uncommitted-drift impossible branch is SILENT).
+> **The push to `main` is BLOCKED by this session's permission layer** (the
+> frontend-rebuild push was allowed; default-branch pushes are not) — the owner runs
+> ONE command: `git push origin a46c1f:main` from the repo. **Queued-run caveat,
+> stated in advance**: today's 22:30Z context cron had already TRIGGERED before the
+> pause could land (measured queue delay puts its run at ~06:19–08:30Z); a run
+> triggered pre-pause may execute the pre-pause workflow file and commit ONE more
+> context refresh. Tonight's board is unaffected either way (the curl precedes it;
+> the deploy's statics are the hashes above). If that straggler commits, the
+> homogeneous-window start SHIFTS to its context hash — the stamp is conditional and
+> says so, rather than pretending the window opened at a file the straggler then
+> moved. `data/ump_k.json` keeps accruing by design; the whitelist guard
+> (`tests/bot-path-whitelist.test.ts`, WHITELIST = {ump_k.json, context.json,
+> priors.json}) would flag `data/pen_quality.json` THE DAY it materializes — that
+> file is NOT whitelisted, confirmed by reading the test's constant.
 >
 > **POWER, NOW PARTLY COMPUTABLE (2026-07-29, owner's item 5 — for the owner's
 > re-decision; the original decision stays on the record with its date)**: the
@@ -416,7 +440,8 @@ n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and
 
 **Count: 0 fitted / 38 chosen (11 with no stated rationale) / 7 since-measured — of
 which one vindicated, four condemned or weak.** The sentence at the top of this doc now
-carries these numbers.
+carries these numbers. **(v2.1, 2026-07-29: +simJoint clamp → 40 / 39 chosen (12 no
+rationale) / 8 since-measured; the clamp never binds on n=1 board — bundle.)**
 
 **WHAT THE PARAMETER EXIT CAN AND CANNOT LICENSE (2026-07-29, owner's paragraph — both
 halves stated)**: A positive Phase 2 result would establish that **this configuration's
@@ -495,6 +520,7 @@ column as a list of bugs. Frozen; see `docs/pitcher-outs-audit.md` §8.
 |---|---|---|
 | `coreMaxLegs` | `3` | core tickets max 3 legs |
 | `coreMaxDec` | `15` | core odds ceiling ≈ +1400 |
+| `simJoint` clamp | `0.25–4×` | ⚠️ **CHOSEN, no stated rationale (census v2.1, 2026-07-29)** — bounds on the joint/naive rescale (L2686–2706); measured NEVER-BINDING on the 07-26 archive (factors 0.564–1.192, 19 usable ratios; n=1 board); a clamp that binds replaces the dependence model with the clamp — the guard for the ungraded-group class is spec'd in the bundle |
 | `maxCoreTickets` / `minCoreTickets` | `6` / `4` | core card size band |
 | `perParlayCap` | `0.25` | max fraction of DAILY on one ticket |
 | `funMaxTickets` / `funMaxLegs` | `1` / `4` | FUN: one ticket per day (supplementals count), max 4 legs |
@@ -3338,6 +3364,27 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   inside one 40-minute window means it did NOT land.** Per-fire generate cost, computed
   from its request URLs (no generate since 07-26): ~**150/fire**; each cron slot and
   the manual curl cost the same.
+  **⚠️ CLUSTER-BLINDNESS, PRE-COMMITTED BEFORE THE 08:02Z TEST (2026-07-29, owner's
+  item 5 — written so tomorrow is a confirmation, not a discovery)**: `_snapshot_kind`
+  reads the LAST PAID TIMESTAMP from the COMMITTED day-file (`day["snapshots"]`,
+  tools/snapshot_props.py L143–151), `props-history.yml` declares **NO concurrency
+  group**, and its Commit step is a plain `git push` with no pull/retry. Three
+  runners spaced ~3 min that all check out before any commits will each read the
+  same stale state and ALL PAY — **MIN_GAP as shipped dedupes SPACED ticks, not
+  overlapping clusters** — and a second overlapping pusher is REJECTED non-ff: its
+  snapshot is PAID AND LOST, worse than a duplicate. The 4-of-10 replay was
+  sequential-state and OVERSTATES cluster dedupe. **Expected reading tomorrow: two
+  or three paid inside the 08:02–08:07Z window IF the runs overlap (checkout-to-
+  commit latency > spacing) — that confirms the CONCURRENCY gap, not a MIN_GAP-code
+  failure; the landed/not-landed reading stands as written. Fix, SPEC-ONLY (owner):
+  a `concurrency:` group on props-history.yml (queue, not cancel) + a pull-rebase
+  retry in the Commit step.** Impossible branch: one-paid-per-window with no
+  concurrency group and a committed-state read → print the run timestamps —
+  something else serialises (candidate: GitHub's own queue trickling starts —
+  measured arrivals were spread 08:04–10:49Z). Both script copies verified
+  IDENTICAL (line-history and frontend-rebuild both sha256 `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828` — the
+  executing copy carries MIN_GAP; the doc-commit-wearing-a-fix's-name branch does
+  not fire).
 - **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
   (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
   board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before
@@ -3529,7 +3576,9 @@ suspension accrual ×2 + pre series + the pair + **the M14 production check** �
 | 07-31 | same expiry, K's/outs | engine (behavioral) |
 | 08-01 | same expiry, ML/RL | engine (behavioral) |
 | **07-29** | **MIN_GAP ships** (`1617d1b`, pushed) — props-archive cadence segments pre/post | instrument |
-| **07-29** | **cfSel stamps ship** (held commit; additive `PredRecord.cfSel` on susp rows — prediction-record SCHEMA gains a field, live behavior unchanged, guard-proven byte-identical) | instrument |
+| **07-29** | **cfSel stamps ship** (pushed `9753fb9` stack; additive `PredRecord.cfSel` on susp rows — prediction-record SCHEMA gains a field, live behavior unchanged, guard-proven byte-identical) | instrument |
+| **07-29** | **sha+config echo ships** (same push — `data.echo` on every board + response body: engineSha, priors/ctx content hashes, gates, caps, selMode, damping, cfSelEnabled; write-only, guard-enforced) | instrument |
+| **07-29 (pending the owner's one command)** | **bot pause** — priors.json + context.json writers stop; ump_k accrues; homogeneous data-vintage window opens at the pause | collection regime |
 | conditional | outs flag (**decided 2026-07-29: deploys Thursday 07-30**, pitcher-outs-audit) · alt keys · sha/config echo | engine (config) / instrument ×2 |
 
 **The convention, fixed (it covered code changes only — today's behavioral change was

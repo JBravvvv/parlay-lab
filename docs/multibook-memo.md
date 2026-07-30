@@ -21,7 +21,12 @@
 > DOES NOT ESTABLISH A POSITIVE GAIN. The sequencing sentence is: A1 removes the
 > penalty; the residual gain is UNMEASURABLE — detecting +1.9 bp at 80% power needs
 > ~1,400 boards (retired, not pending; bundle). A1's case = penalty removal + restored
-> monotonicity (≤+1.5, one board) + the level effect (+60.6) + the floor.** (The earlier "+1.9 [−1.2, +5.0]" was 60
+> monotonicity (≤+1.5, one board) + the level effect (+60.6) + the floor.**
+> **(RESTATED 2026-07-29, shrink test: the level effect and the floor are
+> λ=0-conditional — edge-fragile under shrink-to-market (gap crosses zero at λ≈0.74
+> eval-only; rankings converge in-loop at λ=0.5; bundle SHRINK block). A1's case =
+> penalty removal + restored monotonicity. The power figure restates at the paired
+> +1.3: ~3,000 boards; clustered −0.4, sign not established.)** (The earlier "+1.9 [−1.2, +5.0]" was 60
 > different seeds — superseded by the comparable 200.) A1's own narrowing travels with
 > it (breaks at +2.0, one board; bundle).
 > **THE STANDING DEDUCTION**: under the shipped engine multi-book is net −26.1; under A1
