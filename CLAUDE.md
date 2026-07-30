@@ -415,6 +415,43 @@ every caller; the trigger mark spec'd (gen.trigger + pred src), additive,
 SPEC-ONLY.** Spec-only queue: +the forced-board/trigger mark, +the real lineup
 condition (achievable ≥ T); the old lineup guard withdrawn. Hold from
 `407fd5f`.
+**TENTH POST-COMPACTION TURN (2026-07-30Z, pre-window)**: **TRIGGER MARK SHIPPED
+AND PUSHED (`4c036ba` — the push carried the seven held doc/test commits, all
+doc-and-test-only per the audits; `4c036ba` is the only runtime-toucher; engine
+sha re-verified IDENTICAL f6cf1513; landing reading pre-committed: tomorrow's
+board carries `gen.trigger === "header"` or the mark did not land).** **ITEM 1
+BOUNDED**: max realized top-ticket on any card on disk **$62 = 2.48%**
+(distribution printed); at n=1 the Kelly ceiling binds BELOW the structural $250
+— **≤ $200 = 8% on the strongest measured ticket ($107–200 typical): the 10% is
+UNREACHABLE in ev_gated** (reachable only legacy/override); binding census over
+60 tickets: capG 3 · Kelly 6 · weight 51; **the exact-sum impossible branch
+FIRED BY DESIGN — the .15 cards deployed $49 of $250: under-deployment is real,
+exact-sum is the LEGACY rule, thin cards do NOT concentrate by construction in
+the disciplined path.** The 2%-rule sentence NARROWED: binding on 7 of 10 cards
+(tops $52–62); 3 of 10 sat under $50 already ($22/$22/$48). **ITEM 2**: **T =
+0.80 SET by the owner before any board's number was known — the 42nd chosen
+parameter (census v2.3: 42/41 chosen/9 since-measured)**; both curves printed
+(07-26 hourly peak 0.867@16Z, build 0.857; tomorrow 0.50 through 22:30Z → 0.833
+from 22:45Z); T-fails on disk: 0 of 1 at every candidate → guard never red →
+SPEC-ONLY per the standing rule; pre-committed: ≥0.80 at 22:45Z → composition
+valid; below → engine-half only; 22:00Z ≥0.80 → re-derive (projected 0.50).
+**ITEM 3**: NO written target for hits/TB/HR (the HRR anchor was a transfer, now
+labeled); ledger channel ~2–5 legs/market/day vs graded-rows ~14–19; **the
+exit's test is POOLED (`shLedgerStats` ALL/CORE/FUN — never per-market) →
+masking possible — the finding**; honest N per market at the LEDGER rate:
+12-pp ≈ 35–40 board-days, 3-pp ≈ 100+ — both exceed the 9.7 reachable →
+**TWO EXITS, BOTH UNREACHABLE THIS CYCLE WITHOUT A RESET — beside the
+parameter-exit sentence.** **ITEM 4 confirmed**: fallback curl needs NO force
+(401 → no lastRun); curl-after-cron-success returns `{skipped}` — safe, zero
+cost; a second board after a T-fail REQUIRES force (dead-slate refusal disabled
+with it) — OFF unless the owner authorizes in the moment; one leak named (the
+good-board skip's coverage test could open a no-force path after 45 min, bounded
+by the window's closure). **ITEM 5 close-out**: the owner's two cron-job.org
+edits by 3:30 PM PT (header 1–4; entry 1 → `45 22 * * 1-5`); the fourteen-step
+chain on the 22:45Z board, no curl, no force; T-fail branch reads engine-half
+only; the 08:02–08:07Z landing test three outcomes; quota reads free at both
+ends; bounded line extended (+T, +the two-exits sentence). Hold from `da27070`
+(post-push: the new docs commit is the held one).
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =

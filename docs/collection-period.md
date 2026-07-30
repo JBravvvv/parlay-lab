@@ -25,6 +25,13 @@
 > → 41 parameters / 40 chosen (12 no rationale) / 1 stated-arithmetic; 9
 > since-measured. The relax is the FOURTH unmeasured parameter with a measured
 > consequence, after `coreEvMin`, damping 0.5, and `SH_W`.)**
+> **(v2.3, 2026-07-30 late: T = 0.80 joins — the lineup condition's threshold,
+> CHOSEN by the owner before any board's number was known, rationale stated
+> (separates the 22:45Z window from the 22:00Z design point) → 42 parameters /
+> 41 chosen (12 no rationale) / 1 stated-arithmetic; 9 since-measured. And the
+> relax's measured consequence NARROWS same-day: the disciplined path's Kelly
+> ceilings bound n=1 at ≤ ~8% and under-deploy thin cards ($49 of $250 measured)
+> — the 10% is reachable only in legacy/override modes.)**
 
 > ⚠️ **REVIEW REACHABILITY WITHOUT A RESET (2026-07-29, owner's order — written above
 > the credit sentence so 08-15 is not discovered on 08-15). From 1,676 remaining,
@@ -3789,6 +3796,94 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   quota READS settle it tomorrow. If the slate shrinks below 6 by 22:45Z: the
   board covers whatever unstarted remains and the slate count printed at the
   go/no-go is the record; at zero unstarted → a THIRD no-board day, recorded.
+
+- **THE 10% CEILING, BOUNDED BY MEASUREMENT (2026-07-30 late, owner's item 1)**:
+  realized top-ticket stakes across every stake-carrying card on disk (10 harness
+  cards — no real card is persisted, the standing gap): **max $62 = 2.48% of
+  bankroll**; full distribution [22, 22, 48, 52, 56, 58, 59, 62, 62, 62]. **At
+  n=1 the belief-sized Kelly ceiling binds BELOW the structural $250: ceiling =
+  kellyStakeMult(4) × min(¼-Kelly, 2%-of-bankroll) × B ≤ $200 = 8.0% of bankroll
+  on the strongest ticket measured (typical tickets $107–200) — the 10% is
+  UNREACHABLE in the disciplined path; the operative ceiling is ≤ 8%** (legacy /
+  override modes lack the Kelly ceiling — there the 10% remains reachable;
+  production default is ev_gated). Binding census across all 60 tickets on the 10
+  cards: **capG-bound 3 · Kelly-bound 6 (the two λ-stressed thin cards) ·
+  weight-governed 51.** **AND THE EXACT-SUM IMPOSSIBLE BRANCH FIRES, BY DESIGN**:
+  the share-0.15 cards deployed **$49 of $250 — under-deployment is real** —
+  "Ceilings are HARD; the remainder stays unallocated" (L3105–06) deliberately
+  broke exact-sum in the disciplined path. **So the mechanism, stated plainly:
+  exact-sum is the LEGACY rule; in ev_gated, thin cards do NOT concentrate by
+  construction — the Kelly ceilings bound them and the remainder sits
+  unallocated. The 1/n relax's measured consequence shrinks accordingly: it
+  raises the belief-free cap, but the belief-sized ceiling underneath is what the
+  disciplined path actually pays.** The freeze-doc exposure line restates to: the
+  worst single slip in the disciplined path is bounded by min(structural ladder,
+  ~8% Kelly ceiling); measured worst on any card: 2.48%.
+  **THE OWNER'S 2%-BINDING SENTENCE, MEASURED AND NARROWED**: the $50 rule binds
+  on **7 of the 10** measured cards (tops $52–62); on **3 of 10** the engine's
+  own output already sat under $50 (the two λ-stressed cards at $22 and the
+  share-1.0 prob card at $48) — the rule is the binding constraint on every
+  STRONG-belief card measured, not on every card.
+
+- **T = 0.80, SET BY THE OWNER BEFORE ANY BOARD EXISTS (2026-07-30 — chosen NOT
+  fitted, the 42nd such parameter; census v2.3: 42 parameters / 41 chosen (12 no
+  rationale) / 1 stated-arithmetic / 9 since-measured)**: reason, his: it sits
+  below tomorrow's projected 0.833 curl/moved-cron window and above the 22:00Z
+  design point (0.50–0.66), separating the two paths on the axis that matters,
+  chosen while no board's number is known. **The curves it was chosen against
+  (computable from gameInfo alone for ANY hour — confirmed)**: 07-26 hourly:
+  0.0 (13Z) · 0.067 (14Z) · 0.533 (15Z) · **0.867 (16Z — build hour 16:46 =
+  0.857)** · 0.857 (17–18Z) · 0.5 (19–20Z) · 1.0 over 1 unstarted (21–23Z, the
+  small-n tail); tomorrow 20:00–23:30Z at 15-min steps: **0.0 → 0.50 (20:15
+  through 22:30) → 0.833 from 22:45 → 1.0 over 3 from 23:15.** T-fail counts on
+  disk: **0 of 1 board at every candidate (0.60/0.70/0.80/0.85** — 07-26's 0.857
+  passes even 0.85). **The guard has never been red on real data → SPEC-ONLY
+  under the standing rule.** Pre-committed for tomorrow: 22:45Z board carries
+  achievable ≥ 0.80 → composition readings VALID on it; below → engine-half
+  only, exactly as the 22:00Z-only branch was priced; impossible branch: 22:00Z
+  ≥ 0.80 → the separation was wrong, re-derive before the window (the projected
+  22:00Z value is 0.50 — the branch is not expected to fire).
+
+- **THE N ANCHOR, UN-BORROWED (2026-07-30, owner's item 3)**: **no written target
+  effect size exists for hits, TB, or HR — said explicitly; the 6–10 board-day
+  anchor was HRR's retirement standard transferred, and it is now labeled as
+  such.** Rows per board-day per market at tomorrow's 6-game slate, both
+  channels: the LEDGER channel (the bankroll exit's SOLE instrument — placed
+  legs): **~2–5 legs/market/day**; the GRADED-BOARD-ROWS channel (calibration,
+  not the bankroll exit): hits ~19 · TB ~14 · HR ~19 per board-day (07-26 counts
+  × 6/16). **The exit's test is POOLED — `shLedgerStats` scopes ALL/CORE/FUN,
+  never per-market — so a miss in one market can be masked by two clean ones at
+  the expected roughly-equal row split; that is the finding.** The honest N, per
+  market: at the LEDGER rate, a 12-pp miss needs ~100–120 legs ≈ **~35–40
+  board-days per market**; a 3-pp miss ≈ **~100+ board-days** — **both exceed
+  the reachable board-days under every cadence (9.7 max). THE SENTENCE, BESIDE
+  THE PARAMETER-EXIT SENTENCE: TWO EXITS, BOTH UNREACHABLE THIS CYCLE WITHOUT A
+  RESET — the parameter exit for credits, the bankroll exit for settled-leg
+  volume in the reopened markets.** (Via the graded-rows channel a 12-pp miss
+  shows in ~6–8 board-days — reachable board-only — but that channel measures
+  CALIBRATION, not the bankroll; the distinction is the point.)
+
+- **force CONFIRMATIONS + THE SECOND-BOARD PATH (2026-07-30, owner's item 4)**:
+  (1) **the 3:40–4:05 PM PT fallback curl runs WITHOUT force** — a 401'd cron
+  returns before the `lastRun` SET, so no rate cap arms; no good board exists;
+  the evening-6 are unstarted. (2) If the 22:45Z cron SUCCEEDS and a curl lands
+  inside 45 minutes: the rate cap fires FIRST and returns `{skipped: "ran
+  recently"}` — **no second build, no spend; the board itself is read from
+  /api/board, free — the fallback is safe and costs nothing after a cron
+  success.** (3) A second board after a T-fail **requires force=1** (rate cap +
+  good-board skip both stand in the way), and force disables the dead-slate
+  refusal with it — **that path exists, costs ~55–60, and is OFF unless the
+  owner authorizes it explicitly in the moment with the disabled protections
+  stated.** One leak named on the impossible branch: after 45 minutes, the
+  good-board skip's own goodness test (coverage-based) could decline to skip a
+  poorly-covered existing board — a no-force second build would then be possible;
+  the window's closure (~23:05Z first pitches) and the dead-slate refusal bound
+  it. **THE TRIGGER MARK SHIPPED** (`4c036ba`, pushed; guard
+  `tests/trigger-mark.test.ts` observed RED on both halves first): `gen.trigger
+  = "cron-ua" | "header" | "manual" | "manual-forced"` rides the board KV, the
+  archive, the prediction store (gens[]), and the response. **Landing reading,
+  pre-committed: tomorrow's board carries `gen.trigger === "header"` or the
+  mark/deploy did not land.**
 
 - **THE CLEAR-COUNT MIDDLE BRANCH, FIXED BEFORE THE BOARD EXISTS (2026-07-30,
   owner's item 5)**: clear count between 1 and 5 → **neither the gate nor the cap
