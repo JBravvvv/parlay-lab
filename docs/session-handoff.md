@@ -1,267 +1,314 @@
-# SESSION HANDOFF — written 2026-07-29, immediately before context compaction
+# SESSION HANDOFF — brought current 2026-07-30 (~04:3xZ), immediately before compaction
 
-Purpose: everything this session established that a fresh context must know, on disk.
-Every factual claim carries a file path (or file:line), or is marked
-IN-CONTEXT-ONLY-UNVERIFIED. Nothing here is a new measurement.
+Purpose: tomorrow's entire chain, on disk. Every line re-sourced from the docs this
+turn; figures not sourceable are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves
+them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version got stale.
 
-## 1. READ-FIRST LIST
+## 1. STALE-ON-ARRIVAL (lines of the 07-29 handoff this session corrected/superseded)
 
-Docs (load before acting):
-- `CLAUDE.md` — state block, the verification chain + Wednesday order + step-0/1
-  clearances + capture commands + step-8 pre-commit, M-index M1–M18, calendar (with the
-  aspirational stamp), guard inventory, standing rules (rule 23, L2402 rule, hold rhythm).
-- `docs/freeze-exit-bundle.md` — every M/A finding with measured effect; the vintage
-  table; M14 audit + addenda (200-seed adoption, reconciliation, A1 robustness/retirement);
-  M16/M17/M18 rows; level-vs-derivative census.
-- `docs/collection-period.md` — freeze scope + frozen table (provenance census v2);
-  M18 first line; credit budget/burn/runway; MIN_GAP ship record + landing instrument;
-  no-reset contingency; 08-15 decision page + reviews/power table; suspension shadow
-  accrual + cfSel flag spec; ledger section + export pre-commit; vintage events census;
-  dark-gap series table.
-- `docs/multibook-memo.md` — the adoption headline (net −26.1, A1 sequencing), M13 §2c,
-  M15 dedup corrections, the CLV kernel run, the predictions×fp join pre-commit,
-  placeability census, Over-only counts.
-- `docs/singles-vs-parlays.md` — the doctrine + four dated corrections (frame, sign,
-  allocator-in-loop, M14 isolation), the crossover-undetermined ruling, few-cluster marks.
-- `docs/harness-substitutions.md` — teeth-test standards; the fixture-representativeness
-  pre-committed reading (its 08-14 date moved — see collection-period 08-15 decision).
-- `docs/hrr-recalibration.md` — HRR audit; the suspension basis (L83–86) and reversal.
-- `docs/pitcher-outs-audit.md` — outs defects; the suspension-flag spec + go/no-go page.
-- `docs/board-timing.md`, `docs/phase2-memo.md` — board cadence; Series A design
-  (L40–42 = the floor requirement; L41 = timing-vintage segmentation).
-- `docs/session-handoff.md` — this file.
+- ~~"Pushed head at handoff: 1617d1b; HELD: 465b85a, 7ac2a4a, 2469ad0 + this file"~~ —
+  STALE: everything through `4c036ba` is PUSHED (two ship pushes: `1617d1b..9753fb9`
+  stack+cfSel+echo; `9753fb9..4c036ba` docs+trigger mark); held = `e4e7bd1` + this
+  file's commit. §4 below.
+- ~~the chain table (step 0 MIN_GAP landing / 0b cfSel sign-off / Wednesday order)~~ —
+  STALE: cfSel + the sha/config echo SHIPPED and pushed; MIN_GAP's landing test was
+  CONSUMED by the concurrency fix (its landing test is now the 08:02–08:07Z window);
+  the Wednesday order was overtaken by the 07-29 NO-BOARD DAY (0 of 16 unstarted at
+  02:14Z; slot not spent) — the chain moved to the 07-30 run sheet, §2.
+- ~~spec-only queue rows: MIN_GAP (landing pending) / cfSel (sign-off) / sha+config
+  echo (own sign-off) / outs flag (go/no-go)~~ — STALE: first three shipped; outs
+  DECIDED (flag deploys Thursday evening; `docs/pitcher-outs-audit.md` DECIDED).
+- The alleged M17/M18 corrections (owner's 07-30 items 2–3): **NO correction was
+  needed** — the gitignored/unversioned premise died on three printed queries
+  (`check-ignore` exit 1; `ls-files` both tracked; bot commits ON the JSON) —
+  `docs/collection-period.md`, THE UNVERSIONED-INPUTS PREMISE block.
+- ~~"abstention is the boundary" (in-loop tolerance)~~ — RETRACTED 2026-07-29 late:
+  the in-loop shade fed the SHADED est to the admission gate (omniscient gate); the
+  EVAL-ONLY run is the tolerance instrument — bundle, tolerance table + its dated
+  markers.
+- ~~the in-loop ≈−5.4 crossings and the 2.4× exceedance ratio~~ — STRUCK (the grid
+  extension first, then the retraction above); the standing crossings are eval-only
+  **prob −3.2 / EV −4.3 pp, interpolated** — bundle.
+- ~~the lineup guard `luPct ≥ achievable − ε`~~ — WITHDRAWN as the lineup guard
+  (detects feed-lag, not early generation; not an identity — the inputs differ);
+  replaced by the spec'd `gen.achievable ≥ T` with **T = 0.80 set by the owner** —
+  collection-period.
+- The pause's justification RESTATED: the bot IS the committed data-vintage writer
+  (premise-death queries above); the pause stands as governance with that recorded —
+  collection-period, pause block.
+- ~~"A1's operative argument = the +60.6 level"~~ — the level and floor are
+  **λ=0-conditional** after the shrink test (edge-fragile, crossing λ≈0.74); A1's
+  case = restored monotonicity + penalty removal — bundle SHRINK block, memo lead.
+- ~~handoff §5 items 1 (MIN_GAP landing wording) and 10 (outs ICOU)~~ — 1 superseded
+  (fix's landing test), 10 DISCHARGED (owner re-issued on the record, marker dated).
 
-Guard tests (all green at handoff unless marked):
-`tests/parity.test.ts` · `tests/doc-structure.test.ts` · `tests/retraction-markers.test.ts`
-· `tests/m2-interlock.test.ts` · `tests/hrr-suspension-coupling.test.ts` ·
-`tests/workflow-timing.test.ts` · `tests/factor-classification.test.ts` ·
-`tests/calibration-window.test.ts` · `tests/sweep-covers-engine.test.ts` (**it.fails —
-documents open M13**) · `tests/outs-suspension-coupling.test.ts` (**it.fails — flag not
-applied, awaiting go/no-go**) · `tests/bot-path-whitelist.test.ts` (M17) ·
-`tests/sha-references.test.ts` (dangling-citation guard; accepts origin- or
-HEAD-reachable) · `tests/min-gap.test.ts` (MIN_GAP shipped) ·
-`tests/singles-counterfactual.test.ts` (analysis harness, `PL_BOARD=`).
-Created this session: the last five listed plus this file.
+## 2. TOMORROW'S RUN SHEET (2026-07-30 PT — execute from here)
 
-## 2. GIT STATE
+**Deadlines (both Thursday 07-30 PT, different gates):**
+1. **3:30 PM PT — the owner's ONE cron-job.org visit**: header `x-cron-key` on
+   entries 1–4 AND entry 1 → `45 22 * * 1-5`. Gates the verification board (fires
+   22:45Z = 3:45 PM PT, achievable 0.833, cost PROJECTED ~55–60 at 6 events).
+   (2:45 PM PT was the cutoff for an unmoved 22:00Z entry — superseded by the move.)
+2. **Thursday EVENING, after the board's readings — the outs flag deploys**
+   (regardless of any board reading; both branches pre-committed;
+   `docs/pitcher-outs-audit.md` DECIDED). Gates Friday's K's/outs reopen (07-31
+   expiry). Deploying before the cron would put a second engine change on the first
+   verified board — evening, not earlier.
 
-- Branch `frontend-rebuild`. **Pushed head at handoff: `1617d1b` (MIN_GAP ship)**, landed
-  `64c42ad..1617d1b` (git log / origin).
-- **HELD (unpushed, ancestors of local HEAD): `465b85a`, `7ac2a4a`, `2469ad0`, plus the
-  commit adding this file.** The hold rhythm is CLAUDE.md's standing rule.
-- Sha renames this session (rebases over bot commits; old names are gc-able loose
-  objects, deliberately truncated to 6 hex here so the citation guard ignores them):
-  59f6ee→`b9ba57c` · 0d96d3→`f544358` · 91cf2a→`3235dd5` · b17ae3→`ec1842c` ·
-  e11bbb→`1d723d9` · 21b8bd→`2a469f6` · 2b8124→`28e901e` · ce57af→`dcf26a2` ·
-  711aa8→`33dd31b` · b207dd→`465b85a` · 079440→`7ac2a4a` · 440031→`1617d1b`.
-  Docs cite only resolving shas (enforced: `tests/sha-references.test.ts`).
-- Served artifact (CLAUDE.md STEP-0 CLEARANCE): chunk `256-171aff5d10da160d.js`; engine
-  string sha256 `f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`;
-  last verified 2026-07-29 post-push. Chunk names are content-hashed — grep by STRING
-  hash.
-- Bot: `engine-v2-bot`, workflows `.github/workflows/context.yml` + `model.yml`;
-  whitelisted write paths = `data/ump_k.json`, `public/model/context.json`,
-  `public/model/priors.json` (`tests/bot-path-whitelist.test.ts`). It commits daily —
-  expect origin to move; rebase before push (CLAUDE.md).
+**Cron failure branches (collection-period, the owner's item 5)**: (a) fires 22:45Z
+with header → the chain runs on its board — no curl, no force; (b) 401 → **curl
+3:40–4:05 PM PT** on the owner's go/no-go, slate count printed first, NO force
+(a 401'd cron sets no lastRun; protections pass naturally); (c) board empty/malformed
+→ report the response and STOP — no second slot; (d) no fire → cron-job.org fact,
+owner's check; (e) impossible: two boards → old entry didn't clear — print both; the
+chain reads the 22:45Z board (`latest` wins), ONE board-day. Slate <6 by 22:45Z →
+board covers the unstarted remainder, count printed; zero → THIRD no-board day.
+**force ruling**: bypasses THREE protections (rate cap, good-board skip, DEAD-SLATE
+refusal); OFF tomorrow; a second board after a T-fail requires it and is OFF absent
+the owner's explicit in-the-moment authorization. Curl-after-cron-success returns
+`{skipped}` — free, safe.
 
-## 3. VERIFICATION CHAIN (CLAUDE.md, "WEDNESDAY'S ORDER" + the numbered chain)
+**The fourteen steps, in order (collection-period, TOMORROW'S ORDER)**: slate count
+printed → the owner's go/no-go → quota READ (free: `/v4/sports` via the odds proxy,
+headers passed) → board (cron preferred, curl fallback) → quota READ → `gen=list` →
+**echo present in the response body** (absent → the push did not land) → **cfSel
+stamp on every suspended row** (absent → did not land) → `self_consistency`: zero
+TB≥1==H≥1 violations, zero HRR legs in built tickets, BOTH population sizes printed
+(zero-over-empty is not a pass) → app-switcher double reopen → HRR rows present AND
+greyed → replay dump + ParlayPred membership diff → Control C's production
+predictions vs the pre-commitments → ticket count vs both pre-commits.
+**T = 0.80**: 22:45Z board achievable ≥ 0.80 → composition readings VALID; below →
+**engine-half only** (echo, cfSel, self_consistency, greyed rows, replay+join — no
+composition or cap-binding reading). **Trigger-mark landing**: the board carries
+`gen.trigger === "header"` or the mark did not land.
+**Control C's numbers (CLAUDE.md STEP-8 pre-commit)**: IF the cap binds, the
+prob-ranked 6 forgoes **≥ 30 bp** E[ln] vs the same pool's EV-ranked 6, and displaced
+rank-7+ tickets carry HIGHER czEv than entrants (07-26 signature: entrants ~**2–4%
+czEv / ≥63% prob** vs displaced ~**7%**). Cap binds + displaced-higher-EV → M14
+confirmed in production; cap does not bind → M14 unobserved, sweep stays archival.
+**Clear-count readings**: 0 clear → `coreEvMin=2` is the binding gate (print
+blocked-reason counts); card at 6 → cap binding, M14 live, record ranks 7+;
+**1–5 → the blocked-reason HISTOGRAM over all pool tickets IS the reading, modal
+reason named** — and a non-binding cap is NOT evidence against M14.
+**HRR four counts, separate readings**: (1) rows PRESENT (absent → THIRD vacuity,
+reopen did not happen, 08-15 population restarts); (2) rows GREYED; (3) shadow rows
+`susp:true` AND cfSel-stamped; (4) HRR legs in tickets = ZERO (any >0 → hrrAltMax not
+reaching the server path — M-item same day). All four → the suspension verified
+end-to-end for the first time.
+**08:02–08:07Z landing test (the concurrency fix's)**: ONE paid + N−1 skips + no
+rejected push → landed; two+ paid OR any rejected push → NOT landed, MIN_GAP and the
+fix revert to spec TOGETHER; ZERO paid → the queue starved the window — its own line.
+**predictions×fp join (tomorrow evening, owner's sync phrase, zero credits)**:
+contents required (rows, per-market split, both-price count, fixture-days = 1);
+per-market game-clustered gain, ONE fixture-day + PRE-vintage; **vs the
+archive-derived +1.07 [+0.88, +1.33] — diff, never average**; zero both-price rows →
+failing field + fifth "unrecoverable" restatement; negative market → decomposition
+restates (multibook-memo, EXTENDED block).
 
-| step | what | status at handoff | closing instrument | cost | owner |
-|---|---|---|---|---|---|
-| 0 | MIN_GAP ships | **SHIPPED `1617d1b`; LANDING UNCONFIRMED** | next cluster: one paid snapshot per 40-min window + N−1 skip lines (collection-period, MIN_GAP bullet) | 0 | session confirms |
-| 0b | cfSel flag | **spec'd, awaiting sign-off** (collection-period, flag spec) | owner's sign-off, then the diff | 0 | **Josh** |
-| 1 | push stack + re-grep | **CLEARED** (STEP-0/STEP-1 blocks, CLAUDE.md) | done | 0 | done |
-| 2 | header fix (x-cron-key on entries 1–4) | **not started** | cron-job.org edit | 0 | **Josh** |
-| 3 | manual generate curl + captures + quota before/after | not started | the curl (CLAUDE.md capture block) | **~150** protected | **Josh** (types nothing secret beyond his own) |
-| 4 | gen=list non-empty | not started | response field | 0 | session |
-| 5 | self_consistency: 0 TB≥1==H≥1 violations, 0 HRR ticket legs, both population sizes printed | not started — **closes step 1's server half** | `tools/self_consistency.py` | 0 | session |
-| 6 | app-switcher double reopen | not started | device | 0 | **Josh** |
-| 7 | HRR rows present AND greyed | not started | device | 0 | **Josh** |
-| 8 | replay dump + ParlayPred membership diff | not started; replay deterministic (see §10); diff needs sync phrase | harness replay + authed pred read | 0 | session + **Josh** (phrase) |
+## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 23)
 
-Nothing locks Wednesday until the chain completes (CLAUDE.md, owner's rule).
+1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
+2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
+   (test header).
+3. Echo landing: present in the response body or the push did not land (CLAUDE.md
+   ITEM-1 block).
+4. cfSel: stamp on EVERY susp record or DID NOT LAND (collection-period, cfSel
+   SHIPPED block).
+5. Trigger mark: `gen.trigger === "header"` or did not land (collection-period).
+6. T = 0.80 branches: ≥0.80 at 22:45Z → composition valid; below → engine-half only;
+   impossible: 22:00Z ≥ 0.80 (projected 0.50) → re-derive (collection-period).
+7. luPct/achievable falsifiable predictions: cron 0.50/0.50, curl-window 0.833/0.833
+   — the measured pair CAN untie and prints either way (collection-period).
+8. Cron failure branches (a)–(e) incl. the two-boards impossible (§2).
+9. self_consistency reading + its four sub-branches (zero-HRR-rows = reopen failure;
+   ungreyed = display half; HRR ticket legs = server half M-item; zero-over-empty
+   not a pass) (CLAUDE.md chain step 5).
+10. Behavioral-vintage ticket counts: zero-clear → coreEvMin binding with counts;
+    card-at-6 → cap binding, ranks 7+ recorded (CLAUDE.md step-5 block).
+11. Clear-count MIDDLE branch: 1–5 → the histogram is the reading (collection-period).
+12. Step-8 M14 production reading with the ≥30 bp / 2–4%-vs-7% numbers (CLAUDE.md
+    STEP-8).
+13. ParlayPred replay diff, four branches: identical → validated-on-one-day; differ →
+    two allocators, stop; empty → hypothesis label; impossible membership-not-stakes
+    → allocator not a function of its inputs (carried from the 07-29 handoff §5.7,
+    transcribed to disk there).
+14. predictions×fp join: the four 07-28 branches + the 07-30 extension (§2;
+    multibook-memo).
+15. Ledger export reading: reconstructible → "cannot re-examine" withdraws dated;
+    not → absent fields NAMED; count vs the owner's "38" → both printed (the "38"
+    remains IN-CONTEXT-ONLY-UNVERIFIED — no on-disk record; resolved by the export).
+16. Triplicate-membership check inside the export read: leg-set match → M19 reached
+    the ledger by hand (collection-period, export block).
+17. HRR suspension review: at the READ quota (1,461) board-only = 9.74 board-days —
+    **UNREACHABLE without a reset, written in advance**; retirement half restates to
+    repair+10 (collection-period, reachability + supersession).
+18. Reset branches: reset → restate runway, reprice calendar; no reset → ordered
+    shutdown executes and the parameter exit does not fit this cycle
+    (collection-period).
+19. Outs flag ship Thursday evening; `outs-suspension-coupling.test.ts` `it.fails`
+    flips → `it` in THAT commit (guard header; pitcher-outs-audit DECIDED).
+20. `sweep-covers-engine.test.ts` (M13) flips only in the alt-keys fix commit (guard
+    header; alt keys spec-only behind the burn plan).
+21. Fixture-representativeness reading at 08-17: ≤2/≥5-of-25 branches, the five cold
+    sites, the range-detector thresholds (harness-substitutions, PRE-COMMITTED
+    section).
+22. Second-board-after-T-fail: requires force, OFF absent explicit in-the-moment
+    authorization with the disabled protections stated (collection-period).
+23. The 22:00Z board's own coverage impossible branch: luPct > 50 → the projection
+    was wrong, the window wider — print both (collection-period, item-1 resolution).
 
-## 4. SPEC-ONLY QUEUE
+## 4. GIT AND ARTIFACT STATE
 
-| item | changes | files | guard (red observed?) | prerequisites | additive? |
-|---|---|---|---|---|---|
-| **MIN_GAP** | **SHIPPED `1617d1b`** — pre-sweep payment dedupe | `tools/snapshot_props.py` | `tests/min-gap.test.ts` (RED→GREEN same commit) | **landing confirmation pending** (instrument in §5) | yes |
-| cfSel flag | counterfactual selection on suspended rows | `app/api/generate/route.ts` (+`pred-serialize` stamp) | none yet — spec'd | **owner sign-off before the curl** (collection-period) | yes — branches nothing live |
-| sha+config echo | engineSha + config echo in generate/board | route + archive | required red-at-implementation (CLAUDE.md spec) | own sign-off | yes |
-| outs suspension flag | 3 same-line engine edits | `legacy/index.html` + re-extract + guard flip | `tests/outs-suspension-coupling.test.ts` (**RED observed: 10 outs legs**) | **Wednesday go/no-go — Josh** | config+display only |
-| alt keys (M13 fix) | sweep requests +3 alt markets | `tools/snapshot_props.py` | `tests/sweep-covers-engine.test.ts` (**RED observed: 3 keys**) | burn plan → owner | yes; vintage-stamped |
-| ledger export | read-only backup curls | none (owner runs) | n/a | owner runs with phrase | yes |
-| ledger append-only invariant | monotone-superset guard | new test | spec'd; encodes at 2 snapshots | export first | yes |
-| A1 / damping / coreEvMin / cap | allocator changes | engine | n/a | **exit sign-off; freeze holds** | no — frozen |
+- Branch `frontend-rebuild`: **pushed head `4c036ba`** (trigger mark; the push carried
+  the seven prior doc/test-only commits — runtime-touchers this session: `0914eeb`
+  cfSel, `9753fb9` echo, `4c036ba` mark). **HELD: `e4e7bd1`** (+ this file's commit).
+- **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
+  deploys nowhere — `vercel.json` `main: false`).
+- Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,
+  sha256 `f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b` — last
+  re-extracted and matched **2026-07-30 post-4c036ba-push** (edge cache had not yet
+  cycled at the last probe; the mark is server-route code — its landing evidence is
+  reading #5, not the chunk).
+- The two model files are **NOT gitignored and never were**: tracked, bot-committed
+  (priors nightly, context 2×/day; latest at pause time priors `00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e` / context `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`, local ≡ origin); production reads its own deployment's
+  committed statics; tests read fix45 static snapshots.
+- **The bot pause (`a46c1f`, on main)**: froze the priors.json + context.json
+  WRITERS; `ump_k.json` keeps accruing; ONE pre-pause-queued context run may still
+  commit (~06–08:30Z) — the window-start stamp is conditional on it
+  (collection-period, pause block). The pause did NOT need to freeze anything for
+  the fixture bar (orthogonality block); it buys one data vintage for the parameter
+  exit's cross-day paths.
+- props-history: main's copy (the firing one) = OLD TEN-CRON + the concurrency fix;
+  the 07-27 three-cron+wait redesign never fired (frontend-rebuild only);
+  convergence = owner's call, spec-only. Executing script = frontend-rebuild's pull,
+  both copies sha256
+  `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828`, MIN_GAP inside.
 
-## 5. OPEN PRE-COMMITTED READINGS (verbatim; unresolved at handoff)
+## 5. FROZEN TABLE AND CENSUS (v2.3, collection-period)
 
-1. **MIN_GAP landing** (`docs/collection-period.md`, MIN_GAP SHIPPED bullet): "the next
-   morning cluster's day-file must append **one paid snapshot per 40-minute window with
-   the N−1 skips visible as 'skipped: pre within MIN_GAP' lines in the other runs'
-   Actions logs — two paid sweeps inside one 40-minute window means it did NOT land.**"
-2. **Predictions×fp join** (`docs/multibook-memo.md`, PRE-COMMITTED block): "(1) rows
-   join carrying both `cz` and `fp` → the hits two-book gain gets its first measured
-   magnitude, **stamped one fixture-day + pre-vintage**, and 'unrecoverable' withdraws
-   with a dated marker — fourth claim, fourth outcome. (2) rows join but `cz` is null
-   throughout hits/K's → **the field is written and never populated — an M-item, not a
-   join failure**. (3) zero rows → the query and the keys actually present under
-   `pl:pred:*` get printed (the same curl without `date` returns the day list). (4)
-   impossible branch: pred rows exist for 2026-07-26 → the boards={07-26} /
-   fp={07-27,28} partition was wrong and the same-day join was available two turns ago —
-   print both."
-3. **Ledger export reading** (`docs/collection-period.md`, THE EXPORT'S READING):
-   "reconstructible → 'cannot re-examine' WITHDRAWS with a dated marker and the
-   suspension's basis becomes auditable; not → the absent fields get NAMED, not
-   adjectival; export ticket-count vs the owner's 38 → both printed if they disagree."
-   (The "38" is the owner's stated figure; no on-disk record — IN-CONTEXT-ONLY-UNVERIFIED.)
-4. **Wednesday step-5 reading** (`CLAUDE.md`, chain step 5): "A pass = zero TB≥1==H≥1
-   violations AND zero HRR legs in built tickets AND both population sizes printed on
-   the run's own output… A zero over an empty population is NOT a pass and the run says
-   so itself. Zero HRR rows on the board → the greyed-row check is VACUOUS and the
-   reopen did not happen — a reopen failure, not a suspension success. HRR rows present
-   but UNGREYED on device → the display half fails. HRR legs present in built tickets →
-   `hrrAltMax` is not reaching the server path — the server half closes in the WORST
-   direction and that is an M-item the same day."
-5. **Behavioral-vintage ticket counts** (`CLAUDE.md`, chain step 5 block): "(a) zero
-   tickets clear with `consMinEv` gone → `coreEvMin = 2` is the binding gate — a FINDING
-   with a number (print the blocked-reason counts)… (b) the card fills to
-   `maxCoreTickets = 6` on day one → the cap is binding on the first live board and
-   Control C's displacement mechanism (M14) is live in production — record which tickets
-   sat at ranks 7+."
-6. **Step-8 M14 production reading** (`CLAUDE.md`, STEP-8 PRE-COMMIT): "IF the cap
-   binds, the prob-ranked 6 forgoes **≥ 30 bp** E[ln] vs the same pool's EV-ranked 6,
-   and rank-7+ displaced tickets carry HIGHER czEv than same-rank entrants… cap binds +
-   displaced-higher-EV → **M14 confirmed in production**; cap does not bind → **M14
-   unobserved in production, the sweep stays archival — said plainly, not treated as
-   confirmation.**"
-7. **ParlayPred replay diff** (owner's branches, issued in-session; transcribed here to
-   disk — previously IN-CONTEXT-ONLY-UNVERIFIED): sets identical → replay is a
-   validated instrument for composition on this board — say validated-on-one-day, not
-   validated; sets differ → two allocators or a nondeterminism — stop the chain and
-   diff; ParlayPred empty for today → replay unvalidated and the M14 production reading
-   is a hypothesis — label in advance; impossible: replay reproduces membership but not
-   stakes with stakes derivable → the allocator is not a function of its inputs.
-8. **HRR review thresholds** (`docs/collection-period.md`, THE NUMBERS AND THE
-   THRESHOLDS): suspension half "**vacuous if fewer than 10 board-days exist by
-   08-15**"; retirement half "**WILL be vacuous; it restates to first-repair-ship + 10
-   board-days**."
-9. **Reset branches** (`docs/collection-period.md`, runway bullet): "reset → restate
-   runway, reprice the calendar; no reset → the ordered shutdown list executes in its
-   stated order and the parameter exit does not fit this cycle."
-10. **Outs go/no-go** (`docs/pitcher-outs-audit.md`, flag spec + go/no-go page): flip
-    `it.fails` → `it` in the flag's commit on "go"; DELETE the guard in the fix's commit
-    on "no". Owner also ruled (this session): "if quota forces it, outs takes the flag
-    and the fix waits for a cycle with headroom" — IN-CONTEXT-ONLY-UNVERIFIED (owner
-    message; now on disk here). **(MARKER DISCHARGED 2026-07-29, same day: the owner
-    re-issued the ruling on the record in the post-compaction relay — "OUTS TAKES THE
-    FLAG", both branches pre-committed; the dated decision now lives in
-    `docs/pitcher-outs-audit.md`, DECIDED section.)**
-11. **Guard flips** (`tests/sweep-covers-engine.test.ts`, `tests/outs-suspension-coupling.test.ts`
-    headers): each `it.fails` flips to `it` only in the commit that ships its fix/flag.
+**42 parameters / 0 fitted / 41 chosen (12 with no stated rationale) / 1
+stated-arithmetic; 9 since-measured.** Additions this session: the simJoint clamp
+0.25–4× (v2.1, never binds on n=1 board), the 1/n cap relax (v2.2, ladder measured),
+T = 0.80 (v2.3, owner-chosen pre-data). **Named
+unmeasured-with-measured-consequence: `coreEvMin` (self-graded sweep), damping 0.5
+(40 bp range), `SH_W` (sweep self-graded by construction), the 1/n relax (the
+10%/5%/3.33%/2.5% ladder — narrowed same day: Kelly ceilings bound n=1 at ≤ ~8% and
+under-deploy thin cards, $49-of-$250 measured; 10% reachable only legacy/override).**
+Operator rule (NOT an engine parameter, distinct by design): **no single slip above
+2% of bankroll ($50)** — binding on 7 of 10 measured cards; 3 of 10 sat under $50.
 
-## 6. UNRESOLVED CONTRADICTIONS (both sides on disk, neither retracted)
+## 6. INSTRUMENT LEDGER (what each sees, is blind to, and carries)
 
-1. `docs/singles-vs-parlays.md` CORRECTION 4 tail: "A1 (edge-aware base) … and A2
-   (leg-equivalent floor) … the existing amendment pair addresses M14's two halves" vs
-   the same file's REFINEMENTS item 2 + `docs/freeze-exit-bundle.md` M14 row: "ranking
-   sufficient, cap innocent, **A2 is innocent of M14**."
-2. `CLAUDE.md` M14 row: "A1 is THE fix on this evidence" vs `docs/freeze-exit-bundle.md`
-   M14 ADDENDUM: "A1 is NOT sufficient everywhere; narrowed to 'sufficient at ≤ +1.5 on
-   one board'." (Also the retirement of A1's adoption effect sits beside the sequencing
-   sentence naming A1 the unblocker — memo lead.)
-3. `docs/multibook-memo.md` §2 table header "n=511 both-priced rows" (kept for the
-   record) vs §2b M15 correction "the unique population is 362 rows" — append-only kept
-   both; a fresh reader meets 511 first.
-4. `docs/collection-period.md` heading "Nothing is unrecoverable — the whole window is
-   in git" vs the appended "EXCEPT: one captured-field gap" + M18's data-vintage line.
+- **Exact E[ln] evaluator** (`growth`, 2^n at chosen stakes): sees chosen-stake
+  outcomes under a stated belief; BLIND to across-ticket dependence (product measure
+  over tickets — M16) and to its own belief's error (self-grading). Carries: M14
+  sweeps/controls, A1 levels+floor (now λ=0-conditional), damping, coreEvMin
+  withdrawal.
+- **Eval-only vs in-loop**: eval-only = selection-on-belief, evaluation-on-truth →
+  THE tolerance instrument (crossings prob −3.2 / EV −4.3, interpolated; perParlayCap
+  bound the EV card's $62 top). In-loop = the SHADED belief reaches the gate —
+  an omniscient gate; design results only (the abstention finding retracted).
+- **Shrink-to-market (λ)**: sees edge-proportional overconfidence (selection-on-edge
+  — killed the +60.6 as operative); BLIND to truth beyond the market (λ ≤ 1 cannot
+  represent below-market truth — HRR's −12.9 needs λ = 2.55–2.94, outside the axis).
+- **Uniform shade**: location shifts only; structurally blind to selection-on-edge.
+- **Blend sweep**: self-graded BY CONSTRUCTION (the evaluation prob amplifies with
+  the parameter under test) — can neither withdraw nor vindicate `SH_W`; its
+  by-products stand (s=0.15 convergence; the exit reads `pModel`, unnarrowed).
+- **ρ-stress (game-factor copula, 40k seeded, validated at ρ=0 ≤10 bp)**: sees
+  across-ticket same-game dependence at stated ρ. Carries: M16's magnitude, A1's
+  ρ-robustness, the blend peak's ρ-robustness (pairs don't grow with the peak).
+- **simJoint**: within-ticket same-game only; 22/25 groups on 07-26; BLIND to K's
+  groups (M6 — the M19 triplicate's cause) and everything across tickets; clamp
+  0.25–4× never bound (19 observable ratios, 3 undefined ≠ unbinding).
+- **The replay** (shAllocate determinism, byte-identical): reconstructs allocation
+  from the persisted pool; blind to anything never persisted (real card stakes).
+- **The sha re-grep**: the client engine string only; the server bundle is
+  unreadable from outside — the ECHO closes that half (engineSha + config +
+  priors/ctx hashes in every response/board).
+- **The withdrawn guard** (`luPct ≥ achievable − ε`): a feed-lag detector — luPct is
+  data (lu flags), achievable is schedule (FP−3h): not an identity, but blind to
+  early generation (both go to 0 together); replaced by `achievable ≥ T`, T = 0.80.
+- **The free quota read** (`/v4/sports` through the odds proxy): exact, zero
+  credits, headers passed (route L51–55).
 
-## 7. FREEZE AND EXITS
+## 7. POSITION
 
-- Freeze scope: `docs/collection-period.md` top — no model weights, gate thresholds,
-  market suspensions, structure caps, or selection-mode defaults change; sign-off
-  required for ANY change including collection instruments (MIN_GAP shipped only on the
-  owner's explicit sole-exception authorization — this session's precedent).
-- The two exits: `docs/collection-period.md` "the two exits" — the PARAMETER exit
-  (~09-22, Phase 2 slope + identification diagnostic; what it can and cannot license is
-  written in the same doc, LICENSING paragraph: 9 of 39 frozen parameters sit in its
-  measurement path) and the BANKROLL exit (unscheduled; sole instrument = CLV/ledger —
-  which is one unbacked Upstash key, ledger section).
-- Append-only: the ledger of record is the docs; corrections are dated addenda, never
-  rewrites (CLAUDE.md standing rules; enforced in part by
-  `tests/retraction-markers.test.ts`).
-- M18 caveat on everything cross-day: data vintage floats by design; state the axis
-  (`docs/collection-period.md` first line; bundle M18).
+- **Quota: READ 1,461 remaining / 18,539 used** — 2026-07-30 (the doc stamps the
+  read "~03:5xZ"; the exact minute of the earlier 07-29 morning read remains
+  IN-CONTEXT-ONLY-UNVERIFIED, inherited — the next reads stamp their own times).
+  Delta from 1,676/18,324: 215, attribution closed within 1 credit.
+- **Board-days: 1,461 / 150 = 9.74 < 10 — the ≥10 threshold is NOT reachable under
+  any cadence**; the 08-15 HRR suspension review is UNREACHABLE without a reset
+  (written 07-30, in advance). Tomorrow's board cost ~55–60 (projected).
+- **Homogeneous window: COUNT ZERO** (opened at the pause; 07-29 produced no board;
+  the first member is the 07-30 board under either definition; conditional on the
+  one queued straggler context commit).
+- **Both exits: TWO EXITS, BOTH UNREACHABLE THIS CYCLE WITHOUT A RESET** — the
+  parameter exit for credits (~13.5k needed to 09-22 vs 1,461), the bankroll exit
+  for settled-leg volume (per-market N at the ledger rate: 12-pp ≈ 35–40
+  board-days; 3-pp ≈ 100+; the exit's test is POOLED — masking possible). The reset
+  date remains unread; every downstream date ASPIRATIONAL-PENDING-RESET.
 
-## 8. POSITION AND CALENDAR
+## 8. UNRESOLVED CONTRADICTIONS (both sides on disk)
 
-- Quota: **1,676 remaining / 18,324 used — as-of 2026-07-29, read after the 08:04–10:49Z
-  sweep cluster** (`docs/collection-period.md`, 07-29 morning reading bullet; exact
-  clock time of the read: IN-CONTEXT-ONLY-UNVERIFIED). 641 spent since the prior
-  reading, attributed to 7 morning sweeps (~670 computed) — same bullet.
-- Runway derivation (`docs/collection-period.md`, "Runway with MIN_GAP live"): sweeps
-  ≈ ~420/day post-MIN_GAP → sweeps+board 2.9 days · board-only 11.2 · sweeps-only 4.0;
-  ≥10 board-days reachable ONLY board-only (11, barely) without a reset.
-- Calendar: ASPIRATIONAL-PENDING-RESET stamp atop `CLAUDE.md` Dated open items and in
-  `docs/collection-period.md`.
-- Reviews vs reachability (`docs/collection-period.md`, EVERY CALENDARED REVIEW table):
-  fixture-representativeness → 08-17 (row-level argument recorded; bar HELD at 20 by the
-  owner, decision dated 2026-07-29); crossover doctrine → 08-20 (MDE ~15–17 bp);
-  HRR retirement → repair+10 (only written target, ±3 pp ≈ 1 SE at n=300); HRR
-  suspension review → needs ≥10 board-days; 08-10 six regressions → board-independent.
+1. `docs/singles-vs-parlays.md` Correction-4 tail ("the A1+A2 pair addresses M14's
+   two halves") vs the same file's REFINEMENTS + bundle M14 row ("A2 innocent of
+   M14").
+2. Bundle M14 row L142 ("A1 is THE M14 fix on this evidence") vs the narrowing
+   ("sufficient at ≤ +1.5, one board") vs the shrink restatement (levels
+   λ=0-conditional) — three altitudes of the same claim, none retracted.
+3. `docs/multibook-memo.md` §2 header "n=511" (kept) vs §2b's unique 362.
+4. `docs/collection-period.md` "Nothing is unrecoverable" heading vs the appended
+   EXCEPT + M18's data-vintage line.
+5. The golden-rules "exact-sum allocator" (locked product rule) vs the disciplined
+   path's hard-ceilings/unallocated-remainder text (L3105–06) and the measured
+   $49-of-$250 under-deployment — design supersession never reconciled in the
+   golden-rules text.
 
-## 9. NOT ON DISK (named missing input → how obtained)
+## 9. NOT ON DISK (missing input → how obtained)
 
-- **Ledger contents** (rows behind 46.3%/59.2%, ticket count, any CZ Under-settlement):
-  `pl:ledger:v1`, sync phrase → the export curls (`docs/collection-period.md`, ledger
-  section). Owner runs; Josh types his own secrets (CLAUDE.md standing rule).
-- **Prediction-store contents** (07-27/28 blobs, client accrual counts, 07-26 existence):
-  `pl:pred:<date>`, sync phrase → the join curl (`docs/multibook-memo.md`).
-- **The reset date**: owner's Odds-API dashboard only (headers carry no reset field —
-  `docs/collection-period.md`, dark-window bullet).
-- **Vercel deploy list** (timestamps × commit): dashboard/token only; the served
-  artifact is the outside evidence (CLAUDE.md STEP-0).
-- **Server-runtime engine hash + board config echo**: needs the spec'd sha+config-echo
-  instrument (CLAUDE.md; own sign-off). Until then boards support behavioral vintage
-  claims only.
-- **Raw feed payloads beyond two 07-28 events**: capture + credits
-  (`docs/collection-period.md`, EXCEPT section; `docs/multibook-memo.md` §2c).
-- **Today's (07-29) board and everything downstream** (chain 3–8, cfSel capture, M14
-  production check, behavioral-vintage readings): the header fix / protected curl.
-- **Upstash retention/eviction policy**: dashboard; not written in the repo
-  (`docs/collection-period.md`, ledger section).
+- Ledger contents (the "38", HRR populations, any triplicate member): `pl:ledger:v1`
+  + sync phrase → the export curls (collection-period).
+- Prediction-store contents pre-07-30: `pl:pred:*` + sync phrase → the join curl.
+- The reset date: owner's Odds-API dashboard only.
+- Vercel deploy list: dashboard only; the served artifact + the echo are the outside
+  evidence.
+- Real card stakes ever placed: the ledger export only (allocation never persisted;
+  archived `stake` fields are display tiers).
+- calW/calG effective blend shares per market: `pl:cal:weights` (server) — the echo
+  does not yet carry them (noted in the bundle).
+- Whether Josh's two cron-job.org edits landed: the 22:45Z fire itself (branch (d)).
+- Upstash retention policy: dashboard.
 
 ## 10. DO-NOT-REDERIVE (read, don't recompute)
 
-- 200-seed adoption runs, clustered variant, paired A1 result, percentiles,
-  reconciliation, A1 retirement: `docs/freeze-exit-bundle.md` (M14 ADDENDUM + ADDENDUM 2
-  + A1 ROBUSTNESS + RECONCILIATION blocks) and `docs/multibook-memo.md` lead.
-- M14 controls (identity/negative-bump/census), cap sweep, EV-ranking sweep (+2.0
-  break), damping sweep (± shading), ρ-stress, pair counts: bundle M14/M16 rows +
-  `docs/singles-vs-parlays.md` corrections 1–4 and REFINEMENTS.
-- coreEvMin extended sweep + shade collapse (self-graded withdrawal): frozen-table row,
-  `docs/collection-period.md`.
-- Two-book population numbers incl. M15 dedup (+1.07 pre-vintage etc.): memo §2b.
-- 14-day CZ census, M13 chain, alternates raw evidence: memo §2c.
-- CLV kernel run (38/319, 14/14, 47 signatures), paired pre/close (149 pairs, p=0.875):
-  memo.
-- Cluster-pair info content, burn attribution (738/day; 641; 4-of-10 replay), provenance
-  census v2 (39/0/38/11), prior-drift table (7,240–10,041/day), vintage census, dark-gap
-  series table: `docs/collection-period.md`.
-- Placeability census (0/64 misses; Over-only leg counts), simJoint coverage (the
-  triplicated live K's parlay): memo + bundle M16 row.
-- Allocator replay determinism (byte-identical across sessions): recorded in the held
-  commit message `465b85a` (git show) and CLAUDE.md STEP-8 block ("reconstructible by
-  deterministic replay").
-- Scratchpad artifacts (SESSION-SCOPED, not durable): `ctrl*.json`, `cards26*.json`,
-  `pop362g.json`, `props27.json`, `board26_*.json` under this session's scratchpad —
-  regenerate from `origin/line-history` archives + the harness if a new session needs
-  them; every number they produced is already in the docs above.
+- Shade/shrink/blend sweeps, the full grids + composition: bundle (FULL GRID,
+  SHRINK, BLEND blocks) + `tests/a1-shade.test.ts` / `a1-shrink.test.ts` /
+  `blend-sweep.test.ts` (PL_BOARD harnesses; the 07-26 fixture regenerates from
+  `origin/line-history` `data/boards/`).
+- Tolerance table + retraction chain: bundle (one table, dated markers).
+- λ*-mapping (2.55–2.94, mean gaps +6.66/+8.30): bundle + hrr-recalibration.
+- ρ-stress + pair census + truth-proxy table (per share): bundle.
+- Clamp census (0.564–1.192, 19-of-22): bundle.
+- Cap ladder (10/5/3.33/2.5), Kelly-ceiling bound ($200/8%), stake distribution
+  (max $62 = 2.48%), binding census (3/6/51), under-deployment ($49/$250):
+  collection-period item-1/2 blocks (07-30 late).
+- Achievable curves (07-26 hourly; 07-30 15-min) + the retro guard pass
+  (0.857/0.857): collection-period T block.
+- The 200-seed adoption family, reconciliation, A1 percentiles, M14 controls,
+  coreEvMin/damping sweeps, M15/M13 populations, provenance census history, M16
+  per-pair, M19 census, placeability: bundle + memo + collection-period (as in the
+  07-29 handoff — unchanged locations).
+- force-flag audit (three bypasses), trigger-mark rationale: collection-period +
+  `tests/trigger-mark.test.ts` header.
 
 ## 11. PROTOCOL
 
-Josh relays paste blocks between two sessions and is not the operator — no side tasks,
-no explanations addressed to him, no decisions on his behalf. Standing rules live in
-`CLAUDE.md` (pointer, not copy). **First action after compaction: re-read this file and
-`CLAUDE.md`, confirm the held sha resolves (`git log --oneline -4`), print the chain's
-current step, and stop.**
+Josh relays paste blocks between two sessions and is not the operator — no side
+tasks, no explanations addressed to him, no decisions on his behalf. Standing rules
+live in `CLAUDE.md` (pointer, not copy). **First action after compaction: re-read
+this file and `CLAUDE.md`, confirm the held sha resolves (`git log --oneline -3`),
+print the current chain step AND tomorrow's next deadline in PT (the 3:30 PM PT
+cron-job.org visit, unless the clock has passed it — then the 3:40–4:05 PM PT curl
+window), and STOP.**
