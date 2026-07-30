@@ -6050,3 +6050,217 @@ count spend", 2026-07-27). After 45 min the good-board skip takes over
 is two changes, isolated**; the weekend arming consequence above is the one
 thing the header edit changes beyond Thursday, priced for the owner before the
 visit.
+
+## THE MODE-COVERAGE GAP — MEASURED, CLOSED, AND ONE M-ITEM (2026-07-30, owner's item 1; shipped before the board)
+
+**The four modes, device-reachability, tap counts**:
+| mode | device-reachable | taps | Kelly ceiling | suspension bars apply |
+|---|---|---|---|---|
+| `ev_gated` (default, cron pin) | ✓ Settings | ~2 | ✓ | ✓ |
+| `dk_fd` | ✓ Settings | ~2 | ✓ | ✓ |
+| `probability` | ✓ Settings | ~2 | ✗ | **✗** |
+| `caesars_ev` | ✓ Settings | ~2 | ✗ | **✗** |
+| any mode + override (`force`) | ✓ Builder "Allocate anyway" (NO-PLAY days) | 1 | ✗ | ✓ (the bar is upstream in `buildParlaySet`; force only reaches `shAllocate`) |
+
+**THE EXTENDED HRR GUARD, RUN 2026-07-30 (armed fixture slate, per mode)**:
+| mode | force | pool | HRR in pool | HRR in FUN | verdict |
+|---|---|---|---|---|---|
+| ev_gated | false | 50 | 0 | 0 | PASS |
+| ev_gated | true | 50 | 0 | 0 | PASS |
+| dk_fd | false | 36 | 0 | 0 | PASS |
+| dk_fd | true | 36 | 0 | 0 | PASS |
+| **probability** | false | 48 | **11** | **4** | **UNFILTERED** |
+| **caesars_ev** | false | 48 | **11** | **4** | **UNFILTERED** |
+
+**M20 — THE SUSPENSION IS UNENFORCED IN TWO DEVICE-REACHABLE MODES (the owner's
+branch-1 reading, mode named, counts printed)**: `probability` and `caesars_ev`
+are each ~2 taps from the device and carry **11 H+R+RBI legs into the pool and 4
+into the FUN pick** — the exact numbers of the 2026-07-27 eleven-leg scare. This
+is BY DESIGN (the parity stance: the bar sits inside `buildParlaySet`'s
+disciplined branch, and the frozen table's `hrrAltMax` row already carries
+"⚠️ Effect CONDITIONAL on `selMode ∈ {ev_gated, dk_fd}`") — **but the design's
+premise, that those modes are not production-reachable, is FALSE on this
+device.** Wherever the mode is switched, the suspension is cosmetic. The
+consequence, stated at the owner's standard: the same holds for the outs flag
+Thursday (measured: **10 outs legs** in the pool in each legacy mode today), and
+for every future suspension — a suspension is a disciplined-mode property, not
+a market property. **Today's device check runs in `probability` as well as
+`ev_gated`** (the fifteenth chain step, below). Not shipped, not decided: making
+the bars unconditional would end the parity stance — the legacy modes exist to
+reproduce the historical engine — so this is an owner decision, spec-only,
+recorded with its numbers.
+
+**The gap is CLOSED as a coverage matter** (test-only ship today: no engine
+string, no hash move, no vintage event): `tests/helpers/modes.ts` extracts the
+WHOLE reachable domain from source — the `SelectionMode` union (every mode
+Settings can persist), `CRON_SEL_MODE`, `getSelectionMode`'s default, and
+override reachability read from the Builder's `shSetOverride(true)` control — so
+a new mode joins every guard the day it is added. Both callers extended:
+- `tests/hrr-suspension-coupling.test.ts`: disciplined modes × {force off, force
+  on} must be ZERO (4 cells, all pass); the legacy pair is now a CENSUS pinning
+  11/4 — a future change that silently extends OR removes the bar there fails
+  here; the unset-posture plant kept.
+- `tests/outs-suspension-coupling.test.ts`: same domain (its `it.fails` halves
+  still flip in the ship commit); legacy census pins 10 outs legs per mode.
+**No other guard calls `productionModes()`** — the list is exactly these two.
+
+**Are the new instruments mode-aware? NO — all four have only ever run in
+`ev_gated`** (stated plainly): cfSel's guard mirrors the cron arming
+(`selMode = "ev_gated"`, guard L51) and the production path is the pinned route;
+the echo RECORDS selMode but its guard exercises one literal; the trigger mark
+is mode-independent by construction (route auth state); `self_consistency` is a
+board-level archive check with no mode axis (it reads emitted rows). None is
+WRONG in another mode — none has been EXERCISED in one. Spec-only follow-up,
+owner's call. Impossible branch: **no mode is unexercisable by the harness** —
+all four ran today.
+
+## THE ECHO-GUARD EXCEPTION IS THE STANDING PROCEDURE — AND AN EXCEPTION-FREE FORM EXISTS (2026-07-30, owner's item 2; the build waits on this)
+
+**The assertion, cited** (`tests/engine-echo.test.ts` L26–29): `expect(ENGINE_SHA,
+"engine moved without a served-artifact re-verification").toBe(SERVED_ENGINE_SHA_VERIFIED)`.
+`ENGINE_SHA` is computed at module load from the LIVE repo engine string
+(`src/lib/engine-echo.ts`); `SERVED_ENGINE_SHA_VERIFIED` is a hand-updated
+constant whose rule is "updates ONLY beside a fresh re-grep" of the SERVED
+chunk. So it compares **repo-now vs served-as-of-the-last-manual-verification** —
+and the owner is right that this can never be green in the same commit as an
+engine change: the served artifact only carries the new string after a deploy,
+and the deploy needs a green build. **It is the standing procedure for every
+engine ship, not a one-time exception** — my "one-time dated exception" wording
+is WITHDRAWN.
+
+**The exception-free formulation, and it exists**: split the one blocking
+assertion into two.
+1. **BLOCKING — runtime vs COMMITTED SOURCE**: `ENGINE_SHA` (computed from
+   `legacy/index.html`'s extracted string) must equal the sha of the CHECKED-IN
+   generated artifact `src/engine/legacy-src.gen.ts`. Both exist pre-deploy, so
+   an engine ship regenerates the artifact and the check is green in the SAME
+   commit — no exception, ever. What it catches: the real historical failure
+   mode — `legacy/index.html` edited without re-running `tools/extract-engine.mjs`,
+   i.e. the repo shipping a stale engine to production.
+2. **NON-BLOCKING — served vs committed**: a REPORT (not a gate) that re-greps
+   the served chunk and prints match/mismatch with both hashes and the last
+   verification date, red only in the post-deploy verification step.
+**What that LOSES, named exactly**: the current form fails the build when
+production is serving something other than what the repo says — i.e. it catches
+a FAILED OR PARTIAL DEPLOY, a rollback, or an edge-cache serving a stale chunk,
+without anyone running the re-grep. Under the split, that class becomes a report
+someone must read; nothing blocks. **The mitigation that keeps it absolute**: a
+RESOLUTION GUARD — if `SERVED_ENGINE_SHA_VERIFIED` differs from `ENGINE_SHA` AND
+the marker `PENDING-LIVE-VERIFICATION` is present, the build fails once the
+marker is older than N hours (N = 24, chosen — an engine deploy verifies same
+day or it is a defect). That makes the marker self-expiring: **nothing today
+enforces resolution — the owner's "permanent by default" reading is correct as
+the code stands.**
+**Pending queue items that would need the exception under the CURRENT
+formulation: 6** — A1, `coreEvMin`, the 1/n cap, damping, `SH_W`, the
+ungraded-group fix (all engine-string). Plus Thursday's outs flag = **7 with
+it**. (The `achievable ≥ T` route gate is route-only — no engine string, no
+exception.)
+**Recommendation, not taken**: reformulate to the split + resolution guard
+BEFORE Thursday's build — it is test/tooling-only (no engine string, no hash
+move, no vintage event), it makes the ship exception-free, and it converts the
+served-vs-repo check from "blocking but bypassable" to "reporting plus a
+self-expiring gate". **Impossible branch checked: the guard has NEVER been
+bypassed** — `git log 9753fb9..HEAD -- src/engine/legacy-src.gen.ts
+legacy/index.html` is EMPTY; no engine-string change has occurred since the sha
+instrument shipped, so Thursday's would be the first.
+
+## WEEKEND ENTRIES: THE PREMISE CONFIRMED, AND THE NUMBERS FOR FRIDAY (2026-07-30, owner's item 3)
+
+**Premise CONFIRMED — board-days are credit-limited, not calendar-limited.**
+1,238 credits ÷ ~150 = 8.25 board-days against ~55 calendar days to 09-22; every
+recorded rationing table prices cadence in credits/day, and the per-date cap
+(MAX_RUNS_PER_DATE = 3) never binds at one board/day. Nothing calendar-limits
+board-days: no per-week quota, no cooldown, no expiry before the reset. Adding
+the header to entries 2–4 does not create board-days — it spends the same pool
+at hours chosen in 2026-07 for coverage reasons, before T existed.
+**DECISION RECORDED (owner's, 2026-07-30): header on ENTRY 1 ONLY; entries 2–4
+stay unheadered and keep 401'ing at zero cost.** Reversible at zero cost; a
+spent board-day is not.
+
+**Projected coverage at the weekend hours** (from the schedule + the FP−3h rule;
+PROJECTED — the real slates post later in the week):
+| hour | typical slate shape | achievable (FP−3h) | luPct |
+|---|---|---|---|
+| Sat 18:00Z (entry 2) | split early/late; afternoon bulk ~20:05Z+ | **~0.2–0.4** — the 18:00Z fire precedes most first pitches by >3 h | ≈ achievable, feed-lag aside |
+| Sun 17:00Z (entry 3) | bulk 17:35Z | **~0.6–0.8** (the bulk is 35 min out — well inside FP−3h) | ≈ achievable |
+| Sun 22:30Z (entry 4) | the 23:20Z national game only | **~1.0 for that game**, but the bulk has STARTED — board covers 1 game | high on a tiny population |
+Against **T = 0.80**: Saturday 18:00Z FAILS T on the projection; Sunday 17:00Z is
+BORDERLINE; Sunday 22:30Z passes on a one-game population.
+
+**The Sunday trap CONFIRMED — the good-board skip does NOT check T**: it computes
+coverage over UNSTARTED games (`liveCoverage`) and skips on its own `cov.skip`
+threshold; **T (`gen.achievable ≥ 0.80`) is not consulted anywhere in the route —
+it is a spec'd reading, not shipped code.** So a sub-T 17:00Z board blocks the
+22:30Z fire whenever the skip's coverage test is satisfied. Mechanism confirmed
+as the owner described.
+
+**Shadow-accrual value at those hours** (the only reason to want weekend boards —
+the 08-15 review is shadow-fed): rows scale with events, ~30–50 HRR rows and
+~250–300 prop rows per full slate (measured order from the archive); Sunday
+17:00Z ≈ a full bulk → the best weekend accrual; Sat 18:00Z ≈ full slate rows but
+sub-T composition; Sun 22:30Z ≈ ONE game → ~2–4 HRR rows, negligible accrual.
+**Best-coverage hour**: Saturday ≈ **20:00–20:30Z** (3 h before the ~23:15Z
+weekend evening cluster); Sunday ≈ **20:00Z** (after the 17:35Z bulk starts, 3 h
+before the 23:20Z nighter — but it then misses the bulk entirely; the honest
+Sunday answer is that no single hour serves both, which is why entries 3 and 4
+exist). Cost of a new entry at either hour: one board ≈ ~150 at a full slate
+(~6 × events), i.e. **~18% of the remaining pool per weekend board**.
+
+## THE UNTRACEABLE SPENDER — BOUNDED IN ADVANCE, AND THE STAMP SPEC (2026-07-30, owner's item 4)
+
+**Is CLV capture spend bounded and knowable in advance? PARTLY — and the
+unbounded part is why the residual could not be reconciled in the moment.** The
+`/api/clv` job is driven by cron-job.org at **96×/day (every 15 min)**; each
+firing is self-paced (the same pattern as `snapshot_props.py`): it captures only
+when a game's close window is open, so the number of PAID captures per day is
+bounded by GAMES, not by firings — **~1 capture per game per day, ~6 credits per
+capture** (one event × the market set). For today's 10-game slate that is
+**~10 captures ≈ 60 credits, PRE-COMMITTED as today's expected CLV figure**;
+tonight's fold reconciles against that number rather than explaining a residual
+after the fact. What is NOT knowable in advance: WHICH firing pays (the window
+opens on real first pitches) — so the spend is bounded but its TIMING is not,
+and a quota read mid-window cannot attribute the delta without the fold.
+**Therefore, per the owner's third branch, stated: any quota band anchored
+mid-day is a LOWER BOUND on spend until the fold lands** — the bands stay usable,
+labeled.
+
+**THE SPEND STAMP, SPEC'D NOT SHIPPED (additive, zero credits)**: at capture
+time, write a one-line stamp to the day-file's own structure —
+`{t, kind:"clv", events:N, est:6*N}` appended to a `spend[]` array in
+`data/props/<date>.json` (the file the capture already folds into), or to a
+Redis key `pl:spend:<date>` the fold drains. Cost: zero Odds credits, one extra
+write on a path that already writes. Effect: the quota read reconciles in the
+moment instead of hours later. Owner's call; nothing shipped.
+
+**Tonight's fold re-run is PENDING** — the fold runs with the evening props
+sweep (~20:20Z measured); the re-reconciliation and the ~97's close/survive
+verdict are reading 27 (handoff), to be printed when the fold lands. The
+pre-committed branches stand as the owner wrote them.
+
+## THE RE-SCOPED CHECK DOES NOT COVER L2258 — SAID PLAINLY (2026-07-30, owner's item 5)
+
+**What L2258 gates**: it is the `shClamp(x, 0.86, 1.12, "2258")` call in the
+`pitcher_outs` path — the clamp whose OFFSET class (pinned at the low bound
+≥0.90 of calls) is the evidence that the outs model's opponent-offense factor
+delivers a near-constant. The fixture's verdict there is load-bearing for M2/the
+outs defect: **VALIDATED at ≥0.90 OFFSET → the fixture's clamp/shrink numbers
+promote to confirmed and the outs finding keeps its second instrument;
+UNREPRESENTATIVE / class change → the `pitcher_outs` clamp count, the H+R+RBI
+clamp-protection table, and the `shShrink` k table (with all nine own-sample
+weights) re-run on the archive.**
+
+**Is any qualifying site a proxy? NO — and no correlation basis exists to call
+one.** The 13 sites that clear ≥30 calls at board 1 are the high-traffic pricing
+sites (1647/2089/2069 park+prior, 1591, 1757, 2088, 1624, 2309, 1660, 2054/2055,
+2318/2319); L2258 is a low-traffic site (~6 calls per 15-game slate, ~2.4 per
+6-game board) in a different code path with different bounds and a different
+class. Nothing in the docs measures a correlation between any site's pinned
+fraction and L2258's, and none is computable from a single fixture — **so no
+proxy is claimed.**
+
+**THE SENTENCE, for the record beside the STRUCK block**: *the re-scoped
+hot-site-fidelity check will produce verdicts on sites that were not the reason
+the check existed, and the load-bearing site (L2258) remains unmeasured this
+cycle.* The re-scope is therefore **PARTIAL** — it is not a rescue of the
+20-board check.

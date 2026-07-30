@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
+import { deviceReachableModes, isDisciplined, overrideReachable } from "./helpers/modes";
 
 /**
  * THE OUTS SUSPENSION FLAG — guard written BEFORE the flag, observed RED (2026-07-28).
@@ -37,15 +37,9 @@ import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
  * not deploy — the owner's impossible branch, made mechanical here.
  */
 
+/** The reachable domain (2026-07-30): every selectable mode, not just the pin. */
 function productionModes(): string[] {
-  const route = readFileSync("app/api/generate/route.ts", "utf8");
-  const cron = /CRON_SEL_MODE\s*=\s*"(\w+)"/.exec(route);
-  expect(cron, "CRON_SEL_MODE vanished from the generate route — re-point this extraction").toBeTruthy();
-  const client = readFileSync("src/lib/engine-client.ts", "utf8");
-  const fn = client.slice(client.indexOf("function getSelectionMode"));
-  const dflt = /return\s+"(\w+)"/.exec(fn);
-  expect(dflt, "getSelectionMode's default vanished — re-point this extraction").toBeTruthy();
-  return [...new Set([cron![1], dflt![1]])];
+  return deviceReachableModes().filter(isDisciplined);
 }
 
 type PoolTicket = { pl: { legs: { lkey?: string }[] } };
@@ -67,15 +61,29 @@ describe("outs suspension flag is coupled to the production arming modes (SPEC �
   });
   afterAll(() => vi.useRealTimers());
 
-  it.fails("every production-reachable mode emits ZERO outs legs to the pool (open — awaits Wednesday go/no-go)", async () => {
+  it.fails("every DISCIPLINED mode emits ZERO outs legs to the pool (open — flips in the ship commit)", async () => {
     const modes = productionModes();
-    expect(modes.length).toBeGreaterThanOrEqual(1);
+    expect(modes.length, "no disciplined mode in the reachable domain").toBeGreaterThanOrEqual(2);
     for (const mode of modes) {
       const { inPool, poolSize } = await outsCounts(mode);
       expect(poolSize, `${mode}: the pool emptied — that is a different failure`).toBeGreaterThan(10);
       expect(inPool, `${mode}: outs legs reached the pool — the flag is not applied (expected while open)`).toBe(0);
     }
-  }, 300_000);
+  }, 600_000);
+
+  /** The legacy pair census, mirroring the HRR guard (2026-07-30): device-reachable in
+   *  ~2 taps and unfiltered by design — pinned as counts so the exposure lives in CI.
+   *  Reads BEFORE the flag ships and must keep reading after it (the flag is
+   *  disciplined-mode-conditional by spec, like hrrAltMax). */
+  it("CENSUS: the legacy pair carries outs legs (device-reachable, unfiltered by design)", async () => {
+    const legacy = deviceReachableModes().filter((m) => !isDisciplined(m));
+    for (const mode of legacy) {
+      const { inPool, poolSize } = await outsCounts(mode);
+      console.log(`OUTS MODE ${mode}: pool=${poolSize} outsPool=${inPool}`);
+      expect(poolSize, `${mode}: the pool emptied`).toBeGreaterThan(10);
+      expect(inPool, `${mode}: no outs legs — bar went unconditional or the fixture lost its outs rows`).toBeGreaterThan(0);
+    }
+  }, 600_000);
 
   it("PLANT: the legacy posture shows outs legs — the check can see an unfiltered world", async () => {
     const { inPool } = await outsCounts(undefined);

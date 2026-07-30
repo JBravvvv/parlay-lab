@@ -45,9 +45,16 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 ## 2. TOMORROW'S RUN SHEET (2026-07-30 PT — execute from here)
 
 **Deadlines (both Thursday 07-30 PT, different gates):**
-1. **3:30 PM PT — the owner's ONE cron-job.org visit**: header `x-cron-key` on
-   entries 1–4 AND entry 1 → `45 22 * * 1-5`. Gates the verification board (fires
-   22:45Z = 3:45 PM PT, achievable 0.833, cost PROJECTED ~55–60 at 6 events).
+1. **3:30 PM PT — the owner's ONE cron-job.org visit**: **header `x-cron-key` on
+   ENTRY 1 ONLY** (REVISED 2026-07-30, owner's decision — entries 2–4 stay
+   UNHEADERED and keep 401'ing at zero cost: board-days are credit-limited, not
+   calendar-limited, so arming the weekend hours spends the same 1,238-credit
+   pool at hours chosen before T existed; Saturday 18:00Z projects sub-T and
+   Sunday 17:00Z would block the 22:30Z fire through the good-board skip, which
+   does NOT check T. Reversible at zero cost; a spent board-day is not —
+   collection-period, WEEKEND ENTRIES block) **AND entry 1 → `45 22 * * 1-5`.**
+   Gates the verification board (fires 22:45Z = 3:45 PM PT, achievable 0.833,
+   cost PROJECTED ~55–60 at 6 events).
    (2:45 PM PT was the cutoff for an unmoved 22:00Z entry — superseded by the move.)
 2. **Thursday EVENING, after the board's readings — the outs flag deploys**
    (regardless of any board reading; both branches pre-committed;
@@ -191,9 +198,26 @@ does not start):**
 nobody had pre-committed — now written as readings 24–26 below, before
 3:30 PM PT. Everything else lands on readings 3–14.
 
-## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 26 — 23 at the
-## 07-30 compaction handoff + readings 24–26 added 2026-07-30 ~17Z, owner's
-## item 5)
+**STEP 15 — ADDED 2026-07-30 (owner's item 1, the mode-coverage finding)**: after
+the ev_gated device checks, **switch Settings → `probability` and re-read the
+board's HRR rows and the card**. Expected from the fixture measurement:
+suspension bars do NOT apply there — HRR (and, post-Thursday, outs) legs are
+POOL-ELIGIBLE and can enter the card. Reading: HRR legs present in the
+probability-mode card → M20 confirmed on live production data (the fixture said
+11 pool / 4 FUN); ZERO → the live slate simply carries no qualifying HRR ticket
+that day (NOT evidence the bar applies — print the row population beside it).
+**Switch back to `ev_gated` before locking anything.** Nothing is staked from a
+legacy mode.
+
+**Pre-fire quota read + cost bracket (reading 26)**: read immediately before the
+22:45Z fire and again after; expected board cost **~55–60 at 6 events**
+(delta/events ∈ [5,8] = PASS). **Re-projected 22:30Z quota: ≤ ~1,180**
+(16:4xZ read 1,238 − the 17Z sweep ~36–60 − the CLV path's pre-committed ~60/day
+share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
+
+## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 28 — 23 at the
+## 07-30 compaction handoff + 24–26 added ~17Z (owner's item 5) + 27–28 added
+## ~18Z (owner's items 4 and 1))
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
 2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
@@ -303,6 +327,18 @@ nobody had pre-committed — now written as readings 24–26 below, before
     steps proceed (the concurrent CLV capture path can contaminate the bracket
     — the ~97-credit ambiguous residual this morning is the precedent; tight
     reads around the fire minimize it).
+27. **CLV fold reconciliation (added 07-30, owner's item 4)**: after tonight's
+    fold (~20:20Z props sweep), re-run the reconciliation against the
+    PRE-COMMITTED CLV figure — **~10 captures × ~6 = ~60 credits today** (one
+    capture per game, 10-game slate). Fold closes the ~97 → mechanism CONFIRMED,
+    the projection formula restates to include CLV capture and the band rebuilds
+    on it; residual SURVIVES → an unattributed spender exists and **that outranks
+    the board**; capture spend turns out unbounded in advance → every band in the
+    docs restates as LOWER-BOUND-ONLY (collection-period, UNTRACEABLE SPENDER).
+28. **M20 live check (added 07-30, owner's item 1)**: chain step 15 — the
+    probability-mode device read; HRR legs present → M20 confirmed in production;
+    zero → print the row population beside it (absence of a qualifying ticket is
+    not evidence the bar applies).
 
 ## 4. GIT AND ARTIFACT STATE
 
