@@ -272,12 +272,19 @@ figures read as incompatible; two were crossings, one was a RATIO)**:
 |---|---|---|---|
 | evaluation-only (cards fixed) | prob | **−3.2** | interpolated (+8.2 at −3 → −29.9 at −4) |
 | evaluation-only | EV | **−4.3** | interpolated (+11.1 at −4 → −30.8 at −5) |
-| in-loop (selection responds) | prob | **≈ −5.4** | EXTRAPOLATED one step past the grid (still +8.3 at −5) |
-| in-loop | EV | **≈ −5.4** | converges to prob's card from −3 on; same extrapolation |
+| in-loop (selection responds) | prob | ~~≈ −5.4 extrapolated~~ **NO CROSSING — corrected 2026-07-29 late, grid extended to −8: positive (+8.3) at −5, the gate goes NO-PLAY from −6. Abstention is the boundary; in-loop E[ln] never goes negative on this axis on this board** | measured (−6/−7/−8 all 0-ticket) |
+| in-loop | EV | **same single behavior — the two rankings select IDENTICAL cards from −1 through −8 (measured per step, printed), so there is ONE in-loop tolerance because there is one card; only the −0 step differs** | measured |
 
 **There is no −2.4 tolerance and never was**: the "~2.4×" was the exceedance RATIO
 12.9 ÷ 5.4 in the sentence "exceeds the in-loop tolerance (≈5.4) by ~2.4×" — the
 parenthetical adjacency bred the misread; the figure set above is the record.
+**(AND STRUCK 2026-07-29 late: the ratio's denominator was the invalid −5.4
+extrapolation — with the grid extended, the in-loop instrument has NO crossing to
+ratio against. What remains of the HRR comparison: −12.9 vs the EVAL-ONLY crossings
+−3.2/−4.3 (~4×/3×, fixed-card instrument, selected-legs-vs-uniform population caveat
+unchanged) and the selection-axis mapping (λ = 2.55–2.94, outside the axis) — the
+in-loop engine abstains rather than crossing, which is the gate doing exactly its
+job under uniform overconfidence, at the model's remaining beliefs, n=1 board.)**
 
 **THE HRR −12.9 MAPPED THROUGH THE SHRINKAGE INSTRUMENT (owner's item 4 — the axis
 that can carry a selected-legs number)**: the λ=0 cards' selected legs carry a mean
@@ -315,6 +322,40 @@ reads the raw disagreement; what expresses only ~35% of it is production's GROWT
 (selection and stakes run on the blended `p`) — both halves stated, each on its
 own axis. Effective share ≤ nominal everywhere above (`shWm`: calW·calG
 shrink-only, not archived — the echo does not yet carry calW; noted).
+
+**THE BLEND SWEEP UNDER CORRELATION STRESS AND UNDER THE MEASURED MISS (2026-07-29
+late, owner's item 4 — the peak charged at exactly where it peaks)**: per-share card
+census + ρ-stressed E[ln] (game-factor Gaussian copula, corr(i,j) =
+ρ·|G∩|/√(|Gi||Gj|), 40k seeded draws; sampler VALIDATED at ρ=0 vs the exact
+computation, within MC noise ≤ ~10 bp) + evaluation under the HRR-style truth proxy
+(leg truth = imp − (λ−1)(p₀−imp) at λ = 2.55 / 2.94 — the mapping of the only
+measured calibration miss):
+
+| share | rank | xGame pairs | xPlayer | in-ticket groups | ungraded | exact | ρ=.05 | ρ=.10 | ρ=.20 | E@λ2.55 | E@λ2.94 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.15 | both | 1 | 0 | 0 | 0 | +2.7 | −0.7 | −0.3 | −0.1 | −134.5 | −154.3 |
+| 0.35 | prob | 3 | 0 | 0 | 0 | +102.4 | +101.3 | +101.6 | +100.9 | −441.6 | −509.7 |
+| 0.35 | EV | 2 | 0 | 0 | 0 | +186.3 | +178.7 | +178.8 | +180.8 | −632.3 | −726.0 |
+| 0.50 | prob/EV | 3 / 2 | 0 | 0 | 0 | +142.6 / +352.4 | ≈exact | ≈exact | ≈exact | −367.5 / −625.0 | −424.1 / −717.9 |
+| 0.75 | prob/EV | 2 / 1 | 0 | 0 | 0 | +192.4 / +603.7 | ≈exact | ≈exact | ≈exact | −323.1 / −578.2 | −370.5 / −665.1 |
+| 1.00 | prob/EV | 1 / 1 | 0 | 0 | 0 | +567.0 / +902.4 | ≈exact | ≈exact | ≈exact | −441.5 / −574.3 | −511.1 / −660.6 |
+
+**Reading 1 — the correlation charge does not land: the premise "card size grows so
+correlation exposure grows" measured FALSE.** Cards grow 3t → 6t but cross-ticket
+same-game pairs stay 1–3 and FALL toward the peak; same-player pairs 0, within-ticket
+groups 0, ungraded groups 0 at every share — the bare-product path carries none of
+any card, and E[ln] under ρ = 0.20 sits within MC noise (±~3 bp) of independent at
+every share. The E[ln]-rises-with-ρ impossible branch stayed silent (wiggles are MC
+noise, non-systematic). **Reading 2 — the peak COLLAPSES under the measured miss:
+every card at every share is deeply negative under the λ* mapping (−134 to −726 bp),
+and MORE negative at higher shares.** Per the pre-committed branch: collapse under
+either charge → **the blend sweep is recorded as an artifact of self-graded
+evaluation (as already labeled), not as evidence of the blend's value — and the
+sentence that stands is the EXIT-SCOPE one: the exit reads `pModel` (raw model);
+production growth expresses ~35% of the disagreement. That sentence does not depend
+on the sweep.** Caveat carried: the λ* truth applies an HRR-measured miss to every
+leg — an assumption about markets with NO settled data, used here as a stress, not
+as truth.
 
 **WITHIN-TICKET PRICING MAGNITUDE, MEASURED ON THE 07-26 ARCHIVE (2026-07-29,
 owner's item 6 — the magnitude before the reopen, not the description)**:

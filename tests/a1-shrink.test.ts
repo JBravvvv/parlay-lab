@@ -242,7 +242,7 @@ describe("A1 shrink-to-market test (analysis harness, report only)", () => {
         `  ${"shade".padEnd(7)}${"g(prob)".padStart(11)}${"g(EV)".padStart(11)}` +
         `  ${"prob card".padEnd(12)}${"EV card".padEnd(12)}`,
     );
-    for (const dpp of [0, 1, 2, 3, 4, 5]) {
+    for (const dpp of [0, 1, 2, 3, 4, 5, 6, 7, 8]) {
       const poolD = parlays.map((pl, idx) => ({ pl: shadePl(pl, dpp), src: "p", idx }));
       const pc = cardOf(alloc(poolD as unknown[], DAILY, cfgOpen));
       setW();
@@ -252,9 +252,12 @@ describe("A1 shrink-to-market test (analysis harness, report only)", () => {
       const ge = growth(ec);
       const f = (x: number | null) =>
         (x == null ? "—" : (x >= 0 ? "+" : "") + (x * 10000).toFixed(1)).padStart(11);
+      const idsOf = (c: { pl: Row }[]) =>
+        c.map((x) => String(x.pl.name)).sort().join("+");
       // eslint-disable-next-line no-console
       console.log(
-        `  ${("-" + dpp).padEnd(7)}${f(gp)}${f(ge)}  ${comp(pc).padEnd(12)}${comp(ec).padEnd(12)}`,
+        `  ${("-" + dpp).padEnd(7)}${f(gp)}${f(ge)}  ${comp(pc).padEnd(12)}${comp(ec).padEnd(12)}` +
+          `  ${idsOf(pc) === idsOf(ec) ? "IDENTICAL-CARDS" : "cards differ"}`,
       );
     }
     expect(true).toBe(true);

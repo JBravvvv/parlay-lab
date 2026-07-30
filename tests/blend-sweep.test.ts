@@ -143,6 +143,7 @@ describe("blend-weight sweep (analysis harness, report only)", () => {
         `\n  ${"share".padEnd(8)}${"g(prob)".padStart(11)}${"g(EV)".padStart(11)}${"gap".padStart(10)}` +
         `  ${"prob card".padEnd(11)}${"EV card".padEnd(11)}${"clamped legs".padStart(13)}`,
     );
+    const dumps: Record<string, unknown> = {};
     for (const s of [0.15, 0.35, 0.5, 0.75, 1.0]) {
       clamped = 0;
       const poolS = parlays.map((pl, idx) => ({ pl: reblendPl(pl, s), src: "p", idx }));
@@ -156,6 +157,17 @@ describe("blend-weight sweep (analysis harness, report only)", () => {
         (x == null ? "—" : (x >= 0 ? "+" : "") + (x * 10000).toFixed(1)).padStart(11);
       const cmp = (c: { pl: Row }[]) =>
         `${c.length}t/${c.reduce((a2, x) => a2 + (((x.pl.legs as Row[]) ?? []).length), 0)}l`;
+      if (process.env.PL_DUMP) {
+        const dump = (card: { pl: Row; stake: number }[]) =>
+          card.map((c) => ({
+            name: c.pl.name, stake: c.stake, prob: c.pl.prob, czDec: c.pl.czDec,
+            simJoint: !!c.pl.simJoint,
+            legs: ((c.pl.legs as Row[]) ?? []).map((l) => ({
+              label: l.label, gkey: l.gkey, lkey: l.lkey, prob: l.prob, imp: l.imp,
+            })),
+          }));
+        dumps[String(s)] = { prob: dump(pc), ev: dump(ec) };
+      }
       // eslint-disable-next-line no-console
       console.log(
         `  ${String(s).padEnd(8)}${f(gp)}${f(ge)}` +
@@ -190,6 +202,7 @@ describe("blend-weight sweep (analysis harness, report only)", () => {
         `\n  λ ∈ [0,1] can only shrink est toward market — est−imp = (1−λ)(p−imp) ≥ 0 when p>imp;` +
         `\n  a −12.9 mean lies BEYOND the market (truth below the CONSENSUS itself).`,
     );
+    if (process.env.PL_DUMP) fs.writeFileSync(process.env.PL_DUMP, JSON.stringify(dumps));
     expect(true).toBe(true);
   }, 300_000);
 });

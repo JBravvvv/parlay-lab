@@ -190,6 +190,38 @@
 > pause buys is one data vintage for the PARAMETER EXIT's cross-day re-measurement
 > paths (M18's fourteen downstream findings).
 >
+> **THE UNVERSIONED-INPUTS PREMISE, RESOLVED BY QUERY (2026-07-29 late, owner's
+> items 2–3 — three independent queries, all printed on the run)**:
+> `git check-ignore -v` on both model files exits 1 — **neither is ignored by any
+> rule anywhere**; `git ls-files public/model/` lists **both as tracked**; and the
+> bot's commits touch **the JSON itself** — priors nightly (3abc2ce 07-25 →
+> b75e905 07-26 → ff2ad74 07-27 → 65e159a 07-28 → 671aed9 07-29 15:58Z), context
+> 2×/day (latest 64c42ad 07-29 20:32Z), author `engine-v2-bot`. **M17 and M18 need
+> NO correction — the claims that would have needed markers do not exist on disk.**
+> The files are versioned with EVERY nightly vintage stored as a commit: the
+> backup IS the git history; regeneration from live upstreams is not reproducible
+> retroactively and does not need to be — the two-file backup spec is NOT needed,
+> for the stated reason. **Production reads its own deployment's committed
+> statics** (`selfBase()` fetch of `/model/*.json` — the deploy is built from
+> origin, so the copy IS the committed copy at the deployed sha; if the fetch ever
+> failed, `armV2` would run those factors dormant — a degrade path that exists and
+> is not active). Local replays read the **fix45 STATIC snapshots** (tests-only,
+> frozen 2026-07-26 — NOT the deployed copy); the archived-board sweeps consumed
+> neither — they read the board's own stored rows, which embed production's 07-26
+> vintage. **The echo hashes the TEXT production fetched from its own deployment —
+> it attributes production's copy by construction.** Attribution: archived boards
+> are attributable by M18's commit-log method (INFERRED — board `at` × bot commit
+> times, e.g. 07-26 = `b75e905` + `3e2b93c`); tomorrow's board is the first
+> DIRECTLY attributable one (hash pair ON the board). No archived board carries a
+> hash pair (the echo shipped 07-29 night; no board has run since) — the
+> impossible branch does not fire. **The window-start question DISSOLVES: "zero as
+> of the pause" and "zero until an echoed board exists" COINCIDE, because 07-29
+> produced no board — the first member is the 07-30 board under either
+> definition, and every reachability figure in this doc STANDS unchanged.** The
+> pause stands as governance; its justification is recorded as: freezing the
+> committed data-vintage WRITERS (which the bot is — by query above), exactly as
+> signed off.
+>
 > **EXECUTION STATUS (2026-07-29, owner's sign-off received)**: the pause commit is
 > BUILT — `a46c1f` on a local `main` worktree, exactly the diff above; the two
 > frozen-at hashes are IN ITS MESSAGE: priors
@@ -210,6 +242,32 @@
 > (`tests/bot-path-whitelist.test.ts`, WHITELIST = {ump_k.json, context.json,
 > priors.json}) would flag `data/pen_quality.json` THE DAY it materializes — that
 > file is NOT whitelisted, confirmed by reading the test's constant.
+>
+> **07-29 CLOSE-OUT RECORD (dated, owner's item 1)**: `consMinEv` expiry made four
+> markets live on 07-29; **no server board was generated** (0 of 16 games unstarted
+> at the 02:14Z go/no-go read; the protected slot NOT spent); **the behavioral
+> vintage changed on a day that produced no board, and the reopen verification did
+> not run.** **The homogeneous window opened at the pause at COUNT ZERO and is
+> still at zero.**
+>
+> **TOMORROW'S WINDOW, PRICED FROM THE FEED AND THE RULE (2026-07-29 late — the
+> 07-30 chain fully pre-committed tonight)**: the 07-30 slate is **10 games, SPLIT**
+> — first pitch 16:10Z, then 17/18×2, and an evening block of 6 from ~23:05Z to
+> 02:10Z (statsapi, free). The rule (`docs/board-timing.md` L18–20, L48–49): the MC
+> path needs a confirmed 9-man lineup; MLB posts ~3h before first pitch; the
+> lineup-window is modeled at FP−3h; **weekday peak confirmed-coverage hour is
+> 22:00Z at 66%** (L66). Two windows: (a) full-slate ~13:10–16:10Z — all 10 games
+> pregame but evening lineups PROJECTED (fringe rows noParlay); (b) **evening-6
+> ~20:05–23:05Z — the 22:00Z design point, lineups largely confirmed, HRR rows
+> present, pool ≈ 6-game scale (cap can still bind at 6)**. Cost: ~150 at a full
+> slate; the evening-6 residue scales with events swept ≈ **~60–100**. **The cron
+> (`0 22 * * 1-5`, entries 1–4) fires INSIDE window (b) once the header is fixed —
+> the cron's board is the plan; the manual curl is the fallback.** Pre-committed
+> (owner): cron board inside the window → slot stays unspent, the chain reads the
+> cron's board (the stronger test — it exercises the path that actually runs);
+> cron 401s or lands outside → manual curl inside window (b) on the owner's
+> go/no-go, slate count printed first; window closes boardless → **second no-board
+> day, recorded, and the outs flag still deploys Thursday as decided.**
 >
 > **POWER, NOW PARTLY COMPUTABLE (2026-07-29, owner's item 5 — for the owner's
 > re-decision; the original decision stays on the record with its date)**: the
@@ -3407,6 +3465,30 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   together** rather than staying live in a state that pays and loses; (c) ZERO
   paid in the window → **the queue starved the window — its own line, not a
   pass**.
+
+- **07-29 CLOSE-OUT, ON DISK (owner's item 6)**: the chain did not run tonight
+  (no-board day, recorded above). Concurrency fix: LIVE on the frontend-rebuild
+  copy (guard enforcing), main copy `53d007` pending the owner's one push; landing
+  test = the 08:02–08:07Z window, all three outcomes above incl. the
+  starved-window line. Outs flag: **deploys Thursday regardless of any board
+  reading** — recorded with the reason (`docs/pitcher-outs-audit.md`, DECIDED
+  section: both branches pre-committed by the owner; the chain's failure modes are
+  HRR/engine-string, not outs). Header fix: **the owner's, and still the gate.**
+  **Quota: the last READ remains 1,676 / 18,324 (07-29 morning, post-cluster).**
+  Since that read, the day-file shows exactly 2 further paid snapshots (20:32Z
+  pre, 23:38Z close ≈ ~120–192 computed at ~6/event on the shrinking eligible
+  slate) + line-history ticks (~24) → **DERIVED remaining ≈ 1,460–1,530 — derived,
+  not read** (the day-file stores no quota field — checked; a fresh read costs a
+  paid call or the dashboard). **Runway on the fixed cadence at the derived
+  midpoint (~1,495): sweeps-only ~3.6d · board-only ~10.0d · both ~2.6d ·
+  Series-A-complete ~6.1d — the ≥10-board-day threshold is now KNIFE-EDGE
+  (9.7–10.2 board-days across the derivation bounds).** **What tomorrow's board
+  can support: the echo, the cfSel stamp reading, self_consistency, the
+  greyed-row check, the replay + ParlayPred diff, and Control C's production
+  predictions. What it cannot: any vintage claim about archived boards. It is
+  board 1 of the homogeneous window — item 3 resolved with the echo attributing
+  production's copy AND the window never having depended on it (the inputs were
+  versioned throughout).**
 - **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
   (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
   board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before

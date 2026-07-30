@@ -255,7 +255,10 @@ mechanically with model share — self-graded BY CONSTRUCTION; SH_W stays
 CHOSEN-unmeasured; the exit reads `pModel` (raw model) — NOT narrowed; production
 GROWTH expresses ~35% — both halves in the bundle; one axis: s = w0(1−λ), shipped
 at 0.35/0.15, eval-only zero-cross ≈ s 0.09. **TOLERANCE RECONCILED** (bundle
-table): eval-only −3.2/−4.3 interpolated; in-loop ≈−5.4 extrapolated both; the
+table): eval-only −3.2/−4.3 interpolated; ~~in-loop ≈−5.4 extrapolated~~
+**CORRECTED same night (grid extended to −8): in-loop has NO crossing — positive
++8.3 at −5, NO-PLAY from −6; cards IDENTICAL across rankings from −1 (measured);
+the 2.4× ratio struck with its denominator**; the
 "−2.4" was the exceedance RATIO 12.9÷5.4, never a tolerance. **HRR MAPPING**:
 −12.9 pp needs λ = 2.55–2.94, OUTSIDE the axis — HRR's selected legs settled below
 the market itself; adverse selection into overpriced lines, not model-vs-market
@@ -265,6 +268,30 @@ pool-eligible population is GENUINELY n=0 — guard stays spec-only; clamp: 0 bi
 of 19 OBSERVABLE, 3 UNDEFINED ≠ unbinding. **ITEM 7**: triplicate-membership added
 to the export's pre-committed reading. Spec-only, unchanged: coreEvMin, cap, A1,
 damping, alt keys, ledger invariant, ungraded-group guard, blend weight.
+**FIFTH POST-COMPACTION TURN (2026-07-29 late — no curl; tomorrow fully
+pre-committed)**: **07-29 = NO-BOARD DAY, recorded** (behavioral vintage changed
+on a day with no board; reopen verification did not run; homogeneous window at
+COUNT ZERO). **TOMORROW'S WINDOW PRICED**: 07-30 is a SPLIT slate (10 games;
+16:10Z first pitch; evening-6 from ~23:05Z); the chain's window is
+**evening-6, ~20:05–23:05Z** (board-timing L66: 22:00Z = 66% confirmed); **the
+22:00Z cron fires INSIDE it once the header is fixed — cron board = the plan,
+manual curl = the fallback on the owner's go/no-go (slate count printed first);
+boardless window = second no-board day, recorded, outs flag Thursday
+regardless.** Cost ~150 full-slate / ~60–100 evening-6. **THE UNVERSIONED-INPUTS
+PREMISE DIED ON THREE QUERIES** (check-ignore exit 1; ls-files tracked; bot
+commits ON the JSON — printed in collection-period): M17/M18 UNCHANGED; the
+backup is the git history; production reads its deployment's committed statics;
+the echo attributes production's copy by construction; **the window-start
+definitions COINCIDE (no board today) — every reachability figure stands.**
+**BLEND SWEEP CHARGED (bundle)**: ρ-robust because the correlation exposure does
+NOT grow with the peak (pairs 1–3, in-ticket groups 0, ungraded 0 at every
+share); **COLLAPSES under the measured-miss mapping (−134…−726 bp at
+λ=2.55/2.94)** → recorded as self-graded-evaluation artifact; the EXIT-SCOPE
+sentence is what stands. **Quota: last READ 1,676; derived ≈1,460–1,530 after
+the two evening sweeps (day-file carries no quota field — checked); board-only
+runway now KNIFE-EDGE at 9.7–10.2 board-days.** Held from `800cb50` (this
+turn's commit stacks on it); main stack `a46c1f`→`53d007` still awaiting the
+owner's single push.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =
