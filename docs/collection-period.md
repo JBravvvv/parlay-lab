@@ -531,7 +531,7 @@ column as a list of bugs. Frozen; see `docs/pitcher-outs-audit.md` §8.
 ### Model blend & badges
 | parameter | value | meaning |
 |---|---|---|
-| `SH_W` | `props .35 · ml .15 · rl .15` | model weight vs de-vigged consensus |
+| `SH_W` | `props .35 · ml .15 · rl .15` | model weight vs de-vigged consensus — **ANNOTATED 2026-07-29 (owner's item 3)**: swept in-loop on the archived board (`tests/blend-sweep.test.ts`); E[ln]-under-own-belief rises MECHANICALLY with model share (the evaluation prob amplifies with the parameter being tested — self-graded BY CONSTRUCTION, the 95-bp shape in its purest form) → **the sweep can neither withdraw nor vindicate the 0.35; SH_W stays CHOSEN-unmeasured**. What it did establish: at share 0.15 both rankings collapse to one 3-ticket card (gap +0.0); the exit is NOT narrowed by the blend — `phase2_series_b` regresses on **`pModel`, the raw model field** (its L9), while production GROWTH expresses only the blended ~35% — both halves stated. Effective share ≤ nominal (`shWm` calW·calG shrink-only, unarchived) |
 | `SH_EDGE_MIN` | `props 4% · ml 2% · rl 2%` | EV needed for an EDGE badge |
 | `SH_OVER_LEAN` | `0.25` | legacy-mode over-lean threshold (disciplined modes pick sides vs fair; `dirPref` default `{}` = both) |
 | Kelly | ¼-Kelly, capped 2% of bankroll per bet | sizing |
@@ -3385,6 +3385,28 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   IDENTICAL (line-history and frontend-rebuild both sha256 `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828` — the
   executing copy carries MIN_GAP; the doc-commit-wearing-a-fix's-name branch does
   not fire).
+  **✅ THE FIX SHIPPED SAME NIGHT (owner's authorization, MIN_GAP conditions)**:
+  queue-mode `concurrency:` group (`cancel-in-progress: false` — every cron entry
+  stays, delivery serialised never dropped) + a pull-rebase ×3 retry around the
+  push (the paid-and-lost mode's belt). Guard `tests/props-concurrency.test.ts`
+  OBSERVED RED on both copies before the edits; the local (frontend-rebuild) copy
+  is enforcing; **the origin/main half — the copy schedules actually fire — WARNS
+  until the owner's push lands (main commit `53d007`, stacked on the pause
+  `a46c1f`; one push carries both), pre-committed to flip enforcing in the landing
+  commit.** Magnitude, derived from disk (not bought): ~96 credits/sweep (16
+  events × 6) × the observed 3-runner window (08:02/05/07Z trio) → worst-case
+  overlap overpay ≈ **(3−1) × 96 ≈ 192/day** on the morning window; whether any
+  push was historically REJECTED is Actions-side and not derivable from local
+  disk — skipped, not estimated. **The ration table STANDS on the fixed cadence**:
+  its ~420/day was computed from the sequential replay, which is exactly the
+  post-fix behavior; as-shipped-without-the-fix risked ~510–610/day.
+  **THE LANDING TEST RESTATES (the fix consumes MIN_GAP's confirmation —
+  tomorrow's 08:02–08:07Z window now tests the FIX)**: (a) ONE paid snapshot in
+  the window, N−1 skips logged, NO rejected push → **landed**; (b) two or more
+  paid, OR any rejected push → **not landed — MIN_GAP AND the fix revert to spec
+  together** rather than staying live in a state that pays and loses; (c) ZERO
+  paid in the window → **the queue starved the window — its own line, not a
+  pass**.
 - **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
   (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
   board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before
@@ -3511,6 +3533,13 @@ aspirational-calendar stamp above is that sentence's consequence.
   reconstructible → "cannot re-examine" WITHDRAWS with a dated marker and the
   suspension's basis becomes auditable; not → the absent fields get NAMED, not
   adjectival; export ticket-count vs the owner's 38 → both printed if they disagree.
+  **ADDED 2026-07-29 (owner's item 7 — M19 can reach the ledger by hand)**: the
+  triplicate-membership check joins this read's pre-committed list — any ledger
+  ticket whose leg-set matches the K's pair
+  (`drewrasmussen|pitcher_strikeouts|7.5` + `parkermessick|pitcher_strikeouts|4.5`)
+  or the CLE@TB ML/RL pair → **M19 reached the ledger via manual slip-add** and its
+  row restates from display-only; no match → the display-only classification is
+  confirmed for this ledger. Not joinable without the export — stated, not guessed.
 - **APPEND-ONLY, MADE ENFORCEABLE — SPEC ONLY (2026-07-29)**: content-addressed export
   snapshots (`ledger-export-<date>.json` + its sha256 in the filename or an index) plus
   a guard test that fails the build when any row key present in an earlier committed
@@ -3579,6 +3608,8 @@ suspension accrual ×2 + pre series + the pair + **the M14 production check** �
 | **07-29** | **cfSel stamps ship** (pushed `9753fb9` stack; additive `PredRecord.cfSel` on susp rows — prediction-record SCHEMA gains a field, live behavior unchanged, guard-proven byte-identical) | instrument |
 | **07-29** | **sha+config echo ships** (same push — `data.echo` on every board + response body: engineSha, priors/ctx content hashes, gates, caps, selMode, damping, cfSelEnabled; write-only, guard-enforced) | instrument |
 | **07-29 (pending the owner's one command)** | **bot pause** — priors.json + context.json writers stop; ump_k accrues; homogeneous data-vintage window opens at the pause | collection regime |
+| **07-29 (same push)** | **props-history concurrency group + push retry** (main `53d007`; guard red-observed; landing test = the 07-30 08:02–08:07Z window, three outcomes pre-committed) | instrument |
+| **07-29** | **the behavioral vintage changed on a day that produced NO server board** — 0 of 16 games unstarted at the 02:14Z go/no-go read; the protected slot NOT spent (owner's pre-committed branch); chain steps 4–12 move to the 07-30 slate, which becomes the first board of the new behavioral vintage AND (post-pause) of the data-vintage window | record |
 | conditional | outs flag (**decided 2026-07-29: deploys Thursday 07-30**, pitcher-outs-audit) · alt keys · sha/config echo | engine (config) / instrument ×2 |
 
 **The convention, fixed (it covered code changes only — today's behavioral change was

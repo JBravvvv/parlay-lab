@@ -41,7 +41,7 @@ Ranking all nine on "effect on model-minus-market" would put four at exactly zer
 | **M16** | **cross-ticket same-game dependence is priced NOWHERE in production** — within-ticket dependence IS priced (`simJoint` reprices same-game groups inside a ticket, L2641–2712; 22 of 25 groups on the 07-26 board), but the CARD's joint distribution across tickets has no code path; the sole compensation is the shared-game damping constant `0.5` in the greedy ranking — **chosen, never fitted** (frozen table), **and measured NOT to compensate: under ρ-stress the damp ordering is unchanged and pair counts barely move (4/3/3/3) — its 40 bp range is SELECTION quality; the name/comment describe correlation protection it does not deliver (the intent-vs-behavior shape, recorded here per the owner's rule)**. Measured magnitude, restated PER PAIR: **~1–1.5 bp per cross-ticket same-game pair at ρ≈0.1** (MC-noise-limited); the 07-26 card carries 3 pairs (≤ ~4 bp) — the archived-board pair-count distribution is **n=1 board**; today's board joins it once it exists | the E[ln] evaluation instruments inherit the same across-ticket independence (harness comment; validated) — the ρ-stress is the charge: A1's paired advantage survives it (+22.7/+23.4/+22.8 at ρ=0.05/0.10/0.20) and the damping peak stays at 1.0 under it | n=1 card; a card with more same-game overlap carries more; re-measure on live cards when boards resume | **NEW 2026-07-29 — documented, small measured magnitude on this card; no ship** |
 | **M18** | **THE FREEZE HELD THE CODE VINTAGE AND FLOATED THE DATA VINTAGE FOR THE ENTIRE WINDOW** — the engine reads `public/model/priors.json` + `context.json` at REQUEST time on BOTH surfaces (client `engine-client.ts` L324–25; server `generate/route.ts` L191–92 → `eng.set("SH_CTX",…)` L205) and consumes them in the RATE path (`shPriorH`/`shPriorHR`/`shPriorKf`/`shPct`/`shOppWhiffF`, L1582–1626 → `pModel` on every batter/pitcher row). Measured drift: **priors change 7,240–10,041 numeric fields PER DAY (mean abs-Δ ~1.0, max ~30); context ~85–94 per boundary; ump_k ~20–32** — daily, by design (Statcast/weather/umps are live inputs, the same class as the statsapi season stats fetched live). **So "one engine vintage" was never something the freeze could hold across days, and no doc said so — every cross-day comparison in this window is cross-DATA-vintage** | the cross-day comparisons that inherit the axis: **14 of 21 findings' measured effects sit downstream of priors/context** (M1 M2 M3 M4 M5 M7+M9 M10 M11 M12 M14 M16 A1 A2 A4; NOT downstream: M8 identity, M6 count, M13 request-list, M15 snapshot-dedupe, M17 process, A3 analytic). **(AMENDED 2026-07-29, owner's arithmetic: the itemized lists count 14 + 6 = 20 of 21 — the 21st is M18 ITSELF, the SEVENTH not-downstream item: the axis is measured FROM the bot's git history, not through floating priors, so it cannot be downstream of itself.)** **Fidelity replay is NOT runnable** (07-26's construction inputs — odds/stats — are unrecoverable; the impossible branch cannot fire). **Attribution IS possible, explicitly**: each archived board's `at` maps to the prior/context version live at generation via the bot's own commit timestamps — e.g. the 07-26 16:46Z board ran under priors `b75e905` (12:47Z) + context `3e2b93c` (07:48Z) | the convention extension: the VINTAGE EVENTS census gains a DATA-VINTAGE axis — per-day, tracked by the bot's commit log (which is exactly what makes attribution possible), never frozen. **The whitelist answer: the whitelist STAYS (the paths are designed inputs) and M17's guard is correctly named for what it guards — CODE vintage via paths; DATA vintage is M18's axis, tracked not frozen** | **NEW 2026-07-29 — first line of the freeze doc; no ship (the inputs are supposed to move; the DOCS were not saying so)** |
 | **M17** | **an automated writer (`engine-v2-bot`) held `contents: write` to the production branch through the entire freeze with NO path enforcement** — 15 commits since 07-24 (daily, BY DESIGN: the shadow log depends on its context/priors commits); whole-window file census: exactly `public/model/context.json` + `public/model/priors.json` + `data/ump_k.json`, zero code paths — but that census was inspection, not a guard; a workflow bug or compromised action could have written engine code onto the branch Vercel builds and nothing would have fired | vintage-control axis, orthogonal to model and allocation; companion gap found by the same audit: doc-cited shas had NO resolution check (format only) — a rebase left 3 dangling citations silently | **GUARDED same day (the guard IS the fix)**: `tests/bot-path-whitelist.test.ts` (every bot commit since freeze start ⊆ the 3-path whitelist, extracted from git, invalid-by-value plant; GREEN on the real history) + `tests/sha-references.test.ts` (every doc-cited sha reachable from an origin ref or allowlisted-with-reason; **observed RED on the 3 real danglings**, fixed in the same commit) | **NEW 2026-07-29 — guards enforcing; no process change beyond them** |
-| **M19** | **duplicate ticket emission in `parlaysLive`, plus sim-gap naive pricing on the same entries** — `buildParlaySet` has NO ticket-level dedupe (L2777/L2788 push unconditionally; the only pressure is the per-player usage cap, L2663–73, which does not prevent identical leg-sets). 07-26 archive: `parlaysLive` holds **22 entries, 19 unique leg-sets** — the K's parlay (Rasmussen U7.5 + Messick U4.5) **×3** and a CLE@TB Mixed (RL away + ML home) **×2** (the ×2 found 2026-07-29, same instrument, same board). The K's triplicate is also the board's ONLY naive-priced same-game group (`probNaive` null — no `SIMS[gkey]` joint for that game; the displayed 36.4% is a pure product; ρ-bound ±~2.2 pp per 0.1 of ρ, unmeasured because the sim never ran there) | magnitude: **3 redundant entries and 3 naive-priced entries = 1.38% of 218 emitted tickets, 1.40% of notional stake, 0% of allocated card dollars** — `shCardPool` (L2957–65) admits only `parlays`+`parlaysMixed`, so `parlaysLive` never reaches `shAllocate` or the card; `pred-serialize.ts` L232 skips it too (live tickets never logged as predictions) | **the blanket "the live path has no sim" is CORRECTED (2026-07-29, owner's trace order)**: all three ticket sets share one `build()` path (L2795–97) and the sim-joint upgrade (L2686–2706) fires wherever `SIMS[gkey].jointAll` grades the group — `parlaysLive` is all-same-game by construction and **19 of 22 live tickets ARE sim-priced**; naive product fires only where the sim lacks the game or a leg's marginal | **NEW 2026-07-29 — display-surface defect, measured on the 07-26 archive (n=1 board); no ship (freeze); the dedupe fix and a naive-price disclosure tag are exit items** |
+| **M19** | **duplicate ticket emission in `parlaysLive`, plus sim-gap naive pricing on the same entries** — `buildParlaySet` has NO ticket-level dedupe (L2777/L2788 push unconditionally; the only pressure is the per-player usage cap, L2663–73, which does not prevent identical leg-sets). 07-26 archive: `parlaysLive` holds **22 entries, 19 unique leg-sets** — the K's parlay (Rasmussen U7.5 + Messick U4.5) **×3** and a CLE@TB Mixed (RL away + ML home) **×2** (the ×2 found 2026-07-29, same instrument, same board). The K's triplicate is also the board's ONLY naive-priced same-game group (`probNaive` null — the CAUSE is M6: the sim carries no K-count outcome, so `legP` has no `pitcher_strikeouts` entries and `jointAll` refuses the group at L2700; the displayed 36.4% is a pure product; ρ-bound ±~2.2 pp per 0.1 of ρ, unmeasured because the sim cannot grade it). **AMENDED 2026-07-29 (owner's item 7): display-only is NOT ledger-proof — manual slip-add is a path into the ledger, the bankroll exit's only instrument; the triplicate-membership check is added to the authed export's pre-committed reading (collection-period)** | magnitude: **3 redundant entries and 3 naive-priced entries = 1.38% of 218 emitted tickets, 1.40% of notional stake, 0% of allocated card dollars** — `shCardPool` (L2957–65) admits only `parlays`+`parlaysMixed`, so `parlaysLive` never reaches `shAllocate` or the card; `pred-serialize.ts` L232 skips it too (live tickets never logged as predictions) | **the blanket "the live path has no sim" is CORRECTED (2026-07-29, owner's trace order)**: all three ticket sets share one `build()` path (L2795–97) and the sim-joint upgrade (L2686–2706) fires wherever `SIMS[gkey].jointAll` grades the group — `parlaysLive` is all-same-game by construction and **19 of 22 live tickets ARE sim-priced**; naive product fires only where the sim lacks the game or a leg's marginal | **NEW 2026-07-29 — display-surface defect, measured on the 07-26 archive (n=1 board); no ship (freeze); the dedupe fix and a naive-price disclosure tag are exit items** |
 | **M8** | **`shTbOver` prices a 0.5 line with the 1.5 formula** — `if(line<2)` catches both, and `1−(P0+P1·s1)` is `P(TB≥2)` | **a DEFINITE bug, proven with no external reference.** TB O0.5 and hits O0.5 are the same event; the market prices them **0.1 pp** apart and the model **24.4 pp** apart (33.6% vs 58.1%), on 127 joined rows of the real board | nothing. **One comparison**: `if(line<1)return 1-P0;` | ✅ **SHIPPED 2026-07-27 night** under the reopening decision (bug-grade, sign-off D): same-line fix at L1548, pinned test swapped WITH a reintroduction plant, `baseline43` byte-identical (fixture prices no TB-0.5 row). Board-level confirmation pending: zero TB≥1==H≥1 violations expected on the first post-ship board |
 | **M7+M9** | ⚠️ **INTERLOCKED PAIR — ship together or not at all.** M7: `shPOver` uses Poisson where the process was assumed binomial. M9: the compensating term hiding it | ⚠️ **M9-AS-UNIFORM-λ-INFLATION REFUTED 2026-07-27** (`tools/rung_signature.py`): uniform +13.9% predicts **+5.7 pp** at hits O1.5; measured within-player **+1.4–2.0**; paired shortfall **+4.35 pp, t = 11.1** (n=17). The fixed-n binomial *reference* fails with it — the market prices hits ~70% of the way to Poisson, so **both magnitudes were computed against a reference the market refutes**. Net real rung structure: **+1.4–2.0 pp at O1.5** | **each other, still** — swapping `shPOver` to binomial alone still moves 617 rows ~5 pp regardless of what truth is. Re-derivation needs the reference distribution as an output, not an assumption: **graded outcomes** (the expAB-tercile grading test, 3σ ~08-20, doubles as the reference) | **needs re-derivation — held, demoted below M10** |
 | **M10** | **closed-form expAB over-steepness** — hits O0.5 residual climbs **+7.39 pp/AB (SE 1.73, n=135/232)**; survives quality controls (+6.16, SE 1.57); walk-discount component 4 SE; **sim-priced HRR is FLAT (+0.73, SE 2.54)** — two independent volume models (sim, market) agree against the closed form's `λ = rate × expAB` | ~12 pp of residual span across expAB 3.0–4.6 — the largest structure on the hits board | grading by expAB tercile (135 covered rows/day, **3σ ~08-20**) decides who owns the gradient; the archive series re-measures daily | **PROVISIONAL — one board; mechanism traced 2026-07-27: errors-in-variables in `bbr`** (three convergent signatures — SD(bbr) 0.0908→0.0545 across ab30 quartiles, walk-dim slope ~halves, full-noise slope +9.4 vs measured +7.39; `tools/m10_eiv.py`). **Specified fix: `shShrink(bbr, n, k≈75, lgBB)` before expAB — 0.9 untouched.** The blend has no window past 30 days, so the noise floor is structural — the flat limb of the EIV test cannot exist, which is the stronger form of the finding. ⚠️ The sim's `pBB` consumes the SAME `bbr` (2026-07-27), narrowing the HRR-flat discriminator (HRR is walk-neutral by accounting) and killing sim-volume routing as an escape — the shrink fixes both consumers at one line |
@@ -265,6 +265,57 @@ tolerance — the two are not directly commensurable and this entry does not ans
 the bankroll exit. And the sentence that stands beside it: THE ENGINE'S TOLERANCE
 IS UNTESTED ON EVERY MARKET THAT IS ABOUT TO REOPEN.**
 
+**TOLERANCE RECONCILIATION — ONE TABLE, ONE AXIS (2026-07-29, owner's item 4: three
+figures read as incompatible; two were crossings, one was a RATIO)**:
+
+| instrument | ranking | crossing (pp/leg) | method |
+|---|---|---|---|
+| evaluation-only (cards fixed) | prob | **−3.2** | interpolated (+8.2 at −3 → −29.9 at −4) |
+| evaluation-only | EV | **−4.3** | interpolated (+11.1 at −4 → −30.8 at −5) |
+| in-loop (selection responds) | prob | **≈ −5.4** | EXTRAPOLATED one step past the grid (still +8.3 at −5) |
+| in-loop | EV | **≈ −5.4** | converges to prob's card from −3 on; same extrapolation |
+
+**There is no −2.4 tolerance and never was**: the "~2.4×" was the exceedance RATIO
+12.9 ÷ 5.4 in the sentence "exceeds the in-loop tolerance (≈5.4) by ~2.4×" — the
+parenthetical adjacency bred the misread; the figure set above is the record.
+
+**THE HRR −12.9 MAPPED THROUGH THE SHRINKAGE INSTRUMENT (owner's item 4 — the axis
+that can carry a selected-legs number)**: the λ=0 cards' selected legs carry a mean
+claimed gap (p − imp) of **+6.66 pp (prob card, 14 legs)** / **+8.30 pp (EV card,
+14 legs)**; a mean of **−12.9 pp requires λ = 2.94 / 2.55 — OUTSIDE [0,1] by nearly
+2×** (est−imp = (1−λ)(p−imp) can never go negative for p>imp inside the axis).
+**Per the pre-committed branch 2: the observed HRR gap lies outside anything the
+shrinkage axis spans — the finding, about HRR and nothing else: its selected legs
+settled below the PRICE-IMPLIED probability itself, i.e. below both the model and
+the market. Shrinking the model fully to market would NOT have saved those bets;
+the failure is adverse selection into market-overpriced lines (consistent with the
+O1.5+ 32% tail), not model-vs-market disagreement. Caveat carried: the ledger's
+59.2% is price-implied and vig-inclusive — de-vig shaves ~3–5 pp off the gap and
+moves nothing above.**
+
+**BLEND-WEIGHT SWEEP (2026-07-29, owner's item 3 — the λ axis run toward the model;
+`tests/blend-sweep.test.ts`, in-loop, both rankings)**: shares 0.15 / 0.35 / 0.50 /
+0.75 / 1.00 → prob **+2.7 / +102.4 / +142.6 / +192.4 / +567.0**, EV **+2.7 /
++186.3 / +352.4 / +603.7 / +902.4**, gap +0.0 / +83.9 / +209.8 / +411.3 / +335.4;
+cards move at every share (3t/7l at 0.15 — BOTH rankings collapse to one card —
+through 6t/12–14l above; the blend-does-not-reach-selection impossible branch does
+NOT fire; zero clamped legs). **THE VERDICT IS SELF-LABELED: E[ln]-under-own-belief
+rises MECHANICALLY with model share — the evaluation probability amplifies with the
+parameter under test. This is the 95-bp shape in its purest form, and per the
+owner's own branch the rise gets no reading unless it survives the shrinkage
+instrument — which is the SAME axis run the other way, where the gap collapses
+(a1-shrink). The sweep can neither withdraw nor vindicate the shipped 0.35; SH_W
+stays CHOSEN-unmeasured in the census.** What it does establish: **ONE AXIS** —
+model share s = w0·(1−λ); the shipped configuration sits at s = 0.35 (props) /
+0.15 (ml-rl); the eval-only gap's zero crossing λ ≈ 0.74 maps to s ≈ 0.09; the
+shrink sweep spans s ∈ [0, 0.35], the blend sweep extends it to 1.0. **And the
+exit's question is NOT narrowed by the blend**: `phase2_series_b.py` regresses on
+**`pModel` — the model-only field** (its L9: "(pModel − open_fair)"), so the exit
+reads the raw disagreement; what expresses only ~35% of it is production's GROWTH
+(selection and stakes run on the blended `p`) — both halves stated, each on its
+own axis. Effective share ≤ nominal everywhere above (`shWm`: calW·calG
+shrink-only, not archived — the echo does not yet carry calW; noted).
+
 **WITHIN-TICKET PRICING MAGNITUDE, MEASURED ON THE 07-26 ARCHIVE (2026-07-29,
 owner's item 6 — the magnitude before the reopen, not the description)**:
 - **The pricing line**: naive product at legacy L2684–85; sim-joint rescale
@@ -306,11 +357,33 @@ owner's item 6 — the magnitude before the reopen, not the description)**:
   negative it OVERSTATES by the same Δ; per-pair sign is unmeasured without the
   sim. Where the sim graded, its signed answer is emitted − naive: mean −1.06 pp,
   min −16.70, max +3.80, 2 of 22 negative.
-- **THE CLAMP (2026-07-29, owner's item 6)**: the simJoint rescale is clamped
-  **0.25–4×** (L2686–2706). On the 07-26 archive the realized factors span
-  **0.564–1.192** (quartiles 1.000/1.029/1.067; 19 usable ratios of the 22 graded —
-  3 HR-parlay tickets round `probNaive` to 0 and yield no ratio): **the clamp binds
-  ZERO times, in neither direction, on this board** (n=1 board). Provenance: the
+- **THE CLAMP (2026-07-29, owner's item 6; denominator restated same day)**: the
+  simJoint rescale is clamped **0.25–4×** (L2686–2706). On the 07-26 archive the
+  realized factors span **0.564–1.192** (quartiles 1.000/1.029/1.067) over **19
+  USABLE ratios of the 22 graded — and the other 3 are UNDEFINED, which is NOT the
+  same as unbinding**: those HR-parlay tickets round `probNaive` to 0 at the
+  archive's 1-decimal storage, so their clamp state is UNOBSERVABLE from the
+  archive. The claim is exactly: **0 binds among the 19 observable; 3 unobservable;
+  n=1 board.**
+- **THE THREE UNGRADED-GROUP TICKETS, ANSWERED (2026-07-29, owner's item 6 — "n=3,
+  not n=0")**: both counts, both populations: **3 ungraded-group tickets among the
+  218 EMITTED** (the K's triplicate, all in `parlaysLive`) and **0 among the
+  POOL-ELIGIBLE population the spec'd invariant guards** (czDec non-null,
+  `parlays`/`parlaysMixed`, no live legs). What makes the group ungradable: **M6 —
+  the sim carries no K-count outcome**, so `legP` (built only for simmed legs,
+  L1979) has no entry for a `pitcher_strikeouts` lkey and the grading gate
+  `if(!(mp>0))ok=false` (L2700) refuses the group — the price falls to the bare
+  product BY THE FALLBACK the comment documents. Their dependence treatment: bare
+  product, ρ-bound ±2.38 pp per 0.1ρ. **Their czEv is computed from NOTHING —
+  `czDec`/`czEv`/`czOdds` are all null (no Caesars quote), so the gate never read
+  them: excluded before the gate on TWO independent grounds (czEv null; parlaysLive
+  never pooled, L2957–65).** Stake share: 3 × $50 display-tier = 1.40% of emitted
+  notional; **not in any allocated card** (the card excludes `parlaysLive`). Per
+  the pre-committed branch: **all three are excluded before the gate → the
+  invariant stays ENCODABLE and SPEC-ONLY — its population (pool-eligible) is
+  genuinely at n=0; the branch-did-not-fire conclusion needed no narrowing, and
+  the M14-admission-fed-by-unpriced-dependence coupling remains unobserved on this
+  board.** Provenance: the
   bounds are **CHOSEN — no stated rationale in the comment** → they join the census:
   **v2.1 restates 40 parameters / 0 fitted / 39 chosen (12 with no stated
   rationale) / 1 stated-arithmetic** (frozen table row added,

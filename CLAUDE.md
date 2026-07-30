@@ -233,6 +233,38 @@ overlap; fix = concurrency group + pull-rebase retry, SPEC-ONLY — collection-p
 to monotonicity + penalty removal (M14 row; bundle SHRINK block; both instruments
 named). Spec-only additions: the ungraded-group guard (bundle) + the props-history
 concurrency group.
+**FOURTH POST-COMPACTION TURN (2026-07-29 late / 07-30Z)**: **ITEM-1 GATE FIRED —
+0 of 16 games unstarted at the 02:14Z read (statsapi, free): THE PROTECTED SLOT WAS
+NOT SPENT** per the owner's pre-committed branch; the 07-29 behavioral vintage
+changed on a day that produced NO server board (census row); **chain steps 4–12
+move to the 07-30 slate** — which becomes board 1 of the behavioral vintage AND
+(post-pause) of the data-vintage window. **ITEM-2 EVIDENCE: local ≡ origin
+byte-identical on both model files** (437,824 B / 21,746 B; shas 00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e /
+2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80; "0 lines" = zero newlines, single-line JSON); the pause commit stages
+EXACTLY two workflow files; NO gitignore rule touches the model paths (the
+gitignore premise matched nothing on the record); priors.json shows 8 nightly bot
+commits — M17/M18 consistent; vercel.json: `main: false` — main deploys nowhere.
+**THE OWNER'S ONE PUSH now carries TWO main commits**: pause `a46c1f` +
+props-history concurrency fix `53d007` —
+`git push origin 53d007:main`. **CONCURRENCY FIX SHIPPED** (guard red-observed both
+copies; local enforcing, main half warns until the push lands, flip pre-committed;
+tomorrow's 08:02–08:07Z window now tests THE FIX: one-paid+skips+no-rejected-push
+= landed / two+-paid-or-rejected-push = both revert to spec / zero-paid = queue
+starved, own line). **BLEND SWEEP (item 3)**: E[ln]-under-own-belief rises
+mechanically with model share — self-graded BY CONSTRUCTION; SH_W stays
+CHOSEN-unmeasured; the exit reads `pModel` (raw model) — NOT narrowed; production
+GROWTH expresses ~35% — both halves in the bundle; one axis: s = w0(1−λ), shipped
+at 0.35/0.15, eval-only zero-cross ≈ s 0.09. **TOLERANCE RECONCILED** (bundle
+table): eval-only −3.2/−4.3 interpolated; in-loop ≈−5.4 extrapolated both; the
+"−2.4" was the exceedance RATIO 12.9÷5.4, never a tolerance. **HRR MAPPING**:
+−12.9 pp needs λ = 2.55–2.94, OUTSIDE the axis — HRR's selected legs settled below
+the market itself; adverse selection into overpriced lines, not model-vs-market
+disagreement (vig caveat carried). **ITEM 6**: the 3 ungraded are parlaysLive-only
+(cause = M6, no K-count sim; czEv null → never gate-eligible); the invariant's
+pool-eligible population is GENUINELY n=0 — guard stays spec-only; clamp: 0 binds
+of 19 OBSERVABLE, 3 UNDEFINED ≠ unbinding. **ITEM 7**: triplicate-membership added
+to the export's pre-committed reading. Spec-only, unchanged: coreEvMin, cap, A1,
+damping, alt keys, ledger invariant, ungraded-group guard, blend weight.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =
