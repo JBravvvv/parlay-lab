@@ -97,9 +97,13 @@ bled. O0.5 went 12/19 (63%) and stayed active, tagged **watch** — ~~stays~~ **
 > imp — the anchor IS the market's price; the impossible branch does not fire), so
 > the distance past the market is the full **−12.9 pp**. **Populations: NOT the
 > same rows — the 46.3/59.2 population is the graded ledger's SELECTED HRR legs
-> (07-17→07-22, off-disk), while the archived 07-26 board's selected legs contain
-> NO HRR at all (suspended): the mapping is a TRANSFER between two populations AND
-> two market mixes, and it says so.** What agreement with the market buys, both
+> (07-17→07-22, off-disk), while the archived 07-26 board's selected legs ~~contain
+> NO HRR at all~~ (CORRECTED 2026-07-30, same night, from the card dump: the 07-26
+> replay cards DO carry HRR — two O0.5 legs each (Trammell, Chisholm) — because
+> that vintage ran `hrrAltMax = 0.5` with O0.5 ACTIVE; the ledger population also
+> spans O1.5+ alternates and different days/vintages. The mapping remains a
+> TRANSFER between two populations and two line mixes — but not because HRR is
+> absent from the card).** What agreement with the market buys, both
 > rankings, eval-only at λ=1: **−161.3 (prob) / −178.4 (EV) bp** — belief-sized
 > stakes grading at consensus truth is the CZ vig drag; in-loop at λ=1 the gate
 > correctly abstains (NO-PLAY). No extrapolation to any other market.

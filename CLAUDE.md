@@ -320,10 +320,39 @@ condition exists** (per-game precondition, designed fallback, no board threshold
 — the finding); boards DO record luPct/achievable at generation; **guard spec'd
 not shipped: gen.luPct ≥ gen.achievable − ε**; the 22:00Z cron stays the plan,
 its board prints its own coverage. **HEADER DEADLINE: 3:00 PM PT Thursday
-(22:00Z cron) — by ~2:45 PM PT.** Tomorrow's order recorded in full
+(22:00Z cron) — by ~2:45 PM PT (SEPARATED 2026-07-30 from the outs deadline —
+same Thursday, different gates: header gates the verification board; the outs
+flag deploys Thursday EVENING, after the board's readings, gating Friday's
+K's/outs reopen; miss the header → curl at 3:40–4:05 PM PT, which OUT-COVERS the
+cron 83% vs 50% on this slate; both miss → Friday carries TWO reopens' vintage,
+two-vintage stamp, 3 unverified days + K's/outs day 1 — collection-period, TWO
+DEADLINES block).** Tomorrow's order recorded in full
 (collection-period). Board 1 of the window CONFIRMED via the echo's
 production-copy hashing. Outs flag Thursday regardless, recorded. Spec-only:
 +the lineup-confirmation guard, +workflow-copy convergence. Hold from `0a24a30`.
+**SEVENTH POST-COMPACTION TURN (2026-07-30Z)**: deadlines SEPARATED (above);
+**$62.50 = perParlayCap 0.25 × DAILY — a belief-free STRUCTURE cap, in the
+census, and it binds FIRST** (EV-card top $62 vs Kelly's belief-sized layer
+underneath; dailyBankrollCap 10%/day above it; NO real card's stakes ever
+persisted — the replay is the record; exposure fact recorded in
+collection-period). **Coverage projection FROM THE FEED** (corrected — 20:05Z was
+wrong): evening-6 confirmed 0% at 20:05Z / 50% at 21:00Z / 50% at 22:00Z / 83%
+only at 22:40–23:05Z; 6/6-before-pitch impossible for this slate; a 22:00Z board
+carries luPct≈50 = achievable≈50 → guard-GREEN at ε = one game; **the guard's
+condition is READABLE AFTER THE FACT on tomorrow's board (data.gen rides the
+archive) → guard stays SPEC-ONLY and tomorrow decides it; it has been observed
+neither red nor green on any real board (07-26 carries luCoverage 13/15/.867 but
+no gen block)**. **HRR four-counts pre-committed** (present / greyed /
+susp+cfSel-stamped / zero-in-tickets — absent-from-feed = third vacuity, said in
+advance; my "07-26 cards contain NO HRR" line CORRECTED, dated: two O0.5 legs per
+replay card, hrrAltMax=0.5 era). **Clear-count MIDDLE branch fixed**: 1–5 clears
+→ the blocked-reason histogram IS the reading, modal reason named; non-binding
+cap ≠ evidence against M14. **Two-book join RUNS TOMORROW EVENING** (first
+same-day pred×fp coexistence; owner's sync phrase; memo's four branches).
+Tomorrow's board CANNOT support: archived-board vintage claims; the M14
+production reading if the cap does not bind (unobserved ≠ refuted); any HRR
+reading if the feed carries none (third vacuity); the join without the phrase.
+Hold from `44db680`.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =

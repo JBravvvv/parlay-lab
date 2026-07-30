@@ -3519,6 +3519,26 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   production's copy AND the window never having depended on it (the inputs were
   versioned throughout).**
 
+- **THE $62.50 CEILING, RECORDED AS A BANKROLL-EXPOSURE FACT (2026-07-30, owner's
+  item 2 — no change ships; recorded before a board emits it)**: the binding
+  per-ticket ceiling is **`perParlayCap` = 0.25 × DAILY ($250) = $62.50 = 2.5% of
+  the $2,500 bankroll — a STRUCTURE cap, belief-independent, in the census
+  (chosen class)**. It is not Kelly-derived: the Kelly layer underneath
+  (`shKellyFrac` = min(¼-Kelly, 2%-of-bankroll) × `kellyStakeMult` 4) sizes the
+  WEIGHTS and is computed on BELIEF — the same quantity measured miscalibrated on
+  the one settled market. **Independent caps exist and the structural one binds
+  first**: on the replay cards the EV card's top ticket sits at $62 (perParlayCap,
+  rounded) with the prob card's at $59 unbound; above the ticket, `dailyBankrollCap`
+  = 0.10 bounds the locked day at $250 = 10% of bankroll, and `coreMaxDec`/
+  `coreMaxLegs` bound structure. **The exposure statement: the worst single slip
+  is bounded by a belief-free 2.5% of bankroll; BENEATH that cap the allocation is
+  belief-proportional.** What boards on disk say: **no real card's stakes have
+  ever been persisted** (the allocation-capture gap; the client's locked cards
+  live in the off-disk ledger) — the $62/$59 figures are the deterministic replay
+  of 07-26; the archived tickets' `stake` fields are display-tier suggestions
+  (up to $100), NOT card stakes — the above-ceiling impossible branch does not
+  fire on any persisted card stake, because none exists.
+
 - **THE LINEUP-CONFIRMATION RULE HAS NO TESTABLE CONDITION (2026-07-30, owner's
   item 5 — the branch that fired)**: `docs/board-timing.md` L18–20 states the rule
   as a PER-GAME sim precondition ("the Monte Carlo path requires a confirmed 9-man
@@ -3533,10 +3553,24 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   (no threshold is invented)**: encode `gen.luPct ≥ gen.achievable − ε` — "the
   board captured what was capturable at its hour" — both fields already computed
   in the route; a board violating it generated EARLIER than its own slate allowed,
-  which is the original defect's testable form. Awaits sign-off. For tomorrow: the
-  evening-6 block is fully inside the FP−3h lineup window from ~20:05Z; **the
-  22:00Z cron remains the plan** (its board prints its own `luPct`/`achievable`,
-  and tomorrow's reading includes that comparison); the curl stays the fallback.
+  which is the original defect's testable form. Awaits sign-off. For tomorrow, FROM THE FEED
+  (corrected 2026-07-30 — the earlier "~20:05Z" line used the hour approximation):
+  evening-6 first pitches 23:10×2 / 23:15 / 01:40×2 / 02:10; FP−3h confirmed
+  share: **0/6 at 20:05Z · 3/6 = 50% at 21:00Z · 3/6 = 50% at 22:00Z · 5/6 ≈ 83%
+  only at ~22:40–23:05Z — and 6/6-before-first-pitch is IMPOSSIBLE for this slate
+  shape** (the last game's FP−3h opens at 23:10, when the first games start). A
+  22:00Z board would carry **gen.luPct ≈ 50 and gen.achievable ≈ 50** (both
+  measured over the 6 unstarted) — guard-GREEN at ε = one game (≈17 pp on 6
+  eligible, the spec'd ε). **The 22:00Z cron remains the plan**; the curl
+  fallback, timed 22:40–23:05Z, out-covers it at 83%. **AFTER-THE-FACT
+  READABILITY (the owner's question)**: YES for tomorrow — `data.gen` rides the
+  board KV and the archive, so the guard's condition is readable without shipping
+  it; the guard stays SPEC-ONLY and tomorrow's board is read against it. On-disk
+  red check: the one archived board (07-26) carries `luCoverage` (13/15, .867)
+  but NO `gen` block (backfill predates the stamp) — the full condition is
+  retroactively computable from `gameInfo` starts + `at` via the route's own
+  `achievableCoverage`, and **the guard has to date been observed neither red nor
+  green on any real board; tomorrow is its first observable.**
 
 - **TOMORROW'S ORDER, RECORDED (owner's item 6)**: slate count printed → the
   owner's go/no-go → quota READ (free instrument) → board (cron preferred, curl
@@ -3544,13 +3578,60 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   stamp on every suspended row** → `self_consistency` with both population sizes
   printed → app-switcher double reopen → HRR rows present AND greyed → replay dump
   + ParlayPred membership diff → Control C's production predictions against the
-  30 bp / 2–4% pre-commitments → ticket count against both pre-commits. **The
-  header fix is the owner's and its deadline is the 22:00Z cron: 3:00 PM PT
-  Thursday 07-30 — done by ~2:45 PM PT for margin.** Board 1 of the homogeneous
-  window: CONFIRMED — the echo hashes the text production fetched from its own
-  deployment (`grabText(selfBase())`, by construction, on disk). The outs flag
-  deploys Thursday regardless of any board reading — recorded with its reason
-  (`docs/pitcher-outs-audit.md`, DECIDED).
+  30 bp / 2–4% pre-commitments → ticket count against both pre-commits. **TWO DEADLINES, SEPARATED (2026-07-30, owner's item 1 — both fall on THURSDAY
+  07-30 PT; they were never two days apart, but they gate different things and the
+  doc now says so)**:
+  1. **HEADER FIX (owner's) — by 2:45 PM PT Thursday** (the 22:00Z cron; cron-job.org
+     edits take effect at the next fire, so the lead is only save-margin). Gates:
+     the reopen-verification board. **Miss it → the manual curl inside the
+     evening-6 window on the owner's go/no-go, slate count printed first — best
+     slot 3:40–4:05 PM PT (22:40–23:05Z), where confirmed coverage reaches 5/6 ≈
+     83% vs the cron's 3/6 = 50%** (the curl fallback out-covers the cron on this
+     slate; feed-derived, table below). Both miss → **Friday's board carries TWO
+     reopens' vintage at once** (hits/TB/HR/HRR day 3 + K's/outs day 1, the 07-31
+     expiry) and every reading stamps two-vintage — said in advance.
+     Consecutive live-but-unverified days: **2 as of tomorrow's window closing
+     boardless (07-29, 07-30); 3 + K's/outs day 1 as of Friday's.**
+  2. **OUTS-FLAG DEPLOY (decided) — Thursday, AFTER the board's readings, evening
+     PT.** Gates: Friday's K's/outs reopen arrives flagged. Sequencing matters:
+     deploying the flag BEFORE the 22:00Z cron would put a second engine change on
+     the first verified board mid-chain — the flag deploys Thursday evening, after
+     the chain reads the board, still before Friday. (The earlier single-clock
+     line merging these is superseded by this block, dated.)
+  Board 1 of the homogeneous window: CONFIRMED — the echo hashes the text
+  production fetched from its own deployment (`grabText(selfBase())`, by
+  construction, on disk). The outs flag deploys Thursday regardless of any board
+  reading — recorded with its reason (`docs/pitcher-outs-audit.md`, DECIDED) —
+  Thursday EVENING, after the board's readings, per deadline 2 above.
+
+- **THE CLEAR-COUNT MIDDLE BRANCH, FIXED BEFORE THE BOARD EXISTS (2026-07-30,
+  owner's item 5)**: clear count between 1 and 5 → **neither the gate nor the cap
+  is binding, and the reading IS the blocked-reason histogram over ALL pool
+  tickets, with the modal reason named — the histogram, not the ticket count.**
+  And restated so nobody misreads tomorrow: **a non-binding cap is NOT evidence
+  against M14** — the step-8 pre-commit already says it: cap does not bind → M14
+  unobserved in production, the sweep stays archival.
+- **THE TWO-BOOK JOIN'S STATUS FOR TOMORROW (owner's item 5)**: the archive has
+  carried `fp` per-book prices since 07-26 ~21:39Z; tomorrow's board creates the
+  first prediction rows that coexist with same-day `fp` sweeps → **the
+  predictions×fp join RUNS TOMORROW EVENING** (the owner's authed read — sync
+  phrase — per the memo's pre-committed curl and four branches). It would produce
+  the first measured two-book magnitude on a same-day, pre-vintage population; it
+  does NOT need another day of fp.
+- **HRR, FOUR COUNTS AS FOUR SEPARATE READINGS (2026-07-30, owner's item 4 —
+  tomorrow is the first board where HRR rows and HRR shadow rows coexist)**:
+  (1) HRR rows PRESENT on the board (feed-dependent; **absent → the greyed-row
+  check is VACUOUS for the third time, the reopen did not happen, and the 08-15
+  review's population count restarts from the next board — recorded in advance**);
+  (2) HRR rows GREYED (`susp`, display half); (3) HRR shadow/prediction rows with
+  `susp:true` AND the `cfSel` stamp (the landed reading); (4) HRR legs in built
+  tickets = **ZERO** (server half; **any >0 → `hrrAltMax` is not reaching the
+  server path — an M-item the same day, and the suspension is cosmetic**). All
+  four present-and-correct → **the suspension is verified end-to-end for the
+  first time and the 08-15 review has a population.** Why 07-26 shows HRR legs in
+  its replay cards: that vintage ran `hrrAltMax = 0.5` — O0.5 was ACTIVE and two
+  O0.5 legs sit on each replay card; the full suspension (−1) shipped 07-27
+  night, so tomorrow expects zero.
 - **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
   (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
   board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before
