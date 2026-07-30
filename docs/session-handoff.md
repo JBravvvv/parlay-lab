@@ -209,6 +209,13 @@ POOL-ELIGIBLE and can enter the card. Reading: HRR legs present in the
 probability-mode card → M20 confirmed on live production data (the fixture said
 11 pool / 4 FUN); ZERO → the live slate simply carries no qualifying HRR ticket
 that day (NOT evidence the bar applies — print the row population beside it).
+**SEQUENCING (added 2026-07-30, owner's item 1): run step 15 ONLY AFTER the board is
+confirmed present.** `bestBoard()` falls through to a CLIENT GENERATE when neither a
+cached nor a server board exists (`engine-client.ts` L297), and that path writes
+PredRecords to `pl:pred` stamped with the DEVICE's mode — the one write path a
+legacy-mode read could contaminate (it also spends credits). With the 22:45Z board
+present the fallthrough cannot fire. Client rows DO carry `selMode`, so any such row
+is separable after the fact (reading 15's exclusion).
 **OPERATOR RULE #2 (owner's, dated 2026-07-30, beside the 2% rule): step 15 is a
 DIAGNOSTIC ONLY — the mode returns to `ev_gated` before any slip is placed, and
 `pl_selmode` is VERIFIED to read `ev_gated` as the LAST action before placing.**
@@ -221,11 +228,30 @@ it IS **board 1 of the homogeneous window** — `data/ump_k.json` moved this mor
 (`8f8e8c8`, 07:43Z) but is NOT an engine input (four-step trace + the pinned-off
 `umpKFrozen` factor; collection-period, ump_k block), and `context.json` stayed
 frozen at the pause pair. **One line on what it cannot support regardless of
-outcome: it cannot certify the suspension in any mode but `ev_gated`** — the
+outcome: it cannot certify the suspension in any mode but `ev_gated`, and it cannot
+certify the outs flag at all because the flag does not exist yet** — the
 board's tickets are built under the server's pinned mode, so the zero-HRR-legs
 half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
 modes); step 15's diagnostic read is the only cover for the other three, and it
 is a device read, not a server certification.
+
+**TONIGHT'S SHIP SEQUENCE (owner-authorized 2026-07-30; strict order)**:
+1. the board fires 22:45Z → the fifteen steps → **all readings on disk**;
+2. THEN the outs build — and `docs/pitcher-outs-audit.md`'s coverage-gap record is
+   written FIRST (it is: "THE FLAG'S OWN COVERAGE GAP", with the measured 10
+   legacy-mode outs legs beside it — the owner's non-optional first condition);
+3. the build commit flips BOTH `it.fails` halves and keeps the scope-by-diff
+   invariant GREEN — red there STOPS the ship and outs reopens unflagged Friday
+   (pre-committed, and fine);
+4. it regenerates `legacy-src.gen.ts` (the engine string MOVES), sets
+   `tests/served-verification.json` `pending: true` with today's timestamp, and
+   updates `SERVED_ENGINE_SHA_VERIFIED` to the new runtime hash;
+5. post-deploy: re-grep the served chunk, confirm runtime === served, clear the
+   marker — **inside 24h, now enforced by the resolution guard**.
+**Friday is a TWO-VINTAGE board** (the engine ship + the K's/outs `consMinEv`
+reopen): outs-, K's- and allocation-level series restart at board 1; the row-level
+clamp census and the `self_consistency` identities CARRY ACROSS (collection-period,
+WHAT FRIDAY'S DOUBLE VINTAGE EVENT COSTS SERIES A).
 
 **Pre-fire quota read + cost bracket (reading 26)**: read immediately before the
 22:45Z fire and again after; expected board cost **~55–60 at 6 events**
@@ -294,6 +320,18 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     before 07-24 carries NO mode — the 46.3/59.2 window (07-17→07-22) sits
     entirely in that blind span, and for those days the question is
     UNANSWERABLE RETROACTIVELY. Recorded before the export runs.)
+    (ADDED 2026-07-30 late, owner's items 1 and 4 — TWO MORE REQUIREMENTS:
+    (a) THE 08-15 REVIEW'S QUERY EXCLUDES non-`ev_gated` rows by the `selMode`
+    field on prediction records, and PRINTS the count it drops — client generates
+    stamp the device's mode, so a legacy-mode row is separable but must be
+    excluded, not silently pooled; (b) PER-FIELD PRESENCE COUNTS BY DATE, not
+    just the mode split: for every ledger field, how many rows carry it, bucketed
+    by lock date — the schema changed during the store's own life (`overrode`
+    2026-07-19, `selMode` 2026-07-24, the basis fields `bs`/`bsBook`/`bsOdds`/
+    `bsDec`/`bsEv` 2026-07-19), so append-only holds for ROWS and not for COLUMNS.
+    Expect `grading.v: 2` to appear on rows predating it — that is
+    `shGradeOrientFix` rewriting old grading blocks in place, the one legitimate
+    backfill, not a mystery.)
     denominators — and print WHICH variant matched (a provenance RECOVERY,
     labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached

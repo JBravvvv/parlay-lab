@@ -595,3 +595,36 @@ ruling, so the board reading cannot flip the deploy**:
 The `it.fails` → `it` flip on `tests/outs-suspension-coupling.test.ts` lands in the
 flag's Thursday ship commit, per the guard's own header — not today. Today's record is
 this decision, dated, before the board.
+
+# THE FLAG'S OWN COVERAGE GAP — RECORDED BEFORE THE SHIP (2026-07-30, the owner's first and non-optional ship condition)
+
+**The outs flag is enforced in the DISCIPLINED branch only.** Like `hrrAltMax`, its
+three edits sit behind `selMode ∈ {ev_gated, dk_fd}` (`finalizeCats`'s `dscpM` gate,
+`buildParlaySet`'s dscp branch). **In `probability` and `caesars_ev` — both ~2 taps
+from the device (Settings → mode, persisted to `pl_selmode`) — the flag does not
+apply at all.** Measured on the armed fixture 2026-07-30, BEFORE the ship:
+**10 `pitcher_outs` legs reach the pool in EACH legacy mode** (pool 48), against
+ZERO in `ev_gated` and `dk_fd` once the flag lands. The HRR precedent measured the
+same shape the same day: 11 HRR legs / 4 FUN in each legacy mode, and under
+`caesars_ev` an H+R+RBI parlay sits on the card at $62.
+
+**So, stated exactly as it must be read**: *the flag reduces exposure in the pinned
+mode and does not eliminate it on the owner's device.* A market suspension in this
+engine is a property of the disciplined SELECTION PATH, not of the market. Anyone
+reading "outs is suspended" should read "outs is suspended in `ev_gated` and
+`dk_fd`". The census is pinned in CI (`tests/outs-suspension-coupling.test.ts`, the
+legacy-pair census), so a silent change in either direction fails the build.
+**Unfixed by choice**: making the bars unconditional would end the parity stance
+(the legacy modes exist to reproduce the historical engine) — an owner decision,
+spec-only. **Operator rule #2 (2026-07-30) is the live mitigation**: the legacy-mode
+read is a diagnostic only, the mode returns to `ev_gated` before any slip, and
+`pl_selmode` is verified as the last action before placing.
+
+**The remaining three ship conditions, carried into the build commit**: the
+coupling test's two `it.fails` halves flip in that commit; the scope-by-diff
+invariant stays GREEN through it (red → the boundary is wider than the flag's doc
+claims → STOP the ship, and outs reopens unflagged Friday — the pre-committed
+branch, and it is fine); post-deploy, re-grep the served chunk, confirm runtime ===
+served, and clear `PENDING-LIVE-VERIFICATION` inside 24h (the resolution guard in
+`tests/engine-echo.test.ts` now enforces the deadline). The ship happens AFTER
+tonight's board is read and its results are on disk.

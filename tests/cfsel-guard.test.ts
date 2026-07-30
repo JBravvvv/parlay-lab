@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { armedFixtureEngine, ARMED_DAILY, FROZEN_NOW, digest, stableHash } from "./helpers/fixture-env";
 import { computeCfSel } from "@/lib/cfsel";
+import { deviceReachableModes, isDisciplined } from "./helpers/modes";
 
 /**
  * cfSel GUARD (2026-07-29, owner's ship condition): "the live emitted card must be
@@ -31,8 +32,17 @@ import { computeCfSel } from "@/lib/cfsel";
 
 type Row = Record<string, unknown>;
 
-describe("cfSel guard: live board and live card are byte-identical flag on/off", () => {
-  it("reproduction, byte-identity, restore, de-vacuization, coverage — plus plants", async () => {
+/* MODE SWEEP (2026-07-30, owner's item 1 — "that guard was my condition for the ship,
+   and it was written before productionModes() was extended"). The byte-identity claim
+   is re-run in EVERY device-reachable mode. cfSel is the one genuinely mode-SENSITIVE
+   instrument (it re-runs analyze + shCardPool + shAllocate), so a claim proven in
+   ev_gated alone was proven in one quarter of its domain. The counterfactual itself is
+   server-only (src/lib/cfsel.ts is imported by app/api/generate/route.ts and nowhere
+   else), so production always runs it in the pinned mode — this sweep proves the
+   INSTRUMENT is non-mutating everywhere, not that production visits those modes. */
+describe.each(deviceReachableModes())("cfSel byte-identity in %s", (MODE) => {
+  it("live board and live card are byte-identical flag on/off", async () => {
+    const armMode = MODE;
     /* frozen clock, as armed-baseline.test.ts: without it the byDateRange batter-stat
        routes miss (dates computed from the real clock) and every batter row dies at
        `if(!st)return` — zero HRR rows, and this guard is vacuously un-runnable.
@@ -48,7 +58,7 @@ describe("cfSel guard: live board and live card are byte-identical flag on/off",
        and the guard would prove nothing — no HRR rows, no susp rows, vacuously green.
        Discovered red: the first run failed exactly that way. */
     const cfg = eng.get<Record<string, unknown>>("SH_CFG");
-    cfg.selMode = "ev_gated";
+    cfg.selMode = armMode;
     cfg.mktN = Object.fromEntries(
       ["ml", "rl", "batter_hits", "batter_total_bases", "batter_home_runs",
         "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"].map((k) => [k, 999]),
@@ -95,10 +105,12 @@ describe("cfSel guard: live board and live card are byte-identical flag on/off",
     expect(cardAfter, "the live card changed under cfSel — shared mutable state").toBe(cardBefore);
 
     // 4. DE-VACUIZATION: lifted-bar tickets actually carry HRR legs
-    expect(
-      cf.cfHrrTicketLegs,
-      "counterfactual tickets carry ZERO HRR legs — cfSel is vacuous (stamps false forever)",
-    ).toBeGreaterThan(0);
+    if (isDisciplined(armMode)) {
+      expect(
+        cf.cfHrrTicketLegs,
+        "counterfactual tickets carry ZERO HRR legs — cfSel is vacuous (stamps false forever)",
+      ).toBeGreaterThan(0);
+    }
 
     // 5. COVERAGE: every suspended row resolves to a stamp value (true or false)
     const cats = (data.categories ?? {}) as Record<string, Row[]>;
@@ -113,12 +125,18 @@ describe("cfSel guard: live board and live card are byte-identical flag on/off",
         expect(typeof stamp.card).toBe("boolean");
       }
     }
-    expect(suspRows, "fixture carries no suspended rows — the guard proves nothing").toBeGreaterThan(0);
+    if (isDisciplined(armMode)) {
+      expect(suspRows, "fixture carries no suspended rows — the guard proves nothing").toBeGreaterThan(0);
+    } else {
+      // legacy modes tag nothing (finalizeCats' dscpM gate) — zero susp rows is the
+      // CORRECT reading there, and it is exactly why cfSel would stamp nothing
+      expect(suspRows, "legacy mode carries susp rows — the parity stance changed").toBe(0);
+    }
 
     // the owner's print: both cards, and the cfSel counts
     // eslint-disable-next-line no-console
     console.log(
-      `\ncfSel GUARD — armed fixture\n` +
+      `\ncfSel GUARD [mode=${armMode}] — armed fixture\n` +
         `  live card (flag OFF === flag ON, byte-identical): ${cardBefore}\n` +
         `  cf: tickets carry ${cf.cfHrrTicketLegs} HRR legs · pool ${cf.cfPoolTickets} tickets ` +
         `(${cf.cfHrrPoolLegs} HRR legs) · cf card ${cf.cfCardTickets} tickets\n` +

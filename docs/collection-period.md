@@ -6512,3 +6512,220 @@ the earlier fire always wins, and quality never enters the comparison.
 **The honest summary for Friday**: a Sunday board buys shadow ROWS (the ≥300-row
 half of the retirement criterion) but cannot buy the ≥10 BOARD-DAYS half, because
 the pool binds first. Nothing about the weekend changes the two-exits finding.
+
+## STEP 15 IS SAFE — WITH ONE WRITE PATH NAMED AND AN EXCLUSION WRITTEN (2026-07-30, owner's item 1; resolved before 3:45 PM PT)
+
+**Does switching `pl_selmode` trigger a re-analyze / re-pool / re-allocate on view?**
+The switch itself does NOT: `flipMode` (`app/settings/page.tsx` L30–34) calls
+`setSelectionMode`, which writes `localStorage.pl_selmode` and patches the live
+`SH_CFG.selMode` in memory (`engine-client.ts` L58–68) — nothing else. Its own
+UI note states the semantics: *"takes effect on the next card calc / Sharp read."*
+Viewing the Builder afterwards RECOMPUTES the card locally (`useMemo` →
+`shCardCalc`), which is pure compute — no network, no store write.
+
+**THE ONE WRITE PATH, named**: `useBoard` → `bestBoard()` → **`return generateBoard()`**
+(`engine-client.ts` L297) when NEITHER a cached NOR a server board exists. That
+path calls `logBoardPredictions(board.date, data, getSelectionMode())` (L379) —
+**writing PredRecords into `pl:pred`, the population the 08-15 review reads, in
+whatever mode the device is in** (and spending credits). Two secondary writers,
+both checked: `markNoPlay(todayStr(), getSelectionMode())` (Builder) — carries the
+mode, is write-once per date, and **cannot fire in a legacy mode at all** (`noPlay`
+is `evGated || …`, false where the gate is off); and the ledger/`syncNow` path,
+which requires explicit lock taps.
+
+**Do client writes carry `selMode`? YES** — `boardToPredictions(d, {src:"client",
+selMode})` stamps every record (`pred-serialize.ts` L235: `...(from.selMode ? {selMode}
+: {})`), and `getSelectionMode()` always returns a value. **So a contaminated row is
+separable after the fact → the owner's SECOND branch fires: step 15 RUNS tonight,
+and the exclusion is written into reading 15 now** (`selMode === "ev_gated" AND
+src` filter; count what the filter drops).
+**Tonight's specific risk is nil in any case**: the 22:45Z cron board will exist
+server-side, so `bestBoard` returns it and the fallthrough cannot fire. **Sequencing
+rule, added to step 15: do the probability read only AFTER the board is confirmed
+present** — the fallthrough is armed exactly when no board exists.
+
+**cfSel's counterfactual runs in the PINNED SERVER MODE, always** — `src/lib/cfsel.ts`
+is imported by `app/api/generate/route.ts` and by nothing else (grep printed one
+import site), and it re-uses the route's own `cfg`. So the counterfactual and the card
+it shadows are built in the SAME mode, and cfSel never runs on the device at all.
+**The owner's impossible branch (cfSel measuring a mode that did not build the card)
+is SILENT.**
+
+**THE cfSel BYTE-IDENTITY GUARD, RE-RUN IN ALL FOUR MODES (the ship condition,
+re-tested after `productionModes()` was extended)** — `describe.each` over the
+extracted domain; **all four PASS byte-identity on board and card**:
+| mode | live card (flag OFF ≡ ON) | cf tickets | cf HRR legs | susp rows |
+|---|---|---|---|---|
+| `ev_gated` | Outs 2-leg $60 · TB 3-leg $11 · Outs 3-leg $34 | 4 | 52 | 14 |
+| `dk_fd` | Outs 2-leg $60 · Outs 2-leg $30 · Outs 2-leg $60 | 5 | 32 | 14 |
+| `probability` | ML $56 · RL $55 · RL $50 · ML $47 · Mixed $25 · Outs $17 | 6 | 53 | **0** |
+| `caesars_ev` | **H+R+RBI 2-leg $62** · ML $62 · RL $62 · RL $2 · ML $62 | 5 | 53 | **0** |
+**No M-item: the byte-identity claim holds in every mode.** But the sweep printed
+M20 in its most concrete form yet: **under `caesars_ev` the live card's TOP TICKET
+IS AN H+R+RBI PARLAY AT $62** — the suspended market, on the card, at 2.48% of
+bankroll. And the legacy modes stamp **zero** susp rows (the `dscpM` gate in
+`finalizeCats`), so **cfSel would stamp nothing there** — the 08-15 shadow
+population is a disciplined-mode artifact by construction, which is the right
+behavior and is now pinned by the guard.
+
+## SELF-ARMING PARAMETERS — AND ONE CROSSED TODAY, UNSTAMPED (2026-07-30, owner's item 2)
+
+**The enumeration, by arming class:**
+| parameter | class | trigger | triggering quantity NOW | fired? | projected condition |
+|---|---|---|---|---|---|
+| `consMinEv` (batter markets) | **DATE-armed** | 07-29 expiry | — | **YES, 07-29** | stamped on the calendar; caught |
+| `consMinEv` (K's, outs) | **DATE-armed** | 07-31 expiry | — | not yet | Friday — a stamped vintage event |
+| `consMinEv` (ML, RL) | **DATE-armed** | 08-01 expiry | — | not yet | Saturday |
+| **`shUmpKf`** | **COUNT-armed** | `db.umps[hp].g >= 5` (`build_context.py` L232) | **1 umpire at g≥5** (Lance Barrett, g 4→5) | **CROSSED IN THE DATA TODAY, 2026-07-30 — five days before the ~08-04 projection** | ~8 more at g=4 cross within days; 35 at g=3 follow |
+| `shPenQF` | COUNT-armed in principle | `pen_quality.json` accrual | **DB never materializes in a commit** (the known git-add gap) | no | cannot arm while its DB is uncommitted |
+| the consensus gate (`mktN` vs `consMinN=100`) | **COUNT-armed** | graded rows per market crossing 100 | off-disk (server `pl:cal:*`) | unknown | **the class the owner named** — it fires as the population accrues |
+
+**Does the crossing reach production? NO — a DOUBLE BRAKE**: (1) the carrier is
+frozen — `build_context.py` writes `kFactor` into `context.json`, which the pause
+dropped from the bot's `git add` (last write `64c42ad`, 07-29 20:32Z); (2) the
+factor is pinned — `shUmpKf` returns `1` while `SH_CFG.umpKFrozen: true`. **So no
+board has seen it and NO SERIES RESTATES.** The precise statement, which is not the
+same as "nothing happened": **the arm CONDITION crossed unstamped inside the
+window; the EFFECT is double-braked; if either brake lifts, the factor is live
+immediately with ≥1 umpire already armed** — it would not start from zero.
+
+**Is the counted quantity affected by the cadence we ration? For `shUmpKf`, NO** —
+it counts real MLB games behind the plate, accruing from `statsapi` finals whether
+or not we generate boards. **For the consensus gate, YES** — `mktN` counts OUR
+graded rows, so **rationing boards changes when markets reopen: the ration decision
+IS an engine-vintage decision**, exactly as the owner put it. That coupling is
+recorded here for the first time.
+
+**Does the vintage convention cover self-arming events? NO — this is the gap.** The
+convention's class line reads: *"vintage EVENTS are code, config, gate-crossings,
+cadence — the data axis is deliberately not in that class."* "Gate-crossings" was
+written for the DATE-armed `consMinEv` expiries (that is the extension referenced);
+nothing in it distinguishes a crossing whose fire moment is set by accumulating data,
+and nothing requires a stamp AT fire time. **→ M21**, and the owner's encoded rule
+lands rather than a written one.
+
+**THE ENCODED RULE — a self-arm writes its own stamp at fire time**:
+`tests/self-arm-stamp.test.ts` pins the armed COUNT (`umpKf: 1`). When accruing data
+moves it, the suite goes RED with instructions naming what to record and where; the
+only way back to green is a dated entry here plus the constant update in the same
+commit. It also asserts the double brake is still in place (`umpKFrozen: true` and
+`shUmpKf`'s early return), so a silent release of either shows up as a test failure
+rather than as a live factor. **OBSERVED RED 2026-07-30** with the pin planted at 0
+against the live count of 1 — the message printed the crossing — then green once
+recorded. Plant included.
+
+## umpKFrozen — THE PIN IS A LIVE MODEL DECISION, WITH A MEASURED MAGNITUDE (2026-07-30, owner's item 3)
+
+**Provenance and class**: `SH_CFG.umpKFrozen: true`, engine L1147, comment dated
+**2026-07-25** ("`shUmpKf` is PINNED OFF for the collection period"). It IS in the
+42-parameter census — the frozen table's row (this doc, L457) is explicit that
+**"unlike `penQ` this factor would have ARMED ITSELF"** — filed in the **CHOSEN,
+rationale in comments** class, and it carries `penQFrozen` as its sibling.
+**Independent of M6**: M6 is "K's are priced with no sim of the quantity" (the sim
+carries no K-count outcome, so `jointAll` refuses the group) — a *pricing-coverage*
+finding. `umpKFrozen` is a *factor-activity* decision on the same market. The pin
+was **the freeze's instrument, not M6's fix**: it holds the K-rate factor constant
+so the collection window's K-market readings are not confounded by a factor arming
+itself mid-window. It is the remedy for a CONFOUND, and simultaneously the thing
+that makes the shape ("a factor computed and discarded before it reaches the price")
+literally true today.
+**What unfreezes it: NOTHING automatic — no date, no count, no wired condition.**
+Only an owner sign-off flipping the boolean. So it does NOT belong in item 2's
+self-arm enumeration; what self-arms is the DATA BEHIND IT (`g >= 5`), which is why
+the two must be read together: **the pin is the only thing standing between a
+self-arming factor and the price, and the pin has no expiry.**
+
+**THE REPLAY (armed fixture, `ev_gated`, `umpKFrozen` false vs true) — MATERIAL**:
+| quantity | pinned (today) | factor live |
+|---|---|---|
+| K/outs rows compared | 18 | 18 |
+| rows whose prob MOVED | — | **8 of 18** |
+| max \|Δprob\| | — | **16 pp** |
+| mean \|Δprob\| (moved rows) | — | **3.34 pp** |
+| ump-tagged rows | **0** | **13** |
+| pool tickets | 50 | 50 |
+| **emitted card** | Outs 2-leg **$60** · TB 3-leg **$11** · Outs 3-leg **$34** | Outs 2-leg **$58** · Outs 2-leg **$60** · TB 3-leg **$11** |
+| cards identical? | **NO — a different ticket set and different stakes** |
+**→ the owner's third branch fires: the pin is a live model decision, not
+housekeeping.** It goes in the frozen table WITH THIS NUMBER beside it: pinning
+`shUmpKf` changes 8 of 18 K/outs row probabilities (max 16 pp) and changes which
+tickets are emitted. The impossible branch (zero diff) is SILENT — the factor
+plainly can reach the price; the pin is exactly what stops it.
+**The pipeline that maintains it**: `context.yml` → `tools/build_context.py`,
+2×/day, reading `statsapi` finals — **ZERO Odds credits** (keyless). Besides the
+frozen carrier, the only consumers of its output are `tools/gate_activity.py`'s
+projections and the shadow log (`gameInfo.shadow.umpKf`), which records what the
+factor *would* have been — the reason freeze-exit can re-measure it at all.
+
+**THE PLAUSIBILITY CHECK (free, from the committed history)**: today's largest
+single-day ump delta is **Bruce Dreckman `k` 35 → 61 = +26 — accompanied by
+`g` 2 → 3, i.e. ONE game.** Against the bound: 26 combined strikeouts in one MLB
+game is high but ordinary (the modern 9-inning record is 26; extra-inning games
+exceed it). **The internal accounting settles it: 15 umpires each gained exactly
++1 game, their K deltas sum to 243, and the league row moved 3280 → 3523 = +243 —
+an exact match, with `days` 18 → 19 and `pks` 198 → 213 = +15 games.** Mean added
+K/game = 243/15 = **16.2**, dead on the MLB average. **Not a pipeline defect: one
+game per umpire, no backfill, conserved totals.**
+
+## THE LEDGER'S SCHEMA CHANGED DURING ITS OWN LIFE (2026-07-30, owner's item 4)
+
+**Full field audit — add-dates from the writer's history** (`shTicketSnap` /
+`shLockCard`, `legacy/index.html`). Row counts missing each field are **OFF-DISK**
+(the ledger lives behind the sync phrase); the export must count them — that is why
+per-field presence counts by date are added to reading 15 below.
+| scope | fields present since **2026-07-11** (the store's birth) | added later |
+|---|---|---|
+| entry | `date`, `lockedAt`, `locked`, `lateLock`, `daily`, `fun`, `bankroll`, `cardEv`, `core`, `funT`, `games`, `grading`, `gradedAt`, `clv` | **`overrode` 2026-07-19** (`2aedbd7`) · **`selMode` 2026-07-24** (`70dfa8e`) |
+| ticket | `id`, `bucket`, `name`, `type`, `tier`, `stake`, `czOdds`, `czDec`, `prob`, `czEv`, `fair`, `confirmed`, `legs` | **`bsOdds`, `bsDec`, `bsEv` 2026-07-19** |
+| leg | `label`, `prop`, `cz`, `game`, `gkey`, `lkey`, `est` | **`bs`, `bsBook` 2026-07-19** |
+| grading | — | `grading.v: 2` (the orientation fix; `shGradeOrientFix` REWRITES old grading blocks — see the backfill note) |
+**Of the 38 tickets**: the split by date is OFF-DISK and is the export's job — but the
+STRUCTURAL statement holds now: any ticket locked before 07-19 lacks the basis
+fields AND `overrode`; before 07-24 lacks `selMode`. **The 46.3/59.2 window
+(07-17 → 07-22) sits entirely before the `selMode` add-date and mostly before
+`overrode`'s.**
+
+**THE CONFOUND, PLAINLY**: *for the days that fund the HRR suspension, mode and
+override are UNFALSIFIABLE. Legacy modes carry no HRR bar — and, as the cfSel sweep
+showed today, `caesars_ev` puts an H+R+RBI parlay on the card at the top stake. So
+the suspension's justifying population may mix disciplined and undisciplined
+selection, and no query can separate them.* This is a stronger statement than
+"off-disk": the data to separate them was never written.
+
+**Consumers that assume schema stability — printed**: `src/lib/clv-report.ts` L55
+reads `selMode` defensively (`typeof … === "string" ? … : null`) and its own comment
+says *"stamped at lock from this deploy on"* — correct, but every pre-07-24 row
+lands in the `null` bucket, so any mode-sliced CLV report silently under-counts
+rather than reporting the gap. `shLedgerStats` (the bankroll exit's test) reads only
+`stake`/`payout`/`result` — schema-stable, unaffected. `app/ledger/page.tsx` renders
+`e.overrode` truthily — a pre-07-19 override is invisible, indistinguishable from
+"no override". **The one genuine BACKFILL RISK is `shGradeOrientFix`**, which
+rewrites old `grading` blocks in place (`v: 2`) — so grading, unlike the rest, is NOT
+append-only, and the owner's impossible branch (a row carrying a field added after
+its own date) **may legitimately fire on `grading.v`**: if the export shows it, that
+is the orientation fix, not a mystery. Everything else is append-only in rows and
+mutable only in columns.
+
+## WHAT FRIDAY'S DOUBLE VINTAGE EVENT COSTS SERIES A (2026-07-30, owner's item 5; before the build)
+
+**Friday 07-31 carries TWO vintage events on one board**: (1) the outs flag's engine
+ship (Thursday evening deploy → Friday is the first board on the new artifact), and
+(2) the `consMinEv` expiry for K's and outs — a DATE-armed gate crossing, i.e. a
+market reopen. **Every Friday reading is therefore stamped TWO-VINTAGE in advance**,
+per the owner's standing pre-commitment.
+
+**What restarts and what carries across, given the row-level boundary finding:**
+| series | Friday's status | why |
+|---|---|---|
+| **row-level clamp census / hot-site fidelity** | **CARRIES ACROSS** — tonight's board stays board 1 | the flag is selection-level; rows keep pricing (accrual preserved), and the scope-by-diff invariant is what proves it in the ship's own CI |
+| `self_consistency` row identities (TB≥1 == H≥1) | CARRIES ACROSS | board-level, mode- and selection-independent |
+| **outs-market readings** | **RESTART at board 1 (Friday)** | the flag's own doc scopes its boundary here; post-flag outs boards never pool with pre-flag ones |
+| **K's-market readings** | **RESTART at board 1 (Friday)** | the `consMinEv` reopen is a gate crossing on that market |
+| **whole-board / allocation-level (the crossover series)** | **RESTART at board 1 (Friday)** | ticket composition changes when a market's eligibility changes — this is the series the 08-20 date was always segmented on |
+| Series A (board × close join) | **the BOARD side restarts for outs/K's; the CLOSE side is untouched** | closes come from the props sweeps (`line-history`), which no engine ship touches; the join simply carries a vintage stamp from Friday on |
+| HRR shadow accrual (the 08-15 population) | CARRIES ACROSS | HRR is neither reopening nor changing; its rows accrue identically |
+**The cost, in one line**: tonight's board is the ONLY member of the pre-flag
+whole-board vintage, so the allocation-level series starts over Friday at n=1 — which
+changes nothing material, because that series was already recorded UNREACHABLE at 20
+boards this cycle. **The ship costs a series that could not have completed anyway;
+it does not cost the row-level series, which is the one still accruing.**
