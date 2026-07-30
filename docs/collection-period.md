@@ -3458,6 +3458,28 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   disk — skipped, not estimated. **The ration table STANDS on the fixed cadence**:
   its ~420/day was computed from the sequential replay, which is exactly the
   post-fix behavior; as-shipped-without-the-fix risked ~510–610/day.
+  **THE FIRING COPY WAS THE PRE-REDESIGN ONE ALL ALONG (2026-07-30, the owner's
+  impossible branch FIRED — the full diff printed on the run)**: schedules fire
+  from the DEFAULT branch (`main`, printed), and **main's props-history.yml is the
+  OLD TEN-CRON copy** — plain `python3 tools/snapshot_props.py`, no `--wait`, no
+  `--fold-only`, no `timeout-minutes` — while the 2026-07-27 "TEN CRONS REPLACED
+  BY ONE THAT WAITS" redesign exists ONLY on frontend-rebuild and **has never
+  fired**. Consequences, recorded: (1) every measured cadence fact (the two-batch
+  queue behavior, the 08:02–08:07Z trio, the morning clusters, the burn) describes
+  MAIN's ten-cron copy — the measurements are RIGHT about reality and the design
+  docs describe a workflow that never ran; (2) the MOVING INPUTS row
+  "props-history.yml (2×/day)" is CORRECTED, dated: nominal TEN/day on the firing
+  copy; (3) **the concurrency group + pull-rebase retry NOW LIVE ON THE FIRING
+  COPY** (pushed `c2459c4..53d0076 → main` this night; the block printed from
+  origin/main) — tomorrow's window tests the fix against exactly the schedule that
+  produces clusters; (4) the executing SCRIPT is unambiguous — the workflow
+  overwrites the checkout with origin/frontend-rebuild's `snapshot_props.py`
+  (workflow L57–59), both copies hash `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828` identical, MIN_GAP marker
+  present ×1; (5) **CONVERGENCE OF THE TWO WORKFLOW COPIES IS THE OWNER'S CALL,
+  SPEC-ONLY**: (a) port the three-cron+wait redesign to main (the designed
+  cadence, never yet exercised), or (b) keep ten-cron+concurrency (the measured
+  cadence, now serialised). Neither ships without his word.**
+
   **THE LANDING TEST RESTATES (the fix consumes MIN_GAP's confirmation —
   tomorrow's 08:02–08:07Z window now tests the FIX)**: (a) ONE paid snapshot in
   the window, N−1 skips logged, NO rejected push → **landed**; (b) two or more
@@ -3474,21 +3496,61 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   reading** — recorded with the reason (`docs/pitcher-outs-audit.md`, DECIDED
   section: both branches pre-committed by the owner; the chain's failure modes are
   HRR/engine-string, not outs). Header fix: **the owner's, and still the gate.**
-  **Quota: the last READ remains 1,676 / 18,324 (07-29 morning, post-cluster).**
-  Since that read, the day-file shows exactly 2 further paid snapshots (20:32Z
-  pre, 23:38Z close ≈ ~120–192 computed at ~6/event on the shrinking eligible
-  slate) + line-history ticks (~24) → **DERIVED remaining ≈ 1,460–1,530 — derived,
-  not read** (the day-file stores no quota field — checked; a fresh read costs a
-  paid call or the dashboard). **Runway on the fixed cadence at the derived
-  midpoint (~1,495): sweeps-only ~3.6d · board-only ~10.0d · both ~2.6d ·
-  Series-A-complete ~6.1d — the ≥10-board-day threshold is now KNIFE-EDGE
-  (9.7–10.2 board-days across the derivation bounds).** **What tomorrow's board
+  **Quota: READ, not derived (2026-07-30 ~03:5xZ — the FREE instrument found on
+  the owner's question): `/v4/sports` costs ZERO credits and the odds proxy passes
+  the quota headers through (`app/api/odds/route.ts` L51–55; cached path, no
+  passcode). READ: remaining 1,461 / used 18,539.** Delta vs the last read
+  (1,676/18,324): **215 spent — attribution closes within 1 credit** (20:32Z pre
+  sweep + 23:38Z close sweep ≈ ~192 + line-history ticks ~24 ≈ 216 computed; the
+  read itself 0). The read lands at the very bottom of the derived 1,460–1,530
+  band. **Board-days on the READ figure: 1,461 / 150 = 9.74 — UNDER 10. THE ≥10
+  BOARD-DAY THRESHOLD IS NOT REACHABLE UNDER ANY CADENCE ON THE QUOTA ON HAND:
+  the 08-15 HRR suspension review is UNREACHABLE WITHOUT A RESET — written
+  tonight, per the owner's pre-committed branch, not discovered on 08-15.** (The
+  reachability table above restates: the board-only cell's "REACHED (11, barely)"
+  carries this dated supersession — at the READ quota it is 9.7, NOT reached.)
+  Every future runway figure uses READS via the free instrument, not derivations.
+  The reset date remains unread by the owner; every downstream date stays
+  PENDING as stamped. **What tomorrow's board
   can support: the echo, the cfSel stamp reading, self_consistency, the
   greyed-row check, the replay + ParlayPred diff, and Control C's production
   predictions. What it cannot: any vintage claim about archived boards. It is
   board 1 of the homogeneous window — item 3 resolved with the echo attributing
   production's copy AND the window never having depended on it (the inputs were
   versioned throughout).**
+
+- **THE LINEUP-CONFIRMATION RULE HAS NO TESTABLE CONDITION (2026-07-30, owner's
+  item 5 — the branch that fired)**: `docs/board-timing.md` L18–20 states the rule
+  as a PER-GAME sim precondition ("the Monte Carlo path requires a confirmed 9-man
+  lineup on both sides") with a designed fallback (closed-form + the
+  projected-lineup `noParlay` rule) — **there is no board-level threshold anywhere
+  in the doc**; the 22:00Z hour was chosen as the MEASURED weekday coverage peak
+  (66%, L66), not against a bar. So 66% neither satisfies nor violates a rule —
+  **a ranked defect was documented and never given a testable condition; that is
+  the finding.** Boards DO record their coverage at generation (the gen stamp:
+  `luConfirmed`, `luPct`, `achievable`, plus `data.luCoverage`) — the
+  cannot-read-after-the-fact branch does not fire. **THE GUARD, SPEC'D NOT SHIPPED
+  (no threshold is invented)**: encode `gen.luPct ≥ gen.achievable − ε` — "the
+  board captured what was capturable at its hour" — both fields already computed
+  in the route; a board violating it generated EARLIER than its own slate allowed,
+  which is the original defect's testable form. Awaits sign-off. For tomorrow: the
+  evening-6 block is fully inside the FP−3h lineup window from ~20:05Z; **the
+  22:00Z cron remains the plan** (its board prints its own `luPct`/`achievable`,
+  and tomorrow's reading includes that comparison); the curl stays the fallback.
+
+- **TOMORROW'S ORDER, RECORDED (owner's item 6)**: slate count printed → the
+  owner's go/no-go → quota READ (free instrument) → board (cron preferred, curl
+  fallback) → quota READ → `gen=list` → **echo present in the response** → **cfSel
+  stamp on every suspended row** → `self_consistency` with both population sizes
+  printed → app-switcher double reopen → HRR rows present AND greyed → replay dump
+  + ParlayPred membership diff → Control C's production predictions against the
+  30 bp / 2–4% pre-commitments → ticket count against both pre-commits. **The
+  header fix is the owner's and its deadline is the 22:00Z cron: 3:00 PM PT
+  Thursday 07-30 — done by ~2:45 PM PT for margin.** Board 1 of the homogeneous
+  window: CONFIRMED — the echo hashes the text production fetched from its own
+  deployment (`grabText(selfBase())`, by construction, on disk). The outs flag
+  deploys Thursday regardless of any board reading — recorded with its reason
+  (`docs/pitcher-outs-audit.md`, DECIDED).
 - **Runway with MIN_GAP live (2026-07-29, from 1,676 remaining)**: sweeps ≈ **~420/day**
   (4 pre + 1 close × ~16 events × 6 cr, slate-dependent). Days of runway: **sweeps+one
   board ≈ 2.9 · board-only ≈ 11.2 · sweeps-only ≈ 4.0.** Board-days reachable before

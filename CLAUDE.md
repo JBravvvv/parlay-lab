@@ -292,6 +292,38 @@ the two evening sweeps (day-file carries no quota field — checked); board-only
 runway now KNIFE-EDGE at 9.7–10.2 board-days.** Held from `800cb50` (this
 turn's commit stacks on it); main stack `a46c1f`→`53d007` still awaiting the
 owner's single push.
+**SIXTH POST-COMPACTION TURN (2026-07-30Z, pre-window)**: **MAIN PUSHED —
+`c2459c4..53d0076 → main` (owner's authorization): the pause AND the concurrency
+fix are live on the branch schedules read (default = main, printed; the
+concurrency block printed from origin/main).** The impossible branch FIRED on the
+workflow diff: **main's props-history.yml is the OLD TEN-CRON pre-redesign copy —
+the 07-27 three-cron+wait redesign never fired; every measured cadence fact
+describes main's copy; convergence is the owner's call, SPEC-ONLY** (both options
+recorded, collection-period). Executing script = frontend-rebuild's pull, both
+copies `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828`-identical, MIN_GAP marker present. **QUOTA IS NOW READ, FREE**
+(`/v4/sports` = 0 credits through the odds proxy, headers passed L51–55): **1,461
+remaining / 18,539 used — delta 215 vs the last read, attribution closes within 1
+credit. Board-days on the READ: 9.74 — UNDER 10: the 08-15 HRR suspension review
+is UNREACHABLE WITHOUT A RESET, written tonight** (reachability cell superseded,
+dated). **ITEM-1 RETRACTION: "abstention is the boundary" RETRACTED — the in-loop
+shade fed the SHADED est to the gate (omniscient gate; `shadePl` recomputes czEv);
+the EVAL-ONLY run (composition AND stakes frozen at shade-0; binding ceiling
+perParlayCap on the EV card's $62 top stake) is THE tolerance instrument: prob
+−3.2 / EV −4.3 pp, interpolated; HRR's −12.9 exceeds it ~4.0×/~3.0× on the one
+market with settled data, untested on all four reopening.** The in-loop sweep is
+relabeled: what a better-calibrated model would do (design result, not
+tolerance). **λ* READING CONFIRMED and recorded in hrr-recalibration.md**:
+selected HRR legs lost to the book's own price (λ*=2.55–2.94 past the market;
+λ=1 mean gap 0.00 by construction; transfer-between-populations stated; λ=1
+eval-only −161.3/−178.4 bp, in-loop NO-PLAY). **LINEUP RULE: no testable
+condition exists** (per-game precondition, designed fallback, no board threshold
+— the finding); boards DO record luPct/achievable at generation; **guard spec'd
+not shipped: gen.luPct ≥ gen.achievable − ε**; the 22:00Z cron stays the plan,
+its board prints its own coverage. **HEADER DEADLINE: 3:00 PM PT Thursday
+(22:00Z cron) — by ~2:45 PM PT.** Tomorrow's order recorded in full
+(collection-period). Board 1 of the window CONFIRMED via the echo's
+production-copy hashing. Outs flag Thursday regardless, recorded. Spec-only:
++the lineup-confirmation guard, +workflow-copy convergence. Hold from `0a24a30`.
 **STEP-0 CLEARANCE (2026-07-29, post-push re-grep — the owner's blocking gate)**: served
 chunk **`256-171aff5d10da160d.js` still referenced by the served HTML**; extracted engine
 string sha256 **`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b`** =

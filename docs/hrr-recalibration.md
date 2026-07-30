@@ -85,6 +85,25 @@ and **32% on O1.5+ alternate lines** specifically. Reliability slope (nightly ca
 n=273): **1.74** — noisy, but the ledger's O1.5+ subset is where the dollars actually
 bled. O0.5 went 12/19 (63%) and stayed active, tagged **watch** — ~~stays~~ **REVERSED 2026-07-27 (see the reversal note at the top of this file)**.
 
+> **THE λ* READING, CONFIRMED AND RECORDED (2026-07-30, owner's item 4 — a
+> bankroll-relevant statement available with no ledger read, scoped to HRR)**:
+> mapping the measured gap through the shrinkage instrument
+> (`tests/blend-sweep.test.ts`), the truth that reproduces −12.9 pp on selected
+> legs requires **λ* = 2.55–2.94 — past λ=1, the market's own price.** The owner's
+> reading is CONFIRMED: **selected HRR legs were losing to the book's own implied
+> probability (46.3% vs 59.2%), not merely to the model's optimism** — the same
+> statement the ledger measured, now expressed on the shrinkage axis. The numbers
+> beside it: at λ=1 the mean selected-leg gap is **0.00 pp by construction** (est ≡
+> imp — the anchor IS the market's price; the impossible branch does not fire), so
+> the distance past the market is the full **−12.9 pp**. **Populations: NOT the
+> same rows — the 46.3/59.2 population is the graded ledger's SELECTED HRR legs
+> (07-17→07-22, off-disk), while the archived 07-26 board's selected legs contain
+> NO HRR at all (suspended): the mapping is a TRANSFER between two populations AND
+> two market mixes, and it says so.** What agreement with the market buys, both
+> rankings, eval-only at λ=1: **−161.3 (prob) / −178.4 (EV) bp** — belief-sized
+> stakes grading at consensus truth is the CZ vig drag; in-loop at λ=1 the gate
+> correctly abstains (NO-PLAY). No extrapolation to any other market.
+
 `SH_CFG.hrrAltMax = 0.5` ~~(now `-1`, 2026-07-27)~~ suspends every H+R+RBI line above O0.5 from all auto-built
 tickets in both disciplined selection modes, and Phase 2 renders those rows greyed with
 "Suspended — sim recalibration" on the Board; The Sharp and the manual slip exclude them

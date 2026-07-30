@@ -272,19 +272,26 @@ figures read as incompatible; two were crossings, one was a RATIO)**:
 |---|---|---|---|
 | evaluation-only (cards fixed) | prob | **−3.2** | interpolated (+8.2 at −3 → −29.9 at −4) |
 | evaluation-only | EV | **−4.3** | interpolated (+11.1 at −4 → −30.8 at −5) |
-| in-loop (selection responds) | prob | ~~≈ −5.4 extrapolated~~ **NO CROSSING — corrected 2026-07-29 late, grid extended to −8: positive (+8.3) at −5, the gate goes NO-PLAY from −6. Abstention is the boundary; in-loop E[ln] never goes negative on this axis on this board** | measured (−6/−7/−8 all 0-ticket) |
-| in-loop | EV | **same single behavior — the two rankings select IDENTICAL cards from −1 through −8 (measured per step, printed), so there is ONE in-loop tolerance because there is one card; only the −0 step differs** | measured |
+| in-loop (selection responds) | prob | ~~≈ −5.4 extrapolated~~ ~~NO CROSSING — abstention is the boundary~~ **RETRACTED 2026-07-29 late (owner's catch, same night): the in-loop instrument feeds the SHADED est to the ADMISSION GATE and the ranking key (`tests/a1-shrink.test.ts`: `shadePl` recomputes `czEv` from the shaded prob, and the shaded pool feeds `alloc`) — an OMNISCIENT gate that is told about the miscalibration. Production's gate reads the UNSHADED belief, admits, and loses. The in-loop sweep is RELABELED to the question it answers: what a better-calibrated model would do — a design result about the gate (it abstains correctly under corrected beliefs), NOT a tolerance of the shipped engine** | relabeled; −5.4 rows stay struck |
+| in-loop | EV | same relabel — identical cards from −1 through −8 remain a fact about the corrected-belief allocator, not about production | relabeled |
 
 **There is no −2.4 tolerance and never was**: the "~2.4×" was the exceedance RATIO
 12.9 ÷ 5.4 in the sentence "exceeds the in-loop tolerance (≈5.4) by ~2.4×" — the
 parenthetical adjacency bred the misread; the figure set above is the record.
 **(AND STRUCK 2026-07-29 late: the ratio's denominator was the invalid −5.4
-extrapolation — with the grid extended, the in-loop instrument has NO crossing to
-ratio against. What remains of the HRR comparison: −12.9 vs the EVAL-ONLY crossings
-−3.2/−4.3 (~4×/3×, fixed-card instrument, selected-legs-vs-uniform population caveat
-unchanged) and the selection-axis mapping (λ = 2.55–2.94, outside the axis) — the
-in-loop engine abstains rather than crossing, which is the gate doing exactly its
-job under uniform overconfidence, at the model's remaining beliefs, n=1 board.)**
+extrapolation. THEN RESOLVED same night, owner's item 1: THE EVAL-ONLY RUN IS THE
+TOLERANCE INSTRUMENT, by construction — composition AND stakes frozen at the
+shade-0 allocator output (`cardOf(alloc(...))` runs once, before the sweep; the
+shade maps evaluation copies only — `growth(shaded(card,d))`; stakes ride the copy
+untouched): selection-on-belief, evaluation-on-truth, which is what production
+actually does. Binding ceiling among its belief-sized stakes: `perParlayCap`
+($62.50) on the EV card's top ticket ($62, rounded); the prob card tops at $59,
+unbound. THE TOLERANCE: prob −3.2 pp / EV −4.3 pp, both INTERPOLATED. And the one
+line, wherever the tolerance appears: HRR's measured −12.9 pp exceeds it ~4.0×
+(prob) / ~3.0× (EV) — on the ONE market with settled data — and the tolerance is
+UNTESTED on all four markets reopening tomorrow. The eval-only-vs-in-loop shade-0
+difference (+187.2 vs +186.3, 0.9 bp) is the named r1 re-rounding pass, printed —
+the shared-composition impossible branch fired benignly with its cause on disk.)**
 
 **THE HRR −12.9 MAPPED THROUGH THE SHRINKAGE INSTRUMENT (owner's item 4 — the axis
 that can carry a selected-legs number)**: the λ=0 cards' selected legs carry a mean
