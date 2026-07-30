@@ -5833,3 +5833,220 @@ the frozen table additionally stays single-instrument through this cycle** —
 both clauses together, as ordered. What the exit loses concretely: through this
 cycle no fixture-derived clamp/shrink figure gains the "confirmed" stamp, and
 every finding leaning on them keeps the caveat.
+
+## 07-30 MORNING COLD READ — RECORDED (~16:4xZ, owner's item 1; raw outputs beside verdicts)
+
+**STEP 1 — the landing test: LANDED.** Raw: in the pre-registered 06:30–09:30Z
+window, exactly ONE commit touches `data/props/2026-07-30.json`: `ca80f02
+2026-07-30T07:42:46Z "prop history: 2026-07-30T07:42Z"` (day-file ground truth:
+`t 07:42:43Z, kind pre, events 10`). The Actions run list shows the cluster as
+07:42:28 (paid) / 07:43:58, 07:56:17, 07:57:22 (skipped — no commits), ALL
+`success` — **no rejected push**. One paid + N−1 skips + no rejected push = the
+LANDED outcome as written. A SECOND paid landed at 09:37:48Z (`e414249`, pre,
+10 events) — 115 min after the last paid, OUTSIDE the window, no two commits
+inside any 40-min span: MIN_GAP-designed spacing ("delivery is never cancelled,
+only serialised"), not a duplicate; the 09:46:42 and 10:02:13 runs skipped
+behind it. The 07-29 all-paid trio precedent (08:02/08:05/08:07) is broken —
+**MIN_GAP and the concurrency fix behave as shipped.**
+
+**STEP 2 — the straggler: DID NOT COMMIT.** `git log origin/main --since
+2026-07-30T05:00Z -- public/model/context.json` → empty (no main commits at all
+since 05Z). **The homogeneous-window start stamp STANDS at the pause pair**
+(priors `00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e`,
+context `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`).
+
+**STEP 3 — quota READ 16:4xZ: 1,238 remaining / 18,762 used** (free `/v4/sports`
+through the odds proxy, headers passed). Delta from the ~03:5xZ read
+(1,461/18,539): **223 spent in ~12.8 h.**
+
+**ITEMIZED, PER SPENDER (04:00→16:45Z, from the line-history log — 4 commits
+total)**:
+| spender | evidence | ≈credits |
+|---|---|---|
+| props pre sweep 07:42Z | day-file: 10 events × ~6 | ~60 |
+| props pre sweep 09:37Z | day-file: 10 events × ~6 | ~60 |
+| line ticks 06:13Z + 13:11Z | `data/2026-07-30.json` | ~6 |
+| **known subtotal** | | **~126** |
+| **RESIDUAL** | no git trail | **~97 — AMBIGUOUS** |
+
+**The residual is AMBIGUOUS and is not resolved by judgment.** The likely
+mechanism has no commit trail by design: the Vercel-side `/api/clv` close
+captures (96×/day cron-job.org job) spend at CAPTURE time and only appear in
+git when `snapshot_props.py` FOLDS them into the day-file later (the 00:14Z
+`close/3 events` entry is exactly such a fold). Today's first pitch is 16:10Z,
+so capture windows opened ~14:35Z — inside this read's span. **Disambiguators,
+in order**: (1) tonight's fold — captured closes with `t` in 14:35–16:45Z in
+the day-file attribute the residual to the CLV path; (2) Vercel function logs
+(dashboard-only, §9); (3) the Odds dashboard usage log (owner-only).
+
+**THE BAND, APPLIED HONESTLY**: the projection (≈1,325, band 1,290–1,360) is
+anchored at 22:30Z; at 16:45Z the read already sits BELOW the floor — the
+projection is breached early. Attribution splits the deviation: **~120 is
+DESIGNED spend my projection under-modeled** (it assumed the cluster = ONE
+paid; the delayed crons stretched 2.5 h and MIN_GAP correctly permitted a
+second paid at ≥40 min — a projection error, not a spend anomaly), and **~97
+is the AMBIGUOUS residual above** — so the pre-committed "below 1,290 =
+un-designed spend" label can neither be confirmed nor cleared until the
+disambiguators run. Said as AMBIGUOUS, per the owner's rule. Re-projection for
+22:30Z from the 16:45Z read: ≤ ~1,180 (the 17Z sweep ~36–60 still to come, the
+ambiguous spender still active). **Runway restates: 1,238/150 = 8.25
+board-days** (was 9.74 at the 03:5xZ read).
+
+## THE THURSDAY SHIP IS A BUILD, NOT A DEPLOY — WHAT IT ACTUALLY REQUIRES (2026-07-30, owner's item 2; stated BEFORE any build authorization)
+
+**The exact diff, every file**:
+1. `legacy/index.html` — the three same-line edits, all INSIDE the engine
+   string: (a) `finalizeCats` L2512–14: the outs analog of `suspRow`
+   (`lpq[1]==="pitcher_outs" && SH_CFG.outsSusp && dscpM` — dscpM covers BOTH
+   disciplined modes, the hrrAltMax precedent); (b) the `buildParlaySet` leg
+   filter (the L2652-analog site): outs legs never enter the pool under
+   `outsSusp` + disciplined; (c) `shFunPick`: never picks outs. Plus the
+   boolean itself: `SH_CFG` gains `outsSusp: true` in the engine literal
+   (config-in-engine, exactly where `hrrAltMax` lives) — no route change
+   needed; the echo picks it up from cfg automatically.
+2. `src/engine/legacy-src.gen.ts` — REGENERATED (`tools/extract-engine.mjs`).
+   **THE ENGINE STRING MOVES.**
+3. `tests/outs-suspension-coupling.test.ts` — BOTH `it.fails` → `it` (pool half
+   + tag half), same commit.
+4. `src/lib/engine-echo.ts` — `SERVED_ENGINE_SHA_VERIFIED` — see the interlock.
+   (`tests/engine-echo.test.ts` L76 does NOT flip: it tests null-serialization
+   of an ABSENT cfg key on a literal, not production's value.)
+
+**THE HASH MOVES — the pre-committed branch fires, stated before authorization**:
+Thursday's 22:45Z board runs the CURRENT artifact (`f6cf1513…`); the evening
+deploy changes the engine string; **Friday's board is a DIFFERENT engine
+artifact** — the served-artifact verification RESTATES on Friday (re-extract
+the chunk, match the new sha, update `SERVED_ENGINE_SHA_VERIFIED` beside that
+fresh re-grep), and Friday's echo must carry the NEW engineSha. **A discovered
+interlock, new with this ship (the first engine-string change since the sha
+instrument shipped)**: `tests/engine-echo.test.ts` HARD-asserts
+`ENGINE_SHA === SERVED_ENGINE_SHA_VERIFIED`, and the constant's own rule says
+it updates "ONLY beside a fresh live verification, same commit" — but the live
+artifact serves the NEW string only AFTER the ship deploys. The ship commit
+therefore CANNOT satisfy the rule's letter: **the sequence must be — ship
+commit updates the constant to the new runtime hash marked
+PENDING-LIVE-VERIFICATION (a dated, one-time exception to the rule, recorded in
+the commit), deploy, then the post-deploy re-grep either CONFIRMS (marker
+lifted, same-day) or MISMATCHES (revert + stop).** Without this the ship's own
+CI is red on a guard that cannot go green pre-deploy.
+
+**Guard independence, answered**: the `it.fails` halves flip only with the ship
+BY DESIGN — that is the observed-red standard, not circularity: the assertions
+(zero outs legs in the pool; tags present over a non-empty population) are
+defined independently of any implementation, the guard was RED on 07-28 against
+the real defect, and its ability to see an unfiltered world is proven by the
+legacy plant + the comparator plant, with arming extracted from source. What
+the guard does NOT cover, named: (i) live-slate behavior — fixture-only until
+Friday's board; (ii) **the dk_fd gap** — `productionModes()` extracts
+{CRON_SEL_MODE, client default} = {ev_gated}; dk_fd is device-reachable
+(Settings, ~2 taps) and the SPEC covers it via `dscpM`, but no test pins it —
+the hrr coupling guard shares this same gap. A one-line guard extension closes
+it; spec-only, owner's call.
+
+**Wrong-wiring detectability BEFORE Friday — mostly yes, in the ship's own CI**:
+wrong market key or a wider-than-claimed boundary → the scope-by-diff invariant
+goes RED; broken accrual (rows vanish) → the population assertions go RED; a
+no-op flag → the `it.fails` halves cannot flip → the ship cannot go green →
+does not deploy (the owner's impossible branch, mechanical). Detectable ONLY on
+Friday: the live-slate half — pre-committed as **the outs four-counts on
+Friday's board** (rows PRESENT · GREYED · susp-stamped in predictions ·
+ZERO outs legs in tickets — the HRR four-counts analog, plus cfSel stamps now
+extending to outs shadow rows). The pre-committed "undetectable before Friday →
+does not ship" branch therefore does NOT fire; the build/deploy authorization
+stays the owner's, now with the hash statement and the interlock on the record.
+
+**Config-only path: NONE EXISTS.** `outsSusp` has zero read sites today
+(tonight's diff: on/off byte-identical, tickets included) and the builder
+closures are engine-internal — no existing knob suspends a market. The
+route-post-filter alternative is rejected with its costs stated: it DROPS
+whole tickets after the build instead of substituting (thinner cards — the
+builder would have picked replacements), tags no rows (the display and
+prediction halves go missing unless the serializer diverges from the engine),
+and it forks board-vs-engine semantics — the "engine ships verbatim" rule
+exists to prevent exactly that fork. **Impossible branch, both facts printed**:
+the flag is NOT already wired (`outsSusp` appears only in the echo reader and
+its guard; the on/off diff is byte-identical), and the echo's null is the
+DESIGNED pre-ship state ("absent config key echoes null"), not a wiring
+accident.
+
+## DATED CORRECTION TO "STRUCK AT 20" — ZERO USABLE BOARDS: THE INSTRUMENT DID NOT EXIST (2026-07-30, owner's item 3)
+
+**The correction, stronger than quota**: the 07-26 archived board carries NO
+`clampActivity` (verified on the gunzipped archive last night; `index.json`
+lists exactly ONE board-day, best ≡ latest — so NO board on disk carries it;
+the impossible branch is silent). The clamp instrumentation is ADDITIVE
+2026-07-27 — every board that could have existed before it cannot carry the
+measurement. **The check's usable-board count is ZERO, not 7 or 9: every
+reachability figure for it was counting boards that cannot carry the
+measurement. The STRUCK record stands, and its ground strengthens: unreachable
+FIRST because its instrument did not exist, and SECOND because quota binds.**
+The count starts at board 1 — today's 22:45Z board, the first built with
+`clampLog: true` armed (route L244) — IF `clampActivity` rides it (reading 24,
+pre-committed in the handoff).
+
+**Clamp calls per board, MEASURED on the armed fixture slate (probe run and
+deleted 2026-07-30; 15 games, 25 of 30 static sites executed, 5,183 total
+calls)** — per-site n on 15 games, with boards-to-≥30 PROJECTED at a 6-game
+evening slate (per-game rate × 6/board; label PROJECTED — the fixture is a full
+07-09 slate, evening composition may differ):
+| site (n on 15 games) | calls/6-game board | boards to ≥30 |
+|---|---|---|
+| 1647, 2089 (792) · 2069 (732) · 1591 (461) · 1757 (398) · 2088 (396) · 1624 (341) · 2309 (203) · 1660/2054/2055 (198) · 2318/2319 (161) | 64–317 | **1 — thirteen sites qualify at board 1** |
+| 1615 (30) | 12 | 3 |
+| 1669, 2114 (22) | ~9 | 4 |
+| 1610 (15) · 2368 (14) | ~6 | 5–6 |
+| 1594 (11) · 1629 (10) · 2280 (10) | ~4 | 7–8 |
+| 2339 (7) | ~3 | 11 |
+| 2258 (6) | ~2.4 | **13 — the load-bearing L2258 class check is a LOW-TRAFFIC site** |
+| 2160 (4) | ~1.6 | 19 |
+| 2371 (1) | ~0.4 | ~75 |
+| the FIVE cold sites (0 calls of 30 static — incl. L1605) | no rate exists | their own pre-committed test (harness-substitutions) |
+
+**Hot-site fidelity: yes, it reads the same instrument and starts at ZERO too.**
+Its restatement in board-days from today: **first readable at board 1** (13
+sites clear ≥30 in one 6-game board, IF clampActivity rides); ~18 sites by
+board ~5–6; the tail (2339/2258/2160/2371) needs 11–75 six-game boards — with
+8.25 board-days of quota, **the L2258 class check does not qualify this cycle
+either**; the five cold sites remain their own test. The promotion criterion
+(single-instrument → confirmed) accrues site-by-site as counts cross 30, never
+as a calendar date.
+
+## THE FOUR CRON-JOB.ORG GENERATE ENTRIES + THE COLLISION SEQUENCE (2026-07-30, owner's item 4; resolves before the 3:30 PM PT visit)
+
+**All four entries call the SAME endpoint** — `GET
+https://parlay-lab-six.vercel.app/api/generate` with header `x-cron-key` =
+the `CRON_SECRET` env value on Vercel ("Josh types the secret"), timezone UTC,
+failure = HTTP ≥ 400 (429 = the per-date cap of 3 spending runs). The docs'
+schedule table (`docs/cron-jobs.md`; its "three entries" heading is stale — the
+table has four rows):
+| # | days | cron (UTC) | today (Thu)? |
+|---|---|---|---|
+| 1 | Mon–Fri | `0 22 * * 1-5` → owner edits to `45 22 * * 1-5` | **fires — the only weekday entry** |
+| 2 | Saturday | `0 18 * * 6` | no |
+| 3 | Sunday | `0 17 * * 0` | no |
+| 4 | Sunday | `30 22 * * 0` | no |
+**Entries 2–4 DO call /api/generate — but weekend-only. Today's edit is
+ISOLATED: no second entry can hit generate near 22:45Z on a Thursday.** The
+weekend consequence of adding the header to 2–4, priced now: Saturday 18:00Z
+and Sunday 17:00Z + 22:30Z become SPENDING fires (~6 × unstarted events each,
+~55–150); the two Sunday fires sit 5.5 h apart (no 45-min interaction) and
+inside MAX_RUNS_PER_DATE = 3; Sunday's 22:30Z entry exists for the night game —
+if the 17:00Z board already covers it the conditional skip returns free.
+The fifth cron-job.org job (the `/api/clv` self-paced ticker, 96×/day) is
+recorded in the docs (props-history.yml header) and is NOT among the four — no
+undocumented entry; the impossible branch is silent.
+
+**The collision sequence (22:45Z fire + a hypothetical 23:00Z second call),
+from the route's own order**: auth → **45-min limiter** (`now − lastRun < 45
+min → {ok:true, skipped:"ran recently"}` — L126 region) → conditional
+good-board skip → INCR. A 23:00Z call 15 min after a 22:45Z spending run stops
+at the LIMITER: it returns `{skipped:"ran recently"}` — it does NOT return the
+board (the board reads free from `/api/board`), does NOT reach the good-board
+skip, and does NOT increment the run count — `K_LASTGEN` and the INCR both sit
+at the point of commitment, past every free exit ("a cap named for spend must
+count spend", 2026-07-27). After 45 min the good-board skip takes over
+(coverage-measured over unstarted games) — also free, also no INCR.
+**Pre-committed reading resolved: only entry 1 fires today → the 3:30 PM visit
+is two changes, isolated**; the weekend arming consequence above is the one
+thing the header edit changes beyond Thursday, priced for the owner before the
+visit.

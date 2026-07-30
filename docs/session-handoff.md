@@ -169,7 +169,31 @@ each step maps to a labeled outcome, no interpretation)**:
 3. Nothing else fires a reading before the 3:30 PM PT visit — stop there; the
    quota read happens at the visit and stamps its own time.
 
-## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 23)
+**[MORNING READ EXECUTED 16:4xZ — LANDED / stamp STANDS / quota 1,238 with a
+~97-credit AMBIGUOUS residual; full record: collection-period, 07-30 MORNING
+COLD READ block.]**
+
+**BOARD 1 — WHAT TODAY'S 22:45Z BOARD SEEDS (added 2026-07-30 ~17Z, owner's
+item 5; every series that begins today, what the board must carry, and the
+absent-reading — a series that silently starts empty is worse than one that
+does not start):**
+| series (board 1 of…) | must carry | if absent |
+|---|---|---|
+| homogeneous window | the echo's priors/ctx hash pair = the PAUSE pair (the straggler did NOT commit — verified 16:4xZ) | echo absent → reading 3 (push didn't land); pair ≠ pause pair → reading 25 (print both, trace) |
+| clamp census + hot-site fidelity | `clampActivity` on the board data (route arms `clampLog` L244) | reading 24 — census stays ZERO, named defect, not silent |
+| config-echo series | the echo object; `selMode:"ev_gated"`; `outsSusp === null` (pre-ship) | readings 3 + 25 |
+| trigger-mark series | `gen.trigger === "header"` | reading 5 (mark did not land) |
+| cfSel series | cfSel stamp on every susp row — today's susp population = HRR rows ONLY (pre-outs-flag) | reading 4; empty susp population → the HRR-counts third-vacuity branch (reading 9) |
+| same-day fp × predictions | pred rows for 07-30 + the day-file's pre/close rows (3 already) | reading 14's branches |
+| behavioral vintage (4 markets live) | self_consistency + clear-count + Control C | readings 9–12 |
+| luPct/achievable pair | both printed | reading 7 |
+**Chain re-check against this list**: the fourteen steps produce three numbers
+nobody had pre-committed — now written as readings 24–26 below, before
+3:30 PM PT. Everything else lands on readings 3–14.
+
+## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 26 — 23 at the
+## 07-30 compaction handoff + readings 24–26 added 2026-07-30 ~17Z, owner's
+## item 5)
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
 2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
@@ -257,6 +281,28 @@ each step maps to a labeled outcome, no interpretation)**:
     authorization with the disabled protections stated (collection-period).
 23. The 22:00Z board's own coverage impossible branch: luPct > 50 → the projection
     was wrong, the window wider — print both (collection-period, item-1 resolution).
+24. **Board-1 clampActivity (added 07-30)**: today's board data carries
+    `clampActivity` (per-site {bounds,n,lo,hi,mid}; the route arms `clampLog`
+    L244) → the clamp census and hot-site fidelity START — 13 sites projected to
+    clear ≥30 calls at board 1 on a 6-game slate (probe table,
+    collection-period), real rates checked against the projection. ABSENT → the
+    arming is not reaching production analyze (SH_V2/clampLog wiring, route
+    L244) — a NAMED defect, the census count stays ZERO, never silent.
+25. **Board-1 echo field check (added 07-30)**: `outsSusp === null` (pre-ship
+    TODAY; === true on Friday's post-flag board — both states pre-committed);
+    `selMode === "ev_gated"`; priors/ctx hash pair === the pause pair (§4
+    carries both full hashes; the straggler did not commit, verified 16:4xZ).
+    Any other value → print expected-vs-observed and STOP that half: a non-null
+    outsSusp today means something shipped early; a foreign hash pair means the
+    deploy's statics are not the pause vintage — trace before composition
+    readings.
+26. **Board cost bracket (added 07-30)**: quota READ immediately before and
+    after the board → delta; model: ~6 credits × unstarted events fetched
+    (events printed from the slate count). PASS: delta/events ∈ [5, 8].
+    Outside → per-spender attribution printed BEFORE the chain's composition
+    steps proceed (the concurrent CLV capture path can contaminate the bracket
+    — the ~97-credit ambiguous residual this morning is the precedent; tight
+    reads around the fire minimize it).
 
 ## 4. GIT AND ARTIFACT STATE
 
@@ -265,9 +311,9 @@ each step maps to a labeled outcome, no interpretation)**:
   this file; engine-echo guard green immediately pre-push; origin verified
   carrying `315e0d4a56c0d287d79890a4ad34b8477a0390e2`. The earlier push the same
   night carried `e4e7bd1`+`8ca4d1b`, same standard.) Runtime-touchers this
-  session remain: `0914eeb` cfSel, `9753fb9` echo, `4c036ba` mark. **HELD: this
-  turn's commit only (docs + the scope-by-diff guard extension — test file, not
-  runtime).**
+  session remain: `0914eeb` cfSel, `9753fb9` echo, `4c036ba` mark. **HELD:
+  `6c0af0` (6-hex, unpushed — docs + the scope-by-diff guard extension, a test
+  file, not runtime) + the 07-30 morning-read commit on top of it.**
 - **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
   deploys nowhere — `vercel.json` `main: false`).
 - Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,
@@ -340,13 +386,18 @@ Operator rule (NOT an engine parameter, distinct by design): **no single slip ab
 
 ## 7. POSITION
 
-- **Quota: READ 1,461 remaining / 18,539 used** — 2026-07-30 (the doc stamps the
-  read "~03:5xZ"; the exact minute of the earlier 07-29 morning read remains
-  IN-CONTEXT-ONLY-UNVERIFIED, inherited — the next reads stamp their own times).
-  Delta from 1,676/18,324: 215, attribution closed within 1 credit.
-- **Board-days: 1,461 / 150 = 9.74 < 10 — the ≥10 threshold is NOT reachable under
-  any cadence**; the 08-15 HRR suspension review is UNREACHABLE without a reset
-  (written 07-30, in advance). Tomorrow's board cost ~55–60 (projected).
+- **Quota: READ 1,238 remaining / 18,762 used — 2026-07-30 16:4xZ** (updated;
+  the ~03:5xZ read was 1,461/18,539, its delta 215 attribution-closed within 1).
+  The 16:4xZ delta of 223 splits: ~126 attributed (two MIN_GAP-spaced pre
+  sweeps ~120 + two line ticks ~6) + **~97 AMBIGUOUS residual** — no git trail;
+  likely the Vercel-side CLV capture path (spends at capture, commits at the
+  fold); disambiguators pre-committed (tonight's fold / Vercel logs / Odds
+  dashboard) — collection-period, MORNING COLD READ block. The exact minute of
+  the 07-29 morning read remains IN-CONTEXT-ONLY-UNVERIFIED, inherited.
+- **Board-days: 1,238 / 150 = 8.25** (restated from 9.74 at the 03:5xZ read);
+  the ≥10 threshold stays NOT reachable under any cadence; the 08-15 HRR
+  suspension review stays UNREACHABLE without a reset (written in advance).
+  Today's board cost ~55–60 (projected; settled by reading 26's bracket).
 - **Homogeneous window: COUNT ZERO** (opened at the pause; 07-29 produced no board;
   the first member is the 07-30 board under either definition; conditional on the
   one queued straggler context commit).
