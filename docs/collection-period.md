@@ -3183,8 +3183,12 @@ where the bar removes HRR rows from the candidate set in both disciplined modes 
 ticket exists for either allocator to pick. **Empirically verified under production's
 `ev_gated`: pool 0 HRR legs, FUN 0.** The scare: the first scratch run showed 11 HRR legs in
 the pool and 4 in FUN — because the bare sandbox runs `selMode` UNDEFINED (the legacy/parity
-posture, where the bar intentionally does not apply). That posture is unreachable in
-production (armV2 and the cron both set `ev_gated`; `CRON_SEL_MODE` is test-asserted), and
+posture, where the bar intentionally does not apply). ~~That posture is unreachable in
+production (armV2 and the cron both set `ev_gated`; `CRON_SEL_MODE` is test-asserted)~~ —
+**CORRECTED 2026-07-30 (M20): the UNDEFINED posture is unreachable, but the LEGACY MODES
+(`probability`, `caesars_ev`) are ~2 taps from the device and carry the identical
+unfiltered pool — 11 HRR legs / 4 FUN, measured. See the M20 bundle row and THE MODE, THE
+LEDGER block below.** And
 it is also exactly why the baselines never moved.One real edge, already covered:
 a pre-deploy cached board carries old parlays — `lockMaxAgeMin:30` forces a fresh
 new-engine board before any lock. Legacy modes remain unfiltered by design (parity posture,
@@ -6300,3 +6304,211 @@ credits (keyless builders) — the quota reconciliation is unaffected.
    citation of a renamed id was updated in the same commit, and the guard is
    green. The props-history workflow already carries a pull-rebase ×3 retry for
    the same reason on `line-history`.
+
+## ump_k.json IS NOT AN ENGINE INPUT — THE STAMP STANDS ON A FOUR-STEP TRACE (2026-07-30, owner's item 1; resolved before 3:30 PM PT)
+
+**Does the deployed engine read `data/ump_k.json` at runtime? NO. The trace, by
+evidence rather than import graph:**
+1. **The runtime fetches exactly TWO model artifacts, named in source**:
+   `${base}/model/priors.json` and `${base}/model/context.json` — server route
+   L196–197, client `engine-client.ts` L324–325. There is no third fetch.
+2. **The string `ump_k` does not occur anywhere in the engine string, `src/`, or
+   `app/`** (grep over `legacy/index.html` + all TS/TSX, excluding the generated
+   copy): zero hits. The only readers/writers in the repo are
+   `tools/build_context.py` (L40 reads it, L67 writes it) and `context.yml`'s
+   `git add` line.
+3. **It is not even reachable over HTTP**: it lives in `data/`, and Next serves
+   static files only from `public/`. Production could not fetch it if it tried.
+4. **Its only downstream carrier is FROZEN**: `build_context.py` folds ump
+   accrual into `public/model/context.json` (`ump_db_games`,
+   `league_k_per_game`) — and the pause dropped context.json from the bot's
+   `git add`. Last context.json write: **`64c42ad`, 2026-07-29 20:32Z** — before
+   the pause landed. Today's bot commit `8f8e8c8` touched `data/ump_k.json` ONLY.
+**And a fifth, independent barrier**: the factor those numbers feed is pinned
+OFF — `shUmpKf(g)` returns `1` unconditionally while `SH_CFG.umpKFrozen: true`
+(engine L1604, frozen table row). Even if the data reached production, it would
+multiply by one.
+**→ NOT read at runtime. The window-start stamp STANDS on evidence, and tonight's
+board IS board 1 of the homogeneous window.** The owner's first branch (pause
+froze one file and left another floating) does NOT fire — but only because of
+step 4: ump_k floats, and it is harmless *because its carrier is frozen*. Recorded
+that way, not as "the file doesn't matter."
+
+**What writes it, on what schedule, and every write since freeze start**:
+`context.yml` (`tools/build_context.py`), scheduled `0 17` and `30 22` UTC,
+committing as `engine-v2-bot`. Writes since the 07-25 freeze start (dates, all
+`context: refresh (weather/umps/bullpen)`): **07-25 `155d174`, 07-26 `3e2b93c`,
+07-27 `b538365`, 07-28 `b21dddf`, 07-29 `925f1c6`, 07-30 `8f8e8c8`** — six,
+one per day, ~06:38–10:55Z. (The file's history runs to 2026-07-11; the 07-20
+`4cd1c5d` write is the owner's own model commit.)
+
+**Today's diff vs yesterday (`925f1c6` → `8f8e8c8`)**: keys unchanged
+(`days`, `league`, `pks`, `umps`); `days` 18 → 19, `pks` 198 → 213 (one slate of
+finals folded), `umps` 85 → 85 entries, `league` `{g:198, k:3280}` →
+`{g:213, k:3523}`. **30 numeric ump fields changed; max absolute change 26**
+(Bruce Dreckman `k` 35 → 61), **mean absolute change 8.6**. So the file IS moving
+materially — it simply cannot reach production.
+
+**Which findings sit downstream of it**: through `shUmpKf` → the K-rate path
+(λ for `pitcher_strikeouts`), so **M6** (K's priced with no sim of the quantity)
+and **M2/M2′** (the outs interlock, which shares the K-rate machinery) are the
+findings whose mechanism touches it — but **every measured effect on disk was
+produced with `umpKFrozen: true`**, i.e. with the factor at 1, so **no measured
+effect in M1–M20 or A1–A4 depends on any version of this file.** That is also
+the answer to the impossible branch: **no archived board's behavior depends on
+any version of ump_k** — not an earlier one, not a later one; the 07-26 board's
+`umpKf` shadow field records what the factor *would* have been, and it is
+recorded as shadow precisely because it was pinned off.
+
+**Committed, not ignored** (`git check-ignore` exits 1; `git ls-files` lists it):
+**it is the one model input with a complete per-day version history in git.**
+What that buys, printed: every archived board is attributable to an exact ump_k
+version by commit time (the M18 method, but exact rather than inferred); the
+freeze-exit re-measurement of the ump factor can replay any day's true database
+rather than today's; and the ~08-04/08-08/08-13 self-arm clocks can be evaluated
+retroactively at any date, because the accrual curve (198 → 213 games, 3280 →
+3523 K's) is stored, not just its endpoint.
+
+## THE MODE, THE LEDGER, AND A DATED CORRECTION TO THE 07-27 SCARE (2026-07-30, owner's item 2)
+
+**Reading the persisted mode on device, fewest taps**: Settings → the selection-mode
+row shows the active mode (it is rendered from `getSelectionMode()`, which reads
+`localStorage.pl_selmode`). **~2 taps.** If it has never been set — or holds any
+unrecognized value — the read returns **`ev_gated`** (`engine-client.ts` L49–52).
+
+**Does the ledger carry the mode? PARTLY — and the gap is dated**: the ledger
+**ENTRY** carries `selMode` (L3404) and `overrode` (L3405); tickets inherit their
+entry's values (there is no per-ticket mode field, and none is needed — one card
+is built in one mode). **But `selMode` was added on 2026-07-24 (`70dfa8e`,
+"Hardening Phase 2") and `overrode` on 2026-07-19 (`2aedbd7`)** — so **any ledger
+entry locked BEFORE 07-24 carries no `selMode` at all**, and for those days the
+question "was this card built in a mode with no suspension bar?" is
+**UNANSWERABLE RETROACTIVELY**. The HRR population that funds the suspension
+(07-17 → 07-22) sits **entirely before that date** — so the owner's second
+pre-committed branch fires for exactly the window that matters. Recorded before
+the export runs, as ordered. What the export CAN still answer for those days:
+whether HRR legs are present at all (they are — that is the 46.3/59.2
+population), and whether a `hrrAltMax`-suspended rung appears, which for
+pre-07-27 entries proves nothing (the suspension shipped 07-27).
+**→ added to reading 15's join**: print `selMode` and `overrode` per entry, count
+entries with the field ABSENT, and split the 38 tickets by mode
+{ev_gated, dk_fd, probability, caesars_ev, ABSENT}.
+
+**Does the prediction store carry the mode per board? YES** — `boardToPredictions`
+stamps `selMode` on every record (route L380, `CRON_SEL_MODE`; the client path
+passes `getSelectionMode()`), and the echo carries `selMode` at board level. So
+**tonight's board is attributable after the fact**, and a device read taken in
+another mode can be told apart from the server's ev_gated card.
+
+**DATED CORRECTION — M20 corrects the 07-27 interpretation.** The eleven-leg
+scare WAS recorded as mode-specific ("the bare sandbox runs `selMode` UNDEFINED
+— the legacy/parity posture"), so the *numbers* were never read as a general HRR
+problem. **But the sentence that follows it is now false**: *"That posture is
+unreachable in production (armV2 and the cron both set `ev_gated`;
+`CRON_SEL_MODE` is test-asserted)."* Unreachability was argued for the UNDEFINED
+posture and then relied on for the whole legacy class — and `probability` /
+`caesars_ev` are ~2 taps away, reproducing the identical 11 pool / 4 FUN.
+**~~"That posture is unreachable in production"~~ — CORRECTED 2026-07-30 (M20):
+the undefined posture is unreachable; the LEGACY MODES ARE NOT, and they carry
+the same unfiltered pool. See the M20 row (freeze-exit-bundle) and the
+MODE-COVERAGE GAP block above.**
+
+**OPERATOR RULE #2 (2026-07-30, the owner's, dated beside the 2% rule)**:
+*step 15's probability-mode read is a DIAGNOSTIC ONLY. The mode returns to
+`ev_gated` before any slip is placed, and `pl_selmode` is verified to read
+`ev_gated` as the LAST action before placing.* A persisted diagnostic state is
+exactly how this becomes a real-money defect: the mode is device state, it
+survives app restarts, and the Builder's one-tap override sits on the same card
+the slip is placed from. (Rule #1 stands: no single slip above 2% of bankroll =
+$50 at $2,500.)
+
+## THE ECHO GUARD, REFORMULATED AND SHIPPED (2026-07-30, owner's item 3 — test-only; observed red before the flip)
+
+**Shipped as specced, three parts** (`tests/engine-echo.test.ts` +
+`tests/served-verification.json`; no engine string, no runtime file touched, no
+hash move, no vintage event):
+1. **BLOCKING — runtime vs committed**: `ENGINE_SHA` (the string imported at
+   runtime) must equal a FRESH extraction from `legacy/index.html` using the
+   extractor's own rule (largest `<script>`). Both exist pre-deploy → an engine
+   ship regenerates and stays green IN THE SAME COMMIT. **No exception, ever.**
+   Its plant: a one-character engine edit is detected.
+2. **NON-BLOCKING — served vs committed**: a `SERVED-CHECK` report line printing
+   committed hash, last-verified served hash, match, and the pending marker.
+   **Where the owner will actually see it**: (a) it prints on every suite run;
+   (b) the same value rides **every generated board's echo (`engineSha`)** — read
+   at the chain's echo step (reading 25), i.e. daily on any board day, which is
+   the surface that matters more than CI output.
+3. **RESOLUTION GUARD**: `tests/served-verification.json` carries
+   `{pending, since}`. A ship sets `pending: true`; the post-deploy re-grep
+   clears it and updates `SERVED_ENGINE_SHA_VERIFIED`. **If a pending marker is
+   older than 24h, the build FAILS.** When not pending, it additionally requires
+   committed === last-verified-served — so drift cannot hide behind an absent
+   marker either.
+**OBSERVED RED, per the owner's pre-committed branch**: a 48h-old pending marker
+was planted; the guard failed with *"PENDING-LIVE-VERIFICATION has been open
+48.0h (limit 24h)"*; the plant was removed and the suite is green. A guard nobody
+has seen fail is not an invariant — this one has been seen.
+**WHAT THE SPLIT STOPS CATCHING, one line**: *a failed or partial deploy, a
+rollback, or a stale edge chunk now REPORTS instead of blocking* — covered by the
+echo's `engineSha` on every generated board (read at the chain's echo step, so on
+every board day) and by the STEP-0 re-grep ritual on ship days; frequency: daily
+when boards run, plus once per ship.
+**IMPOSSIBLE BRANCH CHECKED AND SILENT**: runtime and committed do NOT differ
+right now — `SERVED-CHECK: committed=f6cf15130a8b servedVerified=f6cf15130a8b
+match=true pending=false`.
+
+## THE FOUR INSTRUMENTS × THREE QUESTIONS — AND WHAT self_consistency ACTUALLY READS (2026-07-30, owner's item 4)
+
+Both sentences were true under different meanings; the ambiguous one is corrected
+below. **Three separate questions, four rows:**
+| instrument | records the mode? | behaves identically across modes? | exercised in >1 mode? |
+|---|---|---|---|
+| **cfSel** | NO (it stamps `{pool, card}` on susp records; the board-level `selMode` in the echo is what attributes it) | **NO** — it re-runs `analyze` + `shCardPool` + `shAllocate`, all mode-sensitive; in a legacy mode its "counterfactual" baseline is a pool that was never filtered | **NO** — guard mirrors the cron arming (`selMode = "ev_gated"`) |
+| **echo** | **YES** — `selMode` is an ordered field | **YES** — pure read-and-hash, no branch | **NO** — its guard exercises one literal |
+| **trigger mark** | no (records the TRIGGER: cron-ua/header/manual/manual-forced) | **YES** — computed from route auth state, mode-independent by construction | n/a — has no mode axis |
+| **self_consistency** | NO | **YES** for its identity checks (see below) | **NO** — every run to date is on ev_gated-generated boards |
+**Correction applied**: my 07-30 sentence *"the echo RECORDS selMode but is not
+mode-aware"* was two claims in one phrase and is restated as the table — the echo
+records the mode and behaves identically across modes; it has simply never been
+exercised in another one. The genuinely mode-SENSITIVE instrument in the list is
+**cfSel**, and that is the one worth saying out loud.
+
+**AND THE ONE THAT MATTERS TONIGHT — `self_consistency` reads THE BOARD, not the
+tickets.** `rows()` iterates `data["propBoard"]` → per-game markets → rows,
+keyed `(player, market, line)` with `pO`/`fO` (`tools/self_consistency.py`
+L60–80). **The TB≥1 == H≥1 identity is therefore MODE-INDEPENDENT** — propBoard
+rows are priced upstream of any selection gate, so tonight's run certifies the
+identity for every mode at once.
+**The chain's OTHER half — "zero HRR legs in built tickets" — is NOT part of
+that script and IS mode-dependent**: it reads the board's `parlays` /
+`parlaysMixed`, which `buildParlaySet` produced under the server's pinned
+`ev_gated`. **So the ticket half certifies ONE mode, and step 15 is the only
+thing covering the others.** Said before the board, as ordered.
+
+## WEEKEND — SATURDAY STRUCK ON THE CONDITION; THE SUNDAY TRAP NAMED; FRIDAY'S INPUTS (2026-07-30, owner's item 5)
+
+**Entry 2 (Sat `0 18 * * 6`) is STRUCK ON MEASUREMENT, not on the pool**:
+projected achievable at 18:00Z is **~0.2–0.4, below T = 0.80**, because the
+Saturday bulk's first pitches sit >3h after that hour, so the FP−3h lineup
+condition is unmet for most of the slate. **That entry cannot produce a
+composition-valid board at its scheduled hour regardless of credits** — a
+condition failure, recorded as such; it would produce an engine-half-only board.
+
+**THE SUNDAY BLOCKING TRAP (named mechanism, for the record)**: the good-board
+skip tests coverage over unstarted games ONLY — **T is not consulted anywhere in
+the route** (`gen.achievable ≥ T` is a spec'd reading, not shipped code). So a
+sub-T board built at 17:00Z can satisfy the skip and thereby **block the 22:30Z
+entry from building the better board**. The trap is structural, not incidental:
+the earlier fire always wins, and quality never enters the comparison.
+
+**FRIDAY'S DECISION INPUTS (printed; the owner decides Friday)**:
+| input | figure |
+|---|---|
+| best Sunday hour (bulk 17:35Z; nighter 23:20Z) | **~17:00Z for the bulk** — no single hour serves both; a 20:00Z entry would catch the nighter and miss the bulk entirely |
+| cost of ONE Sunday board at 17:00Z, full slate (~15 games) | **~150 credits ≈ 12% of the 1,238 pool** (~90 at a 10-game slate ≈ 7%) |
+| HRR shadow rows it would accrue | **~30–50** (order from the archive: ~35 HRR rows on a 15-game board; the 07-26 board carried 17 closed-form rungs in one game alone) |
+| 08-15 review population WITHOUT it | board-days from weekday fires only: **≤ 8.25 total at the current runway**, i.e. the ≥10 board-day threshold is unreachable — the review is already recorded UNREACHABLE without a reset |
+| 08-15 review population WITH it | **one weekend board-day added per Sunday** (~2 by 08-15): 8.25 → ~8.4 board-days of pool-limited capacity, still **< 10**. It does NOT rescue the threshold; it buys ~30–50 shadow rows toward the ≥300-row half |
+**The honest summary for Friday**: a Sunday board buys shadow ROWS (the ≥300-row
+half of the retirement criterion) but cannot buy the ≥10 BOARD-DAYS half, because
+the pool binds first. Nothing about the weekend changes the two-exits finding.

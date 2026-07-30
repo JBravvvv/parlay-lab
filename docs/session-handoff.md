@@ -209,8 +209,23 @@ POOL-ELIGIBLE and can enter the card. Reading: HRR legs present in the
 probability-mode card → M20 confirmed on live production data (the fixture said
 11 pool / 4 FUN); ZERO → the live slate simply carries no qualifying HRR ticket
 that day (NOT evidence the bar applies — print the row population beside it).
-**Switch back to `ev_gated` before locking anything.** Nothing is staked from a
-legacy mode.
+**OPERATOR RULE #2 (owner's, dated 2026-07-30, beside the 2% rule): step 15 is a
+DIAGNOSTIC ONLY — the mode returns to `ev_gated` before any slip is placed, and
+`pl_selmode` is VERIFIED to read `ev_gated` as the LAST action before placing.**
+Nothing is staked from a legacy mode; a persisted diagnostic state is exactly how
+this becomes a real-money defect (the Builder's one-tap override sits on the same
+card the slip is placed from).
+
+**TONIGHT'S BOARD — WHAT IT IS AND WHAT IT CANNOT SUPPORT (2026-07-30 final)**:
+it IS **board 1 of the homogeneous window** — `data/ump_k.json` moved this morning
+(`8f8e8c8`, 07:43Z) but is NOT an engine input (four-step trace + the pinned-off
+`umpKFrozen` factor; collection-period, ump_k block), and `context.json` stayed
+frozen at the pause pair. **One line on what it cannot support regardless of
+outcome: it cannot certify the suspension in any mode but `ev_gated`** — the
+board's tickets are built under the server's pinned mode, so the zero-HRR-legs
+half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
+modes); step 15's diagnostic read is the only cover for the other three, and it
+is a device read, not a server certification.
 
 **Pre-fire quota read + cost bracket (reading 26)**: read immediately before the
 22:45Z fire and again after; expected board cost **~55–60 at 6 events**
@@ -269,6 +284,16 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     the same legs → 59.2 ±0.05 pp; subsets printed: rung 0.5 (12/19 = 63%
     expected), rung ≥1.5 (32% expected). If the headline pair misses, try the
     two written variants IN ORDER — core-only tickets; then won/lost/push
+    (ADDED 2026-07-30, owner's item 2 — THE MODE SPLIT: print `selMode` and
+    `overrode` PER ENTRY, count entries where the field is ABSENT, and split the
+    38 tickets by mode {ev_gated, dk_fd, probability, caesars_ev, ABSENT}. Any
+    legacy-mode entry → HRR/outs legs may already be in the ledger from a mode
+    with no bar and the bankroll exit's population is not what it appears — that
+    outranks the board. KNOWN IN ADVANCE: `selMode` was added to the ledger entry
+    2026-07-24 (`70dfa8e`) and `overrode` 2026-07-19 (`2aedbd7`), so every entry
+    before 07-24 carries NO mode — the 46.3/59.2 window (07-17→07-22) sits
+    entirely in that blind span, and for those days the question is
+    UNANSWERABLE RETROACTIVELY. Recorded before the export runs.)
     denominators — and print WHICH variant matched (a provenance RECOVERY,
     labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached

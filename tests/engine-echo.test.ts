@@ -1,37 +1,112 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DAMPING, ENGINE_SHA, SERVED_ENGINE_SHA_VERIFIED, buildEcho } from "@/lib/engine-echo";
 
 /**
- * sha+config ECHO GUARD (2026-07-29, owner's authorization — shipped with cfSel).
+ * sha+config ECHO GUARD (2026-07-29; REFORMULATED 2026-07-30 on the owner's
+ * authorization — "seven pending items each needing a permanent-by-default exception
+ * is not a guard").
  *
- * 1. RUNTIME-vs-SERVED: ENGINE_SHA (computed at module load from the live engine
- *    string) must equal the last VERIFIED served-chunk hash. When the repo engine
- *    moves without the served-artifact re-grep moving with it, this goes RED — the
- *    owner's requirement ("fails when the runtime engine hash diverges from the
- *    served-chunk hash"). The constant updates ONLY beside a fresh live verification,
- *    same commit.
- * 2. WRITE-ONLY: the route's `echo` is attached and returned, never read — enforced
+ * THE DEFECT IN THE OLD FORM: one blocking assertion compared the RUNTIME engine hash
+ * against a hand-updated SERVED-chunk constant. The served artifact cannot carry a new
+ * engine string until a deploy, and a deploy needs a green build — so NO engine change
+ * could ever pass without an exception. Six queued engine items (A1, coreEvMin, the 1/n
+ * cap, damping, SH_W, the ungraded-group fix) plus the outs flag would each have needed
+ * one. An invariant with a standing exception is a written rule, not an encoded one.
+ *
+ * THE SPLIT:
+ * 1. BLOCKING — runtime vs COMMITTED SOURCE: the engine string imported at runtime
+ *    (`LEGACY_SRC` → ENGINE_SHA) must equal a FRESH extraction from legacy/index.html
+ *    using the extractor's own rule (largest <script> block). Both artifacts exist
+ *    pre-deploy, so an engine ship regenerates and stays green IN THE SAME COMMIT — no
+ *    exception, ever. This catches the real historical failure: legacy/index.html edited
+ *    without re-running tools/extract-engine.mjs, i.e. the repo shipping a stale engine.
+ * 2. NON-BLOCKING — served vs committed: REPORTED, never gating (console + the board's
+ *    own echo, which carries engineSha on every response — the daily-visible surface).
+ * 3. RESOLUTION GUARD — tests/served-verification.json carries {pending, since}. A ship
+ *    sets pending:true; the post-deploy re-grep clears it and updates
+ *    SERVED_ENGINE_SHA_VERIFIED. If a pending marker outlives its deploy by more than
+ *    MAX_PENDING_H, THE BUILD FAILS — the exception cannot become permanent by default.
+ *    OBSERVED RED 2026-07-30 with a planted 48h-old pending marker, before the flip.
+ *
+ * WHAT THE SPLIT STOPS CATCHING (one line, also in docs/collection-period.md): a failed
+ * or partial deploy, a rollback, or a stale edge chunk now REPORTS instead of blocking —
+ * covered by the echo's engineSha on every generated board (read at the chain's echo
+ * step, reading 25) and by the STEP-0 re-grep ritual on ship days.
+ *
+ * 4. WRITE-ONLY: the route's `echo` is attached and returned, never read — enforced
  *    here by a source scan (exactly ONE `.echo` assignment, zero `.echo` reads,
  *    anywhere in src/ + app/). An instrument that can alter behavior is not an
  *    instrument.
- * 3. DAMPING is EXTRACTED from the live allocator source, not copied — if the
+ * 5. DAMPING is EXTRACTED from the live allocator source, not copied — if the
  *    expression moves, DAMPING goes null and this goes red rather than echoing a
  *    stale number.
- * 4. PLANT (invalid-by-value): a mismatched hash constant is detected.
  */
 
+const MAX_PENDING_H = 24;
+
+/** The extractor's own rule (tools/extract-engine.mjs): the largest <script> block. */
+function extractFromHtml(): string {
+  const html = readFileSync("legacy/index.html", "utf8");
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  expect(scripts.length, "no <script> blocks in legacy/index.html").toBeGreaterThan(0);
+  const src = scripts.sort((a, b) => b.length - a.length)[0];
+  expect(src.length, `script suspiciously small: ${src.length} bytes`).toBeGreaterThan(100_000);
+  return src;
+}
+
 describe("sha+config echo", () => {
-  it("runtime engine hash equals the last VERIFIED served-chunk hash", () => {
-    expect(ENGINE_SHA, "engine moved without a served-artifact re-verification").toBe(
-      SERVED_ENGINE_SHA_VERIFIED,
-    );
+  it("BLOCKING: the runtime engine string equals a fresh extraction from legacy/index.html", () => {
+    const fresh = createHash("sha256").update(extractFromHtml(), "utf8").digest("hex");
     expect(ENGINE_SHA).toMatch(/^[0-9a-f]{64}$/);
+    expect(
+      ENGINE_SHA,
+      "legacy/index.html and src/engine/legacy-src.gen.ts disagree — run `node tools/extract-engine.mjs` " +
+        "and commit the regenerated artifact IN THIS COMMIT (the repo would otherwise ship a stale engine)",
+    ).toBe(fresh);
   });
 
-  it("PLANT (invalid-by-value): a diverged hash is detected", () => {
-    const planted = "deadbeef" + SERVED_ENGINE_SHA_VERIFIED.slice(8);
-    expect(planted === ENGINE_SHA, "the checker passed a hash that cannot match").toBe(false);
+  it("PLANT (invalid-by-value): a one-character engine edit is detected", () => {
+    const mutated = createHash("sha256").update(extractFromHtml() + " ", "utf8").digest("hex");
+    expect(mutated === ENGINE_SHA, "the checker passed a string that cannot match").toBe(false);
+  });
+
+  it("REPORT (non-blocking): served-vs-committed drift is printed, never gated", () => {
+    const match = ENGINE_SHA === SERVED_ENGINE_SHA_VERIFIED;
+    const v = JSON.parse(readFileSync("tests/served-verification.json", "utf8")) as {
+      pending: boolean;
+      since: string;
+    };
+    console.log(
+      `SERVED-CHECK: committed=${ENGINE_SHA.slice(0, 12)} servedVerified=${SERVED_ENGINE_SHA_VERIFIED.slice(0, 12)} ` +
+        `match=${match} pending=${v.pending} since=${v.since}` +
+        (match ? "" : " — DRIFT: re-grep the served chunk, or a ship is mid-flight (see the pending marker)"),
+    );
+    expect(SERVED_ENGINE_SHA_VERIFIED).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("RESOLUTION GUARD: a PENDING-LIVE-VERIFICATION marker may not outlive its deploy", () => {
+    const v = JSON.parse(readFileSync("tests/served-verification.json", "utf8")) as {
+      pending: boolean;
+      since: string;
+    };
+    if (!v.pending) {
+      // not mid-ship: the committed and served hashes must agree, or nobody is tracking the drift
+      expect(
+        ENGINE_SHA,
+        "committed engine differs from the last verified served hash with NO pending marker — " +
+          "either set pending:true in tests/served-verification.json (a ship is mid-flight) or re-grep the served chunk",
+      ).toBe(SERVED_ENGINE_SHA_VERIFIED);
+      return;
+    }
+    const ageH = (Date.now() - Date.parse(v.since)) / 3_600_000;
+    expect(Number.isFinite(ageH), `unparseable "since" in served-verification.json: ${v.since}`).toBe(true);
+    expect(
+      ageH,
+      `PENDING-LIVE-VERIFICATION has been open ${ageH.toFixed(1)}h (limit ${MAX_PENDING_H}h) — ` +
+        "run the served-chunk re-grep, update SERVED_ENGINE_SHA_VERIFIED, and clear the marker",
+    ).toBeLessThanOrEqual(MAX_PENDING_H);
   });
 
   it("the echo is write-only: one assignment, zero reads, route and src", () => {
