@@ -122,6 +122,10 @@ export type GenStamp = {
   luPct: number;
   /** schedule-only ceiling at that moment, same denominator */
   achievable: number;
+  /** provenance mark (2026-07-30, shipped): which auth path built this board —
+      forced and manual boards were previously indistinguishable from scheduled
+      ones in the archive AND the prediction store (src was hardcoded "cron") */
+  trigger?: "cron-ua" | "header" | "manual" | "manual-forced";
   src?: string;
 };
 

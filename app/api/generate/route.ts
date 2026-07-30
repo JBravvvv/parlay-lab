@@ -281,8 +281,18 @@ export async function GET(req: NextRequest) {
       .map((g) => (g?.start ? Date.parse(g.start) : NaN))
       .filter((t) => isFinite(t));
     const started = startsAll.filter((t) => t <= now);
+    /* trigger mark (2026-07-30, owner's ship order): provenance from the route's own
+       auth state. On gen, so it rides the board KV + archive (data.gen), the
+       prediction store (mergeDayBlob's gens[] spreads gen), and the response — with
+       no further plumbing. Guard: tests/trigger-mark.test.ts (observed red first). */
+    const trigger = manual
+      ? (force ? "manual-forced" as const : "manual" as const)
+      : scheduled
+        ? ("header" as const)
+        : ("cron-ua" as const);
     const gen = {
       at: now,
+      trigger,
       /* how far past the EARLIEST first pitch this fire landed. Positive = the board
          priced a slate already underway; that is the number a delay makes move. */
       lateMs: startsAll.length ? now - Math.min(...startsAll) : null,
