@@ -9,7 +9,8 @@ on:
   #                                         # data/props (a different workflow), a repo-wide grep
   #                                         # finds zero consumers of data/YYYY-MM-DD.json, and
   #                                         # docs/credit-budget.md L192 says so independently.
-  #                                         # Measured delivery ~7.5 runs/day x 6 credits = ~45/day.
+  #                                         # Measured delivery 3-4 runs/day x 6 = ~22/day, from the
+  #                                         # Actions run log 07-28/29/30 (the ~45 was inferred, not read).
   #                                         # Reversible: uncomment this block, one commit.
   #                                         # Guard: tests/line-history-consumers.test.ts fails if a
   #                                         # consumer ever appears.)
