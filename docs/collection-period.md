@@ -7319,3 +7319,181 @@ actually fires. The outs flag's ship sequence — which was gated on *"after ton
 board is read and its results are on disk"* — **has no board to be gated on**; its
 own deadline (Thursday evening, before Friday's K's/outs reopen) is now inside the
 same night. **That collision is the owner's call and is stated, not resolved here.**
+
+## ⛔ 2026-07-31 ~01:5xZ — THE OUTS SHIP WAS BUILT, THE SCOPE-BY-DIFF INVARIANT WENT RED, AND THE SHIP IS STOPPED
+
+**The owner's pre-committed branch fired: "scope-by-diff goes red during the build →
+stop. Outs reopens unflagged and that is the recorded branch."** The build was made,
+the guard went red, the engine edits are REVERTED, and the tree is back at
+`f6cf1513…`. **Outs is NOT suspended. Friday's reopen is unflagged.**
+
+**What was built (for the record, so the next attempt is a re-apply not a re-design)** —
+six edits to `legacy/index.html`, engine string 280,466 → **282,186 chars**, sha
+`f6cf1513…` → **`3e06cac82d3bb90b5cd3d009c147bb6cc21bc21cab9a0b1067bbefcb8295942a`**:
+(1) `SH_CFG.outsSusp: true` beside `hrrAltMax`; (2) `finalizeCats` — `suspRow` gains
+the outs disjunct behind the same `dscpM`; (3) `buildParlaySet` — outs legs filtered
+from every auto-built ticket in both disciplined modes; (4) `shFunPick` — the bar
+restated for ad-hoc pools; (5)+(6) the two false engine comments corrected (item 5).
+
+**THE RED, and its exact cause — diagnosed, not waved away.** The invariant compares
+`stripOutsTags(on)` vs `stripOutsTags(off)` over the **FULL analyze output**. Key by
+key (diagnostic run, then deleted):
+| key | result |
+|---|---|
+| `categories`, `categoriesLive`, `propBoard`, `simMarkets`, `gameInfo`, `liveGames`, `trap`, `passes`, `luCoverage`, `parlaysLive` | **IDENTICAL** |
+| `parlays` | DIFFERS (156,739 → 156,271 B) |
+| `parlaysMixed` | DIFFERS (114,041 → 113,161 B) |
+| `overview` | DIFFERS (1,139 → 1,139 B — same length, different content) |
+**Every row-level key is byte-identical.** The diff is confined to the two auto-built
+ticket sets — **which is precisely what the flag is for** — plus `overview`, whose
+dependence on the ticket sets is *inferred, not verified*.
+
+**So the finding is a GUARD-DESIGN defect, not a wider boundary — and that is exactly
+why the ship still stops.** The guard's own header says it asserts *"prices/est/EV and
+every other ROW-LEVEL field byte-identical"*; the implementation compares the whole
+object, ticket sets included. **The implementation does not match its stated
+assertion, and the ship it was gating is what discovered that.** I did not rewrite the
+comparator to convert its own red into a green inside the commit it gates — that is
+the one move this entire rhythm exists to prevent, and a guard edited to permit the
+ship it failed is not a guard.
+
+**THE OWNER'S DECISION, two options, neither taken here:**
+1. **Authorize the comparator's scope correction** — compare `categories`,
+   `categoriesLive`, `propBoard` and the other row-level keys only, with the ticket
+   change asserted separately (it already is: the pool half requires ZERO outs legs,
+   and the tag half requires every outs row tagged). `overview` must be resolved
+   first — either shown to be ticket-derived (then it belongs on the ticket side) or
+   treated as row-level (then its 1,139-byte change is a real finding and the boundary
+   IS wider than claimed). **That question is open and is the reason this is not a
+   formality.** Then re-apply the six edits and re-run the sequence.
+2. **Leave it** — outs reopens unflagged Friday, as the pre-committed branch says, and
+   the flag waits for the next hash-moving ship.
+
+**State after the stop**: `legacy/index.html` and `legacy-src.gen.ts` reverted
+(`git checkout`); `SERVED_ENGINE_SHA_VERIFIED` unchanged at `f6cf1513…`; **no pending
+marker was written** (the resolution guard has nothing to resolve, and its 24h clock
+never started); both coupling `it.fails` halves remain UNFLIPPED; suite green at the
+reverted tree. **Nothing shipped. Nothing deployed. No credits spent.** The two engine
+comment corrections (item 5) died with the revert — they ride the next hash-moving
+ship, as the owner's second branch specifies.
+
+## THE FOUR 200-WITHOUT-A-BOARD EXITS, FOR READING THE CRON LOG (2026-07-31, owner's item 2)
+
+Every exit below returns **HTTP 200** and writes no board. Match the log's response
+text to the mechanism:
+| # | body | mechanism | run slot consumed? |
+|---|---|---|---|
+| 1 | `{"ok":true,"skipped":"ran recently"}` | the 45-minute limiter (L127) — fires only if a spending run happened within 45 min | **NO** |
+| 2 | `{"ok":true,"skipped":"dead-slate","live":0,"confirmed":0,"pct":0}` | no unstarted games at all (`board-store.ts` L161) | **NO** |
+| 3 | `{"ok":true,"skipped":"low-ceiling",...}` / `"no-games-left"` / `"covered"` / `"thin"` | the good-board skip's four verdicts (L169–180) — `covered` = a good board already exists; `low-ceiling`/`no-games-left` = the schedule says a board cannot be useful | **NO** |
+| 4 | `{"ok":true,"date":…,"logged":0,"note":"no pregame picks (off day or slate underway)"}` | **the only one AFTER the spend** (L387) — the slate was fetched and priced, but produced zero pregame prediction rows | **YES — and credits were spent** |
+**CONFIRMED: no run slot was consumed for 07-30.** `MAX_RUNS_PER_DATE` increments at
+`INCR` (L177), which sits *past* every free exit — and exits 1–3 all return before it.
+Exit 4 would have incremented AND spent, and it did not fire (the quota arithmetic
+below leaves no room for a ~150-credit board, and `gens: []` confirms nothing reached
+the store). **The three-run cap for 2026-07-30 is untouched.**
+**Reading the log against the owner's four states**: a **401** body is
+`{"error":"unauthorized"}` — the header did not land or its value is wrong; **no
+execution at 22:45Z** means the schedule edit did not save (check whether the old
+`0 22` entry fired and 401'd instead); a **200 at 22:45Z** matches one of the four
+rows above and is an ENGINE reading, not a dashboard one — read the body text to say
+which; an execution at **22:00Z** means the edit saved to the wrong entry.
+
+## THE 200 CREDITS, SPLIT — AND A CORRECTION TO THIS MORNING'S ATTRIBUTION (2026-07-31, owner's item 3)
+
+**~~"the ~97 residual is likely the /api/clv capture path"~~ — WRONG, corrected today.**
+`/api/clv` sights *"every still-pregame leg of TODAY'S LOCKED CARD"* (route header,
+L17–24). **No card was locked on 07-29 or 07-30 — there was no board to build one from
+— so the CLV ticker had nothing to sight and spent ≈ 0 on both days.** The spender I
+had not counted is **`line-history.yml`: hourly (`12 * * * *`), 3 markets × 2 regions =
+6 credits/run by the script's own header — ~144 credits/day, every day, board or no
+board.**
+**The 16:45Z → 01:25Z window (200 credits), split:**
+| spender | evidence | ≈credits |
+|---|---|---|
+| line-history hourly ticks | 8–9 runs × 6 | **~52** |
+| props sweeps | day-file: 20:46Z pre 6 events + 23:35Z close 4 events, × ~6/event | **~60** |
+| CLV ticks | no locked card → nothing to sight | **~0** |
+| **known subtotal** | | **~112** |
+| **UNATTRIBUTED** | | **~88** |
+**The ~88 is named, not guessed.** Candidates, in order: (a) **the `bestBoard`
+fallthrough** — a device opening the app with no cached and no server board triggers a
+CLIENT generate (~150 at a 10-game slate) and writes `src:"client"` prediction rows;
+(b) props sweeps that fetched before the MIN_GAP skip decided; (c) the board-archive
+job's own reads. **(a) is decisively checkable and costs nothing: `src:"client"` rows
+for 2026-07-30 in `pl:pred` — already reading 15(c).** Same correction applies to this
+morning: line-history alone accounts for ~77 of that window, which is most of the ~97
+I had called ambiguous.
+
+**WHICH SERIES SURVIVE A DARK DAY — named in or out:**
+| series | fed by | usable without a same-day board? |
+|---|---|---|
+| the rung-bucketed movement regression (M8/ladder confirmation) | props sweeps, close vs open | **IN — board-independent** (the docs' own line: "accrues on credits alone") |
+| the 08-08 HRR repair spec input | archive close-joined HRR rows | **IN — board-independent** |
+| the pre↔close pairing series | props sweeps both sides | **IN** |
+| the ML/RL line-movement archive | line-history | **IN** |
+| **Series A (the board × close join)** | both halves | **OUT — requires the board side** |
+| CLV / closing-line value | locked card legs | **OUT — requires a card, hence a board** |
+| the clamp census, hot-site fidelity, the echo/cfSel/mktN/trigger-mark readings, the homogeneous window | boards | **OUT** |
+**→ the owner's SECOND branch is the one that fires: the sweep data mostly stands
+alone.** Four series keep accruing dark; two (Series A, CLV) are holed 1:1 per dark
+day; the board-only series are simply not running. **Nothing is destroyed — Series A
+loses those days and resumes (per-day join), and CLV loses days that had no card
+anyway.**
+
+**THE TWO NUMBERS**: at **1,038 credits** —
+**sweeps-only, no boards: ~5.0 days** (144 line-history + ~60 props ≈ 204/day).
+**boards-only, no sweeps: ~6.9 boards** (at ~150) — or **~17 boards** at the ~60 an
+evening 6-event board costs, which is the number that matters if boards resume small.
+**A dark day costs**: Series A one paired day (holed, not destroyed); CLV one day of
+closes it could not have taken anyway; the board-only series one day each of the
+9.74 → 8.25 → 6.9 runway that has now bought **zero boards in two days**.
+**Impossible branch — CHECKED**: no series has more board-days than boards exist; the
+board count on disk is 1 (the 07-26 archive) and every board-keyed series correctly
+reads 0 or 1.
+
+## M26 — A WARNING SUPPRESSED BY ITS OWN POSITIVITY GATE (2026-07-31, owner's item 4)
+
+**The gate**: `app/builder/page.tsx` **L885** —
+`{kellyGuide && card.kellyDaily > 0 && card.enteredDaily > 5 * card.kellyDaily && (…)}`.
+**Provenance: SILENT.** It arrived in `06d3cbc` (2026-07-19, *"Raise the EV gate to +2%
+and add the Kelly sizing guide (advisory)"*), and the only comment on it (L883–884)
+explains the *advisory* posture — *"never blocks: oversizing is the one leak discipline
+can't cap, so it gets named while the record is still young"* — and **says nothing
+about the zero case.** No commit message, no comment, no doc mentions that
+`kellyDaily === 0` disables it. **→ the owner's first branch fires: M26, display tier,
+mechanism named** — *the oversizing warning is suppressed by the same condition that
+makes oversizing certain.*
+
+**WHAT WOULD HAVE BEEN ON SCREEN, ticket by ticket** (fixture, bankroll $750, entered
+DAILY $250 — the badge fires whenever `stake > 2×kelly`, and `p.kelly` is `0`, not
+`null`, so it fires on every zero):
+| `caesars_ev` | | `probability` | |
+|---|---|---|---|
+| #1 $62 | badge **"Kelly $3"** | #1 $56 | badge **"Kelly $0"** |
+| #2 $62 | badge **"Kelly $0"** | #2 $55 | badge **"Kelly $0"** |
+| #3 $62 | badge **"Kelly $0"** | #3 $50 | badge **"Kelly $0"** |
+| #4 $2 | badge **"Kelly $0"** | #4 $47 | badge **"Kelly $0"** |
+| #5 $62 | badge **"Kelly $0"** | #5 $25 | badge **"Kelly $0"** |
+| | | #6 $17 | badge **"Kelly $0"** |
+| **banner: FIRES** (250 > 5×3) | *"Entered $250 is 83.3x the Kelly-consistent $3"* | **banner: SUPPRESSED** | `kellyDaily === 0` |
+**So the impossible branch is HALF-fired and must be said plainly**: on the
+`caesars_ev` card the banner **would** have appeared — so for that mode the display is
+NOT the failure, and the failure is upstream (M25's branch). On the `probability` card
+the banner is genuinely absent while **every** ticket is infinitely overstaked. Both
+states are on the record.
+
+**Does the pattern repeat? ONE other site, and it is the same shape**:
+`app/builder/page.tsx` **L857** —
+`{rebuild && card.alloc.picks.length > 0 && <RebuildNote …/>}` — the note explaining
+*which markets are still under `consMinN`* is suppressed when the card has **zero
+picks**, i.e. on exactly the NO-PLAY day the consensus gate most likely caused.
+**→ the owner's second branch fires: this is a CLASS, not an instance —
+ZERO-SUPPRESSES-EXPLANATION: a diagnostic gated on the quantity whose zero value is
+the alarming case.** Two sites, both in the builder, both silent about it.
+
+**SPEC, NOT SHIPPED (as ordered)**: surface the RATIO with a breach label when
+`stake > ceiling`, drop the `kellyDaily > 0` gate so a zero-Kelly card is the loudest
+case rather than the silent one, and give `RebuildNote` the same treatment. Guard
+observed red first. **Worthless until legacy modes are safe — which operator rule #3
+already handles**, and that is why this stays spec.

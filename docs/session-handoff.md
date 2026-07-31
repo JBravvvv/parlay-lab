@@ -44,6 +44,18 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 
 ## 2. RUN SHEET
 
+> ## ⛔ STATUS 2026-07-31 ~02:0xZ — NO BOARD, AND THE OUTS SHIP IS STOPPED ON ITS OWN GUARD
+> **The outs flag did NOT ship.** It was built (6 edits, engine 280,466 → 282,186 chars,
+> `f6cf1513…` → `3e06cac82d3bb90b5cd3d009c147bb6cc21bc21cab9a0b1067bbefcb8295942a`), the **scope-by-diff invariant went RED**, and the
+> pre-committed branch fired: STOP. Engine edits REVERTED, tree back at `f6cf1513…`, no
+> pending marker written, both `it.fails` halves still unflipped, nothing deployed, no
+> credits spent. **Outs reopens UNFLAGGED Friday** unless the owner rules otherwise.
+> The red is a GUARD-DESIGN defect, diagnosed not waved: the comparator checks the FULL
+> analyze output, and the only differing keys are `parlays`, `parlaysMixed` (the flag's
+> intended effect) and `overview` (ticket-derived by inference, NOT verified) — every
+> row-level key is byte-identical. **The comparator was not rewritten to pass the ship it
+> gates.** Owner's call, two options, in collection-period (THE OUTS SHIP … STOPPED).
+>
 > ## ⚠️ STATUS 2026-07-31 ~01:3xZ — THE 07-30 BOARD DOES NOT EXIST
 > `/api/board?date=2026-07-30` → `{board: null, gens: [], reason: "no-board-for-date"}`,
 > READ not inferred. The 22:45Z fire and the 22:40–23:05Z curl fallback are BOTH past.
@@ -57,6 +69,21 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 > yet.** The outs flag's ship gate ("after tonight's board is read") now collides with
 > its own Thursday-evening deadline — the owner's call. Full record:
 > collection-period, 07-30 CLOSE-OUT.
+
+> **FRIDAY'S SEEDS — nothing started earlier, so this is the full list.** The next board
+> that fires is board 1 of: the **homogeneous window** (still COUNT ZERO after two dark
+> days); the **clamp census** and **hot-site fidelity** (`clampActivity` has never ridden
+> a board — reading 24); the **config echo** (reading 25); **`mktN` on a board** (shipped
+> 07-30, never yet observed — reading 29); **cfSel with `rank` and `stake`** (shipped
+> 07-30, so no board has ever carried a sizeable counterfactual); the **trigger mark**
+> (reading 5); and the **same-day fp × predictions** join. It is NOT board 1 of a new
+> engine vintage — the outs ship stopped, so `f6cf1513…` still serves.
+> **HIGHEST-VALUE READ AVAILABLE, ZERO CREDITS, UNRUN: the ledger export.** The curl and
+> reading 15's one query sit in collection-period (THE EXPORT CURL AND READING 15). Run
+> it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into
+> realized, and it needs nothing but the sync phrase.
+> **Quota 1,038 / 18,962 · runway 6.9 board-days at ~150, ~17 at an evening board's ~60 ·
+> sweeps-only burn ~204/day → ~5.0 days dark.**
 
 ## 2a. THE RUN SHEET AS WRITTEN (2026-07-30 PT — re-arms for the next fire)
 
