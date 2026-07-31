@@ -41,6 +41,15 @@ Saturday entry `0 18 * * 6` lands at achievable **0.267** — engine-half only.
 **⚠️ USE `x-cron-key`, NOT THE PHRASE**: `route.ts` L101/L105/L289 stamp `trigger` from the
 auth path, so a phrase curl stamps `"manual"` and **reading 5 pre-commits `=== "header"` or
 it did not land** — a phrase curl would read as a failure when nothing failed.
+**⚠️ AND TOMORROW'S BOARD SAYS NOTHING ABOUT THE CRON EDITS.** It fires on the owner's curl;
+entry 1 is weekday-only. **The first weekday test is MONDAY 2026-08-03, 22:45Z**, and what
+confirms the edits is the cron-job.org execution log plus `gen.trigger === "header"` on a fire
+nobody curled. Saturday's `0 18 * * 6` entry IS due, is UNHEADERED, and **401s at zero credits
+and zero run-slot cost**. If it ever authenticated it would build at achievable 0.267
+(`MIN_ACHIEVABLE = 0.15`, so `low-ceiling` does NOT protect) — but the 22:38Z curl would still
+REBUILD, because `liveCoverageOf` counts `lu` over UNSTARTED games and every game that board
+confirmed has started by then (pct 0.000 < `SKIP_COVERAGE` 0.7 → `thin`). **Cost of that
+scenario: ~80 credits of nothing and 1 of `MAX_RUNS_PER_DATE` = 3. Not the board.**
 
 **RUN THESE FIRST — all zero Odds credits. Order: propsnap → calibration → ledger → pred →
 Variant B.** The first needs NO phrase (`/api/propsnap`'s read is ungated); the rest are yours.

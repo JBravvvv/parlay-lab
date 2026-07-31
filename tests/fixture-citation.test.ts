@@ -144,3 +144,57 @@ describe("no doc cites a fixture figure as a production magnitude", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * EVERY M/A ROW NAMES ITS SOURCE (2026-07-31, owner's item 1, second half).
+ *
+ * The citation audit found ELEVEN amendment rows that named no source at all — including all
+ * four A-items, which the exit sign-off reads. An unlabelled row is indistinguishable from a
+ * fixture row until someone traces it, and tracing the eleven turned one of them (M25) up as
+ * fixture-derived. So "unlabelled" was not clean; it was untraced.
+ *
+ * THE RULE: every M/A row carries a source. An explicit `[src: …]` token is the strong form and
+ * is REQUIRED of any new row. Rows that carry an inline source claim in their own prose
+ * (archive / fixture / production / synthetic / spec-unmeasured) are accepted as the weak form —
+ * they are grandfathered, they are counted below, and converting them is the standing to-do.
+ */
+const BUNDLE = path.join(DOCS, "freeze-exit-bundle.md");
+const ROW = /^\| \*\*(M\d+|A\d+)\*\*/;
+/** the weak form: a source claim in the row's own prose */
+const INLINE_SOURCE = [/archiv/i, /fixture/i, /production/i, /synthetic/i, /ledger/i, /run log/i, /quota/i, /spec-only/i, /unmeasured/i, /UNRUN/, /UNREACHABLE/, /refuted/i, /premise died/i];
+
+export function unsourcedRows(text: string): { tag: string; strong: boolean }[] {
+  return text
+    .split("\n")
+    .filter((l) => ROW.test(l))
+    .map((l) => ({ tag: l.match(ROW)![1], strong: l.includes("[src:"), inline: INLINE_SOURCE.some((p) => p.test(l)) }))
+    .filter((r) => !r.strong && !r.inline)
+    .map(({ tag, strong }) => ({ tag, strong }));
+}
+
+describe("no amendment row is unsourced", () => {
+  const text = fs.readFileSync(BUNDLE, "utf8");
+
+  it("every M/A row carries a source, strong or inline", () => {
+    const bad = unsourcedRows(text);
+    expect(
+      bad,
+      `\n\nAMENDMENT ROWS WITH NO SOURCE: ${bad.map((b) => b.tag).join(", ")}\n` +
+        `An unlabelled row is indistinguishable from a fixture row until someone traces it — ` +
+        `that is how M25's fixture-derived $500/$13/38.5x sat in the bundle unmarked. Add a ` +
+        `[src: …] token naming what produced the number: PRODUCTION, ARCHIVE (which board), ` +
+        `FIXTURE, SYNTHETIC, REPO/GIT, CODE READ, or CLOSED-FORM ARITHMETIC.\n`,
+    ).toEqual([]);
+  });
+
+  it("the strong form is counted, so the weak form cannot quietly become permanent", () => {
+    const rows = text.split("\n").filter((l) => ROW.test(l));
+    const strong = rows.filter((l) => l.includes("[src:")).length;
+    // 12 traced on 2026-07-31 (the eleven unlabelled + M6). Ratchet: this may rise, never fall.
+    expect(strong, `strong-form [src:] tokens dropped below the 2026-07-31 count`).toBeGreaterThanOrEqual(12);
+  });
+
+  it("PLANT (invalid-by-value): a row with neither form is caught", () => {
+    expect(unsourcedRows("| **M99** | a thing | 5 pp | nothing | ready |")).toEqual([{ tag: "M99", strong: false }]);
+  });
+});

@@ -973,3 +973,164 @@ the owner named:
 7. **IMPOSSIBLE BRANCH**: `mults` non-empty while every market sits under `SLOPE_MIN_N` → the
    weekly state machine moved without the nightly fit and `applyWeeklyAdjustment`'s own n ≥ 150
    gate did not hold. Print both.
+
+---
+
+# PART SIX — 2026-07-31, owner's items 1–4
+
+## 21. THE ELEVEN TRACED (item 1)
+
+| row | what actually produced its number | class |
+|---|---|---|
+| **M1** | per-row park error + mean `parkH` 1.0013 / `parkHR` 0.9720 "across the 07-26 venues" | **ARCHIVE** — ⚠️ **working not on disk**: those two means appear in **no producing block**, only in the row |
+| **M2** | gap −23.3 → −11.5 pp, 0/38 → 11/38, λ 13.7 → 15.3 (collection-period L4736) | **ARCHIVE** — 2026-07-26 board, 38 outs rows |
+| **M3** | market rung-drift **+0.479**, n=5 closed-form pairs; +0.356 vs +0.468, n=15 sim (hrr-recalibration L8/L47) | **ARCHIVE** — 2026-07-26 board |
+| **M11** | +0.79 pp per 10 pts, SE 0.09, t≈9; `tools/recency_weights.py` | **ARCHIVE (statsapi, NO board)** — n=3,061 leak-free player-dates, 07-11→07-26, 481 batters |
+| **M17** | 15 bot commits since 07-24, three-path census | **REPO/GIT** — a census, not a measurement |
+| **M25** | **$500 vs $13 ceiling = 38.5× across 11 legacy tickets** | **🔴 FIXTURE** — collection-period **L7323–24**, *"THE DOLLAR TOTALS (armed fixture, DAILY $250, bankroll $750)"*. The 13-sites/11-protections count is a **CODE READ** and stands |
+| **M21** | 1 armed, 8 at g=4 — `data/ump_k.json` | **ARCHIVE** — ⚠️ **STALE**: 2 armed and 11 at g=4 as of 07-31; the ~08-04 date was an ESTIMATE |
+| **A1** | log-growth 126.6 → 187.2 bp, crossover 3.05 → 1.40 pp | **ARCHIVE** — 2026-07-26 board via `tests/a1-shade.test.ts` + `PL_BOARD` |
+| **A2** | 4 of 18 tickets (22%), crossover 3.05 → 3.50 pp | **ARCHIVE** — same board (collection-period L4757, singles-vs-parlays L686) |
+| **A3** | −1.000 / −0.501 / −0.334% at 1/2/3 legs | **CLOSED-FORM ARITHMETIC** on the measured 1.071 overround (collection-period L1182, n=1,336). **No run produced the triple** |
+| **A4** | 1/8 vs 1/4 Kelly +6.4 / +5.1 bp, $250 every cell | **ARCHIVE** — same board (singles-vs-parlays L465–531) |
+
+**Plus M6**, which the strict classifier surfaced after the eleven were done: **169 K rows** is an
+ARCHIVE row census, and the finding itself — *no sim path exists for the quantity* — is a **CODE
+READ that needs no magnitude**.
+
+### The pre-committed readings
+
+- **"any A-item is fixture-derived": DOES NOT FIRE.** All four trace to the archived 2026-07-26
+  board (A3 to closed-form arithmetic on an archive-measured overround). **The allocation
+  amendments the exit sign-off reads are NOT fixture-derived.** Stated plainly because the
+  opposite would have restated the sign-off's inputs.
+- **"any row's number cannot be traced to any run": FIRES ONCE, in a weaker form than 'reasoning'.**
+  **M1** names its population (the 07-26 venues) but **its working is nowhere on disk** — 1.0013
+  and 0.9720 exist only in the bundle row. That is a computed-once figure with no recorded
+  derivation. **Dated marker applied in the row.** It is not reasoning-in-place-of-measurement; it
+  is a measurement whose arithmetic was never written down, and it cannot be re-derived without
+  re-running the venue means.
+- **"all eleven trace to archive or production": NO.** **M25 is fixture-derived**, and it was
+  sitting unmarked in the row that carries the single largest live-money claim in the bundle
+  (*legacy modes place negative-EV bets by construction*). **The class restates: fixture-sourced
+  M/A rows go from 7 to 8**, and of those **7 of 8 do not reproduce the caveat** — M20 alone does.
+  M25's row now carries the split explicitly: the dollar ratio is fixture, the site count is code.
+- **How many carry no number at all**: **zero of the eleven.** Every one has a magnitude. What
+  three of them have is a magnitude of a *different kind* — M17 a git census, A3 arithmetic, M6 a
+  code read — and those are now labelled as such rather than reading like measurements.
+- **IMPOSSIBLE BRANCH — two rows citing the same number from different sources: DOES NOT FIRE.**
+  `crossover 3.05 pp` appears in A1 and A2 and traces to the same board and the same run in both.
+
+**ENCODED**: `tests/fixture-citation.test.ts` now also fails when an M/A row carries **no source at
+all**, with a plant. Twelve rows carry the strong `[src: …]` form and the count is ratcheted so it
+cannot fall. **The residual, stated**: fifteen rows are accepted on the WEAK form — a source word
+in their own prose rather than an explicit token. Converting them is the standing to-do, and until
+then the guard's floor is "no row is silent", not "every row is explicit".
+
+## 22. TOMORROW'S CRON QUESTION — AND WHAT SATURDAY'S ENTRY ACTUALLY DOES (item 2)
+
+**TOMORROW'S BOARD TELLS US NOTHING ABOUT THE CRON EDITS. Say it plainly and do not let a
+successful curl read as evidence the cron works.** The board fires on the owner's header curl;
+entry 1 is `45 22 * * 1-5` and **Saturday is not in its range**. **The first weekday test is
+MONDAY 2026-08-03 at 22:45Z**, and what confirms the edits is the **cron-job.org execution log**
+(the owner's screen) plus, if a board appears, `gen.trigger === "header"` on a fire nobody curled.
+The repo cannot distinguish a 401 from a non-execution — that has been true since 07-30 and is
+still true.
+
+**Will the Saturday entry fire? YES — `0 18 * * 6` is due.** Per the run sheet's record, entries
+2–4 are **UNHEADERED**, so it hits `/api/generate` without `x-cron-key` and gets
+`{"error":"unauthorized"}` at **zero Odds credits and zero run-slot consumption** — the 401 is
+returned before any spend and before `INCR`. **It stays unheadered.**
+
+**If it somehow authenticates, here is exactly what happens — and the trap does NOT fire, for a
+reason worth having in advance:**
+
+1. At 18:00Z, `liveCoverage` runs first. `MIN_ACHIEVABLE = 0.15` and Saturday's 18:00Z achievable
+   is **0.267** — **above the floor, so `low-ceiling` does NOT skip.** The board builds, spending
+   ~15 events ≈ **77–88 credits** and consuming **1 of `MAX_RUNS_PER_DATE = 3`**.
+2. At **22:38Z** the owner's curl reads that stored board. `liveCoverageOf` counts `lu === true`
+   **over UNSTARTED games only** (`board-coverage.ts` L28–33). The 18:00Z board's lineup-confirmed
+   games were the 19:07 and 20:10 starts — **all of them have started by 22:38** — so
+   `confirmed = 0` over 11 upcoming, **pct = 0.000**, far under `SKIP_COVERAGE = 0.7`.
+3. `cov.skip` is therefore **false**, reason `thin`, and **the curl REBUILDS.**
+
+**→ The Sunday trap does not arrive on Saturday. What a successful Saturday entry costs is ~80
+credits of nothing and one of three run slots — not the board.** Recorded before the fact.
+
+**Pre-committed:** entry 401s → no interaction, fire at 22:38Z · entry succeeds and builds a
+sub-T board → **the curl still rebuilds** (mechanism above), so the day is NOT engine-half by that
+route; what to check instead is the run counter and the ~80-credit hole · **IMPOSSIBLE BRANCH: a
+board already exists for 08-01 when the curl returns a skip body → report the body verbatim and
+stop.**
+
+## 23. WHAT ESCAPES THE PROVENANCE GUARD — THE SIZE OF THE LIMIT (item 3)
+
+| | count |
+|---|---|
+| distinct numeric figures across `docs/` | **1,880** (16,019 occurrences) |
+| registry entries | **4** |
+| **coverage** | **4 / 1,880 = 0.213%** |
+| distinct figures on **load-bearing** lines (frozen table · pre-committed reading · decision · amendment · magnitude) | **262** |
+| **load-bearing coverage** | **4 / 262 ≈ 1.5%** |
+
+**THE OWNER'S FIRST BRANCH FIRES: the guard is a SPOT-CHECK, NOT AN INVARIANT**, and the
+instrument ledger now says so with the ratio.
+
+**Can registration be defaulted? Not at figure granularity.** A guard that fails on any
+unregistered figure would fire on 1,876 of 1,880 — unusable, and the reflex it trains is to
+suppress it. **The threshold that makes it workable is to change the UNIT from the figure to the
+LINE, over a scoped set**: require a source token on **every frozen-table row and every M/A row**
+— 262 load-bearing lines instead of 1,880 figures, and §21's row guard is already half of it.
+**SPEC'D, NOT SHIPPED**, per the owner's instruction; the decision waits until tomorrow's board is
+read.
+
+## 24. THE `umpKFrozen` ROW, VERBATIM, AND THE CIRCULARITY (item 4)
+
+**The frozen-table row, as it now reads on disk** (`collection-period.md`):
+
+> | **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have
+> **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |
+
+**That row still describes DEPTH by implication and carries a superseded date.** The correction
+this turn landed in the *consequence list* (`session-handoff.md` §7) and in §13 above; **the
+frozen-table row itself has not been rewritten**, and it should be, because it is what a sign-off
+reads. Flagged rather than silently edited: it is the frozen table, and a row there moves with the
+owner's word. **What it should say**: the factor is clamped to **[0.92, 1.08]**, **60% (51 of 85)
+of umpires land ON a bound**, so **magnitude per row cannot grow**; what grows is **coverage**,
+from ~0.35 of a 15-game board today to **83 of 85 umpires armed by freeze exit** — i.e. essentially
+every game. **The decision is breadth, and it arrives fully formed at exit rather than gradually.**
+
+**Does the unpin have a date or a condition? NEITHER.** There is no dated review and no stated
+condition anywhere on disk. **It sits at exit alongside every other amendment and competes for the
+same sign-off** — which is exactly the wrong place for a decision whose input space changes by
+40× between now and then.
+
+**THE CIRCULARITY IS REAL.** To justify unpinning you want a production measurement of the
+factor's effect. The factor cannot affect anything until it ships, and it cannot ship without the
+justification. **Under the current design this decision cannot be informed by measurement.**
+
+**What breaks it — and one of the three already exists:**
+
+1. **THE SHADOW PATH, WHICH IS ALREADY BUILT AND ALREADY RUNNING.** `build_context.py` L217–223
+   emits **`kRaw`** — *the same ratio computed at ANY g*, "recorded, never applied" — and the
+   engine carries `shUmpKfShadow`, which returns the ungated raw ratio, its clamped view and `g`
+   **without ever multiplying** (`tests/pinned-factors.test.ts` L60–71). **Cost: ZERO Odds
+   credits.** Its blocker is not money: `context.json` is frozen by the M18 pause, so no NEW
+   `kRaw` reaches a board while the freeze holds. **The smallest experiment that breaks the
+   circularity: one board generated against an UNFROZEN context, with the factor still pinned,
+   diffed against `shUmpKfShadow`'s recorded counterfactual.** That measures the effect without
+   applying it — and it costs one board's credits, not a policy change.
+2. A single board with the factor live and diffed — spends the same credits and *does* apply it.
+3. Nothing — accept that the row is a judgement call and label it as one.
+
+**PRE-COMMITTED: the circularity is real, so it is recorded as a decision that cannot be informed
+by measurement under the current design — and option 1 is the named experiment that changes that,
+at zero Odds credits plus one board, blocked only by the vintage pause it would have to interrupt.**
+
+## 25. HOUSEKEEPING FOUND WHILE TRACING
+
+**Three orphaned test files that no runner executes**: `tests/bot-path-whitelist.test 2.ts`,
+`tests/min-gap.test 2.ts`, `tests/sha-references.test 2.ts` — macOS duplicate artefacts dated
+2026-07-29. `vitest.config` includes `tests/**/*.test.ts`; these end in `test 2.ts` and **do not
+match**. 84 `.ts` files in `tests/`, **81 run**. They may hold divergent copies of three guards.
+**NOT deleted** — reported for the owner's word.
