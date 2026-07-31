@@ -8451,3 +8451,30 @@ burn and only reaches 4.6 days.** The props cadence is not what ends the cycle �
 07-29** — more snapshots than crons, because GitHub delivers each cron more than once in
 its batch windows and MIN_GAP now dedupes the payment rather than the delivery.
 **Both are printed: schedule says 4, archive says 5 (post-fix) and 10 (pre-fix).**
+
+## THE CALENDAR IS STOPPED, NOT LATE — DATED ADDENDUM (2026-07-31, owner's item 2)
+
+**Every projected date in this file — the Phase-2 ICC schedule (L2575–79), the consensus-reopen
+tables (L3069–73, L3104–07), the `SUMMARY_DAYS` row (L878), the HRR trigger range (L511–19) — was
+computed at an assumed cadence of ONE BOARD PER DAY. The actual cadence has been ZERO SINCE
+2026-07-26.** Under `reopenDays(n, rate, need)` a zero rate returns **`null`** — *"never, at this
+rate"* (`src/lib/gate-rebuild.ts` L83–86). **Those dates are therefore STOPPED, not late**, and
+every row above should be read with that word in front of it. The restated table lives in
+`docs/session-handoff.md` §8A; it is not duplicated here.
+
+**Two gates, both currently shut.** A graded row needs a **generate** (`/api/generate` L380 writes
+`src:"cron"`; the client fallthrough `engine-client` L297→L379 writes `src:"client"` — so accrual
+is **generate**-only, not strictly board-only) **and** the **grader** (`/api/calibrate`,
+`GRADE_DAYS = 6`), whose Vercel cron was removed this session — `vercel.json` now carries **no
+`crons` array at all**.
+
+**THE ONE CLOCK THAT KEPT RUNNING, and why.** `shUmpKf`'s `g >= 5` arming was projected ~2026-08-04
+and crossed **2026-07-30** (Lance Barrett, first ever) and **2026-07-31** (Willie Traynor, second),
+marked at fire time in `tests/self-arm-stamp.test.ts` (`ARMED.umpKf = 2`) against `data/ump_k.json`.
+It counts **real MLB games**, not our graded rows, so it is cadence-independent. **The only
+calendared item that arrived is the only one we do not drive.**
+
+**RATE INCONSISTENCY, RECORDED NOT CORRECTED.** L2573 says *"at the measured 70 graded rows/day"*;
+L3064 says `graded = 70` over the **two** complete dates 07-25 and 07-26 — **35/day**. At 35/day
+the 300-row floor lands **~2026-08-03**, not ~07-31. Resolving it needs the graded-row count, which
+is off-disk (phrase-gated). Carried as contradiction #9 in the handoff.

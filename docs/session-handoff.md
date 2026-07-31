@@ -265,26 +265,90 @@ and cost **zero** — gating them buys nothing and costs `board-archive` its acc
 
 ## 4. RUN SHEET
 
-**THE FOUR READS, IN ORDER — all zero Odds credits. Variant B is SUSPENDED** (its 12 credits
-measure a billing constant while 146 are unaccounted for).
+### 4A. THE FOUR READS — ONE EXECUTABLE BLOCK, NOTHING ELSE TO READ FIRST
+
+**CREDIT CONFIRMATION, EACH ONE TRACED TO WHAT IT CALLS (2026-07-31, not to the label above it).**
+Every route file was read this turn. `curl` with no `-X` sends **GET**; every write path below is
+`PUT`/`POST` and is unreachable from these commands.
+
+| read | endpoint | Odds API reference in the file? | verdict |
+|---|---|---|---|
+| 1 | `/api/propsnap?date=…` | **YES — the file has one** (`oddsFetch` L46–58, `/events` L79, per-event L97). **BUT** the `?date=` READ PATH returns at **L71**, before the auth check (L76) and before any fetch. **Reads Redis only** | **0 credits** |
+| 2 | `/api/predictions?date=…` | **none** — no `fetch`, no `ODDS_API_KEY`, no upstream host anywhere in the file | **0 credits** |
+| 3 | `/api/calibration` | **none** — Redis + `effectiveCalibration()` on stored objects | **0 credits** |
+| 4 | `/api/ledger` | **none** — Redis only (`readStore`/`readBank`/`readNoPlay`) | **0 credits** |
+
+**THE ONE SHARP EDGE, stated because it is the same URL:** `/api/propsnap` is **two paths in one
+GET handler**. Drop the `?date=` and it becomes the **capture** path — `/events` plus up to
+`MAX_EVENTS = 16` per-event fetches, **~6 credits each, ≈96 worst case**. It is *safe by
+construction anyway*: `cronHeaderAuthed` at **L76 precedes the first `oddsFetch` at L79**, so a
+date-less call without the cron key **401s at zero cost**. A malformed date is a **400** at L69.
+**There is no way to spend from this block.**
+
+**TWO CORRECTIONS TO THE LABELS THIS BLOCK REPLACES:**
+1. **Read 3 needs NO phrase.** `/api/calibration`'s **GET is open** (route L18 — no `syncAuthed`;
+   its own header says so: *"GET is open: it serves only aggregate statistics"*). Only **POST**
+   (the auto-toggle) is gated. Sending the header anyway is harmless and the block keeps it.
+2. **`burn-report.mjs --pred` WAS BROKEN and is fixed in this working tree.** `DayBlob.records` is
+   a **keyed map**, not an array (`pred-serialize` L135; route L39 serves the blob unwrapped), and
+   `predCensus` iterated it as an array — **`TypeError: recs is not iterable` on every real
+   export**, while its test passed on a hand-built array production never produces. Instrument
+   defect #6's shape, in a tool, one command before it ran. Fixed, plus an error-body STOP, plus
+   the `gens` witness; regression case pinned on the **map** shape (`tests/chain-tools.test.ts`,
+   20 tests green).
 
 ```
-# 1. propsnap store — UNGATED, no phrase needed. Is it capturing on WEEKDAYS?
+# ── 1 ── propsnap store. UNGATED read, NO phrase. Precondition 2: are there WEEKDAY rows?
 for d in 2026-07-28 2026-07-29 2026-07-30 2026-07-31; do
-  curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d"; echo; done
+  echo -n "$d "; curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d"; echo; done
 
-# 2. reading 15(c) — src:"client" rows separate a client GENERATE from a poll
-curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
+# ── 2 ── reading 15(c). PHRASE HERE ────────────────────────────────── <PHRASE>
+curl -sS -H "x-pl-sync: <PHRASE>" \
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
 node tools/burn-report.mjs --pred ~/pl-pred-0730.json
 
-# 3. /api/calibration — HAS the nightly fit ever moved calW/calG?
+# ── 3 ── calibration. GET is OPEN — the header is optional, kept for uniformity.
 curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/calibration
 
-# 4. the ledger export — reading 15 whole
+# ── 4 ── the ledger export. PHRASE HERE ─────────────────────────────── <PHRASE>
 curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger.json
 node tools/ledger-report.mjs ~/pl-ledger.json
 ```
+
+**WHAT EACH ONE SETTLES — condensed to what CHANGES on the output, and what STOPS the run.**
+
+| # | output | what it changes |
+|---|---|---|
+| **1** | `snapshots` **non-empty on any of 07-28…07-31** | **Precondition 2 HOLDS.** Weekday capture is real; the weekend-only reading of `CLAUDE.md` L150 is wrong and the props ceiling restates on measured weekday volume |
+| | `{"date":…,"snapshots":[]}` **on all four** | capture is weekend-only as documented; the four morning GitHub snapshots are the entire weekday record and the 162–185/day ceiling stands |
+| | **mixed** | print which dates carried rows — the cadence is the finding, not the count |
+| | **STOP** | any body that is **not** `{date, snapshots}` — a `503 sync-not-configured` means the store env is missing and reads 2–4 will also fail. **Fix that before running anything else** |
+| **2** | **`clientRows > 0`** | **the `bestBoard` fallthrough FIRED.** That date was not dark for the store, and the credits it spent are part of the 146. The cheapest discriminator resolves toward operator-side |
+| | **`clientRows == 0`** | the fallthrough is **CLEARED for that date**; the residual needs another candidate and the Vercel log becomes the only instrument |
+| | **`GENERATIONS` list** | server passes only (the client path stamps none). A `trigger` of `header`/`cron-ua` vs `manual` dates each server board; **zero gens + non-zero rows = client-only, positively** |
+| | **STOP** | `{"error":"bad-sync-key"}` → the phrase did not match; **do not retry read 4 with the same phrase.** `{"error":"sync-not-configured"}` → env, not phrase. The tool now exits **65** on either rather than censusing an error body as zero rows |
+| **3** | **`mults` empty `{}` / `global: null` / `log: []`** | the fit **never moved**. The pause froze nothing that was moving — **EXPOSURE WITHOUT EFFECT**, third freeze point is PRECAUTIONARY not corrective |
+| | **`mults` populated** | a **live fit**: every board before today read a different calibration than tomorrow's would, and **the homogeneous window starts 07-31, not 07-29** |
+| | `summary.n` per market vs `SLOPE_MIN_N = 100` / `GLOBAL_MIN_N = 150`; `lastRun` | **dates the vintage** — and `lastRun` is also the direct read of whether the paused nightly job has run since |
+| | `auto: "off"` | mults are empty **by the switch**, not by absence of data — a different fact from the first row and must not be read as it |
+| | **STOP** | a `502` — the store is unreachable; reads 2 and 4 are then also unreliable |
+| **4** | **`ledger.length`** | **the 38 settles first — it is the GATE, not a sibling** (§5 reading 15). Every sub-reading below is denominated in this number |
+| | `(1) OVERSTAKE … above their own ceiling: N` | M24 realized-vs-prospective on the real population |
+| | `(3) HRR 07-17..07-22 … expect 46.3 / 59.2` | reproduces or fails to reproduce the pair the HRR suspension rests on |
+| | `(4) FIELD CENSUS BY DATE` | the mode split, and which dates predate `selMode` (07-24) / `overrode` (07-19) |
+| | **STOP — hard** | `>>> AND N carry selMode "ev_gated"` — **the ceiling failed inside the disciplined branch.** Stop the run and report it; that outranks the board |
+| | **STOP** | `{"ledger":[]}` with a **200** → the store is EMPTY, which is not the same as the export failing. Print it and stop: an empty ledger makes every sub-reading vacuous and **the bankroll exit has no population at all** |
+
 **Then the Vercel function log and the `APP_PASSCODE` env check.**
+
+**ORDER IS NOT ARBITRARY:** read 1 is ungated and proves the deployment answers at all; read 2
+proves the phrase before read 4 spends a round trip on the only copy of the bankroll population;
+read 3 is free and dates the vintage; read 4 is the one whose output gates two sub-readings.
+
+### 4B. THE REST OF THE SHEET
+
+**Variant B is SUSPENDED** (its 12 credits measure a billing constant while 146 are unaccounted
+for).
 
 **THE TOOLS, by path:**
 | tool | replaces |
@@ -371,6 +435,53 @@ nothing and 1 of `MAX_RUNS_PER_DATE` = 3.**
 15. Ledger export reading: reconstructible → "cannot re-examine" withdraws dated;
     not → absent fields NAMED; count vs the owner's "38" → both printed (the "38"
     remains IN-CONTEXT-ONLY-UNVERIFIED — no on-disk record; resolved by the export).
+    **▶ GATE (ADDED 2026-07-31, owner's item 3 — ORDERING IS PART OF THE READING).**
+    **THE HEADLINE COUNT PRINTS FIRST AND GATES THE TWO SUB-READINGS BELOW IT. It is not
+    their sibling.** `ledger-report.mjs` prints `ledger: N entries, M locked` on line 1,
+    before anything else, and **N is the denominator of both the MODE SPLIT and the
+    REALIZED-OVERSTAKE query**. Those two are written against "the 38 tickets"; the 38 is
+    the OWNER'S recollection with no on-disk record (the only 38 on disk is "4 of 38
+    core-eligible outs rows", `multibook-memo.md` L430 — a different quantity, and it must
+    not be read as corroboration). **So: read N. If N ≠ 38, the sub-readings are computed
+    over N and every "38" in their wording is corrected in the same pass — a CORRECTION,
+    dated, not a discrepancy to reconcile away.** Neither sub-reading may be interpreted
+    before N is on screen. **N is also the first thing that can invalidate the whole read:
+    `{"ledger":[]}` at 200 means the population does not exist.**
+    **▶ THE EXPORT'S EXPECTED SCHEMA (ADDED 2026-07-31, read from `app/api/ledger/route.ts`
+    this turn), so a malformed response is distinguishable from a legitimate one.** GET
+    returns **exactly four top-level keys** (L73):
+    `{ ledger: SyncEntry[], bank: BankStore|null, noplay: NoPlayLog|null, at: number|null }`.
+    `ledger` is **always an array** (`readStore` L62 returns null unless `Array.isArray`),
+    **never absent** — `s?.ledger ?? []`. Per entry, the fields the report reads:
+    `date`, `locked`, `core[]`, `funT[]` (tickets: `id`, `stake`, `prob`, `czDec`, `czEv`,
+    `legs[]` with `lkey`/`label`/`prop`/`cz`), `bankroll`, `grading.legs{}` keyed
+    `label|prop` → `{result}`, `grading.v`, plus `selMode` (present only from 07-24) and
+    `overrode` (only from 07-19). **ANY OTHER TOP-LEVEL SHAPE IS MALFORMED**, including a
+    bare array, and `ledger-report.mjs` accepts `blob.ledger ?? blob` (L103) so a bare array
+    would be silently accepted — **check the top-level keys yourself before trusting it.**
+    **▶ STOP RULE FOR THE EXPORT (ADDED 2026-07-31).** Do not re-run, do not vary the
+    command, report the body:
+    · `{"error":"bad-sync-key"}` **401** → the phrase did not match (L51). Nothing was read
+      and nothing was written.
+    · `{"error":"sync-not-configured","missing":[…]}` **503** → env, not phrase (L49); the
+      array names what is missing.
+    · `{"error":"store unreachable: …"}` **502** → Upstash is down (L75). **Read 2 and read 3
+      are equally unreliable at that moment**; stop the whole block, not just this read.
+    · `{"ledger":[],"bank":null,"noplay":null,"at":null}` **200** → **a VALID response over an
+      EMPTY store.** This is the dangerous one: it is not an error and every sub-reading
+      returns a clean zero. **The bankroll exit would have no population.** Print it verbatim,
+      stop, and do not let `0 of 0` be recorded as a pass.
+    · anything non-JSON (an HTML error page, an empty body) → the request did not reach the
+      route; do not diagnose it as a ledger fact.
+    **▶ THE EXPORT CANNOT MUTATE THE LEDGER — cited, because this is the only copy of the
+    bankroll exit's population.** `GET` is `app/api/ledger/route.ts` **L68–77**: it calls
+    `gate()`, then `readStore()` / `readBank()` / `readNoPlay()`, then returns. **Those three
+    helpers issue only `GET` (L58) and `redisGetJson` (L28, L40).** Every write in the file —
+    `redisSetJson` at **L113** and **L118**, and `redis(["SET", STORE_KEY, …])` at **L120** —
+    is inside **`PUT` (L79–125)**, a different exported handler. `curl` without `-X` sends
+    GET, so **the read 4 command cannot reach any of them.** The merge that could rewrite
+    history (`mergeLedgers`, L105) is likewise PUT-only, and by design it merges INTO the
+    stored copy rather than replacing it (route header L10–11).
     (ADDED 2026-07-30, fields confirmed on disk — LEDGER PER-MARKET RECOVERABILITY
     block: the export additionally prints per-market legs/wins/implied-vs-hit and
     per-entry `selMode` + `overrode`; per-leg results exist in `grading.legs`, so
@@ -660,6 +771,73 @@ legacy mode opened at all until M24 resolves.
 
 ---
 
+## 8A. THE CALENDAR — STOPPED, NOT LATE (2026-07-31, owner's item 2)
+
+> **EVERY DATE BELOW IS A COUNT-ARMED CROSSING PROJECTED FROM AN ACCRUAL RATE, AND THE RATE HAS
+> BEEN ZERO SINCE 2026-07-26. THEY ARE NOT LATE — THE CLOCK IS STOPPED. `reopenDays` RETURNS
+> `null` — "NEVER, AT THIS RATE" — WHENEVER THE RATE IS ZERO (`src/lib/gate-rebuild.ts` L83–86).**
+> **A DARK DAY DOES NOT DELAY THESE DATES; IT SUSPENDS THEM.**
+
+**THE DATE-ARMED CLASS IS EMPTY.** It was struck on 2026-07-30 (`collection-period.md` L7029 ff.,
+"THE REOPEN CALENDAR IS COUNT-ARMED"): there is **no date anywhere in the consensus gate**; the
+engine blocks on `small && consEv < consMinEv` where `small` is a **count** test against `mktN`
+(L3037–3048), and the 07-29 / 07-31 / 08-01 "expiries" were **projections misfiled as dates**.
+Nothing on this calendar arrives by the calendar.
+
+**TWO GATES, AND BOTH ARE CURRENTLY SHUT.** A graded row needs (1) a **generate** to write the
+row and (2) the **grader** to grade it.
+
+| gate | mechanism | state |
+|---|---|---|
+| **rows** | `/api/generate` L380 writes `src:"cron"`; the client fallthrough (`engine-client` L297 → L379) writes `src:"client"`. **Accrual is GENERATE-only, not board-only** | **zero known since 07-26** — but the client path is exactly what **read 2** measures |
+| **grading** | `/api/calibrate` (`GRADE_DAYS = 6` most-recent logged dates per run) | **UNSCHEDULED — `vercel.json` now carries no `crons` array at all** (paused this session). `lastRun` from **read 3** is the direct measurement |
+
+**THE RESTATED CALENDAR.** "Assumed" is the rate the date was computed at; "actual" is what has
+happened since 07-26.
+
+| date | what it gates | assumed rate | actual | restated |
+|---|---|---|---|---|
+| **~2026-07-31** | Phase-2 **game**-cluster ICC (≥20 clusters + ≥300 rows) | 70 graded rows/day, 15 clusters/day | **0/day** | **STOPPED.** Clusters likely met (~30 from 07-25/26); **the 300-row floor is the binding one and stands near ~70** |
+| **~2026-07-31** | Phase-2 **player**-cluster ICC (same floors) | same | **0/day** | **STOPPED**, same binding floor |
+| **2026-08-08** | ML · RL consensus reopen | 7.5 graded legs/day | **0/day** | **STOPPED** — `reopenDays` → `null` |
+| **2026-08-15** | Phase-2 **day**-cluster ICC — the unit that decides whether **2.7σ becomes 1.1σ**; **the HRR amendment stays unsigned until it lands** | ≥20 day-clusters **at 1 logged day/day** | **0/day** | **STOPPED.** A day-cluster requires a *logged* day; five dark days added **zero** |
+| **2026-08-17** | Total Bases consensus reopen | 4.5/day | **0/day** | **STOPPED** |
+| **2026-08-20** | the 20-board crossover review | 1 board/day | **0/day** | **STOPPED** |
+| **2026-08-23** | Hits · HR · H+R+RBI consensus reopen | 3.5/day | **0/day** | **STOPPED** |
+| **2026-09-03** | K's · Outs consensus reopen (the positive control) | 2.5/day | **0/day** | **STOPPED** |
+| **2026-09-08** | `SUMMARY_DAYS = 45` first caps; window start 2026-08-09 | 1 **logged date**/day | **0/day** | **STOPPED** — and the doc already says so in its own terms: *"`allDays` counts logged dates, not calendar days"* (L880–882) |
+| **~2026-09-15** (09-10 → 09-26) | the HRR retirement trigger | 2.9 legs/day central | **0/day** | **STOPPED** |
+| **2026-09-22** | the parameter exit | ~13.5k credits | **553 in the pool** | **UNREACHABLE THIS CYCLE** — already recorded in §9, and unaffected by cadence |
+| ~~2026-08-17~~ | fixture representativeness | 20 boards | — | **already STRUCK** as unreachable this cycle and re-scoped with **no calendar date** (reading 21) |
+
+**⚠️ IMPOSSIBLE BRANCH — IT FIRED. One calendared date has ALREADY BEEN MARKED REACHED, and
+EARLY.** `shUmpKf`'s `g >= 5` arming was projected **~2026-08-04**. It crossed **twice**:
+**2026-07-30 (Lance Barrett, g 4→5, FIRST EVER, ~5 days ahead)** and **2026-07-31 (Willie
+Traynor, SECOND, one day later)**. **What marked it:** `tests/self-arm-stamp.test.ts`'s
+`ARMED.umpKf = 2` with both crossings dated in the constant's own note, backed by `data/ump_k.json`
+and written at fire time by the person who must then decide whether a vintage boundary moved —
+which is the whole reason M21 exists.
+
+**AND IT IS THE EXCEPTION THAT PROVES THE RULE.** `shUmpKf` counts **real MLB games**, not our
+graded rows — it is **cadence-independent**, so it kept running while every board-clocked date
+stopped. That is the sharpest available statement of the coupling: **the only clock that moved is
+the only one we do not drive.** It reached no board (double brake: frozen `context.json` carrier +
+`umpKFrozen: true`), so nothing restates from it — but it arrived, and the rest did not.
+
+**WHAT COULD FLIP THIS — read 2.** If the prediction store carries `src:"client"` rows for any
+date after 07-26, then rows accrued without a board, **the rate is not zero**, and every row above
+restates on **measured** accrual for the first time rather than on a stopped clock. That is the
+second branch of item 2's pre-committed reading, and it is the same read that discriminates the
+burst. **Until it returns, "STOPPED" is the honest label and "projected" is not.**
+
+**ONE INCONSISTENCY FOUND WHILE RESTATING — recorded, not corrected (see §10 #9).** The Phase-2
+block reads **"at the measured 70 graded rows/day"** (L2573) while the recomputation block reads
+**`graded = 70` over the TWO complete dates 07-25 and 07-26** (L3064) — i.e. **35/day**. If 35/day
+is the right figure, the 300-row floor lands **~08-03, not ~07-31**, even at one board per day, and
+the two dates in this table's first two rows were **~2× optimistic before a single dark day**.
+
+---
+
 ## 9. POSITION
 
 - **Quota: 553 remaining / 19,447 used — 2026-07-31T21:04:11.529Z** (`data/quota-log.jsonl`, live
@@ -694,6 +872,18 @@ legacy mode opened at all until M24 resolves.
 7. **Phase-2 threshold rows** (`collection-period.md` L2577–78) read **"~2026-07-31"** for the
    game- and player-cluster thresholds — **that is today, and neither is confirmed reached.**
    Flagged, not corrected: a dated marker is owed once someone checks.
+   **(ADDENDUM 2026-07-31, owner's item 2 — the marker is now owed as STOPPED, not as late.**
+   Both are count-armed on graded rows at an assumed 1 board/day; the actual rate has been
+   **zero since 07-26**, and `reopenDays` returns `null` — "never, at this rate" — at rate 0
+   (`gate-rebuild.ts` L83–86). **§8A restates the whole calendar on the actual cadence.** The
+   check itself is phrase-gated and off-disk, so **the date arrived and nothing on disk can say
+   whether the threshold did** — which makes these the first calendared items whose own arrival
+   is unverifiable from here. Read 2 is what flips them to measured accrual.**)**
+9. **The Phase-2 accrual rate is stated two ways in one file**: L2573 reads **"at the measured 70
+   graded rows/day"**, while L3064 reads **`graded = 70` over the TWO complete dates 2026-07-25
+   and 2026-07-26** — i.e. **35/day**. Both are labelled "measured". At 35/day the 300-row floor
+   lands **~2026-08-03**, not ~07-31. Found 2026-07-31 while restating the calendar; **recorded,
+   not corrected** — resolving it needs the graded-row count, which is off-disk.
 8. **Every doc describing scheduled behaviour from the working tree** — `credit-budget.md`'s job
    table and `cron-jobs.md` gained dated re-derivations, but `workflow-timing.test.ts`'s
    classification text still reads the ship branch **by design** (main's copies carry no TIMING

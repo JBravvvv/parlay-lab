@@ -67,6 +67,35 @@ describe("burn-report.mjs — the residual is named", () => {
     expect(c.clientRows).toBe(1);
     expect(c.byMode["client/caesars_ev"]).toBe(1);
   });
+
+  /**
+   * THE SHAPE PRODUCTION ACTUALLY SERVES (2026-07-31, found from disk one command before the
+   * read ran). The case above passes on an ARRAY. `DayBlob.records` is `Record<string,
+   * PredRecord>` (pred-serialize L135) and `/api/predictions` serves the blob unwrapped
+   * (route L39) — so the ONLY shape this tool ever receives in production is a MAP, and on it
+   * the original threw `TypeError: recs is not iterable`. A green test on a shape production
+   * never produces is instrument defect #6 in miniature; this is the case that would have
+   * caught it, and it is the map that is pinned.
+   */
+  it("reading 15(c): the REAL blob shape — records as a keyed map, not an array", () => {
+    const c = predCensus({
+      date: "2026-07-30",
+      at: 1,
+      records: { "a|1": { src: "cron", selMode: "ev_gated" }, "b|2": { src: "client", selMode: "caesars_ev" } },
+      parlays: {},
+      games: {},
+      gens: [{ at: 2, trigger: "header", src: "cron" }],
+    });
+    expect(c.total, "a keyed map must census, not throw").toBe(2);
+    expect(c.clientRows).toBe(1);
+    expect(c.byMode["client/caesars_ev"]).toBe(1);
+    expect(c.gens).toEqual([{ at: 2, trigger: "header", src: "cron" }]);
+  });
+
+  it("an empty blob censuses to zero rather than throwing (dark date, not a crash)", () => {
+    expect(predCensus({ date: "2026-07-30", at: 0, records: {}, parlays: {}, games: {} }).total).toBe(0);
+    expect(predCensus({ date: "2026-07-30", at: 0, records: {}, parlays: {}, games: {} }).gens).toEqual([]);
+  });
 });
 
 describe("ledger-report.mjs — reading 15 whole", () => {
