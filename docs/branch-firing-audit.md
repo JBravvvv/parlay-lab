@@ -496,7 +496,8 @@ zero additions; 10 umpires advanced by exactly +10 games, matching the league de
 The counter is monotone.
 
 **→ THE OWNER'S SECOND BRANCH FIRES, and it changes a decision.** The replay magnitude on record
-for `umpKFrozen` — *8 of 18 K/outs rows move, max 16 pp, the emitted card CHANGES* — **was measured
+for `umpKFrozen` — *8 of 18 K/outs rows move, max 16 pp, the emitted card CHANGES*, a FIXTURE
+figure — **was measured
 with ONE umpire armed.** At ~78 of 85 armed, essentially every game's HP umpire carries a
 `kFactor`, so the factor applies to nearly every K/outs row rather than to the subset whose umpire
 happened to have five games. **That magnitude does not transfer, and unpinning `umpKFrozen` at
@@ -723,3 +724,252 @@ P(2) = 25%, P(≥3) = 18%.
 - **IMPOSSIBLE BRANCH**: any umpire's `g` decreases, or the league `g` moves by more than the
   number of games played → the counter is not monotone and the whole accrual model is wrong.
   Checked today: zero decreases, 10 umpires advanced by exactly +10 against a league delta of +10.
+
+---
+
+# PART FIVE — 2026-07-31, owner's items 1–5
+
+## 16. THE CITATION AUDIT (item 1)
+
+**Method, stated because it bounds the result**: a keyword classifier over each row's own text —
+`production` / `archive` / `fixture` / `synthetic` / `spec-unmeasured`. It classifies **what the
+row claims about its source**, not what actually produced the number. A row with no token is
+**UNLABELLED**, which is itself the finding.
+
+**`freeze-exit-bundle.md`, M/A rows — 28 tags exist (M5 refuted, M9 folded into M7+M9), 27 rows
+parsed:**
+
+| source class | rows |
+|---|---|
+| **UNLABELLED — names no source at all** | **11** (M1, M2, M3, M11, M17, M25, M21, A1, A2, A3, A4) |
+| ARCHIVE | 10 |
+| **FIXTURE** | **7** |
+| SPEC / UNMEASURED | 7 |
+| PRODUCTION | 2 |
+| SYNTHETIC | 1 |
+
+**Of the 7 fixture-sourced rows, exactly ONE (M20) reproduces the caveat. Six do not** — M4, M8,
+M12, M16, M23, M24.
+
+**→ THE OWNER'S FIRST BRANCH FIRES. This is a class with a count, and it goes in the instrument
+ledger beside the five instrument defects as DEFECT #7: PROVENANCE LOST IN TRANSIT.** The
+producing block says "armed fixture"; the citing block does not. Every instance the registry
+guard found, all corrected in place this turn:
+
+| file:line | figure | was |
+|---|---|---|
+| `session-handoff.md:510` | 8 of 18, 16 pp | **the primary defect — no fixture word anywhere near** |
+| `session-handoff.md:511` | 16 of 173, 15.1 pp | same |
+| `branch-firing-audit.md:499` | 8 of 18 | my own citation, earlier this session |
+| `collection-period.md:6805, 6814` | 8 of 18 | inside a block headed "armed fixture", but 4+ lines away |
+| `collection-period.md:7012, 7017` | 15.1 pp, 16 of 173 | same |
+| `harness-substitutions.md:970` | 25 of 30 | table row, qualifier in the prose above |
+
+**Nine citations, five documents.** `docs/cron-jobs.md` L421 had already written the rule for one
+family — *"every clamp and shrink number in the frozen table came from one armed fixture … those
+numbers are single-instrument until 08-14"* — and it was never generalised.
+
+**IMPOSSIBLE BRANCH — a measured effect tracing to a fixture built to straddle a guard: IT FIRES,
+TWICE, and both are retracted with dated markers**: the `umpKFrozen` replay and the `penQFrozen`
+replay. `tests/helpers/fixture-env.ts` L72–78 says `fix45/context.json` is *"a SYNTHETIC
+COMPOSITION of real values … with `hpUmp.g` spanning 3/5/9/40 and `pen_quality.ip` alternating
+9.0/40.0 **so both sides of the guards are covered**"*. **A fixture built to straddle a guard
+cannot measure the effect of that guard.** Both are now stated as fixture sensitivity readings,
+not magnitudes.
+
+### The two corrected rows
+
+**`umpKFrozen`** — production `context.json` has **never carried a `kFactor`** (`build_context.py`
+L232 gates at g ≥ 5; first crossing 07-30; carrier frozen 07-29T20:32Z). **No production
+measurement of the effect exists at any n.** What IS measurable, from the real `data/ump_k.json`:
+the factor is clamped to **[0.92, 1.08]**; **60% (51 of 85) of umpires would land ON a bound**;
+therefore **per-row magnitude cannot grow with the armed count — only coverage can**, from ~0.35
+of a 15-game board today to ~13.8 of 15 at freeze exit; and the two armed clamp in opposite
+directions, so the armed population is not directionally biased. **The unpin decision is about
+BREADTH, NOT DEPTH.**
+
+**`penQFrozen`** — **what exists**: the factor is computed and discarded (M23); `shPenQFShadow`
+returns 30 finite values over 30 teams in [0.9500, 1.0600]; the live guard refuses anything under
+15 IP. **What does NOT exist**: any production measurement at all — **`data/pen_quality.json` has
+never materialised in a commit**, so the factor's INPUT is absent from production, not merely
+pinned. A replay of an absent input measures the fixture and nothing else.
+
+### The encoding, and its stated limit
+
+`tests/fixture-citation.test.ts`. **The obvious guard cannot work**: "a doc line naming a fixture
+must carry a caveat" is blind exactly where the qualifier went missing, which is the failure mode.
+**The nearest enforceable version is a REGISTRY OF THE FIGURES THEMSELVES** — a literal string per
+fixture-derived quantity; any docs line containing it (word-boundaried) must have a provenance
+token within ±3 lines. Observed red on nine instances across five docs, green after all nine were
+corrected; the mechanism is proven both ways plus a "provenance too far away" case on synthetics.
+
+**ITS LIMIT, STATED RATHER THAN ASSUMED HANDLED — this is the known-weak case the owner asked
+for**: it covers only figures someone has entered in the registry. A new fixture figure is
+unguarded until registered. **So the rule remains WRITTEN — a fixture is not production, a
+projection is not a measurement — and the test holds only the part a machine can hold.**
+
+**RECORDED AS THE STANDARD (owner's words, 2026-07-31)**: *declining to produce a synthetic number
+and setting it beside real ones is the correct call.* A projection is not a measurement and a
+fixture is not production.
+
+## 17. TOMORROW'S BOARD — the sequence, decided in advance (item 2)
+
+### The curl
+
+```
+curl -sS -H "x-cron-key: <CRON_SECRET>" "https://parlay-lab-six.vercel.app/api/generate"
+```
+
+**Use `x-cron-key`, NOT the sync phrase, and here is why it matters**: `app/api/generate/route.ts`
+L101/L105 sets `manual = syncAuthed(req)` and `scheduled = !manual && cronHeaderAuthed(req)`, and
+L289 stamps `trigger` from that. **A phrase curl stamps `trigger: "manual"`; a cron-key curl
+stamps `"header"`.** Reading 5 pre-commits `gen.trigger === "header"` **or it did not land** — so a
+phrase curl would make reading 5 read as a failure when nothing failed. **This clash is recorded
+now rather than discovered at the board.** `?force=1` is available only on the phrase path and is
+**not needed**: the 45-minute limiter (L126) has nothing to collide with after four dark days.
+
+**If it returns any of the four 200-without-a-board bodies — `{"ok":true,"skipped":"ran recently"}`
+· `{"ok":true,"skipped":"dead-slate",…}` · the good-board skip's `low-ceiling`/`no-games-left`/
+`covered`/`thin` · `{"ok":true,"date":…,"logged":0,"note":"no pregame picks…"}` — DO NOT RETRY AND
+DO NOT FORCE. Report the body verbatim and stop.** A 401 body is `{"error":"unauthorized"}` and
+means the header did not match; that is also a stop, not a retry.
+
+### The window, to the minute — and the crossing is at 22:10Z, not 22:15Z
+
+| from | PT | unstarted | ready | achievable | |
+|---|---|---|---|---|---|
+| **22:10Z** | 15:10 | **11** | 9 | **0.818** | **T crossed** |
+| **22:38Z** | 15:38 | **11** | 10 | **0.909** | **← FIRE HERE** |
+| 22:40Z | 15:40 | 10 | 10 | 1.000 | costs one game |
+| 23:05Z | 16:05 | 9 | 9 | 1.000 | |
+| 23:10Z | 16:10 | 8 | 8 | 1.000 | |
+| 23:15Z | 16:15 | **5** | 5 | 1.000 | ten of fifteen gone |
+
+**Waiting from 22:10 to 22:38 costs NOTHING — still 11 unstarted — and buys 0.818 → 0.909.**
+Waiting to 22:40 costs one game for 1.000. After 23:05 the slate empties fast. **Fire at 22:38Z
+(15:38 PT); anywhere in 22:38–22:45Z is equivalent within one game.** Cost at 11 unstarted:
+**62–70** on the band.
+
+### Preconditions at the fire
+
+| # | condition | status |
+|---|---|---|
+| 1 | residual is client-side | **PENDING — Variant B** |
+| 2 | propsnap store has no weekday rows | **PENDING — the ungated curl** |
+| 3 | calibrate pause landed | ✅ **SATISFIED** — `vercel.json`'s `crons` array removed, read back from origin, deploy verified alive |
+
+**If either pending read comes back wrong, the board does not fire, and the day is recorded with
+the FAILING CONDITION NAMED — not as "dark".** Four days have been recorded as dark; the fifth
+gets a reason.
+
+### The seeds block — what board 1 must carry, field by field
+
+| reading | must-carry field | absent ⇒ |
+|---|---|---|
+| homogeneous window | the board exists at all | window stays COUNT ZERO, fifth dark day |
+| echo landing (r3) | `echo` present in the response body | the push did not land |
+| trigger mark (r5) | `gen.trigger === "header"` | did not land — **use the cron-key curl** |
+| echo fields (r25) | `outsSusp === true`, `selMode === "ev_gated"`, priors/ctx hash = the pause pair | something shipped early, or the statics are not the pause vintage |
+| **outs flag, first production exercise** | outs rows present AND `susp` — **and ZERO outs legs in built tickets** | vacuity branch first: zero outs rows proves nothing |
+| cfSel (r4, r24) | `cfSel` on EVERY susp row, with `rank` AND `stake` | did not land |
+| clamp census (r24) | `clampActivity` present, per-site counts | arming is not reaching production analyze |
+| hot-site fidelity | per-site call counts ≥ 30 on the pooled archive | cold sites print counts |
+| **mktN / reopen crossing (r29)** | `echo.mktN` per market vs `consMinN = 100`, beside per-market blocked-reason counts | the mktN echo did not land; the blocked-reason proxy is the only reading |
+| HRR | rows present AND greyed | display half vs server half |
+| replay + join | ParlayPred membership diff | four branches, unchanged |
+
+**THE CALIBRATION VINTAGE STAMP ON THAT BOARD**: the pause froze `pl:cal:summary`/`weights` at
+whatever the store last held, and **`GET /api/calibration` is what dates it.** Board 1 must be
+recorded with that stamp beside it — it is the first board of the homogeneous window and the
+first board whose calibration input is provably immobile.
+
+**PRE-COMMITTED, fixed now**: achievable ≥ 0.80 at the fire → composition readings VALID, full
+fifteen steps · below 0.80 → engine-half only · any 200-without-a-board body → report and stop ·
+**IMPOSSIBLE BRANCH: tickets containing `pitcher_outs` legs → the outs flag is not reaching the
+server path and is cosmetic. M-item the same day, and it outranks the card.**
+
+## 18. VARIANT B RESTATED — `c` IS NOW THE PRIMARY TARGET (item 3)
+
+**Step 1 is a request of KNOWN product**: `regions=us,eu × markets=h2h,totals,spreads` = **3 × 2 =
+6 market-region pairs**. Its quota delta measures the billing model directly.
+
+**What it pins down**: whether a fully-quoted market-region pair costs exactly 1 credit, on THAT
+request shape. **What it does NOT pin down**: whether `c` generalises across slates. The props
+sweep requests **six markets × one region** per event, and its per-event cost is the number of
+those six actually quoted — which varies by game. **So step 1 calibrates the BILLING RULE, not the
+props sweep's per-event MEAN.** A delta of exactly 6 says "1 credit per quoted pair" and leaves
+the props mean still bounded by [5.114, 5.845]; it does not collapse the band by itself. Stated
+plainly so the read is not over-claimed when it lands.
+
+**With the rule pinned, the series is recomputed and printed again** (§12's table), and that is
+what survives or collapses.
+
+**Pre-committed:**
+- **`c` at or near 6.0 for the known request** → the billing rule is 1/pair. The binding window's
+  props attribution at 6.0/event would go negative, so **a constant per-event cost across slates
+  is dead** — replaced by *cost = Σ over events of (markets quoted, ≤ 6)*, i.e. the archive's
+  event count is a UPPER bound on billable units and the residual must be recomputed per day from
+  per-event market counts, which the archive does carry.
+- **`c` near 5.1 for the known request** → a fully-quoted pair sometimes costs less than 1, the
+  constant model is consistent, the residual sits at its floor, and the relay contrast stands at
+  **2.2×**.
+- **`c` outside [0, 6]** → something else is being charged on that request. Print it; that
+  outranks the SharpDesk question.
+
+**The cache test is now secondary**: steps 3 and 5 tell us whether SharpDesk is a repeat spender,
+not what `c` is. Both still run; the order is unchanged.
+
+## 19. THE ARMING RATE'S PROVENANCE — AND A BETTER PROJECTION (item 4)
+
+**1.45 came from the DISTRIBUTION, not from the two observed days.** The closed form was
+`(umpires at g = 4) × (league games/day ÷ roster)` = `11 × (11.2 ÷ 85)` = **1.449**. Its three
+inputs are the g-distribution, the league game count and the roster. **The two crossings were a
+comparison, never an input. The owner's first branch fires: the test is valid and tomorrow is a
+real test.**
+
+**But the closed form was an UNDERESTIMATE**, because it counts only the g = 4 pool and ignores
+umpires at g = 3 who draw two assignments. A simulation over the same distribution — uniform
+assignment, 11.2 games/day, seeded, 4,000 runs — gives **mean 1.61**, and its full distribution
+replaces the Poisson approximation:
+
+| crossings tomorrow | 0 | 1 | 2 | 3 | ≥4 |
+|---|---|---|---|---|---|
+| **simulated** | **14.7%** | **34.4%** | **31.5%** | **14.7%** | **4.7%** |
+
+**Projection, by simulation rather than by extrapolation** (2,000 runs, 90% band):
+
+| date | armed, median | 90% band |
+|---|---|---|
+| 2026-08-01 | 4 | [2, 6] |
+| 2026-08-15 | **40** | [36, 45] |
+| **2026-09-22 (freeze exit)** | **83 of 85** | **[80, 85]** |
+
+**The earlier ~78 was a linear extrapolation of the closed-form rate. The simulation says 83 of
+85 — effectively the entire roster — and it uses the distribution, not the observations.** Both
+the test and the projection are therefore non-circular; the assumption they DO rest on is
+**uniform assignment across the 85**, which is the thing the ">2 twice" branch would falsify.
+
+**Revised branch for tomorrow, replacing the Poisson figures**: 0 → 14.7%, not a rejection;
+**two consecutive zeros ≈ 2.2%** and WOULD question the model · 1 or 2 → the body, 66% combined ·
+3 → 14.7%, unremarkable · **≥4 → 4.7%, and twice would mean assignments are not uniform.**
+
+## 20. THE `/api/calibration` PRE-COMMITMENT, COMPLETE (item 5)
+
+Already on disk at the top of `collection-period.md`; restated here whole, with the two framings
+the owner named:
+
+1. **per-market `n` against `SLOPE_MIN_N = 100` and `GLOBAL_MIN_N = 150`, and whether ANY market
+   has ever cleared them.**
+2. **the current `mults` and `globalShrink`** — that pair IS the frozen vintage from today.
+3. **`lastRun`** — which dates the vintage. Written at calibrate route L47, **read by nothing**.
+4. **`weights.log`** — `{at, market, before, after, bucket}` per adjustment; any entry is dated
+   proof the engine's inputs moved.
+5. **IF THE STORE HOLDS AN IDENTITY** (no market ever cleared a threshold): **the calibrate pause
+   froze nothing that was moving. The finding is EXPOSURE WITHOUT EFFECT, and the third freeze
+   point is PRECAUTIONARY RATHER THAN CORRECTIVE.** Said that way, in those words.
+6. **IF THE STORE HOLDS A LIVE FIT**: every board before today read a different calibration than
+   tomorrow's will, and **cross-day comparability of anything already measured restates** — the
+   homogeneous window's start date becomes 2026-07-31, not 2026-07-29.
+7. **IMPOSSIBLE BRANCH**: `mults` non-empty while every market sits under `SLOPE_MIN_N` → the
+   weekly state machine moved without the nightly fit and `applyWeeklyAdjustment`'s own n ≥ 150
+   gate did not hold. Print both.

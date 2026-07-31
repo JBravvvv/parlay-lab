@@ -967,7 +967,7 @@ applied and already killed one finding.
 
 | | |
 |---|---|
-| sites executing | 25 of 30 |
+| sites executing (**fixture** slate) | 25 of 30 |
 | **firing fewer than 30 times** | **11 of 25** |
 | firing 10 times or fewer | 6 |
 | median calls per site | 161 |

@@ -32,11 +32,15 @@ residual is client-side — **Variant B**; (2) the propsnap store shows no weekd
 (3) **the calibrate pause is landed** so board 1 is not read against a calibration that
 moves overnight — DONE this turn, `vercel.json`'s `crons` array removed.
 
-**TOMORROW, Sat 2026-08-01, 15 games**: T = 0.80 is crossed at **22:15Z (0.818, 11
-unstarted)**; 22:45–23:00Z reads 1.000 over 10. **THE WINDOW IS 22:15Z–23:00Z = 15:15–16:00
-PT.** ⚠️ **The cron cannot do it**: entry 1 is `45 22 * * 1-5`, weekdays only, and the
-Saturday entry `0 18 * * 6` lands at achievable **0.267** — engine-half only. A
-composition-valid board tomorrow fires on the owner's curl inside that window.
+**TOMORROW, Sat 2026-08-01, 15 games** (exact transitions, `branch-firing-audit.md` §17):
+T = 0.80 crosses at **22:10Z** (0.818 over 11 unstarted — not 22:15, the 15-min grid missed
+it); **22:38Z reads 0.909 over 11 and is the FIRE POINT** — waiting from 22:10 costs no
+games and buys the margin; 22:40Z reads 1.000 but costs one game; by 23:15Z only 5 of 15
+remain. ⚠️ **The cron cannot do it**: entry 1 is `45 22 * * 1-5`, weekdays only, and the
+Saturday entry `0 18 * * 6` lands at achievable **0.267** — engine-half only.
+**⚠️ USE `x-cron-key`, NOT THE PHRASE**: `route.ts` L101/L105/L289 stamp `trigger` from the
+auth path, so a phrase curl stamps `"manual"` and **reading 5 pre-commits `=== "header"` or
+it did not land** — a phrase curl would read as a failure when nothing failed.
 
 **RUN THESE FIRST — all zero Odds credits. Order: propsnap → calibration → ledger → pred →
 Variant B.** The first needs NO phrase (`/api/propsnap`'s read is ungated); the rest are yours.
@@ -506,9 +510,26 @@ carries an earlier v1 line reading "38 CHOSEN (11 …)" at L16 — the v2.3 bloc
 it and says so.)
 **Unmeasured-with-measured-consequence**: `coreEvMin` (self-graded sweep) · damping 0.5
 (40 bp range) · `SH_W` (sweep self-graded by construction) · the 1/n cap relax
-(10%/5%/3.33%/2.5% ladder; Kelly ceilings bound n=1 at ≤ ~8%) · **`umpKFrozen`** (replay
-07-30: 8 of 18 K/outs rows move, max 16 pp, and the emitted card CHANGES) ·
-**`penQFrozen`** (M23: 16 of 173 rows move, max 15.1 pp, card identical).
+(10%/5%/3.33%/2.5% ladder; Kelly ceilings bound n=1 at ≤ ~8%) ·
+**`umpKFrozen`** — ⚠️ **CORRECTED 2026-07-31 (owner's item 1): the replay figures here were
+FIXTURE-DERIVED and were cited as production magnitudes.** `tests/fixtures/fix45`'s context
+sets `hpUmp.g` to 3/5/9/40 and supplies `kFactor` values by hand, and
+`tests/armed-baseline.test.ts` L32–36 says of that fixture *"Do not cite a figure from this
+baseline as a production measurement."* **Production `context.json` has never carried a single
+`kFactor`** (`build_context.py` L232 gates on g ≥ 5; no umpire reached 5 until 07-30; the
+carrier froze 07-29T20:32Z). **What is measurable, from the real `data/ump_k.json`**: the factor
+is clamped to **[0.92, 1.08]**, **60% (51 of 85) of umpires would land ON a bound**, so
+**per-row magnitude cannot grow with the armed count — only COVERAGE can**, from ~0.35 of a
+15-game board's HP umpires today to ~13.8 of 15 at the projected freeze-exit count. The two
+armed clamp in opposite directions (1.080 / 0.920), so the armed population is not directionally
+biased. **The unpin decision is about BREADTH, NOT DEPTH. No production measurement of the
+effect exists.** ·
+**`penQFrozen`** — ⚠️ **SAME CORRECTION, same fixture**: `fix45` alternates `pen_quality.ip`
+9.0/40.0 to straddle the `ip ≥ 15` guard. **What exists**: the factor is computed and discarded
+(M23), `shPenQFShadow` returns 30 finite values over 30 teams in [0.9500, 1.0600], and the live
+guard refuses anything under 15 IP. **What does NOT exist**: any production measurement at all
+— `data/pen_quality.json` **has never materialised in a commit**, so the factor's input is
+absent from production, not merely pinned. `docs/branch-firing-audit.md` §13.
 **Operator rules** (NOT engine parameters): **#1** no slip above 2% ($50 at $2,500) ·
 **#2** step 15 is diagnostic only, mode returns to `ev_gated` as the last action before
 placing · **#3** no legacy mode opened at all until M24 resolves.

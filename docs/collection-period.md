@@ -6802,7 +6802,7 @@ self-arming factor and the price, and the pin has no expiry.**
 | quantity | pinned (today) | factor live |
 |---|---|---|
 | K/outs rows compared | 18 | 18 |
-| rows whose prob MOVED | — | **8 of 18** |
+| rows whose prob MOVED (**fixture**, not production) | — | **8 of 18** |
 | max \|Δprob\| | — | **16 pp** |
 | mean \|Δprob\| (moved rows) | — | **3.34 pp** |
 | ump-tagged rows | **0** | **13** |
@@ -6811,7 +6811,7 @@ self-arming factor and the price, and the pin has no expiry.**
 | cards identical? | **NO — a different ticket set and different stakes** |
 **→ the owner's third branch fires: the pin is a live model decision, not
 housekeeping.** It goes in the frozen table WITH THIS NUMBER beside it: pinning
-`shUmpKf` changes 8 of 18 K/outs row probabilities (max 16 pp) and changes which
+`shUmpKf` changes 8 of 18 K/outs row probabilities on THE ARMED FIXTURE (max 16 pp) and changes which
 tickets are emitted. The impossible branch (zero diff) is SILENT — the factor
 plainly can reach the price; the pin is exactly what stops it.
 **The pipeline that maintains it**: `context.yml` → `tools/build_context.py`,
@@ -7009,12 +7009,12 @@ shadow. **The third branch does not fire; nothing claims it is live.**
 |---|---|
 | rows compared | **173** |
 | rows whose prob MOVED | **16** |
-| max \|Δprob\| | **15.1 pp** |
+| max \|Δprob\| (**fixture**, not production) | **15.1 pp** |
 | mean \|Δprob\| (moved rows) | **1.44 pp** |
 | pool tickets | 50 → 50 |
 | **emitted card** | **IDENTICAL** (Outs2 $60 · TB3 $11 · Outs3 $34 both ways) |
 **→ the first branch fires: computed and discarded. M23.** Magnitude, stated with its
-limit: **the factor reaches prices (16 of 173 rows, up to 15.1 pp) but does not change
+limit: **on the ARMED FIXTURE the factor reaches prices (16 of 173 rows, up to 15.1 pp) but does not change
 what gets bet on this board** — unlike `shUmpKf`, whose replay changed the card. The
 impossible branch (reaches the price by another path) is silent: with the pin on,
 `shPenQF` returns 1 before reading anything.
