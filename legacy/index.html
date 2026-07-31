@@ -1084,7 +1084,7 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
        than consMinN graded ledger legs also needs the de-vigged consensus itself to price it
        no worse than consMinEv% at the basis. mktN arrives from the calibration store at arm
        time; an unknown market counts as small — a market is never assumed proven. */
-  coreCzEvMin:0,coreMaxLegs:3,hrrAltMax:-1/* 0.5→−1 2026-07-27, signed off: HRR O0.5 joins its own market's suspension until the retirement criterion in docs/collection-period.md */,consMinN:100,consMinEv:-1,mktN:null,
+  coreCzEvMin:0,coreMaxLegs:3,outsSusp:true/* 2026-07-31 signed off: pitcher_outs suspended from auto-selection in the disciplined modes pending the M2 interlocked-pair fix (docs/pitcher-outs-audit.md DECIDED). Same construction as hrrAltMax. */,hrrAltMax:-1/* 0.5→−1 2026-07-27, signed off: HRR O0.5 joins its own market's suspension until the retirement criterion in docs/collection-period.md */,consMinN:100,consMinEv:-1,mktN:null,
   /* FUN structure caps (Correction 2, 2026-07-23): FUN is exempt from the EV gate —
      a lottery ticket is never +EV, that's what makes it a lottery — so it is capped by
      structure instead: at most funMaxTickets per day (supplemental locks count toward
@@ -2511,7 +2511,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
            ticket); O0.5 carries a "watch" tag. Legacy modes untagged (parity). */
         var lpq=(r.lkey||"").split("|"),hrrRow=lpq[1]==="batter_hits_runs_rbis";
         var dscpM=(SH_CFG.selMode==="dk_fd"||SH_CFG.selMode==="ev_gated");
-        var suspRow=dscpM&&hrrRow&&SH_CFG.hrrAltMax!=null&&Number(lpq[2])>SH_CFG.hrrAltMax;
+        var suspRow=dscpM&&((hrrRow&&SH_CFG.hrrAltMax!=null&&Number(lpq[2])>SH_CFG.hrrAltMax)||(lpq[1]==="pitcher_outs"&&!!SH_CFG.outsSusp));
         /* EV at the best available price; ¼-Kelly fraction capped at 2% of bankroll (doc Phase 7) */
         var dec=amToDec(r.oddsN),ev=shEV(r.p,dec),band=shBand(r.nEff);
         var kellyF=Math.min(0.25*shKelly(r.p,dec),0.02);
@@ -2657,6 +2657,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
            calibration earns them back */
         var lp=(r.lkey||"").split("|");
         if(lp[1]==="batter_hits_runs_rbis"&&Number(lp[2])>hrrMax)return false;
+        if(lp[1]==="pitcher_outs"&&SH_CFG.outsSusp)return false; /* outs suspension 2026-07-31 — same bar, whole-market, M2/M2' unfixed */
         return true;});});
       C=C2;
     }
@@ -3192,8 +3193,10 @@ function shFunPick(pool,amount,cfg,excludeIds,excludeLegs){
   function legDup(w){return w.pl.legs.some(function(l){return usedLegs[l.label+"|"+l.prop];});}
   /* bucket playable tickets into odds tiers at the CAESARS price */
   var tiers=cfg.funTiers.map(function(){return [];});
+  var dscpF=(cfg.selMode==="dk_fd"||cfg.selMode==="ev_gated"); /* suspensions reach FUN too (2026-07-31) */
   pool.forEach(function(w,i){
     if(ex[shTicketId(w.pl)])return;
+    if(dscpF&&cfg.outsSusp&&w.pl.legs.some(function(l){return (l.lkey||"").split("|")[1]==="pitcher_outs";}))return;
     if((Number(w.pl.prob)||0)<cfg.funMinProb)return; /* honest-longshot floor */
     if(cfg.funMaxLegs&&w.pl.legs.length>cfg.funMaxLegs)return; /* structure cap (Correction 2) */
     /* dk_fd: tiers cut at the basis price, and a FUN ticket still needs a CZ quote to play */

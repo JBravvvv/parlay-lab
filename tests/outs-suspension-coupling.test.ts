@@ -61,7 +61,7 @@ describe("outs suspension flag is coupled to the production arming modes (SPEC �
   });
   afterAll(() => vi.useRealTimers());
 
-  it.fails("every DISCIPLINED mode emits ZERO outs legs to the pool (open — flips in the ship commit)", async () => {
+  it("every DISCIPLINED mode emits ZERO outs legs to the pool (SHIPPED 2026-07-31)", async () => {
     const modes = productionModes();
     expect(modes.length, "no disciplined mode in the reachable domain").toBeGreaterThanOrEqual(2);
     for (const mode of modes) {
@@ -103,12 +103,29 @@ function isOutsRow(r: Record<string, unknown>): boolean {
   return ((r.lkey as string) || "").split("|")[1] === "pitcher_outs";
 }
 
-/** Deep-copy the analyze output, removing ONLY the hrrAltMax-precedent tag set from
- *  pitcher_outs rows in categories/categoriesLive. Everything else — every pricing
- *  field on every row, non-outs rows in full, clampActivity, tickets — is compared
- *  byte-for-byte. */
+/** THE ROW-LEVEL KEYS. Scope corrected 2026-07-31 on the owner's authorization after
+ *  the ship this guard gated exposed a header/implementation disagreement: the header
+ *  always claimed ROW-LEVEL identity, the implementation compared the WHOLE analyze
+ *  output — including `parlays`/`parlaysMixed`, which a selection-level flag changes BY
+ *  DESIGN, making the assertion unsatisfiable for the entire class of flag it exists to
+ *  check. Resolved by measurement, not by preference: a field-by-field diff of
+ *  `overview` found EXACTLY two differing spans, both ticket counts
+ *  ("93 not-started + 68 mixed" → "91 + 66"), while every category's ROW count was
+ *  identical — so every differing `overview` field derives from the ticket sets.
+ *  The ticket-level change is NOT unasserted: the pool half below requires ZERO outs
+ *  legs and the tag half requires every outs row tagged. */
+const ROW_LEVEL_KEYS = [
+  "categories", "categoriesLive", "propBoard", "simMarkets",
+  "gameInfo", "liveGames", "trap", "passes", "luCoverage",
+];
+
+/** Deep-copy the ROW-LEVEL half of the analyze output, removing ONLY the
+ *  hrrAltMax-precedent tag set from pitcher_outs rows. Everything else — every pricing
+ *  field on every row, non-outs rows in full — is compared byte-for-byte. */
 function stripOutsTags(d: unknown): unknown {
-  const c = JSON.parse(JSON.stringify(d)) as Record<string, Record<string, unknown[]>>;
+  const full = JSON.parse(JSON.stringify(d)) as Record<string, unknown>;
+  const c: Record<string, Record<string, unknown[]>> = {};
+  for (const k of ROW_LEVEL_KEYS) if (k in full) c[k] = full[k] as Record<string, unknown[]>;
   for (const catsKey of ["categories", "categoriesLive"]) {
     const cats = c[catsKey];
     if (!cats) continue;
@@ -162,7 +179,7 @@ describe("scope by diff: the flag's boundary is measured, not self-declared", ()
     expect(JSON.stringify(stripOutsTags(mutated))).not.toBe(JSON.stringify(stripOutsTags(off)));
   }, 600_000);
 
-  it.fails("flag-on tags every outs cats row and drops its badges (open — flips in the ship commit with the pool half)", async () => {
+  it("flag-on tags every outs cats row and drops its badges (SHIPPED 2026-07-31, same commit as the pool half)", async () => {
     const mode = productionModes()[0];
     const on = await analyzeWith(mode, true);
     const outsRows = Object.values((on.categories as Record<string, unknown[]>) || {})

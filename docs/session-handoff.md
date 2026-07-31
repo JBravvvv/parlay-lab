@@ -44,7 +44,25 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 
 ## 2. RUN SHEET
 
-> ## ⛔ STATUS 2026-07-31 ~02:0xZ — NO BOARD, AND THE OUTS SHIP IS STOPPED ON ITS OWN GUARD
+> ## ✅ STATUS 2026-07-31 ~03:0xZ — THE OUTS FLAG IS SHIPPED
+> `overview` resolved by measurement (two differing spans, both ticket counts; every
+> category ROW count identical) → the scope correction was AUTHORIZED, the corrected
+> guard was OBSERVED RED on a planted row-level mutation, and the flag shipped: engine
+> **280,466 → 281,096 chars**,
+> `f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b` →
+> **`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**. Zero outs legs
+> in both disciplined modes; the legacy pair still carries 10 each (parity, pinned);
+> both `it.fails` flipped; 74 files / 562 tests green.
+> **`PENDING-LIVE-VERIFICATION` set 02:50Z — THE POST-DEPLOY RE-GREP IS DUE BY
+> 2026-08-01 02:50Z**, enforced by the resolution guard: if it is not done, the build
+> fails. **Friday's first action.**
+> **The first attempt turned three guards red** — item 5's comment correction at L1070
+> inserted lines ABOVE the line-number-keyed clamp sites ("clamp site L2258
+> disappeared"). Both comment edits were DROPPED per item 5's second branch and are
+> recorded as known-false. **General finding: any engine edit inserting a line above
+> L2371 is a silent instrument-vintage event.**
+>
+> ## ⛔ SUPERSEDED — STATUS 2026-07-31 ~02:0xZ (the first, stopped attempt)
 > **The outs flag did NOT ship.** It was built (6 edits, engine 280,466 → 282,186 chars,
 > `f6cf1513…` → `3e06cac82d3bb90b5cd3d009c147bb6cc21bc21cab9a0b1067bbefcb8295942a`), the **scope-by-diff invariant went RED**, and the
 > pre-committed branch fired: STOP. Engine edits REVERTED, tree back at `f6cf1513…`, no
@@ -76,8 +94,8 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 > a board — reading 24); the **config echo** (reading 25); **`mktN` on a board** (shipped
 > 07-30, never yet observed — reading 29); **cfSel with `rank` and `stake`** (shipped
 > 07-30, so no board has ever carried a sizeable counterfactual); the **trigger mark**
-> (reading 5); and the **same-day fp × predictions** join. It is NOT board 1 of a new
-> engine vintage — the outs ship stopped, so `f6cf1513…` still serves.
+> (reading 5); and the **same-day fp × predictions** join. **AND it IS board 1 of a new ENGINE VINTAGE** — the outs flag shipped 2026-07-31, so the served engine string is the new one (full hash in the status block above and in `src/lib/engine-echo.ts`) and every Friday reading is stamped TWO-VINTAGE in advance (the
+> engine ship + the K's/outs `consMinEv` crossing).
 > **HIGHEST-VALUE READ AVAILABLE, ZERO CREDITS, UNRUN: the ledger export.** The curl and
 > reading 15's one query sit in collection-period (THE EXPORT CURL AND READING 15). Run
 > it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into

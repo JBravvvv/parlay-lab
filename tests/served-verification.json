@@ -1,6 +1,6 @@
 {
-  "_": "SERVED-ARTIFACT VERIFICATION STATE (2026-07-30, owner's item 3). Test-owned: no runtime code reads this file. `pending` is set TRUE by an engine ship (the served artifact cannot carry the new string until that ship deploys), and set FALSE by the post-deploy re-grep, which also updates SERVED_ENGINE_SHA_VERIFIED in src/lib/engine-echo.ts. The resolution guard in tests/engine-echo.test.ts FAILS THE BUILD once a pending marker is older than MAX_PENDING_H hours — so the exception cannot become permanent by default.",
-  "pending": false,
-  "since": "2026-07-30T00:00:00Z",
-  "note": "no engine-string change outstanding; ENGINE_SHA === SERVED_ENGINE_SHA_VERIFIED"
+  "_": "SERVED-ARTIFACT VERIFICATION STATE (2026-07-30, owner's item 3). Test-owned: no runtime code reads this file. `pending` is set TRUE by an engine ship (the served artifact cannot carry the new string until that ship deploys), and set FALSE by the post-deploy re-grep, which also updates SERVED_ENGINE_SHA_VERIFIED in src/lib/engine-echo.ts. The resolution guard in tests/engine-echo.test.ts FAILS THE BUILD once a pending marker is older than MAX_PENDING_H hours \u2014 so the exception cannot become permanent by default.",
+  "pending": true,
+  "since": "2026-07-31T02:50:00Z",
+  "note": "outs flag ship 2026-07-31 ~02:50Z: engine string moved f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b -> b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867 (280,466 -> 281,096 chars). The served artifact carries the new string only after this deploy; the post-deploy re-grep clears this marker and is DUE BY 2026-08-01 02:50Z (24h, enforced by the resolution guard)."
 }

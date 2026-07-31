@@ -7497,3 +7497,164 @@ the alarming case.** Two sites, both in the builder, both silent about it.
 case rather than the silent one, and give `RebuildNote` the same treatment. Guard
 observed red first. **Worthless until legacy modes are safe — which operator rule #3
 already handles**, and that is why this stays spec.
+
+## ✅ 2026-07-31 ~02:5xZ — overview RESOLVED, THE SCOPE CORRECTION AUTHORIZED, THE OUTS FLAG SHIPPED
+
+**`overview` IS A STRING** (built at L2813 — a human-readable summary sentence), not an
+object. Its components: slate game count, live-game count, Monte-Carlo path count and
+simmed-game counts, Coors/wind notes, the V2 priors count, the `SH_W` blend
+percentages, the selMode sentence, **`counts` — per-category ROW counts from
+`preF.cats`**, the recency-blend sentence, **the three parlay counts**, and the
+data-gaps note.
+
+**THE FIELD-BY-FIELD DIFF (diagnostic run, then deleted): EXACTLY TWO DIFFERING SPANS,
+BOTH TICKET COUNTS.**
+| span | flag OFF | flag ON |
+|---|---|---|
+| @1013 | `93 not-started` | `91 not-started` |
+| @1030 | `68 mixed` | `66 mixed` |
+Ticket arrays: `parlays` 93 → 91, `parlaysMixed` 68 → 66, `parlaysLive` 0 → 0.
+**Per-category ROW counts: IDENTICAL for every category** — so `counts`, the one
+row-level component inside `overview`, contributes NO diff. The same-byte-length
+change (1,139 → 1,139) is two 2-digit counts each falling by 2.
+**→ every differing `overview` field derives from `parlays`/`parlaysMixed`. The owner's
+FIRST branch fires and the scope correction is AUTHORIZED.** The impossible branch
+(`overview` differing while both ticket sets are identical) did not fire.
+**Who reads `overview`**: the UI banner only — no instrument, no tool, no measurement
+on disk consumes it. Recorded because it was asked, and noted as NOT load-bearing for
+the decision, which turned on derivation.
+
+**WHICH ENCODED THE OWNER'S INVARIANT — the honest answer**: *both* the header and the
+implementation established scope BY DIFF, never by the flag's doc, so both satisfy the
+rule as stated. They disagreed only on the comparator's SCOPE. And the implementation's
+scope (whole analyze output) is **unsatisfiable by construction for the entire class of
+flag it exists to check**: a selection-level flag must change the ticket sets, so a
+whole-output comparator can only ever be green when the flag does nothing. **The header
+encoded the assertion that actually separates narrow from wide; the code encoded one
+that separates "does something" from "does nothing."** Corrected to the header's scope,
+with the ticket-level change asserted separately (the pool half requires ZERO outs legs;
+the tag half requires every outs row tagged).
+**RECORDED, as the owner ordered: the guard's header and its implementation described
+different assertions, and the ship it gated is what exposed it. A guard whose header
+and code disagree is a written rule with a test attached.**
+**Corrected guard OBSERVED RED before the ship**, per the owner's condition: a planted
+row-level mutation (a `prob` bumped inside `categories`) failed it with the intended
+message; plant removed, green.
+
+## ⚠️ THE LINE-NUMBER FINDING — A COMMENT NEARLY BROKE THE ROW-LEVEL INSTRUMENTS (2026-07-31)
+
+**The first ship attempt turned THREE guards red**: `clamp-activity`,
+`shrink-activity`, `hrr-compression` — *"clamp site L2258 disappeared from the
+engine."* **Cause, traced: the clamp instrumentation keys each call site by its LINE
+NUMBER, passed as a literal 4th argument (`shClamp(x,.86,1.12,"2258")`).** Item 5's
+comment correction at **L1070 inserted four lines ABOVE the instrumented region
+(L1591–L2371)**, shifting every clamp site — so the ids no longer matched their own
+lines. **The four functional edits are all at or below L2513 and shift nothing.**
+**→ item 5's SECOND branch fires: the comment corrections "complicate the ship's diff",
+so both are LEFT and recorded** — `legacy/index.html` **L1070** *"zero edge = zero
+stake"* and **L2991–92** *"stakes only flow after an explicit override"*, both known
+false in the legacy modes (M25), both awaiting a ship that has a reason to move lines.
+**AND THE GENERAL FINDING, which outlives this ship: any engine edit that INSERTS A
+LINE above L2371 is a silent instrument-vintage event** — it invalidates the
+line-number-keyed site ids that the clamp census, `shrink-activity` and the 08-17
+fixture-representativeness check all depend on. It does not change a single price. **It
+was caught only because three guards happen to pin the ids; nothing states the rule.**
+
+**THE SHIP, as it went out** — four functional edits, ZERO comment edits:
+`SH_CFG.outsSusp: true` (same line, no shift) · `finalizeCats` `suspRow` gains the outs
+disjunct behind `dscpM` (L2513, one line replaced in place) · `buildParlaySet` bars outs
+legs from every auto-built ticket in both disciplined modes (one line) · `shFunPick`
+restates the bar for ad-hoc pools (two lines). Engine **280,466 → 281,096 chars**,
+`f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b` →
+**`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**.
+**Verification at the shipped tree**: zero outs legs in the pool in BOTH disciplined
+modes; the legacy pair still carries **10 outs legs each** (parity stance, pinned as a
+census); scope-by-diff green under the corrected comparator; both `it.fails` halves
+flipped to `it` and green; **74 files / 562 tests green**, including the three
+line-number-keyed instrument guards. `PENDING-LIVE-VERIFICATION` set 2026-07-31 02:50Z
+— **the post-deploy re-grep is DUE BY 2026-08-01 02:50Z**, enforced.
+
+## line-history — 144/DAY, 70% OF THE BURN, NEVER AUTHORIZED (2026-07-31, owner's item 2; NOT changed)
+
+**What it collects**: MLB `h2h`/`totals`/`spreads` across **us+eu** regions (eu carries
+Pinnacle, the sharp anchor) through the app's own odds proxy, appending one compact
+snapshot per run to `data/YYYY-MM-DD.json` on `line-history`
+(`tools/snapshot_odds.py`). **Its own header states the cost: "3 markets × 2 regions =
+6 credits/run; hourly ~2.7k/month."** Granularity: whole-slate, hourly, game-level
+ML/RL/total prices — NOT props.
+**Consumers, named**: `tools/close_fair.py` · `tools/close_capture.py` ·
+`tools/phase2_series_b.py` (Series B) · plus the ML/RL half of the multibook memo's
+two-book work and `docs/cron-jobs.md`'s timing measurements.
+**Provenance**: created **2026-07-11** in `2151737` ("Engine v2 Phase 1: Statcast priors
+pipeline + line-history cron + program doc") — i.e. **on day one of the program**, as
+part of a bundle, at hourly from the start. **No commit, comment, or doc states a
+requirement for HOURLY.** The cadence has never appeared in a ration table, a cadence
+decision, or a credit projection — **the owner's first branch fires: it is an unmeasured
+cadence consuming ~70% of the runway.**
+**What it collected on the two dark days**: 24 snapshots/day of open→close ML/RL/total
+movement. **Usable without boards — yes**: `close_fair`/`close_capture` and Series B all
+read prices against time, not against our boards. **But Series B is the pre↔close
+pairing whose BOARD side is holed on dark days**, so its ML/RL half accrues while its
+board-joined half does not.
+**THE FOUR-CADENCE TABLE at 1,038 credits** (props ~60/day continues in every row):
+| cadence | line-history/day | total/day | days of runway | what it costs |
+|---|---|---|---|---|
+| **hourly (today)** | **144** | **~204** | **~5.0** | nothing lost; ~70% of the pool buys 24 snapshots/day of a curve that moves slowly outside the last hour |
+| **every 3h** | 48 | ~108 | **~9.6** | open→close shape kept at 8 points/day; the sub-hour move near first pitch is lost — which is exactly where the close lives |
+| **every 6h** | 24 | ~84 | **~12.4** | open/mid/close only; movement REGRESSIONS lose resolution, level comparisons survive |
+| **daily** | 6 | ~66 | **~15.7** | one point/day — open-to-close is gone; only day-over-day levels remain |
+| **off** | 0 | ~60 | **~17.3** | Series B's ML/RL half stops; `close_fair`/`close_capture` starve; props series unaffected |
+**The impossible branch — checked**: the arithmetic accounts for it exactly; 6/run ×
+24 runs = 144, and the script's own header states the same. No second derivation
+disagrees. **Nothing changed. The table is the owner's to decide.**
+
+## READING 15(c) AS ONE QUERY, AND WHAT A CLIENT ROW LOOKS LIKE (2026-07-31, owner's item 3)
+
+**The query, runnable on the same phrase as the export:**
+```
+curl -sS -H "x-pl-sync: <YOUR SYNC PHRASE>" \
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" \
+  > ~/pl-pred-2026-07-30.json     # repeat for 2026-07-29
+```
+Then: count records by `src` and by `selMode`; any record with **`src: "client"`** is a
+`bestBoard` fallthrough firing.
+**What a client-generated row looks like**: `src: "client"` (the cron path hardcodes
+`src: "cron"`, route L380) · `selMode` = **the DEVICE's mode at that moment**
+(`getSelectionMode()`, engine-client L379) rather than the pinned `ev_gated` ·
+**NO echo** — the echo is attached by the ROUTE only, so a client board carries none ·
+**no `gen.trigger`** and no board-KV entry. **So yes: perfectly distinguishable in the
+08-15 query, on `src` alone**, which is why reading 15's exclusion filter works.
+**If it fired on a dark day, does a board exist that `/api/board` does not surface?**
+**No — and this is the important part.** `generateBoard()` writes to **localStorage**
+and to `pl:pred` via `logBoardPredictions`; it does **not** write the board KV that
+`/api/board` reads (only the route does, after `encodeBoard`). **So a client generate
+produces prediction rows and a device-local board, and `/api/board` correctly reports
+`no-board-for-date`.** The day would be dark for the board archive and NOT dark for the
+prediction store — a state nothing in the docs has ever described.
+**Pre-committed branches stand as written**; the third candidate for the ~88, if no
+client rows exist, is named now: **the props-sweep runs that fetch before MIN_GAP
+decides** — `snapshot_props.py` reads the slate to decide `close`/`pre`/skip, and
+whether that read spends is unverified from here (its skip message prints AFTER the
+decision). That is checkable in the Actions logs, free.
+
+## M26 NARROWED, AND THE CLASS GETS ITS BOUNDARY (2026-07-31, owner's item 4)
+
+**FULL grep of every positivity/non-emptiness gate in the builder, board and ledger
+screens — 19 sites. Two are the class, one is its boundary, sixteen are ordinary
+empty-list renders.**
+| site | gate | verdict |
+|---|---|---|
+| `builder` **L885** | `card.kellyDaily > 0` hides the oversizing banner | **CLASS — M26.** Zero means "every ticket's Kelly is zero", the alarming state |
+| `builder` **L857** | `card.alloc.picks.length > 0` hides `RebuildNote` | **CLASS, but COMPENSATED — see below** |
+| `builder` **L896** | `(unallocated ?? 0) > 0` hides the unallocated-remainder line | **THE BOUNDARY — correctly suppressed**: zero unallocated means the card deployed fully, which is the benign state. The owner's impossible branch fires usefully here and gives the class its edge: *the class is gates where zero means "the protection produced nothing", not "there is nothing to report."* |
+| L749, L762, L859, L911, L939, L958, L1001, L536, L838, L792, board L342, ledger L518/L549, ParlaysSection L120/L218, ProScoreboard L174 | empty-list / no-value renders | not the class |
+**AND A CORRECTION TO MY OWN FRAMING FROM LAST TURN**: I wrote that on a no-play Friday
+*"the screen will be silent about why."* **That is wrong.** `BlockedPanel` renders
+**UNGATED** at **L818**, and the no-play panel carries its **own** rebuild render at
+**L800** (`{rebuild && …}`, not gated on picks). **So an empty card on Friday shows the
+blocked-reason panel and the rebuild note.** M26's second site is real but compensated —
+the information is reachable by another path on exactly the day it matters.
+**→ the class has TWO members and ONE genuinely severe one (L885).** No site hides a
+blocked-reason, a suppression, or a cap outright. Spec unchanged: surface the ratio with
+a breach label, drop the `kellyDaily > 0` gate, give L857 the same treatment for
+symmetry. Guard red first. **Not shipped.**
