@@ -12,11 +12,20 @@
 > frozen; cross-day claims state the axis from now on.
 
 > ⚠️ **THE FREEZE IS HOLDING A VINTAGE ASSEMBLED ALMOST ENTIRELY FROM UNMEASURED CHOICES
-> (census v2, 2026-07-29 — v1's numbers were wrong and are corrected below): of 39
+> (census v2.3, 2026-07-30 late — headline restated 2026-07-31): of **42** frozen
+> parameters, **0 were FITTED, 41 CHOSEN (12 with no stated rationale), 1 with stated
+> arithmetic; 9 have been measured since** — one vindicated (k=4), four condemned or
+> weak.** The parameter exit is not a tune-up of a measured system; it is the first
+> measurement pass over most of it.
+>
+> ~~(census v2, 2026-07-29 — v1's numbers were wrong and are corrected below): of 39
 > frozen parameters, 0 were FITTED, 38 CHOSEN (11 with no stated rationale), 1 with
-> stated arithmetic; 7 have been measured since — one vindicated (k=4), four condemned
-> or weak.** The parameter exit is not a tune-up of a measured system; it is the first
-> measurement pass over most of it. **(v2.1, 2026-07-29: the `simJoint` clamp bounds
+> stated arithmetic; 7 have been measured since~~ **[SUPERSEDED 2026-07-31, owner's item
+> 5 — the v2 headline sat above its own v2.1/v2.2/v2.3 amendments and read as the current
+> count. A dated amendment chain is this project's convention; a headline that never
+> absorbs it is not an amendment, it is a stale assertion. The BORN-provenance table
+> below had the same defect in a worse form — it never gained the three rows at all —
+> and was repaired the same day.]** **(v2.1, 2026-07-29: the `simJoint` clamp bounds
 > 0.25–4× join — CHOSEN, no stated rationale → 40 parameters / 39 chosen (12 no
 > rationale) / 1 stated-arithmetic; 8 since-measured — the clamp measured
 > NEVER-BINDING on the 07-26 archive, 0.564–1.192 across 19 ratios, n=1 board.)**
@@ -499,19 +508,28 @@ one each). By BORN provenance:
 |---|---|---|
 | **FITTED** | none — nothing in the frozen table was fitted from data at birth | **0** |
 | **CHOSEN with stated arithmetic** | `GAP_BUCKET_MIN_N` 150 | **1** |
-| **CHOSEN, rationale in comments** | selMode · `coreEvMin` · damping 0.5 · 20-board bar · `coreCzEvMin` · `consMinN`/`consMinEv` · `dailyBankrollCap` · `hrrAltMax` (signed; value chosen) · `coreNoHR` · `penQFrozen`/`umpKFrozen` · `coreMaxLegs` · `coreMaxDec` · `maxCoreTickets`/`minCoreTickets` · `perParlayCap` · `funMaxTickets`/`funMaxLegs` · `FUN_DEFAULT` · `funMinProb` · `funTiers` · `SH_W` · `SH_EDGE_MIN` · `SH_OVER_LEAN` · Kelly ¼ + 2% cap | **27** |
-| **CHOSEN, no stated rationale** | ump `g ≥ 5` · ump clamp [0.92, 1.08] · the nine `shShrink` k's | **11** |
+| **CHOSEN, rationale in comments** | selMode · `coreEvMin` · damping 0.5 · 20-board bar · `coreCzEvMin` · `consMinN`/`consMinEv` · `dailyBankrollCap` · `hrrAltMax` (signed; value chosen) · `coreNoHR` · `penQFrozen`/`umpKFrozen` · `coreMaxLegs` · `coreMaxDec` · `maxCoreTickets`/`minCoreTickets` · `perParlayCap` · `funMaxTickets`/`funMaxLegs` · `FUN_DEFAULT` · `funMinProb` · `funTiers` · `SH_W` · `SH_EDGE_MIN` · `SH_OVER_LEAN` · Kelly ¼ + 2% cap · **the `1/n` cap relax (ADDED 2026-07-31, census v2.2 — rationale stated, never measured)** · **`T` = 0.80 (ADDED 2026-07-31, census v2.3 — owner-chosen before any board's number was known; separates the 22:45Z window from the 22:00Z design point)** | **29** |
+| **CHOSEN, no stated rationale** | ump `g ≥ 5` · ump clamp [0.92, 1.08] · the nine `shShrink` k's · **the `simJoint` clamp bounds 0.25–4× (ADDED 2026-07-31, census v2.1)** | **12** |
 | **INHERITED / UNKNOWN** | none in the table (the `0.140` outs constant is an ENGINE constant outside the frozen table — inherited, M2's defect; noted, not counted) | **0** |
 
-**MEASURED-SINCE overlay (7 of 39)**: k=4 ×3 — measured RIGHT (M2, the vindication v1
-erased) · k=60 ×3 — measured WRONG (M11) · k=10 — measured weak (HRR). Plus two
-n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and damping
-0.5 (40 bp, shade-robust).
+**TABLE SUM: 0 + 1 + 29 + 12 + 0 = 42.** (REPAIRED 2026-07-31, owner's item 5. The three
+rows above marked ADDED were carried only in the v2.1/v2.2/v2.3 prose amendments and were
+never entered here, so the enumeration read 39 while the prose read 42 — an omission, not
+an amendment. The enumeration and the prose now agree at 42.)
 
-**Count: 0 fitted / 38 chosen (11 with no stated rationale) / 7 since-measured — of
-which one vindicated, four condemned or weak.** The sentence at the top of this doc now
-carries these numbers. **(v2.1, 2026-07-29: +simJoint clamp → 40 / 39 chosen (12 no
-rationale) / 8 since-measured; the clamp never binds on n=1 board — bundle.)**
+**MEASURED-SINCE overlay (9 of 42)**: k=4 ×3 — measured RIGHT (M2, the vindication v1
+erased) · k=60 ×3 — measured WRONG (M11) · k=10 — measured weak (HRR) · **the `simJoint`
+clamp — measured NEVER-BINDING on the 07-26 archive, 0.564–1.192 across 19 ratios, n=1
+board (v2.1)** · **the `1/n` cap relax — measured consequence: the disciplined path's
+Kelly ceilings bound n=1 at ≤ ~8% and under-deploy thin cards, $49 of $250 (v2.2)**. Plus
+two n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and
+damping 0.5 (40 bp, shade-robust).
+
+**Count: 0 fitted / 41 chosen (12 with no stated rationale) / 1 stated-arithmetic / 9
+since-measured — of which one vindicated, four condemned or weak. Total 42.** The
+sentence at the top of this doc carries these numbers. ~~(0 fitted / 38 chosen (11 with
+no stated rationale) / 7 since-measured)~~ **[SUPERSEDED 2026-07-31 — same defect as the
+headline: the v2.1 amendment was appended below this line instead of restating it.]**
 
 **WHAT THE PARAMETER EXIT CAN AND CANNOT LICENSE (2026-07-29, owner's paragraph — both
 halves stated)**: A positive Phase 2 result would establish that **this configuration's

@@ -39,6 +39,7 @@ sat unread and unnamed here. The list was a partial index presented as complete 
 | `freeze-exit-bundle.md` | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies, the vintage table |
 | `credit-budget.md` | **measured** per-job credit consumption and a proposed budget — priced line-history at ~25/day and named it non-load-bearing |
 | `cron-jobs.md` | the four cron-job.org entries, their schedules, and the measured GitHub-Actions delivery delays |
+| `branch-firing-audit.md` | **which branch actually fires**: the main-vs-frontend-rebuild split, every operational change marked live/not-live, the Actions run log against the burn series, and the declared-cron ceilings |
 | `session-handoff.md` | this file: the gate, the chain, the readings, the protocol |
 | `hrr-recalibration.md` | the H+R+RBI suspension's evidence, its provenance markers, the λ* reading |
 | `pitcher-outs-audit.md` | the outs model defect (M2/M2′), the flag's spec, the DECIDED record, the coverage gap |
@@ -72,6 +73,11 @@ sat unread and unnamed here. The list was a partial index presented as complete 
 | ~~"the 08-15 review's shadow population = susp counts"~~ | the population is the **cfSel-stamped subset**; susp counts are ADMISSION, not selection | 07-30 | collection-period, cfSel review block |
 | ~~"a no-play screen will be silent about why"~~ | **FALSE** — `BlockedPanel` (L818) and the no-play rebuild render (L800) are both UNGATED | 07-31 | collection-period, M26 block |
 | ~~"shPenQFShadow returns NaN"~~ | **my probe's error** (it returns an object; `Math.min` over objects is NaN). 30 teams, 30 finite values | 07-31 | collection-period, THE NaN FINDING WAS MINE |
+| ~~"props-history has FOUR crons / context has THREE / model.yml is ACTIVE"~~ (the 06:1x §6 table) | **ALL THREE WRONG — read from the non-firing branch.** Firing copy: props-history **TEN**, context **TWO**, model **PAUSED** | 07-31 | branch-firing-audit §1–2 |
+| ~~"the class is EVENT-DRIVEN, not scheduled" (the 4 h 26 m flat)~~ | **UNSUPPORTED** — the run log shows ZERO Actions runs in the flat, so it discriminates nothing | 07-31 | branch-firing-audit §3 |
+| ~~"GitHub delivers each cron more than once per batch"~~ | **WITHDRAWN** — ten declared, ten delivered, one-for-one on 07-28/29/30 | 07-31 | branch-firing-audit §4 |
+| ~~"line-history disabled, saving ~45/day"~~ | **the disable never reached the firing copy** and the job ran through 07-30T21:53:41Z; measured delivery is **3–4 runs/day ≈ 22/day**, not 7.5 × 6. Disabled for real 07-31 (`3356c54`) | 07-31 | branch-firing-audit §2 |
+| ~~"`/api/propsnap`: NO EVIDENCE, nothing it captured has ever folded"~~ | **mechanical, not evidential** — `--fold-only` only exists on the non-firing copy, so no capture *could* fold. Back on the candidate list | 07-31 | branch-firing-audit §2 |
 
 ## 2. THE OPEN QUESTION — ~224/DAY WITH NO NAMED MECHANISM
 
@@ -87,11 +93,19 @@ days. Both exits die on it before they die on anything measured.**
 | 07-30 16:45Z → 07-31 01:25Z | 200 | 23.1/h |
 | **07-31 01:25Z → 04:50Z** | **0** | **0/h** |
 | **07-31 04:50Z → 05:55Z** | **0** | **0/h** |
-**4 h 26 m of exactly zero.** A scheduled job cannot produce that — `props-history` alone
-has four active crons and GitHub's morning batch lands 06:00–08:30Z. **→ THE CLASS IS
-EVENT-DRIVEN, NOT SCHEDULED: it fires when something is USED, not when a clock ticks.**
-The 200-credit window spans the working day (9:45 AM–6:25 PM PT); the flat stretch is the
-night. Corroborated: no 07-31 props file exists and line-history is correctly silent.
+~~**4 h 26 m of exactly zero.** A scheduled job cannot produce that … **→ THE CLASS IS
+EVENT-DRIVEN, NOT SCHEDULED** … the flat stretch is the night.~~
+**[RETRACTED 2026-07-31, owner's item 2 — the Actions run log settles it and kills the
+inference: there were ZERO Actions runs between 2026-07-30T23:35:48Z and 06:26Z. The flat
+contains no scheduled delivery of any kind, so it discriminates nothing. The error was
+inferring absence-of-scheduled-spend from cron DECLARATIONS instead of from the run log.
+Also wrong: 01:25Z–05:55Z is 18:25–22:55 PT — evening, not night.
+`docs/branch-firing-audit.md` §3.]**
+**WHAT THE RUN LOG DOES SAY** (56 runs, 07-28→07-31; full table in the audit): residual
+**95** / **91** / **128** credits across the three spend windows and **0** across the
+flat — 314 unattributed over 37.4 h = **8.4/h ≈ 201/day**, highest at **14.8/h** during
+09:45–18:25 PT. Concentrated in the PT working day, consistent with device/browser use,
+**not demonstrated** — three coarse windows, and the flat had no client activity either.
 
 **CANDIDATES AND STATUS:**
 | candidate | status |
@@ -101,7 +115,7 @@ night. Corroborated: no 07-31 props file exists and line-history is correctly si
 | **`useAllStar.ts` L77 / `ufc.ts` L84–86** | **UNCOUNTED**, client-triggered odds fetches through the proxy; `ufc` has a `fresh=1` path that bypasses the cache |
 | props sweeps fetching before the gap decision | **CLEARED 07-31** — decide precedes fetch; the `/events` call at L277 costs ZERO (measured: 1,038 before and after) |
 | `/api/clv` | **CLEARED** — sights only legs of today's locked card; none was locked |
-| `/api/propsnap` | **NO EVIDENCE** — same per-event cost as the sweep, but no snapshot on 07-29 or 07-30 carries `src: "vercel"`, so nothing it captured has ever folded |
+| `/api/propsnap` | ~~**NO EVIDENCE**~~ → **BACK ON THE LIST, 2026-07-31.** The reason nothing carries `src: "vercel"` is MECHANICAL: the `--fold-only` tick lives only in `props-history.yml` on frontend-rebuild, the firing copy on main invokes `snapshot_props.py` **with no arguments**, so **a Vercel capture has never folded to git.** Absence of folded evidence ≠ absence of capture (`branch-firing-audit.md` §2) |
 **THE UNGATED SURFACE**: `/api/odds` is ungated except `fresh=1`; `/api/propsnap`'s READ
 is ungated; `/api/board` is deliberately ungated. **A warmup, health check, preview
 deploy or crawler can reach the proxy, and any Board render by anything pays the
@@ -381,9 +395,11 @@ all six disciplined tickets** and become an M-item that outranks the card. Empty
   (`17a68ee357ab9b0eeb6708423b4df61d40cabb79`, verified by `git ls-remote` this turn).
   **Working tree clean, nothing held** — `git status -sb` reads
   `## frontend-rebuild...origin/frontend-rebuild` with no ahead/behind.
-- **main: `53d0076`** (`53d0076c893b3bab46f4eeb5f3f4367e6aa385f8`) — the pause commit
-  plus the props-history concurrency fix. **main deploys nowhere** (`vercel.json`
-  `main: false`).
+- **main: `3356c54`** (`3356c547b77dc51d5474dc51982f9f1f14829b0d`, 2026-07-31 — the
+  line-history schedule disable, cherry-picked; was `53d0076`). **main deploys nowhere on
+  Vercel** (`vercel.json` `main: false`) **but it is the branch every scheduled workflow
+  fires from** (`origin/HEAD → main`) — see §6 and `branch-firing-audit.md`. It is 326
+  commits behind `frontend-rebuild` and has only ever been updated by hand.
 - **Served artifact: chunk `256-7cc559a830020345.js`** (renamed from
   `256-171aff5d10da160d.js`, which is itself the evidence the deploy landed). Engine
   string **281,096 chars**, sha256
@@ -403,34 +419,54 @@ all six disciplined tickets** and become an M-item that outranks the card. Empty
   `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`.
 - **THE BOT PAUSE — WHAT IT ACTUALLY FROZE**: it dropped `public/model/context.json`
   from `context.yml`'s `git add` (so the context artifact is frozen at `64c42ad`,
-  2026-07-29 20:32Z) and **`data/ump_k.json` keeps accruing by design**. **⚠️
-  `model.yml`'s cron reads ACTIVE in the file today (`30 9 * * *`)** — the pause is
-  described in this doc's history as disabling it; **the file says otherwise**, and
-  whether priors.json is still being committed is resolved by
-  `git log origin/main -- public/model/priors.json`.
+  2026-07-29 20:32Z) and **`data/ump_k.json` keeps accruing by design**.
+  ~~**⚠️ `model.yml`'s cron reads ACTIVE in the file today (`30 9 * * *`)** … resolved by
+  `git log origin/main -- public/model/priors.json`.~~ **[CORRECTED 2026-07-31 — I read
+  the NON-FIRING copy. On `origin/main`, model.yml's schedule is COMMENTED OUT: the pause
+  is IN FORCE. The query named was also wrong — the bot commits to `frontend-rebuild`, so
+  main would show no priors.json history either way. The right query,
+  `git log origin/frontend-rebuild -- public/model/priors.json`, gives the answer:
+  **priors last written `671aed9` 2026-07-29T15:58:41Z, context last `64c42ad`
+  2026-07-29T20:32:00Z, NOTHING SINCE.** Both writers stopped; the homogeneous data
+  vintage is intact.]**
 - `data/ump_k.json` crossed its self-arm threshold on 2026-07-30 (**Lance Barrett, g 4→5
   — the first umpire ever**), double-braked by the frozen carrier and
   `SH_CFG.umpKFrozen: true`; pinned by `tests/self-arm-stamp.test.ts`.
 
-## 6. JOB INVENTORY — DERIVED FROM FILES THIS TURN
+## 6. JOB INVENTORY — **REPLACED 2026-07-31: THE FIRING COPIES ON `origin/main`**
 
-| workflow | active crons (UTC) | docs claimed | reaches Odds API | cost |
+> ⚠️ **THE 2026-07-31 06:1x TABLE WAS DERIVED FROM THE WORKING TREE — i.e. from
+> `frontend-rebuild`, WHICH FIRES NOTHING. Every row of it was wrong about what runs, and
+> in both directions: it called "ten-cron" wrong (it is right), called "two crons" wrong
+> (it is right), and called the pause contradicted (it is in force).** Schedules fire only
+> from the default branch (`origin/HEAD → main`). Full audit: `branch-firing-audit.md`.
+
+| workflow (**on `origin/main`**) | active crons (UTC) | reaches Odds API | observed | ceiling |
 |---|---|---|---|---|
-| `props-history.yml` | **`0 13`, `0 17`, `0 23`, `0 3`** (four) | "ten-cron" / "three-cron+wait" — **BOTH WRONG** | YES | ~6 × unstarted events; `0 3` is `--fold-only`, free |
-| `board-archive.yml` | `0 12`, `0 19` | — | reads `/api/board` only | **0** (its own header L12–13) |
-| `context.yml` | **`0 17`, `30 22`, `0 12`** (three) | "two" — **WRONG** | no | 0 |
-| `model.yml` | **`30 9` — ACTIVE** | "paused/disabled" — **CONTRADICTED BY THE FILE** | no | 0 |
-| `hr-overround.yml` | `0 15 * * 0` | — | no | 0 |
-| `ufc.yml` | `0 15 * * 3`, `0 15 * * 6` | — | no (the client path spends) | 0 |
-| `line-history.yml` | **NONE — disabled 2026-07-31** | hourly | (was YES) | 0 |
+| `props-history.yml` | **TEN**: `0 17`, `0 20`, `0 21`, `0 22`, `30 22`, `0 23`, `30 23`, `0 0`, `30 0`, `0 1` | YES | ~198/day (5 paid of 10 delivered) | **7 paid ≈ 651/day** (MIN_GAP 40 min over a 480-min span) |
+| `board-archive.yml` | `0 12`, `0 19` | reads `/api/board` only | **0** | 0 |
+| `context.yml` | **TWO**: `0 17`, `30 22` (the `0 12` weekend cron is frontend-rebuild-only → **NEVER FIRED**) | no | 0 | 0 |
+| `model.yml` | **NONE — PAUSED and IN FORCE** (`a46c1f8`) | no | 0 | 0 |
+| `hr-overround.yml` | `0 15 * * 0` | no | 0 | 0 |
+| `line-history.yml` | **NONE — disabled on the FIRING copy 2026-07-31 (`3356c54`)**; was `12 * * * *` and delivering 3–4 runs/day through 07-30 | (was YES) | ~22/day until tonight | was **144/day** (no gap guard in `snapshot_odds.py`) |
+| `ufc.yml` | **ABSENT FROM main — HAS NEVER FIRED** | no | 0 | 0 |
+| `pages-build-deployment` | GitHub built-in, `event: dynamic`, 5 runs | no (runs no repo code) | **0** | 0 — but **in no inventory until now**, and its 07-30T03:03:28Z trigger is unexplained |
 **Routes reaching the Odds API**: `/api/odds` (proxy; `APP_PASSCODE` gates `fresh=1`
 only) · `/api/generate` (`cronHeaderAuthed`/`syncAuthed`) · `/api/clv` (`syncAuthed`) ·
 `/api/propsnap` (write gated, **READ UNGATED**).
 **Client-side proxy callers (none in any ration table)**: `src/engine2/sharpBoard.ts`,
 `src/lib/useAllStar.ts`, `src/lib/ufc.ts`, `src/lib/fetcher.ts`.
-**Archive-vs-schedule discrepancy (impossible branch, FIRES)**: the workflow declares 4
-crons; the archive shows **5 snapshots on 07-30 and 10 on 07-29** — GitHub delivers each
-cron more than once per batch, and MIN_GAP dedupes the PAYMENT, not the delivery.
+~~**Archive-vs-schedule discrepancy (impossible branch, FIRES)**: the workflow declares 4
+crons … GitHub delivers each cron more than once per batch~~ **[WITHDRAWN 2026-07-31 —
+the firing copy declares TEN, and the run log shows TEN delivered on 07-28, 07-29 and
+07-30. One-for-one. Nothing is delivered twice; MIN_GAP dedupes the PAYMENT, which is the
+mechanism working as documented.]**
+**⚠️ SCRIPT vs YML**: every workflow on main pulls its script from
+`origin/frontend-rebuild` at run time and `tools/` does not exist on main at all — so
+**script-level changes are LIVE on push** (MIN_GAP proved it: 10 runs → 5 paid) and **only
+yml-level things can be stale** (schedules, concurrency, checkout targets, **step
+arguments**, timeouts). Guarded by `tests/workflow-branch-sync.test.ts`, **RED right now**
+on seven files with an empty allow-list.
 
 ## 7. FROZEN TABLE, CENSUS, AND THE FOUR JUSTIFICATIONS
 
@@ -512,9 +548,16 @@ often than analyses, and they fail by returning plausible numbers.**
 - **Quota: READ 1,038 remaining / 18,962 used — 2026-07-31 05:55:44Z**
   (`data/quota-log.jsonl`, live read this turn). **Unchanged across three reads spanning
   4 h 26 m** — the flat that establishes the event-driven shape.
-- **Burn ≈ 422/day** (props ~198 measured + ~224 unattributed; line-history now 0).
-  **RUNWAY ≈ 2.5 DAYS.** ⚠️ Every runway/burn figure written before 2026-07-31 is
-  superseded (§1).
+- **Burn ≈ 421/day observed** (props ~198 + line-history ~22 + residual ~201, the last
+  three re-derived from the Actions run log 2026-07-31). **RUNWAY ≈ 2.5 DAYS.**
+  ⚠️ Every runway/burn figure written before 2026-07-31 is superseded (§1).
+- **AND THE CEILING, now on the record beside the observation** so a delivery improvement
+  is never read as a new spender: props-history's ten firing crons admit **7 paid
+  snapshots ≈ 651/day** under MIN_GAP (480-min span, 40-min gap). At ceiling the burn is
+  **~852/day → RUNWAY ≈ 1.2 DAYS** (it was ~996/day → **1.04 days** before tonight's
+  line-history disable reached the firing copy). `credit-budget.md` L175 prices
+  props-history at ≤192 — **3.4× below** this ceiling, written against a two-cron file
+  that stopped being the firing copy on 2026-07-26.
 - **Board-days: 1,038 / 150 = 6.9** at a full slate, ~17 at an evening 6-event board's
   ~60 — but the RUNWAY IN DAYS, not the board count, is what binds.
 - **Homogeneous window: COUNT ZERO.** 07-29, 07-30 and 07-31 all produced no board —
@@ -539,11 +582,25 @@ often than analyses, and they fail by returning plausible numbers.**
    path's hard-ceilings/unallocated-remainder text (L3105–06) and the measured
    $49-of-$250 under-deployment — design supersession never reconciled in the
    golden-rules text.
-6. `docs/collection-period.md` L16 ("38 CHOSEN (11 with no stated rationale)") vs the
-   v2.3 census block ("41 chosen (12 …)") — the later block supersedes, but the earlier
-   line is still present and unmarked.
-7. This doc's own pause description ("froze the priors + context WRITERS") vs
-   `.github/workflows/model.yml`, whose `schedule:` block reads ACTIVE (§5, §6).
+6. ~~`docs/collection-period.md` L16 ("38 CHOSEN (11 …)") vs the v2.3 census block~~
+   **RESOLVED 2026-07-31, owner's item 5** — headline struck with a SUPERSEDED marker; the
+   BORN-provenance table gained its three missing rows (`simJoint` clamp → no-rationale
+   12; the 1/n relax and T = 0.80 → rationale-in-comments 29); **table sum now 0+1+29+12+0
+   = 42**, agreeing with the prose. The table had the worse defect — it never gained the
+   rows at all, which is an omission, not an amendment. Still open, PRINTED NOT EDITED:
+   `docs/freeze-exit-bundle.md` **L451** carries "v2.1 restates 40 parameters / 39 chosen
+   (12 …)" — correctly labelled v2.1, so a dated snapshot rather than a stale assertion,
+   but any reader taking it as current gets 40 instead of 42.
+7. ~~This doc's pause description vs `model.yml`'s ACTIVE `schedule:` block~~
+   **RESOLVED 2026-07-31 — the DOC was wrong, not the pause.** I read the copy on
+   `frontend-rebuild`, which fires nothing. On `origin/main` the schedule is commented
+   out and both writers stopped on 07-29 (§5). **The generalisation is contradiction 8.**
+8. **NEW 2026-07-31 — every claim in this doc about anything on a clock was derived from
+   the non-firing branch.** §6 is replaced; `credit-budget.md`'s job table, `cron-jobs.md`
+   and `tests/workflow-timing.test.ts` (which reads `.github/workflows` from the working
+   tree, L32–33 — **instrument defect #6**) all still describe frontend-rebuild's copies.
+   Resolving instrument: `tests/workflow-branch-sync.test.ts`, **RED right now** on seven
+   files.
 
 ## 11. NOT ON DISK (missing input → how obtained)
 
