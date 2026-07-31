@@ -4,6 +4,34 @@ Purpose: tomorrow's entire chain, on disk. Every line re-sourced from the docs t
 turn; figures not sourceable are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves
 them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version got stale.
 
+## ⛔ TONIGHT (2026-07-31): NO BOARD FIRES — owner's ruling, item 1
+
+**A board at ~150 against 1,038 with ~47% of the burn unexplained is a bet on an unknown,
+not a measurement.** The cron entry stays as it is; **no curl**. Consequences, stated:
+**the homogeneous window stays at COUNT ZERO (a third consecutive dark board-day), and
+the outs flag — live in production since 2026-07-31 02:50Z — remains UNEXERCISED on a
+real board.** Every reading pre-committed for Friday re-arms for the next fire.
+
+**RUN THESE TWO ON YOUR PHRASE, TOP OF THE SHEET, ZERO CREDITS:**
+```
+curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger.json
+curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
+curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-29" > ~/pl-pred-0729.json
+```
+then, spending nothing:
+```
+node tools/ledger-report.mjs ~/pl-ledger.json      # reading 15 whole
+node tools/burn-report.mjs --pred ~/pl-pred-0730.json   # reading 15(c)
+```
+**Reading 15(c) settles the largest open question in the project: whether the
+`bestBoard` fallthrough is the ~224/day.**
+
+**BURN SERIES (`tools/quota.mjs --series`, live):** 13.5/h → 17.4/h → 23.1/h →
+**0/h → 0/h**. The flat 4.5 h is the finding: **event-driven, not scheduled.**
+**Quota 1,038 / 18,962 · burn ~422/day · runway ~2.5 days · board-days 6.9 at a full
+slate.** ⚠️ **EVERY RUNWAY, BURN AND BOARD-DAY FIGURE WRITTEN BEFORE 2026-07-31 IS
+SUPERSEDED** — they rested on one evening window generalised to a day.
+
 ## 0. READ-FIRST INDEX (added 2026-07-31, owner's item 3 — every doc, no exceptions)
 
 **Why this exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"
@@ -209,7 +237,7 @@ the owner's explicit in-the-moment authorization. Curl-after-cron-success return
 printed → the owner's go/no-go → quota READ (free: `/v4/sports` via the odds proxy,
 headers passed) → board (cron preferred, curl fallback) → quota READ → `gen=list` →
 **echo present in the response body** (absent → the push did not land) → **cfSel
-stamp on every suspended row** (absent → did not land) → `self_consistency`: zero
+stamp on every suspended row** (absent → did not land) → `self_consistency` (**`python3 tools/self_consistency.py`** — the tool exists; call it by path): zero
 TB≥1==H≥1 violations, zero HRR legs in built tickets, BOTH population sizes printed
 (zero-over-empty is not a pass) → app-switcher double reopen → HRR rows present AND
 greyed → replay dump + ParlayPred membership diff → Control C's production
@@ -547,7 +575,9 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     authorization with the disabled protections stated (collection-period).
 23. The 22:00Z board's own coverage impossible branch: luPct > 50 → the projection
     was wrong, the window wider — print both (collection-period, item-1 resolution).
-24. **Board-1 clampActivity (added 07-30)**: today's board data carries
+24. **Board-1 clampActivity (added 07-30; CALLS A TOOL as of 07-31 —
+    `node tools/board-report.mjs <board.json>` prints presence and per-site counts, and
+    `tests/clamp-activity.test.ts` implements the same computation on the fixture)**: today's board data carries
     `clampActivity` (per-site {bounds,n,lo,hi,mid}; the route arms `clampLog`
     L244) → the clamp census and hot-site fidelity START — 13 sites projected to
     clear ≥30 calls at board 1 on a 6-game slate (probe table,

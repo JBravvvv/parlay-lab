@@ -8167,3 +8167,127 @@ whole card.**
   ungated rebuild render (L800), so the blocked reasons ARE readable. Print the
   blocked-reason histogram and the rebuild note; **a NO-PLAY day with a printed cause is
   a result, not a silence.**
+
+## ⚠️ THE ~224/DAY: SHAPE MEASURED, INVENTORY DERIVED FROM FILES, AND TWO UNCOUNTED SPENDERS FOUND (2026-07-31, owner's item 1)
+
+**THE BURN SERIES FROM DISK — and its shape answers the mechanism-class question:**
+| stamp | remaining / used | Δ | span | rate |
+|---|---|---|---|---|
+| 07-28 evening | 2,317 / 17,683 | — | — | — |
+| 07-29 morning | 1,676 / 18,324 | 641 | ~12 h | ~53/h |
+| 07-30 ~03:5xZ | 1,461 / 18,539 | 215 | ~19 h | ~11/h |
+| 07-30 16:45Z | 1,238 / 18,762 | 223 | 12.8 h | ~17/h |
+| 07-31 01:25Z | 1,038 / 18,962 | 200 | 8.7 h | ~23/h |
+| 07-31 04:50Z | **1,038 / 18,962** | **0** | 3.4 h | **0** |
+| 07-31 05:51Z | **1,038 / 18,962** | **0** | 1.0 h | **0** |
+**FOUR HOURS AND TWENTY-SIX MINUTES OF EXACTLY ZERO SPEND.** A scheduled job cannot
+produce that — `props-history` alone carries four active crons (`0 13`, `0 17`, `0 23`,
+`0 3` UTC) and GitHub's morning batch lands 06:00–08:30Z. **→ THE UNATTRIBUTED SPEND IS
+EVENT-DRIVEN, NOT SCHEDULED.** That names the class without naming the job: **it fires
+when something is USED, not when a clock ticks** — and the 07-30 16:45→01:25 window that
+carried 200 credits spans 9:45 AM–6:25 PM PT, the working day, while the quiet 4.4 hours
+are the night. (Corroborating: **no 07-31 props file exists yet and line-history is
+correctly silent** — today's zero is not a measurement artifact.)
+
+**THE JOB INVENTORY, DERIVED FROM FILES (not memory) — and the owner's third branch
+FIRES: it contains things not in the docs.**
+| workflow | active crons (UTC) | reaches the Odds API? | per-run cost |
+|---|---|---|---|
+| `props-history.yml` | **`0 13`, `0 17`, `0 23`, `0 3`** — FOUR, not the "ten-cron" nor the "three-cron+wait" this doc has described | **YES** | ~6 × unstarted events; `0 3` is `--fold-only` (free) |
+| `board-archive.yml` | **`0 12`, `0 19`** | reads `/api/board` only — **ZERO credits**, stated in its own header L12–13 | 0 |
+| `context.yml` | **`0 17`, `30 22`, `0 12`** — THREE (a third was added; the pause block describes two) | no | 0 |
+| `model.yml` | `30 9` — **ACTIVE**, despite the 07-29 pause being described as disabling it | no | 0 |
+| `hr-overround.yml` | `0 15 * * 0` | no | 0 |
+| `ufc.yml` | `0 15 * * 3`, `0 15 * * 6` | no (the client path spends) | 0 |
+| `line-history.yml` | **NONE — disabled 2026-07-31** | (was YES) | 0 |
+**Routes that can reach the Odds API**: `/api/odds` (the proxy; `APP_PASSCODE` gates
+`fresh=1` only), `/api/generate` (`cronHeaderAuthed`/`syncAuthed`), `/api/clv`
+(`syncAuthed`), **`/api/propsnap` (`cronHeaderAuthed` for write — but its READ is
+UNGATED by design)**.
+
+**⚠️ TWO UNCOUNTED SPENDERS, BOTH CLIENT-SIDE, BOTH ABSENT FROM EVERY RATION TABLE:**
+1. **`SharpDesk` on the Board page.** `src/components/mlb/SharpDesk.tsx` L51–55 runs
+   `useQuery({queryKey:["sharp-board"], queryFn: loadSharpBoard, staleTime: 240_000})`,
+   and `src/engine2/sharpBoard.ts` L10/L135 fetches
+   `/v4/sports/baseball_mlb/odds?regions=us,eu&markets=h2h,totals,spreads` — **3 markets
+   × 2 regions = 6 credits per uncached call.** It is mounted unconditionally at
+   `app/board/page.tsx` **L377**. **Every Board-page open outside a 4-minute window costs
+   6 credits, and nothing counts it.**
+2. **`useAllStar.ts` L77** fetches per-event odds at `regions=us,eu` with a MARKETS list —
+   same shape, client-triggered. **`ufc.ts` L84–86** fetches MMA odds through the proxy,
+   with a `fresh=1` path that bypasses the cache.
+**Neither appears in `credit-budget.md`'s consumer table, which counts "client generates"
+but not client PAGE LOADS.** Together with the `bestBoard` fallthrough (~120–240 per
+device-day, already counted there), these are exactly the event-driven class the burn
+series' shape points at.
+
+**IS ANYTHING READABLE WITHOUT CREDITS?** The proxy passes `x-requests-remaining` /
+`x-requests-used` through on **every** response (`app/api/odds/route.ts` L51–55), so the
+running total is free to read — **but it logs nothing per-request that is readable from
+outside.** Vercel's function logs record every invocation with its URL; that is the
+one-read attribution the owner asked about, and it is **dashboard-only** (owner's
+screen). **Spec, zero credits, no engine string**: have the proxy emit a one-line
+`console.log` per upstream call (path + market count + a caller tag from the referer),
+which turns the Vercel log into a per-request ledger.
+**CAN ANYTHING ELSE TRIGGER THESE ROUTES?** `/api/propsnap`'s **read is ungated**;
+`/api/odds` is ungated except for `fresh=1`; `/api/board` is deliberately ungated. So a
+warmup, health check, preview deploy, or crawler CAN reach `/api/odds` — and **any
+Board-page render by anything at all pays the SharpDesk 6.** No allow-list or referer
+check exists on the proxy. That is a real, unbounded surface, and it is the second
+reason the burn has no floor.
+
+**IMPOSSIBLE BRANCH — CHECKED, DOES NOT FIRE**: the sum of known jobs at measured rates
+(props ~198/day + line-history ~54 + everything else at 0) is ~252, comfortably UNDER
+the observed ~476/day. Nothing is double-counted; the 2.5-day figure is not wrong in the
+owner's favour.
+
+**READING 15(c), AS A RUNNABLE CURL — top of the sheet, owner's phrase, zero credits:**
+```
+curl -sS -H "x-pl-sync: <YOUR SYNC PHRASE>" \
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" \
+  > ~/pl-pred-2026-07-30.json
+curl -sS -H "x-pl-sync: <YOUR SYNC PHRASE>" \
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-29" \
+  > ~/pl-pred-2026-07-29.json
+```
+Then `node tools/burn-report.mjs --pred ~/pl-pred-2026-07-30.json` prints the
+`src`×`selMode` census. **A `src:"client"` row on either date = the fallthrough fired,
+and that day was NOT dark for the prediction store.**
+
+## THE PROPS CADENCE HAS NO WRITTEN REQUIREMENT EITHER (2026-07-31, owner's item 3 — table only, nothing changed)
+
+**Consumers of `data/props/`, by file, with the cadence each actually requires:**
+| consumer | what it reads | cadence it requires |
+|---|---|---|
+| `tools/close_capture.py` | *"did a close land, and how far ahead of first pitch was it"* — its own header | **ONE `close` per day, inside the 95-min window.** Not a rate — an event |
+| `tools/close_fair.py` | *"takes the `kind == "close"` snapshot"* (header L5) — **the close, singular** | **ONE `close` per day.** `pre` snapshots are unused by it |
+| `tools/phase2_series_b.py` | the later snapshot vs the close, for movement | **TWO points per day: one early, one close** |
+| the Pro Scoreboard panel (`credit-budget.md` L175) | *"the last prop snapshot before first pitch"* | **ONE per day** |
+**NO CONSUMER REQUIRES MORE THAN TWO SNAPSHOTS PER DAY, and none is written as a
+requirement anywhere** — `phase2-memo.md` L32/L732 describe the close-quality stamps and
+how to report them, never a rate. **→ the owner's first branch fires: second uncounted
+cadence in two days.**
+
+**AND THE OWNER'S SHARPEST QUESTION ANSWERS ITSELF: no consumer distinguishes a snapshot
+taken 40 minutes apart from one taken 3 hours apart.** Every consumer selects by `kind`
+(`close` vs `pre`) and by `mins`-to-first-pitch, never by inter-snapshot spacing. **So
+the gap is the wrong knob and the COUNT PER DAY is the right one** — MIN_GAP's 40-minute
+rule happens to reduce the count, which is why it saved ~576/day, but the count is what
+the consumers care about.
+
+**THE FOUR-CADENCE TABLE, on the corrected burn** (measured 07-30: 33 event-fetches;
+props is now the only archive spender since line-history was disabled):
+| cadence | snapshots/day | props credits/day | total burn/day | runway at 1,038 | what it destroys |
+|---|---|---|---|---|---|
+| **current (4 crons, MIN_GAP-deduped)** | ~5 | **~198** | ~422 (incl. ~224 unattributed) | **~2.5 days** | — |
+| **half (one pre + one close)** | 2 | **~80** | ~304 | **~3.4 days** | nothing any consumer reads — Series B keeps its two points |
+| **daily (close only)** | 1 | **~40** | ~264 | **~3.9 days** | Series B's early point; `close_fair`/`close_capture`/Pro Scoreboard all survive |
+| **off** | 0 | **0** | ~224 | **~4.6 days** | the close archive — the ONE thing this job exists for, and a missed close is unrecoverable |
+**The honest framing: even switching props OFF entirely leaves ~224/day of unattributed
+burn and only reaches 4.6 days.** The props cadence is not what ends the cycle — **item
+1's unnamed spender is.** That is why this table is printed and not acted on.
+**Impossible branch — CHECKED, and it FIRES**: the workflow declares **four** crons
+(`0 13`, `0 17`, `0 23`, `0 3`) while the archive shows **5 snapshots on 07-30 and 10 on
+07-29** — more snapshots than crons, because GitHub delivers each cron more than once in
+its batch windows and MIN_GAP now dedupes the payment rather than the delivery.
+**Both are printed: schedule says 4, archive says 5 (post-fix) and 10 (pre-fix).**
