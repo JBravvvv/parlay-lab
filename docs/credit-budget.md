@@ -1,5 +1,26 @@
 # Odds API credit budget (2026-07-25)
 
+> ## ⚠️ RE-DERIVED FROM THE FIRING BRANCH — 2026-07-31 (owner's item 5)
+>
+> **Every job figure below was derived from workflow files on `frontend-rebuild`, which fires
+> NOTHING.** GitHub schedules run only from the default branch (`origin/HEAD` -> `origin/main`).
+> Re-derived from `origin/main` this date; full audit in `docs/branch-firing-audit.md`.
+>
+> | line below | as written | **firing copy, measured 2026-07-31** |
+> |---|---|---|
+> | `props-history.yml` "2x/day ... <=192" (L175) | 2 crons | **TEN crons.** MIN_GAP (40 min) over a 480-min span admits **7 paid/day**; at the measured **5.84 credits/event** and a 15-event slate that is a **~615/day CEILING** — 3.2x the figure below. Observed 07-30: 198. Observed 07-31 morning batch alone: **339** |
+> | `line-history` 144/day (L140) | scheduled rate | **144 was the CEILING, not the observation** (24 crons x 6, no gap guard in `snapshot_odds.py`). Delivery measured from the Actions run log: **3-4 runs/day = ~22/day**. **DISABLED on the firing copy 2026-07-31** (`3356c54`) -> now **0** |
+> | `/api/clv` ~45/day (L139) | — | unchanged; not re-derived this date |
+> | client generates 120-240/device/day (L178) | — | unchanged, and **still the leading unattributed candidate** (reading 15(c)) |
+> | — | **absent** | **`SharpDesk` is mounted unconditionally on `/board` and fetches `h2h,totals,spreads x us,eu` = 6 credits per CACHE-MISSING render** (`app/board/page.tsx` L377, `sharpBoard.ts` L135). The 4-minute window is the SERVER-side Next data cache (`/api/odds` `TTL_SECONDS = 240`), so it is shared across every caller. In no table here |
+> | — | **absent** | **`useAllStar.ts` L77 and `ufc.ts` L84-86** — client-triggered proxy fetches, `ufc` with a cache-bypassing `fresh=1` path |
+> | — | **absent** | **A THIRD SCHEDULER: Vercel Cron.** `vercel.json` declares `/api/calibrate` at `30 9 * * *`. **0 Odds credits** (statsapi + Redis only), but it was in no inventory until 2026-07-31 |
+> | — | **absent** | **`/api/propsnap`** costs **6 credits/event, up to 16 events = <=96 per fire**, triggered by cron-job.org entries 5-6 if they exist. Nothing it captured has ever folded, because `--fold-only` lives on the non-firing copy |
+>
+> **The unattributed residual — ~201/day, measured against the Actions run log — appears in no
+> line of this document.** It is larger than every job priced here except props-history.
+
+
 **Measured 2026-07-25: 15,872 used, 4,128 remaining on a 20,000/month plan, ~24 days
 into the cycle → ~661 credits/day → ~20,500/month.** The architecture is structurally
 over-subscribed *before* adding anything. At this rate the key exhausts in ~6 days,

@@ -27,9 +27,15 @@ import { describe, expect, it } from "vitest";
 /** Recorded crossings — update ONLY beside a dated entry in collection-period. */
 const ARMED = {
   /** umpires at g >= 5 in data/ump_k.json (build_context L232 gates kFactor on this) */
-  umpKf: 1,
+  umpKf: 2,
   /** the dated record of the last change, for the reader who finds this red */
-  note: "2026-07-30: Lance Barrett crossed g=5 — FIRST EVER, ~5 days ahead of the ~08-04 projection. Double-braked (frozen context.json carrier + SH_CFG.umpKFrozen), so it reached no board. See collection-period, SELF-ARMING PARAMETERS block.",
+  note:
+    "2026-07-30: Lance Barrett crossed g=5 — FIRST EVER, ~5 days ahead of the ~08-04 projection. " +
+    "2026-07-31: Willie Traynor crossed g 4->5 — SECOND, one day later, on bot commit 200e40282380485b35a70c6a28b689c356cc7e3d " +
+    "(08:21:47Z, ump_k.json only). Two crossings in two days; nine more sit at g=4. k/g at arming straddles the " +
+    "league mean (Barrett 18.0, Traynor 13.8, league 16.6) — the armed subpopulation is NOT a high-K selection. " +
+    "Both crossings double-braked (context.json frozen at 2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 " +
+    "+ SH_CFG.umpKFrozen), so neither reached a board and no series restates. See collection-period, SELF-ARMING PARAMETERS block.",
 };
 
 describe("self-arming parameters stamp themselves at fire time", () => {

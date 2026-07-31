@@ -39,7 +39,8 @@ sat unread and unnamed here. The list was a partial index presented as complete 
 | `freeze-exit-bundle.md` | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies, the vintage table |
 | `credit-budget.md` | **measured** per-job credit consumption and a proposed budget — priced line-history at ~25/day and named it non-load-bearing |
 | `cron-jobs.md` | the four cron-job.org entries, their schedules, and the measured GitHub-Actions delivery delays |
-| `branch-firing-audit.md` | **which branch actually fires**: the main-vs-frontend-rebuild split, every operational change marked live/not-live, the Actions run log against the burn series, and the declared-cron ceilings |
+| `branch-firing-audit.md` | **which branch actually fires**: the main-vs-frontend-rebuild split, every operational change marked live/not-live, the Actions run log against the burn series, the declared-cron ceilings, **the third scheduler (Vercel), the `/api/propsnap` trace, the measured close distribution, and the redesign-vs-cron-cut pricing** |
+| `board-open-experiment.md` | the controlled client-spend protocol with its pre-committed readings — **and the STOP that makes the literal version unsafe on a dark board-day** |
 | `session-handoff.md` | this file: the gate, the chain, the readings, the protocol |
 | `hrr-recalibration.md` | the H+R+RBI suspension's evidence, its provenance markers, the λ* reading |
 | `pitcher-outs-audit.md` | the outs model defect (M2/M2′), the flag's spec, the DECIDED record, the coverage gap |
@@ -545,19 +546,28 @@ often than analyses, and they fail by returning plausible numbers.**
 
 ## 9. POSITION
 
-- **Quota: READ 1,038 remaining / 18,962 used — 2026-07-31 05:55:44Z**
-  (`data/quota-log.jsonl`, live read this turn). **Unchanged across three reads spanning
-  4 h 26 m** — the flat that establishes the event-driven shape.
-- **Burn ≈ 421/day observed** (props ~198 + line-history ~22 + residual ~201, the last
-  three re-derived from the Actions run log 2026-07-31). **RUNWAY ≈ 2.5 DAYS.**
-  ⚠️ Every runway/burn figure written before 2026-07-31 is superseded (§1).
-- **AND THE CEILING, now on the record beside the observation** so a delivery improvement
-  is never read as a new spender: props-history's ten firing crons admit **7 paid
-  snapshots ≈ 651/day** under MIN_GAP (480-min span, 40-min gap). At ceiling the burn is
-  **~852/day → RUNWAY ≈ 1.2 DAYS** (it was ~996/day → **1.04 days** before tonight's
-  line-history disable reached the firing copy). `credit-budget.md` L175 prices
-  props-history at ≤192 — **3.4× below** this ceiling, written against a two-cron file
-  that stopped being the firing copy on 2026-07-26.
+- **Quota: READ 699 remaining / 19,301 used — 2026-07-31 13:57:11Z** (`data/quota-log.jsonl`,
+  live read this turn). ~~1,038 at 05:55:44Z~~ — **339 credits spent between 06:41:11Z and
+  13:57:11Z (7 h 16 m, 46.6/h), and it is FULLY ATTRIBUTED**: props-history's morning batch,
+  8 delivered runs → **4 PAID snapshots / 58 event-fetches** on `data/props/2026-07-31.json`.
+  Modelled 348 against 339 measured → **5.84 credits per event, the 6-per-event model confirmed**,
+  and the **residual in that window is ≈ 0 (−9)**.
+- **TWO NATURAL EXPERIMENTS, 12 h 32 m of no device use, residual ZERO in both** (01:25Z→06:41Z:
+  no runs, no spend; 06:41Z→13:57Z: 9 runs, spend fully attributed). Against 8.4/h of residual on
+  days the app was used. Observational, not controlled — `board-open-experiment.md` is what makes
+  it controlled.
+- **Burn**: props ~198 (07-30) but **339 on 07-31 BEFORE NOON** · line-history now 0 ·
+  residual ~201/day on use-days, **~0 on relay-days**. ⚠️ Every runway/burn figure written
+  before 2026-07-31 is superseded (§1).
+- **RUNWAY AT 699 — TWO NUMBERS, and the ceiling is the one that binds**: at the observed
+  ~421/day, **1.66 days**; at the props CEILING (7 MIN_GAP-admitted paid snapshots × 15
+  events × 5.84 ≈ **615/day**, + residual) **~816/day → 0.86 DAYS**. **615/day against 699
+  remaining is a bad night, not a bad week** — one fully-delivered day inside the current
+  ten-cron declaration ends the cycle, and today already spent 339 by 11:04Z.
+- **The reversible lever, priced, not taken** (`branch-firing-audit.md` §7): cutting main's
+  ten crons to five/four/three gives ceilings ~440/~352/~264 → runway **1.09 / 1.26 / 1.50
+  days**. Same ceiling as the never-executed redesign, none of its risk.
+  `credit-budget.md` L175's ≤192 is **3.2× below** the real ceiling — corrected in place.
 - **Board-days: 1,038 / 150 = 6.9** at a full slate, ~17 at an evening 6-event board's
   ~60 — but the RUNWAY IN DAYS, not the board count, is what binds.
 - **Homogeneous window: COUNT ZERO.** 07-29, 07-30 and 07-31 all produced no board —

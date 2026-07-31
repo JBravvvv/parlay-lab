@@ -206,3 +206,180 @@ was written against a two-cron file that has not been the firing copy since 2026
   `model.yml`, `props-history.yml` (all `differs`) and `ufc.yml` (`missing-on-firing`). Its own
   comparator is proven green/red/allow-listed on synthetics. It goes green when main is
   reconciled file-by-file or a difference is entered with a date and a reason.
+
+---
+
+# PART TWO — 2026-07-31, owner's items 1–4
+
+## 5. THE THIRD SCHEDULER: VERCEL. IT EXISTS, IT IS IN NO INVENTORY, AND IT COSTS ZERO.
+
+`vercel.json`, verbatim and entire:
+
+```json
+{
+  "git": { "deploymentEnabled": { "main": false, "line-history": false } },
+  "crons": [ { "path": "/api/calibrate", "schedule": "30 9 * * *" } ]
+}
+```
+
+**The owner's third pre-committed branch FIRES: a Vercel cron exists that is in no inventory, and
+the job inventory was incomplete for the third time** (after the GitHub ten-cron count and the
+firing-branch split). One entry, `/api/calibrate`, daily at **09:30 UTC**.
+
+**It authenticates and it runs.** `app/api/calibrate/route.ts` L74–82: `authed()` accepts
+`Authorization: Bearer $CRON_SECRET`, which is exactly the header Vercel Cron sends; failing that
+`syncAuthed`; and **L81 `return !cron` — with `CRON_SECRET` unset the route is OPEN**, documented
+as deliberate ("the run is idempotent, writes only derived aggregates").
+
+**It costs 0 Odds credits, verified by construction**: the route's only outbound host is
+`statsapi.mlb.com` (L101 schedule, L181 boxscore) — keyless and free — plus Redis. No
+`the-odds-api.com` reference exists in the file. Its declared schedule `30 9 * * *` also happens
+to be the exact cron the M18 pause commented out of `model.yml`, which is a coincidence of hour,
+not a relationship.
+
+### `/api/propsnap` — traced end to end
+
+| question | answer, from `app/api/propsnap/route.ts` |
+|---|---|
+| **write trigger** | `cronHeaderAuthed` only (L76) — header `x-cron-key` = `CRON_SECRET`. **No UA fallback, no client path, no Vercel cron entry.** So only cron-job.org (or anything holding the secret) can make it capture |
+| **read trigger** | **UNGATED** (L64–72), `GET /api/propsnap?date=YYYY-MM-DD` — no phrase, no passcode |
+| **where it writes** | Redis, `pl:propsnap:{date}` (L35), **TTL 4 days** (L36), **last 6 snapshots only** (L114 `.slice(-6)`) |
+| **cost per invocation** | one `/events` call (measured at **0**) + **6 credits per event** (`regions=us`, six markets, L33/L98), capped at `MAX_EVENTS = 16` (L37) → **up to 96 credits per fire**, ~78 on a 13-game slate |
+| **is it scheduled?** | **NOT from this repo.** `CLAUDE.md` L150 records cron-job.org entries 5–6 as `0 17 * * 0,6` and `30 18 * * 0,6` — **weekend-only** — and marks them "being created". Whether they exist is the owner's dashboard |
+| **who reads it** | `tools/snapshot_props.py` L224 (the `--fold` path) — **which has never run in production**, because main invokes the script with no arguments |
+
+**Cadence arithmetic if entries 5–6 exist as specified**: 2 fires × 2 weekend days = 4 fires/week
+at up to 96 = **≤384/week ≈ 55/day averaged, and ZERO on weekdays.** The measured residual is
+95 / 91 / 128 credits on **Wednesday and Thursday windows**, so weekend-only entries **cannot**
+explain it. If the store shows weekday rows, the entries are not what `CLAUDE.md` describes and
+that is the finding.
+
+**THE STORE READ — ungated, zero Odds credits, no sync phrase needed.** This is the read that
+settles it; it is the owner's to run:
+
+```bash
+for d in 2026-07-25 2026-07-26 2026-07-27 2026-07-28 2026-07-29 2026-07-30 2026-07-31; do
+  curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d" \
+  | python3 -c "import json,sys; b=json.load(sys.stdin); s=b.get('snapshots') or []; \
+print(f\"{b['date']}: {len(s)} snapshots\" + ''.join(f\"  [{x['t']} {x['kind']} {len(x['events'])}ev src={x.get('src')}]\" for x in s))"
+done
+```
+
+(The 4-day TTL means only the last four dates can still hold rows; earlier dates returning `0`
+is expected and is not evidence of anything.)
+
+**Pre-committed readings, item 1** — the two data-dependent branches cannot be answered from disk
+and are held for that output:
+- **rows on WEEKDAY dates** → propsnap has been capturing off a cadence nobody inventoried, and
+  captures/day goes beside residual/day for reconciliation.
+- **rows only on 07-25/26 (Sat/Sun) or none at all** → propsnap is cleared **on evidence** rather
+  than on the absence of folded rows, and the residual's candidate list is down to client-side
+  plus the ungated surface.
+- **IMPOSSIBLE BRANCH: rows on a date whose residual is ~0** — 07-31 is now exactly such a date
+  (12 h 32 m of zero residual) → the timing does not fit and the candidate needs a different
+  mechanism. Print both.
+
+### Every route that reaches the Odds API, and what can schedule it
+
+| route | reaches Odds API | auth | schedulable by |
+|---|---|---|---|
+| `/api/odds` | **YES** (proxy) | **UNGATED**; `APP_PASSCODE` gates `fresh=1` only | anything at all — no allow-list, no referer check |
+| `/api/generate` | **YES** | `cronHeaderAuthed` / `syncAuthed` | cron-job.org entries 1–4 |
+| `/api/propsnap` | **YES** | write `cronHeaderAuthed`; **read ungated** | cron-job.org entries 5–6, if they exist |
+| `/api/clv` | **YES** | `syncAuthed` | cron-job.org (the 96×/day entry) |
+| `/api/board`, `/api/sharp` | no | `APP_PASSCODE` / ungated | — |
+| `/api/calibrate` | **no** | Bearer `CRON_SECRET` / `syncAuthed` / open if unset | **Vercel cron, `30 9 * * *`** |
+| `/api/calibration`, `/api/ledger`, `/api/predictions`, `/api/digest` | no | `syncAuthed` | — |
+| `/api/stats`, `/api/ufcprops` | no | **NONE** | — |
+
+**Three schedulers total, now all inventoried**: GitHub Actions (from `main`), cron-job.org (the
+owner's dashboard), and Vercel Cron (`vercel.json`). Nothing else in the repo declares a schedule.
+
+## 6. `--wait` NEVER RAN — BUT THE CLOSES ARE GOOD ANYWAY (owner's item 3)
+
+**A correction to my own claim of this morning first.** I wrote that "every archived close is
+whatever landed rather than a window-targeted capture." **That was wrong.** `_snapshot_kind`
+(`tools/snapshot_props.py` **L152**) labels a snapshot `close` **only when the next unstarted
+first pitch is within `CLOSE_WINDOW_S = 95 * 60`** (L133). The label is computed from the slate on
+**every** path, argument or not. A mislabelled close is structurally impossible; `--wait` does not
+touch the labelling.
+
+**What `close` has meant in practice — every close snapshot in the archive, 17 archived days:**
+
+| captured (UTC) | events | minutes to next unstarted first pitch |
+|---|---|---|
+| 2026-07-27T23:41 | 6 | 18.2 |
+| 2026-07-28T00:13 | 4 | 32.6 |
+| 2026-07-28T23:32 | 9 | 8.1 |
+| 2026-07-29T00:10 | 5 | 88.0 |
+| 2026-07-29T23:38 | 6 | 2.8 |
+| 2026-07-30T00:14 | 3 | 84.6 |
+| 2026-07-30T23:35 | 4 | 35.1 |
+
+**n = 7. min 2.8 · p25 18.2 · median 32.6 · p75 35.1 · max 88.0 · mean 38.5 minutes. 7/7 inside
+the 95-minute window; 5/7 inside 60; 3/7 inside 30.**
+
+**The owner's SECOND branch fires: the distribution is close to first pitch anyway.** The finding
+is stated in his terms — **a mechanism nobody ran was credited with an outcome that occurred
+without it** — with one sharpening: the outcome credited to `--wait` (correctly-timed closes) is
+produced by `_snapshot_kind`, which always runs. What `--wait` would actually buy is **coverage**,
+and the coverage gap is now measured: **7 closes over 17 archived days = 41%**, and every one of
+the seven landed in the 23:3x–00:1x UTC band. **Zero weekend or matinee closes exist.**
+
+**IMPOSSIBLE BRANCH — a close snapshot postdating first pitch: DOES NOT FIRE. Zero of seven.**
+Nothing in the archive is mislabelled.
+
+**Every consumer of `close`, and whether its conclusion depends on nearness to first pitch:**
+
+| consumer | reads | depends on nearness? |
+|---|---|---|
+| `tools/close_fair.py` | `kind == "close"` snapshots (L42) | **yes — and it stamps it**: every row carries `mins` (L51, L59) and it flags negatives (L66). Downstream cannot lose the timing |
+| `tools/close_capture.py` | close/pre census per day (L60, L75, L129, L147) | it **is** the coverage instrument; the 41% above is its quantity |
+| `phase2_series_b` (model-vs-close slope) | close-side fair prices | **yes** — a far-from-pitch close attenuates the slope toward zero. Measured median 32.6 min: **not attenuated** |
+| `/api/clv` | its own near-pitch sighting from Vercel | **no** — does not read the props archive |
+| multibook close-side figures | `data/props/` | `multibook-memo.md` L201 already records the 07:55Z/20:32Z pair and that no backfill was possible |
+
+**`phase2-memo.md` against the measurement**: L298 states that `_snapshot_kind()` returns `close`
+when the next unstarted first pitch is within 95 min — **verified**. L595 records close capture as
+built, decided from the slate, "10 crons so some firing lands in the window" — **that describes the
+FIRING copy correctly**, because the memo predates the 07-27 three-cron redesign that never
+shipped. L311's *"close" is a T−2.5h reading at best* and L290's *nine hours late* describe the
+**pre-07-26 two-cron era** and are already superseded in place. **No dated marker is owed to the
+close-quality argument: it was measured true today.** L659's *close CAPTURE RATE* is the live
+question, and its number is 41%.
+
+## 7. THE REDESIGN, AND THE MINIMAL ALTERNATIVE — PRICED, NOT DECIDED
+
+**Has the redesign ever executed, anywhere? NO. 0 of 66 props-history runs over 17 days were
+`workflow_dispatch`; every one was `schedule`.** The owner's first branch fires: **it does not
+ship on the strength of being written.** Shipping it to the firing branch would be deploying
+never-executed collection code into a window with barely a day of runway.
+
+**What it changes**: ten cron entries → four, of which three can pay (`0 17` with `--wait`,
+`0 13`, `0 23`) and one is free (`0 3 --fold-only`, which only reads `/api/propsnap`), plus
+`timeout-minutes: 330`. `--wait` would begin holding the `0 17` runner (up to `MAX_WAIT_S` = 300
+min) until the close window opens, converting a 41% close rate into a deterministic one.
+`--fold-only` would begin folding Vercel captures into the archive at zero Odds cost — nothing has
+ever folded.
+
+**The two options, priced at 699 remaining. Props ceilings assume a 15-event slate at the measured
+5.84 credits/event ≈ 88 per paid snapshot; residual held at its 201/day observed rate.**
+
+| option | paying ticks/day | props ceiling | + residual | **runway at 699** | risk |
+|---|---|---|---|---|---|
+| **do nothing** (ten crons) | 7 (MIN_GAP-admitted) | **~615** | ~816 | **0.86 d** | none |
+| **cut to five** (yml only, reversible) | 5 | **~440** | ~641 | **1.09 d** | none — schedules only |
+| **cut to four** | 4 | **~352** | ~553 | **1.26 d** | none |
+| **cut to three** | 3 | **~264** | ~465 | **1.50 d** | fewer chances to land a close |
+| **ship the redesign** | 3 paying + 1 free | **~264** | ~465 | **1.50 d** | **never executed anywhere** |
+
+Two things stated plainly, as asked:
+
+1. **THE CEILING MATTERS MORE THAN THE OBSERVED RATE.** 615/day against 699 remaining is **a bad
+   night, not a bad week** — a single fully-delivered day inside the current declaration ends the
+   cycle. Today already ran at 348 props credits before noon.
+2. **The minimal cut buys the same ceiling reduction as the redesign with none of its risk.**
+   Cutting to three costs one commit on `main`, touches schedules only, is reversible in one
+   revert, and reaches the identical ~264 ceiling. What it does NOT buy is `--wait`'s deterministic
+   close or `--fold-only`'s free weekend fold. **If the redesign is wanted, the branch the owner
+   already pre-committed applies: run it once by `workflow_dispatch` on an affordable day first.**

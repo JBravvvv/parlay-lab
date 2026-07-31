@@ -1,5 +1,25 @@
 # External scheduler entries — cron-job.org (2026-07-26)
 
+> ## ⚠️ THE THIRD SCHEDULER, AND THE FIRING-BRANCH SPLIT — 2026-07-31 (owner's item 5)
+>
+> This document is about **cron-job.org**, and its entries are unaffected by what follows — they
+> call the deployment directly and do not depend on any branch. Two things it does not say:
+>
+> 1. **`vercel.json` STILL DECLARES A CRON.** The paragraph above records `/api/generate` leaving
+>    `vercel.json`; what stayed is **`{"path": "/api/calibrate", "schedule": "30 9 * * *"}`**,
+>    live and authenticating (`app/api/calibrate/route.ts` L75-76 accepts Vercel's
+>    `Authorization: Bearer $CRON_SECRET`; L81 leaves the route OPEN if `CRON_SECRET` is unset).
+>    It costs **0 Odds credits** — statsapi and Redis only — but there are **THREE schedulers**,
+>    not two, and this was the third one nobody had inventoried.
+> 2. **GitHub Actions schedules fire only from `main`**, which is 326 commits behind
+>    `frontend-rebuild` and has no sync mechanism. This document's GitHub delivery measurements
+>    remain valid (they were taken from the Actions API, i.e. from what actually ran), and its
+>    "ten crons" reference at L110 is **correct for the firing copy**. But any workflow FILE
+>    description elsewhere in the repo that was read from the working tree describes a copy that
+>    does not fire. Full audit: `docs/branch-firing-audit.md`; guarded by
+>    `tests/workflow-branch-sync.test.ts`.
+
+
 **Josh types the secret. It is never entered on his behalf, never logged, never placed in a
 query string.** `/api/generate` spends ~120 Odds credits per call, so the secret travels in a
 **header** only.

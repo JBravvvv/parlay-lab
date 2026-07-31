@@ -6610,6 +6610,29 @@ same as "nothing happened": **the arm CONDITION crossed unstamped inside the
 window; the EFFECT is double-braked; if either brake lifts, the factor is live
 immediately with ≥1 umpire already armed** — it would not start from zero.
 
+> ### 🔔 SECOND CROSSING, 2026-07-31 — THE GUARD FIRED, WHICH IS THE POINT
+> **`tests/self-arm-stamp.test.ts` went RED on the bot's own commit**, one day after it was
+> written. **`200e40282380485b35a70c6a28b689c356cc7e3d`** (engine-v2-bot, **2026-07-31T08:21:47Z**,
+> `context: refresh (weather/umps/bullpen)`) touched **`data/ump_k.json` and nothing else** — the
+> pause spec exactly. **Willie Traynor crossed g 4 → 5: the SECOND umpire ever, one day after the
+> first**, against a projection that put the FIRST at ~08-04. `ARMED.umpKf` 1 → **2**, updated in
+> this commit as the guard's contract requires.
+> - **Rate, now measurable rather than projected**: two crossings in two days. Nine more sit at
+>   g = 4 in the same file. The ~08-04 projection was wrong in the same direction twice.
+> - **k/g at arming is NOT homogeneous**: Barrett 90/5 = **18.0**, Traynor 69/5 = **13.8**, league
+>   3694/223 = **16.6**. The first two armed umpires straddle the league mean by ±2 K/g, so the
+>   armed subpopulation is not a high-K selection — worth stating before anyone assumes it is.
+> - **File state**: league g 213 → 223, k 3523 → 3694; days 19 → 20 (`2026-07-30` added);
+>   `data/ump_k.json` sha256 **`57f54c55cda92bc1932ebfe20e46dc8eca277a1a46e0ac9afa195fe1bf978df2`**.
+> - **DID IT REACH A BOARD? NO — both brakes re-verified THIS TURN, not assumed.** Brake 1:
+>   `umpKFrozen: true` and `shUmpKf`'s early return are both present in `legacy/index.html`
+>   (the guard's second assertion is green). Brake 2: `public/model/context.json` is still at
+>   **`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`** and
+>   `public/model/priors.json` at **`00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e`**
+>   — the pause-time pair, unchanged. And no board has fired since 07-28. **No series restates.**
+> - The statement in the paragraph above holds unchanged, with the number moved: if either brake
+>   lifts, the factor is live immediately with **two** umpires already armed, not one.
+
 **Is the counted quantity affected by the cadence we ration? For `shUmpKf`, NO** —
 it counts real MLB games behind the plate, accruing from `statsapi` finals whether
 or not we generate boards. **For the consensus gate, YES** — `mktN` counts OUR

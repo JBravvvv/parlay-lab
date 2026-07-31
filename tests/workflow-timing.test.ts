@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 /**
  * THE CONFIGURED CRON HOUR IS NEVER THE OBSERVED HOUR. ENFORCED, NOT REMEMBERED.
@@ -143,5 +144,50 @@ describe("every scheduled workflow declares whether its value depends on WHEN it
       const claimed = rows.some((r) => r.guard === name);
       expect(claimed, `${g.file} defines guard \`${name}\` but no workflow declares it`).toBe(true);
     }
+  });
+});
+
+/**
+ * INSTRUMENT DEFECT #6, CLOSED 2026-07-31 (owner's item 5).
+ *
+ * Everything above enumerates `.github/workflows` from the WORKING TREE — i.e. from
+ * `frontend-rebuild`, which fires NOTHING. Schedules run only from the default branch
+ * (`origin/HEAD` -> `origin/main`). So for two weeks the one guard over scheduled workflows was
+ * classifying a set of files that cannot fire, and a workflow that existed ONLY on main would
+ * have been invisible to it — unclassified, unguarded, and running.
+ *
+ * WHY THE CLASSIFICATION TEXT IS STILL READ FROM THE TREE, deliberately: the TIMING blocks are
+ * AUTHORED here, and main's copies do not carry them (that is one of the seven divergences
+ * `tests/workflow-branch-sync.test.ts` waives). Re-pointing the parser at main would turn an
+ * authoring convention into a false red. What was actually missing is a COVERAGE assertion —
+ * that the firing set is a subset of the classified set — and that is what this adds. Content
+ * equality between the two branches is workflow-branch-sync's job; this is coverage only.
+ */
+describe("the guard covers everything that FIRES, not just what we edit", () => {
+  const FIRING_REF = "origin/main";
+  it(`every workflow on ${FIRING_REF} is present here to be classified`, () => {
+    let firing: string[];
+    try {
+      firing = execFileSync("git", ["ls-tree", "--name-only", FIRING_REF, ".github/workflows/"], {
+        cwd: path.join(__dirname, ".."),
+        encoding: "utf8",
+      })
+        .split("\n")
+        .filter((n) => n.endsWith(".yml"))
+        .map((n) => path.basename(n))
+        .sort();
+    } catch (e) {
+      throw new Error(
+        `cannot read ${FIRING_REF} — run \`git fetch origin main\`. This guard classifies scheduled ` +
+          `workflows; without the firing branch it cannot know which ones fire. (${e})`,
+      );
+    }
+    const missing = firing.filter((f) => !files.includes(f));
+    expect(
+      missing,
+      `\n\n${missing.join(", ")} exist(s) on ${FIRING_REF} — where schedules FIRE — but not in the ` +
+        `working tree, so this guard has never classified it and nothing here is protecting it. ` +
+        `Bring the file onto the ship branch, or delete it from main.\n`,
+    ).toEqual([]);
   });
 });
