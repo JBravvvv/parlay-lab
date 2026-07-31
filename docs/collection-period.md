@@ -7803,3 +7803,146 @@ the same read; not yet run.**
 2 delivered ticks ≈ 12, props ≈ 60, CLV ≈ 0 → ~72 known of 200). **~128 is within the
 range `credit-budget.md` independently assigns to a single client generate (120–240),
 which sharpens rather than resolves the attribution — reading 15(c) settles it.**
+
+## THE EXTRACTOR IS NOW A VERSIONED TOOL WITH A DOUBLE ANCHOR (2026-07-31, owner's item 1)
+
+**Where it lived: NOWHERE.** There was no served-chunk extractor in the repo — the
+STEP-0 re-grep ritual was an ad-hoc script **re-typed at the terminal on each ship**.
+That is the sharper finding behind the apostrophe bug: **the chain's only eye on
+production was unversioned, unguarded, and re-derived under time pressure.** Now
+`tools/verify-served-engine.mjs`, with `tests/served-extractor.test.ts`.
+
+**Consumers, enumerated — and the owner's first pre-committed branch does NOT fire:**
+| consumer | uses the chunk extractor? |
+|---|---|
+| chain STEP-0 re-grep ritual (CLAUDE.md) | **YES** — this was the only one |
+| `tests/engine-echo.test.ts` BLOCKING half | **NO** — it calls `extractFromHtml()`, which matches `<script>…</script>` in `legacy/index.html`. It delimits on HTML tags, not on quotes, so **the apostrophe defect cannot reach it** |
+| the echo's `SERVED-CHECK` report line | **NO** — it compares two constants; it extracts nothing |
+| any tool | **NO** — none existed |
+**→ the reformulated echo guard has NOT carried a false-red path**, and last night's
+observed-red demonstration proved what it claimed (the resolution clock). Stated plainly
+because the owner's framing assumed otherwise.
+**Has any past run reported a mismatch?** Two historical extraction failures are on
+record (a template-literal probe that found nothing; a backtick scanner that grabbed 69k
+chars) — **both were recognised as extraction failures because their outputs were
+absurd.** 2026-07-31 was the first PLAUSIBLE one: 278,267 against 281,096, a 1% miss.
+That is the project's defect shape exactly — a component returning a believable number
+while covering a fraction of its domain.
+
+**THE ANCHOR, and why it cannot be produced by earlier chunk content**: two independent
+markers that must agree on the same offset — (1) the facade call **`)(r,'`** that
+immediately precedes the literal (the engine is the eval'd shim's single-quoted
+argument), and (2) the engine's own opening bytes **`\n/* ===== config ===== */`** in
+escaped form. **Both verified UNIQUE in the served chunk** (one occurrence each).
+Neither is quote-derived, so no apostrophe anywhere can move the start; the escape-aware
+scan now runs only to find the END, where being inside a known literal makes it correct.
+Disagreement between the anchors throws rather than guessing.
+
+**THE MECHANISM, traced to the byte** (not inferred): apostrophes precede the engine
+literal at chunk offsets **4045, 5373, 6205** — an **ODD** count — so the scanner paired
+(4045↔5373) and then (6205↔**6210, the engine's own opening quote**). The scan resumed at
+6211, **inside** the engine, where the outer loop — which is backslash-blind — treated
+the engine's *escaped* `Pitcher K\'s` at 9065 as an opening quote and ran to the true
+end, yielding a **suffix beginning 2,829 chars in**. The synthetic chunk in the guard
+reproduces that parity exactly (three UNESCAPED apostrophes before the facade) and the
+old anchor fails on it, while the new one is byte-exact.
+
+**THE INVARIANT ENCODED**: extracted length must equal the repo's; extraction must be
+byte-exact on a hazard chunk; and **a proper-substring result is reported as an
+EXTRACTION DEFECT by name, never as a served/repo divergence** — the suffix signature is
+cheap to assert and is the exact fingerprint of this bug. A genuine divergence is
+verified NOT to be labelled that way. **Verified against the real chunk: MATCH,
+281,096 chars, exit 0.**
+
+**INSTRUMENT LEDGER — the fifth instrument defect found by an instrument doing its job
+badly rather than by a model error** (after: the cfSel spec's vacuity, the lineup guard's
+wrong direction, the scope-by-diff comparator's header/code disagreement, and the
+line-number-keyed site ids). **The pattern is now explicit: in this project, instruments
+fail more often than analyses do, and they fail by returning plausible numbers.**
+
+## THE OUTS SHIP'S JUSTIFICATION, RESTATED (2026-07-31, owner's item 2)
+
+**The ship's justification is: (a) the owner's dated UNCONDITIONAL pre-commitment
+("outs deploys Thursday regardless of whether a board reads clean"), and (b) the
+zero-cost vintage window (the homogeneous count was ZERO, so no accumulated boards were
+reset).** Both are facts on disk.
+**MARKED AS REASONING, NOT MEASUREMENT (owner's own correction, dated 2026-07-31)**: the
+supporting argument that *"the reopen deadline's premise had weakened because the reopen
+is count-armed and accrual was zero"* was **reasoning about the calendar, not a
+measurement** — `mktN` was not read, and still has not been. It does not carry the ship
+and is recorded here so it cannot later be mistaken for evidence.
+
+**THE SAME TEST APPLIED ACROSS THE BUNDLE — justification sentences resting on mechanism
+rather than on a measurement recorded this window.** Count: **4**, each named with what
+would settle it:
+| # | where | the sentence rests on | what would make it a measurement |
+|---|---|---|---|
+| 1 | this block | the reopen's count-armed premise weakening | a `mktN` read (now on the board via the echo — reading 29) |
+| 2 | M6 (bundle) | "K's are priced with no sim of the quantity" — traced to code (L1979/L2700) but its *consequence* for ticket quality is argued, not measured | the ungraded-group fix's own before/after on a real board |
+| 3 | M16 (bundle) | cross-ticket dependence "priced nowhere" — the ~1–1.5 bp/pair magnitude IS measured, but "damping 0.5 doesn't compensate" is argued from the ρ-stress ordering | a card-level E[ln] under the copula at the shipped damping vs a fitted one |
+| 4 | the 08-15 review's premise | that suspending HRR was right — rests on 46.3/59.2, whose provenance is UNVERIFIED and whose population is mode-unfalsifiable | the ledger export (reading 15) |
+**The rule, stated as the owner put it: a mechanism is a hypothesis until traced to a
+line of code, and a justification is a hypothesis until traced to a measurement.** Items
+2 and 3 above have their code lines; none of the four has its measurement yet.
+
+## line-history DISABLED, AND "NOTHING READS IT" IS NOW AN INVARIANT (2026-07-31, owner's item 4 — executed)
+
+**Executed as ordered**: `.github/workflows/line-history.yml`'s `schedule:` block is
+**commented out with its dated reason; the workflow is NOT deleted and
+`workflow_dispatch:` remains**, so it is recoverable in one commit.
+**No consumer surfaced during implementation** — the owner's stop-branch did not fire.
+**The measured information cost is ZERO CONSUMERS, stated as measured**: three
+independent checks (the three tools read `data/props`; a repo-wide grep finds no reader
+of `data/YYYY-MM-DD.json`; `credit-budget.md` L192 states it) — and now an **invariant**,
+`tests/line-history-consumers.test.ts`, which fails if a consumer of the day-file ever
+appears, and separately asserts the workflow was disabled rather than deleted.
+**OBSERVED RED** with a planted consumer file.
+**AND THE OWNER'S DIRECT QUESTION — which is right, last turn or this one?** **This
+turn.** Last turn I listed `close_fair.py`/`close_capture.py` as line-history consumers;
+that was **wrong**, produced by conflating the BRANCH (`line-history`, which hosts both
+`data/` and `data/props/`) with the WORKFLOW. **The ML/RL line archive has no reader —
+it was never a consumer, and the "series it feeds" list I gave was incorrect.** The
+cleared version stands.
+**CREDITS SAVED AND RUNWAY RESTATED**: measured delivery **~7.5 runs/day × 6 = ~45/day
+saved** (nominal hourly would have been 144). Burn falls from **~105/day to ~60/day**
+(props sweeps only). **At 1,038 credits: ~17.3 sweep-days, up from ~9.9 — the disable
+buys ~7.4 days**, exactly as the owner priced it. **Board-days on the corrected burn:
+1,038 ÷ 150 = 6.9 at a full slate, or ~17 at an evening 6-event board's ~60 —
+unchanged by this decision, which frees days rather than boards.**
+**Vintage stamp**: a cadence change is a vintage event by the convention's own class
+line. **Stamped 2026-07-31; the ML/RL line-movement archive is SEGMENTED pre/post at
+this date** — any future series reading it must not pool across the boundary. Since
+nothing reads it, the segmentation is prospective only.
+
+## THE READ-FIRST LIST WAS A PARTIAL INDEX PRESENTED AS COMPLETE (2026-07-31, owner's item 3)
+
+**17 docs; 11 were absent from the handoff. The owner's second branch fires, in the
+terms they set: this project's own defect shape — a component reporting success while
+covering a fraction of its domain — applied to its own memory.**
+**Missing set (now added, with descriptions):** `credit-budget.md` · `board-timing.md` ·
+`generate-timing.md` · `clv.md` · `phase2-memo.md` · `settlement-audit.md` ·
+`rebaseline-2026-07-25.md` · `progress.md` · `freeze-exit-bundle.md` (referenced only as
+"bundle", never by filename) · `harness-substitutions.md` (one passing mention, no index
+entry). **Present: `collection-period.md`, `cron-jobs.md`, `hrr-recalibration.md`,
+`multibook-memo.md`, `pitcher-outs-audit.md`, `singles-vs-parlays.md`.**
+
+**DOES ANY MISSING DOC CONTRADICT A CONCLUSION FROM THIS SESSION? ONE DOES — and it is
+the one already corrected**: `credit-budget.md` contradicted (a) my "line-history spends
+144/day" (it measured ~25/day from the archive) and (b) my "it has never appeared in a
+ration table" (L176 prices it; L209 proposes stopping it). **Both conclusions were
+retracted with dated markers before this block was written; the doc's numbers stand.**
+Spot-checked and NOT contradicting: `board-timing.md` and `generate-timing.md` carry the
+FP−3h lineup rule that T = 0.80 is priced against — consistent; `phase2-memo.md`'s Series
+A floor (~246/day) is the figure already in use; `clv.md`'s per-leg sighting matches the
+`/api/clv` route header read this turn. The remaining four (`settlement-audit`,
+`rebaseline`, `progress`, plus `harness-substitutions`, which was already being read
+directly) contain no claim this session touched.
+**The real cost, as the owner framed it: not the wasted work — one conclusion reached
+against a measurement already on disk, twice over, in the same doc.**
+**Impossible branch — CHECKED and it does NOT fire**: every doc in `docs/` is referenced
+by at least one guard, list or session (the sha-references and doc-structure guards
+enumerate the whole directory). None is orphaned.
+**ENCODED**: `tests/read-first-index.test.ts` — the read-first index must name every file
+in `docs/`, and each entry must carry a description rather than a bare filename.
+**OBSERVED RED against the partial list** (10 names printed), green after the index was
+completed; a third assertion plants a removal.

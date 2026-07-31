@@ -4,6 +4,34 @@ Purpose: tomorrow's entire chain, on disk. Every line re-sourced from the docs t
 turn; figures not sourceable are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves
 them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version got stale.
 
+## 0. READ-FIRST INDEX (added 2026-07-31, owner's item 3 — every doc, no exceptions)
+
+**Why this exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"
+claim were produced while `credit-budget.md` — which had already measured the same job —
+sat unread and unnamed here. The list was a PARTIAL index presented as complete (11 of 17
+docs absent). Guarded by `tests/read-first-index.test.ts`, which fails if any doc in
+`docs/` is missing or listed without a description.
+
+| doc | last touched | what it holds |
+|---|---|---|
+| `collection-period.md` | 07-31 | the freeze's operating record: reachability, census, every M-item's working, the run-sheet blocks |
+| `freeze-exit-bundle.md` | 07-31 | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies and the vintage table |
+| `credit-budget.md` | 07-25 | **measured** per-job credit consumption and a proposed budget — the doc that priced line-history at ~25/day and named it non-load-bearing |
+| `cron-jobs.md` | 07-27 | the four cron-job.org entries, their schedules and the measured GitHub-Actions delivery delays |
+| `session-handoff.md` | — | this file: the chain, the readings, the protocol |
+| `hrr-recalibration.md` | 07-31 | the H+R+RBI suspension's evidence, its provenance markers and the λ* reading |
+| `pitcher-outs-audit.md` | 07-31 | the outs model defect (M2/M2′), the flag's spec, the DECIDED record and the coverage gap |
+| `harness-substitutions.md` | 07-29 | what the test sandbox replaces; the clamp-fixture spec and the fixture-representativeness criteria |
+| `multibook-memo.md` | 07-29 | two-book execution scoping, the M15 dedup and the join pre-commitments |
+| `singles-vs-parlays.md` | 07-29 | the structural counterfactual behind A1/A2 and the M14 refinements |
+| `phase2-memo.md` | 07-27 | Series A/B design, the model-vs-close regression and Series A's credit floor |
+| `board-timing.md` | 07-26 | when the engine should generate: the lineup rule (FP−3h) that T = 0.80 prices |
+| `generate-timing.md` | 07-25 | the free-win timing argument for the generate slot |
+| `clv.md` | 07-24 | the CLV instrument: per-leg sighting, the cents scale, the no-backfill guarantee |
+| `settlement-audit.md` | 07-24 | the historical grading record and the ML/RL settlement corrections |
+| `rebaseline-2026-07-25.md` | 07-25 | the 07-25 rebaseline: a bug fix, not a silenced test |
+| `progress.md` | 07-24 | the 07-24 session-end snapshot |
+
 ## 1. STALE-ON-ARRIVAL (lines of the 07-29 handoff this session corrected/superseded)
 
 - ~~"Pushed head at handoff: 1617d1b; HELD: 465b85a, 7ac2a4a, 2469ad0 + this file"~~ —
@@ -53,6 +81,12 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 > inside 24h; the guard goes green ON RESOLUTION (with `pending:false` it also requires
 > committed === served; deleting the marker makes it throw). **The outs flag is LIVE for
 > Friday's reopen.**
+> **Extractor now VERSIONED**: `tools/verify-served-engine.mjs` (double anchor: the
+> facade call `)(r,'` + the engine's escaped opening bytes, both unique) with
+> `tests/served-extractor.test.ts` — byte-exact on a hazard chunk, the suffix signature
+> reported as an EXTRACTION DEFECT rather than a mismatch, observed red on the old
+> anchor. **The echo guard never used it** (it reads `<script>` blocks), so no false-red
+> path existed there.
 > ⚠️ **The extractor reported a FALSE MISMATCH first** — "longest single-quoted literal"
 > resumed 2,829 chars inside the engine after an apostrophe (`Pitcher K\'s`) opened a
 > pseudo-literal. Re-anchoring on the engine's opening bytes gave the exact match. An
@@ -118,9 +152,11 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 > it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into
 > realized, and it needs nothing but the sync phrase.
 > **Quota 1,038 / 18,962 · runway 6.9 board-days at ~150, ~17 at an evening board's ~60 ·
-> sweeps-only burn ~105/day (CORRECTED — line-history delivers ~7.5 ticks/day, not 24)
-> → ~9.9 days dark, not 5.0. Cadence table re-priced on measured delivery in
-> collection-period; nothing changed, awaiting the owner's sign-off.**
+> sweeps-only burn **~60/day** — line-history DISABLED 2026-07-31 (owner's decision;
+> schedule commented, workflow kept, `tests/line-history-consumers.test.ts` makes
+> "nothing reads it" an invariant, observed red). **~17.3 sweep-days, up from ~9.9 —
+> the disable buys ~7.4 days.** Board-days unchanged: 6.9 at a full slate, ~17 at an
+> evening board's ~60.**
 
 ## 2a. THE RUN SHEET AS WRITTEN (2026-07-30 PT — re-arms for the next fire)
 

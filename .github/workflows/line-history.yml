@@ -6,8 +6,16 @@ name: engine-v2-line-history
 #   observed timestamp, never the cron hour. Queue drops thin the DENSITY (measured: 3-5 of 24 ticks
 #   run) but cannot mis-timestamp a reading. Density is a coverage question, not a timing one.
 on:
-  schedule:
-    - cron: "12 * * * *" # hourly; slate-hours gating happens in the script's data (empty slates are tiny)
+  # schedule:                              # DISABLED 2026-07-31 (owner's decision — the
+  #   - cron: "12 * * * *"                  # cadence ration. NOTHING READS THIS JOB'S OUTPUT:
+  #                                         # close_fair/close_capture/phase2_series_b all read
+  #                                         # data/props (a different workflow), a repo-wide grep
+  #                                         # finds zero consumers of data/YYYY-MM-DD.json, and
+  #                                         # docs/credit-budget.md L192 says so independently.
+  #                                         # Measured delivery ~7.5 runs/day x 6 credits = ~45/day.
+  #                                         # Reversible: uncomment this block, one commit.
+  #                                         # Guard: tests/line-history-consumers.test.ts fails if a
+  #                                         # consumer ever appears.)
   workflow_dispatch:
 
 permissions:
