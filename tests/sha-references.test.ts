@@ -25,14 +25,40 @@ const FILES = ["CLAUDE.md", ...readdirSync("docs").filter((f) => f.endsWith(".md
 const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
+/**
+ * NARROWED 2026-07-31 (M27, owner's word). `ea7445a` widened this to `[...refs, "HEAD"]` so docs
+ * could cite the HELD stack — real commits, ancestors of the local branch, deliberately unpushed
+ * under the hold rhythm. That widening rode inside a commit titled "Session handoff before
+ * compaction" and was never reviewed as a guard change; its original survived as an UNTRACKED
+ * orphan (`tests/sha-references.test 2.ts`) that vitest's glob does not run.
+ *
+ * THE HOLE IT OPENED: a doc could cite a sha that exists only on a local commit. A later reset or
+ * rebase dangles the citation and this guard has ALREADY PASSED.
+ *
+ * THE NARROWING: HEAD counts only for shas the handoff RECORDS as held. `heldStack()` reads the
+ * git-state section of docs/session-handoff.md for shas the doc itself calls held/unpushed; if it
+ * names none — the normal state, and the state today — HEAD is NOT consulted and this is the
+ * strict guard the orphan preserved. The hold rhythm keeps working; the hole does not.
+ */
+function heldStack(): Set<string> {
+  try {
+    const doc = readFileSync("docs/session-handoff.md", "utf8");
+    const held = new Set<string>();
+    for (const line of doc.split("\n")) {
+      if (!/\bheld\b|\bunpushed\b|HELD STACK/i.test(line)) continue;
+      if (/nothing held/i.test(line)) continue;
+      for (const m of line.matchAll(/\b[0-9a-f]{7,40}\b/g)) held.add(m[0].slice(0, 10));
+    }
+    return held;
+  } catch { return new Set(); }
+}
+
 function originRefs(): string[] {
   try {
     const refs = execSync('git for-each-ref --format="%(refname)" refs/remotes/origin', { encoding: "utf8" })
       .split("\n").map((s) => s.trim().replace(/"/g, "")).filter(Boolean);
-    // HEAD is included so docs may cite the HELD stack (real commits, ancestors of the
-    // local branch, deliberately unpushed under the hold rhythm — docs/session-handoff.md
-    // records exactly those). A sha reachable from NEITHER origin nor HEAD is dangling.
-    return [...refs, "HEAD"];
+    // HEAD only when the handoff actually records a held stack (M27). Empty => strict.
+    return heldStack().size ? [...refs, "HEAD"] : refs;
   } catch { return []; }
 }
 

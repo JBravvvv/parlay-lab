@@ -22,7 +22,17 @@ fallthrough (~90 + SharpDesk, and it would leave `src:"client"` rows in `pl:pred
 `/api/propsnap` fire (≤96, whose entries `CLAUDE.md` L150 says are weekend-only — today is
 Friday). **Reading 15(c) and the propsnap curl are now URGENT, not merely first.** Today:
 1,038 → 553 = 485 spent, 339 attributed, 146 not. **Runway 1.4–1.8 days.**
-`branch-firing-audit.md` §30.
+`branch-firing-audit.md` §30–31. **WHAT IT WAS NOT, traced**: `board-archive` fetches only
+`/api/board` (Redis, zero — traced not asserted); **seven frontend-rebuild pushes 14:06→16:10Z
+cost ZERO**, and no page is server-rendered or ISR'd (all `"use client"`, no `revalidate`), so
+**Vercel builds cannot spend**. The only ungated spending path is **`/api/odds`**, and 146 ≈ **24
+cache-missing SharpDesk-shaped calls (24 × 6 = 144)** — one every ~7.5 min for three hours.
+**The Vercel function log is the single read that distinguishes a poll from a session;
+reading 15(c) separates a client GENERATE from a poll for free.** Quota flat at 553 since.
+**Runway: hypothesis A (one-off) 1.9–3.4 d · B (recurring at 48.3/h) 0.41 d · C (external)
+not computable** — §34 argues the board both ways and does not decide it.
+**Order revised, Variant B SUSPENDED**: propsnap → `burn-report --pred` (15(c)) →
+`/api/calibration` → ledger export.
 
 **PRIOR STATE, 14:36:08Z — quota 699, five consecutive zero-spend relay reads.**
 The residual is REAL and robust (it survives the whole admissible cost range and cannot

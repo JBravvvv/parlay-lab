@@ -1354,3 +1354,167 @@ the owner's to control."* This window is either the strongest evidence for it (a
 triggered) or the clearest evidence against it (48.3/h with nobody there). **It is not a reason to
 cancel tomorrow's board by itself — but it must be resolved BEFORE the fire, and the two reads
 that resolve it are already first in the queue.**
+
+---
+
+# PART EIGHT — 2026-07-31, owner's items 1–4
+
+## 31. THE BURST: WHAT IT WAS NOT (item 1)
+
+**Quota is flat again — 553 at 19:11:31Z, 553 at 19:12:16Z, 553 at 19:19:55Z.** The burst started
+and stopped inside one three-hour window. **Resolution limit, stated: `data/quota-log.jsonl` holds
+only the two endpoints of that window. Nothing on disk can subdivide it retroactively.**
+
+**`board-archive` — TRACED, not asserted.** `tools/archive_boards.py` makes exactly two outbound
+call shapes: `{BASE}/api/board?date=…&gen=list` (L99) and `…&gen=<which>` (L103). `/api/board` has
+**no Odds-API reference of any kind** — `gen` only selects which stored generation to return
+(route L26–33). **Its zero-credit header is a traced fact.** The job inventory's cost column stands.
+
+**THE DEPLOY HYPOTHESIS IS DEAD, MEASURED AND STRUCTURAL.**
+- **Measured**: between 14:06Z and 16:10Z I pushed `frontend-rebuild` **seven times** (`ceb63a7`,
+  `49a9d83`, `2ecffd2`, `9324517`, `591caf2`, `ebec94e`, `a045944`). Quota across that span:
+  **699 → 699 → 699 → 699.** Seven Vercel builds, **zero credits.**
+- **Structural**: every page under `app/` is `"use client"` except `layout.tsx`; there is **no
+  `revalidate`, no `generateStaticParams`, no `force-static`** anywhere; `sharpBoard.ts` is
+  `"use client"` and is imported by exactly one file, `SharpDesk.tsx`. **No build-time or ISR
+  fetch of the Odds API exists in this codebase.** The owner's first branch does not fire.
+
+**THE UNGATED SURFACE, WITH COSTS PER CALL:**
+
+| route | gate | what an unauthenticated caller triggers | cost per call |
+|---|---|---|---|
+| **`/api/odds`** | **UNGATED** except `fresh=1` (`APP_PASSCODE`) | any upstream the caller names, served through the Next data cache (`TTL_SECONDS = 240`) | **1 credit per market×region pair returned**, or **0 on a cache hit**. SharpDesk's shape = **6** |
+| `/api/board` | deliberately ungated | a Redis read | **0** |
+| `/api/propsnap` READ | ungated | a Redis read | **0** |
+| `/api/propsnap` WRITE | `x-cron-key` | — | ≤96 |
+| `/api/generate` | `x-cron-key` / phrase | — | ~6 × unstarted events |
+| `/api/clv` | phrase | — | ~6 per sighting |
+
+**So the only ungated path that can spend is `/api/odds`, and 146 credits is ≈ 24 cache-missing
+calls of SharpDesk's shape (24 × 6 = 144) — one miss every ~7.5 minutes for three hours.** That is
+the shape of *something polling the site*, or of a browser session with the Board page open. **It
+is not distinguishable from disk.**
+
+**THE SINGLE READ THAT WOULD DISTINGUISH THEM: the Vercel function log** — per-invocation URLs for
+`/api/odds`, dashboard-only. **The owner opens it.** Second-best, and free: `pl:pred` `src:"client"`
+rows (reading 15(c)) separate "a client generate" from "a proxy poll", because a generate writes
+rows and a poll does not.
+
+**TODAY ON ONE AXIS** (full timeline on disk; the load-bearing rows):
+
+| UTC | PT | event |
+|---|---|---|
+| 01:25 | 18:25 | QUOTA 1,038 |
+| 06:41 | 23:41 | QUOTA 1,038 — after **8** frontend-rebuild pushes, zero spend |
+| 08:10–11:04 | 01:10–04:04 | **8 props-history runs → 4 paid snapshots, 58 event-fetches** |
+| 13:57 | 06:57 | **QUOTA 699 — 339 spent, fully attributed to props** |
+| 14:02, 14:28 | | pages-build-deployment ×2 (my two **main** pushes) |
+| 14:36 / 14:53 / 15:45 / 16:10 | | QUOTA **699, 699, 699, 699** — **seven frontend-rebuild pushes, ZERO spend** |
+| **17:12** | **10:12** | **board-archive (schedule) — the ONLY run in the window, zero credits traced** |
+| **19:11** | **12:11** | **QUOTA 553 — 146 SPENT, NOTHING ACCOUNTS FOR IT** |
+| 19:12, 19:19 | | QUOTA 553, 553 — flat again |
+
+**485 spent today: 339 attributed, 146 not.**
+
+**IMPOSSIBLE BRANCH — the quota moves again with no push, no Actions run and no device use: NOT
+FIRED YET.** Flat across three reads since. If it recurs it is an external caller and it outranks
+the freeze; `tools/quota.mjs` appends on every call, so the standing instruction is to call it
+often enough to bracket the next one.
+
+## 32. THE PER-GAME CONTEXT — I OVERSTATED IT, AND THE UNRESOLVED PATH IS NEUTRAL (item 2)
+
+**CORRECTION TO MY OWN CLAIM.** I wrote that weather had matched nothing since 07-29. **That is
+wrong. Weather does not come from `context.json` at all** — the slate fetch hydrates it live from
+statsapi (`legacy/index.html` **L1218**, `hydrate=probablePitcher,weather,lineups,venue,linescore`;
+stored at **L1244** as `weather: g.weather||null`). `shTempF` (L1616) and `windNote` (L2024) read
+that live field. **They are unaffected.**
+
+**`SH_CTX.games` is read by exactly ONE function**: `shUmpCtx` (L1600–01), verified by grep. So the
+frozen context's per-game array feeds **the umpire block and nothing else**. Team-keyed blocks
+(`pen_quality` L1611, `bullpen_last3` L1663) resolve by name and are unaffected.
+
+**The unresolved path, cited:**
+- `shUmpCtx` L1603: no pairing match → **`return null`**.
+- `shUmpKf` L1605: `if(SH_CFG.umpKFrozen)return 1` — identity before it even looks. Unfrozen:
+  `u=null` → `f=null` → **`return 1`**. **A NEUTRAL DEFAULT. The price does not move.**
+- `shUmpKfShadow` L1608: `if(!u)return null` — **records nothing**, and is never multiplied.
+
+**→ THE OWNER'S FIRST BRANCH FIRES: the unresolved path is a neutral default, a stated engine
+configuration, not a defect. No M-number.**
+
+**Is it prospective only? YES.** No board has been generated since 2026-07-26, and the context
+froze 07-29. **No board on disk has ever run with an unresolved block** — the impossible branch
+does not fire. **Tomorrow's board is the first**, and what it loses is **not pricing** (the factor
+is pinned to 1 regardless) but **the shadow record**: `gameInfo.shadow` will carry no `kRaw` for
+any game, so the seeds block's ump line yields nothing and the kRaw experiment stays blocked.
+
+**Scoped regeneration, field list for the diff**: `context.json`'s top-level keys are
+`generated_at · date · league_k_per_game · ump_db_games · games · bullpen_last3 · pen_quality`.
+A regeneration that must be accepted only if the diff is confined to **`games`, `date`,
+`generated_at`, `ump_db_games`** — with **`bullpen_last3`, `pen_quality` and `league_k_per_game`
+byte-identical** — is mechanically checkable key by key. **It is still a vintage event and it
+competes with the board for the same day.** Printed; not taken.
+
+## 33. M27 NARROWED, AND THE HYGIENE SWEEP (item 3)
+
+**Narrowed on the owner's word.** `originRefs()` now consults `HEAD` **only when the handoff
+actually records a held stack** — `heldStack()` reads the git-state section for shas the doc calls
+held or unpushed, skipping the "nothing held" line. **Today it returns empty, so the guard is
+strict — exactly the assertion the orphan preserved.** The hold rhythm still works the moment the
+doc records one. Green.
+
+**THE SWEEP — and the subject-line rule does not survive contact.** 87 commits since 2026-07-24
+touch `tests/`. A keyword rule on subjects flags **45 of 87**, and almost every one is a NEW guard
+shipped alongside a finding — this repo's healthy pattern, and subjects here run to hundreds of
+words so the keyword is nearly always present. **A subject rule would train suppression. It is not
+the workable version.**
+
+**The workable version is the DIFF.** Shipped as `tools/guard-diff-audit.mjs`:
+
+| | count |
+|---|---|
+| commits touching `tests/` since 07-24 | **87** |
+| deleting lines from a `*.test.ts` | **31** |
+| removing lines carrying `expect(` / `it(` / `describe(` | **17** (91 lines) |
+| **NET-NEGATIVE in a test file — coverage actually shrank** | **1** |
+
+**The one net-negative commit is `371bdd8`** (`calibration.test.ts` +65/−73), whose subject says
+*"Re-scope the calibration buckets to EV"* — **the deletion is explained by its own subject.** The
+other 30 are rewrites in place: reformulations, not removals.
+
+**THE OWNER'S SECOND BRANCH — any other weakened assertion: NO.** M27 is the only weakening found.
+
+**AND THE TOOL'S OWN LIMIT, which is the finding worth keeping**: `ea7445a` deleted **one line and
+zero assertion lines**. It was a behaviour change inside a helper, not an assertion removal —
+**an assertion-count rule would MISS M27.** What found M27 was an untracked orphan preserving the
+pre-change file. **So the sweep narrows the review set from 87 to 31; it does not close the class,
+and no encoding here does.**
+
+## 34. THE BOARD UNDER THREE HYPOTHESES (item 4 — printed, not decided)
+
+Quota **553**. Props ceiling post-cut **162–185/day**. Board **62–70**.
+
+| hypothesis | residual/day | burn/day | **runway at 553** | after a 66-credit board |
+|---|---|---|---|---|
+| **A — one-off deploy/session artifact** | ~0–100 | 162–285 | **1.9–3.4 d** | **1.7–3.0 d** |
+| **B — recurring at 48.3/h** | **1,159** | **1,321–1,344** | **0.41 d — under ten hours** | **0.36 d** |
+| **C — external and unbounded** | unbounded | unbounded | **not computable** | irrelevant |
+
+**Hypothesis A is the only one where tomorrow's board is a normal decision.** Under B the key dies
+before Sunday and a board is 12% of what is left. Under C nothing we ration matters.
+
+**What the board still buys, under each**: unchanged in content — board 1 of the homogeneous
+window, the outs flag's first production exercise, `mktN` observed, cfSel `rank`/`stake`,
+`clampActivity`, the replay diff. Under A that is worth 66 credits of a ~2–3 day runway. Under B
+it is worth 66 credits of a **ten-hour** runway, and the same 66 credits buy roughly ninety minutes
+of the unknown instead — **which is the argument for firing it FIRST rather than not at all**,
+because a board is the only artifact that survives the key dying. Under C the board is unaffected
+by the reasoning entirely; the spend is not ours to ration.
+
+**BOTH WAYS, PLAINLY. FOR**: the burst does not change what the board measures, four dark days have
+already cost the window its first four boards, and if the key is about to die the board is the last
+chance to exercise the outs flag and read `mktN` at all. **AGAINST**: precondition 1 was *"the
+residual is client-side and therefore mine to control"* and this window is evidence against it, so
+firing now spends 66 credits into a system whose largest spender is unidentified — and a board read
+against an unexplained burn is the same bet-on-an-unknown the gate was written to refuse.
+**NOT DECIDED. The owner decides at 15:38 PT with the four reads in hand.**
