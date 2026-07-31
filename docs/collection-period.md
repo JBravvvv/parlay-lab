@@ -3161,7 +3161,10 @@ killing the TB ones: the floor and the suspension are complements, not substitut
    regression net; board-level confirmation = `tools/self_consistency.py` reading **zero**
    TB≥1==H≥1 violations on the first post-ship board (118/127 before).
 2. **HRR O0.5 suspension**: `hrrAltMax: 0.5 → -1` — every H+R+RBI rung now susp-tagged and
-   barred from tickets, board-visible. **Recorded as a REVERSAL, not an extension (item 2)**:
+   barred from tickets, board-visible. **⚠️ CORRECTED 2026-07-30 (M25): "every rung … barred"
+   holds ONLY in the disciplined branch — `dscpM` at L2513 and `selMP` at L2651. In
+   `probability`/`caesars_ev` no rung is tagged or barred, and an H+R+RBI O1.5 parlay sits at
+   rank 1 of the measured `caesars_ev` card at $62.** **Recorded as a REVERSAL, not an extension (item 2)**:
    `docs/hrr-recalibration.md` kept O0.5 active on the 12/19 evidence and the saturation
    argument; it is reversed on defects found since (M11, M10, M12, the +10.0 sim residual).
    **Retirement criterion — named, measurable, dated**: the owner's proposed shadow-based
@@ -7097,3 +7100,171 @@ columns below are RATES, not dates.** With `rate` = graded legs per complete boa
 **Reading 29 extended (also on the board tonight)**: print **per-market blocked-reason
 counts**, so the `consensus` count is visible whether or not it is zero — a zero printed
 beside a non-zero pool count is evidence; a zero printed alone is not.
+
+## ⚠️ M25 — `disciplined` IS ONE BOOLEAN GATING ELEVEN PROTECTIONS, TWO TAPS FROM THE DEVICE (2026-07-30, owner's item 1; the branch fires hard)
+
+**COUNT FIRST: 13 code sites, 11 distinct protections, one flag.** The flag appears in
+four syntactic forms that all reduce to the same predicate —
+`disciplined = ((mode==="ev_gated"||basisMode) && !force)` (L3108),
+`evGated = (mode==="ev_gated"||basisMode) && !force` (L3000),
+`dscpM`/`dscp5 = (selMode==="dk_fd"||selMode==="ev_gated")` (L2461, L2513), and the
+inline `selMP==="dk_fd"||selMP==="ev_gated"` in `buildParlaySet` (L2651).
+
+| # | site | protection it gates |
+|---|---|---|
+| 1 | L3008 | **`coreEvMin` — THE EV GATE** (`if(evGated&&!(selEv>=evMin))return`) |
+| 2 | L3011–3018 | **`coreCzEvMin` — the settlement floor** ("nv_tax", documented as override-proof) |
+| 3 | L3032–3034 | **`booksInd` — the independent-consensus requirement** |
+| 4 | L3037–3048 | **`consMinN`/`consMinEv` — the small-sample consensus gate** |
+| 5 | L3056 | **NO-PLAY as a first-class result** (`noPlay: evGated || …`) |
+| 6 | L3112–3115 | **the Kelly ceiling** (M24) |
+| 7 | L3121–3122 | **the disciplined target** — the card absorbs only what ceilings permit |
+| 8 | L3156 | **ceiling-breach prevention on the fallback pass** (`if(disciplined)break`) |
+| 9 | L3158 | **the exact-sum dump** — leftover money is forced onto a ticket ONLY in legacy (`if(left>0&&!disciplined)`) |
+| 10 | L2513–2514, L2539 | **the HRR suspension — display half** (`susp`/`watch` tags, badge suppression) |
+| 11 | L2651–2659 | **the HRR suspension — pool half** (`buildParlaySet` filters HRR rows out of every auto-built ticket) |
+| 12 | L2461–2463 | both sides flow through in disciplined modes (unders treatment) |
+| 13 | L2470 | the trap/pass list is legacy-only |
+**→ the owner's first branch fires at 11, not 3: this one boolean is the single point
+of failure for the ENTIRE discipline set, and it is two taps from the device.**
+
+**IN or OUT, named as asked:**
+| protection | inside `disciplined`? |
+|---|---|
+| `coreEvMin` (EV gate) | **IN** |
+| `coreCzEvMin` (settlement floor) | **IN** — despite its comment claiming it "runs on the force path too": true for `force`, FALSE for legacy modes |
+| HRR bar (`hrrAltMax`), display + pool | **IN** (both halves) |
+| the outs flag as spec'd | **IN** — it mirrors `hrrAltMax` at the same two sites, by design |
+| consensus gates (`booksInd`, `consMinN`/`consMinEv`) | **IN** |
+| Kelly ceiling | **IN** |
+| **structure caps** (`coreNoHR`, `coreMaxLegs`, `coreMaxDec`) | **OUT** — `shCoreEligible` has no mode condition; mode only selects WHICH price the length cap reads |
+| **leg caps** (`coreKsLegMax`, `coreKsFillOnly`, `coreKsCap`) | **OUT** — no mode condition (L3070–3084, L3111) |
+| `perParlayCap` / the 1/n relax / `capG` | **OUT** (L3107) |
+| `maxCoreTickets` / `minCoreTickets` | **OUT** (L3073–3074) |
+| leg-dedup and same-game damping | **OUT** (L3086–3096) |
+| `dailyBankrollCap` (the 10% lock roof) | **OUT** (L3397–3399) |
+**So the structure and leg caps DO apply in legacy modes — which is why the legacy
+cards still cap at 3 legs and still refuse HR props. The discipline that vanishes is
+every EV-, consensus-, suspension- and sizing-related protection.** No protection was
+found outside the conditional that nevertheless fails in a legacy mode — **the
+impossible branch is SILENT**; the split is clean.
+
+**`disciplined` is derived from MODE PLUS `force`**, not mode alone: `!force` is a
+conjunct at both L3000 and L3108. So an override in a disciplined mode disables the
+same eleven protections that a mode switch disables — `force` and legacy modes are the
+same hole entered from two directions.
+
+**M24'S SCOPE RESTATES, per the owner's second branch**: from *a sizing defect* to
+**a discipline-branch defect**. The `$0`-ceiling tickets are not a Kelly curiosity —
+they are the visible symptom of protections 1, 2 and 6 all being off at once, which is
+why a **negative-czEv ML/RL parlay (czEv −4.5 to −12.5)** reaches a card at all.
+**Legacy modes place negative-EV bets BY CONSTRUCTION**, not by accident.
+
+**THE DOLLAR TOTALS (armed fixture, DAILY $250, bankroll $750)**: across the 11 legacy
+tickets, **$500 staked against $13 of computed ceiling — a ratio of 38.5×**
+(`probability` $250 staked / $0 of ceiling; `caesars_ev` $250 staked / $13).
+
+**DOC SENTENCES CLAIMING A PROTECTION GLOBALLY — grepped, each with file and line:**
+| where | claim | status |
+|---|---|---|
+| `CLAUDE.md` L38 | "HRR O1.5+ and HR-anytime-parlay suspended from auto-selection; <100-graded-leg markets need consensus-fair EV ≥ −1%" — **no mode qualifier** | **CORRECTED 2026-07-30** — see the dated line added there |
+| `docs/collection-period.md` L3163–3164 | "every H+R+RBI rung now susp-tagged and barred from tickets, board-visible" — **no mode qualifier** | **CORRECTED 2026-07-30**, dated marker in place |
+| `legacy/index.html` L1070 | code comment: "zero edge = zero stake" — **globally false**: in legacy modes zero edge takes a $62 stake | **recorded here, NOT edited** — the comment is inside the engine string, and editing it would move the served hash for a comment; the correction lives in this doc and in the M25 row |
+| `legacy/index.html` L2991–2992 | "zero qualifiers means NO-PLAY … stakes only flow after an explicit override (force=true)" | **scoped in context** (it describes `ev_gated`), but the second clause is false for legacy modes, where stakes flow with NO override — same treatment: recorded, not edited |
+| `docs/collection-period.md` L454 (`hrrAltMax` frozen-table row) | ALREADY carries "⚠️ Effect CONDITIONAL on `selMode ∈ {ev_gated, dk_fd}`" | **no correction needed** — the qualifier was written 07-27 |
+
+## THE EXPORT CURL AND READING 15 AS ONE QUERY (2026-07-30, owner's item 2)
+
+**The curl — Josh types the phrase; it is never entered for him, never logged, never
+placed in a query string:**
+```
+curl -sS -H "x-pl-sync: <YOUR SYNC PHRASE>" \
+  https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger-2026-07-30.json
+```
+(`app/api/ledger/route.ts` L68–77: GET returns `{ledger, bank, noplay, at}` behind the
+`x-pl-sync` gate. Zero Odds credits — it is a Redis read.)
+
+**READING 15, RESTATED AS ONE QUERY** (all of it computable from fields present since
+2026-07-11 — `prob`, `czDec`, `stake`, `entry.bankroll` — so NONE of it is blocked by
+the pre-07-24 `selMode` blind span):
+1. **Overstake**: per ticket, `ceiling = round(4 × entry.bankroll × max(0, min(0.25 ×
+   kelly(prob/100, czDec), 0.02)))`, `ratio = stake / ceiling`. Print: ratio per
+   ticket, **count above 1**, **max**, **total dollars staked above ceiling**, and the
+   **per-market split**.
+2. **$0-ceiling tickets**: count, and total staked on them.
+3. **Negative `czEv` at placement**: count (the field is on every ticket since 07-11).
+4. Alongside: the **46.3/59.2 reproduction** (the pre-registered join) and the
+   **per-field presence census by date**.
+**Pre-committed branches (the owner's, verbatim in effect)**: any ratio > 1 → a
+REALIZED overstake in the ledger, the 38-ticket population contains bets the engine's
+own sizing said not to place, the bankroll exit's population is not what it assumes —
+**count and dollars printed before anything else next turn**. Any $0-ceiling ticket →
+**the strongest single finding of the window, and it goes at the top of the freeze
+doc**. Zero above 1 → **all 38 were placed in a disciplined mode, M24 is PROSPECTIVE
+ONLY — and that gets stated as plainly as the bad branch would be.** Impossible
+branch: a ratio > 1 on a row whose `selMode` reads `ev_gated` → **the ceiling failed
+INSIDE the disciplined branch — stop.**
+
+## cfSel NOW RECORDS RANK AND STAKE — SHIPPED BEFORE THE FIRE (2026-07-30, owner's item 3)
+
+**The owner's first branch fired and the diff is IN**: `CfSelStamp` gains
+`rank?: number` (1-based position on the counterfactual card) and `stake?: number`
+(its whole-dollar allocation at `CFSEL_DAILY = 250`), populated from the counterfactual
+allocator's own ordered `picks`. Guard extended and **OBSERVED RED first** ("card:true
+stamp carries no rank — the counterfactual is unsizeable", both disciplined modes),
+green after, all four modes byte-identical still. `PredRecord.cfSel` widened to match.
+**Tonight's board therefore carries a SIZEABLE counterfactual instead of a boolean** —
+the alternative was permanent whether-only blindness for every board from tonight on.
+
+**THE LIMITATION, in the review's own entry (the owner's item, stated not implied)**:
+**cfSel answers whether a leg would have been selected BY THE SHIPPED ALLOCATOR, not
+by a correct one.** The counterfactual runs **the same `shAllocate`, at the same
+`CFSEL_DAILY = 250`, with the same ranking key** (`src/lib/cfsel.ts` L74–77 —
+`shCardPool` then `shAllocate(pool, CFSEL_DAILY, saved, false)`, `saved` being the live
+cfg) — so it inherits **M14 in full**: non-monotonicity in price, cap-binding, and
+prob-rather-than-EV ranking. A `card: true` stamp means *this leg would have survived
+an allocator we have recorded as defective*. That is still the right instrument for the
+question "did the bar change what got bet", and it is not evidence that the bet would
+have been correct.
+
+**The ≥300-row criterion: CHOSEN, not fitted** — it is `hrr-recalibration`'s own
+retirement threshold (≥300 rows AND ≥10 board-days), with no power model anywhere;
+**it joins the census as an unmeasured calendar-gating parameter** beside the 20-board
+bar and the ≥10 board-day threshold. **What the review CAN conclude at ~190 stamped
+decisions**: a direction — whether suspended HRR legs would have been selected at all,
+and now (with rank/stake) how much money the bar diverted — plus the graded outcome of
+those specific rows. **What it CANNOT**: clear its own stated threshold, so any verdict
+is explicitly under-powered against the criterion that was written for it; and it
+cannot separate "the bar was right" from "the allocator would have picked badly anyway"
+— M14 sits inside the counterfactual.
+
+## THE ENGINE HAS BEEN DISPLAYING THE MISMATCH ALL ALONG (2026-07-30, owner's item 4)
+
+**Per-ticket: YES.** `TicketCard` receives `kelly={p.kelly}` (`app/builder/page.tsx`
+L757, L905) and renders a badge whenever
+**`kellyGap = kelly != null && (stake > 2*kelly || kelly > 2*stake)`** (L143, badge at
+L167–172). Because `p.kelly` is `0` (not null) for a $0-ceiling ticket, the condition
+`stake > 0` is TRUE — **the screen has literally been showing "Kelly $0" beside a $62
+stake.** So the owner's suspicion is right: the mismatch has been on screen the whole
+time, unlabelled as a breach.
+
+**MEASURED, per mode (fixture, bankroll $750, entered DAILY $250):**
+| mode | actually staked | `kellyDaily` on screen | staked ÷ kellyDaily | 5× banner |
+|---|---|---|---|---|
+| `ev_gated` | $105 | **$26** | 4.0× | **fires** (entered 250 > 5×26) |
+| `dk_fd` | $150 | **$37** | 4.1× | **fires** |
+| `caesars_ev` | **$250** | **$3** | **83.3×** | **fires** |
+| `probability` | **$250** | **$0** | — | **SUPPRESSED** |
+**AND THAT LAST ROW IS THE FINDING**: the existing warning is gated on
+`card.kellyDaily > 0` (L885), so **in the one mode where every ticket's Kelly is zero,
+the banner that would say so is disabled by its own guard.** The display-tier protection
+turns itself off in exactly the worst case — the same shape as M25 one layer up.
+Per-ticket badges in `caesars_ev`: `Kelly $3` beside $62, then **`Kelly $0` beside
+$62, $62, $2, $62**.
+
+**SPEC, NOT SHIPPED (as ordered)**: the card surfaces the RATIO and names it — when
+`stake > ceiling`, show `stake ÷ ceiling` with a breach label rather than a bare Kelly
+figure, and drop the `kellyDaily > 0` gate so a zero-Kelly card is the loudest case
+instead of the silent one. Guard observed red first. **This is display-tier and it is
+the only thing that would have caught M24 by eye** — the data was already on screen;
+what was missing was the sentence saying what it meant.

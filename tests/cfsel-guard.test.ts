@@ -127,6 +127,25 @@ describe.each(deviceReachableModes())("cfSel byte-identity in %s", (MODE) => {
     }
     if (isDisciplined(armMode)) {
       expect(suspRows, "fixture carries no suspended rows — the guard proves nothing").toBeGreaterThan(0);
+
+    /* SIZEABLE COUNTERFACTUAL (2026-07-30, owner's item 3): a `card:true` stamp must
+       carry the RANK and STAKE the counterfactual allocator gave it — otherwise the
+       08-15 review can say WHETHER a suspended leg would have been bet but never HOW
+       LARGE, and that blindness is permanent for every board from tonight forward.
+       OBSERVED RED before the fields existed. */
+    let carded = 0;
+    for (const st of cf.stamps.values()) {
+      if (!st.card) continue;
+      carded++;
+      expect(typeof st.rank, "card:true stamp carries no rank — the counterfactual is unsizeable").toBe("number");
+      expect(st.rank as number, "rank must be 1-based").toBeGreaterThanOrEqual(1);
+      expect(typeof st.stake, "card:true stamp carries no stake — the counterfactual is unsizeable").toBe("number");
+      expect(Number.isFinite(st.stake as number), "non-finite counterfactual stake").toBe(true);
+      expect(st.stake as number, "a carded counterfactual ticket with a non-positive stake").toBeGreaterThan(0);
+    }
+    if (isDisciplined(armMode)) {
+      expect(carded, "no card:true stamps — the sizeable-counterfactual check is vacuous").toBeGreaterThan(0);
+    }
     } else {
       // legacy modes tag nothing (finalizeCats' dscpM gate) — zero susp rows is the
       // CORRECT reading there, and it is exactly why cfSel would stamp nothing

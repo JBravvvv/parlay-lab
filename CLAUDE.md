@@ -36,6 +36,10 @@ Context for continuing development of **PARLAY//LAB**, a single-file multi-sport
 > - **July 2026 overhaul (fix-file, all 6 phases deployed):** default selection mode = **EV-gated @ CZ**;
 >   settlement floor czEv ≥ 0 on core locks (override-proof, "nv_tax" blocked reason); HRR O1.5+ and
 >   HR-anytime-parlay suspended from auto-selection; <100-graded-leg markets need consensus-fair EV ≥ −1%;
+>   **⚠️ CORRECTED 2026-07-30 (M25): every protection in this line — the HRR/HR suspensions, the
+>   consensus-fair floor, the EV gate and the settlement floor — applies ONLY inside the disciplined
+>   branch (`selMode ∈ {ev_gated, dk_fd}` AND not `force`). In `probability`/`caesars_ev`, two taps
+>   from the device, ELEVEN protections are off at once. See collection-period, M25.**
 >   CORE max 3 legs / FUN max 4 legs, 1 FUN ticket, FUN $5/day default; **managed bankroll** ($2,500 base,
 >   localStorage `pl_bank2`, computed = base + logged deposits/withdrawals + graded P/L, no free edits;
 >   10% daily exposure cap at lock); unders enabled in disciplined modes with per-market direction prefs

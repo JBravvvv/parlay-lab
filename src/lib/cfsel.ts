@@ -34,12 +34,22 @@ import type { BoardData, Engine } from "@/engine";
  */
 export const CFSEL_DAILY = 250;
 
-export type CfSelStamp = { pool: boolean; card: boolean };
+export type CfSelStamp = {
+  pool: boolean;
+  card: boolean;
+  /** 1-based position on the counterfactual card (present only when `card`). Added
+   *  2026-07-30 (owner's item 3): without rank+stake the 08-15 review can say WHETHER a
+   *  suspended leg would have been bet but never HOW LARGE, and that blindness would be
+   *  permanent for every board from this one forward. */
+  rank?: number;
+  /** whole-dollar stake the counterfactual allocator gave that ticket at CFSEL_DAILY. */
+  stake?: number;
+};
 
 type Leg = { gkey?: string | null; lkey?: string | null };
 type Ticket = { legs?: Leg[]; czDec?: number | null };
 type PoolW = { pl?: Ticket };
-type AllocOut = { picks?: { w?: { pl?: Ticket } }[] };
+type AllocOut = { picks?: { w?: { pl?: Ticket }; stake?: number }[] };
 
 export type CfSelResult = {
   stamps: Map<string, CfSelStamp>;
@@ -82,10 +92,23 @@ export function computeCfSel(eng: Engine, slate: unknown): CfSelResult {
       inPool.add(keyOf(l));
       if (isHrr(l)) cfHrrPoolLegs++;
     }
-  const inCard = new Set<string>();
-  for (const p of alloc.picks ?? []) for (const l of p.w?.pl?.legs ?? []) inCard.add(keyOf(l));
+  /* rank = 1-based index in the allocator's own ordering; stake = its whole-dollar
+     allocation. The allocator forbids a leg on two card tickets, so a key maps to one
+     pick; the min-rank guard is defensive, not expected to bind. */
+  const inCard = new Map<string, { rank: number; stake: number }>();
+  (alloc.picks ?? []).forEach((p, i) => {
+    const stake = Number(p.stake);
+    for (const l of p.w?.pl?.legs ?? []) {
+      const k = keyOf(l);
+      const prev = inCard.get(k);
+      if (!prev || i + 1 < prev.rank) inCard.set(k, { rank: i + 1, stake: Number.isFinite(stake) ? stake : 0 });
+    }
+  });
   const stamps = new Map<string, CfSelStamp>();
-  for (const k of inPool) stamps.set(k, { pool: true, card: inCard.has(k) });
+  for (const k of inPool) {
+    const c = inCard.get(k);
+    stamps.set(k, c ? { pool: true, card: true, rank: c.rank, stake: c.stake } : { pool: true, card: false });
+  }
   return {
     stamps,
     cfPoolTickets: pool.length,

@@ -221,7 +221,10 @@ opened in `probability` or `caesars_ev` at all, for any purpose, until M24 is
 resolved — step 15's diagnostic is the SOLE exception, it runs ONCE, and the return
 to `ev_gated` is the immediately following action.** M24: the belief-sized Kelly
 ceiling is computed in every mode and applied in only two — 11 of 11 legacy tickets
-exceed their own ceiling, 9 of them against a computed ceiling of $0.
+exceed their own ceiling, 9 of them against a computed ceiling of $0. **And M25: that
+same boolean gates ELEVEN protections — the EV gate, the settlement floor, both
+consensus gates, NO-PLAY, the Kelly ceiling and both halves of the HRR bar — so a
+legacy mode is not "a different ranking", it is the discipline set switched off.**
 **OPERATOR RULE #2 (owner's, dated 2026-07-30, beside the 2% rule): step 15 is a
 DIAGNOSTIC ONLY — the mode returns to `ev_gated` before any slip is placed, and
 `pl_selmode` is VERIFIED to read `ev_gated` as the LAST action before placing.**
@@ -239,8 +242,9 @@ certify the outs flag at all because the flag does not exist yet — and it cann
 consensus-gate crossing is readable only as the blocked-reason proxy (reading 29),
 nor can it see any legacy-mode exposure, since the server builds in `ev_gated` and
 legacy modes stamp zero susp rows, and it cannot SIZE the counterfactual — cfSel
-records WHETHER a suspended row would have been selected (`pool`/`card`) but not at
-what rank or stake** — the
+records whether a suspended row would have been selected AND — as of this afternoon's
+ship — its counterfactual `rank` and `stake`, but that counterfactual runs the SHIPPED
+allocator, so it inherits M14 (non-monotone, cap-bound, prob-ranked)** — the
 board's tickets are built under the server's pinned mode, so the zero-HRR-legs
 half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
 modes); step 15's diagnostic read is the only cover for the other three, and it
@@ -366,6 +370,14 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     that carries it** — the indirect answer to the mode question. Any realized
     overstake → a realized defect inside the bankroll exit's own population, and it
     outranks the board.)
+    (RESTATED 2026-07-30 evening as ONE QUERY — collection-period, THE EXPORT CURL
+    AND READING 15 block: (1) overstake ratio per ticket + count above 1 + max +
+    total dollars staked above ceiling + per-market split; (2) count of $0-ceiling
+    tickets and what was staked on them; (3) count with negative `czEv` at
+    placement; (4) alongside, the 46.3/59.2 reproduction and the per-field presence
+    census by date. The curl is written out there; **Josh types the phrase**.
+    Impossible branch: a ratio > 1 on a row whose `selMode` reads `ev_gated` → the
+    ceiling failed INSIDE the disciplined branch — STOP.)
     denominators — and print WHICH variant matched (a provenance RECOVERY,
     labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
