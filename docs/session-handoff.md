@@ -14,16 +14,29 @@ ZERO (a FOURTH consecutive dark board-day), and the outs flag — live in produc
 2026-07-31 02:50Z — remains UNEXERCISED on a real board.** Every pre-committed reading
 re-arms for the next fire.
 
-**STATE, 2026-07-31 13:57:11Z — quota 699 / 19,301.** The residual is down to ONE candidate
-class. Measured over 62.96 h: **relay windows (no device use) 12.54 h → residual +0.02/h;
-non-relay windows 50.42 h → +4.61/h**, with no counterexample in either direction
-(`branch-firing-audit.md` §9). Burn after the cron cut: **~185/day props on a relay day →
-runway ~3.78 d; ~386/day with the app in use → ~1.81 d.** A board costs **~95** (~76–88 at
-13–15 unstarted events × the measured 5.84 credits/event).
+**STATE, 2026-07-31 14:36:08Z — quota 699 / 19,301, five consecutive zero-spend relay reads.**
+The residual is REAL and robust (it survives the whole admissible cost range and cannot
+vanish), but **the per-event cost is not a constant and last turn's 5.845 is REFUTED** —
+the tightest value the data admits is **c ≤ 5.114**, and at that end the relay windows are
+**not zero**: +3.21/h against +7.07/h in use, a factor of 2.2 rather than infinity
+(`branch-firing-audit.md` §12). **Every figure is a band from here:**
+| | c = 5.114 | c = 5.845 |
+|---|---|---|
+| burn, relay day | 239 | 185 |
+| burn, in use | 332 | 296 |
+| **runway at 699** | **2.1–2.9 d** | **2.4–3.8 d** |
+| board cost (10–11 unstarted) | 57–62 | 64–70 |
 
-**A BOARD TOMORROW IS AFFORDABLE IF, AND ONLY IF, TWO THINGS HOLD**: (1) the residual is
-client-side and therefore under the owner's control; (2) the propsnap store shows no
-weekday rows. Both are settled by the zero-credit reads below.
+**THREE PRECONDITIONS FOR A BOARD, all on disk** (`branch-firing-audit.md` §14): (1) the
+residual is client-side — **Variant B**; (2) the propsnap store shows no weekday rows;
+(3) **the calibrate pause is landed** so board 1 is not read against a calibration that
+moves overnight — DONE this turn, `vercel.json`'s `crons` array removed.
+
+**TOMORROW, Sat 2026-08-01, 15 games**: T = 0.80 is crossed at **22:15Z (0.818, 11
+unstarted)**; 22:45–23:00Z reads 1.000 over 10. **THE WINDOW IS 22:15Z–23:00Z = 15:15–16:00
+PT.** ⚠️ **The cron cannot do it**: entry 1 is `45 22 * * 1-5`, weekdays only, and the
+Saturday entry `0 18 * * 6` lands at achievable **0.267** — engine-half only. A
+composition-valid board tomorrow fires on the owner's curl inside that window.
 
 **RUN THESE FIRST — all zero Odds credits. Order: propsnap → calibration → ledger → pred →
 Variant B.** The first needs NO phrase (`/api/propsnap`'s read is ungated); the rest are yours.

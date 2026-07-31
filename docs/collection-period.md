@@ -50,6 +50,59 @@
 > **SPEC ONLY, not shipped**: replace L81 with a hard `return false`, so an absent secret closes
 > the route instead of opening it.
 >
+> ## ✅ PAUSED 2026-07-31 — THE THIRD FREEZE POINT
+>
+> **The `crons` array is removed from `vercel.json`** (frontend-rebuild, the branch Vercel builds
+> from — `main` and `line-history` are both `deploymentEnabled: false`). The ROUTE stays, its
+> `syncAuthed` + `Bearer CRON_SECRET` paths stay, so it can still be run on demand. **Nothing was
+> added to the file**: Vercel's schema rejects unknown top-level properties and this project cannot
+> afford a failed deploy, so the rationale lives here and in the commit rather than in the JSON.
+> **Reversible in one commit.**
+>
+> **THE THREE FREEZE POINTS, and what the original pause actually froze — TWO OF THREE:**
+> | floating input | writer | frozen | when | by |
+> |---|---|---|---|---|
+> | `public/model/priors.json` | `model.yml` (GitHub, `30 9`) | **YES** | 2026-07-29 | `a46c1f8`, schedule commented on `main` |
+> | `public/model/context.json` | `context.yml` (GitHub) | **YES** | 2026-07-29 | `a46c1f8`, dropped from the bot's `git add` |
+> | **`pl:cal:summary` / `pl:cal:weights`** | **`/api/calibrate` (VERCEL cron, `30 9`)** | **NO — ran daily for two more days** | **2026-07-31** | this change |
+> **The M18 pause froze two of three. The third ran for two more days because the scheduler that
+> drove it was in no inventory.** Said plainly, as asked.
+>
+> **IT IS A FREEZE, NOT A CHANGE — the distinction verified, not assumed.** `effectiveCalibration`
+> (`src/engine2/calibration.ts` **L592–599**) has **no staleness check of any kind**: it reads
+> `summary`, `weights` and `auto` and uses them. `pl:cal:lastRun` is **written by the calibrate
+> route (L47) and read by nothing** — a repo-wide grep for `pl:cal:lastRun` returns that one line.
+> `app/api/generate/route.ts` L195–213 reads the store and passes the result straight through. So a
+> stopped writer means **the store holds its last values and the engine keeps reading them**.
+> **IMPOSSIBLE BRANCH — the engine falls back to a different calibration path when the store is
+> stale: DOES NOT FIRE.** There is no other path; with a null summary L592 sets `rel = null` and the
+> mults reduce to the weekly state alone, which is not a fallback but the same expression.
+>
+> **NOT the alternative**: `pl:cal:auto = "off"` returns `{mults:{}, globalS:null}` at L594 — it
+> CHANGES the engine's inputs rather than holding them. Recorded so the cheap-looking option is not
+> taken by mistake.
+>
+> **THE VINTAGE STAMP IS NOT YET KNOWN.** The store's last write is `pl:cal:lastRun`, readable only
+> through `GET /api/calibration` (syncAuthed, owner's phrase, zero Odds credits). **Pre-committed
+> reading, written before it is run:**
+> - **per-market `n` against `SLOPE_MIN_N = 100` and `GLOBAL_MIN_N = 150`, and whether ANY market
+>   has ever cleared them.** If none has, `slopeMults` has been returning an identity and **the
+>   daily writer has been writing a no-op: EXPOSURE WITHOUT EFFECT** — stated as plainly as the bad
+>   branch, and the pause is then hygiene rather than a correction.
+> - **the current `mults` and `globalShrink`, plus `weights.log` if the store carries one** (it
+>   does: `WeightState.log` accumulates `{at, market, before, after, bucket}` per adjustment).
+>   Any entry in that log is a dated proof that the engine's inputs moved.
+> - **if any market cleared the threshold: print WHICH and WHEN, and every measurement recorded
+>   after that date is downstream of a calibration that moved** — including the M14 sweeps, the
+>   A1 levels and every board-derived figure taken after it.
+> - **if the last write is today at 09:30Z** → tonight's board would have read a fit written this
+>   morning, and every earlier board read a different one. **Cross-day comparability of anything
+>   board-derived is then not established for the window**, and the homogeneous window's start
+>   date is 2026-07-31, not 2026-07-29.
+> - **IMPOSSIBLE BRANCH**: `mults` non-empty while every market sits under `SLOPE_MIN_N` → the
+>   weekly state machine moved without the nightly fit, and `applyWeeklyAdjustment`'s own n ≥ 150
+>   gate did not hold. Print both.
+
 > **THE PAUSE DIFF FOR IT, if the owner wants the third input frozen** — one line, reversible,
 > and it freezes by STOPPING NEW WRITES while the last-written summary keeps being read, exactly
 > as the `context.json` freeze does:

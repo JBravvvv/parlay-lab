@@ -534,3 +534,192 @@ in use; (699 − 95) / 185 = **3.26 days** on relay days.
 The gate therefore holds on exactly two cheap reads, both the owner's, neither costing an Odds
 credit: **the propsnap store curl** and **`GET /api/calibration`** (which item 2 added), followed
 by the ledger export, `burn-report --pred`, and Variant B.
+
+---
+
+# PART FOUR — 2026-07-31, owner's items 1–5
+
+## 12. THE COST MODEL IS NOT A CONSTANT, AND LAST TURN'S FIGURE IS REFUTED (item 3)
+
+Billing is **per market per region actually returned** (`snapshot_props.py` requests six markets
+× the `us` region only, so **6.0/event is the structural maximum**). Since `residual ≥ 0` always,
+each window gives an **upper bound** on a constant per-event cost `c`:
+
+| window (UTC) | endpoints | spent | ev | lh | **implied `c` if residual were 0** |
+|---|---|---|---|---|---|
+| 07-28 23:00 → 07-29 12:00 | **SEEDED** (minute unknown) | 641 | 123 | 2 | **5.114** ← binding |
+| 07-29 12:00 → 07-30 03:55 | SEEDED | 215 | 18 | 2 | 11.278 |
+| 07-30 03:55 → 16:45 | SEEDED | 223 | 20 | 2 | 10.550 |
+| 07-30 16:45 → 07-31 01:25 | SEEDED | 200 | 10 | 2 | 18.800 |
+| 07-31 06:41 → 13:57 | **EXACT** (both tool reads) | 339 | 58 | 0 | **5.845** |
+
+**→ `c = 6.0` IS REFUTED BY DATA, AND SO IS THE 5.845 I PUBLISHED LAST TURN**: either makes the
+first window's residual negative. **The tightest constant the data admits is `c ≤ 5.114`.**
+The rows above 6.0 are not violations — they are upper bounds on residual-dominated windows.
+**Impossible branch — an implied cost outside anything the billing model can produce: DOES NOT
+FIRE** in the binding direction; every *lower* bound sits inside [0, 6].
+
+**The residual as a band**, at the two ends of the admissible range:
+
+| window | h | spent | ev | resid @5.114 | resid @5.845 | /h @5.114 | /h @5.845 | device |
+|---|---|---|---|---|---|---|---|---|
+| 07-28 23:00 → 07-29 12:00 | 13.00 | 641 | 123 | **0** | −90 | 0.0 | −6.9 | in use |
+| 07-29 12:00 → 07-30 03:55 | 15.92 | 215 | 18 | +111 | +98 | 7.0 | 6.1 | in use |
+| 07-30 03:55 → 16:45 | 12.83 | 223 | 20 | +109 | +94 | 8.5 | 7.3 | in use |
+| 07-30 16:45 → 07-31 01:25 | 8.67 | 200 | 10 | +137 | +130 | 15.8 | 14.9 | in use |
+| 07-31 01:25 → 14:36 (5 reads) | 13.19 | 339 | 58 | **+42** | **0** | **3.2** | **0.0** | **RELAY** |
+
+**RELAY: +3.21/h → +0.02/h. IN USE: +7.07/h → +4.61/h.**
+
+**The owner's FIRST branch fires: the residual survives across the whole admissible cost range.**
+It cannot vanish — lowering `c` only raises it, and raising `c` past 5.114 is refuted. **Total
+residual ≥ 399 credits over 63.6 h. It is real.** Every runway figure is a band from here.
+
+**But the evidence for the client-side hypothesis is materially weaker than I reported.** At the
+data-consistent end the relay windows are **not zero**: +42 credits over 13.19 h. The contrast
+falls from *(0 vs 4.6)* to *(3.2 vs 7.1)* — **a factor of 2.2, not infinity.**
+
+**The honest tension, stated rather than resolved**: a *constant* `c` cannot make both the first
+window and the relay window zero. If the per-event mean genuinely differs by slate — which it must,
+since it is a count of markets quoted — then 5.845 can be right for 07-31 and ≤5.114 right for
+07-28/29, and the relay residual really is ~0. **Nothing on disk distinguishes these.** What
+distinguishes them: **Variant B step 1 is a request of KNOWN product (3 markets × 2 regions = 6),
+so its delta calibrates the billing model exactly.** That is a second reason to run it, independent
+of SharpDesk. Spec, not shipped: log the `x-requests-used` delta per upstream call in
+`/api/odds` (the headers already pass through at L51–54) — that turns the model into a measurement.
+
+### Every figure restated as a band
+
+| | at `c` = 5.114 | at `c` = 5.845 |
+|---|---|---|
+| props ceiling, post-cut (31.6 ev/day) | **162/day** | **185/day** |
+| residual, relay day | **77/day** | **~0/day** |
+| residual, app-in-use day | **170/day** | **111/day** |
+| **burn, relay day** | **239** | **185** |
+| **burn, in-use day** | **332** | **296** |
+| **runway at 699, relay** | **2.9 d** | **3.8 d** |
+| **runway at 699, in use** | **2.1 d** | **2.4 d** |
+| board cost, 10–11 unstarted | **57–62** | **64–70** |
+
+## 13. THE UMP REPLAY: THE CURVE REQUIRES SYNTHETIC INPUTS, AND SO DID THE NUMBER ALREADY ON THE TABLE (item 2)
+
+**The owner's third branch fires, and harder than the question assumed.**
+
+**Both inputs are synthetic, and always were.** `build_context.py` L232 emits `kFactor` only at
+`g ≥ 5`. **No umpire reached g = 5 until 2026-07-30**, and `context.json` has been frozen since
+2026-07-29T20:32Z. **Production `context.json` has therefore NEVER contained a single `kFactor`.**
+Anything that shows the factor moving a row must have supplied both the arming flag `g` **and** the
+`kFactor` value by hand.
+
+**And the existing figure is one of those.** `tests/armed-baseline.test.ts`'s own header, L26–36:
+
+> the fix45 context **deliberately carries `hpUmp.kFactor` … values that clear both guards**,
+> making `shUmpKf` **fixture-ACTIVE while … production-inert** … `hpUmp.g` spans **(3/5/9/40)** …
+> **chosen to exercise both sides of each guard**, which is right for catching movement and
+> **wrong for anything else** … **Do not cite a figure from this baseline as a production
+> measurement.**
+
+**The frozen table cites it as exactly that.** And it is not an n = 1 figure either: the replay
+block records **13 ump-tagged rows** with the factor live — a fixture-wide arming, not one umpire.
+**So the row's number is not "measured at n = 1"; it is a synthetic-fixture sensitivity reading at
+an arming level that corresponds to no real state, past or projected.**
+
+**→ NO CURVE IS PRODUCED HERE.** Building one at counts 1/5/10/25/50/78 would mean inventing 78
+`kFactor` values and their game assignments and presenting the result beside real numbers. The
+owner pre-committed against it and it is the right call.
+
+**What IS measurable, and is measured, from `data/ump_k.json` (85 umpires, real):**
+
+- `kFactor = round((u.k/u.g) / leagueKpg, 4)`, clamped to **[0.92, 1.08]** in the engine.
+- League mean **16.565 K/game**. Raw ratio across all 85: min **0.745** · p25 **0.966** ·
+  median **1.041** · p75 **1.127** · max **1.388**.
+- **60% (51 of 85) would land ON a clamp bound.** The factor is bounded at ±8% by construction, so
+  **the per-row magnitude cannot grow with the armed count — only the number of affected rows can.**
+- The two actually armed **clamp in OPPOSITE directions**: Barrett 1.087 → **1.080**,
+  Traynor 0.833 → **0.920**. The next eleven (g = 4) are 1.080 ×3, 1.041 ×2, 0.981, 0.966, 0.951,
+  0.921, 0.920 ×2 — **also split.** The armed population is not directionally biased.
+
+**What that implies for the unpin decision, without a synthetic curve**: per-row movement is capped
+at ±8% at every count; what scales is coverage, from ~0.35 of a 15-game board's HP umpires today to
+~13.8 of 15 at the projected freeze-exit count. **The decision is about breadth, not depth**, and
+the frozen table's row must say that instead of carrying a fixture number.
+
+**Impossible branch — the card stops changing at higher counts**: unevaluable without the curve;
+recorded as unevaluated rather than answered.
+
+**A real measurement is available, and its precondition is now dated**: once the pause lifts (or a
+`context.json` is built from the REAL `ump_k.json` rather than from hand-picked g values), replay
+the archived board with actual arming. Until then the frozen table's row carries the clamp bound,
+the coverage projection, and an explicit "no production measurement exists".
+
+### The same test across the bundle — measurements whose regime has changed
+
+| measurement | regime when taken | regime now | status |
+|---|---|---|---|
+| **`umpKFrozen` replay** (8/18, 16 pp, card changes) | synthetic fixture arming, 13 tagged rows | production has never had one armed umpire; 2 armed, ~78 projected | **MISLABELLED — fixture figure cited as production** |
+| **`penQFrozen` replay** (M23: 16/173, 15.1 pp) | same fix45 fixture (`pen_quality.ip` alternation 9.0/40.0, chosen to straddle the guard) | `pen_quality.json` **never materialises in a commit** | **same class — fixture-active, production-inert** |
+| **props ~198/day** | ten crons, MIN_GAP live | **four crons since 2026-07-31** | superseded; ceiling restated |
+| **line-history ~45/day** | inferred from a scheduled rate | measured 3–4 runs/day | corrected on both branches |
+| **burn/runway before 07-31** | 6.0 credits/event, ten crons, line-history live | `c ≤ 5.114`, four crons, line-history off | **all superseded; bands above** |
+| **the 46.3/59.2 HRR pair** | pre-07-24, before `selMode` existed | modes recorded since 07-24 | provenance UNVERIFIED pending the export |
+| **M15 n=511 → 362** | pre-dedup | post-dedup | recorded, both figures kept |
+| **the 20-board fixture bar** | a calendar span that no longer exists | struck as unreachable 07-30 | re-scoped to hot-site fidelity |
+
+**Seven besides the ump row.** The two fixture-derived replays are the same defect; the rest are
+superseded-with-a-marker, which is the convention working.
+
+## 14. THE BOARD'S THREE PRECONDITIONS, AND TOMORROW'S NUMBERS (item 4)
+
+**Preconditions, on disk, each with its reading:**
+
+| # | condition | settled by | reading |
+|---|---|---|---|
+| 1 | the residual is client-side and therefore the owner's to control | **Variant B** (`board-open-experiment.md`) | step 1 costs 6 and step 3 costs 0 → mechanism named. Step 1 costs 0 after a 10-min quiet gap → cleared, and the residual is neither Actions nor SharpDesk |
+| 2 | the propsnap store shows **no weekday rows** | the ungated curl (§5) | weekday rows → an uninventoried ≤96-per-fire spender is live and the board's price changes |
+| 3 | **the calibrate pause is landed**, so board 1 is not read against a calibration that moves overnight | `vercel.json` on origin + `GET /api/calibration` | pause landed AND the store's last write is dated → board 1 and every board after it read ONE calibration vintage |
+
+**Tomorrow, Saturday 2026-08-01 — 15 games (statsapi, zero Odds credits):**
+
+| UTC | PT | unstarted | ready | achievable | ≥ T = 0.80 | board cost band |
+|---|---|---|---|---|---|---|
+| 21:45Z | 14:45 | 11 | 8 | 0.727 | no | 62–70 |
+| 22:00Z | 15:00 | 11 | 8 | 0.727 | no | 62–70 |
+| **22:15Z** | **15:15** | **11** | **9** | **0.818** | **YES — the crossing** | **62–70** |
+| 22:30Z | 15:30 | 11 | 9 | 0.818 | YES | 62–70 |
+| **22:45Z** | **15:45** | **10** | **10** | **1.000** | **YES** | **57–64** |
+| 23:00Z | 16:00 | 10 | 10 | 1.000 | YES | 57–64 |
+| 23:15Z | 16:15 | 5 | 5 | 1.000 | YES | 32–35 |
+
+**THE WINDOW IS 22:15Z–23:00Z (15:15–16:00 PT).** Before it, T fails; after 23:15Z ten of fifteen
+games are gone and the board is a five-game board.
+
+**⚠️ THE CRON CANNOT DO IT TOMORROW.** Entry 1 is `45 22 * * 1-5` — **weekdays only; Saturday is
+not in its range.** The Saturday entry is `0 18 * * 6`, and **at 18:00Z achievable is 0.267 with
+15 unstarted** — far below T, i.e. **engine-half only**. So if the board fires tomorrow it fires
+**on the owner's curl, inside 22:15Z–23:00Z**, and the cron question is moot for this date.
+
+**Runway after a board at ~60 credits**: (699 − 60) = 639 → **1.9 d** at the in-use band,
+**2.7 d** at the relay band.
+
+## 15. THE ARMING RATE PREDICTS SOMETHING TESTABLE TOMORROW — PRE-COMMITTED (item 5)
+
+Written before the fact, 2026-07-31, and settled free by the next `context.yml` run
+(`0 17`/`30 22`, zero Odds credits) plus `tests/self-arm-stamp.test.ts`.
+
+**Going in**: 2 armed · **11 at g = 4** · 34 at g = 3 · 85 umpires · 11.2 plate assignments/day.
+**Expected crossings tomorrow: 11 × (11.2/85) = 1.45.** Poisson(1.45): P(0) = 23%, P(1) = 34%,
+P(2) = 25%, P(≥3) = 18%.
+
+- **ZERO cross** → inside the 23% tail on one draw; the rate is not rejected. Two consecutive
+  zeros would be P ≈ 5% and WOULD put the 1.45 estimate in question — record it and wait for the
+  second day rather than restating on one.
+- **ONE crosses** → the modal outcome; the rate stands and the 09-22 projection of ~78 stands with it.
+- **TWO cross** → also within the body (25%); consistent, and the running mean over four days
+  becomes the estimate rather than the 2-in-2 that produced 1.44.
+- **MORE THAN TWO** → 18% on one draw, but a second such day makes the g = 4 pool empty faster
+  than 11.2 games/day can refill it from g = 3, which the rate model does not represent.
+  **That would mean assignments are not uniform across the 85** — a real defect in the projection,
+  and the fix is to model per-umpire assignment frequency instead of a league mean.
+- **IMPOSSIBLE BRANCH**: any umpire's `g` decreases, or the league `g` moves by more than the
+  number of games played → the counter is not monotone and the whole accrual model is wrong.
+  Checked today: zero decreases, 10 umpires advanced by exactly +10 against a league delta of +10.
