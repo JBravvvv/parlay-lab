@@ -5,17 +5,33 @@ be sourced this turn are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves th
 Supersedes the 2026-07-30 handoff in place; §1 flags what the last two sessions made
 stale.
 
-## ⛔ THE GATE: NO BOARD FIRES UNTIL THE ~224/DAY RESOLVES (owner's ruling, 2026-07-31)
+## ⛔ THE GATE: NO BOARD FIRES UNTIL THE RESIDUAL RESOLVES (owner's ruling, 2026-07-31)
 
-**A board at ~150 credits against 1,038 with ~47% of the burn unexplained is a bet on an
-unknown, not a measurement.** The cron-job.org entry stays exactly as it is; **no curl,
-no force, nothing fires.** Consequences, stated rather than discovered later: **the
-homogeneous window stays at COUNT ZERO (a THIRD consecutive dark board-day), and the outs
-flag — live in production since 2026-07-31 02:50Z — remains UNEXERCISED on a real
-board.** Every pre-committed reading re-arms for the next fire.
+**A board against an unexplained burn is a bet on an unknown, not a measurement.** The
+cron-job.org entry stays exactly as it is; **no curl, no force, nothing fires.**
+Consequences, stated rather than discovered later: **the homogeneous window stays at COUNT
+ZERO (a FOURTH consecutive dark board-day), and the outs flag — live in production since
+2026-07-31 02:50Z — remains UNEXERCISED on a real board.** Every pre-committed reading
+re-arms for the next fire.
 
-**RUN THESE ON YOUR PHRASE FIRST — zero credits, and reading 15(c) settles the largest
-open question in the project:**
+**STATE, 2026-07-31 13:57:11Z — quota 699 / 19,301.** The residual is down to ONE candidate
+class. Measured over 62.96 h: **relay windows (no device use) 12.54 h → residual +0.02/h;
+non-relay windows 50.42 h → +4.61/h**, with no counterexample in either direction
+(`branch-firing-audit.md` §9). Burn after the cron cut: **~185/day props on a relay day →
+runway ~3.78 d; ~386/day with the app in use → ~1.81 d.** A board costs **~95** (~76–88 at
+13–15 unstarted events × the measured 5.84 credits/event).
+
+**A BOARD TOMORROW IS AFFORDABLE IF, AND ONLY IF, TWO THINGS HOLD**: (1) the residual is
+client-side and therefore under the owner's control; (2) the propsnap store shows no
+weekday rows. Both are settled by the zero-credit reads below.
+
+**RUN THESE FIRST — all zero Odds credits. Order: propsnap → calibration → ledger → pred →
+Variant B.** The first needs NO phrase (`/api/propsnap`'s read is ungated); the rest are yours.
+```
+for d in 2026-07-28 2026-07-29 2026-07-30 2026-07-31; do curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d"; done   # is propsnap capturing on weekdays?
+curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/calibration        # HAS the nightly fit moved calW/calG? (docs/collection-period.md, top block)
+```
+**Then, and reading 15(c) settles the largest open question in the project:**
 ```
 curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger.json
 curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
@@ -444,7 +460,7 @@ all six disciplined tickets** and become an M-item that outranks the card. Empty
 
 | workflow (**on `origin/main`**) | active crons (UTC) | reaches Odds API | observed | ceiling |
 |---|---|---|---|---|
-| `props-history.yml` | **TEN**: `0 17`, `0 20`, `0 21`, `0 22`, `30 22`, `0 23`, `30 23`, `0 0`, `30 0`, `0 1` | YES | ~198/day (5 paid of 10 delivered) | **7 paid ≈ 651/day** (MIN_GAP 40 min over a 480-min span) |
+| `props-history.yml` | **FOUR since 2026-07-31 (`7bfb6b3`)**: `0 17`, `0 20`, `0 21`, `30 22` — cut from ten, chosen from the archive (all 7 closes came from the `0 20`/`0 21` bands; the seven queued crons produced 0 closes and 72% of the spend) | YES | ~339 (07-31) / ~198 (07-30) | **~185/day** at 31.6 ev × 5.84 |
 | `board-archive.yml` | `0 12`, `0 19` | reads `/api/board` only | **0** | 0 |
 | `context.yml` | **TWO**: `0 17`, `30 22` (the `0 12` weekend cron is frontend-rebuild-only → **NEVER FIRED**) | no | 0 | 0 |
 | `model.yml` | **NONE — PAUSED and IN FORCE** (`a46c1f8`) | no | 0 | 0 |

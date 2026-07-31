@@ -383,3 +383,154 @@ Two things stated plainly, as asked:
    revert, and reaches the identical ~264 ceiling. What it does NOT buy is `--wait`'s deterministic
    close or `--fold-only`'s free weekend fold. **If the redesign is wanted, the branch the owner
    already pre-committed applies: run it once by `workflow_dispatch` on an affordable day first.**
+
+---
+
+# PART THREE — 2026-07-31, owner's items 1, 3, 4, 5
+
+## 8. THE CRON CUT — chosen from the archive, applied to `main` (item 1)
+
+**The declared hour does not control WHEN a run arrives, only HOW MANY arrive.** 70 props-history
+runs over 20 days land in four stable bands, and joining them to the 17-day archive gives this:
+
+| delivery band | producing cron | paid snaps | ev/snap | median lead | **closes** | share of all props spend |
+|---|---|---|---|---|---|---|
+| 20–21Z | `0 17` (+3.1–3.9 h) | 17 | 7.9 | **112 min** | **0** — 17 min outside the 95-min window | 135/617 ev = 22% |
+| 23Z | `0 20` (+3.5 h) | 4 | 6.2 | **18 min** | **4** | 25/617 = 4% |
+| 00Z | `0 21` (+3.2 h) | 3 | 4.0 | **85 min** | **3** | 12/617 = 2% |
+| 06–11Z | the **seven queued crons** (+7.5–10 h) | 33 | 13.5 | **508 min** | **0** | **445/617 ev = 72%** |
+
+**All seven archived closes came from exactly two crons. The seven that produced none of them
+produced three quarters of the cost.**
+
+**Impossible branch — closes produced by hours the schedule does not declare: DOES NOT FIRE.**
+Every archived capture maps to one of the four bands, and every band maps to a declared cron under
+the measured delay.
+
+**The owner's SECOND branch fires: no three-cron set covers both.** Dropping the queued tick
+collapses the model-vs-close span from **508 min to ~94 min** (112 → 18), which is the pre spread
+Series B regresses over. He pre-committed to spending one cron rather than losing the close, so
+**FOUR, not three.**
+
+**Applied on `main` only** (`7bfb6b3`, read back from origin):
+
+```
+    - cron: "0 17 * * *"   # -> 20:0x-20:5x, 19/20 days. The same-day `pre`, median lead 112 min.
+    - cron: "0 20 * * *"   # -> ~23:3x. LOAD-BEARING: 4 of the 7 archived closes.
+    - cron: "0 21 * * *"   # -> ~00:1x. LOAD-BEARING: the other 3.
+    - cron: "30 22 * * *"  # -> queues to the next morning batch = the 8.5h-out opener
+```
+
+Six commented out (`0 22`, `0 23`, `30 23`, `0 0`, `30 0`, `0 1`). **MIN_GAP untouched;
+`snapshot_props.py` untouched; no step argument added; the never-executed redesign not shipped.**
+One queued tick is enough: in the two-cron era a single queued cron delivered on **15 of 15 days**.
+
+**Ceiling restated at the measured 5.84 credits/event**: 7.9 + 6.2 + 4.0 + 13.5 = **31.6 ev/day →
+~185 credits/day**, down from ~339 measured on 07-31.
+
+| | props/day | + residual | **runway at 699** |
+|---|---|---|---|
+| before the cut | ~339–615 | ~540–816 | 0.86–1.29 d |
+| **after the cut, app in use** | **~185** | ~386 | **1.81 d** |
+| **after the cut, relay day** | **~185** | ~185 | **3.78 d** |
+
+## 9. THE RESIDUAL BY WINDOW, WITH DEVICE USE FLAGGED (item 3)
+
+Attribution: props from the archive at the measured **5.84 credits/event**; line-history at 6/run
+from the Actions log.
+
+| window (UTC) | h | spent | props ev → cr | lh | known | **residual** | /h | device use |
+|---|---|---|---|---|---|---|---|---|
+| 07-28 23:00 → 07-29 12:00 | 13.00 | 641 | 123 → 718 | 2 | 730 | **−89** | −6.9 | app in use |
+| 07-29 12:00 → 07-30 03:55 | 15.92 | 215 | 18 → 105 | 2 | 117 | **+98** | +6.1 | app in use |
+| 07-30 03:55 → 16:45 | 12.83 | 223 | 20 → 117 | 2 | 129 | **+94** | +7.3 | app in use |
+| 07-30 16:45 → 07-31 01:25 | 8.67 | 200 | 10 → 58 | 2 | 70 | **+130** | +15.0 | app in use |
+| 07-31 01:25 → 04:50 | 3.42 | 0 | 0 | 0 | 0 | **0** | 0 | **RELAY** |
+| 07-31 04:50 → 05:55 | 1.10 | 0 | 0 | 0 | 0 | **0** | 0 | **RELAY** |
+| 07-31 05:55 → 06:41 | 0.76 | 0 | 0 | 0 | 0 | **0** | 0 | **RELAY** |
+| 07-31 06:41 → 13:57 | 7.27 | 339 | 58 → 339 | 0 | 339 | **0** | 0 | **RELAY** |
+
+**RELAY: 4 windows, 12.54 h, residual +0 → +0.02/h.
+NON-RELAY: 4 windows, 50.42 h, residual +232 → +4.61/h.**
+
+**The owner's FIRST branch fires: every zero-residual window is a relay window and every
+high-residual window is not. No counterexample exists on disk.** What the client-side hypothesis
+predicts for each window is exactly what each window shows, including the graded rise 6.1 → 7.3 →
+15.0/h across 07-29→07-31 as the app was used more heavily before the relay began.
+
+**IMPOSSIBLE BRANCH — residual negative after attribution: IT FIRES, at −89.** The reading is that
+**the per-event cost model is not a constant**: measured 641/123 = **5.21** in that window against
+**5.84** in the clean 07-31 window. The Odds API bills per market per region actually returned, so
+an event quoting fewer than six markets costs fewer than six credits. **6.0 is a ceiling, 5.21–5.84
+is the observed range, and the residuals above are therefore conservative** — at 5.21 the
+non-relay residual rises by ~30. The qualitative split is unaffected.
+
+**This is observational, not controlled.** `docs/board-open-experiment.md` Variant B is unchanged
+and confirmed at **12 credits**; it is what makes it controlled, and it runs after the propsnap read.
+
+## 10. THE ARMING RATE, MEASURED (item 4)
+
+**The ~08-04 projection was an ESTIMATE, not a measurement** — `collection-period.md` L1333 records
+`shUmpKf` as *"INERT — will self-activate ~2026-08-04"* with no derivation, and L466/L869 repeat
+the date. **It joins the reasoning-not-measurement list.** It was wrong in the same direction
+twice: the first crossing came 5 days early, the second 4.
+
+**The g distribution, `data/ump_k.json` at `200e402` (85 umpires, 223 games, 20 days):**
+
+| g | umpires | |
+|---|---|---|
+| **5** | **2** | **ARMED — `kFactor` emitted (`build_context.py` L232)** |
+| 4 | **11** | one plate game from arming |
+| 3 | 34 | |
+| 2 | 23 | |
+| 1 | 15 | |
+
+**Rate from real games rather than from the projection**: 223 games / 20 days = **11.2 plate
+assignments/day** over 85 umpires ≈ 0.13 games/umpire/day. With **11 sitting at g = 4**, expected
+crossings ≈ **1.44/day** — against **2 observed in 2 days**. Consistent.
+
+**Projected ARMED: ~24 of 85 by 2026-08-15. ~78 of 85 by 2026-09-22 (freeze exit).**
+
+**IMPOSSIBLE BRANCH — an umpire's g decreased: DOES NOT FIRE.** Zero decreases, zero removals,
+zero additions; 10 umpires advanced by exactly +10 games, matching the league delta 213 → 223.
+The counter is monotone.
+
+**→ THE OWNER'S SECOND BRANCH FIRES, and it changes a decision.** The replay magnitude on record
+for `umpKFrozen` — *8 of 18 K/outs rows move, max 16 pp, the emitted card CHANGES* — **was measured
+with ONE umpire armed.** At ~78 of 85 armed, essentially every game's HP umpire carries a
+`kFactor`, so the factor applies to nearly every K/outs row rather than to the subset whose umpire
+happened to have five games. **That magnitude does not transfer, and unpinning `umpKFrozen` at
+freeze exit is a materially different decision than it was at one umpire.** The frozen table's row
+must carry the count and the date, and the replay must be re-run at the count that will actually
+be live — not at n = 1.
+
+## 11. WHAT THE GATE IS WAITING ON, AND WHETHER A BOARD IS AFFORDABLE (item 5)
+
+**After tonight's reads, is the residual NAMED or only NARROWED?** If propsnap returns empty on
+weekdays and Variant B confirms 6, the residual is **narrowed to a mechanism and not closed to a
+caller.** 201 ÷ 6 = 33.5 cache-missing renders/day, and the 4-minute window is server-side and
+shared, so those renders need not be the owner's. **What would close it is the caller census —
+the Vercel function log, dashboard-only.** Everything else is elimination.
+
+**What a board costs and buys.** At tonight's slate size (13–15 unstarted events in the 07-31
+archive) and the measured 5.84 credits/event: **~76–88 credits**, ~95 with the game-lines call.
+The docs' older ~150 figure is the conservative bound. It buys, in one fire: **board 1 of the
+homogeneous window** (currently COUNT ZERO after four dark days) · **the outs flag's first
+production exercise** (live since 02:50Z, never yet on a real board) · **`mktN` observed** rather
+than projected (reading 29, the reopen crossing) · **cfSel with `rank` and `stake`** (reading 24)
+· **`clampActivity`** · the replay + ParlayPred membership diff.
+
+**Runway after one board, at the post-cut ceiling**: (699 − 95) / 386 = **1.56 days** with the app
+in use; (699 − 95) / 185 = **3.26 days** on relay days.
+
+**Plainly: a board tomorrow IS affordable, conditional on two things being true.**
+1. **The residual is client-side and therefore under the owner's control.** If it is, a relay day
+   burns ~185 and one board is 0.25 days out of 3.26 — comfortable. If it is an unnamed spender
+   that runs regardless, the burn stays ~386 and one board is 0.25 out of 1.81 — a bad trade
+   against a key that dies in under two days.
+2. **The propsnap store comes back without weekday rows.** Weekday rows would mean an
+   uninventoried ≤96-credit-per-fire spender is live, and that changes the board's price.
+
+The gate therefore holds on exactly two cheap reads, both the owner's, neither costing an Odds
+credit: **the propsnap store curl** and **`GET /api/calibration`** (which item 2 added), followed
+by the ledger export, `burn-report --pred`, and Variant B.

@@ -1,5 +1,71 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> # 🔴 THE FREEZE HAS A THIRD FLOATING INPUT AND THE PAUSE FROZE TWO OF THREE (2026-07-31, owner's item 2)
+>
+> **`/api/calibrate` runs DAILY at 09:30Z on a Vercel cron, and the engine reads its output at
+> runtime.** The M18 pause froze `priors.json` and `context.json`. It did not touch this, because
+> nobody knew the scheduler existed: `vercel.json` declares
+> `{"path": "/api/calibrate", "schedule": "30 9 * * *"}` and that entry was in no inventory until
+> tonight.
+>
+> **THE PATH TO THE ENGINE, traced rather than assumed:**
+> `app/api/generate/route.ts` **L195–200** reads `pl:cal:summary`, `pl:cal:weights` and
+> `pl:cal:auto` → **L213** `effectiveCalibration(summary, weights, auto)` → **L245–246** passes
+> `calW: armed.mults` and `calG: armed.globalS` into `analyze`. The client path does the same
+> (`src/lib/engine-client.ts` L347/L350).
+>
+> **AND IT IS THE NIGHTLY HALF THAT MOVES, not just the weekly one.**
+> `src/engine2/calibration.ts` **L598**:
+> `if (rel) for (const [m, v] of Object.entries(slopeMults(rel))) merged[m] = Math.min(merged[m] ?? 1, v)`
+> — `rel = summary.reliability`, **rewritten every night**. So the effective per-market multiplier
+> is `min(weekly 3D state machine, NIGHTLY reliability-slope fit)`, and `globalS` comes straight
+> from `summary.globalShrink.s`. `applyWeeklyAdjustment` is gated (L653 `WEEK_MS`, L657
+> `tier === "ADJUST"`, L660 significance) — **the weights are the slow half; the summary is the
+> fast one, and it is unguarded by any freeze.**
+>
+> **→ THE OWNER'S FIRST BRANCH FIRES: this is a vintage event every day at 09:30Z, and the
+> homogeneous window is NOT homogeneous.** M17/M18's shape for the third time — a floating input
+> nobody inventoried.
+>
+> **WHAT IS AND IS NOT ESTABLISHED.** Established from code: the read path, the daily write, and
+> that the nightly summary reaches `calW`/`calG`. **NOT established: whether the fit has actually
+> MOVED anything** — `slopeMults` needs `SLOPE_MIN_N = 100` graded legs per market and
+> `GLOBAL_MIN_N = 150` for the global fit, and the graded population lives only in Redis. **The
+> read that settles it is `GET /api/calibration` — `syncAuthed`, the owner's phrase, ZERO Odds
+> credits.** It returns the summary, the weights and the auto flag. Until it is run, this entry
+> says "a daily writer to a live engine input", not "the engine moved".
+>
+> **IMPOSSIBLE BRANCH — does its output feed any measurement recorded this window? IT FIRES:**
+> `effectiveCalibration` L593 derives **`mktN`** from `summary.reliability`, and `mktN` is
+> **reading 29's instrument** — the consensus-gate crossing. So the reopen clock is read off a
+> store that this daily job rewrites. Print both when reading 29 is taken.
+>
+> **THE EXPOSURE**: `app/api/calibrate/route.ts` **L81 `return !cron`** — with `CRON_SECRET`
+> unset the route is **OPEN**, documented as deliberate ("idempotent, writes only derived
+> aggregates"). It is a daily writer to an engine input on a path anyone can find.
+> **Not verifiable from this repo**: check Vercel → Project → Settings → Environment Variables.
+> Indirect evidence says it IS set (cron-job.org authenticates `/api/generate` and
+> `/api/propsnap` with `x-cron-key` = the same secret), so the fail-open branch is probably not
+> live — but it is one deletion away, and the route would not announce the change.
+> **SPEC ONLY, not shipped**: replace L81 with a hard `return false`, so an absent secret closes
+> the route instead of opening it.
+>
+> **THE PAUSE DIFF FOR IT, if the owner wants the third input frozen** — one line, reversible,
+> and it freezes by STOPPING NEW WRITES while the last-written summary keeps being read, exactly
+> as the `context.json` freeze does:
+> ```diff
+>  {
+>    "git": { "deploymentEnabled": { "main": false, "line-history": false } },
+> -  "crons": [ { "path": "/api/calibrate", "schedule": "30 9 * * *" } ]
+> +  "comment": "crons PAUSED 2026-07-31 — /api/calibrate is a daily writer to a live engine",
+> +  "comment2": "input (calW/calG via pl:cal:summary). Reversible: restore the crons array."
+>  }
+> ```
+> **NOT the alternative**: setting `pl:cal:auto = "off"` looks like a freeze and is not one —
+> L594 then returns `{mults: {}, globalS: null}`, i.e. it CHANGES the engine's inputs rather than
+> holding them. Stated so the cheap-looking option is not taken by mistake.
+
+
 > ⚠️ **M18 (2026-07-29): THE FREEZE HAS HELD THE CODE VINTAGE AND FLOATED THE DATA
 > VINTAGE FOR THE ENTIRE WINDOW.** The engine reads `public/model/priors.json` and
 > `context.json` at REQUEST time on both surfaces, straight into the rate path

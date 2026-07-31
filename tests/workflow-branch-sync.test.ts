@@ -55,13 +55,17 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
   "props-history.yml": {
     since: "2026-07-31",
     divergence:
-      "main runs the 2026-07-26 TEN-cron file with no step arguments; frontend-rebuild carries the " +
-      "07-27 redesign (three crons, --wait, --fold-only, timeout-minutes 330). The redesign has " +
-      "NEVER executed: 0 of 66 props-history runs were workflow_dispatch.",
+      "TWO divergences now. (1) main runs the 2026-07-26 base file with no step arguments; " +
+      "frontend-rebuild carries the 07-27 redesign (--wait, --fold-only, timeout-minutes 330), " +
+      "which has NEVER executed anywhere: 0 of 66 props-history runs were workflow_dispatch. " +
+      "(2) main's schedule was CUT ten -> four on 2026-07-31 (7bfb6b3), keeping 0 17 / 0 20 / " +
+      "0 21 / 30 22 — the two close-producing bands plus one same-day pre and one queued opener " +
+      "— while frontend-rebuild still declares the redesign's own four (0 17 --wait, 0 13, " +
+      "0 23, 0 3 --fold-only). The two branches now disagree on the cron SET as well as on args.",
     awaiting:
-      "owner's choice — (a) manual workflow_dispatch run on an affordable day, then ship; or " +
-      "(b) the minimal yml-only cron cut on main (ten -> five/four/three), priced in " +
-      "docs/branch-firing-audit.md §6.",
+      "owner's choice on the redesign — either a manual workflow_dispatch run on an affordable " +
+      "day and then ship it (superseding the cut), or fold the cut's chosen four back onto " +
+      "frontend-rebuild so the two agree. Priced in docs/branch-firing-audit.md PART THREE §8.",
   },
   "line-history.yml": {
     since: "2026-07-31",
