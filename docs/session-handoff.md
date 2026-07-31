@@ -138,6 +138,27 @@ a session of yours → FIRE · nothing accounts for the 146 → NO BOARD, fifth 
 missing input is the Odds key used outside our routes · **the burst recurs before 15:38 PT →
 NO BOARD, and the recurrence is the finding.**
 
+## ⚠️ DO NOT SET `APP_PASSCODE` TONIGHT WITHOUT STEPS 1–3 FIRST
+
+`/api/odds` **401s** a `fresh=1` with no `x-pl-pass` — **it does NOT fall through to cache**
+(route L38–40) — and `snapshot_props.py` retries 3× then prints `skipped: proxy unreachable`
+and returns. **The morning batch would collect NOTHING.** Second casualty:
+**`/api/sharp` L69–70 401s whenever `APP_PASSCODE` is set, and NO client code sends
+`x-pl-pass`** (the passcode is written to `localStorage.pl_pass` and never used) — **the Sharp
+page breaks on every device until a client change ships.**
+
+**ORDER — staged, each step inert until the last** (`branch-firing-audit.md` §39):
+1. ✅ **DONE** — both sweep scripts send `x-pl-pass` only if `APP_PASSCODE` is in their env.
+2. GitHub → Secrets → Actions → `APP_PASSCODE`.
+3. **`props-history.yml` on `main`** — `env: APP_PASSCODE: ${{ secrets.APP_PASSCODE }}` on the
+   snapshot step. (The one step that touches the firing branch.)
+4. **LAST** — Vercel → Environment Variables → `APP_PASSCODE`. The gate activates here.
+
+**AND IT DOES NOT CLOSE THE EXPOSURE.** The cache keys on the full URL and the caller controls
+`u`'s markets/regions/event-id. One URL → 2,160/day ceiling; **varied `u` → every call is a
+miss, bounded only by request rate.** Gating `fresh=1` removes the trivial bypass and nothing
+more.
+
 ## 0. READ-FIRST INDEX — every doc, no exceptions (guarded by `tests/read-first-index.test.ts`)
 
 **Why it exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"

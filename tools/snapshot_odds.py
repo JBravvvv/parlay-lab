@@ -12,6 +12,14 @@ import json, os, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 PROXY = "https://parlay-lab-six.vercel.app/api/odds"
+PASS = os.environ.get("APP_PASSCODE", "")   # 2026-07-31: sent ONLY if set, so this is inert
+                                           # until APP_PASSCODE exists in BOTH Vercel and the
+                                           # GitHub secret. /api/odds 401s a fresh=1 with no
+                                           # x-pl-pass once the Vercel var is set, and the 401
+                                           # does NOT fall through to cache (route L36-40) —
+                                           # the sweep would collect NOTHING. Header first,
+                                           # secret last. Never hardcode the value.
+
 UPSTREAM = ("https://api.the-odds-api.com/v4/sports/baseball_mlb/odds"
             "?regions=us,eu&markets=h2h,totals,spreads&oddsFormat=american")
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -21,7 +29,9 @@ def fetch():
     url = f"{PROXY}?u={urllib.parse.quote(UPSTREAM, safe='')}&fresh=1"
     for i in range(4):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            _h = {"User-Agent": UA, "Accept": "application/json"}
+            if PASS: _h["x-pl-pass"] = PASS
+            req = urllib.request.Request(url, headers=_h)
             with urllib.request.urlopen(req, timeout=60) as r:
                 body = r.read().decode()
             return json.loads(body)  # non-JSON (bot challenge) -> except -> retry

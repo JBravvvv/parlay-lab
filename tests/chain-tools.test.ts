@@ -162,3 +162,47 @@ describe("board-report.mjs — the vacuity branch fires first", () => {
     expect(r.crossed.batter_hits.crossed).toBe(true);
   });
 });
+
+/**
+ * PLANT ADDED 2026-07-31 (owner's item 2). This file's original observed-red was "every import
+ * threw MODULE_NOT_FOUND before the tools landed" — a one-time historical act that cannot be
+ * re-run now the modules exist. These are invalid-by-value plants: each asserts the checker
+ * REJECTS a value that must never pass, so the red is a standing property rather than a memory.
+ *
+ * It does NOT prove wiring — these are pure functions with no file input, which is why
+ * tests/guard-wiring.test.ts lists chain-tools under UNCOVERED with that reason.
+ */
+describe("PLANT (invalid-by-value): each chain tool refuses a value that must never pass", () => {
+  it("kellyFrac cannot return a positive fraction on a non-positive edge", () => {
+    expect(kellyFrac(10, 2.0)).toBe(0);            // 10% at evens — deeply negative edge
+    expect(kellyFrac(50, 1.0)).toBeNull();         // dec <= 1 is not a price
+    expect(kellyFrac(50, 2.0)).not.toBe(0.25);     // the 0.25x and 2% caps must both bite
+  });
+
+  it("attribute cannot hide a residual by folding it into a known line", () => {
+    const a = attribute({ spent: 1000, props: 1, ticks: 1 });
+    expect(a.known).toBe(2);
+    expect(a.residual).toBe(998);                   // never absorbed, never clamped
+    expect(a.residualPct).toBeGreaterThan(99);
+  });
+
+  it("outsCounts cannot report a pass on an empty board", () => {
+    const o = outsCounts({ categories: {}, parlays: [], parlaysMixed: [] });
+    expect(o.vacuous).toBe(true);                   // the branch that must fire before any count
+    expect(o.rowsPresent).toBe(0);
+  });
+
+  it("predCensus cannot report zero client rows when a client row exists", () => {
+    expect(predCensus({ records: [{ src: "client" }] }).clientRows).toBe(1);
+    expect(predCensus({ records: [] }).clientRows).toBe(0);
+  });
+
+  it("burnSeries cannot report spend where the quota did not move", () => {
+    const rows = parseSeries([
+      JSON.stringify({ at: "2026-07-31T01:00:00Z", remaining: 100, used: 900 }),
+      JSON.stringify({ at: "2026-07-31T02:00:00Z", remaining: 100, used: 900 }),
+    ].join("\n"));
+    expect(burnSeries(rows)[0].spent).toBe(0);
+    expect(burnSeries(rows)[0].perHour).toBe(0);
+  });
+});

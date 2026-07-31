@@ -1673,3 +1673,153 @@ guard would fail on a real corruption.
 | **a session of the owner's** | **FIRE.** Precondition 1 holds in the sense that matters — the spend is operator-controllable |
 | **nothing that accounts for 146** | **NO BOARD. Fifth dark day**, and the missing input is named: **the Odds API key in use outside our routes** |
 | **the burst recurs before 15:38 PT** | **NO BOARD**, and **the recurrence is the finding** |
+
+---
+
+# PART TEN — 2026-07-31, owner's items 1–3
+
+## 39. SEQUENCING `APP_PASSCODE` — DO NOT FLIP IT TONIGHT WITHOUT THE HEADER (item 1)
+
+**THE OWNER'S SECOND BRANCH FIRES: rejection 401s. It does NOT fall through to cache.**
+`app/api/odds/route.ts` **L38–40** returns `NextResponse.json({error:"passcode required for a fresh
+pull"}, {status:401})` **before** the upstream fetch. There is no fallback path.
+
+**And the sweep DIES, it does not degrade.** `tools/snapshot_props.py`'s `fetch()` retries three
+times (15/30/45 s sleeps), returns `None`, and `main()` L278–280 prints
+`"skipped: proxy unreachable"` and **returns. The morning batch would collect nothing.**
+
+| caller of `fresh=1` | what it gets when gated | verdict |
+|---|---|---|
+| `tools/snapshot_props.py` L22 | 401 → `None` → `skipped: proxy unreachable` | **DEAD — the collection that pays for the window stops** |
+| `tools/snapshot_odds.py` L21 | same | dead, but the job is disabled anyway |
+| `src/lib/ufc.ts` L86 (`fresh` path only) | 401 | **degraded, and it has never fired** — not a consideration |
+| everything else (`sharpBoard`, `useAllStar`, `fetcher`, `/api/clv`) | unaffected — none sends `fresh=1` | fine |
+
+**⚠️ IMPOSSIBLE BRANCH — something gated with NO header path at all: IT FIRES.**
+`app/api/sharp/route.ts` **L69–70** 401s whenever `APP_PASSCODE` is set, **unconditionally, not
+just on `fresh`**. The device passcode is written to `localStorage.pl_pass` by
+`app/settings/page.tsx` L348 — **and a repo-wide grep finds NO client code that ever sends
+`x-pl-pass`.** So the passcode is stored and never used. **Setting `APP_PASSCODE` breaks the Sharp
+page on every device until a client change ships.** Print this before flipping — it is the second
+casualty and it has no header path today.
+
+### THE ORDER OF OPERATIONS THAT LEAVES NO GAP
+
+**Staged, and they need NOT be one visit — each step is inert until the last one.**
+
+1. **SHIPPED THIS TURN**: both sweep scripts now send `x-pl-pass` **only if `APP_PASSCODE` is
+   present in their environment**. While it is unset everywhere, nothing changes. Value from
+   `os.environ`, never hardcoded:
+   ```diff
+   +PASS = os.environ.get("APP_PASSCODE", "")
+   -    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+   +    _h = {"User-Agent": UA, "Accept": "application/json"}
+   +    if PASS: _h["x-pl-pass"] = PASS
+   +    req = urllib.request.Request(url, headers=_h)
+   ```
+   Live immediately — the workflows pull `tools/` from `origin/frontend-rebuild` at run time, so
+   **there is only ONE copy of each script**, no main/ship split.
+2. **GitHub → Settings → Secrets → Actions → new secret `APP_PASSCODE`.** Inert alone.
+3. **`props-history.yml` ON `main`** (the firing copy) — add to the snapshot step:
+   `env:\n  APP_PASSCODE: ${{ secrets.APP_PASSCODE }}`. Still inert: the script sends a header the
+   route ignores while Vercel's var is unset. **This is a yml change on main and it is the one
+   step that touches the firing branch.**
+4. **LAST: Vercel → Settings → Environment Variables → `APP_PASSCODE`.** The gate activates at
+   this instant, and the sweep is already sending the header.
+5. **Then, same visit:** enter the passcode once in Settings on the device (persisted to
+   `localStorage.pl_pass`) — **and know that this does NOT fix `/api/sharp`**, which needs the
+   client change from the impossible branch above. Check the Sharp page immediately after.
+
+**There is no ordering in which collection is gated but unauthenticated, provided step 4 is last.**
+
+### DOES GATING `fresh=1` CLOSE THE EXPOSURE? NO — IT NARROWS IT.
+
+`/api/odds` validates `u` (L26: `https:` only, `hostname === "api.the-odds-api.com"`), so a caller
+can only proxy to that host. **But the Next data cache keys on the FULL URL**, and the caller
+controls markets, regions, sport and event id inside `u`.
+
+| adversarial pattern | ceiling |
+|---|---|
+| **one URL, cached path** | 1 spend per `TTL_SECONDS = 240` → **360/day × 6 = 2,160/day** — already more than the 553 remaining |
+| **varied `u`, cached path** | **every call is a cache MISS. Bounded only by request rate — effectively unbounded**, i.e. it drains the pool as fast as it can be called |
+| `fresh=1`, ungated (today) | same as varied-`u`, with no cache to vary around |
+
+**So: setting `APP_PASSCODE` removes the trivial bypass and nothing more. THE EXPOSURE IS NOT
+CLOSED — it is narrowed, and it remains unbounded against a caller that varies `u`.** The only
+thing that closes it is authenticating `/api/odds` itself, which is feasible (the device passcode
+already exists in `localStorage`) but requires the four browser call sites to send `x-pl-pass` —
+a real change, spec'd only if item 1's log names an external caller.
+
+## 40. THE `fresh=1` DISAMBIGUATION FOR THE LOG (item 3)
+
+**Our own sweep sends `fresh=1`, so the log will show both.** How to tell them apart:
+
+| signal | OUR sweep | not ours |
+|---|---|---|
+| **user-agent** | `snapshot_props.py`'s `UA` constant — a fixed, non-browser string | a browser UA, a library UA, or absent |
+| **the `u` parameter's shape** | `…/v4/sports/baseball_mlb/events` first, then `…/events/<id>/odds?regions=us&…&markets=batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs` — **six markets, `regions=us` ONLY** | anything else. **SharpDesk's shape is `regions=us,eu` + `markets=h2h,totals,spreads` — three markets, two regions.** The two are unmistakable |
+| **timestamps** | cluster tightly around a props-history run start (08:10, 09:34, 10:19, 11:04 today) | **the burst window 16:10–19:11Z contains NO props-history run at all** |
+| **IP** | a GitHub Actions runner range | anything else |
+
+**PRE-COMMITTED:**
+- **All `fresh=1` traffic in the window matches our sweep's shape** → **the burst was our own
+  collection and the attribution arithmetic is wrong somewhere.** Best outcome available; it takes
+  a **correction**, not a fix — and the first place to look is whether a sweep run paid without
+  committing a snapshot, since the archive is what attribution is computed from.
+- **`fresh=1` traffic that does not match** → external, and the passcode (§39) is the answer.
+- **No `fresh=1` and 146 spent anyway** → **the cached path missed repeatedly, which requires many
+  DISTINCT upstream URLs** — one URL cannot miss more than 15 times an hour. That implies a caller
+  enumerating events or markets, i.e. something walking the API surface rather than polling one
+  endpoint. **That is a scraper, not a monitor**, and it makes the varied-`u` ceiling above the
+  operative one.
+
+## 41. THE WIRING META-TEST — SHIPPED, AND THE COUNT (item 2)
+
+`tests/guard-wiring.test.ts`. For each covered guard: back up its real input, corrupt it in the
+specific way that guard exists to catch, **run that guard alone in a subprocess, assert non-zero
+exit**, restore, and assert the restore was byte-exact. The guard reads its own real path
+throughout — nothing is injected, so nothing about its wiring is assumed.
+
+**OBSERVED RED FIRST, as required.** The first run included a **NO-OP control** — a "corruption"
+that appends a newline and changes nothing the guard reads. **It failed to fail**, exactly as it
+should:
+
+```
+× tests/self-arm-stamp.test.ts fails when ump_k.json is corrupted: NO-OP CONTROL …
+  tests/self-arm-stamp.test.ts STAYED GREEN on a corrupted data/ump_k.json.
+Tests  1 failed | 6 passed (7)
+```
+
+That is the demonstration that a green result here means the corruption was real. The control is
+not kept — it would be permanently red — and its removal is why coverage is stated as a count.
+
+**RESULTS: 5 of 5 covered guards FAIL on a real corruption. ZERO dead guards found.**
+
+| guard | corruption | result |
+|---|---|---|
+| `self-arm-stamp` | a third umpire promoted to g ≥ 5 | ✅ fails |
+| `read-first-index` | a doc row deleted from the index | ✅ fails |
+| `doc-structure` | an amendment id referenced with no bundle entry | ✅ fails |
+| `fixture-citation` | a fixture figure cited with no provenance | ✅ fails |
+| `sha-references` | a dangling sha inserted in a doc | ✅ fails |
+
+**THE COUNT, PLAINLY. Of the seven encoded invariants the owner signed off, TWO are proven wired**
+— `self-arm-stamp` and `read-first-index`. **Five are not corruptible by this harness** and are
+listed in `UNCOVERED` with the reason, which the test asserts is non-empty:
+`site-id-integrity` and `served-extractor` read `legacy/index.html` (**corrupting the engine string
+risks leaving it mutated if the run dies — not worth the coverage**); `finite-prices` asserts on
+computed values with no file input; `chain-tools` and `line-history-consumers` would require
+editing source, which is the change under test rather than its input.
+**Three further guards outside the seven are now proven wired, for five total.**
+
+**IMPOSSIBLE BRANCH — a guard whose real input cannot be corrupted in the way it exists to catch:
+IT FIRES, for `finite-prices`.** Its assertion is about computed board values, so there is no
+artifact to corrupt; its plant proves the comparator and nothing can prove its wiring without a
+board. Recorded rather than papered over.
+
+**AND `chain-tools` NOW HAS A STANDING PLANT** (five invalid-by-value cases: a non-positive edge
+cannot produce a positive Kelly fraction; the residual cannot be folded into a known line; an
+empty board cannot report a pass; a client row cannot census to zero; a flat quota cannot report
+spend). Its original red — *"every import threw MODULE_NOT_FOUND"* — was a memory; these re-run
+every build. **`doc-structure` needed no plant: it is now proven WIRED, which is strictly
+stronger.**
