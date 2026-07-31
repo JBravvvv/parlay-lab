@@ -1518,3 +1518,158 @@ residual is client-side and therefore mine to control"* and this window is evide
 firing now spends 66 credits into a system whose largest spender is unidentified — and a board read
 against an unexplained burn is the same bet-on-an-unknown the gate was written to refuse.
 **NOT DECIDED. The owner decides at 15:38 PT with the four reads in hand.**
+
+---
+
+# PART NINE — 2026-07-31, owner's items 1–3
+
+## 35. THE VERCEL FUNCTION LOG — READING WRITTEN BEFORE THE LOG IS OPENED (item 1)
+
+**Window: 2026-07-31 16:10:13Z → 19:11:31Z. Known spend: 146 credits. Known cause: none.**
+
+### What to look for
+
+| # | look for | why it discriminates |
+|---|---|---|
+| 1 | **count and timestamps of `/api/odds` invocations** in the window | 146 ÷ 6 = **24.3**. ~24 calls at **regular ~7.5-min spacing → POLL**. Irregular clustering → session. **Fewer than ~24 → the market×region product differed and the arithmetic must be redone, not assumed** |
+| 2 | **user-agent, referer, IP shape** | a browser session carries a referer from `parlay-lab-six.vercel.app` and a real UA; a poller usually carries neither, or a library UA (`curl`, `python-requests`, `Go-http-client`, an uptime service) |
+| 3 | **`fresh=1` on the query string** | **THIS IS THE ONE THAT MATTERS — see below. `fresh=1` bypasses the 240 s cache, so EVERY call pays.** Without it a caller pays at most once per 4 minutes globally |
+| 4 | **direct hits vs page renders** | `/api/odds` is called from the browser by `SharpDesk`, `useAllStar`, `ufc` and `fetcher` — a page render shows `/board` (or `/`) alongside it. `/api/odds` alone with no page request is a direct caller |
+| 5 | **`/api/generate`, `/api/propsnap`, `/api/clv` in the same window** | a `generate` hit explains ~90 at once; a `propsnap` hit explains ≤96 and also means its cron entries are not the weekend-only ones `CLAUDE.md` L150 describes |
+| 6 | **the same cadence BEFORE 16:10Z** | if the pattern predates the window it is not new — it is the first time two quota reads happened to bracket it |
+
+### Pre-committed reading — fixed now, before the log is open
+
+- **Regular ~7.5-min intervals, non-browser agent** → **EXTERNAL POLLER on an ungated route.**
+  **Not ours to ration; the response is to GATE THE ROUTE, not to cut collection.** That becomes
+  the highest-priority ship and it outranks the props cadence entirely.
+- **Irregular, browser UA, our referer** → a session had the Board page open. **Operator-side**,
+  precondition 1 holds in the sense that matters, and the lever is device use.
+- **`fresh=1` present on any of them** → **that is the mechanism regardless of who called**, and
+  the fix below is a ZERO-CODE change.
+- **The cadence predates 16:10Z** → **the residual has been this all along. Every relay-versus-use
+  contrast in §9 and §12 is CONFOUNDED and the client-side hypothesis is DEAD, not weakened.**
+  Every window's residual restates as "poller + whatever else", and the 2.2× contrast becomes an
+  artifact of when the poller happened to be running.
+- **Nothing in the log accounts for 146 credits** → **the spend did not come through our routes at
+  all**, and the next candidate is **the Odds API key in use somewhere outside this deployment**
+  (a second project, a leaked key, a stale local `.env`). **That outranks the freeze**, and the
+  read that follows is the Odds API dashboard's own usage-by-key view.
+- **IMPOSSIBLE BRANCH: the log shows requests but the arithmetic does not fit** — e.g. 6 requests
+  for 146 credits, or 60 requests for 146 — **print both numbers.** A request count that implies a
+  per-call cost outside [1, 6] means the calls were not the shape we think, or something else was
+  billed in the same window.
+
+### 🔴 AND THE FINDING THAT MAKES `fresh=1` THE LEADING CANDIDATE
+
+`app/api/odds/route.ts` **L36–40**:
+
+```ts
+const fresh = req.nextUrl.searchParams.get("fresh") === "1";
+const pass = process.env.APP_PASSCODE;
+if (fresh && pass && req.headers.get("x-pl-pass") !== pass) { … 401 }
+```
+
+**The gate is conditional on `APP_PASSCODE` being SET. `tools/snapshot_props.py` L22 and
+`tools/snapshot_odds.py` L21 both request `&fresh=1` and send NO `x-pl-pass` header — and the
+props sweep landed 58 event-fetches this morning. Therefore `APP_PASSCODE` IS UNSET IN
+PRODUCTION, and `fresh=1` IS CURRENTLY UNGATED.**
+
+**Anyone who finds `/api/odds?u=<upstream>&fresh=1` can force a cache-bypassing upstream fetch and
+spend on EVERY call, with no 4-minute floor at all.** That is the unbounded version of the ungated
+surface, it is the most plausible mechanism for a 146-credit burst, and it was inferred here from
+the sweep's own behaviour rather than read from the dashboard — **confirm `APP_PASSCODE`'s state in
+Vercel → Settings → Environment Variables when you are there.**
+
+## 36. GATING `/api/odds` — THE SPEC, AND IT IS A ZERO-CODE CHANGE
+
+**Every legitimate caller, and whether it can carry a header:**
+
+| caller | where it runs | uses `fresh=1`? | can carry a secret? |
+|---|---|---|---|
+| `src/engine2/sharpBoard.ts` L135 (SharpDesk) | browser | **no** | only via the device passcode the Settings page already stores |
+| `src/lib/useAllStar.ts` L65 | browser | no | same |
+| `src/lib/ufc.ts` L86 | browser | **yes, conditionally** | same |
+| `src/lib/fetcher.ts` L25 | browser | no | same |
+| `app/api/clv/route.ts` L49 | **server** | no (`cache: "no-store"` on its own fetch) | yes trivially |
+| `tools/snapshot_props.py` L22 | GitHub runner | **YES** | **yes — one header line** |
+| `tools/snapshot_odds.py` L21 | GitHub runner | **YES** (job disabled) | yes |
+| `tools/quota.mjs` | local | no | yes |
+
+**THE MINIMAL FIX, in order of cost:**
+
+1. **SET `APP_PASSCODE` in Vercel. Zero code.** It immediately 401s every unauthenticated
+   `fresh=1`, closing the unbounded path. **Cost: two follow-ups** — add
+   `"x-pl-pass": os.environ["APP_PASSCODE"]` to the `Request(...)` headers in `snapshot_props.py`
+   (and `snapshot_odds.py`, currently disabled), with the value passed as a GitHub secret; and
+   enter the passcode once in Settings on the device so `ufc`'s fresh path and `/api/sharp` keep
+   working. **`/api/sharp` L69–70 already 401s when `APP_PASSCODE` is set**, so that is the second
+   thing to check after flipping it.
+2. **Leave the cached path open.** Gating non-`fresh` `/api/odds` would break SharpDesk, useAllStar
+   and fetcher for any device without the passcode, and the cached path is already bounded at
+   **one spend per 4 minutes globally** — a ~2,160/day worst case, but only if something polls
+   continuously, which item 1's log settles.
+3. **If the log names a poller on the CACHED path**, the narrow fix is an origin/referer check on
+   `/api/odds` for browser-shaped requests plus the passcode for tool-shaped ones — a real code
+   change, spec'd only if that branch fires.
+
+**Not shipped. The diff for step 1 is an environment variable and two header lines; it waits on
+the log.**
+
+## 37. THE PLANT AUDIT — 6 OF 7 PRESERVED, AND WHAT PLANTS ACTUALLY PROVE (item 2)
+
+**The seven guards signed off in the encoding sessions:**
+
+| guard | in-repo plant case? |
+|---|---|
+| `served-extractor.test.ts` | ✅ |
+| `site-id-integrity.test.ts` | ✅ |
+| `line-history-consumers.test.ts` | ✅ |
+| `read-first-index.test.ts` | ✅ |
+| `finite-prices.test.ts` | ✅ |
+| `self-arm-stamp.test.ts` | ✅ |
+| **`chain-tools.test.ts`** | **❌ NONE** |
+
+**`chain-tools.test.ts`'s observed-red was *"every import above threw MODULE_NOT_FOUND"* — a
+one-time historical act that cannot be re-run now that the modules exist.** Its thirteen
+assertions are real; its red is a memory. **Also plant-less: `doc-structure.test.ts`**, which is
+the guard that caught two errors in this session's own commits.
+
+**23 of 82 test files carry a re-runnable plant.** So the honest state is mixed, and the owner's
+first branch fires **for one of the seven and for the majority of the suite**: most observed-reds
+in this project are historical claims, not standing properties. **Recorded in the instrument
+ledger.**
+
+**AND THE SHARPER POINT, which is the answer to "what would actually catch a behaviour change
+inside a test helper".** Every preserved plant here proves the **COMPARATOR** — the pure function
+rejects synthetic invalid input. **None proves the WIRING** — that the live assertion fails when
+the REAL artifact is corrupted. **A guard whose comparator is perfect but whose reader points at
+the wrong input passes every plant it has.** That is exactly instrument defect #6
+(`workflow-timing` reading the non-firing branch) and exactly M27 (a helper's return value
+widened, zero assertions touched). **Plants as written could not have caught either.**
+
+**What would**: run each guard against a **deliberately corrupted copy of its own input** and
+assert it fails — an observed-red that re-runs every build.
+
+**COST, and the owner's second branch fires — it is cheap.** Most of these guards read a hardcoded
+path. The change is: **give each reader an optional path parameter defaulting to the real one**
+(one line per guard), then **one meta-test** that, for each guard, copies its input to a temp file,
+corrupts it in the specific way the guard exists to catch, and asserts the guard throws. Roughly
+**one line per guard plus a ~60-line meta-test and one corrupted-fixture recipe per guard**.
+**SPEC'D, NOT SHIPPED.**
+
+**IMPOSSIBLE BRANCH — any guard passes on its own plant today: DOES NOT FIRE.** The suite is green
+at 82 files / 605 tests, and every in-repo plant is an assertion inside that run, so a passing
+suite is a passing plant. What it does not establish — and this is the whole finding — is that the
+guard would fail on a real corruption.
+
+## 38. THE FOUR BOARD BRANCHES, RECORDED BEFORE THE READS (item 3)
+
+**The owner's decision, conditional, written before tonight's reads:**
+
+| the log shows | decision |
+|---|---|
+| **an external poller** | **FIRE at 22:38Z.** The burn is not ours to control by abstaining, and a board is the artifact that survives whatever happens to the key. Gating `/api/odds` (§36 step 1) ships before or after depending on the log |
+| **a session of the owner's** | **FIRE.** Precondition 1 holds in the sense that matters — the spend is operator-controllable |
+| **nothing that accounts for 146** | **NO BOARD. Fifth dark day**, and the missing input is named: **the Odds API key in use outside our routes** |
+| **the burst recurs before 15:38 PT** | **NO BOARD**, and **the recurrence is the finding** |

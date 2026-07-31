@@ -88,6 +88,56 @@ node tools/ledger-report.mjs ~/pl-ledger.json            # reading 15, whole
 node tools/burn-report.mjs --pred ~/pl-pred-0730.json    # reading 15(c)
 ```
 
+## 🎯 TOMORROW'S FIRE SEQUENCE — ONE BLOCK, NOTHING ELSE TO READ (Sat 2026-08-01)
+
+**Fire at 22:38Z = 15:38 PT.** Window 22:10Z–23:00Z; at 22:38 the board has **11 unstarted
+games and achievable 0.909**. The cron cannot do it (entry 1 is `45 22 * * 1-5`, weekdays).
+
+```
+# 1. quota BEFORE
+node tools/quota.mjs
+
+# 2. the board — x-cron-key, NOT the phrase (a phrase curl stamps trigger:"manual" and
+#    reading 5 pre-commits === "header")
+curl -sS -H "x-cron-key: <CRON_SECRET>" "https://parlay-lab-six.vercel.app/api/generate"
+
+# 3. quota AFTER  (reading 26: delta / unstarted-events should land in [5, 8])
+node tools/quota.mjs
+```
+
+**IF THE RESPONSE IS ANY OF THESE FOUR — STOP. Do not retry, do not force. Report the body.**
+```
+{"ok":true,"skipped":"ran recently"}
+{"ok":true,"skipped":"dead-slate",…}
+{"ok":true,"skipped":"low-ceiling"|"no-games-left"|"covered"|"thin",…}
+{"ok":true,"date":…,"logged":0,"note":"no pregame picks (off day or slate underway)"}
+```
+A 401 body is `{"error":"unauthorized"}` — also a stop; the header did not match.
+
+**THEN THE FIRST THREE CHAIN STEPS:**
+```
+# step 1 — the echo is present in the response body   (reading 3; absent => the push did not land)
+curl -sS "https://parlay-lab-six.vercel.app/api/board?date=2026-08-01" | python3 -m json.tool | head -40
+
+# step 2 — the whole board to disk, then every landing check at once
+curl -sS "https://parlay-lab-six.vercel.app/api/board?date=2026-08-01" > ~/board-0801.json
+node tools/board-report.mjs ~/board-0801.json
+
+# step 3 — self-consistency  (BOTH population sizes must print; zero-over-empty is NOT a pass)
+python3 tools/self_consistency.py
+```
+`board-report.mjs` prints, in order: the **outs VACUITY branch first**, the echo fields
+(`outsSusp` must be `true`, `selMode` `ev_gated`), the trigger mark, cfSel coverage with
+`rank`/`stake`, `clampActivity`, and `mktN` vs `consMinN = 100` with the blocked-reason
+histogram. **Known limit: `gameInfo.shadow` will carry no `kRaw`** — the frozen context is
+07-29's slate and shares zero pairings with tomorrow's, so the ump shadow records nothing
+(neutral, not a defect: `shUmpKf` returns 1 either way).
+
+**BOARD DECISION, DECIDED IN ADVANCE** (`branch-firing-audit.md` §38): external poller → FIRE ·
+a session of yours → FIRE · nothing accounts for the 146 → NO BOARD, fifth dark day, and the
+missing input is the Odds key used outside our routes · **the burst recurs before 15:38 PT →
+NO BOARD, and the recurrence is the finding.**
+
 ## 0. READ-FIRST INDEX — every doc, no exceptions (guarded by `tests/read-first-index.test.ts`)
 
 **Why it exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"
