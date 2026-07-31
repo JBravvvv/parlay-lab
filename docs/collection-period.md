@@ -6729,3 +6729,187 @@ whole-board vintage, so the allocation-level series starts over Friday at n=1 �
 changes nothing material, because that series was already recorded UNREACHABLE at 20
 boards this cycle. **The ship costs a series that could not have completed anyway;
 it does not cost the row-level series, which is the one still accruing.**
+
+## ⚠️ BANKROLL EXPOSURE, MEASURED AND RECORDED BEFORE THE BOARD (2026-07-30, owner's item 1 — the first branch FIRES)
+
+**Confirmed: the $62 ticket is the SAME market as the 46.3/59.2 finding**, not a
+neighbour — `lkey` = `brysonstott|batter_hits_runs_rbis|1.5` and
+`justincrawford|batter_hits_runs_rbis|1.5`. Both legs are **O 1.5**, i.e. exactly
+the O1.5+ alternate-line subset that hit **32%** in the ledger — the worst-calibrated
+slice of the worst-calibrated market. Both are PHI batters (same game).
+| the ticket | value |
+|---|---|
+| modeled prob | **24.8%** |
+| price / implied | **+326 → 23.5%** |
+| czEv | **+5.6%** |
+| stake | **$62 = 8.27% of a $750 bankroll**, rank **#1 on the card** |
+| bound by | **`capG` (structural)** = max(perParlayCap 0.25, 1/n) × DAILY = $62.5 |
+| **its Kelly ceiling** | **$13 — COMPUTED AND DISCARDED** (`disciplined` is false in `caesars_ev`, L3108 `&&!force`) |
+**The engine computes the belief-sized ceiling for this ticket and then does not
+apply it: $62 staked against a $13 ceiling — 4.8×.** That is the archetypal
+"computed and discarded before it reaches the price" shape, here on the stake itself.
+
+**All four modes, one table** (armed fixture, DAILY $250, bankroll $750):
+| mode | Kelly ceiling? | max single-ticket share | suspended-market ticket on the card? |
+|---|---|---|---|
+| `ev_gated` | ✓ applied | 8.00% ($60, ceiling-bound) | **no** |
+| `dk_fd` | ✓ applied | 8.00% ($60, ceiling-bound) | **no** |
+| `probability` | ✗ | 7.47% ($56) — `capG` $63 | **no** (today; see the outs note) |
+| `caesars_ev` | ✗ | **8.27% ($62) — three tickets at capG** | **YES — rank #1, $62** |
+**1 of 4 modes places a suspended-market ticket on the card today**, and it places it
+at the top at the largest stake on the card.
+
+**The 08-15 blindness, as a population fact**: susp rows measured — `ev_gated` **14**,
+`dk_fd` **14**, `probability` **0**, `caesars_ev` **0** (the board carries 14 HRR rows
+in every mode; only the disciplined modes TAG them). **The impossible branch — a
+legacy mode stamping a susp row — is SILENT.** So the population the 08-15 review
+reads is *"HRR rows as priced and tagged in `ev_gated`/`dk_fd`"*, and what it
+**structurally cannot see** is: (a) any HRR row as it appeared in a legacy mode, and
+(b) **whether an HRR leg was ever SELECTED ONTO A CARD — because selection is only
+possible in the modes that emit no susp stamp at all.** The review's own entry now
+says this rather than discovering it on 08-15.
+
+**THE OPERATOR RULE AND THE GAP IT DOES NOT COVER**: $62 > $50, so **rule #1 catches
+this ticket.** But the answer to "can any mode produce a suspended-market ticket under
+$50?" is **YES, and one arrives tonight**: after the outs flag ships, `pitcher_outs`
+becomes a suspended market, and the measured `probability`-mode card carries
+**an outs ticket at $17 (2.27% of bankroll)** — rank #6, far under the $50 rule.
+Stake is a function of rank and weight, not of market, so the 2% rule bounds SIZE and
+does not bound SUSPENDED-MARKET PARTICIPATION. **Recorded today, as asked: the
+operator rule catches the $62 case and will not catch the $17 case.** The only thing
+covering the latter is operator rule #2 (return to `ev_gated` before placing).
+
+## GRADING IS MUTABLE — SCOPED EXACTLY, AND THE FUNDING WINDOW IS CLEAN (2026-07-30, owner's item 3 — the first branch does NOT fire)
+
+**What `shGradeOrientFix` rewrites**: ONLY `g.detail` — the score DISPLAY STRING —
+and only on legs whose `lkey` is `ml_home` or `rl_home` whose detail matches
+`/^\d+-\d+$/`, flipping "3-5" to "5-3". Trigger: `shGrade()` calls it first on every
+grading run; it self-limits with `if((e.grading.v||1)>=2) return`, so each entry is
+rewritten at most once. **It never assigns `result`** — so the owner's impossible
+branch (a rewrite changing a graded OUTCOME rather than its orientation) is
+**SILENT, by construction**.
+
+**Does the 07-17 → 07-22 funding window contain rewritten rows? NO — and not by
+date, by MARKET**: the rewriter touches `ml_home`/`rl_home` legs only. The 46.3/59.2
+population is `batter_hits_runs_rbis` legs, whose `lkey` can never match. **The HRR
+funding population is untouchable by this rewriter regardless of dates.**
+→ **46.3/59.2 stays PROVENANCE-UNVERIFIED (recoverable by the export's join); it does
+NOT upgrade to provenance-unrecoverable.** Row counts carrying `v: 2` remain off-disk
+— the export's v-field census answers it (added to reading 15).
+
+**Is pre-rewrite state recoverable? Not from the store** — the flip is an in-place
+overwrite with no prior-value retention. It IS re-derivable from public boxscores
+(the score is a fact), so the loss is a provenance loss, not a data loss.
+
+**FULL AUDIT — every writer that mutates a ledger row in place** (5 `shLedgerSave`
+call sites):
+| site | writes | mutation of a LOCKED row? |
+|---|---|---|
+| L3410 `shLockCard` | the whole entry | no — creation |
+| L3640 `shGradeOrientFix` | `grading` (detail strings), `gradedAt` | **yes** |
+| L3675 `shGrade` | `grading`, `gradedAt` | **yes** |
+| L3706 CLV sight | `clv` | **yes** |
+| L4071 `shLedgerImport` | a whole entry — **but only if the date is absent** (`if(shLedgerFind(e.date)){skipped++;return;}`) | no — never overwrites |
+**AND THE GUARD THAT BOUNDS IT (L3304–3315)**: when the target row is `locked`,
+`shLedgerSave` merges **only** `grading`, `gradedAt`, `clv` onto the existing
+snapshot — *"immutability guard: merge ONLY the allowed subfields onto the locked
+snapshot"*. **Every money field — stakes, prices, legs, `selMode`, `overrode`,
+bankroll — is immutable once locked.** So the precise statement replacing "the
+append-only rule is a policy the code does not honour": **the code honours it for
+rows and for every money column; exactly three grading/CLV subfields are mutable BY
+DESIGN and BY GUARD, and one of those three is rewritten in place without retaining
+its prior value** → **M22**, recorded as a defect of provenance retention, scoped to
+a display string, with no path to results or money.
+
+## shPenQF — COMPUTED AND DISCARDED, THE ARCHETYPAL SHAPE AGAIN (2026-07-30, owner's item 4 → M23)
+
+**What it computes**: a bullpen-quality multiplier per team from
+`SH_CTX.pen_quality` (ERA/IP vs a `__league` row), consumed by the run-scoring path
+that feeds ML/RL/total pricing. **What "never commits" means at a line**:
+`origin/main`'s `context.yml` **L30** — the firing copy's entire add list is now
+`git add data/ump_k.json`. `data/pen_quality.json` **is tracked but has not been
+written by the bot ONCE**: its last commit is `4cd1c5d`, **2026-07-20**, the owner's
+own model commit. `build_context.py` reads it, accumulates onto it, rewrites it in
+the runner's checkout — and the runner is torn down. **So the rolling DB restarts
+from the 07-20 state on every run, ten days stale, and the aggregate in
+`context.json` is one run's accumulation on top of a fixed base.**
+
+**How long blocked**: since the bot's first context run after 07-20 — **10 days**,
+every run since. **Does anything report it as ACTIVE? NO** — checked: the prediction
+record's own field comment says the factor is *"never applied"* (`pred-serialize.ts`
+L83), the engine only pushes a `u`-tag when `uf !== 1` (which the pin prevents), and
+the shadow writes to `gameInfo.shadow.penQAway/penQHome` under a name that says
+shadow. **The third branch does not fire; nothing claims it is live.**
+
+**THE REPLAY (armed fixture, `ev_gated`, `penQFrozen` false vs true)**:
+| quantity | result |
+|---|---|
+| rows compared | **173** |
+| rows whose prob MOVED | **16** |
+| max \|Δprob\| | **15.1 pp** |
+| mean \|Δprob\| (moved rows) | **1.44 pp** |
+| pool tickets | 50 → 50 |
+| **emitted card** | **IDENTICAL** (Outs2 $60 · TB3 $11 · Outs3 $34 both ways) |
+**→ the first branch fires: computed and discarded. M23.** Magnitude, stated with its
+limit: **the factor reaches prices (16 of 173 rows, up to 15.1 pp) but does not change
+what gets bet on this board** — unlike `shUmpKf`, whose replay changed the card. The
+impossible branch (reaches the price by another path) is silent: with the pin on,
+`shPenQF` returns 1 before reading anything.
+**A sub-finding worth its own line**: `shPenQFShadow` returned a value for all 30
+teams, and the min/max over them is **NaN** — at least one team's shadow multiplier
+is NaN. Under the pin this is inert; **if `penQFrozen` is ever lifted, a NaN
+multiplier would propagate into pricing.** Spec-only: guard the shadow's finite-ness
+before any unfreeze.
+**Its pipeline spends nothing**: `context.yml` → `build_context.py`, keyless
+statsapi/Savant, **zero Odds credits**.
+
+## THE REOPEN CALENDAR IS COUNT-ARMED — A CLASS CORRECTION TO MY OWN M21 ENUMERATION (2026-07-30, owner's item 5)
+
+**~~"`consMinEv` expiry — DATE-armed"~~ — CORRECTED 2026-07-30, same day it was
+written.** There is NO date anywhere in the gate. The engine reads
+(L3037–3048): `small = legs.some(l => !(mktN && mkt && mktN[mkt] >= consMinN))`, then
+blocks when `small && consEv < consMinEv`. This doc's own mechanism sentence already
+said it — *"reopening IS the consensus gate turning off; `consMinEv` applies only
+while `mktN < consMinN`. Nothing turns on — a guard expires"* — and the vintage
+census row calling 07-29/07-31/08-01 **"date-conditional"** is the same error, now
+struck: **all three are COUNT-armed crossings whose dates are PROJECTIONS from an
+accrual rate** (`reopenDays(n, rate, need)`, `gate-rebuild.ts` L82–86, recomputed
+nightly by `/api/calibrate` precisely because *"a projection that cannot move is a
+stale number wearing a commitment's clothes"*). **So the owner's thesis is exactly
+right, and it is now the second count-armed class in two days.**
+
+**Current `mktN` per market: OFF-DISK** — it lives in the server calibration store
+and reaches the engine only at arm time (`engine-client.ts` L358; route L257
+`cfg.mktN = armed.mktN`). **The echo carries `consMinN`/`consMinEv` but NOT `mktN`**,
+so tonight's board cannot report it directly → **added to the authed-read list, and
+tonight's OBSERVABLE PROXY is pre-committed as reading 29**: any ticket blocked with
+reason `consensus` proves that market is still under 100.
+
+**Projected crossing per market — NOT COMPUTABLE TONIGHT, and that is the finding**:
+`reopenDays` needs `n` (off-disk) and `rate` (graded legs per COMPLETE date, also
+off-disk). Under one board/day the rate is whatever a board grades (~14–19 rows/board
+across markets); **under the rationed cadence the rate falls proportionally, and
+under dark it is ZERO — where `reopenDays` returns `null`, meaning NEVER.** That is
+the cadence coupling in its exact form: **a dark day does not delay the reopen, it
+suspends the clock entirely.**
+
+**What the engine uses below the threshold**: not a fallback — a STRICTER GATE. Below
+100 the ticket must additionally clear the de-vigged consensus at `consMinEv`; above
+100 that check stops applying. And *"an unknown market counts as small — a market is
+never assumed proven"* (`mktN: null` → every market small). **So no measurement
+"assumed consensus was live"**; the risk runs the other way — measurements taken
+below the threshold were taken under the STRICTER regime, which is how the 07-26
+board reproduced NO-PLAY with 18 tickets blocked at `consensus`.
+
+**Are 07-31 and 08-01 expiries only, or must the gate also cross? THE SAME EVENT** —
+there is nothing else to expire. Friday's "reopen" IS the K's/outs `mktN` crossing
+100, **and nobody has verified that it has happened or will happen by Friday.**
+**Has any market crossed already, unstamped? THE 07-29 CROSSING IS ITSELF
+UNVERIFIED** — it was recorded from the PROJECTED date ("on 07-29 the batter markets
+cross 100"), and `mktN` has not been read since. **Dated backfill marker, per the
+owner's pre-commitment: the 07-29 batter-market crossing is RECORDED-BY-PROJECTION,
+NOT BY READING; it may have crossed earlier, later, or not at all.** Tonight's
+blocked-reason histogram (reading 29) is the first chance to observe it, and the
+authed calibration read settles it exactly. The impossible branch (`mktN` > 100
+everywhere, so the gate never bound) is **contradicted by the 07-26 archive**, where
+18 tickets were blocked at `consensus` — the gate demonstrably bound eleven days ago.

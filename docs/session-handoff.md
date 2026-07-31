@@ -229,7 +229,10 @@ it IS **board 1 of the homogeneous window** — `data/ump_k.json` moved this mor
 `umpKFrozen` factor; collection-period, ump_k block), and `context.json` stayed
 frozen at the pause pair. **One line on what it cannot support regardless of
 outcome: it cannot certify the suspension in any mode but `ev_gated`, and it cannot
-certify the outs flag at all because the flag does not exist yet** — the
+certify the outs flag at all because the flag does not exist yet — and it cannot observe `mktN` (not in the echo), so the
+consensus-gate crossing is readable only as the blocked-reason proxy (reading 29),
+nor can it see any legacy-mode exposure, since the server builds in `ev_gated` and
+legacy modes stamp zero susp rows** — the
 board's tickets are built under the server's pinned mode, so the zero-HRR-legs
 half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
 modes); step 15's diagnostic read is the only cover for the other three, and it
@@ -332,6 +335,18 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     Expect `grading.v: 2` to appear on rows predating it — that is
     `shGradeOrientFix` rewriting old grading blocks in place, the one legitimate
     backfill, not a mystery.)
+    (ADDED 2026-07-30 evening, owner's items 2–3: (c) COUNT CLIENT-GENERATED ROWS
+    — `src: "client"` records in `pl:pred`, by date and by `selMode`. Any such row
+    is a `bestBoard` FALLTHROUGH firing — an UNBUDGETED spender that hits the same
+    odds proxy and key, so it is INSIDE the quota accounting and leaves NO git
+    trail: a live candidate for the ~97-credit residual alongside the CLV path.
+    Zero client rows → the sequencing rule covers it prospectively and that is the
+    whole finding; any client row with a non-`ev_gated` mode → reading 15's
+    exclusion is a REPAIR, not a precaution, and the 08-15 population restates
+    after the filter; client rows with no matching credit spend → print both.
+    (d) the `v`-FIELD CENSUS: how many entries carry `grading.v: 2`, and whether
+    any sits in 07-17→07-22 — expected NONE by market (M22 touches only
+    `ml_home`/`rl_home` legs), so a hit there contradicts the scoping.)
     denominators — and print WHICH variant matched (a provenance RECOVERY,
     labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
@@ -405,6 +420,17 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     probability-mode device read; HRR legs present → M20 confirmed in production;
     zero → print the row population beside it (absence of a qualifying ticket is
     not evidence the bar applies).
+29. **Consensus-gate crossing, observed not projected (added 2026-07-30, owner's
+    item 5)**: the blocked-reason histogram is the proxy — ANY ticket blocked with
+    reason `consensus` proves that market is still under `consMinN = 100`, i.e. the
+    "expiry" has NOT happened for it. Zero `consensus` blocks → consistent with the
+    batter crossing having occurred but NOT proof (a market with no eligible tickets
+    produces no blocks either) — print the per-market pool counts beside it. **The
+    07-29 batter crossing is RECORDED-BY-PROJECTION, NOT BY READING** (`mktN` has not
+    been read since; it is off-disk and NOT in the echo), so only the authed
+    calibration read settles it. **Friday's K's/outs "reopen" IS this same crossing**
+    — if the gate still blocks K's/outs tickets Friday, the reopen is PARTIAL, the
+    engine is running the stricter regime, and every Friday reading says so.
 
 ## 4. GIT AND ARTIFACT STATE
 
