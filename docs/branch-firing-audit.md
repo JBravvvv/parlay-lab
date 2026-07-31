@@ -1307,3 +1307,50 @@ full-board reproduction either.
 **Reading 15's overstake query is UNCHANGED and still first after the propsnap read.** This
 measures what the allocator WOULD emit; the ledger export measures what was actually staked. They
 are different questions and both stand.
+
+## 30. 🔴 146 CREDITS IN THREE HOURS, IN A RELAY WINDOW, UNATTRIBUTED (2026-07-31 19:11Z)
+
+**Read live at the end of this turn: quota 699 → 553 between 16:10:13Z and 19:11:31Z — 146
+credits in 3.02 h = 48.3/h, the highest rate ever recorded here.**
+
+**What ran in that window: ONE Actions run — `board-archive` at 17:12:01Z, which its own header
+certifies costs ZERO Odds credits (it reads `/api/board` only).** No new props snapshot: the
+07-31 archive still holds exactly the four morning snapshots (58 event-fetches) it held at 13:57Z.
+line-history is disabled on the firing copy. **So 146 of 146 credits are unattributed.**
+
+**It was not me.** My only outbound calls this turn were the deploy check (root + `/api/board`) at
+~14:5xZ and one `/api/board` read at 19:12Z, and the quota is unchanged across both pairs of reads
+— 699 before and after the first, 553 before and after the second.
+
+**`/api/board?date=2026-07-31` returns `board: null` — no SERVER board was built.** That does not
+clear a client generate: `generateBoard()` writes `localStorage` and calls `logBoardPredictions`,
+and **never writes the server board key**, so a client generate leaves exactly this signature.
+
+**Candidates, in order, and none is resolvable from disk:**
+
+1. **A client generate via the `bestBoard` fallthrough** — ~6 × 15 unstarted events ≈ **90**, plus
+   SharpDesk 6 per cache-missing render. Two renders plus a generate reaches ~146 comfortably.
+   **It would write `src: "client"` rows into `pl:pred`. READING 15(c) SETTLES IT AND IS NOW
+   URGENT, not merely first in the queue.**
+2. **`/api/propsnap` firing** — ≤96 per fire. `CLAUDE.md` L150 records its cron-job.org entries as
+   **weekend-only** (`* * 0,6`) and today is Friday, so a hit here would ALSO mean the entries are
+   not what that line describes. **The ungated propsnap curl settles it at zero cost.**
+3. **The owner's own reads** — but every read on tonight's list is zero-credit except Variant B,
+   which is 12. **146 ≫ 12**, so the list alone cannot explain it.
+4. An unnamed spender.
+
+**WHAT THIS DOES TO THE EVIDENCE.** The relay-window residual is no longer ~0/h (at c = 5.845) or
++3.21/h (at c = 5.114). **This window alone is 48.3/h with no device use claimed and no scheduler
+running.** It is the first observation that points AWAY from the client-side hypothesis rather
+than toward it — or, if it was a client generate, it is the hypothesis firing at a magnitude
+nobody had priced. **Both readings are live and the two queued reads separate them.**
+
+**POSITION RESTATED.** Today's spend: **1,038 → 553 = 485 credits**, of which **339 attributed to
+props and 146 unattributed**. At 553 remaining, props ceiling 162–185/day post-cut, and a residual
+now bounded below by today's 146: **burn 308–386/day → RUNWAY 1.4–1.8 DAYS.**
+
+**THE BOARD DECISION IS AFFECTED.** Precondition 1 was *"the residual is client-side and therefore
+the owner's to control."* This window is either the strongest evidence for it (a generate he
+triggered) or the clearest evidence against it (48.3/h with nobody there). **It is not a reason to
+cancel tomorrow's board by itself — but it must be resolved BEFORE the fire, and the two reads
+that resolve it are already first in the queue.**

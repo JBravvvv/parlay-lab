@@ -14,7 +14,17 @@ ZERO (a FOURTH consecutive dark board-day), and the outs flag — live in produc
 2026-07-31 02:50Z — remains UNEXERCISED on a real board.** Every pre-committed reading
 re-arms for the next fire.
 
-**STATE, 2026-07-31 14:36:08Z — quota 699 / 19,301, five consecutive zero-spend relay reads.**
+**🔴 STATE, 2026-07-31 19:12:16Z — quota 553 / 19,447. 146 CREDITS IN 3.02 h (48.3/h), IN A
+RELAY WINDOW, ENTIRELY UNATTRIBUTED** — one Actions run in the window (`board-archive`, zero
+credits by its own header), no new props snapshot, line-history off, no server board. **The
+highest unattributed rate ever recorded.** It is either a client generate via the `bestBoard`
+fallthrough (~90 + SharpDesk, and it would leave `src:"client"` rows in `pl:pred`) or a
+`/api/propsnap` fire (≤96, whose entries `CLAUDE.md` L150 says are weekend-only — today is
+Friday). **Reading 15(c) and the propsnap curl are now URGENT, not merely first.** Today:
+1,038 → 553 = 485 spent, 339 attributed, 146 not. **Runway 1.4–1.8 days.**
+`branch-firing-audit.md` §30.
+
+**PRIOR STATE, 14:36:08Z — quota 699, five consecutive zero-spend relay reads.**
 The residual is REAL and robust (it survives the whole admissible cost range and cannot
 vanish), but **the per-event cost is not a constant and last turn's 5.845 is REFUTED** —
 the tightest value the data admits is **c ≤ 5.114**, and at that end the relay windows are
