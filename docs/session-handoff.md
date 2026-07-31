@@ -152,7 +152,21 @@ docs absent). Guarded by `tests/read-first-index.test.ts`, which fails if any do
 > it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into
 > realized, and it needs nothing but the sync phrase.
 > **Quota 1,038 / 18,962 · runway 6.9 board-days at ~150, ~17 at an evening board's ~60 ·
-> sweeps-only burn **~60/day** — line-history DISABLED 2026-07-31 (owner's decision;
+> ⚠️ **BURN CORRECTED 2026-07-31 — MY EARLIER FIGURES WERE ~4× LOW.** Measured from the
+> props archive: 07-30 props alone cost **~198/day** (33 event-fetches × 6), not the
+> "~60" I generalised from one window. Against the two quota reads (1,461 → 1,038 over
+> 21.5 h = **423 spent**): props ~180 + line-history ~42 = ~222 known, **~201
+> UNATTRIBUTED ≈ ~224/day — now the LARGEST single line, bigger than props.**
+> **Day burn ≈ 476/day before the line-history disable, ≈ 422 after. RUNWAY AT 1,038 ≈
+> 2.5 DAYS, not 17.3.** Every runway figure above this line is superseded.
+> **~47% of the burn has no named mechanism**; reading 15(c) and a Vercel function-log
+> read are the two zero-credit disambiguators, both queued.
+> **MIN_GAP CLEARED AND MEASURED**: decide precedes the expensive fetch (the `/events`
+> call at L277 costs ZERO — measured, 1,038 before and after), so a skipped run spends
+> nothing; and the archive shows the saving directly — 07-29 (pre-fix) **129
+> event-fetches ≈ 774 credits** vs 07-30 (post-fix) **33 ≈ 198**. **~576/day, the
+> largest saving in the project.**
+> superseded burn line: ~60/day — line-history DISABLED 2026-07-31 (owner's decision;
 > schedule commented, workflow kept, `tests/line-history-consumers.test.ts` makes
 > "nothing reads it" an invariant, observed red). **~17.3 sweep-days, up from ~9.9 —
 > the disable buys ~7.4 days.** Board-days unchanged: 6.9 at a full slate, ~17 at an

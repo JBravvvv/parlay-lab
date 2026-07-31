@@ -7946,3 +7946,224 @@ enumerate the whole directory). None is orphaned.
 in `docs/`, and each entry must carry a description rather than a bare filename.
 **OBSERVED RED against the partial list** (10 names printed), green after the index was
 completed; a third assertion plants a removal.
+
+## ⚠️ 2026-07-31 — MIN_GAP CLEARED, AND THE BURN IS ~4× WHAT I HAVE BEEN REPORTING (owner's item 4)
+
+**THE ORDER OF OPERATIONS — DECIDE PRECEDES THE EXPENSIVE FETCH. The owner's second
+branch fires.** `tools/snapshot_props.py` `main()`:
+| line | step | cost |
+|---|---|---|
+| L273 | `fold_vercel()` — local file work | 0 |
+| **L277** | `events = fetch(".../v4/sports/baseball_mlb/events")` | **0 — MEASURED**: quota 1,038 before and 1,038 after a live call through the proxy (the Odds API does not count the events endpoint) |
+| **L289** | `kind = _snapshot_kind(events, now, day_probe)` — the MIN_GAP decision | 0 |
+| **L290–292** | `if kind is None: return` — **the skip happens HERE** | 0 |
+| **L298** | the per-event `/events/{id}/odds?markets=…` loop — **the entire cost** | ~6/event |
+**A skipped run spends NOTHING.** The props-sweep candidate for the ~88 is **CLEARED**,
+and the landing test's verdict stands as measured.
+
+**AND MIN_GAP'S SAVING IS NOW MEASURED DIRECTLY, FROM THE ARCHIVE ITSELF:**
+| date | snapshots | event-fetches | props credits |
+|---|---|---|---|
+| **2026-07-29** (pre-fix; the 08:04 / 08:08 / 08:11 cluster all PAID) | 10 | **129** | **~774** |
+| **2026-07-30** (post-fix) | 5 | **33** | **~198** |
+**MIN_GAP bought ~576 credits/day — the single largest saving in the project**, and it
+bought credits, not disk. The impossible branch (skipped runs showing spend while the
+code decides first) does not fire.
+
+**⚠️ AND THE CORRECTION THAT MATTERS MOST TONIGHT — MY BURN FIGURES WERE WRONG BY ~4×.**
+I have been quoting props at "~60/day". That was one evening window's figure
+(10 events × 6) generalised to a day. **Measured from the archive, 07-30 props cost
+~198/day.** Rebuilding the whole thing against the two quota reads:
+| | |
+|---|---|
+| measured spend 03:5xZ → 01:25Z (**21.5 h**) | **423 credits** (1,461 → 1,038) |
+| props in that window (07:42 ×10, 09:37 ×10, 20:46 ×6, 23:35 ×4 = 30 events) | **~180** |
+| line-history in that window (~7 delivered ticks × 6) | **~42** |
+| **known** | **~222** |
+| **UNATTRIBUTED** | **~201 in 21.5 h ≈ ~224/day** |
+**So the day's burn is ≈ 198 (props) + ~54 (line-history) + ~224 (unattributed) ≈
+**~476/day**, not the ~105 or ~204 I have reported. After last night's line-history
+disable: **≈ 422/day.**
+**RUNWAY RESTATES HARD: 1,038 ÷ ~422 ≈ 2.5 DAYS, not 17.3.** Every runway figure I gave
+before this block is superseded; the ~17.3 assumed props at 60/day and no unattributed
+spender.
+**AND THE UNATTRIBUTED SPENDER IS NOW THE LARGEST SINGLE LINE — bigger than props.**
+The fourth candidate the owner asked for, with the third one eliminated tonight:
+| candidate | status |
+|---|---|
+| `bestBoard` fallthrough (client generate ~120–240/device/day, `credit-budget.md` L176) | **LIVE, and it fits ~224/day almost exactly** — settled at zero cost by reading 15(c) |
+| props sweeps fetching before the gap decision | **CLEARED tonight** (decide precedes fetch) |
+| `/api/clv` | **CLEARED** — sights only legs of today's locked card; none was locked |
+| **`/api/propsnap`** (the fourth, examined tonight) | **NO EVIDENCE OF ACTIVITY** — it costs the same per event as the GitHub sweep (`docs/cron-jobs.md`), but **no snapshot in `data/props/` for 07-29 or 07-30 carries `src: "vercel"`**, so nothing it captured has ever folded |
+**The disambiguators, both zero-credit and both queued: reading 15(c) (`src:"client"`
+rows in `pl:pred`) and a Vercel function-log read (owner's dashboard).** Until one runs,
+**~47% of the burn has no named mechanism** — and that is the sentence that should govern
+any spending decision before Friday's fire.
+
+## THE CHAIN IS A CHECKLIST, NOT AN INSTRUMENT SUITE (2026-07-31, owner's item 1)
+
+**Count first: of the fifteen chain steps, 3 are versioned tools and 12 are prose.** The
+owner's first branch fires — **the chain goes in the instrument ledger as a checklist,
+with the count.**
+| # | step | versioned? |
+|---|---|---|
+| 1 | slate count printed | **PROSE** (statsapi curl by hand) |
+| 2 | owner's go/no-go | prose — a decision, not an instrument |
+| 3 | quota READ (pre) | **PROSE** (curl + grep by hand) |
+| 4 | board (cron or curl) | prose — an action |
+| 5 | quota READ (post) | **PROSE** |
+| 6 | `gen=list` | **PROSE** |
+| 7 | echo present in the body | **PROSE** |
+| 8 | cfSel stamp on every susp row | **PROSE** |
+| 9 | `self_consistency` | ✅ **`tools/self_consistency.py`** |
+| 10 | app-switcher double reopen | prose — a device action |
+| 11 | HRR rows present AND greyed | **PROSE** (device read) |
+| 12 | replay dump + ParlayPred membership diff | ✅ **`tests/` replay harness** |
+| 13 | Control C's production predictions | **PROSE** |
+| 14 | ticket count vs both pre-commits | **PROSE** |
+| 15 | legacy-mode diagnostic read | **PROSE** (device action, operator rules #2/#3) |
+**Readings and the off-board reads:**
+| reading | versioned? |
+|---|---|
+| 15 (ledger export + the HRR join + overstake + per-field census) | **PROSE** — a curl plus four analyses described in a doc |
+| 15(c) (client-row census) | **PROSE** |
+| 24 (board-1 `clampActivity`) | **PROSE** — though `tests/clamp-activity.test.ts` implements the same computation on a fixture |
+| 25 (echo field check) | **PROSE** |
+| 26 (board cost bracket) | **PROSE** |
+| 27 (fold re-run) | **PROSE** |
+| 28 (legacy-mode device read) | **PROSE** |
+| 29 (consensus crossing / `mktN`) | **PROSE** |
+| the quota read | **PROSE** |
+| the predictions × fp join | **PROSE** |
+| the served re-grep | ✅ **`tools/verify-served-engine.mjs`** — versioned LAST NIGHT, and only because it failed |
+
+**WHICH PROSE STEPS FEED A NUMBER OTHER NUMBERS DEPEND ON** — the owner's distinction
+between a task and an unversioned instrument:
+| step | what depends on it |
+|---|---|
+| **the quota read** | every runway, board-day and ration figure in this doc — **including the ~4× error corrected above** |
+| **reading 15** | the bankroll exit's population, the 46.3/59.2 provenance, M24's realized-overstake question |
+| **reading 15(c)** | the ~224/day unattributed spender AND the homogeneous-window count |
+| **reading 29 / `mktN`** | the reopen calendar, and therefore every date in this doc |
+| **reading 26** | the per-board cost model the runway is built on |
+| steps 7, 8, 25 | landing verdicts for three shipped features |
+| steps 1, 2, 4, 10, 11, 15 | actions and device reads — **tasks, not instruments** |
+
+**THE VERSIONING ORDER, for the owner's authorization** — priority by
+"how many numbers depend on it", all zero-credit and none touching the engine:
+1. **`tools/quota.mjs`** — read remaining/used, append to a dated log. Feeds every runway
+   figure; would have made tonight's ~4× error visible days ago as a burn series.
+2. **`tools/ledger-report.mjs`** — reading 15 whole: overstake ratios, $0-ceiling count,
+   the HRR 46.3/59.2 join, per-field presence by date, `src:"client"` census (15(c)).
+   Runs on a saved export file, so the phrase never enters a script.
+3. **`tools/board-report.mjs`** — steps 6–8 and readings 24–26, 29 from a saved board
+   JSON: echo fields, cfSel stamp coverage, `clampActivity` presence, `mktN` vs
+   `consMinN`, blocked-reason histogram, the cost bracket.
+4. **`tools/burn-report.mjs`** — the attribution arithmetic itself: props event-fetches
+   from the archive, line-history ticks, quota deltas, and the residual printed as a
+   named unknown rather than a number I reconstruct by hand each turn.
+**Nothing versioned tonight beyond what item 3 requires.**
+**PROVENANCE MARKER, per the owner's second branch**: every measurement in this doc whose
+input came from a prose step — **all quota figures, all runway figures, the burn splits,
+the board-cost bracket** — carries hand-execution provenance. **Tonight's ~4× burn error
+is the demonstration, not a hypothetical.**
+**Impossible branch — IT FIRES, twice**: `tools/self_consistency.py` exists and the run
+sheet describes step 9 in prose without naming the tool's path; and
+`tests/clamp-activity.test.ts` implements reading 24's computation while reading 24 is
+written as a hand check. **The tools exist and the ritual does not call them.**
+
+## THE FOUR MECHANISM-JUSTIFICATIONS: TWO ARE UNRUN, TWO ARE UNREACHABLE (2026-07-31, owner's item 2)
+
+| # | claim resting on mechanism | what settles it | zero credits? | what ships/holds/reopens on it | verdict |
+|---|---|---|---|---|---|
+| 1 | the reopen deadline's premise "weakened because accrual was zero" | a `mktN` read — **now on the board via the echo** (reading 29) | **YES** | **NOTHING** — the outs ship rests on the unconditional pre-commitment + the zero-cost vintage window; this was support, already demoted | **UNRUN** (and already marked reasoning) |
+| 2 | M6 — K's priced with no sim of the quantity; its *consequence for ticket quality* is argued | the ungraded-group fix's own before/after on a real board | **NO** — needs a board and a ship | K's/outs **reopen Friday** partly on the view that the pricing gap is tolerable | **UNREACHABLE this cycle** |
+| 3 | M16 — "damping 0.5 doesn't compensate" for cross-ticket dependence | a card-level E[ln] under a copula that prices across-ticket dependence — **no such evaluator exists**; the exact evaluator is a product measure over tickets, blind by construction | **NO** — it is not a credit problem, it is an instrument that does not exist | **the FROZEN TABLE**: damping 0.5 sits there as unmeasured-with-measured-consequence | **UNREACHABLE — and structurally, not temporarily** |
+| 4 | the 08-15 review's premise — that suspending HRR was right — resting on 46.3/59.2 | **the ledger export (reading 15)** | **YES** | the HRR suspension **holds** on it; the 08-15 review is scheduled on it | **UNRUN, not unresolvable** |
+**The owner's first branch fires for #1 and #4: both are settled by zero-credit reads
+already on the run sheet, so they are QUEUED READS, not justification defects — and they
+say so here.** #4 is the sharpest: *the 08-15 premise is unrun, not unreachable, and the
+thing that settles it costs nothing but the owner's phrase.*
+**The owner's second branch fires for #2 and #3**: both are demoted to **reasoning,
+dated 2026-07-31**. What depends on #2: the Friday reopen's tolerability judgment (and
+Friday's readings are stamped two-vintage regardless). What depends on #3: the damping
+constant's frozen-table row and A1's ρ-robustness argument.
+**AND THE OWNER'S THIRD BRANCH, STATED PLAINLY AS ORDERED**: **M16's damping claim gates
+the frozen table, and the damping row carries the marker until it is measured under an
+evaluator that can price across-ticket dependence — WHICH DOES NOT EXIST.** The ρ-stress
+harness prices dependence for a *stated* ρ; it cannot tell us what ρ is. So the row's
+marker is not a to-do with a date; it is a statement that the measurement is unavailable
+with the instruments this project has, and it stays until one is built.
+
+## FRIDAY'S BOARD — PRE-COMMITTED READINGS, WRITTEN BEFORE THE BOARD EXISTS (2026-07-31, owner's item 3)
+
+**THE OUTS FOUR COUNTS, each with its reading and its vacuity branch:**
+1. **outs legs in BUILT TICKETS = ZERO.** Any >0 → the flag is not reaching the server
+   path in production and the suspension is cosmetic — **an M-item the same day**, and no
+   slip is placed from that card.
+2. **outs ROWS PRESENT on the board** (`categories` / `propBoard` carry `pitcher_outs`
+   rows). **VACUITY BRANCH — the one that matters**: if outs rows are absent from the
+   FEED entirely, counts 1, 3 and 4 are all trivially satisfied and prove nothing. Print
+   the outs row count FIRST; zero rows → **the flag is unverified on this board**, say so,
+   and do not record the suspension as verified end-to-end.
+3. **outs rows carry `susp: true`** (the `finalizeCats` disjunct). Present rows without
+   the stamp → the display half did not land while the pool half may have.
+4. **cfSel decisions on outs rows** — every susp outs row carries `{pool, card}` and, now,
+   `rank`/`stake` when `card` is true. Absent → the cfSel ship did not reach outs rows,
+   and the 08-15 population starts without its counterfactual on the newest suspension.
+**All four, with a non-empty population, → the outs suspension is verified end-to-end for
+the first time.**
+
+**THE REOPEN — the count-armed crossing nobody has observed:**
+Print **`echo.mktN` per market** beside the **per-market blocked-reason counts**.
+- **Any `consensus` block on `pitcher_strikeouts` or `pitcher_outs`** → the `consMinEv`
+  expiry fired on the calendar but **the gate still binds: those markets did NOT reopen**,
+  the engine is running the stricter regime, and every Friday reading says so.
+- `mktN[K's]` and `mktN[outs]` **≥ 100** → the crossing has happened; **< 100** → it has
+  not, whatever the date said. **This is the first direct observation of the reopen
+  clock** — every date in this doc has been a projection off an assumed accrual rate.
+- Zero consensus blocks **with the per-market pool counts printed beside them** →
+  consistent with crossing, not proof (a market with no eligible tickets produces no
+  blocks).
+
+**cfSel RANK AND STAKE:** present on **every** stamped row whose `card` is true, or the
+ship did not land. **And the sizing question the field was added for: total counterfactual
+dollars that would have gone to suspended markets on this board** — sum `stake` over
+`card: true` stamps, printed per market (HRR and, for the first time, outs). That number
+is what the 08-15 review was blind to until yesterday.
+
+**THE SITE-ID CENSUS:** board 1. `clampActivity` present (reading 24) **and** the 30 ids
+resolving as `tests/site-id-integrity.test.ts` now asserts — the census's first member is
+keyed to ids whose meaning is pinned.
+
+## ⚠️ THE PLACEMENT CHECKLIST — WHAT THE OWNER CHECKS BEFORE PLACING A SLIP (2026-07-31, written before the board exists)
+
+**In order. Any single failure is a STOP for that ticket; items 1 and 5 are stops for the
+whole card.**
+1. **MODE.** `pl_selmode` reads **`ev_gated`** — verified as the **LAST action before
+   placing** (operator rule #2). Anything else → stop, switch back, re-verify.
+2. **THE 2% RULE.** No single slip above **2% of bankroll = $50 at $2,500** (operator
+   rule #1). A ticket above it is not placed, whatever the card says.
+3. **STAKE vs ITS OWN DISPLAYED KELLY.** Every ticket: read the Kelly figure on the
+   ticket card. **If stake > kelly, the ticket is NOT placed** — regardless of what the
+   card recommends.
+4. **A MISSING KELLY BADGE IS ITSELF A STOP.** The badge renders whenever
+   `stake > 2 × kelly` or `kelly > 2 × stake` (`TicketCard` L143). Its ABSENCE means the
+   two are within 2× of each other — normally fine — **but absence combined with a stake
+   at the structural cap is the signature of a ceiling-free mode**, so if the badge is
+   missing AND any stake sits at the cap, go back to item 1.
+5. **THE CARD'S OWN MODE PROVENANCE.** The board was built server-side in `ev_gated`;
+   the card is computed **on the device in the device's mode**. If item 1 passed, they
+   agree. If the day's ledger entry is later found with a non-`ev_gated` `selMode`,
+   that contradicts item 1 and the entry is flagged.
+**PRE-COMMITTED READINGS on the checklist itself:**
+- **Any ticket on Friday's card exceeds its own displayed Kelly → it is NOT placed, and
+  the occurrence is recorded as a DISCIPLINED-MODE overstake — which would contradict
+  last night's measurement of exactly 1.00× on all six disciplined tickets.** That
+  contradiction outranks the card: it would mean the ceiling is not applied where we
+  believe it is, and it becomes an M-item the same day.
+- **The card is empty → NO-PLAY with a documented cause.** `BlockedPanel` renders
+  **ungated** (`app/builder/page.tsx` L818) and the no-play panel carries its own
+  ungated rebuild render (L800), so the blocked reasons ARE readable. Print the
+  blocked-reason histogram and the rebuild note; **a NO-PLAY day with a printed cause is
+  a result, not a silence.**
