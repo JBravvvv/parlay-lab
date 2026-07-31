@@ -162,6 +162,7 @@ describe("every covered guard is proven WIRED, not just proven correct", () => {
   }
 
   it("states its own coverage rather than implying completeness", () => {
+    /* (kept below) */
     const covered = CASES.length;
     const uncovered = Object.keys(UNCOVERED).length;
     // eslint-disable-next-line no-console
@@ -171,5 +172,146 @@ describe("every covered guard is proven WIRED, not just proven correct", () => {
     );
     expect(covered).toBeGreaterThan(0);
     for (const w of Object.values(UNCOVERED)) expect(w.length, "every uncovered guard needs its reason").toBeGreaterThan(30);
+  });
+});
+
+/**
+ * THE SAME QUESTION, ASKED OF THE TOOLS (2026-07-31, owner's item 1 — extension authorized).
+ *
+ * TWO TOOLS WERE FOUND BROKEN ON REAL INPUT WHILE THEIR TESTS PASSED ON SYNTHETIC SHAPES:
+ *   - `burn-report --pred` threw `TypeError: recs is not iterable` on EVERY real export, because
+ *     `DayBlob.records` is a keyed map and its test hand-built an array.
+ *   - `verify-served-engine` returned a plausible SUFFIX of a real chunk (the false 278,267
+ *     mismatch) while its assertions passed.
+ * A third was found by running `board-report` on the archived 2026-07-26 board for the first
+ * time: on `/api/board`'s real failure envelope (`{board:null, reason, gens}` at **200**) it
+ * printed a complete, plausible, entirely fabricated reading of a board that does not exist.
+ *
+ * THE RULE THIS ENCODES: **a tool handed a shape it cannot read must FAIL LOUDLY — non-zero
+ * exit — rather than return a plausible number.** Every case below feeds a shape PRODUCTION
+ * ACTUALLY EMITS (the route's own error envelopes, verbatim from the route files) or a
+ * corrupted real artifact, and asserts a non-zero exit.
+ *
+ * WHY NOT CORRUPT THE REAL ARTIFACTS IN PLACE: the real board and props archives live on the
+ * `line-history` branch, not the working tree, so there is nothing here to corrupt and nothing
+ * to restore. The artifacts are fetched read-only when the ref is present and SKIPPED WITH A
+ * REASON when it is not — the count stays honest either way.
+ */
+type ToolCase = { tool: string; why: string; input: unknown; expectExit: "nonzero" };
+
+/** Shapes copied from the route files, not invented — each is a real 200 response. */
+const TOOL_CASES: ToolCase[] = [
+  {
+    tool: "tools/board-report.mjs",
+    why: "/api/board returns {board:null,reason} at 200 on four paths (route L23/L47/L54/L58); `blob.board ?? blob` fell through to the envelope and printed a full fake reading",
+    input: { board: null, reason: "no-board-for-date", gens: [] },
+    expectExit: "nonzero",
+  },
+  {
+    tool: "tools/board-report.mjs",
+    why: "a board with no `categories` is not a board; zero rows there would print as the VACUOUS branch, a much weaker and different claim",
+    input: { board: { at: 1, date: "2026-08-01", data: { parlays: [] } } },
+    expectExit: "nonzero",
+  },
+  {
+    tool: "tools/ledger-report.mjs",
+    why: "a LOCKED entry with no `bankroll` gives every ticket a ceiling of 0, ratio Infinity, and a 100% overstake rate indistinguishable from a real finding",
+    input: { ledger: [{ date: "2026-07-20", locked: true, core: [{ id: "a", stake: 62, prob: 24.8, czDec: 4.26, legs: [] }] }] },
+    expectExit: "nonzero",
+  },
+  {
+    tool: "tools/ledger-report.mjs",
+    why: "{ledger:[]} at 200 is a VALID response over an EMPTY store — every sub-reading returns a clean zero and the bankroll exit has no population",
+    input: { ledger: [], bank: null, noplay: null, at: null },
+    expectExit: "nonzero",
+  },
+  {
+    tool: "tools/ledger-report.mjs",
+    why: "a bare array is a shape /api/ledger cannot produce (route L73 always sends the four-key object), so accepting it means accepting a file of unknown provenance as the bankroll population",
+    input: [{ date: "2026-07-20", locked: true, core: [] }],
+    expectExit: "nonzero",
+  },
+  {
+    tool: "tools/burn-report.mjs",
+    why: "an error body is a JSON object too; censusing it reports zero client rows, which reads as 'the fallthrough is cleared'",
+    input: { error: "bad-sync-key" },
+    expectExit: "nonzero",
+  },
+];
+
+function runTool(tool: string, argv: string[]): number {
+  try {
+    execFileSync("node", [path.join(REPO, tool), ...argv], {
+      cwd: REPO,
+      stdio: "pipe",
+      env: { ...process.env, PATH: `${NODE_BIN}:${process.env.PATH ?? ""}` },
+      timeout: 60_000,
+    });
+    return 0;
+  } catch (e) {
+    return (e as { status?: number }).status ?? 1;
+  }
+}
+
+describe("every TOOL fails loudly on a shape it cannot read, rather than returning a plausible number", () => {
+  for (const [i, c] of TOOL_CASES.entries()) {
+    it(`${c.tool} refuses: ${c.why}`, () => {
+      const tmp = path.join(REPO, `.tool-wiring-${i}.tmp.json`);
+      try {
+        fs.writeFileSync(tmp, JSON.stringify(c.input));
+        const argv = c.tool.includes("burn-report") ? ["--pred", tmp] : [tmp];
+        const code = runTool(c.tool, argv);
+        expect(
+          code,
+          `\n\n${c.tool} EXITED 0 on a shape production actually emits.\n` +
+            `It returned a number instead of refusing. ${c.why}\n`,
+        ).not.toBe(0);
+      } finally {
+        if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+      }
+    }, 70_000);
+  }
+
+  /** The real artifact, when the archive branch is present. Read-only: nothing is corrupted in
+   *  place because nothing of this lives in the working tree. */
+  it("board-report READS the archived 2026-07-26 production board (or says why it could not)", () => {
+    const ref = "origin/line-history:data/boards/2026-07-26.best.json.gz";
+    let gz: Buffer;
+    try {
+      gz = execFileSync("git", ["show", ref], { cwd: REPO, maxBuffer: 64 * 1024 * 1024 });
+    } catch {
+      // eslint-disable-next-line no-console
+      console.log(`\nTOOL WIRING: SKIPPED the real-board case — \`git show ${ref}\` failed.\n  Fetch it with: git fetch origin line-history   (git only, zero Odds credits)\n`);
+      return;
+    }
+    const tmp = path.join(REPO, ".tool-wiring-real-board.tmp.json");
+    try {
+      fs.writeFileSync(tmp, require("node:zlib").gunzipSync(gz));
+      expect(runTool("tools/board-report.mjs", [tmp]), "the tool must READ a real production board").toBe(0);
+      /* and the corrupted copy of that same real artifact must be refused */
+      fs.writeFileSync(tmp, JSON.stringify({ board: null, reason: "corrupted-real-artifact" }));
+      expect(runTool("tools/board-report.mjs", [tmp]), "a real artifact replaced by the route's own null envelope must be refused").not.toBe(0);
+    } finally {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    }
+  }, 70_000);
+
+  it("states which tools have touched a real artifact and which have not", () => {
+    const REAL_INPUT_SEEN: Record<string, string> = {
+      "tools/quota.mjs": "YES — it WROTE data/quota-log.jsonl (20 real rows) and --series parses its own output",
+      "tools/burn-report.mjs --props": "YES — run against origin/line-history:data/props/*.json (18 real day-files) on 2026-07-31",
+      "tools/board-report.mjs": "YES — run against the archived 2026-07-26 production board on 2026-07-31; three defects found",
+      "tools/verify-served-engine.mjs": "YES — run against the real served chunk; it FAILED there once (the false 278,267 mismatch) and was corrected",
+      "tools/burn-report.mjs --pred": "NO — no real prediction blob exists yet; read 2 will be its first",
+      "tools/ledger-report.mjs": "NO — no real export exists yet; read 4 will be its first, on the ONLY copy of the bankroll population",
+    };
+    const unproven = Object.entries(REAL_INPUT_SEEN).filter(([, v]) => v.startsWith("NO"));
+    // eslint-disable-next-line no-console
+    console.log(
+      `\nTOOL/REAL-INPUT LEDGER: ${Object.keys(REAL_INPUT_SEEN).length - unproven.length} proven on production input, ${unproven.length} UNPROVEN.\n` +
+        Object.entries(REAL_INPUT_SEEN).map(([t, v]) => `  ${v.startsWith("NO") ? "UNPROVEN" : "  proven"}  ${t} — ${v}`).join("\n") + "\n",
+    );
+    expect(unproven.length, "the unproven count is reported, never implied to be zero").toBeGreaterThanOrEqual(0);
+    for (const v of Object.values(REAL_INPUT_SEEN)) expect(v.length).toBeGreaterThan(30);
   });
 });

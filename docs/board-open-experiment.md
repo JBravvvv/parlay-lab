@@ -113,7 +113,16 @@ the app:
 
 **12 h 32 m of no device use, and the residual is zero in both.** The second window is the stronger
 of the two because it contains known spend to calibrate against: measured **339 ÷ 58 event-fetches
-= 5.84 credits per event**, which confirms the 6-per-event model used in every attribution here.
+= 5.84 credits per event**, ~~which confirms the 6-per-event model used in every attribution
+here~~.
+
+> **STRUCK 2026-07-31 (owner's item 3). The struck clause is REFUTED.** A per-event constant of
+> 5.845 — and of 6.0 — is ruled out by `residual >= 0`: the binding window (641 spent, 123 event-
+> fetches, 2 line-history runs) bounds **c ≤ 5.114**, and both larger values make that window's
+> residual negative. The **measurement** above (339 ÷ 58 = 5.845 on THIS window) stands as a
+> measurement; what falls is the inference that it **confirms a constant**. The honest statement
+> is a band, **c ∈ [5.114, 5.845]**, with the per-event cost NOT a constant across windows —
+> `docs/branch-firing-audit.md` L557 carries the refutation and the arithmetic.
 
 Against 8.4/h of residual on days the app was used, that is a real asymmetry — but it is still an
 observational contrast, not a controlled one. **The experiment above is what makes it controlled**,

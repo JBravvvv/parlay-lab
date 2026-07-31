@@ -771,6 +771,70 @@ legacy mode opened at all until M24 resolves.
 
 ---
 
+## 7A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
+
+**THE CLASS: a tool whose tests feed it a synthetic shape has never been tested.** Two were found
+broken on production data; a third was found the moment it was pointed at a real artifact.
+
+| tool | what its tests feed it | real artifact ever passed through? | obtainable at zero credits? |
+|---|---|---|---|
+| `quota.mjs` | hand-built JSONL lines | **YES** — it WROTE `data/quota-log.jsonl` (20 real rows); `--series` parses its own output | already on disk |
+| `burn-report --props` | hand-built `{snapshots:[…]}` | **YES** — run 07-31 against 18 real day-files | `origin/line-history:data/props/*.json` |
+| `board-report` | hand-built `{categories:{…}}` | **YES, first time 2026-07-31** — the archived 07-26 board. **Three defects** | `origin/line-history:data/boards/2026-07-26.best.json.gz` |
+| `verify-served-engine` | a synthetic chunk | **YES** — and it **FAILED** there (the false 278,267 mismatch), then corrected | the served chunk |
+| **`burn-report --pred`** | a hand-built **ARRAY** | **NO.** Threw `TypeError` on the only shape production emits | **none exists — read 2 is its first** |
+| **`ledger-report`** | hand-built entry objects | **NO** — and it receives the **only copy of the bankroll population** | **none exists — read 4 is its first** |
+
+**THE HONEST COUNT: 4 proven on production input, 2 UNPROVEN**, reported by
+`tests/guard-wiring.test.ts` on every run rather than implied.
+
+**`board-report`'s THREE DEFECTS, all found by one run against the real 07-26 board:**
+1. **The failure envelope was read as a board.** `/api/board` returns **`{board: null, reason, gens}`
+   at 200** on four paths (route L23/L47/L54/L58). `blob.board ?? blob` treated `null` as absent
+   and fell through to the envelope — printing a complete, plausible, **fabricated** reading,
+   VACUOUS branch and all. **Now STOPs at exit 65.**
+2. **A false M-item on every pre-flag board.** It printed *">>> M-ITEM: the flag is not reaching the
+   server path"* for 76 outs legs on a board that **predates `outsSusp` entirely**. **Now gated on
+   `echo.outsSusp === true`**, with the no-echo case named as undecidable rather than as failure.
+3. **🔴 READING 5 WAS UNANSWERABLE AND WOULD HAVE READ AS A FAILURE.** `/api/board` returns
+   `gens: GenIndexEntry[] = {at, priced, live, luPct, bytes}` (`board-store` L51–60) — **there is
+   no `trigger` field in it and no `gen` key at all.** The tool looked for `blob.gen.trigger`, so
+   it would have printed `ABSENT` **tomorrow no matter what happened**, and reading 5 pre-commits
+   *`trigger === "header"` OR IT DID NOT LAND*. **`trigger` is stamped by `/api/generate` (route
+   L289) into its own RESPONSE BODY and into the prediction store's `GenStamp`** — read it there.
+   The tool now says so instead of guessing.
+
+**M19 MEASURED ON A REAL BOARD FOR THE FIRST TIME:** 110 `parlays` + 86 `parlaysMixed` = **196
+emitted, 168 distinct leg-sets — 28 duplicates** (4 inside `parlays`, 24 shared across). Count (1)
+is now reported over **distinct** leg-sets with the raw union beside it.
+
+**`ledger-report`'s SHAPE ASSUMPTIONS — every one found by walking its input handling, all now
+explicit checks that exit 65 rather than degrade:**
+| assumption | what it did silently | now |
+|---|---|---|
+| `blob.ledger ?? blob` | accepted a **bare array** — a shape the endpoint cannot emit | **refused** |
+| an error body is an object | `{error:…}` → `entries.length` undefined → then a `TypeError` mid-print | **refused with the body** |
+| **`e.bankroll ?? 0`** | **a locked entry with no bankroll ⇒ every ceiling 0 ⇒ ratio Infinity ⇒ 100% overstake**, printed with a dollar total | **refused, naming the entry** |
+| `e.date` string-compared | a non-ISO date silently excludes the whole 07-17→07-22 window → `0W/0L`, `hit undefined%` | **refused** |
+| `kellyFrac` → null | tickets with no computable ceiling counted in the denominator, invisible | **counted and printed as `(0) EXCLUDED`** |
+| `l.cz` is American | a decimal price (e.g. `2.5`) yields **97.6% implied** — plausible and wrong | **warns with the count and examples** |
+| `fieldCensus` keys by date | duplicate dates **overwrite**, so the census describes only the last | **warns** |
+| `mkt(t)` = leg 0's market | a mixed-market parlay is attributed entirely to its first leg | documented, unchanged |
+| `{ledger:[]}` at 200 | a clean zero from an **empty store** — the bankroll exit with no population | **refused** |
+
+**IMPOSSIBLE BRANCH — did a fixture derived from a real artifact still diverge from production?**
+**Not found.** No tool fixture in this repo was derived from a real artifact; all six were
+hand-built. That is the finding — the branch could not fire because the condition it tests for
+has never existed here.
+
+**THE META-TEST NOW COVERS TOOLS**, not just guards (`tests/guard-wiring.test.ts`): six cases feed
+each tool a shape **the routes actually emit** — copied from the route files, not invented — and
+assert a **non-zero exit**; plus a real-artifact case that reads the archived 07-26 board and then
+refuses the same file replaced by the route's null envelope. It **skips with a printed reason**
+when `origin/line-history` is not fetched, so the count stays honest.
+
+---
+
 ## 8A. THE CALENDAR — STOPPED, NOT LATE (2026-07-31, owner's item 2)
 
 > **EVERY DATE BELOW IS A COUNT-ARMED CROSSING PROJECTED FROM AN ACCRUAL RATE, AND THE RATE HAS
@@ -830,11 +894,82 @@ restates on **measured** accrual for the first time rather than on a stopped clo
 second branch of item 2's pre-committed reading, and it is the same read that discriminates the
 burst. **Until it returns, "STOPPED" is the honest label and "projected" is not.**
 
-**ONE INCONSISTENCY FOUND WHILE RESTATING — recorded, not corrected (see §10 #9).** The Phase-2
-block reads **"at the measured 70 graded rows/day"** (L2573) while the recomputation block reads
-**`graded = 70` over the TWO complete dates 07-25 and 07-26** (L3064) — i.e. **35/day**. If 35/day
-is the right figure, the 300-row floor lands **~08-03, not ~07-31**, even at one board per day, and
-the two dates in this table's first two rows were **~2× optimistic before a single dark day**.
+### 8A.1 WHICH RATE IS THE MEASUREMENT — RESOLVED 2026-07-31 (owner's item 2)
+
+**35/day. Not 70.** Both derivations, printed:
+
+- **"70 graded rows/day" (L2573)** — asserted, with **no derivation shown anywhere in the file**.
+- **35/day (L3064)** — *"Recomputed from actual accrual on 2026-07-27 (`graded = 70` over the two
+  complete dates 2026-07-25 and 2026-07-26)"*. **70 ÷ 2 dates = 35/date.**
+
+**TWO INDEPENDENT INTERNAL CROSS-CHECKS SETTLE IT, both inside the same file.** (1) The per-market
+`measured /day` column at L3069–73 is **exactly `n` ÷ 2** in every row — ML·RL 15→7.5, TB 9→4.5,
+Hits 7→3.5, K's/Outs 5→2.5. A two-date denominator, stated by the arithmetic. (2) The per-market
+`n` values **sum to 70** over those two dates (15+15+9+7+7+7+5+5). **So 70 is the TWO-DAY TOTAL and
+L2573 mislabelled it as a daily rate.**
+
+**THE ERROR'S SCOPE IS NARROWER THAN IT FIRST LOOKED, AND SAYING SO IS THE POINT.** The
+consensus-reopen tables were **already derived at 35/day and are correct**. **Only the Phase-2 ICC
+block used 70/day**, and only its two rows were ~2× optimistic. At 35/day from `CAL_START`
+2026-07-25 the 300-row floor lands **~2026-08-03, not ~07-31** — so those two dates *were* wrong
+**before the cadence failed**, and then the cadence failed on top of it. The rest were merely
+stopped.
+
+### 8A.2 THE OPTIMISTIC CASE AS A NUMBER — boards resume 2026-08-01 at one per day
+
+Banked: **70 graded rows over 2 complete dates**; five dark days added nothing. Rate **35/day**,
+per-market as measured. Board cost **62–70 credits** (midpoint 66); props **162–185/day** (~170).
+
+| item | arithmetic | **restated date** | boards | credits (boards only) |
+|---|---|---|---|---|
+| **Phase-2 game ICC** | (300−70)/35 = 6.6 → **7 boards** | **2026-08-07** | 7 | **~462** |
+| **Phase-2 player ICC** | same floors | **2026-08-07** | 7 | ~462 |
+| ML · RL reopen | (100−15)/7.5 = 11.3 → 12 | **2026-08-12** | 12 | ~792 |
+| **Phase-2 day ICC** | 20 day-clusters, 2 banked → 18 | **2026-08-18** | 18 | ~1,188 |
+| 20-board crossover | 18 more boards¹ | **2026-08-18** | 18 | ~1,188 |
+| Total Bases reopen | (100−9)/4.5 = 20.2 → 21 | **2026-08-21** | 21 | ~1,386 |
+| Hits · HR · HRR reopen | (100−7)/3.5 = 26.6 → 27 | **2026-08-27** | 27 | ~1,782 |
+| K's · Outs reopen | (100−5)/2.5 = 38 | **2026-09-07** | 38 | ~2,508 |
+| `SUMMARY_DAYS` caps | 45 logged dates, 2 banked¹ | **2026-09-12** | 43 | ~2,838 |
+| HRR retirement | ~09-15 + the 5 dark days | **~2026-09-20** | — | — |
+| parameter exit | credit-bound, not cadence-bound | 2026-09-22 | — | **~13,500** |
+
+¹ banked board/logged-date counts are **off-disk**; read 2 and read 3 supply them, and these two
+rows restate on the real count.
+
+### 8A.3 ⚠️ IMPOSSIBLE BRANCH — IT FIRES A SECOND TIME. ONE ITEM **IS** REACHABLE AT 553.
+
+**The Phase-2 game- and player-cluster ICC needs 7 boards ≈ 462 credits. The pool is 553.**
+It clears with **~91 credits of margin — but ONLY if props collection stops entirely**, because
+props alone burns 162–185/day and would consume the pool in ~3 days on its own. Four things must
+hold and each is nameable: **(1)** props collection off; **(2)** the 146-credit burst does not
+recur (at 48.3/h it is 1,159/day and ends this inside ten hours); **(3)** the grader actually runs
+— `/api/calibrate` is **unscheduled** since `vercel.json`'s `crons` array was removed, though it
+costs **zero Odds credits** (statsapi + Redis), so it is a trigger, not a budget item; **(4)**
+35/day holds.
+
+**Everything else is out of reach**: the day-level ICC — the unit that decides whether 2.7σ becomes
+1.1σ, and the one the HRR amendment waits on — needs **~1,188 credits of boards**, more than twice
+the pool. Every consensus reopen is further still.
+
+**WHAT THE PARAMETER EXIT WOULD NEED TO BE REACHABLE.** ~13,500 credits against 553. A reset is the
+only path, and it is not sufficient by itself: **(a)** a reset must restore ≥ ~13,500 of headroom
+**before 2026-09-22**, and **(b)** the unattributed residual must be closed first — at the observed
+48.3/h it is **1,159/day**, which exhausts even a full 20,000-credit pool in **~17 days**, well
+short of 09-22. **The reset date is unread (owner's Odds-API dashboard only).** So the exit is
+reachable only on a reset *plus* a closed residual, and the residual is §2's open question.
+
+**THE SENTENCE THAT NOW BELONGS AT THE TOP OF THE COLLECTION DOC:** *exactly one calendared item is
+reachable with the credits on hand — the Phase-2 game/player ICC, at 7 boards, and only with props
+collection stopped. Every other date in this document is out of reach this cycle.*
+
+**WHAT A SHORTER OR SMALLER WINDOW WOULD HAVE TO BE — named, not designed.** To be worth running
+inside ~8 boards it would have to: **(i)** answer a question whose floor is a **row** count, not a
+day count — the day-clustered ICC and every 20-board bar are structurally excluded; **(ii)** accept
+a **pooled** estimate, since no single market reaches 100 in eight boards; **(iii)** state its power
+against the accrued `K_s` rather than assuming it; and **(iv)** carry a pre-committed reading that
+survives a **stopped** clock, i.e. one whose negative branch is informative. That is the shape.
+**Designing it is not authorized and is not done here.**
 
 ---
 
@@ -879,6 +1014,30 @@ the two dates in this table's first two rows were **~2× optimistic before a sin
    check itself is phrase-gated and off-disk, so **the date arrived and nothing on disk can say
    whether the threshold did** — which makes these the first calendared items whose own arrival
    is unverifiable from here. Read 2 is what flips them to measured accrual.**)**
+10. **🔴 A FIFTH PROPS SNAPSHOT LANDED INSIDE A WINDOW MEASURED AS SPENDING ZERO** (found
+    2026-07-31 by running `burn-report --props` against the real archive for the first time).
+    `origin/line-history:data/props/2026-07-31.json` holds **FIVE** snapshots, not four:
+    08:10:13Z (13 ev) · 09:34:42Z (15) · 10:19:51Z (15) · 11:04:30Z (15) — **58 event-fetches, the
+    morning batch, matching §9** — **plus 20:48:14Z, `kind=close`, 14 events**, committed at
+    20:48:17Z. **14 × 6 ≈ 84 credits.** But **quota reads 553 at 20:21:56Z AND 553 at 21:04:11Z**,
+    a window that *contains* 20:48. **Both instruments are on disk and they disagree.** Exactly one
+    of these is false: (a) that snapshot cost ~6/event; (b) the 20:21/21:04 quota reads are fresh;
+    (c) it cost anything at all. Note the snapshot carries **no `src` field**, and the Vercel route
+    stamps `src:"vercel"` (propsnap L44/L113) — so it was **not** the Vercel capture path.
+    **CONSEQUENCES IF (b) IS THE FALSE ONE:** `tools/quota.mjs` reads through `/api/odds` **without
+    `fresh=1`** (L23–24), i.e. through the 240 s Next data cache — and the whole burn series,
+    including the 146, would inherit whatever staleness that introduces. **CONSEQUENCE FOR
+    TOMORROW EITHER WAY: reading 26's cost bracket (delta ÷ unstarted-events ∈ [5,8]) is not
+    measurable if a 14-event sweep can land without moving the quota.** Recorded, not resolved.
+    Today's props total also restates from 58 to **72 event-fetches**, which the residual
+    arithmetic in §2 has **not** been re-derived against.
+11. **The retraction convention is enforced for FORMAT but not for REACH.**
+    `tests/retraction-markers.test.ts` requires a paragraph *bearing* a marker to carry a date —
+    it is keyed on the marker, so it is structurally blind to a doc asserting the withdrawn claim
+    with **no marker at all**. Same blindness `fixture-citation` names in its own header. **THE
+    GAP IS NOW CLOSED by `tests/retracted-claims.test.ts`** (a registry of the claims themselves,
+    marker required within ±4 lines), which found two on encoding day; the gap is recorded here
+    because the convention's written form still says nothing about reach.
 9. **The Phase-2 accrual rate is stated two ways in one file**: L2573 reads **"at the measured 70
    graded rows/day"**, while L3064 reads **`graded = 70` over the TWO complete dates 2026-07-25
    and 2026-07-26** — i.e. **35/day**. Both are labelled "measured". At 35/day the 300-row floor

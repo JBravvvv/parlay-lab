@@ -1,5 +1,25 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> # 🔴 EXACTLY ONE CALENDARED ITEM IN THIS DOCUMENT IS REACHABLE WITH THE CREDITS ON HAND (2026-07-31, owner's item 2)
+>
+> **The Phase-2 game- and player-cluster ICC — 7 boards, ≈462 credits against a pool of 553 — and
+> only with props collection stopped. EVERY OTHER DATE IN THIS DOCUMENT IS OUT OF REACH THIS
+> CYCLE**, including the day-level ICC (~1,188 credits of boards) that the HRR amendment waits on,
+> every consensus reopen, and the parameter exit (~13,500).
+>
+> **AND EVERY DATE HERE IS A COUNT-ARMED CROSSING PROJECTED FROM AN ACCRUAL RATE THAT HAS BEEN
+> ZERO SINCE 2026-07-26.** `reopenDays` returns `null` — *"never, at this rate"* — at rate 0
+> (`src/lib/gate-rebuild.ts` L83–86). **These dates are STOPPED, not late.** The restated table,
+> computed on the corrected 35/day and assuming boards resume 2026-08-01 at one per day, is in
+> `docs/session-handoff.md` §8A.2; it is not duplicated here.
+>
+> **THE RATE IS 35/DAY, NOT 70 — RESOLVED 2026-07-31.** L2573's *"at the measured 70 graded
+> rows/day"* mislabels a **two-day total** as a daily rate; L3064 derives it (`graded = 70` over
+> the two complete dates 07-25 and 07-26). Two internal cross-checks settle it: the per-market
+> `/day` column at L3069–73 is exactly `n ÷ 2` in every row, and those `n` sum to 70.
+> **Scope: the consensus-reopen tables were already correct at 35/day; only the Phase-2 ICC block
+> used 70/day, so only its two dates were ~2× optimistic BEFORE the cadence stopped.**
+
 > # 🔴 THE FREEZE HAS A THIRD FLOATING INPUT AND THE PAUSE FROZE TWO OF THREE (2026-07-31, owner's item 2)
 >
 > **`/api/calibrate` runs DAILY at 09:30Z on a Vercel cron, and the engine reads its output at
@@ -8448,9 +8468,18 @@ burn and only reaches 4.6 days.** The props cadence is not what ends the cycle �
 1's unnamed spender is.** That is why this table is printed and not acted on.
 **Impossible branch — CHECKED, and it FIRES**: the workflow declares **four** crons
 (`0 13`, `0 17`, `0 23`, `0 3`) while the archive shows **5 snapshots on 07-30 and 10 on
-07-29** — more snapshots than crons, because GitHub delivers each cron more than once in
-its batch windows and MIN_GAP now dedupes the payment rather than the delivery.
+07-29** — ~~more snapshots than crons, because GitHub delivers each cron more than once in
+its batch windows~~ and MIN_GAP now dedupes the payment rather than the delivery.
 **Both are printed: schedule says 4, archive says 5 (post-fix) and 10 (pre-fix).**
+
+> **STRUCK 2026-07-31 (owner's item 3). The struck clause is WITHDRAWN and was already
+> withdrawn when this paragraph was written — it sat here undated and unmarked, directly
+> above that day's addendum.** The Actions run log shows **ten declared crons and ten
+> deliveries, one-for-one**; the platform does not duplicate a delivery. The count gap is
+> **MIN_GAP deduping the PAYMENT, not the platform duplicating the DELIVERY** — which the
+> surviving half of the sentence already said. **The impossible branch still fires** (four
+> declared vs five archived is still a real gap); only its *explanation* is retracted, and
+> the correct one is that the branch copy declares four while the firing copy declared ten.
 
 ## THE CALENDAR IS STOPPED, NOT LATE — DATED ADDENDUM (2026-07-31, owner's item 2)
 
