@@ -1,440 +1,185 @@
-# SESSION HANDOFF — brought current 2026-07-30 (~04:3xZ), immediately before compaction
+# SESSION HANDOFF — rewritten from disk 2026-07-31 ~06:1xZ, immediately before compaction
 
-Purpose: tomorrow's entire chain, on disk. Every line re-sourced from the docs this
-turn; figures not sourceable are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves
-them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version got stale.
+Every line below was re-read and re-derived from disk THIS TURN. Figures that could not
+be sourced this turn are marked IN-CONTEXT-ONLY-UNVERIFIED with what resolves them.
+Supersedes the 2026-07-30 handoff in place; §1 flags what the last two sessions made
+stale.
 
-## ⛔ TONIGHT (2026-07-31): NO BOARD FIRES — owner's ruling, item 1
+## ⛔ THE GATE: NO BOARD FIRES UNTIL THE ~224/DAY RESOLVES (owner's ruling, 2026-07-31)
 
-**A board at ~150 against 1,038 with ~47% of the burn unexplained is a bet on an unknown,
-not a measurement.** The cron entry stays as it is; **no curl**. Consequences, stated:
-**the homogeneous window stays at COUNT ZERO (a third consecutive dark board-day), and
-the outs flag — live in production since 2026-07-31 02:50Z — remains UNEXERCISED on a
-real board.** Every reading pre-committed for Friday re-arms for the next fire.
+**A board at ~150 credits against 1,038 with ~47% of the burn unexplained is a bet on an
+unknown, not a measurement.** The cron-job.org entry stays exactly as it is; **no curl,
+no force, nothing fires.** Consequences, stated rather than discovered later: **the
+homogeneous window stays at COUNT ZERO (a THIRD consecutive dark board-day), and the outs
+flag — live in production since 2026-07-31 02:50Z — remains UNEXERCISED on a real
+board.** Every pre-committed reading re-arms for the next fire.
 
-**RUN THESE TWO ON YOUR PHRASE, TOP OF THE SHEET, ZERO CREDITS:**
+**RUN THESE ON YOUR PHRASE FIRST — zero credits, and reading 15(c) settles the largest
+open question in the project:**
 ```
 curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger.json
 curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
 curl -sS -H "x-pl-sync: <PHRASE>" "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-29" > ~/pl-pred-0729.json
 ```
-then, spending nothing:
 ```
-node tools/ledger-report.mjs ~/pl-ledger.json      # reading 15 whole
-node tools/burn-report.mjs --pred ~/pl-pred-0730.json   # reading 15(c)
+node tools/ledger-report.mjs ~/pl-ledger.json            # reading 15, whole
+node tools/burn-report.mjs --pred ~/pl-pred-0730.json    # reading 15(c)
 ```
-**Reading 15(c) settles the largest open question in the project: whether the
-`bestBoard` fallthrough is the ~224/day.**
 
-**BURN SERIES (`tools/quota.mjs --series`, live):** 13.5/h → 17.4/h → 23.1/h →
-**0/h → 0/h**. The flat 4.5 h is the finding: **event-driven, not scheduled.**
-**Quota 1,038 / 18,962 · burn ~422/day · runway ~2.5 days · board-days 6.9 at a full
-slate.** ⚠️ **EVERY RUNWAY, BURN AND BOARD-DAY FIGURE WRITTEN BEFORE 2026-07-31 IS
-SUPERSEDED** — they rested on one evening window generalised to a day.
+## 0. READ-FIRST INDEX — every doc, no exceptions (guarded by `tests/read-first-index.test.ts`)
 
-## 0. READ-FIRST INDEX (added 2026-07-31, owner's item 3 — every doc, no exceptions)
-
-**Why this exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"
+**Why it exists**: on 2026-07-31 three turns of ration tables and a "70% of the burn"
 claim were produced while `credit-budget.md` — which had already measured the same job —
-sat unread and unnamed here. The list was a PARTIAL index presented as complete (11 of 17
-docs absent). Guarded by `tests/read-first-index.test.ts`, which fails if any doc in
-`docs/` is missing or listed without a description.
+sat unread and unnamed here. The list was a partial index presented as complete (11 of
+17 docs absent). The guard fails if any doc is missing or listed without a description.
 
-| doc | last touched | what it holds |
-|---|---|---|
-| `collection-period.md` | 07-31 | the freeze's operating record: reachability, census, every M-item's working, the run-sheet blocks |
-| `freeze-exit-bundle.md` | 07-31 | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies and the vintage table |
-| `credit-budget.md` | 07-25 | **measured** per-job credit consumption and a proposed budget — the doc that priced line-history at ~25/day and named it non-load-bearing |
-| `cron-jobs.md` | 07-27 | the four cron-job.org entries, their schedules and the measured GitHub-Actions delivery delays |
-| `session-handoff.md` | — | this file: the chain, the readings, the protocol |
-| `hrr-recalibration.md` | 07-31 | the H+R+RBI suspension's evidence, its provenance markers and the λ* reading |
-| `pitcher-outs-audit.md` | 07-31 | the outs model defect (M2/M2′), the flag's spec, the DECIDED record and the coverage gap |
-| `harness-substitutions.md` | 07-29 | what the test sandbox replaces; the clamp-fixture spec and the fixture-representativeness criteria |
-| `multibook-memo.md` | 07-29 | two-book execution scoping, the M15 dedup and the join pre-commitments |
-| `singles-vs-parlays.md` | 07-29 | the structural counterfactual behind A1/A2 and the M14 refinements |
-| `phase2-memo.md` | 07-27 | Series A/B design, the model-vs-close regression and Series A's credit floor |
-| `board-timing.md` | 07-26 | when the engine should generate: the lineup rule (FP−3h) that T = 0.80 prices |
-| `generate-timing.md` | 07-25 | the free-win timing argument for the generate slot |
-| `clv.md` | 07-24 | the CLV instrument: per-leg sighting, the cents scale, the no-backfill guarantee |
-| `settlement-audit.md` | 07-24 | the historical grading record and the ML/RL settlement corrections |
-| `rebaseline-2026-07-25.md` | 07-25 | the 07-25 rebaseline: a bug fix, not a silenced test |
-| `progress.md` | 07-24 | the 07-24 session-end snapshot |
+| doc | what it holds |
+|---|---|
+| `collection-period.md` | the freeze's operating record: reachability, census, every M-item's working, the run-sheet blocks, the burn investigation |
+| `freeze-exit-bundle.md` | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies, the vintage table |
+| `credit-budget.md` | **measured** per-job credit consumption and a proposed budget — priced line-history at ~25/day and named it non-load-bearing |
+| `cron-jobs.md` | the four cron-job.org entries, their schedules, and the measured GitHub-Actions delivery delays |
+| `session-handoff.md` | this file: the gate, the chain, the readings, the protocol |
+| `hrr-recalibration.md` | the H+R+RBI suspension's evidence, its provenance markers, the λ* reading |
+| `pitcher-outs-audit.md` | the outs model defect (M2/M2′), the flag's spec, the DECIDED record, the coverage gap |
+| `harness-substitutions.md` | what the test sandbox replaces; the clamp-fixture spec and the fixture-representativeness criteria |
+| `multibook-memo.md` | two-book execution scoping, the M15 dedup, the join pre-commitments |
+| `singles-vs-parlays.md` | the structural counterfactual behind A1/A2 and the M14 refinements |
+| `phase2-memo.md` | Series A/B design, the model-vs-close regression, Series A's credit floor |
+| `board-timing.md` | when the engine should generate: the FP−3h lineup rule that T = 0.80 is priced against |
+| `generate-timing.md` | the free-win timing argument for the generate slot |
+| `clv.md` | the CLV instrument: per-leg sighting, the cents scale, the no-backfill guarantee |
+| `settlement-audit.md` | the historical grading record and the ML/RL settlement corrections |
+| `rebaseline-2026-07-25.md` | the 07-25 rebaseline: a bug fix, not a silenced test |
+| `progress.md` | the 07-24 session-end snapshot |
 
-## 1. STALE-ON-ARRIVAL (lines of the 07-29 handoff this session corrected/superseded)
+## 1. SUPERSEDED — every figure the last two sessions invalidated
 
-- ~~"Pushed head at handoff: 1617d1b; HELD: 465b85a, 7ac2a4a, 2469ad0 + this file"~~ —
-  STALE: everything through `4c036ba` is PUSHED (two ship pushes: `1617d1b..9753fb9`
-  stack+cfSel+echo; `9753fb9..4c036ba` docs+trigger mark); held = `e4e7bd1` + this
-  file's commit. §4 below.
-- ~~the chain table (step 0 MIN_GAP landing / 0b cfSel sign-off / Wednesday order)~~ —
-  STALE: cfSel + the sha/config echo SHIPPED and pushed; MIN_GAP's landing test was
-  CONSUMED by the concurrency fix (its landing test is now the 08:02–08:07Z window);
-  the Wednesday order was overtaken by the 07-29 NO-BOARD DAY (0 of 16 unstarted at
-  02:14Z; slot not spent) — the chain moved to the 07-30 run sheet, §2.
-- ~~spec-only queue rows: MIN_GAP (landing pending) / cfSel (sign-off) / sha+config
-  echo (own sign-off) / outs flag (go/no-go)~~ — STALE: first three shipped; outs
-  DECIDED (flag deploys Thursday evening; `docs/pitcher-outs-audit.md` DECIDED).
-- The alleged M17/M18 corrections (owner's 07-30 items 2–3): **NO correction was
-  needed** — the gitignored/unversioned premise died on three printed queries
-  (`check-ignore` exit 1; `ls-files` both tracked; bot commits ON the JSON) —
-  `docs/collection-period.md`, THE UNVERSIONED-INPUTS PREMISE block.
-- ~~"abstention is the boundary" (in-loop tolerance)~~ — RETRACTED 2026-07-29 late:
-  the in-loop shade fed the SHADED est to the admission gate (omniscient gate); the
-  EVAL-ONLY run is the tolerance instrument — bundle, tolerance table + its dated
-  markers.
-- ~~the in-loop ≈−5.4 crossings and the 2.4× exceedance ratio~~ — STRUCK (the grid
-  extension first, then the retraction above); the standing crossings are eval-only
-  **prob −3.2 / EV −4.3 pp, interpolated** — bundle.
-- ~~the lineup guard `luPct ≥ achievable − ε`~~ — WITHDRAWN as the lineup guard
-  (detects feed-lag, not early generation; not an identity — the inputs differ);
-  replaced by the spec'd `gen.achievable ≥ T` with **T = 0.80 set by the owner** —
-  collection-period.
-- The pause's justification RESTATED: the bot IS the committed data-vintage writer
-  (premise-death queries above); the pause stands as governance with that recorded —
-  collection-period, pause block.
-- ~~"A1's operative argument = the +60.6 level"~~ — the level and floor are
-  **λ=0-conditional** after the shrink test (edge-fragile, crossing λ≈0.74); A1's
-  case = restored monotonicity + penalty removal — bundle SHRINK block, memo lead.
-- ~~handoff §5 items 1 (MIN_GAP landing wording) and 10 (outs ICOU)~~ — 1 superseded
-  (fix's landing test), 10 DISCHARGED (owner re-issued on the record, marker dated).
-
-## 2. RUN SHEET
-
-> ## ✅ STATUS 2026-07-31 ~05:0xZ — SHIPPED **AND VERIFIED IN PRODUCTION**; MARKER RESOLVED
-> Post-deploy re-grep done: served chunk **`256-7cc559a830020345.js`** (renamed from
-> `256-171aff5d10da160d.js` — itself the deploy evidence) carries an engine string
-> **byte-identical to the repo, 281,096 chars,
-> `b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**, with all four
-> functional edits present in the served bytes. **`PENDING-LIVE-VERIFICATION` RESOLVED**
-> inside 24h; the guard goes green ON RESOLUTION (with `pending:false` it also requires
-> committed === served; deleting the marker makes it throw). **The outs flag is LIVE for
-> Friday's reopen.**
-> **Extractor now VERSIONED**: `tools/verify-served-engine.mjs` (double anchor: the
-> facade call `)(r,'` + the engine's escaped opening bytes, both unique) with
-> `tests/served-extractor.test.ts` — byte-exact on a hazard chunk, the suffix signature
-> reported as an EXTRACTION DEFECT rather than a mismatch, observed red on the old
-> anchor. **The echo guard never used it** (it reads `<script>` blocks), so no false-red
-> path existed there.
-> ⚠️ **The extractor reported a FALSE MISMATCH first** — "longest single-quoted literal"
-> resumed 2,829 chars inside the engine after an apostrophe (`Pitcher K\'s`) opened a
-> pseudo-literal. Re-anchoring on the engine's opening bytes gave the exact match. An
-> instrument that cries mismatch could have rolled back a correct ship.
-> **Site-id integrity ENCODED** (`tests/site-id-integrity.test.ts`, observed red on a
-> planted line): 30 ids, L1591–L2402, **all resolving — the ship shifted nothing**, and
-> no archived datum is keyed to any id (the 07-26 board predates the instrumentation).
->
-> ## ✅ SUPERSEDED — STATUS 2026-07-31 ~03:0xZ — THE OUTS FLAG IS SHIPPED
-> `overview` resolved by measurement (two differing spans, both ticket counts; every
-> category ROW count identical) → the scope correction was AUTHORIZED, the corrected
-> guard was OBSERVED RED on a planted row-level mutation, and the flag shipped: engine
-> **280,466 → 281,096 chars**,
-> `f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b` →
-> **`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**. Zero outs legs
-> in both disciplined modes; the legacy pair still carries 10 each (parity, pinned);
-> both `it.fails` flipped; 74 files / 562 tests green.
-> **`PENDING-LIVE-VERIFICATION` set 02:50Z — THE POST-DEPLOY RE-GREP IS DUE BY
-> 2026-08-01 02:50Z**, enforced by the resolution guard: if it is not done, the build
-> fails. **Friday's first action.**
-> **The first attempt turned three guards red** — item 5's comment correction at L1070
-> inserted lines ABOVE the line-number-keyed clamp sites ("clamp site L2258
-> disappeared"). Both comment edits were DROPPED per item 5's second branch and are
-> recorded as known-false. **General finding: any engine edit inserting a line above
-> L2371 is a silent instrument-vintage event.**
->
-> ## ⛔ SUPERSEDED — STATUS 2026-07-31 ~02:0xZ (the first, stopped attempt)
-> **The outs flag did NOT ship.** It was built (6 edits, engine 280,466 → 282,186 chars,
-> `f6cf1513…` → `3e06cac82d3bb90b5cd3d009c147bb6cc21bc21cab9a0b1067bbefcb8295942a`), the **scope-by-diff invariant went RED**, and the
-> pre-committed branch fired: STOP. Engine edits REVERTED, tree back at `f6cf1513…`, no
-> pending marker written, both `it.fails` halves still unflipped, nothing deployed, no
-> credits spent. **Outs reopens UNFLAGGED Friday** unless the owner rules otherwise.
-> The red is a GUARD-DESIGN defect, diagnosed not waved: the comparator checks the FULL
-> analyze output, and the only differing keys are `parlays`, `parlaysMixed` (the flag's
-> intended effect) and `overview` (ticket-derived by inference, NOT verified) — every
-> row-level key is byte-identical. **The comparator was not rewritten to pass the ship it
-> gates.** Owner's call, two options, in collection-period (THE OUTS SHIP … STOPPED).
->
-> ## ⚠️ STATUS 2026-07-31 ~01:3xZ — THE 07-30 BOARD DOES NOT EXIST
-> `/api/board?date=2026-07-30` → `{board: null, gens: [], reason: "no-board-for-date"}`,
-> READ not inferred. The 22:45Z fire and the 22:40–23:05Z curl fallback are BOTH past.
-> Cron branch **(b) 401 or (d) no fire — indistinguishable from this repo**; the
-> cron-job.org execution log is the owner's distinguisher. Zero credits spent on it
-> either way. Quota READ 01:2xZ: **1,038 / 18,962** (200 spent since 16:4xZ with no
-> board — props sweep + CLV ticks only). Runway **6.9 board-days**. Slate at 01:26Z:
-> 4 Final / 3 In Progress / 2 Warmup / 1 Pre-Game — **3 unstarted**. Homogeneous window
-> still COUNT ZERO (two consecutive board-days spent without a board). **Everything
-> below is unchanged and re-arms for the next fire; the readings simply have no board
-> yet.** The outs flag's ship gate ("after tonight's board is read") now collides with
-> its own Thursday-evening deadline — the owner's call. Full record:
-> collection-period, 07-30 CLOSE-OUT.
-
-> **FRIDAY'S SEEDS — nothing started earlier, so this is the full list.** The next board
-> that fires is board 1 of: the **homogeneous window** (still COUNT ZERO after two dark
-> days); the **clamp census** and **hot-site fidelity** (`clampActivity` has never ridden
-> a board — reading 24); the **config echo** (reading 25); **`mktN` on a board** (shipped
-> 07-30, never yet observed — reading 29); **cfSel with `rank` and `stake`** (shipped
-> 07-30, so no board has ever carried a sizeable counterfactual); the **trigger mark**
-> (reading 5); and the **same-day fp × predictions** join. **AND it IS board 1 of a new ENGINE VINTAGE** — the outs flag shipped 2026-07-31, so the served engine string is the new one (full hash in the status block above and in `src/lib/engine-echo.ts`) and every Friday reading is stamped TWO-VINTAGE in advance (the
-> engine ship + the K's/outs `consMinEv` crossing).
-> **HIGHEST-VALUE READ AVAILABLE, ZERO CREDITS, UNRUN: the ledger export.** The curl and
-> reading 15's one query sit in collection-period (THE EXPORT CURL AND READING 15). Run
-> it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into
-> realized, and it needs nothing but the sync phrase.
-> **Quota 1,038 / 18,962 · runway 6.9 board-days at ~150, ~17 at an evening board's ~60 ·
-> ⚠️ **BURN CORRECTED 2026-07-31 — MY EARLIER FIGURES WERE ~4× LOW.** Measured from the
-> props archive: 07-30 props alone cost **~198/day** (33 event-fetches × 6), not the
-> "~60" I generalised from one window. Against the two quota reads (1,461 → 1,038 over
-> 21.5 h = **423 spent**): props ~180 + line-history ~42 = ~222 known, **~201
-> UNATTRIBUTED ≈ ~224/day — now the LARGEST single line, bigger than props.**
-> **Day burn ≈ 476/day before the line-history disable, ≈ 422 after. RUNWAY AT 1,038 ≈
-> 2.5 DAYS, not 17.3.** Every runway figure above this line is superseded.
-> **~47% of the burn has no named mechanism**; reading 15(c) and a Vercel function-log
-> read are the two zero-credit disambiguators, both queued.
-> **MIN_GAP CLEARED AND MEASURED**: decide precedes the expensive fetch (the `/events`
-> call at L277 costs ZERO — measured, 1,038 before and after), so a skipped run spends
-> nothing; and the archive shows the saving directly — 07-29 (pre-fix) **129
-> event-fetches ≈ 774 credits** vs 07-30 (post-fix) **33 ≈ 198**. **~576/day, the
-> largest saving in the project.**
-> superseded burn line: ~60/day — line-history DISABLED 2026-07-31 (owner's decision;
-> schedule commented, workflow kept, `tests/line-history-consumers.test.ts` makes
-> "nothing reads it" an invariant, observed red). **~17.3 sweep-days, up from ~9.9 —
-> the disable buys ~7.4 days.** Board-days unchanged: 6.9 at a full slate, ~17 at an
-> evening board's ~60.**
-
-## 2a. THE RUN SHEET AS WRITTEN (2026-07-30 PT — re-arms for the next fire)
-
-**Deadlines (both Thursday 07-30 PT, different gates):**
-1. **3:30 PM PT — the owner's ONE cron-job.org visit**: **header `x-cron-key` on
-   ENTRY 1 ONLY** (REVISED 2026-07-30, owner's decision — entries 2–4 stay
-   UNHEADERED and keep 401'ing at zero cost: board-days are credit-limited, not
-   calendar-limited, so arming the weekend hours spends the same 1,238-credit
-   pool at hours chosen before T existed; Saturday 18:00Z projects sub-T and
-   Sunday 17:00Z would block the 22:30Z fire through the good-board skip, which
-   does NOT check T. Reversible at zero cost; a spent board-day is not —
-   collection-period, WEEKEND ENTRIES block) **AND entry 1 → `45 22 * * 1-5`.**
-   Gates the verification board (fires 22:45Z = 3:45 PM PT, achievable 0.833,
-   cost PROJECTED ~55–60 at 6 events).
-   (2:45 PM PT was the cutoff for an unmoved 22:00Z entry — superseded by the move.)
-2. **Thursday EVENING, after the board's readings — the outs flag deploys**
-   (regardless of any board reading; both branches pre-committed;
-   `docs/pitcher-outs-audit.md` DECIDED). Gates Friday's K's/outs reopen (07-31
-   expiry). Deploying before the cron would put a second engine change on the first
-   verified board — evening, not earlier.
-
-**Cron failure branches (collection-period, the owner's item 5)**: (a) fires 22:45Z
-with header → the chain runs on its board — no curl, no force; (b) 401 → **curl
-3:40–4:05 PM PT** on the owner's go/no-go, slate count printed first, NO force
-(a 401'd cron sets no lastRun; protections pass naturally); (c) board empty/malformed
-→ report the response and STOP — no second slot; (d) no fire → cron-job.org fact,
-owner's check; (e) impossible: two boards → old entry didn't clear — print both; the
-chain reads the 22:45Z board (`latest` wins), ONE board-day. Slate <6 by 22:45Z →
-board covers the unstarted remainder, count printed; zero → THIRD no-board day.
-**force ruling**: bypasses THREE protections (rate cap, good-board skip, DEAD-SLATE
-refusal); OFF tomorrow; a second board after a T-fail requires it and is OFF absent
-the owner's explicit in-the-moment authorization. Curl-after-cron-success returns
-`{skipped}` — free, safe.
-
-**The fourteen steps, in order (collection-period, TOMORROW'S ORDER)**: slate count
-printed → the owner's go/no-go → quota READ (free: `/v4/sports` via the odds proxy,
-headers passed) → board (cron preferred, curl fallback) → quota READ → `gen=list` →
-**echo present in the response body** (absent → the push did not land) → **cfSel
-stamp on every suspended row** (absent → did not land) → `self_consistency` (**`python3 tools/self_consistency.py`** — the tool exists; call it by path): zero
-TB≥1==H≥1 violations, zero HRR legs in built tickets, BOTH population sizes printed
-(zero-over-empty is not a pass) → app-switcher double reopen → HRR rows present AND
-greyed → replay dump + ParlayPred membership diff → Control C's production
-predictions vs the pre-commitments → ticket count vs both pre-commits.
-**T = 0.80**: 22:45Z board achievable ≥ 0.80 → composition readings VALID; below →
-**engine-half only** (echo, cfSel, self_consistency, greyed rows, replay+join — no
-composition or cap-binding reading). **Trigger-mark landing**: the board carries
-`gen.trigger === "header"` or the mark did not land.
-**Control C's numbers (CLAUDE.md STEP-8 pre-commit)**: IF the cap binds, the
-prob-ranked 6 forgoes **≥ 30 bp** E[ln] vs the same pool's EV-ranked 6, and displaced
-rank-7+ tickets carry HIGHER czEv than entrants (07-26 signature: entrants ~**2–4%
-czEv / ≥63% prob** vs displaced ~**7%**). Cap binds + displaced-higher-EV → M14
-confirmed in production; cap does not bind → M14 unobserved, sweep stays archival.
-**Clear-count readings**: 0 clear → `coreEvMin=2` is the binding gate (print
-blocked-reason counts); card at 6 → cap binding, M14 live, record ranks 7+;
-**1–5 → the blocked-reason HISTOGRAM over all pool tickets IS the reading, modal
-reason named** — and a non-binding cap is NOT evidence against M14.
-**HRR four counts, separate readings**: (1) rows PRESENT (absent → THIRD vacuity,
-reopen did not happen, 08-15 population restarts); (2) rows GREYED; (3) shadow rows
-`susp:true` AND cfSel-stamped; (4) HRR legs in tickets = ZERO (any >0 → hrrAltMax not
-reaching the server path — M-item same day). All four → the suspension verified
-end-to-end for the first time.
-**08:02–08:07Z landing test (the concurrency fix's)**: ONE paid + N−1 skips + no
-rejected push → landed; two+ paid OR any rejected push → NOT landed, MIN_GAP and the
-fix revert to spec TOGETHER; ZERO paid → the queue starved the window — its own line.
-**predictions×fp join (tomorrow evening, owner's sync phrase, zero credits)**:
-contents required (rows, per-market split, both-price count, fixture-days = 1);
-per-market game-clustered gain, ONE fixture-day + PRE-vintage; **vs the
-archive-derived +1.07 [+0.88, +1.33] — diff, never average**; zero both-price rows →
-failing field + fifth "unrecoverable" restatement; negative market → decomposition
-restates (multibook-memo, EXTENDED block).
-
-**OVERNIGHT — THE COLD-READ BLOCK (written 2026-07-30 ~05:1xZ, owner's item 5;
-read this after waking, nothing needs interpretation):**
-
-The two cron-job.org edits + the deadline, restated first: ONE visit by
-**3:30 PM PT** — (1) header `x-cron-key` onto entries 1–4; (2) entry 1
-`0 22 * * 1-5` → `45 22 * * 1-5`. If the visit happens after 3:00 PM PT (22:00Z),
-the unmoved entry 1 fires headerless at 22:00Z → 401, ZERO credits, no lastRun —
-harmless, already priced. Entries 2–4 are weekend-only (Sat/Sun,
-`docs/cron-jobs.md` table) — no weekday fire.
-
-**The 08:02–08:07Z landing test (fires ~06:30–09:30Z) — what to run and what each
-result looks like:**
-- `git fetch origin line-history`, then
-  `git log origin/line-history --format='%h %ad %s' --date=iso-strict
-  --since=2026-07-30T06:30:00Z --until=2026-07-30T09:30:00Z --
-  data/props/2026-07-30.json`
-- **LANDED** = exactly ONE commit in the window (the one paid snapshot; the other
-  cluster runs skip — their Actions logs print `skipped: pre within MIN_GAP (...)`
-  and they commit nothing). Ground truth inside the file:
-  `git show origin/line-history:data/props/2026-07-30.json` — exactly one
-  snapshot `t` in the window.
-- **NOT LANDED** = two-or-more commits inside any 40-min span (two+ paid), OR any
-  `engine-v2-props-history` Actions run whose Commit step shows a rejected push
-  after the ×3 rebase retry → MIN_GAP and the concurrency fix revert to spec
-  TOGETHER (the pre-committed pair).
-- **STARVED** = ZERO commits in the window → check
-  `gh run list --workflow=engine-v2-props-history --limit 10` for
-  queued/cancelled runs — "the queue starved the window" is its own line, not a
-  pass and not a fail of the fix.
-
-**Everything scheduled between this write and 22:30Z (3:30 PM PT), with credit
-cost** (props sweeps ≈ 6 credits × unstarted events; model/context jobs are
-KEYLESS — zero Odds credits):
-| nominal (UTC) | job | lands (measured delay) | Odds credits |
+| ~~superseded~~ | correction | dated | doc holding the corrected figure |
 |---|---|---|---|
-| queued from 07-29 22:30Z | context.yml straggler (pre-pause trigger) | ~06–08:30Z | 0 — keyless; may commit ONE context.json → the window-start stamp shifts to its hash (pre-committed) |
-| 07-29 23:00/23:30 + 07-30 00:00/00:30/01:00, queue-delayed +8–9h | props-history cluster | ~07:30–09:00Z — THE LANDING TEST | ~60 if landed (ONE paid pre at 10 events) |
-| 17:00 | context.yml | ~17–19Z | 0 — ump_k.json only (context.json dropped by the pause) |
-| 17:00 | props-history | 20:08–20:55Z (measured +3.1–3.9h) | ~36–60 (one paid; ~6 unstarted evening events by then) |
-| 20:00 | props-history | ~21:30Z–after-window | 0–36 (pays only if it lands before 22:30Z AND ≥40 min after the last paid) |
-| 21:00 / 22:00 | props-history | after 22:30Z on measured delays | 0 in-window |
-| 96×/day | cron-job.org CLV ticks | continuous | ~5–15 before 22:30Z (day-game closes from 16:10Z; full-day measured ~24) |
-| 22:00 (if entry 1 unmoved) | cron-job.org board entry 1, headerless | 22:00Z | 0 (401 precedes everything) |
-| — | model.yml | PAUSED (schedule commented) | 0 |
+| ~~"props sweeps ~60/day"~~ | **~198/day** — 33 event-fetches × 6 on 07-30, measured from the archive; the 60 was ONE evening window generalised to a day | 07-31 | collection-period, MIN_GAP CLEARED block |
+| ~~"line-history spends 144/day"~~ | **~45/day measured** (7.5 delivered runs × 6); 144 is the SCHEDULED rate. `credit-budget.md` L39 had it at ~25/day | 07-31 | collection-period, TWO CORRECTIONS block |
+| ~~"line-history has never appeared in a ration table"~~ | **FALSE** — `credit-budget.md` L176 prices it, calls what it feeds "nothing live", and L209 lists "Stop line-history.yml" as line 1 of a proposed budget | 07-31 | collection-period, TWO CORRECTIONS block |
+| ~~"burn ~105/day → 9.9 sweep-days"~~ and ~~"~60/day → 17.3 days"~~ | **~476/day before the line-history disable, ~422 after → RUNWAY ~2.5 DAYS** | 07-31 | collection-period, MIN_GAP CLEARED block |
+| ~~"runway 9.74 / 8.25 / 6.9 board-days"~~ (all pre-07-31) | board-days at a full slate still ~6.9 by division, but the RUNWAY IN DAYS was wrong by ~7×; every date derived from it restates | 07-31 | §9 below |
+| ~~the four-cadence table for line-history (hourly/3h/6h/daily/off at ~105 base)~~ | re-priced on measured delivery; then moot — the job was DISABLED 07-31 | 07-31 | collection-period, line-history DISABLED block |
+| ~~"the ~97 residual is likely the /api/clv capture path"~~ | **CLV spent ~0** — it sights only legs of today's LOCKED CARD and no card was locked; the residual restated to ~128, then to **~224/day** | 07-30 / 07-31 | collection-period, THE 200 CREDITS SPLIT |
+| ~~"close_fair.py / close_capture.py consume line-history"~~ | **FALSE** — all three close tools read `data/props/`; I conflated the BRANCH with the WORKFLOW. **Nothing reads the line-history day-file** | 07-31 | collection-period, TWO CORRECTIONS block |
+| ~~"the served engine is 278,267 chars / mismatched"~~ | **FALSE MISMATCH** from a defective extractor; served ≡ repo, 281,096 chars | 07-31 | collection-period, RE-GREP CONFIRMED block |
+| ~~"props-history is a ten-cron (or three-cron+wait) workflow"~~ | **FOUR active crons**: `0 13`, `0 17`, `0 23`, `0 3` | 07-31 | §6 below |
+| ~~"the pause disabled model.yml"~~ | **model.yml's cron reads ACTIVE** (`30 9 * * *`) in the file today | 07-31 | §6 below |
+| ~~"context.yml has two crons"~~ | **THREE**: `0 17`, `30 22`, `0 12` | 07-31 | §6 below |
+| ~~"the 08-15 review's shadow population = susp counts"~~ | the population is the **cfSel-stamped subset**; susp counts are ADMISSION, not selection | 07-30 | collection-period, cfSel review block |
+| ~~"a no-play screen will be silent about why"~~ | **FALSE** — `BlockedPanel` (L818) and the no-play rebuild render (L800) are both UNGATED | 07-31 | collection-period, M26 block |
+| ~~"shPenQFShadow returns NaN"~~ | **my probe's error** (it returns an object; `Math.min` over objects is NaN). 30 teams, 30 finite values | 07-31 | collection-period, THE NaN FINDING WAS MINE |
 
-**Expected quota at 3:30 PM PT (22:30Z), PROJECTED — one number: ≈ 1,325**
-remaining (band 1,290–1,360), from READ 1,461 − [~60 (08Z paid) + ~36–60
-(20:20Z paid) + 0–36 (a possible third paid) + ~5–15 (CLV)]. A read below ~1,290
-= un-designed spend (grep line-history commits + Actions); above ~1,360 = the
-sweeps starved (also a finding, not a relief). The 3:30 PM read stamps its own
-time.
+## 2. THE OPEN QUESTION — ~224/DAY WITH NO NAMED MECHANISM
 
-**THE MORNING COLD READ, IN ORDER (added 2026-07-30 ~06Z, owner's item 5 —
-each step maps to a labeled outcome, no interpretation)**:
-1. The landing test: run the `git fetch` + `git log` pair above → exactly one of
-   **LANDED / NOT LANDED / STARVED** as defined above.
-2. The straggler: **CORRECTED 2026-07-30 ~18Z — the bot commits to
-   `frontend-rebuild`, NOT `main`** (main holds the workflow files; the job
-   checks out the app branch). The command must be
-   `git fetch origin frontend-rebuild && git log origin/frontend-rebuild
-   --format='%h %an %ad %s' --date=iso --since=2026-07-30T05:00:00Z` — read the
-   FILES, not just the presence of a commit: `public/model/context.json`
-   touched → the window-start stamp SHIFTS to its hash; `data/ump_k.json` only
-   → the pause's git-add drop worked, the stamp STANDS.
-3. Nothing else fires a reading before the 3:30 PM PT visit — stop there; the
-   quota read happens at the visit and stamps its own time.
+**It is larger than props, larger than anything rationed, and it ends the cycle in ~2.5
+days. Both exits die on it before they die on anything measured.**
 
-**[MORNING READ EXECUTED 16:4xZ — LANDED / stamp STANDS / quota 1,238 with a
-~97-credit AMBIGUOUS residual; full record: collection-period, 07-30 MORNING
-COLD READ block.]**
-
-**BOARD 1 — WHAT TODAY'S 22:45Z BOARD SEEDS (added 2026-07-30 ~17Z, owner's
-item 5; every series that begins today, what the board must carry, and the
-absent-reading — a series that silently starts empty is worse than one that
-does not start):**
-| series (board 1 of…) | must carry | if absent |
+**THE SHAPE — STEPPED, NOT CONTINUOUS** (`tools/quota.mjs --series`, from
+`data/quota-log.jsonl`):
+| span | spent | rate |
 |---|---|---|
-| homogeneous window | the echo's priors/ctx hash pair = the PAUSE pair (the straggler did NOT commit — verified 16:4xZ) | echo absent → reading 3 (push didn't land); pair ≠ pause pair → reading 25 (print both, trace) |
-| clamp census + hot-site fidelity | `clampActivity` on the board data (route arms `clampLog` L244) | reading 24 — census stays ZERO, named defect, not silent |
-| config-echo series | the echo object; `selMode:"ev_gated"`; `outsSusp === null` (pre-ship) | readings 3 + 25 |
-| trigger-mark series | `gen.trigger === "header"` | reading 5 (mark did not land) |
-| cfSel series | cfSel stamp on every susp row — today's susp population = HRR rows ONLY (pre-outs-flag) | reading 4; empty susp population → the HRR-counts third-vacuity branch (reading 9) |
-| same-day fp × predictions | pred rows for 07-30 + the day-file's pre/close rows (3 already) | reading 14's branches |
-| behavioral vintage (4 markets live) | self_consistency + clear-count + Control C | readings 9–12 |
-| luPct/achievable pair | both printed | reading 7 |
-**Chain re-check against this list**: the fourteen steps produce three numbers
-nobody had pre-committed — now written as readings 24–26 below, before
-3:30 PM PT. Everything else lands on readings 3–14.
+| 07-29 12:00Z → 07-30 03:55Z | 215 | 13.5/h |
+| 07-30 03:55Z → 16:45Z | 223 | 17.4/h |
+| 07-30 16:45Z → 07-31 01:25Z | 200 | 23.1/h |
+| **07-31 01:25Z → 04:50Z** | **0** | **0/h** |
+| **07-31 04:50Z → 05:55Z** | **0** | **0/h** |
+**4 h 26 m of exactly zero.** A scheduled job cannot produce that — `props-history` alone
+has four active crons and GitHub's morning batch lands 06:00–08:30Z. **→ THE CLASS IS
+EVENT-DRIVEN, NOT SCHEDULED: it fires when something is USED, not when a clock ticks.**
+The 200-credit window spans the working day (9:45 AM–6:25 PM PT); the flat stretch is the
+night. Corroborated: no 07-31 props file exists and line-history is correctly silent.
 
-**STEP 15 — ADDED 2026-07-30 (owner's item 1, the mode-coverage finding)**: after
-the ev_gated device checks, **switch Settings → `probability` and re-read the
-board's HRR rows and the card**. Expected from the fixture measurement:
-suspension bars do NOT apply there — HRR (and, post-Thursday, outs) legs are
-POOL-ELIGIBLE and can enter the card. Reading: HRR legs present in the
-probability-mode card → M20 confirmed on live production data (the fixture said
-11 pool / 4 FUN); ZERO → the live slate simply carries no qualifying HRR ticket
-that day (NOT evidence the bar applies — print the row population beside it).
-**SEQUENCING (added 2026-07-30, owner's item 1): run step 15 ONLY AFTER the board is
-confirmed present.** `bestBoard()` falls through to a CLIENT GENERATE when neither a
-cached nor a server board exists (`engine-client.ts` L297), and that path writes
-PredRecords to `pl:pred` stamped with the DEVICE's mode — the one write path a
-legacy-mode read could contaminate (it also spends credits). With the 22:45Z board
-present the fallthrough cannot fire. Client rows DO carry `selMode`, so any such row
-is separable after the fact (reading 15's exclusion).
-**OPERATOR RULE #3 (owner's, dated 2026-07-30, beside #1 and #2): the app is NOT
-opened in `probability` or `caesars_ev` at all, for any purpose, until M24 is
-resolved — step 15's diagnostic is the SOLE exception, it runs ONCE, and the return
-to `ev_gated` is the immediately following action.** M24: the belief-sized Kelly
-ceiling is computed in every mode and applied in only two — 11 of 11 legacy tickets
-exceed their own ceiling, 9 of them against a computed ceiling of $0. **And M25: that
-same boolean gates ELEVEN protections — the EV gate, the settlement floor, both
-consensus gates, NO-PLAY, the Kelly ceiling and both halves of the HRR bar — so a
-legacy mode is not "a different ranking", it is the discipline set switched off.**
-**OPERATOR RULE #2 (owner's, dated 2026-07-30, beside the 2% rule): step 15 is a
-DIAGNOSTIC ONLY — the mode returns to `ev_gated` before any slip is placed, and
-`pl_selmode` is VERIFIED to read `ev_gated` as the LAST action before placing.**
-Nothing is staked from a legacy mode; a persisted diagnostic state is exactly how
-this becomes a real-money defect (the Builder's one-tap override sits on the same
-card the slip is placed from).
+**CANDIDATES AND STATUS:**
+| candidate | status |
+|---|---|
+| **`bestBoard` fallthrough** (client generate; `credit-budget.md` L176 prices client generates at 120–240/device/day) | **LIVE, and it fits ~224/day almost exactly.** Settled at zero cost by **reading 15(c)** |
+| **`SharpDesk` on the Board page** — `app/board/page.tsx` L377 mounts it unconditionally; `SharpDesk.tsx` L51–55 `useQuery(loadSharpBoard, staleTime 240_000)`; `sharpBoard.ts` L10/L135 fetches `h2h,totals,spreads × us,eu` | **UNCOUNTED SPENDER, NEW 07-31: 6 credits per Board-page open** outside a 4-minute window. In no ration table |
+| **`useAllStar.ts` L77 / `ufc.ts` L84–86** | **UNCOUNTED**, client-triggered odds fetches through the proxy; `ufc` has a `fresh=1` path that bypasses the cache |
+| props sweeps fetching before the gap decision | **CLEARED 07-31** — decide precedes fetch; the `/events` call at L277 costs ZERO (measured: 1,038 before and after) |
+| `/api/clv` | **CLEARED** — sights only legs of today's locked card; none was locked |
+| `/api/propsnap` | **NO EVIDENCE** — same per-event cost as the sweep, but no snapshot on 07-29 or 07-30 carries `src: "vercel"`, so nothing it captured has ever folded |
+**THE UNGATED SURFACE**: `/api/odds` is ungated except `fresh=1`; `/api/propsnap`'s READ
+is ungated; `/api/board` is deliberately ungated. **A warmup, health check, preview
+deploy or crawler can reach the proxy, and any Board render by anything pays the
+SharpDesk 6.** No allow-list, no referer check.
+**WHAT WOULD SETTLE IT, in order**: (1) **reading 15(c)** — `src:"client"` rows in
+`pl:pred` for 07-29/07-30, zero credits, curl above; (2) a **Vercel function-log read**
+(dashboard-only, owner's screen) — per-invocation URLs are the one-read attribution;
+(3) spec'd, not shipped: a one-line `console.log` per upstream call in the proxy, turning
+that log into a per-request ledger.
+**Impossible branch CHECKED, does not fire**: known jobs at measured rates sum to
+~252/day against ~476 observed — nothing double-counted; the 2.5-day figure is not wrong
+in the owner's favour.
 
-**TONIGHT'S BOARD — WHAT IT IS AND WHAT IT CANNOT SUPPORT (2026-07-30 final)**:
-it IS **board 1 of the homogeneous window** — `data/ump_k.json` moved this morning
-(`8f8e8c8`, 07:43Z) but is NOT an engine input (four-step trace + the pinned-off
-`umpKFrozen` factor; collection-period, ump_k block), and `context.json` stayed
-frozen at the pause pair. **One line on what it cannot support regardless of
-outcome: it cannot certify the suspension in any mode but `ev_gated`, and it cannot
-certify the outs flag at all because the flag does not exist yet — and it cannot observe `mktN` (not in the echo), so the
-consensus-gate crossing is readable only as the blocked-reason proxy (reading 29),
-nor can it see any legacy-mode exposure, since the server builds in `ev_gated` and
-legacy modes stamp zero susp rows, and it cannot SIZE the counterfactual — cfSel
-records whether a suspended row would have been selected AND — as of this afternoon's
-ship — its counterfactual `rank` and `stake`, but that counterfactual runs the SHIPPED
-allocator, so it inherits M14 (non-monotone, cap-bound, prob-ranked)** — the
-board's tickets are built under the server's pinned mode, so the zero-HRR-legs
-half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
-modes); step 15's diagnostic read is the only cover for the other three, and it
-is a device read, not a server certification.
+## 3. RUN SHEET
 
-**TONIGHT'S SHIP SEQUENCE (owner-authorized 2026-07-30; strict order)**:
-1. the board fires 22:45Z → the fifteen steps → **all readings on disk**;
-2. THEN the outs build — and `docs/pitcher-outs-audit.md`'s coverage-gap record is
-   written FIRST (it is: "THE FLAG'S OWN COVERAGE GAP", with the measured 10
-   legacy-mode outs legs beside it — the owner's non-optional first condition);
-3. the build commit flips BOTH `it.fails` halves and keeps the scope-by-diff
-   invariant GREEN — red there STOPS the ship and outs reopens unflagged Friday
-   (pre-committed, and fine);
-4. it regenerates `legacy-src.gen.ts` (the engine string MOVES), sets
-   `tests/served-verification.json` `pending: true` with today's timestamp, and
-   updates `SERVED_ENGINE_SHA_VERIFIED` to the new runtime hash;
-5. post-deploy: re-grep the served chunk, confirm runtime === served, clear the
-   marker — **inside 24h, now enforced by the resolution guard**.
-**Friday is a TWO-VINTAGE board** (the engine ship + the K's/outs `consMinEv`
-reopen): outs-, K's- and allocation-level series restart at board 1; the row-level
-clamp census and the `self_consistency` identities CARRY ACROSS (collection-period,
-WHAT FRIDAY'S DOUBLE VINTAGE EVENT COSTS SERIES A).
+**THE GO/NO-GO GATE (above, verbatim): no board fires until §2 resolves.**
 
-**Pre-fire quota read + cost bracket (reading 26)**: read immediately before the
-22:45Z fire and again after; expected board cost **~55–60 at 6 events**
-(delta/events ∈ [5,8] = PASS). **Re-projected 22:30Z quota: ≤ ~1,180**
-(16:4xZ read 1,238 − the 17Z sweep ~36–60 − the CLV path's pre-committed ~60/day
-share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
+**THE TWO PHRASE-CURLS**: `/api/ledger` and `/api/predictions?date=` — the owner types
+the phrase; it never enters a script.
 
-## 3. OPEN PRE-COMMITTED READINGS (verbatim-or-cited; COUNT: 28 — 23 at the
-## 07-30 compaction handoff + 24–26 added ~17Z (owner's item 5) + 27–28 added
-## ~18Z (owner's items 4 and 1))
+**THE FOUR TOOLS, by path, with what each replaces:**
+| tool | replaces |
+|---|---|
+| `tools/quota.mjs` | the hand-run quota curl. Free read + APPEND-ONLY `data/quota-log.jsonl`; `--series` prints the burn series. **The series is now the artifact — one window can never again be generalised to a day** |
+| `tools/ledger-report.mjs <saved-export.json>` | reading 15 whole: overstake vs each ticket's own `shKellyFrac` ceiling (zero floor included), the $0-ceiling census, the HRR 46.3/59.2 join, the per-field census by date. **Prints a STOP if any overstaked row carries `selMode: "ev_gated"`** |
+| `tools/board-report.mjs <board.json>` | chain steps 6–8 and readings 24/25/26/29. **Prints the outs VACUITY BRANCH FIRST** |
+| `tools/burn-report.mjs --props <dir> \| --pred <file>` | the burn attribution (props cost from the ARCHIVE, residual as a NAMED UNKNOWN) and reading 15(c)'s `src`×`selMode` census |
+| `tools/verify-served-engine.mjs --chunk <chunk.js>` | the STEP-0 re-grep. Double anchor; reports a proper substring as an EXTRACTION DEFECT, never as a divergence |
+
+**THE FIFTEEN CHAIN STEPS, in order** (steps 1–14 verbatim from the 07-30 run sheet;
+step 15 added with operator rules #2/#3): slate count printed → the owner's go/no-go →
+quota READ (`node tools/quota.mjs`) → board (cron preferred, curl fallback) → quota READ
+→ `gen=list` → **echo present in the response body** (absent → the push did not land) →
+**cfSel stamp on every suspended row** (absent → did not land) → `self_consistency`
+(**`python3 tools/self_consistency.py`**): zero TB≥1==H≥1 violations, zero HRR legs in
+built tickets, BOTH population sizes printed (zero-over-empty is not a pass) →
+app-switcher double reopen → HRR rows present AND greyed → replay dump + ParlayPred
+membership diff → Control C's production predictions vs the pre-commitments → ticket
+count vs both pre-commits → **step 15: the legacy-mode diagnostic read, ONCE, gated on
+the board being confirmed present, with the mode returned to `ev_gated` as the
+immediately following action.**
+
+**T = 0.80 AND ITS BRANCHES**: board achievable ≥ 0.80 → composition readings VALID;
+below → **engine-half only** (echo, cfSel, self_consistency, greyed rows, replay+join —
+no composition or cap-binding reading). Impossible: 22:00Z ≥ 0.80 (projected 0.50) →
+re-derive. T is the 42nd parameter, owner-chosen before any board's number was known.
+
+**CRON STATE AND THE OWNER'S TWO EDITS**: **header `x-cron-key` on ENTRY 1 ONLY**
+(entries 2–4 stay UNHEADERED and keep 401'ing at zero cost — they are weekend-only:
+Sat `0 18 * * 6`, Sun `0 17 * * 0`, Sun `30 22 * * 0`) **AND entry 1 →
+`45 22 * * 1-5`.** All four call `GET /api/generate`. **Neither edit is confirmed
+landed** — the 07-30 fire produced no board and branches (b) 401 and (d) no-execution are
+indistinguishable from this repo; the cron-job.org execution log is the owner's
+distinguisher. **The four 200-without-a-board bodies to match it against**:
+`{"ok":true,"skipped":"ran recently"}` (45-min limiter, L127) · `{"ok":true,"skipped":
+"dead-slate",…}` (board-store L161) · the good-board skip's `low-ceiling` /
+`no-games-left` / `covered` / `thin` (L169–180) · and the only post-spend one,
+`{"ok":true,"date":…,"logged":0,"note":"no pregame picks (off day or slate underway)"}`
+(L387). A 401 body is `{"error":"unauthorized"}`. **No run slot was consumed for 07-30**
+(`INCR` sits past every free exit).
+
+**THE PLACEMENT CHECKLIST — what the owner checks before placing a slip** (full text:
+collection-period, THE PLACEMENT CHECKLIST). In order; any single failure is a STOP for
+that ticket, items 1 and 5 are stops for the whole card:
+1. **`pl_selmode` reads `ev_gated`**, verified as the LAST action before placing.
+2. **No single slip above 2% of bankroll = $50 at $2,500.**
+3. **Stake vs its own displayed Kelly — if stake > kelly, the ticket is NOT placed**,
+   regardless of what the card says.
+4. **A missing Kelly badge combined with a stake at the structural cap** → back to item 1
+   (that combination is the signature of a ceiling-free mode).
+5. **The card's mode provenance** — the board is built server-side in `ev_gated`; the
+   card is computed on the device in the DEVICE's mode.
+**Pre-committed**: any ticket exceeding its own displayed Kelly → **not placed**, and
+recorded as a DISCIPLINED-MODE overstake, which would **contradict the measured 1.00× on
+all six disciplined tickets** and become an M-item that outranks the card. Empty card →
+**NO-PLAY with a printed cause** (BlockedPanel and the rebuild note are both ungated).
+
+## 4. OPEN PRE-COMMITTED READINGS (verbatim; COUNT: 29)
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
 2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
@@ -483,6 +228,8 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     the same legs → 59.2 ±0.05 pp; subsets printed: rung 0.5 (12/19 = 63%
     expected), rung ≥1.5 (32% expected). If the headline pair misses, try the
     two written variants IN ORDER — core-only tickets; then won/lost/push
+    denominators — and print WHICH variant matched (a provenance RECOVERY,
+    labeled); no variant → provenance UNESTABLISHED, printed.)
     (ADDED 2026-07-30, owner's item 2 — THE MODE SPLIT: print `selMode` and
     `overrode` PER ENTRY, count entries where the field is ABSENT, and split the
     38 tickets by mode {ev_gated, dk_fd, probability, caesars_ev, ABSENT}. Any
@@ -536,8 +283,6 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     census by date. The curl is written out there; **Josh types the phrase**.
     Impossible branch: a ratio > 1 on a row whose `selMode` reads `ev_gated` → the
     ceiling failed INSIDE the disciplined branch — STOP.)
-    denominators — and print WHICH variant matched (a provenance RECOVERY,
-    labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
     the ledger by hand (collection-period, export block).
 17. HRR suspension review: at the READ quota (1,461) board-only = 9.74 board-days —
@@ -630,53 +375,86 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     per market against `consMinN = 100`. Absent → the mktN echo did not land and the
     blocked-reason proxy is the only reading.)
 
-## 4. GIT AND ARTIFACT STATE
+## 5. GIT AND ARTIFACT STATE
 
-- Branch `frontend-rebuild`: **pushed head `315e0d4`** (2026-07-30 ~05:5xZ,
-  owner-authorized after its own file audit: docs-only — collection-period +
-  this file; engine-echo guard green immediately pre-push; origin verified
-  carrying `315e0d4a56c0d287d79890a4ad34b8477a0390e2`. The earlier push the same
-  night carried `e4e7bd1`+`8ca4d1b`, same standard.) Runtime-touchers this
-  session remain: `0914eeb` cfSel, `9753fb9` echo, `4c036ba` mark. **HELD:
-  nothing — the held stack was REBASED onto the bot's `8f8e8c8` and pushed
-  2026-07-30 ~18Z (the rebase renamed it; the sha-reference guard exists for
-  exactly this, so no doc cites the pre-rebase ids).**
-- **main: pushed `53d0076`** (pause `a46c1f` + props-history concurrency fix; main
-  deploys nowhere — `vercel.json` `main: false`).
-- Served artifact: chunk `256-171aff5d10da160d.js`; engine string 280,466 chars,
-  sha256 `f6cf15130a8beddf87aa761db68aea9ca3b4ac8a0dd65b138cf11994e4d98e5b` — last
-  re-extracted and matched **2026-07-30 post-4c036ba-push** (edge cache had not yet
-  cycled at the last probe; the mark is server-route code — its landing evidence is
-  reading #5, not the chunk).
-- The two model files are **NOT gitignored and never were**: tracked, bot-committed
-  (priors nightly, context 2×/day; latest at pause time priors `00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e` / context `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`, local ≡ origin); production reads its own deployment's
-  committed statics; tests read fix45 static snapshots.
-- **The bot pause (`a46c1f`, on main)**: froze the priors.json + context.json
-  WRITERS; `ump_k.json` keeps accruing; ONE pre-pause-queued context run may still
-  commit (~06–08:30Z) — the window-start stamp is conditional on it
-  (collection-period, pause block). The pause did NOT need to freeze anything for
-  the fixture bar (orthogonality block); it buys one data vintage for the parameter
-  exit's cross-day paths.
-- props-history: main's copy (the firing one) = OLD TEN-CRON + the concurrency fix;
-  the 07-27 three-cron+wait redesign never fired (frontend-rebuild only);
-  convergence = owner's call, spec-only. Executing script = frontend-rebuild's pull,
-  both copies sha256
-  `01b8231b9fc43e3f05a14cb31203eb1c68dd9c243fee84b4fc095b381103b828`, MIN_GAP inside.
+- **Branch `frontend-rebuild`: origin head `17a68ee`**
+  (`17a68ee357ab9b0eeb6708423b4df61d40cabb79`, verified by `git ls-remote` this turn).
+  **Working tree clean, nothing held** — `git status -sb` reads
+  `## frontend-rebuild...origin/frontend-rebuild` with no ahead/behind.
+- **main: `53d0076`** (`53d0076c893b3bab46f4eeb5f3f4367e6aa385f8`) — the pause commit
+  plus the props-history concurrency fix. **main deploys nowhere** (`vercel.json`
+  `main: false`).
+- **Served artifact: chunk `256-7cc559a830020345.js`** (renamed from
+  `256-171aff5d10da160d.js`, which is itself the evidence the deploy landed). Engine
+  string **281,096 chars**, sha256
+  **`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`** —
+  **byte-identical to the repo, verified 2026-07-31 ~04:5xZ** with
+  `tools/verify-served-engine.mjs` (exit 0, MATCH).
+- **THE OUTS FLAG IS SHIPPED AND LIVE IN PRODUCTION** (four functional edits verified
+  present in the served bytes) **AND UNEXERCISED ON A REAL BOARD** — no board has fired
+  since it deployed.
+- **PENDING-LIVE-VERIFICATION: RESOLVED** — `tests/served-verification.json` reads
+  `pending: false`, `since: 2026-07-31T04:55:00Z`, with the confirmation in its note.
+  The guard goes green ON RESOLUTION, not on removal (with `pending:false` it also
+  requires committed === served; deleting the file makes it throw).
+- **The two model files are NOT gitignored and never were**: tracked, bot-committed;
+  the pause-time pair is priors
+  `00994434be42196b67233ed1663ded2f0651b863434f537cd611da108ca0374e` / context
+  `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`.
+- **THE BOT PAUSE — WHAT IT ACTUALLY FROZE**: it dropped `public/model/context.json`
+  from `context.yml`'s `git add` (so the context artifact is frozen at `64c42ad`,
+  2026-07-29 20:32Z) and **`data/ump_k.json` keeps accruing by design**. **⚠️
+  `model.yml`'s cron reads ACTIVE in the file today (`30 9 * * *`)** — the pause is
+  described in this doc's history as disabling it; **the file says otherwise**, and
+  whether priors.json is still being committed is resolved by
+  `git log origin/main -- public/model/priors.json`.
+- `data/ump_k.json` crossed its self-arm threshold on 2026-07-30 (**Lance Barrett, g 4→5
+  — the first umpire ever**), double-braked by the frozen carrier and
+  `SH_CFG.umpKFrozen: true`; pinned by `tests/self-arm-stamp.test.ts`.
 
-## 5. FROZEN TABLE AND CENSUS (v2.3, collection-period)
+## 6. JOB INVENTORY — DERIVED FROM FILES THIS TURN
 
-**42 parameters / 0 fitted / 41 chosen (12 with no stated rationale) / 1
-stated-arithmetic; 9 since-measured.** Additions this session: the simJoint clamp
-0.25–4× (v2.1, never binds on n=1 board), the 1/n cap relax (v2.2, ladder measured),
-T = 0.80 (v2.3, owner-chosen pre-data). **Named
-unmeasured-with-measured-consequence: `coreEvMin` (self-graded sweep), damping 0.5
-(40 bp range), `SH_W` (sweep self-graded by construction), the 1/n relax (the
-10%/5%/3.33%/2.5% ladder — narrowed same day: Kelly ceilings bound n=1 at ≤ ~8% and
-under-deploy thin cards, $49-of-$250 measured; 10% reachable only legacy/override).**
-Operator rule (NOT an engine parameter, distinct by design): **no single slip above
-2% of bankroll ($50)** — binding on 7 of 10 measured cards; 3 of 10 sat under $50.
+| workflow | active crons (UTC) | docs claimed | reaches Odds API | cost |
+|---|---|---|---|---|
+| `props-history.yml` | **`0 13`, `0 17`, `0 23`, `0 3`** (four) | "ten-cron" / "three-cron+wait" — **BOTH WRONG** | YES | ~6 × unstarted events; `0 3` is `--fold-only`, free |
+| `board-archive.yml` | `0 12`, `0 19` | — | reads `/api/board` only | **0** (its own header L12–13) |
+| `context.yml` | **`0 17`, `30 22`, `0 12`** (three) | "two" — **WRONG** | no | 0 |
+| `model.yml` | **`30 9` — ACTIVE** | "paused/disabled" — **CONTRADICTED BY THE FILE** | no | 0 |
+| `hr-overround.yml` | `0 15 * * 0` | — | no | 0 |
+| `ufc.yml` | `0 15 * * 3`, `0 15 * * 6` | — | no (the client path spends) | 0 |
+| `line-history.yml` | **NONE — disabled 2026-07-31** | hourly | (was YES) | 0 |
+**Routes reaching the Odds API**: `/api/odds` (proxy; `APP_PASSCODE` gates `fresh=1`
+only) · `/api/generate` (`cronHeaderAuthed`/`syncAuthed`) · `/api/clv` (`syncAuthed`) ·
+`/api/propsnap` (write gated, **READ UNGATED**).
+**Client-side proxy callers (none in any ration table)**: `src/engine2/sharpBoard.ts`,
+`src/lib/useAllStar.ts`, `src/lib/ufc.ts`, `src/lib/fetcher.ts`.
+**Archive-vs-schedule discrepancy (impossible branch, FIRES)**: the workflow declares 4
+crons; the archive shows **5 snapshots on 07-30 and 10 on 07-29** — GitHub delivers each
+cron more than once per batch, and MIN_GAP dedupes the PAYMENT, not the delivery.
 
-## 6. INSTRUMENT LEDGER (what each sees, is blind to, and carries)
+## 7. FROZEN TABLE, CENSUS, AND THE FOUR JUSTIFICATIONS
+
+**Census v2.3: 42 parameters / 0 fitted / 41 chosen (12 with no stated rationale) / 1
+stated-arithmetic; 9 since-measured.** (Sourced from collection-period; note the same doc
+carries an earlier v1 line reading "38 CHOSEN (11 …)" at L16 — the v2.3 block supersedes
+it and says so.)
+**Unmeasured-with-measured-consequence**: `coreEvMin` (self-graded sweep) · damping 0.5
+(40 bp range) · `SH_W` (sweep self-graded by construction) · the 1/n cap relax
+(10%/5%/3.33%/2.5% ladder; Kelly ceilings bound n=1 at ≤ ~8%) · **`umpKFrozen`** (replay
+07-30: 8 of 18 K/outs rows move, max 16 pp, and the emitted card CHANGES) ·
+**`penQFrozen`** (M23: 16 of 173 rows move, max 15.1 pp, card identical).
+**Operator rules** (NOT engine parameters): **#1** no slip above 2% ($50 at $2,500) ·
+**#2** step 15 is diagnostic only, mode returns to `ev_gated` as the last action before
+placing · **#3** no legacy mode opened at all until M24 resolves.
+**THE FOUR JUSTIFICATIONS RESTING ON MECHANISM:**
+| # | claim | status |
+|---|---|---|
+| 1 | the reopen deadline's premise "weakened because accrual was zero" | **UNRUN** — a `mktN` read settles it (reading 29, now on the board via the echo). Zero credits. Nothing ships on it |
+| 2 | M6's consequence for ticket quality | **UNREACHABLE this cycle** — needs a board and a ship. Demoted to reasoning, dated 07-31 |
+| 3 | M16's "damping 0.5 doesn't compensate" | **UNREACHABLE STRUCTURALLY** — needs an evaluator that prices across-ticket dependence, **which does not exist**; the ρ-stress harness prices dependence at a STATED ρ and cannot tell us what ρ is. **The damping row carries the marker until such an instrument is built.** Gates the frozen table |
+| 4 | the 08-15 review's premise (46.3/59.2) | **UNRUN, NOT UNRESOLVABLE** — the ledger export settles it and costs only the phrase |
+
+## 8. INSTRUMENT LEDGER
 
 - **Exact E[ln] evaluator** (`growth`, 2^n at chosen stakes): sees chosen-stake
   outcomes under a stated belief; BLIND to across-ticket dependence (product measure
@@ -710,31 +488,43 @@ Operator rule (NOT an engine parameter, distinct by design): **no single slip ab
   early generation (both go to 0 together); replaced by `achievable ≥ T`, T = 0.80.
 - **The free quota read** (`/v4/sports` through the odds proxy): exact, zero
   credits, headers passed (route L51–55).
+- **`tools/verify-served-engine.mjs`** (NEW 07-31): sees the served engine string via a
+  DOUBLE ANCHOR (the facade call `)(r,'` + the engine's escaped opening bytes, both
+  unique); blind to the server bundle (only the echo closes that). Reports a proper
+  substring as an EXTRACTION DEFECT, never as a divergence.
+- **The four chain tools** (`quota` / `ledger-report` / `board-report` / `burn-report`,
+  NEW 07-31): see what the prose steps saw, but leave an artifact. `quota.mjs`'s
+  append-only log makes the burn a SERIES rather than two point reads.
 
-## 7. POSITION
+**⚠️ THE CHAIN IS A CHECKLIST, NOT AN INSTRUMENT SUITE: 3 of 15 steps are versioned
+tools, 12 are prose.** Prose steps whose output OTHER numbers depend on — the class that
+matters — are the quota read, readings 15, 15(c), 29 and 26, and the three landing
+verdicts (steps 7, 8, 25). Steps 1, 2, 4, 10, 11, 15 are tasks, not instruments.
+**FIVE INSTRUMENT DEFECTS, all found by an instrument doing its job badly rather than by
+a model error**: (1) the cfSel spec's vacuity; (2) the lineup guard's wrong direction;
+(3) the scope-by-diff comparator's header/code disagreement; (4) the line-number-keyed
+site ids; (5) the served extractor's false mismatch (278,267 vs 281,096 — a 1% miss, the
+first PLAUSIBLE one). **The pattern is explicit: in this project instruments fail more
+often than analyses, and they fail by returning plausible numbers.**
 
-- **Quota: READ 1,238 remaining / 18,762 used — 2026-07-30 16:4xZ** (updated;
-  the ~03:5xZ read was 1,461/18,539, its delta 215 attribution-closed within 1).
-  The 16:4xZ delta of 223 splits: ~126 attributed (two MIN_GAP-spaced pre
-  sweeps ~120 + two line ticks ~6) + **~97 AMBIGUOUS residual** — no git trail;
-  likely the Vercel-side CLV capture path (spends at capture, commits at the
-  fold); disambiguators pre-committed (tonight's fold / Vercel logs / Odds
-  dashboard) — collection-period, MORNING COLD READ block. The exact minute of
-  the 07-29 morning read remains IN-CONTEXT-ONLY-UNVERIFIED, inherited.
-- **Board-days: 1,238 / 150 = 8.25** (restated from 9.74 at the 03:5xZ read);
-  the ≥10 threshold stays NOT reachable under any cadence; the 08-15 HRR
-  suspension review stays UNREACHABLE without a reset (written in advance).
-  Today's board cost ~55–60 (projected; settled by reading 26's bracket).
-- **Homogeneous window: COUNT ZERO** (opened at the pause; 07-29 produced no board;
-  the first member is the 07-30 board under either definition; conditional on the
-  one queued straggler context commit).
-- **Both exits: TWO EXITS, BOTH UNREACHABLE THIS CYCLE WITHOUT A RESET** — the
-  parameter exit for credits (~13.5k needed to 09-22 vs 1,461), the bankroll exit
-  for settled-leg volume (per-market N at the ledger rate: 12-pp ≈ 35–40
-  board-days; 3-pp ≈ 100+; the exit's test is POOLED — masking possible). The reset
-  date remains unread; every downstream date ASPIRATIONAL-PENDING-RESET.
+## 9. POSITION
 
-## 8. UNRESOLVED CONTRADICTIONS (both sides on disk)
+- **Quota: READ 1,038 remaining / 18,962 used — 2026-07-31 05:55:44Z**
+  (`data/quota-log.jsonl`, live read this turn). **Unchanged across three reads spanning
+  4 h 26 m** — the flat that establishes the event-driven shape.
+- **Burn ≈ 422/day** (props ~198 measured + ~224 unattributed; line-history now 0).
+  **RUNWAY ≈ 2.5 DAYS.** ⚠️ Every runway/burn figure written before 2026-07-31 is
+  superseded (§1).
+- **Board-days: 1,038 / 150 = 6.9** at a full slate, ~17 at an evening 6-event board's
+  ~60 — but the RUNWAY IN DAYS, not the board count, is what binds.
+- **Homogeneous window: COUNT ZERO.** 07-29, 07-30 and 07-31 all produced no board —
+  **three consecutive dark board-days.**
+- **Both exits: UNREACHABLE THIS CYCLE WITHOUT A RESET.** The parameter exit needs
+  ~13.5k credits to 09-22 against 1,038; the bankroll exit needs per-market settled-leg
+  volume (12-pp ≈ 35–40 board-days, 3-pp ≈ 100+) and its test is POOLED, so one market's
+  miss is maskable. **The reset date remains unread — owner's Odds-API dashboard only.**
+
+## 10. UNRESOLVED CONTRADICTIONS (both sides on disk)
 
 1. `docs/singles-vs-parlays.md` Correction-4 tail ("the A1+A2 pair addresses M14's
    two halves") vs the same file's REFINEMENTS + bundle M14 row ("A2 innocent of
@@ -749,8 +539,13 @@ Operator rule (NOT an engine parameter, distinct by design): **no single slip ab
    path's hard-ceilings/unallocated-remainder text (L3105–06) and the measured
    $49-of-$250 under-deployment — design supersession never reconciled in the
    golden-rules text.
+6. `docs/collection-period.md` L16 ("38 CHOSEN (11 with no stated rationale)") vs the
+   v2.3 census block ("41 chosen (12 …)") — the later block supersedes, but the earlier
+   line is still present and unmarked.
+7. This doc's own pause description ("froze the priors + context WRITERS") vs
+   `.github/workflows/model.yml`, whose `schedule:` block reads ACTIVE (§5, §6).
 
-## 9. NOT ON DISK (missing input → how obtained)
+## 11. NOT ON DISK (missing input → how obtained)
 
 - Ledger contents (the "38", HRR populations, any triplicate member): `pl:ledger:v1`
   + sync phrase → the export curls (collection-period).
@@ -764,8 +559,12 @@ Operator rule (NOT an engine parameter, distinct by design): **no single slip ab
   does not yet carry them (noted in the bundle).
 - Whether Josh's two cron-job.org edits landed: the 22:45Z fire itself (branch (d)).
 - Upstash retention policy: dashboard.
+- **Which spender accounts for ~224/day**: `pl:pred` `src:"client"` census (reading
+  15(c), phrase) and the Vercel function log (dashboard).
+- **Whether the owner's two cron-job.org edits landed**: the cron-job.org execution log
+  (owner's screen) — the repo cannot distinguish a 401 from a non-execution.
 
-## 10. DO-NOT-REDERIVE (read, don't recompute)
+## 12. DO-NOT-REDERIVE (read, don't recompute)
 
 - Shade/shrink/blend sweeps, the full grids + composition: bundle (FULL GRID,
   SHRINK, BLEND blocks) + `tests/a1-shade.test.ts` / `a1-shrink.test.ts` /
@@ -786,13 +585,19 @@ Operator rule (NOT an engine parameter, distinct by design): **no single slip ab
   07-29 handoff — unchanged locations).
 - force-flag audit (three bypasses), trigger-mark rationale: collection-period +
   `tests/trigger-mark.test.ts` header.
+- Burn series and per-day attribution: `data/quota-log.jsonl` + `tools/burn-report.mjs`
+  (do not re-derive by hand — that is what produced the ~4× error).
+- The served-engine verification: `tools/verify-served-engine.mjs` (do not re-type an
+  extractor — that is what produced the false mismatch).
 
-## 11. PROTOCOL
+## 13. PROTOCOL
 
-Josh relays paste blocks between two sessions and is not the operator — no side
-tasks, no explanations addressed to him, no decisions on his behalf. Standing rules
-live in `CLAUDE.md` (pointer, not copy). **First action after compaction: re-read
-this file and `CLAUDE.md`, confirm the held sha resolves (`git log --oneline -3`),
-print the current chain step AND tomorrow's next deadline in PT (the 3:30 PM PT
-cron-job.org visit, unless the clock has passed it — then the 3:40–4:05 PM PT curl
-window), and STOP.**
+Josh relays paste blocks between two sessions and is not the operator — no side tasks, no
+explanations addressed to him, no decisions on his behalf. Standing rules live in
+`CLAUDE.md` (pointer, not copy).
+
+**First action after compaction: re-read this file and `CLAUDE.md`, confirm the origin
+sha resolves (`git ls-remote origin refs/heads/frontend-rebuild` → `17a68ee`), then
+print — (1) the open-readings count (29), (2) the quota reading with its timestamp
+(1,038 / 18,962 at 2026-07-31 05:55:44Z), and (3) the go/no-go gate (NO BOARD FIRES until
+the ~224/day resolves; reading 15(c) first). Then STOP.**
