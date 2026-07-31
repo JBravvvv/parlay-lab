@@ -93,6 +93,21 @@ bled. O0.5 went 12/19 (63%) and stayed active, tagged **watch** — ~~stays~~ **
 > numbers. The export must REPRODUCE both from the per-market join (the exact
 > join: `docs/session-handoff.md` reading 15) or the figures' provenance stands
 > unestablished and the suspension rests on a number we cannot re-derive.
+>
+> **AND THE SECOND OBSTACLE, NAMED 2026-07-30 (owner's item 3)**: the days that fund
+> this figure (07-17 → 07-22) predate the ledger's `selMode` field (added 2026-07-24,
+> `70dfa8e`) and mostly predate `overrode` (07-19), so **mode is unfalsifiable across
+> exactly these rows**, and the legacy modes carry no HRR bar — measured the same day:
+> under `caesars_ev` an H+R+RBI O1.5 parlay sits at rank 1 of the card at $62. **If the
+> export reproduces 46.3/59.2 with mode null throughout, then: the number is real and
+> its population is uninterpretable with respect to the discipline that was supposed to
+> produce it.** A hit rate over a population that may mix disciplined and undisciplined
+> selection **cannot support a market suspension as a calibration finding — it can
+> support a flag for investigation**, which is a weaker object than what this
+> suspension was justified by. No independent source can date-attribute those tickets
+> to a mode (`pl_selmode` keeps no history, the entry carries no app version, the
+> prediction store's `selMode` starts at the same deploy) — **the attribution is
+> unrecoverable, not merely off-disk.**
 
 > **THE λ* READING, CONFIRMED AND RECORDED (2026-07-30, owner's item 4 — a
 > bankroll-relevant statement available with no ledger read, scoped to HRR)**:

@@ -143,11 +143,18 @@ describe("sha+config echo", () => {
     );
     for (const k of ["engineSha", "priorsSha", "ctxSha", "hrrAltMax", "coreEvMin", "coreCzEvMin",
       "consMinN", "consMinEv", "coreMaxLegs", "maxCoreTickets", "coreMaxDec", "perParlayCap",
-      "kellyStakeMult", "dailyBankrollCap", "selMode", "outsSusp", "damping", "cfSelEnabled"]) {
+      "kellyStakeMult", "dailyBankrollCap", "selMode", "outsSusp", "mktN", "damping", "cfSelEnabled"]) {
       expect(k in e, `echo field missing: ${k}`).toBe(true);
     }
     expect(() => JSON.stringify(e)).not.toThrow();
     // absent config key echoes null, never undefined (undefined would vanish in JSON)
     expect(e.outsSusp).toBeNull();
+    // mktN rides through verbatim when present (the route sets cfg.mktN from the
+    // calibration store) — this is the reopen clock's only on-board witness
+    const withN = buildEcho(
+      { selMode: "ev_gated", mktN: { batter_hits: 117, pitcher_strikeouts: 62 } },
+      { priorsSha: null, ctxSha: null, cfSelEnabled: false },
+    );
+    expect(withN.mktN).toEqual({ batter_hits: 117, pitcher_strikeouts: 62 });
   });
 });

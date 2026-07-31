@@ -216,6 +216,12 @@ PredRecords to `pl:pred` stamped with the DEVICE's mode — the one write path a
 legacy-mode read could contaminate (it also spends credits). With the 22:45Z board
 present the fallthrough cannot fire. Client rows DO carry `selMode`, so any such row
 is separable after the fact (reading 15's exclusion).
+**OPERATOR RULE #3 (owner's, dated 2026-07-30, beside #1 and #2): the app is NOT
+opened in `probability` or `caesars_ev` at all, for any purpose, until M24 is
+resolved — step 15's diagnostic is the SOLE exception, it runs ONCE, and the return
+to `ev_gated` is the immediately following action.** M24: the belief-sized Kelly
+ceiling is computed in every mode and applied in only two — 11 of 11 legacy tickets
+exceed their own ceiling, 9 of them against a computed ceiling of $0.
 **OPERATOR RULE #2 (owner's, dated 2026-07-30, beside the 2% rule): step 15 is a
 DIAGNOSTIC ONLY — the mode returns to `ev_gated` before any slip is placed, and
 `pl_selmode` is VERIFIED to read `ev_gated` as the LAST action before placing.**
@@ -232,7 +238,9 @@ outcome: it cannot certify the suspension in any mode but `ev_gated`, and it can
 certify the outs flag at all because the flag does not exist yet — and it cannot observe `mktN` (not in the echo), so the
 consensus-gate crossing is readable only as the blocked-reason proxy (reading 29),
 nor can it see any legacy-mode exposure, since the server builds in `ev_gated` and
-legacy modes stamp zero susp rows** — the
+legacy modes stamp zero susp rows, and it cannot SIZE the counterfactual — cfSel
+records WHETHER a suspended row would have been selected (`pool`/`card`) but not at
+what rank or stake** — the
 board's tickets are built under the server's pinned mode, so the zero-HRR-legs
 half covers one mode only (the TB≥1==H≥1 identity is board-level and covers all
 modes); step 15's diagnostic read is the only cover for the other three, and it
@@ -347,6 +355,17 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     (d) the `v`-FIELD CENSUS: how many entries carry `grading.v: 2`, and whether
     any sits in 07-17→07-22 — expected NONE by market (M22 touches only
     `ml_home`/`rl_home` legs), so a hit there contradicts the scoping.)
+    (ADDED 2026-07-30 late, owner's item 1 — THE REALIZED-OVERSTAKE QUERY, which
+    needs NO `selMode` and so is NOT blocked by the pre-07-24 blind span: for each of
+    the 38 placed tickets recompute its own ceiling as `round(kellyStakeMult ×
+    entry.bankroll × max(0, min(0.25 × kelly(prob/100, czDec), 0.02)))` — `prob` and
+    `czDec` present since 2026-07-11, `kellyStakeMult` = 4 frozen — and print: how
+    many tickets exceeded their ceiling, the ratio distribution and max, and how many
+    carried a $0 ceiling yet were staked. **A ratio > 1 is only reachable in a legacy
+    mode or under `force`, so a realized overstake DATES the discipline of the row
+    that carries it** — the indirect answer to the mode question. Any realized
+    overstake → a realized defect inside the bankroll exit's own population, and it
+    outranks the board.)
     denominators — and print WHICH variant matched (a provenance RECOVERY,
     labeled); no variant → provenance UNESTABLISHED, printed.)
 16. Triplicate-membership check inside the export read: leg-set match → M19 reached
@@ -431,6 +450,13 @@ share still to fall). **Runway at that figure: ~7.9 board-days** (1,180/150).
     calibration read settles it. **Friday's K's/outs "reopen" IS this same crossing**
     — if the gate still blocks K's/outs tickets Friday, the reopen is PARTIAL, the
     engine is running the stricter regime, and every Friday reading says so.
+    (EXTENDED 2026-07-30: print **per-market blocked-reason counts** so the
+    `consensus` count is visible whether or not it is zero — a zero beside a non-zero
+    pool count is evidence, a zero alone is not. **AND `mktN` NOW RIDES THE ECHO**
+    (shipped this afternoon: additive, echo-only, zero credits, no engine-string
+    change), so tonight's board reports the reopen clock DIRECTLY — read `echo.mktN`
+    per market against `consMinN = 100`. Absent → the mktN echo did not land and the
+    blocked-reason proxy is the only reading.)
 
 ## 4. GIT AND ARTIFACT STATE
 

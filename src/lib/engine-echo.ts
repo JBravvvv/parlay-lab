@@ -54,6 +54,12 @@ export type BoardEcho = {
   outsSusp: unknown;
   damping: number | null;
   cfSelEnabled: boolean;
+  /** graded legs per market at arm time — the COUNT that arms the consensus gate
+      (`small` when `mktN[mkt] < consMinN`). Added 2026-07-30 on the owner's order:
+      the reopen "dates" are accrual PROJECTIONS off this number, it lives only in
+      the server calibration store, and without it on the board the crossing is
+      observable only as a blocked-reason proxy. Echo-only; nothing branches on it. */
+  mktN: unknown;
 };
 
 export function buildEcho(
@@ -78,6 +84,7 @@ export function buildEcho(
     dailyBankrollCap: g("dailyBankrollCap"),
     selMode: g("selMode"),
     outsSusp: g("outsSusp"),
+    mktN: g("mktN"),
     damping: DAMPING,
     cfSelEnabled: x.cfSelEnabled,
   };

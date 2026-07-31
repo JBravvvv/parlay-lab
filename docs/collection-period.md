@@ -6913,3 +6913,187 @@ blocked-reason histogram (reading 29) is the first chance to observe it, and the
 authed calibration read settles it exactly. The impossible branch (`mktN` > 100
 everywhere, so the gate never bound) is **contradicted by the 07-26 archive**, where
 18 tickets were blocked at `consensus` — the gate demonstrably bound eleven days ago.
+
+## M24 — THE KELLY CEILING IS COMPUTED IN EVERY MODE AND APPLIED IN TWO (2026-07-30, owner's item 1; scope MEASURED)
+
+**The mechanism, at three lines — and it is the STRONG form:**
+- **Computed (ceiling application):** `shAllocate` L3113 `var f=shKellyFrac(s.w.pl);`
+  → L3114 `c=Math.min(c,Math.round(kMult*SH.bankroll*f))`. **Guarded** by L3112
+  `if(disciplined&&kMult>0)`, where L3108 `disciplined=((mode==="ev_gated"||basisMode)&&!force)`.
+  So the CEILING is computed and applied only in the disciplined branch.
+- **Computed anyway, every mode:** `shCardCalc` **L3345** calls `shKellyFrac(p.w.pl)`
+  for EVERY pick unconditionally — outside `shAllocate`, after allocation — and stamps
+  **`p.kelly = Math.round(SH.bankroll*f)`** onto the ticket, then sums it into
+  `kellyDaily`. **This runs in all four modes.**
+- **Row level, every mode:** `finalizeCats` L2517/2523/2529 emit `kellyF`, `czKellyF`,
+  `bsKellyF` on every row unconditionally.
+**→ the legacy branch does not "never compute" the number: the engine computes the
+belief-sized stake for every ticket in every mode, ATTACHES it to the ticket, sums it
+into a displayed daily figure — and does not feed it back into sizing.** Computed,
+carried, and dropped. **The owner's first branch fires: M24, the FOURTH
+computed-and-discarded instance** (after `shUmpKf`, `shPenQF`, and — at row level —
+the discarded ceiling itself), and the first one landing on **stake** rather than price.
+
+**THE DISTRIBUTION (armed fixture, DAILY $250, bankroll $750, ratio = stake ÷ its own
+computed ceiling):**
+| mode | tickets | over ceiling | max ratio | rank-1 ratio |
+|---|---|---|---|---|
+| `ev_gated` | 3 | **0 of 3** | **1.00×** | 1.00× |
+| `dk_fd` | 3 | **0 of 3** | **1.00×** | 1.00× |
+| `probability` | 6 | **6 of 6** | **∞** | **∞** |
+| `caesars_ev` | 5 | **5 of 5** | **∞** | **4.77×** |
+**11 of 11 legacy tickets exceed their own computed ceiling. The ceiling is not a
+constraint in those modes at all** — which is now the freeze doc's sentence: **the
+belief-sized constraint exists in exactly half the device-reachable modes.**
+**AND THE ∞ ENTRIES ARE THE SHARPER FINDING, not an artifact**: `shKellyFrac` returns
+`Math.max(0, Math.min(0.25*k, 0.02))`, so a ticket with non-positive Kelly edge has a
+computed ceiling of **exactly $0 — "stake nothing."** Nine of the eleven legacy tickets
+carry a $0 ceiling and are staked anyway, **$2 to $62** (they are the negative-czEv
+ML/RL parlays: czEv −4.5 to −12.5). The $62 HRR ticket at 4.77× is the *mildest* of
+the eleven; the other four caesars_ev tickets are staked $2–$62 against a ceiling of
+zero.
+**IMPOSSIBLE BRANCH — SILENT, and worth stating**: every disciplined-mode ticket sits
+at **exactly 1.00×** — the ceiling binds precisely where we believe it does, on 6 of 6
+disciplined tickets across both modes.
+
+**Is the ceiling computed on BELIEF? YES — and here is the one sentence the owner
+asked for**: `shKellyFrac` prices `shKelly(pl.prob/100, dec)` off the MODEL's own
+probability, so **the disciplined modes are sized by a quantity measurably wrong on
+HRR (46.3% realised vs 59.2% implied), and the legacy modes discard even that wrong
+quantity** — the disciplined path is mis-sized by a known miss, and the legacy path is
+not sized at all.
+
+**Ledger reconstructibility — YES, and it does not need `selMode`**: a locked ticket
+carries `prob`, `czDec`, and `stake`, plus the entry's `bankroll`. `shKellyFrac` is a
+pure function of `(prob, dec)`, and `kellyStakeMult` is a frozen-table constant (4), so
+**the ceiling is recomputable for every one of the 38 tickets from fields present since
+2026-07-11** — the pre-`selMode` blind span does not block this check. **Added to
+reading 15**: how many placed tickets exceeded their own computed ceiling, by how much,
+and how many carried a $0 ceiling. **That query answers the mode question indirectly**:
+a ratio > 1 is only reachable in a legacy mode or under `force`, so a realized
+overstake dates the discipline of the row that carries it.
+
+**OPERATOR RULE #3 (2026-07-30, the owner's, dated beside #1 and #2)**: *the app is not
+opened in `probability` or `caesars_ev` at all, for any purpose, until M24 is resolved.
+Step 15's diagnostic is the SOLE exception; it runs once, and the return to `ev_gated`
+is the immediately following action.*
+
+## THE 08-15 REVIEW READS cfSel, NOT SUSP COUNTS (2026-07-30, owner's item 2)
+
+**The field's shape, from source** (`src/lib/cfsel.ts`, `pred-serialize.ts` L37):
+`cfSel?: { pool: boolean; card: boolean }` — a stamp per suspended row, keyed
+`${gkey}|${lkey}`, recording **(a) `pool`: with the bar lifted, this row's ticket
+entered the candidate POOL; (b) `card`: it survived `shAllocate` onto the CARD at
+`CFSEL_DAILY = 250`.** So it records **counterfactual SELECTION, not merely the gate
+result** — `card: true` means the row would have been bet.
+**What it does NOT record**: rank, stake, or which cap bound it — so the review can
+answer *whether* an HRR leg would have been selected, and cannot answer *how large*
+the position would have been. **That gap is named today, while boards can still be
+changed** (adding rank+stake to the stamp is additive and cheap — spec-only).
+**→ the owner's FIRST branch fires, with the limit attached: the review is rescued on
+selection and remains blind to size.**
+
+**Which does the 08-15 entry currently name? SUSP COUNTS — and that is now corrected**:
+the entry's population line read "shadow rows `susp:true`", which is the ADMISSION
+population. **The review's population is the cfSel-stamped subset of it**, and the
+verdict query is: *over all boards from tonight, among HRR rows, `count(card:true)` and
+`count(pool:true)` against the graded outcome of those same rows* — i.e. **the
+retirement criterion is evaluated on the rows the bar actually removed from cards,
+which is the only population that answers "was suspending this market right?"**
+**Population size**: last night's measured board carried **14 susp rows stamped**, of
+which **11–13 pool-true and 10–12 card-true** across the four mode runs — call it
+~10–14 stamped decisions per board. At one board/day to 08-15: **~16 boards × ~12 ≈
+190 stamped decisions**, against the retirement criterion's ≥300 rows. **Still short —
+but it is a real population with a real query, where susp counts alone were never going
+to answer the question.**
+
+## THE EXPORT'S HRR QUERY, RESTATED AS ONE QUERY (2026-07-30, owner's item 3)
+
+**The query**: over ledger entries with `2026-07-17 ≤ date ≤ 2026-07-22` and
+`locked === true`, take every leg of every ticket in `core ∪ funT` whose
+`lkey.split("|")[1] === "batter_hits_runs_rbis"`; grade each from
+`grading.legs[label+"|"+prop].result`, keeping `won`/`lost`; then
+**hit = won/(won+lost) → expect 46.3 ±0.05 pp**, and
+**implied = mean of americanToProb(leg.cz) over the same legs → expect 59.2 ±0.05 pp**;
+subsets printed: rung O0.5 (expect 12/19 = 63%) and rung ≥1.5 (expect 32%).
+**Beside it, the per-field presence census**: for each ledger field, rows carrying it,
+bucketed by date — with `selMode` and `overrode` expected ABSENT throughout this window
+(added 07-24 and 07-19), and `grading.v: 2` expected absent-or-irrelevant (M22 touches
+only ML/RL legs).
+
+**What the figure means if it reproduces with mode null on every row — the honest
+statement, in the words the owner asked for**: *the number is real and its population
+is uninterpretable with respect to the discipline that was supposed to produce it.* A
+hit rate over a population that may mix disciplined and undisciplined selection
+**cannot support a market suspension as a calibration finding** — it can support a
+**flag for investigation**, which is a weaker object than what the suspension was
+justified by. Recorded in `hrr-recalibration.md` in those words.
+**Can anything date-attribute those tickets to a mode? NO independent source exists**:
+`pl_selmode` is a single localStorage value with no history (each write overwrites);
+the app carries no version stamp in the ledger entry; the prediction store's `selMode`
+begins with the same 07-24 deploy; and the CLV report reads the same absent field. **The
+attribution is unrecoverable, not merely off-disk.**
+
+## THE NaN FINDING WAS MINE, NOT THE ENGINE'S — AND THE CLASS IS REAL AND NOW ENCODED (2026-07-30, owner's item 4)
+
+**CORRECTION, dated, to my own 07-30 sub-finding**: ~~"`shPenQFShadow` returns a NaN for
+at least one of 30 teams"~~ — **WRONG, and the error was mine**: the function returns an
+OBJECT `{f, era, ip}` (L1611–1615), and my probe took `Math.min` over objects, which is
+NaN by definition. **The corrected read: 30 teams, 30 finite `f` values, range
+[0.9500, 1.0600], ZERO non-finite.** No team is affected; the trace the owner asked for
+ends here.
+
+**But the class survives the instance, and it is worse than a normal bug**:
+`shClamp(NaN, lo, hi)` returns **NaN** — verified by running it — because `Math.max`/
+`Math.min` propagate. Every factor in this engine is a clamped multiplier, so **any
+factor that ever computes NaN carries it into the price silently**. Downstream, a NaN
+price does not error and does not drop the row loudly: **every comparison with NaN is
+false**, so `czEv >= coreEvMin`, `czEv >= czMin` and the greedy `eff > bw` all fail, and
+the row **vanishes with no error, no log, and no blocked-reason entry** — indistinguishable
+from a row that was never eligible. **The owner's first branch fires: the failure mode is
+invisible by construction.**
+**Does any guard exist? NO — and that was true across 559 tests**: every `isFinite` in the
+suite is a FILTER or a helper (`a1-shrink` L130/148/224, `blend-sweep` L133,
+`clamp-instrumentation` L103, `hrr-compression` L87/89), never an assertion that emitted
+prices are finite. **Second branch fires → ENCODED**: `tests/finite-prices.test.ts` —
+every emitted row's `prob/implied/edge/ev/kellyF/czEv/czKellyF/pModel` finite-or-null
+(with a vacuity floor of >100 fields inspected), every allocated stake finite and
+positive, plus a three-part plant (the sweep detects an injected NaN; `shClamp`
+propagation is asserted as the premise; NaN-comparison semantics pinned).
+**OBSERVED RED** with a NaN injected into a real emitted row — `ml ml_home.prob = NaN` —
+then green with the plant removed.
+*(Note on authorization: item 4's report line said "spec, do not ship" while its
+pre-committed reading said "encode it" on exactly this finding. I followed the fired
+branch, and the result is test-only — no runtime file, no engine string. Reversing it is
+one `git rm`.)*
+**Impossible branch — CHECKED AND SILENT**: a NaN cannot reach a stake without first
+reaching a price; the stake invariant above pins it independently, and both are green.
+
+## REOPEN DATES ARE ACCRUAL PROJECTIONS — DOC SENTENCES STAMPED (2026-07-30, owner's item 5)
+
+**`mktN` NOW RIDES THE ECHO — SHIPPED**: `BoardEcho.mktN` (`src/lib/engine-echo.ts`),
+fed by the route's own `cfg.mktN = armed.mktN` (route L257). **Additive, echo-only,
+nothing branches on it, ZERO credits, and NO engine-string change** (the echo is
+TypeScript, not the eval'd engine) — so the owner's pre-committed "addable → ship it"
+branch fires. From tonight's board on, **the reopen clock is observable daily** instead
+of living only in the server calibration store.
+**Every doc sentence stating a reopen date as though it were a date — STAMPED
+ACCRUAL-PROJECTED, CADENCE-DEPENDENT**: the reachability table's vintage-boundary line
+("07-29 batter, 07-31 K's/outs, 08-01 ML/RL"); the 07-29 close-out record's "`consMinEv`
+expiry made four markets live"; the vintage census rows for 07-29/07-31/08-01 (already
+struck from "date-conditional"); the homogeneous-20 derivations that segment on those
+dates (08-17 / 08-20); and the reopening-decision section's "on 07-29 the batter markets
+cross 100". **None of these is a calendar fact; each is `reopenDays(n, rate, need)`
+evaluated once against an assumed rate.**
+
+**PROJECTED CROSSING PER MARKET — the table Friday's decision needs**, with the honest
+caveat first: **`n` (current `mktN`) is OFF-DISK until tonight's echo lands, so the
+columns below are RATES, not dates.** With `rate` = graded legs per complete board-day:
+| cadence | rate per market/day | days to cross from `n` | note |
+|---|---|---|---|
+| one board/day | ~2–5 ledger legs · ~14–19 graded rows across all markets | `ceil((100 − n) / rate)` — computable the moment tonight's echo prints `n` | the only cadence that moves the clock at a stated speed |
+| rationed (~1 board every 2–3 days) | rate × ⅓–½ | **2–3× longer than the one-board-a-day figure** | the ration decision multiplies every reopen date |
+| dark | **0** | **`reopenDays` returns `null` = NEVER** | a dark day does not delay the clock; it stops it |
+**Reading 29 extended (also on the board tonight)**: print **per-market blocked-reason
+counts**, so the `consensus` count is visible whether or not it is zero — a zero printed
+beside a non-zero pool count is evidence; a zero printed alone is not.
