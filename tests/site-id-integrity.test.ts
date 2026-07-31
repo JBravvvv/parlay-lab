@@ -25,7 +25,10 @@ import { describe, expect, it } from "vitest";
  * own reason to move lines. Spec: docs/collection-period.md, THE LINE-NUMBER FINDING.
  */
 
-const ENGINE = "legacy/index.html";
+/* PL_ENGINE_PATH lets tests/guard-wiring.test.ts point this guard at a CORRUPTED TEMP COPY
+   instead of corrupting legacy/index.html in place (2026-07-31, owner's item 3). Default is the
+   real file, so normal behaviour is unchanged and the engine is never mutated. */
+const ENGINE = process.env.PL_ENGINE_PATH || "legacy/index.html";
 const ID_RE = /"(\d{3,4})"\)/g;
 
 /** Every line-number id in the engine source, with the lines it actually occurs on. */

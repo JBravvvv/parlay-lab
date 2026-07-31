@@ -62,7 +62,7 @@ function syntheticChunk(engine: string): string {
 }
 
 describe("served-engine extractor", () => {
-  const engine = readFileSync("src/engine/legacy-src.gen.ts", "utf8").match(
+  const engine = readFileSync(process.env.PL_GEN_PATH || "src/engine/legacy-src.gen.ts", "utf8").match(
     /export const LEGACY_SRC: string =\s*([\s\S]*);\s*$/,
   )!;
   const repo = JSON.parse(engine[1].trim()) as string;

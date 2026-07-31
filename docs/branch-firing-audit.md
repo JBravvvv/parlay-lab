@@ -1823,3 +1823,128 @@ empty board cannot report a pass; a client row cannot census to zero; a flat quo
 spend). Its original red — *"every import threw MODULE_NOT_FOUND"* — was a memory; these re-run
 every build. **`doc-structure` needed no plant: it is now proven WIRED, which is strictly
 stronger.**
+
+---
+
+# PART ELEVEN — 2026-07-31, owner's items 1–3
+
+## 42. THE PASSCODE REGRESSED ON THE DAY IT SHIPPED — M28 (item 1)
+
+**THE OWNER'S SECOND BRANCH FIRES: it did not "never work". It worked, and a named commit removed
+it — on the same day.**
+
+- **`6a28eef` (2026-07-11)** shipped the working path: `app/sharp/page.tsx` read
+  `localStorage.pl_pass`, sent `x-pl-pass` on the `/api/sharp` POST, and handled the 401.
+- **`e9f4bc7` (2026-07-11T12:16:10-07:00)**, subject *"The Sharp = the built-in quant engine's
+  daily read (no key needed)"*, **deleted all three lines**:
+  ```diff
+  -      setPass(localStorage.getItem("pl_pass") ?? "");
+  -        headers: { "content-type": "application/json", ...(pass ? { "x-pl-pass": pass } : {}) },
+  -        if (pass) localStorage.setItem("pl_pass", pass);
+  ```
+- **`app/settings/page.tsx` kept the collection UI.** Since `e9f4bc7` — **twenty days** — the
+  passcode has been written to `localStorage.pl_pass` and **read by nothing**.
+
+**THE DISPLAY HALF IS WORSE THAN THE DISCARDED VALUE.** The Settings panel says, verbatim:
+
+> **Passcode for spend-money actions (The Sharp, forced odds refresh)** … *"Must match the
+> `APP_PASSCODE` environment variable on Vercel. The public URL is reachable by anyone; **this
+> stops strangers from burning your API credits.** Entered once per device."*
+
+**A UI that collects a credential, stores it, sends it nowhere, and tells the operator it is
+stopping strangers from burning credits.** That is the sixth instance of the computed-and-
+discarded class (after `shPenQF`, `shUmpKf`, the Kelly ceiling in legacy modes, `cfSel`'s
+counterfactual, and the `kellyDaily>0` warning gate) — **and the only one that asserts a
+protection exists.** Recorded as **M28**.
+
+**IMPOSSIBLE BRANCH — some caller already sends it: DOES NOT FIRE.** A repo-wide grep over
+`src/` and `app/` finds `x-pl-pass` in **zero** current files; the only history is the two
+2026-07-11 commits above.
+
+### Every call site that 401s once `APP_PASSCODE` is set, and the fix
+
+| call site | route | currently sends `x-pl-pass`? |
+|---|---|---|
+| `src/engine2/sharpBoard.ts` L135 | `/api/odds` | no — only affected if the route is fully gated |
+| `src/lib/useAllStar.ts` L65 | `/api/odds` | no — same |
+| `src/lib/ufc.ts` L86 | `/api/odds` (`fresh=1` path) | **no — 401s immediately** |
+| `src/lib/fetcher.ts` L25 | `/api/odds` | no — only if fully gated |
+| `app/sharp/page.tsx` L425 | `/api/sharp` | **no — 401s immediately** |
+| `app/settings/page.tsx` L322 | `/api/sharp` | **no — 401s immediately** |
+| `tools/snapshot_props.py`, `tools/snapshot_odds.py` | `/api/odds?fresh=1` | ✅ **shipped this turn** |
+
+**IT IS ONE CHANGE, NOT SIX.** All six client sites already funnel through `fetch()`; the fix is a
+single helper plus a one-line spread at each:
+
+```ts
+// src/lib/pass.ts  (NEW — the whole change)
+export function passHeader(): Record<string, string> {
+  try { const p = localStorage.getItem("pl_pass"); return p ? { "x-pl-pass": p } : {}; }
+  catch { return {}; }
+}
+```
+```diff
+- const r = await fetch(`/api/odds?u=${encodeURIComponent(UPSTREAM)}`);
++ const r = await fetch(`/api/odds?u=${encodeURIComponent(UPSTREAM)}`, { headers: passHeader() });
+```
+Six one-line edits, no engine string, no hash move, **no vintage event**. **SPEC ONLY — not
+shipped, per the owner's instruction.** It is what makes step 4 of §39 safe.
+
+## 43. PRICING THE REAL FIX — AND ONLY AUTHENTICATION CLOSES IT (item 2)
+
+| option | client change | what it closes | cost |
+|---|---|---|---|
+| **A — authenticate `/api/odds` itself** | **§42's helper + 6 one-line edits** (the SAME helper) | **everything.** No unauthenticated caller reaches the upstream at all | 1 new file, 6 lines, 1 route line moving the check out of the `fresh` branch |
+| **B — allow-list `u`'s market/region shapes** | **none** | the SHAPES only — **and that is not the exposure** (below) | ~15 route lines |
+| **C — per-IP rate limit** (Redis is already wired) | none | the RATE, not the principal; defeated by multiple IPs | ~15 route lines + a Redis counter |
+
+**⚠️ IMPOSSIBLE BRANCH FIRES, and it kills option B.** *"`u` can be varied in ways an allow-list
+cannot bound while still reaching a legitimate upstream"* — **the EVENT ID.** Example, every part
+of it on any allow-list we would write:
+
+```
+/api/odds?u=https://api.the-odds-api.com/v4/sports/baseball_mlb/events/<any real event id>/odds
+          ?regions=us&markets=batter_hits,batter_total_bases,batter_home_runs,
+                              batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs
+```
+
+That is **exactly the props sweep's own shape**. There are ~15 live event ids on a slate, so an
+allow-list still admits **~16 distinct cache keys** (15 events + the `/events` list), each
+independently refreshable **every 240 s → 360 spends/day each**. **~16 × 360 × 6 ≈ 34,000
+credits/day of admissible spend.** The allow-list bounds the shape and leaves the ceiling two
+orders of magnitude above the pool.
+
+**→ THE OWNER'S SECOND BRANCH FIRES: only full authentication closes it. The staged sequence plus
+§42's helper is the path, and STEP 4 WAITS FOR THE HELPER.**
+
+**`/api/board` and `/api/propsnap`'s read paths**: both are **Redis reads costing zero Odds
+credits** — traced, not asserted (§31 for `/api/board`; propsnap's read path is L68–72, a
+`redisGetJson` and nothing else). **Gating them buys nothing and costs the board-archive job its
+access.** Leave them open; that reasoning is already in their headers.
+
+## 44. THE WIRING COUNT GOES TO FOUR OF SEVEN (item 3)
+
+**THE OWNER'S FIRST BRANCH FIRES: the copy approach works.** Both guards took a one-line
+env-overridable path (`PL_ENGINE_PATH`, `PL_GEN_PATH`) defaulting to the real file, and the harness
+now writes the corrupted content to a **temp copy** and points the guard at it — **`legacy/index.html`
+is never written at all**, which is strictly safer than the in-place mode the doc cases use.
+
+**7 guards proven wired, up from 5.** New: `site-id-integrity` (a clamp site id renamed `1605`→
+`9999`) and `served-extractor` (the generated engine string truncated to 90%).
+
+**OF THE SEVEN INVARIANTS THE OWNER SIGNED OFF: FOUR ARE PROVEN WIRED** — `served-extractor`,
+`site-id-integrity`, `read-first-index`, `self-arm-stamp`. **Three are not, and permanently so
+unless their design changes:**
+
+| guard | why it cannot be corrupted here |
+|---|---|
+| `chain-tools` | asserts pure functions imported from `tools/`; corrupting them means editing source, which is the change under test rather than its input. **Now carries a standing plant instead** |
+| `line-history-consumers` | its corruption is *"a consumer appears"*, i.e. adding a real import to source — same objection |
+| **`finite-prices`** | **asserts on computed board values. There is no artifact to corrupt** — its wiring is unprovable without a board |
+
+**`finite-prices` GETS ITS WIRING PROOF FROM TOMORROW'S BOARD**, added to the seeds block: after
+the board lands, take the saved `~/board-0801.json`, **set one row's price to `NaN` in a COPY, and
+confirm the guard fires on real board data.** That is the only artifact that can prove it, and it
+exists for one day.
+
+**Also proven wired, outside the seven**: `doc-structure`, `fixture-citation`, `sha-references`.

@@ -43,10 +43,27 @@ type Case = {
   input: string;
   why: string;
   corrupt: (text: string) => string;
+  /** when set, the guard is pointed at a corrupted TEMP COPY via this env var and the real file
+   *  is never touched — strictly safer than in-place corruption (2026-07-31, owner's item 3). */
+  viaEnv?: string;
 };
 
 /** Each corruption is the specific failure its guard exists to catch — not a random mutation. */
 const CASES: Case[] = [
+  {
+    guard: "tests/site-id-integrity.test.ts",
+    input: "legacy/index.html",
+    viaEnv: "PL_ENGINE_PATH",
+    why: "a clamp site id renamed — the line-number-keyed-id defect this guard exists to catch",
+    corrupt: (t) => t.replace(/"1605"/, '"9999"'),
+  },
+  {
+    guard: "tests/served-extractor.test.ts",
+    input: "src/engine/legacy-src.gen.ts",
+    viaEnv: "PL_GEN_PATH",
+    why: "the generated engine string truncated — the extraction defect that produced the false 278,267 mismatch",
+    corrupt: (t) => t.slice(0, Math.floor(t.length * 0.9)),
+  },
   {
     guard: "tests/self-arm-stamp.test.ts",
     input: "data/ump_k.json",
@@ -87,8 +104,6 @@ const CASES: Case[] = [
 
 /** Guards deliberately NOT corrupted, with the reason. Counted, never implied covered. */
 export const UNCOVERED: Record<string, string> = {
-  "tests/site-id-integrity.test.ts": "reads legacy/index.html — corrupting the engine string risks leaving it mutated if the run dies",
-  "tests/served-extractor.test.ts": "same, plus its real input is a served chunk that is not in the repo",
   "tests/finite-prices.test.ts": "asserts on computed board values, not a file — there is no input to corrupt",
   "tests/chain-tools.test.ts": "asserts pure functions imported from tools/; corruption would mean editing source, which is the change under test rather than its input",
   "tests/line-history-consumers.test.ts": "its corruption is 'a consumer appears', which means adding a real import to source — same objection",
@@ -96,12 +111,12 @@ export const UNCOVERED: Record<string, string> = {
 };
 
 /** Run one guard alone; true = it failed (which is what a corrupted input must produce). */
-function guardFails(guard: string): boolean {
+function guardFails(guard: string, extraEnv: Record<string, string> = {}): boolean {
   try {
     execFileSync("npx", ["vitest", "run", "--no-file-parallelism", guard], {
       cwd: REPO,
       stdio: "pipe",
-      env: { ...process.env, PATH: `${NODE_BIN}:${process.env.PATH ?? ""}`, CI: "1" },
+      env: { ...process.env, ...extraEnv, PATH: `${NODE_BIN}:${process.env.PATH ?? ""}`, CI: "1" },
       timeout: 120_000,
     });
     return false;
@@ -115,14 +130,25 @@ describe("every covered guard is proven WIRED, not just proven correct", () => {
     it(`${c.guard} fails when ${path.basename(c.input)} is corrupted: ${c.why}`, () => {
       const abs = path.join(REPO, c.input);
       const original = fs.readFileSync(abs, "utf8");
+      const corrupted = c.corrupt(original);
+      expect(corrupted, `${c.guard}: the corruption changed nothing — it cannot test anything`).not.toBe(original);
       let failed = false;
-      try {
-        const corrupted = c.corrupt(original);
-        expect(corrupted, `${c.guard}: the corruption changed nothing — it cannot test anything`).not.toBe(original);
-        fs.writeFileSync(abs, corrupted);
-        failed = guardFails(c.guard);
-      } finally {
-        fs.writeFileSync(abs, original);
+      if (c.viaEnv) {
+        /* COPY MODE — the real file is never written. */
+        const tmp = path.join(REPO, `.guard-wiring-${path.basename(c.input)}.tmp`);
+        try {
+          fs.writeFileSync(tmp, corrupted);
+          failed = guardFails(c.guard, { [c.viaEnv]: tmp });
+        } finally {
+          if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+        }
+      } else {
+        try {
+          fs.writeFileSync(abs, corrupted);
+          failed = guardFails(c.guard);
+        } finally {
+          fs.writeFileSync(abs, original);
+        }
       }
       expect(fs.readFileSync(abs, "utf8"), `${c.input} was NOT restored byte-exactly`).toBe(original);
       expect(

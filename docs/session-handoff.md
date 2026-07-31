@@ -126,6 +126,11 @@ node tools/board-report.mjs ~/board-0801.json
 # step 3 — self-consistency  (BOTH population sizes must print; zero-over-empty is NOT a pass)
 python3 tools/self_consistency.py
 ```
+**+ ONE ADDITION TO THE SEEDS BLOCK (2026-07-31, owner's item 3): `finite-prices`' WIRING PROOF.**
+It is the only guard whose wiring cannot be proven without a board. After the board lands, copy
+`~/board-0801.json`, set **one row's price to `NaN` in the COPY**, and confirm
+`tests/finite-prices.test.ts` fires on real board data. The artifact exists for one day.
+
 `board-report.mjs` prints, in order: the **outs VACUITY branch first**, the echo fields
 (`outsSusp` must be `true`, `selMode` `ev_gated`), the trigger mark, cfSel coverage with
 `rank`/`stake`, `clampActivity`, and `mktN` vs `consMinN = 100` with the blocked-reason
@@ -153,6 +158,13 @@ page breaks on every device until a client change ships.**
 3. **`props-history.yml` on `main`** — `env: APP_PASSCODE: ${{ secrets.APP_PASSCODE }}` on the
    snapshot step. (The one step that touches the firing branch.)
 4. **LAST** — Vercel → Environment Variables → `APP_PASSCODE`. The gate activates here.
+
+**⚠️ AND STEP 4 IS BLOCKED ON A CLIENT CHANGE (M28).** `app/settings/page.tsx` collects a device
+passcode, writes `localStorage.pl_pass`, and **no client code sends it** — `6a28eef` shipped the
+working path 2026-07-11 and **`e9f4bc7` deleted it the same day**. Twenty days inert, while the
+panel says *"this stops strangers from burning your API credits."* So setting `APP_PASSCODE`
+401s `/api/sharp` on every device. **The fix is ONE helper + six one-line spreads
+(`branch-firing-audit.md` §42) — spec'd, not shipped. Step 4 waits for it.**
 
 **AND IT DOES NOT CLOSE THE EXPOSURE.** The cache keys on the full URL and the caller controls
 `u`'s markets/regions/event-id. One URL → 2,160/day ceiling; **varied `u` → every call is a
