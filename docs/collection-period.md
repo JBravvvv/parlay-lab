@@ -7658,3 +7658,148 @@ the information is reachable by another path on exactly the day it matters.
 blocked-reason, a suppression, or a cap outright. Spec unchanged: surface the ratio with
 a breach label, drop the `kellyDaily > 0` gate, give L857 the same treatment for
 symmetry. Guard red first. **Not shipped.**
+
+## ✅ 2026-07-31 ~04:5xZ — RE-GREP CONFIRMED, MARKER RESOLVED, THE OUTS FLAG IS LIVE IN PRODUCTION
+
+**Served chunk: `256-7cc559a830020345.js`** — renamed from `256-171aff5d10da160d.js`,
+which is itself the evidence the deploy landed (the Vercel API was not consulted; the
+instrument used was the **chunk-name change plus a byte-level extraction**, fetched
+2026-07-31 04:5xZ).
+**SERVED ENGINE SHA = `b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`,
+281,096 chars — BYTE-IDENTICAL to the repo string.** All four functional edits verified
+present in the served bytes: `outsSusp:true` in `SH_CFG`, the `buildParlaySet` bar, the
+`shFunPick` bar, the `finalizeCats` disjunct. **The owner's first branch fires: the ship
+is complete and the outs flag is LIVE for Friday's reopen.**
+**Marker RESOLVED** (`tests/served-verification.json` → `pending: false`, note carrying
+the confirmation), well inside the 24h. **And the owner's precise question answered: the
+guard goes green ON RESOLUTION, not on removal** — with `pending: false` it additionally
+*requires* `ENGINE_SHA === SERVED_ENGINE_SHA_VERIFIED`, and deleting the file would make
+the guard throw on `readFileSync`. There is no way to make it green by removing the
+marker.
+
+**⚠️ AND THE EXTRACTOR ITSELF HAD A DEFECT — worth more than the check it performed.**
+The first extraction reported **278,267 chars and a non-matching hash — a MISMATCH**. It was
+wrong. The escape-aware scanner picks the LONGEST single-quoted literal by scanning
+every `'`, and an earlier apostrophe in the chunk (`"Pitcher K\'s"`) opened a
+pseudo-literal that closed on the engine's own opening quote, so the scan resumed
+**2,829 characters INSIDE** the engine and returned a suffix. Proof: the recovered text
+is a byte-exact substring of the repo string at index 2,829, and re-anchoring the scan
+on the engine's known opening bytes returns the full 281,096 and the matching hash.
+**An instrument that reports a false MISMATCH is worse here than one that reports a
+false match: it would have burned the 24h clock and could have triggered a rollback of
+a correct ship.** The fix used — anchor the scan on the engine's first 200 bytes rather
+than on "longest literal" — is recorded here; folding it into a permanent tool is
+spec-only (it touches no engine string, but it should be written once and guarded rather
+than re-derived at 5 AM).
+
+## SITE-ID INTEGRITY — ENCODED, AND THE SHIP DID NOT DRIFT (2026-07-31, owner's item 2)
+
+**How many sites carry line-number ids: 30**, spanning **L1591 → L2402**
+(`shClamp(v,lo,hi,"NNNN")` and the `shShrink` sites).
+**Consumers, named**: `tests/clamp-instrumentation.test.ts` · `tests/clamp-activity.test.ts`
+(the clamp census, and the 08-17 fixture-representativeness check's instrument) ·
+`tests/shrink-activity.test.ts` (the k-justification series) ·
+`tests/hrr-compression.test.ts` (the ladder IQR stages) · `tests/m2-interlock.test.ts` ·
+`tests/sim-rng-stream.test.ts` · plus `tools/range_compression.py`'s downstream reads.
+**What the four functional edits did to line numbers: NOTHING above the region.**
+Measured, not assumed — **all 30 ids resolve to their own line, drift = NONE.**
+`SH_CFG.outsSusp` was a same-line replacement; the other three edits sit at L2513, L2651
+and L3185, all **below** L2402. **The owner's third branch fires: the census is safe, and
+the rule is now encoded prospectively.**
+**Archived data carrying a stale id: NONE — the check is trivial and clean.** The only
+archived board (07-26) predates the clamp instrumentation and carries no `clampActivity`
+at all, so **no archived datum is keyed to any site id.** The census genuinely starts at
+board 1. The impossible branch (a guard pinning an id that already fails to resolve) does
+not fire: all 30 resolve.
+**THE INVARIANT, ENCODED** — `tests/site-id-integrity.test.ts`: every line-number id must
+occur on the line it names; a plant proves a single inserted line above the region is
+detected; and the region's bounds (1591, 2402) are pinned, because a moved region is a
+different measurement. **OBSERVED RED** with one line planted at L1500 — all 30 ids
+drifted and the failure named exactly what to do. **The three accidental guards are no
+longer the check.**
+**A CONTENT-DERIVED ID cannot be introduced without moving the engine string** — the ids
+are literal arguments *inside* it — **so it waits**, exactly as the owner's rule says.
+Spec, for the next ship that has its own reason to move lines: replace `"2258"` with a
+short stable name (`"pitcherOuts.oppOffense"`), and have the census key on that.
+
+## ⚠️ TWO CORRECTIONS TO MY OWN ITEM-2 ANSWER FROM LAST TURN (2026-07-31)
+
+**~~"line-history spends 144/day — 70% of the burn"~~ — WRONG ON BOTH HALVES.**
+1. **144/day is the SCHEDULED rate, not the delivered one.** GitHub Actions drops most
+   hourly ticks. Measured from the archive itself (commits per day to the line-history
+   day-file, 07-18 → 07-30): **5, 6, 6, 5, 6, 7, 8, 5, 13, 14, 9 — mean ≈ 7.5/day →
+   ~45 credits/day**, not 144. `docs/credit-budget.md` L39 had already measured it at
+   **~4.1 snapshots/day → ~25/day** on an earlier 14-day count. **It is ~12–25% of the
+   burn, not 70%.**
+2. **~~"it has never appeared in a ration table, a cadence decision, or a credit
+   projection"~~ — WRONG, and the doc that contains it is `docs/credit-budget.md`**:
+   L176 prices it at 144/day nominal, states what it feeds — **"nothing live"** — and
+   L209 lists **"1. Stop `line-history.yml` | −4,460 | nothing today"** as the first
+   line of a proposed budget. **It has been priced, named non-load-bearing, and proposed
+   for removal.** I asserted otherwise without reading the doc that exists for this.
+
+**AND THE ANSWER TO ITEM 4'S CENTRAL QUESTION IS THEREFORE SIMPLER THAN THE HYBRID**:
+**no series reads sub-hour granularity, because NO SERIES READS `line-history`'s OUTPUT
+AT ALL.** Verified independently three ways: (a) `close_fair.py`, `close_capture.py` and
+`phase2_series_b.py` all read **`data/props/`** — the PROPS sweeps — and their help text
+saying "from the line-history branch" refers to the BRANCH, which also hosts `data/props`;
+(b) a repo-wide grep finds **zero** consumers of `data/YYYY-MM-DD.json`; (c)
+`credit-budget.md` L192 says it outright: *"`line-history.yml` — nothing reads it… it
+reads `data/props`… not `data/`."* **My conflation of the branch with the workflow is
+what produced the wrong consumer list.**
+**→ the owner's THIRD branch fires: nothing reads sub-hour resolution, so the stated cost
+of dropping to 3h was hypothetical.** And the close is untouched either way: **the close
+pipeline runs entirely on the PROPS sweeps**, which have their own self-pacing (a `close`
+capture only when the next unstarted first pitch is within ~95 min, at most one per
+40 min) — **line-history's cadence cannot miss a close because it does not define one.**
+
+**THE CADENCE TABLE, RE-PRICED ON MEASURED DELIVERY** (props ~60/day continues in every
+row; nothing changed — the owner's decision):
+| cadence | line-history/day (measured basis) | total/day | runway at 1,038 | what is lost |
+|---|---|---|---|---|
+| **hourly (today)** | **~45** (7.5 delivered × 6) | ~105 | **~9.9 days** | — |
+| every 3h | ~15–18 | ~78 | **~13.3** | nothing any tool reads; the unbuilt Pinnacle-close reader loses density |
+| every 6h | ~9 | ~69 | **~15.0** | same, more so |
+| daily | ~6 | ~66 | **~15.7** | same |
+| **off** | **0** | **~60** | **~17.3** | **nothing today** — `credit-budget.md`'s own verdict |
+**The hybrid question is moot**: a 3h baseline with an hourly window before first pitch
+would protect a close that this job does not capture. **If the owner wants the runway,
+the measured answer is that stopping it costs nothing that exists** — and that is
+`credit-budget.md`'s standing recommendation, not a new one.
+**Runway restates: at the CURRENT cadence the burn is ~105/day, not ~204 — so 1,038
+funds ~9.9 sweep-days, not 5.0.** Every figure I gave last turn on the 204 basis
+restates here.
+
+## THE TWO STORES CAN DISAGREE ABOUT WHETHER A DAY HAPPENED (2026-07-31, owner's item 3)
+
+**Which store each count reads:**
+| count | store | can it see a client-generated day? |
+|---|---|---|
+| board-days / the ≥10 threshold | **quota arithmetic** (credits ÷ ~150) — not a store at all | it counts SPEND, so a client generate DOES consume a board-day's worth of credits |
+| the homogeneous window | **the board KV / `/api/board`** (and the `line-history` board archive) | **NO** |
+| the clamp census, hot-site fidelity | **the board archive** (`clampActivity` rides the board) | **NO** |
+| Series A's board side | **the board archive** | **NO** |
+| **the 08-15 review population** | **`pl:pred`** | **YES** |
+**→ the owner's first branch fires: the counts read DIFFERENT stores, and the one that
+gates the 08-15 review (`pl:pred`) is precisely the one that CAN contain days the board
+archive does not know about.** A client generate writes `localStorage` + `pl:pred` (via
+`logBoardPredictions`) and **never the board KV**, so `/api/board` correctly reports
+`no-board-for-date` while prediction rows exist for that date.
+**What reconciles them: NOTHING.** No job, tool, guard or doc compares the board archive
+against `pl:pred`'s day set. **That is the finding, and it is a collection-design defect:
+the review's population and the window's count are maintained by different writers with
+no reconciliation and no alarm.** Spec (zero credits, no engine string): a reconciliation
+read — the symmetric difference between `/api/board`'s dates and `pl:pred`'s `DAYS_SET` —
+run beside every quota read.
+**Does a client generate spend without advancing a board-day? YES, by the threshold's own
+definition.** The ≥10 board-day threshold and the homogeneous window both count BOARDS
+(board-archive members); a client generate produces none while spending a full slate
+fetch (`credit-budget.md` prices client generates at **120–240/day per device**).
+**→ the owner's second branch fires: it is the worst-value spend in the system**, and
+reading 15(c) — already queued, zero credits — determines whether it has happened.
+**Impossible branch (the board archive containing a day `pl:pred` does not): checkable in
+the same read; not yet run.**
+**AND THE ~88 RESTATES TO ~128** on the corrected line-history basis (evening window:
+2 delivered ticks ≈ 12, props ≈ 60, CLV ≈ 0 → ~72 known of 200). **~128 is within the
+range `credit-budget.md` independently assigns to a single client generate (120–240),
+which sharpens rather than resolves the attribution — reading 15(c) settles it.**

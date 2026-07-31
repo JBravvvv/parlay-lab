@@ -44,7 +44,24 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 
 ## 2. RUN SHEET
 
-> ## ✅ STATUS 2026-07-31 ~03:0xZ — THE OUTS FLAG IS SHIPPED
+> ## ✅ STATUS 2026-07-31 ~05:0xZ — SHIPPED **AND VERIFIED IN PRODUCTION**; MARKER RESOLVED
+> Post-deploy re-grep done: served chunk **`256-7cc559a830020345.js`** (renamed from
+> `256-171aff5d10da160d.js` — itself the deploy evidence) carries an engine string
+> **byte-identical to the repo, 281,096 chars,
+> `b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**, with all four
+> functional edits present in the served bytes. **`PENDING-LIVE-VERIFICATION` RESOLVED**
+> inside 24h; the guard goes green ON RESOLUTION (with `pending:false` it also requires
+> committed === served; deleting the marker makes it throw). **The outs flag is LIVE for
+> Friday's reopen.**
+> ⚠️ **The extractor reported a FALSE MISMATCH first** — "longest single-quoted literal"
+> resumed 2,829 chars inside the engine after an apostrophe (`Pitcher K\'s`) opened a
+> pseudo-literal. Re-anchoring on the engine's opening bytes gave the exact match. An
+> instrument that cries mismatch could have rolled back a correct ship.
+> **Site-id integrity ENCODED** (`tests/site-id-integrity.test.ts`, observed red on a
+> planted line): 30 ids, L1591–L2402, **all resolving — the ship shifted nothing**, and
+> no archived datum is keyed to any id (the 07-26 board predates the instrumentation).
+>
+> ## ✅ SUPERSEDED — STATUS 2026-07-31 ~03:0xZ — THE OUTS FLAG IS SHIPPED
 > `overview` resolved by measurement (two differing spans, both ticket counts; every
 > category ROW count identical) → the scope correction was AUTHORIZED, the corrected
 > guard was OBSERVED RED on a planted row-level mutation, and the flag shipped: engine
@@ -101,7 +118,9 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 > it BEFORE the next fire — it is the only thing that turns M24/M25 from prospective into
 > realized, and it needs nothing but the sync phrase.
 > **Quota 1,038 / 18,962 · runway 6.9 board-days at ~150, ~17 at an evening board's ~60 ·
-> sweeps-only burn ~204/day → ~5.0 days dark.**
+> sweeps-only burn ~105/day (CORRECTED — line-history delivers ~7.5 ticks/day, not 24)
+> → ~9.9 days dark, not 5.0. Cadence table re-priced on measured delivery in
+> collection-period; nothing changed, awaiting the owner's sign-off.**
 
 ## 2a. THE RUN SHEET AS WRITTEN (2026-07-30 PT — re-arms for the next fire)
 
