@@ -19,16 +19,30 @@ name: engine-v2-props-history
 # which does not queue. These crons are the delay-tolerant fallback.
 on:
   schedule:
-    - cron: "0 17 * * *"   # nominal 10am PT — the day's opener
-    - cron: "0 20 * * *"
-    - cron: "0 21 * * *"
-    - cron: "0 22 * * *"
-    - cron: "30 22 * * *"
-    - cron: "0 23 * * *"
-    - cron: "30 23 * * *"
-    - cron: "0 0 * * *"
-    - cron: "30 0 * * *"
-    - cron: "0 1 * * *"
+    # 2026-07-31 — CUT FROM TEN TO FOUR (owner's item 1), chosen from the ARCHIVE, not the
+    # schedule's shape. Measured over 17 archived days, deliveries land in four bands and the
+    # declared hour does not control when a run arrives — only how many arrive:
+    #   20-21Z  17 paid, 7.9 ev/snap, median lead 112 min ->  0 closes (17 min outside the window)
+    #   23Z      4 paid, 6.2 ev/snap, median lead  18 min ->  4 closes
+    #   00Z      3 paid, 4.0 ev/snap, median lead  85 min ->  3 closes
+    #   06-11Z  33 paid, 13.5 ev/snap, median lead 508 min -> 0 closes, and 72% OF ALL SPEND
+    # ALL SEVEN archived closes came from the 23Z and 00Z bands. The seven queued crons produced
+    # none of them and three quarters of the cost. MIN_GAP is untouched; snapshot_props.py is
+    # untouched. Reversible: uncomment. Ceiling falls ~339 -> ~185 credits/day (measured
+    # ev/snapshot x the measured 5.84 credits/event). docs/branch-firing-audit.md PART THREE.
+    - cron: "0 17 * * *"   # -> 20:0x-20:5x, 19/20 days. The same-day `pre`, median lead 112 min.
+    - cron: "0 20 * * *"   # -> ~23:3x. LOAD-BEARING: 4 of the 7 archived closes.
+    - cron: "0 21 * * *"   # -> ~00:1x. LOAD-BEARING: the other 3.
+    - cron: "30 22 * * *"  # -> queues to the next morning batch = the 8.5h-out opener, the wide
+                           #    end of the model-vs-close span. One queued tick delivered on
+                           #    15 of 15 days in the two-cron era, so one is enough.
+    # COMMENTED OUT 2026-07-31 — six queued crons that only ever added morning duplicates:
+    # - cron: "0 22 * * *"
+    # - cron: "0 23 * * *"
+    # - cron: "30 23 * * *"
+    # - cron: "0 0 * * *"
+    # - cron: "30 0 * * *"
+    # - cron: "0 1 * * *"
   workflow_dispatch:
 
 # MIN_GAP reads the last paid timestamp from the COMMITTED day-file, so overlapping
