@@ -582,7 +582,7 @@ drift, even when both values look reasonable on their own.
 | `hrrAltMax` | ~~`0.5`~~ **`-1` (2026-07-27, signed off — reopening decision)** | ~~lines above O0.5~~ **every H+R+RBI rung** suspended from auto-selection; retirement criterion in THE REOPENING DECISION section. ⚠️ **Effect CONDITIONAL on `selMode ∈ {ev_gated, dk_fd}`** — the legacy posture is unfiltered by design (parity stance); the coupling to the production arming modes is TEST-ENFORCED (`tests/hrr-suspension-coupling.test.ts`, with a plant proving the legacy world stays visible) |
 | `coreNoHR` | `true` | HR props never on core; HR-anytime parlays are FUN-only |
 | **`penQFrozen`** | **`true`** | `shPenQF` pinned off for the collection period — see KNOWN-INERT below. |
-| **`umpKFrozen`** | **`true`** | `shUmpKf` pinned off. Unlike `penQ` this factor would have **armed itself** across ~2026-08-04 → 08-13; pinning **preserves** current behaviour. |
+| **`umpKFrozen`** | **`true`** | ⚠️ **ROW REPLACED 2026-07-31 (owner's word).** `shUmpKf` pinned off. **NO PRODUCTION MEASUREMENT OF THE EFFECT EXISTS AT ANY n** — production `context.json` has never carried a `kFactor` (`build_context.py` L232 gates at g ≥ 5; the first crossing was 2026-07-30; the carrier froze 07-29 20:32Z), so every replay figure ever cited for this row came from the ARMED FIXTURE. **What is measurable, from the real `data/ump_k.json`:** the factor is clamped to **[0.92, 1.08]** and **60% (51 of 85) of umpires would land ON a bound**, so **per-row magnitude CANNOT grow with the armed count — only COVERAGE can**, from **~0.35 of a 15-game board today to 83 of 85 [80, 85] at freeze exit** (simulation over the g-distribution, not extrapolation). The two armed clamp in OPPOSITE directions (Barrett 1.087→1.080, Traynor 0.833→0.920), so the armed population is not directionally biased. **THE DECISION IS BREADTH, NOT DEPTH.** ~~armed itself across ~2026-08-04 → 08-13~~ **STRUCK — an estimate, wrong in the same direction twice (crossings landed 07-30 and 07-31).** The unpin has **no date and no condition**; see `branch-firing-audit.md` §24 for the circularity and the `kRaw` shadow that breaks it. |
 | **ump `g >= 5` gate** | `5` (`tools/build_context.py` L189) | umpire plate-appearance count required before a `kFactor` is emitted. **No stated rationale — see the analysis below; it is ~7× too low.** |
 | **ump kFactor clamp** | `[0.92, 1.08]` (`shUmpKf`) | ±8% cap on the umpire K adjustment. **No stated rationale; narrower than the sampling noise the gate admits.** |
 | **`GAP_BUCKET_MIN_N`** | `150` | rows needed in a disagreement bucket before its calibration gap is read. **Fifth entry of the unexamined-constant class — and the only one with its arithmetic stated up front:** at n=150 SE(gap)=4.1 points, so the 12.9-point H+R+RBI miscalibration reads at 3.2σ. |
@@ -1449,7 +1449,7 @@ with the same standing as a parameter drift.**
 | `shOppWhiffF` | 29 | 30 lineups | **97%** | live |
 | `shPitPctF` | 26 | 30 pitchers | **87%** | live |
 | `shLaborF` | 11 | 30 pitchers | **37%** | live — **by design**, see below |
-| **`shUmpKf`** | 0 | 15 games | **0%** | **INERT — will self-activate ~2026-08-04** |
+| **`shUmpKf`** | 0 | 15 games | **0%** | ~~INERT — will self-activate ~2026-08-04~~ **CORRECTED 2026-07-31: it SELF-ACTIVATED IN THE DATA on 2026-07-30 (Barrett) and 2026-07-31 (Traynor) — the ~08-04 date was an ESTIMATE with no derivation. Still inert on a board: triple-braked (pinned · carrier frozen · and the frozen carrier's per-game blocks match no current slate — see §26).** |
 | **`shPenQF`** | 0 | 30 teams | **0%** | **INERT — pinned, see KNOWN-INERT** |
 
 `shLaborF`'s 37% is **not** a defect: it returns identity for any starter between 85 and
@@ -6716,7 +6716,7 @@ behavior and is now pinned by the guard.
 | `consMinEv` (batter markets) | **DATE-armed** | 07-29 expiry | — | **YES, 07-29** | stamped on the calendar; caught |
 | `consMinEv` (K's, outs) | **DATE-armed** | 07-31 expiry | — | not yet | Friday — a stamped vintage event |
 | `consMinEv` (ML, RL) | **DATE-armed** | 08-01 expiry | — | not yet | Saturday |
-| **`shUmpKf`** | **COUNT-armed** | `db.umps[hp].g >= 5` (`build_context.py` L232) | **1 umpire at g≥5** (Lance Barrett, g 4→5) | **CROSSED IN THE DATA TODAY, 2026-07-30 — five days before the ~08-04 projection** | ~8 more at g=4 cross within days; 35 at g=3 follow |
+| **`shUmpKf`** | **COUNT-armed** | `db.umps[hp].g >= 5` (`build_context.py` L232) | **2 umpires at g≥5 as of 2026-07-31** (Lance Barrett 07-30, Willie Traynor 07-31); **11 more at g=4** | **CROSSED IN THE DATA TODAY, 2026-07-30 — five days before the ~08-04 projection** | ~8 more at g=4 cross within days; 35 at g=3 follow |
 | `shPenQF` | COUNT-armed in principle | `pen_quality.json` accrual | **DB never materializes in a commit** (the known git-add gap) | no | cannot arm while its DB is uncommitted |
 | the consensus gate (`mktN` vs `consMinN=100`) | **COUNT-armed** | graded rows per market crossing 100 | off-disk (server `pl:cal:*`) | unknown | **the class the owner named** — it fires as the population accrues |
 

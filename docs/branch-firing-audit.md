@@ -1134,3 +1134,176 @@ at zero Odds credits plus one board, blocked only by the vintage pause it would 
 2026-07-29. `vitest.config` includes `tests/**/*.test.ts`; these end in `test 2.ts` and **do not
 match**. 84 `.ts` files in `tests/`, **81 run**. They may hold divergent copies of three guards.
 **NOT deleted** — reported for the owner's word.
+
+---
+
+# PART SEVEN — 2026-07-31, owner's items 1–4
+
+## 26. THE THREE ORPHANS — TWO ARE COPIES, ONE IS EVIDENCE (item 1)
+
+**None is tracked by git.** All three are UNTRACKED local files; no commit introduced them. Sizes
+and mtimes say what produced them: `2691 B / 07-29 12:32`, `1871 B / 07-29 13:51`,
+`3557 B / 07-29 12:32` — a filesystem duplication (the macOS `" 2"` suffix), not a repo action.
+
+| orphan | vs its live twin | verdict |
+|---|---|---|
+| `bot-path-whitelist.test 2.ts` | **byte-identical** | copy artefact |
+| `min-gap.test 2.ts` | **byte-identical** | copy artefact |
+| **`sha-references.test 2.ts`** | **DIFFERS** | **evidence** |
+
+**The difference, and it goes the direction that matters.** The orphan's `originRefs()` returns
+**only** `refs/remotes/origin`. The LIVE file appends `"HEAD"`:
+
+```diff
+-    return execSync('git for-each-ref --format="%(refname)" refs/remotes/origin', …)
++    const refs = execSync('git for-each-ref --format="%(refname)" refs/remotes/origin', …)
++    // HEAD is included so docs may cite the HELD stack (real commits, ancestors of the
++    // local branch, deliberately unpushed under the hold rhythm …)
++    return [...refs, "HEAD"];
+```
+
+**→ THE OWNER'S FIRST BRANCH FIRES: the orphan asserts something the live file no longer does.
+The live guard is WEAKER — it accepts a sha reachable only from a local, unpushed commit.**
+
+Three things make this less bad than the branch's worst case, and one that makes it worth an
+M-number anyway:
+
+- **The weakening is documented in place**, with a stated reason (the hold rhythm), not silent.
+- **It changes nothing today**: the tree is clean and everything is pushed, so `HEAD` is an
+  ancestor of `origin/frontend-rebuild` and adds no reachability.
+- **But it landed inside `ea7445a` (2026-07-29T14:10:29-07:00)**, whose subject is *"Session
+  handoff before compaction"* — **a guard change riding inside a docs commit**, five lines in a
+  120-file window. It was never reviewed as a guard change.
+- **The residual risk is real and small**: a doc may cite a sha that exists only on a local commit;
+  if that commit is later discarded by a reset or rebase, the citation dangles and the guard has
+  already passed. The strict version could not do that.
+
+**Recorded as M27 — a guard weakened in place, with its original preserved beside it, unrun.**
+NOT restored unilaterally: the widening has a stated justification and reverting it would break
+the hold rhythm the owner actually uses. **The decision is his**; the choice is (a) keep the
+widening and accept the reset/rebase hole, or (b) restrict it to shas that are ancestors of the
+current branch AND recorded in the handoff's held-stack list, which is the narrow version.
+
+**THE FULL SWEEP, reconciled.** `vitest.config` includes `tests/**/*.test.ts`.
+
+| | count |
+|---|---|
+| `.ts` files under `tests/` (recursive) | **86** |
+| match the glob and run | **81** |
+| do not match | **5** |
+
+The five: the three orphans **plus two legitimate non-tests** — `tests/helpers/fixture-env.ts` and
+`tests/helpers/modes.ts`, which are imported by test files rather than run as ones. **So the sweep
+finds exactly three orphans and nothing else** — the owner's "more than three" branch does not
+fire. (My earlier "84" was a top-level `ls`; the recursive count is 86.)
+
+**IMPOSSIBLE BRANCH — an orphan referencing a function or path that no longer exists: DOES NOT
+FIRE.** All three reference live symbols; the sha-references orphan differs only in the ref list.
+
+**Not deleted, per instruction.** The two identical copies are safe to remove in one commit; the
+third should be kept until M27 is decided, because it is the only surviving record of the strict
+assertion. A runner-glob check that forces file-count and run-count to agree is the natural guard
+and is **spec'd, not shipped**.
+
+## 27. THE FROZEN-TABLE DATE SWEEP (item 2)
+
+The `umpKFrozen` row is replaced on the owner's word — verbatim text in §5 of this file's summary
+and in `collection-period.md`. The sweep across the rest:
+
+| row / line | what is wrong | action |
+|---|---|---|
+| `umpKFrozen` (frozen table) | *"would have armed itself across ~2026-08-04 → 08-13"* — an **estimate presented as a schedule**, wrong in the same direction twice | **REPLACED**, date struck |
+| `shUmpKf` inertness row (L1452) | *"INERT — will self-activate ~2026-08-04"* — same estimate | **CORRECTED**, dated |
+| self-arming table (L6719) | *"1 umpire at g≥5 … 8 more at g=4"* | **CORRECTED** to 2 armed / 11 at g=4, dated |
+| M21 (bundle) | same stale counts | corrected in the `[src:]` token |
+| Phase-2 threshold rows (L2577–78) | *"~2026-07-31"* for the game- and player-cluster thresholds — **that is TODAY, and neither is confirmed reached** | **FLAGGED, not corrected**: they are projections whose due date has arrived and nothing has read them. A dated marker is owed once someone checks |
+| `Hits` review row (L3071) | 2026-08-23 / 2026-08-09 | future, no action |
+
+**Magnitudes whose regime has changed** — the ump defect repeating — were swept in PART FIVE §16
+and PART SIX §21 and are all now labelled: **M25 (fixture → archive, re-measured below)**,
+**`penQFrozen`** (fixture, and its input has never existed in production), and the seven
+regime-change entries in §13's table. **Count of rows carrying a superseded date: four, all
+corrected; one pair flagged as due-today-unread.**
+
+## 28. `kRaw` IS IN THE FROZEN CONTEXT — AND IT STILL CANNOT RUN TOMORROW (item 3)
+
+**`kRaw` IS already in the frozen production `public/model/context.json`.** Read from disk:
+`date: 2026-07-29`, 16 games, **11 carry an `hpUmp` block**, fields
+`{name, g, kFactor, kRaw, lgKpg}`, **`kRaw` non-null on all 11**, `kFactor` null on all 11
+(correct — nobody had g ≥ 5 on 07-29). Values 0.8652–1.2677 against `lgKpg` 16.566.
+
+**So the first branch looked like it fired — and then the impossible branch fired instead, in the
+owner's own words: the pause froze the input out of existence FOR THIS PURPOSE.**
+
+`shUmpCtx(g)` (`legacy/index.html` **L1600–01**) resolves the ump block by **iterating
+`SH_CTX.games` and matching the GAME**. The frozen context holds **2026-07-29's fifteen team
+pairings**. Tomorrow's slate is fifteen pairings. **The overlap is ZERO.**
+
+**→ On tomorrow's board every game returns `null` from `shUmpCtx`, so `shUmpKfShadow` records
+NOTHING. The experiment cannot run for free on tomorrow's board.**
+
+**AND THE CONSEQUENCE IS LARGER THAN THE UMP FACTOR.** Every context block resolved **per game**
+— the ump block, and `weather` (which `shTempF` reads off `g.weather`, populated from the same
+per-game merge) — **has matched nothing on any board since 2026-07-29.** Team-keyed blocks
+(`bullpen_last3`, `pen_quality`) still resolve, because they are looked up by team name
+(`shPenF` L1663, `shPenQFShadow` L1611). **So the M18 pause did not merely hold the per-game
+context's VALUES; after one day it stopped them resolving at all.** That is a property of the
+freeze nobody had written down, and it means the homogeneous window is homogeneous in a stronger
+and emptier sense than intended for those factors.
+
+**What would have to change**: a context regeneration. It **can** be scoped — `build_context.py`
+writes the whole file, so the scoped version is *regenerate, then diff, then accept only if the
+diff is confined to `games[]` and `ump_db_games`*. **That diff is verifiable**: `pen_quality`,
+`bullpen_last3` and `league_k_per_game` are all separately addressable in the JSON, so a
+field-scoped comparison is mechanical. **But it is a vintage event** — a new `games[]` is new
+data reaching the engine — and it waits for the owner's decision with the diff in front of him.
+
+**What the experiment would yield, when it can run**: one board, factor still pinned, `kRaw`
+recorded per game by `shUmpKfShadow`, diffed against the live card. **That measures the factor's
+effect on prices without applying it.** What it does NOT measure: anything realized, any
+interaction with the allocator's ceilings, or the effect at the freeze-exit armed count — it is
+one board at one arming level.
+
+**Does the shadow reach the archive?** `board-archive.yml` captures `/api/board` whole, and
+`gameInfo.shadow` is an archived board field (`29400d0` added it), **so the diff can be run after
+the fact rather than live** — which means the experiment does not need to be watched, only fired.
+
+## 29. M25 RE-MEASURED ON THE ARCHIVE — AND THE CLAIM REFINES (item 4)
+
+**What the claim rests on after the split**: a **CODE READ** — `disciplined`/`evGated`/`dscpM`/
+`selMP` are four spellings of one predicate, and **13 sites implement 11 protections behind it**
+(`shAllocate` L2998–3001 · `finalizeCats` L2513 · `buildParlaySet`'s dscp gate, with the full
+site list in the row). That establishes, with no dollar figure at all, that **eleven protections
+switch off together on a two-tap mode change.** That half never needed a magnitude.
+
+**And the archive DOES produce a real magnitude.** `tests/m25-archive.test.ts`, on
+`data/boards/2026-07-26.best.json.gz` from the line-history branch — a real captured production
+board, 67-ticket pool, bankroll $750, daily $250, the same parameters the fixture used:
+
+| mode | tickets | staked | own computed ceiling | **ratio** | over ceiling | $0 ceiling | negative czEv |
+|---|---|---|---|---|---|---|---|
+| **`probability`** | 6 | **$250** | **$10** | **25.0×** | **6 of 6** | **5** | **5** |
+| **`caesars_ev`** | 6 | $250 | $265 | **0.9×** | 2 | **0** | **0** |
+| `ev_gated` | 6 | $225 | $225 | **1.00×** | **0** | 0 | 0 |
+
+**THE OWNER'S FIRST BRANCH FIRES: the row now carries a measured number and the fixture's pooled
+38.5× is retired with a dated marker.**
+
+**And the claim refines in a way the fixture's single pooled number concealed.** *"Legacy modes
+place negative-EV bets by construction"* is **MEASURED TRUE for `probability`** — 5 of 6 tickets
+carry negative `czEv`, 5 sit on a $0 ceiling, and every one of the six exceeds its own ceiling —
+and **NOT DEMONSTRATED for `caesars_ev`**, which on this board took zero negative-czEv tickets,
+zero $0-ceilings, and landed at 0.9×. **The fixture pooled "11 legacy tickets" across both modes
+into one 38.5×; the archive separates them and only one of the two behaves as the sentence says.**
+
+`ev_gated` reproducing **exactly 1.00× with zero over-ceiling tickets**, on a different board from
+the earlier disciplined measurement, corroborates it independently.
+
+**Harness provenance, stated**: the BOARD is archived production; the ALLOCATOR is production
+code; the ENGINE is `fixtureEngine()` with the v2 kernel dormant, which `shAllocate` does not use.
+So this is an archive measurement of the allocation path, not a fixture reading — and it is not a
+full-board reproduction either.
+
+**Reading 15's overstake query is UNCHANGED and still first after the propsnap read.** This
+measures what the allocator WOULD emit; the ledger export measures what was actually staked. They
+are different questions and both stand.
