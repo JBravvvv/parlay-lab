@@ -7268,3 +7268,54 @@ figure, and drop the `kellyDaily > 0` gate so a zero-Kelly card is the loudest c
 instead of the silent one. Guard observed red first. **This is display-tier and it is
 the only thing that would have caught M24 by eye** — the data was already on screen;
 what was missing was the sentence saying what it meant.
+
+## ⚠️ 2026-07-30 CLOSE-OUT: NO BOARD. THE FIRE WINDOW PASSED UNOBSERVED (recorded 2026-07-31 ~01:3xZ)
+
+**READ, not inferred** — `/api/board?date=2026-07-30` returns
+`{"board": null, "gens": [], "reason": "no-board-for-date"}`. **The 22:45Z verification
+board does not exist. `gens: []` means NO generate run reached the spending path for
+this date at all.**
+
+**Which cron branch fired: (b) or (d), and THEY ARE INDISTINGUISHABLE FROM HERE.** A
+401'd fire sets no `lastRun` and writes no board; a fire that never happened also writes
+no board. Both produce exactly this response. **The distinguisher is cron-job.org's own
+execution log — the owner's screen, per branch (d) as pre-committed.** Nothing in this
+repo can separate them, and no credit was spent either way (a 401 returns before any
+fetch).
+
+**The clock, stated plainly**: the fire was 22:45Z (3:45 PM PT); the fallback curl window
+was 22:40–23:05Z (3:40–4:05 PM PT). **Both are past** — this was recorded at ~01:30Z
+Friday = **6:30 PM PT Thursday**. The chain's fifteen steps did not run, and the
+readings pre-committed for tonight (24–29, the echo, cfSel's new rank/stake stamps, the
+trigger mark, T = 0.80, the four HRR counts, `mktN` on the board) **have no board to be
+read against.**
+
+**Slate state at 01:26Z (statsapi, free)**: 10 games — **4 Final, 3 In Progress, 2
+Warmup (01:40Z), 1 Pre-Game (02:10Z)**. **Three games remain unstarted.** A board
+generated now would price a 3-game remainder against ~150 credits of slate fetch, on
+lineups already posted — it would satisfy T (achievable ≈ 1.0 over 3) while covering
+30% of the day. **NOT taken, and not recommended**: it buys a board-day whose
+composition readings describe three late games, at ~15% of the remaining pool, on a
+night when the engine-half readings (echo, cfSel, trigger mark, `mktN`) can be had for
+the same price tomorrow on a full slate.
+
+**QUOTA, READ 01:2xZ: 1,038 remaining / 18,962 used.** Against the 16:4xZ read
+(1,238/18,762): **200 spent, with NO board generated.** Attribution: the 17:00Z props
+sweep (landing ~20:20Z on the measured delay) plus the CLV capture ticks across the
+evening's first pitches — **the same two spenders that produced this morning's ~97
+residual, now the ONLY spenders.** The projected 22:30Z figure was ≈1,325 against an
+actual ≈1,038 by 01:25Z; the gap is the unmodelled CLV capture path, whose magnitude
+across a full evening is now bounded at ~200 for a 10-game slate **with no board of our
+own.** Runway: **1,038 / 150 = 6.9 board-days** (was 8.25 this morning, 9.74 last
+night). **The pool is falling ~200/day on background spend alone, which is a
+board-day every 0.75 days lost to jobs we are not reading.**
+
+**What this costs, precisely**: the homogeneous window is still at **COUNT ZERO** —
+07-29 produced no board and now 07-30 produced no board, so **two consecutive
+board-days have been spent without a board**, and every series that was to begin
+"tonight" (clamp census, hot-site fidelity, the echo/cfSel/trigger-mark landing
+readings, `mktN`'s first on-board reading) still begins on the first board that
+actually fires. The outs flag's ship sequence — which was gated on *"after tonight's
+board is read and its results are on disk"* — **has no board to be gated on**; its
+own deadline (Thursday evening, before Friday's K's/outs reopen) is now inside the
+same night. **That collision is the owner's call and is stated, not resolved here.**

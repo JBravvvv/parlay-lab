@@ -42,7 +42,23 @@ them. Supersedes the 2026-07-29 handoff in place; §1 flags what that version go
 - ~~handoff §5 items 1 (MIN_GAP landing wording) and 10 (outs ICOU)~~ — 1 superseded
   (fix's landing test), 10 DISCHARGED (owner re-issued on the record, marker dated).
 
-## 2. TOMORROW'S RUN SHEET (2026-07-30 PT — execute from here)
+## 2. RUN SHEET
+
+> ## ⚠️ STATUS 2026-07-31 ~01:3xZ — THE 07-30 BOARD DOES NOT EXIST
+> `/api/board?date=2026-07-30` → `{board: null, gens: [], reason: "no-board-for-date"}`,
+> READ not inferred. The 22:45Z fire and the 22:40–23:05Z curl fallback are BOTH past.
+> Cron branch **(b) 401 or (d) no fire — indistinguishable from this repo**; the
+> cron-job.org execution log is the owner's distinguisher. Zero credits spent on it
+> either way. Quota READ 01:2xZ: **1,038 / 18,962** (200 spent since 16:4xZ with no
+> board — props sweep + CLV ticks only). Runway **6.9 board-days**. Slate at 01:26Z:
+> 4 Final / 3 In Progress / 2 Warmup / 1 Pre-Game — **3 unstarted**. Homogeneous window
+> still COUNT ZERO (two consecutive board-days spent without a board). **Everything
+> below is unchanged and re-arms for the next fire; the readings simply have no board
+> yet.** The outs flag's ship gate ("after tonight's board is read") now collides with
+> its own Thursday-evening deadline — the owner's call. Full record:
+> collection-period, 07-30 CLOSE-OUT.
+
+## 2a. THE RUN SHEET AS WRITTEN (2026-07-30 PT — re-arms for the next fire)
 
 **Deadlines (both Thursday 07-30 PT, different gates):**
 1. **3:30 PM PT — the owner's ONE cron-job.org visit**: **header `x-cron-key` on
