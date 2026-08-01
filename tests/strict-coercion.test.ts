@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { num, numFromText, req } from "../tools/strict.mjs";
 import { violatesIdentity } from "../tools/quota.mjs";
+import { stripComments } from "./helpers/source";
 
 /**
  * NULL IS NOT ZERO — THE TOOL-INPUT HALF OF `finite-prices` (2026-08-01, owner's item 3).
@@ -72,10 +73,10 @@ describe("no new raw coercion appears in the tools", () => {
          instances of it, reporting 10 where the code has 7. A guard that cannot tell code from a
          comment about code is measuring the wrong artifact — the same lesson as instrument
          defect #6, one layer down. Newlines are preserved so line numbers stay true. */
-      const src = fs
-        .readFileSync(p, "utf8")
-        .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-        .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
+      /* 2026-08-01: was an INLINE copy of this stripper. It is now the shared one — which also
+         knows about HTML comments, a form this copy never learned. Converted here rather than
+         edited in place blind: the file went red on a real plant in the same commit. */
+      const src = stripComments(fs.readFileSync(p, "utf8"));
       src.split("\n").forEach((ln, i) => {
         if (/\bNumber\s*\(/.test(ln)) sites.push(`${t}:${i + 1}`);
       });
@@ -92,7 +93,11 @@ describe("no new raw coercion appears in the tools", () => {
   });
 
   it("the three tools that were fixed no longer coerce their measured inputs", () => {
-    const q = fs.readFileSync(path.join(dir, "quota.mjs"), "utf8");
+    /* STRIPPED (2026-08-01). OBSERVED DEAD: with quota.mjs's `numFromText(` call MOVED INTO a
+       comment — the header parse back to raw coercion, which is instrument defect #6 itself —
+       this file passed 8/8. The `.not.toMatch` assertions beside it are the safe direction; the
+       one PRESENCE assertion was not. */
+    const q = stripComments(fs.readFileSync(path.join(dir, "quota.mjs"), "utf8"));
     expect(q, "quota must not Number() a header").not.toMatch(/Number\(\s*r\.headers\.get/);
     expect(q).toMatch(/numFromText\(/);
     const pp = fs.readFileSync(path.join(dir, "price-path.mjs"), "utf8");

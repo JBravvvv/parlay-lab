@@ -211,18 +211,15 @@ describe("mirrored engine constants do not drift", () => {
    * "deliberate" cannot quietly become "divergent". A future copied-literal sweep returns
    * a clean list, and anything it does return is real.
    */
-  const KNOWN_DUPLICATIONS = [
-    {
-      file: "tests/strict-coercion.test.ts",
-      of: "tests/helpers/source.ts :: stripComments",
-      why:
-        "signed-off guard; replacing its body in place is the M27 failure mode. Converting " +
-        "it to the shared import is queued (§11 item 5a), not done. Until then the copy is " +
-        "pinned to the original here.",
-      // the two regex literals that ARE the stripper — text-identical in both files
-      pins: [String.raw`/\/\*[\s\S]*?\*\//g`, String.raw`/(^|[^:])\/\/[^\n]*/g`],
-    },
-  ];
+  /* THE REGISTRY IS NOW EMPTY, AND THAT IS THE POINT (2026-08-01).
+     `tests/strict-coercion.test.ts` was the one registered deliberate duplication — an inline
+     copy of the comment stripper, left alone because replacing a signed-off guard's body blind
+     is the M27 failure mode. It was converted to the shared import in the same commit that put
+     a real plant against it, so the exception is GONE rather than perpetually waived. An empty
+     registry means the copied-literal sweep returns a clean list with nothing to skim past.
+     Re-add an entry only with its reason and its pins; a waiver that outlives its reason is
+     indistinguishable from an unnoticed copy. */
+  const KNOWN_DUPLICATIONS: { file: string; of: string; why: string; pins: string[] }[] = [];
 
   it("every registered deliberate duplication still agrees with its original", () => {
     const shared = readFileSync("tests/helpers/source.ts", "utf8");
