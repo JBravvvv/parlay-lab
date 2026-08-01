@@ -1692,6 +1692,184 @@ reflexively; the test is whether its absence blocked a real reading this session
 > keys as a group.** That is the owner's decision to make, and it is **not urgent** — none is
 > device-settable, so none is an M29-class exposure. Recorded as §11 item 5e, unshipped.
 
+### 12N. THE ECHO AS IT WILL STAND ON TOMORROW'S BOARD — 27 FIELDS (2026-08-01, owner's item 3)
+
+**SECOND AUTHORIZED SET SHIPPED: `lockMaxAgeMin`, `coreKsFillOnly`, `coreKsCap`, `coreKsLegMax`.**
+Same conditions as the first four. **`ENGINE_SHA` before and after:
+`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867` — unchanged**, still equal to
+`SERVED_ENGINE_SHA_VERIFIED`; `legacy/index.html` unchanged at
+`49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`. **Additive, no hash move.**
+**Guard red first:** *"echo field missing: lockMaxAgeMin"*, *"lockMaxAgeMin must echo null when
+absent"*, and the field count *"expected 23 to be 27"*.
+
+**THE ECHO IS NOW PINNED AT 27 FIELDS BY A GUARD**, so a field enters only as a deliberate act:
+*"If a field was ADDED, name the question it answers in the same commit; if REMOVED, say what
+stopped being asked. The echo is a record, not a dump."* SH_CFG declares 36 keys; **21 of them are
+echoed, and the fifteen that answered nothing stay out.**
+
+| # | field | what the board testifies to |
+|---|---|---|
+| 1 | `engineSha` | which engine string built it — the anchor for every vintage claim |
+| 2 | `priorsSha` | which Statcast priors were armed |
+| 3 | `ctxSha` | which daily context — the frozen carrier's identity |
+| 4 | `hrrAltMax` | whether HRR alternates above the line were suspended |
+| 5 | `coreEvMin` | the EV floor a core ticket had to clear |
+| 6 | `coreCzEvMin` | the settlement floor at Caesars |
+| 7 | `consMinN` | the small-sample gate's threshold — reading 29's denominator |
+| 8 | `consMinEv` | the consensus floor that pairs with it |
+| 9 | `coreMaxLegs` | the leg cap |
+| 10 | `maxCoreTickets` | the card cap — reading 10's cap-binding branch |
+| 11 | `coreMaxDec` | the odds ceiling |
+| 12 | `perParlayCap` | the per-ticket exposure cap |
+| 13 | `kellyStakeMult` | the Kelly multiplier — M24's ceiling |
+| 14 | `dailyBankrollCap` | the day's allocation bound |
+| 15 | `selMode` | **which selection mode built it.** Client-injected; SH_CFG has no default |
+| 16 | `outsSusp` | whether `pitcher_outs` was suspended — M2's live flag |
+| 17 | **`dirPref`** | **that the model's SIDE CHOICE was the model's** (M29) |
+| 18 | **`umpKFrozen`** | **that `shUmpKf` was pinned to 1 WHEN THIS BOARD WAS BUILT** — brake 1 |
+| 19 | **`penQFrozen`** | **the same for pen-quality** — brake 2 |
+| 20 | **`coreNoHR`** | **that HR suppression was applied** — the population §7.5's CV finding is about |
+| 21 | **`lockMaxAgeMin`** | **what price age it treated as stale** — placement checklist item 4 |
+| 22 | **`coreKsFillOnly`** | **whether K legs were fill-only** — M6 |
+| 23 | **`coreKsCap`** | **how many K legs could reach a card** — M6 |
+| 24 | **`coreKsLegMax`** | **the per-ticket K cap** — M6 |
+| 25 | `mktN` | graded legs per market at arm time — the reopen clock's only on-board witness |
+| 26 | `damping` | the shared-game constant, **extracted from the live expression, null if it moves** |
+| 27 | `cfSelEnabled` | whether the counterfactual pass ran |
+
+**FIFTEEN STAY OUT, and the reason is the rule:** `roundTo` · `minCoreTickets` · `thinSlateEV` ·
+`funMaxLegs` · `funMaxTickets` · `funTiers` · `funTierNames` · `funAmt2` · `funAmt3` · `funSplit2` ·
+`funSplit3` · `funMinProb` · `dailyKellyGuide` · `seasonEnd` · `projPaths`. **None answered a
+question asked this session.** If one becomes load-bearing it is added **then**, beside the question.
+
+**TOMORROW'S BOARD IS THE FIRST THAT WOULD BE SELF-DESCRIBING** — the first that can state its own
+brake state, its own side-choice provenance, and its own staleness threshold rather than having them
+inferred from the repo at a commit. `tools/board-report.mjs` prints all eight new fields beside the
+existing ones.
+
+### 12L. MIN_GAP: THE SAVING HELD BY LUCK, NOT BY GUARD (2026-08-01, owner's item 1)
+
+**THE GATE IS INTACT IN THE EXECUTING COPY.** Read from `tools/snapshot_props.py` itself, not from
+the test — L174:
+```python
+    if last_any and (now - last_any).total_seconds() < MIN_GAP_S:
+        print(f"  skipped: pre within MIN_GAP (... since last paid snapshot)")
+        return None
+    return "pre"
+```
+**The pre branch keys on `MIN_GAP_S`.** The close branch keeps its own gap at L163 and runs first.
+
+**PROVENANCE, CONFIRMED: THE SAVING WAS MEASURED FROM ARCHIVE DELIVERY VERSUS PAYMENT. NO PART OF
+IT RESTS ON THE GUARD HAVING BEEN GREEN.** Two independent measurements, both counts of delivered
+runs against paid event-fetches:
+- **07-28 replay, at ship time:** ten deliveries → **five paid snapshots**, and all five surviving
+  gaps ≥ 40 min (`branch-firing-audit.md` L31).
+- **07-31 06:41Z → 13:57Z, inside the dead window:** **8 props-history runs → 4 paid snapshots,
+  58 event-fetches ≈ 348 credits**, residual ≈ 0 (`board-open-experiment.md` L112).
+
+**HOW LONG IT WAS DEAD: from `1617d1b` (2026-07-29T20:54:10Z, the ship) to `b99ac55`
+(2026-08-01T17:50:25Z, the fix) — 2 days, 20 hours, 56 minutes.** Its greenness proved nothing
+about the code for its **entire life**: the guard was written and observed red-then-green in the
+ship commit against a source that already had the token in a comment, so the RED it showed that day
+came from the marker being absent, not from the gate being absent.
+
+**HOW MANY CLUSTERED BATCHES FELL INSIDE — bounded, not counted.** `props-history` ran **30 times
+over 07-28 → 07-31** (`branch-firing-audit.md` §3). The dead window opens partway through that
+span, and **the run log on disk is at four-window resolution, so the split at 07-29T20:54Z is not
+derivable from it.** What IS resolved inside the window is one full cluster — the 07-31 window
+above, **8 runs deduped to 4 paid** — plus the audit's three spend windows recording **3 + 2 + 2 =
+7 paid snapshots** in total. **The exact batch count needs the Actions log, which is remote.**
+
+> **THE PRE-COMMITTED READING FIRES ON BRANCH 1: `MIN_GAP` is intact, so the saving held by luck
+> rather than by guard.** The **IMPOSSIBLE BRANCH DOES NOT FIRE** — the one cluster resolvable
+> inside the dead window shows the dedupe working (8 → 4), and no duplicate paid sweep inside a
+> 40-minute window appears anywhere in the on-disk record.
+
+**WHAT VERIFIES EACH CHANGE WHOSE VALUE WAS MEASURED ONCE AND THEN ASSUMED HELD:**
+
+| change | what verifies it TODAY | was it verified yesterday? |
+|---|---|---|
+| **MIN_GAP pre-dedupe** | live guard **(since 2026-08-01)** + **archive measurement**, independent of it | **NO — a dead guard for 2 d 20 h 56 m** |
+| **concurrency GROUP** | live guard, and it **survived the plant** — `REQ_GROUP` is a multi-line regex encoding YAML indentation | **YES** |
+| **push RETRY** (same file) | live guard **(since 2026-08-01)** | **NO — dead; passed 3/3 with the retry commented out** |
+| **trigger mark** | live guard **(since 2026-08-01)**. Its PRODUCTION reading (reading 5) has still never run | **NO — dead; passed 3/3 with `"manual-forced"` in a comment** |
+| **cfSel** | **behavioural** — `cfsel-guard` asserts on RUNTIME objects: the `SH_CFG` binding is the same object after, the board bytes and the card are byte-identical. **Comments cannot reach it** | **YES** |
+| **bot pause / M17 whitelist** | **git history** — `git log --author=engine-v2-bot --name-only` against a path whitelist. Metadata, not source text | **YES** |
+
+**NOTHING ON THAT LIST IS VERIFIED BY NOTHING.** Three of six were verified by a **dead guard**,
+which is worse than nothing in one specific way: it read as assurance. **The two that were genuinely
+safe were safe for the same reason — they assert against something that is not source text at all
+(a live object, git metadata).**
+
+### 12M. THE STANDING RULE FOR GUARD AUTHORSHIP — AND A CORRECTION TO YESTERDAY'S VERSION
+
+> ### THE RULE
+> **A guard that asserts a string is PRESENT in source text is satisfiable by prose.**
+> `toContain` / `toMatch` say *"somewhere in this text"*, and a comment is in the text.
+> **Assert on something a comment cannot be:** a live object, git metadata, a structural
+> expression, or a count over **comment-stripped** source. Never over raw.
+>
+> **AND THE PART I GOT WRONG YESTERDAY:** a COUNT is not a substitute for the filter.
+> **A count catches ADDITION and misses SUBSTITUTION.** `writes.length === 1` goes red when a
+> comment is added beside intact code (2 ≠ 1) — which is how `engine-echo` survived its first
+> plant — but stays green when the code is **moved into** a comment (still 1). **Measured
+> 2026-08-01: `engine-echo` passed 12/12 with the echo assignment moved into a comment, meaning no
+> board would have carried an echo at all.**
+>
+> **THE STRIPPER IS LOAD-BEARING. THE COUNT IS WHAT MAKES IT PRECISE.**
+
+**THE PRE-COMMITTED BRANCH "several can be restated as counts, and each becomes filter-independent"
+IS ANSWERED BY MEASUREMENT, AND THE ANSWER IS NO.** Every one of the eight stripped assertions was
+counted, raw versus code-only:
+
+| assertion | file | raw | code |
+|---|---|---|---|
+| `umpKFrozen:\s*true` | `legacy/index.html` | 1 | 1 |
+| `var luDen=slate.games.length;` | `legacy/index.html` | 1 | 1 |
+| `const dropR = sentR - records.length` | `app/api/predictions/route.ts` | 1 | 1 |
+| `summary.full = full` | `app/api/calibrate/route.ts` | 1 | 1 |
+| `"manual-forced"` · `"header"` | `app/api/generate/route.ts` | 1 · 1 | 1 · 1 |
+| `git pull --rebase origin line-history` | `props-history.yml` | 1 | 1 |
+| `total_seconds() < MIN_GAP_S` | `tools/snapshot_props.py` | 2 | 2 |
+
+**Seven of eight occur exactly once in raw AND once in code — so `count === 1` is satisfied by the
+substitution plant just as `toContain` is.** Restating them as counts would have changed nothing.
+**The second branch is the one that fires: the stripper is load-bearing for all of them, so it needs
+its own plant.**
+
+**THE STRIPPER'S OWN PLANT — OBSERVED RED.** `stripComments` knew `/* */` and `//` and **not
+`<!-- -->`**, and the largest file any guard scans is `legacy/index.html`, whose extension
+guarantees that form exists. With `var luDen=slate.games.length;` moved into an HTML comment, the
+**already-fixed** `coverage-denominator` passed **9/9**. Fixed; same plant → red. The filter now
+carries regression cases of its own in `tests/mirrored-constants.test.ts` — block, line, HTML, hash
+(Python **and** YAML), **and LENGTH PRESERVATION**, which `trigger-mark`'s `indexOf` ordering
+assertion depends on.
+
+**THE CONVENTION FOR THE THIRD CATEGORY** — a guard deliberately asserting the PROSE rather than the
+code, so a future stripper does not silently break it:
+
+> **A guard file declares, per source read, whether it is about CODE or about the PROSE beside it,
+> by the NAME OF THE BINDING.** A stripped binding takes the plain name (`ROUTE`, `src`, `engine`);
+> a deliberately raw one takes the `_RAW` suffix (`ROUTE_RAW`) **and carries a comment saying which
+> assertion needs it and why.** Two copies in one file is normal and expected; one copy used for
+> both intents is the defect.
+
+Already applied: `calibration-window` (`ROUTE` stripped for the code assertions, **`ROUTE_RAW` for
+*"the constant carries the date and the reason at its declaration"***, which asserts the 2026-09-08
+caution is documented where the next editor will see it) and `min-gap` (**anchor raw, slice
+stripped** — the anchor is a dated comment signature by design).
+
+**THE RAW-VERSUS-STRIPPED AUDIT — one mismatch found, one correct-by-intent case confirmed:**
+- **MISMATCH, FIXED:** `accrual-volume`'s `/api/generate` span. Its assertions are absence checks,
+  which a comment can only make FIRE — harmless. But **the span BOUNDARIES were located by
+  `indexOf` on raw source**, so a comment mentioning either anchor before the real one mislocates
+  the span, and a span pointing at the wrong region makes both absence assertions **vacuously
+  true**. Now located and asserted on stripped source.
+- **CORRECT BY INTENT, LEFT RAW:** `engine-echo`'s `extractFromHtml()` reproduces
+  `tools/extract-engine.mjs`'s rule (the largest `<script>` block) to compute the engine string.
+  **Stripping would corrupt the extraction and change the sha.** Its intent is the raw file and it
+  must stay raw — the canonical example the convention exists to protect.
+
 ### 12I. THE §12F RESIDUAL IS RECOVERABLE FROM GIT — SPEC'D, NOT SHIPPED
 
 **The brake status at crossing time IS in history, and it verifies.** Run this turn as a read, not

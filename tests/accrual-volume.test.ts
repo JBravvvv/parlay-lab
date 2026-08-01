@@ -86,7 +86,13 @@ describe("prediction accrual volume — the rate that sets every reopening date"
   });
 
   it("/api/generate NEVER slices — asserted, because the cron path is what feeds mktN", () => {
-    const GEN = fs.readFileSync(path.join(__dirname, "..", "app", "api", "generate", "route.ts"), "utf8");
+    /* STRIPPED TOO (2026-08-01, from the raw-vs-stripped audit). The assertions below are
+       ABSENCE checks, which a comment can only make FIRE — the harmless direction. The real
+       exposure is the SPAN BOUNDARIES: `from` and `to` are located by indexOf on raw source,
+       so a comment mentioning either anchor BEFORE the real one mislocates the span, and a
+       span pointing at the wrong region makes both absence assertions vacuously true. Located
+       in code, asserted in code. */
+    const GEN = stripComments(fs.readFileSync(path.join(__dirname, "..", "app", "api", "generate", "route.ts"), "utf8"));
     /* This was stated as fact in a report before it was checked. A truncation on the CRON
        path would move every market's reopening date with nothing to show for it — the client
        path at least has a human watching a response. So: no slice, cap or take anywhere

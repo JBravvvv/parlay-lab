@@ -189,7 +189,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (echo) for (const k of ["engineSha", "selMode", "outsSusp", "mktN", "consMinN", "hrrAltMax", "damping", "cfSelEnabled",
     /* 2026-08-01: the three brakes + the side override. A board that omits these cannot be
        audited after the fact; `null` means the board did not report it, NOT that it was off. */
-    "dirPref", "umpKFrozen", "penQFrozen", "coreNoHR"]) {
+    "dirPref", "umpKFrozen", "penQFrozen", "coreNoHR",
+    /* second authorized set: the price-age lock (placement checklist item 4) and the three
+       K-caps (M6 had no board-side witness for any of them). */
+    "lockMaxAgeMin", "coreKsFillOnly", "coreKsCap", "coreKsLegMax"]) {
     console.log(`  ${k}: ${typeof echo[k] === "object" ? JSON.stringify(echo[k]) : echo[k]}`);
   }
   /* READING 5 CANNOT BE ANSWERED FROM /api/board — 2026-07-31, and this would have produced a
