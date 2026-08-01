@@ -1863,6 +1863,114 @@ on the file where it would matter most. `served-extractor` reads it raw and must
 the same reason `engine-echo`'s `extractFromHtml()` does. **That is the risk of one filter feeding
 most of the suite, named and pinned rather than left to be discovered.**
 
+### 12Q. SHARED-HELPER DEGENERACY — THE STRIPPER WAS AN INSTANCE, NOT THE FINDING
+
+> ### THE RULE, GENERAL FORM
+> **A filter shared by N guards silently disables N guards when it goes inert, so it needs an
+> assertion that fires when it stops doing anything.**
+>
+> Record it beside the count-versus-substitution rule. That one is about **what a single assertion
+> can be fooled by**; this one is about **what a single helper can take down**.
+
+**THE IMPORT CENSUS — every module more than one guard depends on:**
+
+| shared helper | dependent guards |
+|---|---|
+| **`tests/helpers/fixture-env`** | **38** — `FROZEN_NOW` 30 · `fixtureEngine` 20 · `armedFixtureEngine` 14 · `fixtureFetchJson` 8 · `TODAY` 7 · `digest` 4 · `ARMED_DAILY` 3 · `readBaseline` 2 |
+| `tests/helpers/source` | **13** — `stripComments` 10 · `stripHashComments` 4 |
+| `tests/helpers/modes` | **3** — `deviceReachableModes` 3 · `isDisciplined` 3 · `overrideReachable` 2 |
+| `tools/strict.mjs` | the tool suites (`num` / `req` / `numFromText`) |
+
+**`fixture-env` is nearly three times the stripper's surface.** Size was never the risk; a missing
+check was.
+
+**THE NEUTERS WERE RUN, NOT REASONED ABOUT — one per helper:**
+
+| helper | deps | neutered to | caught by its dependents? |
+|---|---|---|---|
+| `stripComments` | 13 | `(s) => s` | **NO — six guards, 40/40 green.** Only its own test noticed |
+| `fixtureFetchJson` | 8 | `{ok:true, body:{}}` | **YES — 7 of 8 failed.** The eighth (`live-current`) does not use it |
+| `stableHash` | 4 | a constant | **YES** — `cfsel-guard` 4 failed, `armed-baseline` 2, including its own *"plant invisible: digest blind to a flipped field"* |
+| `deviceReachableModes` | 3 | `[]` | **YES** — the suspension guards already assert *"no disciplined mode in the reachable domain"* and *"no legacy mode found"* |
+| `tools/strict.mjs` `num()` | — | `() => 0` | **YES** — `strict-coercion` and `chain-tools` both failed |
+| **`armedFixtureEngine`** | **15** | **an UNARMED engine** | **PARTLY — 7 of 15 still passed** |
+
+**🔴 A CORRECTION TO A READING I ALMOST PRINTED.** On the `fixtureFetchJson` neuter, four files
+reported *"11 skipped"*, *"10 skipped"*, *"6 skipped"*, *"4 skipped"* and I was one step from
+reporting **"31 assertions silently become skips."** They do not: the skips are a **consequence of a
+failed `beforeAll`** (`Error: No MLB games scheduled today.`), and the `Test Files` line — which is
+what CI reads — says **failed**. The `Tests` line alone was the wrong instrument. **Caught before
+publication, and the near-miss is the same population error one layer up.**
+
+**THE ONE THAT MATTERS, by the owner's priority rule** (*a helper feeding a brake, a suspension or a
+credit path outranks count*): **`armedFixtureEngine` feeds BOTH suspension guards.** With it
+returning an unarmed engine — no priors, no context, no `SH_V2`, so **no Shin de-vig, no sim, no
+park/ump factors** — **`outs-suspension-coupling` and `hrr-suspension-coupling` both still passed**,
+as did `finite-prices` and `self-consistency`.
+
+> **THAT IS NOT PROOF OF A BUG, and calling it one would be the error this session keeps finding.**
+> The suspension bar lives in `finalizeCats`/`buildParlaySet`, not in the armed pipeline, so holding
+> unarmed is plausible and probably correct. **What it proves is that the certification does not
+> depend on the arming it is documented to run under** — so if arming silently stopped, those guards
+> would go on certifying a WEAKER engine than production runs, and say nothing.
+
+**ENCODED: `tests/helper-degeneracy.test.ts` (7 cases).** One assertion at the SOURCE covers all
+fifteen dependents, and it checks the helper's own claim about itself rather than patching fifteen
+guards. **OBSERVED RED** with both neuters re-applied: *"SH_PRIORS is not set — the 'armed' engine
+is unarmed"* and *"fixtureFetchJson returned an EMPTY body"*.
+
+**IMPOSSIBLE BRANCH — "neutering turns a guard red for the wrong reason": DID NOT FIRE.** Every red
+observed named the neutered helper or a value derived from it. Nothing passed by accident and then
+failed for an unrelated reason.
+
+**WHAT ALREADY HAD A DEGENERACY CHECK, and it is worth saying which:** `deviceReachableModes` (the
+suspension guards' own domain-size assertions), `stableHash` (`armed-baseline`'s pinned md5 plus its
+invisible-plant case), `tools/strict.mjs` (`strict-coercion`'s unit cases). **The stripper was the
+exception, not the rule — but `armedFixtureEngine`, the largest single surface, was the second.**
+
+### 12R. COMMIT DISCIPLINE — ADDED TO THE STANDING RULES (2026-08-01, owner's item 2)
+
+> **Commit against a CLEAN, CONFIRMED run. If a run reports an error that turns out to be transient,
+> the confirmation is the SECOND CLEAN RUN, not the assumption that it was transient.**
+
+**WHAT WENT IN AGAINST THE DIRTY RUN.** One commit: **`715d891`** (the unscoped-sweep writeup). Its
+verification run printed `Errors 1 error` at **318 s**, roughly double the usual ~145 s, with the
+machine loaded. **I committed anyway and said so afterwards, which is the wrong order.**
+
+**🔴 AND THE "TRANSIENT" CALL WAS WRONG — IT RECURRED, AND IT IS NOW NAMED.** I told the owner the
+`Errors 1 error` was transient. The next full run printed it again, and so did the one after. It is
+**recurring, not transient**, and I had discarded the diagnostic detail by piping the run through
+`tail`. Captured in full, it is:
+
+```
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-worker]: Timeout calling "onTaskUpdate"
+ ❯ Object.onTimeoutError node_modules/vitest/dist/chunks/rpc.-pEldfrD.js:53:10
+ ❯ Timeout._onTimeout        node_modules/vitest/dist/chunks/index.B521nVV-.js:59:62
+```
+
+**WHAT IT IS:** a vitest **worker→main RPC timeout in the REPORTER path**, not a test failure and
+not repo code. It appears only on long runs under load (316 s / 318 s / 585 s wall clock) and never
+on targeted runs. Every time it has appeared, the run was **green with exit code 0** — 88 files /
+679 tests.
+
+**WHAT IT IS NOT SAFE TO DISMISS.** Vitest's own message is *"This might cause false positive
+tests."* The mechanism is a **lost REPORT, not a lost assertion** — but an instrument that fails to
+say what happened is precisely the class this session keeps finding. **So the gate is tightened
+rather than the warning waved off: a clean run means `Errors` ABSENT, not merely exit 0.** The
+practical mitigation is not to run the full suite while other heavy work is in flight.
+
+**RE-VERIFICATION: `715d891` IS CLEAN.** Two full runs since, both **87 files / 672 tests green**,
+`tsc --noEmit` exit 0. Its content is documentation plus a spec-queue edit — **no code path
+changed** — and the guard files it describes were each verified individually before their own
+commits.
+
+**THE OTHER FIVE OF THE SIX, checked rather than assumed:** `39b621b` (the stripper guard) went in
+against a **full-suite green run, 87/672**. `d197ceb`, `dc3361a`, `efd95a0` (guards 10, 11, 12) went
+in against **TARGETED runs plus `tsc`, not the full suite** — which is a weaker gate than the rule
+now requires, and is recorded here rather than left implicit. All three are covered by the two clean
+full runs since. **Nothing needs re-doing; the gate does.**
+
 ### 12L. MIN_GAP: THE SAVING HELD BY LUCK, NOT BY GUARD (2026-08-01, owner's item 1)
 
 **THE GATE IS INTACT IN THE EXECUTING COPY.** Read from `tools/snapshot_props.py` itself, not from
