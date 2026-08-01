@@ -128,6 +128,45 @@ export function hrrJoin(entries, from = "2026-07-17", to = "2026-07-22") {
   return { won, lost, hit, implied, rungs, n: imps.length };
 }
 
+/**
+ * (5): THE LATE-LOCK DISTRIBUTION (2026-08-01, owner's item 1 — the auto-lock memo's magnitude).
+ *
+ * Both quantities are already frozen into every entry, so this needs no new capture: `lockedAt`
+ * (legacy L3406) and each leg's game start via `entry.games[gkey].start`, copied from
+ * `d.gameInfo` by `shTicketSnap`. `lateLock` is recorded too — it is a boolean set by
+ * `shCardStarted`, and this prints the MAGNITUDE the boolean does not carry.
+ *
+ * Positive minutes = locked AFTER the earliest first pitch. The impossible branch (a locked entry
+ * with no corresponding board) surfaces here as an entry with no resolvable game start at all.
+ */
+export function lateLockDist(entries) {
+  const rows = [];
+  let noStart = 0;
+  for (const e of entries) {
+    if (!e.locked) continue;
+    const starts = [];
+    for (const t of [...(e.core ?? []), ...(e.funT ?? [])]) {
+      for (const l of t.legs ?? []) {
+        const s = l.gkey && e.games?.[l.gkey]?.start;
+        const ms = s ? Date.parse(s) : NaN;
+        if (Number.isFinite(ms)) starts.push(ms);
+      }
+    }
+    if (!starts.length || !Number.isFinite(Number(e.lockedAt))) { noStart++; continue; }
+    rows.push({ date: e.date, lateFlag: !!e.lateLock, minutes: Math.round((Number(e.lockedAt) - Math.min(...starts)) / 60_000) });
+  }
+  rows.sort((a, b) => a.minutes - b.minutes);
+  const late = rows.filter((r) => r.minutes > 0);
+  const q = (p) => (rows.length ? rows[Math.min(rows.length - 1, Math.floor(p * rows.length))].minutes : null);
+  return {
+    n: rows.length, noStart, late: late.length,
+    flaggedLate: rows.filter((r) => r.lateFlag).length,
+    disagree: rows.filter((r) => r.lateFlag !== r.minutes > 0),
+    min: rows.length ? rows[0].minutes : null, p50: q(0.5), max: rows.length ? rows[rows.length - 1].minutes : null,
+    rows,
+  };
+}
+
 /** (4): per-field presence by date. Pure. */
 export function fieldCensus(entries) {
   const fields = ["selMode", "overrode", "bankroll", "clv", "grading"];
@@ -177,6 +216,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const h = hrrJoin(entries);
   console.log(`\n(3) HRR 07-17..07-22: ${h.won}W/${h.lost}L  hit ${h.hit?.toFixed(1)}%  implied ${h.implied?.toFixed(1)}%  (expect 46.3 / 59.2)`);
   console.log(`    by rung: ${JSON.stringify(h.rungs)}`);
+  const ll = lateLockDist(entries);
+  console.log(`\n(5) LATE-LOCK DISTRIBUTION — lockedAt minus EARLIEST first pitch, minutes (positive = after)`);
+  console.log(`    n=${ll.n} locked entries with a resolvable game start   LATE: ${ll.late}   lateLock flag set: ${ll.flaggedLate}`);
+  if (ll.n) console.log(`    min ${ll.min}   median ${ll.p50}   max ${ll.max}`);
+  if (ll.late) console.log(`    late entries: ${ll.rows.filter((r) => r.minutes > 0).map((r) => `${r.date} +${r.minutes}m`).join(", ")}`);
+  if (ll.disagree.length) console.log(`    >>> ${ll.disagree.length} entries where the lateLock FLAG disagrees with the computed minutes: ${ll.disagree.map((r) => `${r.date} flag=${r.lateFlag} min=${r.minutes}`).join(", ")}`);
+  if (ll.noStart) console.log(`    >>> IMPOSSIBLE BRANCH: ${ll.noStart} locked entries have NO resolvable game start (no games{} or no lockedAt) — a locked entry with no corresponding board. Print them before believing any number above.`);
+  if (!ll.n && !ll.noStart) console.log(`    (no locked entries — the late-lock defect is UNMEASURED, not absent)`);
+
   console.log("\n(4) FIELD CENSUS BY DATE:");
   for (const [d, f] of Object.entries(fieldCensus(entries)).sort()) console.log(`    ${d}: ${JSON.stringify(f)}`);
 }

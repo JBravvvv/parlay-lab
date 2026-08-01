@@ -91,6 +91,7 @@ guard fails if any doc is missing or listed without a description.
 |---|---|
 | `collection-period.md` | the freeze's operating record: reachability, census, every M-item's working, the run-sheet blocks, the burn investigation |
 | `freeze-exit-bundle.md` | the M/A amendment table (M1–M26, A1–A4) with magnitudes, dependencies, the vintage table |
+| `auto-lock-memo.md` | **MEMO, NOT A SPEC (2026-08-01)**: the lock mechanism traced to lines (one writer, six refusals, it snapshots), the late-lock defect named **UNMEASURED on disk** with the export as its instrument, why placement-vs-selection is auto-lock's **prerequisite**, why price stability is measurable from the props archive at zero credits, and why grading may resume while **fitting waits for the parameter exit** |
 | `credit-budget.md` | **measured** per-job credit consumption and a proposed budget — priced line-history at ~25/day and named it non-load-bearing |
 | `cron-jobs.md` | the four cron-job.org entries, their schedules, and the measured GitHub-Actions delivery delays |
 | `branch-firing-audit.md` | **which branch actually fires**: the main-vs-frontend-rebuild split, every operational change marked live/not-live, the Actions run log against the burn series, the declared-cron ceilings, **the third scheduler (Vercel), the `/api/propsnap` trace, the measured close distribution, and the redesign-vs-cron-cut pricing** |
