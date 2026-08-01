@@ -749,3 +749,139 @@ A membership guard would encode the judgment it cannot make; a count guard canno
 parameter, and it fails loudly the moment the number moves without the table moving with it.
 `lockMaxAgeMin` sat unregistered while its structural twin was registered from the start — **that
 is the failure mode a count guard catches and a membership guard would have papered over.**
+
+---
+
+# HR PAIR STRUCTURE RULE — MEASURED FIRST (memo section, 2026-08-01, owner's proposal)
+
+**NOTHING SHIPS.** The proposal: *no two players from the same team on a HR parlay*, on the stated
+reason that two teammates both homering is **less** likely than two homers spread across teams or
+games.
+
+## §H1 THE CLAIM IS BACKWARDS. MEASURED, NOT ARGUED.
+
+`node tools/hr-pair-dependence.mjs 2026-04-01 2026-07-31` — statsapi, **zero Odds credits**.
+**1,605 final games · 120 dates · 610 hitters.** Pooled P(≥1 HR in a game with a PA) = **0.1067**.
+Ratio = observed joints ÷ Σ p_i·p_j. **Above 1 is positive dependence.** 95% CI from a **cluster
+bootstrap over games** (dates for stratum c) — pairs inside one game are not independent draws.
+
+| stratum | pairs | joints | **rate-matched ratio [95% CI]** | raw ratio |
+|---|---|---|---|---|
+| **(a) same team, same game** | 151,787 | 1,877 | **1.103 [1.048, 1.168]** | 1.087 |
+| **(b) opposing teams, same game** | 166,424 | 2,020 | **1.065 [1.022, 1.140]** | 1.067 |
+| **(c) different games, same slate** | 120,640 | 1,346 | **0.982 [0.893, 1.071]** | 0.981 |
+
+**🔴 THE SECOND PRE-COMMITTED BRANCH FIRES, AND IT IS NOT SOFTENED: the claim is backwards.**
+Two teammates homering in the same game is **~10% MORE likely than independence, not less**, and
+the interval excludes 1. **A rule banning the pair would remove positively-correlated legs.** For a
+parlay — where every leg must hit — positive dependence means the true joint probability is
+**higher** than an independence price implies. **Those are the pairs a parlay bettor is helped by,
+and banning them removes the structure rather than pricing it.**
+
+**THE IMPOSSIBLE BRANCH DOES NOT FIRE.** Raw 1.087 vs rate-matched 1.103 — same sign, similar
+magnitude. **The result is not selection**: pairing two high-rate hitters explains almost none of it.
+
+**THE ORDERING IS THE MECHANISM, AND IT CUTS AGAINST THE CLAIM EXACTLY AS PRE-COMMITTED.**
+(a) 1.103 > (b) 1.065 > (c) 0.982. Same team shares park, weather **and** the opposing starter;
+opposing teams share park and weather but face different pitchers; different games share nothing.
+**Stratum (c) is the control and it behaves perfectly — no dependence, interval spanning 1.**
+Shared game-level inputs are the explanation, and they push (a) up, not down.
+
+**THE FOURTH BRANCH — is the right unit same-game rather than same-team?** Directionally yes, but
+honestly: **the (a) and (b) intervals overlap substantially** ([1.048, 1.168] vs [1.022, 1.140]).
+**Same-GAME is the well-supported unit; the same-TEAM increment over it is not separable at this
+n.** The owner's phrasing picks the narrower unit and the data does not support that boundary.
+
+**LINEUP ADJACENCY IS NOT THE MECHANISM.** If consecutive hitters facing one pitcher in one inning
+drove it, adjacent pairs would show the largest effect. They do not:
+
+| lineup gap | pairs | joints | ratio [95% CI] |
+|---|---|---|---|
+| 1 | 32,735 | 442 | 1.100 [1.046, 1.247] |
+| 2 | 28,507 | 380 | 1.108 [1.021, 1.168] |
+| 3 | 24,415 | 333 | 1.153 [1.116, 1.321] |
+| 4 | 20,413 | 233 | 1.026 [0.889, 1.109] |
+| ≥5 | 41,651 | 478 | 1.161 [1.090, 1.222] |
+
+**Flat-to-rising with distance.** The dependence is **game-level** (park, weather, starter, ball),
+not batting-order-level.
+
+**KNOWN LIMIT, stated:** p_i is estimated from the same sample the joints are measured in, which
+biases the ratio slightly **toward** 1 — so it is conservative for a dependence claim in either
+direction, and the true (a) effect is if anything larger than 1.103.
+
+## §H2 WHAT ALREADY CONSTRAINS HR PAIRS — MORE THAN EXPECTED
+
+| constraint | line | scope |
+|---|---|---|
+| **`coreNoHR: true`** | cfg L1121, enforced **L2975–76** | **DAILY/CORE money NEVER touches HR — the type or any leg whose lkey contains `\|batter_home_runs\|`.** HR lives in FUN only. **NOT `dscpM`-gated: it applies in ALL FOUR MODES** |
+| HR line restriction | L2241 | only the **0.5 (anytime)** line is ever ingested — never 1.5+ |
+| **`simJoint`** | L2693–2706 | same-**game** groups repriced from joint sim paths, scaled by `jointAll ÷ Π marginals`, **clamped 0.25–4×**; armed only under `shV2Sim()`. **Cross-game independence stands, explicitly** |
+
+**🔴 IMPOSSIBLE BRANCH FIRES: the suspension the owner believes is live does not exist.**
+`hrrAltMax` suspends **`batter_hits_runs_rbis`** — H+R+RBI — **not `batter_home_runs`.** There has
+never been an HR-anytime suspension. The two are separate markets and the memory conflates them.
+
+**FIRST PRE-COMMITTED BRANCH FIRES: `simJoint` ALREADY PRICES SAME-TEAM PAIRS**, because it groups
+by `gkey` and same-team implies same-game. **So the proposal is a request to change a dependence
+treatment, not to add a rule** — and §H1 says the change would be **upward**, not a ban. One
+correction to the framing though: **there is no rho constant to set.** simJoint's scale factor is
+**measured per group from the sims**, not a parameter — its own comment says *"measured from the
+sims, joint outcomes, not a guess."* The open question is whether the sim's implied ratio matches
+**1.103**, and that is checkable only on a board that contains such a pair.
+
+**THE EXPOSURE, MEASURED ON THE ONLY REAL BOARD WE HAVE (2026-07-26, 168 distinct tickets):**
+
+| | count |
+|---|---|
+| tickets with ≥ 2 HR legs | **12** |
+| HR pairs in them | **81** |
+| **same-team** | **0** |
+| same-game, opposing teams | **3** (Clemens MIN + Kurtz ATH · Reynolds PIT + Busch CHC · Perez KC + Dingler DET) |
+| different games | 78 |
+
+**THE PROPOSED RULE'S TARGET SET IS EMPTY ON THAT BOARD.** Zero same-team HR pairs — an expected
+consequence of `coreNoHR` pushing HR into FUN, where tickets are built from a thinner pool.
+
+**LEGACY MODES:** HR legs appear in FUN in every mode, but **`coreNoHR` bars them from CORE in all
+four** — so unlike `outsSusp` and `hrrAltMax`, this one is **not** a two-tap exposure and does
+**not** join M20's row.
+
+## §H3 CAP vs CORRELATION TERM — MOOT IN ITS ORIGINAL FORM
+
+**Item 3 was conditional on §H1 confirming the claim. It did not.** Recorded rather than designed:
+
+- **A cap** would remove 0 pairs on the 07-26 board and, in general, remove pairs whose measured
+  joint runs **10% above** independence. On a parlay that is **removing structure that helps the
+  ticket**, so its E[ln] effect is expected **negative** — and the evaluator's known blindness to
+  dependence means it would score the removal as roughly neutral, i.e. **the instrument cannot see
+  the harm it would do.** That is the strongest argument against acting here at all.
+- **A correlation term is already present** and is `simJoint`. It is representable *within* a
+  ticket (22 of 25 groups, M16) and **not** across tickets — unchanged by this proposal.
+- **The boundary the strata support is same-GAME, not same-TEAM** — and same-game is what
+  `simJoint` already keys on. **The engine's existing unit is the one the data supports.**
+- **Reversibility:** a cap is a structure constant in the frozen table; `simJoint`'s scaling is not
+  a parameter at all. **Neither is the small reversible change the proposal assumed.**
+
+## §H4 VINTAGE — IF ANYTHING WERE TO SHIP
+
+It would be a **structure cap** (frozen table, structure section) — not a model parameter and not a
+suspension, since no HR suspension exists to extend. **It moves the engine string, resets the
+homogeneous window, and needs the pending-live-verification sequence.** **The vintage cost right
+now is ZERO** — the window has been at zero for five dark days, exactly as with the outs flag —
+and **it could ride the next hash-moving ship rather than taking its own.** None of that is a
+reason to ship it; §H1 is the reason not to.
+
+## §H5 SEQUENCING FOR THIS PROPOSAL
+
+- **Measurable TODAY at zero credits — DONE:** §H1's three strata, the rate-matched control, the
+  adjacency split, the existing-constraint trace, and the 07-26 exposure census.
+- **Needs the ledger:** whether any HR pair was ever actually placed, and at what result. Read 4.
+- **Needs boards:** whether a same-team HR pair ever reaches a card at all (zero on the one board
+  we have), and whether `simJoint`'s implied ratio matches the measured **1.103** when one does.
+- **Needs the exit:** any change to how dependence is priced — that is a model change, and the
+  parameter exit is what licenses it.
+
+**RECOMMENDATION: do not build the rule.** The measurement says it would remove the wrong thing,
+the exposure it targets is empty on real data, and the engine already prices the dependence at the
+unit the data supports.
