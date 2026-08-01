@@ -86,6 +86,181 @@ same-day ship rather than a spec.**
 ---
 
 
+> ### ⚠️ A DEFECT I CAUSED THIS TURN, CAUGHT BY THE GUARD (2026-08-01)
+> Attributing the 621 needed the props archive, which lives on the `line-history` branch. I fetched
+> it with **`git fetch origin line-history --depth=1`** — which wrote `.git/shallow` and **orphaned
+> four doc-cited commits on that branch** (`1e77c9d`, `ca80f02`, `e414249`, `77eef5d`).
+> **`sha-references` went red and named all four.** Repaired with a full fetch; all four resolve and
+> are reachable again. **A read-only investigation mutated repo state, and only the guard said so.**
+> **Standing form for archive reads from here: full fetch, never `--depth=1`.**
+
+## 0.1 🔴 THE CALIBRATION FIT IS LIVE AND ITS VINTAGE IS UNDATEABLE — scope, before it sits overnight
+
+### 0.1a WHAT READS `mults` AT RUNTIME — TRACED TO A LINE. THE ENGINE APPLIES IT AT PRICE TIME.
+
+```
+/api/calibration → src/lib/engine-client.ts L347   calW: cal.mults ?? null   (into SH_V2)
+                 → legacy/index.html      L1744    (calW && SH_V2.calW[mkt] != null)
+                                                     ? Number(SH_V2.calW[mkt]) : 1
+```
+**SHRINK-ONLY, PER MARKET, APPLIED TO THE MODEL BLEND WEIGHT AT PRICE TIME.** So a board priced
+while `mults.pitcher_outs = 0.1429` blended `pitcher_outs` at **1/7th** the model weight of a board
+priced without it.
+
+> **THE PRE-COMMITTED BRANCH FIRES: the engine reads `mults` at price time, so every outs
+> measurement taken through a live multiplier is DOWNSTREAM and gets the stamp.** The M2/M2′
+> justifying evidence for the outs suspension was measured on boards whose outs pricing ran through
+> a multiplier of unknown value at unknown times.
+>
+> **⚠️ ONE LIMB NOT TRACED, AND IT DECIDES HOW WIDE THE STAMP IS:** L347 is the **CLIENT** arm
+> (`armV2` in `engine-client.ts`). **Whether the SERVER generate path also sets `calW` was not
+> verified this turn** — if it does not, archived server boards were priced WITHOUT the multiplier
+> and only device-generated boards are downstream. **That is the first thing to read tomorrow; it is
+> a grep, not a measurement.**
+
+### 0.1b IS THE MULTIPLIER'S HISTORY RECOVERABLE? NO — AND THE VINTAGE IS UNDATEABLE.
+
+| source | result |
+|---|---|
+| git history of any mirroring file | **none exists.** `mults` lives only in the Upstash store (`K_WEIGHTS`); nothing in the repo mirrors it |
+| the store's own history | **`log: 0 entries`** in the served response — empty |
+| `lastRun` | **`null`** |
+| Upstash versioning | **not established, and not reachable without the dashboard** |
+
+> **THE VINTAGE CANNOT CURRENTLY BE DATED, and on this evidence it is permanent.** *"Everything
+> measured after that date is downstream of a moved fit"* **cannot be evaluated** — the date is
+> missing input, not a small number.
+
+### 0.1c IS THE EMPTY LOG A PARTIAL-WRITE SHAPE? NO — THE WRITE ORDER RULES IT OUT.
+
+`app/api/calibrate/route.ts`, in order:
+```
+L339  summary.reliability = fitReliability(graded)
+L351  summary.window = {...}
+L438  summary.full = full
+L444  await redisSetJson(K_SUMMARY, summary)      ← SUMMARY WRITTEN FIRST
+L447  const auto = (await redis(["GET", K_AUTO])) ?? "on"
+L449  if (auto !== "off") {
+L455      await redisSetJson(K_WEIGHTS, weights)  ← WEIGHTS WRITTEN SECOND
+L466      adjustments: weights.log.length
+```
+**A death mid-write would lose WEIGHTS and keep SUMMARY. We observe the opposite — weights present
+(`mults` populated), log empty.** That is **not** the partial-write shape, so **it is not an M-item
+on the calibrate job.** The empty log is consistent with a `weights` blob whose `log` array was
+never appended or was reset; **which of those is undetermined from the served response** and needs
+the raw `K_WEIGHTS` blob.
+
+### 0.1d THE ONE SENTENCE FOR THE FREEZE DOC
+
+> **The calibration pause froze a LIVE fit — `auto` is on, `mults` carries `pitcher_outs` 0.1429,
+> and 7 of 9 markets clear both thresholds — whose vintage cannot currently be dated, because
+> `lastRun` is null and the store's log is empty. The homogeneous-window claim is therefore
+> UNRESOLVED, not restated; and the third freeze point was NOT precautionary.**
+
+**The global fit did not move:** `s = 1`, `slopeBefore === slopeAfter` to fifteen digits on n = 1908.
+**Per-market moved; global is an identity.**
+
+---
+
+## 0.3 🔴 NO BOARD — 2026-08-01. SIXTH DARK BOARD-DAY, CHOSEN.
+
+**DECISION RECORDED AT `2026-08-01T22:54:10Z`.** The window (22:10Z–23:00Z) was **still open** when the decision
+was taken — this is a **CHOICE, not a timeout.**
+
+> ### THE FAILING CONDITION, NAMED: THE UNATTRIBUTED 621.
+> The gate's own words are that **no board fires until the residual resolves.** At 22:41:20Z the
+> quota read **19,337 / 663 against 19,958 / 42 at 01:35:56Z — 621 credits in 21.09 h.** That is the
+> residual **four times over**, on a day the four branches were written against a **146**-credit
+> question. The Vercel function log is unread. **Firing into that is a bet on an unknown, which is
+> the sentence that set the gate.**
+>
+> **COST WAS NEVER THE REASON.** The board is ~60–70 against **19,337 remaining** — 0.35% of the
+> pool, and the runway is not the constraint. **NOT affordability. NOT the window.**
+
+**AFTER ATTRIBUTION (§0.2) THE FAILING CONDITION DOES NOT CLEAR: ~291–300 credits survive.**
+
+---
+
+## 0.2 🔴 THE 621, ATTRIBUTED FROM DISK — A LARGE RESIDUAL SURVIVES
+
+**All of this is archive + Actions log. No dashboard, no Odds credits.**
+
+### The props archive for 2026-08-01 (`line-history` branch, `data/props/2026-08-01.json`)
+
+| # | t (UTC) | kind | events | in quota window | ~credits @5.84 | @6 |
+|---|---|---|---|---|---|---|
+| 1 | 00:13:45Z | close | 7 | no (pre-01:35) | 41 | 42 |
+| 2 | 07:38:14Z | pre | 15 | **YES** | 88 | 90 |
+| 3 | 17:56:28Z | close | 15 | **YES** | 88 | 90 |
+| 4 | **19:30:25Z** | close | **3** | **YES** | **18** | **18** |
+| 5 | 20:39:43Z | pre | 11 | **YES** | 64 | 66 |
+| 6 | 21:44:15Z | close | 11 | **YES** | 64 | 66 |
+
+**Day total: 6 snapshots, 62 events ≈ 362–372 credits.**
+**Inside the quota window (01:35:56Z → 22:41:20Z): 5 snapshots, 55 events ≈ 321–330 credits.**
+
+### The Actions run log, same window — 12 runs on 08-01
+
+`engine-v2-props-history` **×7** (00:13:37 · 07:38:05 · 17:56:21 · 19:30:17 · **20:01:26** · 20:39:37
+· 21:44:06) · `engine-v2-context` ×2 · `board-archive` ×2 · `pages build` ×1.
+**Every one `schedule` / `success` / `main`.**
+
+- **SEVEN RUNS, SIX SNAPSHOTS.** The 20:01:26Z run printed **`skipped: no unstarted games`** and
+  captured nothing. **Zero credits, and the run-versus-payment gap is visible in the log** — the
+  delivery-redundancy/payment-dedupe design working in production.
+- **`board-archive` and `context` cost ZERO** — `/api/board` has no Odds-API reference; the context
+  builder is statsapi-only. `pages build` runs no repo script.
+- **MIN_GAP held: consecutive paid gaps 444 · 618 · 94 · 69 · 65 minutes — all ≥ 40.** A fourth
+  independent confirmation, on production data, of the saving whose guard was dead for 2 d 20 h.
+
+> ### ✅ THE line-history BRANCH DOES NOT FIRE — THE DISABLE HELD.
+> **Last `engine-v2-line-history` run: `2026-07-30T21:53:41Z`. ZERO runs on 07-31 and ZERO on
+> 08-01.** The disable shipped 07-31 and has held for two days. **No burn figure restates.**
+
+### 🔴 THE RESIDUAL AFTER ATTRIBUTION
+
+```
+QUOTA-MEASURED SPEND 01:35:56Z -> 22:41:20Z .............  621
+ATTRIBUTED — props-history, 55 events in-window .........  321 (@5.84) .. 330 (@6)
+                                                          ------------------------
+RESIDUAL, UNATTRIBUTED ..................................  291 .. 300
+```
+
+> **THE PRE-COMMITTED "LARGE RESIDUAL SURVIVES" BRANCH FIRES. Plainly: ~291–300 credits spent
+> today by something that is not a workflow in this repo.**
+>
+> **THE SHAPE MATCHES §2's.** 291 over 21.09 h = **13.8/h**, against §2's measured working-day
+> residual of **14.8/h** (07-30 16:45Z → 07-31 01:25Z). **Same rate, one day later. The
+> unattributed actor is LIVE TODAY, not a one-off on 07-31.**
+>
+> **THE 146 IS NOW THE SMALLER EVENT.** The burst question has not stayed at its original size; it
+> has been joined by a second, larger, same-shaped day.
+>
+> **IMPOSSIBLE BRANCH — "attributed exceeds 621": DOES NOT FIRE.** 330 < 621; the quota series and
+> the archive agree in direction and magnitude.
+
+### The two `--window` crons — PARTIAL LANDING, and the trap fired exactly as written
+
+**The flag WORKED where it ran.** Run `30714901004` (19:30:17Z) printed, verbatim:
+
+```
+window: 120 min -> 3 of 29 events
+```
+
+**A 29-event slate restricted to 3 — ~18 credits instead of ~170.** The archive's snapshot 4 is
+that capture.
+
+**But only ONE windowed capture exists.** The 20:01:26Z run skipped on `no unstarted games` before
+any capture; the 20:39 and 21:44 runs printed no window line and took 11 events each — the
+pre-existing crons.
+
+> **THE LANDING TEST IS NOT EVALUABLE, AND THAT IS ITS PRE-COMMITTED RESULT.** `price-path`'s
+> 60–120 bucket needs a **PAIR**. One windowed capture produces no pair. **This is exactly the
+> partial landing §4C warned about — "it looks like a landing and is not."** The flag is proven
+> correct on the firing copy; the SPACING is unproven.
+
+---
+
 ## 0.4 🔴 READS 1 AND 3 RUN — 2026-08-01T22:41Z. READS 2 AND 4 BLOCKED ON THE PHRASE.
 
 ### ⏱️ TWO THINGS THAT OUTRANK THE READS, BOTH FROM THE QUOTA LINE
