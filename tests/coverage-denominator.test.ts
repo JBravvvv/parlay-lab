@@ -4,6 +4,7 @@ import path from "node:path";
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { liveCoverage } from "@/lib/server/board-store";
 import { boardStale, LU_PCT_FLOOR } from "@/lib/board-stale";
+import { stripComments } from "./helpers/source";
 
 /**
  * EVERY COVERAGE RATIO DECLARES ITS DENOMINATOR — enforced, not documented.
@@ -176,7 +177,14 @@ describe("coverage ratios declare their denominator, and the declaration is chec
    * is where that reader finds out.
    */
   it("the engine's luCoverage is MIXED-denominator — documented, frozen, unread by any gate", () => {
-    const src = fs.readFileSync(path.join(__dirname, "..", "legacy", "index.html"), "utf8");
+    /* STRIP COMMENTS FIRST (2026-08-01). OBSERVED DEAD: with `var luDen=slate.games.length;`
+       renamed in the code and the exact string left in a comment beside it, this guard passed
+       9/9. It pins the ENGINE'S COVERAGE DENOMINATOR — the number `liveCoverageOf`, the
+       staleness gate and the T=0.80 fire window are all reasoned about against — and a
+       presence assertion over raw text is satisfiable by prose. Note the scope: only `src` is
+       stripped. The luCoverage-consumer loop below DEPENDS on seeing comments, and reads its
+       own unstripped copy. */
+    const src = stripComments(fs.readFileSync(path.join(__dirname, "..", "legacy", "index.html"), "utf8"));
     expect(src).toContain("var luDen=slate.games.length;");
     expect(src).toContain("if(started)return;");
     // pct and observedPct really are the same expression — not a transcription slip here
