@@ -157,4 +157,52 @@ describe("doc structure — the memory is guarded like the code", () => {
     const missing = promised.filter((c) => !src.includes(`("${c}"`) && !src.includes(`"${c}",`));
     expect(missing, "promised in the docstring, absent from the code — phantom coverage").toHaveLength(0);
   });
+
+  /* G — AMBIGUOUS ADDRESS (2026-08-01, owner's item 3). The handoff shipped with TWO
+     sections labelled `### 4A.` — the four reads and the cron state — and every guard in
+     this file passed on it. The docs are the memory across compaction and they are
+     addressed by label ("§4A", "§5 reading 15"); a label that resolves to two places is a
+     defect IN THE MEMORY, not a typo.
+
+     WHY FULL-TEXT DUPLICATE DETECTION WOULD NOT HAVE CAUGHT IT: the two headings differ in
+     everything except the label. Only the ADDRESS collided. So this keys on the leading
+     `N.` / `NA.` token and nothing else — which also means the deliberate full-text repeats
+     in collection-period.md ("### CORRECTION (2026-07-26) …") are untouched, because they
+     carry no address.
+
+     MEASURED at introduction, across docs/*.md + CLAUDE.md: TWO collisions —
+     session-handoff's `4A` (the reported one) and branch-firing-audit's `5`, which was NOT
+     known and which nothing referenced by number. Both fixed in the same commit. */
+  function labelledHeadings(text: string): Map<string, number[]> {
+    const seen = new Map<string, number[]>();
+    text.split("\n").forEach((ln, i) => {
+      const m = ln.match(/^#{2,6}\s+(\d{1,2}[A-Z]?)\.\s/);
+      if (!m) return;
+      const at = seen.get(m[1]) ?? [];
+      at.push(i + 1);
+      seen.set(m[1], at);
+    });
+    return seen;
+  }
+
+  it("G: the checker itself sees a duplicated section label", () => {
+    const doc = "## 4A. FIRST\ntext\n## 4B. OTHER\n## 4A. SECOND\n";
+    const dupes = [...labelledHeadings(doc)].filter(([, at]) => at.length > 1);
+    expect(dupes.map(([l]) => l), "the address checker cannot see a collision").toEqual(["4A"]);
+  });
+
+  it("G: no doc has two sections at the same address", () => {
+    const collisions: string[] = [];
+    for (const f of docFiles()) {
+      for (const [label, at] of labelledHeadings(readFileSync(f, "utf8"))) {
+        if (at.length > 1) collisions.push(`${f}: "${label}." appears at lines ${at.join(", ")}`);
+      }
+    }
+    expect(
+      collisions,
+      `a section label resolves to more than one place — the docs are addressed by these ` +
+        `labels across compaction, so an ambiguous one loses whichever section the reader ` +
+        `does not land on:\n  ${collisions.join("\n  ")}`,
+    ).toEqual([]);
+  });
 });

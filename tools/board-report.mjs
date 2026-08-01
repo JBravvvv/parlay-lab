@@ -104,8 +104,16 @@ export function reopenReport(data, echo) {
     byMarket[k] = (byMarket[k] ?? 0) + 1;
   }
   const mktN = echo?.mktN ?? null;
-  const consMinN = echo?.consMinN ?? 100;
-  const crossed = mktN ? Object.fromEntries(Object.entries(mktN).map(([m, n]) => [m, { n, crossed: n >= consMinN }])) : null;
+  /* 2026-08-01: was `echo?.consMinN ?? 100`. The VALUE agreed with the engine, but the
+     fallback fired on an ABSENT ECHO — which is reading 3's stop condition, not a missing
+     config key. The tool would have printed a `crossed` verdict computed from a copied
+     literal on exactly the boards where the push did not land. Absent is not 100.
+     Pinned by tests/mirrored-constants.test.ts. */
+  const consMinN = typeof echo?.consMinN === "number" && Number.isFinite(echo.consMinN) ? echo.consMinN : null;
+  const crossed =
+    mktN && consMinN !== null
+      ? Object.fromEntries(Object.entries(mktN).map(([m, n]) => [m, { n, crossed: n >= consMinN }]))
+      : null;
   return { byReason, byMarket, mktN, consMinN, crossed };
 }
 
@@ -170,7 +178,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`\nclampActivity (reading 24): ${ca ? `PRESENT, ${Object.keys(ca).length} sites` : ">>> ABSENT — clampLog arming is not reaching production analyze"}`);
 
   const r = reopenReport(data, echo);
-  console.log(`\nREOPEN (reading 29): consMinN=${r.consMinN}`);
+  console.log(`\nREOPEN (reading 29): consMinN=${r.consMinN ?? ">>> UNREADABLE — no echo. Reading 3 says the push did not land; the gate is NOT assumed to be 100"}`);
   console.log(`  mktN: ${r.crossed ? JSON.stringify(r.crossed) : ">>> ABSENT from the echo"}`);
   console.log(`  blocked reasons: ${JSON.stringify(r.byReason)}`);
   if ((r.byReason.consensus ?? 0) > 0) console.log("  >>> CONSENSUS BLOCKS PRESENT: the expiry fired but the gate STILL BINDS — those markets did NOT reopen.");

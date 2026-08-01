@@ -413,7 +413,10 @@ nothing and 1 of `MAX_RUNS_PER_DATE` = 3.**
 ---
 
 
-### 4A. CRON STATE — UPDATED 2026-08-01
+### 4C. CRON STATE — UPDATED 2026-08-01
+*(Relabelled 2026-08-01 from a SECOND `4A.` — the file shipped with two sections at that
+address and every doc guard passed on it. `4A` keeps its original meaning, THE FOUR READS;
+`4B` is unchanged. Guarded from here by `tests/doc-structure.test.ts` rule G.)*
 
 **`main` now declares SIX props crons** (read back from `origin/main` = `b1f17d2`):
 
@@ -765,6 +768,32 @@ Traynor 07-31), 11 at g = 4; simulation projects **83 of 85 [80, 85] armed by fr
   **New docs:** `docs/auto-lock-memo.md` (1,557 lines, 42 sections) ·
   `docs/props-window-cron.diff` (the applied diff, kept as the record).
 
+### 6B. POST-COMPACTION TURN — 2026-08-01, applied on top of `614ad4e`
+
+**COMPACTION HELD.** `614ad4e` resolves; `origin/frontend-rebuild` was equal to it at the start of
+this turn; §§1–5 intact; **the fire block re-hashes
+`5b86b0e0b5171dc939c541d470170453455294710d5590736727ba13dad867aa`, byte-identical to `03c4ae4`.**
+Open readings **29**, contiguous 1–29, **five with impossible branches (6, 8, 13, 15, 23)**.
+
+| shipped this turn | what |
+|---|---|
+| `tests/self-arm-stamp.test.ts` | **REWRITTEN** — the demotion. 3 tests → **6**. §12F |
+| `tests/mirrored-constants.test.ts` | **NEW**, 6 tests — the mirror sweep's encoded invariant. §12G |
+| `tests/helpers/source.ts` | **NEW** — one comment-stripper, after the same defect twice |
+| `src/lib/engine-echo.ts` | `MODELLED_MARKETS` + `NAMED_CATS`, the `DAMPING` pattern generalized. **Exports only — the echo PAYLOAD is unchanged**, so no board shape moves |
+| `tools/board-report.mjs` | the `?? 100` echo fallback → `null` + `>>> UNREADABLE` |
+| `tests/doc-structure.test.ts` | **rule G** — unique section addresses. 8 tests → **10** |
+| `docs/session-handoff.md` | duplicate `4A` → **`4C`**; new §6B, §8.1, §12F, §12G |
+| `docs/branch-firing-audit.md` | duplicate `5` → **`5A`** (found by rule G, not reported) |
+| `docs/freeze-exit-bundle.md` | **M29** bundle row + vintage row |
+
+- **SUITE: 85 files / 644 tests → 86 files / 655 tests, all green.** `npx tsc --noEmit` exit **0**.
+- **NO ENGINE STRING MOVED.** `legacy/index.html` was flipped and reverted for observed red (b) and
+  re-hashes `49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`, with `git status`
+  clean on it. Served chunk, `ENGINE_SHA` and `served-verification.json` all **untouched**.
+- **NOTHING WAS MEASURED AND NO BOARD FIRED.** Quota reading unchanged: **19,958 remaining / 42 used
+  at 2026-08-01T01:35:56.369Z** — no Odds credit was spent this turn.
+
 ## 7. THIS SESSION'S MEASUREMENTS — ALL AT ZERO ODDS CREDITS, EACH WITH ITS POPULATION STAMP
 
 **Every figure below cost nothing.** statsapi is free and keyless; the props archive and the board
@@ -952,6 +981,37 @@ archived 07-26 board carry a line, a modelled market, and a priced side.
 **PER-STAGE DROP COUNTS ARE NOT MEASURED** — only stage 12's (4.5%) and stage 9's (7,467 rows at
 1.5 plus 3,254 at 2.5 in the archive). **The other twelve stages have no count.** Spec'd in §11.
 
+### 8.1 WHY THE COUNTS CANNOT BE ADDED CHEAPLY, AND WHAT A RECONSTRUCTION WOULD MISS (2026-08-01)
+*(numbered `8.1` on §7's convention, deliberately NOT `8A` — `8A.1`–`8A.4` are already taken, by
+legacy addresses carried inside §13)*
+
+**THE REAL COUNTERS ARE NOT ADDITIVE.** Every one of the fourteen stages is a `continue`/`return`
+**inside the engine string**, so incrementing a counter at each one **moves the engine hash** and
+costs a served-artifact re-verification and a vintage event. **They ride the next hash-moving ship,
+alongside `simJoint`'s j2/pm emission (§11 item 2)** — one verification for both, rather than two.
+
+**THE OUT-OF-ENGINE RECONSTRUCTION — spec-only, and its limit is the point.** A tool differencing
+the archived feed against the archived board can re-derive a stage's drop **only if every input that
+stage tests is on disk.** Nine of fourteen qualify; **five do not**, because they test state the
+engine held at build time and never emitted:
+
+| # | stage | why it is opaque to a reconstruction |
+|---|---|---|
+| 10 | L2244 no stats record | needs the stats map as of build time |
+| 11 | L2252·L2273·L2372 pitcher with no projection | needs the projection map as of build time |
+| 12 | **L2287 `ab30 < 25`** | needs `ab30`, which lives in the stats record, not the feed |
+| 13 | **L2297 posted-lineup scratch** | needs the lineup snapshot at build time — time-varying within the day |
+| 14 | L2482 selected side unpriced | happens **after** model pricing; needs the model's chosen side |
+
+> **THE ARGUMENT AGAINST SHIPPING THE RECONSTRUCTION AS A SUBSTITUTE: the five it cannot see are the
+> five worth seeing.** The nine it can are mechanical and structural — unmodelled market, missing
+> line, malformed key, duplicate, unquoted side. **The five opaque ones are the data-dependent
+> ones**, and they include **both bare literals whose thresholds nothing justifies** (`ab30 ≥ 25`,
+> and the HR-rung literal's sibling) and **the only stage that varies with when the board was
+> built** (lineup scratch). A reconstruction would report the boring nine precisely and stay silent
+> on the interesting five, **which reads as coverage.** It stays spec-only for that reason, and if
+> it is ever built the limit ships printed, per stage, in its own output.
+
 ---
 
 ## 9. THE BARE-LITERAL CLASS — AND WHAT THE CENSUS ACTUALLY COVERS
@@ -1081,8 +1141,9 @@ about baseball, and that includes the owner's own proposals.**
 | 1a | **the attestation ADDENDUM, not a backfill** — an entry dated ≤ 2026-08-01 with no `placed` field resolves to `placed: true BY ATTESTATION` **at read time** | the owner's attestation, **recorded 2026-08-01** | n/a — deliberately **not** a field write; a fourth mutable subfield on a locked row is the class M22 flags |
 | **2** | **`simJoint` j2/pm emission** — emit both factors per group; **a measurement, not an inference from a rounded number** | — | **NO — inside the engine string.** Rides the next hash-moving ship; vintage cost currently zero |
 | **3** | **the probability floor** — any value in `(30.9%, 37.1%]` reproduces the board exclusion; 34% mid-gap | **BLOCKED ON READ 4** for a data fit. **As specified it is FITTED TO A RULE, not to data, and shipping it would launder `coreNoHR`'s provenance** | n/a — recorded as the general form, spec-only |
-| **4** | **the self-arm demotion** — count → informational, **assert the BRAKES**, crossing record becomes an **append-only log** the guard checks for **completeness** | the owner's authorization. **The threshold has already arrived: ~87% of refreshes change the count** | test-only |
-| **5** | **per-stage drop counts** for the fourteen-stage chain — twelve stages have no count | none; archive + board are on disk | measurement only |
+| ~~**4**~~ | ~~**the self-arm demotion**~~ — **✅ SHIPPED 2026-08-01** (owner's item 1). Count → informational, brakes asserted, crossing record append-only with a monotone floor, guard checks **completeness** and names the umpire. Both reds observed; the original proven green on the same edit. **§12F**, and the residual is named there | — | test-only |
+| **5** | **per-stage drop counts** for the fourteen-stage chain — twelve stages have no count | none; archive + board are on disk | **NO — NOT ADDITIVE.** Every stage is a `continue`/`return` **inside the engine string**, so a counter at each one moves the hash. **RIDES THE NEXT HASH-MOVING SHIP, alongside item 2's `simJoint` j2/pm.** The out-of-engine **reconstruction** tool stays **spec-only** and can see **9 of 14** — see §8 |
+| **5a** | **convert the seven TS/TSX market-set mirrors to `MODELLED_MARKETS`**, and `tests/strict-coercion.test.ts`'s inline comment-stripper to `tests/helpers/source.ts` | none. The six **Python** mirrors cannot import it and stay guard-covered. strict-coercion is **signed off — replace, do not edit in place** (M27) | **YES** — `src/` and test-only, no engine string |
 | **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
 | 7 | full `/api/odds` authentication (**the only thing that closes the route**) · `APP_PASSCODE` steps 2–4 · M28's `src/lib/pass.ts` | **step 4 is LAST** — see §3 | — |
 | 8 | the targeted-capture **landing test** — first day the pair runs, `price-path` must print **n > 0 in 60–120** | the crons delivering | — |
@@ -1326,6 +1387,100 @@ so **P(no crossing) ≈ 13% — the count already changes on ~87% of refreshes.*
 `self-arm-stamp` fires on data alone.** `sha-references` fires on a rebase orphaning a citation
 (always a real defect); `workflow-branch-sync` fires on **divergence and on 14-day waiver expiry** —
 a calendar, designed to demand one decision per waiver, working as intended.
+
+**THE DEMOTION IS APPLIED (2026-08-01, owner's item 1).** The standing rule above is unchanged and
+was followed: the count is demoted to informational, **the brakes are asserted**, and the stamp is
+still written by hand. See **§12F** for the defect that forced it and both observed reds.
+
+### 12F. INSTRUMENT DEFECT #7 — THE GUARD PROVED A NUMBER, NOT THE RECORD
+
+**The count was the assertion; the crossing record was PROSE in `ARMED.note` that nothing read.**
+So the guard was **GREEN on a record with a crossing deleted from it** — the live count comes from
+`data/ump_k.json` and does not move when the prose does.
+
+**MEASURED 2026-08-01, on the original guard, before it was replaced:** Willie Traynor's dated
+crossing deleted from `ARMED.note`, while `data/ump_k.json` still carries him at `{"g":5,"k":69}` →
+**`3 passed`, 0 failed.** The record lost a crossing and the instrument said nothing. **That is the
+capture the demotion buys, and it is why this is a defect and not a preference.**
+
+**WHAT REPLACED IT** (`tests/self-arm-stamp.test.ts`, 6 tests):
+| check | strength |
+|---|---|
+| the arm COUNT | **INFORMATIONAL — printed, never asserted.** A count that only rises is not news |
+| **COMPLETENESS** | every umpire at `g >= 5` must carry a dated entry, and the failure **NAMES** them |
+| **APPEND-ONLY** | `CROSSINGS.length >= FLOOR`, floor **4**, monotone — raise it in the commit that appends |
+| the DOUBLE BRAKE | **unchanged in strength**, plus every entry must record `braked: true` |
+
+**BOTH REDS OBSERVED AND PRINTED BEFORE ACCEPTANCE:**
+- **(a) Traynor entry deleted → TWO failures, one edit.** COMPLETENESS: *"…NOTHING RECORDED IT:
+  Willie Traynor"*. APPEND-ONLY: *"the crossing record LOST entries (3 < floor 4)"*. Restored.
+- **(b) `umpKFrozen:true` → `false` in `legacy/index.html` → brake test red** (*"umpKFrozen is no
+  longer true — brake 1 released"*). Reverted; `legacy/index.html` re-hashes
+  **`49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`**, byte-identical, and
+  `git status` is clean on it. **No engine string moved.**
+
+**THE FOUR CROSSINGS ARE BACKFILLED WITH THEIR DATES** — Barrett 2026-07-30 (**`commit: null`, NOT
+GUESSED** — the crossing predates the record and the sha was never captured), Traynor 2026-07-31
+(`200e4028…`), Moore + Thomas 2026-08-01 (both `b68b1e36…`).
+
+> ### 🔴 THE RESIDUAL — NAMED, NOT CLOSED
+> **A crossing that is RECORDED BUT WRONG is caught by nothing.** `date` is checked for SHAPE only
+> (a regex), never against the commit that carried it; `commit` is never resolved; `braked: true`
+> asserts only that **the record claims** a brake, not that a brake held. Wrong date → **green**.
+> Wrong sha → **green**. `braked: true` on a crossing that actually reached a board → **green**.
+> Only `braked: false` is caught, and only because it contradicts the record's own claim.
+> **Closing it needs a git join** — resolve `commit`, assert it touches `data/ump_k.json`, assert
+> its author date equals `date`. **SPEC, NOT SHIPPED.**
+
+### 12G. THE MIRRORED-CONSTANT SWEEP — THE CENSUS NEVER COVERED THIS OBJECT
+
+**The `DAMPING` pattern (engine-echo L39) is confirmed and generalizes.** It extracts by matching
+the LIVE allocator expression and taking the capture group —
+`LEGACY_SRC.match(/\(gUse\[l\.game\]\|\|0\)\*([0-9.]+)/)` → `Number(m[1])`, **null if the expression
+ever moves**, never a default. Shipped this turn on the same pattern:
+`MODELLED_MARKETS` (from `var SH_MKT_LABEL={…}`, **6 keys**) and `NAMED_CATS` (from
+`var SH_NAMED_CATS=[…]`, **8**) in `src/lib/engine-echo.ts`.
+
+**WHY THE CENSUS MISSED IT:** the census (44 params, v2.5) enumerates **config KEYS**. A mirror is a
+different object — a second copy of a key **SET**, or a config **VALUE** re-typed inside a tool that
+never reads `SH_CFG`. Neither is a parameter, so neither was ever counted.
+
+**THE SWEEP — THIRTEEN tracked mirrors of the market set. TWELVE AGREE WITH THE ENGINE TODAY.**
+Six tools (`gate_activity.py`, `ladder_drift.py`, `range_compression.py`, `selection_effect.py`,
+`self_consistency.py`, `snapshot_props.py`) and seven `src/` files. **Plus FOUR config VALUES
+re-typed in `tools/gate_activity.py` — `czEv >= 2` (`coreEvMin`), `legs > 3` (`coreMaxLegs`),
+`czDec > 15` (`coreMaxDec`), `ro.get('need', 100)` (`consMinN`) — all four agree, and the first
+three drive fires-COUNTS, not just labels.**
+
+**THE ONE THAT DIFFERS — and it is real but inert. Registered as M29.** `src/lib/engine-client.ts`'s
+`DIR_MARKETS` names **five of six**, omitting `batter_home_runs`. The omission is defensible (HR is
+a 0.5-only market — engine L2241 drops every other rung — so it has no under side) and is **waived
+with that reason**. The finding is the other half: **`DIR_MARKETS` has ZERO importers and
+`setDirPref` has ZERO callers**, while the engine half is **LIVE** — L2465
+`var pref=(SH_CFG.dirPref&&SH_CFG.dirPref[mkt])||"both"` sits inside `dscp5`
+(`selMode==="dk_fd"||selMode==="ev_gated"` — **the server default**) and **overrides the
+model-chosen side**, and `engine-client` L117 pushes `cfg.dirPref = getDirPref()` from
+`localStorage.pl_dirpref` at boot. **`BoardEcho` carries no `dirPref` field**, so it would not say
+so. Server boards are unaffected (no localStorage; `dirPref:{}` at L1098) — **the exposure is
+device-side only and needs a hand-edited localStorage key.** M28's shape with the halves reversed.
+
+**ENCODED:** `tests/mirrored-constants.test.ts` (6 tests) re-parses the engine and diffs **every**
+mirror on every run — the Python tools cannot import the TS export, so the guard is what covers
+them. **Converting the seven TS/TSX mirrors to `MODELLED_MARKETS` is QUEUED, not done.**
+
+**OBSERVED RED, on real code, before the file was accepted:** `tools/board-report.mjs` L107 read
+`const consMinN = echo?.consMinN ?? 100`. **The value agreed with the engine — the defect was the
+CONDITION.** The fallback fires when **the echo is absent**, and an absent echo is **reading 3's
+stop condition** ("present in the response body or the push did not land"). The tool would have
+printed a `crossed` verdict computed from a copied literal **on exactly the boards where the push
+did not land.** Fixed to `null` + `>>> UNREADABLE`; pinned.
+
+**AND THE SAME LESSON RECURRED INSIDE THE FIX.** The new guard's first version flagged
+`echo?.consMinN ?? 100` **inside the comment recording that the fallback had been removed** — it
+fired on the tombstone. Identical to the ratchet's comment-vs-code correction, **in a guard whose
+own header cites it.** Twice is a class: the stripper now lives once, in `tests/helpers/source.ts`.
+`tests/strict-coercion.test.ts` keeps its inline copy — **it is signed off and is NOT edited in
+place** (the M27 failure mode); converting it is queued.
 
 ---
 

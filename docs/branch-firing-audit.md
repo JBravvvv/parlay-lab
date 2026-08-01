@@ -211,7 +211,10 @@ was written against a two-cron file that has not been the firing copy since 2026
 
 # PART TWO — 2026-07-31, owner's items 1–4
 
-## 5. THE THIRD SCHEDULER: VERCEL. IT EXISTS, IT IS IN NO INVENTORY, AND IT COSTS ZERO.
+## 5A. THE THIRD SCHEDULER: VERCEL. IT EXISTS, IT IS IN NO INVENTORY, AND IT COSTS ZERO.
+*(Relabelled 2026-08-01 from a SECOND `5.` — found by `tests/doc-structure.test.ts` rule G
+while fixing the handoff's duplicate `4A`, not reported. Nothing cited `§5` of this file, and
+§6–§38 keep their numbers, so no reference moves.)*
 
 `vercel.json`, verbatim and entire:
 

@@ -39,6 +39,36 @@ export const sha256Text = (s: string) => createHash("sha256").update(s, "utf8").
 const dampM = LEGACY_SRC.match(/\(gUse\[l\.game\]\|\|0\)\*([0-9.]+)/);
 export const DAMPING = dampM ? Number(dampM[1]) : null;
 
+/**
+ * ── THE DAMPING PATTERN, GENERALIZED (2026-08-01, owner's item 2) ────────────────────
+ * DAMPING above is a RUNTIME READ of the shipped expression rather than a copied literal,
+ * and it is the answer to a class this repo has now hit four times. These two exports
+ * apply it to the modelled-market SET, which is mirrored by hand in thirteen tracked
+ * files (six tools, seven src) — every one of which is a drift waiting to happen, and
+ * none of which the parameter census covers, because the census covers CONFIG KEYS and
+ * this is a key SET.
+ *
+ * Null (not a guessed default) if either declaration ever moves — a missing extraction
+ * must read as "we no longer know", never as an empty market set, which would silently
+ * make every downstream membership test vacuously true. `tests/mirrored-constants.test.ts`
+ * fails on null for exactly that reason.
+ *
+ * WHY EXPORTS AND NOT A REWRITE OF ALL THIRTEEN: six of the mirrors are PYTHON tools that
+ * cannot import this module. They are covered instead by the guard, which re-parses the
+ * engine and diffs every mirror on every run — the repo's own idiom of an encoded
+ * invariant over a written rule. The seven TS/TSX mirrors CAN import these; converting
+ * them is queued, not done, and the guard holds the line meanwhile.
+ */
+const lblM = LEGACY_SRC.match(/var SH_MKT_LABEL=\{([^}]*)\}/);
+export const MODELLED_MARKETS: string[] | null = lblM
+  ? (lblM[1].match(/([a-z_]+):/g) ?? []).map((s) => s.slice(0, -1))
+  : null;
+
+const catsM = LEGACY_SRC.match(/var SH_NAMED_CATS=\[([^\]]*)\]/);
+export const NAMED_CATS: string[] | null = catsM
+  ? (catsM[1].match(/"([a-z_]+)"/g) ?? []).map((s) => s.replace(/"/g, ""))
+  : null;
+
 export type BoardEcho = {
   engineSha: string;
   priorsSha: string | null;
