@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { burnSeries, parseSeries } from "../tools/quota.mjs";
 import { attribute, predCensus, propsCost } from "../tools/burn-report.mjs";
 import { fieldCensus, hrrJoin, kellyFrac, overstake } from "../tools/ledger-report.mjs";
-import { cfSelReport, outsCounts, reopenReport } from "../tools/board-report.mjs";
+import { cfSelReport, outsCounts, reopenReport, sideConsistency } from "../tools/board-report.mjs";
 
 /**
  * GUARDS FOR THE FOUR CHAIN TOOLS (2026-07-31, owner's authorization).
@@ -268,5 +268,35 @@ describe("PLANT (invalid-by-value): each chain tool refuses a value that must ne
     ].join("\n"));
     expect(burnSeries(rows)[0].spent).toBe(0);
     expect(burnSeries(rows)[0].perHour).toBe(0);
+  });
+
+  /* M29 SIDE CONSISTENCY (2026-08-01). The engine's own arithmetic leaves `p >= imp` on
+     EVERY row under dscp5 — "O" because pAdj>=nv, "U" because 1-pAdj > 1-nv. A dirPref
+     override is the only thing that produces p < imp, and it is the ONLY after-the-fact
+     trace of it, because BoardEcho carries no dirPref field. */
+  const row = (lkey, p, imp) => ({ lkey, p, imp });
+  const board = (rows) => ({ categories: { batter_hits: rows } });
+
+  it("sideConsistency passes a board the model could have produced", () => {
+    const r = sideConsistency(board([row("a|batter_hits|1.5", 0.55, 0.50), row("b|batter_hits|0.5", 0.50, 0.50)]), { selMode: "ev_gated" });
+    expect(r.readable).toBe(true);
+    expect(r.checked).toBe(2);
+    expect(r.violations).toEqual([]);
+  });
+
+  it("sideConsistency NAMES a row the model cannot produce", () => {
+    const r = sideConsistency(board([row("ok|batter_hits|1.5", 0.55, 0.50), row("bad|batter_hits|2.5", 0.40, 0.52)]), { selMode: "ev_gated" });
+    expect(r.violations).toHaveLength(1);
+    expect(r.violations[0].lkey).toBe("bad|batter_hits|2.5");
+    expect(r.violations[0].gap).toBeCloseTo(0.12, 6);
+  });
+
+  it("sideConsistency refuses to call an unreadable board clean", () => {
+    // rows with no p/imp are NOT zero violations — that is the fabrication shape this
+    // repo has hit four times. readable:false is a different claim from a pass.
+    const r = sideConsistency(board([{ lkey: "x|batter_hits|1.5" }]), { selMode: "ev_gated" });
+    expect(r.readable).toBe(false);
+    expect(r.checked).toBe(0);
+    expect(r.total).toBe(1);
   });
 });

@@ -771,10 +771,11 @@ Traynor 07-31), 11 at g = 4; simulation projects **83 of 85 [80, 85] armed by fr
 ### 6B. POST-COMPACTION TURN — 2026-08-01, `614ad4e` → `4a29597`
 
 > **THE DEMOTION IS `4a29597d2adbcd21483495f429b139a9b7d8fa40`** (2026-08-01T10:05:17-07:00),
-> followed by one commit recording this sha. **BOTH ARE LOCAL — `origin/frontend-rebuild` IS STILL
-> `614ad4e`.** The instruction authorized the commit ("hold from `614ad4e` until the demotion
-> commits") and did not mention the push. One command closes it:
-> `git push origin frontend-rebuild`.
+> followed by `953bc1b` recording it. **PUSHED 2026-08-01 on the owner's instruction:
+> `614ad4e..953bc1b frontend-rebuild -> frontend-rebuild`.** `origin/frontend-rebuild` =
+> **`953bc1b4fbebb9ddf8f76506889bc990214c04ec`**, and that is the hold point for the turn that
+> follows. *(`953bc1b`'s own subject line says "not pushed" — true when it was written, false one
+> instruction later. The sha, not the subject, is the record.)*
 
 **COMPACTION HELD.** `614ad4e` resolves; `origin/frontend-rebuild` was equal to it at the start of
 this turn; §§1–5 intact; **the fire block re-hashes
@@ -1149,7 +1150,10 @@ about baseball, and that includes the owner's own proposals.**
 | **3** | **the probability floor** — any value in `(30.9%, 37.1%]` reproduces the board exclusion; 34% mid-gap | **BLOCKED ON READ 4** for a data fit. **As specified it is FITTED TO A RULE, not to data, and shipping it would launder `coreNoHR`'s provenance** | n/a — recorded as the general form, spec-only |
 | ~~**4**~~ | ~~**the self-arm demotion**~~ — **✅ SHIPPED 2026-08-01** (owner's item 1). Count → informational, brakes asserted, crossing record append-only with a monotone floor, guard checks **completeness** and names the umpire. Both reds observed; the original proven green on the same edit. **§12F**, and the residual is named there | — | test-only |
 | **5** | **per-stage drop counts** for the fourteen-stage chain — twelve stages have no count | none; archive + board are on disk | **NO — NOT ADDITIVE.** Every stage is a `continue`/`return` **inside the engine string**, so a counter at each one moves the hash. **RIDES THE NEXT HASH-MOVING SHIP, alongside item 2's `simJoint` j2/pm.** The out-of-engine **reconstruction** tool stays **spec-only** and can see **9 of 14** — see §8 |
-| **5a** | **convert the seven TS/TSX market-set mirrors to `MODELLED_MARKETS`**, and `tests/strict-coercion.test.ts`'s inline comment-stripper to `tests/helpers/source.ts` | none. The six **Python** mirrors cannot import it and stay guard-covered. strict-coercion is **signed off — replace, do not edit in place** (M27) | **YES** — `src/` and test-only, no engine string |
+| **5a** | **convert the seven TS/TSX market-set mirrors to `MODELLED_MARKETS`**, and `tests/strict-coercion.test.ts`'s inline comment-stripper to `tests/helpers/source.ts` | none. The six **Python** mirrors cannot import it and stay guard-covered. strict-coercion is **signed off — replace, do not edit in place** (M27). Registered and pinned meanwhile (§12H) | **YES** — `src/` and test-only, no engine string |
+| **5b** | **the twelve remaining PRESENCE-assertion scanners** (§12H) — comment-strip each, **one at a time, each with its own plant**. A twelve-guard sweep in one commit is how a signed-off guard gets weakened in place | none | test-only |
+| **5c** | **the §12F git join** — `commit` resolves · touches `data/ump_k.json` · author date == `date` · **`braked` becomes a CHECK** against `umpKFrozen:true` (comment-stripped) and the frozen `context.json` sha at that commit · Barrett's null asserts date-shape only and is NAMED unverifiable. **Verified to work retroactively on all three sha-carrying crossings** (§12I) | none — it is a pure git read | test-only |
+| **5d** | **`dirPref` in `BoardEcho`** (M29), and with it **`umpKFrozen` / `penQFrozen` / `coreNoHR`** so a board testifies to its own brake state | none | **YES — `buildEcho` reads `SH_CFG` through `g(k)`; no engine string, no hash move** |
 | **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
 | 7 | full `/api/odds` authentication (**the only thing that closes the route**) · `APP_PASSCODE` steps 2–4 · M28's `src/lib/pass.ts` | **step 4 is LAST** — see §3 | — |
 | 8 | the targeted-capture **landing test** — first day the pair runs, `price-path` must print **n > 0 in 60–120** | the crons delivering | — |
@@ -1470,9 +1474,166 @@ model-chosen side**, and `engine-client` L117 pushes `cfg.dirPref = getDirPref()
 so. Server boards are unaffected (no localStorage; `dirPref:{}` at L1098) — **the exposure is
 device-side only and needs a hand-edited localStorage key.** M28's shape with the halves reversed.
 
-**ENCODED:** `tests/mirrored-constants.test.ts` (6 tests) re-parses the engine and diffs **every**
+**ENCODED:** `tests/mirrored-constants.test.ts` (7 tests) re-parses the engine and diffs **every**
 mirror on every run — the Python tools cannot import the TS export, so the guard is what covers
 them. **Converting the seven TS/TSX mirrors to `MODELLED_MARKETS` is QUEUED, not done.**
+
+### 12G.1 M29 IN FULL — SEMANTICS, THE SWEEP, AND THE ONLY AFTER-THE-FACT TRACE (2026-08-01)
+
+**WHAT `dirPref` DOES WHEN SET — the semantics, from L2465, verbatim:**
+```js
+var dscp5=(SH_CFG.selMode==="dk_fd"||SH_CFG.selMode==="ev_gated");
+if(dscp5){
+  sideCh=(pAdj>=nv)?"O":"U";
+  var pref=(SH_CFG.dirPref&&SH_CFG.dirPref[mkt])||"both";
+  if(pref==="over")sideCh="O";else if(pref==="under")sideCh="U";
+}else sideCh=(isHitter||pAdj>=SH_OVER_LEAN)?"O":"U";
+```
+**PER-MARKET, keyed by market id, three values — `"over"` forces the over, `"under"` forces the
+under, missing key = `"both"` = the model picks.** It is not a filter that drops rows: **it
+REPLACES the model's side choice** on every row of that market, then the row is priced on the
+forced side. Default `dirPref:{}` at L1098.
+
+**CAN IT BE SET TODAY? ONLY BY HAND-EDITING `localStorage`.** `setDirPref` (`engine-client` L88)
+is the only writer of `pl_dirpref` and it has **zero callers**; `DIR_MARKETS`, the list that would
+render the control, has **zero importers**. **So the exposure is theoretical on this device** —
+nobody could have set it through the app, accidentally or otherwise. **The caveat that survives
+that:** `getDirPref()` is read at boot unconditionally (L117), so **a client-side generate on a
+device where the key HAD been set would be undetectable from the echo.**
+
+**THE SWEEP — is this a class or one key?** `SH_CFG` declares **36 keys**; `BoardEcho` carries
+**13 of them** (plus `selMode`, which `SH_CFG` does **not** declare — it is client-injected only,
+which is what the generate route's L248 comment says). **23 SH_CFG keys are outside the echo.**
+But the question is narrower than that, and the answer is narrow too:
+
+> **`dirPref` IS THE ONLY ONE. M29 IS ISOLATED.** Every write to `SH_CFG` from the client is at
+> `engine-client.ts` L66 / L99 / L116–117 and `armV2` L355–358, plus `cfsel.ts` L68–78. Of those,
+> exactly **two read `localStorage`** — `selMode` (`pl_selmode`, **IN the echo**) and `dirPref`
+> (`pl_dirpref`, **NOT in the echo**). `mktN` comes from `/api/calibration` over the network and is
+> echoed. `cfsel`'s `hrrAltMax: 99` is a **replaced binding restored in `finally`**, echoed as
+> `cfSelEnabled`. **And the engine writes NO `SH_CFG.<key>` anywhere** — a repo-wide scan of
+> `legacy/index.html` for `SH_CFG.x =` returns **zero**, so there is no engine-side localStorage
+> hydration to miss.
+
+**THE OTHER 22 ARE A SEPARATE, WEAKER FINDING and are recorded as such:** `roundTo`,
+`minCoreTickets`, `thinSlateEV`, `funMaxLegs`, `funMaxTickets`, `dailyKellyGuide`, `lockMaxAgeMin`,
+**`coreNoHR`, `penQFrozen`, `umpKFrozen`**, `coreKsFillOnly`, `coreKsCap`, `coreKsLegMax`,
+`funTiers`, `funTierNames`, `funAmt2`, `funAmt3`, `funSplit2`, `funSplit3`, `funMinProb`,
+`seasonEnd`, `projPaths`. **None is device-settable**, so none is an M29-class exposure — but
+**the echo cannot testify that the two BRAKES were on when a board was built**, which is exactly
+the claim §12F's residual is about. Adding `umpKFrozen`/`penQFrozen`/`coreNoHR` to the echo is
+additive and would make a board self-describing on the brakes. **Queued, not shipped.**
+
+**PUTTING `dirPref` IN THE ECHO IS ADDITIVE** — `buildEcho` reads `SH_CFG` through a `g(k)` helper
+in `src/lib/engine-echo.ts` and the route attaches the result. **One field, no engine-string
+change, no hash move, no vintage event.** It does not ride the hash-moving ship.
+
+**AND THE AFTER-THE-FACT TRACE, WHICH TURNED OUT TO EXIST.** The emitted row carries
+`p:sd.p, imp:sd.imp` (L2494), and `sd` is `{side:"O",p:pAdj,imp:nv}` or
+`{side:"U",p:1-pAdj,imp:1-nv}`. **Either way the model's own arithmetic leaves `p >= imp` on every
+row** — "O" because `pAdj>=nv`, "U" because `pAdj<nv` implies `1-pAdj > 1-nv`. **A `dirPref`
+override forces the side against that comparison and therefore produces the one thing the model
+never does: `p < imp`.** Shipped as `sideConsistency()` in `tools/board-report.mjs`, printed on
+every board run beside `echo.selMode`, with three cases in `tests/chain-tools.test.ts` — including
+one asserting that **a board with no `p`/`imp` reads `readable: false`, NOT zero violations.**
+A legacy-mode board takes the `SH_OVER_LEAN` branch and is not bound by the invariant, so only a
+violation on an `ev_gated`/`dk_fd` board is the finding.
+
+**🔴 THE IMPOSSIBLE BRANCH IS UNEVALUATED, and the reason is on disk: THERE IS NO BOARD TO CHECK.**
+`data/` holds `pen_quality.json`, `quota-log.jsonl`, `ump_k.json` — **no board archive**; the
+archive lives behind `/api/board` and `tools/archive_boards.py` fetches it. The fixtures do not
+substitute: `baseline39/43.json` carry `categories.all` as compact arrays
+`[player, "… O 5.5", odds, p%, EV%]` — **`p` and EV%, but not the de-vigged `nv`** — and EV ≥ 0 is
+**not** the same test, because `nv` is de-vigged and sits below the raw implied. **The first board
+that exists is the first evaluation.**
+
+### 12H. COMMENT-READ-AS-CODE — THE FULL SCANNER SWEEP, AND A DEMONSTRATED FALSE NEGATIVE
+
+**NINETEEN guards and tools scan source text. TWO strip comments; SEVENTEEN do not.**
+
+**THE POLARITY IS WHAT MATTERS, and it splits the risk cleanly:**
+
+| assertion shape | what a comment does | cost |
+|---|---|---|
+| **ABSENCE** — `.not.toMatch`, `toEqual([])`, `toHaveLength(0)` | makes the guard fire on prose | **FALSE POSITIVE — noise.** Both earlier instances were this |
+| **PRESENCE** — `.toMatch`, `.test(…)).toBe(true)`, `toContain` | **satisfies "the code still does X" from a COMMENT** | **FALSE NEGATIVE — the guard misses what it exists to catch** |
+
+**Thirteen guards carry at least one PRESENCE assertion over unstripped source.** That is the
+false-negative-capable set: `accrual-volume` · `calibration-window` · `coverage-denominator` ·
+`doubleheader` · `engine-echo` · `engine-units` · `engine-v2-integration` · `factor-classification` ·
+`min-gap` · `read-first-index` · `retracted-claims` · **`self-arm-stamp`** · `sim-rng-stream`.
+
+> ### 🔴 MEASURED, NOT ARGUED — ON THE BRAKE GUARD, HOURS AFTER IT SHIPPED
+> `legacy/index.html` planted with **`umpKFrozen:false,/* was umpKFrozen:true */`** — the brake
+> **RELEASED in code**, the string still present **in a comment**:
+> ```
+> ✓ tests/self-arm-stamp.test.ts (6 tests)     Tests  6 passed (6)
+> ```
+> **The double-brake guard passed while brake 1 was off.** That is §12F's own guard, and the
+> failure is the direction that costs something. **Third instance of the class; the first with a
+> false negative.**
+>
+> **FIXED IN THE SAME TURN:** the brake check now strips comments. **Same plant, guard rebuilt →
+> `AssertionError: umpKFrozen is no longer true — brake 1 released`, 1 failed | 5 passed.**
+> Engine reverted, re-hashes
+> `49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`, `git status` clean.
+> *(Written in full deliberately. The first draft abbreviated it to its first eight hex characters,
+> which is shaped exactly like a short git sha — `sha-references` flagged it as a citation pointing
+> at nothing, correctly. A content digest and a commit id are the same alphabet; only the length
+> tells them apart, so content digests are written whole in these docs.)*
+
+**THE REMAINING TWELVE ARE NAMED AND NOT FIXED.** Each needs its own judgment about whether the
+pattern it greps for can plausibly appear in a comment in the file it reads — a sweep that changes
+twelve guards at once is how a signed-off guard gets weakened in place (M27). **Queued as §11 item
+5b, one at a time, each with its own plant.**
+
+**THE DELIBERATE COPY IS NOW REGISTERED AND CHECKED.** `tests/strict-coercion.test.ts` keeps an
+inline stripper rather than importing the shared one — it is signed off, and replacing its body in
+place is the M27 failure mode. **That copy is exactly the class §12G swept for**, so leaving it
+unregistered would mean a future sweep returns a list with one entry that is fine, which trains the
+reader to skim. It is registered in `tests/mirrored-constants.test.ts` with its reason **and
+pinned**: the guard asserts both regex literals are still text-identical in both files, so
+*deliberate* cannot quietly become *divergent*.
+
+### 12I. THE §12F RESIDUAL IS RECOVERABLE FROM GIT — SPEC'D, NOT SHIPPED
+
+**The brake status at crossing time IS in history, and it verifies.** Run this turn as a read, not
+a ship:
+
+| ump | date | commit | touches `ump_k.json` | author date == recorded | `umpKFrozen` | `penQFrozen` | `context.json` sha |
+|---|---|---|---|---|---|---|---|
+| Lance Barrett | 2026-07-30 | **null** | — | — | — | — | **UNVERIFIABLE BY DESIGN — predates the record** |
+| Willie Traynor | 2026-07-31 | `200e4028` | **YES** | **YES** | `true` | `true` | **MATCHES the recorded freeze** |
+| Malachi Moore | 2026-08-01 | `b68b1e36` | **YES** | **YES** | `true` | `true` | **MATCHES** |
+| Derek Thomas | 2026-08-01 | `b68b1e36` | **YES** | **YES** | `true` | `true` | **MATCHES** |
+
+The freeze hash both commits resolve to is
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` — **the value already recorded
+in the crossing note, reached independently from `git show <sha>:public/model/context.json`.**
+
+**THE SPEC (not shipped, per instruction).** Extend `tests/self-arm-stamp.test.ts` with a git join,
+one assertion per recorded field:
+1. `commit` **resolves** (`git cat-file -t` is `commit`);
+2. it **touches `data/ump_k.json`** (`git show --name-only`);
+3. its **author date equals `date`** — this is what closes "wrong date";
+4. **`braked` becomes a CHECK**: `git show <sha>:legacy/index.html` must contain `umpKFrozen:true`
+   **after comment-stripping** (§12H — otherwise the join inherits the false negative it was
+   written to fix), and `git show <sha>:public/model/context.json` must hash to the recorded
+   freeze. Both brakes, at the commit, not at HEAD.
+5. **Barrett's `commit: null` asserts the DATE SHAPE ONLY**, and the entry is recorded as
+   **unverifiable by design** — it predates the record. A null that means "never captured" must
+   not be silently treated as a pass; the guard names it in its output.
+
+**WHAT THIS CONVERTS:** `braked: true` stops being the record's own claim about itself and becomes
+a statement checked against two artifacts in history. **The residual named in §12F shrinks to
+Barrett's single unverifiable entry** — and, going forward, nothing is unverifiable, because every
+future crossing arrives with a bot commit sha.
+
+**THE ONE THING IT STILL CANNOT SEE:** whether a board was *generated* between the crossing commit
+and the next one. The brakes being on in the repo is not the same as no board having been built —
+that is what `dirPref`'s neighbours in §12G.1 are about (`umpKFrozen` and `penQFrozen` are **not in
+the echo**, so no board testifies to its own brake state). **Adding them to the echo is additive
+and is the other half of this.**
 
 **OBSERVED RED, on real code, before the file was accepted:** `tools/board-report.mjs` L107 read
 `const consMinN = echo?.consMinN ?? 100`. **The value agreed with the engine — the defect was the

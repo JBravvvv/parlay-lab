@@ -202,6 +202,47 @@ describe("mirrored engine constants do not drift", () => {
     ).toEqual([]);
   });
 
+  /**
+   * REGISTERED DELIBERATE DUPLICATIONS (2026-08-01, owner's item 2).
+   *
+   * A sweep whose output contains one entry that is "fine" trains the reader to skim the
+   * output. So the one deliberate copy in the repo is registered HERE, with its reason,
+   * and CHECKED — the registry asserts the copy still agrees with the shared original, so
+   * "deliberate" cannot quietly become "divergent". A future copied-literal sweep returns
+   * a clean list, and anything it does return is real.
+   */
+  const KNOWN_DUPLICATIONS = [
+    {
+      file: "tests/strict-coercion.test.ts",
+      of: "tests/helpers/source.ts :: stripComments",
+      why:
+        "signed-off guard; replacing its body in place is the M27 failure mode. Converting " +
+        "it to the shared import is queued (§11 item 5a), not done. Until then the copy is " +
+        "pinned to the original here.",
+      // the two regex literals that ARE the stripper — text-identical in both files
+      pins: [String.raw`/\/\*[\s\S]*?\*\//g`, String.raw`/(^|[^:])\/\/[^\n]*/g`],
+    },
+  ];
+
+  it("every registered deliberate duplication still agrees with its original", () => {
+    const shared = readFileSync("tests/helpers/source.ts", "utf8");
+    const bad: string[] = [];
+    for (const d of KNOWN_DUPLICATIONS) {
+      const copy = readFileSync(d.file, "utf8");
+      for (const pin of d.pins) {
+        if (!shared.includes(pin)) bad.push(`${d.of}: the ORIGINAL no longer contains ${pin}`);
+        if (!copy.includes(pin)) bad.push(`${d.file}: the registered copy no longer contains ${pin}`);
+      }
+    }
+    expect(
+      bad,
+      `a duplication registered as DELIBERATE has drifted from what it duplicates:\n  ` +
+        bad.join("\n  ") +
+        `\nEither re-sync it or convert the copy to the shared import — a registered ` +
+        `exception that no longer matches is just an unregistered copy.`,
+    ).toEqual([]);
+  });
+
   it("PLANT (invalid-by-value): a mirror missing a market is caught", () => {
     const six = MODELLED_MARKETS as string[];
     const named = marketsNamedIn("batter_hits pitcher_outs", six);

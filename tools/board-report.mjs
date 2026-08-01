@@ -93,6 +93,36 @@ export function cfSelReport(data) {
   return { suspRows: susp.length, stamped: stamped.length, carded: carded.length, missingRank: missingRank.length, dollarsByMarket };
 }
 
+/**
+ * M29 — dirPref DIVERGENCE, the only test that can detect it after the fact (2026-08-01).
+ *
+ * The engine picks the side at L2465: under `dscp5` (`selMode` is `dk_fd` OR `ev_gated`)
+ * `sideCh=(pAdj>=nv)?"O":"U"`, and the emitted row carries `p:sd.p, imp:sd.imp` (L2494)
+ * where `sd` is `{side:"O",p:pAdj,imp:nv}` or `{side:"U",p:1-pAdj,imp:1-nv}`.
+ *
+ * EITHER WAY THAT ARITHMETIC LEAVES **`p >= imp` ON EVERY ROW** — "O" because `pAdj>=nv`,
+ * "U" because `pAdj<nv` implies `1-pAdj > 1-nv`. A `dirPref` override forces the side
+ * against that comparison, so it produces the one thing the model never does: **`p < imp`**.
+ *
+ * WHY THIS MATTERS: `BoardEcho` carries no `dirPref` field, so a board generated on a
+ * device with `localStorage.pl_dirpref` set records a side choice with **no trace of what
+ * chose it**. This row-level invariant is the trace. A non-zero count is NOT proof of
+ * dirPref on its own — a legacy-mode board (`probability`/`caesars_ev`) takes the
+ * `SH_OVER_LEAN` branch instead and is not bound by it — so the count prints beside
+ * `echo.selMode`, and only a violation on an `ev_gated`/`dk_fd` board is the finding.
+ */
+export function sideConsistency(data, echo) {
+  const rows = rowsOf(data).filter((r) => r.p != null && r.imp != null);
+  const total = rowsOf(data).length;
+  if (!rows.length) {
+    return { readable: false, total, checked: 0, violations: [], selMode: echo?.selMode ?? null };
+  }
+  const violations = rows
+    .filter((r) => Number.isFinite(r.p) && Number.isFinite(r.imp) && r.p < r.imp)
+    .map((r) => ({ lkey: r.lkey ?? "?", mkt: mktOf(r), p: r.p, imp: r.imp, gap: r.imp - r.p }));
+  return { readable: true, total, checked: rows.length, violations, selMode: echo?.selMode ?? null };
+}
+
 /** reading 29: mktN vs consMinN beside the blocked-reason histogram. Pure. */
 export function reopenReport(data, echo) {
   const blocked = data.blocked ?? data.alloc?.blocked ?? [];
@@ -176,6 +206,21 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   const ca = data.clampActivity;
   console.log(`\nclampActivity (reading 24): ${ca ? `PRESENT, ${Object.keys(ca).length} sites` : ">>> ABSENT — clampLog arming is not reaching production analyze"}`);
+
+  const sc = sideConsistency(data, echo);
+  if (!sc.readable) {
+    console.log(`\nM29 SIDE CONSISTENCY: >>> UNREADABLE — 0 of ${sc.total} rows carry p/imp. NOT a pass.`);
+  } else if (sc.violations.length === 0) {
+    console.log(`\nM29 SIDE CONSISTENCY: clean — 0 of ${sc.checked} rows have p < imp (selMode=${sc.selMode ?? "?"})`);
+  } else {
+    console.log(`\nM29 SIDE CONSISTENCY: >>> ${sc.violations.length} of ${sc.checked} rows have p < imp (selMode=${sc.selMode ?? "?"})`);
+    console.log(`  >>> On an ev_gated/dk_fd board the model CANNOT produce this. Something chose the side:`);
+    console.log(`  >>> dirPref (localStorage pl_dirpref, absent from the echo), a legacy mode, or force.`);
+    for (const v of sc.violations.slice(0, 12)) {
+      console.log(`     ${v.lkey}  ${v.mkt}  p=${v.p} imp=${v.imp} (gap ${v.gap.toFixed(4)})`);
+    }
+    if (sc.violations.length > 12) console.log(`     … and ${sc.violations.length - 12} more`);
+  }
 
   const r = reopenReport(data, echo);
   console.log(`\nREOPEN (reading 29): consMinN=${r.consMinN ?? ">>> UNREADABLE — no echo. Reading 3 says the push did not land; the gate is NOT assumed to be 100"}`);

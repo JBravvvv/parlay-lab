@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { stripComments } from "./helpers/source";
 
 /**
  * SELF-ARM STAMP GUARD (2026-07-30, owner's item 2 — "count-armed parameters fire on
@@ -158,8 +159,14 @@ describe("self-arming parameters stamp themselves at fire time", () => {
   });
 
   it("the DOUBLE BRAKE that keeps the crossing off the boards is still in place", () => {
-    // brake 1: the factor is pinned off in the engine's frozen table
-    const engine = readFileSync("legacy/index.html", "utf8");
+    /* STRIP COMMENTS FIRST — and this is a FALSE NEGATIVE, the dangerous direction.
+       MEASURED 2026-08-01, on this guard, hours after it shipped: `umpKFrozen:false,`
+       in the code with `/* was umpKFrozen:true *​/` beside it → **6 passed**. The brake
+       was RELEASED and the brake guard said nothing, because it greps a raw string and a
+       comment carries that string. A presence assertion over unstripped source is
+       satisfiable by prose. Third instance of comment-read-as-code; the first two were
+       false POSITIVES, which only cost noise. See tests/helpers/source.ts. */
+    const engine = stripComments(readFileSync("legacy/index.html", "utf8"));
     expect(/umpKFrozen:\s*true/.test(engine), "umpKFrozen is no longer true — brake 1 released").toBe(true);
     expect(
       /function shUmpKf\(g\)\{if\(SH_CFG\.umpKFrozen\)return 1;/.test(engine),
