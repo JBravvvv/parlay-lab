@@ -125,6 +125,11 @@ export function sideConsistency(data, echo) {
 
 /** reading 29: mktN vs consMinN beside the blocked-reason histogram. Pure. */
 export function reopenReport(data, echo) {
+  /* ABSENT is not EMPTY (2026-08-01, owner's item 3). `data.blocked ?? data.alloc?.blocked ?? []`
+     yields the same `{}` histogram whether the board blocked nothing or carries no `blocked`
+     field at all — and "nothing was blocked" reads as good news while "this board shape has no
+     blocked array" means the reading did not happen. Distinguished, not defaulted. */
+  const blockedPresent = data.blocked != null || data.alloc?.blocked != null;
   const blocked = data.blocked ?? data.alloc?.blocked ?? [];
   const byReason = {};
   const byMarket = {};
@@ -144,7 +149,7 @@ export function reopenReport(data, echo) {
     mktN && consMinN !== null
       ? Object.fromEntries(Object.entries(mktN).map(([m, n]) => [m, { n, crossed: n >= consMinN }]))
       : null;
-  return { byReason, byMarket, mktN, consMinN, crossed };
+  return { byReason, byMarket, mktN, consMinN, crossed, blockedPresent };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -181,7 +186,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`  (4) outs rows cfSel-stamped: ${o.cfSelStamped}`);
 
   console.log(`\nECHO (reading 25): ${echo ? "PRESENT" : ">>> ABSENT — on a board generated AFTER the echo shipped this means the push did not land; on an older board it means the feature did not exist. Check the board's date before reading it as a failure."}`);
-  if (echo) for (const k of ["engineSha", "selMode", "outsSusp", "mktN", "consMinN", "hrrAltMax", "damping", "cfSelEnabled"]) {
+  if (echo) for (const k of ["engineSha", "selMode", "outsSusp", "mktN", "consMinN", "hrrAltMax", "damping", "cfSelEnabled",
+    /* 2026-08-01: the three brakes + the side override. A board that omits these cannot be
+       audited after the fact; `null` means the board did not report it, NOT that it was off. */
+    "dirPref", "umpKFrozen", "penQFrozen", "coreNoHR"]) {
     console.log(`  ${k}: ${typeof echo[k] === "object" ? JSON.stringify(echo[k]) : echo[k]}`);
   }
   /* READING 5 CANNOT BE ANSWERED FROM /api/board — 2026-07-31, and this would have produced a
@@ -200,6 +208,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (Array.isArray(blob.gens)) console.log(`  (this response carries ${blob.gens.length} generation index entries: ${JSON.stringify(blob.gens.map((g) => g.at))})`);
 
   const c = cfSelReport(data);
+  /* VACUITY BRANCH (2026-08-01, owner's item 3). `0/0 stamped, 0 card:true` printed as a
+     clean line reads as a pass; it is "nothing to check". Zero over an empty population is
+     not a pass — the same rule the outs counts already encode, applied here. */
+  if (c.suspRows === 0) {
+    console.log(`\ncfSel: >>> VACUOUS — 0 suspended rows on this board. NOTHING WAS CHECKED.`);
+    console.log(`  >>> This is not "cfSel landed". Reading 4 is UNEVALUATED until a board carries susp rows.`);
+  } else
   console.log(`\ncfSel: ${c.stamped}/${c.suspRows} susp rows stamped, ${c.carded} card:true`);
   if (c.missingRank) console.log(`  >>> ${c.missingRank} card:true stamps MISSING rank/stake — the ship did not land`);
   console.log(`  counterfactual dollars to suspended markets: ${JSON.stringify(c.dollarsByMarket)}`);
@@ -225,6 +240,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const r = reopenReport(data, echo);
   console.log(`\nREOPEN (reading 29): consMinN=${r.consMinN ?? ">>> UNREADABLE — no echo. Reading 3 says the push did not land; the gate is NOT assumed to be 100"}`);
   console.log(`  mktN: ${r.crossed ? JSON.stringify(r.crossed) : ">>> ABSENT from the echo"}`);
-  console.log(`  blocked reasons: ${JSON.stringify(r.byReason)}`);
+  console.log(`  blocked reasons: ${r.blockedPresent ? JSON.stringify(r.byReason) : ">>> NO `blocked` ARRAY ON THIS BOARD — the reading did not happen. This is NOT \"nothing was blocked\"."}`);
   if ((r.byReason.consensus ?? 0) > 0) console.log("  >>> CONSENSUS BLOCKS PRESENT: the expiry fired but the gate STILL BINDS — those markets did NOT reopen.");
 }

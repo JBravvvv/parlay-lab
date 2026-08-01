@@ -1595,6 +1595,103 @@ reader to skim. It is registered in `tests/mirrored-constants.test.ts` with its 
 pinned**: the guard asserts both regex literals are still text-identical in both files, so
 *deliberate* cannot quietly become *divergent*.
 
+### 12J. THE PRESENCE-ASSERTION SWEEP — FIVE OF SIX WERE DEAD (2026-08-01, owner's item 1)
+
+**FIRST, A CORRECTION TO MY OWN COUNT.** Last turn I reported *"thirteen guards carry PRESENCE
+assertions over unstripped source."* That came from a **file-level** regex that counted any
+`.toMatch(` in the file — including assertions on **computed values**, e.g.
+`expect(ENGINE_SHA).toMatch(/^[0-9a-f]{64}$/)`, which never touches source text. Re-derived
+per-assertion against the variable actually holding the file contents, **the class is SIX, not
+thirteen.** Six of the original twelve read no source file at all (`doubleheader`, `engine-units`,
+`engine-v2-integration`, `retracted-claims`) or assert only absence/counts on it
+(`factor-classification`, `sim-rng-stream`). **The narrower number is the worse news, because the
+hit rate inside it is much higher.**
+
+**PREDICTION, STATED BEFORE ANY PLANT RAN: 3 of 6 dead.** I expected `coverage-denominator`,
+`accrual-volume` and `calibration-window` to fall, and expected `min-gap` to survive on its
+slice-scoping. **ACTUAL: 4 of 6 dead this turn, 5 counting `self-arm-stamp` last turn.** The plants
+falsified the prediction in the direction that costs money.
+
+| # | guard | protects | plant result | fix |
+|---|---|---|---|---|
+| 0 | `self-arm-stamp` | **brake 1 (`umpKFrozen`)** | **DEAD** (last turn) | strip |
+| 1 | `coverage-denominator` | **the engine's lineup-coverage denominator** — what `liveCoverageOf`, the staleness gate and the T = 0.80 fire window are reasoned about against | **DEAD — 9/9 passed** with `var luDen=slate.games.length;` renamed and the string left in a comment | strip `src` only; the luCoverage-consumer loop **depends** on seeing comments and keeps its own raw copy |
+| 2 | `accrual-volume` | **truncation accounting** — that a dropped record is counted, not silently lost | **DEAD — 5/5 passed** with `const dropR = sentR - records.length` renamed | strip `ROUTE` |
+| 3 | `calibration-window` | **the calibration window + vintage stamping** | **DEAD — 12/12 passed** with `summary.full = full` renamed | strip `ROUTE` **and** the DEL/SREM scan's `src` |
+| 4 | **`min-gap`** | **the pre-sweep PAYMENT dedupe — ~96 credits per duplicate clustered sweep** | **DEAD — 2/2 passed** with the gate defeated in code (`< 0` instead of `< MIN_GAP_S`); the token survives in the comment at L169 **inside the slice** | strip the **slice**, keep the **anchor** raw |
+| 5 | `engine-echo` | **the echo is WRITE-ONLY** — exactly one assignment, no reads | **SURVIVED — went RED on the plant** | none needed |
+
+**WHY `engine-echo` SURVIVED, AND IT IS THE GENERALIZABLE LESSON.** Its assertions are **COUNTS**
+(`writes.length === 1`, `dotEcho.length === 1`), and a comment can only ever **ADD** an occurrence.
+So on a count assertion a comment produces a **false POSITIVE** — noise — and can never produce a
+false negative. **`toContain` / `toMatch` says "somewhere in this text"; `=== 1` says "exactly here,
+this many times."** The second is a structural claim and prose cannot satisfy it.
+
+**`read-first-index` is NOT IN THE CLASS** — it reads MARKDOWN, which has no code comments, and its
+only positive assertion (`block.length > 200`) is a triviality guard, not a behaviour claim. It has
+a different weakness (`block` runs to end-of-file, so a doc described anywhere later counts), which
+is a scoping question and is not this.
+
+**`min-gap` IS THE ONE THAT MATTERS AND IT IS THE ONE I PREDICTED WOULD SURVIVE.** I reasoned that
+slice-scoping between two structural indices was protection. It is not, when the scope contains the
+prose describing the thing being scoped — L169's explanatory comment sits between the anchor and
+`return "pre"` and says `MIN_GAP_S` in plain text. Gate defeated, guard green, and every clustered
+cron pays a full sweep again.
+
+> **THE PRE-COMMITTED READING FIRES: more than half of the class was dead.** Presence-assertion-
+> over-raw-source is **the dominant guard defect in this repo** — 5 of 6, against 7 numbered
+> instrument defects accumulated over three days. It goes in the ledger as a CLASS, not an
+> instance. **Impossible branch did not fire:** every guard was green before its plant and green
+> again after the revert; none was already red.
+
+**A THIRD CATEGORY THE STRIPPING REVEALED, which is not a defect at all.** `calibration-window`'s
+*"the constant carries the date and the reason at its declaration"* is **deliberately about the
+comment** — it asserts the 2026-09-08 caution is documented where the next editor will see it.
+Stripping turned it red, correctly, and it now reads an explicit `ROUTE_RAW`. **A guard file needs
+both copies and must say which assertion is about code and which is about the prose beside it.**
+
+### 12K. THE ECHO NOW CARRIES THE BRAKES (2026-08-01, owner's item 2) — SHIPPED
+
+**Four fields added through `g(k)`: `dirPref`, `umpKFrozen`, `penQFrozen`, `coreNoHR`.**
+
+**ADDITIVE, CONFIRMED BY HASH.** `ENGINE_SHA` before and after:
+`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867` — **unchanged**, still equal to
+`SERVED_ENGINE_SHA_VERIFIED`. `legacy/index.html` unchanged at
+`49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`. **No engine string, no hash
+move, no vintage event.**
+
+**GUARD OBSERVED RED FIRST:** the two new cases in `tests/engine-echo.test.ts` failed with
+*"echo field missing: dirPref"* and *"dirPref must echo null when absent"* before the fields
+existed. The second is the one that matters: **an absent brake must echo `null`, never `undefined`**
+— `undefined` vanishes in `JSON.stringify`, which would make a board that did not report the field
+indistinguishable from one built before the field existed. **`null` says "the board did not report
+this", which is a different claim from "the brake was off."**
+
+| field | what a board can now testify to that it could not before |
+|---|---|
+| **`umpKFrozen`** | that `shUmpKf` was pinned to 1 **when this board was built**. The git join (§12I) proves the REPO's state at a crossing commit; it cannot prove a board built between commits was braked. This can |
+| **`penQFrozen`** | the same for the pen-quality factor — the other half of the double brake, previously asserted only at its own guard |
+| **`coreNoHR`** | that HR suppression was on. §7.5's CV finding and the refuted same-team HR rule are both reasoned about a population `coreNoHR` defines, and no board said whether it was applied |
+| **`dirPref`** | that the model's SIDE CHOICE was the model's. M29's only other witness is the row-level `p >= imp` invariant, which is an inference; this is the board's own statement |
+
+`tools/board-report.mjs` prints all four beside the existing echo fields.
+
+**THE REMAINING NINETEEN — WHICH WOULD HAVE ANSWERED A QUESTION WE ACTUALLY ASKED.** Not added
+reflexively; the test is whether its absence blocked a real reading this session.
+
+| key | would it have answered a question we asked? |
+|---|---|
+| **`lockMaxAgeMin`** | **YES.** It is the newest registered parameter (census 42→43) and the price-age lock rule is what the placement checklist's item 4 turns on. A board cannot currently say what age it considered stale |
+| **`coreKsFillOnly` · `coreKsCap` · `coreKsLegMax`** | **YES, as a group.** M6 is *"K's priced with no sim"* — the K-market structural caps are the parameters that decide how many K legs reach a card, and the M6 reading has no board-side witness for any of them |
+| `funMaxLegs` · `funMaxTickets` · `funTiers` · `funTierNames` · `funAmt2` · `funAmt3` · `funSplit2` · `funSplit3` · `funMinProb` | **NO.** FUN is exempt from the EV gate by design and no measurement this session was about the FUN bucket. Nine keys, zero questions |
+| `roundTo` · `minCoreTickets` · `thinSlateEV` | **NO.** Never appeared in a reading |
+| `dailyKellyGuide` | **NO.** Advisory display only; it hides an amber note and blocks nothing |
+| `seasonEnd` · `projPaths` | **NO.** `projPaths` is pinned by `SIM_PATHS` client-side and already asserted there; `seasonEnd` has never been read |
+
+> **FOUR of the nineteen would have answered a real question: `lockMaxAgeMin`, and the three K-cap
+> keys as a group.** That is the owner's decision to make, and it is **not urgent** — none is
+> device-settable, so none is an M29-class exposure. Recorded as §11 item 5e, unshipped.
+
 ### 12I. THE §12F RESIDUAL IS RECOVERABLE FROM GIT — SPEC'D, NOT SHIPPED
 
 **The brake status at crossing time IS in history, and it verifies.** Run this turn as a read, not
@@ -1738,6 +1835,42 @@ collection doc's top line.**
 
 ---
 
+
+### 13C. THE UNEVALUATED BACKLOG — SIXTEEN CHECKS WAITING ON A BOARD (2026-08-01, owner's item 3)
+
+**THE NUMBER IS THE POINT: SIXTEEN checks are written, guarded, and have never run against
+production.** That is the accumulated cost of five dark days, stated as a count rather than as a
+feeling. Every one of them is code that exists, passes its own unit cases, and has **zero
+production evaluations.**
+
+| # | check | where | evaluable on ONE board? | vacuous-pass risk |
+|---|---|---|---|---|
+| 1 | **`sideConsistency`** — `p >= imp` on every row (M29) | `board-report` | **YES** | **NO — `readable:false` when no row carries `p`/`imp`** |
+| 2 | **`finite-prices` WIRING PROOF** — a `NaN` planted in a COPY of a real board | `tests/finite-prices` | **YES**, and the artifact exists for one day | **NO** — `checked > 100` and `picks.length > 0` |
+| 3 | the **outs four counts** | `board-report` | **YES** | **NO** — the VACUITY branch prints first |
+| 4 | **cfSel rank/stake** (reading 4) | `board-report` | **YES, but only if the board carries susp rows** | **WAS YES — FIXED THIS TURN.** `0/0 stamped, 0 card:true` printed as a clean line; it now prints `>>> VACUOUS — NOTHING WAS CHECKED` |
+| 5 | **`mktN` vs `consMinN`** (reading 29) | `board-report` | **YES** | **NO** — `consMinN` is `null` + `>>> UNREADABLE` without an echo |
+| 6 | the **blocked-reason histogram** | `board-report` | **YES** | **WAS YES — FIXED THIS TURN.** An absent `blocked` array gave the same `{}` as a genuinely empty one; absent now prints `>>> the reading did not happen` |
+| 7 | the **clamp census** (reading 24) | `board-report` | **YES** | **NO** — prints `>>> ABSENT` |
+| 8 | **the echo's presence** (reading 3) | generate response | **NO — not from the board.** The RESPONSE BODY is the only witness | **NO** |
+| 9 | **the trigger stamp** (reading 5) | generate response | **NO — structurally unreadable from `/api/board`**; `gens[]` has no `trigger` field | n/a — it cannot pass at all, which is why it moved |
+| 10 | **the four NEW echo fields** — `dirPref`, `umpKFrozen`, `penQFrozen`, `coreNoHR` | board + response | **YES** | **NO** — absent echoes `null`, never `undefined` |
+| 11 | **`self_consistency`** — both populations | `tools/self_consistency.py` | **YES** | **NO** — zero-over-empty is explicitly not a pass |
+| 12 | **M14 production reading** (step 8) — the ≥ 30 bp / 2–4% vs 7% numbers | `board-report` | **YES** | see #6 — it reads the same histogram |
+| 13 | **luPct / achievable** falsifiable pair (reading 7) | board + `gens` | **YES** | **NO** — the pair can untie and prints either way |
+| 14 | **ParlayPred replay diff** (reading 13) | replay + board | **YES**, plus a replay run | **NO** — an empty diff has its own labelled branch |
+| 15 | **ticket counts vs both pre-commits** (readings 10, 11) | board | **YES** | **NO** — the MIDDLE branch (1–5) is itself a reading |
+| 16 | **`price-path`'s 60–120 bucket** — the cron landing test | `tools/price-path` | **NO — needs at least TWO captures.** One cron delivering is a PARTIAL LANDING that produces no pair | **NO** — `n > 0` is the assertion, and zero is stated to mean the SPACING is wrong |
+
+**FOURTEEN of the sixteen are evaluable on tomorrow's single board.** Two are not: **#16 needs two
+captures** (both new crons delivering, ~14:1x and ~14:5x PT), and **#8/#9 need the generate RESPONSE
+BODY**, which is why the fire block's step 2 captures it rather than only the board.
+
+> **THE PRE-COMMITTED READING FIRED ON TWO.** #4 and #6 could each have passed vacuously on
+> tomorrow's board — `cfSel: 0/0` and `blocked reasons: {}` both print as clean lines and both mean
+> "nothing was checked". **Both now declare unreadable instead, the way `sideConsistency` already
+> did.** The rule earned its keep at exactly the moment the list was written down, which is the
+> argument for writing it down.
 
 ### 13B. THE CALENDAR — STOPPED, NOT LATE (2026-07-31, owner's item 2)
 

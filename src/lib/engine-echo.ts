@@ -86,6 +86,16 @@ export type BoardEcho = {
   dailyBankrollCap: unknown;
   selMode: unknown;
   outsSusp: unknown;
+  /* 2026-08-01 (owner's item 2): the three BRAKES and the side override. The echo carried
+     13 of SH_CFG's 36 keys and none of these four, so no board could state whether the ump
+     factor and the pen-quality factor were pinned off when it was built, whether HR was
+     suppressed, or whether a device-local `dirPref` had overridden the model's chosen side
+     (M29). The git join proves the REPO's brake state at a commit; only this proves the
+     BOARD's. All four are plain g(k) reads — additive, no engine-string change. */
+  dirPref: unknown;
+  umpKFrozen: unknown;
+  penQFrozen: unknown;
+  coreNoHR: unknown;
   damping: number | null;
   cfSelEnabled: boolean;
   /** graded legs per market at arm time — the COUNT that arms the consensus gate
@@ -118,6 +128,10 @@ export function buildEcho(
     dailyBankrollCap: g("dailyBankrollCap"),
     selMode: g("selMode"),
     outsSusp: g("outsSusp"),
+    dirPref: g("dirPref"),
+    umpKFrozen: g("umpKFrozen"),
+    penQFrozen: g("penQFrozen"),
+    coreNoHR: g("coreNoHR"),
     mktN: g("mktN"),
     damping: DAMPING,
     cfSelEnabled: x.cfSelEnabled,

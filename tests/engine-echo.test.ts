@@ -157,4 +157,43 @@ describe("sha+config echo", () => {
     );
     expect(withN.mktN).toEqual({ batter_hits: 117, pitcher_strikeouts: 62 });
   });
+
+  /* THE BOARD MUST TESTIFY TO ITS OWN BRAKE STATE (2026-08-01, owner's item 2).
+     Until now the echo carried 13 of SH_CFG's 36 keys, and the three BRAKE flags were not
+     among them. The git join (§12I) proves the REPO had the brakes on at a crossing commit;
+     it cannot say whether a board was generated with them off, because no board recorded it.
+     `dirPref` is the fourth: M29's device-settable side override, which changes the SELECTED
+     SIDE inside ev_gated and left no trace anywhere.
+     ALL FOUR ARE ADDITIVE — plain `g(k)` reads over the same SH_CFG object, no engine string,
+     no hash move. OBSERVED RED before they were added: every one of the four `k in e` checks
+     below failed. */
+  const BRAKE_FIELDS = ["dirPref", "umpKFrozen", "penQFrozen", "coreNoHR"] as const;
+
+  it("the echo carries the three brakes and the side override", () => {
+    const e = buildEcho(
+      { selMode: "ev_gated", dirPref: { batter_hits: "over" }, umpKFrozen: true, penQFrozen: true, coreNoHR: true },
+      { priorsSha: null, ctxSha: null, cfSelEnabled: false },
+    );
+    for (const k of BRAKE_FIELDS) {
+      expect(
+        k in e,
+        `echo field missing: ${k}. A board that cannot state its own brake/override state ` +
+          `cannot be audited after the fact — that is exactly what M29 and the §12F residual ` +
+          `are about.`,
+      ).toBe(true);
+    }
+    expect(e.dirPref).toEqual({ batter_hits: "over" });
+    expect(e.umpKFrozen).toBe(true);
+    expect(e.penQFrozen).toBe(true);
+    expect(e.coreNoHR).toBe(true);
+  });
+
+  it("an ABSENT brake key echoes null, never undefined — absent is not `off`", () => {
+    // undefined vanishes in JSON.stringify, so an absent brake would be INDISTINGUISHABLE
+    // from a board built before the field existed. null survives the round trip and says
+    // "the board did not report this", which is a different claim from "the brake was off".
+    const e = buildEcho({ selMode: "ev_gated" }, { priorsSha: null, ctxSha: null, cfSelEnabled: false });
+    for (const k of BRAKE_FIELDS) expect(e[k], `${k} must echo null when absent`).toBeNull();
+    expect(JSON.parse(JSON.stringify(e))).toHaveProperty("umpKFrozen", null);
+  });
 });
