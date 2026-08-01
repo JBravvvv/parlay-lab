@@ -1326,3 +1326,115 @@ three to one.** Two of the population errors are the owner's, seven are mine or 
 range, and the schema vintage of whatever is being counted.** Every one of the nine was caught the
 same way — by someone asking *which set is this about?* rather than *is this argument sound?* — and
 none was caught by re-checking the logic.
+
+---
+
+# 2026-08-01, seventh pass — the 25-AB floor sized, `coreNoHR`'s scope corrected, the simulation vindicated
+
+## §H18 THE 25-AB FLOOR DROPS 4.5% OF QUOTED ROWS, AND IT IS PRICE-NEUTRAL
+
+**Method:** statsapi `byDateRange` over 2026-06-26…07-26, **`playerPool=ALL`**, joined by
+normalised name to every distinct player × market in the 07-26 props archive — which is the
+**pre-filter** population, because the archive is captured before the engine sees anything.
+
+**A CORRECTION TO MY FIRST ATTEMPT, because it is the session's own error class:** the same call
+without `playerPool=ALL` returns **157 splits with a minimum of 65 AB** — a *qualified-batters
+leaderboard*, on which the answer would have been "0% dropped". **That is a population error, caught
+before it was reported.** With `ALL` the pool is **483 hitters, minimum 0 AB**.
+
+| market | rows | **dropped** | share | unmatched | median implied kept / dropped |
+|---|---|---|---|---|---|
+| `batter_hits` | 247 | 12 | **4.9%** | 0 | — / — *(no `cz` on hits rows)* |
+| `batter_home_runs` | 271 | 12 | **4.4%** | 1 | **14.8 / 14.8** |
+| `batter_hits_runs_rbis` | 135 | 6 | **4.4%** | 0 | **53.5 / 55.9** |
+| `batter_total_bases` | 230 | 10 | **4.3%** | 0 | **46.5 / 48.8** |
+| **TOTAL** | **883** | **40** | **4.5%** | 1 (0.1%) | |
+
+**`ab30` of the dropped rows: min 5, median 16, max 24** — genuine low-AB players (callups, platoon,
+injury returns), not a distinct population.
+
+**🔴 THE DROP IS SMALL AND PRICE-NEUTRAL — THE SECOND BRANCH FIRES.** The kept/dropped median
+implied is **identical on HR (14.8 / 14.8)** and within ~2 pp on HRR and TB. **The floor is not
+shaping the price distribution.** **IMPOSSIBLE BRANCH DOES NOT FIRE:** dropped rows carry no prices
+that surviving rows do not.
+
+### Which session figures move — and the load-bearing ones do not
+
+| measurement | computed on | moves? |
+|---|---|---|
+| **§H13 HR-band disjointness (0 of 14,181)** | **the ARCHIVE — pre-filter** | **NO.** It already included every sub-25-AB player. **The conclusion is if anything stronger: it was measured without the floor** |
+| **§M1 price path** | archive, pre-filter | **NO** |
+| **§H1 HR-pair dependence (1.103)** | statsapi box scores — no floor exists there | **NO** |
+| §H13 two-book / rung decomposition | archive, pre-filter | **NO** |
+| **§H10 CV table and per-market medians** | **the BOARD — post-filter** | **yes, by ≤4.5% of rows, price-neutral** — medians shift negligibly and the 15.1–30.9% band is unchanged |
+| the 07-26 exposure census (12 tickets, 81 pairs) | board, post-filter | yes, marginally |
+| the clamp census | board, post-filter | yes, marginally |
+
+**→ MY PROBABILITY-FLOOR SPEC KEEPS ITS BASIS.** The disjointness result that grounds it was
+measured on the unfiltered archive, so the third pre-committed branch does not fire.
+
+**PROVENANCE OF `25`: a bare literal with the comment `/* sample-size discipline */` and nothing
+else — no derivation, no doc, no citation anywhere. CHOSEN.** It is the fifth entry in the
+bare-literal class, and per the pre-committed reading **every board-derived population statement
+from this session now carries the stamp: "survivors of `ab30 ≥ 25`."**
+
+## §H19 `coreNoHR`'s SCOPE, CORRECTED IN THE CENSUS
+
+| | controls |
+|---|---|
+| **`coreNoHR`** (config, L2975–76) | **CORE ticket eligibility ONLY** — rejects a ticket whose type is `batter_home_runs` or any of whose legs carries `\|batter_home_runs\|` |
+| **L2785** (bare literal) | **MIXED-pool membership** — `if(k==="batter_home_runs")return` in `mixPool`. Verified: **49 HR legs in `parlays`, 0 in `parlaysMixed`** |
+
+**Setting `coreNoHR: false` restores HR to CORE and NOT to MIXED.** The old comment — *"HR
+volatility lives in the FUN bucket only"* — **overstates the key's reach**: the key does not put HR
+in FUN, it keeps HR out of CORE, and a separate unnamed literal keeps it out of MIXED. **Census
+entry rewritten to say what the key does rather than what its name implies.**
+
+**OTHER KEYS NARROWED BY BARE LITERALS: one instance found, and I am not claiming a sweep.** Within
+the L2200–3200 span, `coreNoHR`/L2785 is the only pair where a config key and a bare literal govern
+the same subject with different scopes. A full sweep is **the same judgment problem** as the census
+sweep and is **not mechanical** — so this is reported as one confirmed instance, not as a count.
+
+**DID ANY DECISION THIS SESSION REST ON AN OVERSTATED SCOPE? ONE, AND IT IS ALREADY CORRECTED.**
+§H10's entanglement argument said `coreNoHR` "made the same-team proposal's target set empty."
+**That is right for CORE and incomplete: L2785 is why no HR pair could appear in `parlaysMixed`
+either.** The conclusion (target set empty) is unchanged; its attribution now names both.
+**IMPOSSIBLE BRANCH — a key preempted entirely by a literal, i.e. dead configuration: NOT FOUND.**
+`coreNoHR` has live, distinct effect on CORE.
+
+## §H20 THE SIMULATION IS HOLDING — AND I WAS WRONG ABOUT THE RATE
+
+**Simulation, 2,000 runs, 90% band (`branch-firing-audit.md` L940–946): 2026-08-01 → median 4,
+band [2, 6]. OBSERVED: EXACTLY 4.** Not merely inside the band — **on the median.** Observed rate
+**4 crossings in 3 days = 1.33/day** against the simulation's mean **1.61/day**: inside.
+
+**🔴 SO THE FIRST BRANCH FIRES, AND IT CORRECTS MY OWN STATEMENT FROM THE PREVIOUS COMMIT.** I wrote
+*"the projection was not slightly early, it was wrong about the RATE."* **That is wrong. The rate is
+right — the simulation predicted today's count exactly.** What was wrong is the **~2026-08-04
+figure**, which came from a **different and earlier derivation**: the closed form
+`(umpires at g=4) × (league games/day ÷ roster)` = `11 × (11.2 ÷ 85)` = **1.449**, an
+**acknowledged UNDERESTIMATE** because it counts only the g = 4 pool and ignores g = 3 umpires who
+draw two assignments. **The error was in the derivation, not in the rate**, and the simulation that
+replaced it has now been validated against data for the first time.
+
+**→ 83 of 85 [80, 85] armed by freeze exit is the OPERATIVE FIGURE.** The `>2 twice` branch — which
+would falsify uniform assignment — **does not fire**: today's 4 is one observation at the median,
+not two excursions above 2.
+
+**IMPOSSIBLE BRANCH — an armed umpire's `g` decreasing: DOES NOT FIRE.** All four hold or rise
+(Barrett 5/90 unchanged, Traynor 5/69 unchanged, Moore 4→5, Thomas 4→5).
+
+**THE DOUBLE BRAKE, RE-ASSERTED PER CROSSING RATHER THAN AS A BLANKET:** the guard's second case
+re-checks **both** brakes — `context.json` frozen at
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` **and** `SH_CFG.umpKFrozen ===
+true` — **on every run, and it passed in the same run that went red on the count.** Because the
+brakes are global rather than per-umpire, one passing assertion covers all four; **there is no
+per-umpire state that could differ.** Recorded as such rather than implying four separate checks.
+
+**WHEN THE FIFTH CROSSING LANDS, THE GUARD GOES RED AGAIN — AND THE MANUAL STEP IS THE POINT.**
+With **14 umpires at g = 4** it will now fire on most refreshes. **It should NOT auto-record.** The
+guard's value is precisely that a human must decide *whether a vintage boundary moved* before the
+number is updated — that is M21's whole content, and an auto-updating stamp would be a counter, not
+a control. **The cost is a red suite on refresh days; the alternative is a parameter arming itself
+silently, which is the defect it was built for.** If the noise becomes untenable the right change is
+to assert **the brakes** and record the count as informational — **not** to automate the stamp.
