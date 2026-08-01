@@ -772,6 +772,58 @@ legacy mode opened at all until M24 resolves.
 
 ---
 
+## 7A.0 THE RATION DECISIONS RESTATE AT 19,958 (2026-08-01, owner's item 3)
+
+### The props cron cut did NOT cost close capture — measured, not argued
+
+**8 closes in the archive** (`kind === "close"`, 58 snapshots over 18 day-files), by UTC hour:
+
+| UTC hour | closes | which retained cron lands there |
+|---|---|---|
+| 23 | **4** | `0 20` → ~23:3x |
+| 00 | **3** | `0 21` → ~00:1x |
+| 20 | **1** | `0 17` → ~20:0x–20:5x |
+
+**ALL 8 OF 8 LAND IN A BAND A RETAINED CRON COVERS.** The six cut crons (`0 22`, `0 23`, `30 23`,
+`0 0`, `30 0`, `0 1`) queued into the **morning** batch — hours 06–11 hold 33 of the 58 snapshots,
+and **not one close.** **The cut removed duplicates, not closes.**
+
+**→ THE OWNER'S FIRST BRANCH DOES NOT FIRE.** Close capture is not materially degraded, so
+restoring a cron is **not indicated by this measurement** and nothing needs to be spent on it.
+**IMPOSSIBLE BRANCH (the four would have caught MORE than the ten): does not fire either — equal
+at 8 of 8, not more.**
+
+**THE ONE THING THE CUT DOES COST, and it is item 2's blocker, not close capture:** the archive
+takes **at most one snapshot inside 120 minutes per event**, and a price-path observation needs
+**two**. That is why the 60–90/30–60/10–30/<10 buckets are **empty** (memo §M1). **If a lock-time
+criterion is ever to be fitted, the capture that would fit it is a SECOND snapshot inside the
+window** — a different change from restoring a cut cron, aimed at a different band, and priced
+separately when it is wanted.
+
+### Variant B is UN-SUSPENDED
+
+Suspended at 553 because 12 credits mattered. **At 19,958 the premise is gone, and its purpose is
+now load-bearing**: it calibrates **`c`**, the per-event cost — which is the residual's attribution
+instrument, and **the residual is the calendar's binding constraint**. Protocol and readings stand
+as written in `docs/board-open-experiment.md`, **including the `bestBoard`-fallthrough STOP**
+(`engine-client` L297 → `generateBoard()` → `logBoardPredictions`: opening the board with no cached
+and no server board GENERATES one, spends, and writes `src:"client"` rows). **Run it after the four
+reads, before the board.**
+
+### Does one board per day to 2026-09-22 fit? YES, with room — the ration framing goes away
+
+52 days from 2026-08-01. Boards at ~66: **3,432**. Props at ~170/day: **8,840**. **Total ≈ 12,272
+against 19,958 — it fits with ~7,686 to spare**, and the calendar's binding line (K's/Outs at 38
+boards ≈ 8,968) sits inside it.
+
+**→ THE OWNER'S SECOND BRANCH FIRES. THE CONSTRAINT IS NO LONGER CREDITS.** It is **the residual
+plus the chain**: at 48.3/h the residual alone is 1,159/day = **60,268 over those 52 days, three
+times the pool**, draining it by **~2026-08-18**; and boards have been dark five days with the
+chain unverified end to end and the cron edits untested until Monday. **That sentence replaces the
+collection doc's top line.**
+
+---
+
 ## 7A.1 THE QUOTA INSTRUMENT — TRACED, PARTLY IMPEACHED, FIXED (2026-08-01, owner's item 1)
 
 **THE PATH THE VALUE TAKES, line by line.** `quota.mjs` L23–24 →

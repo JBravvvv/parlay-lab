@@ -1,5 +1,19 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
+> # 🔴 THE CONSTRAINT IS NOT CREDITS. IT IS THE RESIDUAL PLUS THE CHAIN. (2026-08-01, owner's item 3)
+>
+> **One board per day to 2026-09-22 FITS AT 19,958 WITH ROOM** — 52 days × ~66/board = 3,432 plus
+> ~170/day of props = 8,840, **≈12,272 against 19,958, ~7,686 spare**, with the calendar's binding
+> line (K's/Outs at 38 boards ≈ 8,968) inside it. **THE RATION FRAMING IS RETIRED.**
+> **What binds instead:** the **unattributed residual** — at the observed 48.3/h it is 1,159/day,
+> **60,268 over those 52 days, three times the pool**, draining it by **~2026-08-18** — and **the
+> chain**, which is unverified end to end after five dark board-days, with the cron edits untested
+> until Monday 2026-08-03 22:45Z. **The Vercel function log is the single determinant.**
+> **MEASURED THE SAME DAY: the props cron cut did NOT cost close capture.** All **8 of 8** archived
+> closes land in a band a retained cron covers (4 at 23Z → `0 20`, 3 at 00Z → `0 21`, 1 at 20Z →
+> `0 17`); the six cut crons queued into the morning batch, which holds 33 of 58 snapshots and
+> **zero closes**. Restoring one is **not indicated**. Handoff §7A.0 carries the working.
+>
 > # 🔴 SUPERSEDED THE SAME NIGHT — THE POOL RESET (2026-08-01T01:35:56Z)
 >
 > **The sentence below was written at a pool of 553 and was correct at 553. The pool is now

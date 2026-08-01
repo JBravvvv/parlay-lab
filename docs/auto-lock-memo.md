@@ -300,3 +300,169 @@ rather than assumed.
   48.3/h the residual drains 19,958 in ~17 days.
 - **The fire block stands at 15:38 PT (22:38Z), Sat 2026-08-01**, byte-identical since `03c4ae4`.
 - **Nothing in this memo ships. It is a memo.**
+
+---
+
+# MEASURED — 2026-08-01, at a pool of 19,958 (owner's items 1–4)
+
+## §M1 THE PRICE PATH — MEASURED, AND IT DOES NOT ANSWER THE QUESTION
+
+`node tools/price-path.mjs <props-dir>` — zero Odds credits, reads the already-paid archive.
+**|Δ `fair`| in percentage points, each earlier snapshot against that event's LAST archived
+snapshot, bucketed by the earlier snapshot's minutes-to-first-pitch.**
+
+**DENOMINATORS: 17,546 observations · 7,266 distinct rows · 149 distinct games · 16 fixture-days.**
+Reference-snapshot lead: median **155 min** before first pitch (min 1, max 775) — **so every figure
+is a LOWER BOUND**; movement to a reference 155 minutes out cannot include what a true close adds.
+
+| bucket (min to first pitch) | n | rows | mean | sd | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|---|---|---|
+| **>180** | 17,000 | 6,960 | **1.20** | 1.24 | 0.86 | 2.78 | 5.59 | **11.42** |
+| **120–180** | 477 | 477 | **0.45** | 0.66 | 0.27 | 1.14 | 3.32 | 6.35 |
+| **90–120** | 69 | 69 | **0.46** | 0.46 | 0.38 | 1.04 | 1.97 | 1.97 |
+| **60–90** | **0** | — | — | — | — | — | — | — |
+| **30–60** | **0** | — | — | — | — | — | — | — |
+| **10–30** | **0** | — | — | — | — | — | — | — |
+| **<10** | **0** | — | — | — | — | — | — | — |
+
+### 🔴 THE ANSWER IS "NO KNEE, BECAUSE THERE IS NO DATA WHERE THE KNEE WOULD BE"
+
+**n is not small in the four tightest buckets. It is ZERO.** The archive cannot speak at all about
+the region a lock-time criterion would operate in. **The owner's "n too small" branch fires, in its
+sharpest form.**
+
+**AND THE REASON IS STRUCTURAL, NOT BAD LUCK.** An observation needs the **same row in two
+snapshots** of one event. Across the whole archive there are **631 snapshot-events**, of which
+**55 sit inside 120 min, 27 inside 90, 20 inside 60** — and those tight ones are almost always the
+*last* snapshot for their event, which is the reference and is excluded by construction.
+**Populating the tight buckets requires TWO captures inside the window, and the current cadence
+takes at most one.** No amount of waiting fixes this; only a cadence change would.
+
+**THE APPARENT KNEE AT >180 → 120–180 (0.38×, 1.20 → 0.45 pp) IS A HORIZON ARTIFACT, NOT A KNEE.**
+The `>180` bucket runs out to 1,180 minutes, so its observations are measured over a much longer
+gap to the same reference — more elapsed time, mechanically more movement. **It is not evidence
+that prices settle at 180 minutes.** The honest reading of 120–180 vs 90–120 is **1.01× — flat**.
+
+### THE VARIANCE IS THE FINDING THE MEAN HIDES
+
+At >180: **mean 1.20, median 0.86, p99 5.59, max 11.42.** The tail is ~13× the median. A criterion
+tuned to the mean **fires early on exactly the rows that move most** — which is the failure the
+owner named in advance.
+
+### MOVEMENT DIFFERS BY MARKET — SO A CARD-LEVEL LOCK TIME IS WRONG
+
+| market | >180 | 120–180 | 90–120 |
+|---|---|---|---|
+| `pitcher_strikeouts` | 1.73 (721) | **1.19** (16) | 0.82 (3) |
+| `pitcher_outs` | 1.70 (569) | **1.17** (13) | 0.49 (1) |
+| `batter_total_bases` | 1.21 (5,360) | 0.41 (160) | 0.58 (22) |
+| `batter_hits` | 1.18 (5,468) | 0.34 (150) | 0.43 (23) |
+| `batter_hits_runs_rbis` | 1.06 (4,882) | 0.46 (138) | 0.30 (20) |
+
+**In the 120–180 window the pitcher markets move ~3× the batter markets** (1.17–1.19 vs
+0.34–0.46). **The owner's per-market branch fires: a single card-level lock time is wrong and the
+criterion is per-leg.** What that does to the design: a card cannot be locked as a unit on a price
+criterion — either each leg locks when *its* market settles (and a parlay's legs then lock at
+different times, which the current one-entry-per-day ledger shape cannot represent), or the card
+locks on the **latest-settling leg**, which makes the pitcher markets the binding constraint for
+every card containing one.
+
+### `batter_home_runs` HAS NO `fair` ANYWHERE IN THE ARCHIVE
+
+Every HR row carries `fair: null` — only two-sided cross-book rows get a devigged fair. **Any
+criterion computed on `fair` is structurally blind to HR.** Named because HR is 9,578 rows, a
+third of the paired sample, and its absence is invisible unless checked.
+
+### 🔴 MY OWN TOOL FABRICATED 9,578 OBSERVATIONS ON ITS FIRST RUN — THE SAME CLASS, AGAIN
+
+The first version read `Number(r.fair)`. **`Number(null)` is `0` and `Number.isFinite(0)` is
+`true`**, so every HR row became a **perfect zero-movement observation**: it printed
+`batter_home_runs 0.00` across every bucket and dragged the pooled >180 mean from **1.20 down to
+1.07**. Caught by dumping one real row. **Third tool in three days found broken on real input.**
+Fixed with a strict extractor (`typeof === "number"`), and the note is in the source at the line
+that caused it.
+
+### IMPOSSIBLE BRANCH — movement near zero at every horizon: DOES NOT FIRE, but with a caveat
+Movement is **not** near zero (1.20 mean, 11.42 max at >180). **However `lockMaxAgeMin` is on a
+DIFFERENT AXIS: it is BOARD AGE, not minutes-to-first-pitch.** This curve does not fit it. **The
+measurement that would**: |Δ `fair`| over a fixed elapsed gap, which the archive supports at ~40–90
+min gaps (MIN_GAP is 40 min) but **not at exactly 30**. So `lockMaxAgeMin = 30` remains **unfitted
+by this measurement**, and §M4 records what it would take.
+
+## §M2 ITEM 1 — THE `placed` SPEC, AND IT IS ADDITIVE
+
+**IMPOSSIBLE BRANCH — does an existing field already distinguish them? NO.** The nearest is
+`confirmed` (per ticket, `number | null`), which records **the actual PRICE** and is settable only
+until that ticket's first pitch. It does not record whether a bet was made, and a ticket can be
+placed at the locked price with `confirmed` left null. **`confirmed` covers actualPrice; it does
+not cover placement, and it does not cover stake.**
+
+| field | shape | why |
+|---|---|---|
+| `placed` | `true \| false \| null`, **absent ⇒ null** | null = unanswered · false = deliberately not placed · true = bet. The exit needs all three, and absent-means-null is what makes it additive |
+| `actualStake` | `number \| null`, per ticket | `stake` is and stays the ENGINE's allocation. Never overwrite it |
+| `actualPrice` | **not needed — `confirmed` already covers it** | but its pre-first-pitch-only window is a real limit, recorded here |
+
+**ADDITIVE, WITH NO ENGINE-STRING CHANGE — the first branch fires, ship on sign-off.** The path:
+`shLockCard` (inside the engine string) writes **nothing new** — the fields are absent at lock,
+which is exactly `null`/unanswered. They are set afterwards from the **React ledger page**
+(`app/ledger/page.tsx`, outside the engine string) and PUT back through `/api/ledger`. **No engine
+string, no hash move, no re-verification of the served chunk.**
+
+**THE ONE NON-OBVIOUS REQUIREMENT, or a two-device merge eats them silently.** `mergeDay`
+(`ledger-merge.ts` L85–99) deep-clones the **base** entry and then overlays only three things from
+the loser: `grading`, `clv`, and per-ticket `confirmed` (L95–97). **A new field on the losing copy
+is DROPPED**, and `pickBase` ranks by `[gradeScore, clvCount, confirmedCount, jsonLength]` — it
+does not know about placement, so **the copy without the placement data can win.** So the change is
+three parts: the UI control, an **overlay rule in `mergeDay` shaped exactly like `confirmed`'s**,
+and a `pickBase` key so a placement-bearing copy outranks one without.
+
+**DEFAULT-PLUS-CORRECTION IS THE WRONG SHAPE HERE.** A default of `placed: true` would silently
+re-create the exact ambiguity the field exists to remove — an unanswered entry would be
+indistinguishable from an attested one. **A UI control that starts at null and requires a tap is
+more error-prone in the sense that it can be left blank, and that is the point: blank must be
+visible.** Recommended: a three-state control on the ledger row, plus a count of unanswered
+entries shown at the top of the ledger page so blanks are loud.
+
+**GUARD, OBSERVED RED FIRST:** an entry created after the ship date lacking `placed` fails a new
+test — with the date as the discriminator so the historical entries stay legal and are reported as
+a named, counted, permanently-unanswerable population.
+
+### DATED TODAY, WHILE IT IS STILL ANSWERABLE: was locked the same as placed?
+
+**Nothing on disk can answer it, and nothing ever will be able to.** What the owner would have to
+**attest**, in his own words and dated: *for every locked day to 2026-08-01, was every locked
+ticket actually bet, at the recorded stake?* What the export can **corroborate but not prove**:
+`lateLock` (a late lock is a candidate for "locked but not bet"), `confirmed` (a recorded actual
+price is evidence a bet happened), and **stake against the 2% rule** — a locked ticket above 2% of
+that entry's `bankroll` was either not bet, or bet against the rule, and either answer is
+informative. `ledger-report.mjs` reading (1) already prints the ratios; reading (5) prints the
+late-locks. **The attestation is the only source; the export is the cross-check.**
+
+## §M3 ITEM 4 — THE REFUSALS
+
+**HAS EITHER FIRED? NO EVIDENCE EXISTS, AND NONE CAN.** A refused lock calls `shStatus(...)` and
+**returns before `shLedgerSave`** — nothing is persisted, on any path. The ledger records successes
+only. **The sole possible evidence is the owner's memory of the on-screen message.** The owner's
+first branch fires: **these are unexercised-in-production protections that auto-lock would depend
+on**, and that belongs above the design.
+
+**ARE THEY SILENT? NO — the third branch does NOT fire.** Every refusal calls
+`shStatus(msg, true)` with the numbers in the message: *"Lock blocked — this board is Xm old and
+the prices may no longer be live (limit 30m)"* and *"Lock blocked — $X staked would be Y% of the
+$Z bankroll (cap 10% = $C)"*. **This is the opposite of the zero-suppresses-explanation class: the
+refusal states the quantity, the threshold, and the remedy.** No M-item.
+
+**ARE THE SIX ENCODED-GUARDED?** Partly, and better than expected — **corrected from my own first
+reading, which assumed not**: `tests/lock-price-age.test.ts` covers the price-age refusal,
+`tests/sizing-discipline.test.ts` references `dailyBankrollCap`, and
+`tests/legacy-harness/int40lock.js` covers the re-lock refusal (*"re-lock refused, entry
+unchanged"*) plus `lateLock === false` on a frozen pregame clock. **What no test covers is a
+refusal firing against a REAL card** — the guard-wiring distinction this session has been about.
+
+**`lockMaxAgeMin = 30`: CHOSEN, and I could not find it in the census's parameter table.**
+`dailyBankrollCap 0.10` **is** registered (`collection-period.md` L610). `lockMaxAgeMin` appears in
+prose (L2586 *"by design, daily"*, L3366) but not in that table. **Flagged as a census question,
+not asserted as an omission** — if it belongs there the count moves 42 → 43. **Either way it is
+chosen, not fitted, so the owner's second branch fires: item 2 is what would fit it — on the board-
+age axis, which §M1 shows this curve is not.**
