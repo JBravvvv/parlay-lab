@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
 import { boardToPredictions, mergeDayBlob, HIST_MAX } from "@/lib/pred-serialize";
+import { stripComments } from "./helpers/source";
 
 /**
  * ACCRUAL VOLUME — the two unguarded inputs to `mktN` (2026-07-27).
@@ -25,7 +26,12 @@ import { boardToPredictions, mergeDayBlob, HIST_MAX } from "@/lib/pred-serialize
  * loose absolute floor beside it.
  */
 
-const ROUTE = fs.readFileSync(path.join(__dirname, "..", "app", "api", "predictions", "route.ts"), "utf8");
+/* STRIP COMMENTS (2026-08-01). OBSERVED DEAD: with `const dropR = sentR - records.length`
+   renamed in the route and the exact string left in a comment beside it, this guard passed
+   5/5. It pins the TRUNCATION ACCOUNTING — that a dropped record is COUNTED rather than
+   silently lost — which is a denominator, and the whole point of this file. Every assertion
+   on ROUTE below is a presence check, and none of them needs to see a comment. */
+const ROUTE = stripComments(fs.readFileSync(path.join(__dirname, "..", "app", "api", "predictions", "route.ts"), "utf8"));
 
 describe("prediction accrual volume — the rate that sets every reopening date", () => {
   beforeAll(() => {
