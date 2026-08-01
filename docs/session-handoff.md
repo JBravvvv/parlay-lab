@@ -306,23 +306,53 @@ date-less call without the cron key **401s at zero cost**. A malformed date is a
    the `gens` witness; regression case pinned on the **map** shape (`tests/chain-tools.test.ts`,
    20 tests green).
 
-```
+```bash
+set -o pipefail    # ← FIRST LINE. A pipeline's status is its LAST stage's, so without this
+                   #   `curl ... | anything` reports the filter's success, not curl's.
+
 # ── 1 ── propsnap store. UNGATED read, NO phrase. Precondition 2: are there WEEKDAY rows?
 for d in 2026-07-28 2026-07-29 2026-07-30 2026-07-31; do
-  echo -n "$d "; curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d"; echo; done
+  echo -n "$d "; curl -sS "https://parlay-lab-six.vercel.app/api/propsnap?date=$d"; echo
+  echo "   curl_exit=$?"
+done
 
 # ── 2 ── reading 15(c). PHRASE HERE ────────────────────────────────── <PHRASE>
+#   NOTE the temp-then-move: `>` TRUNCATES THE DESTINATION BEFORE curl RUNS, so a failed
+#   retry destroys the previous good export. For read 4 that file is the only copy of the
+#   bankroll population.
 curl -sS -H "x-pl-sync: <PHRASE>" \
-  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" > ~/pl-pred-0730.json
-node tools/burn-report.mjs --pred ~/pl-pred-0730.json
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" -o ~/pl-pred-0730.tmp
+echo "curl_exit=$?"   # non-zero ⇒ STOP. Do not run the tool on a partial file.
+mv ~/pl-pred-0730.tmp ~/pl-pred-0730.json
+node tools/burn-report.mjs --pred ~/pl-pred-0730.json; echo "tool_exit=$?"
 
 # ── 3 ── calibration. GET is OPEN — the header is optional, kept for uniformity.
 curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/calibration
+echo "curl_exit=$?"
 
 # ── 4 ── the ledger export. PHRASE HERE ─────────────────────────────── <PHRASE>
-curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger > ~/pl-ledger.json
-node tools/ledger-report.mjs ~/pl-ledger.json
+curl -sS -H "x-pl-sync: <PHRASE>" https://parlay-lab-six.vercel.app/api/ledger -o ~/pl-ledger.tmp
+echo "curl_exit=$?"   # non-zero ⇒ STOP. ~/pl-ledger.json still holds the last good export.
+mv ~/pl-ledger.tmp ~/pl-ledger.json
+node tools/ledger-report.mjs ~/pl-ledger.json; echo "tool_exit=$?"
 ```
+
+**WHY THE BLOCK CHANGED (2026-08-01, owner's item 1) — and what was NOT wrong with it.**
+**No read ever piped `curl` into a parser**; reads 2 and 4 redirected to a file and invoked the tool
+as a **separate statement**, so the pipeline-status trap never reached them. **MEASURED, every
+failure shape, on both tools:**
+
+| the file curl left | `ledger-report` | `burn-report --pred` |
+|---|---|---|
+| **empty** (transport failure) | **exit 1** | **exit 1** |
+| **partial** (dropped mid-body) | **exit 1** | **exit 1** |
+| **an error body** (`{"error":"bad-sync-key"}`) | **exit 65** | **exit 65** |
+
+**Not one silent success.** The pre-committed "fix it before I run them" branch **does not fire on
+the parse path.** Two things are hardened anyway, both cheap: **`-o tmp` then `mv`**, because `>`
+truncates before curl runs and a failed retry would destroy the only ledger export; and an explicit
+`curl_exit=` echo, because `curl -sS` **exits 0 on an HTTP 401 or 502** — the body is the signal
+there, which is why `-f` is deliberately NOT used (it would suppress the body the STOP rows read).
 
 **WHAT EACH ONE SETTLES — condensed to what CHANGES on the output, and what STOPS the run.**
 
@@ -1154,6 +1184,8 @@ about baseball, and that includes the owner's own proposals.**
 | ~~**5b**~~ | ~~the remaining PRESENCE-assertion scanners~~ — **✅ DONE 2026-08-01.** The unscoped sweep (§12O) re-derived the class as **12 of 24 text-scanning guards**, planted **eleven against real code one per commit**, and found **ten dead**. Thirteen remain unplanted and **none is in the vulnerable class** | — | test-only |
 | ~~**5a**~~ | ~~convert `strict-coercion`'s inline stripper~~ — **✅ DONE 2026-08-01**, in the same commit that put a real plant against the file. `KNOWN_DUPLICATIONS` is now **empty** | — | test-only |
 | **5f** | **the seven TS/TSX market-set mirrors** → `MODELLED_MARKETS` (the other half of the old 5a) | none; the six Python mirrors stay guard-covered | **YES** |
+| **5g** | **a NULL-CONTEXT fixture case** — an `armedFixtureEngine` variant whose `SH_CTX.games` does not match the slate, so the configuration production actually runs in (`shUmpCtx` null for every game) has a baseline of its own. Today every armed guard runs against a context that resolves 15 of 15 (§12V) | none | **YES** — test-only |
+| **5h** | **the scoped context splice** — fresh `games[]` only, every team-keyed block byte-identical. **0 Odds credits, but a VINTAGE EVENT: it releases brake 2.** Do NOT ride it with the first board in five days | the owner's decision with the diff in front of him | n/a — data |
 | **5c** | **the §12F git join** — `commit` resolves · touches `data/ump_k.json` · author date == `date` · **`braked` becomes a CHECK** against `umpKFrozen:true` (comment-stripped) and the frozen `context.json` sha at that commit · Barrett's null asserts date-shape only and is NAMED unverifiable. **Verified to work retroactively on all three sha-carrying crossings** (§12I) | none — it is a pure git read | test-only |
 | **5d** | **`dirPref` in `BoardEcho`** (M29), and with it **`umpKFrozen` / `penQFrozen` / `coreNoHR`** so a board testifies to its own brake state | none | **YES — `buildEcho` reads `SH_CFG` through `g(k)`; no engine string, no hash move** |
 | **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
@@ -1902,6 +1934,125 @@ re-verifying them would cost 165 s each for no readable gain.
 
 **THE DURATION IS THE CONTROL:** 165 s quiet versus 316–585 s loaded, same code, error present only
 in the loaded runs.
+
+### 12V. WHAT THE 07-29 CONTEXT COSTS TOMORROW'S BOARD — BOUNDED, AND NOTHING MISREADS IT
+
+**THE TWO CONTEXTS, SAME SHAPE, AND THE SPLIT IS GAME-KEYED vs TEAM-KEYED:**
+
+| block | keyed by | PRODUCTION (07-29, frozen) | FIXTURE `fix45` (07-09) | resolves on 08-01? |
+|---|---|---|---|---|
+| `games[]` | **the slate** | 16 | 15 | **NO — 0 of tomorrow's pairings** |
+| `ump_db_games` | game | **n = 0** | **n = 0** | **empty in BOTH — the fixture is not exercising it either** |
+| `pen_quality` | **team** | **31 teams** | 31 | **YES** — team names do not go stale |
+| `bullpen_last3` | **team** | **30 teams** | 30 | **YES** |
+| `league_k_per_game` | — | scalar | scalar | **YES** |
+
+> **WHAT TOMORROW'S BOARD ACTUALLY LOSES IS THE `games[]` BLOCK ONLY:** venue, probables, and the
+> `hpUmp` identity — and with it `shUmpCtx`, which returns **null for every game**.
+> **THE TWO PRICE-MOVING CONTEXT FACTORS — `pen_quality` and `bullpen_last3` — RESOLVE NORMALLY**,
+> because they are keyed by team. Weather is unaffected: hydrated live from statsapi.
+
+**THE UMP FACTOR IS 1 FOR THREE INDEPENDENT REASONS, and only one of them is the stale context:**
+`SH_CFG.umpKFrozen` short-circuits `shUmpKf` before anything is read (brake 1) · `shUmpCtx` returns
+null because the slate does not match · and **even a resolving context carries no `kFactor` — 0 of
+15 and 0 of 16 measured**, because `build_context.py` L232 emits one only at `g >= 5` and the
+carrier is frozen. **The stale context is the least load-bearing of the three.**
+
+**DOES ANY GUARD'S ASSERTION CHANGE ON A NULL-CONTEXT BOARD? NO — and the reason is that the one
+guard about this builds its own context.** `tests/pinned-factors.test.ts` constructs
+`ctxWith(hpUmp) = {games:[{...GAME, hpUmp}]}` with a **fabricated** `kFactor`, and drives all four
+configurations directly: frozen → 1 · unfrozen with `kFactor 1.07` → **1.07** · `g = 3, kFactor null`
+→ **1 (the gate, not the clamp)** · `g = 40, kFactor 1.31` → **1.08 (clamped)**. **It has already
+tested the null path**, synthetically and independently of any fixture. No assertion anywhere
+depends on the fixture's context resolving.
+
+**DOES `board-report` OR `self_consistency` MISREAD AN ABSENT CONTEXT? NO.**
+- **`board-report` never looks at it** — a grep for `shadow`, `kRaw` and `gameInfo` in the tool
+  returns **nothing**. It cannot read absent-as-zero because it does not read the field. The fire
+  block's *"`gameInfo.shadow` will carry no `kRaw`"* is a note for the human, not a parse.
+- **`self_consistency.py` reads board rows, not context** — `p` and `market_fair`, and in
+  `--shadow` mode a row's `sh[col]`, where **rows without a shadow value are skipped by
+  construction**. The default mode is untouched. In `--shadow m11` (the ump column) a null-context
+  board yields **zero rows**, which is a **zero over an empty population** — and the chain step
+  already requires **BOTH population sizes printed, with zero-over-empty explicitly not a pass.**
+  **Already encoded; nothing to fix before the fire.**
+
+> **THE PRE-COMMITTED READING: "nothing misreads it" FIRES.** Tomorrow's board is read with the
+> context limit stated and nothing else changes.
+>
+> **IMPOSSIBLE BRANCH — "a guard passes only because the fixture resolves context":** the closest
+> case is `armed-baseline`, whose pinned digest is computed on a board built WITH a resolving
+> per-game context. **It is a fixture-stability pin, not a production-configuration certification** —
+> it would break if the fixture changed, which is its job. **What is true and worth recording: no
+> baseline exists for the null-context configuration.** Adding one is the fixture-set item below.
+
+**WHAT WOULD RESTORE THE MATCH — AND THE SCOPE IS NOT WHAT IT LOOKS LIKE.** `tools/build_context.py`
+hits **statsapi only** (`https://statsapi.mlb.com/api/v1`) — **ZERO Odds credits.** But a plain
+re-run **rewrites `pen_quality` and `bullpen_last3` too**, and those are the blocks that currently
+RESOLVE and DO move prices. **So "touch `games` and `ump_db_games` only" is not a re-run — it is a
+surgical splice**: generate fresh, take the new `games` array, and write it into the frozen file
+leaving every team-keyed block byte-identical.
+
+| | cost |
+|---|---|
+| Odds credits | **0** |
+| what moves | `public/model/context.json` — `games[]` (16 entries) and `ump_db_games` (n=0 → n=0) |
+| what must NOT move | `pen_quality` (31) · `bullpen_last3` (30) · `league_k_per_game` |
+| vintage | **a VINTAGE EVENT** — it releases **brake 2**, the frozen carrier at `2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`, which all four recorded ump crossings are stamped as double-braked against |
+| timing | `build_context.py` L263: statsapi publishes `officials` **only near first pitch**, so a run at 15:38 PT (≈27 min before a 23:05Z first pitch) may resolve venue and probables but **not `hpUmp`** |
+
+> ### 🔴 IT SHOULD NOT RIDE BEFORE THE FIRE, and the reason is not cost.
+> Brake 1 (`umpKFrozen`) still holds, so the factor stays 1 either way and there is **no pricing
+> gain**. What it would buy is `hpUmp` identity — **which statsapi may not even publish yet at the
+> fire time.** Against that it **releases brake 2 on the same day as the first board in five days**,
+> conflating two changes on the one board every reading is pre-committed against, and it makes the
+> crossing record's *"all four double-braked"* stamp false going forward. **It waits for the owner's
+> decision with the splice diff in front of him.**
+
+**QUEUED (§11 item 5g), NOT SHIPPED:** the null-context fixture case — an `armedFixtureEngine`
+variant whose `SH_CTX.games` does not match the slate, so the configuration tomorrow actually runs
+in has a baseline of its own.
+
+### 12U. THE PIPELINE-EXIT TRAP — SWEPT, AND THE STANDING FORM (owner's item 1)
+
+> ### 🔴 THE STANDING GATE FORM. EVERY FUTURE GATE USES THIS VERBATIM.
+> ```bash
+> set -o pipefail
+> <command> > out.log 2>&1; echo "EXIT=$?"
+> ```
+> **Never a pipe on a verification.** Redirect to a file, read `$?` on the next statement, then
+> read the file. `set -o pipefail` is the belt for any block that must pipe anyway.
+>
+> **MEASURED in this shell (zsh):** `false | tail -1` → **exit 0**. `set -o pipefail; false | tail -1`
+> → **exit 1**. The trap is real and pipefail closes it.
+
+**THE SWEEP — every place an exit is read through a pipe:**
+
+| surface | piped exit? | verdict |
+|---|---|---|
+| **workflows on `main`** (5 files) | **NONE** | grep for `\| tee/grep/head/tail/jq/python/node/xargs/sed/awk/cut/sort/wc/tr` across every `run:` step on **both branches**: zero matches. The `\|\|` hits are logical-OR in `${{ }}` expressions, not shell pipes |
+| **workflows on `frontend-rebuild`** | **NONE** | same sweep, same result |
+| **the run sheet's four reads** | **NONE** | reads 2 and 4 redirect with `>` and invoke the tool as a **separate statement**; reads 1 and 3 print to the terminal |
+| **this session's gate runs** | **YES — the defect** | `npx vitest run \| tail -N && git commit` reports `tail`'s status. It committed against a failed suite once (`715d891`, vitest exit 1) |
+| tool invocations (`node tools/*.mjs <file>`) | **NONE** | each takes a path argument; nothing is piped in |
+
+> **THE IMPOSSIBLE BRANCH — "a workflow on main reads an exit through a pipe": DOES NOT FIRE.**
+> Production is clean on both branches. **The defect was confined to the dev loop, which is where
+> it did its damage.**
+
+**AND THE FOUR READS ARE SAFE ON THE PARSE PATH, measured rather than argued** — empty file → exit
+1, partial file → exit 1, error body → exit 65, on **both** tools. See §4A for the table and for the
+two hardenings applied anyway (`-o tmp` + `mv`, and an explicit `curl_exit` echo).
+
+**THE TWELVE UNKNOWN GUARD COMMITS — NOT WORTH CONFIRMING, AND THE INFERENCE STANDS AS AN
+INFERENCE.** Confirming them means checking out each of twelve intermediate commits and running the
+full suite: **12 × ~150 s ≈ 30 minutes**, plus twelve checkouts, to learn whether an intermediate
+tree was momentarily red. **Nothing depends on an intermediate state** — each guard commit's content
+is present in the current tree, and the current tree is verified end-to-end. **The reason to believe
+they were clean is duration correlation** (the RPC timeout has appeared only at 316 / 318 / 585 s and
+never on a runs-in-seconds targeted invocation) — **which is an inference from correlation, not a
+reading, and is recorded as one.** The pre-committed branch fires: the tree's verification is what
+matters.
 
 ### 12S. THE SUSPENSION BAR IS A PURE MARKET-AND-LINE TEST — "PROBABLY" RESOLVED (owner's item 1)
 
