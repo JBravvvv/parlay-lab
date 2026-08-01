@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { stripHashComments } from "./helpers/source";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -58,10 +59,17 @@ describe("the line-history day-file has no consumers", () => {
   });
 
   it("the schedule is disabled but the workflow is NOT deleted (redundancy stays recoverable)", () => {
-    const wf = readFileSync(".github/workflows/line-history.yml", "utf8");
+    /* TWO COPIES, BY THE CONVENTION (2026-08-01). OBSERVED DEAD: with `workflow_dispatch:`
+       commented out — the disabled job now UNRECOVERABLE without a rewrite, which is the exact
+       thing this assertion exists to prevent — the guard passed 3/3.
+       `wf` is CODE: the dispatch trigger must be live YAML.
+       `wfRaw` is PROSE: "DISABLED 2026-07-31" is a dated reason that lives in a comment BY
+       DESIGN, and asserting it against stripped source would be asserting it can never hold. */
+    const wfRaw = readFileSync(".github/workflows/line-history.yml", "utf8");
+    const wf = stripHashComments(wfRaw);
     expect(wf.includes("workflow_dispatch"), "manual dispatch was removed — the job is unrecoverable without a rewrite").toBe(true);
     expect(/^\s*schedule:/m.test(wf), "an ACTIVE schedule block is back — either intended (update this guard) or accidental").toBe(false);
-    expect(wf.includes("DISABLED 2026-07-31"), "the disable lost its dated reason").toBe(true);
+    expect(wfRaw.includes("DISABLED 2026-07-31"), "the disable lost its dated reason").toBe(true);
   });
 
   it("PLANT: a planted consumer string is detected", () => {
