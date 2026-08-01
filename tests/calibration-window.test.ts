@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { CAL_START } from "@/engine2/calibration";
+import { stripComments } from "./helpers/source";
 
 /**
  * THE CALIBRATION WINDOW IS A DENOMINATOR, AND IT SLIDES (2026-07-27).
@@ -28,7 +29,18 @@ import { CAL_START } from "@/engine2/calibration";
  * Widening the TRAINING window is a frozen-parameter change and stays unshipped.
  */
 
-const ROUTE = fs.readFileSync(path.join(__dirname, "..", "app", "api", "calibrate", "route.ts"), "utf8");
+/* STRIP COMMENTS (2026-08-01). OBSERVED DEAD: with `summary.full = full` renamed in the
+   calibrate route and the exact string left in a comment beside it, this guard passed 12/12.
+   It pins the CALIBRATION WINDOW and its vintage stamping — `full.window`, `summary.window`,
+   `capped`, SUMMARY_DAYS — every one a presence check that prose can satisfy. `doc` below is
+   MARKDOWN and is deliberately NOT stripped. */
+const ROUTE = stripComments(fs.readFileSync(path.join(__dirname, "..", "app", "api", "calibrate", "route.ts"), "utf8"));
+/* ...and the UNSTRIPPED copy, for the one test that is deliberately ABOUT the comment.
+   "the constant carries the date and the reason at its declaration" asserts that the
+   CAUTION IS DOCUMENTED where the next editor will see it — a legitimate assertion about
+   prose, and the reason this file needs both copies rather than one. Stripping revealed it
+   by turning that test red; it is not collateral, it is the distinction. */
+const ROUTE_RAW = fs.readFileSync(path.join(__dirname, "..", "app", "api", "calibrate", "route.ts"), "utf8");
 const FREEZE_END = "2026-09-22";
 
 const dayNum = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / 86_400_000);
@@ -43,7 +55,10 @@ describe("the calibration window declares itself, and the exit reading is not th
        a positive count is the expected state and its absence means the scan broke. */
     let seen = 0;
     for (const f of files) {
-      const src = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
+      /* stripped for the same reason, plus one of its own: a COMMENTED-OUT "DEL" line would
+         increment `seen`, which is this test's non-empty guard — prose could satisfy the very
+         check that exists to prove the scan matched something. */
+      const src = stripComments(fs.readFileSync(path.join(__dirname, "..", f), "utf8"));
       for (const line of src.split("\n")) {
         if (!/"DEL"|"SREM"|"EXPIRE"/.test(line)) continue;
         seen++;
@@ -136,7 +151,7 @@ describe("the calibration window declares itself, and the exit reading is not th
   it("the constant carries the date and the reason at its declaration", () => {
     // a test can only fire when it is run; the comment is what the next person editing
     // the line actually sees. Both, not either.
-    const decl = ROUTE.slice(0, ROUTE.indexOf("const SUMMARY_DAYS"));
+    const decl = ROUTE_RAW.slice(0, ROUTE_RAW.indexOf("const SUMMARY_DAYS"));
     expect(decl).toContain("2026-09-08");
     expect(decl).toContain("BEFORE 2026-09-08");
     expect(decl).toContain("SYNCED-WINDOW");
