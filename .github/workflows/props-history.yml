@@ -31,6 +31,17 @@ on:
     # untouched. Reversible: uncomment. Ceiling falls ~339 -> ~185 credits/day (measured
     # ev/snapshot x the measured 5.84 credits/event). docs/branch-firing-audit.md PART THREE.
     - cron: "0 17 * * *"   # -> 20:0x-20:5x, 19/20 days. The same-day `pre`, median lead 112 min.
+    # TARGETED PAIR — ADDED 2026-08-01, owner signed off from docs/props-window-cron.diff.
+    # THE GAP IT EXISTS FOR: the 60-120-minutes-to-first-pitch bucket is STRUCTURALLY EMPTY in the
+    # archive (17,546 observations, ZERO in 60-90/30-60/10-30/<10) because a price path needs TWO
+    # captures inside the window and every existing cron delivers at most one. That bucket is the
+    # only place a lock-time criterion could ever be FITTED rather than chosen.
+    # SPACING: ~45 min apart, >= MIN_GAP_S (40), so neither suppresses the other. Neighbour gaps
+    # 20:0x -> 21:1x ~70 min and 21:5x -> 23:3x ~100 min. NOTHING COLLIDES; no existing cron moves.
+    # COST: --window 120 restricts each capture to ~3-8 events (~18-48 credits) instead of the
+    # full slate's 13-15, so the pair is ~36-96/day against a pool of 19,958.
+    - cron: "10 18 * * *"  # -> ~21:1x, ~115 min before a 23:05Z first pitch   [--window 120]
+    - cron: "55 18 * * *"  # -> ~21:5x, ~70 min before it                      [--window 120]
     - cron: "0 20 * * *"   # -> ~23:3x. LOAD-BEARING: 4 of the 7 archived closes.
     - cron: "0 21 * * *"   # -> ~00:1x. LOAD-BEARING: the other 3.
     - cron: "30 22 * * *"  # -> queues to the next morning batch = the 8.5h-out opener, the wide
@@ -69,7 +80,11 @@ jobs:
           git fetch --depth 1 origin frontend-rebuild
           git checkout origin/frontend-rebuild -- tools/snapshot_props.py
       - name: Snapshot props
-        run: python3 tools/snapshot_props.py
+        # Only the targeted pair passes --window; every other firing keeps the full-slate default,
+        # so the four pre-existing crons are byte-identical in behaviour.
+        env:
+          PL_WINDOW: ${{ (github.event.schedule == '10 18 * * *' || github.event.schedule == '55 18 * * *') && '--window 120' || '' }}
+        run: python3 tools/snapshot_props.py $PL_WINDOW
       - name: Commit
         run: |
           git config user.name "engine-v2-bot"
