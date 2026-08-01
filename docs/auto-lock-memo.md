@@ -1113,3 +1113,121 @@ same-**team** for TB (1.063 [1.024, 1.130] with (b) flat at 0.992) — and **hit
 stratum**. **A single same-game correction factor is the wrong shape for all three at once.** That
 is a positive argument for `simJoint`'s per-group empirical approach over any fixed rho — **and
 whether it delivers is exactly what the precision gap prevents us from knowing.**
+
+---
+
+# 2026-08-01, fifth pass — the separating experiment RAN, and it refutes my own §H10 caveat
+
+## §H12 ITEM 1 — NOT YET LANDED. NOTHING TO REPORT, AND THAT IS THE REPORT.
+
+**The two new crons have NOT fired.** They declare **18:10Z and 18:55Z today (2026-08-01)**; at the
+time of writing it is **~06:5xZ**, so they are **~11 hours out**, with expected delivery
+**~21:1xZ ≈ 14:1x PT** and **~21:5xZ ≈ 14:5x PT**. **No delivery times, no run logs, no quota
+deltas, and no 60–120 bucket exist yet. None are estimated.**
+
+**THE CHECK, ready to run when they land** (all zero Odds credits except the quota read, which is
+free):
+```
+# 1. did they deliver, and did --window print?
+gh run list --workflow=props-history.yml --limit 6 --json name,createdAt,conclusion,databaseId
+gh run view <id> --log | grep -E "window:|snapshot kind=|skipped:"
+
+# 2. the archive, and the bucket
+git fetch origin line-history && git show origin/line-history:data/props/2026-08-01.json > ~/props-0801.json
+node tools/price-path.mjs <dir-with-that-file>     # 60-120 bucket n is the reading
+
+# 3. the cost
+node tools/quota.mjs
+```
+**Every pre-committed branch stands exactly as written and is not restated here.** The one worth
+repeating because it is the trap: **one cron delivering is a PARTIAL LANDING that produces no pair
+and therefore no observation — it looks like a landing and is not.**
+
+## §H13 ITEM 3 — THE ARCHIVE CARRIES THE RUNGS, SO THE EXPERIMENT RAN TODAY
+
+**FIRST BRANCH FIRES.** The archive holds alternate rungs that no board has ever carried:
+
+| market | rungs present in the 18-day archive |
+|---|---|
+| `batter_home_runs` | **0.5: 10,579 · 1.5: 7,467 · 2.5: 3,254** |
+| `batter_hits_runs_rbis` | 0.5: 1,708 · **1.5: 7,644 · 2.5: 466** |
+| `batter_total_bases` | 0.5: 3,739 · **1.5: 7,948 · 2.5: 13** |
+| `batter_hits` | 0.5: 9,496 · **1.5: 1,325** |
+
+**So the experiment I called "blocked on a board that does not exist" was never blocked.** The
+archive and the board are different populations, and I had reasoned about the board. **Recorded as
+my error, not as a discovery.**
+
+### THE RESULT: THE BANDS STAY DISJOINT. MY §H10 CAVEAT IS REFUTED.
+
+Implied probability from the Caesars OVER price (vigged, but applied uniformly to every row so the
+overlap structure is preserved), across all 18 archived days:
+
+| market \| rung | n | p10 | median | p90 | **share inside HR's 15.1–30.9% band** |
+|---|---|---|---|---|---|
+| **`batter_home_runs\|0.5`** | 10,477 | 9.5 | **16.7** | 24.7 | **52.7% (5,523)** |
+| `batter_home_runs\|1.5` | 6,254 | 1.2 | **2.2** | 4.2 | 0.0% |
+| `batter_hits_runs_rbis\|1.5` | 5,189 | 45.7 | 52.2 | 58.5 | **0.0%** |
+| `batter_hits_runs_rbis\|2.5` | 279 | 45.9 | 47.8 | 51.7 | **0.0%** |
+| `batter_total_bases\|1.5` | 5,011 | 42.0 | 45.9 | 51.5 | **0.0%** |
+| `batter_total_bases\|0.5` · `batter_hits_runs_rbis\|0.5` | 2,038 · 796 | 54.5 · 56.5 | 60.6 · 60.8 | 65.5 · 63.4 | 0.0% |
+| `pitcher_outs` (five rungs) | 868 | 43.5–55.6 | 45.9–60.6 | 51.7–64.5 | **0.0%** |
+
+**🔴 ZERO OF 14,181 NON-HR ROWS FALL INSIDE HR'S BAND — WITH THE SUSPENDED RUNGS ADMITTED.**
+
+**→ THE DISJOINTNESS IS NOT MANUFACTURED BY `hrrAltMax` OR THE 0.5-LINE RULE. IT IS A GENUINE
+PROPERTY OF HOW THESE MARKETS ARE PRICED, AND §H10's "partly manufactured" CAVEAT IS WITHDRAWN,
+DATED 2026-08-01.** The deep rungs do not sit in HR's band — they sit **above** it (HRR 2.5 at a
+47.8% median, TB 1.5 at 45.9%), because an *alternate rung on a high-probability market is still a
+high-probability event*. And **HR's own alternate rungs go the other way entirely**: `HR|1.5` sits
+at a **2.2% median**, far *below* the band. **Admitting rungs widens the gap; it does not close it.**
+
+**IMPOSSIBLE BRANCH — rungs present in the archive but absent from every board: IT FIRES, and the
+line is `legacy/index.html` L2241:**
+```js
+if(mkt==="batter_home_runs"&&row.ln!==0.5)return; /* HR: only the 0.5 (anytime) line — never 1.5+ */
+```
+**A bare literal, hardcoded, with NO config key anywhere** (grep returns exactly one site). **So it
+is ours, it is a FOURTH constraint, and it is not in the census — not even as a named parameter.**
+Recorded; registering a bare literal is the owner's call and would move the count 43 → 44.
+
+**ONE GAP IN THIS MEASUREMENT, NAMED:** `batter_hits` rows carry no Caesars price in the archive, so
+they are absent from the table above. Their board-side implied sits at **62–70%**, nowhere near the
+band, so the conclusion is unaffected — but the row is missing and I am not implying it was tested.
+
+## §H14 ITEM 2 — THE PROBABILITY FLOOR, SPEC ONLY
+
+**THE FLOOR THAT REPRODUCES THE EXCLUSION EXACTLY: any value in `(30.9%, 37.1%]`.** On the archived
+board, HR's maximum implied is **30.9%** and the lowest non-HR leg is `pitcher_outs` at **37.1%** —
+so **every threshold in that 6.2-point gap partitions the 303 rows identically to `coreNoHR`.**
+A stated value of **34%** sits in the middle of the gap.
+
+**FIRST BRANCH FIRES: the floor reproduces the exclusion exactly** — 50 HR rows excluded, 253
+non-HR rows admitted, **byte-identical at the row level** on the 07-26 board *and* across 14,181
+archived non-HR rows. *(Row-level: CORE eligibility applies further filters — `coreMaxLegs`,
+`coreEvMin`, `coreCzEvMin` — which the floor does not touch and which are unchanged either way.)*
+
+**IMPOSSIBLE BRANCH — a current CORE leg below the floor: DOES NOT FIRE.** Zero of 253 board rows
+and zero of 14,181 archived rows sit below 37.1% outside HR.
+
+**WHAT EACH WOULD CATCH THAT THE OTHER DOES NOT:**
+- **The floor catches, the ban does not:** any future leg in any market that prices below ~34% — a
+  deep TB/HRR rung if the suspensions ever lift, a new market, a longshot ML. **Today: nothing.**
+- **The ban catches, the floor does not:** an HR leg that ever prices **above** ~34%. Today the
+  maximum observed is 30.9% on the board and HR|0.5's p90 is 24.7% across 18 archived days — **so
+  this is rare but not impossible**, and under the floor such a leg would become CORE-eligible.
+
+**IS THE FLOOR FITTED OR CHOSEN? NEITHER, AND THIS HAS TO BE SAID PLAINLY: IT IS FITTED TO A RULE.**
+Setting it to reproduce `coreNoHR`'s exclusion means **it inherits `coreNoHR`'s provenance
+entirely** — and `coreNoHR` was domain reasoning until this session gave it a CV number after the
+fact. **A floor calibrated to an unmeasured rule is not a measured parameter; it is the same rule
+in more general clothing, and shipping it would launder the provenance.** Recorded in those terms.
+
+**WHAT WOULD FIT IT TO DATA: the CV or variance level at which CORE's realised record degrades.**
+That needs realised outcomes per CORE ticket — **BLOCKED ON READ 4**, and there are zero locked
+entries on disk. **Named as blocked rather than designed around.**
+
+**RECORD, PER THE PRE-COMMITTED READING: the floor is the general form of the rule, spec-only.
+Shipping it changes NOTHING today — the partition is identical — and changes EVERYTHING if the
+alternate rungs ever return or a new market is added below 34%.** That is the entire argument for
+preferring it, and it is an argument about the future, not about any measurement.
