@@ -100,6 +100,7 @@ const f = (x, d = 3) => (x == null ? "—" : x.toFixed(d));
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [start, end] = process.argv.slice(2);
   if (!start || !end) { console.error("usage: node tools/hr-pair-dependence.mjs <startDate> <endDate>"); process.exit(64); }
+  const STAT = process.argv.includes("--stat") ? process.argv[process.argv.indexOf("--stat") + 1] : "hr";
   const pairsC = Number(process.argv.includes("--pairsC") ? process.argv[process.argv.indexOf("--pairsC") + 1] : 400000);
 
   const sched = await j(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&startDate=${start}&endDate=${end}`);
@@ -114,7 +115,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       const t = b.teams[side];
       const players = Object.values(t?.players ?? {})
         .filter((p) => (p.stats?.batting?.plateAppearances ?? 0) > 0)
-        .map((p) => ({ id: p.person.id, hr: (p.stats.batting.homeRuns ?? 0) > 0 ? 1 : 0, order: Number(p.battingOrder ?? 0) }));
+        .map((p) => {
+          const b = p.stats.batting;
+          const tb = (b.hits ?? 0) + (b.doubles ?? 0) + 2 * (b.triples ?? 0) + 3 * (b.homeRuns ?? 0);
+          return {
+            id: p.person.id, order: Number(p.battingOrder ?? 0),
+            /* the prop lines the engine actually ingests: HR anytime (0.5), Hits 0.5, TB 1.5 */
+            hr: (b.homeRuns ?? 0) > 0 ? 1 : 0,
+            hits: (b.hits ?? 0) > 0 ? 1 : 0,
+            tb: tb > 1 ? 1 : 0,
+          };
+        });
       sides.push({ teamId: t?.team?.id, players });
     }
     return { ...g, sides };
@@ -125,7 +136,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const gp = new Map(), hr = new Map();
   for (const b of boxes) for (const s of b.sides) for (const p of s.players) {
     gp.set(p.id, (gp.get(p.id) ?? 0) + 1);
-    hr.set(p.id, (hr.get(p.id) ?? 0) + p.hr);
+    hr.set(p.id, (hr.get(p.id) ?? 0) + p[STAT]);
   }
   const rate = (id) => (gp.get(id) ? hr.get(id) / gp.get(id) : 0);
   const pooled = [...gp.keys()].reduce((n, id) => n + hr.get(id), 0) / [...gp.values()].reduce((a, b) => a + b, 0);
@@ -136,11 +147,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       for (let x = 0; x < s.players.length; x++) for (let y = x + 1; y < s.players.length; y++) {
         const i = s.players[x], k = s.players[y];
         const adj = i.order && k.order ? Math.abs(Math.round(i.order / 100) - Math.round(k.order / 100)) : null;
-        A.push({ key: b.pk, pi: rate(i.id), pj: rate(k.id), both: i.hr && k.hr, adj });
+        A.push({ key: b.pk, pi: rate(i.id), pj: rate(k.id), both: i[STAT] && k[STAT], adj });
       }
     }
     for (const i of b.sides[0].players) for (const k of b.sides[1].players) {
-      B.push({ key: b.pk, pi: rate(i.id), pj: rate(k.id), both: i.hr && k.hr });
+      B.push({ key: b.pk, pi: rate(i.id), pj: rate(k.id), both: i[STAT] && k[STAT] });
     }
   }
   /* (c) different games, same slate — sampled, because the full cross product is enormous */
@@ -153,7 +164,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (let t = 0; t < want; t++) {
       const i = flat[Math.floor(rnd() * flat.length)], k = flat[Math.floor(rnd() * flat.length)];
       if (i.gi === k.gi || i.id === k.id) continue;
-      C.push({ key: date, pi: rate(i.id), pj: rate(k.id), both: i.hr && k.hr });
+      C.push({ key: date, pi: rate(i.id), pj: rate(k.id), both: i[STAT] && k[STAT] });
     }
   }
 
@@ -163,8 +174,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     ["(c) different games, same slate", C, (p) => p.key],
   ];
 
-  console.log(`\nHR PAIR DEPENDENCE — ${boxes.length} games, ${byDate.size} dates, ${gp.size} hitters, ${start}..${end}`);
-  console.log(`pooled P(>=1 HR per game-with-a-PA) = ${f(pooled, 4)}\n`);
+  console.log(`\n${STAT.toUpperCase()} PAIR DEPENDENCE — ${boxes.length} games, ${byDate.size} dates, ${gp.size} hitters, ${start}..${end}`);
+  console.log(`pooled P(hit the ${STAT} threshold per game-with-a-PA) = ${f(pooled, 4)}\n`);
   console.log("stratum                            pairs    joints    RATE-MATCHED ratio [95% CI]        RAW ratio");
   for (const [label, arr, keyOf] of rows) {
     if (!arr.length) { console.log(`${label.padEnd(34)} 0`); continue; }

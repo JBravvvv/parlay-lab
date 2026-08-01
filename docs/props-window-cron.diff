@@ -1,0 +1,53 @@
+# TARGETED CAPTURE — PROPOSED DIFF, NOT APPLIED (2026-08-01, owner's item 3 of the prior turn)
+# Purpose: populate the 60-120-minutes-to-first-pitch bucket, which is structurally EMPTY
+# (docs/auto-lock-memo.md §M1) because a price path needs TWO captures inside the window and the
+# cadence delivers one. Cost ~36-96 credits/day at a pool of 19,958.
+# Part (a) goes to frontend-rebuild (the workflow pulls tools/ from there at run time).
+# Part (b) goes to main — the FIRING copy — and joins workflow-branch-sync's expiring allow-list.
+
+--- a/tools/snapshot_props.py
++++ b/tools/snapshot_props.py
+@@
+-MAX_WAIT_S = 300 * 60      # 5h — under the 360-minute hosted-runner job ceiling, with headroom
++MAX_WAIT_S = 300 * 60      # 5h — under the 360-minute hosted-runner job ceiling, with headroom
++
++# TARGETED WINDOW (2026-08-01). Without this the sweep takes `todays[:16]`, i.e. anything inside
++# 20 hours, so a capture aimed at the 60-120 band still pays for the whole slate. `--window N`
++# restricts it to events whose first pitch is inside N minutes. Default OFF: the four existing
++# crons are byte-identical in behaviour.
++WINDOW_DEFAULT_S = 20 * 3600
+@@
+     wait = "--wait" in sys.argv
++    window_s = WINDOW_DEFAULT_S
++    if "--window" in sys.argv:
++        window_s = int(sys.argv[sys.argv.index("--window") + 1]) * 60
+     events = fetch("https://api.the-odds-api.com/v4/sports/baseball_mlb/events")
+@@
+     todays = [e for e in events
+-              if 0 < (datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) - now).total_seconds() < 20 * 3600]
++              if 0 < (datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) - now).total_seconds() < window_s]
++    if window_s != WINDOW_DEFAULT_S:
++        print(f"window: {window_s//60} min -> {len(todays)} events (of {len(events)} on the board)")
+
+--- a/.github/workflows/props-history.yml        (ON main)
++++ b/.github/workflows/props-history.yml        (ON main)
+@@
+     - cron: "0 17 * * *"   # -> 20:0x-20:5x, 19/20 days. The same-day `pre`, median lead 112 min.
++    # TARGETED PAIR (2026-08-01): two captures inside 60-120 min of the ~23:05Z block, which is
++    # the band the lock-time criterion needs and the archive has NEVER sampled twice.
++    # Spacing ~45 min >= MIN_GAP_S (40). Neighbour gaps: 20:0x -> 21:1x ~70 min;
++    # 21:5x -> 23:3x ~100 min. NOTHING COLLIDES AND NO EXISTING CRON MOVES.
++    - cron: "10 18 * * *"  # -> ~21:1x, ~115 min before a 23:05Z first pitch
++    - cron: "55 18 * * *"  # -> ~21:5x, ~70 min before it
+     - cron: "0 20 * * *"   # -> ~23:3x. LOAD-BEARING: 4 of the 7 archived closes.
+@@
+-          python3 tools/snapshot_props.py
++          # the targeted pair passes --window; every other firing keeps the full-slate default
++          python3 tools/snapshot_props.py ${{ (github.event.schedule == '10 18 * * *' || github.event.schedule == '55 18 * * *') && '--window 120' || '' }}
+
+# PRE-COMMITTED LANDING TEST: on the first day it runs,
+#   node tools/price-path.mjs <props-dir>
+# must print n > 0 in the 60-120 bucket. ZERO MEANS IT DID NOT LAND AND THE PAIR SPACING IS WRONG
+# — not that prices do not move. Print both crons' actual delivery times beside it.
+# ALSO REQUIRED ON APPLY: add the divergence to tests/workflow-branch-sync.test.ts's EXPIRING
+# allow-list, dated, naming the decision that ends it.

@@ -885,3 +885,103 @@ reason to ship it; §H1 is the reason not to.
 **RECOMMENDATION: do not build the rule.** The measurement says it would remove the wrong thing,
 the exposure it targets is empty on real data, and the engine already prices the dependence at the
 unit the data supports.
+
+## §H6 THE RULE IS DROPPED — A MEASURED REFUTATION, DATED 2026-08-01
+
+**The owner proposed a same-team HR ban on reasoning about baseball. The measurement returned the
+opposite sign — 1.103 [1.048, 1.168] against independence — the target set on the only real board
+was empty (0 of 81 HR pairs), and the evaluator could not have seen the harm. THE RULE IS DROPPED.**
+
+**IT JOINS THE REASONING-NOT-MEASUREMENT LIST, AND IT IS THE OWNER'S SECOND ENTRY.** The first was
+the count-armed accrual argument for the outs ship. **The standing rule holds without exception:
+nothing in this project has been found by reasoning about baseball, and that includes the owner's
+own proposals.** Recorded in his words.
+
+**AND THE CORRECTION TO HIS OWN FRAMING, kept beside it:** same-**game** is the supported unit;
+same-**team** is not separable at this n for HR; the phrasing picked a boundary the data does not
+support. *(But see §H7 — for TOTAL BASES the unit reverses, and same-team IS the right one.)*
+
+### Do other structure caps rest on domain reasoning rather than measurement?
+
+| constraint | what it rests on |
+|---|---|
+| **`coreNoHR: true`** | **🔴 DOMAIN REASONING. Its own comment says "(user rule)"** — *"HR volatility lives in the FUN bucket only."* **No measurement is cited anywhere.** It is a variance argument, never tested |
+| `coreMaxLegs: 3` | **MEASURED** — its comment carries the graded record: 2-leg −0.7% on $464; 3+ legs 1-25 |
+| `hrrAltMax: −1` | **MEASURED** — the 46.3/59.2 HRR population, with a written retirement criterion (provenance pending the export) |
+| `outsSusp: true` | **MEASURED** — M2's interlocked pair, `docs/pitcher-outs-audit.md` DECIDED |
+| `coreCzEvMin: 0` | definitional, not empirical — a sign constraint (never lock a negative-EV core ticket) |
+| `dailyBankrollCap: 0.10` | chosen bankroll convention, registered as CHOSEN |
+
+**→ THE FIRST BRANCH FIRES, COUNT = 1: `coreNoHR` is a structure cap resting on domain reasoning
+alone.** What would settle it: the same box-score method applied to HR-containing CORE tickets'
+realised variance versus the FUN bucket's — measurable at zero credits, and **not run.** Recorded,
+not acted on. It is also the constraint that made the proposed rule's target set empty, so the
+two are entangled and neither should move without the other being re-measured.
+
+## §H7 THE simJoint AUDIT — BLOCKED BY STORED PRECISION, AND THAT IS THE FINDING
+
+**The audit cannot be completed from the archived board, and the reason is not the sims.**
+
+On 2026-07-26, **3 of 196 tickets carry `simJoint: true`** — all three are the same-game HR
+tickets. Their stored values:
+
+| ticket | `prob` | `probNaive` | implied ratio |
+|---|---|---|---|
+| ATH@MIN group (2 legs of 4) | **0.3** | **0.3** | 1.000 *at the stored precision* |
+| CHC@PIT group (2 legs of 6) | **0** | **0** | **undefined** |
+| KC@DET group (2 legs of 5) | **0** | **0** | **undefined** |
+
+**🔴 `ticket.prob` IS STORED AS A PERCENTAGE ROUNDED TO ONE DECIMAL** (measured: 176 of 196 values
+carry 1 dp, 20 carry 0; max 51.7, min 0). At 0.3% the rounding interval is [0.25, 0.35], so the
+implied ratio is bounded only to roughly **[0.71, 1.40]** — **an interval that contains BOTH 1.000
+(no correction applied) and 1.103 (the measured value).** Two of the three round to zero on both
+sides and are unbounded.
+
+**NEITHER PRE-COMMITTED BRANCH FIRES.** The board archive **cannot distinguish "simJoint priced no
+dependence" from "simJoint priced it correctly."** That is a **capture/serialisation gap in the one
+artifact that would audit the one component that prices dependence** — the same class as the props
+archive's structurally-empty tight window, one layer over. **Fix, spec-only: emit the per-group
+ratio `j2/pm` onto the ticket directly, or raise `prob`/`probNaive` precision. Additive, echo-only
+in shape, and it makes the audit possible on the next board.**
+
+**THE CLAMP:** 0.25–4×. A measured 1.103 sits far inside it, so **the clamp cannot be binding for
+HR pairs** — and with n = 1 computable group, nothing can be said about whether it ever binds.
+**Impossible branch (implied ratios below 1 where reality shows positive): NOT EVALUABLE at this
+precision** — recorded as unresolved rather than absent.
+
+**AND THE AUDIT NEEDS BOARDS ANYWAY:** 3 same-game groups, all HR, on one board. Even at full
+precision that is n = 3.
+
+### The reality side, measured for every market the sims group (2026-06-01…07-31, 781 games)
+
+| market | (a) same team | (b) opposing, same game | (c) different games |
+|---|---|---|---|
+| **HR** *(4-month window: **1.103 [1.048, 1.168]**)* | 1.072 [0.987, 1.239] | 1.039 [0.954, 1.151] | 0.999 [0.867, 1.117] |
+| **Hits (≥1)** | 1.013 [0.996, 1.035] | 1.000 [0.983, 1.022] | 1.009 [0.974, 1.046] |
+| **Total Bases (≥2)** | **1.063 [1.024, 1.130]** | 0.992 [0.939, 1.054] | 0.990 [0.937, 1.047] |
+
+**🔴 DEPENDENCE IS MARKET-SPECIFIC, AND FOR TOTAL BASES THE UNIT REVERSES.** TB same-team is
+positive and its interval excludes 1, while TB **opposing-team is flat** — so **for TB the right
+unit IS same-team**, the opposite of HR, where (a) and (b) were both elevated and indistinguishable.
+**Hits pairs are effectively independent in every stratum.** A single same-game correction factor is
+therefore the wrong shape for all three markets at once, and `simJoint`'s per-group empirical
+approach is — in principle — the right one. Whether it delivers is what the precision gap blocks.
+
+**Note on windows:** HR's 2-month interval spans 1 while its 4-month interval excludes it. The
+4-month figure is the headline; the 2-month row exists only so the three markets are compared on
+one identical sample. **Stated rather than letting the reader assume the HR result weakened.**
+
+## §H8 CROSS-GAME INDEPENDENCE IS NOW EMPIRICALLY CONFIRMED — instrument ledger
+
+**`simJoint` asserts cross-game independence explicitly** (*"Cross-game independence stands"*,
+L2691) **and the measurement supports it**: stratum (c) = **0.982 [0.893, 1.071]**, n = 120,640
+pairs over 118 date-clusters, **interval spanning 1**, confirmed independently at 0.999 (HR),
+1.009 (hits) and 0.990 (TB) on the two-month window. **This is a design assumption verified against
+real data, which is rare here — and it is recorded as the rarer finding, not buried.**
+
+**WHAT IT DOES NOT COVER, and the distinction matters:** across-**ticket** dependence is priced
+**nowhere** (M16). The 0.982 result speaks only to legs in **different games**. **Two legs in
+different tickets on the same card can share a game — and for those, stratum (a)/(b) applies, not
+(c).** On the 07-26 board the 78 different-game HR pairs are covered by this confirmation; **the 3
+same-game pairs are not**, and neither is any cross-ticket pair sharing a game. **So the
+confirmation licenses the cross-game half of the assumption and says nothing about M16.**
