@@ -28,7 +28,13 @@ export function stripComments(src: string): string {
     .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
 }
 
-/** Blank out `#` comments in Python sources, preserving newlines. */
-export function stripPyComments(src: string): string {
+/**
+ * Blank out `#` comments, preserving newlines. Python AND YAML — same comment character,
+ * and both are scanned by guards in this repo (`snapshot_props.py`, `props-history.yml`).
+ */
+export function stripHashComments(src: string): string {
   return src.replace(/(^|[^"'])#[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
 }
+
+/** @deprecated name — kept so existing imports keep working. Same function. */
+export const stripPyComments = stripHashComments;

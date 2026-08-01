@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { stripHashComments } from "./helpers/source";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -35,7 +36,13 @@ function checks(src: string): string[] {
 
 describe("props-history: concurrency group + push retry", () => {
   it("the local (frontend-rebuild) copy carries both", () => {
-    expect(checks(readFileSync(".github/workflows/props-history.yml", "utf8"))).toHaveLength(0);
+    /* STRIP `#` COMMENTS (2026-08-01). MEASURED: this guard is HALF DEAD. With the push
+       retry commented out — the exact failure the retry exists for, a concurrent push no
+       longer retried — it passed 3/3, because REQ_RETRY is a plain substring test.
+       REQ_GROUP survived the same treatment, and the reason is the lesson: it is a
+       MULTI-LINE STRUCTURAL regex encoding YAML indentation, which a `#` prefix breaks.
+       Structure beats containment; the filter is only needed where structure was not used. */
+    expect(checks(stripHashComments(readFileSync(".github/workflows/props-history.yml", "utf8")))).toHaveLength(0);
   });
 
   /* PENDING-ENFORCEMENT (2026-07-29): the main-branch push is the owner's (this
