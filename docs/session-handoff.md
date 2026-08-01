@@ -162,6 +162,175 @@ the raw `K_WEIGHTS` blob.
 
 ---
 
+## 0.17 CALIBRATION: CLOSED AS DESIGNED-UNDATEABLE, AND THE OUTS STAMP
+
+**`lastRun` AND THE LOG WERE NEVER WIRED — the absence is by construction, not by loss.**
+`K_LASTRUN` is read at route L119 for the 10-minute limiter and **never written on the success
+path**; `weights.log` is reported as `adjustments: weights.log.length` (L466) but nothing appends to
+it in the fit branch. **So there is no history to recover and no partial write to diagnose.**
+**CLOSED AS DESIGNED-UNDATEABLE.**
+
+### 0.17a SPEC — wire `lastRun` and the log, so the NEXT fit is dated (one commit, guard red first)
+
+**A DORMANT-PATH FIX: the calibrate job is paused, so nothing changes until calibration resumes.
+Zero vintage cost, zero credits.**
+
+| step | change |
+|---|---|
+| 1 | after `redisSetJson(K_WEIGHTS, weights)` (L455), `await redis(["SET", K_LASTRUN, String(now)])` |
+| 2 | before that write, `weights.log.push({at: now, mults: {...weights.mults}, n: summary.reliability})` — **append, never replace**, so the history accrues from the first resumed run |
+| 3 | the GET surfaces both, so `/api/calibration` answers *when* as well as *what* |
+| guard | **RED FIRST:** a case asserting `lastRun` is a finite epoch and `log.length` rises across two fits. Against today's code it fails on both — `lastRun` is null and `log` is 0 |
+
+**NOT SHIPPED. §11 item 5j.** It is a write-path edit to a paused job on the eve of a board decision;
+it waits.
+
+### 0.17b THE OUTS STAMP — the list, so the count is on record
+
+> **STAMP: `DOWNSTREAM OF AN UNDATEABLE MULTIPLIER`.** Every item below was measured on boards whose
+> `pitcher_outs` pricing may have run through `mults.pitcher_outs = 0.1429` — a **7× shrink on the
+> model blend weight, applied at price time** (`engine-client.ts` L347 → `SH_V2.calW` → engine
+> L1744) — at a moment nothing recorded.
+
+| # | measurement | where |
+|---|---|---|
+| 1 | **M2 / M2′ — the interlocked outs pair, k = 3.4** | `pitcher-outs-audit.md`; the suspension's justifying evidence |
+| 2 | **M6 — K's priced with no sim** (shares the pitcher pipeline) | M/A index |
+| 3 | the **outs four counts** and their vacuity branch | §13C #3 |
+| 4 | **cfSel's outs counterfactual** — rank, stake, dollars-by-market | §13C #4 |
+| 5 | the **CV table's `pitcher_outs` column** | §7.5 |
+| 6 | **`range_compression.py`'s outs finding** (1.20× wider than market, then 0.51 real) | tool header |
+| 7 | the **07-26 archived board's outs rows** — 76 outs legs, the pre-flag population | §12C |
+| 8 | **reading 26's outs share** of the cost bracket | §5 |
+
+**EIGHT ITEMS STAMPED.** None is retracted — the stamp says *the multiplier's state at measurement
+time is unknown*, not *the number is wrong*.
+
+**⚠️ AND THE STAMP'S WIDTH IS STILL UNSET.** L347 is the **client** arm. **Whether the SERVER
+generate path sets `calW` was not verified** — if it does not, archived server boards priced WITHOUT
+the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
+grep and it is the first thing tomorrow.**
+
+## 0.15 🔴 THE COST MODEL IS RIGHT AND THE DENOMINATOR IS WRONG — c IS NOT A COST
+
+**THE PREMISE THIS ITEM WAS SET ON DOES NOT SURVIVE MEASUREMENT.** *"Today's measured per-event cost
+is 12.4"* — **my derivation gives 11.29 for today**, and more importantly **`c` is not a cost at
+all.** It is `spent ÷ archived events`, and the archive is not the paid population.
+
+### THE c SERIES, every quota bracket that contains a delivery
+
+| window (UTC) | h | spent | archived ev | c |
+|---|---|---|---|---|
+| 07-28 23:00 → 07-29 12:00 | 13.00 | 641 | 123 | **5.21** |
+| 07-29 12:00 → 07-30 03:55 | 15.92 | 215 | 18 | **11.94** |
+| 07-30 03:55 → 16:45 | 12.83 | 223 | 20 | **11.15** |
+| 07-30 16:45 → 07-31 01:25 | 8.67 | 200 | 10 | **20.00** |
+| 07-31 06:41 → 13:57 | 7.27 | 339 | 58 | **5.84** |
+| **07-31 16:10 → 19:11** | 3.02 | **146** | **0** | **— (the burst)** |
+| 07-31 20:21 → 21:04 | 0.70 | 0 | 14 | **0.00 — EXCLUDED, see below** |
+| 08-01 01:35 → 22:41 | 21.09 | 621 | 55 | **11.29** |
+
+**c ranges 5.21 → 20.00. No constant fits, and 12.4 is not among the observations.**
+
+### 0.15a WHY — AND THE ANSWER IS A DROPPED POPULATION, NOT A PRICE CHANGE
+
+**THE BILLED RATE IS FIXED BY THE REQUEST SHAPE AND THE 6/EVENT MODEL IS CORRECT.**
+`tools/snapshot_props.py` L323 requests **`?regions=us&oddsFormat=american&markets=<6 markets>`** —
+**one region × six markets = 6 credits per event**, plus 1 for the `/events` list. `--window` changes
+**which** events are fetched, **not the per-event price** (same markets, same region). And L30 sends
+**`&fresh=1`**, so the proxy cache is bypassed: **every fetch is billed.**
+
+**THE DENOMINATOR IS THE DEFECT.** L322–327:
+```python
+for e in todays[:16]:
+    od = fetch(.../events/{e["id"]}/odds?regions=us&...)   # ← BILLED, 6 credits
+    if not od or not od.get("bookmakers"):
+        continue                                            # ← DROPPED, never archived
+    snap["events"].append(...)
+```
+**An event with no bookmakers is PAID FOR AND DROPPED.** So `archived ≤ fetched`, always, and
+`c = spent ÷ archived` **inflates by exactly the drop rate.** The low-c windows (5.21, 5.84) are
+days where nearly every fetched event had books; the high-c windows (11–20) are sweeps where half or
+more returned nothing.
+
+> **THERE IS NO COST MODEL TO RE-DERIVE. The constant is 6 credits per event FETCHED and it was
+> right from the start. What no instrument on disk records is the FETCH count** — the archive keeps
+> only survivors, and the run log prints a count only when `--window` is set.
+> **`spent ÷ archived` is a drop-rate estimator wearing a price's clothes.**
+
+**THE c = 0.00 ROW IS EXCLUDED, WITH ITS REASON.** 07-31 20:21→21:04 brackets the 20:48Z sweep whose
+cost §2 already records as **permanently unmeasurable** — it fell into the pool reset. Zero there is
+an artifact of the reset, **not an observation of a zero price.** The impossible branch
+(*"any bracketed window implies c below 5"*) technically fires on this row and is **discharged by
+exclusion, not by explanation.**
+
+### 0.15b 🔴 THE 07-31 BURST CANNOT CLOSE AT ANY VALUE OF c
+
+**Inside 2026-07-31T16:10:13Z → 19:11:31Z the Actions log contains exactly ONE run:
+`board-archive` at 17:12:01Z** — which calls `/api/board`, has no Odds-API reference, and costs
+**zero**. **No props-history run. No line-history run. ZERO archived deliveries.**
+
+> **c × 0 = 0 for every c.** The 146 has **no delivery to attribute it to at any price.**
+> **THE PRE-COMMITTED BRANCH FIRES: 07-31 does not close, the residual survives at its real size,
+> and the log stays BLOCKING. THE SURVIVING NUMBER IS 146, UNCHANGED.**
+> **The external-actor hypothesis is not dead. It is untouched.**
+
+### 0.15c TODAY BOUNDED ON THE FETCH COUNT, NOT THE ARCHIVE COUNT
+
+Five in-window props runs. The windowed one fetched **3** (its log prints `3 of 29`); the skipped one
+fetched **0**; the other four fetched **at most `todays[:16]` = 16** each.
+
+```
+MAXIMUM ATTRIBUTABLE  = 4 × (1 + 16×6)  +  (1 + 3×6)  +  0   =  388 + 19  =  407
+QUOTA-MEASURED SPEND                                          =  621
+MINIMUM SURVIVING RESIDUAL                                    =  214
+```
+**Even on the most generous fetch model the day does not close: ≥ 214 unattributed, up to ~291 on
+the archive count.**
+
+> ### 🔴 THE GATE'S CONDITION IS **NOT** MET.
+> Both bursts survive. **Tomorrow's board does not fire on this evidence, and the Vercel function
+> log remains BLOCKING, not confirmatory.** The first pre-committed branch — *both bursts close, the
+> gate is met, the cron fires at 22:45Z with no dashboard read* — **does not fire.**
+
+**WHAT RESTATES, AND IT IS NOT THE RUNWAY BANDS.** Every figure built on `spent ÷ archived` was
+measuring drop rate, not price. The **price** figures (6/event, ~97 per full 16-event sweep) stand.
+**RUNWAY at the real rate:** six crons/day, four full (≈97) + two windowed (≈19) ≈ **~427/day**;
+**19,337 ÷ 427 ≈ 45 days.** Not 24, not 48.
+
+**QUEUED (§11 item 5i): print the FETCH count.** One `print()` beside the drop, so `spent ÷ fetched`
+becomes measurable instead of estimated. Zero credits, zero vintage.
+
+## 0.16 THE QUEUE DELAY IS ~1 HOUR, NOT 3 — THE PAIR MISSED BY DESIGN, NOT BY VARIANCE
+
+**Both new crons DID fire.** Matching 08-01's seven props deliveries against the six declared hours:
+
+| declared (UTC) | delivered | delay |
+|---|---|---|
+| `0 17` | 17:56:21Z | **+56 min** |
+| **`10 18`** | **19:30:17Z** | **+80 min** ← the windowed capture, `3 of 29` |
+| **`55 18`** | **20:01:26Z** | **+66 min** ← fired, then `skipped: no unstarted games` |
+| `0 20` | 20:39:37Z | **+40 min** |
+| `0 21` | 21:44:06Z | **+44 min** |
+| `30 22` | next morning batch | (the workflow's own note) |
+
+> **THE DELAY IS 40–80 MINUTES, MEDIAN ~56. THE ~3-HOUR ASSUMPTION THE PAIR WAS PLACED ON IS WRONG
+> BY A FACTOR OF THREE.** The windowed capture landed **19:30Z — 215 minutes before a ~23:05Z first
+> pitch**, far outside the 60–120 bucket. **The flag worked; the placement was computed from a delay
+> that does not exist.**
+>
+> **IMPOSSIBLE BRANCH — "a cron delivered before its declared hour": DOES NOT FIRE.** Every observed
+> delay is positive.
+
+**THE LANDING TEST'S VERDICT, as its pre-commitment defined it: `n = 0` in the 60–120 bucket. THE
+SPACING IS WRONG, NOT THE PRICES.**
+
+**THE FIX IS ARITHMETIC, NOT ARCHITECTURE.** At a ~56-minute median, a capture landing 60–120 minutes
+before a 23:05Z first pitch wants a declared hour of **≈ 21:05Z minus 90 minutes minus 56 = ~20:20Z**
+— i.e. **`20 20 * * *`**, not `10 18`. **The two new entries are MIS-TARGETED BY ~2 HOURS and should
+be retargeted, not retired.** `--wait` is not needed for this: the delay is tight enough that a fixed
+hour can land the window. **Retargeting is a `main` edit and waits for the owner.**
+
 ## 0.3 🔴 NO BOARD — 2026-08-01. SIXTH DARK BOARD-DAY, CHOSEN.
 
 **DECISION RECORDED AT `2026-08-01T22:54:10Z`.** The window (22:10Z–23:00Z) was **still open** when the decision
@@ -1497,6 +1666,9 @@ about baseball, and that includes the owner's own proposals.**
 | ~~**5b**~~ | ~~the remaining PRESENCE-assertion scanners~~ — **✅ DONE 2026-08-01.** The unscoped sweep (§12O) re-derived the class as **12 of 24 text-scanning guards**, planted **eleven against real code one per commit**, and found **ten dead**. Thirteen remain unplanted and **none is in the vulnerable class** | — | test-only |
 | ~~**5a**~~ | ~~convert `strict-coercion`'s inline stripper~~ — **✅ DONE 2026-08-01**, in the same commit that put a real plant against the file. `KNOWN_DUPLICATIONS` is now **empty** | — | test-only |
 | **5f** | **the seven TS/TSX market-set mirrors** → `MODELLED_MARKETS` (the other half of the old 5a) | none; the six Python mirrors stay guard-covered | **YES** |
+| **5i** | **print the FETCH count in `snapshot_props.py`** — one `print()` beside the no-bookmakers drop, so `spent ÷ fetched` becomes measurable instead of estimated from survivors (§0.15) | none | **YES** — 0 credits, 0 vintage |
+| **5j** | **wire `lastRun` + `weights.log`** so the next fit is dated (§0.17a). Dormant-path: the job is paused | guard red first | **YES** — write path, paused job |
+| **5k** | **retarget the two `--window` crons ~2 h later** — the measured queue delay is 40–80 min, not 3 h (§0.16) | a `main` edit; owner's call | n/a — schedule |
 | **5g** | **a NULL-CONTEXT fixture case** — an `armedFixtureEngine` variant whose `SH_CTX.games` does not match the slate, so the configuration production actually runs in (`shUmpCtx` null for every game) has a baseline of its own. Today every armed guard runs against a context that resolves 15 of 15 (§12V) | none | **YES** — test-only |
 | **5h** | **the scoped context splice** — fresh `games[]` only, every team-keyed block byte-identical. **0 Odds credits, but a VINTAGE EVENT: it releases brake 2.** Do NOT ride it with the first board in five days | the owner's decision with the diff in front of him | n/a — data |
 | **5c** | **the §12F git join** — `commit` resolves · touches `data/ump_k.json` · author date == `date` · **`braked` becomes a CHECK** against `umpKFrozen:true` (comment-stripped) and the frozen `context.json` sha at that commit · Barrett's null asserts date-shape only and is NAMED unverifiable. **Verified to work retroactively on all three sha-carrying crossings** (§12I) | none — it is a pure git read | test-only |
