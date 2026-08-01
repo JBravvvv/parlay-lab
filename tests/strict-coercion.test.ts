@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { num, numFromText, req } from "../tools/strict.mjs";
+import { violatesIdentity } from "../tools/quota.mjs";
 
 /**
  * NULL IS NOT ZERO — THE TOOL-INPUT HALF OF `finite-prices` (2026-08-01, owner's item 3).
@@ -98,5 +99,48 @@ describe("no new raw coercion appears in the tools", () => {
     expect(pp, "price-path must not Number() a fair").not.toMatch(/Number\(\s*r\.fair/);
     const lr = fs.readFileSync(path.join(dir, "ledger-report.mjs"), "utf8");
     expect(lr, "ledger-report must not isFinite(Number(lockedAt))").not.toMatch(/Number\.isFinite\(Number\(e\.lockedAt/);
+  });
+});
+
+/**
+ * THE QUOTA SERIES IDENTITY (2026-08-01, owner's item 1). `remaining + used` is the plan size and
+ * is constant INSIDE a period and ACROSS a reset — both sides of the 2026-08-01 boundary sum to
+ * 20,000 — so it is a FABRICATION detector, not a reset detector, which is exactly the shape
+ * needed: the coercion defect's output was `{remaining: 0, used: 0}`.
+ *
+ * AUDIT RESULT, recorded because a clean result matters as much as a finding: all 21 rows in
+ * `data/quota-log.jsonl` at the time of the audit satisfy it. Zero failures, zero `remaining: 0`,
+ * zero duplicate timestamps, zero non-monotone rows inside a period. The series is CLEAN and the
+ * defect was PROSPECTIVE — no burn figure, runway band, or residual conclusion restates.
+ */
+describe("the quota series identity", () => {
+  it("PLANT (invalid-by-value): the coercion defect's exact output is rejected", () => {
+    expect(violatesIdentity({ remaining: 0, used: 0 })).toMatch(/fabricated/);
+    expect(violatesIdentity({ remaining: null, used: null })).toMatch(/not both finite/);
+    expect(violatesIdentity({ remaining: 553, used: 19000 })).toMatch(/expected 20000/);
+  });
+
+  it("holds on both sides of the real reset — so it cannot be used to DETECT one", () => {
+    expect(violatesIdentity({ remaining: 553, used: 19447 })).toBeNull();
+    expect(violatesIdentity({ remaining: 19958, used: 42 })).toBeNull();
+  });
+
+  it("every row already in the append-only log satisfies it", () => {
+    const p = path.join(__dirname, "..", "data", "quota-log.jsonl");
+    const rows = fs.readFileSync(p, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    expect(rows.length).toBeGreaterThan(0);
+    const bad = rows.map((r, i) => ({ i: i + 1, r, why: violatesIdentity(r) })).filter((x) => x.why);
+    expect(
+      bad,
+      `\n\nROWS FAILING remaining + used == 20000:\n` +
+        bad.map((b) => `  row ${b.i} ${b.r.at}: ${b.why}`).join("\n") +
+        `\n\nThe log is APPEND-ONLY: a bad row is marked in a dated addendum, never deleted, and ` +
+        `every figure derived from the interval containing it restates.\n`,
+    ).toEqual([]);
+    const seen = new Set<string>();
+    for (const r of rows) {
+      expect(seen.has(r.at), `duplicate timestamp ${r.at} — print both rows before trusting either`).toBe(false);
+      seen.add(r.at);
+    }
   });
 });

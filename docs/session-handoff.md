@@ -737,7 +737,7 @@ instance, and the only one that claims a protection.**
 
 ## 8. FROZEN TABLE, CENSUS, AND PROVENANCE
 
-**Census v2.3: 42 parameters / 0 fitted / 41 chosen (12 with no stated rationale) / 1
+**Census v2.4 (2026-08-01): 43 parameters / 0 fitted / 42 chosen (12 with no stated rationale) / 1
 stated-arithmetic; 9 since-measured.** The BORN-provenance table was repaired 2026-07-31 — it had
 never gained the rows for the `simJoint` clamp, the 1/n relax and T = 0.80 — and **its sum now
 reads 0 + 1 + 29 + 12 + 0 = 42, agreeing with the prose for the first time.**

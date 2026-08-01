@@ -202,8 +202,8 @@
 > consequence, after `coreEvMin`, damping 0.5, and `SH_W`.)**
 > **(v2.3, 2026-07-30 late: T = 0.80 joins — the lineup condition's threshold,
 > CHOSEN by the owner before any board's number was known, rationale stated
-> (separates the 22:45Z window from the 22:00Z design point) → 42 parameters /
-> 41 chosen (12 no rationale) / 1 stated-arithmetic; 9 since-measured. And the
+> (separates the 22:45Z window from the 22:00Z design point) → 43 parameters /
+> 42 chosen (12 no rationale) / 1 stated-arithmetic; 9 since-measured (v2.4, 2026-08-01). And the
 > relax's measured consequence NARROWS same-day: the disciplined path's Kelly
 > ceilings bound n=1 at ≤ ~8% and under-deploy thin cards ($49 of $250 measured)
 > — the 10% is reachable only in legacy/override modes.)**
@@ -622,6 +622,7 @@ drift, even when both values look reasonable on their own.
 | `coreCzEvMin` | `0` | settlement floor — never lock a core ticket negative-EV at Caesars (override-proof) |
 | `consMinN` / `consMinEv` | `100` / `−1` (%) | markets under 100 graded legs also need consensus-fair EV ≥ −1% |
 | `dailyBankrollCap` | `0.10` | CORE+FUN day exposure ≤ 10% of the managed bankroll, enforced at lock |
+| **`lockMaxAgeMin`** | **`30` (min)** | **REGISTERED 2026-08-01 (owner's item 5) — census v2.3 → v2.4, 42 → 43.** Board age above this REFUSES the lock (`legacy/index.html` L3389–92): locking uses the board's STORED prices, so a stale board would write prices that were never available and CLV would compare a close against an `imp` never locked at. **CHOSEN, not fitted.** What would fit it is board age against price movement since generation — `board.at` joined to props snapshots bracketing it — which needs a board archive deeper than its current **n = 1 day** (`docs/auto-lock-memo.md` §M8). It was omitted from this table until 2026-08-01 while `dailyBankrollCap`, its exact structural twin, was registered from the start |
 
 ### Suspensions (until recalibration earns them back)
 | parameter | value | meaning |
@@ -691,7 +692,7 @@ Kelly ceilings bound n=1 at ≤ ~8% and under-deploy thin cards, $49 of $250 (v2
 two n=1-board implications short of measurement: `coreEvMin` (self-graded sweep) and
 damping 0.5 (40 bp, shade-robust).
 
-**Count: 0 fitted / 41 chosen (12 with no stated rationale) / 1 stated-arithmetic / 9
+**Count (v2.4, 2026-08-01 — `lockMaxAgeMin` registered): 0 fitted / 42 chosen (12 with no stated rationale) / 1 stated-arithmetic / 9
 since-measured — of which one vindicated, four condemned or weak. Total 42.** The
 sentence at the top of this doc carries these numbers. ~~(0 fitted / 38 chosen (11 with
 no stated rationale) / 7 since-measured)~~ **[SUPERSEDED 2026-07-31 — same defect as the
@@ -4017,7 +4018,7 @@ the acute risk narrows to this week's overlap of reopen days with a near-empty c
   STRONG-belief card measured, not on every card.
 
 - **T = 0.80, SET BY THE OWNER BEFORE ANY BOARD EXISTS (2026-07-30 — chosen NOT
-  fitted, the 42nd such parameter; census v2.3: 42 parameters / 41 chosen (12 no
+  fitted, the 42nd such parameter; census v2.4: 43 parameters / 42 chosen (12 no
   rationale) / 1 stated-arithmetic / 9 since-measured)**: reason, his: it sits
   below tomorrow's projected 0.833 curl/moved-cron window and above the 22:00Z
   design point (0.50–0.66), separating the two paths on the axis that matters,

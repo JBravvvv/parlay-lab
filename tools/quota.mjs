@@ -18,7 +18,7 @@
  * The log is APPEND-ONLY by construction: this tool never rewrites an existing line.
  */
 import fs from "node:fs";
-import { numFromText } from "./strict.mjs";
+import { num, numFromText } from "./strict.mjs";
 
 const LOG = "data/quota-log.jsonl";
 /**
@@ -71,6 +71,24 @@ export function burnSeries(rows) {
   return out;
 }
 
+/**
+ * THE PERIOD IDENTITY: `remaining + used` is the plan size, constant inside a billing period AND
+ * across a reset (both sides of 2026-08-01 sum to 20,000). So it is NOT a reset detector — it is a
+ * FABRICATION detector, and it catches exactly the failure mode the old header coercion could
+ * produce: `Number(null)` twice gives `{remaining: 0, used: 0}`, which sums to 0 and fails here.
+ *
+ * Audited 2026-08-01 over all 21 rows then in the log: 21/21 satisfy it, so the series is CLEAN and
+ * the defect was prospective. Asserted at WRITE time from now on — a row that fails is never
+ * appended, because the log is append-only and a bad row could only ever be addended, not removed.
+ */
+export const PLAN_SIZE = 20_000;
+export function violatesIdentity(row, planSize = PLAN_SIZE) {
+  const s = num(row?.remaining), u = num(row?.used);
+  if (s === null || u === null) return `remaining/used not both finite numbers: ${JSON.stringify(row)}`;
+  if (s + u !== planSize) return `remaining + used = ${s + u}, expected ${planSize} — this row is fabricated or the plan size changed (which is itself a finding, not a rounding error)`;
+  return null;
+}
+
 export async function readQuota(fetchImpl = fetch) {
   const pass = process.env.APP_PASSCODE;
   const r = await fetchImpl(URL_, pass ? { headers: { "x-pl-pass": pass } } : undefined);
@@ -92,7 +110,10 @@ export async function readQuota(fetchImpl = fetch) {
         `NOTHING IS APPENDED: an absent header is not a quota of zero.`,
     );
   }
-  return { at: new Date().toISOString(), remaining, used };
+  const row = { at: new Date().toISOString(), remaining, used };
+  const bad = violatesIdentity(row);
+  if (bad) throw new Error(`quota identity violated — NOTHING IS APPENDED. ${bad}`);
+  return row;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

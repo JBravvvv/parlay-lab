@@ -600,3 +600,152 @@ locked-but-not-bet), **`confirmed`** (a recorded actual price is evidence a bet 
 auto-lock exists the question is meaningless** — the ledger would hold engine selections and no
 field would separate them from placements. Every entry dated **on or before 2026-08-01** is covered
 by this attestation; every entry after it requires the `placed` field.
+
+---
+
+# 2026-08-01, third pass (owner's items 1–5)
+
+## §M10 THE QUOTA SERIES IS CLEAN — SAID AS PLAINLY AS THE OTHER BRANCH WOULD BE
+
+**All 21 rows in `data/quota-log.jsonl` satisfy `remaining + used == 20,000`. Zero failures. Zero
+rows with `remaining: 0`. Zero duplicate timestamps. Zero non-monotone rows inside a period.**
+
+**→ THE FIRST PRE-COMMITTED BRANCH FIRES. The series is clean, the burn investigation's inputs
+stand, and the coercion defect was PROSPECTIVE — nothing on disk restates.** No burn figure, no
+runway band, no residual conclusion, and not the 146.
+
+| # | at | remaining | used | sum |
+|---|---|---|---|---|
+| 1–5 | 07-28T23:00 → 07-31T01:25 | 2317 · 1676 · 1461 · 1238 · 1038 | 17683 · 18324 · 18539 · 18762 · 18962 | 20000 ×5 |
+| 6–8 | 07-31 04:50 → 06:41 | 1038 ×3 | 18962 ×3 | 20000 ×3 |
+| 9–13 | 07-31 13:57 → 16:10 | 699 ×5 | 19301 ×5 | 20000 ×5 |
+| 14–20 | 07-31 19:11 → 21:04 | 553 ×7 | 19447 ×7 | 20000 ×7 |
+| **21** | **08-01T01:35:56.369Z** | **19958** | **42** | **20000** |
+
+**THE IDENTITY HOLDS ACROSS THE RESET TOO** — 553+19,447 and 19,958+42 both equal 20,000 — **so it
+is NOT a reset detector. It is a FABRICATION detector**, which is the shape actually needed: the
+coercion defect's output was `{remaining: 0, used: 0}`, which sums to 0 and fails. The reset needs
+its own witness, and `burnSeries` already uses one (`remaining` rises **or** `used` falls) →
+`spent: null`, `reset: true`.
+
+**ENCODED AT WRITE TIME**, because the log is append-only and a bad row could only ever be
+addended, never removed: `violatesIdentity()` in `quota.mjs` now throws before the append.
+Guard in `tests/strict-coercion.test.ts` with the plant, observed red on the defect's exact output.
+
+**IMPOSSIBLE BRANCH (two rows, same timestamp, different values): does not fire — zero duplicates.**
+
+## §M11 THE 8,201 ROWS ARE SCHEMA VINTAGE, NOT A PARSER GAP
+
+**A "neither-side" row, verbatim** (`2026-07-12.json | pitcher_outs | Robert Gasser|17.5`):
+```json
+{ "fair": 0.4809, "n": 4, "cz": { "o": -110, "u": -121 } }
+```
+**It is not empty. It carries a fair, a book count, and a two-sided Caesars price.** What it lacks
+is the `bo`/`bu`/`fb`/`czf`/`no` KEYS — they are **absent from the object**, not null.
+
+**AND THE SPLIT IS EXACT, BY DATE, NOT BY MARKET:**
+
+| files | rows | rows carrying `bo`/`bu` |
+|---|---|---|
+| **2026-07-12 → 07-25** (12 files) | 21,323 | **0 — 100% "neither"** |
+| **2026-07-26 → 07-31** (6 files) | 34,843 | **34,843 — 100% present** |
+
+`compact()`'s own docstring dates the extension **2026-07-25**; it first reaches the archive on
+**07-26**. The ~38% rate was uniform across all six markets because it is a **fraction of the
+archive's history, not a property of any market.**
+
+**SO: the "spans markets" TRIGGER fires but the branch's PREMISE does not.** It is not a parser
+gap and it takes **no M-number**. And the "empty rows inflating a denominator" branch does not fire
+either — the rows are not empty.
+
+**🔴 IMPOSSIBLE BRANCH FIRES, IN LETTER: a neither-side row DOES carry a price under a different
+key** — `cz: {o: -110, u: -121}`, both sides, in a row with no `bo`/`bu`. **Both printed above.**
+The correct reading is **not** "the parser reads the wrong field": `cz` (Caesars) was always
+captured, `bo`/`bu` (cross-book bests) were added later. **The parser reads the right field; the
+field did not exist yet.**
+
+**WHAT THIS CORRECTS IN §M6:** "8,201 with neither (a separate anomaly — unresolved)" is
+**RESOLVED and was never an anomaly**. The HR finding is *unaffected and slightly stronger*:
+**`fair` is 0 for HR in BOTH schema vintages** — 0 of 21,300 across all 18 files — so it is not a
+schema artifact. Restated precisely: **of the 13,099 HR rows written by the CURRENT schema, all
+carry an over price and none carries an under.**
+
+**DENOMINATOR EXPOSURE, named rather than swept:** any figure computed over "archived rows" that
+assumes `bo`/`bu`/`no`/`fb` exist silently sees **21,323 rows (38% of the archive) as missing
+them**. `fair` is present in both vintages, so §M1's price path is unaffected. **I found no such
+figure this turn; I did not do an exhaustive sweep and am not claiming one.**
+
+## §M12 ITEM 3 — THE TARGETED CAPTURE, PROPOSED. NOT APPLIED.
+
+**IT IS TWO CHANGES, NOT ONE**, and that matters: the workflow alone cannot do it, because
+`snapshot_props.py` currently takes `todays[:16]` where `todays` is *anything within 20 hours*.
+
+**(a) `tools/snapshot_props.py`** — add a `--window MIN` flag; when set, restrict `todays` to
+events whose first pitch is inside MIN minutes. Additive, default off, no behaviour change to the
+existing four crons.
+
+**(b) `.github/workflows/props-history.yml` ON `main`** — two crons, and **no existing cron moves**:
+
+| declared | measured landing | lead to a 23:05Z first pitch | bucket |
+|---|---|---|---|
+| `10 18 * * *` | ~21:1x | **~115 min** | **60–120** ✓ |
+| `55 18 * * *` | ~21:5x | **~70 min** | **60–120** ✓ |
+
+**Spacing ~45 min ≥ `MIN_GAP_S` 40** ✓. Gaps to the neighbours: 20:0x → 21:1x ≈ 70 min ✓;
+21:5x → 23:3x ≈ 100 min ✓. **Nothing collides, so the retained four stay exactly where they are.**
+
+**EXPECTED EVENT COUNTS AND COST:** at ~21:1x the next-120-minute set is roughly the 22:0x–23:1x
+block, **~3–8 events**; at ~6 credits/event that is **~18–48 per capture, ~36–96/day for the
+pair** — against a pool of 19,958 and an existing props line of 162–185/day.
+
+**VINTAGE STAMP + SERIES SEGMENTATION:** the props series segments **pre/post first landing**, and
+**the information cost here is a GAIN, not a loss** — the 60–120 bucket goes from structurally
+empty to populated. Nothing already captured is degraded, and no existing figure restates.
+
+**PRE-COMMITTED LANDING TEST:** on the first day it runs, `node tools/price-path.mjs <dir>` must
+print **n > 0 in the 60–120 bucket**. **Zero means it did not land and the pair spacing is wrong**
+— not that prices do not move. Print both crons' actual delivery times beside it.
+
+**ALSO REQUIRED:** the divergence goes on `tests/workflow-branch-sync.test.ts`'s **expiring
+allow-list**, dated, naming the decision that ends it.
+
+**AWAITING THE WORD. The diff is printed in the turn, not applied.**
+
+## §M13 ITEM 4 — BACKFILL: THE RULE SAYS ADDENDUM, NOT FIELD WRITE
+
+**Writing `placed: true` into historical locked entries would be a FOURTH mutable subfield on a
+locked row — and that is exactly the class M22 already flags.** The store's rule is *"no
+retroactive edits, ever"* (L3394), with a **named, enumerated** exception list of three
+(`confirmed`, `grading`, `clv`). Adding a fourth to make a field convenient is the move the rule
+exists to prevent.
+
+**THE RULE-FOLLOWING FORM IS AN ADDENDUM, and it is also the better instrument.** The attestation
+is already recorded and dated (§M9). The exit's reader resolves it at READ time: *an entry dated
+on or before 2026-08-01 with no `placed` field is `placed: true` BY ATTESTATION, dated
+2026-08-01.* That keeps the exit's population complete from day one **and** keeps an attested true
+distinguishable from a recorded true forever — which a field write destroys. If the attestation is
+ever qualified, **one line changes instead of N rows.**
+
+**Recommendation: addendum. The call is the owner's.**
+
+## §M14 ITEM 5 — WHAT A CORRECT CENSUS SWEEP WOULD REQUIRE: JUDGMENT
+
+**APPLIED: census v2.3 → v2.4, 42 → 43**, `lockMaxAgeMin` registered beside `dailyBankrollCap`
+with its rationale and what would fit it. Count restated in all four places it appears
+(`session-handoff.md` L740; `collection-period.md` L205–206, L695, L4021).
+
+**A frozen parameter is: (1) a literal in the engine's own config or constants, (2) whose value
+enters a pricing, selection, sizing, or admission decision at runtime, (3) not derived from data.**
+
+**(1) is mechanical** — scope to the `SH_CFG` object literal, excluding nested schemas. **(3) is
+mechanical** — a fitted value has a fitting procedure. **(2) IS NOT.** Deciding whether
+`funTierNames` (display), `roundTo` (presentation), `seasonEnd` (calendar) or `lockMaxAgeMin`
+(admission) *enters a decision* requires reading what consumes it. My automated attempt returned
+264 "keys" and 189 "missing" precisely because it could not make that call — it counted JSON-schema
+fields and prose numbers as parameters. **That output was discarded, not reported.**
+
+**→ THE CENSUS STAYS HAND-MAINTAINED, WITH A GUARD ON THE COUNT RATHER THAN ON MEMBERSHIP.**
+A membership guard would encode the judgment it cannot make; a count guard cannot invent a
+parameter, and it fails loudly the moment the number moves without the table moving with it.
+`lockMaxAgeMin` sat unregistered while its structural twin was registered from the start — **that
+is the failure mode a count guard catches and a membership guard would have papered over.**
