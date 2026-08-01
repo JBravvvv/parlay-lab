@@ -1438,3 +1438,120 @@ number is updated — that is M21's whole content, and an auto-updating stamp wo
 a control. **The cost is a red suite on refresh days; the alternative is a parameter arming itself
 silently, which is the defect it was built for.** If the noise becomes untenable the right change is
 to assert **the brakes** and record the count as informational — **not** to automate the stamp.
+
+---
+
+# 2026-08-01, eighth pass — the PRE/POST-FILTER STAMP, and a cross-population correction
+
+## §H21 THE FILTER CHAIN — MORE THAN THREE STAGES, SO IT BECOMES THE STANDARD STAMP
+
+**Second pre-committed branch fires.** Between the feed and a board row, in order
+(`legacy/index.html`; the first block is the quote ingestion, the second the prop-row builder):
+
+| # | line | drops |
+|---|---|---|
+| 1 | L2611 | markets this app does not label/model (`SH_MKT_LABEL` membership) |
+| 2 | L2614 | rows with no line |
+| 3 | L2615 | rows with no over, no under **and** no Caesars price |
+| 4 | L2622·L2624 | malformed keys / non-finite line |
+| 5 | L2625 | **duplicate `player\|line`** — first wins |
+| 6 | L2626 | rows with neither side quoted |
+| 7 | L2239 | markets outside the modelled category set |
+| 8 | L2240 | rows with no line (again, builder side) |
+| 9 | **L2241** | **every HR rung except 0.5** — bare literal |
+| 10 | L2244 | players with no stats record |
+| 11 | L2252·L2273·L2372 | pitchers with no innings/K/λ projection |
+| 12 | **L2287** | **hitters with `ab30 < 25`** — bare literal |
+| 13 | L2297 | **players scratched from a posted lineup** |
+| 14 | L2482 | rows whose selected side has no odds |
+
+**FOURTEEN STAGES.** So the stamp is not a list of filters — **it is a single named population:**
+
+> **BOARD-ROW POPULATION** = survivors of the fourteen-stage feed→board chain, of which two are
+> bare literals (`HR 0.5-only`, `ab30 ≥ 25`) and one is data-dependent (`posted-lineup scratch`).
+
+**IMPOSSIBLE BRANCH — a board row no filter in the chain admits: NOT FOUND.** Every one of the 303
+rows on the archived 07-26 board carries a line, a market in `SH_CATS`, and a priced side.
+
+## §H22 CLASSIFICATION — AND ONE CROSS-POPULATION COMPARISON, CORRECTED
+
+| measurement | population | count |
+|---|---|---|
+| HR-pair dependence (§H1), hits/TB dependence (§H7) | **PRE — statsapi box scores, no filter at all** | 2 |
+| price path (§M1), close coverage (§7A.0), rung inventory (§H13), band overlap (§H13), the 25-AB drop (§H18) | **PRE — props archive** | 5 |
+| quota series (§M10), cron/schedule figures, guard-wiring | **NEITHER — infrastructure, not a market population** | 3 |
+| **CV table and per-market medians (§H10)** | **POST — board rows** | 1 |
+| **07-26 HR-pair exposure census (§H2)** | **POST — emitted tickets** | 1 |
+| **simJoint implied-ratio audit (§H7)** | **POST — emitted tickets** | 1 |
+| **clamp census (reading 24)** | **POST — board rows** | 1 |
+
+**PRE: 7 · POST: 4 · infrastructure: 3.** **The stamp is now applied to all four POST entries.**
+
+### 🔴 THE CROSS-POPULATION COMPARISON — FOUND, AND IT MOVES A NUMBER
+
+**§H13 measured "0 of 14,181 non-HR ARCHIVE rows fall inside HR's 15.1–30.9% band" — but that band
+came from the BOARD.** A post-filter range applied to a pre-filter population. **That is the exact
+class, and it takes a dated correction.**
+
+**Re-measured apples-to-apples, both sides pre-filter:**
+
+| | n | min | p1 / p10 | median | p90 / p99 | max |
+|---|---|---|---|---|---|---|
+| **`HR\|0.5`** | 10,477 | **2.4** | — | 16.7 | 24.7 / **32.8** | **40.2** |
+| **all non-HR** | 14,191 | **38.5** | 40.8 / 43.7 | 51.0 | — | — |
+
+**THE BANDS OVERLAP — 82 of 14,191 non-HR rows (0.58%) fall inside HR's full pre-filter range**
+(79 `TB|1.5`, 2 `outs|15.5`, 1 `outs|18.5`), and **4 of 10,477 HR rows sit above the non-HR
+minimum.** **"Zero overlap" was an artifact of the narrower post-filter band. CORRECTED, dated
+2026-08-01.**
+
+**WHAT SURVIVES AND WHAT DOES NOT:**
+- **The separation is still strong** — HR p99 **32.8** against non-HR p1 **40.8**, an 8-point gap,
+  and **99.42%** of non-HR rows sit above HR's entire range. The qualitative conclusion holds.
+- **The "byte-identical partition" claim in §H14 was BOARD-ONLY and does not hold pre-filter.**
+  Corrected.
+- **The floor itself is unharmed, and by luck rather than design:** all 82 overlapping non-HR rows
+  sit in **[38.5, 40.2]**, i.e. *above* a 34% floor — so **a 34% floor still excludes zero non-HR
+  rows on the pre-filter population.** What changes is the other side: it would **admit** the HR
+  rows above 34%, where the ban excludes them. **The floor and the ban are near-equivalent, not
+  equivalent, and the difference lives in HR's upper tail.**
+
+## §H23 SELF-ARM GUARDS — THE STANDING RULE, AND THE NOISE THRESHOLD HAS ALREADY ARRIVED
+
+> **A self-arm guard must not auto-record. An auto-updating stamp is a counter, not a control —
+> the manual step exists so a human decides whether a vintage boundary moved before the number
+> changes. If the noise becomes untenable, assert the BRAKES and demote the count to
+> informational. Never automate the stamp.**
+
+**Recorded as the standing rule for self-arm guards generally.**
+
+### The threshold, computed rather than waited for
+
+Expected crossings per refresh from the g = 4 pool alone: **14 × (11.2 ÷ 85) = 1.84/day**, and the
+simulation's own correction for g = 3 umpires drawing two assignments scales that by ~1.11 →
+**≈ 2.05/day**. **P(no crossing on a refresh) ≈ e^−2.05 ≈ 13%.**
+
+**🔴 SO THE COUNT ALREADY CHANGES ON ~87% OF REFRESHES. THE FIRST BRANCH FIRES, AND IT FIRES NOW —
+not at some future threshold.** Per the owner's pre-commitment, made before being annoyed by it:
+
+**DEMOTE THE COUNT TO INFORMATIONAL. ASSERT THE BRAKES.** The crossing record becomes an
+**append-only log** — one dated line per crossing — and the guard's job changes from *pinning a
+constant* to **checking the log for completeness**: every umpire currently at `g ≥ 5` must have a
+dated line, and both brakes must hold. **It still goes red when a crossing is unrecorded; it no
+longer goes red merely because a crossing happened.** That keeps the human decision exactly where
+M21 put it while removing the daily false alarm. **Spec'd here, not built — it is a guard change
+and the owner's to authorize.**
+
+### Other guards that fire on data movement rather than code change
+
+| guard | fires on | manual step worth keeping? |
+|---|---|---|
+| **`self-arm-stamp`** | `ump_k.json` refresh | **yes — but demote the count per above** |
+| **`sha-references`** | a rebase orphaning a cited sha | **yes** — a dangling citation is always a real defect |
+| **`workflow-branch-sync`** | branch divergence **and waiver expiry (14 days)** | **yes** — expiry firing IS the decision prompt |
+| `fixture-citation` · `retracted-claims` | doc edits — **code/prose change, not data** | n/a |
+| `strict-coercion` ratchet | code change only | n/a |
+
+**Only `self-arm-stamp` fires on data alone with a count that moves daily.** `workflow-branch-sync`
+fires on a **calendar** (14-day waivers), which is a different thing: it is designed to fire once
+per waiver and demand a decision, and that is working.
