@@ -86,6 +86,60 @@ same-day ship rather than a spec.**
 ---
 
 
+## 0.5 🎯 PRE-READ STATE — 2026-08-01, the verification layer CLOSED (§12W)
+
+**QUOTA: 19,958 remaining / 42 used, at `2026-08-01T01:35:56.369Z`.** Last row of
+`data/quota-log.jsonl`. **No Odds credit has been spent since.** (Pre-reset it read 553 / 19,447 at
+`2026-07-31T21:04:11.529Z`.)
+
+**THE FOUR READS, IN ORDER — full block with the hardening at §4A. Each one's STOP, one line:**
+
+| # | read | STOP if |
+|---|---|---|
+| **1** | `/api/propsnap?date=…` × four weekdays — **ungated, no phrase, 0 credits** | any body that is **not** `{date, snapshots}`. A `503 sync-not-configured` means the store env is missing and reads 2–4 will also fail — **fix that before anything else** |
+| **2** | `/api/predictions?date=2026-07-30` → `burn-report --pred` — **phrase, 0 credits** | `{"error":"bad-sync-key"}` → the phrase did not match; **do not retry read 4 with it.** `sync-not-configured` → env, not phrase. Tool exits **65** on either |
+| **3** | `/api/calibration` — **GET is OPEN, the phrase is optional**, 0 credits | a **502** — the store is unreachable, and reads 2 and 4 are then unreliable too |
+| **4** | `/api/ledger` → `ledger-report` — **phrase, 0 credits** | **`>>> AND N carry selMode "ev_gated"`** — the ceiling failed inside the disciplined branch; **that outranks the board.** Also `{"ledger":[]}` with a 200 → the store is EMPTY, every sub-reading vacuous |
+
+**Order is not arbitrary:** 1 is ungated and proves the deployment answers at all · 2 proves the
+phrase before 4 spends a round trip on the only copy of the bankroll population · 3 is free and
+dates the vintage · 4 gates two sub-readings. **`curl_exit=` prints after each; non-zero is a STOP.**
+
+**THE CRONS.** Two new props entries declared on `main` (`10 18 * * *`, `55 18 * * *`, both
+`--window 120`), **NOT YET LANDED**. Expected delivery **~21:1xZ ≈ 14:1x PT** and
+**~21:5xZ ≈ 14:5x PT** — 40–85 minutes before the fire.
+**LANDING TEST: `node tools/price-path.mjs <props-dir>` must print `n > 0` in the 60–120 bucket.**
+**Zero means the SPACING is wrong, not that prices do not move. ONE cron delivering is a PARTIAL
+LANDING that produces no pair and therefore no observation — it looks like a landing and is not.**
+Full text at **§4C**.
+
+**THE FIRE: 22:38Z = 15:38 PT.** Window 22:10Z–23:00Z; 22:38Z reads **0.909 over 11 unstarted**.
+Cost **62–70**. **The cron cannot do it** — entry 1 is `45 22 * * 1-5`, weekdays only.
+Block, stop rules and the full command sequence at **§1**.
+
+**THE FOUR BOARD BRANCHES, decided before the reads** (`branch-firing-audit.md` §38):
+
+| the Vercel log shows | decision |
+|---|---|
+| an external poller | **NO BOARD until M28's passcode helper ships** |
+| a session of the owner's | **FIRE** — precondition 1 holds in the sense that matters |
+| nothing accounting for 146 | **NO BOARD.** Fifth dark day; the missing input is named as the Odds key used outside our routes |
+| the burst recurs before 15:38 PT | **NO BOARD**, and the recurrence is the finding |
+
+**THE VERCEL LOG READING — six things to look for, verbatim and written before the log is opened:
+§2.** Dashboard-only; it is what resolves the 146-credit burst.
+**THE ENV-VAR CHECK: Vercel → Settings → Environment Variables, is `APP_PASSCODE` set? §3.**
+**⚠️ DO NOT SET IT before steps 1–4 of §3** — `/api/odds` 401s a `fresh=1` with no `x-pl-pass` and
+does **not** fall through to cache, so the morning batch would collect nothing; and **M28 blocks
+step 4** — the device passcode is written to `localStorage.pl_pass` and **no client code sends it**.
+
+**STATE:** `origin/frontend-rebuild` = the sha at the bottom of §6B · engine
+`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`, **unmoved all session** ·
+suite **88 files / 679 tests**, `VITEST_EXIT=0`, errors absent · **open readings 29** ·
+**three freeze points intact**, both brakes on.
+
+---
+
 ## 0. READ-FIRST INDEX — every doc, no exceptions (guarded by `tests/read-first-index.test.ts`)
 
 **Why it exists**: three turns of ration tables and a "70% of the burn" claim were produced while
@@ -1239,6 +1293,83 @@ instance, and the only one that claims a protection.**
 
 ---
 
+
+### 12W. 🔒 THE VERIFICATION LAYER IS CLOSED — 2026-08-01
+
+**Twelve turns of instrument work sit between the last measurement and this line. Nothing below is
+open; the next thing that happens is read 1.**
+
+**THREE CORRECTIONS TO THE CLOSE-OUT BRIEF, because a close-out that records the wrong state is
+worse than none.**
+1. **The suite is `88 files / 679 tests`, not 668.** Measured on the gate that carried `cb4b02c`:
+   `VITEST_EXIT=0`, 162.16 s, zero unhandled errors.
+2. **The null-context configuration is NOT the fixture default.** It is **§11 item 5g, QUEUED and
+   UNSHIPPED** — a grep of `tests/helpers/fixture-env.ts` for any null-context variant returns
+   **zero**. §12V states it: today every armed guard still runs against a context resolving 15 of 15.
+   **The configuration tomorrow's board runs in has no baseline of its own.**
+3. **There is no deferred "read 3 guard reordered rather than root-caused" in this record.** No such
+   refactor was made. Read 3's only change was a LABEL correction (§4A: its GET is open, the phrase
+   is optional and kept for uniformity). The real deferrals are listed below.
+
+**THE DEMONSTRATED-CATCH RATIO, both numbers:**
+
+| population | demonstrated | total |
+|---|---|---|
+| **guards that scan source text or git — planted against REAL code** | **11** | **24** |
+| every test file carrying an executable in-file `PLANT` case | **22** | **88** |
+
+**Ten of the eleven were DEAD when planted.** Of the thirteen unplanted: **ten assert ABSENCE over
+source** — a comment can only make them *fire*, the harmless direction — and **three assert against
+git metadata or live runtime behaviour** (`arming-parity`, `bot-path-whitelist`, `sha-references`),
+which a comment cannot reach. **No guard in the substitution-vulnerable class is unplanted.**
+Separately, **six shared helpers were neutered** and their dependents measured (§12Q).
+
+---
+
+### THE SIX STANDING RULES THIS LAYER PRODUCED — verbatim, in one place
+
+> **1. SUBSTITUTION, NOT COUNT ALONE.** A count catches ADDITION and NOT SUBSTITUTION. The stripper
+> is load-bearing and the count is what makes it precise. Both, not either.
+
+> **2. THE FILTER IS AN INSTRUMENT AND GETS A PLANT LIKE EVERYTHING ELSE.** A stripper needs its own
+> degeneracy assertion: under-strip (a form it does not know), over-strip (comment-shaped text out
+> of a string — a FALSE NEGATIVE for absence assertions), and degeneracy (it stops stripping at
+> all, which nothing else in the suite can see).
+
+> **3. A FILTER SHARED BY N GUARDS SILENTLY DISABLES N GUARDS WHEN IT GOES INERT, so it needs an
+> assertion that fires when it stops doing anything.**
+
+> **4. A CLEAN RUN MEANS `Errors` ABSENT, NOT MERELY EXIT 0** — and if a run reports an error that
+> looks transient, the confirmation is the SECOND CLEAN RUN, never the assumption.
+
+> **5. THE GATE FORM, USED VERBATIM:**
+> ```bash
+> set -o pipefail
+> <command> > out.log 2>&1; echo "EXIT=$?"
+> ```
+> Never a pipe on a verification: a pipeline's status is its LAST stage's.
+
+> **6. CHECK WHICH POPULATION A CLAIM IS ABOUT BEFORE CHECKING WHETHER IT IS TRUE.** Population
+> errors outnumber logic errors ~4:1 in this session's own defect census (§12D).
+
+---
+
+### THE RESIDUAL, NAMED — known-unproven, not hidden
+
+| # | residual | why it is safe to carry |
+|---|---|---|
+| 1 | **13 of 24 text-scanning guards unplanted** | ten are absence-only (comments can only make them fire); three assert git metadata or live behaviour. **None is substitution-vulnerable** |
+| 2 | **12 intermediate commits' error state UNKNOWN** | their verifications used `grep -E 'Tests '`, which cannot match `Errors`. **Recorded as an INFERENCE from duration correlation, not a reading.** Nothing depends on an intermediate state; the current tree is verified end-to-end |
+| 3 | **no baseline for the null-context configuration** (5g) | the factor is 1 for three independent reasons (§12V), and `pinned-factors` already drives the null path synthetically |
+| 4 | **`armedFixtureEngine`'s arming is not depended on by 7 of its 15 guards** | not a bug — the suspension bar is a pure market-and-line test (§12S). Covered at the source by `helper-degeneracy` |
+| 5 | **the §12F git join is SPEC, not shipped** (5c) | verified to work retroactively on all three sha-carrying crossings (§12I); Barrett's entry stays unverifiable by design |
+| 6 | **§12 subsections are out of alphabetical order on disk** (12V before 12U before 12S…) | an artefact of inserting before a fixed anchor. **Addresses are unique — rule G passes** — so no reference is ambiguous. Cosmetic; deliberately NOT reordered before the fire |
+| 7 | **16 checks written, guarded, never run against production** (§13C) | fourteen are evaluable on tomorrow's single board; the two vacuity risks were found and fixed |
+
+**DEFERRED BY CHOICE, with the degeneracy suite as the reason it is safe:** §11 items **5c** (git
+join) · **5f** (seven TS/TSX mirrors) · **5g** (null-context fixture) · **5h** (the context splice —
+a VINTAGE EVENT that releases brake 2 and must not ride with the first board in five days). **Each
+is covered meanwhile by an assertion at the source rather than by a promise.**
 
 ### 12A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
 
