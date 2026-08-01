@@ -17,6 +17,7 @@
  *       07-19, `selMode` 07-24, the basis fields 07-19).
  */
 import fs from "node:fs";
+import { num } from "./strict.mjs";
 
 export const KELLY_STAKE_MULT = 4;
 const HRR = "batter_hits_runs_rbis";
@@ -96,7 +97,10 @@ export function overstake(entries) {
     maxRatio: over.length ? Math.max(...over.map((r) => (r.ratio === Infinity ? 1e9 : r.ratio))) : 0,
     dollarsOver: over.reduce((s, r) => s + Math.max(0, r.stake - (r.ceiling ?? 0)), 0),
     zeroCeiling: rows.filter((r) => r.ceiling === 0),
-    negativeCzEv: rows.filter((r) => Number(r.czEv) < 0).length,
+    /* `Number(null)` is 0 and `0 < 0` is false, so an ABSENT czEv was silently classified
+       as "not negative" rather than as unknown — under-counting the census. */
+    negativeCzEv: rows.filter((r) => (num(r.czEv) ?? 0) < 0).length,
+    czEvUnknown: rows.filter((r) => num(r.czEv) === null).length,
     byMarket: rows.reduce((m, r) => ((m[r.market] = (m[r.market] ?? 0) + 1), m), {}),
     rows,
   };
@@ -152,8 +156,11 @@ export function lateLockDist(entries) {
         if (Number.isFinite(ms)) starts.push(ms);
       }
     }
-    if (!starts.length || !Number.isFinite(Number(e.lockedAt))) { noStart++; continue; }
-    rows.push({ date: e.date, lateFlag: !!e.lateLock, minutes: Math.round((Number(e.lockedAt) - Math.min(...starts)) / 60_000) });
+    /* `Number(null)` is 0 and finite, so a null lockedAt became EPOCH 0 and the entry
+       read as ~-30,000,000 minutes = "locked long before first pitch" = not late. Strict. */
+    const lockedAt = num(e.lockedAt);
+    if (!starts.length || lockedAt === null) { noStart++; continue; }
+    rows.push({ date: e.date, lateFlag: !!e.lateLock, minutes: Math.round((lockedAt - Math.min(...starts)) / 60_000) });
   }
   rows.sort((a, b) => a.minutes - b.minutes);
   const late = rows.filter((r) => r.minutes > 0);

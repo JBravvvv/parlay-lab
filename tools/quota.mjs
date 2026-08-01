@@ -18,6 +18,7 @@
  * The log is APPEND-ONLY by construction: this tool never rewrites an existing line.
  */
 import fs from "node:fs";
+import { numFromText } from "./strict.mjs";
 
 const LOG = "data/quota-log.jsonl";
 /**
@@ -76,10 +77,20 @@ export async function readQuota(fetchImpl = fetch) {
   if (r.status === 401) {
     throw new Error("401 on a fresh=1 read — APP_PASSCODE is set in Vercel but not in this shell. Export it here, or the quota instrument is blind (route L36-40).");
   }
-  const remaining = Number(r.headers.get("x-requests-remaining"));
-  const used = Number(r.headers.get("x-requests-used"));
-  if (!Number.isFinite(remaining) || !Number.isFinite(used)) {
-    throw new Error("quota headers absent — the proxy stopped passing them through (route L51-55)");
+  /* THIS GUARD WAS UNREACHABLE FOR THE CASE IT NAMES (found 2026-08-01, owner's item 3).
+     `headers.get()` returns **null** when a header is absent, `Number(null)` is **0**, and
+     `Number.isFinite(0)` is **true** — so an absent quota header sailed past the check and was
+     logged as `remaining: 0, used: 0`: a fabricated "pool exhausted" reading, appended to the
+     append-only series, from a proxy that had simply stopped forwarding the pair. `numFromText`
+     rejects null and "" instead of coercing them. */
+  const remaining = numFromText(r.headers.get("x-requests-remaining"));
+  const used = numFromText(r.headers.get("x-requests-used"));
+  if (remaining === null || used === null) {
+    throw new Error(
+      `quota headers absent or unparseable — the proxy stopped passing them through (route L51-55). ` +
+        `remaining=${JSON.stringify(r.headers.get("x-requests-remaining"))} used=${JSON.stringify(r.headers.get("x-requests-used"))}. ` +
+        `NOTHING IS APPENDED: an absent header is not a quota of zero.`,
+    );
   }
   return { at: new Date().toISOString(), remaining, used };
 }

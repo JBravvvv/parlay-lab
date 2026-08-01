@@ -466,3 +466,137 @@ prose (L2586 *"by design, daily"*, L3366) but not in that table. **Flagged as a 
 not asserted as an omission** — if it belongs there the count moves 42 → 43. **Either way it is
 chosen, not fitted, so the owner's second branch fires: item 2 is what would fit it — on the board-
 age axis, which §M1 shows this curve is not.**
+
+---
+
+# MEASURED — 2026-08-01, second pass (owner's items 1–3, 5)
+
+## §M5 THE CAPTURE GAP — IT IS THE CADENCE, AND MIN_GAP IS NOT THE BLOCKER
+
+**WHAT WOULD POPULATE 60–120: two captures per game inside that window.** A 60-minute-wide window
+admits a pair **40+ minutes apart** (e.g. at ~115 and ~70 minutes to first pitch), so **`MIN_GAP_S`
+= 40 min DOES NOT BLOCK IT.** The owner's MIN_GAP branch does **not** fire for this bucket.
+
+**WHERE MIN_GAP *IS* THE BINDING CONSTRAINT: the 10–30 and <10 buckets.** Two captures 30 minutes
+apart are refused by `_snapshot_kind` (L163 for closes, L174 for any paid snapshot). **That floor
+was fitted against duplicate suppression** — cron clusters landing together and paying twice
+(L166–175, measured 07-28/29) — **and it now forecloses a different measurement it was never
+evaluated against.** Cost of lowering it: the duplicate-suppression it was bought for. **Named as a
+parameter conflict; not changed.**
+
+**TARGETED IS CHEAPER THAN BROAD.** The morning sweeps captured **13–15 events**; the archived
+closes captured **3–14** (median ~5). A capture restricted to events with first pitch inside the
+next 120 minutes therefore costs roughly **4–9 events ≈ 24–54 credits**, so **a pair is ≈ 48–108
+credits/day** — against a pool of 19,958 and a props line already at 162–185/day. **Affordable by
+an order of magnitude.**
+
+**`--wait` DOES NOT ADDRESS THIS.** `_wait_for_window` (L199–217) sleeps until the next unstarted
+first pitch is within `CLOSE_WINDOW_S`, then returns — **the caller takes ONE snapshot and exits.**
+It produces **one** capture, not two. It fixes *when* the single capture lands, not *how many*
+land. **The owner's `--wait` branch does not fire**: shipping the redesign does not close this gap.
+
+**IMPOSSIBLE BRANCH — does any archived day already carry two captures inside 90 minutes for one
+event? NO.** Derivable from the curve itself: two such captures would produce an observation in the
+60–90 bucket or tighter, and **all four of those buckets are empty**. 27 snapshot-events sit inside
+90 minutes across the whole archive; **no two of them share an event on a day.**
+
+**THE DEADLINE, PLAINLY: 52 usable fixture-days between 2026-08-01 and 2026-09-22 at one board per
+day.** Every day without the second capture is a fixture-day the price path can never see, and it
+is unrecoverable — the prices are gone. **The cron diff is not written here** (this is a memo); the
+shape is a second targeted cron ~45 minutes after the existing close band, restricted to the
+next-120-minute event set.
+
+## §M6 `batter_home_runs` — THE ARCHIVE IS BLIND, PRODUCTION IS NOT
+
+**TRACED, and it is a MISSING COMPLEMENTARY SIDE, not a de-vig failure or a parser gap.**
+`compact()` computes a fair only inside `if "o" in pair and "u" in pair` — it needs **both sides
+from the same book**. Measured across the archive:
+
+| | HR rows |
+|---|---|
+| total | **21,300** |
+| with a numeric `fair` | **0** |
+| with **both** `bo` and `bu` | **0** |
+| with only `bo` (over) | 13,099 |
+| with only `bu` (under) | **0** |
+| with neither | 8,201 *(a separate anomaly — unresolved, recorded)* |
+
+**No HR row anywhere in the archive has an under side**, so `r["fairs"]` is never appended and
+`fair` is `None` by construction. Fair coverage elsewhere: HRR **100%**, K's **100%**, hits
+**98.1%**, outs **96.5%**, TB **92.8%**, **HR 0.0%**.
+
+**PRODUCTION IS NOT BLIND — THE OWNER'S SECOND BRANCH FIRES, AND THE IMPOSSIBLE BRANCH FIRES TOO.**
+On the archived **2026-07-26** production board: **50 HR rows of 303, all with finite `prob` AND
+finite `implied`** (sample: `yordanalvarez|batter_home_runs|0.5`, prob 32.4, implied 30.9, cz 180),
+and **49 HR legs in built tickets**. **Something priced it: the engine, from a one-sided over
+quote.** So this is a **COLLECTION defect in the archive's schema**, not a pricing failure — and
+the first branch (*"HR has never been priceable, M-number"*) **does NOT fire.**
+
+**WHAT RESTATES: every `fair`-based measurement over the props archive silently excluded HR.**
+The one produced this session is §M1's price path — **21,300 HR rows dropped**, already stated
+there. **Any other market-level decomposition drawn from the archive's `fair` inherits the same
+hole and must name it.** The archive's own `bo`/`cz`/`no` fields are unaffected, so
+CZ-coverage-style findings stand.
+
+## §M7 THE COERCION CLASS — FOURTH INSTANCE, TWO MORE LIVE SITES FOUND
+
+**WHAT WOULD HAVE CAUGHT `Number(null)`: a strict parse at the boundary, which is exactly
+`finite-prices`' rule applied to TOOL INPUT instead of engine output.** It is encodable as one
+helper: **`tools/strict.mjs`** — `num` (a finite number or null, never a coercion), `req` (or throw,
+naming the field), `numFromText` (for headers and CLI args, where `null`/`""` must still not become
+0). **Shipped, with plants, observed red.**
+
+**THE AUDIT FOUND TWO MORE LIVE SITES, both in tools scheduled to run tonight:**
+
+| site | what it did silently | now |
+|---|---|---|
+| **`quota.mjs`** `Number(headers.get(...))` | `get()` returns **null** when absent → `Number(null)` is 0 → **the guard whose message reads "quota headers absent" COULD NOT FIRE.** It would have appended **`remaining: 0, used: 0`** — a fabricated "pool exhausted" row — to the append-only series | **refuses, prints both raw header values, appends nothing** |
+| **`ledger-report.mjs`** `Number.isFinite(Number(e.lockedAt))` | a null `lockedAt` passed as **epoch 0**, so the entry read as locked ~30 million minutes *before* first pitch — **"not late", in the reading added to measure late locks** | **strict; the entry falls to the impossible-branch count** |
+| `ledger-report.mjs` `Number(r.czEv) < 0` | an **absent** czEv scored as "not negative" rather than unknown — under-counting the census | **counted separately as `czEvUnknown`** |
+
+**SITES WHERE null→0 IS LOAD-BEARING AND CORRECT — the impossible branch fires, and they are
+documented rather than changed:** `bySrc[src] ?? 0`, `byReason[...] ?? 0`, `(m[r.market] ?? 0) + 1`
+and `s.events?.length ?? 0` are **accumulator initialisers**, where "absent" genuinely means "none
+counted yet". `board-report`'s `r.cfSel.stake ?? 0` is safe **only because** `missingRank` counts
+those same rows separately — the null is reported, not absorbed. `ledger-report`'s
+`r.ceiling ?? 0` is safe **only because** `over` already excludes null-ratio rows upstream.
+
+**THE COUNT, RATCHETED: 6 raw `Number(` sites remain in tool code** (all in `amToDec` / `amToProb`
+/ `kellyFrac`, whose callers null-guard first), pinned by `tests/strict-coercion.test.ts` so a new
+one cannot appear silently. **And that ratchet itself had to be corrected**: keying on lines
+starting with `*` or `//` counted the prose *explaining* the trap as instances of it — 10 reported
+against 7 real — so it now strips comments before scanning. A guard that cannot tell code from a
+comment about code is measuring the wrong artifact.
+
+## §M8 `lockMaxAgeMin` AND THE CENSUS
+
+**IT BELONGS.** It is a chosen numeric threshold that gates a write to the ledger, exactly like
+`dailyBankrollCap` (registered, `collection-period.md` L610). **Recommendation: register it —
+42 → 43 — with the count restated everywhere it appears.** Not done here: a census change is the
+owner's, and the count appears in several docs and in the bundle.
+
+**WHAT WOULD FIT IT: board age against price movement since generation.** The join is
+**possible in principle and not available today.** It needs a board's generation time (`board.at`,
+present on every archived board) matched to props snapshots of the same event bracketing it — but
+**the board archive holds exactly ONE day (2026-07-26)** against 18 props days, so the join has
+`n = 1` board. **It becomes measurable as the board archive fills**, and it is a different
+measurement from §M1's, on the axis that actually gates the lock.
+
+**THE FULL CENSUS SWEEP IS NOT DONE, and I am not reporting a number for it.** An automated pass
+over `SH_CFG` returned 264 "keys" and 189 "missing" — it had captured JSON-schema fields, nested
+game objects and prose, not tuning parameters. **That output is not a finding and is discarded.**
+A valid sweep needs a curated list of `SH_CFG`'s numeric tuning parameters checked against the
+census's own table. **Named as outstanding.**
+
+## §M9 THE OWNER'S ATTESTATION — DATED 2026-08-01, RECORDED BEFORE IT BECOMES UNANSWERABLE
+
+> **"Every ledger entry to date was placed. I locked what I bet and bet what I locked."**
+> — the owner, 2026-08-01
+
+**This is his statement and it is not corroborated by anything on disk.** The only cross-checks
+that exist are indirect and are named as such: **`lateLock`** (a late lock is a candidate for
+locked-but-not-bet), **`confirmed`** (a recorded actual price is evidence a bet happened), and
+**stake against the 2% rule** (`ledger-report` reading (1)). **It is recorded now because after
+auto-lock exists the question is meaningless** — the ledger would hold engine selections and no
+field would separate them from placements. Every entry dated **on or before 2026-08-01** is covered
+by this attestation; every entry after it requires the `placed` field.

@@ -27,6 +27,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { num } from "./strict.mjs";
 
 /** minutes-to-first-pitch buckets, descending — the owner's grid. */
 export const BUCKETS = [
@@ -38,9 +39,6 @@ export const BUCKETS = [
   { label: "10-30", lo: 10, hi: 30 },
   { label: "<10", lo: -Infinity, hi: 10 },
 ];
-
-/** a value is a number or it is absent — never coerced (see the STRICT note below). */
-const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 export const bucketOf = (min) => BUCKETS.find((b) => min >= b.lo && min < b.hi)?.label ?? null;
 
