@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { stripPyComments } from "./helpers/source";
 
 /**
  * MIN_GAP GUARD (2026-07-29 — the owner's SOLE authorized ship of the day).
@@ -25,7 +26,13 @@ describe("MIN_GAP: pre sweeps are payment-deduped in the snapshot script", () =>
     const gateIdx = src.indexOf("MIN_GAP pre-dedupe (2026-07-29, signed)");
     const preIdx = src.indexOf('return "pre"');
     expect(gateIdx, "gate must precede the pre return").toBeLessThan(preIdx);
-    expect(src.slice(gateIdx, preIdx), "the gate must key on MIN_GAP_S").toContain("MIN_GAP_S");
+    /* THE SLICE IS STRIPPED, THE ANCHOR IS NOT (2026-08-01). OBSERVED DEAD: with the gate
+       defeated in code — `< 0` instead of `< MIN_GAP_S`, so the pre-dedupe never fires and
+       every clustered cron pays a full ~96-credit sweep again — this guard passed 2/2,
+       because `MIN_GAP_S` still appears in the explanatory comment at L169 INSIDE the slice.
+       The anchor is deliberately a dated comment signature and stays raw; the GATE assertion
+       is about code and must not be satisfiable by the prose that describes it. */
+    expect(stripPyComments(src.slice(gateIdx, preIdx)), "the gate must key on MIN_GAP_S").toContain("MIN_GAP_S");
   });
 
   it("PLANT (invalid-by-value): the checker sees a source without the gate", () => {
