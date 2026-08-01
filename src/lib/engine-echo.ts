@@ -96,6 +96,17 @@ export type BoardEcho = {
   umpKFrozen: unknown;
   penQFrozen: unknown;
   coreNoHR: unknown;
+  /* 2026-08-01, SECOND authorized set. Added on ONE test — does its absence block a question
+     we actually asked? The other fifteen SH_CFG keys outside the echo failed that test and
+     stay out; if one becomes load-bearing it is added THEN, beside the question.
+     `lockMaxAgeMin` — the price-age lock is item 4 of the placement checklist, and no board
+     could state what age it treated as stale.
+     `coreKsFillOnly` / `coreKsCap` / `coreKsLegMax` — M6 is "K's priced with no sim", and
+     these three decide how many K legs reach a card. The M6 reading had no board-side witness. */
+  lockMaxAgeMin: unknown;
+  coreKsFillOnly: unknown;
+  coreKsCap: unknown;
+  coreKsLegMax: unknown;
   damping: number | null;
   cfSelEnabled: boolean;
   /** graded legs per market at arm time — the COUNT that arms the consensus gate
@@ -132,6 +143,10 @@ export function buildEcho(
     umpKFrozen: g("umpKFrozen"),
     penQFrozen: g("penQFrozen"),
     coreNoHR: g("coreNoHR"),
+    lockMaxAgeMin: g("lockMaxAgeMin"),
+    coreKsFillOnly: g("coreKsFillOnly"),
+    coreKsCap: g("coreKsCap"),
+    coreKsLegMax: g("coreKsLegMax"),
     mktN: g("mktN"),
     damping: DAMPING,
     cfSelEnabled: x.cfSelEnabled,

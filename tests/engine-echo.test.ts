@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { DAMPING, ENGINE_SHA, SERVED_ENGINE_SHA_VERIFIED, buildEcho } from "@/lib/engine-echo";
+import { stripComments } from "./helpers/source";
 
 /**
  * sha+config ECHO GUARD (2026-07-29; REFORMULATED 2026-07-30 on the owner's
@@ -111,10 +112,16 @@ describe("sha+config echo", () => {
 
   it("the echo is write-only: one assignment, zero reads, route and src", () => {
     const route = readFileSync("app/api/generate/route.ts", "utf8");
-    const writes = route.match(/\)\.echo = echo;/g) ?? [];
+    /* COUNT ON STRIPPED SOURCE (2026-08-01). This guard SURVIVED an addition plant — a comment
+       added beside intact code makes the count 2 — and I generalised that into "a count cannot
+       false-negative". THAT WAS WRONG, and the substitution plant proved it: with the echo
+       assignment MOVED INTO a comment (code gone, count still 1) this file passed 12/12, and no
+       board would have carried an echo at all. A count catches ADDITION, never SUBSTITUTION.
+       The filter is load-bearing; the count is what makes it precise. */
+    const writes = stripComments(route).match(/\)\.echo = echo;/g) ?? [];
     expect(writes.length, "exactly one echo assignment in the route").toBe(1);
     // any OTHER `.echo` appearance in the route is a read — forbidden
-    const dotEcho = route.match(/\.echo\b/g) ?? [];
+    const dotEcho = stripComments(route).match(/\.echo\b/g) ?? [];
     expect(dotEcho.length, "a `.echo` read exists in the route beyond the assignment").toBe(1);
     // and nothing else in the runtime tree touches `.echo`
     const { execSync } = require("node:child_process") as typeof import("node:child_process");
@@ -168,6 +175,46 @@ describe("sha+config echo", () => {
      no hash move. OBSERVED RED before they were added: every one of the four `k in e` checks
      below failed. */
   const BRAKE_FIELDS = ["dirPref", "umpKFrozen", "penQFrozen", "coreNoHR"] as const;
+
+  /* SECOND AUTHORIZED SET (2026-08-01, owner's item 3). Added on ONE test — does its absence
+     block a question we actually asked? — and the fifteen that failed that test stay out.
+     `lockMaxAgeMin`: the price-age lock is item 4 of the placement checklist, and a board
+     could not say what age it considered stale.
+     The three K-caps: M6 is "K's priced with no sim", and the caps are what decide how many
+     K legs reach a card — the M6 reading had no board-side witness for any of them. */
+  const ASKED_FIELDS = ["lockMaxAgeMin", "coreKsFillOnly", "coreKsCap", "coreKsLegMax"] as const;
+
+  it("the echo carries the price-age lock and the three K-caps", () => {
+    const e = buildEcho(
+      { selMode: "ev_gated", lockMaxAgeMin: 20, coreKsFillOnly: true, coreKsCap: 2, coreKsLegMax: 1 },
+      { priorsSha: null, ctxSha: null, cfSelEnabled: false },
+    );
+    for (const k of ASKED_FIELDS) {
+      expect(k in e, `echo field missing: ${k}`).toBe(true);
+    }
+    expect(e.lockMaxAgeMin).toBe(20);
+    expect(e.coreKsFillOnly).toBe(true);
+    expect(e.coreKsCap).toBe(2);
+    expect(e.coreKsLegMax).toBe(1);
+  });
+
+  it("the asked-for fields echo null when absent, on the same rule as the brakes", () => {
+    const e = buildEcho({ selMode: "ev_gated" }, { priorsSha: null, ctxSha: null, cfSelEnabled: false });
+    for (const k of ASKED_FIELDS) expect(e[k], `${k} must echo null when absent`).toBeNull();
+  });
+
+  it("THE ECHO IS A RECORD OF WHAT BOARDS MUST TESTIFY TO, NOT A CONFIG DUMP", () => {
+    /* The owner's rule, encoded: a field enters the echo because a question was asked that it
+       answers. SH_CFG declares 36 keys; this pins the echo at the 21 that earned a place, so
+       adding one is a deliberate act with a reason rather than drift toward a dump. Raise this
+       number only beside the question the new field answers. */
+    const e = buildEcho({}, { priorsSha: null, ctxSha: null, cfSelEnabled: false });
+    expect(
+      Object.keys(e).length,
+      "the echo's field count moved. If a field was ADDED, name the question it answers in the " +
+        "same commit; if REMOVED, say what stopped being asked. The echo is a record, not a dump.",
+    ).toBe(27);
+  });
 
   it("the echo carries the three brakes and the side override", () => {
     const e = buildEcho(

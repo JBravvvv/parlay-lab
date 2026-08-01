@@ -24,6 +24,13 @@
  */
 export function stripComments(src: string): string {
   return src
+    /* HTML COMMENTS FIRST (2026-08-01). THE STRIPPER'S OWN PLANT, observed red: the biggest
+       file any guard here scans is `legacy/index.html`, and the first version knew only about
+       `/* *\/` and `//`. With `var luDen=slate.games.length;` moved into `<!-- ... -->`,
+       coverage-denominator passed 9/9 — a comment form the filter could not see, in the one
+       file whose extension guarantees that form exists. A filter is an instrument; it gets a
+       plant like everything else. */
+    .replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
     .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
 }

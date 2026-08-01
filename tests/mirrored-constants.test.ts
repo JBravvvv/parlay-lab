@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MODELLED_MARKETS, NAMED_CATS } from "@/lib/engine-echo";
-import { stripComments } from "./helpers/source";
+import { stripComments, stripHashComments } from "./helpers/source";
 
 /**
  * MIRRORED ENGINE CONSTANTS (2026-08-01, owner's item 2 — "a copied engine constant
@@ -241,6 +241,25 @@ describe("mirrored engine constants do not drift", () => {
         `\nEither re-sync it or convert the copy to the shared import — a registered ` +
         `exception that no longer matches is just an unregistered copy.`,
     ).toEqual([]);
+  });
+
+  /* THE FILTER IS AN INSTRUMENT AND GETS ITS OWN PLANTS (2026-08-01, owner's item 2).
+     Every stripped guard inherits the stripper's blind spots, so a form it misses is a silent
+     hole in all of them at once. The HTML case is not hypothetical: it was OBSERVED RED
+     against coverage-denominator on legacy/index.html before this ran. */
+  it("the stripper blanks every comment form the scanned files actually contain", () => {
+    for (const [name, src, hidden] of [
+      ["block", "/* var x = 1; */ var y = 2;", "var x = 1;"],
+      ["line", "// var x = 1;\nvar y = 2;", "var x = 1;"],
+      ["HTML", "<!-- var x = 1; -->var y = 2;", "var x = 1;"],
+    ] as [string, string, string][]) {
+      expect(stripComments(src).includes(hidden), `stripComments misses ${name} comments`).toBe(false);
+      expect(stripComments(src)).toContain("var y = 2;");
+      expect(stripComments(src).length, "the stripper must preserve LENGTH — indexOf ordering assertions depend on it").toBe(src.length);
+    }
+    // hash comments: python AND yaml
+    expect(stripHashComments("# a = 1\nb = 2").includes("a = 1")).toBe(false);
+    expect(stripHashComments("# a = 1\nb = 2")).toContain("b = 2");
   });
 
   it("PLANT (invalid-by-value): a mirror missing a market is caught", () => {
