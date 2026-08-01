@@ -1231,3 +1231,98 @@ entries on disk. **Named as blocked rather than designed around.**
 Shipping it changes NOTHING today — the partition is identical — and changes EVERYTHING if the
 alternate rungs ever return or a new market is added below 34%.** That is the entire argument for
 preferring it, and it is an argument about the future, not about any measurement.
+
+---
+
+# 2026-08-01, sixth pass — the BARE-LITERAL CLASS, the laundering rule, and the error distribution
+
+## §H15 THE CENSUS COUNTS CONFIG LITERALS. A CONSTRAINT THAT NEVER BECAME ONE IS INVISIBLE TO IT.
+
+**REGISTERED: census v2.4 → v2.5, 43 → 44**, restated in all five places. The L2241 row is named in
+the census **as a bare literal rather than a config key**, because that provenance is the finding.
+
+**THE SWEEP — FIRST BRANCH FIRES. There are more.** Filter-position drops in the row/ticket path
+(`legacy/index.html` L2200–3200), classified by hand:
+
+| line | the literal | what it drops | measurable? | in any doc? |
+|---|---|---|---|---|
+| **L2241** | `row.ln!==0.5` on HR | **every HR rung but anytime** — 7,467 rows at 1.5 and 3,254 at 2.5 in the archive | **yes, done** — HR\|1.5 sits at a 2.2% median | now, as of today |
+| **L2287** | **`ab30 < 25`** | **every hitter with fewer than 25 at-bats in the last 30 days.** Comment: *"sample-size discipline"* | **yes** — the dropped population is in the archive and box scores | **NO** |
+| **L2785** | `if(k==="batter_home_runs")return` in `mixPool` | **HR from the MIXED pool entirely.** Verified on the real board: **HR legs in `parlays` = 49, in `parlaysMixed` = 0** | yes | **NO** |
+| **L2787** | `[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]]` | the **mixed-ticket count plan** — how many tickets of each leg-count get built | yes | **NO** |
+| L2777 | `plan[k]\|\|[3,4,5]` | default leg-counts per category | yes | **NO** |
+
+**COUNT: 5 bare-literal constraints in one 1,000-line span, against 44 config-keyed census
+parameters — and the span is ~0.4% of a 281,096-character engine string.** The sweep is **scoped
+and hand-classified, so 5 is a FLOOR, not a total.** I am not reporting an engine-wide number; the
+last time I automated this kind of sweep it returned 264 "keys" and I discarded it.
+
+**→ THE CLASS IS REAL AND IT TAKES A NAME: BARE-LITERAL CONSTRAINTS.** The census's coverage
+restates as **CONFIG-KEYS-ONLY, with the bare-literal count printed beside it.** **The freeze has
+been holding the parameters it can see.**
+
+**WHAT A MEASUREMENT ON DISK WOULD CHANGE IF ONE WERE LIFTED:**
+- **L2241 — YES, and it already has.** Every board-derived implied-probability distribution in
+  §H10 excludes HR 1.5/2.5. Lifting it adds rows at a 2.2% median, which **widens** HR's CV gap
+  rather than closing it — the archive measurement (§H13) already showed this.
+- **L2287 — YES, and this one is untested.** The 25-AB floor shapes the row population of *every*
+  board measurement taken this session, including §H10's per-market medians. **Nothing on disk
+  measures what it drops.**
+- **L2785 — YES, narrowly.** It is why the 07-26 HR-pair census (12 tickets, 81 pairs) is entirely
+  a `parlays` phenomenon. The counts are unaffected (I deduped the union) but the attribution is
+  now exact.
+
+**🔴 IMPOSSIBLE BRANCH — NEAR-MISS, PRINTED BECAUSE IT MATTERS.** `coreNoHR` (config) and L2785
+(bare) both exclude HR from ticket construction, and they do **not** contradict — but **setting
+`coreNoHR: false` would NOT restore HR to mixed tickets, because a bare literal blocks that set
+independently.** So the config key does **less than its name and its census entry imply**, and the
+difference is **invisible from the config**. Not dead code; a scope mismatch between what the census
+describes and what the engine does.
+
+**CAN THE GUARD BE MECHANICAL? NO — AND THAT IS THE SAME ANSWER AS THE CENSUS SWEEP.** Deciding
+whether a literal in a filter position is a *constraint* or a *structural necessity* requires
+knowing whether the quantity it gates is tunable. `grp.length<2` (a group needs two legs) and
+`ab30<25` (a chosen sample floor) are syntactically identical and semantically opposite.
+**THE NEAREST ENFORCEABLE VERSION, and it is the same shape that worked for fixture citations and
+retracted claims: a REGISTRY.** Each known bare-literal constraint listed with its line and its
+literal; the guard asserts each is **still present at that line** (so a silent change or removal
+fails) and that the **registry count matches the census's bare-literal count**. It cannot find new
+ones — that needs judgment — so the registry is the written rule and the guard holds the part a
+machine can. **Spec'd, not built.**
+
+## §H16 THE LAUNDERING RULE — RECORDED AS A STANDING REASON, VERBATIM
+
+> **A floor calibrated to an unmeasured rule is not a measured parameter; it is the same rule in
+> more general clothing, and shipping it would launder the provenance.**
+
+**That sentence is the standing reason, not this instance's conclusion.** It applies to any
+parameter whose value is set to reproduce another parameter's behaviour rather than to match data.
+**The test: if changing parameter B's value would change the "right" value of parameter A, then A is
+fitted to B, not to the world — and A's census class must say so.**
+
+**APPLIED GENERALLY — SECOND BRANCH FIRES, and it is trivially true.** The census carries
+**0 fitted parameters**, so no parameter is *classed* fitted and none can be misclassed by this
+test. **The proposed probability floor would have been the first instance had it shipped — and it
+did not.** Recorded so the first real case is caught rather than discovered later.
+
+## §H17 THE ERROR DISTRIBUTION — POPULATION ERRORS DOMINATE
+
+**ADDED TO THE STANDING RULES:**
+
+> **Check which population a claim is about before checking whether it is true.**
+
+**THE COUNT, this session, classified honestly:**
+
+| class | count | examples |
+|---|---|---|
+| **POPULATION — the claim was about the wrong set** | **~9** | the archive experiment called "blocked" while the archive held the rungs · §6's job inventory read off the non-firing branch · the 8,201 "anomaly" that was a date split · the owner's same-team HR rule · the owner's count-armed accrual argument · fixture figures cited as production magnitudes (9 citations) · "weather has matched nothing" · `board-report`'s false M-item on a pre-flag board · §H10's "partly manufactured" |
+| **COERCION / SHAPE — the value or its container was misread** | **~7** | `predCensus` map-vs-array · `price-path`'s `Number(null)` (9,578 fabricated rows) · `quota.mjs`'s unreachable header guard · `ledger-report`'s `lockedAt` epoch-0 · its `czEv` "not negative" · `board-report`'s null envelope · the ratchet counting comments as code |
+| **GENUINE LOGIC — the inference was wrong from correct data** | **~2** | publishing `c = 5.845` as a constant (refuted by `residual ≥ 0`) · "every archived close is whatever landed" (misread `_snapshot_kind`) |
+
+**Population errors outnumber logic errors roughly four to one, and coercion errors outnumber them
+three to one.** Two of the population errors are the owner's, seven are mine or the tools'.
+
+**WHERE THAT SAYS TO LOOK NEXT:** not at the reasoning. **At the denominator, the branch, the date
+range, and the schema vintage of whatever is being counted.** Every one of the nine was caught the
+same way — by someone asking *which set is this about?* rather than *is this argument sound?* — and
+none was caught by re-checking the logic.
