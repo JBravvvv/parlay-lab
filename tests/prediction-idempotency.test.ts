@@ -12,6 +12,7 @@ import {
 } from "@/lib/pred-serialize";
 import { FROZEN_NOW, fixtureEngine } from "./helpers/fixture-env";
 import type { BoardData } from "@/engine";
+import { stripComments } from "./helpers/source";
 
 /**
  * PREDICTION-ROW IDEMPOTENCY (Phase 1, 2026-07-25)
@@ -282,7 +283,15 @@ describe("two real generations against one fixture date", () => {
    past gradedFromBlob into raw records again. */
 describe("the training channel has one door", () => {
   it("/api/calibrate fills the training set only through gradedFromBlob", () => {
-    const src = fs.readFileSync(path.join(__dirname, "..", "app/api/calibrate/route.ts"), "utf8");
+    /* STRIPPED (2026-08-01). OBSERVED DEAD: with `graded.push(...gradedFromBlob(blob))` MOVED
+       INTO a comment — the one door into the training set closed, nothing filling it — this file
+       passed 15/15. BOTH assertions below survived: the `toMatch` because the text was still
+       there, and the `=== 2` count because a substitution does not change the count. That is the
+       clearest demonstration in the suite that a count is not a substitute for the filter.
+       This file already stripped comments AD HOC for the `.hist` check three lines down — the
+       author knew about the problem for one assertion and not the two above it. One stripped
+       copy now serves all three, from tests/helpers/source.ts. */
+    const src = stripComments(fs.readFileSync(path.join(__dirname, "..", "app/api/calibrate/route.ts"), "utf8"));
     expect(src).toMatch(/graded\.push\(\.\.\.gradedFromBlob\(blob\)\)/);
     // exactly two writers into the training set: the store (via the one door) and the
     // cloud-ledger backfill for dates the store never logged. Nothing hand-rolled.
@@ -290,7 +299,6 @@ describe("the training channel has one door", () => {
     // must still grade superseded and stale rows so they stay auditable.)
     expect((src.match(/graded\.push\(/g) ?? []).length).toBe(2);
     // and no executable line in the route reaches into a record's history
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-    expect(code).not.toMatch(/\.hist\b/);
+    expect(src, "an executable line in the route reaches into a record's history").not.toMatch(/\.hist\b/);
   });
 });
