@@ -86,6 +86,90 @@ same-day ship rather than a spec.**
 ---
 
 
+## 0.4 🔴 READS 1 AND 3 RUN — 2026-08-01T22:41Z. READS 2 AND 4 BLOCKED ON THE PHRASE.
+
+### ⏱️ TWO THINGS THAT OUTRANK THE READS, BOTH FROM THE QUOTA LINE
+
+> **1. 621 CREDITS SPENT SINCE THE LAST READING — FOUR TIMES THE BURST §2 IS ABOUT.**
+> `2026-08-01T01:35:56.369Z` → **19,958 / 42**
+> `2026-08-01T22:41:20.190Z` → **19,337 / 663**
+> **621 credits over 21.09 h = 29.4/h.** Unattributed at this line. A full day of six props crons
+> is plausibly in range (4 × ~85 + 2 × ~33 ≈ 400) but **that is an estimate, not an attribution** —
+> the archive is what settles it, and it has not been read.
+>
+> **2. THE READING LANDED AT 22:41:20Z = 15:41 PT — THREE MINUTES PAST THE FIRE POINT.**
+> The window is 22:10Z–23:00Z. **It is open and closing.** No board has been fired.
+
+### READ 1 — propsnap store. UNGATED, 0 credits. `curl_exit=0` on all four.
+
+```
+2026-07-28  {"date":"2026-07-28","snapshots":[]}
+2026-07-29  {"date":"2026-07-29","snapshots":[]}
+2026-07-30  {"date":"2026-07-30","snapshots":[]}
+2026-07-31  {"date":"2026-07-31","snapshots":[]}
+```
+
+**EMPTY ON ALL FOUR. Body shape is exactly `{date, snapshots}` — no STOP condition fired.**
+
+> **PRECONDITION 2 DOES NOT HOLD, ON EVIDENCE.** Weekday capture is **weekend-only as documented**;
+> the four morning GitHub snapshots are the entire weekday record and the **162–185/day ceiling
+> stands**. **The `bestBoard` fallthrough did NOT write boards nobody counted** — propsnap is
+> **CLEARED as a candidate for the 146**, and now also for the 621.
+
+### READ 3 — `/api/calibration`. GET is OPEN, no phrase, 0 credits. `curl_exit=0`, 77,217 bytes.
+
+```
+auto:     "on"
+mults:    {"pitcher_outs": 0.14285714285714288}
+global:   {"s":1, "n":1908, "slopeBefore":1.0749819257606252, "slopeAfter":1.0749819257606252}
+lastRun:  null
+log:      0 entries
+```
+
+| market | n | slope (≥100) | global (≥150) |
+|---|---|---|---|
+| **all** | **1908** | CLEARED | CLEARED |
+| batter_total_bases | 381 | CLEARED | CLEARED |
+| batter_hits | 360 | CLEARED | CLEARED |
+| batter_hits_runs_rbis | 341 | CLEARED | CLEARED |
+| batter_home_runs | 324 | CLEARED | CLEARED |
+| **pitcher_outs** | **176** | **CLEARED** | **CLEARED** |
+| pitcher_strikeouts | 170 | CLEARED | CLEARED |
+| rl | 79 | below | below |
+| ml | 77 | below | below |
+
+**SEVEN OF NINE MARKETS CLEAR BOTH THRESHOLDS.**
+
+> ### 🔴 THE "ANY MARKET CLEARED" BRANCH FIRES, AND THE FIT IS LIVE — NOT AN IDENTITY.
+> **`mults` IS POPULATED**: `pitcher_outs` carries **0.1429**, a **7× shrink** on that market's model
+> blend weight. **`auto` is `"on"`, not off** — so this is not "empty by the switch"; it is a fit
+> that ran and moved one market.
+>
+> **THE THIRD FREEZE POINT WAS NOT PRECAUTIONARY.** The pre-committed alternative — *"the fit never
+> moved, exposure without effect"* — **is refuted.** Pausing calibration froze something that was
+> live.
+>
+> **AND IT IS `pitcher_outs`** — the market already suspended under M2/M2′, now also carrying the
+> only non-identity calibration multiplier in the store.
+>
+> **THE GLOBAL FIT DID NOT MOVE:** `s = 1`, and `slopeBefore === slopeAfter` to fifteen digits on
+> n = 1908. **Per-market moved; global is an identity.**
+>
+> **🔴 WHEN IT MOVED IS NOT DATEABLE FROM THIS RESPONSE.** `lastRun` is **null** and `log` is
+> **empty (0 entries)**. So *"everything measured after that date is downstream of a moved fit"*
+> **cannot be evaluated** — the date is missing input, not a small number. **The homogeneous-window
+> claim is therefore UNRESOLVED, not restated.**
+>
+> Top-level `quarantine` is present and was not parsed in this pass — recorded so it is not
+> mistaken for absent.
+
+### READS 2 AND 4 — NOT RUN. BLOCKED ON THE SYNC PHRASE, BY STANDING RULE.
+
+Both require `-H "x-pl-sync: <PHRASE>"`. **Josh types his own secrets** — the phrase is never entered
+for him. The two commands are in §4A, hardened (`-o tmp` then `mv`, `curl_exit` echoed). **Reading
+15, the 38-ticket gate, the overstake census, the HRR 46.3/59.2 reproduction and reading 15(c) all
+remain UNREAD.**
+
 ## 0.5 🎯 PRE-READ STATE — 2026-08-01, the verification layer CLOSED (§12W)
 
 **QUOTA: 19,958 remaining / 42 used, at `2026-08-01T01:35:56.369Z`.** Last row of
