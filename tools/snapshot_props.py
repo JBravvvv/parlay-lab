@@ -191,6 +191,7 @@ def _snapshot_kind(events, now, day):
 # `timeout-minutes` under the ceiling so the kill is ours, not GitHub's.
 # If the window opens beyond the cap, we do NOT wait: we take the `pre` reading and exit, which
 # leaves an honest hole that tools/close_capture.py reports rather than a job killed mid-sweep.
+WINDOW_DEFAULT_S = 20 * 3600  # the historical behaviour; --window overrides it
 MAX_WAIT_S = 300 * 60      # 5h — under the 360-minute hosted-runner job ceiling, with headroom
 WAIT_TICK_S = 5 * 60       # log progress so a waiting runner is visibly alive, not hung
 
@@ -284,6 +285,17 @@ def main():
     if "--fold-only" in sys.argv:
         return
     wait = "--wait" in sys.argv
+    # TARGETED WINDOW (2026-08-01, owner's item 1 — signed off from the diff).
+    # WHY IT IS NEEDED AT ALL: without it a "targeted" cron still pays for the whole slate,
+    # because `todays` below admits anything inside 20 hours. The 60-120-minutes-to-first-pitch
+    # bucket is STRUCTURALLY EMPTY in the archive (docs/auto-lock-memo.md SS M1) — a price path
+    # needs TWO captures inside the window and the cadence delivers one — and that bucket is the
+    # only place a lock-time criterion could ever be fitted.
+    # DEFAULT IS OFF: with no --window the value is WINDOW_DEFAULT_S and every existing cron is
+    # byte-identical in behaviour. Only the two new entries on `main` pass it.
+    window_s = WINDOW_DEFAULT_S
+    if "--window" in sys.argv:
+        window_s = int(sys.argv[sys.argv.index("--window") + 1]) * 60
     events = fetch("https://api.the-odds-api.com/v4/sports/baseball_mlb/events")
     if events is None:
         print("skipped: proxy unreachable")
@@ -302,7 +314,9 @@ def main():
         return
     print(f"snapshot kind={kind}")
     todays = [e for e in events
-              if 0 < (datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) - now).total_seconds() < 20 * 3600]
+              if 0 < (datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) - now).total_seconds() < window_s]
+    if window_s != WINDOW_DEFAULT_S:
+        print(f"window: {window_s // 60} min -> {len(todays)} of {len(events)} events on the board")
     snap = {"t": now.isoformat(timespec="seconds"), "kind": kind, "events": []}
     for e in todays[:16]:
         od = fetch(f'https://api.the-odds-api.com/v4/sports/baseball_mlb/events/{e["id"]}/odds'

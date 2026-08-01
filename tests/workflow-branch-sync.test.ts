@@ -61,11 +61,25 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
       "(2) main's schedule was CUT ten -> four on 2026-07-31 (7bfb6b3), keeping 0 17 / 0 20 / " +
       "0 21 / 30 22 — the two close-producing bands plus one same-day pre and one queued opener " +
       "— while frontend-rebuild still declares the redesign's own four (0 17 --wait, 0 13, " +
-      "0 23, 0 3 --fold-only). The two branches now disagree on the cron SET as well as on args.",
+      "0 23, 0 3 --fold-only). The two branches now disagree on the cron SET as well as on args. " +
+      "(3) ADDED 2026-08-01, owner signed off from the diff: main gains a TARGETED PAIR — " +
+      "`10 18` (-> ~21:1x) and `55 18` (-> ~21:5x), both passing `--window 120` — to populate the " +
+      "60-120-minutes-to-first-pitch bucket, which is STRUCTURALLY EMPTY in the archive because a " +
+      "price path needs TWO captures inside the window and the cadence delivers one " +
+      "(docs/auto-lock-memo.md §M1, §M12). frontend-rebuild carries the `--window` FLAG (default " +
+      "off, so the four existing crons are byte-identical) but NOT the two cron entries, because " +
+      "scheduled behaviour lives on the firing copy. main is now at SIX crons, frontend-rebuild " +
+      "at four.",
     awaiting:
       "owner's choice on the redesign — either a manual workflow_dispatch run on an affordable " +
       "day and then ship it (superseding the cut), or fold the cut's chosen four back onto " +
-      "frontend-rebuild so the two agree. Priced in docs/branch-firing-audit.md PART THREE §8.",
+      "frontend-rebuild so the two agree. Priced in docs/branch-firing-audit.md PART THREE §8. " +
+      "AND SEPARATELY for divergence (3): the pre-committed landing test — first day the pair " +
+      "runs, `node tools/price-path.mjs <props-dir>` must print n > 0 in the 60-120 bucket. Zero " +
+      "means the SPACING is wrong, not that prices do not move; ONE cron delivering is a PARTIAL " +
+      "landing that produces no pair and therefore no observation, and reads as a failure. " +
+      "NOTE: `since` deliberately NOT bumped to 2026-08-01 — divergences (1) and (2) are still " +
+      "open and their countdown must not be extended by a new one.",
   },
   "line-history.yml": {
     since: "2026-07-31",
