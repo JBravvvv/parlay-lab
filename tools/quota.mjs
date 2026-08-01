@@ -20,27 +20,62 @@
 import fs from "node:fs";
 
 const LOG = "data/quota-log.jsonl";
+/**
+ * `fresh=1` ADDED 2026-07-31 (owner's item 1). Without it this read goes through `/api/odds`'s
+ * Next data cache (`next: { revalidate: 240 }`, route L43), and the route lifts the quota headers
+ * off the `upstream` Response object (L51-54) — which on a cache HIT is reconstructed from the
+ * cache entry, so the header carries the value captured WHEN THE ENTRY WAS WRITTEN. Two of the
+ * seven "flat" reads on 2026-07-31 fell inside a 240 s window of their predecessor and were
+ * therefore unable to show movement even if there had been any.
+ *
+ * IT STILL COSTS NOTHING: `/v4/sports` is not counted by the Odds API — measured, four
+ * CONSECUTIVE FRESH reads (07-31 01:25 → 04:50 → 05:55 → 06:41, every gap far beyond 240 s) all
+ * returning 1,038. `fresh=1` changes the cache, not the billing.
+ *
+ * THE PASSCODE COUPLING, stated because it is a live trap: once `APP_PASSCODE` is set in Vercel,
+ * `/api/odds` 401s a `fresh=1` with no `x-pl-pass` and does NOT fall through to cache — this tool
+ * would stop reading entirely. Same `os.environ`-style pattern as the python sweeps: sent only if
+ * set, never hardcoded. (§3 step 4 is last for exactly this reason.)
+ */
 const URL_ = "https://parlay-lab-six.vercel.app/api/odds?u=" +
-  encodeURIComponent("https://api.the-odds-api.com/v4/sports/");
+  encodeURIComponent("https://api.the-odds-api.com/v4/sports/") + "&fresh=1";
 
 export function parseSeries(text) {
   return text.split("\n").filter(Boolean).map((l) => JSON.parse(l));
 }
 
-/** Deltas between consecutive reads, with the per-hour rate. Pure — no I/O. */
+/**
+ * Deltas between consecutive reads, with the per-hour rate. Pure — no I/O.
+ *
+ * RESETS ARE NAMED, NOT SUBTRACTED (2026-07-31). The pool reset between 21:04Z and 22:4xZ on
+ * 2026-07-31 — 553/19,447 became 19,958/42. Plain subtraction turns that into `spent = -19,405`
+ * at some absurd negative rate, which would corrupt every downstream mean and, worse, would look
+ * like a number. A reset is detected on EITHER witness (remaining rises, or used falls) and the
+ * row is emitted as `reset: true` with `spent: null` — an interval whose burn is UNMEASURABLE,
+ * because the counter it was measured against no longer exists.
+ */
 export function burnSeries(rows) {
   const out = [];
   for (let i = 1; i < rows.length; i++) {
     const a = rows[i - 1], b = rows[i];
     const hours = (Date.parse(b.at) - Date.parse(a.at)) / 3_600_000;
-    const spent = a.remaining - b.remaining;
-    out.push({ from: a.at, to: b.at, hours: +hours.toFixed(2), spent, perHour: hours > 0 ? +(spent / hours).toFixed(1) : null });
+    const reset = b.remaining > a.remaining || (b.used != null && a.used != null && b.used < a.used);
+    const spent = reset ? null : a.remaining - b.remaining;
+    out.push({
+      from: a.at, to: b.at, hours: +hours.toFixed(2), spent,
+      perHour: reset || !(hours > 0) ? null : +(spent / hours).toFixed(1),
+      ...(reset ? { reset: true, note: `POOL RESET — ${a.remaining}/${a.used} -> ${b.remaining}/${b.used}. Burn across this interval is UNMEASURABLE.` } : {}),
+    });
   }
   return out;
 }
 
 export async function readQuota(fetchImpl = fetch) {
-  const r = await fetchImpl(URL_);
+  const pass = process.env.APP_PASSCODE;
+  const r = await fetchImpl(URL_, pass ? { headers: { "x-pl-pass": pass } } : undefined);
+  if (r.status === 401) {
+    throw new Error("401 on a fresh=1 read — APP_PASSCODE is set in Vercel but not in this shell. Export it here, or the quota instrument is blind (route L36-40).");
+  }
   const remaining = Number(r.headers.get("x-requests-remaining"));
   const used = Number(r.headers.get("x-requests-used"));
   if (!Number.isFinite(remaining) || !Number.isFinite(used)) {

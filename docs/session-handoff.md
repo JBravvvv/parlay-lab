@@ -771,6 +771,74 @@ legacy mode opened at all until M24 resolves.
 
 ---
 
+## 7A.1 THE QUOTA INSTRUMENT — TRACED, PARTLY IMPEACHED, FIXED (2026-08-01, owner's item 1)
+
+**THE PATH THE VALUE TAKES, line by line.** `quota.mjs` L23–24 →
+`GET /api/odds?u=<https://api.the-odds-api.com/v4/sports/>` **with no `fresh=1`** → route L42–44
+`fetch(url, { next: { revalidate: 240 } })` — **the Next data cache** → route **L51–54** lifts
+`x-requests-remaining` / `x-requests-used` **off the `upstream` Response object** and re-sets them
+→ `quota.mjs` L44–45 parses those headers.
+
+**SO THE MECHANISM IS REAL: on a cache HIT the `upstream` object is reconstructed from the cache
+entry, and its headers carry the values captured WHEN THE ENTRY WAS WRITTEN.** The tool was
+reading a header that can be up to 240 s stale. **Yes, the Odds API returns the quota headers on
+every call** — that is why the proxy can forward them, and why a cached response carries a stale
+pair rather than none.
+
+**THE SEVEN FLAT READS AGAINST THE 240 s WINDOW — the spacing decides it:**
+
+| read | gap from last *fetch* | verdict |
+|---|---|---|
+| 19:11:31.883Z | — | **FRESH** |
+| 19:12:16.165Z | 44.3 s | **CACHE HIT — could not have shown movement** |
+| 19:19:55.586Z | 503.7 s | **FRESH** |
+| 19:27:29.559Z | 454.0 s | **FRESH** |
+| 19:31:25.848Z | 236.3 s | **CACHE HIT — by 3.7 seconds** |
+| 20:21:56.770Z | 3,267.2 s | **FRESH** |
+| 21:04:11.529Z | 2,534.8 s | **FRESH** |
+
+**FIVE OF SEVEN ARE FRESH FETCHES, ALL READING 553 — AND THE TWO THAT BRACKET THE 20:48Z SWEEP
+(20:21:56 AND 21:04:11) ARE BOTH FRESH.** So the first pre-committed branch does **not** fire in
+full: the tool did read through cache and two flat reads were structurally unable to move, **but
+not the load-bearing pair. THE SECOND BRANCH FIRES — the flatness is real, and the 20:48Z sweep's
+cost is the false fact.**
+
+**KNOWN-FRESH READS THAT VALIDATE THE TOOL:** every read whose value *moved* proves a live fetch.
+There are **six** — 07-29T12:00 (−641), 07-30T03:55 (−215), 07-30T16:45 (−223), 07-31T01:25
+(−200), 07-31T13:57:11 (−339), 07-31T19:11:31 (−146). The 13:57 read follows a spend we can
+account for exactly (58 event-fetches). **The instrument tracks real movement; what it could not
+do was distinguish "no movement" from "not asked".**
+
+**THE DIRECT TEST — RUN, AND IT COST NOTHING.** There *is* a cache-free path that needs no
+secret: `&fresh=1` sets `cache: "no-store"` (route L43), and `/v4/sports` is not billed —
+**measured by four consecutive fresh reads (07-31 01:25 → 04:50 → 05:55 → 06:41, every gap far
+beyond 240 s) all returning 1,038.** Three calls back to back:
+
+```
+CACHED (what quota.mjs did)  remaining=19958  used=42
+FRESH  (&fresh=1)            remaining=19958  used=42
+CACHED again                 remaining=19958  used=42
+```
+
+**IMPOSSIBLE BRANCH — DID NOT FIRE. They agree.** Stated precisely: this compared the **cached
+proxy path against the fresh proxy path**. A bare upstream call needs the Odds API key, **which
+is the owner's to type** — that comparison has not been made and is not made here.
+
+**THE FIX, SHIPPED:** `quota.mjs` now requests **`fresh=1`** and sends `x-pl-pass` **only if
+`APP_PASSCODE` is in its env** (the same pattern as the python sweeps), with an explicit 401
+message naming the coupling — once §3 step 4 lands, a fresh read without the header 401s and
+**this tool goes blind**. And **`burnSeries` now NAMES A RESET** instead of subtracting through
+it: either witness (`remaining` rises or `used` falls) yields `spent: null`, `reset: true`.
+
+**HOW A 14-EVENT CAPTURE COULD LAND AT ZERO — the candidate the owner named is RULED OUT.**
+`snapshot_props.py` has **one** fetch entry point (L29–30) and it **always** appends `&fresh=1`,
+so every props call is `no-store` and pays. Cached upstream responses cannot explain it, and the
+props cost model does **not** change on that account. What remains: the upstream counter posts
+with a lag, or the spend went against a different key. **Unresolved, and now unresolvable for
+this instance** — the period closed.
+
+---
+
 ## 7A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
 
 **THE CLASS: a tool whose tests feed it a synthetic shape has never been tested.** Two were found
@@ -937,7 +1005,40 @@ per-market as measured. Board cost **62–70 credits** (midpoint 66); props **16
 ¹ banked board/logged-date counts are **off-disk**; read 2 and read 3 supply them, and these two
 rows restate on the real count.
 
-### 8A.3 ⚠️ IMPOSSIBLE BRANCH — IT FIRES A SECOND TIME. ONE ITEM **IS** REACHABLE AT 553.
+### 8A.4 SUPERSEDED BY THE RESET — 2026-08-01T01:35Z, hours after 8A.3 was written
+
+**8A.3 BELOW IS A CLOSED-PERIOD FACT AND IS KEPT AS ONE. IT IS NO LONGER THE POSITION.** The pool
+is **19,958**, not 553 (§9). Repriced at ~66 credits/board and ~170/day of props:
+
+| item | boards | credits (boards + props) | at 19,958 |
+|---|---|---|---|
+| Phase-2 game/player ICC (08-07) | 7 | ~1,652 | **REACHABLE** |
+| ML · RL reopen (08-12) | 12 | ~2,832 | **REACHABLE** |
+| Phase-2 day ICC (08-18) — the HRR amendment's gate | 18 | ~4,248 | **REACHABLE** |
+| Total Bases reopen (08-21) | 21 | ~4,956 | **REACHABLE** |
+| Hits · HR · HRR reopen (08-27) | 27 | ~6,372 | **REACHABLE** |
+| K's · Outs reopen (09-07) | 38 | ~8,968 | **REACHABLE** |
+| parameter exit (09-22) | — | ~13,500 | **REACHABLE**, ~6,458 to spare |
+
+**THE COSTS ARE NOT ADDITIVE — the same boards serve every row — so the binding line is K's/Outs
+at 38 boards ≈ 8,968, and the whole calendar fits inside 19,958. On credits alone, EVERYTHING IS
+NOW REACHABLE, and props collection no longer has to stop.**
+
+**ONE THING DECIDES WHETHER THAT HOLDS, AND IT IS §2's OPEN QUESTION.** At the observed **48.3/h**
+the unattributed residual is **1,159/day**, which drains 19,958 in **~17 days — ~2026-08-18**.
+Under that hypothesis only the items dated **on or before ~08-12** land: the game/player ICC and
+the ML·RL reopen. The day-level ICC sits exactly on the boundary, and K's/Outs and the parameter
+exit are lost. **So what spent the 146 credits is no longer a budgeting question — it is the
+single determinant of the entire calendar.** That is a sharper reason to read the Vercel log than
+any that existed before the reset.
+
+**AND THE RESET DATE IS NO LONGER OFF-DISK.** §11 carried it as *"unread — owner's Odds-API
+dashboard only"*. It is now **measured**: the boundary fell inside 21:04:11Z → 01:35:56Z, which
+contains **2026-08-01T00:00Z**, and both period totals sum to 20,000. Treat the next reset as
+**~2026-09-01T00:00Z, pending one more observation** — one boundary is a measurement, not yet a
+period.
+
+### 8A.3 ⚠️ IMPOSSIBLE BRANCH — IT FIRED AT 553 *(pre-reset; superseded by 8A.4)*
 
 **The Phase-2 game- and player-cluster ICC needs 7 boards ≈ 462 credits. The pool is 553.**
 It clears with **~91 credits of margin — but ONLY if props collection stops entirely**, because
@@ -975,8 +1076,24 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 9. POSITION
 
-- **Quota: 553 remaining / 19,447 used — 2026-07-31T21:04:11.529Z** (`data/quota-log.jsonl`, live
-  read this turn). **Flat across seven reads spanning 1 h 53 m.**
+> # 🔴 THE POOL RESET. 2026-08-01T01:35:56Z: **19,958 remaining / 42 used.**
+>
+> **Measured, not inferred** — `data/quota-log.jsonl`, live read this turn through the corrected
+> tool. The pool went **553/19,447 → 19,958/42** across the interval 2026-07-31T21:04:11.529Z →
+> 2026-08-01T01:35:56.369Z, which **contains 2026-08-01T00:00Z**. Both witnesses agree
+> (`remaining` rose, `used` fell) and both period totals sum to **20,000**.
+> **READING 18's RESET BRANCH FIRES: restate the runway, reprice the calendar.** Every figure
+> below marked *(pre-reset)* is a closed-period fact and is kept as one.
+> **THE BURN ACROSS THAT INTERVAL IS UNMEASURABLE**, not zero — the counter it was measured
+> against no longer exists — and `burnSeries` now emits `spent: null` there rather than −19,405.
+> **AND THE 20:48Z SWEEP'S COST IS NOW PERMANENTLY UNMEASURABLE**: it could only have posted
+> inside the period that just closed, and that period's last observation is the 21:04 read.
+
+- **Quota: 19,958 remaining / 42 used — 2026-08-01T01:35:56.369Z.**
+- *(pre-reset)* 553 remaining / 19,447 used at 2026-07-31T21:04:11.529Z, **flat across seven reads
+  spanning 1 h 53 m — of which FIVE were fresh fetches and TWO were cache hits** (§7A.1). The two
+  that bracket the 20:48Z sweep, 20:21:56Z and 21:04:11Z, are **both fresh**, so that flatness is
+  real.
 - **Today: 1,038 → 553 = 485 spent. 339 attributed** (props-history's morning batch, 8 delivered
   runs → 4 paid snapshots, 58 event-fetches; modelled 348 against 339 measured). **146 NOT.**
 - **The per-event cost is NOT a constant.** Since `residual ≥ 0`, each window bounds it from
@@ -1031,6 +1148,22 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
     measurable if a 14-event sweep can land without moving the quota.** Recorded, not resolved.
     Today's props total also restates from 58 to **72 event-fetches**, which the residual
     arithmetic in §2 has **not** been re-derived against.
+    **(RESOLVED IN PART 2026-08-01, owner's item 1 — two of the three are now settled and the
+    third is beyond reach.** (b) is **TRUE**: 20:21:56Z and 21:04:11Z are **both fresh fetches**
+    by spacing (3,267 s and 2,535 s since the previous fetch, far beyond the 240 s window), so the
+    flatness across 20:48 is real — §7A.1. (c) is **FALSE**: `snapshot_props.py` has one fetch
+    entry point and it **always** appends `&fresh=1` (L29–30) → `cache: "no-store"` → **it paid**;
+    and the snapshot carries no `src`, while the fold path stamps `"src": sn.get("src","vercel")`
+    (L263), so it was a **direct python capture, not a fold**. **The write is OURS**: commit
+    `77eef5d`, author **`engine-v2-bot`**, and the firing copy's `0 17 * * *` cron is documented
+    in the workflow's own measured comment as landing **20:0x–20:5x on 19 of 20 days** —
+    **20:48:14Z is inside that band, so item 2's FIRST branch fires and the props cost model
+    absorbs it.** That leaves **(a)**: the counter did not reflect ~82 credits within 16 minutes.
+    **Upstream counter lag is the surviving hypothesis, and it would make every window boundary in
+    the burn series soft by the lag interval — including the 146's.** **IT CANNOT NOW BE TESTED
+    FOR THIS INSTANCE: the pool reset at ~00:00Z, so the spend could only have posted inside a
+    period whose last observation is the 21:04 read.** The props total stands at 72 event-fetches
+    as a closed-period fact.**)**
 11. **The retraction convention is enforced for FORMAT but not for REACH.**
     `tests/retraction-markers.test.ts` requires a paragraph *bearing* a marker to carry a date —
     it is keyed on the marker, so it is structurally blind to a doc asserting the withdrawn claim

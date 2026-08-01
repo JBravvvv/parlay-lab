@@ -1,6 +1,19 @@
 # Collection period — the freeze (hardening Phase 4, effective 2026-07-24)
 
-> # 🔴 EXACTLY ONE CALENDARED ITEM IN THIS DOCUMENT IS REACHABLE WITH THE CREDITS ON HAND (2026-07-31, owner's item 2)
+> # 🔴 SUPERSEDED THE SAME NIGHT — THE POOL RESET (2026-08-01T01:35:56Z)
+>
+> **The sentence below was written at a pool of 553 and was correct at 553. The pool is now
+> 19,958 remaining / 42 used**, measured through the corrected instrument; the boundary fell
+> inside 2026-07-31T21:04:11Z → 2026-08-01T01:35:56Z, which contains 00:00Z, and both period
+> totals sum to 20,000. **Reading 18's RESET branch fires.**
+> **ON CREDITS ALONE, EVERY CALENDARED ITEM IN THIS DOCUMENT IS NOW REACHABLE** — the binding
+> line is K's/Outs at 38 boards ≈ 8,968 including props, and the parameter exit at ~13,500 fits
+> with ~6,458 to spare. Props collection no longer has to stop.
+> **WHAT DECIDES IT IS THE UNATTRIBUTED RESIDUAL, NOT THE POOL.** At the observed 48.3/h it is
+> 1,159/day and drains 19,958 in ~17 days (~2026-08-18) — under which only items dated on or
+> before ~08-12 land. The repriced table is `docs/session-handoff.md` §8A.4.
+>
+> # ~~EXACTLY ONE CALENDARED ITEM IN THIS DOCUMENT IS REACHABLE WITH THE CREDITS ON HAND~~ (2026-07-31, owner's item 2 — CORRECTED ABOVE 2026-08-01)
 >
 > **The Phase-2 game- and player-cluster ICC — 7 boards, ≈462 credits against a pool of 553 — and
 > only with props collection stopped. EVERY OTHER DATE IN THIS DOCUMENT IS OUT OF REACH THIS

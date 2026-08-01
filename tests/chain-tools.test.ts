@@ -34,6 +34,41 @@ describe("quota.mjs — the burn series", () => {
     expect(s[0].perHour).toBeCloseTo(23.1, 0);
   });
 
+  /**
+   * A POOL RESET IS NAMED, NEVER SUBTRACTED (2026-07-31 → 08-01, measured). The pool reset
+   * between 21:04:11Z and 01:35:56Z: 553/19,447 became 19,958/42. Plain subtraction makes that
+   * `spent = -19,405` at −4,283/h — a number, printed with a unit, that would have entered every
+   * downstream mean. The interval's burn is not zero and not negative: it is UNMEASURABLE,
+   * because the counter it was measured against no longer exists.
+   */
+  it("a pool RESET yields spent:null, not a negative burn", () => {
+    const rows = parseSeries(
+      [
+        JSON.stringify({ at: "2026-07-31T21:04:11.529Z", remaining: 553, used: 19447 }),
+        JSON.stringify({ at: "2026-08-01T01:35:56.369Z", remaining: 19958, used: 42 }),
+      ].join("\n"),
+    );
+    const s = burnSeries(rows);
+    expect(s[0].spent, "a reset interval has no measurable burn").toBeNull();
+    expect(s[0].perHour).toBeNull();
+    expect(s[0].reset).toBe(true);
+    expect(s[0].note).toMatch(/POOL RESET/);
+  });
+
+  it("PLANT (invalid-by-value): a reset can never be reported as a positive or negative spend", () => {
+    const s = burnSeries([
+      { at: "2026-08-01T00:00:00Z", remaining: 100, used: 19900 },
+      { at: "2026-08-01T01:00:00Z", remaining: 20000, used: 0 },
+    ]);
+    expect(typeof s[0].spent === "number").toBe(false);
+    // and the `used` witness alone is enough, even if `remaining` were unchanged
+    const usedOnly = burnSeries([
+      { at: "2026-08-01T00:00:00Z", remaining: 500, used: 19500 },
+      { at: "2026-08-01T01:00:00Z", remaining: 500, used: 12 },
+    ]);
+    expect(usedOnly[0].reset, "a falling `used` is a reset even when `remaining` is level").toBe(true);
+  });
+
   it("a FLAT stretch reads as zero, which is the shape that distinguishes scheduled from event-driven", () => {
     const rows = parseSeries(
       [
