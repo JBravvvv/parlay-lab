@@ -1,8 +1,12 @@
-# SESSION HANDOFF — rewritten from disk 2026-07-31 ~21:1xZ, immediately before compaction
+# SESSION HANDOFF — rewritten from disk 2026-08-01, immediately before compaction
 
-Every line below was re-read and re-derived from disk THIS TURN. Figures that could not be
-sourced this turn are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes
-the ~06:1xZ rewrite in place; §0's stale-flags list what this session invalidated.
+Every line below was re-read and re-derived from disk THIS TURN. Sections 1–5 are carried
+**byte-verbatim** from the prior revision by extraction rather than retyping, so no transcription
+error is possible in the fire block or the readings. Figures that could not be sourced this turn
+are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes the 2026-07-31
+~21:1xZ rewrite in place; every line this session made stale is flagged where it sits.
+
+**Origin at the moment of writing: `frontend-rebuild` = `50d0f7a`, `main` = `b1f17d2`.**
 
 ---
 
@@ -81,6 +85,7 @@ same-day ship rather than a spec.**
 
 ---
 
+
 ## 0. READ-FIRST INDEX — every doc, no exceptions (guarded by `tests/read-first-index.test.ts`)
 
 **Why it exists**: three turns of ration tables and a "70% of the burn" claim were produced while
@@ -120,6 +125,7 @@ magnitudes → **fixture-derived**, corrected · the props-history/context/model
 read from the non-firing branch, replaced.
 
 ---
+
 
 ## 2. THE OPEN QUESTION — 146 CREDITS IN THREE HOURS, UNATTRIBUTED
 
@@ -210,6 +216,7 @@ poll does not.
 
 ---
 
+
 ## 3. THE EXPOSURE — `fresh=1` IS UNGATED AND ONLY FULL AUTH CLOSES IT
 
 **`app/api/odds/route.ts` L36–40** gates `fresh=1` **only if `APP_PASSCODE` is set**:
@@ -263,6 +270,7 @@ ceiling two orders of magnitude above the pool.**
 and cost **zero** — gating them buys nothing and costs `board-archive` its access. They stay open.
 
 ---
+
 
 ## 4. RUN SHEET
 
@@ -401,6 +409,46 @@ Saturday's `0 18 * * 6` **is due, is unheadered, and 401s at zero credits and ze
 `liveCoverageOf` counts `lu` over UNSTARTED games and every game that board confirmed has started
 by then (pct 0.000 < `SKIP_COVERAGE` 0.7 → `thin`). Cost of that scenario: **~80 credits of
 nothing and 1 of `MAX_RUNS_PER_DATE` = 3.**
+
+---
+
+
+### 4A. CRON STATE — UPDATED 2026-08-01
+
+**`main` now declares SIX props crons** (read back from `origin/main` = `b1f17d2`):
+
+```
+0 17 * * *    -> 20:0x-20:5x   (unchanged)
+10 18 * * *   -> ~21:1x        [--window 120]   NEW 2026-08-01
+55 18 * * *   -> ~21:5x        [--window 120]   NEW 2026-08-01
+0 20 * * *    -> ~23:3x        (unchanged — 4 of 8 archived closes)
+0 21 * * *    -> ~00:1x        (unchanged — the other 3)
+30 22 * * *   -> next morning  (unchanged)
+```
+
+**The `--window` flag reaches ONLY the two new entries**, via a schedule-conditional on
+`github.event.schedule`. **`WINDOW_DEFAULT_S = 20*3600` on `frontend-rebuild` — default OFF, so the
+four pre-existing crons are byte-identical in behaviour.** Divergence recorded on
+`tests/workflow-branch-sync.test.ts`'s **expiring allow-list as item (3)**, with `since` left at
+**2026-07-31** so the two older open divergences keep their 14-day countdown.
+
+**🔴 NOT YET LANDED AT THE TIME OF WRITING.** They declare 18:10Z / 18:55Z; expected delivery
+**~21:1xZ ≈ 14:1x PT** and **~21:5xZ ≈ 14:5x PT**, i.e. **40–85 minutes before the 15:38 PT fire.**
+**The whole placement rests on GitHub's measured ~3-hour queue delay holding** — if Actions
+delivered promptly they would land at 11:1x / 11:5x PT, outside the window, paying for nothing.
+
+**LANDING TEST, PRE-COMMITTED:** `node tools/price-path.mjs <props-dir>` must print **n > 0 in the
+60–120 bucket**. **Zero means the SPACING is wrong, not that prices do not move. ONE cron
+delivering is a PARTIAL LANDING that produces no pair and therefore no observation — it looks like
+a landing and is not.** If `--window` is absent from the run log, each capture took the full slate
+at 13–15 events ≈ 78–90 credits (**~156–180/day instead of ~36–96**); the flag prints
+`window: 120 min -> N of M events`, so **its absence from the log is the symptom.**
+
+**cron-job.org, UNCHANGED:** header `x-cron-key` on **ENTRY 1 ONLY**; entries 2–4 unheadered and
+401 at zero cost. Entry 1 → `45 22 * * 1-5`. **NEITHER EDIT IS CONFIRMED LANDED, and tomorrow's
+board CANNOT confirm them** — it fires on the owner's curl and entry 1 is weekday-only.
+**MONDAY 2026-08-03 AT 22:45Z IS THE FIRST REAL TEST**, confirmed by the execution log plus
+`gen.trigger === "header"` on a fire nobody curled.
 
 ---
 
@@ -649,6 +697,7 @@ nothing and 1 of `MAX_RUNS_PER_DATE` = 3.**
 
 ---
 
+
 ## 6. GIT AND ARTIFACT STATE
 
 - **`frontend-rebuild`: origin head `0b65964`** (`0b659648691bd9ba2c934de1e466efb7c8f4f8e4`,
@@ -691,7 +740,357 @@ Traynor 07-31), 11 at g = 4; simulation projects **83 of 85 [80, 85] armed by fr
 
 ---
 
-## 7. INSTRUMENT LEDGER
+
+### 6A. UPDATED 2026-08-01 — what this session changed in git and artifact state
+
+- **`origin/frontend-rebuild` = `50d0f7a`** · **`origin/main` = `b1f17d2`** (main moved for the
+  first time since the cron cut, to carry the targeted pair — §4 CRON STATE).
+- **The bot pushed `b68b1e3`** (2026-08-01T07:37:59Z, `context: refresh`, `data/ump_k.json` only),
+  which **rejected a push mid-turn** and, on rebase, **turned `self-arm-stamp` red as designed** —
+  two more crossings (§7.8). `ARMED.umpKf` updated **2 → 4** in the same commit as the dated record.
+- **Served chunk `256-7cc559a830020345.js`, engine 281,096 chars, sha256
+  `b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`**, byte-identical to the repo.
+  `tests/served-verification.json`: **`pending: false`, `since: 2026-07-31T04:55:00Z`.**
+  **UNCHANGED THIS SESSION — no engine-string ship occurred.**
+- **The outs flag is LIVE but still UNEXERCISED** — no board has generated since it shipped.
+- **THE THREE FREEZE POINTS, unchanged:** priors `671aed9` (07-29T15:58:41Z) · context `64c42ad`
+  (07-29T20:32:00Z) · calibration (paused this session — `vercel.json` carries **no `crons` array
+  at all**).
+- **The per-game context still resolves NOTHING since 07-29** — `context.json` is 07-29's slate and
+  shares zero team pairings with 08-01, so `shUmpCtx` returns null for every game and `shUmpKf`
+  returns 1 either way. **Weather is UNAFFECTED** — it is hydrated live from statsapi (L1218 slate,
+  L1244 store); only the umpire block is game-keyed off the frozen `SH_CTX.games`.
+- **New tools on disk this session:** `tools/price-path.mjs` · `tools/hr-pair-dependence.mjs` ·
+  `tools/strict.mjs`. **New guards:** `tests/strict-coercion.test.ts` · `tests/retracted-claims.test.ts`.
+  **New docs:** `docs/auto-lock-memo.md` (1,557 lines, 42 sections) ·
+  `docs/props-window-cron.diff` (the applied diff, kept as the record).
+
+## 7. THIS SESSION'S MEASUREMENTS — ALL AT ZERO ODDS CREDITS, EACH WITH ITS POPULATION STAMP
+
+**Every figure below cost nothing.** statsapi is free and keyless; the props archive and the board
+archive live on `origin/line-history` and are reachable by `git` alone. **Nothing here consumed a
+single Odds credit, and the pool moved only by the reset.**
+
+### 7.1 HR PAIR DEPENDENCE — the owner's proposed rule, refuted
+**POPULATION: PRE-FILTER — statsapi box scores. No engine filter exists on this path.**
+`tools/hr-pair-dependence.mjs`. 1,605 final games · 120 dates · 610 hitters · 2026-04-01…07-31.
+Pooled P(≥1 HR per game with a PA) = **0.1067**. Ratio = observed joints ÷ Σ p_i·p_j; **> 1 is
+positive dependence.** 95% CI from a **cluster bootstrap over games** (dates for stratum c).
+
+| stratum | pairs | joints | **rate-matched [95% CI]** | raw |
+|---|---|---|---|---|
+| **(a) same team, same game** | 151,787 | 1,877 | **1.103 [1.048, 1.168]** | 1.087 |
+| **(b) opposing teams, same game** | 166,424 | 2,020 | **1.065 [1.022, 1.140]** | 1.067 |
+| **(c) different games, same slate** | 120,640 | 1,346 | **0.982 [0.893, 1.071]** | 0.981 |
+
+**Lineup adjacency is NOT the mechanism** — gaps 1/2/3/4/≥5 give 1.100 / 1.108 / 1.153 / 1.026 /
+1.161, flat-to-rising with distance. The dependence is **game-level** (park, weather, starter).
+
+### 7.2 THE SAME MEASUREMENT FOR EVERY MARKET THE SIMS GROUP
+**POPULATION: PRE-FILTER — box scores.** One identical sample, 2026-06-01…07-31, 781 games.
+
+| market | (a) same team | (b) opposing | (c) different games |
+|---|---|---|---|
+| HR | 1.072 [0.987, 1.239] | 1.039 [0.954, 1.151] | 0.999 [0.867, 1.117] |
+| **Hits (≥1)** | 1.013 [0.996, 1.035] | 1.000 [0.983, 1.022] | 1.009 [0.974, 1.046] |
+| **Total Bases (≥2)** | **1.063 [1.024, 1.130]** | 0.992 [0.939, 1.054] | 0.990 [0.937, 1.047] |
+
+**🔴 DEPENDENCE IS MARKET-SPECIFIC AND THE UNIT REVERSES.** TB same-team is positive with an
+interval excluding 1 while TB **opposing-team is flat** — **for TB the right unit IS same-team**,
+the opposite of HR. **Hits pairs are effectively independent everywhere.** A single same-game
+correction factor is the wrong shape for all three at once — an argument **for** `simJoint`'s
+per-group empirical approach. **HR's 2-month interval spans 1 while its 4-month one does not; the
+4-month figure is the headline and the 2-month row exists only so the markets share one sample.**
+
+### 7.3 CROSS-GAME INDEPENDENCE — CONFIRMED, and this is the rare one
+**POPULATION: PRE-FILTER — box scores.** `simJoint` asserts cross-game independence explicitly
+(L2691). **Stratum (c) = 0.982 [0.893, 1.071], n = 120,640 pairs over 118 date-clusters, interval
+spanning 1**, corroborated at 0.999 (HR) · 1.009 (hits) · 0.990 (TB) on the two-month window.
+**A design assumption verified against real data.**
+**WHAT IT DOES NOT COVER:** across-**ticket** dependence is priced **nowhere** (M16). The result
+speaks only to legs in **different games** — two legs in different tickets on one card **can share
+a game**, and for those, strata (a)/(b) apply. **It licenses the cross-game half and says nothing
+about M16.**
+
+### 7.4 THE PRICE PATH — and four buckets that are structurally empty
+**POPULATION: PRE-FILTER — props archive, 18 day-files.** `tools/price-path.mjs`. |Δ `fair`| in
+percentage points to each event's LAST archived snapshot. **17,546 observations · 7,266 distinct
+rows · 149 games · 16 fixture-days.** Reference lead median **155 min**, so **every figure is a
+LOWER BOUND.**
+
+| bucket (min to first pitch) | n | mean | sd | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|---|---|
+| **>180** | 17,000 | 1.20 | 1.24 | 0.86 | 2.78 | 5.59 | **11.42** |
+| **120–180** | 477 | 0.45 | 0.66 | 0.27 | 1.14 | 3.32 | 6.35 |
+| **90–120** | 69 | 0.46 | 0.46 | 0.38 | 1.04 | 1.97 | 1.97 |
+| **60–90 · 30–60 · 10–30 · <10** | **0** | — | — | — | — | — | — |
+
+**NO KNEE, BECAUSE THERE IS NO DATA WHERE THE KNEE WOULD BE.** n is not small in the four tightest
+buckets — **it is zero** — and the cause is structural: an observation needs the **same row in two
+snapshots**, and of 631 snapshot-events only 55 sit inside 120 min, 27 inside 90, 20 inside 60,
+almost all being the event's LAST snapshot, which is the reference and excluded by construction.
+**The apparent >180 → 120–180 drop (0.38×) is a HORIZON ARTIFACT** — the >180 bucket runs to 1,180
+minutes. **The honest adjacent comparison is 120–180 → 90–120 at 1.01×, flat.** Variance is the
+finding the mean hides: median 0.86 against p99 5.59 and max 11.42.
+
+### 7.5 THE CV TABLE — what `coreNoHR` never had
+**🔴 POPULATION: POST-FILTER — BOARD ROWS. Survivors of the fourteen-stage chain (§8), including
+`ab30 ≥ 25` and HR-0.5-only.** Archived 2026-07-26 board.
+
+| market | median implied | **CV = √((1−p)/p)** |
+|---|---|---|
+| `batter_hits` | 67.2% | 0.70 |
+| `batter_total_bases` | 62.7% | 0.77 |
+| `ml`/`rl` · `batter_hits_runs_rbis` | 59.1% · 58.5% | 0.83 · 0.84 |
+| `pitcher_outs` · `pitcher_strikeouts` | 49.5% · 48.3% | 1.01 · 1.03 |
+| **`batter_home_runs`** | **20.5%** | **1.97** |
+
+**HR carries ~2.8× a hits leg's coefficient of variation.** But at *matched* implied probability a
+leg's variance is `p(1−p)`, **identical by construction** — so HR is not more volatile at
+comparable probabilities; **HR never trades at comparable probabilities.**
+
+### 7.6 THE 25-AB FLOOR — sized, and price-neutral
+**POPULATION: PRE-FILTER — props archive joined to statsapi `playerPool=ALL`.**
+**A CORRECTION CAUGHT BEFORE REPORTING:** the same call **without** `playerPool=ALL` returns 157
+splits with a **minimum of 65 AB** — a qualified-batters leaderboard, on which the answer would
+have been "0% dropped". **That is a population error, caught in flight.** With `ALL`: 483 hitters,
+minimum 0 AB.
+
+| market | rows | dropped | share | median implied kept / dropped |
+|---|---|---|---|---|
+| `batter_hits` | 247 | 12 | 4.9% | — *(no `cz` on hits rows)* |
+| `batter_home_runs` | 271 | 12 | 4.4% | **14.8 / 14.8** |
+| `batter_hits_runs_rbis` | 135 | 6 | 4.4% | 53.5 / 55.9 |
+| `batter_total_bases` | 230 | 10 | 4.3% | 46.5 / 48.8 |
+| **TOTAL** | **883** | **40** | **4.5%** | unmatched 1 (0.1%) |
+
+`ab30` of dropped rows: **min 5 · median 16 · max 24.** **The drop is small and PRICE-NEUTRAL**, so
+the load-bearing pre-filter results are unaffected; only the four POST entries move, by ≤4.5% of
+rows with no price shift.
+
+### 7.7 THE HR BAND — measured on ONE population, which corrects the earlier claim
+**POPULATION: PRE-FILTER on BOTH sides — props archive, implied from the Caesars OVER price,
+uniform treatment.**
+
+| | n | min | p1 | median | p99 | max |
+|---|---|---|---|---|---|---|
+| **`HR\|0.5`** | 10,477 | **2.4** | — | 16.7 | **32.8** | **40.2** |
+| **all non-HR** | 14,191 | **38.5** | 40.8 | 51.0 | — | — |
+
+**THE BANDS OVERLAP: 82 of 14,191 non-HR rows (0.58%)** sit inside HR's full range — 79 `TB|1.5`,
+2 `outs|15.5`, 1 `outs|18.5` — and **4 of 10,477 HR rows sit above the non-HR minimum.**
+**The separation is still strong** (HR p99 32.8 vs non-HR p1 40.8; 99.42% of non-HR rows above
+HR's entire range) **but it is not zero.** See §10 for the dated correction this replaces.
+
+### 7.8 THE CROSSING RATE — the simulation validated against data for the first time
+**POPULATION: `data/ump_k.json`, the full umpire roster. Not board-filtered.**
+Simulation (2,000 runs, 90% band, `branch-firing-audit.md` L940–946): **2026-08-01 → median 4,
+band [2, 6]. OBSERVED: EXACTLY 4.** On the median. Observed **4 crossings in 3 days = 1.33/day**
+against the simulated mean **1.61/day** — inside.
+
+| # | umpire | date | g / k | k/g |
+|---|---|---|---|---|
+| 1 | Lance Barrett | 2026-07-30 | 5 / 90 | 18.0 |
+| 2 | Willie Traynor | 2026-07-31 | 5 / 69 | 13.8 |
+| **3** | **Malachi Moore** | **2026-08-01** | **5 / 74** | **14.8** |
+| **4** | **Derek Thomas** | **2026-08-01** | **5 / 99** | **19.8** |
+
+League k/g **16.48** — k/g at arming still straddles it, so the armed subpopulation is **not** a
+high-K selection at n = 4. **FOURTEEN umpires now sit at g = 4.** **The double brake held on all
+four** (`context.json` frozen at
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` + `SH_CFG.umpKFrozen`), both
+re-asserted green in the same run that went red on the count. **No board affected, no series
+restates.** **83 of 85 [80, 85] armed by freeze exit is the operative figure.**
+
+### 7.9 CLOSE COVERAGE — the cron cut cost nothing
+**POPULATION: PRE-FILTER — props archive.** 8 archived closes over 58 snapshots and 18 day-files:
+4 at UTC 23 (`0 20`), 3 at UTC 00 (`0 21`), 1 at UTC 20 (`0 17`). **All 8 of 8 land in a band a
+retained cron covers.** The six cut crons queued into the morning batch — hours 06–11 hold 33 of
+58 snapshots and **zero closes**. **The cut removed duplicates, not closes.**
+
+---
+
+## 8. THE FOURTEEN-STAGE CHAIN AND THE BOARD-ROW POPULATION STAMP
+
+**Between the feed and a board row, in order** (`legacy/index.html`; the first block is quote
+ingestion, the second the prop-row builder):
+
+| # | line | drops |
+|---|---|---|
+| 1 | L2611 | markets this app does not label/model (`SH_MKT_LABEL` membership) |
+| 2 | L2614 | rows with no line |
+| 3 | L2615 | rows with no over, no under **and** no Caesars price |
+| 4 | L2622 · L2624 | malformed keys / non-finite line |
+| 5 | L2625 | **duplicate `player\|line`** — first wins |
+| 6 | L2626 | rows with neither side quoted |
+| 7 | L2239 | markets outside the modelled category set |
+| 8 | L2240 | rows with no line (builder side) |
+| 9 | **L2241** | **every HR rung except 0.5** — BARE LITERAL |
+| 10 | L2244 | players with no stats record |
+| 11 | L2252 · L2273 · L2372 | pitchers with no innings / K / λ projection |
+| 12 | **L2287** | **hitters with `ab30 < 25`** — BARE LITERAL |
+| 13 | L2297 | players scratched from a posted lineup |
+| 14 | L2482 | rows whose selected side has no odds |
+
+**THE STANDARD STAMP — use this rather than naming filters individually:**
+
+> **BOARD-ROW POPULATION** = survivors of the fourteen-stage feed→board chain, of which **two are
+> bare literals** (`HR 0.5-only`, `ab30 ≥ 25`) and **one is data-dependent** (posted-lineup scratch).
+
+**PRE / POST CLASSIFICATION — PRE 7 · POST 4 · infrastructure 3.**
+
+| population | measurements |
+|---|---|
+| **PRE — box scores** (2) | HR-pair dependence · hits/TB dependence |
+| **PRE — props archive** (5) | price path · close coverage · rung inventory · band overlap · the 25-AB drop |
+| **POST — board rows / tickets** (4) | **the CV table and per-market medians · the 07-26 HR-pair exposure census · the simJoint implied-ratio audit · the clamp census** |
+| infrastructure (3) | quota series · cron and schedule figures · guard wiring |
+
+**IMPOSSIBLE BRANCH — a board row no filter in the chain admits: NOT FOUND.** All 303 rows on the
+archived 07-26 board carry a line, a modelled market, and a priced side.
+
+**PER-STAGE DROP COUNTS ARE NOT MEASURED** — only stage 12's (4.5%) and stage 9's (7,467 rows at
+1.5 plus 3,254 at 2.5 in the archive). **The other twelve stages have no count.** Spec'd in §11.
+
+---
+
+## 9. THE BARE-LITERAL CLASS — AND WHAT THE CENSUS ACTUALLY COVERS
+
+> **THE CENSUS COUNTS CONFIG LITERALS. A CONSTRAINT THAT NEVER BECAME A CONFIG KEY IS INVISIBLE TO
+> IT BY CONSTRUCTION.** Coverage therefore restates as **CONFIG-KEYS-ONLY, with the bare-literal
+> count printed beside it. The freeze has been holding the parameters it can see.**
+
+**CENSUS: 44 config-keyed parameters (v2.5, 2026-08-01).** **BARE-LITERAL CONSTRAINTS FOUND: 5.**
+
+| line | the literal | what it drops | in any doc before today? |
+|---|---|---|---|
+| **L2241** | `row.ln!==0.5` on HR | every HR rung but anytime — **7,467 archive rows at 1.5, 3,254 at 2.5** | now, registered in the census |
+| **L2287** | **`ab30 < 25`** | hitters under 25 at-bats in 30 days. Comment: *"sample-size discipline"*. **Measured this session at 4.5% of quoted rows, price-neutral** | **NO** |
+| **L2785** | `if(k==="batter_home_runs")return` in `mixPool` | **HR from the MIXED pool entirely** — verified: **49 HR legs in `parlays`, 0 in `parlaysMixed`** | **NO** |
+| **L2787** | `[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]]` | the mixed-ticket count plan | **NO** |
+| **L2777** | `plan[k]\|\|[3,4,5]` | default leg-counts per category | **NO** |
+
+**FIVE IN ONE 1,000-LINE SPAN, AND THAT SPAN IS ~0.4% OF A 281,096-CHARACTER ENGINE STRING. FIVE
+IS A FLOOR, NOT A TOTAL.** No engine-wide number is reported: the last automated sweep of this kind
+returned 264 "keys" after capturing JSON-schema fields and prose, and **it was discarded rather
+than published.**
+
+**WHY THE GUARD CANNOT BE MECHANICAL:** deciding whether a filter-position literal is a
+**constraint** or a **structural necessity** requires knowing whether the quantity it gates is
+tunable — and `grp.length<2` (a group needs two legs) and `ab30<25` (a chosen sample floor) are
+**syntactically identical and semantically opposite.** **NEAREST ENFORCEABLE VERSION: a registry**
+(§11), the same shape that worked for fixture citations and retracted claims.
+
+**🔴 SCOPE MISMATCH, PRINTED BECAUSE IT MATTERS:** `coreNoHR` (config) and L2785 (bare) both keep
+HR out of ticket construction and do **not** contradict — **but setting `coreNoHR: false` would NOT
+restore HR to mixed tickets.** The config key does **less than its name and its census entry
+imply**, and the difference is **invisible from the config**. Corrected in the census (§9A).
+**No dead configuration found** — `coreNoHR` has live, distinct effect on CORE.
+
+
+### 9A. FROZEN TABLE, CENSUS, AND PROVENANCE
+
+**Census v2.5 (2026-08-01): 44 parameters / 0 fitted / 43 chosen (12 with no stated rationale) / 1
+stated-arithmetic; 9 since-measured.** The BORN-provenance table was repaired 2026-07-31 — it had
+never gained the rows for the `simJoint` clamp, the 1/n relax and T = 0.80 — and **its sum now
+reads 0 + 1 + 29 + 12 + 0 = 42, agreeing with the prose for the first time.**
+
+**PROVENANCE COUNT across the 29 M/A rows** (`freeze-exit-bundle.md`; the classifier reads what
+each row CLAIMS): after this session's tracing, **zero rows are silent** — 12 carry the strong
+`[src: …]` token (ratcheted so the count cannot fall) and the rest carry an inline source claim.
+**Fixture-sourced rows: 8 of 29, of which 7 do NOT reproduce the caveat (M20 alone does).**
+
+**THE TWO CORRECTED ROWS:**
+- **`umpKFrozen`** — **no production measurement of the effect exists at any n**; production
+  `context.json` has never carried a `kFactor`. What is measurable: the factor is clamped to
+  **[0.92, 1.08]**, **60% (51 of 85) of umpires land ON a bound**, so **magnitude cannot grow with
+  the armed count — only COVERAGE can**, ~0.35 of a board today → 83 of 85 at exit. The two armed
+  clamp in opposite directions. **BREADTH, NOT DEPTH.** The ~08-04 date is struck.
+- **M25** — the fixture's pooled 38.5× is **retired**. Re-measured on the **archived 2026-07-26
+  production board** (`tests/m25-archive.test.ts`, 67-ticket pool, $750/$250): **`probability`
+  $250 vs a $10 ceiling = 25.0×, 6 of 6 over, 5 $0-ceilings, 5 negative-czEv**; **`caesars_ev`
+  $250 vs $265 = 0.9×, 2 over, ZERO negative-czEv**; `ev_gated` $225 vs $225 = **1.00×, zero
+  over**. **The claim refines: "legacy modes place negative-EV bets by construction" is measured
+  TRUE for `probability` and NOT DEMONSTRATED for `caesars_ev`.**
+
+**UNMEASURED-WITH-MEASURED-CONSEQUENCE**: `coreEvMin` (self-graded sweep) · damping 0.5 (40 bp
+range) · `SH_W` (self-graded by construction) · the 1/n cap relax (Kelly ceilings bound n=1 at
+≤ ~8%) · **`umpKFrozen`** (magnitude clamped; consequence is coverage) · **`penQFrozen`** (its
+INPUT `data/pen_quality.json` **has never materialised in a commit** — the factor is absent from
+production, not merely pinned).
+
+**OPERATOR RULES** (not engine parameters): **#1** no slip above 2% ($50 at $2,500) · **#2** step
+15 is diagnostic only, mode returns to `ev_gated` as the last action before placing · **#3** no
+legacy mode opened at all until M24 resolves.
+
+---
+
+## 10. DROPPED AND CORRECTED — every dated marker from this session
+
+### 10.1 🔴 THE SAME-TEAM HR RULE IS DROPPED — a MEASURED REFUTATION, not a declined feature
+**The owner proposed a same-team HR ban on reasoning about baseball. The measurement returned the
+opposite sign — 1.103 [1.048, 1.168] against independence — the target set on the only real board
+was empty (0 of 81 HR pairs), and the evaluator could not have seen the harm.** For a parlay,
+positive dependence means the true joint is **higher** than an independence price implies: **those
+are the pairs the bettor is helped by, and banning them removes structure rather than pricing it.**
+**Correction to the framing, kept beside it:** same-**game** is the supported unit for HR;
+same-**team** is not separable at that n. *(For TB the unit reverses — §7.2.)*
+
+### 10.2 THE REASONING-NOT-MEASUREMENT LIST — three entries, two of them the owner's
+| # | claim | whose | status |
+|---|---|---|---|
+| 1 | the count-armed accrual argument for the outs ship | **owner's** | on the list |
+| 2 | the same-team HR ban | **owner's** | **refuted by measurement 2026-08-01** |
+| 3 | **`coreNoHR`** — *"HR volatility lives in the FUN bucket only (user rule)"*, no measurement cited anywhere | owner's, in code | **measured true after the fact 2026-08-01: CV 1.97 vs 0.70–1.03** — moves off the list **with its number** |
+
+**THE STANDING RULE HOLDS WITHOUT EXCEPTION: nothing in this project has been found by reasoning
+about baseball, and that includes the owner's own proposals.**
+
+### 10.3 CORRECTIONS DATED 2026-08-01
+- **`coreNoHR`'s SCOPE** — governs **CORE ticket eligibility only** (L2975–76). L2785 independently
+  governs mixed-pool membership. **Census entry rewritten to say what the key does rather than what
+  its name implies.** One decision rested on the overstated scope and is corrected: the entanglement
+  argument credited `coreNoHR` alone with emptying the same-team target set; **L2785 is why no HR
+  pair could reach `parlaysMixed` either.** Conclusion unchanged; attribution now names both.
+- **🔴 THE ZERO-OVERLAP CLAIM — WITHDRAWN.** "0 of 14,181 non-HR rows inside HR's 15.1–30.9% band"
+  used a band taken from the **board** and applied to the **archive** — a post-filter range on a
+  pre-filter population, **the exact 4:1-dominant error class.** Re-measured on one population:
+  **82 of 14,191 (0.58%) overlap.** The qualitative separation survives; **the "byte-identical
+  partition" claim was BOARD-ONLY and does not hold pre-filter.**
+- **THE "PARTLY MANUFACTURED" CAVEAT — WITHDRAWN.** The separating experiment ran (the archive
+  carries the rungs no board does) and **the bands stay disjoint with suspended rungs admitted**:
+  deep rungs sit **above** HR's band because an alternate rung on a high-probability market is
+  still a high-probability event, and **HR's own rungs go the other way at a 2.2% median.**
+  **Admitting rungs widens the gap.**
+- **"THE PROJECTION WAS WRONG ABOUT THE RATE" — WITHDRAWN.** **The rate is right**; the simulation
+  predicted today's count exactly. **The ~2026-08-04 figure came from an earlier derivation** —
+  the closed form `11 × (11.2 ÷ 85) = 1.449`, **an acknowledged underestimate** ignoring g = 3
+  umpires who draw two assignments. **The error was in the derivation, not the rate.**
+- **"THE ARCHIVE EXPERIMENT IS BLOCKED" — WITHDRAWN.** It was never blocked; the archive and the
+  board are different populations and I had reasoned about the board.
+- **THE `qualified` PLAYER POOL** — a statsapi call without `playerPool=ALL` returns a
+  **qualified-batters leaderboard** (157 splits, min 65 AB). **Caught before publication.**
+
+---
+
+## 11. SPEC-ONLY QUEUE — WITH PREREQUISITES. NOTHING HERE IS SHIPPED.
+
+| # | item | prerequisite | additive? |
+|---|---|---|---|
+| **1** | **`placed` flag + `actualStake`** — `true\|false\|null`, **absent ⇒ null**; three-state control on the ledger page, an **overlay rule in `mergeDay` shaped exactly like `confirmed`'s**, and a `pickBase` key. **Blank must be visible: an unanswered count above the fold, no default of `true`** | none — **it is itself the prerequisite for auto-lock.** Every day it does not exist is ledger data that cannot later be split into selected-vs-bet | **YES — no engine-string change.** `shLockCard` writes nothing new; the fields are set afterwards from the React ledger page |
+| 1a | **the attestation ADDENDUM, not a backfill** — an entry dated ≤ 2026-08-01 with no `placed` field resolves to `placed: true BY ATTESTATION` **at read time** | the owner's attestation, **recorded 2026-08-01** | n/a — deliberately **not** a field write; a fourth mutable subfield on a locked row is the class M22 flags |
+| **2** | **`simJoint` j2/pm emission** — emit both factors per group; **a measurement, not an inference from a rounded number** | — | **NO — inside the engine string.** Rides the next hash-moving ship; vintage cost currently zero |
+| **3** | **the probability floor** — any value in `(30.9%, 37.1%]` reproduces the board exclusion; 34% mid-gap | **BLOCKED ON READ 4** for a data fit. **As specified it is FITTED TO A RULE, not to data, and shipping it would launder `coreNoHR`'s provenance** | n/a — recorded as the general form, spec-only |
+| **4** | **the self-arm demotion** — count → informational, **assert the BRAKES**, crossing record becomes an **append-only log** the guard checks for **completeness** | the owner's authorization. **The threshold has already arrived: ~87% of refreshes change the count** | test-only |
+| **5** | **per-stage drop counts** for the fourteen-stage chain — twelve stages have no count | none; archive + board are on disk | measurement only |
+| **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
+| 7 | full `/api/odds` authentication (**the only thing that closes the route**) · `APP_PASSCODE` steps 2–4 · M28's `src/lib/pass.ts` | **step 4 is LAST** — see §3 | — |
+| 8 | the targeted-capture **landing test** — first day the pair runs, `price-path` must print **n > 0 in 60–120** | the crons delivering | — |
+| 9 | the props-history redesign (**never executed: 0 of 66 runs were `workflow_dispatch`**) · the three orphan test files · `umpKFrozen`'s unpin decision (no date, no condition) · `coreEvMin` · the 1/n cap · A1 · damping · `SH_W` · alt keys · the ungraded-group fix · the ratio surface + both positivity gates (M26) · a proxy per-request `console.log` | various | — |
+
+---
+
+## 12. INSTRUMENT LEDGER
 
 **SEVEN INSTRUMENT DEFECTS, every one found by an instrument doing its job badly rather than by a
 model error**: (1) the cfSel spec's vacuity · (2) the lineup guard's wrong direction · (3) the
@@ -735,96 +1134,73 @@ instance, and the only one that claims a protection.**
 
 ---
 
-## 8. FROZEN TABLE, CENSUS, AND PROVENANCE
 
-**Census v2.5 (2026-08-01): 44 parameters / 0 fitted / 43 chosen (12 with no stated rationale) / 1
-stated-arithmetic; 9 since-measured.** The BORN-provenance table was repaired 2026-07-31 — it had
-never gained the rows for the `simJoint` clamp, the 1/n relax and T = 0.80 — and **its sum now
-reads 0 + 1 + 29 + 12 + 0 = 42, agreeing with the prose for the first time.**
+### 12A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
 
-**PROVENANCE COUNT across the 29 M/A rows** (`freeze-exit-bundle.md`; the classifier reads what
-each row CLAIMS): after this session's tracing, **zero rows are silent** — 12 carry the strong
-`[src: …]` token (ratcheted so the count cannot fall) and the rest carry an inline source claim.
-**Fixture-sourced rows: 8 of 29, of which 7 do NOT reproduce the caveat (M20 alone does).**
+**THE CLASS: a tool whose tests feed it a synthetic shape has never been tested.** Two were found
+broken on production data; a third was found the moment it was pointed at a real artifact.
 
-**THE TWO CORRECTED ROWS:**
-- **`umpKFrozen`** — **no production measurement of the effect exists at any n**; production
-  `context.json` has never carried a `kFactor`. What is measurable: the factor is clamped to
-  **[0.92, 1.08]**, **60% (51 of 85) of umpires land ON a bound**, so **magnitude cannot grow with
-  the armed count — only COVERAGE can**, ~0.35 of a board today → 83 of 85 at exit. The two armed
-  clamp in opposite directions. **BREADTH, NOT DEPTH.** The ~08-04 date is struck.
-- **M25** — the fixture's pooled 38.5× is **retired**. Re-measured on the **archived 2026-07-26
-  production board** (`tests/m25-archive.test.ts`, 67-ticket pool, $750/$250): **`probability`
-  $250 vs a $10 ceiling = 25.0×, 6 of 6 over, 5 $0-ceilings, 5 negative-czEv**; **`caesars_ev`
-  $250 vs $265 = 0.9×, 2 over, ZERO negative-czEv**; `ev_gated` $225 vs $225 = **1.00×, zero
-  over**. **The claim refines: "legacy modes place negative-EV bets by construction" is measured
-  TRUE for `probability` and NOT DEMONSTRATED for `caesars_ev`.**
+| tool | what its tests feed it | real artifact ever passed through? | obtainable at zero credits? |
+|---|---|---|---|
+| `quota.mjs` | hand-built JSONL lines | **YES** — it WROTE `data/quota-log.jsonl` (20 real rows); `--series` parses its own output | already on disk |
+| `burn-report --props` | hand-built `{snapshots:[…]}` | **YES** — run 07-31 against 18 real day-files | `origin/line-history:data/props/*.json` |
+| `board-report` | hand-built `{categories:{…}}` | **YES, first time 2026-07-31** — the archived 07-26 board. **Three defects** | `origin/line-history:data/boards/2026-07-26.best.json.gz` |
+| `verify-served-engine` | a synthetic chunk | **YES** — and it **FAILED** there (the false 278,267 mismatch), then corrected | the served chunk |
+| **`burn-report --pred`** | a hand-built **ARRAY** | **NO.** Threw `TypeError` on the only shape production emits | **none exists — read 2 is its first** |
+| **`ledger-report`** | hand-built entry objects | **NO** — and it receives the **only copy of the bankroll population** | **none exists — read 4 is its first** |
 
-**UNMEASURED-WITH-MEASURED-CONSEQUENCE**: `coreEvMin` (self-graded sweep) · damping 0.5 (40 bp
-range) · `SH_W` (self-graded by construction) · the 1/n cap relax (Kelly ceilings bound n=1 at
-≤ ~8%) · **`umpKFrozen`** (magnitude clamped; consequence is coverage) · **`penQFrozen`** (its
-INPUT `data/pen_quality.json` **has never materialised in a commit** — the factor is absent from
-production, not merely pinned).
+**THE HONEST COUNT: 4 proven on production input, 2 UNPROVEN**, reported by
+`tests/guard-wiring.test.ts` on every run rather than implied.
 
-**OPERATOR RULES** (not engine parameters): **#1** no slip above 2% ($50 at $2,500) · **#2** step
-15 is diagnostic only, mode returns to `ev_gated` as the last action before placing · **#3** no
-legacy mode opened at all until M24 resolves.
+**`board-report`'s THREE DEFECTS, all found by one run against the real 07-26 board:**
+1. **The failure envelope was read as a board.** `/api/board` returns **`{board: null, reason, gens}`
+   at 200** on four paths (route L23/L47/L54/L58). `blob.board ?? blob` treated `null` as absent
+   and fell through to the envelope — printing a complete, plausible, **fabricated** reading,
+   VACUOUS branch and all. **Now STOPs at exit 65.**
+2. **A false M-item on every pre-flag board.** It printed *">>> M-ITEM: the flag is not reaching the
+   server path"* for 76 outs legs on a board that **predates `outsSusp` entirely**. **Now gated on
+   `echo.outsSusp === true`**, with the no-echo case named as undecidable rather than as failure.
+3. **🔴 READING 5 WAS UNANSWERABLE AND WOULD HAVE READ AS A FAILURE.** `/api/board` returns
+   `gens: GenIndexEntry[] = {at, priced, live, luPct, bytes}` (`board-store` L51–60) — **there is
+   no `trigger` field in it and no `gen` key at all.** The tool looked for `blob.gen.trigger`, so
+   it would have printed `ABSENT` **tomorrow no matter what happened**, and reading 5 pre-commits
+   *`trigger === "header"` OR IT DID NOT LAND*. **`trigger` is stamped by `/api/generate` (route
+   L289) into its own RESPONSE BODY and into the prediction store's `GenStamp`** — read it there.
+   The tool now says so instead of guessing.
 
----
+**M19 MEASURED ON A REAL BOARD FOR THE FIRST TIME:** 110 `parlays` + 86 `parlaysMixed` = **196
+emitted, 168 distinct leg-sets — 28 duplicates** (4 inside `parlays`, 24 shared across). Count (1)
+is now reported over **distinct** leg-sets with the raw union beside it.
 
-## 7A.0 THE RATION DECISIONS RESTATE AT 19,958 (2026-08-01, owner's item 3)
-
-### The props cron cut did NOT cost close capture — measured, not argued
-
-**8 closes in the archive** (`kind === "close"`, 58 snapshots over 18 day-files), by UTC hour:
-
-| UTC hour | closes | which retained cron lands there |
+**`ledger-report`'s SHAPE ASSUMPTIONS — every one found by walking its input handling, all now
+explicit checks that exit 65 rather than degrade:**
+| assumption | what it did silently | now |
 |---|---|---|
-| 23 | **4** | `0 20` → ~23:3x |
-| 00 | **3** | `0 21` → ~00:1x |
-| 20 | **1** | `0 17` → ~20:0x–20:5x |
+| `blob.ledger ?? blob` | accepted a **bare array** — a shape the endpoint cannot emit | **refused** |
+| an error body is an object | `{error:…}` → `entries.length` undefined → then a `TypeError` mid-print | **refused with the body** |
+| **`e.bankroll ?? 0`** | **a locked entry with no bankroll ⇒ every ceiling 0 ⇒ ratio Infinity ⇒ 100% overstake**, printed with a dollar total | **refused, naming the entry** |
+| `e.date` string-compared | a non-ISO date silently excludes the whole 07-17→07-22 window → `0W/0L`, `hit undefined%` | **refused** |
+| `kellyFrac` → null | tickets with no computable ceiling counted in the denominator, invisible | **counted and printed as `(0) EXCLUDED`** |
+| `l.cz` is American | a decimal price (e.g. `2.5`) yields **97.6% implied** — plausible and wrong | **warns with the count and examples** |
+| `fieldCensus` keys by date | duplicate dates **overwrite**, so the census describes only the last | **warns** |
+| `mkt(t)` = leg 0's market | a mixed-market parlay is attributed entirely to its first leg | documented, unchanged |
+| `{ledger:[]}` at 200 | a clean zero from an **empty store** — the bankroll exit with no population | **refused** |
 
-**ALL 8 OF 8 LAND IN A BAND A RETAINED CRON COVERS.** The six cut crons (`0 22`, `0 23`, `30 23`,
-`0 0`, `30 0`, `0 1`) queued into the **morning** batch — hours 06–11 hold 33 of the 58 snapshots,
-and **not one close.** **The cut removed duplicates, not closes.**
+**IMPOSSIBLE BRANCH — did a fixture derived from a real artifact still diverge from production?**
+**Not found.** No tool fixture in this repo was derived from a real artifact; all six were
+hand-built. That is the finding — the branch could not fire because the condition it tests for
+has never existed here.
 
-**→ THE OWNER'S FIRST BRANCH DOES NOT FIRE.** Close capture is not materially degraded, so
-restoring a cron is **not indicated by this measurement** and nothing needs to be spent on it.
-**IMPOSSIBLE BRANCH (the four would have caught MORE than the ten): does not fire either — equal
-at 8 of 8, not more.**
-
-**THE ONE THING THE CUT DOES COST, and it is item 2's blocker, not close capture:** the archive
-takes **at most one snapshot inside 120 minutes per event**, and a price-path observation needs
-**two**. That is why the 60–90/30–60/10–30/<10 buckets are **empty** (memo §M1). **If a lock-time
-criterion is ever to be fitted, the capture that would fit it is a SECOND snapshot inside the
-window** — a different change from restoring a cut cron, aimed at a different band, and priced
-separately when it is wanted.
-
-### Variant B is UN-SUSPENDED
-
-Suspended at 553 because 12 credits mattered. **At 19,958 the premise is gone, and its purpose is
-now load-bearing**: it calibrates **`c`**, the per-event cost — which is the residual's attribution
-instrument, and **the residual is the calendar's binding constraint**. Protocol and readings stand
-as written in `docs/board-open-experiment.md`, **including the `bestBoard`-fallthrough STOP**
-(`engine-client` L297 → `generateBoard()` → `logBoardPredictions`: opening the board with no cached
-and no server board GENERATES one, spends, and writes `src:"client"` rows). **Run it after the four
-reads, before the board.**
-
-### Does one board per day to 2026-09-22 fit? YES, with room — the ration framing goes away
-
-52 days from 2026-08-01. Boards at ~66: **3,432**. Props at ~170/day: **8,840**. **Total ≈ 12,272
-against 19,958 — it fits with ~7,686 to spare**, and the calendar's binding line (K's/Outs at 38
-boards ≈ 8,968) sits inside it.
-
-**→ THE OWNER'S SECOND BRANCH FIRES. THE CONSTRAINT IS NO LONGER CREDITS.** It is **the residual
-plus the chain**: at 48.3/h the residual alone is 1,159/day = **60,268 over those 52 days, three
-times the pool**, draining it by **~2026-08-18**; and boards have been dark five days with the
-chain unverified end to end and the cron edits untested until Monday. **That sentence replaces the
-collection doc's top line.**
+**THE META-TEST NOW COVERS TOOLS**, not just guards (`tests/guard-wiring.test.ts`): six cases feed
+each tool a shape **the routes actually emit** — copied from the route files, not invented — and
+assert a **non-zero exit**; plus a real-artifact case that reads the archived 07-26 board and then
+refuses the same file replaced by the route's null envelope. It **skips with a printed reason**
+when `origin/line-history` is not fetched, so the count stays honest.
 
 ---
 
-## 7A.1 THE QUOTA INSTRUMENT — TRACED, PARTLY IMPEACHED, FIXED (2026-08-01, owner's item 1)
+
+### 12B. 7A.1 THE QUOTA INSTRUMENT — TRACED, PARTLY IMPEACHED, FIXED (2026-08-01, owner's item 1)
 
 **THE PATH THE VALUE TAKES, line by line.** `quota.mjs` L23–24 →
 `GET /api/odds?u=<https://api.the-odds-api.com/v4/sports/>` **with no `fresh=1`** → route L42–44
@@ -892,71 +1268,156 @@ this instance** — the period closed.
 
 ---
 
-## 7A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
+### 12C. THE TOOL-FABRICATION CLASS — FOUR INSTANCES IN THREE DAYS
 
-**THE CLASS: a tool whose tests feed it a synthetic shape has never been tested.** Two were found
-broken on production data; a third was found the moment it was pointed at a real artifact.
+**Every one returned a number that looked right, on real data, while its tests passed.**
 
-| tool | what its tests feed it | real artifact ever passed through? | obtainable at zero credits? |
-|---|---|---|---|
-| `quota.mjs` | hand-built JSONL lines | **YES** — it WROTE `data/quota-log.jsonl` (20 real rows); `--series` parses its own output | already on disk |
-| `burn-report --props` | hand-built `{snapshots:[…]}` | **YES** — run 07-31 against 18 real day-files | `origin/line-history:data/props/*.json` |
-| `board-report` | hand-built `{categories:{…}}` | **YES, first time 2026-07-31** — the archived 07-26 board. **Three defects** | `origin/line-history:data/boards/2026-07-26.best.json.gz` |
-| `verify-served-engine` | a synthetic chunk | **YES** — and it **FAILED** there (the false 278,267 mismatch), then corrected | the served chunk |
-| **`burn-report --pred`** | a hand-built **ARRAY** | **NO.** Threw `TypeError` on the only shape production emits | **none exists — read 2 is its first** |
-| **`ledger-report`** | hand-built entry objects | **NO** — and it receives the **only copy of the bankroll population** | **none exists — read 4 is its first** |
-
-**THE HONEST COUNT: 4 proven on production input, 2 UNPROVEN**, reported by
-`tests/guard-wiring.test.ts` on every run rather than implied.
-
-**`board-report`'s THREE DEFECTS, all found by one run against the real 07-26 board:**
-1. **The failure envelope was read as a board.** `/api/board` returns **`{board: null, reason, gens}`
-   at 200** on four paths (route L23/L47/L54/L58). `blob.board ?? blob` treated `null` as absent
-   and fell through to the envelope — printing a complete, plausible, **fabricated** reading,
-   VACUOUS branch and all. **Now STOPs at exit 65.**
-2. **A false M-item on every pre-flag board.** It printed *">>> M-ITEM: the flag is not reaching the
-   server path"* for 76 outs legs on a board that **predates `outsSusp` entirely**. **Now gated on
-   `echo.outsSusp === true`**, with the no-echo case named as undecidable rather than as failure.
-3. **🔴 READING 5 WAS UNANSWERABLE AND WOULD HAVE READ AS A FAILURE.** `/api/board` returns
-   `gens: GenIndexEntry[] = {at, priced, live, luPct, bytes}` (`board-store` L51–60) — **there is
-   no `trigger` field in it and no `gen` key at all.** The tool looked for `blob.gen.trigger`, so
-   it would have printed `ABSENT` **tomorrow no matter what happened**, and reading 5 pre-commits
-   *`trigger === "header"` OR IT DID NOT LAND*. **`trigger` is stamped by `/api/generate` (route
-   L289) into its own RESPONSE BODY and into the prediction store's `GenStamp`** — read it there.
-   The tool now says so instead of guessing.
-
-**M19 MEASURED ON A REAL BOARD FOR THE FIRST TIME:** 110 `parlays` + 86 `parlaysMixed` = **196
-emitted, 168 distinct leg-sets — 28 duplicates** (4 inside `parlays`, 24 shared across). Count (1)
-is now reported over **distinct** leg-sets with the raw union beside it.
-
-**`ledger-report`'s SHAPE ASSUMPTIONS — every one found by walking its input handling, all now
-explicit checks that exit 65 rather than degrade:**
-| assumption | what it did silently | now |
+| # | tool | the fabrication |
 |---|---|---|
-| `blob.ledger ?? blob` | accepted a **bare array** — a shape the endpoint cannot emit | **refused** |
-| an error body is an object | `{error:…}` → `entries.length` undefined → then a `TypeError` mid-print | **refused with the body** |
-| **`e.bankroll ?? 0`** | **a locked entry with no bankroll ⇒ every ceiling 0 ⇒ ratio Infinity ⇒ 100% overstake**, printed with a dollar total | **refused, naming the entry** |
-| `e.date` string-compared | a non-ISO date silently excludes the whole 07-17→07-22 window → `0W/0L`, `hit undefined%` | **refused** |
-| `kellyFrac` → null | tickets with no computable ceiling counted in the denominator, invisible | **counted and printed as `(0) EXCLUDED`** |
-| `l.cz` is American | a decimal price (e.g. `2.5`) yields **97.6% implied** — plausible and wrong | **warns with the count and examples** |
-| `fieldCensus` keys by date | duplicate dates **overwrite**, so the census describes only the last | **warns** |
-| `mkt(t)` = leg 0's market | a mixed-market parlay is attributed entirely to its first leg | documented, unchanged |
-| `{ledger:[]}` at 200 | a clean zero from an **empty store** — the bankroll exit with no population | **refused** |
+| 1 | `verify-served-engine` | returned a plausible **SUFFIX** of a real chunk — the false 278,267 mismatch |
+| 2 | `burn-report --pred` | `DayBlob.records` is a **keyed map**; the test hand-built an **array**. Threw `TypeError` on **every** real export |
+| 3 | `board-report` | `/api/board`'s **`{board:null, reason}` at 200** was read as a board — printed a complete, plausible, **fabricated** reading, VACUOUS branch and all. Plus a **false M-item** on a pre-flag board and a **`trigger` read that could never succeed** (no such field in `gens[]`) |
+| 4 | **`price-path`** | **`Number(null) === 0` and `Number.isFinite(0) === true`** — **9,578 HR rows became perfect zero-movement observations** and the pooled mean moved **1.20 → 1.07** |
 
-**IMPOSSIBLE BRANCH — did a fixture derived from a real artifact still diverge from production?**
-**Not found.** No tool fixture in this repo was derived from a real artifact; all six were
-hand-built. That is the finding — the branch could not fire because the condition it tests for
-has never existed here.
+**THE AUDIT THAT FOLLOWED FOUND TWO MORE LIVE SITES, both in tools scheduled to run that night:**
+`quota.mjs`'s `Number(headers.get(...))` — **the guard whose message reads "quota headers absent"
+COULD NOT FIRE**, and would have appended `{remaining: 0, used: 0}` to the append-only series; and
+`ledger-report`'s `Number.isFinite(Number(e.lockedAt))`, where a null `lockedAt` became **epoch 0**
+and read as "not late" **inside the reading added to measure late locks.**
 
-**THE META-TEST NOW COVERS TOOLS**, not just guards (`tests/guard-wiring.test.ts`): six cases feed
-each tool a shape **the routes actually emit** — copied from the route files, not invented — and
-assert a **non-zero exit**; plus a real-artifact case that reads the archived 07-26 board and then
-refuses the same file replaced by the route's null envelope. It **skips with a printed reason**
-when `origin/line-history` is not fetched, so the count stays honest.
+**ENCODED:** `tools/strict.mjs` (`num` / `req` / `numFromText`) + `tests/strict-coercion.test.ts`
+with plants, **plus the write-time quota identity `remaining + used == 20,000`** — which is a
+**fabrication detector, not a reset detector** (it holds on both sides of the reset).
+**RATCHET: 6 raw `Number(` sites remain in tool code.** **The ratchet itself had to be corrected** —
+it counted the prose *explaining* the trap as instances of it (10 reported against 7 real), so it
+now strips comments before scanning. **A guard that cannot tell code from a comment about code is
+measuring the wrong artifact.**
+
+**THE META-TEST NOW COVERS TOOLS**, not just guards: six cases feed each tool a shape **the routes
+actually emit**, copied from the route files, and assert a **non-zero exit**; plus a real-artifact
+case reading the archived 07-26 board and then refusing the same file replaced by the null
+envelope. **TOOL/REAL-INPUT LEDGER: 4 proven on production input, 2 UNPROVEN** — `burn-report
+--pred` and `ledger-report`, whose first real inputs are reads 2 and 4.
+
+### 12D. THE ERROR DISTRIBUTION — POPULATION ERRORS DOMINATE
+
+> **STANDING RULE: check which population a claim is about before checking whether it is true.**
+
+| class | count |
+|---|---|
+| **POPULATION — the claim was about the wrong set** | **9** |
+| **COERCION / SHAPE — the value or its container was misread** | **7** |
+| **GENUINE LOGIC — the inference was wrong from correct data** | **2** |
+
+**Population errors outnumber logic errors ~4:1; coercion errors outnumber them ~3:1.** Two of the
+population errors are the owner's; seven are mine or the tools'. **Where to look next is not the
+reasoning — it is the denominator, the branch, the date range, and the schema vintage.** Every one
+of the nine was caught by asking *which set is this about?*; **none by re-checking the logic.**
+
+### 12E. SELF-ARM GUARDS — THE STANDING RULE
+
+> **A self-arm guard must not auto-record. An auto-updating stamp is a counter, not a control —
+> the manual step exists so a human decides whether a vintage boundary moved before the number
+> changes. If the noise becomes untenable, assert the BRAKES and demote the count to
+> informational. Never automate the stamp.**
+
+**The threshold has arrived:** `14 × (11.2 ÷ 85) = 1.84/day`, ×1.11 for g = 3 doubles ≈ **2.05/day**,
+so **P(no crossing) ≈ 13% — the count already changes on ~87% of refreshes.** **Only
+`self-arm-stamp` fires on data alone.** `sha-references` fires on a rebase orphaning a citation
+(always a real defect); `workflow-branch-sync` fires on **divergence and on 14-day waiver expiry** —
+a calendar, designed to demand one decision per waiver, working as intended.
 
 ---
 
-## 8A. THE CALENDAR — STOPPED, NOT LATE (2026-07-31, owner's item 2)
+## 13. POSITION
+
+> # 🔴 THE POOL RESET. 2026-08-01T01:35:56Z: **19,958 remaining / 42 used.**
+>
+> **Measured, not inferred** — `data/quota-log.jsonl`, live read this turn through the corrected
+> tool. The pool went **553/19,447 → 19,958/42** across the interval 2026-07-31T21:04:11.529Z →
+> 2026-08-01T01:35:56.369Z, which **contains 2026-08-01T00:00Z**. Both witnesses agree
+> (`remaining` rose, `used` fell) and both period totals sum to **20,000**.
+> **READING 18's RESET BRANCH FIRES: restate the runway, reprice the calendar.** Every figure
+> below marked *(pre-reset)* is a closed-period fact and is kept as one.
+> **THE BURN ACROSS THAT INTERVAL IS UNMEASURABLE**, not zero — the counter it was measured
+> against no longer exists — and `burnSeries` now emits `spent: null` there rather than −19,405.
+> **AND THE 20:48Z SWEEP'S COST IS NOW PERMANENTLY UNMEASURABLE**: it could only have posted
+> inside the period that just closed, and that period's last observation is the 21:04 read.
+
+- **Quota: 19,958 remaining / 42 used — 2026-08-01T01:35:56.369Z.**
+- *(pre-reset)* 553 remaining / 19,447 used at 2026-07-31T21:04:11.529Z, **flat across seven reads
+  spanning 1 h 53 m — of which FIVE were fresh fetches and TWO were cache hits** (§7A.1). The two
+  that bracket the 20:48Z sweep, 20:21:56Z and 21:04:11Z, are **both fresh**, so that flatness is
+  real.
+- **Today: 1,038 → 553 = 485 spent. 339 attributed** (props-history's morning batch, 8 delivered
+  runs → 4 paid snapshots, 58 event-fetches; modelled 348 against 339 measured). **146 NOT.**
+- **The per-event cost is NOT a constant.** Since `residual ≥ 0`, each window bounds it from
+  above; the binding window gives **`c ≤ 5.114`**. **Both 6.0 and 5.845 are refuted by data.**
+- **BURN AND RUNWAY AS BANDS**: props ceiling post-cut **162–185/day**. **A: 162–285/day →
+  1.9–3.4 d · B: ~1,330/day → 0.41 d · C: not computable.**
+- **FIVE CONSECUTIVE DARK BOARD-DAYS** (07-27 … 07-31). **Homogeneous window: COUNT ZERO.**
+- **Both exits UNREACHABLE THIS CYCLE WITHOUT A RESET.** The parameter exit needs ~13.5k credits
+  to 09-22 against 553; the bankroll exit needs per-market settled-leg volume (12-pp ≈ 35–40
+  board-days) and its test is POOLED, so one market's miss is maskable. **The reset date remains
+  unread — owner's Odds-API dashboard only.**
+
+---
+
+
+### 13A. 7A.0 THE RATION DECISIONS RESTATE AT 19,958 (2026-08-01, owner's item 3)
+
+### The props cron cut did NOT cost close capture — measured, not argued
+
+**8 closes in the archive** (`kind === "close"`, 58 snapshots over 18 day-files), by UTC hour:
+
+| UTC hour | closes | which retained cron lands there |
+|---|---|---|
+| 23 | **4** | `0 20` → ~23:3x |
+| 00 | **3** | `0 21` → ~00:1x |
+| 20 | **1** | `0 17` → ~20:0x–20:5x |
+
+**ALL 8 OF 8 LAND IN A BAND A RETAINED CRON COVERS.** The six cut crons (`0 22`, `0 23`, `30 23`,
+`0 0`, `30 0`, `0 1`) queued into the **morning** batch — hours 06–11 hold 33 of the 58 snapshots,
+and **not one close.** **The cut removed duplicates, not closes.**
+
+**→ THE OWNER'S FIRST BRANCH DOES NOT FIRE.** Close capture is not materially degraded, so
+restoring a cron is **not indicated by this measurement** and nothing needs to be spent on it.
+**IMPOSSIBLE BRANCH (the four would have caught MORE than the ten): does not fire either — equal
+at 8 of 8, not more.**
+
+**THE ONE THING THE CUT DOES COST, and it is item 2's blocker, not close capture:** the archive
+takes **at most one snapshot inside 120 minutes per event**, and a price-path observation needs
+**two**. That is why the 60–90/30–60/10–30/<10 buckets are **empty** (memo §M1). **If a lock-time
+criterion is ever to be fitted, the capture that would fit it is a SECOND snapshot inside the
+window** — a different change from restoring a cut cron, aimed at a different band, and priced
+separately when it is wanted.
+
+### Variant B is UN-SUSPENDED
+
+Suspended at 553 because 12 credits mattered. **At 19,958 the premise is gone, and its purpose is
+now load-bearing**: it calibrates **`c`**, the per-event cost — which is the residual's attribution
+instrument, and **the residual is the calendar's binding constraint**. Protocol and readings stand
+as written in `docs/board-open-experiment.md`, **including the `bestBoard`-fallthrough STOP**
+(`engine-client` L297 → `generateBoard()` → `logBoardPredictions`: opening the board with no cached
+and no server board GENERATES one, spends, and writes `src:"client"` rows). **Run it after the four
+reads, before the board.**
+
+### Does one board per day to 2026-09-22 fit? YES, with room — the ration framing goes away
+
+52 days from 2026-08-01. Boards at ~66: **3,432**. Props at ~170/day: **8,840**. **Total ≈ 12,272
+against 19,958 — it fits with ~7,686 to spare**, and the calendar's binding line (K's/Outs at 38
+boards ≈ 8,968) sits inside it.
+
+**→ THE OWNER'S SECOND BRANCH FIRES. THE CONSTRAINT IS NO LONGER CREDITS.** It is **the residual
+plus the chain**: at 48.3/h the residual alone is 1,159/day = **60,268 over those 52 days, three
+times the pool**, draining it by **~2026-08-18**; and boards have been dark five days with the
+chain unverified end to end and the cron edits untested until Monday. **That sentence replaces the
+collection doc's top line.**
+
+---
+
+
+### 13B. THE CALENDAR — STOPPED, NOT LATE (2026-07-31, owner's item 2)
 
 > **EVERY DATE BELOW IS A COUNT-ARMED CROSSING PROJECTED FROM AN ACCRUAL RATE, AND THE RATE HAS
 > BEEN ZERO SINCE 2026-07-26. THEY ARE NOT LATE — THE CLOCK IS STOPPED. `reopenDays` RETURNS
@@ -1127,41 +1588,7 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ---
 
-## 9. POSITION
-
-> # 🔴 THE POOL RESET. 2026-08-01T01:35:56Z: **19,958 remaining / 42 used.**
->
-> **Measured, not inferred** — `data/quota-log.jsonl`, live read this turn through the corrected
-> tool. The pool went **553/19,447 → 19,958/42** across the interval 2026-07-31T21:04:11.529Z →
-> 2026-08-01T01:35:56.369Z, which **contains 2026-08-01T00:00Z**. Both witnesses agree
-> (`remaining` rose, `used` fell) and both period totals sum to **20,000**.
-> **READING 18's RESET BRANCH FIRES: restate the runway, reprice the calendar.** Every figure
-> below marked *(pre-reset)* is a closed-period fact and is kept as one.
-> **THE BURN ACROSS THAT INTERVAL IS UNMEASURABLE**, not zero — the counter it was measured
-> against no longer exists — and `burnSeries` now emits `spent: null` there rather than −19,405.
-> **AND THE 20:48Z SWEEP'S COST IS NOW PERMANENTLY UNMEASURABLE**: it could only have posted
-> inside the period that just closed, and that period's last observation is the 21:04 read.
-
-- **Quota: 19,958 remaining / 42 used — 2026-08-01T01:35:56.369Z.**
-- *(pre-reset)* 553 remaining / 19,447 used at 2026-07-31T21:04:11.529Z, **flat across seven reads
-  spanning 1 h 53 m — of which FIVE were fresh fetches and TWO were cache hits** (§7A.1). The two
-  that bracket the 20:48Z sweep, 20:21:56Z and 21:04:11Z, are **both fresh**, so that flatness is
-  real.
-- **Today: 1,038 → 553 = 485 spent. 339 attributed** (props-history's morning batch, 8 delivered
-  runs → 4 paid snapshots, 58 event-fetches; modelled 348 against 339 measured). **146 NOT.**
-- **The per-event cost is NOT a constant.** Since `residual ≥ 0`, each window bounds it from
-  above; the binding window gives **`c ≤ 5.114`**. **Both 6.0 and 5.845 are refuted by data.**
-- **BURN AND RUNWAY AS BANDS**: props ceiling post-cut **162–185/day**. **A: 162–285/day →
-  1.9–3.4 d · B: ~1,330/day → 0.41 d · C: not computable.**
-- **FIVE CONSECUTIVE DARK BOARD-DAYS** (07-27 … 07-31). **Homogeneous window: COUNT ZERO.**
-- **Both exits UNREACHABLE THIS CYCLE WITHOUT A RESET.** The parameter exit needs ~13.5k credits
-  to 09-22 against 553; the bankroll exit needs per-market settled-leg volume (12-pp ≈ 35–40
-  board-days) and its test is POOLED, so one market's miss is maskable. **The reset date remains
-  unread — owner's Odds-API dashboard only.**
-
----
-
-## 10. UNRESOLVED CONTRADICTIONS (both sides on disk)
+## 14. UNRESOLVED CONTRADICTIONS (both sides on disk)
 
 1. `docs/singles-vs-parlays.md` Correction-4 tail ("the A1+A2 pair addresses M14's two halves") vs
    the same file's REFINEMENTS + bundle M14 row ("A2 innocent of M14").
@@ -1236,7 +1663,8 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ---
 
-## 11. NOT ON DISK (missing input → how obtained)
+
+## 15. NOT ON DISK (missing input → how obtained)
 
 - **WHAT SPENT 146 CREDITS** → the **Vercel function log** (dashboard-only), partially
   reading 15(c).
@@ -1259,7 +1687,8 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ---
 
-## 12. DO-NOT-REDERIVE (read, don't recompute)
+
+## 16. DO-NOT-REDERIVE (read, don't recompute)
 
 - Burn series and per-day attribution → `data/quota-log.jsonl` + `tools/burn-report.mjs`. **Do not
   re-derive by hand — that is what produced the ~4× error.**
@@ -1279,15 +1708,33 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ---
 
-## 13. PROTOCOL
+## 17. PROTOCOL
 
-Josh relays paste blocks between two sessions and **is not the operator** — no side tasks, no
-explanations addressed to him, no decisions on his behalf. **Standing rules live in `CLAUDE.md`
-(pointer, not copy).** Writes stay under `/Users/josh/Documents/Parlay-Lab`.
+**Josh relays paste blocks between two sessions and is NOT the operator.** No side tasks, no
+explanations addressed to him, no decisions on his behalf. **Standing rules live in `CLAUDE.md` —
+a POINTER to this file, never a copy.** One copy of the memory: this file. Never re-summarized
+elsewhere.
 
-**FIRST ACTION AFTER COMPACTION: re-read this file and `CLAUDE.md`, confirm the origin sha
-resolves (`git ls-remote origin refs/heads/frontend-rebuild` → `0b65964`), then print —
-(1) the open-readings count (**29**), (2) the quota reading with its timestamp (**553 / 19,447 at
-2026-07-31T21:04:11.529Z**), (3) the fire block's time in PT (**15:38 PT, Sat 2026-08-01**), and
-(4) the gate (**NO BOARD until the 146-credit burst resolves; and if the Vercel log shows an
-external caller, no board until M28's passcode helper ships**). Then STOP.**
+**Writes stay under `/Users/josh/Documents/Parlay-Lab`.** Do not read or write Roster-Lab or
+Edge-Desk, and do not let their `CLAUDE.md` files into the session.
+
+**Josh types his own secrets.** Never enter his sync phrase, Odds API key, Claude key or
+`CRON_SECRET` for him. `/api/generate` and `/api/calibrate` stay gated. **Do not upgrade any paid
+plan, buy anything, or enter any secret on his behalf.**
+
+**Work is committed and pushed only on explicit authorization.**
+
+### FIRST ACTION AFTER COMPACTION — do this, then STOP
+
+1. **Re-read this file and `CLAUDE.md`.**
+2. **Confirm the origin sha resolves:** `frontend-rebuild` = **`50d0f7a`**, `main` = **`b1f17d2`**.
+3. **Print, in this order:**
+   - the **open-readings count** (§5 header states it; count it from the body, not the header),
+   - the **quota reading with its timestamp**,
+   - the **fire block's time in PT**,
+   - **the gate.**
+4. **Then stop and await the relay.** Do not measure, do not ship, do not fire a board.
+
+**THE GATE, so it is not restated wrongly: the four reads are the gate on the board — and none has
+run.** Order: **the four reads → the Vercel function log → the `APP_PASSCODE` env check → Variant B
+→ the crons' landing test when they deliver → the board at 15:38 PT if the four branches allow.**
