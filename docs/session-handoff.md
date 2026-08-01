@@ -768,7 +768,13 @@ Traynor 07-31), 11 at g = 4; simulation projects **83 of 85 [80, 85] armed by fr
   **New docs:** `docs/auto-lock-memo.md` (1,557 lines, 42 sections) ·
   `docs/props-window-cron.diff` (the applied diff, kept as the record).
 
-### 6B. POST-COMPACTION TURN — 2026-08-01, applied on top of `614ad4e`
+### 6B. POST-COMPACTION TURN — 2026-08-01, `614ad4e` → `4a29597`
+
+> **THE DEMOTION IS `4a29597d2adbcd21483495f429b139a9b7d8fa40`** (2026-08-01T10:05:17-07:00),
+> followed by one commit recording this sha. **BOTH ARE LOCAL — `origin/frontend-rebuild` IS STILL
+> `614ad4e`.** The instruction authorized the commit ("hold from `614ad4e` until the demotion
+> commits") and did not mention the push. One command closes it:
+> `git push origin frontend-rebuild`.
 
 **COMPACTION HELD.** `614ad4e` resolves; `origin/frontend-rebuild` was equal to it at the start of
 this turn; §§1–5 intact; **the fire block re-hashes
