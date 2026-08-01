@@ -1151,7 +1151,9 @@ about baseball, and that includes the owner's own proposals.**
 | ~~**4**~~ | ~~**the self-arm demotion**~~ — **✅ SHIPPED 2026-08-01** (owner's item 1). Count → informational, brakes asserted, crossing record append-only with a monotone floor, guard checks **completeness** and names the umpire. Both reds observed; the original proven green on the same edit. **§12F**, and the residual is named there | — | test-only |
 | **5** | **per-stage drop counts** for the fourteen-stage chain — twelve stages have no count | none; archive + board are on disk | **NO — NOT ADDITIVE.** Every stage is a `continue`/`return` **inside the engine string**, so a counter at each one moves the hash. **RIDES THE NEXT HASH-MOVING SHIP, alongside item 2's `simJoint` j2/pm.** The out-of-engine **reconstruction** tool stays **spec-only** and can see **9 of 14** — see §8 |
 | **5a** | **convert the seven TS/TSX market-set mirrors to `MODELLED_MARKETS`**, and `tests/strict-coercion.test.ts`'s inline comment-stripper to `tests/helpers/source.ts` | none. The six **Python** mirrors cannot import it and stay guard-covered. strict-coercion is **signed off — replace, do not edit in place** (M27). Registered and pinned meanwhile (§12H) | **YES** — `src/` and test-only, no engine string |
-| **5b** | **the twelve remaining PRESENCE-assertion scanners** (§12H) — comment-strip each, **one at a time, each with its own plant**. A twelve-guard sweep in one commit is how a signed-off guard gets weakened in place | none | test-only |
+| ~~**5b**~~ | ~~the remaining PRESENCE-assertion scanners~~ — **✅ DONE 2026-08-01.** The unscoped sweep (§12O) re-derived the class as **12 of 24 text-scanning guards**, planted **eleven against real code one per commit**, and found **ten dead**. Thirteen remain unplanted and **none is in the vulnerable class** | — | test-only |
+| ~~**5a**~~ | ~~convert `strict-coercion`'s inline stripper~~ — **✅ DONE 2026-08-01**, in the same commit that put a real plant against the file. `KNOWN_DUPLICATIONS` is now **empty** | — | test-only |
+| **5f** | **the seven TS/TSX market-set mirrors** → `MODELLED_MARKETS` (the other half of the old 5a) | none; the six Python mirrors stay guard-covered | **YES** |
 | **5c** | **the §12F git join** — `commit` resolves · touches `data/ump_k.json` · author date == `date` · **`braked` becomes a CHECK** against `umpKFrozen:true` (comment-stripped) and the frozen `context.json` sha at that commit · Barrett's null asserts date-shape only and is NAMED unverifiable. **Verified to work retroactively on all three sha-carrying crossings** (§12I) | none — it is a pure git read | test-only |
 | **5d** | **`dirPref` in `BoardEcho`** (M29), and with it **`umpKFrozen` / `penQFrozen` / `coreNoHR`** so a board testifies to its own brake state | none | **YES — `buildEcho` reads `SH_CFG` through `g(k)`; no engine string, no hash move** |
 | **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
@@ -1746,6 +1748,120 @@ question asked this session.** If one becomes load-bearing it is added **then**,
 brake state, its own side-choice provenance, and its own staleness threshold rather than having them
 inferred from the repo at a commit. `tools/board-report.mjs` prints all eight new fields beside the
 existing ones.
+
+### 12O. THE UNSCOPED SWEEP — THE AUDITOR HAD THE POPULATION ERROR IT AUDITS FOR
+
+**THE FOURTH LEVEL OF THE CLASS.** v1 of the sweep made two population errors: it **scoped by which
+files a guard reads** (`legacy/ src/ tools/ app/` — never `.github/`), and it **classified by the
+top-level assertion without following into helpers** (`props-concurrency` reads
+`expect(checks(src)).toHaveLength(0)`, an ABSENCE assertion, while `checks()` contains two PRESENCE
+tests). **An instrument that audits instruments, carrying the error it exists to find.**
+
+**v2, with no scope: 86 test files. 24 read source text, config, workflows, or git.** Of those,
+**12 are substitution-vulnerable** (a presence or count assertion over source). The rest assert
+absence over source — the safe direction, where a comment can only make them **fire**.
+
+**ELEVEN PLANTED AGAINST REAL CODE THIS SESSION. TEN WERE DEAD.**
+
+| # | guard | protects | verdict |
+|---|---|---|---|
+| 1 | `self-arm-stamp` | **brake 1, `umpKFrozen`** | DEAD |
+| 2 | `coverage-denominator` | **the lineup-coverage denominator** | DEAD |
+| 3 | `accrual-volume` | truncation accounting | DEAD |
+| 4 | `calibration-window` | the calibration window + vintage stamping | DEAD |
+| 5 | **`min-gap`** | **the pre-sweep PAYMENT dedupe, ~96 credits per duplicate** | DEAD |
+| 6 | `engine-echo` | the echo is write-only | survived ADDITION, **DEAD on SUBSTITUTION** |
+| 7 | `props-concurrency` | the push retry | **HALF DEAD** — the group half survived (structural) |
+| 8 | `trigger-mark` | **board provenance — reading 5's entire basis** | DEAD |
+| 9 | `line-history-consumers` | **the disabled job stays manually recoverable** | DEAD |
+| 10 | `prediction-idempotency` | **the ONE DOOR into the calibration training set** | DEAD |
+| 11 | `strict-coercion` | tools parse strictly — absent is not zero | **SURVIVED** |
+
+**THE SURVIVOR IS THE MOST USEFUL RESULT.** `strict-coercion` pairs a PRESENCE assertion
+(`toMatch(/numFromText\(/)`, which the plant **did** fool) with **the ABSENCE of what would replace
+it** (`.not.toMatch(/Number\(\s*r\.headers\.get/)`). A real regression must INTRODUCE the bad
+pattern, and the absence half catches that whatever the comments say. The complete substitution plant
+— both call sites commented, raw `Number()` restored — took the **original** guard to
+**2 failed | 6 passed**.
+
+> ### THE THREE DEFENCES, in order of cheapness
+> 1. **Pair a presence assertion with the ABSENCE of its replacement.** Free, and it is what saved
+>    `strict-coercion`.
+> 2. **Assert on STRUCTURE, not containment.** `props-concurrency`'s `REQ_GROUP` is a multi-line
+>    regex encoding YAML indentation and a `#` prefix breaks it; `line-history-consumers`'
+>    `/^\s*schedule:/m` is line-anchored and survived for the same reason.
+> 3. **Scan comment-STRIPPED source.** Needed wherever neither of the first two applies.
+
+**PLANTED VERSUS EXISTS — the ratio to track.**
+
+| population | demonstrated | total |
+|---|---|---|
+| **guards that scan source text / git** | **11 planted against REAL code** | **24** |
+| ...of which **substitution-vulnerable** | **11 of 12** | 12 |
+| every test file, carrying an executable in-file `PLANT` case | **22** | **87** |
+| every test file, with **neither** an in-file plant nor a real-code plant | — | **61** |
+
+**THE 61 IS NOT 61 UNGUARDED GUARDS, and saying so would be its own population error.** Most are
+**behavioural**: they run the engine or a pure function and assert on computed output
+(`engine2-devig`, `live-sim`, `bankroll`, `ledger-merge`, `discipline`). A behavioural test's
+failure mode is demonstrable by construction — change the behaviour and the number moves. **The
+number that matters is the first row: 11 of 24 text-scanning guards demonstrated against the real
+artifact.**
+
+**THE THIRTEEN UNPLANTED, and none is in the vulnerable class:** `arming-parity` ·
+`bot-path-whitelist` · `clamp-activity` · `doc-structure` · `factor-classification` ·
+`harness-manifest` · `hrr-compression` · `lid-coupling` · `mirrored-constants` ·
+`read-first-index` · `served-extractor` · `sha-references` · `shrink-activity` ·
+`sim-rng-stream` · `sweep-covers-engine`. Ten assert **absence** over source; three
+(`arming-parity`, `bot-path-whitelist`, `sha-references`) assert against **git metadata or live
+behaviour**, which a comment cannot reach.
+
+**IMPOSSIBLE BRANCH — "a guard that cannot be planted at all": DOES NOT FIRE.** The git-metadata
+guards need a *different* plant mechanism (a bot commit touching a non-whitelisted path; a fabricated
+sha), not no mechanism — and **both already carry exactly that plant in-file**. No guard was found
+asserting something that cannot fail.
+
+> ### THE STANDING RULE, CORRECTED — AND THE CORRECTION IS PART OF THE RECORD
+> **A count catches ADDITION and NOT SUBSTITUTION. The stripper is load-bearing and the count is
+> what makes it precise. BOTH, not either.**
+>
+> **2026-08-01, earlier the same day, I wrote — and the owner accepted — that a count assertion
+> "can never produce a false negative."** That was generalised from ONE plant, an addition plant
+> against `engine-echo`. **It was wrong, and measurement corrected it one turn later:** the
+> substitution plant took `engine-echo` to 12/12 green with the echo assignment moved into a
+> comment. `prediction-idempotency` is the cleanest case — **its `toMatch` AND its
+> `graded.push( === 2` count both survived the same substitution**, because moving code into a
+> comment changes neither. Seven of the eight stripped assertions occur exactly once in raw and
+> once in code, so restating them as counts would have saved none of them.
+
+### 12P. THE STRIPPER, HARDENED — `tests/stripper.test.ts` (2026-08-01, owner's item 2)
+
+**It is load-bearing for TEN guards and had no test of its own failure.** Now it has one, and the
+demonstration is the point:
+
+> **With `stripComments` neutered to `(s) => s`, the six guards that depend on it passed 40/40.**
+> Every one silently reverted to scanning raw source and **not one failed**, because raw source
+> satisfies every presence assertion. **Only `tests/stripper.test.ts` noticed.**
+
+**THREE FAILURE MODES, each with cases:**
+
+| mode | what it is | cost | covered by |
+|---|---|---|---|
+| **1. UNDER-STRIP** | a comment form it does not know | a guard reverts to raw | block · line · **HTML** · **JSX `{/* */}`** · multi-line · hash (Python **and** YAML), plus *"a URL is not a line comment"* |
+| **2. OVER-STRIP** | it removes comment-SHAPED text from a string or data field | presence → noise; **ABSENCE → FALSE NEGATIVE**, the forbidden pattern vanishes from the scanned copy | **measured across every file a guard actually strips: ZERO in-string strips today**, pinned |
+| **3. DEGENERACY** | it stops stripping anything | **every stripped guard reverts to raw, silently** | the only assertion in the suite that fires on it |
+
+**LENGTH PRESERVATION HOLDS ON ALL NINE STRIPPED FILES** and on every synthetic form, including
+multi-line. **`trigger-mark`'s `indexOf` ordering assertion depends on it** — comment characters
+become spaces, never disappear.
+
+**WOULD ANY GUARD BREAK IF THE STRIPPER BECAME MORE AGGRESSIVE? YES, AND THE CASE IS ENCODED.**
+`src/engine/legacy-src.gen.ts` is **deliberately NOT on the stripped list, and the guard fails if it
+is added.** Its content is the whole engine inside **one string literal**, and the engine text
+contains block comments — stripping it removes **engine code from inside a string**, which is mode 2
+on the file where it would matter most. `served-extractor` reads it raw and must keep doing so, for
+the same reason `engine-echo`'s `extractFromHtml()` does. **That is the risk of one filter feeding
+most of the suite, named and pinned rather than left to be discovered.**
 
 ### 12L. MIN_GAP: THE SAVING HELD BY LUCK, NOT BY GUARD (2026-08-01, owner's item 1)
 
