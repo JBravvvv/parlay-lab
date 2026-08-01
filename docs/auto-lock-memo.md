@@ -985,3 +985,131 @@ different tickets on the same card can share a game — and for those, stratum (
 (c).** On the 07-26 board the 78 different-game HR pairs are covered by this confirmation; **the 3
 same-game pairs are not**, and neither is any cross-ticket pair sharing a game. **So the
 confirmation licenses the cross-game half of the assumption and says nothing about M16.**
+
+---
+
+# 2026-08-01, fourth pass — the cron APPLIED, and `coreNoHR` measured
+
+## §H9 THE TARGETED PAIR IS LIVE ON `main` — read back from origin
+
+**`origin/main` = `b1f17d2`, `origin/frontend-rebuild` = `db660c6`.** Six crons on the firing copy:
+
+```
+0 17 * * *    -> 20:0x-20:5x   (unchanged)
+10 18 * * *   -> ~21:1x        [--window 120]   NEW
+55 18 * * *   -> ~21:5x        [--window 120]   NEW
+0 20 * * *    -> ~23:3x        (unchanged, load-bearing: 4 of 8 closes)
+0 21 * * *    -> ~00:1x        (unchanged, load-bearing: 3 of 8)
+30 22 * * *   -> next morning  (unchanged)
+```
+The flag reaches **only** the two new entries, via a schedule-conditional on `github.event.schedule`
+(read back at L86–87). `WINDOW_DEFAULT_S = 20*3600` on `frontend-rebuild` (L194) — **default off, so
+the four pre-existing crons are byte-identical in behaviour.** Allow-list divergence **(3)** added
+with `since` deliberately left at **2026-07-31** so the two older open divergences keep their
+countdown.
+
+**WHEN TO CHECK — FIRST RUN IS TODAY.** `10 18` declares 18:10Z and the measured queue delay for
+this band is **+3h0m to +3h5x**, so it should deliver **~21:1xZ = ~14:1x PT**, with the second at
+**~21:5xZ = ~14:5x PT**. **Check between 14:10 and 15:00 PT — roughly 40–85 minutes before the
+15:38 PT board fire.**
+
+**THE ASSUMPTION THIS RESTS ON, stated:** the placement is entirely a function of GitHub's ~3-hour
+queue delay holding. **If Actions delivered promptly, the pair would land at 11:1x / 11:5x PT — far
+outside the window and paying for nothing.** The landing test is what catches that.
+
+**PRE-COMMITTED LANDING TEST, unchanged:** `node tools/price-path.mjs <props-dir>` must print
+**n > 0 in the 60–120 bucket**. **Zero means the SPACING is wrong, not that prices do not move.**
+**ONE cron delivering is a PARTIAL LANDING that produces no pair and therefore no observation — it
+looks like a landing and is not.** Said in advance, as pre-committed.
+
+**IMPOSSIBLE BRANCH — the pair fires but `--window` is not passed:** each capture then takes the
+full slate at **13–15 events ≈ 78–90 credits**, so the pair costs **~156–180/day instead of
+~36–96** — roughly double the entire existing props line. Detectable in the run log: the flag
+prints `window: 120 min -> N of M events on the board`, and **its absence from the log is the
+symptom.**
+
+**One interaction, noted not feared:** the last targeted capture lands ~21:5xZ, **45 minutes before
+the 22:38Z board**, and `0 20` lands ~23:3xZ **after** it — so reading 26's cost bracket, which
+reads quota tightly around the curl, should be clear of both.
+
+## §H10 `coreNoHR` MEASURED — AND IT COMES BACK TRUE, WITH A PRECISION THAT MATTERS
+
+**Implied probability by market, 2026-07-26 board:**
+
+| market | n | min | p25 | **median** | p75 | max | **CV = √((1−p)/p) at median** |
+|---|---|---|---|---|---|---|---|
+| `batter_hits` | 50 | 62.0 | 65.7 | **67.2** | 68.2 | 70.2 | **0.70** |
+| `batter_total_bases` | 50 | 47.9 | 61.1 | **62.7** | 64.9 | 69.8 | **0.77** |
+| `batter_hits_runs_rbis` | 50 | 54.0 | 56.7 | **58.5** | 59.6 | 61.6 | **0.84** |
+| `ml`/`rl` | 30 | 49.1 | 54.2 | **59.1** | 63.0 | 76.2 | **0.83** |
+| `pitcher_outs` | 38 | 37.1 | 42.9 | **49.5** | 52.8 | 62.4 | **1.01** |
+| `pitcher_strikeouts` | 35 | 39.9 | 43.7 | **48.3** | 57.1 | 59.3 | **1.03** |
+| **`batter_home_runs`** | **50** | **15.1** | **18.0** | **20.5** | **22.5** | **30.9** | **1.97** |
+
+**🔴 HR OCCUPIES A DISJOINT BAND: 15.1%–30.9%, AND ZERO OF 253 NON-HR LEGS FALL INSIDE IT.** The
+next-lowest market bottoms out at 37.1%.
+
+**THE FIRST BRANCH FIRES: the rule is measured true after the fact, and its number is CV 1.97
+against 0.70–1.03 — ~2.8× a hits leg and ~1.9× the highest non-HR market.** `coreNoHR` moves off
+the reasoning-not-measurement list **with that figure attached.**
+
+**BUT THE PRECISION MATTERS, AND IT IS NOT WHAT THE RULE'S COMMENT CLAIMS.** At *matched* implied
+probability a single leg's variance is `p(1−p)` — **identical by construction, market irrelevant.**
+So HR is not "more volatile at comparable probabilities"; **HR never trades at comparable
+probabilities.** The rule is true because its boundary (a market) happens to coincide with the
+property's boundary (low p) **on this board**. That is the opposite outcome to the same-team
+proposal, where the boundary did *not* coincide — **and the two were tested the same way.**
+
+**IMPOSSIBLE BRANCH — HR showing LOWER variance than a CORE market at the same implied
+probability: NOT EVALUABLE. There is no CORE market at the same implied probability** (zero
+overlap), and that non-evaluability is itself the finding.
+
+**THE ENTANGLEMENT, NAMED AS PRE-COMMITTED — and it runs three ways, not two:**
+1. `coreNoHR` emptied the same-team proposal's target set, so **that proposal looked harmless only
+   because this rule had already removed the population.**
+2. **The disjointness is partly MANUFACTURED by two other rules**: `hrrAltMax: −1` suspends every
+   HRR rung and L2241 admits HR only at the 0.5 line. **The deep alternate rungs that would sit in
+   HR's band are already suspended by something else.** So "no non-HR leg in HR's band" is a joint
+   property of three rules, not a property of the markets.
+3. **THE EXPERIMENT THAT SEPARATES THEM:** admit the suspended HRR/TB alternate rungs into the
+   board's row set **without** admitting them to CORE, and re-measure the overlap. If non-HR legs
+   then populate 15–31%, the market boundary is wrong and the rule should be a **probability
+   floor**, not a market ban. **Zero credits on an archived board — but it needs a board carrying
+   alternate rungs, and none does.** Named, not run.
+
+**WHAT WAITS ON THE LEDGER (read 4):** CORE's realised record with and without HR — hit rate,
+realised variance, and P/L — is **not computable from any artifact on disk**. There are zero locked
+entries. **This half of the measurement waits on read 4 and is not estimated.**
+
+**NO CHANGE IS PROPOSED.** The rule is measured true on the board we have; the finding is that its
+*stated reason* ("volatility") is right about the quantity and wrong about the boundary, and that
+its apparent cleanliness depends on two other suspensions.
+
+## §H11 simJoint PRECISION — SPEC, NOT SHIPPED
+
+| option | size | robustness |
+|---|---|---|
+| **A — emit `j2` and `pm` per group onto the ticket** | ~2 lines in the `simJoint` block (they are already computed and discarded) | **A MEASUREMENT.** The ratio is exact, no rounding, and each factor is separately inspectable — a `pm` of 0 or a clamped `j2` is visible rather than inferred |
+| B — raise `prob`/`probNaive` stored precision | 1 line at serialisation | **AN INFERENCE FROM A ROUNDED NUMBER.** Better than 1 dp, but the ratio is still a quotient of two rounded quantities and the clamp's binding stays invisible |
+
+**→ A IS BOTH SMALLER AND MORE ROBUST.** It also fits this repo's own standing pattern: `j2/pm` is
+a **fourth computed-and-discarded quantity** (beside `shPenQF`, the Kelly ceiling in legacy modes,
+and `kellyF` per row) — emitting it is the same fix M23/M24 asked for elsewhere.
+
+**IS IT ADDITIVE?** **NO — both touch the engine string.** The `simJoint` block is `legacy/index.html`
+L2693–2706, inside the eval'd literal, so either option **moves the hash, resets the homogeneous
+window, and needs the pending-live-verification sequence.** **It rides the next hash-moving ship
+rather than taking its own** — and the vintage cost is currently zero, the window having been at
+zero for five dark days.
+
+**WHAT TOMORROW'S BOARD WOULD CARRY:** under **A**, an exact ratio per same-game group — but the
+07-26 board had **3 groups, all HR**, so **one board gives n ≈ 3 and the audit needs many.** Under
+**B**, still nothing decidable at small probabilities. **Neither makes the audit possible on one
+board; A makes each board's contribution exact instead of unbounded.**
+
+**THE MARKET-SPECIFIC FINDING, RECORDED PROPERLY:** HR and TB show dependence on **different
+units** — same-**game** for HR (1.103 [1.048, 1.168], with (a) and (b) indistinguishable),
+same-**team** for TB (1.063 [1.024, 1.130] with (b) flat at 0.992) — and **hits show none in any
+stratum**. **A single same-game correction factor is the wrong shape for all three at once.** That
+is a positive argument for `simJoint`'s per-group empirical approach over any fixed rho — **and
+whether it delivers is exactly what the precision gap prevents us from knowing.**
