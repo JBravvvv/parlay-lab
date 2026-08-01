@@ -7075,6 +7075,37 @@ before any unfreeze.
 **Its pipeline spends nothing**: `context.yml` → `build_context.py`, keyless
 statsapi/Savant, **zero Odds credits**.
 
+## SELF-ARMING: TWO MORE CROSSINGS IN ONE REFRESH — DATED RECORD (2026-08-01)
+
+**`shUmpKf`'s arm count went 2 → 4 in a SINGLE bot refresh.** `data/ump_k.json` gained 2026-07-31
+on commit `b68b1e361180fbdb62897884dddda5a4444499c6` (2026-08-01T07:37:59Z, `context: refresh`,
+that file only), and **Malachi Moore (g 4→5) and Derek Thomas (g 4→5) both crossed.**
+
+| # | umpire | date | g/k at arming | k/g |
+|---|---|---|---|---|
+| 1 | Lance Barrett | 2026-07-30 | 5 / 90 | 18.0 |
+| 2 | Willie Traynor | 2026-07-31 | 5 / 69 | 13.8 |
+| **3** | **Malachi Moore** | **2026-08-01** | **5 / 74** | **14.8** |
+| **4** | **Derek Thomas** | **2026-08-01** | **5 / 99** | **19.8** |
+
+League k/g = **16.48**. **Four crossings in three days against a projection of ~2026-08-04 for the
+FIRST one. THE PROJECTION WAS NOT SLIGHTLY EARLY — IT WAS WRONG ABOUT THE RATE**, and it is the
+same shape as the Phase-2 accrual error: a date computed from an assumed cadence rather than a
+measured one. **FOURTEEN umpires now sit at g = 4**, so the count can double again on one refresh.
+
+**k/g at arming still straddles the league mean (13.8, 14.8, 18.0, 19.8 against 16.48) — the armed
+subpopulation is NOT a high-K selection, now on n = 4 rather than n = 2.**
+
+**DID IT REACH A BOARD? NO. The double brake held on all four** — `context.json` is frozen at
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` and `SH_CFG.umpKFrozen` is
+`true`, both re-asserted green by `tests/self-arm-stamp.test.ts` in the same run that went red on
+the count. **No series restates and no board is affected.**
+
+**THE INSTRUMENT WORKED, and this is the reason M21 exists**: the crossing was invisible in every
+other artifact — it is a data file the engine cannot read, refreshed by a bot, on a day with no
+board. **A guard pinned to a COUNT caught what no date-based convention could.** `ARMED.umpKf`
+updated 2 → 4 in the same commit as this record, per the guard's own instruction.
+
 ## THE REOPEN CALENDAR IS COUNT-ARMED — A CLASS CORRECTION TO MY OWN M21 ENUMERATION (2026-07-30, owner's item 5)
 
 **~~"`consMinEv` expiry — DATE-armed"~~ — CORRECTED 2026-07-30, same day it was

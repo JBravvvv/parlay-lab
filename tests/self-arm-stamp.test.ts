@@ -27,15 +27,20 @@ import { describe, expect, it } from "vitest";
 /** Recorded crossings — update ONLY beside a dated entry in collection-period. */
 const ARMED = {
   /** umpires at g >= 5 in data/ump_k.json (build_context L232 gates kFactor on this) */
-  umpKf: 2,
+  umpKf: 4,
   /** the dated record of the last change, for the reader who finds this red */
   note:
     "2026-07-30: Lance Barrett crossed g=5 — FIRST EVER, ~5 days ahead of the ~08-04 projection. " +
     "2026-07-31: Willie Traynor crossed g 4->5 — SECOND, one day later, on bot commit 200e40282380485b35a70c6a28b689c356cc7e3d " +
-    "(08:21:47Z, ump_k.json only). Two crossings in two days; nine more sit at g=4. k/g at arming straddles the " +
-    "league mean (Barrett 18.0, Traynor 13.8, league 16.6) — the armed subpopulation is NOT a high-K selection. " +
-    "Both crossings double-braked (context.json frozen at 2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 " +
-    "+ SH_CFG.umpKFrozen), so neither reached a board and no series restates. See collection-period, SELF-ARMING PARAMETERS block.",
+    "(08:21:47Z, ump_k.json only). " +
+    "2026-08-01: Malachi Moore AND Derek Thomas BOTH crossed g 4->5 on bot commit b68b1e361180fbdb62897884dddda5a4444499c6 " +
+    "(07:37:59Z, `context: refresh`, ump_k.json only), which added 2026-07-31 to `days` — so the count went 2 -> 4 in a " +
+    "SINGLE refresh and FOUR crossings have now happened in three days against a ~08-04 projection for the FIRST. " +
+    "THE PROJECTION WAS NOT SLIGHTLY EARLY, IT WAS WRONG ABOUT THE RATE. FOURTEEN more sit at g=4. " +
+    "k/g at arming still straddles the league mean (Barrett 18.0, Traynor 13.8, Moore 14.8, Thomas 19.8, league 16.5) — " +
+    "the armed subpopulation is STILL NOT a high-K selection, now on n=4. " +
+    "All four crossings double-braked (context.json frozen at 2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 " +
+    "+ SH_CFG.umpKFrozen), so none reached a board and no series restates. See collection-period, SELF-ARMING PARAMETERS block.",
 };
 
 describe("self-arming parameters stamp themselves at fire time", () => {
