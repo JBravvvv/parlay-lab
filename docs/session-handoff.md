@@ -1863,6 +1863,124 @@ on the file where it would matter most. `served-extractor` reads it raw and must
 the same reason `engine-echo`'s `extractFromHtml()` does. **That is the risk of one filter feeding
 most of the suite, named and pinned rather than left to be discovered.**
 
+### 12T. WHAT THE ERRORS-ABSENT GATE MEANS FOR EVERY PRIOR RUN (owner's item 2)
+
+**EIGHTEEN COMMITS THIS SESSION**, `4a29597` → `83d48e1`. Classified by what the verification
+actually PRINTED, recovered from the record rather than re-run:
+
+| verification form | `Errors` line visible? | commits |
+|---|---|---|
+| **full suite via `tail -N`, N ≥ 4** | **YES — recoverable** | the seven full-suite gates (85/644 · 86/655 · 86/659 · 86/661 · 86/665 · 87/672 · 88/679) |
+| **targeted files via `grep -E 'Tests '`** | **NO — the pattern does not match `Errors`** | the twelve guard commits and the doc commits |
+| **captured to a file** | **YES — and re-readable** | `83d48e1` only |
+
+**THE SUMMARY BLOCK PRINTS `Errors` BETWEEN `Tests` AND `Start at`, and only when non-zero** — so
+any `tail -4` or deeper would have shown it. **Of the recoverable runs, exactly ONE carried it: the
+318 s run at `715d891`.** Every other full-suite gate printed `Test Files` / `Tests` / `Start at` /
+`Duration` with no `Errors` line — **confirmed clean, not assumed.**
+
+**THE TARGETED RUNS ARE UNKNOWN, and unknown is the honest word.** `grep -E 'Tests '` cannot match
+`     Errors  1 error`, so those runs' error state was never captured. **Low risk, not no risk:** the
+timeout is duration-correlated (it has appeared only at 316 s / 318 s / 585 s and never below), and
+targeted runs finish in single-digit seconds. **But that is an inference from correlation, not a
+reading, and it is recorded as one.**
+
+**DOES THE TIMEOUT LOSE A FAILURE, OR ONLY ITS REPORT?** `onTaskUpdate` streams task results
+worker→main, and the main process computes the exit code from that collected state — **so a lost
+update could in principle lose a result.** What makes it safe is not that the paths are independent;
+it is that **the same event that could drop a report ALSO fails the run**: vitest exits **1** on an
+unhandled error even with every test passing (**measured: `EXIT=1`**). There is no path where a
+report is lost and the process still exits 0. **So `exit 0` AND `no Errors line` is a sound gate,
+and it is a CORRECTION rather than belt-and-braces** — because the run I called green was exit 1.
+
+**CHEAP RE-VERIFICATION — ALREADY DONE, AND IT DOES NOT NEED REPEATING BEFORE THE FIRE.** The full
+suite once, on a quiet machine, **captured to a file rather than piped**: `88 files / 679 tests`,
+**165 s**, zero `Unhandled Error` blocks, no `Errors` line, `EXIT=0`. That run gated `83d48e1` and
+covers **the tree as it now stands**, which is what tomorrow's board will run against. It does not
+retroactively verify each intermediate commit — **nothing depends on an intermediate state**, and
+re-verifying them would cost 165 s each for no readable gain.
+
+**THE DURATION IS THE CONTROL:** 165 s quiet versus 316–585 s loaded, same code, error present only
+in the loaded runs.
+
+### 12S. THE SUSPENSION BAR IS A PURE MARKET-AND-LINE TEST — "PROBABLY" RESOLVED (owner's item 1)
+
+**TRACED IN THE ENGINE, NOT REASONED ABOUT.** The bar that keeps suspended rows out of auto-built
+tickets is `shAllocate`'s pre-filter, L2651–2660:
+
+```js
+var selMP=SH_CFG.selMode;
+if(selMP==="dk_fd"||selMP==="ev_gated"){
+  var hrrMax=(SH_CFG.hrrAltMax!=null)?SH_CFG.hrrAltMax:1/0;
+  var C2={};Object.keys(C).forEach(function(k){C2[k]=C[k].filter(function(r){
+    if(selMP==="dk_fd"&&r.bs==null)return false;          /* basis-priced universe, dk_fd ONLY */
+    var lp=(r.lkey||"").split("|");
+    if(lp[1]==="batter_hits_runs_rbis"&&Number(lp[2])>hrrMax)return false;
+    if(lp[1]==="pitcher_outs"&&SH_CFG.outsSusp)return false;
+    return true;});});
+```
+
+**Every input to both suspension clauses is `lkey` (market | line) and `SH_CFG`.** No price, no EV,
+no probability, no category assignment produced by the armed pipeline. The display tag at L2514
+(`suspRow`) is the same test on the same two fields. **The bar is a pure market-and-line test, so
+arming is irrelevant to it and the guards are CORRECTLY arming-independent.** The pre-committed
+first branch fires, and the word "probably" is retired.
+
+**ONE ARMING-ADJACENT CLAUSE SITS IN THE SAME FILTER AND IS NOT THE BAR:**
+`if(selMP==="dk_fd"&&r.bs==null)return false` reads a **priced field** (the basis price). It is a
+universe restriction for `dk_fd` alone, not a suspension — named here so a future reader does not
+find it and conclude the bar is priced.
+
+**AND THE CERTIFICATION IS NOT VACUOUS UNARMED — measured, both engines, same fixture slate:**
+
+| | ARMED | UNARMED |
+|---|---|---|
+| board rows | 199 | 203 |
+| **`pitcher_outs` rows** | **7** | **7** |
+| **HRR rows above `hrrAltMax`** | **14** | **14** |
+| tickets built | 162 | 171 |
+
+**The suspension-eligible populations are identical and non-empty either way**, so "zero suspended
+legs" is a real certification unarmed, not a zero over an empty set. Arming does move the board
+(199 vs 203 rows, 162 vs 171 tickets) — it just does not move what the bar tests.
+
+**WHAT WOULD MAKE THEM ARMING-DEPENDENT, if that is ever wanted:** an assertion on something only
+the armed pipeline produces. The cheapest is `expect(eng.get("SH_V2")?.sim).toBe(true)` in the
+guard's own setup; the strongest is a **priced** field — assert the row's `p` differs from its
+unarmed value, or that `shdw` (the shadow price) is present. **Neither is shipped**, and neither is
+needed for the bar itself; the arming claim is now covered once, at the helper, by
+`tests/helper-degeneracy.test.ts`.
+
+**`finite-prices` AND `self-consistency` PASSING UNARMED IS CORRECT, and here is the sentence.**
+Both assert **invariants that must hold on ANY board** — a price is finite or the row is refused;
+TB ≥ 1 whenever H ≥ 1. An unarmed board is still a board with 203 priced rows, so they are testing
+real values from a different pipeline, not accepting empty ones. `finite-prices` additionally
+carries its own non-empty guards (`checked > 100`, `picks.length > 0`), so it cannot pass vacuously.
+
+> ### 🔴 THE THIRD BRANCH FIRES: THE ARMED FIXTURE ARMS SOMETHING PRODUCTION CURRENTLY DOES NOT
+> | | FIXTURE `fix45/context.json` | PRODUCTION `public/model/context.json` |
+> |---|---|---|
+> | date | **2026-07-09** | **2026-07-29** (frozen at `64c42ad`) |
+> | games | 15 | 16 |
+> | slate pairings matched | **15 of 15 — 100%** | **0 of 15** |
+> | games carrying a `kFactor` | 0 | 0 |
+>
+> **The armed fixture's per-game context resolves for EVERY game of its slate. Production's resolves
+> for NONE** — its 07-29 slate shares zero pairings with 08-01, so `shUmpCtx` returns null for every
+> game and `shUmpKf` returns 1 regardless. **The fixture is therefore testing a configuration in
+> which per-game context is LIVE, while production runs with it resolving to nothing.**
+>
+> It is a **date mismatch, not a switch** — and it is bounded: neither context carries a `kFactor`
+> at all (0 of 15, 0 of 16), which is `umpKFrozen` and the g≥5 gate doing their job, so the ump
+> factor is 1 on both sides. **Weather is unaffected** — hydrated live from statsapi. What the
+> fixture exercises and production does not is the rest of the per-game block: venue, probables,
+> `hpUmp` identity.
+>
+> **IMPOSSIBLE BRANCH — "an unarmed engine produces rows the armed one does not": it produces MORE
+> (203 vs 199), and the four extra are not enumerated here** because the comparison that matters —
+> the suspension-eligible populations — is identical at 7 and 14. Recorded as an open detail, not a
+> finding.
+
 ### 12Q. SHARED-HELPER DEGENERACY — THE STRIPPER WAS AN INSTANCE, NOT THE FINDING
 
 > ### THE RULE, GENERAL FORM
@@ -1951,14 +2069,33 @@ Error: [vitest-worker]: Timeout calling "onTaskUpdate"
 
 **WHAT IT IS:** a vitest **worker→main RPC timeout in the REPORTER path**, not a test failure and
 not repo code. It appears only on long runs under load (316 s / 318 s / 585 s wall clock) and never
-on targeted runs. Every time it has appeared, the run was **green with exit code 0** — 88 files /
-679 tests.
+on targeted runs.
 
-**WHAT IT IS NOT SAFE TO DISMISS.** Vitest's own message is *"This might cause false positive
-tests."* The mechanism is a **lost REPORT, not a lost assertion** — but an instrument that fails to
-say what happened is precisely the class this session keeps finding. **So the gate is tightened
-rather than the warning waved off: a clean run means `Errors` ABSENT, not merely exit 0.** The
-practical mitigation is not to run the full suite while other heavy work is in flight.
+> ### 🔴 AND I GOT THE EXIT CODE WRONG TOO — THE CORRECTION THAT MATTERS
+> I wrote that these runs were *"green with exit code 0."* **They were not. `EXIT=1`.**
+> Recovered from the one run where `echo "EXIT=$?"` sat directly after `npx vitest run`:
+> **vitest exits NON-ZERO on an unhandled error even when every test passes.**
+>
+> **Where the false "exit 0" came from:** the background-task notification says *"completed (exit
+> code 0)"* — and that is the exit of the **whole compound shell command**, whose last statement was
+> an `echo`. **It was never vitest's exit code.** A wrapper's status read as the wrapped command's
+> status: the same shape as `{board:null}` read as a board.
+>
+> **SO THE IMPOSSIBLE BRANCH FIRES: a run exists in the record with a NON-ZERO exit that was treated
+> as green.** `715d891` was committed against it. Its `tail -4` printed `Errors  1 error` on screen
+> and the `&&` chain still reached `git commit`, because the pipeline's status is `tail`'s, not
+> vitest's.
+
+**THE MECHANISM, STATED PRECISELY.** `onTaskUpdate` is the RPC that streams task results from worker
+to main, and the main process computes the exit code from that same collected state — so a lost
+update **could** in principle lose a result. **But the failure is self-announcing: the very event
+that could drop a report ALSO fails the run.** There is no path where a report is lost and the run
+still exits 0. **So "exit 0 AND no `Errors` line" is a sound gate**, and the practical mitigation is
+not to run the full suite while other heavy work is in flight.
+
+**⚠️ AND THE PIPELINE-STATUS TRAP IS THE REAL LESSON:** `npx vitest run | tail -4 && git commit`
+commits on a FAILED suite, every time, because `$?` after a pipeline is the last stage's. **Run the
+suite as its own statement, capture to a file, check the summary, then commit.**
 
 **RE-VERIFICATION: `715d891` IS CLEAN.** Two full runs since, both **87 files / 672 tests green**,
 `tsc --noEmit` exit 0. Its content is documentation plus a spec-queue edit — **no code path
