@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { stripComments } from "./helpers/source";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -24,7 +25,12 @@ const VALUES = ["cron-ua", "header", "manual", "manual-forced"];
 
 describe("trigger mark: board provenance is recorded", () => {
   it("the route computes a trigger from its auth state and puts it on gen", () => {
-    const src = readFileSync(ROUTE, "utf8");
+    /* STRIP COMMENTS (2026-08-01). OBSERVED DEAD: with "manual-forced" removed from the
+       route's code and surviving only in a comment, this guard passed 3/3. It protects BOARD
+       PROVENANCE — the trigger mark is reading 5's entire basis, and the fire block turns on
+       reading `"header"` rather than `"manual"`. `stripComments` preserves length (comment
+       characters become spaces), so the indexOf ORDERING assertion below is unaffected. */
+    const src = stripComments(readFileSync(ROUTE, "utf8"));
     for (const v of VALUES) {
       expect(src.includes(`"${v}"`), `trigger value missing from the route: ${v}`).toBe(true);
     }
@@ -38,7 +44,7 @@ describe("trigger mark: board provenance is recorded", () => {
   });
 
   it("GenStamp carries the field (the prediction store's gens[] inherits it)", () => {
-    const src = readFileSync(SERIAL, "utf8");
+    const src = stripComments(readFileSync(SERIAL, "utf8"));
     expect(/trigger\?：?:?\s*"cron-ua"/.test(src) || src.includes('trigger?: "cron-ua"'),
       "GenStamp lacks the trigger field").toBe(true);
   });
