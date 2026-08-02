@@ -357,6 +357,83 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.005 🎯 AUTONOMY — 2026-08-02. SHIPS 1 AND 2 LANDED. ONE BLOCKER, AND IT IS JOSH'S.
+
+### 🔴 THE ONE THING THAT GATES EVERYTHING: `CRON_SECRET` IS NOT SET
+
+**MEASURED, not inferred:** `gh api repos/JBravvvv/parlay-lab/actions/secrets` returns
+**`total_count = 0`. THE REPOSITORY HAS NO SECRETS AT ALL.** `board.yml` is registered and
+**active** (workflow id `325771506`), it will start on schedule, evaluate the window correctly,
+and then **exit 78 with `CRON_SECRET is not in the environment — NOT firing`.**
+
+> **JOSH: add a repository secret named `CRON_SECRET`, value = the same `CRON_SECRET` already in
+> Vercel's env. GitHub → repo → Settings → Secrets and variables → Actions → New repository
+> secret. You type it; nobody else does.** Until then the system schedules itself, decides
+> correctly, and declines to fire — **which is the right failure, not a silent one.**
+
+**AND A SECOND FACT WORTH SEEING:** no other workflow in this repo uses `secrets.*` at all. The
+collection jobs reach the Odds API through the **public, ungated `/api/odds` proxy** — which is
+exactly §3's `fresh=1` exposure, now visible from the other side. **The board path is the first
+job here that authenticates.**
+
+### ITEM 0 — TODAY, FROM DISK. NOTHING FIRED. SEVENTH DARK DAY.
+
+**`/api/board?date=2026-08-02` → `{"board":null,"reason":"no-board-for-date","gens":[]}`.**
+**An EMPTY generation index: not a failed board, not a skip — zero attempts.** No
+`data/2026-08-02.json`. The 17:15–17:34Z window opened and closed unused.
+
+**MECHANISM: OPERATOR-DEPENDENCE, and it is recorded that way deliberately.** The design required
+Josh at a dashboard at 10:15 on a Sunday morning, having read a table derived hours earlier.
+**That is the defect this block removes; it is not a failure of his.** Six of the seven dark
+days were *chosen* under a credit ration; **this one was lost to a design that needed a human at
+a specific minute.**
+
+**IMPOSSIBLE BRANCH — cannot be evaluated at the window's resolution, and that is the honest
+answer.** The branch was *"credits spent in the window with no board artifact → stop and print
+both."* The quota instrument brackets **16.15 h**, not 20 minutes. What is measurable:
+
+```
+08-02T03:56:35Z -> 08-02T20:05:28Z   16.15 h   SPENT 355   (19,190 -> 18,835 / 1,165 used)
+  archived today: 11 events across 2 props runs (17:56Z close 8, 19:31Z close 3)
+  ATTRIBUTABLE:  68 (1+6xarchived per run) .. 194 (both runs a full sixteen)
+  RESIDUAL:      161 .. 287            RATE: 10.0 .. 17.8 /h
+```
+
+**🔴 AND THE DROP-RATE ESTIMATOR IS OFF ITS OWN SERIES: `spent ÷ archived` = 355/11 = 32.3**,
+against the observed 5.21 · 5.84 · 11.15 · 11.29 · 11.94 · 20.00. **Either the drop rate spiked or
+the residual is live and large.** Per §0.03 the residual figure is a **LOWER BOUND until §11 item
+5i prints the fetch count.** **§0.02's pre-committed expectation of ~390–430 attributable for a
+full Sunday did NOT hold — only two props runs delivered, archiving 11 events.**
+
+### WHAT SHIPPED, WITH SHAS
+
+| ship | sha | what |
+|---|---|---|
+| **1/4 `placed`** | **`916d63c`** | `placed`/`actualStake`, three states, `ACCRUAL_FIELDS` fill-only merge. **Merge-drop hazard OBSERVED RED (3/7) before the fix.** Census above the fold. Engine hash unmoved |
+| **crossings 5–6** | `916d63c` | Marvin Hudson + Nestor Ceja, found by re-gating **after a rebase** |
+| **2/4 scheduler** | **`57448fe`** | `tools/board_window.py` + `board.yml`, 8 guards. Engine hash unmoved |
+| **`board.yml` → main** | **`5dc0e1e`** | Actions only schedules from `main`; without this the workflow is inert |
+
+**🔴 THE BRIEF'S SCHEDULER DESIGN WAS CHANGED, AND THE REASON IS MEASURED HERE.** A 15-minute
+Actions tick cannot work on this account: `props-history.yml` L26–30 records that the queue
+**drops 19 of 24 ticks** and the delay is **40–80 min, median ~56** (§0.16). **The delay is larger
+than the window** — Sunday's was 30 minutes, so a 17:00Z tick lands 17:40–18:20Z, after first
+pitch, every time. **Jitter is absorbed by HOLDING instead**, the pattern `snapshot_props.py`
+already proved: start early, poll from inside the runner, fire once.
+
+**AND `MIN_READY` EARNED ITSELF ON DAY ONE.** `achievable` rises as the slate burns down; today at
+20:22Z the real slate read **achievable 1.000 over ONE unstarted game.** The ratio alone would
+have fired a one-game board. **The tool refused it live, and the refusal is asserted against the
+real schedule in `tests/board-window.test.ts`.**
+
+### WHAT DID NOT SHIP — stated plainly rather than implied
+
+**Ships 3 (lock-at-generation) and 4 (daily grading) are NOT shipped, and items 4 and 5 are not
+written.** They are not blocked; the turn ran out of room after ship 2 and the main-branch
+registration, and **a route change that writes locked cards is not something to land in a hurry
+at the end of a long block.** Nothing about ships 1–2 depends on them. **The `placed` field —
+their stated prerequisite — is in and green, so they start from the right base.**
+
 ## 0.035 🔴 THE WEEKEND HOURS, RE-DERIVED ON 52 SLATES — §0.04's HOURS ARE SUPERSEDED
 
 **§0.04 and §0.045 below are CORRECT ON EVERYTHING EXCEPT THE TWO HOURS.** The entry inventory, the
