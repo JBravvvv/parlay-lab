@@ -1894,6 +1894,70 @@ join) · **5f** (seven TS/TSX mirrors) · **5g** (null-context fixture) · **5h*
 a VINTAGE EVENT that releases brake 2 and must not ride with the first board in five days). **Each
 is covered meanwhile by an assertion at the source rather than by a promise.**
 
+### 12Y. THE RELAY PROTOCOL CHANGES — BRIEFS STOP ASSERTING REPO STATE (2026-08-02T00:36:43Z)
+
+**THE BRIEF THAT PROMPTED THIS WAS FOR A DIFFERENT REPOSITORY, AND THAT IS THE STRONGEST POSSIBLE
+CONFIRMATION OF ITS OWN DIAGNOSIS.** Four items arrived describing ESPN league waiver configs,
+probable-pitcher crons, Blob logging, Discord alerts, a `prevName` gate, `fetchCountContext`, "the
+5-per-matchup league", deploy `8505800` and `413/413` tests. **None of that is in this repository.**
+This is the MLB betting terminal at **`8aaad6d`**, **88 files / 679 tests**. **The brief was
+internally consistent, concrete, and about somewhere else.**
+
+**THE DIAGNOSTIC, RUN AND PRINTED EITHER WAY:**
+```
+git cat-file -t 3fdd34b   ->  fatal: Not a valid object name 3fdd34b
+git cat-file -t 8505800   ->  fatal: Not a valid object name 8505800
+HEAD                      ->  8aaad6d33896af820f3017bafc1f71fde969bd62
+```
+**Neither sha resolves here.** Whether they resolve in the sibling repos **cannot be checked from
+this session** — the standing rule is *"writes stay under /Users/josh/Documents/Parlay-Lab; do not
+read or write Roster-Lab or Edge-Desk"* — so **the cross-project-bleed question is answered only
+for this repo: not from here.** Stating it as resolved would be the same defect one level down.
+
+### 12Y.1 THE PROTOCOL, EFFECTIVE NOW
+
+> **1. A BRIEF CONTAINS ZERO ASSERTED REPO FACTS.** Every premise arrives as a **CHECK with
+> pre-committed branches for pass AND fail**, the fail branch written before the check runs.
+> **2. NO SHA IS CITED FROM THE OTHER SIDE.** Every turn opens with **HEAD printed here**; any
+> reference not to that print arrives marked **UNVERIFIED**.
+> **3. THIS DOCUMENT IS THIS REPO'S ONLY SOURCE OF REPO FACTS.** §0.5 carries HEAD, the served
+> engine sha, the suite count and the state; §12Y.2 carries the defect ledger.
+
+**A `docs/ground-truth.md` is NOT created.** This file already is that document — §0.5 is the state
+block, §12 the instrument ledger, §11 the built/spec'd inventory. **A second source of truth is the
+defect, not the fix.**
+
+### 12Y.2 THIS SESSION'S WRONG-PREMISE LEDGER — measured, not assumed
+
+**These are premises that arrived in briefs FOR THIS REPO and did not survive a check.**
+
+| # | asserted | measured | direction |
+|---|---|---|---|
+| 1 | "the suite is 668 tests" | **679** | count slip |
+| 2 | "the null-context configuration is the fixture default" | **queued 5g, UNSHIPPED — zero occurrences in `fixture-env.ts`** | **more built than exists** |
+| 3 | "read 3's guard reordered rather than root-caused" | **no such refactor exists**; read 3's only change was a label correction | **more done than exists** |
+| 4 | "today's measured per-event cost is 12.4" | **11.29 — and `c` is not a cost at all** (§12X) | **more measured than exists** |
+| 5 | "both bursts close at measured `c`" | **the 07-31 window has ZERO deliveries; `c × 0 = 0`** | **more resolved than exists** |
+| 6 | "the delay distribution killed fixed-hour targeting" | **median ~56 min, spread ~40 — fixed hours work** | **more measured than exists** |
+
+**FIVE OF SIX POINT ONE DIRECTION: toward a repository where more was built, done, measured or
+resolved than is on disk here.** That is the brief's own diagnosis — reconstruction filling gaps
+with the typical case — **observed in this repo's own record rather than argued.**
+
+> ### AND THE LEDGER RECORDS WHAT THE BRIEFS GOT RIGHT, OR IT IS NOT A LEDGER
+> **"Both `--window` crons fired" was ASSERTED AND CORRECT, and it corrected ME.** I reported one
+> windowed capture; matching all seven deliveries against the six declared hours showed **both new
+> entries fired** — `10 18` → 19:30:17Z (captured, `3 of 29`) and `55 18` → 20:01:26Z (fired, then
+> `skipped: no unstarted games`). **The check is the protocol, not distrust of the other side.**
+
+### 12Y.3 WHAT THIS TURN DID NOT DO
+
+**Items 2, 3 and 4 of the brief are not actioned.** They concern league waiver settings, a
+probable-change Blob log, and a `ground-truth.md` for a fantasy-baseball repository. **Acting on
+them would mean reading and writing a repository this session is explicitly barred from touching.**
+They are relayed back untouched rather than half-answered from memory — **which is exactly what the
+protocol above now forbids.**
+
 ### 12X. INSTRUMENT DEFECT #8 — THE ATTRIBUTION METHOD, UNAUDITED AND LOAD-BEARING
 
 **ATTRIBUTED TO ME, NOT TO A TOOL.** `quota.mjs` got a fabrication audit; `ledger-report`,

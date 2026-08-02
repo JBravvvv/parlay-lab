@@ -22,7 +22,12 @@ import { describe, expect, it } from "vitest";
  */
 
 const FILES = ["CLAUDE.md", ...readdirSync("docs").filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`)];
-const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0"]);
+/* 2026-08-01: `3fdd34b` is deliberately unresolvable HERE. It arrived in a relay brief written
+   for a DIFFERENT repository, and §12Y prints the failed `git cat-file` as the diagnostic's
+   OUTPUT — the point of quoting it is that it does not resolve. Allowlisted with that reason
+   rather than mangled out of the prose, so the exception is explicit and this guard keeps its
+   teeth on every other citation. */
+const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0", "3fdd34b"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**
