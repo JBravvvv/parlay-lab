@@ -1,18 +1,18 @@
 {
-  "days": 1,
-  "games": 1,
-  "rows": 18,
+  "days": 7,
+  "games": 38,
+  "rows": 675,
   "rows_without_price": 1671,
-  "games_unmatched_or_unfinal": 14,
+  "games_unmatched_or_unfinal": 8,
   "appeared": {
-    "sum_implied": 1.99,
-    "realized_hr_hitters": 0,
-    "overround": null
+    "sum_implied": 109.06,
+    "realized_hr_hitters": 81,
+    "overround": 1.3465
   },
   "all_listed": {
-    "sum_implied": 2.26,
-    "realized_hr_hitters": 0,
-    "overround": null
+    "sum_implied": 109.53,
+    "realized_hr_hitters": 81,
+    "overround": 1.3522
   },
-  "verdict": "INSUFFICIENT \u2014 1 day(s) with HR prices, need 14"
+  "verdict": "INSUFFICIENT \u2014 7 day(s) with HR prices, need 14"
 }
