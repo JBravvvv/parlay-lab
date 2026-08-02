@@ -9,11 +9,15 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > ~~**Origin at the moment of writing: `frontend-rebuild` = `50d0f7a`, `main` = `b1f17d2`.**~~
 >
 > **🔴 STALE, BANNERED 2026-08-02. `50d0f7a` was origin when this header line was typed — 29 commits
-> before the file was finished, its own last commit included.** **CURRENT, AND VERIFIED BY `git fetch
-> origin` THIS TURN (`FETCH_EXIT=0`, full fetch, no `--depth=1`): `frontend-rebuild` =
-> `275112c740ef104f7abf4de7bf685c1c853cd1c3` — equal to local HEAD, `0 0` ahead/behind, zero commits
-> in `HEAD..origin/frontend-rebuild`; `main` = `b1f17d2ef6bff3a8c62e9de5a6c6165eb4bf6221`,
-> unchanged.**
+> before the file was finished, its own last commit included.** **CURRENT, VERIFIED BY `git fetch
+> origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
+> marker that `tests/sha-currency.test.ts` scores:**
+>
+> - **STATE-CLAIM 2026-08-02:** `origin/frontend-rebuild` = `578c9ece6ce51b2c6356fbfb9dd7e9afe4e5b4fc`
+> - **STATE-CLAIM 2026-08-02:** `origin/main` = `b1f17d2ef6bff3a8c62e9de5a6c6165eb4bf6221`
+>
+> *(Written at that HEAD; the commit carrying this line then makes the first claim exactly 1 behind.
+> That offset is structural — a commit cannot contain its own sha — and K absorbs it.)*
 >
 > **WHY IT IS STRUCK AND NOT OVERWRITTEN, and why no guard caught it:** `sha-references` asserts that
 > a cited sha **RESOLVES** (`git cat-file -e <tok>^{commit}`, L76) — **not that it is CURRENT**.
@@ -2095,7 +2099,7 @@ Separately, **six shared helpers were neutered** and their dependents measured (
 
 ---
 
-### THE SIX STANDING RULES THIS LAYER PRODUCED — verbatim, in one place
+### THE EIGHT STANDING RULES THIS LAYER PRODUCED — verbatim, in one place
 
 > **1. SUBSTITUTION, NOT COUNT ALONE.** A count catches ADDITION and NOT SUBSTITUTION. The stripper
 > is load-bearing and the count is what makes it precise. Both, not either.
@@ -2120,6 +2124,22 @@ Separately, **six shared helpers were neutered** and their dependents measured (
 
 > **6. CHECK WHICH POPULATION A CLAIM IS ABOUT BEFORE CHECKING WHETHER IT IS TRUE.** Population
 > errors outnumber logic errors ~4:1 in this session's own defect census (§12D).
+
+> **7. A BOT-AUTHORED COMMIT IS NOT A BOT-AUTHORED CHANGE — THE DIFF DECIDES, NOT THE AUTHOR FIELD.**
+
+> **8. A SHA THAT RESOLVES IS NOT A SHA THAT IS CURRENT — RESOLUTION IS NOT CURRENCY.**
+
+**BOTH ADDED 2026-08-02, and both were MEASURED here rather than reasoned into existence:**
+
+- **7** came from the bot-pause check. The author census showed `engine-v2-bot` touching
+  `tools/snapshot_props.py` on 2026-08-01 — a tool file, after the pause. **The diff was this
+  session's own `--window` feature**, carried under the bot's author field because the workflow
+  commits its checked-out tree, and
+  `git diff origin/frontend-rebuild origin/line-history -- tools/snapshot_props.py` is **EMPTY**.
+  **Stopping at the author field would have reported a model-file write that did not happen.**
+- **8** came from the stale-banner audit: `50d0f7a` sat in this file's state header for 29 commits,
+  resolving the whole time, invisible to `sha-references` because that guard asserts resolution.
+  **Now encoded** — `tests/sha-currency.test.ts`, §12Z.1.
 
 ---
 
@@ -2257,8 +2277,60 @@ runs on *every* compaction in *every* repo, so this prompt arrives again next ti
 **AND THE INJECTED `CLAUDE.md` IS ITSELF A CONTAMINATION EVENT, not merely an annoyance.** A sibling
 repo's project instructions entering a session whose whole discipline is *which population a claim is
 about* is the same class as the misrouted brief — **foreign context arriving with local authority.**
-**Dated: 2026-08-02, the compaction preceding this turn. Recorded, not repaired, because the repair
-is outside this repo.**
+**Dated: 2026-08-02, the compaction preceding this turn.**
+
+#### 🔻 REMOVED 2026-08-02 — under a dated, scoped, single-turn exception carried by the owner's paste
+
+**THE ONLY WRITE THIS PROJECT HAS EVER MADE OUTSIDE `/Users/josh/Documents/Parlay-Lab`.** Authorized
+for `/Users/josh/.claude/settings.json` and its backup, **this turn only**. The rule restores on the
+next line of this file; **any future write outside the repo needs its own fresh authorization and
+does not inherit this one.**
+
+- **BACKUP:** `/Users/josh/.claude/settings.json.bak-2026-08-02` — `cp -p`, verified byte-identical
+  to the original by `diff -q` **before** the edit.
+- **TARGET:** `/Users/josh/.claude/settings.json` — the `PostCompact` block removed; `PreCompact`,
+  `permissions`, and the three scalar settings untouched. File went 33 lines → 23.
+
+**THE REMOVED JSON, VERBATIM, SO IT IS RECOVERABLE FROM THE RECORD ALONE:**
+
+```json
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s' 'Context was just compacted. BEFORE resuming the task: write any NEW durable knowledge from this session (league facts, constants, gotchas, decisions, deploy state, pending steps) into the CLAUDE.md of the project(s) actually worked on (e.g. /Users/josh/Documents/Roster-Lab/CLAUDE.md, /Users/josh/Documents/Edge-Desk/CLAUDE.md) and the persistent memory files, so nothing from before the compaction is lost. Commit CLAUDE.md changes in the project repo. Then continue where you left off.'"
+          }
+        ]
+      }
+    ]
+```
+
+*(The removal also deleted the trailing comma on the preceding `]` that closed `PreCompact`, which is
+why the diff is 11 lines and not 10. To restore by hand, re-add the comma with the block.)*
+
+**🔴 THE PARSE VALIDATION COULD NOT BE RUN — SAY SO RATHER THAN IMPLY IT PASSED.** The pre-committed
+step was *"validate the file still parses as JSON."* **Both attempts were BLOCKED by the harness
+permission classifier** (`python3 -c "json.load(...)"` on that path, and the same call bundled with
+the diff). **A second variant was not attempted** — retrying around a denial is the behaviour the
+denial exists to stop. **What was done instead: the file was re-read in full and verified
+structurally** — 23 lines, braces and brackets balanced, no trailing comma before any closing token,
+`hooks` now carrying `PreCompact` alone. **That is an inspection, not a parse.** It is sound for a
+23-line file and it is *not* the check that was pre-committed, and the difference is recorded rather
+than smoothed over. **If Claude Code reports a settings error on next start, the backup above is the
+restore.**
+
+**🔴 SOMETHING ELSE IN THE FILE REFERENCES A BARRED REPO — PRINTED, TOUCHED NOTHING** (the second
+pre-committed branch). `permissions.allow` L4–L5:
+
+```json
+      "Bash(/Users/josh/Documents/Roster-Lab/scripts/deploy.sh)",
+      "Bash(bash /Users/josh/Documents/Roster-Lab/scripts/deploy.sh)"
+```
+
+**Left exactly as found.** They are pre-approvals for a sibling project's deploy script — **they do
+not inject anything into this session and they are outside the authorization**, which named the hook.
+**Josh's to keep or cut.**
 
 ### 12Y.3 WHAT THIS TURN DID NOT DO
 
@@ -2290,6 +2362,60 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.1 SHA-CURRENCY — THE GAP IS ENCODABLE, AND THE GUARD FOUND ITS OWN DESIGN FLAW (2026-08-02)
+
+**SHIPPED: `tests/sha-currency.test.ts`, 6 tests.** The question asked was whether a doc-guard can
+assert that state-claim shas are current. **Answer: yes — but neither the marker nor `K=3` survived
+contact with the measurements.**
+
+**THE THREE THINGS THAT HAD TO BE MEASURED FIRST:**
+
+1. **`K=3` IS TOO TIGHT — it would false-red every morning.** A state line records HEAD *at the
+   moment of writing*, and the commit carrying it makes the claim exactly **1 behind** — structural,
+   since a commit cannot contain its own sha. On top of that, `engine-v2-bot` lands **up to 3
+   commits/day on `frontend-rebuild`** (3/day 07-25→07-29, 1/day since 07-30), advancing HEAD after a
+   pull while every claim stays truthful. **K = 10**: absorbs a full day of bot drift plus a pull, and
+   still catches the real failure (29 behind) with ~3× margin. **A guard that cries wolf gets
+   disabled, which is a worse outcome than the gap it closes.**
+2. **HEAD-ANCESTRY CANNOT BE ASSUMED.** MEASURED: `b1f17d2` (`origin/main`) is **NOT** an ancestor of
+   `origin/frontend-rebuild` — the branches diverged. A HEAD-only distance would fail a correct
+   `main` claim. Distance is the **minimum over every ref the sha is an ancestor of**.
+3. **BLOCK-SCOPING THE MARKER IS WRONG, AND THIS FILE PROVES IT.** At the top of this document the
+   struck `~~…50d0f7a…~~` original and its live correction sit in **one blockquote with no blank line
+   between them**, so a marker scoped to its markdown block would sweep the deliberately-preserved
+   stale sha into the claim and go red on the very record it protects. **The marker and the sha are
+   therefore on the SAME LINE**, one claim per line.
+
+**🔴 AND THE GUARD WENT RED ON ITS FIRST RUN, ON A DEFECT IN THE CONVENTION ITSELF — not a planted
+one.** The first version asked whether the marker appeared *anywhere* on the line. It immediately
+failed on
+`> 1. **Step 2 names `50d0f7a`.** Current origin is the **STATE-CLAIM** pair at the top…` — **a
+sentence ABOUT the convention, carrying an intentionally-historical sha, promoted to a live claim by
+the act of naming the marker.** **A marker that prose cannot mention without tripping is a marker
+nobody can document.** Fixed by requiring the marker in the **opening position** (after list/quote/
+emphasis punctuation), which separates a claim from talk about claims and costs nothing, since a real
+claim is written as its own line. **That failure is now a permanent regression case in the file.**
+
+**OBSERVED RED, AS REQUIRED, AND RESTORED:** the header was deliberately staled to
+`50d0f7a29362ddfae00576ba9fa104a901c2b77b`; the guard failed with
+**`L16: … is 30 commits behind (K=10)`**; the file was restored from a pre-plant copy and the guard
+returned **6/6 green**. **The plant reproduced the exact defect the guard was written for.**
+
+**THE MISCLASSIFICATION CHECK — third pre-committed branch — FOUND ONE, AND IT IS LEFT UNMARKED
+DELIBERATELY.** `docs/session-handoff.md` **§6** carries
+`- **origin/frontend-rebuild = 50d0f7a** · **origin/main = b1f17d2**` inside a section titled
+**GIT AND ARTIFACT STATE**. It *reads* like a live claim. **It is not: §6 is a per-turn log** (§6B is
+headed *"POST-COMPACTION TURN — 2026-08-01, `614ad4e` → `4a29597`"*), so its entries are dated
+records of the state at that turn — the same thing a git log holds. **The L9 header was different: it
+claimed "at the moment of writing" for a file that kept being written.** That distinction is the
+convention's boundary and it is written here because it is the one a future turn will get wrong.
+**Marking §6 would demand the memory forget; it stays unmarked.**
+
+**COVERAGE, STATED PLAINLY:** the marker is opt-in, so **a state claim written without it is still
+invisible.** This guard closes the gap for lines that adopt the convention; **it does not detect a
+new unmarked claim**, and no instrument here does. The vacuity assertion (≥2 marked shas) catches the
+convention being *removed*, not a claim never joining it.
 
 ### 12X. INSTRUMENT DEFECT #8 — THE ATTRIBUTION METHOD, UNAUDITED AND LOAD-BEARING
 
@@ -4065,9 +4191,10 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 2. **PRINT `git rev-parse HEAD`** and confirm it resolves on `origin/frontend-rebuild`. **Every
    turn opens with this print** — §12Y: no sha is cited from the analyst side.
    > **✅ ORIGIN CLOSED AS A READ, NOT AN ASSUMPTION — 2026-08-02.** `git fetch origin` (full, no
-   > `--depth=1`) exit **0**: `origin/frontend-rebuild` = **`275112c740ef104f7abf4de7bf685c1c853cd1c3`**
-   > = local HEAD, **`0 0`** ahead/behind, **zero** commits in `HEAD..origin/frontend-rebuild`;
-   > `origin/main` = `b1f17d2`; no `.git/shallow`. **THE BOT PAUSE HOLDS ON THE MODEL FILES:**
+   > `--depth=1`) exit **0**, `0 0` ahead/behind, no `.git/shallow`. The refs themselves are the
+   > two **STATE-CLAIM** lines at the top of this file — **one live copy, scored by
+   > `tests/sha-currency.test.ts`; restating them here would create a second place to go stale.**
+   > **THE BOT PAUSE HOLDS ON THE MODEL FILES:**
    > `engine-v2-bot`'s last write to `public/model/priors.json` is **2026-07-29 15:58:41Z** and to
    > `public/model/context.json` **2026-07-29 20:32:00Z**; everything it has committed since is
    > **data** (`data/props/*`, `data/ump_k.json`). **The one apparent exception is carriage, not
@@ -4113,9 +4240,10 @@ plan, buy anything, or enter any secret on his behalf.**
 > **Preserved struck rather than deleted, per the amendment convention.**
 >
 > **THREE WAYS IT IS WRONG IF RUN AS WRITTEN, each measured this turn:**
-> 1. **Step 2 names `50d0f7a`.** Origin is `275112c740ef104f7abf4de7bf685c1c853cd1c3`, verified by
->    `git fetch origin` this turn. Same defect as the file's L9 header, same reason it survived: the
->    sha **resolves**, so `sha-references` passes it.
+> 1. **Step 2 names `50d0f7a`.** Current origin is the **STATE-CLAIM** pair at the top of this file
+>    — not restated here, so there is one live copy. Same defect as the L9 header, same reason it
+>    survived: the sha **resolves**, so `sha-references` passes it. **Now caught by
+>    `tests/sha-currency.test.ts`.**
 > 2. **Its step 3 omits `git rev-parse HEAD` and the target check** — the two things §12Y made
 >    mandatory *because* of the misrouted brief. The current block opens with both.
 > 3. **Its closing line — "the four reads are the gate on the board — and none has run" — is false
