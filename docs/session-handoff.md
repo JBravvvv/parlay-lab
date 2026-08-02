@@ -121,6 +121,7 @@ compaction is the risk, not the fix.**
 | section | status |
 |---|---|
 | **0.0 THE JOSH BLOCK** | **CURRENT — read first** |
+| **0.04 / 0.045 THE 7-DAY BOARD SCOPE** | **CURRENT, 2026-08-02 — the dashboard visit and today's deadline live in 0.045** |
 | **0.01 THE GATE, AMENDED** | **CURRENT — supersedes 0.05's conclusion** |
 | **0.02 / 0.03 the bracket + interval table** | **CURRENT — the attribution-bracket rule lives here** |
 | 0.05 the gate not satisfied | **SUPERSEDED BY 0.01.** Its ARITHMETIC stands; its conclusion is amended |
@@ -140,6 +141,20 @@ compaction is the risk, not the fix.**
 > `x-cron-key`-not-the-phrase rule remain correct for any future fire**. Its **date, coverage
 > figures, "tomorrow" framing and the four board branches are 08-01's** and are superseded by
 > §0.01's amendment. **Read §0.0 first.**
+>
+> **🎯 AND ITS SCOPE IS NOW SEVEN DAYS (§0.04, 2026-08-02).** The line below reading *"The cron
+> cannot do it — entry 1 is `45 22 * * 1-5`, weekdays only"* **describes a condition under repair,
+> not a standing fact.** The standing weekend structure, derived from seven sampled slates each:
+>
+> | day | hour | PT | clears T | mean cost |
+> |---|---|---|---|---|
+> | **Mon–Fri** | `45 22` (entry 1, untouched) | 15:45 | **10/10** | 50.8 |
+> | **Saturday** | **`45 22 * * 6`** (entry 2, re-houred + header) | 15:45 | **6/7** | 48 |
+> | **Sunday** | **`0 18 * * 0`** (entry 3, re-houred + header) | 11:00 | **7/7** | 51 |
+> | ~~Sunday 2nd~~ | ~~`30 22 * * 0`~~ (entry 4) | — | **RETIRED** — the pair trap, §0.045 | — |
+>
+> **A Saturday shaped like 2026-07-18 lands below T and is stamped engine-half-only under reading 6
+> — it still builds.** The command sequence below is unchanged for every one of these fires.
 
 ### (verbatim below, unchanged since `03c4ae4`)
 
@@ -342,6 +357,121 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.04 🎯 BOARD GENERATION GOES 7 DAYS — DERIVED 2026-08-02, THE WEEKEND ENTRIES ALREADY EXIST
+
+**THE OWNER'S CORRECTION, ACCEPTED AND DERIVED:** every team plays Saturday and Sunday, the weekend
+slates are the fullest of the week, and the 5-day board schedule was a scarcity-era decision that
+outlived its premise. **Design scope is 7 days from here.**
+
+**🔴 THE FIRST FINDING IS THAT THE WEEKEND ENTRIES WERE NEVER MISSING.** `CLAUDE.md` L149 records all
+four cron-job.org entries as **created**: entry 2 = `0 18 * * 6` (Saturday), entry 3 = `0 17 * * 0`
+and entry 4 = `30 22 * * 0` (Sunday). **They are unheadered, so they 401 at zero cost and have been
+silently dead the whole time.** The 5-day behaviour was never a 5-day *schedule* — it was a **4-entry
+schedule with the header on one of them.** So this is a repair of three existing entries, not a
+creation, and **`45 22 * * 1-5` is the only genuinely weekday-masked artifact** (confirmed by sweep:
+every GitHub Actions workflow that touches collection is already `* * *` — see below).
+
+### THE INSTRUMENT — the same one that produced the weekday window, not a new one
+
+`achievableCoverage()` (`src/lib/board-coverage.ts` L72–78), transcribed rather than re-derived:
+`unstarted = starts > now`; `ready = unstarted where (start − 3 h) ≤ now`; **`achievable = ready /
+unstarted`**. Cost at the corrected model (§12X): **`1 + 6 × unstarted`**. Threshold **T = 0.80**
+(the operator's board-quality bar — *not* `MIN_ACHIEVABLE = 0.15`, which is the separate low-ceiling
+refusal floor in `board-store.ts` L140).
+
+**SAMPLED, NOT FITTED TO ONE SLATE — which is instrument defect #8's exact shape.** Seven Sundays
+(2026-07-05 → 08-16), seven Saturdays (07-04 → 08-15), ten weekdays, all from statsapi at **zero Odds
+credits**. **The objective is `ready`** — unstarted AND lineup-posted, the population a board can
+actually price. **`pct ≥ T` is the constraint, not the objective.**
+
+### SUNDAY — 18:00Z / 11:00 PT. The only hour that clears T on all seven.
+
+| Sunday | games | achievable | ready/unstarted | cost |
+|---|---|---|---|---|
+| 2026-07-05 | 15 | **0.800** | 8/10 | 61 |
+| 2026-07-12 | 15 | 1.000 | 7/7 | 43 |
+| 2026-07-19 | 16 | 0.900 | 9/10 | 61 |
+| 2026-07-26 | 15 | 0.857 | 6/7 | 43 |
+| **2026-08-02 (today)** | 15 | **0.875** | **7/8** | **49** |
+| 2026-08-09 | 15 | 0.889 | 8/9 | 55 |
+| 2026-08-16 | 15 | 0.857 | 6/7 | 43 |
+
+**7/7 clear T. meanReady 7.3, meanCost 51, minPct exactly 0.800.** The sweep found **exactly one**
+admissible hour — 17:45Z and 18:15Z each miss on one slate.
+
+**⚠️ THE TRADE THAT WAS NOT TAKEN, PRINTED BECAUSE IT IS CLOSE.** **17:30Z clears 6/7 with meanReady
+12.7 — 74% more bettable games** — failing only on the slate that reads 0.750. Under reading 6 that
+week's board would be **engine-half-only, stamped**, not lost. **18:00Z is chosen because T = 0.80 is
+pre-committed and relaxing it is not authorised this turn.** One word from the owner moves it.
+
+### SATURDAY — 22:45Z / 15:45 PT. 🔴 NO hour clears T on all seven; this is the measured best.
+
+**The third pre-committed branch fires, in its milder form.** Not *"Saturday cannot reach 0.80"* —
+Saturday reaches it easily on six of seven slates. **What no hour does is clear T on EVERY sampled
+Saturday**, because Saturday's first pitch ranges **15:05Z → 19:07Z, a four-hour spread**, against
+Sunday's near-constant 16:15Z.
+
+| Saturday | games | achievable @22:45Z | ready/unstarted | cost |
+|---|---|---|---|---|
+| 2026-07-04 | 15 | 0.909 | 10/11 | 67 |
+| 2026-07-11 | 16 | 1.000 | 6/6 | 37 |
+| **2026-07-18** | 15 | **0.500** | **2/4** | **25** ← **BELOW T** |
+| 2026-07-25 | 15 | 1.000 | 7/7 | 43 |
+| 2026-08-01 | 15 | 1.000 | 10/10 | 61 |
+| 2026-08-08 | 15 | 1.000 | 9/9 | 55 |
+| 2026-08-15 | 15 | 1.000 | 8/8 | 49 |
+
+**6/7 clear. meanReady 7.3, meanCost 48.** `23:00Z` scores meanReady 7.4 on the same 6/7 and the same
+failing slate — **within noise (0.1 of a game)**; 22:45Z is taken so Saturday and the weekdays fire at
+the *same clock minute*, which is one fewer thing to mis-type. **On a 07-18-shaped slate the board
+still builds and is stamped engine-half-only under reading 6** — the pre-committed outcome, not a
+skip. **Expect that roughly 1 Saturday in 7.**
+
+**DOES ONE HOUR COVER SATURDAY, OR DOES THE SLATE SPLIT?** **One hour, and the split is structurally
+unreachable.** Saturday's early national games *cannot* be served at T by any hour: while they are
+lineup-ready the evening block (10–12 games) sits in the denominator and is not, so the curve reads
+**0.067–0.250 all morning** and peaks at 0.200 around 17:15Z. **The early games are not being given
+up by choice — no hour exists at which they clear.**
+
+### WEEKDAY CONTROL — the existing derivation is confirmed, not disturbed
+
+Ten weekdays at entry 1's `22:45Z`: **clears T on 10/10, meanCost 50.8.** Monday **2026-08-03** reads
+**achievable 1.000, ready 7/7, cost 43**. **The weekday window stands exactly as written.**
+
+### 🔴 IMPOSSIBLE BRANCH — DOES NOT FIRE. AND MY FIRST COMPARATOR SAID IT DID.
+
+The branch: *a weekend achievable curve exceeds the weekday's **everywhere** → the weekday derivation
+was wrong.* **Measured at the same UTC clock time on each day's own date, 15:00Z→03:00Z at 15-minute
+steps:**
+
+- **Sunday 08-02 vs Monday 08-03: weekend higher at 30, equal 12, LOWER at 10 of 52.** First
+  counterexample **20:15Z — Sunday 0.000 vs Monday 0.250** (Sunday's slate is over; Monday's has not
+  started).
+- **Saturday 08-08 vs Monday: higher 27, equal 24, LOWER at 1 of 52.** Counterexample **22:45Z —
+  0.889 vs 1.000.**
+
+**NEITHER DOMINATES. The weekday derivation is not contradicted.**
+
+> **⚠️ AN INSTRUMENT ERROR OF MY OWN, CAUGHT AND CORRECTED IN THE SAME TURN.** The first comparator
+> printed **"YES → IMPOSSIBLE BRANCH FIRES"** for both days. **It was asking the wrong question**: it
+> tested whether the weekend *window* opened earlier and closed later than the weekday window —
+> containment — when the pre-committed branch is about the *curve* being higher **at every moment**.
+> Window containment is nearly guaranteed by a longer slate and means nothing. **A wrong comparator
+> reported a repo-invalidating finding; the correct one reports no finding.** Recorded beside the
+> other instrument defects, and it is the second time this session that a first-draft instrument
+> answered a neighbouring question instead of the asked one (the other: `STATE-CLAIM`'s
+> `includes()`, §12Z.1).
+
+### THE 7-DAY SWEEP — what else is weekday-masked
+
+**Nothing in the collection path.** Every GitHub Actions schedule that spends or collects is already
+`* * *`: `props-history` (`0 17`, `0 13`, `0 23`, `0 3` on `frontend-rebuild`; six entries on `main`,
+all `* * *` — §4C), `context` (`0 17`, `30 22`), `board-archive` (`0 12`, `0 19`), `model` (`30 9`).
+`line-history` is disabled. **Two intentional day-masks remain and are NOT artifacts:**
+`hr-overround` `0 15 * * 0` (a weekly job, Sundays by design) and `ufc` `0 15 * * 3` / `0 15 * * 6`
+(a different sport). **`45 22 * * 1-5` is the only 5-day artifact in the board path — confirmed by
+sweep, not assumed.**
+
 ## 0.01 ⚖️ THE GATE, AMENDED 2026-08-02T03:58:45Z — ORIGINAL PRESERVED, MONDAY FIRES
 
 ### THE ORIGINAL, STRUCK-DATED, NOT DELETED
@@ -383,6 +513,64 @@ the sin; this is the opposite.**
 3. **"no evidence of writes anywhere" is NOT ESTABLISHED — it is UNCHECKED.** No instrument on disk
    looks for writes by the residual. **It is an absence of evidence, and the record says so rather
    than promoting it to evidence of absence.**
+
+## 0.045 🎯 THE DASHBOARD VISIT, THE SUNDAY-PAIR TRAP, AND TODAY'S DEADLINE
+
+### THE FOUR ENTRIES — exact values, nothing to compute at the dashboard
+
+| # | now | **change to** | header | why |
+|---|---|---|---|---|
+| **1** | `45 22 * * 1-5` | **UNTOUCHED** | keeps `x-cron-key` | 10/10 clear T, meanCost 50.8 |
+| **2** | `0 18 * * 6` | **`45 22 * * 6`** | **ADD `x-cron-key`** | 18:00Z clears T on **0 of 7** Saturdays; 22:45Z on 6 of 7 |
+| **3** | `0 17 * * 0` | **`0 18 * * 0`** | **ADD `x-cron-key`** | 17:00Z clears **1 of 7** Sundays; 18:00Z clears **7 of 7** |
+| **4** | `30 22 * * 0` | **🔻 RETIRE (disable, do not repurpose)** | — | the Sunday-pair trap; meanReady **1.0** |
+
+**Entry 2's hour was not slightly wrong — it never worked.** `0 18 * * 6` clears T on **zero** of
+seven sampled Saturdays (meanReady 5.0, minPct 0.154). It has been unheadered, so it never spent;
+had the header been added without re-deriving the hour, **it would have paid ~87 credits a week for
+boards that could not clear the bar.** The header being missing is the only reason that never
+happened.
+
+### ITEM 2 — THE SUNDAY-PAIR TRAP, RESOLVED IN THE DESIGN
+
+**THE TRAP, from disk:** `liveCoverage()` (`board-store.ts` L160–181) decides the second fire on
+`cov.pct >= SKIP_COVERAGE` (**0.7**) **measured over games still unstarted at the second fire's
+time** — it never asks whether the earlier board met **T** when it was built. **So a sub-T 17:00Z
+board whose few surviving games happen to be lineup-complete returns `covered` and skips the better
+hour.** Two Sunday entries recreate that every week.
+
+**RESOLUTION: one entry per weekend day at the measured hour.** Entry 4 is **retired outright**, not
+repurposed — there is no second hour worth having: after 18:00Z every later Sunday hour has
+**meanReady ≤ 5.0**, and from 20:30Z on it is **≤ 1.0**. **Entry 4 was buying one national night game
+at the cost of poisoning the main fire.**
+
+**THE ENGINE FIX IS SPEC-ONLY AND DOES NOT SHIP NOW** (§11 item 5l). It moves the engine hash and
+rides the next hash-moving ship.
+
+**WHAT ENTRY 4 WAS FOR, AND WHY LOSING IT IS PRICED.** `cron-jobs.md` L48 records its reason: on
+2026-07-26 the 23:20Z national game carried **11 of 17 closed-form H+R+RBI rows — 65% of the
+ladder-defect exposure.** **Retiring entry 4 gives that up on Sundays where the night game is
+separated from the bulk.** It is the right trade only because the 18:00Z board is worth more than the
+night game *and* the pair mechanically damages it — **but it is a real loss, recorded, not waved
+past.** The skip fix (5l) is what buys it back.
+
+### 🔴 TODAY — SUNDAY 2026-08-02. THE WINDOW IS AHEAD.
+
+**Derived at `2026-08-02T07:28Z` = 00:28 PT. Entry 3's new hour, `18:00Z = 11:00 AM PT`, is 10.5 h
+ahead.** **First pre-committed branch fires: today is board 1 of everything**, the full chain reads
+it, and every seeds-block reading applies as written.
+
+- **TODAY AT 18:00Z: achievable 0.875, ready 7 of 8 unstarted, cost 49.**
+- **EDIT-BY: 11:00 AM PT / 18:00Z. Recommended by 10:30 AM PT** for margin.
+- **Today's slate is atypical** — first pitch **17:35Z** against the usual 16:15Z — so a *one-off*
+  at **17:30Z would reach 14 ready of 15 at 0.933, cost 91**, double the population. **Not
+  recommended and not built into the entry:** it fits today and not the standing design, and
+  §12X's lesson is exactly that a constant fitted to one window is not a constant. If the owner wants
+  it, it is a curl inside 17:15Z–17:30Z, slate count printed first, **no `force`**.
+- **THE GATE IS UNCHANGED.** §0.01: **the board builds regardless; the gate decides the stamp.**
+  Today's board carries **`RESIDUAL-LIVE-UNATTRIBUTED`** unless the Vercel log read lands first.
+- **Entry 1 and Monday 22:45Z are untouched.** If the edit does not land today, the first weekend
+  board is **Saturday 2026-08-08** and **Monday 2026-08-03 22:45Z remains board 1**.
 
 ## 0.02 🔴 THE WEEKEND BRACKET IS ALREADY READING — AND IT IS NOT ZERO
 
@@ -2018,6 +2206,8 @@ about baseball, and that includes the owner's own proposals.**
 | **6** | **the bare-literal registry** — each literal with its line, the guard asserting it is **still present at that line**, plus registry count == the census's bare-literal count. **It cannot find new ones; that needs judgment** | none | test-only |
 | 7 | full `/api/odds` authentication (**the only thing that closes the route**) · `APP_PASSCODE` steps 2–4 · M28's `src/lib/pass.ts` | **step 4 is LAST** — see §3 | — |
 | 8 | the targeted-capture **landing test** — first day the pair runs, `price-path` must print **n > 0 in 60–120** | the crons delivering | — |
+| **5l** | **🔴 THE GOOD-BOARD SKIP MUST CHECK T, NOT EXISTENCE** (2026-08-02, owner's item 2). `liveCoverage()` (`board-store.ts` L160–181) returns `covered` on `cov.pct >= SKIP_COVERAGE` (0.7) measured over games unstarted *at the later fire*, and **never asks whether the earlier board cleared T when it was built** — so a sub-T early board blocks the better hour. Sidestepped for now by **one entry per weekend day** (§0.045); the fix is what would buy back entry 4's night game | the entry-4 retirement is the interim; needs the stored board to carry its build-time achievable | **NO — engine/skip-path change that moves the hash. RIDES THE NEXT HASH-MOVING SHIP** alongside items 2 and 5 |
+| **5m** | **RE-SORT THE DEFERRAL POPULATION WHENEVER A CONSTRAINT IS RELIEVED** (2026-08-02, §12Z.2). The 08-01 reset re-sorted every *shipped* ration decision because they were listed in §12.9; **the deferred ones are listed nowhere, so the weekend-entries deferral kept running on a dead premise.** This row is the list. **Open deferrals whose stated premise was scarcity, to be re-checked at the next quota event:** entry 4's retirement (would the skip fix reinstate it?), item 5h's vintage-event timing, item 8's landing test, the `--window` retarget (5k) | none — a review, not a change | n/a |
 | 9 | the props-history redesign (**never executed: 0 of 66 runs were `workflow_dispatch`**) · the three orphan test files · `umpKFrozen`'s unpin decision (no date, no condition) · `coreEvMin` · the 1/n cap · A1 · damping · `SH_W` · alt keys · the ungraded-group fix · the ratio surface + both positivity gates (M26) · a proxy per-request `console.log` | various | — |
 
 ---
@@ -2362,6 +2552,37 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.2 LEDGER — A DEFERRED DECISION WHOSE PREMISE DIED BECAME A DECISION BY DEFAULT (2026-08-02)
+
+**CAUGHT BY THE OPERATOR, AND THE LEDGER RECORDS HITS FROM HIS SIDE TOO.**
+
+**THE SHAPE:** the weekend-entries question was queued **under scarcity, at quota 553**. Two Sunday
+fires plus a Saturday fire were priced against a pool that could not carry them, so the question was
+**deferred** — correctly, at the time. **The reset on 2026-08-01 took the pool to 19,190 and killed
+the premise.** **Nobody re-sorted the queue.** The deferral kept running on a reason that had stopped
+being true, and **five weeks of the fullest slates of the week went dark by default rather than by
+decision.**
+
+**WHY IT SURVIVED, WHICH IS THE POINT:** a deferral leaves no artifact. **A shipped decision gets a
+guard, a dated line, and a place in this file; a decision NOT to act leaves nothing that any
+instrument reads**, so when its premise dies there is no red anywhere. Every ration decision in
+§12.9's table was re-sorted after the reset; **this one was not on the table to be re-sorted.**
+
+**THIS IS THE SAME CLASS AS THE RATION DECISIONS (§12.9)** — a conclusion outliving the measurement
+that justified it — and **the same class as instrument defect #8**, where a constant fitted to one
+window was carried for two weeks. **The difference is that this one was found by the owner, not by a
+guard, and no guard here would have found it.**
+
+**COST, PRICED HONESTLY:** at §12.9's restated arithmetic the whole 7-day scope costs **+14.1
+credits/day, moving exhaustion by ~1.2 days**. **The deferral was protecting ~0.5% of the pool per
+week and giving up the two fullest slates.** It was defensible at 553 and indefensible at 19,190,
+**and the record contains no line where that flipped.**
+
+**ENCODED RESPONSE — the generalizable half:** **when a constraint is relieved, the deferrals it
+caused are a POPULATION and must be re-sorted as one.** The reset re-sorted the *shipped* decisions
+because they were listed. **The deferred ones are not listed anywhere, which is why §11 is now the
+place they go** — see item 5m.
 
 ### 12Z.1 SHA-CURRENCY — THE GAP IS ENCODABLE, AND THE GUARD FOUND ITS OWN DESIGN FLAW (2026-08-02)
 
@@ -3695,9 +3916,51 @@ day, ≈ 39 days → ≈ **2026-09-09**. **COLLECTION ALONE DOES NOT REACH 2026-
 | the Variant B suspension | **STRUCK** — 12 credits is 0.06% of the pool, and it measures the very constant this defect is about |
 | the 2.5-day runway alarm | **STRUCK** — computed on the pre-reset pool and the unaudited ratio |
 
+### 🎯 RESTATED 2026-08-02 AT 7 BOARDS/WEEK (§0.04's derivation)
+
+**BOARD COSTS, MEASURED — not assumed, and each with its n:**
+
+| population | n | mean cost | clears T |
+|---|---|---|---|
+| weekday @ `22:45Z` | 10 | **50.8** | 10/10 |
+| Saturday @ `22:45Z` | 7 | **48** | 6/7 |
+| Sunday @ `18:00Z` | 7 | **51** | 7/7 |
+
+**THE DELTA IS +2 BOARDS/WEEK = +99 CREDITS/WEEK = +14.1/DAY.**
+
+| regime | boards/week | board credits/day | + collection 427 | days from 19,190 | exhaustion |
+|---|---|---|---|---|---|
+| **5-day (before)** | 5 × 50.8 = 254/wk | **36.3** | **463.3** | **41.4** | **≈ 2026-09-12** |
+| **7-day (now)** | 254 + 48 + 51 = 353/wk | **50.4** | **477.4** | **40.2** | **≈ 2026-09-11** |
+
+**THE EXHAUSTION DATE MOVES BY ~1.2 DAYS.** Two extra boards a week cost **0.5% of the pool per
+week** against a collection line 8.5× their size. **The 7-day scope is very nearly free, and the
+scarcity premise that justified 5 days does not survive contact with the numbers.** *(Both rows sit
+inside §12.9's older bracket — collection-only 45 days/09-15, one-board-a-day 39 days/09-09 — which
+used assumed rather than measured board costs; these supersede.)*
+
+**🔴 THE FREEZE-EXIT CONCLUSION IS UNCHANGED: 2026-09-22 IS STILL NOT REACHED**, at either regime.
+Adding weekend boards does not change that, and nothing here should be read as relief on it.
+
+### REACHABILITY RESTATED AT 7 BOARDS/WEEK — what moves earlier
+
+| item | at 5/week | **at 7/week** | change |
+|---|---|---|---|
+| **reading 17** — HRR suspension review, **≥10 board-days** | 14 calendar days | **10 days** | **−4 days** |
+| ten boards from **2026-08-02** | ≈ 2026-08-16 | **≈ 2026-08-11** | **−5 days** |
+| **the 08-15 HRR review population** (from 08-02) | 9 boards | **13 boards** | **+44%** |
+| **homogeneous window** (zero boards since the outs flag) | starts Monday | **starts TODAY** | −1 day |
+| **freeze exit 2026-09-22** | unreachable | **unreachable** | **no change** |
+| **parameter exit** — Series A reopen gate | already met on data, needs boards **observed** | **same, reached ~29% sooner** | — |
+
+**Reading 17's "UNREACHABLE without a reset" was written at quota 1,461. At 19,190 with 7 boards/week
+the ≥10 board-day threshold is ~10 days out** — the reachability half of that reading restates, and
+its retirement half (repair+10) is unaffected.
+
 **DARK BOARD-DAYS: SIX COMPLETED** (the sixth recorded 2026-08-01 in §0.3, **chosen**, window still
-open). **Sunday 2026-08-02 is PENDING as the seventh** — §0.06 records that Sunday has **no headered
-cron**, so it is dark unless Josh curls the window.
+open). **Sunday 2026-08-02 was pending as the seventh — §0.04/§0.045 make it board 1 instead if the
+entry-3 edit lands before 18:00Z.** §0.06's "Sunday has no headered cron" is the *condition being
+repaired*, not a standing fact.
 
 **THE HOMOGENEOUS WINDOW IS AT ZERO BOARDS.** No board has generated since the outs flag shipped;
 the flag is **LIVE but UNEXERCISED**.
