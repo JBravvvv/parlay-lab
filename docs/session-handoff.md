@@ -211,6 +211,98 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.05 🔴 THE GATE IS NOT SATISFIED BY THE ARITHMETIC — RECORDED 2026-08-02T00:14:06Z
+
+**THE OWNER'S INSTRUCTION WAS TO RELEASE THE GATE ON THE READING THAT BOTH BURSTS CLOSE AT MEASURED
+`c` — 07-31 at 11.5, 08-01 at 12.4. THE MEASUREMENT DOES NOT SUPPORT IT, AND THE REASON IS
+ARITHMETIC RATHER THAN JUDGEMENT.**
+
+### 0.05a THE 07-31 BURST HAS NO DELIVERIES TO PRICE
+
+| inside `2026-07-31T16:10:13Z → 19:11:31Z` | count |
+|---|---|
+| credits spent | **146** |
+| archived props events | **0** |
+| `props-history` runs | **0** |
+| `line-history` runs | **0** |
+| Actions runs of any kind | **1** — `board-archive` at 17:12:01Z |
+
+`board-archive` runs `tools/archive_boards.py`, whose only two call shapes are `/api/board`, and
+`/api/board` contains no Odds-API reference. **Zero credits.**
+
+> **`c × 0 = 0` FOR EVERY VALUE OF `c`, INCLUDING 11.5.** To close 146 at c = 11.5 the window would
+> need ≈ 12.7 delivered events. **It has none.** No re-pricing closes a window with nothing in it.
+
+### 0.05b TODAY DOES NOT CLOSE EITHER, ON THE MOST GENEROUS MODEL
+
+Bounded on the **fetch** count, not the archive: `4 × (1 + 16×6) + (1 + 3×6) + 0 = 407` maximum
+attributable against **621** measured. **≥ 214 survives.** At c = 12.4 × 55 archived = 682, which
+**exceeds** the 621 actually spent — a value that over-attributes is not a closure, it is a
+different error in the other direction.
+
+### 0.05c `/api/clv` — TRACED THIS TURN AND RULED OUT, WHICH IS NEW
+
+It was the best remaining candidate: it **can** reach the Odds API (L89 `regions=us,eu&markets=h2h,spreads`
+= 4 credits; L107 per-event props), and cron-job.org runs it **96×/day** — a scheduler the **Actions
+log cannot see**. That is exactly the shape a continuous unattributed drain would have.
+
+**It spends nothing during the dark stretch.** Four early returns precede any fetch, and the fourth
+is decisive: **`if (!entry) return … skipped: "no locked card today"`.** `docs/cron-jobs.md` L220
+records that **the ledger has been dark since the NO-PLAY window opened.** No locked card, no
+pending legs, no fetch. **Ruled out on the code path, not on assumption.**
+
+> **THE EXTERNAL-ACTOR HYPOTHESIS IS NOT DEAD. IT IS NARROWER AND STRONGER:** every scheduled
+> spender in this repo is now traced and accounted, on both schedulers, and **146 on 07-31 plus
+> ≥214 today remain.** The Vercel function log is still the instrument that resolves it.
+
+### 0.05d THE DECISION IS THE OWNER'S; THE RECORD KEEPS BOTH
+
+**The fire decision belongs to Josh and this document will carry whatever he decides.** What it will
+not carry is *"both bursts closed at measured c"* as a **finding**, because that is a statement about
+numbers and the numbers say otherwise. **If the board fires tomorrow it is recorded as
+`OWNER'S DECISION, TAKEN UNDER A DISAGREEMENT WITH THE INSTRUMENT`, dated, with this arithmetic
+beside it** — the same append-only discipline every correction in this file follows.
+
+**AND THE COST THE OWNER NAMED IS REAL AND STANDS, WITH ONE CORRECTION.** Dark days five, six and
+seven were chosen against a residual whose SIZE was inflated by an unaudited attribution method
+(§12X). **The residual itself was never a phantom — it is still there at 146 and ≥214.** What was
+wrong was how confidently its size was stated, not that it existed. **The collection window is
+append-only and those fixture-days are unrecoverable; that sentence belongs in §13 and is not a
+footnote.**
+
+## 0.06 TOMORROW — SUNDAY 2026-08-02. THERE IS NO HEADERED CRON.
+
+**Today is Saturday 2026-08-01. Tomorrow is Sunday. Monday is 08-03.**
+
+| entry | schedule | headered? | Sunday? |
+|---|---|---|---|
+| **1** | `45 22 * * 1-5` | **YES** (`x-cron-key`) | **NO — weekdays only** |
+| 2 | `0 18 * * 6` | no | Saturday, 401 at zero cost |
+| 3 | `0 17 * * 0` | **no** | **Sunday — 401 at zero cost** |
+| 4 | `30 22 * * 0` | **no** | **Sunday — 401 at zero cost** |
+
+> **SUNDAY HAS NO HEADERED ENTRY. THE FALLBACK CURL AT THE WINDOW IS THE PLAN, NOT THE BACKUP.**
+> Entry 1's edits get their first real test **Monday 2026-08-03 at 22:45Z**, unchanged.
+
+**IF A BOARD IS FIRED TOMORROW** the sequence is §1's block verbatim — quota READ, the `x-cron-key`
+curl (**not** the phrase: `route.ts` L101/L105/L289 stamp `trigger` from the auth path, and reading 5
+requires `"header"`), quota READ, then the chain: `gen=list` → echo present in the response body →
+cfSel stamp on every suspended row → `self_consistency.py` with **both** population sizes →
+app-switcher double reopen → HRR rows present and greyed → replay + ParlayPred membership diff →
+Control C's predictions vs the pre-commitments → ticket count vs both pre-commits → **step 15 last,
+mode returned to `ev_gated` as the immediately following action.**
+
+**Readings 24–29 and 15/15(c) run from the tools** (`board-report.mjs`, `burn-report.mjs --pred`,
+`ledger-report.mjs`). **The echo now carries 27 fields** (§12N) — the four brakes and the four
+asked-for keys included, so tomorrow's is the first board that testifies to its own brake state.
+**The sixteen unevaluated checks (§13C) evaluate for the first time**, fourteen of them on this one
+board.
+
+**THE FIRE BRANCHES, UNCHANGED:** achievable **≥ 0.80** → composition readings valid, full fifteen
+steps; **below** → engine-half only. **The four 200-without-a-board bodies are STOPs. No force. No
+retry.** **Reads 2 and 4 remain the owner's phrase-curls** — worth running before the board, and they
+have never blocked it.
+
 ## 0.15 🔴 THE COST MODEL IS RIGHT AND THE DENOMINATOR IS WRONG — c IS NOT A COST
 
 **THE PREMISE THIS ITEM WAS SET ON DOES NOT SURVIVE MEASUREMENT.** *"Today's measured per-event cost
@@ -1802,6 +1894,53 @@ join) · **5f** (seven TS/TSX mirrors) · **5g** (null-context fixture) · **5h*
 a VINTAGE EVENT that releases brake 2 and must not ride with the first board in five days). **Each
 is covered meanwhile by an assertion at the source rather than by a promise.**
 
+### 12X. INSTRUMENT DEFECT #8 — THE ATTRIBUTION METHOD, UNAUDITED AND LOAD-BEARING
+
+**ATTRIBUTED TO ME, NOT TO A TOOL.** `quota.mjs` got a fabrication audit; `ledger-report`,
+`board-report`, `burn-report`, `price-path` and `verify-served-engine` each got one. **The constant
+that turned quota deltas into attributions never did** — and it is the one the gate was built from.
+
+**THE DEFECT, STATED PRECISELY, BECAUSE THE OBVIOUS VERSION IS WRONG.** It is **not** that the price
+was wrong. `snapshot_props.py` L323 requests `regions=us` × six markets — **6 credits per event
+fetched, fixed by the request shape** — and that model is correct. **The defect is the ATTRIBUTION
+METHOD: `spent ÷ archived events`, generalized from ONE window (07-31 06:41→13:57, 339/58 = 5.84)
+and used for two weeks as though it measured a price.** It does not. The archive keeps only events
+whose response carried bookmakers (L325–326 `continue`); every dropped event was **billed and never
+recorded**. **So the denominator is a survivor population and the ratio is a drop-rate estimator.**
+
+**HOW IT WAS FOUND: the same method that found the other seven — re-derive from the archive and diff
+against the model — applied two weeks late.** The series it produces (5.21 · 5.84 · 11.15 · 11.29 ·
+11.94 · 20.00) has no constant in it, which is the tell.
+
+**WHAT IT WAS LOAD-BEARING FOR:** every burn figure · both runway bands · the ration tables · the
+ten-to-four cron cut · the Variant B suspension · the 2.5-day runway alarm · **and the gate.**
+
+### 12X.1 THE RATION DECISIONS, SORTED AND DATED
+
+| decision | verdict at the audited number |
+|---|---|
+| **the `line-history` disable** | **HELD, for reasons independent of `c`.** It was disabled because **nothing reads its output** — a repo-wide grep found zero consumers of `data/YYYY-MM-DD.json`. That is true at any price. **Confirmed twice more since: zero runs on 07-31 and 08-01** |
+| **MIN_GAP** | **HELD, for reasons independent of `c`.** The dedupe is a COUNT of deliveries against payments, not a price: 07-28 replay 10 → 5 paid; 07-31 **8 runs → 4 paid**; 08-01 **7 runs → 6 snapshots**, the 20:01:26Z run skipping. **Real at any `c`** |
+| **the ten-to-four cron cut's URGENCY** | **OVERSTATED.** The cut itself was defensible — 4 of 8 archived closes came from two bands — but the *urgency* was argued from a runway computed on the unaudited ratio. **Original reasoning preserved; the alarm that drove its timing is corrected** |
+| **the Variant B suspension** | **WRONG.** Suspended because "its 12 credits measure a billing constant while 146 are unaccounted for." **12 credits is 0.06% of 19,337.** The suspension bought nothing and cost the measurement |
+| **the 2.5-day runway alarm** | **WRONG.** Computed on the pre-reset pool and the unaudited ratio. **The audited figure is ~427/day → ~45 days** |
+
+**REVERSAL WARRANTED AT THE AUDITED NUMBER, for the owner to decide:** **Variant B — 12 credits,
+0.06% of the pool, and it measures the billing constant this entire defect is about.** It is the
+cheapest possible purchase of the thing that was missing. **Not run; the owner's call.**
+
+### 12X.2 THE REASONING-NOT-MEASUREMENT LIST — THIRD ENTRY, AND WHAT THE THREE HAVE IN COMMON
+
+> **HEADER, ADDED 2026-08-01: all three entries are the same error — TRUSTING A MODEL OF A
+> MEASUREMENT AS IF IT WERE THE MEASUREMENT. Three is a pattern, and the list says so rather than
+> leaving it to be noticed.**
+
+| # | entry | whose |
+|---|---|---|
+| 1 | the **count-armed accrual argument** — the ~08-04 crossing projection, wrong about the rate; four crossings arrived in three days | mine |
+| 2 | the **same-team HR rule** — reasoned, then measured, then refuted | the owner's, measured out |
+| 3 | **the `c = 5.84` attribution constant** — one window generalized to two weeks without an audit | **mine** |
+
 ### 12A. THE TOOLS ON REAL INPUT (2026-07-31, owner's item 1)
 
 **THE CLASS: a tool whose tests feed it a synthetic shape has never been tested.** Two were found
@@ -3087,6 +3226,57 @@ collection doc's top line.**
 
 ---
 
+
+### 13D. THE CALENDAR RESTATED ON THE AUDITED NUMBER — ONCE, NOT PIECEMEAL
+
+**THE PLANNING RATE IS ~427/DAY, NOT ~800.** ~800 came from `c ≈ 12 × archived events`, and
+**`c ≈ 12` is a drop rate, not a price** (§12X). The audited figure is the request shape: **6 credits
+per event fetched**, plus 1 for the events list.
+
+| line | per day |
+|---|---|
+| four full props crons (≤16 events each) | 4 × (1 + 16×6) = **388** |
+| two `--window 120` crons (~3 events each) | 2 × (1 + 3×6) = **38** |
+| `board-archive`, `context`, `pages` | **0** — no Odds-API reference on any path |
+| **`/api/clv` × 96** | **0 while the ledger is dark**; ~4–30 per run once a card locks |
+| **COLLECTION TOTAL** | **~427** |
+
+**POOL 19,337 ÷ 427 ≈ 45 DAYS → exhaustion ≈ 2026-09-15.** The freeze runs to **2026-09-22**, so
+**collection alone does not reach the end of the freeze by ~7 days** — and that is *before* any
+board.
+
+| calendared item | needs | reachable at ~427/day collection + 1 board/day? |
+|---|---|---|
+| **one board per day to 09-22** | 52 days × ~65 | **NO.** 427 + 65 = 492/day → 19,337 ÷ 492 ≈ **39 days**, exhaustion ≈ **2026-09-09** |
+| **the 08-15 HRR review** | boards through 08-15 | **YES** — 14 days at 492/day = 6,888, well inside |
+| **the parameter exit's Series A** | the reopen clock: `mktN ≥ consMinN = 100` per market | **7 of 9 markets ALREADY clear 100** (read 3, §0.4). **The gate is met on the data; it needs boards to be *observed*, not more accrual** |
+| **`coreNoHR` / CV follow-ups** | POST-filter board populations | **YES** if boards run; they are board-derived, not accrual-derived |
+| **the collection period to 09-22** | ~427/day × 52 = **22,204** | **NO — exceeds the pool by ~2,900** |
+
+> ### 🔴 THE SENTENCE THAT MOVES TO THE TOP OF THE COLLECTION DOC, AND THIS TIME ON AN AUDITED
+> ### NUMBER: COLLECTION AS CURRENTLY SCHEDULED DOES NOT REACH 2026-09-22.
+> It runs out ~09-15 on collection alone, ~09-09 with one board a day. **The lever is the four full
+> props crons at 388/day — 91% of collection.** Windowing all six (or cutting to the two
+> load-bearing close bands) brings collection to **~130/day and the pool to well past the freeze**,
+> at a measured cost in capture density that §4C already prices. **Not decided here; priced here.**
+
+**AND THE HONEST CAVEAT ON ALL OF THE ABOVE:** these figures assume the **fetch** count is `≤16`
+per unwindowed run. **Nothing on disk records the actual fetch count** — §11 item **5i** is the
+one-line `print()` that would turn every number in this table from an upper bound into a measurement.
+
+### 13E. `--wait` IS NOT NEEDED — THE DELAY IS AN HOUR, NOT THREE
+
+**The premise that fixed-hour targeting is dead does not survive the measurement.** Today's five
+matched deliveries ran **+40, +44, +56, +66, +80 minutes** behind their declared hours — **median
+~56, spread ~40 minutes.** That is tight enough for a fixed hour to land a 60-minute-wide bucket.
+
+> **The two `--window` crons are MIS-TARGETED BY ~2 HOURS, not defeated by variance.** At a 56-minute
+> median, a capture landing 60–120 min before a ~23:05Z first pitch wants **≈ `20 20 * * *`**, not
+> `10 18`. **Retarget (§11 item 5k). `--wait` stays unrun and unneeded for this purpose.**
+>
+> **IF the delay distribution later proves unstable across weeks** — today is one day, and one day is
+> not a distribution — **then `--wait` returns, and the standing rule holds: it runs manually once
+> before it ships.** Recorded as the contingency, not the plan.
 
 ### 13C. THE UNEVALUATED BACKLOG — SIXTEEN CHECKS WAITING ON A BOARD (2026-08-01, owner's item 3)
 
