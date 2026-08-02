@@ -22,6 +22,32 @@ import { num } from "./strict.mjs";
 export const KELLY_STAKE_MULT = 4;
 const HRR = "batter_hits_runs_rbis";
 
+/**
+ * PLACEMENT CENSUS (2026-08-02). Three states counted separately — placed / not-placed /
+ * UNANSWERED — because pooling the last two is exactly the population error this project keeps
+ * finding: it converts "we don't know" into "he passed" and quietly changes the denominator of
+ * every realized-money figure. `placed == null` is unanswered; `false` is a recorded decision.
+ * Also reports placed tickets whose `actualStake` differs from the sized `stake`, since real
+ * money differing from the sizing is a fact about the operator, not an error.
+ */
+export function placementCensus(entries) {
+  let tickets = 0, placed = 0, notPlaced = 0, unanswered = 0;
+  const stakeMismatch = [];
+  for (const e of entries ?? []) {
+    for (const t of [...(e.core ?? []), ...(e.funT ?? [])]) {
+      tickets++;
+      const p = t?.placed;
+      if (p === true) {
+        placed++;
+        const a = num(t?.actualStake), s = num(t?.stake);
+        if (a !== null && s !== null && a !== s) stakeMismatch.push({ date: e.date, id: t.id ?? null, stake: s, actualStake: a });
+      } else if (p === false) notPlaced++;
+      else unanswered++;
+    }
+  }
+  return { tickets, placed, notPlaced, unanswered, stakeMismatch };
+}
+
 const amToDec = (a) => { const n = Number(a); if (!Number.isFinite(n) || n === 0) return null; return n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n); };
 const amToProb = (a) => { const n = Number(a); if (!Number.isFinite(n) || n === 0) return null; return n > 0 ? 100 / (n + 100) : Math.abs(n) / (Math.abs(n) + 100); };
 
@@ -206,6 +232,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`>>> GATE: N = ${entries.length}. The mode split and the overstake query are DENOMINATED IN THIS NUMBER.`);
   if (entries.length !== 38) console.log(`>>> N != 38. The owner's "38" is unverified and has no on-disk record; every "38" in the sub-readings is CORRECTED TO ${entries.length}, dated. This is a correction, not a discrepancy to reconcile.`);
   for (const w of warnings) console.log(`!!! WARNING: ${w}`);
+  /* ▶ PLACEMENT CENSUS, ABOVE THE FOLD (2026-08-02, owner's item 2). The system locks every
+     day and never places, so from here the ledger holds tickets nobody answered for. THREE
+     STATES, printed separately and never pooled: an UNANSWERED ticket is not a no-play, and
+     reading it as one would inflate the pass rate and shrink the realized-P&L denominator with
+     no error anywhere. This prints before every other figure because every other figure that
+     mentions money is denominated in the PLACED count, not the ticket count. */
+  const pl = placementCensus(entries);
+  console.log(`placement: ${pl.placed} placed · ${pl.notPlaced} not-placed (a decision) · ${pl.unanswered} UNANSWERED, of ${pl.tickets} tickets`);
+  if (pl.unanswered) console.log(`>>> ${pl.unanswered} TICKETS UNANSWERED. Every realized-money figure below is over the ${pl.placed} PLACED, not the ${pl.tickets} ticket rows. An unanswered ticket is NOT a no-play.`);
+  if (pl.tickets === 0) console.log(`>>> VACUOUS: zero tickets. The placement census is a zero over an EMPTY population and says nothing.`);
+  else if (pl.placed === 0) console.log(`>>> VACUOUS FOR P&L: zero PLACED tickets. Realized-money readings have no population; the record is decisions only.`);
+  if (pl.stakeMismatch.length) console.log(`>>> ${pl.stakeMismatch.length} placed tickets carry actualStake != stake (real money differed from the sizing): ${JSON.stringify(pl.stakeMismatch.slice(0, 5))}`);
   console.log();
   const o = overstake(entries);
   const excluded = o.rows.filter((r) => r.ratio == null).length;

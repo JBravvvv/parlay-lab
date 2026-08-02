@@ -16,8 +16,30 @@
 export type SyncTicket = {
   id?: string;
   confirmed?: number | null;
+  /**
+   * PLACEMENT (2026-08-02). The system locks a card every day and NEVER places; these are the
+   * only fields that record what Josh actually did with it. THREE STATES, and the third is the
+   * point: `true` = placed · `false` = deliberately NOT placed, a decision · `null`/absent =
+   * UNANSWERED. **Reading a null as a false turns "we don't know" into "he passed"**, which
+   * silently changes the denominator of every P&L figure — so null is preserved and counted.
+   */
+  placed?: boolean | null;
+  /** What was actually risked, which need not equal the sized stake. Null until answered. */
+  actualStake?: number | null;
   [k: string]: unknown;
 };
+
+/**
+ * Per-ticket fields that ACCRUE after the lock and must survive a merge from either side.
+ *
+ * WHY THIS IS A LIST AND NOT THREE COPIES OF THE SAME CODE: `mergeDay` deep-copies the
+ * pickBase winner, so any per-ticket field NOT named here is DROPPED when the other device
+ * wins. `confirmed` was the only member and the rule lived inline; adding `placed` without
+ * generalising would have lost real-money answers to a background sync with no error anywhere.
+ * **Anything added to a ticket after the lock belongs in this list.**
+ * Guard: `tests/placed-field.test.ts` (observed red on all three fields before the fix).
+ */
+export const ACCRUAL_FIELDS = ["confirmed", "placed", "actualStake"] as const;
 
 export type SyncEntry = {
   date: string;
@@ -50,6 +72,19 @@ export function validateLedger(x: unknown): { ok: true; entries: SyncEntry[] } |
     if (!Array.isArray((e as SyncEntry).core)) return { ok: false, error: `entry ${d} has no core tickets array` };
     if (seen.has(d)) return { ok: false, error: `duplicate date ${d}` };
     seen.add(d);
+    /* PLACEMENT SHAPE (2026-08-02) — validated only WHEN PRESENT, so every existing client
+       stays valid and the field is purely additive. A malformed `placed` must not reach the
+       store: it is the denominator of the realized-P&L population. */
+    for (const t of [...(e as SyncEntry).core, ...((e as SyncEntry).funT ?? [])]) {
+      const p = (t as SyncTicket).placed;
+      if (p !== undefined && p !== null && typeof p !== "boolean") {
+        return { ok: false, error: `entry ${d}: placed must be boolean or null, got ${typeof p}` };
+      }
+      const s = (t as SyncTicket).actualStake;
+      if (s !== undefined && s !== null && !(typeof s === "number" && Number.isFinite(s) && s >= 0)) {
+        return { ok: false, error: `entry ${d}: actualStake must be a finite number >= 0 or null` };
+      }
+    }
   }
   if (JSON.stringify(x).length > MAX_BYTES) return { ok: false, error: "ledger too large" };
   return { ok: true, entries: x as SyncEntry[] };
@@ -89,12 +124,20 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   if (other.clv) {
     out.clv = { ...JSON.parse(JSON.stringify(other.clv)), ...(out.clv ?? {}) };
   }
+  /* FILL-ONLY, per field, over ACCRUAL_FIELDS. An existing answer is never overwritten in
+     either direction — `!= null` treats `placed:false` as an ANSWER, so a false fills a null
+     and nothing overwrites a false. Two devices holding true-vs-false for the same ticket is a
+     genuine conflict this merge cannot adjudicate; pickBase order decides it, and that is
+     stated rather than hidden. */
   const fill = (mine: SyncTicket[], theirs: SyncTicket[] | undefined) => {
     if (!theirs) return;
     for (const t of mine) {
-      if (t.confirmed != null || !t.id) continue;
+      if (!t.id) continue;
       const m = theirs.find((o) => o.id === t.id);
-      if (m && m.confirmed != null) t.confirmed = m.confirmed;
+      if (!m) continue;
+      for (const f of ACCRUAL_FIELDS) {
+        if (t[f] == null && m[f] != null) (t as Record<string, unknown>)[f] = m[f];
+      }
     }
   };
   fill(out.core, other.core);
