@@ -10,7 +10,121 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
-## 1. 🎯 THE FIRE BLOCK — FIRST IN THE FILE, NOTHING ELSE TO READ (Sat 2026-08-01)
+## 0.0 🎯 THE JOSH BLOCK — FIRST IN THE FILE. TWO DASHBOARD READS, NOTHING ELSE.
+
+*Assembled 2026-08-02T04:08:22Z from the pieces already on disk — §2's six-things list, §3's env-var mechanism,
+§4A's hardened reads. **The ASSEMBLY is this turn's; every clause in it is quoted from those
+sections.** Re-issued unchanged from the last relay.*
+
+```
+━━━ THE VERCEL FUNCTION LOG — the gate's last instrument ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Vercel → parlay-lab → Logs → filter: /api/odds
+
+PULL TWO WINDOWS:
+  A)  2026-07-31  16:10:13Z → 19:11:31Z     TARGET: 146 credits
+  B)  2026-08-01  01:35:56Z → 22:41:20Z     TARGET: >=214 — A LOWER BOUND, see the
+                                            attribution-bracket rule in section 0.03
+
+SIX THINGS TO LOOK FOR (section 2, written before the log was opened):
+  1. count + timestamps of /api/odds invocations
+       ~24 at regular ~7.5-min spacing -> POLL;  irregular -> session;
+       fewer than ~24 -> the market x region product differed, redo the arithmetic
+  2. user-agent / referer / IP shape
+  3. `fresh=1` present on the query string
+  4. direct hits vs page renders
+  5. /api/generate, /api/propsnap, /api/clv in the same window
+  6. the same cadence BEFORE 16:10Z
+
+DISAMBIGUATION — THE MARKET LIST IS THE ONLY DISCRIMINATOR:
+  OURS       = 6 markets, regions=us ONLY
+               batter_hits, batter_total_bases, batter_home_runs,
+               batter_hits_runs_rbis, pitcher_strikeouts, pitcher_outs
+  SharpDesk  = 3 markets, regions=us,eu  (h2h, totals, spreads)
+  BOTH COST ~6 CREDITS PER CALL, so per-call cost cannot tell them apart.
+  146 / ~6 ~= 24 calls over 3.02h ~= one every 7.5 minutes.
+
+BRANCHES, pre-committed:
+  regular ~7.5-min non-browser  -> EXTERNAL POLLER; gate the route, not the collection
+  irregular browser UA + our referer -> session, operator-side
+  `fresh=1` present            -> that is the mechanism regardless of caller
+  cadence predates 16:10Z      -> every relay-vs-use contrast is CONFOUNDED
+  nothing accounts for it      -> the spend did not come through our routes;
+                                  next candidate the Odds key in use outside this deployment
+  IMPOSSIBLE: requests present but the arithmetic does not fit
+                               -> PRINT BOTH NUMBERS; one instrument is wrong
+
+  ⚠️ PRIOR FROM SECTION 0.03a: the residual is EPISODIC, not continuous — 1.17h of
+     continuous ZERO spend immediately after the burst, where an always-on poller at
+     48.3/h would have spent ~56. A regular 7.5-minute cadence cannot produce a
+     70-minute hole. THE POLLER BRANCH OPENS WEAKENED.
+
+━━━ THE ENV VAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Vercel → Settings → Environment Variables → is APP_PASSCODE set?
+⚠️ DO NOT SET IT. MECHANISM: /api/odds route L36-40 401s a fresh=1 with no x-pl-pass and
+   does NOT fall through to cache, so snapshot_props.py retries 3x, prints
+   "skipped: proxy unreachable" and returns — THE MORNING BATCH COLLECTS NOTHING.
+   And M28 blocks it independently: the device passcode is written to
+   localStorage.pl_pass and NO CLIENT CODE SENDS IT, so /api/sharp 401s on every device.
+
+━━━ READS 2 AND 4 — YOUR PHRASE. CONFIRMATORY, NOT BLOCKING. ━━━━━━━━━━━━━━━━━━━━━━━━━
+set -o pipefail
+
+curl -sS -H "x-pl-sync: <PHRASE>" \
+  "https://parlay-lab-six.vercel.app/api/predictions?date=2026-07-30" -o ~/pl-pred-0730.tmp
+echo "curl_exit=$?"          # non-zero => STOP, do not run the tool on a partial file
+mv ~/pl-pred-0730.tmp ~/pl-pred-0730.json
+node tools/burn-report.mjs --pred ~/pl-pred-0730.json; echo "tool_exit=$?"
+   STOP: {"error":"bad-sync-key"} -> phrase wrong, do NOT retry read 4 with it (exit 65)
+   STOP: {"error":"sync-not-configured"} -> env, not phrase
+
+curl -sS -H "x-pl-sync: <PHRASE>" \
+  https://parlay-lab-six.vercel.app/api/ledger -o ~/pl-ledger.tmp
+echo "curl_exit=$?"          # ~/pl-ledger.json still holds the last good export
+mv ~/pl-ledger.tmp ~/pl-ledger.json
+node tools/ledger-report.mjs ~/pl-ledger.json; echo "tool_exit=$?"
+   HARD STOP: ">>> AND N carry selMode ev_gated" -> the ceiling failed INSIDE the
+              disciplined branch; that outranks the board
+   STOP: {"ledger":[]} at 200 -> the store is EMPTY, every sub-reading vacuous
+```
+
+**PRE-COMMITTED READING:** the log attributes the residual → **the gate's condition is met on
+evidence and the board plan executes as written.** It does not → **the external-actor branch is live
+at its measured size and everything downstream waits.** **IMPOSSIBLE:** requests whose arithmetic
+exceeds the unattributed spend → **print both derivations; one instrument is wrong.**
+
+---
+
+## 0.001 ⚠️ RECONCILIATION — WHAT THIS SESSION MADE STALE (2026-08-02T04:08:22Z)
+
+**THE `0.x` SECTIONS ARE IN INSERTION ORDER, NOT LOGICAL ORDER**, because each was prepended before a
+fixed anchor. **Addresses are unique (rule G passes), so no reference is ambiguous** — but read them
+by this table, not by position. **Deliberately NOT reordered: a 3,800-line restructure minutes before
+compaction is the risk, not the fix.**
+
+| section | status |
+|---|---|
+| **0.0 THE JOSH BLOCK** | **CURRENT — read first** |
+| **0.01 THE GATE, AMENDED** | **CURRENT — supersedes 0.05's conclusion** |
+| **0.02 / 0.03 the bracket + interval table** | **CURRENT — the attribution-bracket rule lives here** |
+| 0.05 the gate not satisfied | **SUPERSEDED BY 0.01.** Its ARITHMETIC stands; its conclusion is amended |
+| 0.06 "tomorrow — Sunday" | **STALE BY A DAY.** Written 08-01 for 08-02; it is now 08-02 |
+| **§1 THE FIRE BLOCK** | **🔴 STALE. The Saturday 22:38Z window CLOSED unfired (0.3).** Its command sequence and STOP rules remain correct for any future fire; its date, coverage numbers and "tomorrow" framing are 08-01's |
+| 0.2 / 0.3 / 0.4 the 08-01 reads and attribution | **CURRENT as history** |
+| 0.15 / 0.16 / 0.17 cost model, queue delay, calibration | **CURRENT** |
+| 0.5 PRE-READ STATE | **PARTLY STALE** — its quota line predates the 03:56:35Z reading |
+| §2 THE OPEN QUESTION | **CURRENT, and its size is now bracketed rather than fixed** |
+| §4A the four reads | **reads 1 and 3 RUN (0.4); reads 2 and 4 OPEN** |
+
+## 1. 🎯 THE FIRE BLOCK — Sat 2026-08-01 — 🔴 STALE, WINDOW CLOSED UNFIRED
+
+> **🔴 STALE AS OF 2026-08-02. The Saturday 22:38Z window closed without a board — recorded in
+> §0.3 as the sixth dark board-day, CHOSEN at 22:54:10Z with the window still open.** The block
+> below is preserved BYTE-VERBATIM because its **command sequence, its four STOP bodies and its
+> `x-cron-key`-not-the-phrase rule remain correct for any future fire**. Its **date, coverage
+> figures, "tomorrow" framing and the four board branches are 08-01's** and are superseded by
+> §0.01's amendment. **Read §0.0 first.**
+
+### (verbatim below, unchanged since `03c4ae4`)
 
 **FIRE AT 22:38Z = 15:38 PT.** Window 22:10Z–23:00Z (T = 0.80 crosses at **22:10Z**, 0.818 over
 11 unstarted; **22:38Z reads 0.909 over 11** and is the fire point — waiting from 22:10 costs no
@@ -723,8 +837,12 @@ remain UNREAD.**
 
 ## 0.5 🎯 PRE-READ STATE — 2026-08-01, the verification layer CLOSED (§12W)
 
+**🔴 THIS QUOTA LINE IS STALE — see §0.02. CURRENT: 19,190 remaining / 810 used at
+`2026-08-02T03:56:35.412Z`**, the last row of `data/quota-log.jsonl` and the open end of the
+weekend bracket. *(The line below is 08-01's and is kept because §0.2's attribution is denominated
+in it.)*
 **QUOTA: 19,958 remaining / 42 used, at `2026-08-01T01:35:56.369Z`.** Last row of
-`data/quota-log.jsonl`. **No Odds credit has been spent since.** (Pre-reset it read 553 / 19,447 at
+`data/quota-log.jsonl` at the time of writing. (Pre-reset it read 553 / 19,447 at
 `2026-07-31T21:04:11.529Z`.)
 
 **THE FOUR READS, IN ORDER — full block with the hardening at §4A. Each one's STOP, one line:**
@@ -2065,6 +2183,35 @@ with the typical case — **observed in this repo's own record rather than argue
 > entries fired** — `10 18` → 19:30:17Z (captured, `3 of 29`) and `55 18` → 20:01:26Z (fired, then
 > `skipped: no unstarted games`). **The check is the protocol, not distrust of the other side.**
 
+### 12Y.4 THE MECHANISM, CLOSED — AND THE CHANNEL DEFECT (2026-08-02T04:10:11Z)
+
+**MECHANISM: RELAY-SIDE CARRIAGE, NOT RECONSTRUCTION.** The misrouted brief answered a screenshot
+taken from the sibling session, and the relay carried it here. **`3fdd34b` and `8505800` are that
+repo's shas.** The refusal to grep siblings was correct and **the question closes without it** —
+a reconstructed brief would not have produced internally consistent facts for a specific other repo.
+**This is a DISTINCT mechanism from the other five ledger entries in §12Y.2**, which remain
+reconstruction-across-compactions and point the direction measured there.
+
+**ONE CORRECTION TO THE CLOSING BRIEF: NOTHING BOUNCED.** The premise that the four-item block's
+responses were lost is about the **relay**, not this repo. **Every item ran and committed:**
+
+| item | sha | status |
+|---|---|---|
+| instrument defect #8 (§12X) | `8aaad6d` | **ran, committed, pushed** |
+| reasoning-not-measurement 3rd entry + header (§12X.2) | `8aaad6d` | **ran** |
+| ration decisions sorted (§12X.1) | `8aaad6d` | **ran** |
+| calendar restatement (§13D) | `8aaad6d` | **ran** |
+| `--wait` decision (§13E) — *it says `--wait` is NOT needed* | `8aaad6d` | **ran** |
+| gate disagreement + Sunday cron (§0.05, §0.06) | `8aaad6d` | **ran** |
+| relay protocol (§12Y) | `7c456b2` | **ran** |
+
+**🔴 THE CHANNEL DEFECT, RECORDED BECAUSE IT EXPLAINS THE LOSS PATTERN:** **screenshots and
+body-text cross the relay; DOCUMENTS ARRIVE EMPTY.** That is why responses read as absent on the
+analyst side while the commits exist here. **IN-CONTEXT-ONLY-UNVERIFIED: the empty-document
+behaviour itself.** It is reported from the other side of the relay and **cannot be observed from
+this session** — no instrument here sees the channel. **Resolved by the analyst side reproducing it,
+or by pasting body text instead of attaching a document and seeing whether it lands.**
+
 ### 12Y.3 WHAT THIS TURN DID NOT DO
 
 **Items 2, 3 and 4 of the brief are not actioned.** They concern league waiver settings, a
@@ -3341,6 +3488,52 @@ place** (the M27 failure mode); converting it is queued.
 
 ---
 
+## 12.9 🔴 POSITION, BROUGHT CURRENT 2026-08-02T04:09:16Z — supersedes §13's opening figures
+
+**QUOTA: 19,190 remaining / 810 used at `2026-08-02T03:56:35.412Z`.** Weekend bracket OPEN at this
+reading. First leg already measured (§0.02): **147 spent over 5.25 h, 31–97 attributable, residual
+≥50 at 9.5–22.1/h.**
+
+**THE COST MODEL, CORRECTED (§12X):** the billing object is **`markets × regions` per request**.
+`snapshot_props.py` L323 sends `regions=us` × six markets → **6 credits per event FETCHED**, plus 1
+for the events list. **`c = spent ÷ archived` IS NOT A COST — it is a DROP-RATE ESTIMATOR**, because
+L325–326 drops any event whose response carried no bookmakers **after billing it**. The series it
+produces (5.21 · 5.84 · 11.15 · 11.29 · 11.94 · 20.00) **has no constant in it, and that is the tell.**
+
+**ATTRIBUTION IS A BRACKET, NOT A NUMBER** (§0.03): `spent − upper ≤ residual ≤ spent − lower`,
+where upper assumes a full sixteen fetched per delivering run. **Four intervals go NEGATIVE at the
+upper bound (−232, −76, −49, −97), which proves the upper bound is loose, not that the series is
+wrong.** **Every residual figure in this file is a LOWER BOUND until §11 item 5i prints the fetch
+count.**
+
+**COLLECTION ≈ 427/day** — four full props crons (4 × (1+16×6) = 388) + two windowed (2 × 19 = 38);
+`board-archive`, `context`, `pages` and `/api/clv` all **0** (clv exits at `no locked card today`
+while the ledger is dark). **19,190 ÷ 427 ≈ 45 days → exhaustion ≈ 2026-09-15.** With one board a
+day, ≈ 39 days → ≈ **2026-09-09**. **COLLECTION ALONE DOES NOT REACH 2026-09-22.**
+
+**RATION DECISIONS, SORTED:**
+
+| decision | verdict |
+|---|---|
+| the `line-history` disable | **HELD**, for reasons independent of `c` — zero consumers, and zero runs on 07-31 and 08-01 |
+| MIN_GAP | **HELD** — a COUNT, not a price: 10→5, 8→4, 7 runs→6 snapshots |
+| the ten-to-four cron cut's URGENCY | **OVERSTATED** — the cut was defensible, its timing was argued from the unaudited ratio |
+| the Variant B suspension | **STRUCK** — 12 credits is 0.06% of the pool, and it measures the very constant this defect is about |
+| the 2.5-day runway alarm | **STRUCK** — computed on the pre-reset pool and the unaudited ratio |
+
+**DARK BOARD-DAYS: SIX COMPLETED** (the sixth recorded 2026-08-01 in §0.3, **chosen**, window still
+open). **Sunday 2026-08-02 is PENDING as the seventh** — §0.06 records that Sunday has **no headered
+cron**, so it is dark unless Josh curls the window.
+
+**THE HOMOGENEOUS WINDOW IS AT ZERO BOARDS.** No board has generated since the outs flag shipped;
+the flag is **LIVE but UNEXERCISED**.
+
+**BOTH EXITS:** the **freeze exit** (2026-09-22) is not reachable on collection alone at the audited
+rate; the **parameter exit's Series A reopen gate is ALREADY MET ON THE DATA** — read 3 (§0.4) shows
+**7 of 9 markets clear `consMinN = 100`** — and needs boards **observed**, not more accrual.
+
+---
+
 ## 13. POSITION
 
 > # 🔴 THE POOL RESET. 2026-08-01T01:35:56Z: **19,958 remaining / 42 used.**
@@ -3787,6 +3980,15 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 ---
 
 
+### 15.1 🔴 JOSH'S TWO DASHBOARD READS — the only inputs the gate still waits on (2026-08-02T04:10:11Z)
+
+| missing input | how obtained | blocks |
+|---|---|---|
+| **the `/api/odds` function log, two windows** | **Vercel → parlay-lab → Logs**, filter `/api/odds`. Dashboard-only; no CLI path exists | **the residual's attribution — §0.0 carries the full read** |
+| **whether `APP_PASSCODE` is set in production** | **Vercel → Settings → Environment Variables** | §3's staged sequence. **⚠️ READ ONLY — DO NOT SET IT** |
+| reads 2 and 4 | **Josh's phrase-curls**, §0.0 and §4A | reading 15, the 38-ticket gate, the overstake census, the HRR 46.3/59.2 reproduction, reading 15(c). **CONFIRMATORY, NOT BLOCKING** |
+
+
 ## 16. DO-NOT-REDERIVE (read, don't recompute)
 
 - Burn series and per-day attribution → `data/quota-log.jsonl` + `tools/burn-report.mjs`. **Do not
@@ -3808,6 +4010,27 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 ---
 
 ## 17. PROTOCOL
+
+### 🔴 FIRST ACTION AFTER COMPACTION — DO THIS, THEN STOP (2026-08-02T04:08:48Z)
+
+1. **Re-read `docs/session-handoff.md` §0.0 and §0.001, then `CLAUDE.md`.** Nothing else first.
+2. **PRINT `git rev-parse HEAD`** and confirm it resolves on `origin/frontend-rebuild`. **Every
+   turn opens with this print** — §12Y: no sha is cited from the analyst side.
+3. **PRINT the open-readings count** read from §5's body, not its header.
+4. **PRINT the quota with its timestamp** from the last row of `data/quota-log.jsonl`.
+5. **PRINT the gate's status**: amended §0.01, branches (a)/(b)/(c), and whether the log read has
+   landed.
+6. **PRINT MONDAY'S STRUCTURE:** *entry 1 (`45 22 * * 1-5`, the only headered cron-job.org entry)
+   fires at **2026-08-03 22:45Z** regardless of the gate. **The gate is a DECISION PROCEDURE, NOT A
+   SWITCH IN THE CODE.** An unattributed fire **builds a board anyway**, unless Josh removes the
+   header or accepts it. §0.01(c) rejects removal.*
+7. **THEN STOP.** The next input is Josh's log result or Monday's board.
+
+**THE TARGET CHECK IS MANDATORY, BOTH SIDES.** A brief that does not name Parlay-Lab, or whose shas
+do not resolve here, is **BOUNCED-WRONG-REPO** and nothing else happens. §12Y.
+
+---
+
 
 **Josh relays paste blocks between two sessions and is NOT the operator.** No side tasks, no
 explanations addressed to him, no decisions on his behalf. **Standing rules live in `CLAUDE.md` —
