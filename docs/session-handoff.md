@@ -211,6 +211,121 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.01 ⚖️ THE GATE, AMENDED 2026-08-02T03:58:45Z — ORIGINAL PRESERVED, MONDAY FIRES
+
+### THE ORIGINAL, STRUCK-DATED, NOT DELETED
+
+> ~~**NO BOARD FIRES UNTIL THE RESIDUAL RESOLVES.**~~
+> *Struck 2026-08-02. Set against an UNCHARACTERIZED unknown, and it never priced its own cost
+> side. Preserved verbatim because an amendment that deletes what it amends is an override.*
+
+### THE AMENDMENT, VERBATIM
+
+> **(a) THE LOG READ LANDS BEFORE MONDAY 22:40Z** → gate satisfied, or the external actor is named.
+> **Either way Monday fires**, because a characterized `/api/odds` poller does not touch the board
+> path.
+>
+> **(b) THE READ IS NOT DONE BY MONDAY 22:40Z** → **entry 1 fires as scheduled**, the full chain
+> runs, and **EVERY reading from that board carries the stamp `RESIDUAL-LIVE-UNATTRIBUTED`** so
+> nothing from board 1 is later mistaken for a clean-environment measurement.
+>
+> **(c) REMOVING ENTRY 1's HEADER IS REJECTED.** An eighth dark day buys nothing the stamp does not,
+> and costs a fixture-day that cannot be repurchased.
+
+**THE REASONING, RECORDED WITH IT:** both sides of the ledger moved after the original was written.
+The residual is now **shaped** (`/api/odds`-sized ~6-credit calls; it touches no store the board
+reads or writes) and **bounded** against a pool that outlasts it by months, while **the cost side the
+original never priced is now measured**: dark board-days, append-only, exhaustion ~09-15 against a
+window ending 09-22. **Amending a pre-commitment on new information, in advance, with the original
+beside it, is what the amendment convention is for. Overriding it silently on Monday night would be
+the sin; this is the opposite.**
+
+### 🔴 THREE CORRECTIONS TO THE AMENDMENT'S OWN PREMISES — checked, not assumed
+
+1. **"~180/day worst case" UNDERSTATES THE OBSERVED PEAK.** Measured residual rates:
+   **48.3/h** in the 07-31 burst (= **1,159/day** if sustained), **6.4/h** across 08-01,
+   **9.5/h** in the fresh overnight bracket. **~180/day is roughly the SUSTAINED component
+   (~154–228/day); it is not the worst case.** The pool still outlasts it — 19,190 ÷ ~230 ≈ 83
+   days — so **the amendment's conclusion survives its own arithmetic error.**
+2. **"seven dark board-days" is SIX COMPLETED.** 08-01 is recorded as the sixth; Sunday 08-02 would
+   be the seventh, counted in advance.
+3. **"no evidence of writes anywhere" is NOT ESTABLISHED — it is UNCHECKED.** No instrument on disk
+   looks for writes by the residual. **It is an absence of evidence, and the record says so rather
+   than promoting it to evidence of absence.**
+
+## 0.02 🔴 THE WEEKEND BRACKET IS ALREADY READING — AND IT IS NOT ZERO
+
+**BRACKET OPENED `2026-08-02T03:56:35.412Z` — remaining 19,190 / used 810.** Logged.
+
+**THE FIRST 5.25 HOURS ARE ALREADY MEASURED, and they are the cleanest window in the series:**
+
+```
+2026-08-01T22:41:20Z -> 2026-08-02T03:56:35Z      5.25 h      SPENT 147
+  runs inside:  engine-v2-context   23:24:03Z   statsapi only, 0 credits
+                engine-v2-props-history 23:29:30Z -> close, 5 events archived
+  ATTRIBUTABLE:  31  (archive count)  ..  97  (upper bound, a full 16 fetched)
+  RESIDUAL:      50 .. 116            RATE: 9.5 .. 22.1 /h
+```
+
+> **THE RESIDUAL IS PRESENT IN A QUIET SATURDAY-EVENING WINDOW WITH ONE PROPS RUN.** Even crediting
+> the run with a full sixteen fetches — more than it can have made, since only five were archived —
+> **≥50 credits survive.**
+
+**EXPECTED ATTRIBUTABLE FOR THE REST OF THE BRACKET (Sunday, corrected model):** Sunday's declared
+props crons are the same six; at `1 + min(16,slate)×6` per delivering run and the measured
+one-in-seven skip rate, **expect ~390–430 for a full Sunday, plus 0 from context/board-archive/pages.**
+**MONDAY'S PRE-FIRE READ THEN SUBTRACTS MECHANICALLY:** delta ≈ 430 → residual episodic or absent
+across the weekend; **delta materially above 430 → ongoing, and the excess divided by the bracket's
+hours is its rate.**
+
+## 0.03 EVERY QUOTA INTERVAL AT THE CORRECTED MODEL — AND THE IMPOSSIBLE BRANCH FIRES
+
+| window (UTC) | h | spent | props runs | arch ev | attr @arch | attr @fetch-upper | residual @upper | /h |
+|---|---|---|---|---|---|---|---|---|
+| 07-28 23:00 → 07-29 12:00 | 13.00 | 641 | 9 | 123 | 747 | 873 | **−232** | — |
+| 07-29 12:00 → 07-30 03:55 | 15.92 | 215 | 3 | 18 | 111 | 291 | **−76** | — |
+| 07-30 03:55 → 16:45 | 12.83 | 223 | 7 | 20 | 122 | 194 | **+29** | 2.3 |
+| 07-30 16:45 → 07-31 01:25 | 8.67 | 200 | 2 | 10 | 62 | 194 | **+6** | 0.7 |
+| 07-31 06:41 → 13:57 | 7.27 | 339 | 8 | 58 | 352 | 388 | **−49** | — |
+| 07-31 13:57 → 16:10 (4 rows) | 2.21 | **0** | 0 | 0 | 0 | 0 | **0** | 0 |
+| **07-31 16:10 → 19:11** | 3.02 | **146** | **0** | **0** | **0** | **0** | **146** | **48.3** |
+| **07-31 19:11 → 20:21 (5 rows)** | **1.17** | **0** | 0 | 0 | 0 | 0 | **0** | **0** |
+| 07-31 20:21 → 21:04 | 0.70 | 0 | 1 | 14 | 85 | 97 | **−97** | — |
+| 07-31 21:04 → 08-01 01:35 | 4.53 | **POOL RESET** | — | — | — | — | **not measurable** | — |
+| 08-01 01:35 → 22:41 | 21.09 | 621 | 6 | 55 | 335 | 485 | **+136** | 6.4 |
+| **08-02 bracket, first leg** | 5.25 | 147 | 1 | 5 | 31 | 97 | **+50** | **9.5** |
+
+> ### 🔴 IMPOSSIBLE BRANCH FIRES — FOUR NEGATIVE RESIDUALS: −232, −76, −49, −97.
+> **The arithmetic:** the fetch-upper column assumes **every delivering run fetched a full sixteen**
+> (`1 + 16×6 = 97`). On those four intervals that exceeds the measured spend, so **the assumption is
+> false there** — `todays[:16]` fetches `min(16, games on the board)`, and a close sweep near first
+> pitch has far fewer. **The over-count is in MY upper bound, not in the quota series.**
+> **CONSEQUENCE: attribution is a BRACKET, not a number** — `spent − upper ≤ residual ≤ spent − lower` —
+> and only intervals where **even the upper bound leaves a positive remainder** are evidence of a
+> residual. **§11 item 5i (print the fetch count) collapses the bracket to a number; until it ships,
+> every residual figure here is a LOWER BOUND.**
+
+### 0.03a THE TWO QUESTIONS THIS SETTLES IN ADVANCE OF THE LOG READ
+
+**1. THE ZERO-RESIDUAL WINDOWS STILL READ ZERO.** 07-31 13:57→16:10 (2.21 h) and **19:11→20:21
+(1.17 h)** carry **spent 0** at any model. **An always-on poller at the burst's 48.3/h would have
+spent ~56 credits in that 1.17 h stretch, immediately after the burst. It spent nothing.**
+**→ THE RESIDUAL IS EPISODIC, NOT CONTINUOUS, and the log read's poller branch weakens in advance:
+a regular ~7.5-minute cadence cannot produce a 70-minute hole.**
+
+**2. PRIOR WINDOWS: AMBIGUOUS, AND HONESTLY SO.** 07-30 03:55→16:45 shows **+29 (2.3/h)** and
+07-30 16:45→01:25 **+6 (0.7/h)** — positive, but small enough to sit inside the same upper-bound
+slack that produced four negatives elsewhere. **The pre-07-31 series does NOT establish the residual
+was running earlier, and does not exclude it.** **→ The log read's "cadence before 16:10Z" branch
+opens with a WEAK prior, not a blank and not a finding.**
+
+### 0.03b THE 07-31 ARITHMETIC, FOR THE LOG READ — AND THE DISCRIMINATOR
+
+**146 ÷ ~6 ≈ 24 calls over 3.02 h ≈ one every 7.5 minutes.** **BOTH request shapes cost ~6:** ours is
+**6 markets × `regions=us`**; SharpDesk's is **3 markets × `regions=us,eu`**. **So per-call cost
+CANNOT disambiguate — the MARKET LIST is the only discriminator.** *(Already present in the Josh
+block's disambiguation table; restated here beside the arithmetic it belongs to.)*
+
 ## 0.05 🔴 THE GATE IS NOT SATISFIED BY THE ARITHMETIC — RECORDED 2026-08-02T00:14:06Z
 
 **THE OWNER'S INSTRUCTION WAS TO RELEASE THE GATE ON THE READING THAT BOTH BURSTS CLOSE AT MEASURED
@@ -1957,6 +2072,29 @@ probable-change Blob log, and a `ground-truth.md` for a fantasy-baseball reposit
 them would mean reading and writing a repository this session is explicitly barred from touching.**
 They are relayed back untouched rather than half-answered from memory — **which is exactly what the
 protocol above now forbids.**
+
+### 12Z. THE POLLER CONTINGENCY — SPEC ONLY, RANKED, HELD FOR THE OWNER'S WORD
+
+**IF the log lands on the external-poller branch, the pre-committed response is `gate the route, not
+the collection` — and the obvious instrument is the one we cannot use.** `APP_PASSCODE` kills the
+morning batch (`/api/odds` L36–40: a `fresh=1` without `x-pl-pass` **401s and does NOT fall through
+to cache**, so `snapshot_props.py` retries 3× and returns empty) **and** the device (**M28**:
+`pl_pass` is written to `localStorage` and **no client code sends it**). **So the passcode is not
+available as a first move.**
+
+| | option | diff | closes | risks | rank |
+|---|---|---|---|---|---|
+| **A** | **FIX THE FALLTHROUGH** — on auth failure `/api/odds` serves **cache** instead of 401 | **smallest.** `route.ts` L36–40, one branch: replace `return 401` with the cached path | **`fresh=1` abuse** — an unauthenticated caller can never force an upstream fetch, so the billed surface closes entirely | serves **stale** data to an unauthenticated caller instead of an error; a legitimate caller that silently loses freshness gets no signal unless the response says `stale: true` | **1 — ship first** |
+| **B** | **SHAPE ALLOW-LIST** — validate `markets × regions` against the two shapes we actually use; reject others | small, additive: a validator before the upstream call | bounds the **cache-key attack** (§3: caller controls the EVENT ID, ~16 keys × 360 refreshes × 6 ≈ **34,000 credits/day admissible**) | does **not** stop a caller using OUR exact shape; it narrows the surface, it does not close it | **2 — pairs with A** |
+| **C** | **M28's CLIENT HELPER, THEN THE PASSCODE** | **largest.** `src/lib/pass.ts` exporting `passHeader()`, plus six one-line spreads at the call sites, plus the GitHub secret, plus `props-history.yml`'s env, then the Vercel var **last** | **full closure** — authenticated-only fresh pulls | **four staged steps in order**; setting the Vercel var before the helper ships 401s `/api/sharp` on every device (§3 step 4) | **3 — the real fix, not the fast one** |
+
+> **RANKING RATIONALE: A closes the billed surface with the smallest diff and no ordering hazard.
+> B narrows what A leaves. C is the only complete answer and the only one with a four-step ordering
+> constraint that has already been mis-stepped once in the record.**
+>
+> **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
+> with the log result in hand**, because which of them is warranted depends on what the log says the
+> caller's shape is, and that is the one thing not yet read.
 
 ### 12X. INSTRUMENT DEFECT #8 — THE ATTRIBUTION METHOD, UNAUDITED AND LOAD-BEARING
 
