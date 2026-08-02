@@ -357,6 +357,90 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.003 🎯 THE SCHEDULER IS LIVE AND CONFIGURED — VERIFIED FROM THE ROUTE'S OWN BEHAVIOUR (2026-08-02T22:47Z)
+
+**Josh reports the cron-job.org visit made: CLV → `*/30`, the scheduler entry created with the
+header.**
+
+### THE VERDICT, MEASURED WITHOUT TOUCHING ANY SECRET
+
+**A keyless probe distinguishes every config state** — 404 = not deployed · 503 = `CRON_SECRET`
+unset (the fails-closed branch) · 401 = configured and gated:
+
+```
+GET /api/scheduler  (no header)  ->  HTTP 401  {"error":"unauthorized"}
+```
+
+**DEPLOYED, `CRON_SECRET` SET IN VERCEL, FAILING CLOSED.** An authed tick therefore gets 200
+with both condition values. **And no tick fired today, correctly:** `/api/board?date=2026-08-02`
+still reads `gens: []` — today's window was spent hours before the entry existed, and every poke
+since lands on `ready 1/1 < MIN_READY` or dead-slate.
+
+**WHAT CANNOT BE READ FROM HERE, SAID PLAINLY:** the ticks' own 200 bodies. cron-job.org's
+execution history and the Vercel function log are Josh-side surfaces. **The keyless probe brackets
+the config state; the tick bodies are Josh's read if he wants them before Monday** (cron-job.org
+→ the entry → History shows each response body).
+
+### THE LANDING TEST — PRE-COMMITTED AS SHIPPED, TOMORROW IS THE FIRST LIVE DAY
+
+First live day: the responses show the condition evaluated per poke · **exactly ONE
+`fired:true`** · the board's gen block carries the **header trigger** (`gen.trigger ===
+"header"` — the scheduler forwards with `x-cron-key`, same as entry 1, so reading 5's
+pre-commitment applies verbatim) · `MAX_RUNS` untouched · entries 1–3 untouched as fallbacks.
+**Two fires, or a fire on a false condition → DID NOT LAND, entries 1–3 carry the week, said
+plainly.**
+
+**MONDAY 2026-08-03, PROJECTED PER TICKER POKE** (fresh statsapi read; 8 games, first pitch
+22:40Z / 15:40 PT):
+
+```
+21:30Z 14:30 PT  ready 6/8  achievable 0.750           hold
+21:45Z 14:45 PT  ready 7/8  achievable 0.875  cost 49  ◀◀ PROJECTED FIRST FIRE
+22:45Z 15:45 PT  ready 7/7  achievable 1.000  cost 43  (entry 1 fires here; the route's
+                                                        45-min limiter + covered-skip turn it
+                                                        away at zero cost — that clean refusal
+                                                        is itself part of the landing evidence)
+```
+
+**Expected cost 49. Expected `delta/events` = 49/8 ≈ 6.1 ∈ [5, 8]** (reading 26).
+
+### §0.006 THE ALLEGED CALIBRATE CONTRADICTION — RECONCILED FROM DISK: THERE ISN'T ONE
+
+The relay brief quoted this record as saying `/api/clv` uses 96/day *"via vercel.json crons"* and
+flagged it against "crons stay absent." **The quoted attribution is not in this record.** From
+disk, this turn:
+
+- **`vercel.json` verbatim: NO `crons` key.** Its full content is a `git.deploymentEnabled`
+  block, nothing else.
+- **Its crons history:** `2292b85` (07-17) calibrate added · `c2b8c82` (07-18) + generate ·
+  `91c179b` (07-26) generate OUT (moved to cron-job.org) · **`9324517` (07-31) the array
+  REMOVED — the calibrate pause, exactly as recorded.**
+- **`/api/clv`'s 96/day is cron-job.org's free tier** — CLAUDE.md L152 — and always was. Two
+  schedulers, two facts, compatible.
+
+**The calibrate-pause record stands unamended.** Ledger §12Z.6 records the alleged disagreement
+as a RELAY PARAPHRASE, not a memory defect — the same class §12Y.1 exists for: briefs asserting
+repo state.
+
+### §0.007 THE SECRET SCAN — CLOSED: DUMMIES ONLY, WITH THE EVIDENCE CITED
+
+The brief's premise — *"10 historically-tracked test-dummy files and one live-values branch
+commit"* — **conflates two findings and invents a third.** From disk:
+
+- The **10 tracked files** are `" 3"`-suffixed DUPLICATE COPIES of ordinary tools/tests
+  (`burn-report 3.mjs`, `timezone-parity.test 3.ts`, …) — historical Finder/sync artifacts,
+  green in every gate, containing no secrets of any kind.
+- The **two literal grep hits** are both **`tests/clv-core.test.ts` L225–226**:
+  `process.env.CRON_SECRET = "s3cret"` — a unit-test dummy exercising `cronKeyAuthed`,
+  introduced by `28a854c` (2026-07-19, "Upgrade 03 — CLV automation"). The other hit is this
+  handoff quoting it.
+- **There is no live-values commit.** Full-history sweep, 598 commits, all refs: **0** env
+  files, **0** `apiKey=<value>`, **0** webhook URLs, **0** `Bearer`/`sk-`/`xox`/`ghp_`/`AKIA`
+  tokens.
+
+**NO ROTATION LIST. The scan is closed.** Publication exposes history; this history contains
+nothing to rotate.
+
 ## 0.004 🎯 ARCHITECTURE CORRECTION — SCHEDULING RUNS THROUGH VERCEL (2026-08-02, operator's call)
 
 ### SHIPPED THIS TURN
@@ -2829,6 +2913,25 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.6 LEDGER — TWO MORE RELAY PREMISES, CHECKED AND REFUSED (2026-08-02, evening)
+
+The same turn's brief carried two premises that dissolve on disk, recorded here because the
+pattern is now stable enough to name its rate: **of the last three ordering briefs, every one has
+carried at least one asserted repo-state fact that the repo contradicts** (§12Z.5's two, §12Z.4's
+sequencing, these two).
+
+1. **"This turn's summary says /api/clv uses 96 via vercel.json crons"** — the attribution is the
+   brief's, not the record's. `vercel.json` has NO crons key (verbatim, §0.006), its history shows
+   the array removed at `9324517` exactly as the pause record says, and CLV's 96/day is
+   cron-job.org's free tier (CLAUDE.md L152). **Two schedulers, compatible facts, no memory
+   defect.**
+2. **"The scan found … one live-values branch commit"** — no such commit exists. The two literal
+   hits are one unit-test dummy (`tests/clv-core.test.ts` L225, `28a854c`) and this handoff
+   quoting it. Token sweep across 598 commits: zero hits on every pattern class (§0.007).
+
+**The standing response stays §12Y.1's: briefs do not assert repo state; the repo does.** Each
+alleged fact got a read, not an argument — and the reads are cheaper than the arguments.
 
 ### 12Z.5 LEDGER — SHIPPED-THEN-RETIRED SAME DAY, AND TWO PREMISES CORRECTED (2026-08-02)
 
