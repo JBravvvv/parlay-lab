@@ -357,6 +357,103 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.035 🔴 THE WEEKEND HOURS, RE-DERIVED ON 52 SLATES — §0.04's HOURS ARE SUPERSEDED
+
+**§0.04 and §0.045 below are CORRECT ON EVERYTHING EXCEPT THE TWO HOURS.** The entry inventory, the
+"entries already exist / only the header is missing" finding, the cost model, the entry-4 retirement
+and the §11 5l/5m queue items all stand. **The hours 18:00Z (Sunday) and 22:45Z (Saturday) are
+struck.** Read this section for the hours; read §0.04 for everything else.
+
+### THE DEFECT IN §0.04's DERIVATION, NAMED
+
+`achievable = ready / unstarted`. **A started game leaves the DENOMINATOR**, so the ratio *rises* as
+games start. **Selecting the hour that maximised the achievable ratio therefore selected for
+lateness.** 18:00Z scored 0.882 across 26 Sundays *because* a mean of **6.2 of ~15 games had already
+started**. I measured *how many are ready* and never asked *are they still unstarted*. **Caught by
+the operator, ~9 h before the fire.**
+
+**AND THE FIX IS SMALLER THAN IT LOOKS, WHICH IS THE PART WORTH KEEPING:**
+`ready = unstarted.filter(s − 3 h ≤ now)`, so **`ready ⊆ unstarted` — `ready` ALREADY ENCODES BOTH
+CONDITIONS.** It is the count of games still bettable *and* with lineups posted. **The objective was
+always available and I used its ratio instead of itself.** Objective: **maximise `ready`**, gate:
+**achievable ≥ T on ≥90% of slates**, and **print games-lost-to-early-start beside it** so the
+lateness cost is never invisible again.
+
+### SUNDAY → `15 17 * * 0` — **17:15Z / 10:15 AM PT**. 26 slates, full 2026 season.
+
+First pitch, time-of-day: **earliest 16:10Z · median 16:30Z · latest 19:05Z.**
+
+| hour | meanREADY | meanLOST | ≥T | meanAch | cost | ready/credit |
+|---|---|---|---|---|---|---|
+| 16:00Z | 9.6 | 0.0 | **12%** | 0.638 | 91 | 0.105 |
+| 17:10Z | 13.0 | 0.8 | **96%** | 0.916 | 86 | 0.151 |
+| **17:15Z** | **13.0** | **0.8** | **96%** | **0.919** | **86** | **0.152** |
+| 17:30Z | 13.1 | 0.8 | 96% | 0.922 | 86 | 0.152 |
+| ~~18:00Z~~ | ~~7.8~~ | ~~**6.2**~~ | ~~92%~~ | ~~0.882~~ | ~~54~~ | ~~0.145~~ |
+
+**17:10Z–17:30Z is a plateau at 13.0–13.1 ready / 96% ≥T. The owner's expected ~17:15Z is CONFIRMED
+from data**, taken at 17:15Z for margin before the earliest sampled Sunday first pitch that matters.
+**Against §0.04's 18:00Z: 67% more priceable games, and 0.8 games lost to early starts instead of
+6.2.** One slate of 26 falls below T — **2026-07-05, achievable 0.750, ready 9/12 → engine-half-only,
+stamped.**
+
+**🔴 THE OWNER'S STATED CRITERION, APPLIED LITERALLY, PICKS A WORSE HOUR — printed because the
+disagreement is the finding.** *"Maximise achievable subject to unstarted holding on ≥90% of sampled
+Sundays"* selects **16:00Z**: all-unstarted on 100%, but **achievable ≥ T on only 12% of Sundays** and
+meanReady 9.6. **It buys a zero-loss start at the price of a board that misses the quality bar seven
+weeks in eight.** The reason is the same identity as above — **`ready` already excludes started
+games**, so gating separately on *all* games being unstarted double-counts the condition and pays for
+it in coverage. **Losing a mean 0.8 of 15 games is the cheaper error.**
+
+### SATURDAY → `10 23 * * 6` — **23:10Z / 4:10 PM PT. THE SPLIT VERDICT FIRES.**
+
+**All 26 Saturdays are split slates** (≥90-min gap; median gap **143 min**). First pitch, time-of-day:
+**earliest 15:05Z · median 17:10Z · latest 20:10Z** — a five-hour spread.
+
+**THE EARLY BLOCK CANNOT BE SERVED. 0 of 26.** Across every sampled Saturday, **no minute before the
+early block's first pitch reaches achievable ≥ 0.80** — while the early games are lineup-ready the
+evening block sits unready in the denominator, holding the curve at **0.165–0.418 all morning**.
+**This is structural, not a scheduling preference.**
+
+**BLOCK VALUE, BY EVENT COUNT: early 170 games (mean 6.5/slate) · evening 218 (mean 8.4/slate).**
+**The standing hour owns the EVENING**, per the pre-committed branch — it is both the larger block and
+the only servable one.
+
+| hour | meanREADY | meanLOST | ≥T | meanAch | cost | ready/credit |
+|---|---|---|---|---|---|---|
+| ~~22:45Z~~ | ~~6.4~~ | ~~7.7~~ | ~~**73%**~~ | ~~0.851~~ | ~~44~~ | ~~0.145~~ |
+| 23:00Z | 6.5 | 7.7 | **73%** | 0.855 | 44 | 0.146 |
+| **23:10Z** | **5.1** | 9.8 | **100%** | **1.000** | **31** | **0.161** |
+| 23:15Z | 3.1 | 11.8 | 92% | 0.923 | 19 | 0.159 |
+
+**23:10Z clears T on 26 of 26 — the only hour on either weekend day that never needs the
+engine-half-only stamp — and it is the best ready-per-credit on the board at 0.161.**
+**ALTERNATIVE, PRINTED BECAUSE IT IS A REAL TRADE:** `23:00Z` carries **6.5 ready vs 5.1 (+27%)** for
+**+13 credits**, at **73% ≥T — roughly 1 Saturday in 4 stamped engine-half-only.** One word moves it.
+
+**🔻 RECORDED: THE SATURDAY MORNING BLOCK IS STRUCTURALLY UNCAPTURED — a mean 6.5 games/slate, ~170
+games a season, that no standing hour can reach at T.** Named here rather than left as a silent
+absence; it is a property of the 3-hour lineup lead against a split slate, and only a T change or a
+block-scoped board would touch it.
+
+### IMPOSSIBLE BRANCH — printed under both readings, because they disagree
+
+| reading | Sunday | Saturday |
+|---|---|---|
+| **strict** — *no game started yet* AND achievable ≥ T | **10 of 26 have no such minute** | **26 of 26 have no such minute** |
+| **corrected** — achievable ≥ T at the standing hour | **1 of 26** (2026-07-05) | **0 of 26** |
+
+**Under the strict reading SATURDAY AS A DAY-TYPE is engine-half-only by structure.** **Under the
+corrected reading it never is.** The difference is entirely the double-counted condition: **the
+strict form demands zero early starts, which `ready` never required.** **The corrected reading
+governs; the strict one is printed so the claim is not quietly dropped.**
+
+### THE PER-WEEK RULE STANDS ON TOP
+
+**The standing hour is the DEFAULT, not the verification.** The week each entry first fires live, its
+actual slate is checked against the standing hour with **first pitches printed beside the achievable
+curve** — both conditions, always together.
+
 ## 0.04 🎯 BOARD GENERATION GOES 7 DAYS — DERIVED 2026-08-02, THE WEEKEND ENTRIES ALREADY EXIST
 
 **THE OWNER'S CORRECTION, ACCEPTED AND DERIVED:** every team plays Saturday and Sunday, the weekend
@@ -516,13 +613,27 @@ the sin; this is the opposite.**
 
 ## 0.045 🎯 THE DASHBOARD VISIT, THE SUNDAY-PAIR TRAP, AND TODAY'S DEADLINE
 
-### THE FOUR ENTRIES — exact values, nothing to compute at the dashboard
+### THE FOUR ENTRIES — 🔴 SUPERSEDED BY §0.035's TABLE. The hours below are the pre-correction ones.
 
-| # | now | **change to** | header | why |
+> **🔴 STRUCK 2026-08-02 (later the same day). The two hours are wrong — see §0.035.** The
+> **FINAL** table is:
+> | # | now | **change to** | header |
+> |---|---|---|---|
+> | **1** | `45 22 * * 1-5` | **UNTOUCHED** | keeps `x-cron-key` |
+> | **2** | `0 18 * * 6` | **`10 23 * * 6`** (23:10Z / 4:10 PM PT) | **ADD `x-cron-key`** |
+> | **3** | `0 17 * * 0` | **`15 17 * * 0`** (17:15Z / 10:15 AM PT) | **ADD `x-cron-key`** |
+> | **4** | `30 22 * * 0` | **🔻 RETIRE** | — |
+>
+> **Everything else in this section — the trap analysis, the entry-4 retirement and its priced cost,
+> the "already exist" finding — is unchanged.**
+
+*(pre-correction, struck:)*
+
+| # | now | ~~change to~~ | header | why |
 |---|---|---|---|---|
 | **1** | `45 22 * * 1-5` | **UNTOUCHED** | keeps `x-cron-key` | 10/10 clear T, meanCost 50.8 |
-| **2** | `0 18 * * 6` | **`45 22 * * 6`** | **ADD `x-cron-key`** | 18:00Z clears T on **0 of 7** Saturdays; 22:45Z on 6 of 7 |
-| **3** | `0 17 * * 0` | **`0 18 * * 0`** | **ADD `x-cron-key`** | 17:00Z clears **1 of 7** Sundays; 18:00Z clears **7 of 7** |
+| **2** | `0 18 * * 6` | ~~`45 22 * * 6`~~ | **ADD `x-cron-key`** | 18:00Z clears T on **0 of 7** Saturdays; 22:45Z on 6 of 7 |
+| **3** | `0 17 * * 0` | ~~`0 18 * * 0`~~ | **ADD `x-cron-key`** | 17:00Z clears **1 of 7** Sundays; 18:00Z clears **7 of 7** |
 | **4** | `30 22 * * 0` | **🔻 RETIRE (disable, do not repurpose)** | — | the Sunday-pair trap; meanReady **1.0** |
 
 **Entry 2's hour was not slightly wrong — it never worked.** `0 18 * * 6` clears T on **zero** of
@@ -2553,6 +2664,35 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.3 LEDGER — A DERIVED HOUR THAT CHECKED READINESS AND NOT FIRST PITCH (2026-08-02)
+
+**CAUGHT BY THE OPERATOR, ~9 HOURS BEFORE THE FIRE. SECOND FIRST-PITCH-ADJACENT MISS** — the 22:00Z
+cron's 66% coverage was the first.
+
+**THE DEFECT:** the weekend standing hours were selected by maximising `achievable = ready /
+unstarted` subject to clearing T. **Started games leave the denominator, so the ratio rises as games
+start, and the search selected for lateness.** Sunday's 18:00Z scored 0.882 across 26 slates **because
+a mean of 6.2 of ~15 games had already started.** **I measured how many are ready and never asked
+whether they were still unstarted.**
+
+**THE NUMBER IS WHAT MAKES IT A DEFECT AND NOT A PREFERENCE:** the corrected hour, **17:15Z**, carries
+**meanReady 13.0 against 18:00Z's 7.8** — **67% more priceable games** — while clearing T on **96% vs
+92%**. **The wrong hour was worse on both axes at once.** There was no trade; there was an error.
+
+**AND IT WAS VISIBLE IN MY OWN OUTPUT.** §0.04 printed 17:30Z's meanReady of 12.7 against 18:00Z's
+7.3 and I labelled it *"the trade that was not taken"* — **I read a 74% gap as a preference about
+coverage instead of asking why the later hour had half the games.** **The datum was on the page; the
+question was not asked.**
+
+**THE STANDING QUESTION, ENCODED:** **"ready" and "unstarted" are TWO CONDITIONS — print both, always,
+beside first-pitch times.** Any derived hour that reports a ratio without reporting what the
+denominator lost is not a derivation.
+
+**AND THE HALF WORTH KEEPING:** `ready = unstarted.filter(s − LEAD ≤ now)`, so **`ready ⊆ unstarted`
+— the metric already encoded both conditions.** **The correct objective was available the whole time
+and I used its ratio instead of itself.** The general form: **when a metric is a ratio, check what
+leaving the denominator means before optimising it.**
+
 ### 12Z.2 LEDGER — A DEFERRED DECISION WHOSE PREMISE DIED BECAME A DECISION BY DEFAULT (2026-08-02)
 
 **CAUGHT BY THE OPERATOR, AND THE LEDGER RECORDS HITS FROM HIS SIDE TOO.**
@@ -3920,24 +4060,29 @@ day, ≈ 39 days → ≈ **2026-09-09**. **COLLECTION ALONE DOES NOT REACH 2026-
 
 **BOARD COSTS, MEASURED — not assumed, and each with its n:**
 
-| population | n | mean cost | clears T |
-|---|---|---|---|
-| weekday @ `22:45Z` | 10 | **50.8** | 10/10 |
-| Saturday @ `22:45Z` | 7 | **48** | 6/7 |
-| Sunday @ `18:00Z` | 7 | **51** | 7/7 |
+| population | n | mean cost | clears T | mean READY |
+|---|---|---|---|---|
+| weekday @ `22:45Z` | 10 | **50.8** | 10/10 | — |
+| ~~Saturday @ `22:45Z`~~ | ~~7~~ | ~~48~~ | ~~6/7~~ | ~~6.4~~ |
+| ~~Sunday @ `18:00Z`~~ | ~~7~~ | ~~51~~ | ~~7/7~~ | ~~7.8~~ |
+| **Saturday @ `23:10Z`** (§0.035) | **26** | **31** | **26/26** | **5.1** |
+| **Sunday @ `17:15Z`** (§0.035) | **26** | **86** | **25/26** | **13.0** |
 
-**THE DELTA IS +2 BOARDS/WEEK = +99 CREDITS/WEEK = +14.1/DAY.**
+**THE DELTA IS +2 BOARDS/WEEK = +117 CREDITS/WEEK = +16.7/DAY** *(restated on the corrected hours;
+the pre-correction figure was +99/wk = +14.1/day).*
 
 | regime | boards/week | board credits/day | + collection 427 | days from 19,190 | exhaustion |
 |---|---|---|---|---|---|
 | **5-day (before)** | 5 × 50.8 = 254/wk | **36.3** | **463.3** | **41.4** | **≈ 2026-09-12** |
-| **7-day (now)** | 254 + 48 + 51 = 353/wk | **50.4** | **477.4** | **40.2** | **≈ 2026-09-11** |
+| **7-day (corrected hours)** | 254 + 31 + 86 = **371/wk** | **53.0** | **480.0** | **40.0** | **≈ 2026-09-11** |
 
-**THE EXHAUSTION DATE MOVES BY ~1.2 DAYS.** Two extra boards a week cost **0.5% of the pool per
-week** against a collection line 8.5× their size. **The 7-day scope is very nearly free, and the
-scarcity premise that justified 5 days does not survive contact with the numbers.** *(Both rows sit
-inside §12.9's older bracket — collection-only 45 days/09-15, one-board-a-day 39 days/09-09 — which
-used assumed rather than measured board costs; these supersede.)*
+**THE EXHAUSTION DATE MOVES BY ~1.4 DAYS.** Two extra boards a week cost **0.6% of the pool per
+week** against a collection line 8× their size. **The 7-day scope is very nearly free, and the
+scarcity premise that justified 5 days does not survive contact with the numbers.** **The hour
+correction changed the cost mix — Sunday up 51→86, Saturday down 48→31 — and moved the exhaustion
+date by 0.2 of a day.** *(Both rows sit inside §12.9's older bracket — collection-only 45 days/09-15,
+one-board-a-day 39 days/09-09 — which used assumed rather than measured board costs; these
+supersede.)*
 
 **🔴 THE FREEZE-EXIT CONCLUSION IS UNCHANGED: 2026-09-22 IS STILL NOT REACHED**, at either regime.
 Adding weekend boards does not change that, and nothing here should be read as relief on it.
