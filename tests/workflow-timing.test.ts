@@ -52,16 +52,11 @@ const GUARDS: Record<string, { file: string; symbol: string; how: string }> = {
     symbol: "WINDOW_DAYS = ",
     how: "targets a multi-day window, so any fire inside the TTL captures the date",
   },
-  evaluate: {
-    file: "tools/board_window.py",
-    symbol: "def evaluate(",
-    how:
-      "the board scheduler is the MOST timing-sensitive job here — its window is ~30 minutes " +
-      "against a measured 40-80-minute Actions delay — and it is made insensitive by HOLDING " +
-      "rather than by the cron time: the runner starts early, polls this two-condition " +
-      "evaluation, and fires the first time it holds. The schedule chooses when to start " +
-      "waiting, never when to fire.",
-  },
+  /* `evaluate` (tools/board_window.py) was an entry here for one hour on 2026-08-02 —
+     board.yml shipped-then-retired same day (operator's call: scheduling runs through Vercel).
+     Removed WITH the workflow because this file asserts no guard goes unused; the live
+     implementation is /api/scheduler over src/lib/server/scheduler-decide.ts, guarded by
+     tests/scheduler-route.test.ts. board_window.py stays as the derivation record. */
 };
 
 type Row = { file: string; scheduled: boolean; sensitive: boolean | null; guard: string | null; reason: string };
@@ -133,12 +128,12 @@ describe("every scheduled workflow declares whether its value depends on WHEN it
     const sens = rows.filter((r) => r.scheduled && r.sensitive).map((r) => r.file).sort();
     // board-archive is SENSITIVE-with-a-window rather than INSENSITIVE: it does have a timing
     // requirement (after the day, before the 3-day TTL), it is simply guarded by construction.
-    /* board.yml joined 2026-08-02 — the self-scheduling generator. It is the most
-       timing-sensitive job in the repo (a ~30-minute window against a measured 40-80-minute
-       Actions delay) and, like board-archive, it is SENSITIVE-guarded-by-construction rather
-       than INSENSITIVE: `evaluate` decides the fire, the cron only decides when the runner
-       starts waiting. */
-    expect(sens).toEqual(["board-archive.yml", "board.yml", "context.yml", "props-history.yml"]);
+    /* board.yml joined this list 2026-08-02 and LEFT it the same day — shipped-then-retired on
+       the operator's architecture call (scheduling runs through Vercel, not Actions; the
+       measured ~56-min median delay with a weekend collapse supports it). The two-condition
+       logic lives on in /api/scheduler + src/lib/server/scheduler-decide.ts, guarded by
+       tests/scheduler-route.test.ts; tools/board_window.py stays as the derivation record. */
+    expect(sens).toEqual(["board-archive.yml", "context.yml", "props-history.yml"]);
     const insens = rows.filter((r) => r.scheduled && r.sensitive === false).map((r) => r.file).sort();
     /* line-history.yml LEFT this list 2026-07-31 — not reclassified, DISABLED: its
        schedule block is commented out (owner's cadence ration; nothing reads its output,

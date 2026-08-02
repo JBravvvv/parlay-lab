@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { shapeAllowed } from "@/lib/server/odds-shape";
 
 /**
  * The only caller of The Odds API. The browser passes the engine's full URL;
@@ -7,8 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
  * cache-refresh interval and explicit fresh pulls do.
  *
  * ODDS_API_KEY env overrides the legacy public key (rotate at cutover).
- * fresh=1 bypasses the cache; when APP_PASSCODE is set it requires the
- * x-pl-pass header (spend-money gate).
+ *
+ * HARDENED 2026-08-02 (poller contingency A + B, §12Z, on the owner's word):
+ *   B — the `markets × regions` product must match one of the two shapes this product uses;
+ *       anything else is 403 before the upstream is touched. Bounds the cache-key attack.
+ *   A — an UNAUTHENTICATED `fresh=1` no longer 401s: it degrades to the CACHED path and the
+ *       response carries `x-pl-stale: true`. An unauthenticated caller can never force an
+ *       upstream fetch — and the 401 that would have KILLED THE MORNING BATCH the day
+ *       APP_PASSCODE was set (snapshot_props retries 3x, returns empty) is gone with it.
  */
 const ALLOWED_HOST = "api.the-odds-api.com";
 const TTL_SECONDS = 240;
@@ -26,6 +33,9 @@ export async function GET(req: NextRequest) {
   if (url.protocol !== "https:" || url.hostname !== ALLOWED_HOST) {
     return NextResponse.json({ error: "host not allowed" }, { status: 403 });
   }
+  if (!shapeAllowed(url)) {
+    return NextResponse.json({ error: "market shape not allowed" }, { status: 403 });
+  }
 
   const serverKey = process.env.ODDS_API_KEY;
   if (serverKey) url.searchParams.set("apiKey", serverKey);
@@ -35,12 +45,12 @@ export async function GET(req: NextRequest) {
 
   const fresh = req.nextUrl.searchParams.get("fresh") === "1";
   const pass = process.env.APP_PASSCODE;
-  if (fresh && pass && req.headers.get("x-pl-pass") !== pass) {
-    return NextResponse.json({ error: "passcode required for a fresh pull" }, { status: 401 });
-  }
+  /* A: auth decides FRESHNESS, never availability. Unauthenticated fresh degrades to cache. */
+  const authedFresh = fresh && (!pass || req.headers.get("x-pl-pass") === pass);
+  const degraded = fresh && !authedFresh;
 
   const upstream = await fetch(url.toString(), {
-    ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: TTL_SECONDS } }),
+    ...(authedFresh ? { cache: "no-store" as const } : { next: { revalidate: TTL_SECONDS } }),
   });
 
   const body = await upstream.text();
@@ -48,6 +58,7 @@ export async function GET(req: NextRequest) {
     status: upstream.status,
     headers: { "content-type": "application/json" },
   });
+  if (degraded) res.headers.set("x-pl-stale", "true");
   const quota = upstream.headers.get("x-requests-remaining");
   const used = upstream.headers.get("x-requests-used");
   if (quota) res.headers.set("x-requests-remaining", quota);

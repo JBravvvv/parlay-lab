@@ -357,6 +357,90 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.004 🎯 ARCHITECTURE CORRECTION — SCHEDULING RUNS THROUGH VERCEL (2026-08-02, operator's call)
+
+### SHIPPED THIS TURN
+
+| what | where |
+|---|---|
+| **`board.yml` RETIRED from `main`** (`ed2e4a5`) and from `frontend-rebuild` — **same-day, before it ever armed** (no `CRON_SECRET` existed on GitHub; it never fired; nothing to unwind) | ledger §12Z.5 |
+| **`/api/scheduler`** — the brains as a Vercel route: `x-cron-key` gate that **FAILS CLOSED** (`CRON_SECRET` unset → 503, explicitly not calibrate's `return !cron` failed-open shape), two-condition evaluation from statsapi printed in **every** response, idempotent by construction (board-exists → clean exit), fires by **forwarding** to `/api/generate` with the same header | `app/api/scheduler/route.ts` + `src/lib/server/scheduler-decide.ts`, **11 guards observed red first** (module-not-found red, then each branch) |
+| **Poller contingency A + B SHIPPED** (§12Z, one commit): A — unauthenticated `fresh=1` serves **cache + `x-pl-stale: true`** instead of 401, so the billed surface closes AND setting `APP_PASSCODE` later can no longer kill the morning batch; B — `markets × regions` allow-list (our six-prop×us, sharp h2h/spreads/totals×us,eu, events-list free class) | `app/api/odds/route.ts` + `src/lib/server/odds-shape.ts`, **9 guards, red first**. **C stays staged** |
+| **History secret scan: CLEAN** — 598 commits, all refs: 0 env files ever committed, 0 `apiKey=<value>` hits, 0 webhook URLs, 0 real secret literals (the two grep hits are test dummies `"s3cret"`/`"phrase"`). **No rotation list.** No other workflow uses `secrets.*` — GitHub needs no secret anywhere now | — |
+
+**WHY FORWARD, NOT A SHARED FUNCTION:** `/api/generate` is a signed-off SPENDING route; extracting
+its body is the M27 edit-in-place shape. Self-HTTP with the same header exercises the identical
+path with every protection (45-min limiter, conditional skip, `MAX_RUNS_PER_DATE`) intact.
+**Engine hash unmoved both sides of the ship** — written WHOLE, per the abbreviated-digest lesson
+(§10 item 9, and this line re-learned it: the 8-char prefix of an elided digest parses as a
+dangling short sha and `sha-references` correctly fired on it):
+`legacy/index.html` = `49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495`, pinned
+`ENGINE_SHA` = `b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867`.
+
+**WHAT A+B CHANGES FOR OUR OWN CALLERS:** the sweep already carries the header path (sends
+`x-pl-pass` only when env-set — §3 step 1 SHIPPED); the browser is unaffected until C; the only
+observable change today is that foreign market shapes 403 and unauthenticated `fresh=1` returns
+cached data marked stale instead of erroring once a passcode exists.
+
+### 🔴 ITEM 4 AUDIT — THE PREMISE CORRECTS: DELIVERY DID NOT COLLAPSE; THE ARCHIVE DID
+
+**The full Actions run log, zero failures anywhere:** 07-28→07-31 **10/day delivered**, Sat 08-01
+**8**, Sun 08-02 **4 by 20:42Z** (the 21:00Z and 22:30Z crons still owed). Every archived snapshot
+matches a logged run — **the impossible branch does not fire.** Today's per-cron delay: 56 / 80 /
+66 / 42 min — the measured 40–80 band, on a weekend.
+
+**THE 10× UNDER-TARGET COLLECTION IS AN ARCHIVE PHENOMENON, AND ITS MECHANISM IS THE BOARD-WINDOW
+DEFECT'S SIBLING:** Sunday's first pitch was **17:35Z**; the earliest props cron declares **17:00Z**
+and delivered **17:56Z** — after first pitch, every run, by construction. The runs then fetch a
+mostly-started slate: 8 events, 3, 0, 0. **The props crons on `main` are mis-houred for Sundays in
+exactly the way entry 3 was** — readiness checked, first pitch never consulted. §12Z.3's standing
+question applies to the collection schedule too.
+
+**CORRECTION TO THIS MORNING'S RESIDUAL BRACKET (§0.005):** three runs, not two, had delivered by
+the 20:05Z quota read (20:01Z archived zero — delivered ≠ archived, the §12X distinction applied
+to itself). Upper attributable 3 × 97 = 291, so **RESIDUAL 64..287** at 4.0–17.8/h, not 161..287.
+The lower edge is a quarter of what was printed. **Exhaustion restatement is BLOCKED on §11 item
+5i** (the fetch-count print); directionally the 427/day collection model **over-states** weekend
+spend, so the ≈09-11 date is conservative.
+
+**PROPS→VERCEL MIGRATION — SPEC ONLY, HELD FOR JOSH'S WORD:** extend `/api/propsnap` to write
+dated append-only Blob keys (`props/YYYY-MM-DD/HHMMZ.json`), same MIN_GAP semantics, same 6×us
+shape, driven by the same ticker class. **Consumers that change:** `close_fair.py`,
+`close_capture.py`, `phase2_series_b.py`, `hr_overround.py`, `tools/price-path.mjs` all read
+`data/props/*.json` from `line-history` — they would read a Blob export or a daily Blob→git
+mirror; `tests/*` fixtures unaffected. **The delivery audit above is the evidence in BOTH
+directions: Actions delivery is reliable (0 failures) but late-batched; Vercel is minute-precise.
+The case for migrating is the HOURS, not the reliability.**
+
+### 🔴 THE TICKER (ITEM 3) — HOBBY IS DOCUMENTED IN-REPO, AND THE SPECIFIED RATE HITS A RECORDED CAP
+
+**Plan: Hobby**, from the repo's own text (generate route: *"Vercel Hobby allows only 2 crons and
+both are spoken for"*; CLAUDE.md L1043: *"the generate split lives on cron-job.org (custom
+headers; free tier 100/day…)"*). → **cron-job.org is the ticker; `vercel.json` crons stay absent
+and `/api/calibrate` stays paused.**
+
+**BUT THE SPECIFIED `*/15` ACROSS 15:00Z–03:00Z = 48 pokes/day, AND THE REPO RECORDS THE FREE TIER
+AT 100/DAY WITH `/api/clv` ALREADY USING 96.** 96 + 48 + 3 fallback entries = 147. **The spec does
+not fit the account it names.** The fitting split, printed for Josh in the turn response: CLV
+`*/15`→`*/30` (48) + ticker 48 + entries 1–3 (3) = **99 ≤ 100**. CLV has returned `no locked card
+today` at zero credits for its entire dark-ledger life, so halving it costs nothing measured.
+
+### TOMORROW (ITEM 6) — WHAT IS AND IS NOT AUTONOMOUS, STATED PLAINLY
+
+**A premise in the brief was wrong and is corrected rather than absorbed: "lock-at-generation,
+placed:null, grading — they live in the route layer already" — THEY DO NOT.** Ships 3 and 4 never
+landed (§0.005). The scheduler fires `/api/generate` **as it exists**: board + predictions + gen
+index, **no locked card, no auto-grading.** Tomorrow with the ticker live is: pokes → conditions
+printed per poke → one fire inside the window → **board builds** → readings per §4B/§5. **Josh's
+touch is still lock-and-place until ships 3–4 land.** Fallback chain regardless: **entry 1 Monday
+22:45Z fires on its own.** Held decisions unchanged: **singles manifest** (item 4, spec-and-hold) ·
+**learning A/B page** (item 5) — both still owed.
+
+**LANDING TEST, PRE-COMMITTED (ticker):** first live day — the route's responses show the
+condition evaluated per poke, **exactly one** `fired:true`, the board's gen block carries the
+header trigger, `MAX_RUNS` untouched. **Two fires or a false-condition fire → did not land,
+entries 1–3 carry the week, said plainly.**
+
 ## 0.005 🎯 AUTONOMY — 2026-08-02. SHIPS 1 AND 2 LANDED. ONE BLOCKER, AND IT IS JOSH'S.
 
 ### 🔴 THE ONE THING THAT GATES EVERYTHING: `CRON_SECRET` IS NOT SET
@@ -2745,6 +2829,26 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.5 LEDGER — SHIPPED-THEN-RETIRED SAME DAY, AND TWO PREMISES CORRECTED (2026-08-02)
+
+**`board.yml` shipped to `main` at `5dc0e1e` and retired at `ed2e4a5` the same day, before it ever
+armed** — `actions/secrets` read `total_count = 0` the whole time, so it never fired and there was
+nothing to unwind. **On the operator's direction: scheduling runs through Vercel.** **The design
+survives, the carrier changes** — the two-condition logic moved verbatim into
+`src/lib/server/scheduler-decide.ts`; `tools/board_window.py` stays as the derivation record.
+**A same-day reversal recorded as a reversal, with both shas, is cheap; the alternative — a dead
+workflow on `main` waiting for a secret — is a standing trap.**
+
+**TWO PREMISES IN THE ORDERING BRIEF, CORRECTED FROM MEASUREMENT rather than absorbed:**
+1. **"Actions delivery has a weekend collapse" — NOT SUPPORTED.** The run log shows **zero
+   failures** and full delivery through the weekend (10/10 weekdays, 8 Sat, 4 by 20:42Z Sun with
+   two still owed). **What collapsed is the ARCHIVE** — runs land post-first-pitch on Sundays and
+   fetch burned-down slates (§0.004). The Vercel case stands on the **hours** (median ~56-min
+   delay vs minute-precision), not on reliability.
+2. **"lock-at-generation, placed:null, grading — live in the route layer already" — FALSE.**
+   Ships 3 and 4 never landed (§0.005 says so). Absorbing this premise would have recorded
+   tomorrow as fully autonomous when the locked card and grading do not exist yet.
 
 ### 12Z.4 LEDGER — TWO EMPTY ARRIVALS, TWO DIFFERENT MECHANISMS (2026-08-02, owner's correction)
 
