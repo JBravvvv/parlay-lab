@@ -7107,6 +7107,48 @@ other artifact — it is a data file the engine cannot read, refreshed by a bot,
 board. **A guard pinned to a COUNT caught what no date-based convention could.** `ARMED.umpKf`
 updated 2 → 4 in the same commit as this record, per the guard's own instruction.
 
+## SELF-ARMING: CROSSINGS 5 AND 6 — DATED RECORD (2026-08-02)
+
+**`shUmpKf`'s arm count went 4 → 6 in a single bot refresh, again.** `data/ump_k.json` gained
+2026-08-01 on commit **`24f17575e34f40bbe9c20ac3d319f4f0f6c7e181`** (2026-08-02T18:00:56Z,
+`context: refresh`, that file only), and **Marvin Hudson (g 4→5, k 72→93) and Nestor Ceja
+(g 4→5, k 69→90) both crossed.**
+
+| # | umpire | date | g/k at arming | k/g |
+|---|---|---|---|---|
+| 1 | Lance Barrett | 2026-07-30 | 5 / 90 | 18.0 |
+| 2 | Willie Traynor | 2026-07-31 | 5 / 69 | 13.8 |
+| 3 | Malachi Moore | 2026-08-01 | 5 / 74 | 14.8 |
+| 4 | Derek Thomas | 2026-08-01 | 5 / 99 | 19.8 |
+| **5** | **Marvin Hudson** | **2026-08-02** | **5 / 93** | **18.6** |
+| **6** | **Nestor Ceja** | **2026-08-02** | **5 / 90** | **18.0** |
+
+**SIX crossings in four days.** League now **g = 253, k = 4171, mean k/g = 16.49**. **NINETEEN
+umpires sit at g = 4, up from fourteen** — the count can more than double again on one refresh, and
+**the rate is still rising, not settling.**
+
+**🔴 A PREVIOUS CLAIM WEAKENS AND IS NOT RE-ASSERTED.** At n = 4 this record said the armed set
+*"straddles the league mean — NOT a high-K selection."* **At n = 6 it no longer cleanly straddles:**
+mean k/g **17.17 vs league 16.49, a gap of +0.68**, with **both new members above the mean**.
+**That is NOT a high-K selection claim** — n = 6, no dispersion test, and the two lowest members
+(13.8, 14.8) remain well below. **It is recorded as a DIRECTION TO WATCH, and the n = 4 conclusion
+is retired rather than carried forward as if the population had not changed.**
+
+**DID IT REACH A BOARD? NO, and for these two it is checked three ways rather than two.**
+`SH_CFG.umpKFrozen` is `true`; `public/model/context.json` is frozen at
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80`, last written 2026-07-29; **and
+`/api/board?date=2026-08-02` returned `{"board":null,"reason":"no-board-for-date","gens":[]}` — an
+empty generation index, so no board existed to reach.** **No series restates.**
+
+**🔴 HOW IT WAS FOUND, AND THE PROCESS LESSON:** the bot commit landed on `origin` **while a ship
+was in flight**. The push was rejected non-fast-forward, the divergence was inspected (one bot
+commit, `data/ump_k.json`, one line), and the branch was rebased. **Re-running the full gate on the
+rebased tree went RED on this guard.** Had the rebase been treated as bookkeeping and pushed on the
+strength of the pre-rebase green, **a red tree would have shipped and both crossings would have gone
+unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so the gate re-runs
+after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
+instruction.
+
 ## THE REOPEN CALENDAR IS COUNT-ARMED — A CLASS CORRECTION TO MY OWN M21 ENUMERATION (2026-07-30, owner's item 5)
 
 **~~"`consMinEv` expiry — DATE-armed"~~ — CORRECTED 2026-07-30, same day it was

@@ -101,19 +101,47 @@ const CROSSINGS = [
     braked: true,
     note: "FOURTH. Same commit as Malachi Moore.",
   },
+  {
+    ump: "Marvin Hudson",
+    date: "2026-08-02",
+    commit: "24f17575e34f40bbe9c20ac3d319f4f0f6c7e181",
+    kPerG: 18.6,
+    braked: true,
+    note:
+      "FIFTH. g 4->5, k 72->93. Bot `context: refresh` 18:00:56Z, ump_k.json only, adding " +
+      "2026-08-01 to `days`. FOUND BY THIS GUARD ON A REBASE: the bot commit landed on origin " +
+      "mid-ship, and re-running the gate after integrating it went RED. Had the rebase been " +
+      "pushed without re-gating, a red tree would have shipped and the crossing would have " +
+      "gone unrecorded — the reason a rebase is a tree change, not a bookkeeping step.",
+  },
+  {
+    ump: "Nestor Ceja",
+    date: "2026-08-02",
+    commit: "24f17575e34f40bbe9c20ac3d319f4f0f6c7e181",
+    kPerG: 18.0,
+    braked: true,
+    note: "SIXTH. g 4->5, k 69->90. Same commit as Marvin Hudson.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 4;
+const FLOOR = 6;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
-  "FOUR crossings in three days against a ~08-04 projection for the FIRST. THE PROJECTION " +
-  "WAS NOT SLIGHTLY EARLY, IT WAS WRONG ABOUT THE RATE. Fourteen more sit at g=4. k/g at " +
-  "arming still straddles the league mean (18.0 / 13.8 / 14.8 / 19.8 vs league 16.5): the " +
-  "armed subpopulation is STILL NOT a high-K selection, now on n=4. All four double-braked " +
-  "(context.json frozen at 2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 " +
-  "+ SH_CFG.umpKFrozen), so none reached a board and no series restates.";
+  "SIX crossings in four days against a ~08-04 projection for the FIRST. THE PROJECTION WAS " +
+  "NOT SLIGHTLY EARLY, IT WAS WRONG ABOUT THE RATE — the sixth landed two days before the " +
+  "first was due. NINETEEN more sit at g=4, up from fourteen, so the rate is still rising. " +
+  "k/g at arming: 18.0 / 13.8 / 14.8 / 19.8 / 18.6 / 18.0, mean 17.17 against a league mean " +
+  "of 16.49 (g=253, k=4171). ON n=4 THE ARMED SET STRADDLED THE LEAGUE MEAN; ON n=6 IT NO " +
+  "LONGER CLEANLY DOES — the last two both landed above, and the gap is +0.68 k/g. That is " +
+  "NOT yet a high-K selection claim: n=6, no dispersion test, and the two lowest members are " +
+  "still well below. It is recorded as a DIRECTION TO WATCH, and the honest statement is that " +
+  "the earlier 'still not a high-K selection' was made on n=4 and is not re-asserted on n=6. " +
+  "All six double-braked (context.json frozen at " +
+  "2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 + SH_CFG.umpKFrozen), so " +
+  "none reached a board — verified for the 08-02 pair against an empty gens[] — and no series " +
+  "restates.";
 
 function armedUmps(): string[] {
   const db = JSON.parse(readFileSync("data/ump_k.json", "utf8")) as {
