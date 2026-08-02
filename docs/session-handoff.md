@@ -2557,6 +2557,11 @@ its own mechanism, and only the third has a standing response encoded here.**
 | 2 | **MISROUTE CARRIAGE** — a Roster-Lab brief arrived here | the brief answered a screenshot from the sibling session and the relay carried it; `3fdd34b`/`8505800` are that repo's shas | **CLOSED** (§12Y.4). Response encoded: the target check, §17 |
 | 3 | **HARNESS CROSS-INJECTION AT COMPACTION** | the harness injected **Edge-Desk's `CLAUDE.md`** into this session, and a **`PostCompact` hook** instructed that Parlay-Lab knowledge be written into `Edge-Desk/CLAUDE.md` and committed there | **CLOSED AS HARNESS-SIDE, LOCATED — see below** |
 
+> **⚠️ NOT A FOURTH DEFECT: the 2026-08-02 empty arrivals are a SEQUENCING ERROR, not carriage.**
+> The result-handler ran ~9 h before the fire window opened, so there was nothing to send. **§12Z.4**
+> — and defect 1's ICOU at L2223 **remains unresolved**, a premature "resolved" having been withdrawn
+> there.
+
 **DEFECT 3, LOCATED 2026-08-02 (authorized search, in this order):**
 1. **Parlay-Lab's own config: NOT THERE.** `.claude/` contains **only `launch.json`**. No
    `settings.json`, no `settings.local.json`, no hooks file. `grep -rn 'PostCompact|PreCompact'`
@@ -2663,6 +2668,36 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.4 LEDGER — TWO EMPTY ARRIVALS, TWO DIFFERENT MECHANISMS (2026-08-02, owner's correction)
+
+**I TALLIED TWO EMPTY-CARRIAGE EVENTS. THE OWNER CORRECTED IT: ONE CHANNEL DEFECT, ONE SEQUENCING
+ERROR.** They are not the same failure seen twice, and pooling them would have put a second false
+observation against the channel — the exact error §12Y.2's wrong-premise ledger exists to catch.
+
+| # | event | mechanism | status |
+|---|---|---|---|
+| 1 | documents arrive EMPTY analyst-side | **CHANNEL DEFECT** — attachment carriage; body text and screenshots cross intact | §12Y.4, L2223 **ICOU stands** |
+| 2 | *"the board result is attached/reported"* / *"result follows below"* with nothing present, **~9 h before the fire window opens** | **SEQUENCING ERROR** — the analyst side ran the result-handler ahead of the board. **Nothing was dropped; there was nothing to carry** | **CLOSED by the owner's correction** |
+
+**🔴 AND MY DIAGNOSIS WAS THE WRONG CLASS, WHICH IS THE ENTRY.** I called the second event *"a channel
+observation rather than an authoring slip"* and offered it as **the first direct observation from this
+side of the ICOU at L2223.** **It was not an observation of the channel at all.** The check that would
+have separated them was already on my own screen and I had printed it twice: **the fire window was
+8.96–9.46 hours away, so no board existed to attach.** **A clock problem read as a carriage problem.**
+
+**THE ICOU AT L2223 THEREFORE STANDS UNRESOLVED.** It is resolved only by the analyst side reproducing
+the empty-document behaviour, or by body text landing where a document did not — **not by an empty
+paste that had nothing to send.** **The premature "resolved" is withdrawn here rather than left in the
+record.**
+
+**SAME SHAPE AS §12Z.3, ONE TURN LATER:** *check which population a claim is about before checking
+whether it is true* (standing rule 6). **An empty arrival before the event and an empty arrival after
+the event are two populations.** I had the timestamp that separates them, printed it in the same
+response, and still pooled the two.
+
+**ENCODED:** **before attributing a missing input to the channel, check whether the input could exist
+yet.** Timing first, carriage second.
 
 ### 12Z.3 LEDGER — A DERIVED HOUR THAT CHECKED READINESS AND NOT FIRST PITCH (2026-08-02)
 
