@@ -360,6 +360,91 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.0005 🎯 THE FLIP IS LIVE IN PRODUCTION — SINGLES ON (2026-08-03T02:31Z, owner's word)
+
+### VERDICT: SHIPPED, DEPLOYED, VERIFIED IN THE SERVED BYTES, MARKER CLOSED IN ~16 MINUTES
+
+```
+tools/verify-served-engine.mjs --chunk <LIVE 256-2c7681954a0ee8e7.js>
+served 283,396 chars  sha 39fc86814eb4e8be561278b48822810ee77f33ff822510a8b8f5c530c9acc0ce
+repo   283,396 chars  sha 39fc86814eb4e8be561278b48822810ee77f33ff822510a8b8f5c530c9acc0ce
+MATCH — and `singlesOn:true` / `sjEmit:true` each grep EXACTLY ONCE in the served bytes.
+```
+
+**The flip is verified in PRODUCTION, not merely in the repo.** Engine string
+`87c5dd17b2f25b8e9590ffbdc2b0dbe595abcf185bb97b85ef193b73e7ee2583` → **`39fc86814eb4e8be561278b48822810ee77f33ff822510a8b8f5c530c9acc0ce`**, 283,305 → 283,396 chars.
+
+**🔴 EXPECTED-DELTA STATEMENT, opposite to the 08-02 ship: ZERO BEHAVIOUR DELTA IS *NOT* EXPECTED.**
+Singles entering the pool **is** the intended delta. **The reading tomorrow is that the delta is
+SINGLES AND NOTHING ELSE** — certified by the `singles-vintage` invariant, which reproduces the
+exact pre-flip parlay set when the flag is turned off in-test. **The `87c5…` vintage closes at
+exactly one dark-structure day.**
+
+### THE BASELINE DECISION — the one that mattered, and why it is not regeneration
+
+**`baseline43.json` is the LEGACY APP'S artifact and its value is PROVENANCE**: it proves the
+extraction is faithful to a build that predates this repo. The legacy app had no singles.
+**Regenerating it from our own engine would have destroyed a provenance guarantee and left a
+self-generated file wearing the same filename — the exact self-grading shape this project keeps
+naming.** So parity is **SCOPED**: it pins `singlesOn:false`, the configuration the baseline was
+captured under, and the extraction guarantee survives whole. The **shipped** configuration gets
+its own **GENERATED** nets, labelled as generated: `baseline44-singles.json` (dormant) and
+`baseline-armed-v2-singles.json` (armed). Board digests re-cut in `clamp-instrumentation`.
+
+### FOUR THINGS THE SUITE CAUGHT — each a distinction, not a chore
+
+1. **`predictions.test.ts` asserted `legs >= 2` over the top 10 tickets.** It had encoded the
+   2-leg FLOOR as an invariant of the **logging** path, where it was only ever a fact about the
+   builder. Singles sort high on probability and took the top slots. **Widened to `legs >= 1`
+   over the WHOLE set — strictly stronger — plus new assertions that BOTH populations reach the
+   log.** This is item 2's structural-substitution effect, named in advance and found in place.
+2. **`armed-baseline`'s "propBoard was appended, not merged" is a claim about how the v1 FILE was
+   CONSTRUCTED.** v2 was generated whole, so the claim does not exist for it — pointing the
+   assertion at v2 would assert a construction fact about a file never constructed that way.
+   **Scoped back to v1, which stays on disk as the artifact it documents.**
+3. **My first clamp re-cut used a REIMPLEMENTED hash** (recursive delete, no key sort) and
+   disagreed with `clamp-instrumentation`'s own `boardHash`. **The test's values are the only
+   correct source**; the near-miss is recorded in the file rather than quietly overwritten.
+4. **`propBoard`'s md5 did NOT move** (`135f586f441efe59b35a54f31488e571`). **Singles change
+   tickets, not the row board** — a confirmation the flip's scope is what it claims.
+
+### THE LADDER GUARD — red first, with the flip, and it already read something
+
+**OBSERVED RED against `singlesOn:false`: two failures naming the empty population** — a guard
+green because it measures nothing. Green after the flip. It **PINS the residual rather than
+denying it**: the display ladder may exceed 2% on singles because the board is a display surface;
+what must hold is that the **allocator's** number reaches the card.
+
+**FIRST LIVE READINGS, already printed on the armed fixture:** `2/2 singles display above 2% of
+the pool` (expected, display-only) · **`no single cleared the gate into the card — a GATE
+reading, not a failure`**, exactly the pre-committed branch. **The display-ladder residual
+paragraph updates: the guard is written, the interim "structural protection only" note is
+retired, and the checklist line is unchanged — allocator's locked stakes only, $50 cap.**
+
+### ITEM 2 — THE CARD-LEVEL FIRST-ON READING, PRE-COMMITTED NOW
+
+Beside the single-ticket reading (first clearing single's stake vs ¼-Kelly×4 vs the 2% rule;
+none clearing = a gate reading):
+
+- **STRUCTURE MIX:** singles vs parlays **count and stake share**, printed **beside the
+  allocator's ranking**, so the mix is attributable to EV order rather than assumed.
+- **THE M14 INTERACTION:** singles change the **admission population** the cap and ranking act
+  on. Print **cap-binding, displacement by name, and clear-count** under the new structure
+  against the standing pre-commitments (≥30 bp; 2–4% vs 7%). **If the parlay-era numbers shift,
+  that is the STRUCTURAL SUBSTITUTION EFFECT, named — not a regression.**
+- **🔴 IMPOSSIBLE BRANCH: a single priced differently as a 1-leg ticket than its own leg price →
+  STOP and print both.** Structure must not touch pricing. *(Pre-checked in the engine: for one
+  leg `dec` and `prob` reduce to the leg's own numbers, the simJoint and corr loops both require
+  ≥2 and no-op, and cz/bs/cons reprice a single decimal — so the branch is expected dark. It is
+  still armed, because "expected dark" is what M23 said too.)*
+
+### WHAT DID NOT SHIP, STATED NOT SLIPPED
+
+**Per-stage drop counts (§11 item 5) and 5l are NOT in this commit.** Fourteen engine-string
+sites in the same commit as a composition change would make **item 1's own reading — "the delta
+matches the flip and nothing else" — unprovable.** They ride the next engine ship. **5l stays
+queued as TS-side per its correction.**
+
 ## 0.001a 🎯 DEPLOY CLOSED IN 12 MINUTES; THE DARK STRUCTURE GETS ITS OWN READING (2026-08-03T00:47Z)
 
 ### THE MARKER IS RESOLVED — served == repo, byte-for-byte
