@@ -35,12 +35,22 @@ describe("boardToPredictions", () => {
     // blend metadata present on rows the engine priced with a consensus
     const withBlend = records.filter((r) => r.w != null && r.pModel != null);
     expect(withBlend.length).toBeGreaterThan(50);
-    // suggested parlays captured with their legs + joint probability
+    /* suggested tickets captured with their legs + joint probability.
+       WIDENED 2026-08-03 AT THE SINGLES FLIP, and this is a STRUCTURAL SUBSTITUTION, not a
+       relaxation. The old assertion was `legs.length >= 2` over the top 10 — it encoded the
+       2-leg floor as an invariant of the LOGGING path, where it was only ever a fact about the
+       builder. Singles sort high on probability, so they now occupy the top of the set and the
+       assertion went red on correct behaviour. The property the logger actually owes is that
+       EVERY ticket carries at least one leg and a finite probability; that is asserted over the
+       whole set now rather than the first ten, which is strictly stronger. */
     expect(parlays.length).toBeGreaterThan(20);
-    for (const t of parlays.slice(0, 10)) {
-      expect(t.legs.length).toBeGreaterThanOrEqual(2);
-      expect(isFinite(t.prob)).toBe(true);
+    for (const t of parlays) {
+      expect(t.legs.length, "a logged ticket has no legs").toBeGreaterThanOrEqual(1);
+      expect(isFinite(t.prob), "a logged ticket has a non-finite probability").toBe(true);
     }
+    // and the flip's own population is present in the log, not silently dropped by it
+    expect(parlays.filter((t) => t.legs.length === 1).length, "singles are live in the engine but absent from the prediction log").toBeGreaterThan(0);
+    expect(parlays.filter((t) => t.legs.length >= 2).length, "parlays vanished from the log").toBeGreaterThan(0);
     // the games map carries pk + start for the grader
     const withPk = Object.values(games).filter((g) => g.pk != null);
     expect(withPk.length).toBeGreaterThan(0);

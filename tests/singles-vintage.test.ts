@@ -8,15 +8,14 @@ import { stripComments } from "./helpers/source";
  *
  * WHAT SHIPPED: the 2-leg floor became CONFIGURED (`sel.length < (SH_CFG.singlesOn?1:2)`), a
  * per-type singles builder rides behind the same flag, and the per-group simJoint j2/pm pair
- * emits behind `SH_CFG.sjEmit`. **BOTH FLAGS SHIP FALSE.**
+ * emits behind `SH_CFG.sjEmit`. ~~**BOTH FLAGS SHIP FALSE.**~~ *Struck 2026-08-03 — see below.*
  *
- * WHY OFF, WHEN THE OWNER SAID SHIP: `tests/parity.test.ts` compares the ticket sets
- * element-by-element against the signed-off `baseline43.json`, and `armed-baseline` pins the
- * armed digest. An ON default changes both — and regenerating signed-off baselines inside the
- * same commit that changes behaviour is self-grading. So the STRUCTURE ships tonight (the hash
- * moves, the vintage stamps), the flip is its own commit with the baseline re-derivation beside
- * it, and this file tests BOTH states against the shipped engine via the established
- * `eng.get("SH_CFG")` override — the ON behaviour is verified TONIGHT, not promised.
+ * FLIPPED 2026-08-03 (owner's word: SINGLES ON). Both flags now ship TRUE. The 08-02 ship
+ * deliberately separated the STRUCTURE from the BEHAVIOUR so the two could be verified apart;
+ * this file inverts with the flip and keeps testing BOTH states via the established
+ * `eng.get("SH_CFG")` override. The invariant that survives the flip unchanged is the one that
+ * mattered on 08-02: **turning singles off reproduces the pre-flip parlay set exactly**, so the
+ * flip's delta is attributable to singles and to nothing else.
  *
  * ── THE DISCIPLINE TABLE ON A 1-LEG TICKET, printed before the ship (owner's item 1) ────
  * | discipline                        | covers a single? | mechanism |
@@ -37,9 +36,9 @@ import { stripComments } from "./helpers/source";
 const src = stripComments(readFileSync("legacy/index.html", "utf8"));
 
 describe("the singles vintage — source state", () => {
-  it("both flags ship FALSE — the pinned baselines stay valid", () => {
-    expect(/singlesOn:\s*false/.test(src), "singlesOn is no longer false — the flip must carry baseline re-derivation").toBe(true);
-    expect(/sjEmit:\s*false/.test(src), "sjEmit is no longer false").toBe(true);
+  it("both flags ship TRUE — the flip is live in the shipped engine", () => {
+    expect(/singlesOn:\s*true/.test(src), "singlesOn is not true — the flip did not land in the engine string").toBe(true);
+    expect(/sjEmit:\s*true/.test(src), "sjEmit is not true").toBe(true);
   });
 
   it("the floor is configured, not constant — and not simply deleted", () => {
@@ -54,9 +53,10 @@ describe("the singles vintage — source state", () => {
 });
 
 describe("the singles vintage — BOTH states, live on the shipped engine", () => {
-  it("flag OFF (shipped default): no single is built anywhere", async () => {
+  it("flag OFF (in-test override): no single is built anywhere", async () => {
     vi.setSystemTime(FROZEN_NOW);
     const eng = armedFixtureEngine();
+    eng.get<Record<string, unknown>>("SH_CFG").singlesOn = false;
     const d = eng.analyze(await eng.collectSlate()) as unknown as {
       parlays: { name: string; legs: unknown[] }[]; parlaysMixed: { name: string }[]; parlaysLive: { name: string }[];
     };
@@ -66,14 +66,14 @@ describe("the singles vintage — BOTH states, live on the shipped engine", () =
     expect(all.filter((t) => /single/i.test(t.name)), "a ticket named single exists with the flag OFF").toEqual([]);
   }, 300_000);
 
-  it("flag ON (in-test override): singles enter, parlay composition is untouched, disciplines hold", async () => {
+  it("flag ON (shipped default): singles enter, parlay composition is untouched, disciplines hold", async () => {
     vi.setSystemTime(FROZEN_NOW);
     const off = armedFixtureEngine();
+    off.get<Record<string, unknown>>("SH_CFG").singlesOn = false;
     const dOff = off.analyze(await off.collectSlate()) as unknown as { parlays: { name: string; legs: { prob: number }[]; prob: number; stake: number }[] };
 
     vi.setSystemTime(FROZEN_NOW);
     const on = armedFixtureEngine();
-    on.get<Record<string, unknown>>("SH_CFG").singlesOn = true;
     const dOn = on.analyze(await on.collectSlate()) as unknown as { parlays: { name: string; type: string; legs: { prob: number; label: string }[] }[] };
 
     const singles = dOn.parlays.filter((t) => t.legs.length === 1);
@@ -93,10 +93,9 @@ describe("the singles vintage — BOTH states, live on the shipped engine", () =
     expect(onP, "the flag CHANGED a parlay — the boundary is wider than the flag's doc claims").toEqual(offP);
   }, 300_000);
 
-  it("sjEmit ON (in-test override): j2/pm pairs appear only on simJoint tickets, both factors finite", async () => {
+  it("sjEmit ON (shipped default): j2/pm pairs appear only on simJoint tickets, both factors finite", async () => {
     vi.setSystemTime(FROZEN_NOW);
     const on = armedFixtureEngine();
-    on.get<Record<string, unknown>>("SH_CFG").sjEmit = true;
     const d = on.analyze(await on.collectSlate()) as unknown as {
       parlays: { simJoint: boolean; simJointG?: { g: string; j2: number; pm: number }[] }[];
       parlaysMixed: { simJoint: boolean; simJointG?: { g: string; j2: number; pm: number }[] }[];

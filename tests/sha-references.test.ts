@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
  *
  * ALLOWLIST — tokens that are legitimately NOT commits (each with its why):
  *   e67eaad0 / 942ab102 / 935704d7 / c06b3afe / 135f586f  — board/fixture digests (md5)
+ *   fd73ad6d / 4151ad25                                   — the same, re-cut at the 08-03 flip
  *   f6cf1513                                              — the engine string sha256
  *   4a5e96c0                                              — a git BLOB hash cited in a
  *                                                            ls-tree forensic (cron-jobs.md)
@@ -27,7 +28,10 @@ const FILES = ["CLAUDE.md", ...readdirSync("docs").filter((f) => f.endsWith(".md
    OUTPUT — the point of quoting it is that it does not resolve. Allowlisted with that reason
    rather than mangled out of the prose, so the exception is explicit and this guard keeps its
    teeth on every other citation. */
-const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0", "3fdd34b"]);
+const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0", "3fdd34b",
+  /* 2026-08-03 singles flip: the re-cut board digests. The superseded pair stays allowlisted
+     above because the tests quote both old and new — a retired digest is still a citation. */
+  "fd73ad6d", "4151ad25"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**

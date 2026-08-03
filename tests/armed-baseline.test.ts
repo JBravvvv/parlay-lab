@@ -40,7 +40,7 @@ import { ARMED_DAILY, ARMED_FUN, FROZEN_NOW, armedDigest, armedFixtureEngine, di
  * `simN`/`simNHR` are pinned to `SIM_PATHS_FIXTURE`, and dates are pinned via
  * `createEngine({ today })` under fake timers.
  */
-describe("baseline-armed-v1 — the armed regression net", () => {
+describe("baseline-armed-v2-singles — the armed regression net (re-cut at the singles flip)", () => {
   /**
    * `propBoard` JOINED THE BASELINE ON 2026-07-27, ADDITIVELY.
    *
@@ -64,7 +64,12 @@ describe("baseline-armed-v1 — the armed regression net", () => {
    */
   const BASELINE_BEFORE_PROPBOARD = "53b2424b80a72b6a056e2b4fa264925e";
 
-  it("the propBoard section was appended, not merged into anything", () => {
+  /* SCOPED TO v1 2026-08-03. This assertion is about how the v1 FILE WAS CONSTRUCTED — that
+     propBoard was appended to an existing baseline rather than merged through it. v2-singles was
+     GENERATED WHOLE at the singles flip, so the append-provenance claim does not exist for it and
+     pointing this at v2 would be a category error: it would assert a construction fact about a
+     file that was never constructed that way. v1 stays on disk as the artifact this documents. */
+  it("the propBoard section was appended, not merged into anything (v1 provenance)", () => {
     const raw = fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v1.json"), "utf8");
     const cut = raw.lastIndexOf(',"propBoard":');
     expect(cut, "propBoard section missing from the armed baseline").toBeGreaterThan(0);
@@ -97,7 +102,7 @@ describe("baseline-armed-v1 — the armed regression net", () => {
     const slate = await eng.collectSlate();
     const d = eng.analyze(slate) as unknown as Record<string, unknown>;
     const got = JSON.stringify(armedDigest(d, eng));
-    const want = fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v1.json"), "utf8");
+    const want = fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v2-singles.json"), "utf8");
 
     if (got !== want) {
       const A = JSON.parse(want) as Record<string, never>;
@@ -123,7 +128,7 @@ describe("baseline-armed-v1 — the armed regression net", () => {
 
   it("covers the card path the dormant digest never saw", () => {
     const want = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v1.json"), "utf8"),
+      fs.readFileSync(path.join(__dirname, "fixtures", "baseline-armed-v2-singles.json"), "utf8"),
     ) as { pool: string[]; alloc: { blocked: string[]; noPlay: boolean }; fun: { picks: unknown[] } };
     // the surfaces Phases 3/4/5 land on must actually be present, or this baseline is
     // as void as the criterion it replaces

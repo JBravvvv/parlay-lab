@@ -19,14 +19,21 @@ import { FROZEN_NOW, armedFixtureEngine, fixtureEngine } from "./helpers/fixture
  * the pre-change engine.
  */
 
-/* full-board digests captured 2026-07-27 on the PRE-INSTRUMENTATION engine.
+/* RE-CUT 2026-08-03 AT THE SINGLES FLIP. The flip changes the ticket sets, so the whole-board
+   digest necessarily moves; the ADDITIVE proof this file exists for is unaffected — it is a
+   statement about clampActivity, re-pinned against the current engine. Note the first re-cut
+   attempt used a REIMPLEMENTED hash (recursive delete, no key sort) and disagreed with this
+   file's own boardHash; the values below are this file's, which is the only correct source.
+   Superseded: dormant 942ab102372e369cff0e35bd729a6147, armed c06b3afe85b7216c58dd6008309fb038.
+
+   full-board digests captured 2026-07-27 on the PRE-INSTRUMENTATION engine.
    ARMED re-pinned 2026-07-27 (same day, later): the SHADOW PRICES went in — signed off,
    additive, SH_V2-gated. Armed rows gained `shdw`/`sh`; the dormant board is byte-identical
    and its digest is UNCHANGED, which is the additive proof:
      armed  935704d7c8656aa667b015b804b0778f → c06b3afe85b7216c58dd6008309fb038
      dormant 942ab102372e369cff0e35bd729a6147 → unchanged */
-const BEFORE_DORMANT = "942ab102372e369cff0e35bd729a6147";
-const BEFORE_ARMED = "c06b3afe85b7216c58dd6008309fb038";
+const BEFORE_DORMANT = "4151ad2522d400bcf679cd8b6155a431"; /* re-cut 2026-08-03 at the singles flip; was 942ab102372e369cff0e35bd729a6147 */
+const BEFORE_ARMED = "fd73ad6d2d934dce7cf08978ad68cfd1"; /* re-cut 2026-08-03 at the singles flip; was c06b3afe85b7216c58dd6008309fb038 */
 
 function boardHash(d: Record<string, unknown>): string {
   const { clampActivity: _drop, ...rest } = d;
