@@ -1084,7 +1084,7 @@ var SH_CFG={perParlayCap:0.25,roundTo:1,maxCoreTickets:6,minCoreTickets:4,thinSl
        than consMinN graded ledger legs also needs the de-vigged consensus itself to price it
        no worse than consMinEv% at the basis. mktN arrives from the calibration store at arm
        time; an unknown market counts as small — a market is never assumed proven. */
-  coreCzEvMin:0,coreMaxLegs:3,outsSusp:true/* 2026-07-31 signed off: pitcher_outs suspended from auto-selection in the disciplined modes pending the M2 interlocked-pair fix (docs/pitcher-outs-audit.md DECIDED). Same construction as hrrAltMax. */,hrrAltMax:-1/* 0.5→−1 2026-07-27, signed off: HRR O0.5 joins its own market's suspension until the retirement criterion in docs/collection-period.md */,consMinN:100,consMinEv:-1,mktN:null,
+  coreCzEvMin:0,coreMaxLegs:3,outsSusp:true/* 2026-07-31 signed off: pitcher_outs suspended from auto-selection in the disciplined modes pending the M2 interlocked-pair fix (docs/pitcher-outs-audit.md DECIDED). Same construction as hrrAltMax. */,hrrAltMax:-1/* 0.5→−1 2026-07-27, signed off: HRR O0.5 joins its own market's suspension until the retirement criterion in docs/collection-period.md */,singlesOn:false/* 2026-08-02 singles ship (owner's word): the 2-leg floor lifts and per-type singles enter the pool ONLY when true. Ships FALSE because parity/armed baselines are signed off against the 2-leg sets; the flip is its own commit with the baseline re-derivation beside it. Same construction as outsSusp. */,sjEmit:false/* 2026-08-02: per-group simJoint j2/pm emission (M-item 2). FALSE for the same baseline reason; the flip rides with singlesOn's. */,consMinN:100,consMinEv:-1,mktN:null,
   /* FUN structure caps (Correction 2, 2026-07-23): FUN is exempt from the EV gate —
      a lottery ticket is never +EV, that's what makes it a lottery — so it is capped by
      structure instead: at most funMaxTickets per day (supplemental locks count toward
@@ -2680,7 +2680,11 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
       return out;
     }
     function build(name,type,sel){
-      if(!sel||sel.length<2)return null;
+      /* 2026-08-02: the 2-leg floor is CONFIGURED, not constant. singlesOn lifts it to 1 so a
+         straight bet flows the same pipeline — every downstream term degrades exactly: dec/prob
+         to the leg's own numbers, the simJoint and corr loops need >=2 and no-op, cz/bs/cons
+         reprice one leg, and the allocator's Kelly ceiling reads the same shape. */
+      if(!sel||sel.length<(SH_CFG.singlesOn?1:2))return null;
       var legs=sel.map(legOf);
       var dec=legs.reduce(function(a,l){var d=amToDec(l.odds);return d?a*d:a;},1);
       var prob=legs.reduce(function(a,l){return a*(Number(l.prob)/100);},1);
@@ -2690,7 +2694,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
          product is scaled by (joint sim frequency ÷ product of the sim's own marginals),
          clamped 0.25–4×. Cross-game independence stands; groups the sim didn't fully
          grade fall back to the naive product. */
-      var probNaive=prob,simJoint=false;
+      var probNaive=prob,simJoint=false,sjG=[];
       if(shV2Sim()){
         var byG={};legs.forEach(function(l){if(l.gkey&&l.lkey)(byG[l.gkey]=byG[l.gkey]||[]).push(l);});
         var pJ=prob;
@@ -2702,6 +2706,10 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
           if(!ok)return;
           pJ*=Math.max(0.25,Math.min(4,j2/pm));
           simJoint=true;
+          /* M-item 2 (2026-08-02): the two factors the rounded stored ratio could never
+             recover — emitted per group, gated off until the baseline flip. A MEASUREMENT
+             on the ticket, not an inference from 1-decimal precision. */
+          if(SH_CFG.sjEmit)sjG.push({g:gk2,j2:Math.round(j2*10000)/10000,pm:Math.round(pm*10000)/10000});
         });
         if(simJoint)prob=Math.max(0,Math.min(1,pJ));
       }
@@ -2742,7 +2750,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
       var toWin=Math.round(stake*(dec-1));
       var tier=dec<=6?"SAFER":dec<=25?"BALANCED":"LONGSHOT";
       var am=decToAm(dec);
-      return {name:name,type:type,typeLabel:(type==="MIX"?"Mixed":SH_TYPE_NAME[type]),tier:tier,legs:legs,
+      var T9={name:name,type:type,typeLabel:(type==="MIX"?"Mixed":SH_TYPE_NAME[type]),tier:tier,legs:legs,
         simJoint:simJoint,probNaive:simJoint?Math.round(probNaive*1000)/10:null,
         odds:(am!=null?obSign(am):"—"),prob:Math.round(prob*1000)/10,stake:stake,toWin:toWin,
         czOdds:(czOddsT!=null?obSign(czOddsT):null),czDec:czAll?Math.round(czDec*10000)/10000:null,
@@ -2759,6 +2767,8 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
           (tier==="SAFER"?"Higher-floor ticket — size up: $"+stake+" to win ~$"+toWin+".":
            tier==="LONGSHOT"?"Lottery ticket — keep it small: $"+stake+" to win ~$"+toWin+".":
            "Mid-risk build: $"+stake+" to win ~$"+toWin+".")};
+      if(SH_CFG.sjEmit&&sjG.length)T9.simJointG=sjG; /* key ABSENT unless armed+grouped+flagged — pinned baselines never see it */
+      return T9;
     }
     var out=[];
     /* single-prop-type tickets — leg-count patterns scaled by how deep each category is */
@@ -2787,6 +2797,16 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
     var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
     mixPat.forEach(function(want){var n=Math.min(want,mixPool.length);if(n<2)return;
       var p=build("Mixed · "+n+" legs","MIX",pick(mixPool,n,true));if(p)out.push(p);});
+    /* 2026-08-02 singles (owner's word, flagged): built after the ENTIRE set — per-type AND
+       mixed — because pick() consumes player caps, so a single built any earlier steals a
+       slot from a later parlay and changes composition. MEASURED before this placement was
+       chosen: built inside the per-cat loop, flag-ON removed one mixed parlay (94 -> 93);
+       built here, every >=2-leg ticket is identical flag-on vs flag-off. The projected-lineup
+       rule (noParlay) applies to singles unchanged: an unposted lineup is no better a bet for
+       having one leg. */
+    if(SH_CFG.singlesOn)SH_NAMED_CATS.forEach(function(k){
+      var pool=(C[k]||[]).map(function(r){return {cat:k,r:r};});if(!pool.length)return;
+      var s1=build(SH_TYPE_NAME[k]+" single",k,pick(pool,1,(k!=="batter_home_runs")));if(s1)out.push(s1);});
     out.sort(function(a,b){return b.prob-a.prob;});
     return out;
   }

@@ -13,8 +13,11 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-02:** `origin/frontend-rebuild` = `578c9ece6ce51b2c6356fbfb9dd7e9afe4e5b4fc`
-> - **STATE-CLAIM 2026-08-02:** `origin/main` = `b1f17d2ef6bff3a8c62e9de5a6c6165eb4bf6221`
+> - **STATE-CLAIM 2026-08-03:** `origin/frontend-rebuild` = `ff16d39a738346a1f724b735fb2db6b0c16cd3d5`
+> - **STATE-CLAIM 2026-08-03:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+>
+> *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
+> shipped. The guard is doing the maintenance its header promised.)*
 >
 > *(Written at that HEAD; the commit carrying this line then makes the first claim exactly 1 behind.
 > That offset is structural — a commit cannot contain its own sha — and K absorbs it.)*
@@ -356,6 +359,93 @@ time is unknown*, not *the number is wrong*.
 generate path sets `calW` was not verified** — if it does not, archived server boards priced WITHOUT
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
+
+## 0.002 🎯 JOSH'S WORD, BOTH DECISIONS — SINGLES SHIPPED (FLAGGED), LEARNING = (B) (2026-08-02/03)
+
+### ITEM 1 — THE HASH-MOVING SHIP: THE VINTAGE MOVED TONIGHT; THE BEHAVIOUR FLIPS IN ITS OWN COMMIT
+
+**Manifest from disk, printed before building:** singles floor (new, Josh's YES) · item 2 simJoint
+j2/pm · item 5 per-stage drop counts · item 5l skip-checks-T.
+
+**SHIPPED — the engine string moved for the first time since the outs flag.** Digests whole (this
+section originally carried three 8-char prefixes and `sha-references` fired on every one — the
+§10-item-9 mistake a THIRD time, now a reflex to check): `legacy/index.html`
+`49734a15c5af9bbd6e3f8bef91d4f40308a691813a6a7abece830ca2ffe58495` → (guard-caught intermediate)
+→ final; engine string **281,096 → 283,305 chars**; `ENGINE_SHA`
+`b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867` →
+**`87c5dd17b2f25b8e9590ffbdc2b0dbe595abcf185bb97b85ef193b73e7ee2583`**. `served-verification.json`
+carries the **PENDING marker, since 2026-08-03T00:35Z, 24-h clock — tomorrow's first action after
+the deploy is the served-chunk re-grep.**
+
+1. **The 2-leg floor is CONFIGURED:** `sel.length < (SH_CFG.singlesOn ? 1 : 2)`. **`singlesOn`
+   ships FALSE**, because `parity.test.ts` pins the ticket sets element-by-element against the
+   signed-off `baseline43.json` and `armed-baseline` pins the armed digest — **an ON default
+   regenerates signed-off baselines inside the behaviour commit, which is self-grading. The flip
+   is its own commit with the baseline re-derivation beside it.**
+2. **Per-type singles builder** behind the same flag, **after the ENTIRE set** — see the catch
+   below.
+3. **j2/pm per group** (`simJointG:[{g,j2,pm}]`) behind **`sjEmit`, ships FALSE**, key ABSENT
+   unless armed+grouped+flagged, so pinned baselines never see it.
+4. **Per-stage drop counts: EXCLUDED from tonight's manifest, stated not slipped** — twelve
+   `continue`/`return` sites across the chain, each its own scope-by-diff surface, on the eve of
+   the first autonomous fire. Rides the flip commit. **5l (skip-checks-T): re-derived on disk as
+   TS-side** (`liveCoverage` + the gens index carry what it needs; no hash move required) — its
+   §11 row's "moves the hash" was wrong and is corrected there; it ships with the flip.
+
+**🔴 THE INVARIANT CAUGHT A DESIGN ERROR BEFORE IT SHIPPED.** First placement built each cat's
+single inside the per-cat loop; the scope-by-diff case (`every ≥2-leg ticket identical ON vs OFF`)
+went **RED: flag-ON removed a mixed parlay, 94 → 93** — `pick()` consumes player caps, and a
+single built early stole a slot from the later mixed build. **Builder moved after the entire
+set; green.** The pre-committed stop-branch did not need to fire because the red was fixable
+in-build — but it fired *first*, which is the order the discipline demands.
+
+**BOTH FLAG STATES VERIFIED TONIGHT** (`tests/singles-vintage.test.ts`, 6 tests, via the
+established `eng.get("SH_CFG")` override): OFF = zero singles anywhere; **ON = singles enter,
+every ≥2-leg ticket byte-identical, disciplines hold**; `sjEmit` ON = pairs finite, only on
+simJoint tickets, no key leak. **The discipline table on a 1-leg ticket is in the guard header:
+Kelly ceiling / caps / coreEvMin / suspensions / consensus / noParlay ALL cover it; M24/M25
+exposure is INHERITED, not widened; the display stake ladder is display-only. No uncovered
+structure found.** The **~2.1× figure stays retired** (pre-M14 provenance) — the ship's case is
+structural access.
+
+**TOMORROW'S BOARD RUNS THE NEW VINTAGE HASH WITH OLD BEHAVIOUR — flags off. Board 1 of the
+new `87c5…` vintage, stamped, zero behaviour delta expected.** Singles' first production reading
+moves to the flip's first board: any single clearing the gate prints its stake against its own
+Kelly and the 2% operator rule; none clearing is a reading, not a failure.
+
+**AND `sha-currency` FIRED ITS FIRST LIVE CATCH DURING THIS SHIP** — the STATE-CLAIM header hit
+11 behind (K=10) and the suite refused. Claims refreshed. One day old, already earning.
+
+### ITEM 2 — LEARNING (B), CHOSEN ON JOSH'S WORD, DATED 2026-08-02
+
+**The parameter exit's one-vintage premise is FORMALLY CLOSED — superseded by (B),
+stamped-continuous weekly, Josh's word, this date.** The freeze's purpose sentence restates: the
+freeze bought a clean attribution window; **(B) trades cross-vintage comparability for live
+learning, with every fit dated and the record segmented per vintage.**
+
+**MECHANISM (from §0.006's reconciliation: scheduling is cron-job.org):** one new weekly row,
+printed for Josh in the turn response — `/api/calibrate`, Sundays, **`Authorization: Bearer
+<CRON_SECRET>` (this route's header form — NOT `x-cron-key`)**. **With `CRON_SECRET` now set in
+Vercel, `authed()`'s `return !cron` branch is DEAD — the route fails closed for strangers as of
+today's env, so the failed-open shape is retired by configuration and the row works with zero
+code.** First fire: **Sunday 2026-08-09.**
+
+**🔴 HARD PREREQUISITE, WITH ITS SLACK MEASURED:** an undated fit would recreate the
+undateable-vintage defect knowingly. **§11 item 5j (wire the fit-vintage log; `pl:cal:lastRun`
+exists at route L47 but dates the RUN, not the FIT) must ship, guard red first, BEFORE
+2026-08-09.** Six days of slack; it is the next session's first ship. **First fit's reading,
+pre-committed now:** mults before/after printed · per-market n against SLOPE_MIN_N=100 /
+GLOBAL_MIN_N=150 · magnitude beside it · **a fit that moves nothing declares itself** ·
+`pitcher_outs` enters at the known prior **0.14285714285714288** and what the fit does to it
+prints first.
+
+**TWO PREMISE CORRECTIONS, measured not absorbed:** (1) *"grading is already live daily"* — **it
+is not.** Ship 4 never landed; server-side grading runs only inside `/api/calibrate`
+invocations, which have been unscheduled since the pause. The weekly row therefore resumes
+grading weekly too; DAILY grading remains ship 4, still owed. (2) *separability* — the calibrate
+route runs grading and fitting in ONE invocation, but their writes are disjoint keys (prediction
+grading blocks vs `pl:cal:weights`/`summary`); §0.17's separability claim survives **as a
+write-path fact**, and the stop-branch does not fire.
 
 ## 0.003 🎯 THE SCHEDULER IS LIVE AND CONFIGURED — VERIFIED FROM THE ROUTE'S OWN BEHAVIOUR (2026-08-02T22:47Z)
 

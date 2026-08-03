@@ -26,7 +26,7 @@ export const ENGINE_SHA = createHash("sha256").update(LEGACY_SRC, "utf8").digest
  * alongside a fresh served-chunk verification, in the same commit.
  */
 export const SERVED_ENGINE_SHA_VERIFIED =
-  "b862b2b2c59532a4df598f93959512c073bc04d93cb76a8c436f38b582ea3867";
+  "87c5dd17b2f25b8e9590ffbdc2b0dbe595abcf185bb97b85ef193b73e7ee2583";
 
 export const sha256Text = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
