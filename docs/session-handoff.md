@@ -360,6 +360,74 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.001a 🎯 DEPLOY CLOSED IN 12 MINUTES; THE DARK STRUCTURE GETS ITS OWN READING (2026-08-03T00:47Z)
+
+### THE MARKER IS RESOLVED — served == repo, byte-for-byte
+
+```
+tools/verify-served-engine.mjs --chunk <live 256-9af597fd7617fa86.js>
+served 283,305 chars  sha 87c5dd17b2f25b8e9590ffbdc2b0dbe595abcf185bb97b85ef193b73e7ee2583
+repo   283,305 chars  sha 87c5dd17b2f25b8e9590ffbdc2b0dbe595abcf185bb97b85ef193b73e7ee2583
+MATCH
+```
+
+Chunk renamed (old → new webpack content-hash; both names whole in the marker file, which the
+sha guard does not scan) — itself deploy evidence. Marker resolved at
+**00:47Z, 12 minutes into the 24-h clock**; the resolution guard runs green on it in this
+commit's gate. *(One instrument note, recorded in the marker: the verifier's default
+`/tmp/chunk.js` path served a STALE file first and threw `ANCHOR-1 MISSING` — the live fetch
+resolved it. The default path is a foot-gun; the extractor is fine.)*
+
+**AND CALIBRATE IS ARMED FOR SUNDAY, verified keylessly like the scheduler:** `GET /api/calibrate`
+with no header → **HTTP 401** (`CRON_SECRET` set makes the `return !cron` branch unreachable).
+**Josh's Bearer row fires into a closed gate with the right key. Nothing remains on his side.**
+
+### TOMORROW'S FLIP-VS-BOARD READING — the OFF-but-present state certifies itself (§4B/§5 addendum)
+
+**Reading 30 (added 2026-08-03, rides §5 by pointer):** *Singles absent from tomorrow's card is
+EXPECTED — `singlesOn:false` in the served bytes (verified above). The reading that matters is
+the FLIP-READINESS PAIR, printed with the board:* **(a) parity + armed-baseline GREEN on the new
+string** (the OFF-path is byte-equivalent to pre-ship behaviour — 94/727 green tonight is
+tonight's half; tomorrow's board is the production half); **(b) any behaviour delta on tomorrow's
+board IS A FINDING — print the diff, do not absorb it.** *Vintage stamp: board 1 of the
+`87c5…` vintage, zero behaviour delta expected. A dark structure the chain
+certifies is a shipped flag; a dark structure the chain ignores is M23's `shPenQF` — this line
+exists so tomorrow's board is the former.* *(Vintage named by its first four hex above; the
+whole sha is in the MATCH block.)*
+
+**THE NAMED RESIDUAL (excluded TS-side item — 5l, skip-checks-T):** exact scope =
+`liveCoverage()` consults only `cov.pct >= SKIP_COVERAGE` at the later fire; the fix stores the
+board's build-time achievable (the gen index already carries it) and refuses `covered` when the
+existing board was built sub-T. **Re-derived as NO hash move (its §11 row said otherwise and is
+corrected there); guard not yet written — it ships red-first WITH the flip commit.** Until then
+the interim protection is structural: one entry per weekend day, entry 4 retired.
+
+**THE FLIP, WHEN JOSH SAYS THE WORD (held):** the flag is **engine-string config**
+(`SH_CFG.singlesOn`, `legacy/index.html` — a flip MOVES THE HASH and is its own vintage). The
+flip commit carries: both flags → `true` · baseline re-derivation for parity/armed (the
+signed-off 2-leg baselines retire with a dated line, new baselines generated from the flipped
+engine in the SAME commit and named as such — generation, not regeneration-in-place) · 5l +
+per-stage drop counts ride it · served re-grep marker again. **First-ON reading, pre-committed:
+the first single clearing the gate prints stake vs its own ¼-Kelly×4 ceiling vs the 2% operator
+rule; NONE clearing = a gate reading, not a failure.**
+
+### THE M24/M25 LADDER ON SINGLES — display-only, and exactly where it bites (owner's item 3)
+
+**Where the displayed stake can exceed the computed ceiling:** the build()-time ladder
+(`dec≤3 → $100 …`) prints on BOARD tickets before allocation, in **every** mode. The Kelly
+ceiling is **computed in every mode and applied in two** (M24) — so in `probability` /
+`caesars_ev` / under `force`, an ALLOCATED stake can also exceed it, singles and parlays alike.
+**Singles make the display edge more visible, not wider:** a straight bet clusters at low dec,
+where the ladder maxes at $100 — **4% of the $2,500 bankroll, double operator rule #1's 2%** —
+while a ¼-Kelly×4 ceiling on a typical clearing single runs well under that. **Coverage for
+Josh's disciplined-mode use: FULL, two layers** — he places from the allocator's locked stakes
+(ceiling applied in `ev_gated`), never from ladder displays; and **rule #1 (no slip above 2% =
+$50) caps any manual deviation regardless of mode.** The placement checklist's stake-vs-Kelly
+line covers it **provided the stake read is the allocator's, and the checklist now says so.**
+**The C-stage passcode work changes NOTHING here — it is authentication, not sizing.** M24's
+close remains what it was: the ceiling applying in every mode is an engine change, on the
+M-ledger, not smuggled into tonight.
+
 ## 0.002 🎯 JOSH'S WORD, BOTH DECISIONS — SINGLES SHIPPED (FLAGGED), LEARNING = (B) (2026-08-02/03)
 
 ### ITEM 1 — THE HASH-MOVING SHIP: THE VINTAGE MOVED TONIGHT; THE BEHAVIOUR FLIPS IN ITS OWN COMMIT
