@@ -7149,6 +7149,40 @@ unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so 
 after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
 instruction.
 
+## SELF-ARMING: CROSSINGS 7 THROUGH 12 — DATED RECORD (2026-08-05)
+
+**Six crossings in one re-gate, spanning three unintegrated bot refreshes** — the same
+rebase-catches-crossings mechanism as 5–6, firing for the third time:
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 7 | Mike Estabrook | 2026-08-03 | `f165011` | 5 / 81 | 16.2 |
+| 8 | Chris Conroy | 2026-08-03 | `f165011` | 5 / 68 | 13.6 |
+| 9 | Gabe Morales | 2026-08-05 | `a6f343b` | 5 / 82 | 16.4 |
+| 10 | Lance Barksdale | 2026-08-05 | `a6f343b` | 5 / 77 | 15.4 |
+| 11 | Chad Fairchild | 2026-08-05 | `a6f343b` | 5 / 71 | 14.2 |
+| 12 | Brennan Miller | 2026-08-05 | `a6f343b` | 5 / 76 | 15.2 |
+
+**TWELVE armed in seven days. TWENTY-SIX now sit at g = 4.** League g = 291, k = 4,764, mean
+k/g = **16.37**.
+
+**🔴 THE n=6 DIRECTION DISSOLVED ON MORE DATA — recorded as dissolved, not quietly dropped.**
+At n = 6 this record flagged the armed set +0.68 k/g ABOVE the league mean as a direction to
+watch. **At n = 12 the armed mean is 16.10 — BELOW the league's 16.37.** The direction was
+noise; the n = 6 caution was right to be a caution and wrong as a direction; both facts stay.
+
+**DID ANY REACH A BOARD? NO — over-determined this time:** both brakes hold
+(`SH_CFG.umpKFrozen:true` re-asserted green; `context.json` frozen at
+`2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80` — written whole; the 8-hex
+abbreviation of this same digest is the §10-item-9 mistake's FOURTH instance and the sha guard
+caught it again), **and the same turn's audit found ZERO boards on 08-03/08-04/08-05** — there
+was no board to reach.
+
+**THE CADENCE NOTE:** the three refreshes sat unintegrated for three days because no session
+ran. The crossings were recorded the moment a gate saw them — **the instrument works at ITS
+cadence, not the data's.** A crossing recorded late but dated correctly (from its carrying
+commit) is the convention working; `FLOOR` raised 6 → 12 in the same commit.
+
 ## THE REOPEN CALENDAR IS COUNT-ARMED — A CLASS CORRECTION TO MY OWN M21 ENUMERATION (2026-07-30, owner's item 5)
 
 **~~"`consMinEv` expiry — DATE-armed"~~ — CORRECTED 2026-07-30, same day it was

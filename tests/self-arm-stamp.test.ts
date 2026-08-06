@@ -122,26 +122,70 @@ const CROSSINGS = [
     braked: true,
     note: "SIXTH. g 4->5, k 69->90. Same commit as Marvin Hudson.",
   },
+  {
+    ump: "Mike Estabrook",
+    date: "2026-08-03",
+    commit: "f165011",
+    kPerG: 16.2,
+    braked: true,
+    note: "SEVENTH. g 4->5, k 64->81. Bot refresh 18:51:13Z. Found with the EIGHTH by the rebase re-gate.",
+  },
+  {
+    ump: "Chris Conroy",
+    date: "2026-08-03",
+    commit: "f165011",
+    kPerG: 13.6,
+    braked: true,
+    note: "EIGHTH. g 4->5, k 53->68. Same commit as Estabrook.",
+  },
+  {
+    ump: "Gabe Morales",
+    date: "2026-08-05",
+    commit: "a6f343b",
+    kPerG: 16.4,
+    braked: true,
+    note: "NINTH. g 4->5, k 72->82. Four crossings in ONE refresh (a6f343b, 18:22:27Z).",
+  },
+  {
+    ump: "Lance Barksdale",
+    date: "2026-08-05",
+    commit: "a6f343b",
+    kPerG: 15.4,
+    braked: true,
+    note: "TENTH. g 4->5, k 61->77.",
+  },
+  {
+    ump: "Chad Fairchild",
+    date: "2026-08-05",
+    commit: "a6f343b",
+    kPerG: 14.2,
+    braked: true,
+    note: "ELEVENTH. g 4->5, k 54->71.",
+  },
+  {
+    ump: "Brennan Miller",
+    date: "2026-08-05",
+    commit: "a6f343b",
+    kPerG: 15.2,
+    braked: true,
+    note: "TWELFTH. g 4->5, k 66->76. THREE refresh commits sat unintegrated for three days " +
+      "because no session ran — the crossings were recorded the moment a gate saw them, which " +
+      "is the instrument working at ITS cadence, not the data's.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 6;
+const FLOOR = 12;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
-  "SIX crossings in four days against a ~08-04 projection for the FIRST. THE PROJECTION WAS " +
-  "NOT SLIGHTLY EARLY, IT WAS WRONG ABOUT THE RATE — the sixth landed two days before the " +
-  "first was due. NINETEEN more sit at g=4, up from fourteen, so the rate is still rising. " +
-  "k/g at arming: 18.0 / 13.8 / 14.8 / 19.8 / 18.6 / 18.0, mean 17.17 against a league mean " +
-  "of 16.49 (g=253, k=4171). ON n=4 THE ARMED SET STRADDLED THE LEAGUE MEAN; ON n=6 IT NO " +
-  "LONGER CLEANLY DOES — the last two both landed above, and the gap is +0.68 k/g. That is " +
-  "NOT yet a high-K selection claim: n=6, no dispersion test, and the two lowest members are " +
-  "still well below. It is recorded as a DIRECTION TO WATCH, and the honest statement is that " +
-  "the earlier 'still not a high-K selection' was made on n=4 and is not re-asserted on n=6. " +
-  "All six double-braked (context.json frozen at " +
-  "2a8bcba934c402106302f6d52077b0d56cfff7c768e718ac343b3a533787bd80 + SH_CFG.umpKFrozen), so " +
-  "none reached a board — verified for the 08-02 pair against an empty gens[] — and no series " +
-  "restates.";
+  "TWELVE crossings in seven days (six found 2026-08-05 in ONE rebase re-gate spanning three " +
+  "unintegrated refreshes). TWENTY-SIX more sit at g=4. THE n=6 DIRECTION DISSOLVED ON MORE " +
+  "DATA: armed mean k/g is now 16.10 vs league 16.37 (n=12) — BELOW the mean, after reading " +
+  "+0.68 ABOVE at n=6. The 'direction to watch' was noise, recorded as dissolved rather than " +
+  "quietly dropped. All twelve double-braked (context.json frozen 2a8bcba9... + " +
+  "SH_CFG.umpKFrozen); the 08-03..08-05 six could not have reached a board REGARDLESS: the " +
+  "audit found zero boards on all three days.";
 
 function armedUmps(): string[] {
   const db = JSON.parse(readFileSync("data/ump_k.json", "utf8")) as {
