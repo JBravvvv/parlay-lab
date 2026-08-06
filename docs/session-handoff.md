@@ -41,12 +41,20 @@ NO calibrate row. None ever existed** (§12Z.8 — the phantom-infrastructure le
 08-05 ICOU on the cron-job.org side is CLOSED by this read. §0.0's Vercel-log attribution
 reads (windows A/B, 146 / ≥214) are STILL OWED, second.
 
-**JOSH'S IN-FLIGHT ACTIONS (his word, 2026-08-06):** creating the **scheduler job**
-(`https://parlay-lab-six.vercel.app/api/scheduler`, header `x-cron-key`, every 15 min, hours
-15–23 and 0–2 UTC) and the **calibrate row** (`https://parlay-lab-six.vercel.app/api/calibrate`,
-header `Authorization: Bearer <CRON_SECRET>`, Sundays 10:00 UTC), with a **fresh CRON_SECRET**
-set in Vercel and redeployed. He types the secret; nobody else does. **These are IN-FLIGHT,
-not landed — landed = a 200 in his History tab or an authed effect visible from here (§12Y.6).**
+~~**JOSH'S IN-FLIGHT ACTIONS (his word, 2026-08-06):** creating the **scheduler job** … **These
+are IN-FLIGHT, not landed.**~~ **🏁 LANDED, 2026-08-06 — dashboard screenshots (§12Y.6 ground
+truth), THE MILESTONE DATED: the first automated authed poke in project history.**
+
+- **"Parlay Scheduler" EXISTS and fired: Successful (1.88s) at 2026-08-06T17:45:04Z**
+  (10:45:04 AM PT). The 1.88s duration is itself corroborating — a no-fire poke (statsapi +
+  Redis reads only); a fire forwards to `/api/generate` and runs ~60s. The phantom period
+  (`91c179b` 07-26 → 08-06, §12Z.8) **CLOSES**: a poker exists, and it pokes.
+- **Calibrate row EXISTS, correct:** Sunday 3:00 AM local = 10:00Z, Bearer form. First fire
+  2026-08-09 (reading 33; 5j prerequisite still owed before then).
+- **CLV: the rotation catch fired exactly as flagged in the previous revision** — the 17:30Z
+  tick failed on the OLD embedded key; Josh saved the URL edit ~17:38Z; **the 18:00Z tick is
+  the first test of the new URL. PENDING his History tab** (a Successful row = recovered;
+  another 401 = one re-check of the pasted value).
 
 ```
 ━━━ ⚠️ ROTATION CATCH — THE CLV JOB EMBEDS THE OLD SECRET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -74,6 +82,38 @@ LIVE ARTIFACT** — a locked card, an empty-gate record, or a named reason; **on
 per the no-silent-days design.** Reading 31 and the first-live readings apply as written.
 Externally visible from here without any secret: `/api/board?date=<PT-today>` gains a
 `gens[]` entry with `trigger:"header"`.
+
+### TONIGHT 2026-08-06, MADE CONCRETE — the slate read at 17:57Z, the crossing derived
+
+**THE FULL SLATE (statsapi, read 2026-08-06T17:57:11Z — every game, the three-number rule):
+11 total · 3 started · 3 ready-unstarted** (unstarted 8, achievable 3/8 = 0.375). Started:
+LAA@BAL 16:35Z, ATH@CIN 16:40Z, NYM@CLE 17:10Z. Ready: PIT@MIL 18:10Z, TOR@CHC 18:20Z,
+DET@SEA 20:10Z. Not yet ready: WSH@PHI 22:05Z, CWS@BOS 23:10Z, MIA@ATL 23:15Z, MIN@KC
+23:40Z, SD@AZ 01:40Z.
+
+**THE 17:45:04Z POKE'S EXPECTED BODY (DERIVED FROM THE FEED, labelled as such — the route's
+own body is in cron-job.org's History detail / Vercel's log, Josh-side):** at 17:45Z the
+slate read started 3 / unstarted 8 / ready 3 / achievable 0.375 → `fired:false`, reason
+`achievable 0.375 < 0.8 AND ready 3 < MIN_READY 4`, lock `{present:false, action:null}`
+(board absent, slate alive → generation is still the path; no backfill, no reason record).
+
+**TODAY'S BOARD SCOPE, PRE-COMMITTED (operator item 3 — named reasons, not defects):**
+- **The morning trio (LAA@BAL, ATH@CIN, NYM@CLE) is lost to SCHEDULER-CREATION TIMING** —
+  all three were underway before the first poke ever landed (17:45Z). Named reason.
+- **The afternoon trio (PIT@MIL 18:10Z, TOR@CHC 18:20Z, DET@SEA 20:10Z) is STRUCTURALLY
+  UNSERVABLE at T=0.80 / MIN_READY=4 on this slate shape** — no both-hold moment ever
+  contains them, even with the scheduler live from 15:00Z: while they are ready the evening
+  block sits unready in the denominator (17:45Z reads 0.375; 19:05Z reads 2/6 = 0.333;
+  20:15Z reads 3/5 = 0.600 with ready 3). The Saturday-early-block class, exactly.
+- **THE CROSSING: both conditions first hold at 20:40Z** (MIN@KC's ready crossing, 23:40Z −
+  3h) — unstarted 5, ready 4, achievable 4/5 = 0.80. **First both-hold poke: 20:45Z** →
+  ONE fire → **a 5-game board** (WSH@PHI, CWS@BOS, MIA@ATL, MIN@KC, SD@AZ), `costEstimate
+  = 1 + 6×5 = 31 credits`, gen.trigger `"header"`, **gen.slate stamping ~{total 11, started
+  6, ready 4}** at fire time. The crossing math assumes on-time starts — a delayed DET@SEA
+  re-enters the population and the poke bodies, not this projection, are the record.
+- **The 08-06 record exists no matter what** — locked card on fire; if the gate clears
+  nothing, the zero-ticket decision record with the histogram; if somehow no fire, the
+  self-check's reason record at the first dead-slate poke (~01:40Z+). No silent days.
 
 **THE DESIGN, RESTATED TO WHAT EXISTS (2026-08-06):** required external infrastructure is
 **exactly two cron-job.org rows** — the scheduler job and the calibrate row — plus Parlay
@@ -3409,6 +3449,36 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.9 LEDGER — "FIRST PITCHES ~23:05Z" WAS A NUMBER NOBODY READ (2026-08-06, operator's catch)
+
+**THE DEFECT:** the 2026-08-06T17:01Z turn printed "first pitches ~23:05Z; ready opens
+~20:05Z; no-fire correct" — while LAA@BAL had been underway since 16:35Z. **The derivation
+read NEITHER the full slate NOR the unstarted subset: it read NO FEED AT ALL.** The number
+was echoed from `docs/cron-jobs.md`'s 07-26 line "weekday first pitches cluster 23:05–23:40
+UTC" — a generalization about the evening BULK that silently omits day games. **"Never
+state a number not read this turn," violated by the rule's own custodian**, and the
+population class rode in behind it (the cluster is a partial population passed off as the
+whole): **third appearance** — the 22:00Z cron's 66% (07-26), ready-vs-unstarted (08-02,
+§12Z.3), and now a doc's evening-bulk cluster standing in for a getaway-day slate.
+
+**THE ACCIDENT THAT MAKES IT DANGEROUS:** the no-fire conclusion was CORRECT — re-derived
+at 17:01Z the slate read total 11 / started 2 / unstarted 9 / ready 3 (NYM@CLE, 17:10Z, was
+still unstarted and inside the lead), achievable 0.333: both conditions fail. **Conclusion
+held, derivation invalid — a wrong method endorsed by a right answer is how the method
+survives to be wrong somewhere that matters.**
+
+**THE STANDING FIX WAS ALREADY ENCODED — CITED, NOT RE-SHIPPED:** `Decision` carries all
+three numbers (`ready`, `unstarted`, `started` — `src/lib/server/scheduler-decide.ts`
+L26-31, `started` computed at L39) and the route spreads them into EVERY response body
+("BOTH conditions in every response" — `app/api/scheduler/route.ts`, the `body` construction).
+**So the reconciliation lands on the reading's error, ledgered here.** What DID ship
+(operator item 3, same day): `gen.slate` — the same three numbers from the same feed,
+stamped INTO the board artifact (`src/lib/server/slate.ts`, guard
+`tests/slate-scope.test.ts` observed red first, started-as-ready plant) — so window
+statements in prose now have an artifact to be checked against on both surfaces.
+**Encoded rule: a window statement prints total slate / already started / ready-unstarted,
+read from the feed THIS TURN, or it is not printed.**
+
 ### 12Z.8 LEDGER — PHANTOM INFRASTRUCTURE VIA ASSERTED OPERATOR ACTIONS (2026-08-06)
 
 **TEN DARK BOARD-DAYS CLOSE WITH THEIR TRUE CAUSE: NO POKER EVER EXISTED.** Ground truth,
@@ -5532,10 +5602,11 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 3. **PRINT the open-readings count from §5's BODY** (header says 33; count the body).
 4. **PRINT the quota with its timestamp** from the last row of `data/quota-log.jsonl`.
 5. **PRINT the outage status:** CAUSE CLOSED 2026-08-06 — phantom infrastructure, the jobs
-   never existed (§12Z.8). **The pending item is Josh's two NEW rows (scheduler job +
-   calibrate row, fresh CRON_SECRET redeployed, CLV URL's key updated): confirmed-saved or
-   in-flight. In-flight → the system is still dark and every board-dependent reading stays
-   vacuous; nothing to measure.**
+   never existed (§12Z.8). **AND THE SYSTEM IS ON: "Parlay Scheduler" fired its first
+   authed poke 2026-08-06T17:45:04Z, Successful 1.88s (the Josh block carries the
+   milestone). Remaining pends: CLV's first new-key tick (18:00Z, Josh's History) and
+   tonight's first fire (the concrete pre-commitment in §0.00001: 20:45Z poke, 5-game
+   board, ~31 credits).**
 6. **PRINT tonight's lock-artifact expectation:** the first authed poke from the NEW
    scheduler job produces the lock path's FIRST live artifact (reading 31) — check
    `/api/board?date=<PT-today>` gens[] (a `trigger:"header"` entry is the no-secret proof of

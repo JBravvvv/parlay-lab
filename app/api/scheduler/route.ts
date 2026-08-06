@@ -4,6 +4,7 @@ import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, buildReasonRecord, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 
 /**
@@ -28,21 +29,9 @@ import { buildLockEntry, buildReasonRecord, lockExists, needsLockAction, writeLo
 export const dynamic = "force-dynamic";
 export const maxDuration = 90; // the generate forward can take ~60s on a full slate
 
-const SCHEDULE = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=";
-
-async function slateStarts(date: string): Promise<number[]> {
-  try {
-    const r = await fetch(SCHEDULE + date, { cache: "no-store" });
-    if (!r.ok) return [];
-    const j = (await r.json()) as { dates?: { games?: { gameDate?: string; status?: { detailedState?: string } }[] }[] };
-    return (j.dates?.[0]?.games ?? [])
-      .filter((g) => !/Postponed|Cancelled/i.test(g.status?.detailedState ?? ""))
-      .map((g) => (g.gameDate ? Date.parse(g.gameDate) : NaN))
-      .filter((n) => isFinite(n));
-  } catch {
-    return [];
-  }
-}
+/* slateStarts moved to src/lib/server/slate.ts 2026-08-06 (one copy of the feed URL) so
+   /api/generate's gen.slate scope stamp reads the same population this decision does.
+   Failure semantics here are unchanged: [] -> decide() reads VACUOUS empty-schedule. */
 
 export async function GET(req: NextRequest) {
   /* FAILS CLOSED. /api/calibrate shipped `return !cron` — allow when the secret is unset —

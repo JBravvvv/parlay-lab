@@ -8,6 +8,7 @@ import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuth
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
+import { slateScope } from "@/lib/server/slate";
 import { buildLockEntry, writeLock } from "@/lib/server/lock-card";
 
 /**
@@ -305,6 +306,13 @@ export async function GET(req: NextRequest) {
       luConfirmed: stampCov.confirmed,
       luPct: stampCov.pct,
       achievable: achievableCoverage(startsAll, now),
+      /* SCOPE STAMP (2026-08-06, operator item 3). games/started above count gameInfo —
+         the ENGINE's population (what the odds feed returned). On the 08-06 getaway day
+         three games were underway before the scheduler's first poke; a board that never
+         saw them would record nothing about them. slate carries the FULL day from
+         statsapi (total/started/ready — the standing three-number rule), so the artifact
+         itself says why absent games are absent. NULL = the read failed, never a fake 0. */
+      slate: await slateScope(date, now),
     };
     if (gen.live === 0) {
       console.warn(`[generate] board built with NO unstarted games — every row is post-start. at=${new Date(now).toISOString()}`);

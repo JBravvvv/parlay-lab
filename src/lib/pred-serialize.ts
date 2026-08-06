@@ -127,6 +127,10 @@ export type GenStamp = {
       ones in the archive AND the prediction store (src was hardcoded "cron") */
   trigger?: "cron-ua" | "header" | "manual" | "manual-forced";
   src?: string;
+  /** SCOPE STAMP (2026-08-06): the FULL day's slate from statsapi — total/started/
+      ready-unstarted — beside the engine-population counts above, so the artifact says
+      why absent games are absent. null = the feed read failed (never a fake zero). */
+  slate?: { total: number; started: number; ready: number; unstarted: number } | null;
 };
 
 export type DayBlob = {
