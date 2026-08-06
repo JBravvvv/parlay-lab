@@ -3482,6 +3482,68 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.11 — 🏁 THE FIRST SELF-GENERATED, SELF-LOCKED, SELF-READ CARD; AND DAILY GRADING SHIPS (2026-08-06)
+
+**THE MILESTONE, READ FROM THE ARTIFACT AT 22:05Z:** `/api/board?date=2026-08-06` served
+board + gens `[{at: 2026-08-06T20:45:06.945Z, priced 5, luPct 0.8}]` + reading
+(`kind:"fire"` — the deploy won the race; no repair needed). **`gen.trigger:"header"`, the
+projected 20:45Z poke to the SECOND.** `gen.slate` = `{total 11, started 6, ready 4,
+unstarted 5}` — the scope stamp exactly as pre-committed. **READING 31, CLEAN:** locked
+true · server-lock · selMode ev_gated · placed/actualStake null throughout · daily $75 /
+bankroll 750 / allocSum $39 · 2 tickets · zero violations · refusals printed. **STRUCTURE
+(reading 32):** 0 singles / 2 parlays — both 2-leg Total Bases (stakes $16 czEv 2.8, $23
+czEv 7.7); **zero singles cleared the gate = the GATE reading, declared VACUOUS by the
+artifact itself**; single-vs-leg impossible branch did not fire (vacuous, declared). M14:
+cap NOT binding ($39 of $75, $36 unallocated), stakes monotone with EV. blockedReasons {}
+— the allocator blocked nothing; both candidates cleared.
+
+**DAILY FULL-POPULATION GRADING SHIPS — SHIP 4 LANDS, WIDENED (operator requirement:
+150+/market in days).** THE AUDIT FIRST, from disk: `/api/calibrate` ALREADY graded the
+FULL board (blob.records incl. suspended shadow rows, + parlays, + a ledger join) — never
+card-only. What was missing: **cadence** (nothing poked it since the 07-31 cron cut; only
+the Sunday 10:00Z row existed) and **population labels**. **AND THE STALE SUMMARY
+(rev `200e402`, window 07-25→07-30) ALREADY HOLDS: batter_hits 360 · TB 381 · HR 324 ·
+HRR 341 · pitcher_outs 176 · K's 170 — ALL SIX PROP MARKETS PAST 150 ALREADY; global
+1,908. Only ml 77 / rl 79 are short** (~5 fifteen-game board-days at ~15/board → ≈
+2026-08-11 if boards run daily). Card-only would accrue ~4 legs/day across all markets —
+the months-vs-days arithmetic, confirmed.
+
+Shipped (guards `tests/daily-grading.test.ts` observed red first — module-not-found, the
+shadow-outranks-selected plant, empty-population vacuity):
+- **`?grade=only` mode on `/api/calibrate`**: grades + labels + writes `pl:grade:progress`,
+  and **touches NEITHER `pl:cal:summary` NOR `pl:cal:weights`** — the write-layer
+  separability. Two load-bearing reasons, in the route's own comment: the third freeze
+  point froze those keys BY stopping the writer (a daily recompute would move the engine's
+  inputs daily), and `applyWeeklyAdjustment.lastAdjust=0` would fire the FIRST fit on the
+  first daily pass, violating reading 33's Sunday 2026-08-09 pre-commitment. **Grading
+  cadence and fit cadence are separate by design — enforced at the write layer, cited:
+  the gradeOnly return sits ABOVE both writes, and the guard pins the ordering.**
+- **Population labels on every graded row**: selected / unselected / shadow
+  (`labelPopulation`; shadow OUTRANKS selected — suspension is a property of the market;
+  ml/rl lkeys collide across games so selection there requires the label too). The HRR
+  lesson: **fits and reviews read labeled populations, never pooled silently.** The fits
+  ignore the field (additive; weights byte-identical).
+- **Cadence on the scheduler's own ticks**: `decideGradePass` — first tick of hours 15 and
+  2 UTC (next morning + same-night east-coast finals; 2 × MAX_BOX_FETCHES=14 covers a full
+  slate); runs only on NO-FIRE pokes (a board fire outranks the grading tick). Zero Odds
+  credits.
+- **LEARNING PROGRESS block at the same URL**: `/api/board` now serves `learning` — per
+  market: graded n, hit rate vs implied (pMkt where logged, source counted), by-population
+  split with per-population hit rates, 7-day rate, days-to-150. Vacuity declared on empty
+  settled populations.
+- **Impossible branch, pre-committed and armed**: a graded row contradicting a fresh
+  boxscore (checked against boxes already fetched — zero extra) → both readings collected,
+  stored grade NEVER overwritten, 🔴 flag on the progress artifact + calibrate log.
+- **PRE-COMMITTED for the first full pass with labels accrued:** per-market n and
+  hit-vs-implied print; **any market whose full-population hit rate diverges from its
+  selected-population rate is the selection-bias measurement finally made — loud either
+  direction.** pitcher_outs enters Sunday's fit at `0.14285714285714288` and what the fit
+  does to it prints FIRST (reading 33, unchanged; 5j still owed before 08-09).
+- **SHIPS LEDGER: 4/4 daily grading ✅ LANDS 2026-08-06 (widened — full population +
+  labels + daily cadence; the weekly fit stays Sunday-only).** First grading tick:
+  tonight 02:00–02:14Z (east-coast finals of this very board); first full-coverage pass
+  tomorrow 15:00Z.
+
 ### 12Z.10 LEDGER — "WHY IS ANYTHING HOLDING," ANSWERED FROM DISK; AND THE READING HOP REMOVED (2026-08-06)
 
 **THE ANSWER: NOTHING UNPUSHED WAS EVER HOLDING.** Every turn's close printed HEAD ==

@@ -17,6 +17,8 @@ import { gradePrediction, pnorm, starterInfo, type Boxscore, type GameStatus } f
 import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/server/store";
 import { marketOf } from "@/lib/ledger-segments";
 import { reopenDays } from "@/lib/gate-rebuild";
+import { getLockEntry } from "@/lib/server/lock-card";
+import { buildProgress, labelPopulation, makeSelectedMatcher, PROGRESS_KEY } from "@/lib/server/grading-progress";
 
 /* the slice of a synced ledger day the training loop reads */
 type LedgerDay = {
@@ -132,6 +134,19 @@ export async function GET(req: NextRequest) {
     const today = ptToday();
     let boxFetches = 0;
     let newlyGraded = 0;
+    /* GRADE-ONLY MODE (2026-08-06, daily-grading ship). The scheduler's grading ticks call
+       this route daily with ?grade=only: the grading + labeling loops run and the LEARNING
+       PROGRESS artifact is written, but NOTHING the engine reads moves — pl:cal:summary and
+       pl:cal:weights writes sit strictly below the gradeOnly return. Two reasons, both
+       load-bearing: (1) the third freeze point froze summary/weights BY stopping the writer
+       — a daily summary recompute would move the engine's inputs daily, breaking the
+       homogeneous window; (2) applyWeeklyAdjustment's lastAdjust starts 0, so the first
+       non-Sunday pass would fire the FIRST fit early, violating reading 33's Sunday
+       2026-08-09 pre-commitment. Grading cadence and fit cadence are separate BY DESIGN,
+       enforced here at the write layer, not assumed at the schedule layer. */
+    const gradeOnly = req.nextUrl.searchParams.get("grade") === "only";
+    let labeled = 0;
+    const contradictions: { date: string; lkey: string | null; stored: string; recomputed: string }[] = [];
 
     /* GRADE_DAYS WAS A PERMANENT-LOSS PATH (fixed 2026-07-27).
        `allDays.slice(-GRADE_DAYS)` is a hard window: a row still `pending` when its date fell
@@ -156,9 +171,23 @@ export async function GET(req: NextRequest) {
     for (const date of toGrade) {
       const blob = await redisGetJson<DayBlob>(dayKey(date));
       if (!blob) continue;
+      /* POPULATION LABELS (2026-08-06): selected / unselected / shadow, stamped once per
+         row against the day's locked card. Shadow outranks selected (suspension is a
+         property of the market). Label-only changes persist even when nothing grades. */
+      const matcher = makeSelectedMatcher((await getLockEntry(date)) as never);
+      let labelChanged = false;
+      for (const r of Object.values(blob.records)) {
+        if (r.pop == null) {
+          r.pop = labelPopulation(r, matcher);
+          labeled++;
+          labelChanged = true;
+        }
+      }
       const pending = Object.values(blob.records).filter((r) => !r.res || r.res === "pending");
-      if (!pending.length && date < today) continue;
-      if (!pending.length) continue;
+      if (!pending.length) {
+        if (labelChanged) await redisSetJson(dayKey(date), blob);
+        continue;
+      }
 
       const statuses = await dayStatuses(date);
       const boxes = new Map<number, Boxscore>();
@@ -183,9 +212,24 @@ export async function GET(req: NextRequest) {
         boxFetches++;
       }
 
-      let changed = false;
+      let changed = labelChanged;
       for (const r of Object.values(blob.records)) {
-        if (r.res && r.res !== "pending") continue;
+        if (r.res && r.res !== "pending") {
+          /* IMPOSSIBLE BRANCH (2026-08-06, pre-committed): a graded row whose outcome
+             contradicts the boxscore. Checked only against boxes this pass already fetched
+             (zero extra credits/fetches). On fire: both readings collected and printed,
+             the stored grade is NEVER overwritten — stop and read, not silently repair. */
+          const cpk = pkOf(r.gkey);
+          const cbx = cpk ? boxes.get(cpk) : null;
+          if (cbx && (r.res === "won" || r.res === "lost")) {
+            const g2 = gradePrediction(r.lkey ?? "", r.sub, statuses.get(cpk!) ?? null, cbx);
+            if ((g2.result === "won" || g2.result === "lost") && g2.result !== r.res) {
+              contradictions.push({ date, lkey: r.lkey ?? null, stored: r.res, recomputed: g2.result });
+              console.error(`[calibrate] 🔴 GRADE CONTRADICTION ${date} ${r.lkey}: stored=${r.res} boxscore-says=${g2.result} — NOT overwritten`);
+            }
+          }
+          continue;
+        }
         const pk = pkOf(r.gkey);
         if (!pk || !startedLongAgo(r.gkey)) continue;
         const st = statuses.get(pk) ?? null;
@@ -333,6 +377,30 @@ export async function GET(req: NextRequest) {
     } catch {
       /* ledger unreadable — the prediction store still feeds the summary */
     }
+    /* LEARNING PROGRESS (2026-08-06) — written on EVERY run, grade-only or full: per-market
+       graded n, hit rate vs implied, by-population split, days-to-150 at the measured 7-day
+       rate. Served beside the card by /api/board (`learning`). Vacuity and the contradiction
+       flag are the artifact's own fields. */
+    const progress = buildProgress(gradedAll as never, perDay, today, now, contradictions.length);
+    /* the stamp rule (tests/aggregate-stamps.test.ts): a persisted aggregate says WHEN and
+       WHICH CODE — `at` is set by buildProgress, `rev` here, same as the summary's */
+    progress.rev = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";
+    await redisSetJson(PROGRESS_KEY, progress);
+
+    if (gradeOnly) {
+      /* everything the engine reads sits BELOW this return — see the mode note above */
+      return NextResponse.json({
+        ok: true,
+        gradeOnly: true,
+        newlyGraded,
+        labeled,
+        contradictions,
+        gradedTotal: gradedAll.length,
+        markets: Object.keys(progress.perMarket).length,
+        vacuous: progress.vacuous ?? null,
+      });
+    }
+
     const summary = computeCalibration(graded);
     // 2026-07-20: per-market reliability slopes + the backtested global
     // model-confidence shrink ride on the same nightly summary
@@ -459,6 +527,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       newlyGraded,
+      labeled,
+      contradictions,
       calStart: CAL_START, // the training window's start (Phase 0.5 cutoff)
       gradedTotal: graded.length,
       markets: summary.markets.length,

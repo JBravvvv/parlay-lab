@@ -7,6 +7,7 @@ import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
+import { decideGradePass } from "@/lib/server/grading-progress";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -99,7 +100,32 @@ export async function GET(req: NextRequest) {
     console.warn(`[scheduler] self-check failed: ${(e as Error).message}`);
   }
 
-  if (!d.fire) return NextResponse.json({ fired: false, lock, ...body });
+  if (!d.fire) {
+    /* DAILY GRADING TICKS (2026-08-06): on the first tick of hours 15 and 2 UTC, forward
+       to /api/calibrate?grade=only — grades every board row + labels populations + writes
+       the learning progress artifact, and touches NOTHING the engine reads (the mode's own
+       write gate). Runs only on no-fire pokes: a board fire outranks the grading tick, and
+       the next grading hour covers it. Zero Odds credits (statsapi + Redis). */
+    let grading: Record<string, unknown>;
+    const gp = decideGradePass(now);
+    if (gp.fire) {
+      try {
+        const res = await fetch(new URL("/api/calibrate?grade=only", req.nextUrl.origin), {
+          headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+          cache: "no-store",
+        });
+        let gBody: unknown = null;
+        try { gBody = await res.json(); } catch { gBody = null; }
+        grading = { fired: true, status: res.status, result: gBody };
+        console.log(`[scheduler] grade-only pass: ${res.status}`);
+      } catch (e) {
+        grading = { fired: true, error: (e as Error).message };
+      }
+    } else {
+      grading = { fired: false, reason: gp.reason };
+    }
+    return NextResponse.json({ fired: false, grading, lock, ...body });
+  }
 
   /* Forward to the one spending route, same header contract as cron-job.org entries 1-3.
      Its own limiter, conditional skip and run cap still apply — a race between two pokes is

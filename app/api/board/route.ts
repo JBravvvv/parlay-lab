@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, bestGen, decodeBoard, type GenIndexEntry } from "@/lib/server/board-store";
 import { getReading } from "@/lib/server/self-reading";
+import { PROGRESS_KEY } from "@/lib/server/grading-progress";
 import { redis, redisGetJson, storeEnv } from "@/lib/server/store";
 
 /**
@@ -57,8 +58,12 @@ export async function GET(req: NextRequest) {
        AND its reading. Present on the no-board path too: a reason-record day has a
        reading and no board. */
     const reading = await getReading(date);
-    if (!board) return NextResponse.json({ board: null, reason: "no-board-for-date", gens: index, reading });
-    return NextResponse.json({ board, gens: index, reading });
+    /* LEARNING PROGRESS (2026-08-06): the cumulative per-market graded state — n, hit
+       rate vs implied, by-population split, days-to-150 — written by the daily grade-only
+       passes. Same URL as the card: Josh watches the learning accumulate here. */
+    const learning = await redisGetJson(PROGRESS_KEY);
+    if (!board) return NextResponse.json({ board: null, reason: "no-board-for-date", gens: index, reading, learning });
+    return NextResponse.json({ board, gens: index, reading, learning });
   } catch (e) {
     // never a hard failure: the client falls back to generating, exactly as before
     return NextResponse.json({ board: null, reason: `store-unreachable: ${(e as Error).message}` });

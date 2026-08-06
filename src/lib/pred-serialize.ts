@@ -43,6 +43,11 @@ export type PredRecord = {
      ambiguity CAL_START excludes rather than guesses at. */
   src?: "cron" | "client";
   selMode?: string;
+  /* POPULATION LABEL (2026-08-06, daily-grading ship): selected = entered the day's
+     locked card · unselected = board-only · shadow = suspended market. Stamped at grade
+     time by /api/calibrate; the HRR lesson — fits and reviews read labeled populations,
+     never pooled silently. The fits themselves ignore it (additive; weights byte-identical). */
+  pop?: "selected" | "unselected" | "shadow";
   /* Phase 1 idempotency (2026-07-25). A second generation pass restates the same
      day: same leg, different probability, because 9am prices a projected lineup and
      1pm prices a confirmed one. The store measures the ENGINE, not the bets, so the
@@ -381,6 +386,8 @@ export type GradedFromBlob = {
   ev: number | null;
   ln: number | null;
   susp?: true;
+  /** population label passthrough (2026-08-06) — the fits ignore it; progress splits by it */
+  pop?: "selected" | "unselected" | "shadow";
 };
 
 export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {
@@ -401,6 +408,7 @@ export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {
       ev: r.czEv ?? r.ev ?? null,
       ln: r.ln ?? lineOf(r.lkey),
       ...(r.susp ? { susp: true as const } : {}),
+      ...(r.pop ? { pop: r.pop } : {}),
     });
   }
   return out;
