@@ -3637,6 +3637,14 @@ workflow on `main` waiting for a secret — is a standing trap.**
 > reads ran anyway (board `null`/gens `[]` = correct pre-window state; slate 5/6/1/0.167 on
 > track), VACUOUS-BY-TIMING was printed instead of a false "never fired," and the armed
 > reading held. Timing first, carriage second — the 08-02 lesson, applied.
+>
+> **THIRD OCCURRENCE, 2026-08-06T19:04Z — 18 minutes after the second was ledgered:** "the
+> 20:45Z window has passed" arrived with the clock at 19:04:00Z, 1h41m before the poke it
+> named. Same response: board `null`/gens `[]` (correct), slate re-read unchanged (11/5/6/1,
+> 0.167, no postponements — the 20:40Z crossing stands), VACUOUS-BY-TIMING printed, reading
+> held. **Three early result-handlers in one day is now a channel datum, not an incident:
+> the analyst side appears to be pacing on poke cadence rather than the crossing time. The
+> crossing is 20:40Z; a result exists to read only after a poke at or past 20:45Z.**
 
 **I TALLIED TWO EMPTY-CARRIAGE EVENTS. THE OWNER CORRECTED IT: ONE CHANNEL DEFECT, ONE SEQUENCING
 ERROR.** They are not the same failure seen twice, and pooling them would have put a second false
