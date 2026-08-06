@@ -13,8 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-03:** `origin/frontend-rebuild` = `ff16d39a738346a1f724b735fb2db6b0c16cd3d5`
-> - **STATE-CLAIM 2026-08-03:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+> - **STATE-CLAIM 2026-08-05:** `origin/frontend-rebuild` = `518bddca99ca8d5aee816eea8f221931f511a5cd`
+> - **STATE-CLAIM 2026-08-05:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
 > shipped. The guard is doing the maintenance its header promised.)*
@@ -30,7 +30,47 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
-## 0.0 🎯 THE JOSH BLOCK — FIRST IN THE FILE. TWO DASHBOARD READS, NOTHING ELSE.
+## 0.00001 🎯 THE JOSH BLOCK, CURRENT — TWO READS, ONE LIKELY FIX, ONE SCREEN SAMPLE (2026-08-05)
+
+**THIS SUPERSEDES §0.0 BELOW IN PRIORITY.** §0.0's Vercel-log attribution reads (windows A/B,
+146 / ≥214) are STILL OWED but no longer first — **the system is dark and these two reads are
+what turns it on.**
+
+```
+━━━ READ 1: CRON-JOB.ORG — ARE THE ENTRIES EXECUTING AT ALL? ━━━━━━━━━━━━━━━━━━━━━━━━━
+cron-job.org → each entry (scheduler */15, entries 1–3, CLV */30, calibrate Sunday)
+             → HISTORY tab
+  For each: is it EXECUTING, and with what status?
+    200            -> that entry works; move to the next
+    401            -> the header value is wrong  ->  THE FIX below
+    failed/disabled-> cron-job.org auto-disabled it or it was never enabled — re-enable
+
+━━━ READ 2: VERCEL — ARE POKES ARRIVING, AND AS WHAT? ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Vercel → parlay-lab → Logs → filter: /api/scheduler   and   /api/generate
+  pokes arriving as 401s ("unauthorized poke")  -> the header value  ->  THE FIX
+  no pokes at all                                -> cron-job.org side (read 1 decides)
+
+━━━ THE LIKELY FIX, one visit ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+A 401 on EITHER surface = the x-cron-key VALUE on cron-job.org does not match Vercel's
+CRON_SECRET. Re-paste it from Vercel → Settings → Environment Variables → CRON_SECRET into
+each entry's custom header. (The calibrate entry uses `Authorization: Bearer <same value>`.)
+You type it; nobody else does.
+
+━━━ THE TAB SAMPLE — the verdict is blocked on your screen ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The store reads UNREPRODUCED-FROM-DISK (§0.0004): engine arrays pure on the fixture, both
+render surfaces key-addressed. What decides (a) display vs (b) data: ONE wrong row's text
+(player + prop line) plus WHICH TAB it rendered under, pasted as text.
+```
+
+**WHY THESE OUTRANK EVERYTHING:** every reading in this file downstream of "a board exists"
+— the lock path's first artifact, the singles first-ON pair, reading 30 — is **dark until a
+poke lands authed.** The keyless probes prove the SERVER half works (401 = deployed,
+configured, failing closed); **the cron-job.org half is invisible from the repo:
+IN-CONTEXT-ONLY-UNVERIFIED, resolved only by read 1.**
+
+---
+
+## 0.0 🎯 THE JOSH BLOCK — 🔻 SUPERSEDED IN PRIORITY 2026-08-05 (see §0.00001). The Vercel-log attribution reads below are STILL OWED, second.
 
 *Assembled 2026-08-02T04:08:22Z from the pieces already on disk — §2's six-things list, §3's env-var mechanism,
 §4A's hardened reads. **The ASSEMBLY is this turn's; every clause in it is quoted from those
@@ -121,10 +161,20 @@ fixed anchor. **Addresses are unique (rule G passes), so no reference is ambiguo
 by this table, not by position. **Deliberately NOT reordered: a 3,800-line restructure minutes before
 compaction is the risk, not the fix.**
 
+**⚠️ TABLE EXTENDED 2026-08-05 (rows above the divider are current; below it, the 08-02 rows
+as they stood, further amended in place where marked):**
+
 | section | status |
 |---|---|
-| **0.0 THE JOSH BLOCK** | **CURRENT — read first** |
-| **0.04 / 0.045 THE 7-DAY BOARD SCOPE** | **CURRENT, 2026-08-02 — the dashboard visit and today's deadline live in 0.045** |
+| **0.00001 THE JOSH BLOCK, CURRENT** | **READ FIRST — cron-job.org History + Vercel logs + the tab screen sample. Everything downstream is dark until it resolves** |
+| **0.0004 THE OUTAGE + LOCK GUARANTEE + TAB STATE** | **CURRENT, 2026-08-05 — items 1–4 of the operator's block, plus crossings 7–12** |
+| **0.0005 / 0.001a / 0.002 the flip, deploy, decisions** | **CURRENT as the 08-03 record — singles LIVE, (B) chosen** |
+| 0.003 scheduler-live verification | CURRENT as history; **its "armed for Monday" projection FAILED — see 0.0004** |
+| 12.85 POSITION (08-06) | **CURRENT — supersedes 12.9** |
+| §17 first-action list | **the 08-06 list governs; the 08-02 list kept below it** |
+| ————— | ————— (the 08-02 table, as it stood) |
+| **0.0 THE JOSH BLOCK (08-02)** | ~~CURRENT — read first~~ **🔻 SUPERSEDED IN PRIORITY 2026-08-05 by 0.00001; its Vercel-log attribution reads are STILL OWED, second** |
+| **0.04 / 0.045 THE 7-DAY BOARD SCOPE** | CURRENT as design; **0.045's hours superseded by 0.035; the entries' EXECUTION is the open outage question** |
 | **0.01 THE GATE, AMENDED** | **CURRENT — supersedes 0.05's conclusion** |
 | **0.02 / 0.03 the bracket + interval table** | **CURRENT — the attribution-bracket rule lives here** |
 | 0.05 the gate not satisfied | **SUPERSEDED BY 0.01.** Its ARITHMETIC stands; its conclusion is amended |
@@ -443,6 +493,17 @@ enumerated from the data; prop tabs are the engine's own per-market top-50 ranke
 probability (`r.prob` — the attributable sort field, engine L2575); ml/rl carry the full
 slate (15 = every game) and do not pad.** The spec was already the shipped shape; the guard
 now holds it.
+
+**🔴 THE LOCK PATH HAS NEVER EXERCISED LIVE.** Every guard ran on fixtures; production has
+written zero locked cards. **Its first live artifact arrives with the first authed poke after
+this deploy — IF a poke arrives (§0.00001).** Reading 31 governs that first artifact.
+
+**AND THE REBASE RE-GATE FIRED A THIRD TIME ON THE WAY OUT: crossings 7–12** (Estabrook,
+Conroy @ 08-03 `f165011`; Morales, Barksdale, Fairchild, Miller @ 08-05 `a6f343b` — four in
+one refresh). FLOOR 6 → 12. **The n=6 "+0.68 above league" direction DISSOLVED at n=12: armed
+mean k/g 16.10 vs league 16.37, now BELOW — recorded as dissolved, not dropped.** Both brakes
+green, and reached-a-board is over-determined NO: zero boards existed. Dated record:
+`docs/collection-period.md`, CROSSINGS 7–12 block.
 
 ### TODAY'S SEQUENCE (restated once) AND THE RECORD
 
@@ -2192,7 +2253,7 @@ board CANNOT confirm them** — it fires on the owner's curl and entry 1 is week
 
 ---
 
-## 5. OPEN PRE-COMMITTED READINGS (verbatim; COUNT: 29)
+## 5. OPEN PRE-COMMITTED READINGS (verbatim; COUNT: 33 — 29 carried, 30–33 appended 2026-08-05)
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
 2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
@@ -2434,11 +2495,71 @@ board CANNOT confirm them** — it fires on the owner's curl and entry 1 is week
     change), so tonight's board reports the reopen clock DIRECTLY — read `echo.mktN`
     per market against `consMinN = 100`. Absent → the mktN echo did not land and the
     blocked-reason proxy is the only reading.)
+30. **Flip-readiness pair, now certifying the LIVE structure (added 08-03, restated 08-05)**:
+    with singles LIVE, the pair inverts — (a) parity + armed-baseline GREEN on the flipped
+    string (the generated `baseline44-singles` / `armed-v2-singles` nets, labelled generated,
+    never cited as provenance; `baseline43` scoped to `singlesOn:false` keeps the legacy
+    extraction guarantee); (b) **the first live board's delta vs the pre-flip shape is SINGLES
+    AND NOTHING ELSE** — certified by the `singles-vintage` invariant (flag-off reproduces the
+    exact pre-flip parlay set). Any other delta → print the diff, do not absorb it.
+31. **The lock path's FIRST LIVE artifact (added 2026-08-05 — the path has never exercised
+    live)**: the first authed poke/fire after this deploy produces, for its date, a ledger
+    entry with `locked:true`, `source:"server-lock"`, `placed:null`/`actualStake:null` on
+    every ticket, `daily` recorded ($75 at server defaults: 0.10 × 750), and **refusal
+    statuses printed** (`lockMaxAgeMin` n/a — prices fresh by construction; exposure cap =
+    the daily ceiling). **Empty-gate shape**: zero tickets → `note` names the no-bet day and
+    `blockedReasons` carries the histogram (an EMPTY histogram beside a zero-ticket card is
+    itself a reading: nothing was even eligible). **Vacuity rule: a lock reading over a date
+    with no authed poke is VACUOUS and says so — it is §0.00001's problem, not this
+    reading's.** IMPOSSIBLE: a locked stake differing from the allocator's → the code THROWS
+    "TWO ALLOCATORS" before writing; a locked card existing WITHOUT a corresponding gens[]
+    entry or backfill/reason trigger → print both, a writer exists outside the two shipped
+    paths.
+32. **Singles first-ON card-level pair (added 08-03, still unexercised — zero boards since
+    the flip)**: (a) STRUCTURE MIX — singles vs parlays count and stake share printed BESIDE
+    the allocator's ranking, so the mix is attributable to EV order, not assumed; single-
+    ticket half: first clearing single's stake vs its own ¼-Kelly×4 ceiling vs the 2%
+    operator rule; none clearing = a GATE reading, not a failure. (b) THE M14 INTERACTION —
+    cap-binding, displacement by name, clear-count under the new admission population against
+    the standing ≥30 bp and 2–4%-vs-7% pre-commitments; **a shift is the STRUCTURAL
+    SUBSTITUTION EFFECT, named, not a regression.** IMPOSSIBLE: a single priced differently
+    as a 1-leg ticket than its own leg price → STOP, print both — structure must not touch
+    pricing (pre-checked expected-dark in the engine; armed anyway, because "expected dark"
+    is what M23 said too).
+33. **Sunday 10:00Z calibrate, first fire under (B) (added 08-03; first weekly grading pass
+    AND first dated fit)**: mults BEFORE and AFTER printed; per-market n against
+    SLOPE_MIN_N=100 / GLOBAL_MIN_N=150; the fit's magnitude beside it; **`pitcher_outs`
+    enters at the known prior `0.14285714285714288` and what the fit does to it prints
+    FIRST.** A fit that moves nothing declares itself. **HARD PREREQUISITE: §11 item 5j (the
+    fit-vintage log) ships red-first BEFORE 2026-08-09 — an undated fit knowingly recreates
+    the undateable-vintage defect.** If 5j has not shipped when the entry fires, the fit half
+    of the reading is INVALID-BY-PREREQUISITE and only the grading half reads.
 
 ---
 
 
 ## 6. GIT AND ARTIFACT STATE
+
+### 6C. CURRENT — 2026-08-05 (everything below 6C is per-turn history)
+
+- **HEAD = `origin/frontend-rebuild` = `518bddca99ca8d5aee816eea8f221931f511a5cd`** (STATE-CLAIM
+  at the top of the file; `sha-currency` scores it). `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`.
+- **Pushed this session (08-05):** `12ae04e` (outage audit + lock guarantee + tab purity,
+  rebased over three bot refreshes) · `518bddc` (crossings 7–12, FLOOR 12).
+- **Engine LIVE and VERIFIED IN THE SERVED BYTES (08-03, marker CLOSED ~16 min):** chunk
+  `256-2c7681954a0ee8e7.js`, engine string 283,396 chars, sha256
+  `39fc86814eb4e8be561278b48822810ee77f33ff822510a8b8f5c530c9acc0ce`, **`singlesOn:true` and
+  `sjEmit:true` each grep exactly once in the served bytes.** No engine change since; the 08-05
+  pushes are routes/tests/docs only.
+- **SHIPS LEDGER:** 1/4 `placed` field ✅ (08-02, `916d63c`) · 2/4 scheduler ✅ (08-02 →
+  Vercel-carrier 08-02 evening, `/api/scheduler` fails closed) · **3/4 LOCK-AT-GENERATION ✅
+  (08-05, this turn — never exercised live yet)** · **4/4 daily grading ❌ STILL OWED** (weekly
+  rides Sunday's calibrate; 5j is its prerequisite). **Singles LIVE** (flip 08-03, owner's
+  word). **Learning (B) CHOSEN and ARMED** (calibrate row created, Bearer form, first fire
+  2026-08-09; keyless probe 401 = armed).
+- **Suite: 97 files / 744 tests.** Engine file `legacy/index.html` sha256
+  `af0ee964185d41975f3721ff1fff666f0a85047648f6b972945c2a74bcba41f8` (the flip-era file,
+  unmoved since 08-03).
 
 - **`frontend-rebuild`: origin head `0b65964`** (`0b659648691bd9ba2c934de1e466efb7c8f4f8e4`,
   verified by `git ls-remote` this turn). Working tree **clean, nothing held**.
@@ -4697,7 +4818,29 @@ place** (the M27 failure mode); converting it is queued.
 
 ---
 
-## 12.9 🔴 POSITION, BROUGHT CURRENT 2026-08-02T04:09:16Z — supersedes §13's opening figures
+## 12.85 🔴 POSITION, BROUGHT CURRENT 2026-08-06T00:14Z — supersedes §12.9's figures below
+
+**QUOTA: 18,030 remaining / 1,970 used at `2026-08-06T00:14:32.457Z`** (quota.mjs live read,
+appended to `data/quota-log.jsonl`). Last interval **08-02T20:05 → 08-06T00:14: 76.15 h, spent
+805 = 10.6/h — collection-scale throughout; no board-scale burst anywhere in it.** The
+corrected cost model stands (§12X: 6 credits per event FETCHED, `spent ÷ archived` is a
+drop-rate estimator, attribution is a bracket pending §11 item 5i's fetch-count print).
+
+**EXHAUSTION ARITHMETIC AT THE MEASURED BURN:** 10.6/h ≈ **254/day → 18,030 ÷ 254 ≈ 71 days**
+with zero boards; at the §12.9 planning rate (collection 427/day + 7 boards ≈ 480/day) ≈ **37
+days ≈ 2026-09-12**. The truth is between: the 427/day model over-states weekend collection
+(§0.004 audit) and boards are currently ZERO. **The freeze-exit conclusion is UNCHANGED:
+2026-09-22 is not reached on collection alone at the planning rate; the parameter exit's
+one-vintage premise is FORMALLY SUPERSEDED BY (B)** (owner's word, 08-02, §0.002) — its gate
+was already met on data and now needs boards OBSERVED, which is §0.00001's blocker.
+
+**DARK BOARD-DAYS: TEN total** — six chosen under the ration (through 08-01), 08-02 lost to
+operator-dependence (§0.005), **08-03/08-04/08-05 lost as ZERO-ATTEMPTS despite two armed
+schedulers** (§0.0004: the cron-job.org-side header value is the live suspect). **The
+homogeneous window is at ZERO boards — no board has EVER generated on the singles-live
+vintage, or on any vintage since the outs flag.**
+
+## 12.9 🔴 POSITION, BROUGHT CURRENT 2026-08-02T04:09:16Z — 🔻 SUPERSEDED BY §12.85 (kept as the 08-02 record)
 
 **QUOTA: 19,190 remaining / 810 used at `2026-08-02T03:56:35.412Z`.** Weekend bracket OPEN at this
 reading. First leg already measured (§0.02): **147 spent over 5.25 h, 31–97 attributable, residual
@@ -5214,6 +5357,14 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 15. NOT ON DISK (missing input → how obtained)
 
+- **🔴 FIRST (2026-08-05): WHY NO POKE HAS EVER ARRIVED AUTHED** → Josh's read 1
+  (cron-job.org → each entry → History: executing? 200/401/disabled?) and read 2 (Vercel →
+  Logs → `/api/scheduler` + `/api/generate`). **IN-CONTEXT-ONLY-UNVERIFIED: the
+  cron-job.org-side entry state and `x-cron-key` value** — invisible from the repo; the
+  keyless 401 probes prove only the server half. §0.00001.
+- **🔴 SECOND (2026-08-05): THE TAB CONTAMINATION SIGHTING** → one wrong row's text + which
+  tab, from Josh's screen. **IN-CONTEXT-ONLY-UNVERIFIED: the sighting itself** — the store
+  reads UNREPRODUCED-FROM-DISK (§0.0004), engine arrays pure on the fixture.
 - **WHAT SPENT 146 CREDITS** → the **Vercel function log** (dashboard-only), partially
   reading 15(c).
 - **`APP_PASSCODE`'s actual state** → Vercel → Settings → Environment Variables. **Inferred, not
@@ -5267,7 +5418,29 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 17. PROTOCOL
 
-### 🔴 FIRST ACTION AFTER COMPACTION — DO THIS, THEN STOP (2026-08-02T04:08:48Z)
+### 🔴 FIRST ACTION AFTER COMPACTION — DO THIS, THEN STOP (2026-08-06T01:00Z — supersedes the 08-02 list below)
+
+1. **Re-read §0.00001 (the CURRENT Josh block) and §0.001, then `CLAUDE.md`.** Nothing else
+   first.
+2. **PRINT `git rev-parse HEAD`** and confirm it resolves on `origin/frontend-rebuild` (the
+   STATE-CLAIM pair at the top of the file; `sha-currency` scores it).
+3. **PRINT the open-readings count from §5's BODY** (header says 33; count the body).
+4. **PRINT the quota with its timestamp** from the last row of `data/quota-log.jsonl`.
+5. **PRINT the outage-fix status:** Josh's read 1 (cron-job.org History) and read 2 (Vercel
+   logs) — done or pending. **Pending → the system is still dark and every board-dependent
+   reading stays vacuous; nothing to measure.**
+6. **PRINT tonight's lock-artifact expectation:** the first authed poke after the 08-05 deploy
+   produces the lock path's FIRST live artifact (reading 31) — check
+   `/api/board?date=<PT-today>` gens[] and, via Josh's phrase-read if offered, the ledger
+   entry. **A date with an authed poke and NO lock artifact and NO reason record = the
+   no-silent-days design failed its first live test — that outranks everything else.**
+7. **THEN STOP.** The next input is Josh's dashboard results, his tab screen sample, or the
+   first locked card.
+
+**THE TARGET CHECK IS MANDATORY, BOTH SIDES** (§12Y): a brief that does not name Parlay-Lab,
+or whose shas do not resolve here, is **BOUNCED-WRONG-REPO**.
+
+### the 08-02 list, superseded (kept because its origin-verification notes still hold)
 
 1. **Re-read `docs/session-handoff.md` §0.0 and §0.001, then `CLAUDE.md`.** Nothing else first.
 2. **PRINT `git rev-parse HEAD`** and confirm it resolves on `origin/frontend-rebuild`. **Every
