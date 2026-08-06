@@ -8,6 +8,7 @@ import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuth
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
+import { buildLockEntry, writeLock } from "@/lib/server/lock-card";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -358,6 +359,35 @@ export async function GET(req: NextRequest) {
         console.warn(`[generate] board store failed: ${(e as Error).message}`);
       }
     }
+    /* LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
+       The run that builds the board writes the locked card — picks, prices, stakes, lockedAt,
+       trigger, placed:null throughout — as ONE artifact of the run, not a separate step that
+       can silently not ship again (it was authorized 08-02 and carried as an asterisk through
+       three dark days; that is the defect this block removes). Empty-gate days lock a
+       zero-ticket decision record with the blocked-reason histogram. Best-effort with a LOUD
+       failure: a lock error rides the response and the log, and the scheduler's self-check
+       backfills from the stored board on its next poke, so a transient failure here cannot
+       cost the day. Refusal status, printed per the first-live-lock reading: lockMaxAgeMin is
+       NOT APPLICABLE on this path (prices were fetched by this same run — fresh by
+       construction); the exposure cap IS the daily ceiling the allocator sized under. */
+    let lock: Record<string, unknown> | null = null;
+    try {
+      const entry = buildLockEntry({ eng, data: data as unknown as Record<string, unknown>, date, now, trigger });
+      const w = await writeLock(entry);
+      lock = {
+        tickets: (entry.core as unknown[]).length,
+        allocSum: entry.allocSum ?? 0,
+        daily: entry.daily,
+        emptyGate: (entry.core as unknown[]).length === 0,
+        blockedReasons: entry.blockedReasons ?? {},
+        existedBefore: w.existedBefore,
+        refusals: { lockMaxAgeMin: "n/a — prices fresh by construction", exposureCap: `daily $${entry.daily}` },
+      };
+      console.log(`[generate] LOCKED ${date}: ${(entry.core as unknown[]).length} tickets, $${entry.allocSum ?? 0} of $${entry.daily}${(entry.core as unknown[]).length === 0 ? " (zero-ticket decision record)" : ""}`);
+    } catch (e) {
+      lock = { error: (e as Error).message };
+      console.warn(`[generate] LOCK FAILED — the self-check will backfill: ${(e as Error).message}`);
+    }
     /* cfSel (2026-07-29, owner sign-off): counterfactual selection under a lifted HRR
        bar. Runs AFTER the board KV writes above (the board blob `enc` was encoded at
        its line and is already persisted), on a DEEP-COPIED slate with a REPLACED
@@ -384,7 +414,7 @@ export async function GET(req: NextRequest) {
       }
     }
     if (!records.length) {
-      return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)" });
+      return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)", lock });
     }
 
     const cur = await redisGetJson<DayBlob>(dayKey(date));
@@ -413,6 +443,8 @@ export async function GET(req: NextRequest) {
          board before encode; the first response body carrying this IS the
          deployed-with-cfSel discriminator (no zero-credit probe exists) */
       echo,
+      /* lock-at-generation (2026-08-05): the locked card is part of the run's own artifact */
+      lock,
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

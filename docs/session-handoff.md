@@ -360,6 +360,102 @@ generate path sets `calW` was not verified** — if it does not, archived server
 the multiplier and only device-generated boards are downstream, which would cut this list. **It is a
 grep and it is the first thing tomorrow.**
 
+## 0.0004 🔴 THREE DARK DAYS DESPITE TWO SCHEDULERS — AND THE LOCK GUARANTEE SHIPS (2026-08-05)
+
+### ITEM 1 — THE AUDIT: 08-03, 08-04, 08-05. ZERO BOARDS, ZERO LOCKS, ZERO ATTEMPTS.
+
+**From every reachable surface, at 2026-08-06T00:14Z (17:14 PT Wed 08-05):**
+
+| surface | reading |
+|---|---|
+| `/api/board?date=` 08-03 / 08-04 / 08-05 | **`board:null, gens:[]` on all three — empty generation indexes: not failed boards, not skips, ZERO attempts** |
+| quota | 18,835 → **18,030** across 76.15 h = **10.6/h, collection-scale; no board-scale burst anywhere** |
+| collection | ran all three days: props 3–4 runs/day (22, 54, 41 events archived), context daily — **the bots are fine** |
+| `/api/scheduler` keyless probe | **still 401** — deployed, `CRON_SECRET` set, gate up |
+| **impossible branch** | does not fire at the bracket's resolution: 805 spent sits inside the collection brackets; no unexplained board-scale delta |
+
+**THE VERDICT: DID NOT LAND — created is not fires.** And the deeper finding: **entry 1's
+22:45Z fallback ALSO produced nothing on Monday and Tuesday**, when the window read 1.000 —
+a fire that passed auth would have generated (no board existed; the skip could not trigger).
+**Both the new ticker and the old guaranteed entry failed the same way, which points at the
+shared variable: the cron-job.org side — entries not firing, or firing without the right
+`x-cron-key` value.** From here the pokes are invisible (the route logs `unauthorized poke`
+to the Vercel log — Josh-side). **The landing test's own pre-commitment applies and is
+printed plainly: did not land; and the entries did NOT carry the week either.**
+
+> **JOSH — two dashboard reads, one likely fix:** cron-job.org → each entry → **History**
+> (are the scheduler + entries 1–3 executing, and what status: 200/401/failed-disabled?), and
+> Vercel → Logs → filter `/api/scheduler` + `/api/generate` (are pokes arriving as 401s?).
+> **A 401 in either place = the header value; re-paste `x-cron-key` from Vercel's env.**
+
+**The promised-twice-never-shipped asterisk, LEDGERED (§12Z.7):** lock-at-generation was
+authorized 08-02, carried as an asterisk on 08-02 evening and 08-03, and was still absent
+through three dark days. **An asterisk is not a ship. It ships below, this date.**
+
+### ITEM 2 — THE LOCK GUARANTEE: EVERY DAY A LOCKED CARD OR A NAMED REASON
+
+**SHIPPED (`src/lib/server/lock-card.ts` + both routes; 8 lock guards + 4 purity guards,
+red first — module-not-found, then each branch):**
+
+- **`/api/generate` locks as part of board creation** — one artifact, one commit of the run:
+  picks, prices, stakes, `lockedAt`, `trigger`, **`placed:null`/`actualStake:null`
+  throughout**. Loud-failure best-effort: a lock error rides the response AND the log, and
+  the self-check backfills next poke.
+- **Empty-gate days lock a zero-ticket decision record** with the blocked-reason histogram.
+  **Measured on the fixture: the ev_gated default clears NOTHING (0 picks at daily 75 and
+  250)** — so the mechanics guards run in probability mode to avoid vacuous greens, and the
+  zero-ticket record is tested as its own first-class path, which is also production's
+  likely first state.
+- **The self-check, every poke** (`needsLockAction`, all branches guarded): board-without-lock
+  → **backfill from the stored board**; dead slate with neither → **reason record** in the
+  lock's place. **No silent days: every date carries a locked card or a named reason.**
+- **Refusal prints on first live lock:** `lockMaxAgeMin` n/a on this path (prices fresh by
+  construction — stated, a reading); exposure cap = the daily ceiling (`dailyBankrollCap
+  0.10 × bankroll 750 = $75` server-side, recorded on every entry).
+- **Impossible branch encoded where it can fire:** `buildLockEntry` re-checks each stake at
+  assembly and **THROWS "TWO ALLOCATORS"** on any mismatch — plant observed red.
+- **Merge safety measured:** a re-lock cannot clobber a graded day — and the first draft of
+  that test was WRONG (empty `grading.tickets` over real ids correctly reopens grading);
+  the merge caught my premise, recorded in the test.
+
+### ITEMS 3+4 — THE TAB READING, THE DEFENSIVE LAYER, THE SPEC
+
+**THE (a)/(b) READING, from disk first:** the engine's category arrays are **PURE on the
+armed fixture — 0 cross-market rows in all 8 markets** (ml/rl carry `ml_home`-form lkeys by
+convention); the board page and ParlaysSection are both **key-addressed with correct labels —
+no index math exists to shift.** **Neither (a) nor (b) reproduces from disk.** No stored
+board exists from the contamination sighting (gens[] empty all three days), so the sample the
+verdict needs is **the operator's screen: one wrong row's text + which tab, or the Vercel-side
+board JSON if one existed on his device.** Until then the verdict line reads:
+**UNREPRODUCED-FROM-DISK; ENGINE-LEVEL PURITY NOW PINNED.**
+
+**Shipped regardless (guard red via inverted-predicate + hand-planted RL-row plant, then
+green):** `src/lib/tab-purity.ts` + `tests/tab-purity.test.ts` pin engine purity permanently,
+and **the board page now renders through `splitPure()`** — a row failing its tab's market key
+is **EXCLUDED AND COUNTED** (a gold disclosure box names the count and calls it a data
+finding), never rendered under the wrong tab. **Purity runs BEFORE ranking and truncation,
+so a contaminated bucket can never eat another market's slots.**
+
+**THE TAB SPEC, acceptance from the data (fixture counts):**
+`all:50 · ml:15 · rl:15 · batter_hits:50 · batter_total_bases:37 · batter_home_runs:50 ·
+batter_hits_runs_rbis:14 · pitcher_strikeouts:11 · pitcher_outs:7` — **one tab per market,
+enumerated from the data; prop tabs are the engine's own per-market top-50 ranked by win
+probability (`r.prob` — the attributable sort field, engine L2575); ml/rl carry the full
+slate (15 = every game) and do not pad.** The spec was already the shipped shape; the guard
+now holds it.
+
+### TODAY'S SEQUENCE (restated once) AND THE RECORD
+
+Ticks *(if cron-job.org delivers — see the Josh reads above)* → first both-hold → fire →
+board on the singles-live `39fc…` vintage → **LOCKED CARD (the new path's first live
+artifact — its readings per item 2: tickets/allocSum/daily printed, refusals printed,
+zero-ticket = decision record)** → Josh places and marks `placed`/`actualStake` → **Sunday
+10:00Z calibrate unchanged** (first weekly grading pass + first dated fit — 5j still owed
+before it). Fallbacks: entries 1–3 *pending the cron-job.org verdict*, **Monday-pattern
+22:45Z entry 1 nominally guaranteed but now UNVERIFIED — the audit found it silent for two
+days.** Ships 3–4: **ship 3 (lock) CLOSED this date; ship 4 (daily grading) still owed**
+(weekly rides Sunday's calibrate).
+
 ## 0.0005 🎯 THE FLIP IS LIVE IN PRODUCTION — SINGLES ON (2026-08-03T02:31Z, owner's word)
 
 ### VERDICT: SHIPPED, DEPLOYED, VERIFIED IN THE SERVED BYTES, MARKER CLOSED IN ~16 MINUTES
@@ -3156,6 +3252,22 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.7 LEDGER — AN ASTERISK IS NOT A SHIP (2026-08-05, operator's catch)
+
+**Lock-at-generation was AUTHORIZED 2026-08-02 ("ships today"), not shipped that turn, and the
+gap was disclosed honestly — as an asterisk — on 08-02 evening, again on 08-03 ("no third
+asterisk"), and again in the flip turn.** Then three slate days passed with zero boards and
+zero locks, and the operator's report — "no card locked itself" — is what surfaced it.
+
+**THE MECHANISM, named:** a disclosed gap decays into an accepted gap. Each turn's disclosure
+was true, so no instrument fired; the promise had no artifact, so no guard could watch it —
+**the same shape as §12Z.2's deferral-with-a-dead-premise: decisions and promises that leave
+no artifact are invisible to a system that only reads artifacts.** The fix is the one that
+worked there: **the promise became code the same day it was ledgered** (`lock-card.ts`, the
+self-check, and the no-silent-days rule), and the honest-disclosure pattern is retired for
+ship-or-say-blocked: **an authorized ship that misses its turn gets a named blocker in the
+record, not a footnote that it is still owed.**
 
 ### 12Z.6 LEDGER — TWO MORE RELAY PREMISES, CHECKED AND REFUSED (2026-08-02, evening)
 

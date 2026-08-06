@@ -22,6 +22,7 @@ import { getMoney, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
+import { splitPure } from "@/lib/tab-purity";
 
 const CAT_LABELS: Record<string, string> = {
   all: "TOP 50",
@@ -62,17 +63,21 @@ export default function BoardPage() {
 
   const d = board?.data;
   const cats = (live ? d?.categoriesLive : d?.categories) ?? {};
-  const rows: PickRow[] = useMemo(() => {
-    const base = cats[cat] ?? [];
+  /* TAB PURITY (2026-08-05, operator report: RL under Hits, ML under RL). The engine's arrays
+     measured pure on the fixture and this page is key-addressed — but the defensive layer now
+     makes the property enforced rather than assumed: a row failing its tab's market key is
+     EXCLUDED and COUNTED, never rendered under the wrong tab. Purity runs BEFORE any ranking
+     or truncation, so a contaminated bucket can never eat another market's slots. */
+  const { rows, crossMarket } = useMemo(() => {
+    const { pure, excluded } = splitPure(cat, cats[cat] ?? []);
     // dk_fd: the TOP 50 tab re-ranks by EV at the selection basis (the legacy
     // "all" ranking is EV at the all-books best price — a price dk_fd forbids
     // from influencing anything). No-basis rows sink to the bottom, flagged.
-    if (basisMode && cat === "all") {
-      return base
-        .slice()
-        .sort((a, b) => (b.bsEv == null ? -99 : Number(b.bsEv)) - (a.bsEv == null ? -99 : Number(a.bsEv)));
-    }
-    return base;
+    const base =
+      basisMode && cat === "all"
+        ? pure.slice().sort((a, b) => (b.bsEv == null ? -99 : Number(b.bsEv)) - (a.bsEv == null ? -99 : Number(a.bsEv)))
+        : pure;
+    return { rows: base as PickRow[], crossMarket: excluded.length };
   }, [cats, cat, basisMode]);
   const playable = useMemo(() => rows.filter((r) => r.cz != null), [rows]);
   const offBook = rows.length - playable.length;
@@ -307,6 +312,14 @@ export default function BoardPage() {
           </FilterPill>
         )}
       </div>
+
+      {crossMarket > 0 && (
+        <div className="mb-3 rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-3 py-2 text-[11.5px] text-gold">
+          {crossMarket} row{crossMarket === 1 ? "" : "s"} excluded (cross-market) — rows whose market key does not
+          match this tab. They are counted here instead of rendered under the wrong market; if you see this,
+          the engine filed rows under the wrong category and that is a data finding, not a display bug.
+        </div>
+      )}
 
       {isPending || regen.isPending ? (
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>

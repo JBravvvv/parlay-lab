@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createEngine } from "@/engine";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { buildLockEntry, buildReasonRecord, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -64,7 +66,37 @@ export async function GET(req: NextRequest) {
   // BOTH conditions in every response, fired or not — the standing rule.
   const body = { date, at: new Date(now).toISOString(), T: SCHED_T, minReady: MIN_READY, ...d };
 
-  if (!d.fire) return NextResponse.json({ fired: false, ...body });
+  /* THE SELF-CHECK (2026-08-05): every poke verifies the date carries a locked card. A board
+     without a lock is backfilled FROM THE STORED BOARD (the exact 08-02..08-05 gap: boards
+     could exist that nothing ever locked); a dead slate with neither gets a reason record in
+     the lock's place. No silent days — every date ends with a locked card or a named reason.
+     MAX_RUNS and the dead-slate refusal still govern the spending path; the self-check spends
+     nothing (stored board + statsapi only). */
+  let lock: Record<string, unknown> = { present: await lockExists(date), action: null as string | null };
+  try {
+    const action = needsLockAction({ boardExists: board != null, lockExists: lock.present as boolean, deadSlate: d.reason === "dead-slate" });
+    if (action === "backfill" && board) {
+      const eng = createEngine({
+        fetchJson: () => Promise.reject(new Error("backfill lock never fetches")),
+        storage: (() => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; })(),
+      });
+      const cfg = eng.get<Record<string, unknown>>("SH_CFG");
+      if (cfg) cfg.selMode = LOCK_SEL_MODE;
+      const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill" });
+      await writeLock(entry);
+      lock = { present: true, action: "backfilled", tickets: (entry.core as unknown[]).length };
+      console.log(`[scheduler] self-check BACKFILLED the lock for ${date}: ${(entry.core as unknown[]).length} tickets`);
+    } else if (action === "reason-record") {
+      await writeLock(buildReasonRecord(date, now, `dead slate before any fire — conditions never held (last: ${d.reason === "dead-slate" ? "dead-slate" : d.reason})`));
+      lock = { present: true, action: "reason-recorded" };
+      console.log(`[scheduler] self-check wrote a REASON RECORD for ${date} — no card could exist`);
+    }
+  } catch (e) {
+    lock = { ...lock, error: (e as Error).message };
+    console.warn(`[scheduler] self-check failed: ${(e as Error).message}`);
+  }
+
+  if (!d.fire) return NextResponse.json({ fired: false, lock, ...body });
 
   /* Forward to the one spending route, same header contract as cron-job.org entries 1-3.
      Its own limiter, conditional skip and run cap still apply — a race between two pokes is
@@ -79,5 +111,5 @@ export async function GET(req: NextRequest) {
   } catch {
     genBody = { error: "generate returned non-JSON" };
   }
-  return NextResponse.json({ fired: true, generateStatus: gen.status, generate: genBody, ...body });
+  return NextResponse.json({ fired: true, generateStatus: gen.status, generate: genBody, lock, ...body });
 }
