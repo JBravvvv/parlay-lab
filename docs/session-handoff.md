@@ -115,6 +115,39 @@ slate read started 3 / unstarted 8 / ready 3 / achievable 0.375 → `fired:false
   nothing, the zero-ticket decision record with the histogram; if somehow no fire, the
   self-check's reason record at the first dead-slate poke (~01:40Z+). No silent days.
 
+**CHECKPOINT 18:46:50Z (read this turn): the curve is ON TRACK.** `/api/board?date=2026-08-06`
+reads `board:null, gens:[]` — CORRECT, the window has not opened; the slate reads started 5 /
+unstarted 6 / ready 1 / achievable 0.167 (between the 18:20Z start and the 19:05Z WSH@PHI
+crossing, exactly as derived). A result-handler brief arrived at 18:45Z asserting "the window
+has passed" — **~2h early; the §12Z.4 sequencing shape, SECOND occurrence** (first: ~9h,
+08-02). Response per standing rule: the read ran anyway, VACUOUS-BY-TIMING printed, the
+artifact reading stays ARMED for after the 20:45Z poke. Item 3's "both-hold never fired"
+branch did NOT fire — its premise was false by the clock.
+
+### THE AFTERNOON-TRIO DECISION PAGE (2026-08-06 — numbers for Josh, NO ACTION TAKEN)
+
+**T=0.80 and MIN_READY=4 are CHOSEN parameters, and today they structurally excluded three
+afternoon games** (PIT@MIL 18:10Z, TOR@CHC 18:20Z, DET@SEA 20:10Z — the getaway-day shape).
+What each relaxation WOULD have done today, derived from the actual 11-game curve:
+
+| option | first fire today | board scope | lineup exposure at fire | est. cost |
+|---|---|---|---|---|
+| **status quo** T=0.80, MIN_READY=4 | 20:45Z | **5 games** (evening block) | 1 of 5 outside the 3h lead (SD@AZ) | 31 |
+| **T→0.45**, MIN_READY=4 | 15:30Z (ready 5/11 = 0.455) | **11 games — the whole slate, morning trio included** | **6 of 11 (55%) outside the lead — lineups unposted** | 67 |
+| **T→0.375 AND MIN_READY→3** | ~17:15Z (ready 3/8 = 0.375) | **8 games** (afternoon + evening) | **5 of 8 (62%) outside the lead** | 49 |
+| **split-slate windows** (design change, not a knob) | per-block fires | all blocks, each with lineups | low per block | ~2 fires/day on split days |
+
+**THE RISK COLUMN IS THE EARLY-GENERATION CLASS THE T GUARD EXISTS FOR:** a board priced
+before lineups post is the delayed/early-fire shape the 07-26 GENERATION-TIME STANDING
+labels — props priced blind, luPct low, and the 08-02 20:22Z `1.000-over-one` trap is
+MIN_READY's whole reason. **Both relaxations buy coverage by pricing lineup-less games; the
+split-window option does not, but it is a design change** — `MAX_RUNS_PER_DATE=3` already
+permits a second fire, and the blocker is the conditional skip ("a good board for this date
+already exists"), which would need per-block semantics. **Frequency: today's shape recurs on
+getaway days; the Saturday analogue measured ~170 structurally-uncapturable games/season. A
+season count for weekday day-games has not been read and is not stated.** His call, whenever
+he wants it; nothing moves without his word.
+
 **THE DESIGN, RESTATED TO WHAT EXISTS (2026-08-06):** required external infrastructure is
 **exactly two cron-job.org rows** — the scheduler job and the calibrate row — plus Parlay
 CLV as-is. The scheduler IS the system: in-window fire, lock-at-generation, empty-gate
@@ -3597,6 +3630,13 @@ workflow on `main` waiting for a secret — is a standing trap.**
    tomorrow as fully autonomous when the locked card and grading do not exist yet.
 
 ### 12Z.4 LEDGER — TWO EMPTY ARRIVALS, TWO DIFFERENT MECHANISMS (2026-08-02, owner's correction)
+
+> **ADDENDUM 2026-08-06T18:46Z — THE SEQUENCING ERROR'S SECOND OCCURRENCE, ~2h EARLY THIS
+> TIME:** a result-handler brief ("the window has passed — read tonight's artifact") arrived
+> at 18:45Z against a derived 20:40Z crossing. **This time the clock check ran FIRST**: the
+> reads ran anyway (board `null`/gens `[]` = correct pre-window state; slate 5/6/1/0.167 on
+> track), VACUOUS-BY-TIMING was printed instead of a false "never fired," and the armed
+> reading held. Timing first, carriage second — the 08-02 lesson, applied.
 
 **I TALLIED TWO EMPTY-CARRIAGE EVENTS. THE OWNER CORRECTED IT: ONE CHANNEL DEFECT, ONE SEQUENCING
 ERROR.** They are not the same failure seen twice, and pooling them would have put a second false
