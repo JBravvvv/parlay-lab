@@ -1,5 +1,30 @@
 # External scheduler entries — cron-job.org (2026-07-26)
 
+> ## 🔴 THE ENTRIES BELOW WERE NEVER CREATED — 2026-08-06, ground truth from Josh's dashboard
+>
+> **This document authored entries 1–4 as "ready to paste" on 2026-07-26, in the same commit
+> (`91c179b`) that removed `/api/generate` from `vercel.json`'s crons — and they were never
+> pasted.** Josh's cron-job.org account contained exactly two jobs on 2026-08-06: **Parlay
+> CLV** (30-min cadence, 200s, healthy) and **Roster-Lab alerts**. The entries described
+> below never existed; the record carried them as live for ten days (mechanism:
+> `docs/session-handoff.md` §12Z.8 — phantom infrastructure via asserted operator actions).
+>
+> **THE DESIGN AS OF 2026-08-06 — required external infrastructure is exactly TWO rows,
+> plus CLV as-is:**
+>
+> | cron-job.org job | URL | auth | schedule (UTC) |
+> |---|---|---|---|
+> | **scheduler** *(Josh creating 2026-08-06)* | `https://parlay-lab-six.vercel.app/api/scheduler` | header `x-cron-key: <CRON_SECRET>` | every 15 min, hours 15–23 and 0–2 |
+> | **calibrate** *(Josh creating 2026-08-06)* | `https://parlay-lab-six.vercel.app/api/calibrate` | header `Authorization: Bearer <CRON_SECRET>` | Sundays 10:00 |
+> | **Parlay CLV** *(exists, healthy)* | `…/api/clv?key=<CRON_SECRET>` | query-string key (working; **security queue, spec-only: migrate to header auth some future ship**) | every 30 min |
+>
+> The scheduler IS the system — in-window fire, lock-at-generation, empty-gate records,
+> daily self-check (`/api/scheduler`, fails closed 503 without `CRON_SECRET`). **Entries
+> 1–3 are formally retired from the design — not as fallbacks lost but as phantoms never
+> had.** ⚠️ Rotating `CRON_SECRET` breaks the CLV job's embedded `?key=` until its URL is
+> updated in the same visit. Josh types the secret; nobody else does. Everything below this
+> banner is the 07-26 design text, kept as the dated record.
+
 > ## ⚠️ THE THIRD SCHEDULER, AND THE FIRING-BRANCH SPLIT — 2026-07-31 (owner's item 5)
 >
 > This document is about **cron-job.org**, and its entries are unaffected by what follows — they

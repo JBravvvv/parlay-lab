@@ -13,8 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-05:** `origin/frontend-rebuild` = `518bddca99ca8d5aee816eea8f221931f511a5cd`
-> - **STATE-CLAIM 2026-08-05:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+> - **STATE-CLAIM 2026-08-06:** `origin/frontend-rebuild` = `ebd219c40dc1fe84107dac72510cef5836d4b7a9`
+> - **STATE-CLAIM 2026-08-06:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
 > shipped. The guard is doing the maintenance its header promised.)*
@@ -30,31 +30,37 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
-## 0.00001 🎯 THE JOSH BLOCK, CURRENT — TWO READS, ONE LIKELY FIX, ONE SCREEN SAMPLE (2026-08-05)
+## 0.00001 🎯 THE JOSH BLOCK, CURRENT — TWO ROWS, FIRST POKES, ONE SCREEN SAMPLE (2026-08-06)
 
-**THIS SUPERSEDES §0.0 BELOW IN PRIORITY.** §0.0's Vercel-log attribution reads (windows A/B,
-146 / ≥214) are STILL OWED but no longer first — **the system is dark and these two reads are
-what turns it on.**
+**REWRITTEN 2026-08-06 FROM JOSH'S DASHBOARD SCREENSHOT (ground truth per §12Y.6 — the first
+operator-screenshot state read this record has ever had).** The 08-05 version's READ 1 is
+**RESOLVED**: the cron-job.org account contains exactly **TWO jobs** — **"Parlay CLV"**
+(`https://parlay-lab-six.vercel.app/api/clv?key=…`, 30-min cadence, 200s, healthy) and
+**"Roster-Lab alerts"** (the sibling project's; not ours). **NO scheduler job. NO entries 1–3.
+NO calibrate row. None ever existed** (§12Z.8 — the phantom-infrastructure ledger). The
+08-05 ICOU on the cron-job.org side is CLOSED by this read. §0.0's Vercel-log attribution
+reads (windows A/B, 146 / ≥214) are STILL OWED, second.
+
+**JOSH'S IN-FLIGHT ACTIONS (his word, 2026-08-06):** creating the **scheduler job**
+(`https://parlay-lab-six.vercel.app/api/scheduler`, header `x-cron-key`, every 15 min, hours
+15–23 and 0–2 UTC) and the **calibrate row** (`https://parlay-lab-six.vercel.app/api/calibrate`,
+header `Authorization: Bearer <CRON_SECRET>`, Sundays 10:00 UTC), with a **fresh CRON_SECRET**
+set in Vercel and redeployed. He types the secret; nobody else does. **These are IN-FLIGHT,
+not landed — landed = a 200 in his History tab or an authed effect visible from here (§12Y.6).**
 
 ```
-━━━ READ 1: CRON-JOB.ORG — ARE THE ENTRIES EXECUTING AT ALL? ━━━━━━━━━━━━━━━━━━━━━━━━━
-cron-job.org → each entry (scheduler */15, entries 1–3, CLV */30, calibrate Sunday)
-             → HISTORY tab
-  For each: is it EXECUTING, and with what status?
-    200            -> that entry works; move to the next
-    401            -> the header value is wrong  ->  THE FIX below
-    failed/disabled-> cron-job.org auto-disabled it or it was never enabled — re-enable
+━━━ ⚠️ ROTATION CATCH — THE CLV JOB EMBEDS THE OLD SECRET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/api/clv auths via ?key=<CRON_SECRET> (route header L26). A FRESH CRON_SECRET therefore
+breaks the working Parlay CLV job: its URL still carries the old value and every tick goes
+401 after the redeploy. Update the key value inside the CLV job's URL in the same visit.
 
-━━━ READ 2: VERCEL — ARE POKES ARRIVING, AND AS WHAT? ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Vercel → parlay-lab → Logs → filter: /api/scheduler   and   /api/generate
-  pokes arriving as 401s ("unauthorized poke")  -> the header value  ->  THE FIX
-  no pokes at all                                -> cron-job.org side (read 1 decides)
-
-━━━ THE LIKELY FIX, one visit ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-A 401 on EITHER surface = the x-cron-key VALUE on cron-job.org does not match Vercel's
-CRON_SECRET. Re-paste it from Vercel → Settings → Environment Variables → CRON_SECRET into
-each entry's custom header. (The calibrate entry uses `Authorization: Bearer <same value>`.)
-You type it; nobody else does.
+━━━ VERIFYING THE FIRST POKES (once you confirm the scheduler job is saved) ━━━━━━━━━━
+Vercel → parlay-lab → Logs → filter: /api/scheduler
+  authed 200s, body carrying BOTH condition values  -> pokes land; system is live
+  401s after the redeploy   -> the x-cron-key value on the job does not match the new
+                               CRON_SECRET — one re-paste from Vercel → Settings → Env
+  no pokes within an hour of the confirmed save -> the job itself: cron-job.org →
+                               scheduler job → History tab (executing? status?)
 
 ━━━ THE TAB SAMPLE — the verdict is blocked on your screen ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 The store reads UNREPRODUCED-FROM-DISK (§0.0004): engine arrays pure on the fixture, both
@@ -62,11 +68,19 @@ render surfaces key-addressed. What decides (a) display vs (b) data: ONE wrong r
 (player + prop line) plus WHICH TAB it rendered under, pasted as text.
 ```
 
-**WHY THESE OUTRANK EVERYTHING:** every reading in this file downstream of "a board exists"
-— the lock path's first artifact, the singles first-ON pair, reading 30 — is **dark until a
-poke lands authed.** The keyless probes prove the SERVER half works (401 = deployed,
-configured, failing closed); **the cron-job.org half is invisible from the repo:
-IN-CONTEXT-ONLY-UNVERIFIED, resolved only by read 1.**
+**WHAT HAPPENS WHEN THE FIRST POKES LAND (pre-committed, unchanged):** clean no-fire exits
+until the window → first both-hold poke → **ONE** fire → board → **THE LOCK PATH'S FIRST
+LIVE ARTIFACT** — a locked card, an empty-gate record, or a named reason; **one MUST exist
+per the no-silent-days design.** Reading 31 and the first-live readings apply as written.
+Externally visible from here without any secret: `/api/board?date=<PT-today>` gains a
+`gens[]` entry with `trigger:"header"`.
+
+**THE DESIGN, RESTATED TO WHAT EXISTS (2026-08-06):** required external infrastructure is
+**exactly two cron-job.org rows** — the scheduler job and the calibrate row — plus Parlay
+CLV as-is. The scheduler IS the system: in-window fire, lock-at-generation, empty-gate
+records, daily self-check. **"Entries 1–3" are formally retired from the design — not as
+fallbacks lost but as phantoms never had** (§12Z.8). No transcript nicknames: the record
+names jobs by their cron-job.org titles and URLs as they exist on the dashboard.
 
 ---
 
@@ -424,14 +438,24 @@ grep and it is the first thing tomorrow.**
 | `/api/scheduler` keyless probe | **still 401** — deployed, `CRON_SECRET` set, gate up |
 | **impossible branch** | does not fire at the bracket's resolution: 805 spent sits inside the collection brackets; no unexplained board-scale delta |
 
-**THE VERDICT: DID NOT LAND — created is not fires.** And the deeper finding: **entry 1's
+**THE VERDICT: DID NOT LAND — created is not fires.** ~~And the deeper finding: **entry 1's
 22:45Z fallback ALSO produced nothing on Monday and Tuesday**, when the window read 1.000 —
 a fire that passed auth would have generated (no board existed; the skip could not trigger).
 **Both the new ticker and the old guaranteed entry failed the same way, which points at the
 shared variable: the cron-job.org side — entries not firing, or firing without the right
-`x-cron-key` value.** From here the pokes are invisible (the route logs `unauthorized poke`
+`x-cron-key` value.**~~ From here the pokes are invisible (the route logs `unauthorized poke`
 to the Vercel log — Josh-side). **The landing test's own pre-commitment applies and is
 printed plainly: did not land; and the entries did NOT carry the week either.**
+
+> **🔻 STRUCK 2026-08-06 — THE SHARED VARIABLE RESOLVED, AND IT IS SIMPLER THAN EITHER
+> BRANCH:** Josh's dashboard screenshot (ground truth, §12Y.6) shows the cron-job.org
+> account contains exactly two jobs — **Parlay CLV** and **Roster-Lab alerts**. **The
+> scheduler job, entries 1–3, and the calibrate row NEVER EXISTED.** "Entry 1's guaranteed
+> fallback" described a job that did not exist: nothing failed, because nothing was there
+> to fire. The 08-05 disjunction ("not firing, or firing with a wrong value") was still a
+> level too generous — both limbs presuppose entries. **Full mechanism and the historical
+> reconciliation: §12Z.8.** The remaining true clause above stands: DID NOT LAND, and the
+> pokes were invisible from here because there were no pokes.
 
 > **JOSH — two dashboard reads, one likely fix:** cron-job.org → each entry → **History**
 > (are the scheduler + entries 1–3 executing, and what status: 200/401/failed-disabled?), and
@@ -1177,8 +1201,13 @@ up by choice — no hour exists at which they clear.**
 
 ### WEEKDAY CONTROL — the existing derivation is confirmed, not disturbed
 
-Ten weekdays at entry 1's `22:45Z`: **clears T on 10/10, meanCost 50.8.** Monday **2026-08-03** reads
+Ten weekdays at ~~entry 1's~~ `22:45Z`: **clears T on 10/10, meanCost 50.8.** Monday **2026-08-03** reads
 **achievable 1.000, ready 7/7, cost 43**. **The weekday window stands exactly as written.**
+
+> **🔻 "ENTRY 1" STRUCK 2026-08-06 (§12Z.8): that cron-job.org entry never existed.** The
+> DERIVATION is untouched — 22:45Z clearing T on 10/10 weekdays is schedule-feed arithmetic
+> and remains valid; it now describes what the scheduler job's `*/15` ticker encounters
+> in-window, not a fallback row.
 
 ### 🔴 IMPOSSIBLE BRANCH — DOES NOT FIRE. AND MY FIRST COMPARATOR SAID IT DID.
 
@@ -2254,6 +2283,12 @@ board CANNOT confirm them** — it fires on the owner's curl and entry 1 is week
 ---
 
 ## 5. OPEN PRE-COMMITTED READINGS (verbatim; COUNT: 33 — 29 carried, 30–33 appended 2026-08-05)
+
+> **DATED NOTE 2026-08-06 (§12Z.8) — the readings below are UNCHANGED as written; one
+> premise class restates.** Any reading whose wording references "entry 1"/"the entries"
+> or a cron-job.org fire (readings 5, 6, 8 among them) reads whatever ARRIVES from the
+> NEW scheduler job — the phantom entries never existed, so those readings have simply
+> never had an input. No reading is edited; this note is the reconciliation.
 
 1. Concurrency-fix landing, three outcomes incl. starved window (§2; collection-period).
 2. `props-concurrency.test.ts` main-half warn → ENFORCING flip in the landing commit
@@ -3373,6 +3408,68 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.8 LEDGER — PHANTOM INFRASTRUCTURE VIA ASSERTED OPERATOR ACTIONS (2026-08-06)
+
+**TEN DARK BOARD-DAYS CLOSE WITH THEIR TRUE CAUSE: NO POKER EVER EXISTED.** Ground truth,
+from Josh's dashboard screenshot 2026-08-06: the cron-job.org account contains exactly two
+jobs — **Parlay CLV** (healthy, 200s, 30-min cadence) and **Roster-Lab alerts**. The
+scheduler job, "entries 1–3", and the calibrate row **were never created**. Every diagnosis
+that presupposed them — "not firing, or firing with a wrong `x-cron-key` value", "entry 1's
+guaranteed fallback also produced nothing" — was reasoning about the behaviour of objects
+with no existence. The keyless 401 probes verified the GATE, faithfully, every time;
+**nothing could verify a poker because there was none.**
+
+**THE MECHANISM, NAMED: PHANTOM INFRASTRUCTURE VIA ASSERTED OPERATOR ACTIONS.** `91c179b`
+(2026-07-26) authored the entries in `docs/cron-jobs.md` as "ready to paste" and removed
+`/api/generate` from `vercel.json`'s crons in the same commit — **the real poker was retired
+in the same change that described its never-created replacement.** Briefs then asserted
+"Josh's visit made" (the 08-02 brief: CLV to `*/30`, "the scheduler entry created with the
+header"), and this session **echoed the assertion back as landed state**. From that moment
+the record carried executing jobs that were paste-ready text. **Operator-action and
+dashboard-state assertions are the same defect class as asserted repo facts** (§12Y.1) —
+with one difference that made this one worse: a wrong repo premise dies on the next `git`
+read, while a wrong dashboard premise has **no instrument on this side to kill it**, so it
+compounded for ten days and spawned secondary theories (the header-value hypothesis) that
+were themselves phantom-shaped.
+
+**§12Y EXTENDS, BOTH SIDES — call it §12Y.6:** dashboard state arrives ONLY as
+**(a) operator screenshots** or **(b) externally-visible effects** (a 200 in the route logs
+proves a poker; a `gens[]` entry with `trigger:"header"` proves an authed fire; nothing else
+does). A brief's sentence that an operator action was taken is a REPORT THAT THE ACTION WAS
+ATTEMPTED, never evidence that it landed. **"Created" claims about external dashboards get
+the same treatment repo claims got under §12Y.1: a read, not an echo.**
+
+**THE HISTORICAL RECONCILIATION — DID A GENERATE-POKING JOB EVER EXIST? (all from disk,
+2026-08-06):**
+
+| evidence | reading |
+|---|---|
+| `vercel.json` history | `/api/generate` ADDED to Vercel's own crons `c2b8c82` (07-18); REMOVED `91c179b` (07-26). **A real poker existed for eight days: Vercel's cron, not cron-job.org** |
+| the only board artifact on disk | `origin/line-history:data/boards/2026-07-26.*` — `at = 2026-07-26T16:46:16.340Z`, **`gens: 0`, `genIndex: []`**, captured in-TTL by the archive workflow. Zero server generations that day → **client-generated, positively** (§ the GENERATIONS decode table: zero gens + rows = client-only) |
+| trigger provenance before 07-30 | **unrecorded by construction** — the trigger mark shipped `4c036ba` (07-29/07-30) precisely because "forced and manual boards were indistinguishable from scheduled ones in the archive AND the prediction store" (its own commit message) |
+| any `trigger:"header"` or `trigger:"cron-ua"` record, anywhere | **NONE.** No archived board, no reachable gens index (3-day TTL, route L350; 08-03/04/05 read `[]` live at §0.0004; 08-06 reads `[]` at 17:01Z), no handoff observation. Reading 5 (the trigger-mark production reading) has NEVER run |
+| the gens indexes older than the TTL | expired — **absence there proves nothing either way**; the archived 07-26 index is the one durable in-TTL capture, and it reads zero |
+
+**THE CORRECTED RECORD, DATED:** no cron of any kind is known to have ever fired a board.
+The one archived board is positively client-generated; every earlier board's provenance is
+unrecorded by construction; every "cron fired at 22:00Z"-shaped statement in this record
+restates as **"a board existed; its generator is unknown, and no cron-job.org entry existed
+to be it."** The Vercel-cron era (07-18 → 07-26) MAY have fired boards, but no artifact
+survives to say so. **The phantom period starts at `91c179b`, 2026-07-26: the moment the
+real poker was removed in favour of entries that were never pasted.** "Entry 1's guaranteed
+fallback" is struck everywhere it appears (§0.0004, the weekday-control derivation), each
+strike carrying its date and this section.
+
+**TWO SMALL FINDINGS RECORDED, NOT ACTIONED (2026-08-06):**
+1. **`/api/clv` auths via a query-string key equal to `CRON_SECRET`** (route header L26),
+   visible in the cron-job.org UI and any URL log. It works; it stays. **Security queue,
+   spec-only: migrate CLV to header auth on some future ship.** Corollary flagged in the
+   Josh block: rotating `CRON_SECRET` breaks the CLV job's embedded key until its URL is
+   updated in the same visit.
+2. **The tab-contamination verdict stays OPEN** pending Josh's screen sample (one wrong
+   row's text + its tab) — the ask remains in the Josh block, beneath the scheduler
+   verification.
 
 ### 12Z.7 LEDGER — AN ASTERISK IS NOT A SHIP (2026-08-05, operator's catch)
 
@@ -5357,11 +5454,18 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 15. NOT ON DISK (missing input → how obtained)
 
-- **🔴 FIRST (2026-08-05): WHY NO POKE HAS EVER ARRIVED AUTHED** → Josh's read 1
+- ~~**🔴 FIRST (2026-08-05): WHY NO POKE HAS EVER ARRIVED AUTHED** → Josh's read 1
   (cron-job.org → each entry → History: executing? 200/401/disabled?) and read 2 (Vercel →
   Logs → `/api/scheduler` + `/api/generate`). **IN-CONTEXT-ONLY-UNVERIFIED: the
   cron-job.org-side entry state and `x-cron-key` value** — invisible from the repo; the
-  keyless 401 probes prove only the server half. §0.00001.
+  keyless 401 probes prove only the server half. §0.00001.~~
+  **✅ RESOLVED 2026-08-06 by Josh's dashboard screenshot: the jobs never existed (§12Z.8).
+  The ICOU closes.** What replaces it:
+- **🔴 FIRST (2026-08-06): WHETHER JOSH'S TWO NEW ROWS LANDED AND POKE AUTHED** → his
+  confirmation + Vercel → Logs → `/api/scheduler` (authed 200s with both condition values),
+  or externally: `/api/board?date=<PT-today>` gaining a `gens[]` entry with
+  `trigger:"header"`. **IN-CONTEXT-ONLY-UNVERIFIED until one of those reads: the scheduler
+  job's and calibrate row's existence and header values** — in-flight per his word, §0.00001.
 - **🔴 SECOND (2026-08-05): THE TAB CONTAMINATION SIGHTING** → one wrong row's text + which
   tab, from Josh's screen. **IN-CONTEXT-ONLY-UNVERIFIED: the sighting itself** — the store
   reads UNREPRODUCED-FROM-DISK (§0.0004), engine arrays pure on the fixture.
@@ -5379,8 +5483,9 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
   **every board before today read a different calibration than tomorrow's will** and the
   homogeneous window starts 07-31, not 07-29.
 - Whether `/api/propsnap` has captured on weekdays → the ungated curl (§4 read 1).
-- Whether the owner's two cron-job.org edits landed → the execution log; **first real test Monday
-  2026-08-03 22:45Z.**
+- ~~Whether the owner's two cron-job.org edits landed → the execution log; **first real test Monday
+  2026-08-03 22:45Z.**~~ **RESOLVED 2026-08-06: they did not land — no such jobs existed
+  (§12Z.8). Superseded by the FIRST bullet above (the two NEW rows).**
 - The reset date; the Vercel deploy list; real card stakes ever placed; `calW`/`calG` effective
   blend shares; Upstash retention → all dashboard or export only.
 
@@ -5426,14 +5531,20 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
    STATE-CLAIM pair at the top of the file; `sha-currency` scores it).
 3. **PRINT the open-readings count from §5's BODY** (header says 33; count the body).
 4. **PRINT the quota with its timestamp** from the last row of `data/quota-log.jsonl`.
-5. **PRINT the outage-fix status:** Josh's read 1 (cron-job.org History) and read 2 (Vercel
-   logs) — done or pending. **Pending → the system is still dark and every board-dependent
-   reading stays vacuous; nothing to measure.**
-6. **PRINT tonight's lock-artifact expectation:** the first authed poke after the 08-05 deploy
-   produces the lock path's FIRST live artifact (reading 31) — check
-   `/api/board?date=<PT-today>` gens[] and, via Josh's phrase-read if offered, the ledger
-   entry. **A date with an authed poke and NO lock artifact and NO reason record = the
-   no-silent-days design failed its first live test — that outranks everything else.**
+5. **PRINT the outage status:** CAUSE CLOSED 2026-08-06 — phantom infrastructure, the jobs
+   never existed (§12Z.8). **The pending item is Josh's two NEW rows (scheduler job +
+   calibrate row, fresh CRON_SECRET redeployed, CLV URL's key updated): confirmed-saved or
+   in-flight. In-flight → the system is still dark and every board-dependent reading stays
+   vacuous; nothing to measure.**
+6. **PRINT tonight's lock-artifact expectation:** the first authed poke from the NEW
+   scheduler job produces the lock path's FIRST live artifact (reading 31) — check
+   `/api/board?date=<PT-today>` gens[] (a `trigger:"header"` entry is the no-secret proof of
+   an authed fire) and, via Josh's phrase-read if offered, the ledger entry. **A date with an
+   authed poke and NO lock artifact and NO reason record = the no-silent-days design failed
+   its first live test — that outranks everything else.** If pokes arrive as 401s after the
+   redeploy: the job's header value vs the new secret — print exactly that for his one
+   re-paste. If no pokes within an hour of his confirmed save: the job itself — print the
+   History-tab check.
 7. **THEN STOP.** The next input is Josh's dashboard results, his tab screen sample, or the
    first locked card.
 
