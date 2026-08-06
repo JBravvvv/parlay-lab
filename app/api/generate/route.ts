@@ -10,6 +10,7 @@ import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liv
 import { ptToday } from "@/lib/server/pt-date";
 import { slateScope } from "@/lib/server/slate";
 import { buildLockEntry, writeLock } from "@/lib/server/lock-card";
+import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
 /**
  * Vercel-side daily board generation (calibration 3A, self-driving): the SAME
@@ -379,9 +380,11 @@ export async function GET(req: NextRequest) {
        NOT APPLICABLE on this path (prices were fetched by this same run — fresh by
        construction); the exposure cap IS the daily ceiling the allocator sized under. */
     let lock: Record<string, unknown> | null = null;
+    let lockedEntry: ReturnType<typeof buildLockEntry> | null = null;
     try {
       const entry = buildLockEntry({ eng, data: data as unknown as Record<string, unknown>, date, now, trigger });
       const w = await writeLock(entry);
+      lockedEntry = entry;
       lock = {
         tickets: (entry.core as unknown[]).length,
         allocSum: entry.allocSum ?? 0,
@@ -395,6 +398,26 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       lock = { error: (e as Error).message };
       console.warn(`[generate] LOCK FAILED — the self-check will backfill: ${(e as Error).message}`);
+    }
+    /* SELF-READING (2026-08-06, operator: nothing waits on a human paste). The same run
+       writes the card's READING to pl:reading:{date}, served by /api/board beside the
+       card. Best-effort, fully caught — a reading failure must never cost the board or
+       the lock; the scheduler's self-check repairs a missing reading on its next poke. */
+    let reading: Record<string, unknown> | null = null;
+    try {
+      const r = lockedEntry
+        ? buildReadingSafe({ entry: lockedEntry, gen: gen as never, date, now, kind: "fire" })
+        : ({
+            date, at: now, kind: "fire" as const, partial: true,
+            error: `lock failed before the reading could run: ${String(lock?.error ?? "?")}`,
+            continuation: "the next scheduler poke's self-check backfills the lock and rebuilds this reading",
+            checklist: CHECKLIST,
+          } as unknown as Parameters<typeof writeReading>[0]);
+      await writeReading(r as Parameters<typeof writeReading>[0]);
+      reading = { written: true, partial: !!(r as { partial?: boolean }).partial };
+    } catch (e) {
+      reading = { error: (e as Error).message };
+      console.warn(`[generate] READING write failed — the self-check will repair: ${(e as Error).message}`);
     }
     /* cfSel (2026-07-29, owner sign-off): counterfactual selection under a lifted HRR
        bar. Runs AFTER the board KV writes above (the board blob `enc` was encoded at
@@ -422,7 +445,7 @@ export async function GET(req: NextRequest) {
       }
     }
     if (!records.length) {
-      return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)", lock });
+      return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)", lock, reading });
     }
 
     const cur = await redisGetJson<DayBlob>(dayKey(date));
@@ -439,6 +462,7 @@ export async function GET(req: NextRequest) {
       priced: records.length,
       parlays: parlays.length,
       written,
+      reading,
       total: Object.keys(blob.records).length,
       overview: String(data.overview ?? "").slice(0, 160),
       gen,

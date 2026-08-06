@@ -183,11 +183,16 @@ export async function writeLock(entry: SyncEntry): Promise<{ merged: number; exi
 }
 
 export async function lockExists(date: string): Promise<boolean> {
+  return (await getLockEntry(date)) != null;
+}
+
+/** The stored locked entry for a date, for the self-reading repair path (2026-08-06). */
+export async function getLockEntry(date: string): Promise<SyncEntry | null> {
   const raw = (await redis(["GET", LEDGER_STORE_KEY])) as string | null;
   try {
     const s = raw ? (JSON.parse(raw) as { ledger?: SyncEntry[] }) : null;
-    return !!s?.ledger?.some((e) => e.date === date && e.locked);
+    return s?.ledger?.find((e) => e.date === date && e.locked) ?? null;
   } catch {
-    return false;
+    return null;
   }
 }

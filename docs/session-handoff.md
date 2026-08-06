@@ -3482,6 +3482,45 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.10 LEDGER — "WHY IS ANYTHING HOLDING," ANSWERED FROM DISK; AND THE READING HOP REMOVED (2026-08-06)
+
+**THE ANSWER: NOTHING UNPUSHED WAS EVER HOLDING.** Every turn's close printed HEAD ==
+`origin/frontend-rebuild` with `PUSH_EXIT=0` and a clean worktree; re-verified this turn
+before the ship. **But no guard ENFORCED it — encoded now: `tests/push-state.test.ts`**
+(HEAD must be contained in `origin/<branch>` at gate time; an unpushed commit fails the
+suite with the ahead-count named; skip-with-declaration when no origin ref is readable).
+**Observed red on its own ship**: this guard's own commit, gated after commit and before
+push, is the red case — recorded in the ship note below. **The ledger line: "holding" is a
+SESSION resting state — armed readings awaiting their window — never unpushed work. The
+operator's challenge stands against the READING hop (a human paste between artifact and
+analysis), and that hop is what the self-reading ship removes:**
+
+**SELF-READING SHIPPED (2026-08-06, `src/lib/server/self-reading.ts` + three routes; guard
+`tests/self-reading.test.ts` observed red first — module-not-found, the mispriced-single
+plant, the poisoned-entry partial):**
+- **The run that locks the card writes its READING** to `pl:reading:{date}` (board TTL, so
+  it rides `/api/board` into the daily archive): reading 31 applied (lock fields,
+  placed-null census, refusal statuses), the slate stamp echoed, structure mix (singles vs
+  parlays, count + stake share, beside the allocator order), M14 notes (cap binding,
+  blocked census, stake-vs-EV monotonicity counted as an OBSERVATION), the single-vs-leg
+  check — **its impossible branch writes a 🔴 LOUD flag into the artifact, never throws,
+  never silent** — and Josh's checklist verbatim.
+- **One URL, no session: `/api/board?date=<PT-date>` serves the card AND its reading** —
+  including on the no-board path (a reason-record day has a reading and no board).
+- **Empty-gate and reason days self-read the same way**; every check over an empty
+  population **declares itself VACUOUS in the output** (the vacuity rule, encoded).
+- **No unread days:** a generator failure writes a PARTIAL with a named continuation; the
+  scheduler self-check gained a **repair branch** (locked day, missing reading → rebuilt
+  from the stored board + `getLockEntry`), which also covers a deploy straddling a fire.
+- **WHAT REMAINS HUMAN, permanently:** Josh places and marks (`placed`/`actualStake` —
+  real money, his thumb). **Analyst briefs become exception-driven** (defects, decisions,
+  parameter changes), not routine artifact-reading.
+- **TONIGHT'S BRANCH, said plainly:** this ship pushed ~20:3xZ against a 20:45Z first
+  poke. If the deploy promotes first, tonight self-reads at the URL; if the poke beats the
+  deploy, the **21:00Z poke's repair branch writes the reading** — either way the URL
+  carries it by ~21:01Z, and the armed session reading stands as tonight's pre-committed
+  backstop. **Tomorrow self-reads unconditionally.**
+
 ### 12Z.9 LEDGER — "FIRST PITCHES ~23:05Z" WAS A NUMBER NOBODY READ (2026-08-06, operator's catch)
 
 **THE DEFECT:** the 2026-08-06T17:01Z turn printed "first pitches ~23:05Z; ready opens

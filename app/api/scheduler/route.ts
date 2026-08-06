@@ -5,7 +5,8 @@ import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
-import { buildLockEntry, buildReasonRecord, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
+import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
+import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -73,12 +74,25 @@ export async function GET(req: NextRequest) {
       if (cfg) cfg.selMode = LOCK_SEL_MODE;
       const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill" });
       await writeLock(entry);
+      await writeReading(buildReadingSafe({ entry, gen: ((board.data as Record<string, unknown>).gen as never) ?? null, date, now, kind: "backfill" }));
       lock = { present: true, action: "backfilled", tickets: (entry.core as unknown[]).length };
       console.log(`[scheduler] self-check BACKFILLED the lock for ${date}: ${(entry.core as unknown[]).length} tickets`);
     } else if (action === "reason-record") {
-      await writeLock(buildReasonRecord(date, now, `dead slate before any fire — conditions never held (last: ${d.reason === "dead-slate" ? "dead-slate" : d.reason})`));
+      const rr = buildReasonRecord(date, now, `dead slate before any fire — conditions never held (last: ${d.reason === "dead-slate" ? "dead-slate" : d.reason})`);
+      await writeLock(rr);
+      await writeReading(buildReadingSafe({ entry: rr, gen: null, date, now, kind: "reason-record" }));
       lock = { present: true, action: "reason-recorded" };
       console.log(`[scheduler] self-check wrote a REASON RECORD for ${date} — no card could exist`);
+    } else if (lock.present && !(await getReading(date))) {
+      /* READING REPAIR (2026-08-06): a locked day whose reading is missing — the deploy
+         straddled the fire, or the generate-side write failed. Rebuild from the stored
+         artifacts; no unread days. */
+      const stored = await getLockEntry(date);
+      if (stored) {
+        await writeReading(buildReadingSafe({ entry: stored, gen: board ? (((board.data as Record<string, unknown>).gen as never) ?? null) : null, date, now, kind: "repair" }));
+        lock = { ...lock, action: "reading-repaired" };
+        console.log(`[scheduler] self-check REPAIRED the missing reading for ${date}`);
+      }
     }
   } catch (e) {
     lock = { ...lock, error: (e as Error).message };
