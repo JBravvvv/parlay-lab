@@ -20,3 +20,21 @@
 export function ptToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
 }
+
+/**
+ * The date plus its N-1 predecessors as PT calendar dates, newest first — the fallback
+ * walk for surfaces bounded by the board's 3-day TTL (2026-08-07, the morning dark
+ * window: today has no board until the day's first fire, but yesterday's is still
+ * stored and honestly labeled). Pure calendar arithmetic on the YYYY-MM-DD string —
+ * no clock is read here, so no server-local defect class applies.
+ */
+export function prevPtDates(date: string, n: number): string[] {
+  const out: string[] = [];
+  const [y, m, d] = date.split("-").map(Number);
+  const cur = new Date(Date.UTC(y, m - 1, d));
+  for (let i = 0; i < n; i++) {
+    out.push(cur.toISOString().slice(0, 10));
+    cur.setUTCDate(cur.getUTCDate() - 1);
+  }
+  return out;
+}

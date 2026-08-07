@@ -3482,6 +3482,69 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.13 — THE LIVE READ THAT ENDED THREE FIXTURE ANSWERS; THE MORNING DARK WINDOW NAMED (2026-08-07, evening)
+
+**THE OPERATOR'S THIRD REPORT OF THE SAME SURFACE ("still not populating any prop bets")
+was answered, for the first time, by FETCHING THE DEPLOYED SURFACES AS HE SEES THEM.**
+
+**THE LIVE TABLE (22:49:35Z, four minutes after tonight's fire):**
+
+| market | /api/board categories (live) | /api/picks (live) | tabPure fails (live rows) |
+|---|---|---|---|
+| batter_hits | 50 | 44 | 0 |
+| batter_total_bases | 50 | 48 | 0 |
+| batter_home_runs | 50 | 47 | 0 |
+| batter_hits_runs_rbis | 50 | 45 | 0 |
+| pitcher_strikeouts | 32 | 31 | 0 |
+| pitcher_outs | 44 | 43 | 0 |
+| ml / rl | 30 / 30 | — | 0 / 0 |
+
+*(picks < categories = live/prob-null rows filtered, by design. Tonight's board:
+fired 22:45:06.812Z — the projected poke to the second, second consecutive night —
+trigger header, 12 games, luPct 0.917, reading kind "fire".)*
+
+**VERDICT 1 — KEYS MATCH.** The distinct market-key vocabulary on live production rows is
+exactly the routers' vocabulary; zero tabPure failures anywhere. The key-mismatch
+hypothesis is refuted by the live read; the OPEN tab-contamination verdict does NOT close
+via keys — it stays OPEN, now carrying its first live-surface data point (zero cross-market
+rows live tonight).
+
+**VERDICT 2 — THE LAYER THE LIVE READ NAMES: DATE LOGIC SERVING A BOARDLESS DAY.** Four
+minutes before that table, the same `/api/picks` URL read `no-board-for-date`: both public
+surfaces default to PT-today, and today has NO board until the day's first fire (22:45Z
+tonight; 20:45Z yesterday — mid-afternoon PT). **Every morning check reads empty by
+construction. The operator's three reports were all TRUE on the deployed surface** — while
+three fixture audits kept answering that the arrays were pure. Both prior "pure" verdicts
+are hereby annotated FIXTURE-SCOPE-ONLY (they were correct about the engine, silent about
+the product).
+
+**§12Y EXTENDS AGAIN — §12Y.7, FIXTURE-VERIFIED IS NOT SERVED-VERIFIED, PAGE EDITION:**
+any user-facing symptom is verified against the DEPLOYED surface FIRST (curl the public
+route, no secret, print the body), fixtures second — the same lesson the served-chunk
+extractor taught for the engine, applied to pages. And its corollary, encoded in the new
+guard: **vocabulary fixtures derive from CAPTURED PRODUCTION ROWS, never the code's own
+constants** — the prior tab-purity plant used the code's vocabulary, which is why three
+audits could not disagree with the code
+(`tests/fixtures/production-rows-2026-08-07.json`, captured live, provenance stamped;
+`tests/live-vocabulary.test.ts` red-first).
+
+**THE FIX, AT THE NAMED LAYER (one layer, not per-surface patches):** `/api/picks` now
+walks `prevPtDates(date, 3)` (the board TTL) when today has no board and serves the newest
+stored one **labeled** — `servedDate` + `staleNote: "showing <date>'s board — today's
+fires when enough lineups post"`. Never fabricates; an explicit `?date=` never falls back.
+The Board tab's client path already falls back to the device cache (`bestBoard`,
+engine-client L262-298) — untouched.
+
+**THE IMPOSSIBLE BRANCH (live populated vs his screen), NOW HIS ONE CHECK:** as of
+22:45Z the surfaces are populated — if his app STILL shows no prop bets tonight, the
+defect is client-side (PWA/device cache): **hard-refresh or a private tab, and if still
+empty, one screenshot with the URL bar visible.**
+
+**TONIGHT UNCHANGED, CONFIRMED:** the 08-07 card locked at fire (reading rode along);
+the 02:00Z pass grades it and publishes the first cohort record — this fix deploys hours
+before that pass, so tonight's cohorts publish on a surface that is never silently empty
+again.
+
 ### 12Z.12 — THE PICKS PRODUCT SHIPS; CROSSING 13; THE BOT LANDS ON THE DEPLOY BRANCH (2026-08-07)
 
 **FIRST, THE TURN'S READS (all this turn):** 08-07 board `null`/gens `[]` at 22:08Z —

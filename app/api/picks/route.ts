@@ -4,7 +4,7 @@ import { redis, redisGetJson, storeEnv } from "@/lib/server/store";
 import { PROGRESS_KEY, PROP_MARKETS, TOP_N, type Progress } from "@/lib/server/grading-progress";
 import { tabPure } from "@/lib/tab-purity";
 import { lineOf } from "@/lib/pred-serialize";
-import { ptToday } from "@/lib/server/pt-date";
+import { prevPtDates, ptToday } from "@/lib/server/pt-date";
 
 /**
  * /api/picks — THE PICKS PRODUCT (2026-08-07, operator requirement: Parlay Lab ships
@@ -61,18 +61,40 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const blob = (await redis(["GET", BOARD_KEY(date)])) as string | null;
-    const board = decodeBoard(blob);
+    /* THE MORNING DARK WINDOW (2026-08-07, third operator report, §12Z.13): today has no
+       board until the day's first fire (~afternoon PT), so a today-only read is empty
+       every morning — which is exactly what the operator kept seeing. When the requested
+       date has no board, fall back to the newest stored one inside the 3-day TTL and SAY
+       SO (servedDate + staleNote) — an honestly-labeled yesterday beats a silent empty.
+       An explicit ?date= request never falls back: asking for a specific day means that
+       day. */
+    const explicit = req.nextUrl.searchParams.get("date") != null;
+    const tryDates = explicit ? [date] : prevPtDates(date, 3);
+    let board: ReturnType<typeof decodeBoard> = null;
+    let servedDate = date;
+    for (const d of tryDates) {
+      const blob = (await redis(["GET", BOARD_KEY(d)])) as string | null;
+      board = decodeBoard(blob);
+      if (board) {
+        servedDate = d;
+        break;
+      }
+    }
     const dataObj = ((board as { data?: Record<string, unknown> } | null)?.data ?? null) as Record<string, unknown> | null;
 
     if (!board || !dataObj) {
       return NextResponse.json({
         date,
+        servedDate: null,
         picks: null,
-        reason: board ? "board-blob-without-data" : "no-board-for-date (the board TTL is 3 days; the record below is cumulative)",
+        reason: board ? "board-blob-without-data" : "no-board-inside-ttl (no stored board for this date or the two before it; the record below is cumulative)",
         record,
       });
     }
+    const staleNote =
+      servedDate === date
+        ? null
+        : `showing ${servedDate}'s board — ${date} has no board yet (today's fires when enough lineups post)`;
 
     const cats = (dataObj.categories ?? {}) as Record<string, Row[]>;
     const picks: Record<string, unknown[]> = {};
@@ -102,6 +124,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       date,
+      servedDate,
+      ...(staleNote ? { staleNote } : {}),
       at: board.at ?? null,
       gen: dataObj.gen ?? null,
       topN: TOP_N,

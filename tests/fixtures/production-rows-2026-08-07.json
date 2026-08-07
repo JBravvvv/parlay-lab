@@ -1,0 +1,134 @@
+{
+ "capturedAt": "2026-08-07T22:49:35Z",
+ "source": "GET https://parlay-lab-six.vercel.app/api/board?date=2026-08-07 (gen at 1786142706812, trigger header)",
+ "rows": {
+  "batter_hits": [
+   {
+    "lkey": "ajewing|batter_hits|0.5",
+    "label": "A.J. Ewing (NYM)",
+    "sub": "Hits O 0.5",
+    "prob": 79,
+    "implied": 67.7
+   },
+   {
+    "lkey": "ozziealbies|batter_hits|1.5",
+    "label": "Ozzie Albies (ATL)",
+    "sub": "Hits U 1.5",
+    "prob": 74.8,
+    "implied": 70.3
+   }
+  ],
+  "batter_hits_runs_rbis": [
+   {
+    "lkey": "drewgilbert|batter_hits_runs_rbis|0.5",
+    "label": "Drew Gilbert (SF)",
+    "sub": "H+R+RBI O 0.5",
+    "prob": 66.1,
+    "implied": 61.2
+   },
+   {
+    "lkey": "luistorrens|batter_hits_runs_rbis|0.5",
+    "label": "Luis Torrens (NYM)",
+    "sub": "H+R+RBI O 0.5",
+    "prob": 66,
+    "implied": 60.1
+   }
+  ],
+  "batter_home_runs": [
+   {
+    "lkey": "shoheiohtani|batter_home_runs|0.5",
+    "label": "Shohei Ohtani (LAD)",
+    "sub": "HR (anytime) O 0.5",
+    "prob": 27,
+    "implied": 25.2
+   },
+   {
+    "lkey": "yordanalvarez|batter_home_runs|0.5",
+    "label": "Yordan Alvarez (HOU)",
+    "sub": "HR (anytime) O 0.5",
+    "prob": 26.5,
+    "implied": 28.2
+   }
+  ],
+  "batter_total_bases": [
+   {
+    "lkey": "colsonmontgomery|batter_total_bases|1.5",
+    "label": "Colson Montgomery (CWS)",
+    "sub": "Total Bases U 1.5",
+    "prob": 71.7,
+    "implied": 67.7
+   },
+   {
+    "lkey": "noelvimarte|batter_total_bases|1.5",
+    "label": "Noelvi Marte (CIN)",
+    "sub": "Total Bases U 1.5",
+    "prob": 69.9,
+    "implied": 64.9
+   }
+  ],
+  "ml": [
+   {
+    "lkey": "ml_home",
+    "label": "Boston Red Sox",
+    "sub": "ML vs Athletics",
+    "prob": 70.9,
+    "implied": 71.5
+   },
+   {
+    "lkey": "ml_home",
+    "label": "Boston Red Sox",
+    "sub": "ML vs Athletics",
+    "prob": 66.9,
+    "implied": 66.7
+   }
+  ],
+  "pitcher_outs": [
+   {
+    "lkey": "kevingausman|pitcher_outs|18.5",
+    "label": "Kevin Gausman (TOR)",
+    "sub": "Pitcher Outs U 18.5",
+    "prob": 64.6,
+    "implied": 63.3
+   },
+   {
+    "lkey": "nathaneovaldi|pitcher_outs|18.5",
+    "label": "Nathan Eovaldi (TEX)",
+    "sub": "Pitcher Outs U 18.5",
+    "prob": 63.5,
+    "implied": 62.4
+   }
+  ],
+  "pitcher_strikeouts": [
+   {
+    "lkey": "maxfried|pitcher_strikeouts|4.5",
+    "label": "Max Fried (NYY)",
+    "sub": "Pitcher K's O 4.5",
+    "prob": 63.3,
+    "implied": 59.1
+   },
+   {
+    "lkey": "cadecavalli|pitcher_strikeouts|5.5",
+    "label": "Cade Cavalli (WSH)",
+    "sub": "Pitcher K's O 5.5",
+    "prob": 63.3,
+    "implied": 58.2
+   }
+  ],
+  "rl": [
+   {
+    "lkey": "rl_home",
+    "label": "Seattle Mariners",
+    "sub": "RL +1.5 vs Tampa Bay Rays",
+    "prob": 65.4,
+    "implied": 65.8
+   },
+   {
+    "lkey": "rl_away",
+    "label": "Houston Astros",
+    "sub": "RL +1.5 vs San Diego Padres",
+    "prob": 65.3,
+    "implied": 64.9
+   }
+  ]
+ }
+}
