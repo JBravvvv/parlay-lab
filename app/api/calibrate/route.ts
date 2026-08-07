@@ -18,7 +18,7 @@ import { redis, redisGetJson, redisSetJson, storeEnv, syncAuthed } from "@/lib/s
 import { marketOf } from "@/lib/ledger-segments";
 import { reopenDays } from "@/lib/gate-rebuild";
 import { getLockEntry } from "@/lib/server/lock-card";
-import { buildProgress, labelPopulation, makeSelectedMatcher, PROGRESS_KEY } from "@/lib/server/grading-progress";
+import { buildCohortRecord, buildProgress, cohortDay, labelPopulation, makeSelectedMatcher, PROGRESS_KEY, type CohortDay } from "@/lib/server/grading-progress";
 
 /* the slice of a synced ledger day the training loop reads */
 type LedgerDay = {
@@ -293,6 +293,7 @@ export async function GET(req: NextRequest) {
        declared, not remembered. */
     const graded: GradedPick[] = [];
     const gradedAll: GradedPick[] = [];
+    const cohortDays: CohortDay[] = [];
     const perDay: { date: string; byMarket: Record<string, number>; n: number }[] = [];
     const strandedDates: { date: string; rows: number; inWindow: boolean }[] = [];
     const inWindow = new Set(allDays.slice(-SUMMARY_DAYS));
@@ -315,6 +316,9 @@ export async function GET(req: NextRequest) {
       }
       const dayRows = gradedFromBlob(blob);
       gradedAll.push(...dayRows);
+      /* the picks cohort (2026-08-07): per date per market, the top-N record — stamped
+         rows where mrank exists, labeled reconstruction where it predates the stamp */
+      cohortDays.push(cohortDay(blob as never, date));
       /* per-DATE counts, kept so the reopening projection below is measured from actual
          accrual rather than assumed. Built here because this is the only loop that reads
          every day blob. */
@@ -382,6 +386,10 @@ export async function GET(req: NextRequest) {
        rate. Served beside the card by /api/board (`learning`). Vacuity and the contradiction
        flag are the artifact's own fields. */
     const progress = buildProgress(gradedAll as never, perDay, today, now, contradictions.length);
+    progress.cohorts = buildCohortRecord(cohortDays);
+    if (progress.cohorts.impossible.length) {
+      console.error(`[calibrate] ${progress.cohorts.flag}`);
+    }
     /* the stamp rule (tests/aggregate-stamps.test.ts): a persisted aggregate says WHEN and
        WHICH CODE — `at` is set by buildProgress, `rev` here, same as the summary's */
     progress.rev = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local";

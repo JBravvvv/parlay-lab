@@ -7149,6 +7149,29 @@ unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so 
 after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
 instruction.
 
+## SELF-ARMING: CROSSING 13 — DATED RECORD (2026-08-07)
+
+**One crossing, carried by the FIRST bot commit ever to land on `frontend-rebuild`** (the
+deploy branch — previous refreshes rode `line-history`/`main`): `bb50918`, engine-v2-bot,
+2026-08-07T01:35:27Z, `data/ump_k.json` one line. Rule 7 applied — the diff decides: data
+only, model files untouched. The push also triggered a Vercel deploy (the 08-07 learning
+artifact stamps `rev bb50918`), which is how the commit was first noticed from the
+artifact side before the fetch.
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 13 | Chris Segal | 2026-08-07 | `bb50918` | 5 / 77 | 15.4 |
+
+**THIRTEEN armed. Armed-set mean k/g at n = 13: 16.00** (Σk 1,072 / Σg 67) — still BELOW
+the league mean recorded at the n = 12 entry (16.37); the dissolved n = 6 direction stays
+dissolved.
+
+**DID IT REACH A BOARD? NO — over-determined again:** both brakes hold
+(`SH_CFG.umpKFrozen:true`; `context.json` frozen — the guard's double-brake test re-ran
+green this same gate), and the only board since the freeze (2026-08-06, the first live
+fire) was generated at 20:45:06Z, **five hours BEFORE the crossing landed**; no 08-07
+board existed when this record was written. `FLOOR` raised 12 → 13 in the same commit.
+
 ## SELF-ARMING: CROSSINGS 7 THROUGH 12 — DATED RECORD (2026-08-05)
 
 **Six crossings in one re-gate, spanning three unintegrated bot refreshes** — the same

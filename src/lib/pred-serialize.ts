@@ -1,4 +1,5 @@
 import type { BoardData, PickRow, Ticket } from "@/engine";
+import { tabPure } from "@/lib/tab-purity";
 
 /**
  * Calibration spec 3A — board → prediction records. Pure module (no browser,
@@ -48,6 +49,11 @@ export type PredRecord = {
      time by /api/calibrate; the HRR lesson — fits and reviews read labeled populations,
      never pooled silently. The fits themselves ignore it (additive; weights byte-identical). */
   pop?: "selected" | "unselected" | "shadow";
+  /* MARKET RANK (2026-08-07, picks ship): 1-based position among the market's PURE rows
+     in the engine's own category order, stamped at generation. Absent on impure rows and
+     on rows written before the ship; mergeDayBlob fills-on-absent so a pre-stamp writer's
+     restatement never strips it. */
+  mrank?: number;
   /* Phase 1 idempotency (2026-07-25). A second generation pass restates the same
      day: same leg, different probability, because 9am prices a projected lineup and
      1pm prices a confirmed one. The store measures the ENGINE, not the bets, so the
@@ -215,12 +221,22 @@ export function boardToPredictions(
   const seen = new Set<string>();
   for (const [market, rows] of Object.entries(d.categories ?? {})) {
     if (market === "all") continue; // TOP 50 duplicates the category rows
+    /* MARKET RANK, STAMPED AT GENERATION (2026-08-07, picks ship). The category arrays
+       are the engine's own ranking (the board tabs render them as-is; sort field r.prob,
+       engine L2575) — the rank is the row's position among the market's PURE rows, so
+       "the top 50 that day" becomes a stored, append-only fact instead of a re-sort of
+       anything later. Purity-aware by design: an impure row (the cross-market shape)
+       consumes NO rank, mirroring splitPure's exclusion on the page. */
+    let mrank = 0;
     for (const r of rows as PickRow[]) {
       if (r.live) continue; // calibration measures pregame statements only
       const k = `${r.gkey ?? "?"}|${r.lkey ?? "?"}|${r.sub}`;
       if (seen.has(k) || r.prob == null) continue;
       seen.add(k);
+      const pure = tabPure(market, (r.lkey as string) ?? null);
+      if (pure) mrank++;
       records.push({
+        ...(pure ? { mrank } : {}),
         k,
         label: r.label,
         sub: r.sub,
@@ -345,7 +361,13 @@ export function mergeDayBlob(
     const hist = prev
       ? [...(prev.hist ?? []), { p: prev.p, lu: prev.lu, src: prev.src, at: prev.at ?? 0 }].slice(-HIST_MAX)
       : null;
-    blob.records[r.k] = { ...r, res: prev?.res ?? "pending", at: now, ...(hist?.length ? { hist } : {}) };
+    /* mrank fill-on-absent (2026-08-07 review, high #2): a writer running pre-stamp code
+       (a stale client bundle) restating a stamped row must not STRIP its rank — that
+       would fire the cohort impossible-branch on a legitimate vintage skew. A restatement
+       that CARRIES a rank takes its own (the new generation's ordering); one that carries
+       none keeps the stamp. Same fill-only shape as ledger-merge's ACCRUAL_FIELDS. */
+    const mrank = r.mrank ?? prev?.mrank;
+    blob.records[r.k] = { ...r, ...(mrank != null ? { mrank } : {}), res: prev?.res ?? "pending", at: now, ...(hist?.length ? { hist } : {}) };
     written++;
   }
   for (const t of parlays) {
@@ -388,6 +410,11 @@ export type GradedFromBlob = {
   susp?: true;
   /** population label passthrough (2026-08-06) — the fits ignore it; progress splits by it */
   pop?: "selected" | "unselected" | "shadow";
+  /* MARKET RANK (2026-08-07, picks ship): 1-based position among the market's PURE rows
+     in the engine's own category order, stamped at generation — the day's top-50 cohort
+     as an append-only fact. Absent on impure rows and on rows written before this ship
+     (those dates reconstruct, labeled — see grading-progress cohortDay). */
+  mrank?: number;
 };
 
 export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {

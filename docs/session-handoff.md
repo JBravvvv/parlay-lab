@@ -3482,6 +3482,106 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.12 — THE PICKS PRODUCT SHIPS; CROSSING 13; THE BOT LANDS ON THE DEPLOY BRANCH (2026-08-07)
+
+**FIRST, THE TURN'S READS (all this turn):** 08-07 board `null`/gens `[]` at 22:08Z —
+**CORRECT**: a 15-game all-evening slate (first pitch 22:40Z), achievable 0.733 at the
+read, first both-hold poke projects **~22:45Z**. The 08-06 learning artifact is LIVE
+(`rev bb50918`, at 15:00:11Z — the daily cadence works): per-market n now hits 476 · TB
+504 · HR 445 · HRR 445 · outs 241 · K's 228 · **rl 157 CROSSED 150 · ml 148 (1 day out)**;
+labels accruing (TB shows 3 selected — the 08-06 card's graded legs); contradictions 0;
+**HR full-population hit 0.115 vs implied 0.206 — the widest gap on the board, now
+measurable nightly.** And `bb50918` resolved: **engine-v2-bot's first-ever push to
+`frontend-rebuild`** (data/ump_k.json, one line) — rule 7 applied, data-only diff; it
+deployed (hence the artifact's rev) and carried **CROSSING 13: Chris Segal, g 5 / k 77,
+k/g 15.4** — recorded in collection-period.md, FLOOR 12 → 13, armed mean at n=13 16.00,
+brakes green, no board since the crossing. *(Bot-on-deploy-branch is now a live pattern:
+every bot push redeploys production. Recorded as a fact, not yet a problem — the diff
+rule covers it.)*
+
+**THE PICKS PRODUCT (operator requirement: ship picks — visible daily top-50 overs per
+prop market, cohort-graded with a running record; NOT for the card):**
+
+- **THE SUBSTRATE CONFIRMED FROM DISK:** prediction records ARE the board tab rows —
+  `boardToPredictions` iterates `d.categories` per market in the ENGINE'S OWN RANKED
+  ORDER (the arrays the tabs render; sort r.prob, engine L2575), storing p/pMkt/edge/cz
+  immutably. **THE GAP NAMED: the rank was never stored** — "the top 50 that day" was not
+  a first-class cohort (cfSel's rank is counterfactual-pool scope, susp rows only — it
+  does not narrow item 2).
+- **`mrank` stamped at generation** (pred-serialize; purity-aware — an impure row consumes
+  NO rank, mirroring splitPure; absent on pre-ship rows). Append-only fact, never a
+  re-sort.
+- **`/api/picks` — public like `/api/board`, reads-only** (guard-scanned: no auth imports,
+  no writes, no allocator/engine imports): per prop market the top-50 overs — rank,
+  player, line, price (cz/odds/book), model prob, implied, edge, susp flag — plus the
+  cohort record. The Board page tabs Josh already uses gained the PICKS RECORD line
+  (W–L · hit% vs implied% · source split), read from the same route.
+- **COHORT GRADING rides the existing 02:00Z/15:00Z passes**: `cohortDay` +
+  `buildCohortRecord` attach `cohorts` to `pl:grade:progress` — per market running
+  W–L, hit rate, pooled implied, per-day tail, **source split enforced:
+  STAMPED-AT-LOCK vs RECONSTRUCTED-FROM-STORED-BOARD, never pooled silently.**
+- **BACKFILL VERDICT: JOSH STARTS WITH HISTORY, RECONSTRUCTED AND LABELED.** Every
+  pre-ship date (07-25..07-30 and 08-06 — its rows predate the stamp too) reconstructs as
+  a sort of stored IMMUTABLE p over non-superseded rows — a re-sort of append-only values,
+  not of mutable data; the stated approximation: supersession collapses to the surviving
+  statement. **STAMPED-AT-LOCK begins with the first board generated after this deploy**
+  (tonight's ~22:45Z fire if the deploy wins the race; else 08-08). The record itself
+  first materializes at **tonight's 02:00Z grade pass** (cohorts attach there).
+- **SEPARATION, CITED:** the card path is `lock-card.ts` L101–107 (`shCardPool`/
+  `shAllocate` — untouched); the fits read `graded`/`gradedAll` (calibrate route, the
+  training channel — cohorts ride the progress KV only); grade-only mode still writes
+  neither `pl:cal:summary` nor `pl:cal:weights` (the §12Z.11 write-layer gate, guard-
+  pinned). `/api/picks` writes nothing (guard-scanned).
+- **IMPOSSIBLE BRANCH, armed:** a settled row without a stored rank inside a stamped-era
+  date/market → printed into `cohorts.impossible` with a 🔴 flag, excluded rather than
+  guessed, never silent.
+- **PRE-COMMITTED — the first graded cohort (tonight 02:00Z):** per-market n and
+  hit-vs-implied print; **the cohort-vs-full-population comparison is the first direct
+  read on whether the model's ORDERING carries signal** — e.g. HR full-population reads
+  0.115 vs 0.206 implied; a top-50 cohort materially above its own full-population rate
+  = ordering signal; equal = ranking is noise past the market's own sort. Loud either
+  direction. Vacuity: a cohort over zero settled rows declares itself.
+
+**THE ADVERSARIAL REVIEW, RUN BEFORE THE PUSH (10 agents: 3 lenses → per-finding
+refuters; 4 refuted, 3 confirmed — every confirmed finding fixed in the same ship and
+pinned by a guard test):**
+1. **Impossible-branch over-fire (confirmed):** impure rows and the deploy-transition
+   date's mixed vintages are rankless BY DESIGN and would have baked a permanent false
+   🔴 into the public record. Fixed: `tabPure` re-check (`impure` counted) +
+   `STAMP_SHIP_DATE` scoping (`preStamp` counted); the red flag now fires only for a
+   PURE rankless settled row on a POST-ship date — the true two-writers shape.
+2. **Reconstruction membership (confirmed):** the top-N sort ran over SETTLED rows only,
+   silently promoting rank-51+ rows when higher picks went void/pending. Fixed:
+   membership is decided over the day's FULL stored population, then only its settled
+   members grade (guard: the 49-of-51 membership test).
+3. **Multi-generation rank pooling (confirmed — ACCEPTED AS DOCTRINE, named not hidden):**
+   the graded cohort is the UNION of top-N statements across a day's passes — frozen
+   rows, stale (line-moved) rows, duplicate rank values included; every member was a
+   published pick when stated; per-day `n` prints the union's size. `/api/picks`'s note
+   states that its list is the latest pass while the record grades the union.
+   Plus from the same review: `mergeDayBlob` now fills `mrank` on-absent (a stale client
+   bundle's restatement can no longer strip a stamp), and the `pMkt: 0` null-sentinel no
+   longer poisons implied means (0 is never a real implied).
+
+**THE HRR/ALT-LINES CEILING — DECISION PAGE FOR JOSH, RECORDED NOT ACTIONED:**
+
+| market | board depth (15-game fixture) | "top-50" is structurally |
+|---|---|---|
+| batter_hits | 50 (capped) | top-50 ✓ |
+| batter_home_runs | 50 (capped) | top-50 ✓ |
+| batter_total_bases | 37 | top-37 |
+| **batter_hits_runs_rbis** | **14** | **top-14** |
+| **pitcher_strikeouts** | **11** | **top-11** |
+| **pitcher_outs** | **7** | **top-7** |
+
+**THE NAMED UNLOCK: alternate-line ingestion.** The gate is the ingestion allowlist
+(`src/lib/server/odds-shape.ts` `shapeAllowed` — six prop keys × us) plus the engine's
+ladder handling (M13 recorded the archive sweep alt-keys blind; `hrrAltMax` already
+suspends HRR alternates above the line). **COST (§12X model: billing = markets × regions
+actually returned per request):** each alternate market family added is ~+1 credit per
+event fetched per family — all-six alt families ≈ doubles the ~6/event collection cost;
+engine work is the ladder pricing scope. **No ship without Josh's word.**
+
 ### 12Z.11 — 🏁 THE FIRST SELF-GENERATED, SELF-LOCKED, SELF-READ CARD; AND DAILY GRADING SHIPS (2026-08-06)
 
 **THE MILESTONE, READ FROM THE ARTIFACT AT 22:05Z:** `/api/board?date=2026-08-06` served

@@ -83,6 +83,27 @@ export default function BoardPage() {
   const offBook = rows.length - playable.length;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
 
+  /* PICKS RECORD (2026-08-07): the graded top-50 cohort's running record per prop market,
+     from /api/picks (public; reads pl:grade:progress.cohorts — written by the daily grade
+     passes). Read-only decoration on the tabs Josh already uses; fetch failure = no line. */
+  const [cohorts, setCohorts] = useState<Record<
+    string,
+    { days: number; n: number; w: number; l: number; hitRate: number | null; impliedMean: number | null; bySource: { stamped: number; reconstructed: number } }
+  > | null>(null);
+  useEffect(() => {
+    let dead = false;
+    fetch("/api/picks")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!dead && j?.record?.markets) setCohorts(j.record.markets);
+      })
+      .catch(() => {});
+    return () => {
+      void (dead = true);
+    };
+  }, []);
+  const catRecord = cohorts?.[cat] ?? null;
+
   // live "now" stats for in-progress games — one shared poll for the whole page
   // (board rows, parlay legs); only live games fetch boxscores
   const liveReqs = useMemo(
@@ -312,6 +333,24 @@ export default function BoardPage() {
           </FilterPill>
         )}
       </div>
+
+      {catRecord && catRecord.n > 0 && (
+        <div className="mb-3 rounded-(--radius-panel) border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[11.5px] text-muted">
+          <span className="font-semibold text-fg">PICKS RECORD</span>{" "}
+          <span className="num">
+            {catRecord.w}–{catRecord.l}
+          </span>{" "}
+          over {catRecord.days} day{catRecord.days === 1 ? "" : "s"} · hit{" "}
+          <span className="num">{catRecord.hitRate == null ? "—" : `${(catRecord.hitRate * 100).toFixed(1)}%`}</span> vs implied{" "}
+          <span className="num">{catRecord.impliedMean == null ? "—" : `${(catRecord.impliedMean * 100).toFixed(1)}%`}</span>
+          {catRecord.bySource.reconstructed > 0 && (
+            <span className="opacity-70">
+              {" "}
+              · {catRecord.bySource.stamped} stamped-at-lock / {catRecord.bySource.reconstructed} reconstructed-from-stored-board
+            </span>
+          )}
+        </div>
+      )}
 
       {crossMarket > 0 && (
         <div className="mb-3 rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-3 py-2 text-[11.5px] text-gold">

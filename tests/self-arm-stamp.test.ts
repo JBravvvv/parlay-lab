@@ -172,10 +172,22 @@ const CROSSINGS = [
       "because no session ran — the crossings were recorded the moment a gate saw them, which " +
       "is the instrument working at ITS cadence, not the data's.",
   },
+  {
+    ump: "Chris Segal",
+    date: "2026-08-07",
+    commit: "bb50918",
+    kPerG: 15.4,
+    braked: true,
+    note: "THIRTEENTH. g 4->5, k at arming 77. Carried by the FIRST bot commit ever to land " +
+      "on frontend-rebuild (the deploy branch) — rule 7 applied, the diff decides: data only. " +
+      "Noticed from the deployed learning artifact's rev stamp before the fetch. Armed mean " +
+      "k/g at n=13: 16.00 — the dissolved n=6 direction stays dissolved. No board since the " +
+      "crossing; both brakes green. Record: docs/collection-period.md CROSSING 13.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 12;
+const FLOOR = 13;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
