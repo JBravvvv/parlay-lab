@@ -436,7 +436,10 @@ export default function BoardPage() {
                     <tr key={`${p.rank}|${p.player}|${p.line}`} className="border-t border-white/[0.04]">
                       <td className="num py-1.5 pr-2 text-faint">{p.rank}</td>
                       <td className="py-1.5 pr-2 text-text">
-                        {p.player} <span className="text-muted">{p.side === "o" ? "over" : p.side === "u" ? "under" : p.side} {p.line ?? ""}</span>
+                        {p.player}{" "}
+                        <span className="text-muted">
+                          {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
+                        </span>
                         {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — never on a ticket</span>}
                       </td>
                       <td className="num py-1.5 pr-2 text-muted">
