@@ -30,6 +30,9 @@ import { prevPtDates, ptToday } from "@/lib/server/pt-date";
 
 export const dynamic = "force-dynamic";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** MIRROR of the prediction-store day key used by /api/generate and /api/calibrate —
+    read-only here: grades ride back onto the served picks (status ✓/✗ on the page). */
+const PRED_DAY_KEY = (d: string) => `pl:pred:${d}`;
 
 type Row = {
   label?: string;
@@ -97,6 +100,21 @@ export async function GET(req: NextRequest) {
         : `showing ${servedDate}'s board — ${date} has no board yet (today's fires when enough lineups post)`;
 
     const cats = (dataObj.categories ?? {}) as Record<string, Row[]>;
+    /* grade + schedule joins (2026-08-08): res from the prediction store's day blob
+       (k = gkey|lkey|sub — the store's own key), start from the board's gameInfo. Both
+       best-effort reads; a missing blob just leaves statuses clock-derived. */
+    let resOf = (gkey: string | null | undefined, lkey: string | null | undefined, sub: string | null | undefined): string | null => {
+      void gkey; void lkey; void sub;
+      return null;
+    };
+    try {
+      const blob = await redisGetJson<{ records?: Record<string, { res?: string }> }>(PRED_DAY_KEY(servedDate));
+      const recs = blob?.records ?? {};
+      resOf = (gkey, lkey, sub) => recs[`${gkey ?? "?"}|${lkey ?? "?"}|${sub ?? "?"}`]?.res ?? null;
+    } catch {
+      /* statuses stay clock-derived */
+    }
+    const gi = (dataObj.gameInfo ?? {}) as Record<string, { start?: string | null }>;
     const picks: Record<string, unknown[]> = {};
     const ns: Record<string, number> = {};
     for (const m of PROP_MARKETS) {
@@ -118,6 +136,9 @@ export async function GET(req: NextRequest) {
         cz: r.cz ?? null,
         odds: r.odds ?? null,
         book: r.book ?? null,
+        gkey: r.gkey ?? null,
+        start: (r.gkey && gi[r.gkey]?.start) || null,
+        res: resOf(r.gkey, r.lkey, r.sub),
         ...(r.susp ? { susp: true, note: "suspended market — shadow cohort, never on a ticket" } : {}),
       }));
     }

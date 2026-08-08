@@ -3482,6 +3482,65 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.14 — THE PAGE WAS A LIVE VIEW MASQUERADING AS THE PICKS; THE TABS NOW RENDER THE DAY (2026-08-08T03:1xZ)
+
+**OPERATOR SCREENSHOT 8:12 PM PT: every prop tab 0, ML 8 / RL 8 live, "16 picks". THE
+DISCRIMINATING FETCH SIX MINUTES LATER (03:18:52Z), all four columns:**
+
+| market | stored categories | categoriesLive | /api/picks | page |
+|---|---|---|---|---|
+| batter_hits | 50 | 17 | 44 | **0** |
+| batter_total_bases | 50 | 21 | 48 | **0** |
+| batter_home_runs | 50 | 15 | 47 | **0** |
+| batter_hits_runs_rbis | 50 | 15 | 45 | **0** |
+| pitcher_strikeouts | 32 | 1 | 31 | **0** |
+| pitcher_outs | 44 | 1 | 43 | **0** |
+| ml / rl | 30 / 30 | 2 / 2 | — | 8 / 8 |
+
+**THE TRACED MECHANISM (component and line):** the prop tabs read `cats[cat]` from
+whatever board object `useBoard()` held (`app/board/page.tsx` — `d = board?.data`, rows
+from `splitPure(cat, cats[cat])`; header count summed the same object). `bestBoard`
+(`src/lib/engine-client.ts` L262-298) scores candidates by **STILL-BETTABLE games at
+NOW** — which zeroes every afternoon board by evening and prefers a fresh in-game
+view/generation whose pregame prop pool is legitimately EMPTY. His "16 picks" = ml 8 +
+rl 8 on that object. **The page was correct as a live view and wrong as the product.
+Three sightings, three timestamps, one mechanism: morning = no board yet; evening =
+empty pregame pool on the held object. The stored, stamped board carried full N through
+all of it.**
+
+**THE TAB-CONTAMINATION VERDICT (open since 08-05) — CLOSED-AS-SUPERSEDED:** the
+RL-under-Hits sighting never reproduced on any stored artifact (live keys read zero
+tabPure failures twice, §12Z.13), and the sighting's page-state family is now identified
+as the live-view mechanism above. The surface that produced it no longer exists: **prop
+tabs now render the day's stamped picks from `/api/picks`** (stored board + TTL walk-back
++ `staleNote`; per-row status from `pickStatus` — res dominates, then the clock: upcoming
+/ in-progress / ✓ won / ✗ lost / void; day W–L beside the running record). The LIVE pill
+keeps the live pool — nothing lost, it just stops masquerading. **TOP 50 DECISION,
+STATED: TOP 50 / ML / RL stay the actionable live-board view; the header now names the
+split** ("N live board rows · prop tabs show the day's stamped picks"). `/api/picks`
+joins `res` (prediction-store day blob, read-only) + `start` (gameInfo) onto every pick.
+Guards red-first: `tests/picks-surface.test.ts` (res-dominates taxonomy, wiring scans);
+the never-empty walk-back and captured-production-row vocabulary guards stand from
+§12Z.13.
+
+**🏁 THE FIRST COHORT RECORD IS LIVE (the 02:00Z pass ran; read 03:18Z):** 10 days
+backfilled, `impure 0 · preStamp 0 · impossible 0`, and the 08-07 fire's rows returned
+**stamped** (the deploy won the race). Per market (W–L · hit vs implied):
+**Hits 275–129 · .681 vs .663 · TB 238–171 · .582 vs .619 · HRR 210–155 · .575 vs .578 ·
+K's 112–118 · .487 vs .490 · Outs 115–128 · .473 vs .491 · HR 45–361 · .111 vs .209** —
+HR is −9.8 points against implied, the widest verified gap in the product; Sunday's fit
+sees it with n=406. **The pre-committed ordering read carries its own caveat: the cohort
+≈ the full population (boards cap ≤50/market), so cohort-vs-population divergence is
+near-null by construction on current board sizes — the ordering signal read needs
+markets where board depth exceeds 50, i.e. the alt-lines unlock.**
+
+**ITEM-3 RECONCILIATION, ONE DATED LINE:** the header's sim claim is ACCURATE per disk —
+`SIM_PATHS = 50000` (`src/lib/engine-client.ts` L126, user rule 2026-07-20), same-game
+parlays priced from joint sim paths since `634e24b` (2026-07-19, "Upgrade 02"); the
+"naive product" residue is the STATED cross-game independence (§ the simJoint records)
+and M16's unpriced cross-ticket dependence. **No M-item superseded, no copy overclaim —
+the brief's premise restates against the disk, §12Y.1 class.**
+
 ### 12Z.13 — THE LIVE READ THAT ENDED THREE FIXTURE ANSWERS; THE MORNING DARK WINDOW NAMED (2026-08-07, evening)
 
 **THE OPERATOR'S THIRD REPORT OF THE SAME SURFACE ("still not populating any prop bets")

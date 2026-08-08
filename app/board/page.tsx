@@ -20,6 +20,7 @@ import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
 import { getMoney, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
+import { pickStatus, STATUS_LABEL } from "@/lib/picks-status";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
@@ -83,26 +84,51 @@ export default function BoardPage() {
   const offBook = rows.length - playable.length;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
 
-  /* PICKS RECORD (2026-08-07): the graded top-50 cohort's running record per prop market,
-     from /api/picks (public; reads pl:grade:progress.cohorts — written by the daily grade
-     passes). Read-only decoration on the tabs Josh already uses; fetch failure = no line. */
-  const [cohorts, setCohorts] = useState<Record<
-    string,
-    { days: number; n: number; w: number; l: number; hitRate: number | null; impliedMean: number | null; bySource: { stamped: number; reconstructed: number } }
-  > | null>(null);
+  /* THE PICKS PRODUCT ON THE TABS (2026-08-08, operator's screenshot: every prop tab 0 at
+     8:12 PM while the stored board carried full N — §12Z.14). The prop tabs were reading
+     whatever board object bestBoard held (by evening: a live view with an empty pregame
+     pool). They now render THE DAY'S STAMPED PICKS from /api/picks — the stored board,
+     with the TTL walk-back and staleNote — so a prop tab is never empty by clock again.
+     The LIVE pill still shows the live pool; TOP 50/ML/RL stay the actionable board view. */
+  type ApiPick = {
+    rank: number; player: string | null; side: string | null; line: number | null;
+    prob: number | null; implied: number | null; edge: number | null;
+    cz: number | null; odds: string | number | null; book: string | null;
+    gkey: string | null; start: string | null; res: string | null; susp?: boolean;
+  };
+  type PicksPayload = {
+    date?: string; servedDate?: string | null; staleNote?: string | null;
+    picks?: Record<string, ApiPick[]> | null; ns?: Record<string, number>;
+    record?: { markets?: Record<string, CohortMkt>; flag?: string | null } | null;
+  };
+  type CohortMkt = {
+    days: number; n: number; w: number; l: number; hitRate: number | null; impliedMean: number | null;
+    bySource: { stamped: number; reconstructed: number };
+    perDay?: { date: string; n: number; w: number; l: number }[];
+  };
+  const [picksData, setPicksData] = useState<PicksPayload | null>(null);
   useEffect(() => {
     let dead = false;
     fetch("/api/picks")
       .then((r) => r.json())
       .then((j) => {
-        if (!dead && j?.record?.markets) setCohorts(j.record.markets);
+        if (!dead && j) setPicksData(j as PicksPayload);
       })
       .catch(() => {});
     return () => {
       void (dead = true);
     };
   }, []);
+  const cohorts = picksData?.record?.markets ?? null;
   const catRecord = cohorts?.[cat] ?? null;
+  const catDay = catRecord?.perDay?.length
+    ? catRecord.perDay.find((d0) => d0.date === picksData?.servedDate) ?? null
+    : null;
+  const PROP_TABS = useMemo(
+    () => new Set(["batter_hits", "batter_total_bases", "batter_home_runs", "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"]),
+    [],
+  );
+  const propRows = !live && PROP_TABS.has(cat) ? picksData?.picks?.[cat] ?? null : null;
 
   // live "now" stats for in-progress games — one shared poll for the whole page
   // (board rows, parlay legs); only live games fetch boxscores
@@ -275,7 +301,7 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
                 : "Consensus de-vigged probability vs the Caesars line"
@@ -343,12 +369,23 @@ export default function BoardPage() {
           over {catRecord.days} day{catRecord.days === 1 ? "" : "s"} · hit{" "}
           <span className="num">{catRecord.hitRate == null ? "—" : `${(catRecord.hitRate * 100).toFixed(1)}%`}</span> vs implied{" "}
           <span className="num">{catRecord.impliedMean == null ? "—" : `${(catRecord.impliedMean * 100).toFixed(1)}%`}</span>
+          {catDay && (
+            <span>
+              {" "}· today <span className="num">{catDay.w}–{catDay.l}</span>
+            </span>
+          )}
           {catRecord.bySource.reconstructed > 0 && (
             <span className="opacity-70">
               {" "}
               · {catRecord.bySource.stamped} stamped-at-lock / {catRecord.bySource.reconstructed} reconstructed-from-stored-board
             </span>
           )}
+        </div>
+      )}
+
+      {propRows && picksData?.staleNote && (
+        <div className="mb-3 rounded-(--radius-panel) border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[11.5px] text-muted">
+          {picksData.staleNote}
         </div>
       )}
 
@@ -375,6 +412,50 @@ export default function BoardPage() {
           body="The odds feed or MLB stats API didn't answer. Nothing is fabricated on failure."
           onRetry={() => refetch()}
         />
+      ) : propRows && propRows.length > 0 ? (
+        /* THE DAY'S PICKS (2026-08-08): stamped top-N from the stored board — the same
+           cohort /api/picks serves and the grading records. Never empty by clock. */
+        <Panel>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px]">
+              <thead>
+                <tr className="text-left text-[10.5px] uppercase tracking-wide text-faint">
+                  <th className="py-1.5 pr-2">#</th>
+                  <th className="py-1.5 pr-2">Pick</th>
+                  <th className="py-1.5 pr-2">Lock price</th>
+                  <th className="py-1.5 pr-2 text-right">Model</th>
+                  <th className="py-1.5 pr-2 text-right">Implied</th>
+                  <th className="py-1.5 pr-2 text-right">Edge</th>
+                  <th className="py-1.5">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {propRows.map((p) => {
+                  const st = pickStatus(p.start, p.res, Date.now());
+                  return (
+                    <tr key={`${p.rank}|${p.player}|${p.line}`} className="border-t border-white/[0.04]">
+                      <td className="num py-1.5 pr-2 text-faint">{p.rank}</td>
+                      <td className="py-1.5 pr-2 text-text">
+                        {p.player} <span className="text-muted">{p.side === "o" ? "over" : p.side === "u" ? "under" : p.side} {p.line ?? ""}</span>
+                        {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — never on a ticket</span>}
+                      </td>
+                      <td className="num py-1.5 pr-2 text-muted">
+                        {p.odds ?? "—"}
+                        {p.book ? <span className="ml-1 text-[10px] text-faint">{p.book}</span> : null}
+                      </td>
+                      <td className="num py-1.5 pr-2 text-right">{p.prob == null ? "—" : `${Number(p.prob).toFixed(1)}%`}</td>
+                      <td className="num py-1.5 pr-2 text-right text-muted">{p.implied == null ? "—" : `${Number(p.implied).toFixed(1)}%`}</td>
+                      <td className="num py-1.5 pr-2 text-right">{p.edge == null ? "—" : `${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)}`}</td>
+                      <td className="py-1.5 text-[11px]">
+                        <span className={st === "won" ? "text-live" : st === "lost" ? "text-red-400" : "text-muted"}>{STATUS_LABEL[st]}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       ) : rows.length === 0 ? (
         <Panel>
           <EmptyState
