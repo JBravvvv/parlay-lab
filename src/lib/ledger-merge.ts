@@ -52,6 +52,11 @@ export type SyncEntry = {
     legs?: Record<string, unknown>;
   } | null;
   clv?: Record<string, { am: number; at: number }>;
+  /** PER-BLOCK LOCKING (2026-08-08): each block fire records its scope here — budget
+      (pro-rata share of `daily`), tickets appended, the block's game keys (the
+      TWO-CARDS-ONE-GAME check reads these), and when it fired. Additive; days locked
+      before this ship simply have no blocks map. */
+  blocks?: Record<string, { budget: number; tickets: number; gkeys?: string[]; firedAt?: number }>;
   [k: string]: unknown;
 };
 

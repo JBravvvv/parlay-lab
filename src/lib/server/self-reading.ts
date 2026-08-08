@@ -54,6 +54,7 @@ export type Reading = {
     blockedReasons: Record<string, number>;
     refusals: { lockMaxAgeMin: string; exposureCap: string };
     note: string | null;
+    blocks?: Record<string, { budget: number; tickets: number; gkeys?: string[]; firedAt?: number }> | null;
     violations: string[];
   };
   slate: Gen["slate"] | null;
@@ -134,6 +135,8 @@ export function buildReading(args: { entry: SyncEntry; gen: Gen | null; date: st
       exposureCap: `daily ceiling $${entry.daily ?? "?"} (dailyBankrollCap x bankroll, server-side)`,
     },
     note: (entry.note as string) ?? null,
+    /* per-block locking (2026-08-08): the combined reading names each block's card */
+    blocks: (entry.blocks as Reading["reading31"]["blocks"]) ?? null,
     violations,
   };
   if (entry.locked !== true) violations.push("entry.locked is not true — a reading over an unlocked entry");

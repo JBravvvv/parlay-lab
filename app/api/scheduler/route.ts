@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createEngine } from "@/engine";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
-import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
+import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
+import { BLOCKS_KEY, decideBlock, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { decideGradePass } from "@/lib/server/grading-progress";
@@ -54,8 +55,31 @@ export async function GET(req: NextRequest) {
   const board = decodeBoard((await redis(["GET", BOARD_KEY(date)])) as string | null);
   const d = decide({ starts, now, boardExists: board != null });
 
-  // BOTH conditions in every response, fired or not — the standing rule.
-  const body = { date, at: new Date(now).toISOString(), T: SCHED_T, minReady: MIN_READY, ...d };
+  /* PER-BLOCK LOCKING (2026-08-08, operator requirement — §12Z.15). The day partitions
+     into start-blocks (derived 90-min gap); each block gets its own two-condition window,
+     its own fire, its own card. The registry (pl:blocks:{date}) is the good-BLOCK-skip:
+     one fire per block, ever. A block whose games all started without a fire gets its
+     ORPHAN REASON written once — no silent blocks. The day-level decide() above still
+     runs for the lock self-check and body back-compat; it no longer gates the fire. */
+  const blocksArr = partitionBlocks(starts);
+  const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
+  let regDirty = false;
+  const blockViews = blocksArr.map((b) => {
+    const dec = decideBlock({ block: b, now });
+    const locked = !!reg[b.key]?.firedAt;
+    const orphaned = !!reg[b.key]?.reason;
+    if (!locked && !orphaned && dec.reason.startsWith("dead-block")) {
+      reg[b.key] = { reason: `orphaned — window passed unfired; last conditions: ready ${dec.ready}/${dec.unstarted} of size ${dec.size}`, at: now };
+      regDirty = true;
+      console.warn(`[scheduler] ORPHANED BLOCK ${date} ${b.key}: window passed unfired`);
+    }
+    return { ...dec, locked, orphaned: orphaned || (!locked && dec.reason.startsWith("dead-block")), fire: dec.fire && !locked };
+  });
+  if (regDirty) await redisSetJson(BLOCKS_KEY(date), reg);
+  const target = blockViews.find((v) => v.fire) ?? null;
+
+  // BOTH conditions in every response, fired or not, PER BLOCK — the standing rule.
+  const body = { date, at: new Date(now).toISOString(), T: SCHED_T, minReady: MIN_READY, blocks: blockViews, ...d };
 
   /* THE SELF-CHECK (2026-08-05): every poke verifies the date carries a locked card. A board
      without a lock is backfilled FROM THE STORED BOARD (the exact 08-02..08-05 gap: boards
@@ -100,7 +124,7 @@ export async function GET(req: NextRequest) {
     console.warn(`[scheduler] self-check failed: ${(e as Error).message}`);
   }
 
-  if (!d.fire) {
+  if (!target) {
     /* DAILY GRADING TICKS (2026-08-06): on the first tick of hours 15 and 2 UTC, forward
        to /api/calibrate?grade=only — grades every board row + labels populations + writes
        the learning progress artifact, and touches NOTHING the engine reads (the mode's own
@@ -127,10 +151,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ fired: false, grading, lock, ...body });
   }
 
-  /* Forward to the one spending route, same header contract as cron-job.org entries 1-3.
-     Its own limiter, conditional skip and run cap still apply — a race between two pokes is
-     settled there, not here. */
-  const gen = await fetch(new URL("/api/generate", req.nextUrl.origin), {
+  /* Forward to the one spending route with the TARGET BLOCK, same header contract.
+     Its own limiter, good-BLOCK-skip and run cap still apply — a race between two pokes
+     is settled there, not here. One fire per poke; the next poke serves the next block. */
+  const gen = await fetch(new URL(`/api/generate?block=${encodeURIComponent(target.key)}`, req.nextUrl.origin), {
     headers: { "x-cron-key": process.env.CRON_SECRET },
     cache: "no-store",
   });
@@ -140,5 +164,5 @@ export async function GET(req: NextRequest) {
   } catch {
     genBody = { error: "generate returned non-JSON" };
   }
-  return NextResponse.json({ fired: true, generateStatus: gen.status, generate: genBody, lock, ...body });
+  return NextResponse.json({ fired: true, block: target.key, generateStatus: gen.status, generate: genBody, lock, ...body });
 }

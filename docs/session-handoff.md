@@ -13,8 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-06:** `origin/frontend-rebuild` = `ebd219c40dc1fe84107dac72510cef5836d4b7a9`
-> - **STATE-CLAIM 2026-08-06:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+> - **STATE-CLAIM 2026-08-08:** `origin/frontend-rebuild` = `c075d55b58c97c226cef9130186d601f22e97f7c`
+> - **STATE-CLAIM 2026-08-08:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
 > shipped. The guard is doing the maintenance its header promised.)*
@@ -3481,6 +3481,71 @@ available as a first move.**
 > **A + B ship together in one commit; C stays staged.** **NOT SHIPPED — held for the owner's word
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
+
+### 12Z.15 — PER-BLOCK LOCKING SHIPS; THE THRESHOLD IS DERIVED AND 120 WOULD HAVE ORPHANED THE MOTIVATING CASE (2026-08-08T04:0xZ)
+
+**THE MEASUREMENT FIRST (139 dates / 1,819 games, season to date):** successive-start gap
+histogram valley at 60–89 min (counts 291 @30–59 · 99 @60–89 · 60 @90–119 · 38 @120–149);
+getaway-day separations measure **110–115 min**. **At the brief's ~2h threshold, 08-06's
+morning trio does NOT partition into its own block (gaps 110/115) — the motivating case
+would have been orphaned by the fix built for it. Derived: BLOCK_GAP = 90 min** (above the
+wave structure, below every real separation, below the 3h lineup lead). At 90 min:
+**blocks/day {1: 22, 2: 55, 3: 50, 4: 12} — 117/139 (84%) multi-block; Sat 20/20, Sun
+20/20, Thu 19/20, Wed 18/19; season max 4 blocks/day → MAX_RUNS_PER_DATE raised 3 → 4 =
+blocks-observed, with partitions beyond 4 coalescing at the smallest gap.** Block sizes:
+79 singleton blocks (the night-game shape), bulk at 7–12. Median inter-block gap 2.42h,
+min 1.5h (> the 45-min generate limiter — sequential fires never collide).
+**ORPHANS SINCE LIVE (the motivating annotation): 08-06 = 6 of 11, 08-07 = 3 of 15 —
+nine games in the system's first two days.** 08-06 partitions `[5,1,4,1]`; 08-07 `[15]`
+(one-shot was CORRECT there — per-block must not fragment it, and does not).
+
+**THE SHIP (guards red-first, PRODUCTION-DERIVED plants — the real 08-06/08-07 slates,
+`tests/block-locking.test.ts`):**
+- `src/lib/server/blocks.ts`: `partitionBlocks` (deterministic, coalesces to MAX_BLOCKS),
+  `blockMinReady = ceil(size/2) capped at 4, floored at 1` (a 3-game block needs 2; the
+  Sunday night game needs itself; nothing ever needs more than the global rule),
+  `decideBlock` (the two conditions PER BLOCK; dead-block = the orphan shape),
+  `splitBudget` (**the budget rule: pro-rata by block size over the day ceiling, floors,
+  remainder to the largest block, Σ ≤ daily exactly — what exists is a single-shot
+  allocator per run with NO cross-run draw-down (`lock-card.ts` `shAllocate`), so
+  pro-rata is the default the operator named**). $75 over Sunday's [11,3,1] → **$55/$15/$5**.
+- Scheduler: every poke evaluates EVERY block (all conditions in the body, per block);
+  the registry `pl:blocks:{date}` is the one-fire-per-block record; **orphan blocks get
+  their reason written once — no-silent-days extends to no-silent-BLOCKS**; the fire
+  forwards `?block=<key>`; the day-level good-board skip no longer gates a second
+  block's fire (that WAS the one-shot defect); one fire per poke.
+- Generate: `?block=` → good-BLOCK-skip; the card draws only from tickets whose EVERY
+  leg is a block game (a leg without a gkey stays out, conservative); sized to the
+  block's `splitBudget` share; **the date's ledger entry APPENDS across fires** (carry;
+  ticket dedupe by id; `blocks` map with budget/tickets/gkeys/firedAt; day `daily` stays
+  the ceiling). The local `slateStarts` copy is deleted — scheduler and generate now
+  partition the SAME filtered population or block keys would diverge.
+- **IMPOSSIBLE BRANCH, armed where it can fire:** a new block's games intersecting an
+  already-locked block's games → `buildLockEntry` THROWS "TWO CARDS ONE GAME" (plant
+  observed red). Props cohorts: mrank stamps at every generation; the FIRST block's lock
+  is the day's earliest pregame snapshot and the union-of-statements doctrine (§12Z.12)
+  covers the rest. The combined reading names each block's card (`reading31.blocks`).
+
+**THE KNOBS TABLE (item 3 — per-block, computed on the real slates; Josh's sentence
+picks a row):**
+
+| row | 08-07 (single block, 15 gm) | Sunday 08-09 (blocks 11+3+1) | lineup-lead risk bought |
+|---|---|---|---|
+| **current** T=0.80 / ceil(n/2)∧4 | 12/15 covered · fire 22:45Z · 1 outside lead | **15/15 · fires 15:15Z, 17:15Z, 21:30Z · 1 outside lead** | none — the status quo |
+| moderate T=0.60 / ∧3 | 15/15 · fire 21:15Z | 15/15 · same fires · 1 outside | 4 of 15 priced before lineups on single-block days |
+| loose T=0.45 / ∧2 | 15/15 · fire 20:45Z | 15/15 · block A fires 14:45Z | 7 of 15 (single-block) / 5 of 11 (Sunday A) priced blind |
+
+**THE TABLE'S OWN VERDICT: per-block firing at CURRENT knobs already solves the
+multi-block days (Sunday 15/15, 1 outside lead) — the knobs now only trade coverage
+against blind pricing on SINGLE-block days (08-07's shape: 12/15 vs 15/15 at 4-blind
+cost). No knob moves without Josh's word.**
+
+**PRE-COMMITTED FIRST-LIVE READING (next multi-block day = Sunday 2026-08-09):** blocks
+detected `[11 @16:15Z, 3 @20:05Z, 1 @00:20Z]` · each block's fire time vs its first
+pitch printed · a card (or named zero-ticket record) per block · budget split $55/$15/$5
+beside the allocator's sums · **zero orphans** · the registry and `reading31.blocks`
+agree. IMPOSSIBLE: two cards containing the same game → the THROW above; a locked block
+with no registry entry → print both, a third writer exists.
 
 ### 12Z.14 — THE PAGE WAS A LIVE VIEW MASQUERADING AS THE PICKS; THE TABS NOW RENDER THE DAY (2026-08-08T03:1xZ)
 

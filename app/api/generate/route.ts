@@ -8,8 +8,9 @@ import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuth
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
-import { slateScope } from "@/lib/server/slate";
-import { buildLockEntry, writeLock } from "@/lib/server/lock-card";
+import { slateScope, slateStarts } from "@/lib/server/slate";
+import { buildLockEntry, getLockEntry, writeLock } from "@/lib/server/lock-card";
+import { BLOCKS_KEY, partitionBlocks, splitBudget, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
 /**
@@ -40,7 +41,10 @@ const K_RUNS = "pl:gen:runs:";
     keeping a leak nearer the plan. NOTE: this bounds SERVER runs only — an in-app
     regenerate executes in the browser and never reaches this route, so the cap does
     not bound the spend most likely to run away. See docs/credit-budget.md. */
-const MAX_RUNS_PER_DATE = 3;
+/* raised 3 → 4 (2026-08-08, per-block locking): the season's observed maximum is 4
+   start-blocks/day at the derived 90-min partition (§12Z.15) — the cap = blocks-observed,
+   and partitionBlocks coalesces beyond it so the cap keeps meaning */
+const MAX_RUNS_PER_DATE = 4;
 const DAYS_SET = "pl:pred:days";
 const dayKey = (d: string) => `pl:pred:${d}`;
 const MAX_BYTES = 3_000_000;
@@ -73,22 +77,10 @@ async function serverFetchJson(url: string): Promise<{ ok: boolean; body: unknow
   }
 }
 
-/** First-pitch times for a date, straight from statsapi. Keyless and free — it
-    spends no Odds credits, which is the point: the check that prevents a wasted
-    ~120-credit run must never cost credits itself. Empty on any failure, which
-    degrades to the previous behaviour (run). */
-async function slateStarts(date: string): Promise<number[]> {
-  try {
-    const r = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${date}`, { cache: "no-store" });
-    if (!r.ok) return [];
-    const j = (await r.json()) as { dates?: { games?: { gameDate?: string }[] }[] };
-    return (j.dates?.[0]?.games ?? [])
-      .map((g) => (g.gameDate ? Date.parse(g.gameDate) : NaN))
-      .filter((n) => isFinite(n));
-  } catch {
-    return [];
-  }
-}
+/* slateStarts now comes from src/lib/server/slate.ts (2026-08-08) — the ONE copy, which
+   also filters Postponed/Cancelled. That filter is load-bearing here now: the scheduler
+   and this route both partition the slate into blocks, and the partitions must agree on
+   the population or the block keys diverge between the decision and the fire. */
 
 function memoryStorage() {
   const m = new Map<string, string>();
@@ -146,7 +138,17 @@ export async function GET(req: NextRequest) {
        the third legitimate fire hitting 429 and no board getting built. A cap named for
        spend must count spend. Everything below this point is free: `slateStarts` is
        keyless statsapi and the stored-board read is Redis. */
-    if (!force) {
+    /* PER-BLOCK FIRES (2026-08-08): the scheduler forwards ?block=<key>. The skip
+       becomes good-BLOCK-skip — a block that already fired never fires again (the
+       registry is the record), and the day-level good-board skip must NOT block a second
+       block's fire (that is exactly the one-shot-per-day defect this ship removes). */
+    const blockKey = req.nextUrl.searchParams.get("block");
+    if (blockKey) {
+      const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
+      if (reg[blockKey]?.firedAt) {
+        return NextResponse.json({ ok: true, skipped: "block-already-locked", block: blockKey });
+      }
+    } else if (!force) {
       const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
       /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
          store would otherwise always mean "run" — and on a Sunday at 22:00, with the
@@ -382,8 +384,51 @@ export async function GET(req: NextRequest) {
     let lock: Record<string, unknown> | null = null;
     let lockedEntry: ReturnType<typeof buildLockEntry> | null = null;
     try {
-      const entry = buildLockEntry({ eng, data: data as unknown as Record<string, unknown>, date, now, trigger });
+      /* BLOCK SCOPE (2026-08-08): on a ?block fire the card draws only from that block's
+         games, sized to the block's pro-rata share of the day ceiling; the date's entry
+         APPENDS across fires (carry). Partition recomputed here from the same feed the
+         scheduler read — deterministic, same keys. */
+      let blockGkeys: Set<string> | undefined;
+      let blockBudget: number | undefined;
+      let carry: Awaited<ReturnType<typeof getLockEntry>> = null;
+      if (blockKey) {
+        const bStarts = await slateStarts(date);
+        const bs = partitionBlocks(bStarts);
+        const blk = bs.find((b) => b.key === blockKey);
+        if (blk) {
+          const win = new Set(blk.starts);
+          const giAll = (data.gameInfo ?? {}) as Record<string, { start?: string | null }>;
+          blockGkeys = new Set(
+            Object.entries(giAll)
+              .filter(([, g]) => g?.start && win.has(Date.parse(g.start)))
+              .map(([k]) => k),
+          );
+          /* the same ceiling buildLockEntry derives — read from the engine, not retyped */
+          const cfgB = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
+          const shB = eng.get<{ bankroll?: number }>("SH") ?? {};
+          const bankB = Number(shB?.bankroll) > 0 ? Number(shB.bankroll) : 750;
+          const capFrac = Number(cfgB?.dailyBankrollCap) > 0 ? Number(cfgB.dailyBankrollCap) : 0.1;
+          const daily = Math.max(1, Math.round(capFrac * bankB));
+          blockBudget = splitBudget(daily, bs)[blockKey];
+          carry = await getLockEntry(date);
+        } else {
+          console.warn(`[generate] block ${blockKey} not found in today's partition — locking whole-slate instead`);
+        }
+      }
+      const entry = buildLockEntry({
+        eng,
+        data: data as unknown as Record<string, unknown>,
+        date,
+        now,
+        trigger,
+        ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys, carry, dailyOverride: blockBudget } : {}),
+      });
       const w = await writeLock(entry);
+      if (blockKey && blockGkeys) {
+        const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
+        reg[blockKey] = { firedAt: now, tickets: (entry.blocks?.[blockKey]?.tickets ?? 0), budget: blockBudget, at: now };
+        await redisSetJson(BLOCKS_KEY(date), reg);
+      }
       lockedEntry = entry;
       lock = {
         tickets: (entry.core as unknown[]).length,
