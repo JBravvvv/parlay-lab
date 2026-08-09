@@ -184,10 +184,29 @@ const CROSSINGS = [
       "k/g at n=13: 16.00 — the dissolved n=6 direction stays dissolved. No board since the " +
       "crossing; both brakes green. Record: docs/collection-period.md CROSSING 13.",
   },
+  { ump: "Laz Diaz", date: "2026-08-08", commit: "87f3396", kPerG: 17.2, braked: true,
+    note: "FOURTEENTH. g 4->5, k 86. Bot refresh on the deploy branch; crossings 14-21 record." },
+  { ump: "Doug Eddings", date: "2026-08-08", commit: "87f3396", kPerG: 17.2, braked: true,
+    note: "FIFTEENTH. g 4->5, k 86." },
+  { ump: "Todd Tichenor", date: "2026-08-08", commit: "87f3396", kPerG: 15.0, braked: true,
+    note: "SIXTEENTH. g 4->5, k 75." },
+  { ump: "Dan Merzel", date: "2026-08-09", commit: "aaa5a95", kPerG: 16.8, braked: true,
+    note: "SEVENTEENTH. g 4->5, k 84." },
+  { ump: "Dan Iassogna", date: "2026-08-09", commit: "aaa5a95", kPerG: 15.6, braked: true,
+    note: "EIGHTEENTH. g 4->5, k 78." },
+  { ump: "Alex MacKay", date: "2026-08-09", commit: "aaa5a95", kPerG: 18.0, braked: true,
+    note: "NINETEENTH. g 4->5, k 90." },
+  { ump: "Tyler Jones", date: "2026-08-09", commit: "aaa5a95", kPerG: 15.0, braked: true,
+    note: "TWENTIETH. g 4->5, k 75." },
+  { ump: "Emil Jimenez", date: "2026-08-09", commit: "aaa5a95", kPerG: 15.8, braked: true,
+    note: "TWENTY-FIRST. g 4->5, k 79. Armed mean at n=21: 16.17 vs league 16.40 — the " +
+      "dissolved direction stays dissolved. Boards now exist daily; the brakes alone are " +
+      "the reason none reached one. Record: docs/collection-period.md CROSSINGS 14-21.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 13;
+const FLOOR = 21;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

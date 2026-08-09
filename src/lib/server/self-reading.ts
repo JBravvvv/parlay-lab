@@ -158,14 +158,25 @@ export function buildReading(args: { entry: SyncEntry; gen: Gen | null; date: st
   };
   if (core.length === 0) structureMix.vacuous = "VACUOUS — zero tickets; the mix has no population";
 
+  /* UNIT CONVERSION (2026-08-09, the branch's first live fire was a FALSE one): the leg's
+     `cz` is AMERICAN odds (the first live single read ticketDec 1.6757 vs legCz -148 —
+     the SAME price, −148 ≡ 1 + 100/148). The comparator converts before comparing:
+     |cz| ≥ 100 → American; 1.01 < cz < 51 → already decimal; anything else → uncheckable,
+     counted, never guessed. Tolerance covers stored rounding. */
+  const legDecOf = (cz: number): number | null => {
+    if (Math.abs(cz) >= 100) return cz > 0 ? 1 + cz / 100 : 1 + 100 / Math.abs(cz);
+    if (cz > 1.01 && cz < 51) return cz;
+    return null;
+  };
   const singlesVsLeg: Reading["singlesVsLeg"] = { checked: 0, mismatches: [], impossibleBranchFired: false };
   let uncheckable = 0;
   for (const s of singles) {
     const legCz = (s.legs?.[0]?.cz as number) ?? null;
     const tDec = (s.czDec as number) ?? null;
-    if (legCz == null || tDec == null) { uncheckable++; continue; }
+    const legDec = legCz == null ? null : legDecOf(legCz);
+    if (legDec == null || tDec == null) { uncheckable++; continue; }
     singlesVsLeg.checked++;
-    if (Math.abs(tDec - legCz) > EPS) singlesVsLeg.mismatches.push({ name: s.name ?? null, ticketDec: tDec, legCz });
+    if (Math.abs(tDec - legDec) > 5e-4) singlesVsLeg.mismatches.push({ name: s.name ?? null, ticketDec: tDec, legCz });
   }
   if (uncheckable) singlesVsLeg.uncheckable = uncheckable;
   if (singlesVsLeg.mismatches.length) {

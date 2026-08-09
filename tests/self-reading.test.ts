@@ -89,6 +89,23 @@ describe("buildReading — the artifact analyzes itself", () => {
     expect(JSON.stringify(r)).toMatch(/IMPOSSIBLE BRANCH/);
   });
 
+  it("PRODUCTION REGRESSION (2026-08-09, the branch's first live fire was FALSE) — American leg odds are the same price, no fire", () => {
+    // the real first live single: ticket czDec 1.6757, leg cz -148 (American) — −148 ≡ 1+100/148
+    const ks = ticket({ id: "s1", name: "K's single", stake: 2, czDec: 1.6757, legs: [{ lkey: "p|pitcher_strikeouts|5.5", label: "P over", prop: "pitcher_strikeouts", cz: -148 }] });
+    const r = buildReading({ entry: lockedEntry([ks]), gen: null, date: "2026-08-09", now: NOW, kind: "fire" });
+    expect(r.singlesVsLeg.checked).toBe(1);
+    expect(r.singlesVsLeg.impossibleBranchFired).toBe(false);
+    expect(r.singlesVsLeg.mismatches).toEqual([]);
+    // positive American converts too
+    const ks2 = ticket({ id: "s2", name: "dog single", stake: 2, czDec: 2.4, legs: [{ lkey: "q|batter_hits|0.5", label: "Q over", prop: "batter_hits", cz: 140 }] });
+    const r2 = buildReading({ entry: lockedEntry([ks2]), gen: null, date: "2026-08-09", now: NOW, kind: "fire" });
+    expect(r2.singlesVsLeg.impossibleBranchFired).toBe(false);
+    // a cz in no known unit is UNCHECKABLE, counted, never guessed
+    const odd = ticket({ id: "s3", name: "odd single", stake: 2, czDec: 1.9, legs: [{ lkey: "r|batter_hits|0.5", label: "R over", prop: "batter_hits", cz: 60 }] });
+    const r3 = buildReading({ entry: lockedEntry([odd]), gen: null, date: "2026-08-09", now: NOW, kind: "fire" });
+    expect(r3.singlesVsLeg.uncheckable).toBe(1);
+  });
+
   it("empty-gate day: every empty-population check declares itself VACUOUS; histogram echoed", () => {
     const r = buildReading({ entry: lockedEntry([], { note: "no-bet day" }), gen: null, date: "2026-08-06", now: NOW, kind: "fire" });
     expect(r.reading31.emptyGate).toBe(true);

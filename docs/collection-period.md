@@ -7149,6 +7149,30 @@ unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so 
 after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
 instruction.
 
+## SELF-ARMING: CROSSINGS 14 THROUGH 21 — DATED RECORD (2026-08-09)
+
+**Eight crossings across two unintegrated bot refreshes on the deploy branch** (the
+bot-on-frontend-rebuild pattern is now the norm — third and fourth such commits):
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 14 | Laz Diaz | 2026-08-08 | `87f3396` | 5 / 86 | 17.2 |
+| 15 | Doug Eddings | 2026-08-08 | `87f3396` | 5 / 86 | 17.2 |
+| 16 | Todd Tichenor | 2026-08-08 | `87f3396` | 5 / 75 | 15.0 |
+| 17 | Dan Merzel | 2026-08-09 | `aaa5a95` | 5 / 84 | 16.8 |
+| 18 | Dan Iassogna | 2026-08-09 | `aaa5a95` | 5 / 78 | 15.6 |
+| 19 | Alex MacKay | 2026-08-09 | `aaa5a95` | 5 / 90 | 18.0 |
+| 20 | Tyler Jones | 2026-08-09 | `aaa5a95` | 5 / 75 | 15.0 |
+| 21 | Emil Jimenez | 2026-08-09 | `aaa5a95` | 5 / 79 | 15.8 |
+
+**TWENTY-ONE armed. Armed-set mean k/g at n = 21: 16.17 vs league 16.40 (g=328,
+k=5,380) — still below; the dissolved n = 6 direction stays dissolved.**
+
+**DID ANY REACH A BOARD? NO — and the reason CHANGED CLASS: boards now exist daily**
+(08-08 single-block, 08-09 the first three-block day), so for the first time the answer
+rests on the brakes alone: `SH_CFG.umpKFrozen:true` and the frozen `context.json` (the
+double-brake test re-ran green this gate). `FLOOR` raised 13 → 21 in the same commit.
+
 ## SELF-ARMING: CROSSING 13 — DATED RECORD (2026-08-07)
 
 **One crossing, carried by the FIRST bot commit ever to land on `frontend-rebuild`** (the

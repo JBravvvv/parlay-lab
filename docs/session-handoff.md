@@ -3482,6 +3482,56 @@ available as a first move.**
 > with the log result in hand**, because which of them is warranted depends on what the log says the
 > caller's shape is, and that is the one thing not yet read.
 
+### 12Z.16 — 🏁 THE FIRST MULTI-BLOCK DAY: THREE FIRES, THREE CARDS, ZERO ORPHANS; AND THE IMPOSSIBLE BRANCH'S FIRST FIRE WAS FALSE (2026-08-09T23:2xZ)
+
+**THE PRE-COMMITTED READING (§12Z.15), APPLIED TO SUNDAY 2026-08-09 — every line from the
+live artifact:**
+
+| block | budget | projected fire | ACTUAL fire | first pitch | card |
+|---|---|---|---|---|---|
+| A `16:15Z` (11 gm) | $55 | 15:15Z | **15:15:06Z** | 16:15Z | 1 ticket (Mixed 2-leg, $42) |
+| B `20:05Z` (3 gm) | $15 | 17:15Z | **17:15:08Z** | 20:05Z | 3 tickets ($5+$5+$2) |
+| C `00:20Z` (1 gm) | $5 | 21:30Z | **21:30:10Z** | 00:20Z | **zero-ticket record — the named no-bet block** |
+
+**All three blocks fired on their projected pokes to the second. Zero orphans. Budget
+split $55/$15/$5 exactly as pre-committed; allocSum $54 ≤ $75; `reading31.blocks` and the
+gens index agree (exactly three gens, one per block); violations [].** Three days of
+fires (08-06 → 08-09: five header-triggered fires) have now landed on their projected
+poke every time.
+
+**READING 32 FINALLY HAS A LIVE SINGLE — AND THE SINGLE-VS-LEG IMPOSSIBLE BRANCH'S FIRST
+LIVE FIRE WAS A FALSE ONE:** the $2 "K's single" flagged `ticketDec 1.6757` vs `legCz
+-148` — **the SAME price in two units** (−148 American = 1 + 100/148 = 1.67567…). The
+comparator compared decimal to American; a READER defect, exactly the class the
+reader-reports-never-throws design contains: the card was clean, the flag was loud, the
+correction is dated. **Fixed with unit conversion (|cz| ≥ 100 → American; 1.01–51 →
+decimal; else UNCHECKABLE, counted); the production pair is the regression case**
+(`tests/self-reading.test.ts`). The false flag lives on the stored 08-09 reading until
+the next repair pass rebuilds it. Structure mix: 1 single / 3 parlays — the singles
+ladder's "first clearing single": $2 stake at −148.
+
+**WATCH ITEM, RECORDED NOT ACTIONED: block A fired at luPct 0.4** — the schedule-clock
+condition (ready within the 3h lead) held while only 40% of lineups were CONFIRMED at
+8:15 AM PT. The morning block prices more projected lineups than the evening one-shot
+ever did. It belongs beside the knobs table when Josh next visits it.
+
+**CROSSINGS 14–21 (two more bot refreshes on the deploy branch — the pattern is the
+norm now):** Diaz 17.2 / Eddings 17.2 / Tichenor 15.0 @ `87f3396` (08-08) · Merzel 16.8 /
+Iassogna 15.6 / MacKay 18.0 / Jones 15.0 / Jimenez 15.8 @ `aaa5a95` (08-09). **FLOOR
+13 → 21; armed mean k/g 16.17 vs league 16.40 — still below. Reached-a-board changed
+CLASS: boards now exist daily, so for the first time the brakes ALONE are the answer —
+both re-ran green.**
+
+**AND THE FIRST FIT RAN (reading 33, the grading half):** the Sunday 10:00Z calibrate
+refreshed the summary live (window 07-25 → 08-08, 15 days, global n 3,628; every market
+past 150) **and adjusted NOTHING — `mults {}`, log 0.** A fit that moves nothing declared
+itself; the significance gate (weekly, ±10% cap, shrink-only) is the discipline holding,
+with HR (.111 vs .209, n 604) the likeliest first mover next Sunday. *(Reading 33's
+mults-BEFORE/AFTER print is satisfied vacuously-with-declaration: before {} → after {}.
+The 5j fit-vintage log prerequisite was NOT verified before this fire — that gap is
+ledgered rather than hidden: the fit half of reading 33 ran without its pre-committed
+vintage log and only the no-move outcome made that harmless.)*
+
 ### 12Z.15 — PER-BLOCK LOCKING SHIPS; THE THRESHOLD IS DERIVED AND 120 WOULD HAVE ORPHANED THE MOTIVATING CASE (2026-08-08T04:0xZ)
 
 **THE MEASUREMENT FIRST (139 dates / 1,819 games, season to date):** successive-start gap
