@@ -21,6 +21,8 @@ import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
 import { getMoney, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { pickStatus, STATUS_LABEL } from "@/lib/picks-status";
+import { useCzHidden } from "@/lib/cz-offered";
+import { CzInfo } from "@/components/ui/CzInfo";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
@@ -80,8 +82,12 @@ export default function BoardPage() {
         : pure;
     return { rows: base as PickRow[], crossMarket: excluded.length };
   }, [cats, cat, basisMode]);
-  const playable = useMemo(() => rows.filter((r) => r.cz != null), [rows]);
-  const offBook = rows.length - playable.length;
+  /* EVERY PICK POSTS (2026-08-09, Josh's call): no more holding rows out for lacking a
+     Caesars price — off-book rows render with their best price and Josh's own ⓘ toggle
+     ("offered at Caesars right now?") is the only thing that hides a pick. */
+  const cz = useCzHidden();
+  const visibleRows = useMemo(() => rows.filter((r) => !cz.isHidden(`${r.label}|${r.sub}`)), [rows, cz]);
+  const czHiddenHere = rows.length - visibleRows.length;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
 
   /* THE PICKS PRODUCT ON THE TABS (2026-08-08, operator's screenshot: every prop tab 0 at
@@ -153,7 +159,10 @@ export default function BoardPage() {
           const n = legLive({ gkey: r.gkey, lkey: r.lkey });
           return (
             <div className={r.susp ? "opacity-50" : undefined}>
-              <div className="font-medium text-text">{r.label}</div>
+              <div className="font-medium text-text">
+                {r.label}
+                <CzInfo pickKey={`${r.label}|${r.sub}`} offered={!cz.isHidden(`${r.label}|${r.sub}`)} onToggle={cz.toggle} />
+              </div>
               <div className="text-[11px] text-muted">{r.sub}</div>
               {r.susp && (
                 <div
@@ -284,7 +293,8 @@ export default function BoardPage() {
             } satisfies Column<PickRow>,
           ]),
     ],
-    [bankroll, basisMode, legLive],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bankroll, basisMode, legLive, cz.hidden],
   );
 
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
@@ -430,8 +440,9 @@ export default function BoardPage() {
                 </tr>
               </thead>
               <tbody>
-                {propRows.map((p) => {
+                {propRows.filter((p) => !cz.isHidden(`${cat}|${p.player}|${p.line}|${p.side}`)).map((p) => {
                   const st = pickStatus(p.start, p.res, Date.now());
+                  const pk = `${cat}|${p.player}|${p.line}|${p.side}`;
                   return (
                     <tr key={`${p.rank}|${p.player}|${p.line}`} className="border-t border-white/[0.04]">
                       <td className="num py-1.5 pr-2 text-faint">{p.rank}</td>
@@ -440,7 +451,8 @@ export default function BoardPage() {
                         <span className="text-muted">
                           {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
                         </span>
-                        {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — never on a ticket</span>}
+                        <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
+                        {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — shown always, never on a ticket</span>}
                       </td>
                       <td className="num py-1.5 pr-2 text-muted">
                         {p.odds ?? "—"}
@@ -458,6 +470,14 @@ export default function BoardPage() {
               </tbody>
             </table>
           </div>
+          {cz.count > 0 && (
+            <div className="mt-3 flex items-center justify-between text-[11.5px] text-muted">
+              <span>{cz.count} pick{cz.count === 1 ? "" : "s"} hidden by your Caesars toggle (all tabs)</span>
+              <button type="button" onClick={cz.reset} className="font-semibold text-pos hover:underline">
+                show all again
+              </button>
+            </div>
+          )}
         </Panel>
       ) : rows.length === 0 ? (
         <Panel>
@@ -470,31 +490,20 @@ export default function BoardPage() {
         <>
           <DataTable
             columns={columns}
-            rows={playable}
+            rows={visibleRows}
             rowKey={(r) => `${r.label}|${r.sub}`}
             stagger
             rowClassName={(r) => (r.susp ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
-          {offBook > 0 && (
-            <details className="mt-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3">
-              <summary className="cursor-pointer select-none text-[12px] font-semibold text-muted">
-                Not at Caesars ({offBook}) — real picks, no playable price
-              </summary>
-              <div className="mt-3 space-y-1.5">
-                {rows
-                  .filter((r) => r.cz == null)
-                  .map((r) => (
-                    <div key={`${r.label}|${r.sub}`} className="flex items-baseline justify-between gap-3 text-[12px]">
-                      <span className="text-text">
-                        {r.label} <span className="text-muted">{r.sub}</span>
-                      </span>
-                      <span className="num text-muted">
-                        {String(r.odds ?? "")} best · {Number(r.prob).toFixed(1)}%
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </details>
+          {czHiddenHere > 0 && (
+            <div className="mt-3 flex items-center justify-between rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-2 text-[11.5px] text-muted">
+              <span>
+                {czHiddenHere} pick{czHiddenHere === 1 ? "" : "s"} hidden by your Caesars toggle
+              </span>
+              <button type="button" onClick={cz.reset} className="font-semibold text-pos hover:underline">
+                show all again
+              </button>
+            </div>
           )}
         </>
       )}

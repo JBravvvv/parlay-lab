@@ -52,7 +52,7 @@ export function DataTable<T>({
 
   return (
     <div
-      className="overflow-auto rounded-[16px] border border-white/[0.05]"
+      className="glass-table overflow-auto rounded-[16px] border border-white/[0.05]"
       style={{ maxHeight }}
     >
       <table className="w-full border-collapse text-[12.5px]">

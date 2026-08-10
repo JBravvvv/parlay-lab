@@ -67,4 +67,26 @@ describe("wired — source scans, comment-stripped", () => {
     expect(raw).toMatch(/live board rows/);
     expect(raw).toMatch(/day's stamped picks/);
   });
+
+  it("EVERY PICK POSTS (2026-08-09, Josh's call): no cz-null holdback; only his ⓘ toggle hides, and it is reversible", () => {
+    const src = read("app/board/page.tsx");
+    expect(src).not.toMatch(/rows=\{playable\}/); // the old Caesars-only filter is gone
+    expect(src).not.toMatch(/Not at Caesars \(/); // and so is the holdout drawer
+    expect(src).toMatch(/useCzHidden\(/);
+    expect(src).toMatch(/CzInfo/);
+    expect(src).toMatch(/show all again/); // hidden picks are always recoverable
+    const czInfo = fs.readFileSync(path.join(process.cwd(), "src/components/ui/CzInfo.tsx"), "utf8");
+    expect(czInfo).toMatch(/Is this pick offered at Caesars sportsbook right now\?/);
+  });
+
+  it("the lime liquid glass spans (2026-08-09, Josh's aesthetic call): panels, tables, and no half-green rows", () => {
+    const css = fs.readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
+    const glass = css.slice(css.indexOf(".glass {"), css.indexOf(".glass {") + 900);
+    expect(glass).toMatch(/acc-lime/); // the base surface carries the green
+    expect(css).toMatch(/\.glass-table/); // data tables ride it too
+    const evGlow = css.slice(css.indexOf(".ev-glow {"), css.indexOf(".ev-glow {") + 300);
+    expect(evGlow).not.toMatch(/transparent 55%/); // the half-green/half-black fade is gone
+    const dt = read("src/components/ui/DataTable.tsx");
+    expect(dt).toMatch(/glass-table/);
+  });
 });

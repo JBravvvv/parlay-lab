@@ -117,15 +117,28 @@ body::after {
   color: transparent;
 }
 
-/* ---- glass surface (all panels) — purple-tinted liquid glass */
+/* ---- glass surface (all panels) — LIME liquid glass (2026-08-09, Josh's aesthetic call:
+   green liquid glass THROUGHOUT every stats/picks box, not half green/half black; the
+   gray-on-black text windows were hard to read). Tint stays low-teens alpha so white
+   text keeps its contrast on the dark backdrop; the rim carries the lime, the body
+   carries a full-width wash — no fade-to-black midway. */
 .glass {
-  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
-  background-blend-mode: luminosity;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-acc-lime) 13%, transparent),
+      color-mix(in srgb, var(--color-acc-green) 8%, transparent) 55%,
+      color-mix(in srgb, var(--color-acc-lime) 11%, transparent)
+    ),
+    color-mix(in srgb, var(--color-surface) 46%, transparent);
+  background-blend-mode: normal, luminosity;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid color-mix(in srgb, var(--color-acc-lime) 24%, rgba(255, 255, 255, 0.07));
   border-radius: var(--radius-panel);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, var(--color-acc-lime) 28%, rgba(255, 255, 255, 0.1)),
+    0 0 34px -14px rgba(182, 255, 61, 0.22);
 }
 
 /* ---- liquid glass (hero chips, CTAs): near-transparent with a lit rim */
@@ -164,9 +177,24 @@ body::after {
 .glow-pos { box-shadow: 0 0 44px -8px rgba(182, 255, 61, 0.28), 0 0 0 1px rgba(182, 255, 61, 0.12); }
 .glow-gold { box-shadow: 0 0 44px -8px rgba(199, 154, 59, 0.3), 0 0 0 1px rgba(199, 154, 59, 0.14); }
 
-/* +EV rows get lit, not painted */
+/* ---- data tables ride the same lime glass (2026-08-09): the scrolling body was the
+   gray/black text window Josh flagged — the wash spans the whole table surface */
+.glass-table {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-acc-lime) 10%, transparent),
+      color-mix(in srgb, var(--color-acc-green) 6%, transparent) 60%,
+      color-mix(in srgb, var(--color-acc-lime) 9%, transparent)
+    ),
+    color-mix(in srgb, var(--color-surface) 52%, transparent);
+  border-color: color-mix(in srgb, var(--color-acc-lime) 20%, rgba(255, 255, 255, 0.06));
+}
+
+/* +EV rows get lit, not painted — green THROUGHOUT the row (2026-08-09: the old
+   fade-to-transparent at 55% read as half green/half black; the wash now spans) */
 .ev-glow {
-  background: linear-gradient(90deg, rgba(182, 255, 61, 0.07), transparent 55%);
+  background: linear-gradient(90deg, rgba(182, 255, 61, 0.13), rgba(182, 255, 61, 0.05) 100%);
   box-shadow: inset 2px 0 0 rgba(182, 255, 61, 0.65);
 }
 
