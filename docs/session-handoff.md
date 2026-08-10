@@ -13,8 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-08:** `origin/frontend-rebuild` = `c075d55b58c97c226cef9130186d601f22e97f7c`
-> - **STATE-CLAIM 2026-08-08:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+> - **STATE-CLAIM 2026-08-10:** `origin/frontend-rebuild` = `c69dcc651b25b80153e93618afa900ef613b84a1`
+> - **STATE-CLAIM 2026-08-10:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
 > shipped. The guard is doing the maintenance its header promised.)*
@@ -30,7 +30,39 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
-## 0.00001 🎯 THE JOSH BLOCK, CURRENT — TWO ROWS, FIRST POKES, ONE SCREEN SAMPLE (2026-08-06)
+## 0.000005 🎯 THE JOSH BLOCK, CURRENT — THE SYSTEM RUNS ITSELF; ONE SHIP AUTHORIZED AND QUEUED (2026-08-10T01:3xZ, pre-compaction)
+
+**WHAT IS TRUE NOW, every line from this session's own reads and pushed commits:**
+
+- **THE SYSTEM IS AUTONOMOUS AND PROVEN OVER FOUR LIVE DAYS.** Scheduler pokes every 15
+  min (hours 15–23, 0–2 UTC, cron-job.org "Parlay Scheduler"); **per-block locking live**
+  (90-min derived partition, §12Z.15): five header fires 08-06→08-09 all landed on their
+  projected poke to the second, including Sunday's first three-block day — three cards,
+  $55/$15/$5 split, zero orphans (§12Z.16). Every day: locked card(s) or named reasons;
+  self-reading + picks + learning at the public URLs. Grading daily 02:00Z/15:00Z; the
+  weekly fit ran its first Sunday (08-09) and moved nothing (significance gate; HR .111
+  vs .209 n=604 is the likely first mover next Sunday).
+- **JOSH'S SURFACES:** the Board's prop tabs = the day's stamped picks with statuses +
+  records; `/api/picks` + `/api/board?date=` public. **Every pick posts** (no Caesars
+  holdback); each pick carries the ⓘ "offered at Caesars?" toggle (default yes, No hides
+  on-device, always reversible); H+R+RBI shows fully, barred from tickets only. **The
+  whole surface is lime liquid glass** (his aesthetic call, verified on preview).
+- **🔴 THE ONE AUTHORIZED, UNSHIPPED ITEM — FIRST ACTION AFTER COMPACTION:** **sync the
+  Caesars ⓘ toggle across his devices** (his word, 2026-08-10: "yes sync the toggle
+  across my devices"). SPEC: new `/api/prefs` route, GET/PUT gated by `syncAuthed`
+  (x-pl-sync phrase — Josh types it, never entered for him); payload
+  `{czHidden: {key: {hidden, at}}}`, last-write-wins per key by `at`;
+  `src/lib/cz-offered.ts` pulls on load + pushes on toggle when the device holds the
+  phrase, localStorage stays the offline copy. Display-only — engine/card/record
+  untouched. Guards red-first; gate; push.
+- **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
+  luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
+  the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page
+  (§12Z.12) awaits his word · CLV header-auth migration in the security queue · quota
+  last read 18,030 remaining at 2026-08-06T00:14Z (stale — re-read before any
+  burn-sensitive decision; boards now fire daily and spend).
+
+## 0.00001 🔻 SUPERSEDED 2026-08-10 (kept as the 08-06 record) — THE JOSH BLOCK — TWO ROWS, FIRST POKES, ONE SCREEN SAMPLE (2026-08-06)
 
 **REWRITTEN 2026-08-06 FROM JOSH'S DASHBOARD SCREENSHOT (ground truth per §12Y.6 — the first
 operator-screenshot state read this record has ever had).** The 08-05 version's READ 1 is
@@ -2357,6 +2389,24 @@ board CANNOT confirm them** — it fires on the owner's curl and entry 1 is week
 
 ## 5. OPEN PRE-COMMITTED READINGS (verbatim; COUNT: 33 — 29 carried, 30–33 appended 2026-08-05)
 
+> **DATED CLOSURES 2026-08-10 (append-only; the readings below stay verbatim as the
+> record of what was committed):**
+> - **Reading 30 (flip-readiness pair): CLOSED 2026-08-06** — the first live board WAS the
+>   singles vintage; served-verified; no foreign delta reported.
+> - **Reading 31 (lock path first live artifact): CLOSED 2026-08-06** — first
+>   self-generated/locked card clean (§12Z.11); the design then superseded by per-block
+>   locking (§12Z.15), whose own first-live reading also CLOSED clean (§12Z.16).
+> - **Reading 32 (singles first-ON card pair): PARTIALLY CLOSED 2026-08-09** — first live
+>   single ($2 K's at −148, §12Z.16); its impossible branch's first fire was FALSE (unit
+>   defect, fixed, regression-pinned). The M14-interaction half accrues with more singles.
+> - **Reading 33 (first Sunday fit): CLOSED-WITH-A-LEDGERED-GAP 2026-08-09** — fit ran,
+>   moved nothing, declared itself; the 5j prerequisite was NOT verified pre-fire (gap
+>   ledgered in §12Z.16, made harmless only by the no-move outcome).
+> - Still genuinely OPEN from the carried set: the old §0.0 Vercel-log attribution reads
+>   (146 / ≥214), reads 2 and 4 (phrase), reading 15's ledger-export block, and the
+>   engine-ship riders (5l, drop counts, simJoint j2/pm). The tab-contamination verdict
+>   CLOSED-AS-SUPERSEDED 2026-08-08 (§12Z.14).
+
 > **DATED NOTE 2026-08-06 (§12Z.8) — the readings below are UNCHANGED as written; one
 > premise class restates.** Any reading whose wording references "entry 1"/"the entries"
 > or a cron-job.org fire (readings 5, 6, 8 among them) reads whatever ARRIVES from the
@@ -2648,7 +2698,28 @@ board CANNOT confirm them** — it fires on the owner's curl and entry 1 is week
 
 ## 6. GIT AND ARTIFACT STATE
 
-### 6C. CURRENT — 2026-08-05 (everything below 6C is per-turn history)
+### 6C. CURRENT — 2026-08-10T01:3xZ (supersedes the 08-05 block below; everything below is per-turn history)
+
+- **HEAD = origin/frontend-rebuild = `c69dcc651b25b80153e93618afa900ef613b84a1`**, worktree
+  clean, push-state guard green. `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`.
+- **This session's pushed shas (08-06 → 08-10, in order):** `d793cc3` (phantom ledger) ·
+  `1919f14` (scheduler live + gen.slate) · `f1e2e66` (pre-window ledger) · `25d0679`
+  (third early handler) · `2671ec6` (self-reading + push-state) · `dc4dd09` (daily grading
+  + labels) · `dda0b6d` (picks product + mrank) · `f76a01e` (live-read + TTL fallback) ·
+  `a76a027` (prop tabs render picks) · `c075d55` (side-label fix) · `ceb397a` (per-block
+  locking) · `85120b8` (multi-block reading + comparator fix + crossings 14–21) ·
+  `c69dcc6` (every-pick-posts + ⓘ toggle + lime glass). Bot commits on the deploy branch
+  (data-only, rule 7): `bb50918`, `87f3396`, `aaa5a95`.
+- **Suite: 105 files / 819 tests.** Engine string untouched all session (no hash-moving
+  ship since the singles flip; drop counts + 5l + simJoint j2/pm still ride the next one).
+- **Crossings FLOOR = 21** (armed mean 16.17 vs league 16.40; brakes green; boards exist
+  daily so the brakes alone are the answer now).
+- **KV keys added this session:** `pl:reading:{date}` (self-reading, board TTL) ·
+  `pl:grade:progress` (learning + cohorts, rev-stamped) · `pl:blocks:{date}` (block
+  registry). Public surfaces: `/api/board` (board + gens + reading + learning),
+  `/api/picks` (picks + record + statuses, TTL walk-back).
+
+### 6C-prev. 2026-08-05 (superseded above; per-turn history)
 
 - **HEAD = `origin/frontend-rebuild` = `518bddca99ca8d5aee816eea8f221931f511a5cd`** (STATE-CLAIM
   at the top of the file; `sha-currency` scores it). `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`.
@@ -5471,7 +5542,17 @@ place** (the M27 failure mode); converting it is queued.
 
 ---
 
-## 12.85 🔴 POSITION, BROUGHT CURRENT 2026-08-06T00:14Z — supersedes §12.9's figures below
+## 12.8 POSITION ADDENDUM 2026-08-10 — the dark-days era ENDED; the burn regime CHANGED
+
+**Boards have fired every day since 08-06 (five fires incl. Sunday's three blocks); the
+"ten dark board-days" era below is history.** The burn regime changed with per-block
+locking: up to 4 fires/day at ~1+6×block-size credits each, plus collection. **The quota
+figure below (18,030 at 2026-08-06T00:14Z) is FOUR DAYS STALE and predates every board
+fire — re-run `tools/quota.mjs` before any burn-sensitive decision; do not reason from
+the 10.6/h collection-scale rate, it no longer describes the system.** Graded store at
+the 08-09 read: 3,628 rows, every market past 150 (§12Z.16).
+
+## 12.85 🔴 POSITION, BROUGHT CURRENT 2026-08-06T00:14Z — 🔻 figures superseded by the 12.8 addendum above (kept as the 08-06 record)
 
 **QUOTA: 18,030 remaining / 1,970 used at `2026-08-06T00:14:32.457Z`** (quota.mjs live read,
 appended to `data/quota-log.jsonl`). Last interval **08-02T20:05 → 08-06T00:14: 76.15 h, spent
@@ -6079,7 +6160,20 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 17. PROTOCOL
 
-### 🔴 FIRST ACTION AFTER COMPACTION — DO THIS, THEN STOP (2026-08-06T01:00Z — supersedes the 08-02 list below)
+### 🔴 FIRST ACTION AFTER COMPACTION — 2026-08-10 (supersedes both lists below)
+
+1. **Re-read §0.000005 (the CURRENT Josh block) and §0.001, then `CLAUDE.md`.** Print
+   `git rev-parse HEAD` and confirm containment in `origin/frontend-rebuild`
+   (`sha-currency` + `push-state` score it).
+2. **SHIP THE AUTHORIZED ITEM: the Caesars-toggle sync** — Josh's word 2026-08-10, spec
+   in §0.000005 (`/api/prefs`, syncAuthed phrase-gated, last-write-wins by `at`,
+   cz-offered.ts pull/push, localStorage offline copy). Guards red-first, full gate,
+   push, tell Josh the one thing he does: enter his sync phrase once per device (he
+   types it; never entered for him).
+3. Then the standing rhythm: readings as they arrive (next Sunday's fit with the 5j log
+   verified FIRST this time), the watch items in §0.000005, briefs get the target check.
+
+### 🔻 SUPERSEDED — FIRST ACTION AFTER COMPACTION (2026-08-06T01:00Z — kept as history)
 
 1. **Re-read §0.00001 (the CURRENT Josh block) and §0.001, then `CLAUDE.md`.** Nothing else
    first.
