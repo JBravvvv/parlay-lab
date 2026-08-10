@@ -55,6 +55,39 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
   `src/lib/cz-offered.ts` pulls on load + pushes on toggle when the device holds the
   phrase, localStorage stays the offline copy. Display-only — engine/card/record
   untouched. Guards red-first; gate; push.
+  - **✅ SHIPPED 2026-08-10, first action after compaction, exactly per spec —
+    `f6e24e4480f1125a4f77e71dc525b8ea5e6efdf9`.** New shared kernel
+    `src/lib/cz-hidden-merge.ts` (client + route import the SAME merge, ledger-merge
+    doctrine): LWW per key by `at`; tie → hidden wins (the reversible side); **unhides
+    write TOMBSTONES** (`{hidden:false, at}`) so a stale hide on another device can
+    never resurrect — this is why reset() now writes tombstones instead of
+    `removeItem`; tombstones prune after `CZ_PRUNE_MS` 45d (hides never expire);
+    sorted-key output so devices converge byte-identical. `/api/prefs`: gate identical
+    to `/api/ledger` (503 `sync-not-configured` → 401 `bad-sync-key`), PUT merges into
+    `pl:prefs:v1` — never replaces — 413 over `CZ_MAX_BYTES` 256KB. Client: NEW ls key
+    `pl_cz_hidden_v2` `{hidden,at}` per key; **v1 migrates on first load and is LEFT IN
+    PLACE** (the mergeDayBlob stale-bundle lesson — an old cached bundle keeps its own
+    key); pull-merge on mount (30s remount throttle), debounced 1.2s push on
+    toggle/reset; no phrase → pure device-local, behavior unchanged. Guards
+    `tests/cz-sync.test.ts` (14) observed RED first (module-missing). Gate: **106
+    files / 833 tests**, VITEST_EXIT=0; tsc 0 errors. Served checks: local route fails
+    closed (503 both verbs, no store env); deployed-surface read (401 unauthed +
+    board toggle offline path) recorded below this line when taken.
+  - **⚠️ DEPLOY PENDING, 2026-08-10T02:1xZ — AND A PIPELINE FACT LEARNED THE HARD WAY:
+    a git push does NOT deploy this project.** 15+ min after the `f6e24e4` push,
+    production still served the old build (`/api/prefs` 404, build marker unchanged).
+    `vercel ls`: every production deploy is a CLI deploy (username `jbravvvv`, no git
+    metadata on `vercel inspect`) — cadence 39m/1h/3h/9h, i.e. someone/something runs
+    `vercel --prod` from this folder (a second chat session works here per the
+    dev-server collision note). This session's own `npx vercel --prod --yes` was
+    DENIED by the permission gate — not retried, not worked around. **The code is on
+    origin at `f6e24e4`; it goes live on the next CLI deploy from this worktree
+    (the concurrent session's next deploy carries it automatically) or when Josh/an
+    allowed session runs the deploy.** The deployed-surface reads (401 unauthed,
+    board toggle offline path, v2 localStorage write) are OWED once it serves.
+    **JOSH'S ONE ACTION: enter the sync phrase once per device (Settings — the same
+    phrase ledger sync already uses; a device that already syncs the ledger needs
+    NOTHING).** He types it; it is never entered for him.
 - **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
   luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
   the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page
@@ -6165,11 +6198,11 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 1. **Re-read §0.000005 (the CURRENT Josh block) and §0.001, then `CLAUDE.md`.** Print
    `git rev-parse HEAD` and confirm containment in `origin/frontend-rebuild`
    (`sha-currency` + `push-state` score it).
-2. **SHIP THE AUTHORIZED ITEM: the Caesars-toggle sync** — Josh's word 2026-08-10, spec
-   in §0.000005 (`/api/prefs`, syncAuthed phrase-gated, last-write-wins by `at`,
-   cz-offered.ts pull/push, localStorage offline copy). Guards red-first, full gate,
-   push, tell Josh the one thing he does: enter his sync phrase once per device (he
-   types it; never entered for him).
+2. ~~**SHIP THE AUTHORIZED ITEM: the Caesars-toggle sync**~~ — **✅ DONE 2026-08-10,
+   `f6e24e4` (the shipped-addendum under §0.000005's spec block carries the full
+   record: kernel, tombstones, guards-red-first, gate 106/833, served checks).**
+   Josh's one action: sync phrase once per device (a ledger-syncing device needs
+   nothing).
 3. Then the standing rhythm: readings as they arrive (next Sunday's fit with the 5j log
    verified FIRST this time), the watch items in §0.000005, briefs get the target check.
 
