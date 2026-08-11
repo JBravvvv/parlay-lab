@@ -117,6 +117,16 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
   green, FLOOR 21→27 — collection-period.md record). Gate 107/850, tsc 0. Josh's authed
   toggle-sync wire CONFIRMED 2026-08-11 ("Sync phrase worked") — the ship's last owed
   read is closed.
+- **ONE SELECTION MODE SITE-WIDE, SHIPPED 2026-08-11 (Josh's rule: "Whatever is
+  selected as the Selection Mode in settings should run across the entire site"),
+  `847ece7`, deployed + live-verified both ways** (default header "TOP 50 ranked by
+  EV @ Caesars"; flipping `pl_selmode` to probability reordered the live board and the
+  header followed). The Board's TOP 50 had only reacted to dk_fd — legacy all-books-EV
+  order otherwise. New shared `src/lib/board-order.ts` `orderByMode` (dk_fd→bsEv,
+  ev_gated/caesars_ev→czEv, probability→prob; stable; ORDERING ONLY — every pick still
+  posts, priceless rows sink) + `MODE_LABEL` in the header. Category tabs stay
+  probability-ranked by design (the Builder's parlay pool). Guards red-first
+  (`tests/board-selmode.test.ts`, wiring scan observed red). Gate 108/857, tsc 0.
 - **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
   luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
   the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page
