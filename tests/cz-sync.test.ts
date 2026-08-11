@@ -144,4 +144,10 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/useCzHidden\(/);
     expect(src).toMatch(/cz\.isHidden/);
   });
+
+  it("the hidden-count line counts distinct PICKS, not hidden row occurrences (live read 2026-08-10: one hidden pick, twice in the list, read '2 picks hidden')", () => {
+    const src = read("app/board/page.tsx");
+    expect(src).not.toMatch(/rows\.length - visibleRows\.length/); // the occurrence arithmetic is gone
+    expect(src).toMatch(/czHiddenHere = new Set\(/); // deduped by pick key
+  });
 });

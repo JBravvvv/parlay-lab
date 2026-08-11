@@ -87,7 +87,11 @@ export default function BoardPage() {
      ("offered at Caesars right now?") is the only thing that hides a pick. */
   const cz = useCzHidden();
   const visibleRows = useMemo(() => rows.filter((r) => !cz.isHidden(`${r.label}|${r.sub}`)), [rows, cz]);
-  const czHiddenHere = rows.length - visibleRows.length;
+  // distinct PICKS, not hidden row occurrences — one pick can sit in this list
+  // twice (TOP 50 + its category pool) and must still read "1 pick hidden"
+  const czHiddenHere = new Set(
+    rows.map((r) => `${r.label}|${r.sub}`).filter((k) => cz.isHidden(k)),
+  ).size;
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
 
   /* THE PICKS PRODUCT ON THE TABS (2026-08-08, operator's screenshot: every prop tab 0 at
