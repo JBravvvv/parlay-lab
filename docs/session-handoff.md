@@ -107,6 +107,16 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     **JOSH'S ONE ACTION: enter the sync phrase once per device (Settings — the same
     phrase ledger sync already uses; a device that already syncs the ledger needs
     NOTHING).** He types it; it is never entered for him.
+- **A–F TIERS SHIPPED 2026-08-11 (Josh's ask: "each play … should have a letter grade"),
+  `50e162b`, deployed + live-verified** (Mason Barnett K's O3.5 +11.6% EV wears an A;
+  null-priced rows wear "—"). A grade is a LABEL ON THE ENGINE'S OWN EV — czEv (bsEv in
+  dk_fd mode; props: model−implied edge), fixed published cutoffs A≥+3 · B≥+1 · C≥−1 ·
+  D≥−3 · F below, no price → no grade. `src/lib/grade.ts` + `GradeChip.tsx` +
+  `tests/grade.test.ts` (red-first). Same gate stamped **crossings 22–27** (six umpires
+  in bot refreshes `6f1eb16`/`349067e`, armed mean n=27 16.40 vs league 16.75, brakes
+  green, FLOOR 21→27 — collection-period.md record). Gate 107/850, tsc 0. Josh's authed
+  toggle-sync wire CONFIRMED 2026-08-11 ("Sync phrase worked") — the ship's last owed
+  read is closed.
 - **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
   luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
   the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page
