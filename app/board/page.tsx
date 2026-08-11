@@ -8,6 +8,8 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { ProbBar } from "@/components/ui/ProbBar";
 import { KellyChip } from "@/components/ui/KellyChip";
+import { GradeChip } from "@/components/ui/GradeChip";
+import { gradeFromEv, gradeRank } from "@/lib/grade";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
@@ -192,6 +194,18 @@ export default function BoardPage() {
             </div>
           );
         },
+      },
+      {
+        key: "grade",
+        header: "Tier",
+        // grades the SAME EV the mode displays — czEv at Caesars, bsEv under dk_fd
+        sortValue: (r) => gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv))),
+        cell: (r) =>
+          basisMode ? (
+            <GradeChip grade={gradeFromEv(r.bsEv == null ? null : Number(r.bsEv))} basis="EV @ basis (DK/FD)" />
+          ) : (
+            <GradeChip grade={gradeFromEv(r.czEv == null ? null : Number(r.czEv))} basis="EV @ Caesars" />
+          ),
       },
       {
         key: "prob",
@@ -435,6 +449,7 @@ export default function BoardPage() {
               <thead>
                 <tr className="text-left text-[10.5px] uppercase tracking-wide text-faint">
                   <th className="py-1.5 pr-2">#</th>
+                  <th className="py-1.5 pr-2">Tier</th>
                   <th className="py-1.5 pr-2">Pick</th>
                   <th className="py-1.5 pr-2">Lock price</th>
                   <th className="py-1.5 pr-2 text-right">Model</th>
@@ -450,6 +465,9 @@ export default function BoardPage() {
                   return (
                     <tr key={`${p.rank}|${p.player}|${p.line}`} className="border-t border-white/[0.04]">
                       <td className="num py-1.5 pr-2 text-faint">{p.rank}</td>
+                      <td className="py-1.5 pr-2">
+                        <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />
+                      </td>
                       <td className="py-1.5 pr-2 text-text">
                         {p.player}{" "}
                         <span className="text-muted">

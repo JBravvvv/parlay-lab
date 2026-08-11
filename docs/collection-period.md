@@ -7149,6 +7149,28 @@ unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so 
 after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
 instruction.
 
+## SELF-ARMING: CROSSINGS 22 THROUGH 27 — DATED RECORD (2026-08-11)
+
+**Six crossings across two unintegrated bot refreshes on the deploy branch, found by the
+guard on a rebase re-gate mid-ship (the grade-feature gate went red — the Marvin Hudson
+pattern, working exactly as designed):**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 22 | Will Little | 2026-08-10 | `6f1eb16` | 5 / 89 | 17.8 |
+| 23 | Dan Bellino | 2026-08-10 | `6f1eb16` | 5 / 101 | 20.2 |
+| 24 | Dexter Kelley | 2026-08-10 | `6f1eb16` | 5 / 82 | 16.4 |
+| 25 | Adam Hamari | 2026-08-11 | `349067e` | 5 / 78 | 15.6 |
+| 26 | Nick Mahrley | 2026-08-11 | `349067e` | 5 / 91 | 18.2 |
+| 27 | Mike Muchlinski | 2026-08-11 | `349067e` | 5 / 73 | 14.6 |
+
+**TWENTY-SEVEN armed. Armed-set mean k/g at n = 27: 16.40 vs league 16.75 (g=347,
+k=5,811) — still below; the dissolved direction stays dissolved.**
+
+**DID ANY REACH A BOARD? NO — boards fire daily now, so the answer rests on the brakes
+alone: `SH_CFG.umpKFrozen:true` and the frozen `context.json` (the double-brake test
+re-ran green this gate). `FLOOR` raised 21 → 27 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 14 THROUGH 21 — DATED RECORD (2026-08-09)
 
 **Eight crossings across two unintegrated bot refreshes on the deploy branch** (the

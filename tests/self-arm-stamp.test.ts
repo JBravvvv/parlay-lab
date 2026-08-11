@@ -203,10 +203,28 @@ const CROSSINGS = [
       "dissolved direction stays dissolved. Boards now exist daily; the brakes alone are " +
       "the reason none reached one. Record: docs/collection-period.md CROSSINGS 14-21.",
   },
+  { ump: "Will Little", date: "2026-08-10", commit: "6f1eb16", kPerG: 17.8, braked: true,
+    note: "TWENTY-SECOND. g 4->5, k 89. Bot refresh on the deploy branch (fifth such); found " +
+      "by this guard on a rebase re-gate mid-grade-feature ship — crossings 22-27 record." },
+  { ump: "Dan Bellino", date: "2026-08-10", commit: "6f1eb16", kPerG: 20.2, braked: true,
+    note: "TWENTY-THIRD. g 4->5, k 101." },
+  { ump: "Dexter Kelley", date: "2026-08-10", commit: "6f1eb16", kPerG: 16.4, braked: true,
+    note: "TWENTY-FOURTH. g 4->5, k 82." },
+  { ump: "Adam Hamari", date: "2026-08-11", commit: "349067e", kPerG: 15.6, braked: true,
+    note: "TWENTY-FIFTH. g 4->5, k 78. Second refresh in the same re-gate (349067e added " +
+      "2026-08-10 to days)." },
+  { ump: "Nick Mahrley", date: "2026-08-11", commit: "349067e", kPerG: 18.2, braked: true,
+    note: "TWENTY-SIXTH. g 4->5, k 91." },
+  { ump: "Mike Muchlinski", date: "2026-08-11", commit: "349067e", kPerG: 14.6, braked: true,
+    note: "TWENTY-SEVENTH. g 4->5, k 73. Armed mean at n=27: 16.40 vs league 16.75 (g=347, " +
+      "k=5,811) — still below; the dissolved direction stays dissolved. Boards fire daily; " +
+      "the double brake alone is the answer (re-ran green this gate). Record: " +
+      "docs/collection-period.md CROSSINGS 22-27.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 21;
+const FLOOR = 27;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
