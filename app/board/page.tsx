@@ -20,7 +20,8 @@ import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
-import { getMoney, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
+import { getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
+import { MODE_LABEL, orderByMode } from "@/lib/board-order";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { pickStatus, STATUS_LABEL } from "@/lib/picks-status";
 import { useCzHidden } from "@/lib/cz-offered";
@@ -46,11 +47,13 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
-  // dk_fd: mounted-gated localStorage read (hydration rule) — when on, the board
-  // is priced exactly like the Builder's allocator: EV/Kelly at the DK/FD basis,
-  // Caesars shown as the settlement price only
-  const [basisMode, setBasisMode] = useState(false);
-  useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
+  // ONE SELECTION MODE SITE-WIDE (2026-08-11, Josh's rule): the Board reads the
+  // FULL Settings mode like The Sharp and the Builder do — mounted-gated
+  // localStorage read (hydration rule). dk_fd additionally reprices the columns
+  // at the DK/FD basis; every mode drives the TOP 50 order via orderByMode.
+  const [selMode, setSelMode] = useState<SelectionMode>("ev_gated");
+  useEffect(() => setSelMode(getSelectionMode()), []);
+  const basisMode = selMode === "dk_fd";
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
   const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
@@ -75,15 +78,13 @@ export default function BoardPage() {
      or truncation, so a contaminated bucket can never eat another market's slots. */
   const { rows, crossMarket } = useMemo(() => {
     const { pure, excluded } = splitPure(cat, cats[cat] ?? []);
-    // dk_fd: the TOP 50 tab re-ranks by EV at the selection basis (the legacy
-    // "all" ranking is EV at the all-books best price — a price dk_fd forbids
-    // from influencing anything). No-basis rows sink to the bottom, flagged.
-    const base =
-      basisMode && cat === "all"
-        ? pure.slice().sort((a, b) => (b.bsEv == null ? -99 : Number(b.bsEv)) - (a.bsEv == null ? -99 : Number(a.bsEv)))
-        : pure;
+    // TOP 50 runs on the site-wide selection mode (the legacy "all" ranking was
+    // EV at the all-books best price — a price no mode selects at). Rows missing
+    // the mode's price sink to the bottom, never vanish. Category tabs stay
+    // probability-ranked by design: they are the Builder's high-floor parlay pool.
+    const base = cat === "all" ? orderByMode(pure, selMode) : pure;
     return { rows: base as PickRow[], crossMarket: excluded.length };
-  }, [cats, cat, basisMode]);
+  }, [cats, cat, selMode]);
   /* EVERY PICK POSTS (2026-08-09, Josh's call): no more holding rows out for lacking a
      Caesars price — off-book rows render with their best price and Josh's own ⓘ toggle
      ("offered at Caesars right now?") is the only thing that hides a pick. */
@@ -329,7 +330,7 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
                 : "Consensus de-vigged probability vs the Caesars line"
