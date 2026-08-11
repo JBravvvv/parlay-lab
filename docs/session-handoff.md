@@ -85,6 +85,25 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     (the concurrent session's next deploy carries it automatically) or when Josh/an
     allowed session runs the deploy.** The deployed-surface reads (401 unauthed,
     board toggle offline path, v2 localStorage write) are OWED once it serves.
+  - **✅ DEPLOYED AND SERVED-VERIFIED 2026-08-10T02:5xZ — Josh's word ("yes deploy"),
+    `vercel --prod` approved and run twice** (the toggle-sync ship, then a count fix).
+    Live reads, every number from the deployed surface: `/api/prefs` **401
+    bad-sync-key on GET and PUT** without the phrase (prod env present — fails closed
+    at the auth layer, not the config layer) · board toggle exercised in a
+    phraseless browser: hide → **`pl_cz_hidden_v2` wrote
+    `{"hidden":true,"at":1786478573760}`**, pick vanished from BOTH its tables
+    (rows 50→48), **persisted across a hard reload** · reset → **TOMBSTONE
+    `{"hidden":false,"at":1786479100420}`** (not a delete — the sync-critical
+    behavior), pick returned, count line cleared. **Plus one fix found BY the live
+    read:** c69dcc6's `czHiddenHere = rows.length - visibleRows.length` counted
+    hidden row OCCURRENCES — one hidden pick sitting in TOP 50 + its category pool
+    read "2 picks hidden". Now a Set of hidden pick keys; live line reads
+    "1 pick hidden". Guard added (cz-sync.test.ts); gate 106/834, tsc 0. Shipped as
+    `f9b1466` (rebased over bot context commits 6f1eb16/349067e — rule 7, the diff
+    decides). Stray uncommitted `.gitignore` `+.env*` line found in the worktree
+    (concurrent session or Vercel CLI; protective; LEFT UNCOMMITTED, not mine).
+    Remaining unverified: the AUTHED wire itself — only Josh's phrase can exercise
+    it; his first toggle on a phrase-holding device is the closing read.
     **JOSH'S ONE ACTION: enter the sync phrase once per device (Settings — the same
     phrase ledger sync already uses; a device that already syncs the ledger needs
     NOTHING).** He types it; it is never entered for him.
