@@ -221,10 +221,60 @@ const CROSSINGS = [
       "the double brake alone is the answer (re-ran green this gate). Record: " +
       "docs/collection-period.md CROSSINGS 22-27.",
   },
+  { ump: "Ryan Additon", date: "2026-08-12", commit: "3c7b3a2", kPerG: 17.4, braked: true,
+    note: "TWENTY-EIGHTH. Crossings 28-49: TWENTY-TWO in one rebase re-gate spanning FOUR " +
+      "unintegrated bot refreshes (08-12 -> 08-15) — the season's mass-arming phase; most " +
+      "of the league's regular umpires now cross in any multi-day gap. Record: " +
+      "docs/collection-period.md CROSSINGS 28-49." },
+  { ump: "Adam Beck", date: "2026-08-12", commit: "3c7b3a2", kPerG: 15.2, braked: true,
+    note: "TWENTY-NINTH. g 4->5, k 76." },
+  { ump: "Stu Scheurwater", date: "2026-08-12", commit: "3c7b3a2", kPerG: 16.2, braked: true,
+    note: "THIRTIETH. g 4->5, k 81." },
+  { ump: "Jansen Visconti", date: "2026-08-12", commit: "3c7b3a2", kPerG: 14.0, braked: true,
+    note: "THIRTY-FIRST. g 4->5, k 70." },
+  { ump: "Brian Walsh", date: "2026-08-12", commit: "3c7b3a2", kPerG: 17.6, braked: true,
+    note: "THIRTY-SECOND. g 4->5, k 88." },
+  { ump: "Alfonso Márquez", date: "2026-08-13", commit: "27665be", kPerG: 17.0, braked: true,
+    note: "THIRTY-THIRD. g 4->5, k 85." },
+  { ump: "Adrian Johnson", date: "2026-08-13", commit: "27665be", kPerG: 14.6, braked: true,
+    note: "THIRTY-FOURTH. g 4->5, k 73." },
+  { ump: "John Libka", date: "2026-08-13", commit: "27665be", kPerG: 18.8, braked: true,
+    note: "THIRTY-FIFTH. g 4->5, k 94." },
+  { ump: "Bill Miller", date: "2026-08-13", commit: "27665be", kPerG: 13.0, braked: true,
+    note: "THIRTY-SIXTH. g 4->5, k 65." },
+  { ump: "Jim Wolf", date: "2026-08-13", commit: "27665be", kPerG: 16.6, braked: true,
+    note: "THIRTY-SEVENTH. g 4->5, k 83." },
+  { ump: "Nate Tomlinson", date: "2026-08-13", commit: "27665be", kPerG: 16.6, braked: true,
+    note: "THIRTY-EIGHTH. g 4->5, k 83." },
+  { ump: "Andy Fletcher", date: "2026-08-13", commit: "27665be", kPerG: 17.0, braked: true,
+    note: "THIRTY-NINTH. g 4->5, k 85." },
+  { ump: "Tripp Gibson", date: "2026-08-13", commit: "27665be", kPerG: 15.0, braked: true,
+    note: "FORTIETH. g 4->5, k 75." },
+  { ump: "Rob Drake", date: "2026-08-14", commit: "aedb3f7", kPerG: 15.8, braked: true,
+    note: "FORTY-FIRST. g 4->5, k 79." },
+  { ump: "Alan Porter", date: "2026-08-14", commit: "aedb3f7", kPerG: 21.0, braked: true,
+    note: "FORTY-SECOND. g 4->5, k 105 — the hottest arming yet recorded." },
+  { ump: "Bruce Dreckman", date: "2026-08-14", commit: "aedb3f7", kPerG: 19.2, braked: true,
+    note: "FORTY-THIRD. g 4->5, k 96." },
+  { ump: "James Hoye", date: "2026-08-14", commit: "aedb3f7", kPerG: 17.2, braked: true,
+    note: "FORTY-FOURTH. g 4->5, k 86." },
+  { ump: "Charlie Ramos", date: "2026-08-15", commit: "f8884e3", kPerG: 15.6, braked: true,
+    note: "FORTY-FIFTH. g 4->5, k 78." },
+  { ump: "Vic Carapazza", date: "2026-08-15", commit: "f8884e3", kPerG: 14.2, braked: true,
+    note: "FORTY-SIXTH. g 4->5, k 71." },
+  { ump: "Ryan Wills", date: "2026-08-15", commit: "f8884e3", kPerG: 17.6, braked: true,
+    note: "FORTY-SEVENTH. g 4->5, k 88." },
+  { ump: "Jordan Baker", date: "2026-08-15", commit: "f8884e3", kPerG: 15.6, braked: true,
+    note: "FORTY-EIGHTH. g 4->5, k 78." },
+  { ump: "Paul Clemons", date: "2026-08-15", commit: "f8884e3", kPerG: 16.2, braked: true,
+    note: "FORTY-NINTH. g 4->5, k 81. Armed mean at n=49: 16.38 vs league 16.57 (g=400, " +
+      "k=6,627) — still below; the dissolved direction stays dissolved. Double brake " +
+      "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 28-49.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 27;
+const FLOOR = 49;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

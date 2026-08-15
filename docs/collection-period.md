@@ -7149,6 +7149,45 @@ unrecorded.** **A REBASE IS A TREE CHANGE: it can move a file a guard reads, so 
 after it, always.** `FLOOR` raised 4 → 6 in the same commit as this record, per the guard's own
 instruction.
 
+## SELF-ARMING: CROSSINGS 28 THROUGH 49 — DATED RECORD (2026-08-15)
+
+**TWENTY-TWO crossings across FOUR unintegrated bot refreshes (08-12 → 08-15), found by
+the guard on a rebase re-gate mid-ship — the mass-arming phase: most of the league's
+regular umpires now cross g≥5 in any multi-day gap between sessions.**
+
+| # | umpire | date | commit | k at arming | k/g |
+|---|---|---|---|---|---|
+| 28 | Ryan Additon | 2026-08-12 | `3c7b3a2` | 87 | 17.4 |
+| 29 | Adam Beck | 2026-08-12 | `3c7b3a2` | 76 | 15.2 |
+| 30 | Stu Scheurwater | 2026-08-12 | `3c7b3a2` | 81 | 16.2 |
+| 31 | Jansen Visconti | 2026-08-12 | `3c7b3a2` | 70 | 14.0 |
+| 32 | Brian Walsh | 2026-08-12 | `3c7b3a2` | 88 | 17.6 |
+| 33 | Alfonso Márquez | 2026-08-13 | `27665be` | 85 | 17.0 |
+| 34 | Adrian Johnson | 2026-08-13 | `27665be` | 73 | 14.6 |
+| 35 | John Libka | 2026-08-13 | `27665be` | 94 | 18.8 |
+| 36 | Bill Miller | 2026-08-13 | `27665be` | 65 | 13.0 |
+| 37 | Jim Wolf | 2026-08-13 | `27665be` | 83 | 16.6 |
+| 38 | Nate Tomlinson | 2026-08-13 | `27665be` | 83 | 16.6 |
+| 39 | Andy Fletcher | 2026-08-13 | `27665be` | 85 | 17.0 |
+| 40 | Tripp Gibson | 2026-08-13 | `27665be` | 75 | 15.0 |
+| 41 | Rob Drake | 2026-08-14 | `aedb3f7` | 79 | 15.8 |
+| 42 | Alan Porter | 2026-08-14 | `aedb3f7` | 105 | 21.0 |
+| 43 | Bruce Dreckman | 2026-08-14 | `aedb3f7` | 96 | 19.2 |
+| 44 | James Hoye | 2026-08-14 | `aedb3f7` | 86 | 17.2 |
+| 45 | Charlie Ramos | 2026-08-15 | `f8884e3` | 78 | 15.6 |
+| 46 | Vic Carapazza | 2026-08-15 | `f8884e3` | 71 | 14.2 |
+| 47 | Ryan Wills | 2026-08-15 | `f8884e3` | 88 | 17.6 |
+| 48 | Jordan Baker | 2026-08-15 | `f8884e3` | 78 | 15.6 |
+| 49 | Paul Clemons | 2026-08-15 | `f8884e3` | 81 | 16.2 |
+
+**FORTY-NINE armed. Armed-set mean k/g at n = 49: 16.38 vs league 16.57 (g=400,
+k=6,627) — still below; the dissolved direction stays dissolved. Alan Porter's 21.0 is
+the hottest arming yet recorded.**
+
+**DID ANY REACH A BOARD? NO — the brakes alone: `SH_CFG.umpKFrozen:true` and the frozen
+`context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
+the same commit.**
+
 ## SELF-ARMING: CROSSINGS 22 THROUGH 27 — DATED RECORD (2026-08-11)
 
 **Six crossings across two unintegrated bot refreshes on the deploy branch, found by the
