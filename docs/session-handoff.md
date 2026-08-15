@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-10:** `origin/frontend-rebuild` = `c69dcc651b25b80153e93618afa900ef613b84a1`
+> - **STATE-CLAIM 2026-08-15:** `origin/frontend-rebuild` = `f8884e3af8841d3ab6128e72785f45da85053894`
 > - **STATE-CLAIM 2026-08-10:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it

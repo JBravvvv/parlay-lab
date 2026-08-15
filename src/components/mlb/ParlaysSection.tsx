@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getSelectionMode } from "@/lib/engine-client";
+import { getSelectionMode, type SelectionMode } from "@/lib/engine-client";
+import { MODE_LABEL, orderByMode } from "@/lib/board-order";
 import { Panel } from "@/components/ui/Panel";
 import { FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
@@ -62,12 +63,19 @@ export function ParlaysSection({
 }) {
   const [view, setView] = useState<View>("parlays");
   const [pfilter, setPfilter] = useState("all");
-  // dk_fd: mounted-gated localStorage read (hydration rule)
-  const [basisMode, setBasisMode] = useState(false);
-  useEffect(() => setBasisMode(getSelectionMode() === "dk_fd"), []);
+  // ONE SELECTION MODE SITE-WIDE (2026-08-15, Josh: "The parlays and tickets
+  // should follow the selection mode too"). Full mode read, mounted-gated
+  // (hydration rule); ticket GENERATION already follows it via SH_CFG.selMode —
+  // this aligns the displayed order and the primary price.
+  const [selMode, setSelMode] = useState<SelectionMode>("ev_gated");
+  useEffect(() => setSelMode(getSelectionMode()), []);
+  const basisMode = selMode === "dk_fd";
+  // the mode's price for badges and the +EV glow (probability mode still
+  // badges EV at the settling book — probability drives the ORDER)
+  const modeEv = (t: Ticket) => (basisMode ? (t.bsEv == null ? null : Number(t.bsEv)) : t.czEv == null ? null : Number(t.czEv));
 
   const lists: Record<View, Ticket[]> = { parlays, mixed, live };
-  const all = lists[view] ?? [];
+  const all = useMemo(() => orderByMode(lists[view] ?? [], selMode), [parlays, mixed, live, view, selMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filters = useMemo(() => {
     const base: [string, string][] = [["all", "ALL"], ["SAFER", "SAFER"], ["LONGSHOT", "LONGSHOTS"], ["MIX", "MIXED"]];
@@ -85,7 +93,7 @@ export function ParlaysSection({
     <Reveal>
       <div className="mt-8">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-          Generated parlays — the engine&apos;s ticket sets
+          Generated parlays — the engine&apos;s ticket sets · {MODE_LABEL[selMode]}
         </h2>
 
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -128,7 +136,7 @@ export function ParlaysSection({
                 const e = x(t);
                 const toWin = e.czDec && e.stake != null ? Math.round(e.stake * (e.czDec - 1)) : e.toWin;
                 return (
-                  <Panel key={`${view}|${ti}`} className={(t.czEv ?? -1) >= 0 ? "glow-pos" : ""}>
+                  <Panel key={`${view}|${ti}`} className={(modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="display text-[14px] text-text">{t.name}</div>
                       <span className="num shrink-0 text-[13.5px] font-bold text-gold">
@@ -176,7 +184,7 @@ export function ParlaysSection({
                           <>{String(t.prob)}% combined</>
                         )}
                       </span>
-                      {t.czEv != null && <EvBadge ev={Number(t.czEv)} />}
+                      {modeEv(t) != null && <EvBadge ev={modeEv(t)!} />}
                       {e.stake != null && (
                         <span className="text-muted">${e.stake} → <b className="text-text">${toWin}</b></span>
                       )}

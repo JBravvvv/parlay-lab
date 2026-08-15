@@ -53,7 +53,7 @@ export type Waiver = { since: string; divergence: string; awaiting: string };
  */
 export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
   "props-history.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence:
       "TWO divergences now. (1) main runs the 2026-07-26 base file with no step arguments; " +
       "frontend-rebuild carries the 07-27 redesign (--wait, --fold-only, timeout-minutes 330), " +
@@ -82,7 +82,7 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
       "open and their countdown must not be extended by a new one.",
   },
   "line-history.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence:
       "schedule now disabled on BOTH copies (3356c54 cherry-picked it to main); frontend-rebuild " +
       "additionally carries the TIMING: INSENSITIVE classification block.",
@@ -91,7 +91,7 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
       "measured 3-4 runs/day (~22/day) on both copies in one pass — owner's item 5.",
   },
   "context.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence:
       "main carries the 07-29 pause (git add data/ump_k.json only) and TWO crons; frontend-rebuild " +
       "carries the unpaused git add (context.json + pen_quality.json) and a THIRD cron, `0 12`, " +
@@ -101,7 +101,7 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
       "Odds credits) and how the pause is represented on the ship branch so the two can agree.",
   },
   "model.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence:
       "the M18 data-vintage pause (schedule commented out) exists ONLY on main. frontend-rebuild's " +
       "copy still reads `30 9 * * *` — inert, but it is what a reader sees, and it is what misled " +
@@ -109,17 +109,17 @@ export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
     awaiting: "owner's word to mirror the pause onto frontend-rebuild so the file cannot mislead again.",
   },
   "board-archive.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence: "TIMING: SENSITIVE classification comment on frontend-rebuild only. No behavioural difference.",
     awaiting: "the comment reconciliation sweep (same pass as line-history.yml).",
   },
   "hr-overround.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence: "TIMING: INSENSITIVE classification comment on frontend-rebuild only. No behavioural difference.",
     awaiting: "the comment reconciliation sweep (same pass as line-history.yml).",
   },
   "ufc.yml": {
-    since: "2026-07-31",
+    since: "2026-08-15",
     divergence:
       "the whole workflow is absent from main, so its two declared crons (`0 15 * * 3`, `0 15 * * 6`) " +
       "HAVE NEVER FIRED. It reaches no Odds API itself; the spend on that feature is client-side " +

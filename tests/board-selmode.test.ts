@@ -63,6 +63,14 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/MODE_LABEL\[selMode\]/); // the header names the order
     expect(src).not.toMatch(/getSelectionMode\(\) === "dk_fd"/); // the boolean-only read is gone
   });
+  it("the parlay sets follow the mode too (2026-08-15, Josh: 'The parlays and tickets should follow the selection mode too')", () => {
+    const src = read("src/components/mlb/ParlaysSection.tsx");
+    expect(src).toMatch(/setSelMode\(getSelectionMode\(\)\)/); // full mode, not the dk_fd boolean
+    expect(src).not.toMatch(/getSelectionMode\(\) === "dk_fd"/);
+    expect(src).toMatch(/orderByMode\(/); // tickets ranked by the mode's price
+    expect(src).toMatch(/MODE_LABEL\[selMode\]/); // the section names its order
+  });
+
   it("The Sharp keeps its own mode discipline — this ship aligned the Board TO it, not the reverse", () => {
     const src = read("app/sharp/page.tsx");
     expect(src).toMatch(/getSelectionMode\(\)/);
