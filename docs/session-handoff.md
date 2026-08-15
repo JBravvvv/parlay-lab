@@ -127,6 +127,23 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
   posts, priceless rows sink) + `MODE_LABEL` in the header. Category tabs stay
   probability-ranked by design (the Builder's parlay pool). Guards red-first
   (`tests/board-selmode.test.ts`, wiring scan observed red). Gate 108/857, tsc 0.
+- **PARLAYS FOLLOW THE MODE TOO, SHIPPED 2026-08-15 (Josh, part 2 of the site-wide-mode
+  rule), `82262cf` + crossings `8e73dd0`, deployed + live-verified** (section header
+  names the order; ticket EVs read +3.3 → −4.8 strictly descending under ev_gated).
+  ParlaysSection: full-mode read, `orderByMode` on every ticket set, badge/glow at the
+  mode's price. Generation already followed `SH_CFG.selMode` — this aligned display.
+  Same pass: STATE-CLAIM refreshed to `f8884e3`; **seven 07-31 workflow-drift waivers
+  renewed to 08-15** (owner items STILL OPEN, re-surfaced to Josh: weekend `0 12`
+  context cron ship-or-not · model.yml pause mirror · ufc.yml schedule-or-delete ·
+  comment-reconciliation sweep); **crossings 28–49** (22 umps, four bot refreshes
+  08-12→08-15, armed mean n=49 16.38 vs league 16.57, Porter 21.0 hottest, brakes
+  green, FLOOR 27→49). **CALIBRATION ANSWER GIVEN 2026-08-15 from the live learning
+  artifact (rev aedb3f7): every market past every threshold** — ml 286 · rl 298 ·
+  hits 1,047 · TB 1,099 · HR 972 (14.1% vs 20.3% implied — the persistent gap, now
+  ~5σ) · HRR 1,010 (58.5% vs 57.2% — running AT/ABOVE implied) · K's 512 · outs 554;
+  contradictions 0. The loop is no longer data-starved: weekly Sunday fits by design,
+  next 2026-08-16 10:00Z (5j fit-vintage verify owed FIRST) — HR is the near-certain
+  first mover. HRR unsuspension + alt-lines unlock both await Josh's word.
 - **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
   luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
   the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page
