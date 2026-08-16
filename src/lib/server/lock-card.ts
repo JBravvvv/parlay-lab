@@ -1,6 +1,6 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { PAPER } from "@/lib/paper-mode";
+import { PAPER, ticketWindow } from "@/lib/paper-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -151,13 +151,26 @@ export function buildLockEntry(args: {
     if (t.id) usedIds.add(String(t.id));
     for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) usedLegs.add(legKey(l));
   }
+  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15).
+     The window shapes ONLY this forced pass — the disciplined call above keeps its own
+     cfg (min 4 / max 6, the engine's numbers) because that system is the one being
+     tracked. Pro-rata on block days; ceiling hard; floor best-effort on thin pools. */
+  const carriedCount = (carry?.core ?? []).length;
+  const win = ticketWindow(daily, carriedCount);
+  const gatedCount = alloc.picks.length;
   let forced: AllocResult = { picks: [], sum: 0 };
   const shortfall = daily - alloc.sum;
-  if (shortfall > 0) {
+  const forcedMax = Math.max(0, win.maxNew - gatedCount);
+  if (shortfall > 0 && forcedMax > 0) {
     const rest = (pool as PoolItem[]).filter(
       (w) => !usedIds.has(tid(w.pl)) && !w.pl.legs.some((l) => usedLegs.has(legKey(l))),
     );
-    forced = shAllocate(rest, shortfall, { ...cfg, selMode: "caesars_ev" }, false);
+    forced = shAllocate(rest, shortfall, {
+      ...cfg,
+      selMode: "caesars_ev",
+      maxCoreTickets: forcedMax,
+      minCoreTickets: Math.max(1, win.minNew - gatedCount),
+    }, false);
   }
 
   const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
@@ -268,7 +281,12 @@ export function buildLockEntry(args: {
     ...(core.length === 0
       ? { note: `paper day — $0 of $${daily} deployed: no CZ-playable pregame pool remained; blockedReasons is the histogram` }
       : deployed < daily
-        ? { note: `paper day — deployed $${deployed} of $${daily}: the leg-disjoint pool exhausted before the budget` }
+        ? {
+            note:
+              shortfall > 0 && forcedMax === 0
+                ? `paper day — deployed $${deployed} of $${daily}: the ${ticketWindow(PAPER.daily, 0).maxNew}-ticket day ceiling was reached before the budget`
+                : `paper day — deployed $${deployed} of $${daily}: the leg-disjoint pool exhausted before the budget`,
+          }
         : {}),
   };
   const v = validateLedger([entry]);

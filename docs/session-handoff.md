@@ -179,7 +179,14 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     `placed:false, actualStake:0` — Josh's standing word IS the answer, superseding
     the epoch-1 null-means-unanswered doctrine (lock-card.test.ts records both forms).
     `discipline()` excludes paper entries from the real-money record. PaperBanner on
-    Builder + Ledger. CHECKLIST rewritten for the paper era (old text preserved in the
+    Builder + Ledger. **TICKET COUNT (Josh's follow-up, same day, verbatim: "It can be
+    anywhere from 3-10 tickets for the $150 per day"):** `PAPER_TICKETS {min:3,max:10}` +
+    `ticketWindow(blockBudget, carriedCount)` — day-level window, pro-rata by budget
+    share on block days (110/25/15 → 7/2/1), every live block ≥1, ceiling HARD,
+    floor best-effort on thin pools; shapes ONLY the forced pass via the allocator's own
+    `maxCoreTickets`/`minCoreTickets` knobs — the disciplined call keeps the engine's
+    4–6 profile untouched (it is the system being tracked). Fun does not count toward
+    the window. CHECKLIST rewritten for the paper era (old text preserved in the
     comment). Guards: tests/paper-epoch.test.ts (18) observed RED first; the fixture
     behavioral proof: gate-clears-nothing day → 5 forced tickets, exactly $150,
     gatedSum 0. Bonus catch this gate: the sha-references guard flagged `82262cf` (the

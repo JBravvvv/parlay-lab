@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { PAPER, SUSPENSIONS_LIFTED, applySuspensionLift } from "@/lib/paper-mode";
+import { PAPER, PAPER_TICKETS, SUSPENSIONS_LIFTED, applySuspensionLift, ticketWindow } from "@/lib/paper-mode";
 import { LEDGER_EPOCH, decideEpochMigration, mergeAllowed } from "@/lib/ledger-epoch";
 import { discipline, type NoPlayLog } from "@/lib/noplay";
 import type { SyncEntry } from "@/lib/ledger-merge";
@@ -40,6 +40,25 @@ import type { SyncEntry } from "@/lib/ledger-merge";
 describe("the paper constants are Josh's numbers, verbatim", () => {
   it("$150 core + $25 fun since 2026-08-15", () => {
     expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25 });
+  });
+  it("3-10 tickets for the $150 per day (Josh's word, 2026-08-15 follow-up)", () => {
+    expect(PAPER_TICKETS).toEqual({ min: 3, max: 10 });
+  });
+  it("the day-share count window: single-block gets 3..10; a Sunday split pro-rates and every block keeps >=1", () => {
+    // single block, empty day so far
+    expect(ticketWindow(150, 0)).toEqual({ maxNew: 10, minNew: 3 });
+    // Sunday-shaped budgets $110/$25/$15 pro-rate to 7/2/1 and sum to the ceiling
+    const a = ticketWindow(110, 0);
+    expect(a).toEqual({ maxNew: 7, minNew: 3 });
+    const b = ticketWindow(25, 4); // block A locked 4 tickets
+    expect(b.maxNew).toBe(2);
+    expect(b.minNew).toBe(1);
+    const c = ticketWindow(15, 6);
+    expect(c.maxNew).toBe(1);
+    expect(c.minNew).toBe(1);
+    // the ceiling is HARD: a full day admits nothing more
+    expect(ticketWindow(50, 10)).toEqual({ maxNew: 0, minNew: 0 });
+    expect(ticketWindow(50, 12)).toEqual({ maxNew: 0, minNew: 0 }); // over-full never goes negative
   });
   it("the lift opens every HRR line and pitcher_outs", () => {
     expect(SUSPENSIONS_LIFTED.hrrAltMax).toBeGreaterThan(10); // every real alt line is below this
@@ -111,6 +130,16 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/paper:\s*true/);
     expect(src).toMatch(/placed:\s*false/); // Josh's standing word: he places none of these
     expect(src).not.toMatch(/capFrac \* bankroll/); // the old bankroll-derived ceiling is gone
+  });
+
+  it("the 3-10 window shapes ONLY the forced pass — the disciplined system's own cfg is never count-overridden", () => {
+    const src = read("src/lib/server/lock-card.ts");
+    expect(src).toMatch(/ticketWindow\(/);
+    // the forced call carries the count overrides…
+    expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
+    expect(src).toMatch(/minCoreTickets/);
+    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself)
+    expect(src).toMatch(/shAllocate\(\s*pool,\s*daily,\s*cfg,\s*false/s);
   });
 
   it("the generate route's block budgets split PAPER.daily, not a re-derived bankroll cap", () => {
