@@ -1,6 +1,7 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
 import { PAPER, ticketWindow } from "@/lib/paper-mode";
+import { buildFunHrTickets, type FunLegSrc } from "@/lib/fun-hr";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -214,27 +215,56 @@ export function buildLockEntry(args: {
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
   const core: SyncTicket[] = [...carried, ...newCore];
 
-  /* $25 FUN, once per day — the first fire that finds no fun ticket stakes it via the
-     engine's own shFunPick (tiered longshot selection, EV-gate exempt by design),
-     leg-disjoint from everything staked above. */
+  /* $25 FUN, once per day — RESHAPED 2026-08-15 (Josh's word): 2–5 tickets of HR-over
+     longshots, 3–8 hitters each, one team per ticket, players on at most 2 tickets.
+     Composed deterministically from the board's own HR rows (engine prob + Caesars
+     price, products only — see fun-hr.ts), leg-disjoint from everything staked above.
+     The board's categories are the FULL slate even on block fires, so the first fire
+     of the day composes from the whole day's HR pool. */
   let funT: SyncTicket[] = carry?.funT ?? [];
+  let funNote: string | undefined;
   if (funT.length === 0) {
     for (const p of forced.picks) {
-      usedIds.add(p.id);
       for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
     }
-    const exIds: Record<string, 1> = {};
-    for (const id of usedIds) exIds[id] = 1;
-    const exLegs: Record<string, 1> = {};
-    for (const k of usedLegs) exLegs[k] = 1;
-    const fun = eng.get<(p: unknown, a: number, c: unknown, exI: unknown, exL: unknown) => AllocResult>("shFunPick")(
-      pool,
-      PAPER.fun,
-      cfg,
-      exIds,
-      exLegs,
-    );
-    funT = fun.picks.map((p) => toTicket(p, false));
+    const hrRows = ((data.categories as Record<string, unknown[]> | undefined)?.batter_home_runs ?? []) as Array<Record<string, unknown>>;
+    const funPool: FunLegSrc[] = hrRows
+      .filter((r) => !r.susp && String(r.sub ?? "").includes(" O "))
+      .map((r) => {
+        const label = String(r.label ?? "");
+        const team = /\(([A-Z]{2,3})\)\s*$/.exec(label)?.[1] ?? null;
+        const cz = r.cz == null ? null : Number(r.cz);
+        const dec = cz == null || !Number.isFinite(cz) || cz === 0 ? null : cz > 0 ? 1 + cz / 100 : 1 + 100 / Math.abs(cz);
+        return {
+          player: label.replace(/\s*\([A-Z]{2,3}\)\s*$/, ""),
+          team,
+          label,
+          prop: String(r.sub ?? ""),
+          prob: r.prob == null ? null : Number(r.prob),
+          dec,
+          cz,
+          lkey: (r.lkey as string | undefined) ?? null,
+          gkey: (r.gkey as string | undefined) ?? null,
+        };
+      });
+    const fun = buildFunHrTickets(funPool, PAPER.fun, usedLegs);
+    funNote = fun.note;
+    funT = fun.tickets.map((t) => ({
+      id: tid({ type: t.type, legs: t.legs.map((l) => ({ label: l.label, prop: l.prop })) }),
+      stake: t.stake,
+      prob: Math.round(t.prob * 100) / 100,
+      czDec: Math.round(t.czDec * 100) / 100,
+      czEv: Math.round(t.czEv * 10) / 10,
+      czOdds: t.czOdds,
+      bsDec: null,
+      bsEv: null,
+      name: t.name,
+      type: t.type,
+      legs: t.legs.map((l) => ({ lkey: l.lkey, label: l.label, prop: l.prop, cz: l.cz, ...(l.gkey ? { gkey: l.gkey } : {}) })),
+      paper: true,
+      placed: false,
+      actualStake: 0,
+    }));
   }
 
   /* blocked-reason histogram — the decision record on a no-bet day, present on every day;
@@ -277,6 +307,7 @@ export function buildLockEntry(args: {
     funT,
     games: { ...(carry?.games ?? {}), ...games },
     blockedReasons,
+    ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0
       ? { note: `paper day — $0 of $${daily} deployed: no CZ-playable pregame pool remained; blockedReasons is the histogram` }

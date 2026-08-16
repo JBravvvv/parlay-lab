@@ -186,7 +186,17 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     floor best-effort on thin pools; shapes ONLY the forced pass via the allocator's own
     `maxCoreTickets`/`minCoreTickets` knobs — the disciplined call keeps the engine's
     4–6 profile untouched (it is the system being tracked). Fun does not count toward
-    the window. CHECKLIST rewritten for the paper era (old text preserved in the
+    the window. **FUN RESHAPED (Josh's third follow-up, same day, verbatim: "The 'Fun'
+    Money needs to be split out between 2-5 tickets mainly HR over longshots. It can't
+    include 2 players from the same team though as that shrinks odds significantly. it
+    should be 3-8 players on each with limited repeat players"):** `src/lib/fun-hr.ts`
+    — deterministic composer over the board's own HR-over rows (engine prob + CZ price,
+    products only): 2–5 tickets laddered 3,4,5,6,7 legs · one team per ticket ·
+    repeatCap 2 per player globally · rotated starts so no two tickets identical ·
+    exact-$25 split, remainder on the first · thin pool → fewer/none + `funNote`
+    (never fabricated). shFunPick RETIRED from the paper path. Naive cross-team product
+    pricing disclosed in the module header (HR sim-joint stays an engine-ship rider).
+    Guards tests/fun-hr.test.ts (11, red-first, plants for team/repeat/thin-pool). CHECKLIST rewritten for the paper era (old text preserved in the
     comment). Guards: tests/paper-epoch.test.ts (18) observed RED first; the fixture
     behavioral proof: gate-clears-nothing day → 5 forced tickets, exactly $150,
     gatedSum 0. Bonus catch this gate: the sha-references guard flagged `82262cf` (the

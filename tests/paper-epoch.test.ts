@@ -125,7 +125,7 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/PAPER\.daily/);
     expect(src).toMatch(/"caesars_ev"/); // the no-gate exact-sum top-up mode
     expect(src).toMatch(/forced/);
-    expect(src).toMatch(/shFunPick/);
+    expect(src).toMatch(/buildFunHrTickets/); // fun reshaped 2026-08-15: HR-longshot composer (see tests/fun-hr.test.ts)
     expect(src).toMatch(/PAPER\.fun/);
     expect(src).toMatch(/paper:\s*true/);
     expect(src).toMatch(/placed:\s*false/); // Josh's standing word: he places none of these
