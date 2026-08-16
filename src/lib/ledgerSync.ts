@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { mergeLedgers, type SyncEntry } from "./ledger-merge";
 import { BANK_KEY, mergeBankStores, validateBankStore, type BankStore } from "./bankroll";
 import { NOPLAY_KEY, mergeNoPlayLogs, validateNoPlayLog, type NoPlayLog } from "./noplay";
+import { LEDGER_EPOCH, LOCAL_ARCHIVE_KEY, LOCAL_EPOCH_KEY } from "./ledger-epoch";
 
 /**
  * Client side of ledger sync. One sync phrase (entered once per device in
@@ -64,6 +65,31 @@ export function setSyncKey(key: string) {
   }
   if (k) void syncNow();
   else setState(OFF);
+}
+
+/* PAPER EPOCH (2026-08-15, Josh: "Clear the ledger"). When the cloud announces a newer
+   epoch, this device ARCHIVES its local season first (first archive wins — re-adoption
+   can never clobber it with an empty copy), then drops it and adopts. The old record is
+   never destroyed: it sits under pl_ledger_archive_e1 here and pl:ledger:archive:e1 in
+   the cloud. */
+function localEpoch(): number {
+  try {
+    return Number(localStorage.getItem(LOCAL_EPOCH_KEY) ?? "1") || 1;
+  } catch {
+    return 1;
+  }
+}
+
+function adoptEpoch(server: number) {
+  if (!Number.isFinite(server) || server <= localEpoch()) return;
+  try {
+    const cur = localStorage.getItem(LEDGER_LS);
+    if (cur && !localStorage.getItem(LOCAL_ARCHIVE_KEY)) localStorage.setItem(LOCAL_ARCHIVE_KEY, cur);
+    localStorage.removeItem(LEDGER_LS);
+    localStorage.setItem(LOCAL_EPOCH_KEY, String(server));
+  } catch {
+    /* storage failure — the next sync retries the adoption */
+  }
 }
 
 function readLocal(): { all: SyncEntry[]; locked: SyncEntry[]; unlocked: SyncEntry[]; raw: string } {
@@ -151,7 +177,8 @@ export async function syncNow(): Promise<SyncState> {
       setState({ kind: "error", detail: `sync server ${res.status}` });
       return state;
     }
-    const got = (await res.json()) as { ledger: SyncEntry[]; bank?: unknown; noplay?: unknown };
+    const got = (await res.json()) as { ledger: SyncEntry[]; bank?: unknown; noplay?: unknown; epoch?: number };
+    adoptEpoch(Number(got.epoch ?? 1)); // BEFORE readLocal — the old season must not merge up
     const remote = got.ledger ?? [];
     const vb = got.bank != null ? validateBankStore(got.bank) : null;
     const remoteBank: BankStore | null = vb?.ok ? vb.store : null;
@@ -178,6 +205,7 @@ export async function syncNow(): Promise<SyncState> {
         cache: "no-store",
         body: JSON.stringify({
           ledger: merged,
+          epoch: LEDGER_EPOCH, // the resurrection gate: a push must know the current era
           ...(mergedBank ? { bank: mergedBank } : {}),
           ...(mergedNoPlay ? { noplay: mergedNoPlay } : {}),
         }),

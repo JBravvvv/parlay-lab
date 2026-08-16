@@ -3,6 +3,8 @@ import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry } from "@/lib/l
 import { mergeBankStores, validateBankStore, type BankStore } from "@/lib/bankroll";
 import { mergeNoPlayLogs, validateNoPlayLog, type NoPlayLog } from "@/lib/noplay";
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
+import { LEDGER_EPOCH, mergeAllowed } from "@/lib/ledger-epoch";
+import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 
 /**
  * Ledger cloud sync — one tiny record ("the season ledger") in Upstash Redis,
@@ -52,7 +54,7 @@ function gate(req: NextRequest): NextResponse | null {
   return null;
 }
 
-type Stored = { ledger: SyncEntry[]; at: number };
+type Stored = { ledger: SyncEntry[]; at: number; epoch?: number };
 
 async function readStore(): Promise<Stored | null> {
   const raw = (await redis(["GET", STORE_KEY])) as string | null;
@@ -69,8 +71,9 @@ export async function GET(req: NextRequest) {
   const blocked = gate(req);
   if (blocked) return blocked;
   try {
+    await ensureLedgerEpoch(); // PAPER EPOCH: lazy one-time archive-then-reset (idempotent)
     const [s, bank, noplay] = await Promise.all([readStore(), readBank(), readNoPlay()]);
-    return NextResponse.json({ ledger: s?.ledger ?? [], bank, noplay, at: s?.at ?? null });
+    return NextResponse.json({ ledger: s?.ledger ?? [], bank, noplay, at: s?.at ?? null, epoch: s?.epoch ?? LEDGER_EPOCH });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }
@@ -79,11 +82,29 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const blocked = gate(req);
   if (blocked) return blocked;
-  let body: { ledger?: unknown; bank?: unknown };
+  let body: { ledger?: unknown; bank?: unknown; epoch?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "body must be JSON" }, { status: 400 });
+  }
+  try {
+    await ensureLedgerEpoch();
+  } catch (e) {
+    return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
+  }
+  /* RESURRECTION GATE (2026-08-15): a sender that does not know the current epoch — a
+     stale cached bundle, or a device that has not pulled since the clear — gets the
+     current state back and its LEDGER entries are NOT merged (bank/noplay below are
+     append-only logs and still merge). Without this, one old phone heartbeat would
+     push the whole cleared season straight back into the store. */
+  if (!mergeAllowed(body.epoch)) {
+    try {
+      const [s, bank, noplay] = await Promise.all([readStore(), readBank(), readNoPlay()]);
+      return NextResponse.json({ ledger: s?.ledger ?? [], bank, noplay, at: s?.at ?? null, epoch: s?.epoch ?? LEDGER_EPOCH, staleEpoch: true });
+    } catch (e) {
+      return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
+    }
   }
   const v = validateLedger(body.ledger);
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
@@ -117,8 +138,8 @@ export async function PUT(req: NextRequest) {
       noplay = noplay ? mergeNoPlayLogs(noplay, sentNoPlay) : sentNoPlay;
       await redisSetJson(NOPLAY_STORE_KEY, { noplay, at } satisfies StoredNoPlay);
     }
-    await redis(["SET", STORE_KEY, JSON.stringify({ ledger: merged, at } satisfies Stored)]);
-    return NextResponse.json({ ok: true, ledger: merged, bank, noplay, at });
+    await redis(["SET", STORE_KEY, JSON.stringify({ ledger: merged, at, epoch: LEDGER_EPOCH } satisfies Stored)]);
+    return NextResponse.json({ ok: true, ledger: merged, bank, noplay, at, epoch: LEDGER_EPOCH });
   } catch (e) {
     return NextResponse.json({ error: `store unreachable: ${(e as Error).message}` }, { status: 502 });
   }

@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PaperBanner } from "@/components/ui/PaperBanner";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { EmptyState } from "@/components/ui/states";
@@ -429,6 +430,7 @@ export default function LedgerPage() {
           </div>
         }
       />
+      <PaperBanner />
       <SyncChip />
       {note && <div className="mb-4 text-[12px] text-pos">{note}</div>}
 

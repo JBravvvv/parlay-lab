@@ -58,11 +58,18 @@ describe("buildLockEntry — the card the system locks for itself", () => {
     expect((entry as { allocSum?: number }).allocSum).toBe(stakes.reduce((a, b) => a + b, 0));
   }, T9);
 
-  it("placed:null and actualStake:null THROUGHOUT — unanswered, never defaulted", async () => {
+  it("PAPER EPOCH (2026-08-15, Josh's standing word): every ticket is born placed:false, actualStake:0, paper:true", async () => {
+    /* EPOCH-1 FORM OF THIS CASE (kept for the record): placed:null / actualStake:null
+       THROUGHOUT — null meant UNANSWERED and the system never answered for Josh.
+       OBSERVED RED 2026-08-15 against the paper implementation, then flipped: Josh's
+       word "I will not be taking ANY of the bets" IS the answer, given once, standing —
+       so paper tickets are born placed:false (a decision on record), not null. */
     const { entry } = await fixtureLock();
-    for (const t of entry.core as { placed?: unknown; actualStake?: unknown }[]) {
-      expect(t.placed, "a locked ticket was born answered").toBeNull();
-      expect(t.actualStake).toBeNull();
+    expect((entry as { paper?: boolean }).paper).toBe(true);
+    for (const t of [...(entry.core as { placed?: unknown; actualStake?: unknown; paper?: unknown }[]), ...(entry.funT as { placed?: unknown; actualStake?: unknown; paper?: unknown }[])]) {
+      expect(t.placed, "a paper ticket without the standing not-placed answer").toBe(false);
+      expect(t.actualStake).toBe(0);
+      expect(t.paper).toBe(true);
     }
   }, T9);
 
@@ -76,21 +83,27 @@ describe("buildLockEntry — the card the system locks for itself", () => {
     expect(Object.values(games).some((g) => g.pk != null)).toBe(true);
   }, T9);
 
-  it("EMPTY-GATE day: zero-ticket card still LOCKS, with the blocked-reason histogram attached", async () => {
+  it("GATE-CLEARS-NOTHING day under PAPER: the forced top-up deploys anyway — every ticket forced:true, gatedSum 0", async () => {
     vi.setSystemTime(FROZEN_NOW);
     const eng = armedFixtureEngine();
     const d = eng.analyze(await eng.collectSlate()) as unknown as Record<string, unknown>;
-    /* the engine default (ev_gated) clears NOTHING on this fixture — measured above — so the
-       default path IS the empty-gate path; no dailyOverride contrivance needed. */
+    /* EPOCH-1 FORM (kept for the record): the engine default (ev_gated) clears NOTHING on
+       this fixture, and the day locked a ZERO-ticket decision record. OBSERVED RED
+       2026-08-15: the paper implementation filled this exact card with 5 forced tickets —
+       "$150 every single day no matter what" (Josh's word) means the gated no-bet verdict
+       is recorded (gatedSum 0, forced flags) but hypothetical money still deploys. */
     const entry = buildLockEntry({ eng: eng as never, data: d, date: "2026-07-10", now: FROZEN_NOW, trigger: "test" });
     expect(entry.locked).toBe(true);
-    expect((entry.core as unknown[]).length).toBe(0);
+    const core = entry.core as { stake: number; forced?: boolean }[];
+    expect(core.length, "the paper top-up deployed nothing on a pool the probability mode fills").toBeGreaterThan(0);
+    expect(core.every((t) => t.forced === true), "a gate-cleared-nothing day produced an unforced ticket — two allocators disagree about the gate").toBe(true);
+    expect((entry as { gatedSum?: number }).gatedSum).toBe(0);
+    const deployed = core.reduce((a, t) => a + t.stake, 0);
+    expect((entry as { allocSum?: number }).allocSum).toBe(deployed);
+    expect(deployed, "caesars_ev top-up broke its exact-sum guarantee").toBe(entry.daily);
     const hist = (entry as { blockedReasons?: Record<string, number> }).blockedReasons;
-    expect(hist, "a no-bet day locked WITHOUT its reasons — the decision record is empty").toBeTruthy();
-    /* vacuity rule: the histogram itself may be empty on a fixture where nothing was blocked;
-       what may NOT be absent is the field — an absent record and an empty record differ. */
+    expect(hist, "the gated no-bet verdict lost its reasons — the decision record must survive the top-up").toBeTruthy();
     expect(typeof hist).toBe("object");
-    expect((entry as { note?: string }).note).toMatch(/no-bet|zero-ticket|decision record/i);
   }, T9);
 
   it("the entry VALIDATES and MERGES: a re-lock of the same day cannot clobber or duplicate", async () => {
@@ -106,7 +119,9 @@ describe("buildLockEntry — the card the system locks for itself", () => {
        actually grade its tickets for "done" to survive, so it does. */
     const graded = JSON.parse(JSON.stringify(entry)) as SyncEntry;
     const tix: Record<string, unknown> = {};
-    for (const t of graded.core) if (t.id) tix[t.id] = { result: "won" };
+    /* paper epoch: funT is staked at lock now too — "done" must grade EVERY ticket,
+       core AND fun, or the reopen rule flips it back by design */
+    for (const t of [...graded.core, ...(graded.funT ?? [])]) if (t.id) tix[t.id] = { result: "won" };
     graded.grading = { done: true, tickets: tix, legs: {} };
     const m2 = mergeLedgers([graded], [entry as SyncEntry]);
     expect(m2[0].grading?.done, "a fresh re-lock clobbered a graded day").toBe(true);

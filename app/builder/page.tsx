@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PaperBanner } from "@/components/ui/PaperBanner";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
@@ -579,6 +580,7 @@ export default function BuilderPage() {
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
         }
       />
+      <PaperBanner />
 
       {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-4 flex items-center gap-2">

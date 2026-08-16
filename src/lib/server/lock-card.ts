@@ -1,5 +1,6 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
+import { PAPER } from "@/lib/paper-mode";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -97,12 +98,11 @@ export function buildLockEntry(args: {
   const cfg = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
   const sh = eng.get<{ bankroll?: number }>("SH") ?? {};
   const bankroll = Number(sh.bankroll) > 0 ? Number(sh.bankroll) : 750;
-  /* the engine's own daily ceiling (L3363): dailyBankrollCap × bankroll. The server has no
-     "entered daily", so the ceiling IS the daily — recorded on the entry so the number used
-     is never a mystery. On a block fire, dailyOverride carries the block's pro-rata share
-     (splitBudget) and `daily` on the ENTRY stays the day ceiling. */
-  const capFrac = Number(cfg.dailyBankrollCap) > 0 ? Number(cfg.dailyBankrollCap) : 0.1;
-  const dayCeiling = Math.max(1, Math.round(capFrac * bankroll));
+  /* PAPER EPOCH (2026-08-15, Josh's word): the daily is a FIXED hypothetical $150 — it
+     was round(dailyBankrollCap × bankroll) = $75 through epoch 1. On a block fire,
+     dailyOverride carries the block's pro-rata share (splitBudget of PAPER.daily) and
+     `daily` on the ENTRY stays the day ceiling. */
+  const dayCeiling = PAPER.daily;
   const daily = args.dailyOverride ?? dayCeiling;
 
   /* IMPOSSIBLE BRANCH (2026-08-08, pre-committed): two cards containing the same game.
@@ -125,22 +125,43 @@ export function buildLockEntry(args: {
        without a gkey cannot prove membership and keeps the ticket out (conservative) */
     pool = (pool as AllocPick[]).filter((p) => (p.w?.pl?.legs ?? []).every((l) => l.gkey && blockGkeys.has(l.gkey)));
   }
-  const alloc = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate")(
+  const shAllocate = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate");
+  const alloc = shAllocate(
     pool,
     daily,
     cfg,
     false, // never force: the disciplined path is the only path the system locks by itself
   );
 
-  const newCore: SyncTicket[] = alloc.picks.map((p, i) => {
+  /* PAPER EPOCH (2026-08-15, Josh's word): "$150 every single day no matter what." The
+     disciplined ev_gated allocation above runs FIRST — that is the calibrated system the
+     record exists to track. Whatever the gate leaves unstaked is then FORCED onto the
+     remaining pool via the legacy caesars_ev allocator: no EV gate, exact-sum guarantee,
+     the engine's own dedupe/cap rules. Leg-disjointness across the two passes is enforced
+     HERE (the engine's no-repeated-leg rule holds within one call, not across two).
+     Forced tickets carry forced:true so gated performance and forced deployment can
+     always be split in the record. */
+  const tid = eng.get<(pl: unknown) => string>("shTicketId");
+  type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
+  const legKey = (l: { label?: string | null; prop?: string | null }) => `${l.label}|${l.prop}`;
+  const usedIds = new Set<string>(alloc.picks.map((p) => p.id));
+  const usedLegs = new Set<string>();
+  for (const p of alloc.picks) for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
+  for (const t of carry?.core ?? []) {
+    if (t.id) usedIds.add(String(t.id));
+    for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) usedLegs.add(legKey(l));
+  }
+  let forced: AllocResult = { picks: [], sum: 0 };
+  const shortfall = daily - alloc.sum;
+  if (shortfall > 0) {
+    const rest = (pool as PoolItem[]).filter(
+      (w) => !usedIds.has(tid(w.pl)) && !w.pl.legs.some((l) => usedLegs.has(legKey(l))),
+    );
+    forced = shAllocate(rest, shortfall, { ...cfg, selMode: "caesars_ev" }, false);
+  }
+
+  const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
     const pl = p.w.pl;
-    const stake = args.__plantStakeSkew && i === 0 ? p.stake + 1 : p.stake;
-    if (stake !== p.stake) {
-      throw new Error(
-        `TWO ALLOCATORS: locked stake ${stake} != allocator stake ${p.stake} on ${String(pl.name)} — ` +
-          `the card being locked is not the card the allocator sized. STOP.`,
-      );
-    }
     return {
       id: p.id,
       stake: p.stake,
@@ -151,14 +172,57 @@ export function buildLockEntry(args: {
       bsEv: pl.bsEv ?? null,
       name: pl.name ?? null,
       type: pl.type ?? null,
+      tier: pl.tier ?? null,
       legs: (pl.legs ?? []).map((l) => ({ lkey: l.lkey ?? null, label: l.label ?? null, prop: l.prop ?? null, cz: l.cz ?? null, ...(l.gkey ? { gkey: l.gkey } : {}) })),
-      placed: null, // UNANSWERED — never defaulted, never answered by the system
-      actualStake: null,
+      paper: true,
+      ...(isForced ? { forced: true } : {}),
+      /* Josh's standing word, 2026-08-15: "I will not be taking ANY of the bets." Paper
+         tickets are born placed:false/actualStake:0 — a decision on record, not the
+         epoch-1 null-means-unanswered state. */
+      placed: false,
+      actualStake: 0,
     };
-  });
+  };
+
+  const newCore: SyncTicket[] = [
+    ...alloc.picks.map((p, i) => {
+      const stake = args.__plantStakeSkew && i === 0 ? p.stake + 1 : p.stake;
+      if (stake !== p.stake) {
+        throw new Error(
+          `TWO ALLOCATORS: locked stake ${stake} != allocator stake ${p.stake} on ${String(p.w.pl.name)} — ` +
+            `the card being locked is not the card the allocator sized. STOP.`,
+        );
+      }
+      return toTicket(p, false);
+    }),
+    ...forced.picks.map((p) => toTicket(p, true)),
+  ];
   /* block fires APPEND: the date's entry accumulates each block's card; dedupe by id */
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
   const core: SyncTicket[] = [...carried, ...newCore];
+
+  /* $25 FUN, once per day — the first fire that finds no fun ticket stakes it via the
+     engine's own shFunPick (tiered longshot selection, EV-gate exempt by design),
+     leg-disjoint from everything staked above. */
+  let funT: SyncTicket[] = carry?.funT ?? [];
+  if (funT.length === 0) {
+    for (const p of forced.picks) {
+      usedIds.add(p.id);
+      for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
+    }
+    const exIds: Record<string, 1> = {};
+    for (const id of usedIds) exIds[id] = 1;
+    const exLegs: Record<string, 1> = {};
+    for (const k of usedLegs) exLegs[k] = 1;
+    const fun = eng.get<(p: unknown, a: number, c: unknown, exI: unknown, exL: unknown) => AllocResult>("shFunPick")(
+      pool,
+      PAPER.fun,
+      cfg,
+      exIds,
+      exLegs,
+    );
+    funT = fun.picks.map((p) => toTicket(p, false));
+  }
 
   /* blocked-reason histogram — the decision record on a no-bet day, present on every day;
      on block fires the day's histogram SUMS across blocks */
@@ -179,6 +243,7 @@ export function buildLockEntry(args: {
       }
     : carry?.blocks;
 
+  const deployed = alloc.sum + forced.sum;
   const entry: SyncEntry = {
     date,
     locked: true,
@@ -189,16 +254,22 @@ export function buildLockEntry(args: {
     /* the DAY ceiling, always — a block's own budget lives in blocks[key].budget */
     daily: blockKey ? dayCeiling : daily,
     bankroll,
-    allocSum: Number(carry?.allocSum ?? 0) + alloc.sum,
+    /* PAPER: hypothetical throughout; gated vs forced split is per-ticket (forced:true) */
+    paper: true,
+    paperCfg: { daily: PAPER.daily, fun: PAPER.fun, since: PAPER.since },
+    allocSum: Number(carry?.allocSum ?? 0) + deployed,
+    gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + alloc.sum,
     unallocated: alloc.unallocated ?? 0,
     core,
-    funT: carry?.funT ?? [],
+    funT,
     games: { ...(carry?.games ?? {}), ...games },
     blockedReasons,
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0
-      ? { note: `no-bet day — zero-ticket decision record (the gate cleared nothing at daily $${daily}); blockedReasons is the histogram` }
-      : {}),
+      ? { note: `paper day — $0 of $${daily} deployed: no CZ-playable pregame pool remained; blockedReasons is the histogram` }
+      : deployed < daily
+        ? { note: `paper day — deployed $${deployed} of $${daily}: the leg-disjoint pool exhausted before the budget` }
+        : {}),
   };
   const v = validateLedger([entry]);
   if (!v.ok) throw new Error(`lock entry failed the ledger's own validator: ${v.error}`);
@@ -209,15 +280,17 @@ export function buildLockEntry(args: {
 export async function writeLock(entry: SyncEntry): Promise<{ merged: number; existedBefore: boolean }> {
   const raw = (await redis(["GET", LEDGER_STORE_KEY])) as string | null;
   let cur: SyncEntry[] = [];
+  let epoch: number | undefined;
   try {
-    const s = raw ? (JSON.parse(raw) as { ledger?: SyncEntry[] }) : null;
+    const s = raw ? (JSON.parse(raw) as { ledger?: SyncEntry[]; epoch?: number }) : null;
     if (s && Array.isArray(s.ledger)) cur = s.ledger;
+    epoch = s?.epoch; // the epoch MUST ride through — dropping it would reopen resurrection
   } catch {
     cur = [];
   }
   const existedBefore = cur.some((e) => e.date === entry.date);
   const merged = mergeLedgers(cur, [entry]);
-  await redis(["SET", LEDGER_STORE_KEY, JSON.stringify({ ledger: merged, at: entry.lockedAt })]);
+  await redis(["SET", LEDGER_STORE_KEY, JSON.stringify({ ledger: merged, at: entry.lockedAt, ...(epoch != null ? { epoch } : {}) })]);
   return { merged: merged.length, existedBefore };
 }
 

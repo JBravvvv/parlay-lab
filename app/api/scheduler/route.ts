@@ -8,6 +8,8 @@ import { slateStarts } from "@/lib/server/slate";
 import { BLOCKS_KEY, decideBlock, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
+import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
+import { applySuspensionLift } from "@/lib/paper-mode";
 import { decideGradePass } from "@/lib/server/grading-progress";
 
 /**
@@ -87,6 +89,14 @@ export async function GET(req: NextRequest) {
      the lock's place. No silent days — every date ends with a locked card or a named reason.
      MAX_RUNS and the dead-slate refusal still govern the spending path; the self-check spends
      nothing (stored board + statsapi only). */
+  /* PAPER EPOCH (2026-08-15): the one-time archive-then-reset runs on whichever authed
+     touch arrives first — this poke or Josh's next app-open. Idempotent, reads-only after. */
+  try {
+    const mig = await ensureLedgerEpoch();
+    if (mig.migrated) console.log(`[scheduler] LEDGER EPOCH MIGRATED: epoch-1 blob ${mig.archived ? "archived" : "was empty"}, store reset for the paper era`);
+  } catch (e) {
+    console.warn(`[scheduler] epoch migration check failed: ${(e as Error).message}`);
+  }
   let lock: Record<string, unknown> = { present: await lockExists(date), action: null as string | null };
   try {
     const action = needsLockAction({ boardExists: board != null, lockExists: lock.present as boolean, deadSlate: d.reason === "dead-slate" });
@@ -96,7 +106,10 @@ export async function GET(req: NextRequest) {
         storage: (() => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; })(),
       });
       const cfg = eng.get<Record<string, unknown>>("SH_CFG");
-      if (cfg) cfg.selMode = LOCK_SEL_MODE;
+      if (cfg) {
+        cfg.selMode = LOCK_SEL_MODE;
+        applySuspensionLift(cfg); // backfill locks re-run the allocator — same lift as generation
+      }
       const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill" });
       await writeLock(entry);
       await writeReading(buildReadingSafe({ entry, gen: ((board.data as Record<string, unknown>).gen as never) ?? null, date, now, kind: "backfill" }));

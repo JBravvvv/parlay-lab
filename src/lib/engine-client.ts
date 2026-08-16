@@ -7,6 +7,7 @@ import { BANK_BASE, BANK_KEY, computeBankroll, todayExposure, type BankStore, ty
 import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
 import { liveCoverageOf, pricedGames, type GameInfoLike } from "./board-coverage";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
+import { applySuspensionLift } from "./paper-mode";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -115,6 +116,8 @@ export function getEngine(): Engine {
     if (cfg) {
       cfg.selMode = getSelectionMode();
       cfg.dirPref = getDirPref();
+      /* PAPER EPOCH (2026-08-15, Josh's word): H+R+RBI and pitcher_outs back on tickets */
+      applySuspensionLift(cfg);
     }
   }
   return engine;

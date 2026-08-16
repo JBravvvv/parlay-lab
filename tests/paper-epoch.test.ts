@@ -1,0 +1,151 @@
+import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { PAPER, SUSPENSIONS_LIFTED, applySuspensionLift } from "@/lib/paper-mode";
+import { LEDGER_EPOCH, decideEpochMigration, mergeAllowed } from "@/lib/ledger-epoch";
+import { discipline, type NoPlayLog } from "@/lib/noplay";
+import type { SyncEntry } from "@/lib/ledger-merge";
+
+/**
+ * THE PAPER EPOCH (2026-08-15, Josh's word, verbatim scope):
+ *   "Unsuspend H+R+RBI and other props on tickets; Clear the ledger and start betting a
+ *    hypothetical $150 every single day no matter what on the ticket … I will not be
+ *    taking ANY of the bets so its all hypothetical money to track. Do $25 in fun money
+ *    every day as well."
+ *
+ * Three mechanisms, none of which move the engine hash:
+ *
+ * 1. SUSPENSION LIFT — SH_CFG.hrrAltMax/-1 and outsSusp/true are runtime config the
+ *    engine reads at analyze time; both generators override them after boot (the cfSel
+ *    module proved this exact pattern). Every H+R+RBI line and pitcher_outs return to
+ *    the ticket candidate pool.
+ *
+ * 2. LEDGER EPOCH — "clear" cannot be a plain delete: the sync merge is append-only by
+ *    design, so any device would push the old season straight back. Epoch 2 = the paper
+ *    era. The server archives the epoch-1 blob (SET NX — first archive wins, re-runs
+ *    can't clobber) then resets; clients that see a newer epoch archive their local
+ *    copy and adopt; PUTs carrying an older epoch (stale bundles) are answered, never
+ *    merged. Nothing is destroyed — everything is archived.
+ *
+ * 3. PAPER DEPLOYMENT — the disciplined ev_gated allocation runs FIRST at $150 (that is
+ *    the calibrated system the record tracks); whatever the gate leaves unstaked is
+ *    forced onto the remaining leg-disjoint pool via the legacy caesars_ev allocator
+ *    (no EV gate, exact-sum). Forced tickets carry forced:true so gated performance and
+ *    forced deployment can always be split. $25 fun via the engine's own shFunPick,
+ *    once per day. Every paper ticket: paper:true, placed:false (Josh's standing word —
+ *    he takes none), actualStake:0. discipline() excludes paper entries — hypothetical
+ *    stakes must never pollute the real-money discipline record.
+ */
+
+describe("the paper constants are Josh's numbers, verbatim", () => {
+  it("$150 core + $25 fun since 2026-08-15", () => {
+    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25 });
+  });
+  it("the lift opens every HRR line and pitcher_outs", () => {
+    expect(SUSPENSIONS_LIFTED.hrrAltMax).toBeGreaterThan(10); // every real alt line is below this
+    expect(SUSPENSIONS_LIFTED.outsSusp).toBe(false);
+    expect(SUSPENSIONS_LIFTED.since).toBe("2026-08-15");
+  });
+  it("applySuspensionLift mutates a live cfg and is null-safe", () => {
+    const cfg: Record<string, unknown> = { hrrAltMax: -1, outsSusp: true };
+    applySuspensionLift(cfg);
+    expect(cfg.hrrAltMax).toBe(SUSPENSIONS_LIFTED.hrrAltMax);
+    expect(cfg.outsSusp).toBe(false);
+    expect(() => applySuspensionLift(null)).not.toThrow();
+  });
+});
+
+describe("ledger epoch — the clear that cannot resurrect", () => {
+  it("epoch-1 blob with entries → migrate AND archive; empty → migrate without archive; current → untouched", () => {
+    expect(decideEpochMigration({ ledger: [{ date: "2026-08-01" }] })).toEqual({ migrate: true, archive: true });
+    expect(decideEpochMigration({ epoch: 1, ledger: [] })).toEqual({ migrate: true, archive: false });
+    expect(decideEpochMigration(null)).toEqual({ migrate: true, archive: false });
+    expect(decideEpochMigration({ epoch: LEDGER_EPOCH, ledger: [{ date: "x" }] })).toEqual({ migrate: false, archive: false });
+    expect(decideEpochMigration({ epoch: LEDGER_EPOCH + 1, ledger: [] })).toEqual({ migrate: false, archive: false });
+  });
+  it("RESURRECTION PLANT: a stale-bundle PUT (no epoch) and an epoch-1 PUT are both refused a merge", () => {
+    expect(mergeAllowed(undefined)).toBe(false); // the deployed-yesterday client
+    expect(mergeAllowed(1)).toBe(false);
+    expect(mergeAllowed(LEDGER_EPOCH)).toBe(true);
+    expect(mergeAllowed(LEDGER_EPOCH + 1)).toBe(true);
+    expect(mergeAllowed("not-a-number")).toBe(false);
+  });
+});
+
+describe("discipline() — hypothetical money never pollutes the real-money record", () => {
+  const paperEntry: SyncEntry = {
+    date: "2026-08-16",
+    locked: true,
+    paper: true,
+    core: [{ id: "t1", stake: 150, placed: false, actualStake: 0 }],
+    grading: { done: true, tickets: { t1: { result: "won", payout: 300 } }, legs: {} },
+  } as unknown as SyncEntry;
+  const realEntry: SyncEntry = {
+    date: "2026-08-01",
+    locked: true,
+    core: [{ id: "r1", stake: 20 }],
+    grading: { done: true, tickets: { r1: { result: "lost", payout: 0 } }, legs: {} },
+  } as unknown as SyncEntry;
+  it("a settled paper day adds NOTHING to the gated line; the real day still counts", () => {
+    const d = discipline([paperEntry, realEntry], {} as NoPlayLog, "2026-08-20");
+    expect(d.lifetime.gated.staked).toBe(20); // the real $20, not 20 + the paper 150
+  });
+});
+
+describe("wired — source scans, comment-stripped", () => {
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const read = (p: string) => strip(fs.readFileSync(path.join(process.cwd(), p), "utf8"));
+
+  it("both generators lift the suspension after boot — server cron and browser engine", () => {
+    expect(read("app/api/generate/route.ts")).toMatch(/applySuspensionLift\(cfg\)/);
+    expect(read("src/lib/engine-client.ts")).toMatch(/applySuspensionLift\(cfg\)/);
+  });
+
+  it("lock-card deploys PAPER.daily with a caesars_ev top-up, forced-flagged, and stakes PAPER.fun via shFunPick", () => {
+    const src = read("src/lib/server/lock-card.ts");
+    expect(src).toMatch(/PAPER\.daily/);
+    expect(src).toMatch(/"caesars_ev"/); // the no-gate exact-sum top-up mode
+    expect(src).toMatch(/forced/);
+    expect(src).toMatch(/shFunPick/);
+    expect(src).toMatch(/PAPER\.fun/);
+    expect(src).toMatch(/paper:\s*true/);
+    expect(src).toMatch(/placed:\s*false/); // Josh's standing word: he places none of these
+    expect(src).not.toMatch(/capFrac \* bankroll/); // the old bankroll-derived ceiling is gone
+  });
+
+  it("the generate route's block budgets split PAPER.daily, not a re-derived bankroll cap", () => {
+    const src = read("app/api/generate/route.ts");
+    expect(src).toMatch(/splitBudget\(PAPER\.daily/);
+    expect(src).not.toMatch(/capFrac \* bankB/);
+  });
+
+  it("every writer of pl:ledger:v1 carries the epoch through — a lock or CLV write must not drop it", () => {
+    for (const f of ["src/lib/server/lock-card.ts", "app/api/clv/route.ts", "app/api/ledger/route.ts"]) {
+      expect(read(f), `${f} rewrites the ledger blob without preserving epoch`).toMatch(/epoch/);
+    }
+  });
+
+  it("the ledger route migrates lazily and gates stale-epoch merges; the scheduler migrates on every poke", () => {
+    const route = read("app/api/ledger/route.ts");
+    expect(route).toMatch(/ensureLedgerEpoch/);
+    expect(route).toMatch(/mergeAllowed/);
+    expect(read("app/api/scheduler/route.ts")).toMatch(/ensureLedgerEpoch/);
+  });
+
+  it("the client adopts a newer epoch by ARCHIVING local first, and stamps its epoch on every push", () => {
+    const src = read("src/lib/ledgerSync.ts");
+    expect(src).toMatch(/LOCAL_ARCHIVE_KEY/); // first archive wins, nothing destroyed
+    expect(src).toMatch(/LOCAL_EPOCH_KEY/);
+    expect(src).toMatch(/adoptEpoch\(/); // runs BEFORE readLocal in syncNow
+    expect(src).toMatch(/epoch:\s*LEDGER_EPOCH/); // PUT body carries it
+    // and the literals themselves are pinned where they live
+    const lib = read("src/lib/ledger-epoch.ts");
+    expect(lib).toMatch(/pl_ledger_archive_e1/);
+    expect(lib).toMatch(/pl_ledger_epoch/);
+  });
+
+  it("the surfaces say PAPER — the ledger and builder both banner the hypothetical regime", () => {
+    expect(read("app/ledger/page.tsx")).toMatch(/PaperBanner/);
+    expect(read("app/builder/page.tsx")).toMatch(/PaperBanner/);
+  });
+});

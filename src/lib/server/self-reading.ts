@@ -27,8 +27,12 @@ export const READING_KEY = (date: string) => `pl:reading:${date}`;
 /** matches the board TTL (EX 259200) — the reading rides /api/board into the daily archive */
 const TTL = 259200;
 
+/* PAPER EPOCH REWRITE 2026-08-15 (Josh's word: "I will not be taking ANY of the bets").
+   The epoch-1 checklist ("pl_selmode reads ev_gated last before placing · no slip above
+   $50 · stake <= the allocator's locked number · place, then mark placed and actualStake")
+   assumed real placement; the paper era places nothing. */
 export const CHECKLIST =
-  "pl_selmode reads ev_gated last before placing · no slip above $50 · stake <= the allocator's locked number · place, then mark placed and actualStake";
+  "PAPER EPOCH since 2026-08-15 · $150 core + $25 fun locked hypothetically every day · Josh places NOTHING (placed:false by his standing word) · verify the entry graded next morning and the record split gated vs forced";
 
 const EPS = 1e-9;
 

@@ -130,7 +130,9 @@ function addEntry(line: DiscLine, e: SyncEntry) {
  */
 export function discipline(entries: SyncEntry[], noplay: NoPlayLog, today: string): Discipline {
   const month = today.slice(0, 7);
-  const locked = entries.filter((e) => e.locked);
+  /* PAPER EPOCH (2026-08-15): hypothetical entries never pollute the real-money
+     discipline record — the ledger page tracks their P&L, this panel does not. */
+  const locked = entries.filter((e) => e.locked && (e as { paper?: boolean }).paper !== true);
   const ovDates = new Set(locked.filter((e) => (e as { overrode?: boolean }).overrode === true).map((e) => e.date));
 
   const scope = (inScope: (date: string) => boolean): DisciplineScope => {

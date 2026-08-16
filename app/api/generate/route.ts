@@ -10,6 +10,7 @@ import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liv
 import { ptToday } from "@/lib/server/pt-date";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, writeLock } from "@/lib/server/lock-card";
+import { PAPER, applySuspensionLift } from "@/lib/paper-mode";
 import { BLOCKS_KEY, partitionBlocks, splitBudget, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
@@ -260,6 +261,9 @@ export async function GET(req: NextRequest) {
     if (cfg) {
       cfg.selMode = CRON_SEL_MODE;
       cfg.mktN = armed.mktN;
+      /* PAPER EPOCH (2026-08-15, Josh's word): H+R+RBI and pitcher_outs return to the
+         ticket pool — hrrAltMax/outsSusp are runtime config, not an engine-hash move */
+      applySuspensionLift(cfg);
     }
 
     const slate = await eng.collectSlate();
@@ -403,13 +407,8 @@ export async function GET(req: NextRequest) {
               .filter(([, g]) => g?.start && win.has(Date.parse(g.start)))
               .map(([k]) => k),
           );
-          /* the same ceiling buildLockEntry derives — read from the engine, not retyped */
-          const cfgB = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
-          const shB = eng.get<{ bankroll?: number }>("SH") ?? {};
-          const bankB = Number(shB?.bankroll) > 0 ? Number(shB.bankroll) : 750;
-          const capFrac = Number(cfgB?.dailyBankrollCap) > 0 ? Number(cfgB.dailyBankrollCap) : 0.1;
-          const daily = Math.max(1, Math.round(capFrac * bankB));
-          blockBudget = splitBudget(daily, bs)[blockKey];
+          /* the same ceiling buildLockEntry derives — PAPER.daily, the one shared constant */
+          blockBudget = splitBudget(PAPER.daily, bs)[blockKey];
           carry = await getLockEntry(date);
         } else {
           console.warn(`[generate] block ${blockKey} not found in today's partition — locking whole-slate instead`);

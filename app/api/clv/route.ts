@@ -53,7 +53,7 @@ async function viaProxy<T>(oddsUrl: string): Promise<T | null> {
   }
 }
 
-type Stored = { ledger: SyncEntry[]; at: number };
+type Stored = { ledger: SyncEntry[]; at: number; epoch?: number };
 
 export async function GET(req: NextRequest) {
   if (!cronKeyAuthed(req) && !syncAuthed(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -120,7 +120,8 @@ export async function GET(req: NextRequest) {
       updated = applied.updated;
       if (updated > 0) {
         const merged = mergeLedgers(stored?.ledger ?? [], [applied.entry]);
-        const blob = JSON.stringify({ ledger: merged, at: Date.now() } satisfies Stored);
+        // the epoch rides through — a CLV write must never strip the paper-era marker
+        const blob = JSON.stringify({ ledger: merged, at: Date.now(), ...(stored?.epoch != null ? { epoch: stored.epoch } : {}) } satisfies Stored);
         if (blob.length <= MAX_BYTES) await redis(["SET", STORE_KEY, blob]);
       }
     }

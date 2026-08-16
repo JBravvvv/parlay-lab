@@ -128,7 +128,9 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
   probability-ranked by design (the Builder's parlay pool). Guards red-first
   (`tests/board-selmode.test.ts`, wiring scan observed red). Gate 108/857, tsc 0.
 - **PARLAYS FOLLOW THE MODE TOO, SHIPPED 2026-08-15 (Josh, part 2 of the site-wide-mode
-  rule), `82262cf` + crossings `8e73dd0`, deployed + live-verified** (section header
+  rule), `a6d1ad0` (citation corrected 2026-08-15: the addendum first cited `82262cf`,
+  a pre-rebase sha that never reached origin — the sha-references guard caught it on the
+  next gate) + crossings `8e73dd0`, deployed + live-verified** (section header
   names the order; ticket EVs read +3.3 → −4.8 strictly descending under ev_gated).
   ParlaysSection: full-mode read, `orderByMode` on every ticket set, badge/glow at the
   mode's price. Generation already followed `SH_CFG.selMode` — this aligned display.
@@ -144,6 +146,45 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
   contradictions 0. The loop is no longer data-starved: weekly Sunday fits by design,
   next 2026-08-16 10:00Z (5j fit-vintage verify owed FIRST) — HR is the near-certain
   first mover. HRR unsuspension + alt-lines unlock both await Josh's word.
+- **🧾 THE PAPER EPOCH, SHIPPED 2026-08-15 (Josh's word, VERBATIM: "Unsuspend H+R+RBI and
+  other props on tickets; Clear the ledger and start betting a hypothetical $150 every
+  single day no matter what on the ticket to track over a couple weeks. I will not be
+  taking ANY of the bets so its all hypothetical money to track. Do $25 in fun money
+  every day as well.")** Three mechanisms, zero engine-hash moves (recon: 6-agent
+  workflow wf_4734b6ef-545):
+  - **SUSPENSIONS LIFTED** (`src/lib/paper-mode.ts` — one copy of the numbers):
+    `hrrAltMax -1→99`, `outsSusp true→false`, applied post-boot in BOTH generators
+    (generate route after CRON_SEL_MODE; engine-client getEngine; scheduler backfill
+    path too — backfills re-run the allocator). Data at lift: HRR 58.5% vs 57.2%
+    implied n=1,010 · outs 49.8% vs 49.2% n=554. Takes effect on the NEXT generated
+    board. Left in place deliberately: coreNoHR, K's fill-only caps, noParlay lineup
+    rule (structural discipline, not suspensions), Sharp-only calibration quarantine
+    (auto-exits on data).
+  - **LEDGER EPOCH 2** (`src/lib/ledger-epoch.ts` + server half): "clear" via epoch bump
+    because the merge is append-only and ANY device would resurrect a plain delete.
+    Server: archive epoch-1 blob to `pl:ledger:archive:e1` (SET NX, first archive wins)
+    then reset `{ledger:[], epoch:2}` — runs lazily on every authed ledger request AND
+    every scheduler poke, idempotent. Clients: adoptEpoch archives local `pl_ledger` to
+    `pl_ledger_archive_e1` before dropping it; every PUT stamps `epoch`; the route
+    REFUSES ledger merges from epoch-blind senders (stale bundles) — the resurrection
+    gate. Every blob writer (ledger PUT, writeLock, CLV) carries epoch through.
+    **NOTHING DESTROYED: the real-money season (incl. placed/actualStake answers) lives
+    forever under the archive keys.**
+  - **PAPER DEPLOYMENT** (`lock-card.ts`): daily is a FIXED $150 (was 0.1×750=$75);
+    disciplined ev_gated alloc runs FIRST (the calibrated system the record tracks),
+    shortfall FORCED via `caesars_ev` re-alloc on the leg-disjoint remainder (no EV
+    gate, exact-sum) — forced tickets carry `forced:true`, entries carry `paper:true`,
+    `gatedSum` splits gated vs forced. **$25 fun staked server-side once per day via
+    the engine's own shFunPick** (server never staked fun before). Every paper ticket:
+    `placed:false, actualStake:0` — Josh's standing word IS the answer, superseding
+    the epoch-1 null-means-unanswered doctrine (lock-card.test.ts records both forms).
+    `discipline()` excludes paper entries from the real-money record. PaperBanner on
+    Builder + Ledger. CHECKLIST rewritten for the paper era (old text preserved in the
+    comment). Guards: tests/paper-epoch.test.ts (18) observed RED first; the fixture
+    behavioral proof: gate-clears-nothing day → 5 forced tickets, exactly $150,
+    gatedSum 0. Bonus catch this gate: the sha-references guard flagged `82262cf` (the
+    concurrent session's pre-rebase citation) — corrected to `a6d1ad0`, dated, literal
+    allowlisted with its why. Gate 109/871, tsc 0.
 - **Standing watch items:** morning blocks fire at low confirmed-lineup share (block A
   luPct 0.4, §12Z.16) — beside the knobs table, Josh's knobs, no move without his word ·
   the knobs table itself (§12Z.15) awaits his sentence · alt-lines unlock decision page

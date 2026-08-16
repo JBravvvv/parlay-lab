@@ -31,7 +31,12 @@ const FILES = ["CLAUDE.md", ...readdirSync("docs").filter((f) => f.endsWith(".md
 const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f", "f6cf1513", "4a5e96c0", "3fdd34b",
   /* 2026-08-03 singles flip: the re-cut board digests. The superseded pair stays allowlisted
      above because the tests quote both old and new — a retired digest is still a citation. */
-  "fd73ad6d", "4151ad25"]);
+  "fd73ad6d", "4151ad25",
+  /* 2026-08-15: `82262cf` is a PRE-REBASE sha this guard itself caught dangling — the parlay
+     mode-alignment addendum cited it before the ship was rebased onto bot commits and landed
+     as a6d1ad0. The handoff keeps the bad sha inside its dated correction note (the catch is
+     part of the record), so the literal must stay quotable without resolving. */
+  "82262cf"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**
