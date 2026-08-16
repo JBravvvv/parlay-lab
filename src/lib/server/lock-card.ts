@@ -2,6 +2,7 @@ import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@
 import { redis } from "@/lib/server/store";
 import { PAPER, ticketWindow } from "@/lib/paper-mode";
 import { buildFunHrTickets, type FunLegSrc } from "@/lib/fun-hr";
+import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: every day produces a locked card).
@@ -127,24 +128,86 @@ export function buildLockEntry(args: {
     pool = (pool as AllocPick[]).filter((p) => (p.w?.pl?.legs ?? []).every((l) => l.gkey && blockGkeys.has(l.gkey)));
   }
   const shAllocate = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate");
-  const alloc = shAllocate(
-    pool,
-    daily,
-    cfg,
-    false, // never force: the disciplined path is the only path the system locks by itself
-  );
-
-  /* PAPER EPOCH (2026-08-15, Josh's word): "$150 every single day no matter what." The
-     disciplined ev_gated allocation above runs FIRST — that is the calibrated system the
-     record exists to track. Whatever the gate leaves unstaked is then FORCED onto the
-     remaining pool via the legacy caesars_ev allocator: no EV gate, exact-sum guarantee,
-     the engine's own dedupe/cap rules. Leg-disjointness across the two passes is enforced
-     HERE (the engine's no-repeated-leg rule holds within one call, not across two).
-     Forced tickets carry forced:true so gated performance and forced deployment can
-     always be split in the record. */
   const tid = eng.get<(pl: unknown) => string>("shTicketId");
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
   const legKey = (l: { label?: string | null; prop?: string | null }) => `${l.label}|${l.prop}`;
+
+  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15).
+     The window shapes ONLY the forced pass — the disciplined call keeps its own cfg
+     (min 4 / max 6, the engine's numbers) because that system is the one being
+     tracked. Pro-rata on block days; ceiling hard; floor best-effort on thin pools. */
+  const carriedCount = (carry?.core ?? []).length;
+  const win = ticketWindow(daily, carriedCount);
+
+  /* THE UNDER BIAS (2026-08-16, Josh's word; the 3-day side-split behind it lives in
+     under-bias.ts). Rule 1: tickets carrying a pitcher_outs UNDER leg leave the paper
+     pool — re-admitted least-under-heavy first ONLY if the remainder cannot seat this
+     fire's minimum ("not included very often", literally). */
+  const biasView = (pool as PoolItem[]).map((w) => ({
+    w,
+    name: String(w.pl.name ?? ""),
+    czEv: (w.pl.czEv as number | null) ?? null,
+    legs: w.pl.legs as { lkey?: string | null; prop?: string | null; label?: string | null }[],
+  }));
+  const prunedB = pruneOutsUnder(biasView, win.minNew);
+  let biasPool: PoolItem[] = prunedB.pool.map((b) => b.w);
+
+  /* PAPER EPOCH (2026-08-15, Josh's word): "$150 every single day no matter what." The
+     disciplined ev_gated allocation runs FIRST — that is the calibrated system the
+     record exists to track. Whatever the gate leaves unstaked is then FORCED onto the
+     remaining pool via the legacy caesars_ev allocator: no EV gate, exact-sum guarantee,
+     the engine's own dedupe/cap rules. Leg-disjointness across the two passes is
+     enforced HERE. Forced tickets carry forced:true so gated performance and forced
+     deployment can always be split.
+     Rule 2 of the under bias wraps both passes: the staked card (carried legs included)
+     may run at most 25% under prop legs — over quota, the most under-heavy picked
+     ticket is EVICTED from the pool and both passes re-run. Bounded: every iteration
+     removes a picked ticket, so the loop cannot spin. */
+  const carriedBias = (carry?.core ?? []).map((t) => ({
+    name: String(t.name ?? ""),
+    czEv: (t.czEv as number | null) ?? null,
+    legs: ((t.legs as { lkey?: string | null; prop?: string | null }[] | undefined) ?? []),
+  }));
+  let alloc: AllocResult = { picks: [], sum: 0 };
+  let forced: AllocResult = { picks: [], sum: 0 };
+  let underShare = 0;
+  let quotaEvicted = 0;
+  for (let attempt = 0; ; attempt++) {
+    alloc = shAllocate(biasPool, daily, cfg, false);
+    forced = { picks: [], sum: 0 };
+    const gatedIds = new Set<string>(alloc.picks.map((p) => p.id));
+    const gatedLegs = new Set<string>();
+    for (const p of alloc.picks) for (const l of p.w.pl.legs) gatedLegs.add(legKey(l));
+    for (const t of carry?.core ?? []) {
+      if (t.id) gatedIds.add(String(t.id));
+      for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) gatedLegs.add(legKey(l));
+    }
+    const shortfall = daily - alloc.sum;
+    const forcedMax = Math.max(0, win.maxNew - alloc.picks.length);
+    if (shortfall > 0 && forcedMax > 0) {
+      const rest = biasPool.filter(
+        (w) => !gatedIds.has(tid(w.pl)) && !w.pl.legs.some((l) => gatedLegs.has(legKey(l))),
+      );
+      forced = shAllocate(rest, shortfall, {
+        ...cfg,
+        selMode: "caesars_ev",
+        maxCoreTickets: forcedMax,
+        minCoreTickets: Math.max(1, win.minNew - alloc.picks.length),
+      }, false);
+    }
+    const staged = [...alloc.picks, ...forced.picks].map((p) => ({
+      __id: p.id,
+      name: String(p.w.pl.name ?? ""),
+      czEv: (p.w.pl.czEv as number | null) ?? null,
+      legs: p.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
+    }));
+    underShare = underStats([...carriedBias, ...staged]).share;
+    if (underShare <= 1 - UNDER_BIAS.overShare + 1e-9 || attempt >= 12) break;
+    const worst = worstUnderTicket(staged);
+    if (!worst) break;
+    quotaEvicted++;
+    biasPool = biasPool.filter((w) => tid(w.pl) !== worst.__id);
+  }
   const usedIds = new Set<string>(alloc.picks.map((p) => p.id));
   const usedLegs = new Set<string>();
   for (const p of alloc.picks) for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
@@ -152,27 +215,9 @@ export function buildLockEntry(args: {
     if (t.id) usedIds.add(String(t.id));
     for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) usedLegs.add(legKey(l));
   }
-  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15).
-     The window shapes ONLY this forced pass — the disciplined call above keeps its own
-     cfg (min 4 / max 6, the engine's numbers) because that system is the one being
-     tracked. Pro-rata on block days; ceiling hard; floor best-effort on thin pools. */
-  const carriedCount = (carry?.core ?? []).length;
-  const win = ticketWindow(daily, carriedCount);
   const gatedCount = alloc.picks.length;
-  let forced: AllocResult = { picks: [], sum: 0 };
   const shortfall = daily - alloc.sum;
   const forcedMax = Math.max(0, win.maxNew - gatedCount);
-  if (shortfall > 0 && forcedMax > 0) {
-    const rest = (pool as PoolItem[]).filter(
-      (w) => !usedIds.has(tid(w.pl)) && !w.pl.legs.some((l) => usedLegs.has(legKey(l))),
-    );
-    forced = shAllocate(rest, shortfall, {
-      ...cfg,
-      selMode: "caesars_ev",
-      maxCoreTickets: forcedMax,
-      minCoreTickets: Math.max(1, win.minNew - gatedCount),
-    }, false);
-  }
 
   const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
     const pl = p.w.pl;
@@ -307,6 +352,12 @@ export function buildLockEntry(args: {
     funT,
     games: { ...(carry?.games ?? {}), ...games },
     blockedReasons,
+    /* the under bias, on the record: the card's measured under share and what the
+       bias removed to get there (0/absent = the rules never had to act) */
+    underShare: Math.round(underShare * 1000) / 1000,
+    ...(prunedB.dropped + prunedB.readmitted + quotaEvicted > 0
+      ? { biasDropped: { outsUnder: prunedB.dropped, outsUnderReadmitted: prunedB.readmitted, quotaEvicted } }
+      : {}),
     ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0

@@ -196,7 +196,23 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     exact-$25 split, remainder on the first · thin pool → fewer/none + `funNote`
     (never fabricated). shFunPick RETIRED from the paper path. Naive cross-team product
     pricing disclosed in the module header (HR sim-joint stays an engine-ship rider).
-    Guards tests/fun-hr.test.ts (11, red-first, plants for team/repeat/thin-pool). CHECKLIST rewritten for the paper era (old text preserved in the
+    Guards tests/fun-hr.test.ts (11, red-first, plants for team/repeat/thin-pool).
+    **THE UNDER BIAS (Josh's fourth word, 2026-08-16: outs unders "not included very
+    often"; "overs to have a 75% bias for use vs 25% … I don't want as many unders"):**
+    RE-EVALUATION FIRST, from /api/picks (3 served days — the pt-mirror TTL bounds the
+    window — 619 graded): **outs unders 20–28, 41.7% vs 49.6% model (−8.0), and 48 of
+    58 outs picks were unders**; unders as a CLASS −5..−9 vs model (hits u −7.4, TB u
+    −8.6) while overs run at/above (K's o +8.9, HRR o +4.9). ROOT CAUSE NAMED: the
+    weekly fit is PER-MARKET, side-blind — outs already carried max shrink (0.143) and
+    unders still cleared. `src/lib/under-bias.ts` is the side-aware layer: rule 1
+    pruneOutsUnder (outs-under tickets out of the paper pool; re-admitted
+    least-under-heavy ONLY if the remainder can't seat the fire's minimum) · rule 2
+    ≤25% under share of the card's SIDED prop legs (carried legs included), enforced
+    by a bounded evict-and-rerun loop around BOTH passes. Entry stamps `underShare` +
+    `biasDropped`. Side from prop text (" U "/" O ", the pinned production
+    vocabulary); market from the 3-part lkey; ML/RL sideless, out of the denominator.
+    Guards tests/under-bias.test.ts (red-first). SIDE-AWARE CALIBRATION (per-side
+    mults) noted as the durable fix — engine-feed change, queued behind Josh's word. CHECKLIST rewritten for the paper era (old text preserved in the
     comment). Guards: tests/paper-epoch.test.ts (18) observed RED first; the fixture
     behavioral proof: gate-clears-nothing day → 5 forced tickets, exactly $150,
     gatedSum 0. Bonus catch this gate: the sha-references guard flagged `82262cf` (the

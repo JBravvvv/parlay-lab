@@ -138,8 +138,9 @@ describe("wired — source scans, comment-stripped", () => {
     // the forced call carries the count overrides…
     expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
     expect(src).toMatch(/minCoreTickets/);
-    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself)
-    expect(src).toMatch(/shAllocate\(\s*pool,\s*daily,\s*cfg,\s*false/s);
+    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself;
+    // since 2026-08-16 it draws from the bias-pruned pool — see under-bias.test.ts)
+    expect(src).toMatch(/shAllocate\(\s*biasPool,\s*daily,\s*cfg,\s*false/s);
   });
 
   it("the generate route's block budgets split PAPER.daily, not a re-derived bankroll cap", () => {
