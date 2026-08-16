@@ -2451,7 +2451,17 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
       var nv=(row.fair!=null)?row.fair:((iO!=null&&iU!=null)?shDevig2(iO,iU):null);
       if(row.books>=2)tags.push("consensus");
       var wPr=shWm(SH_W.props,mkt);
-      if(nv!=null){var pAdj=wPr*pO+(1-wPr)*nv;
+      /* side-aware calibration (2026-08-16, operator's word): a model deviation in the
+         UNDER direction (pO below the de-vigged fair) may earn EXTRA fitted shrink —
+         calW["mkt|u"], weekly, shrink-only, same 0.05 floor as shWm. ABSENT KEY =
+         IDENTICAL BLEND: dormant exactly like calW itself, which is what keeps the
+         provenance baseline (baseline43) green while the string hash moves. */
+      if(nv!=null){var wDn=wPr;
+        if(pO<nv&&SH_V2&&SH_V2.calW&&SH_V2.calW[mkt+"|u"]!=null){
+          var muD=Number(SH_V2.calW[mkt+"|u"]);
+          if(isFinite(muD)&&muD>=0&&muD<1)wDn=Math.max(0.05,wPr*muD);
+        }
+        var pAdj=wDn*pO+(1-wDn)*nv;
         if(Math.abs(pO-nv)>=0.10)tags.push("market-gap");
         /* fix-file Phase 5 (2026-07-24): in the disciplined modes BOTH sides flow through
            the same de-vig → fair → edge pipeline — the side is simply whichever one the

@@ -410,6 +410,11 @@ export type GradedFromBlob = {
   susp?: true;
   /** population label passthrough (2026-08-06) — the fits ignore it; progress splits by it */
   pop?: "selected" | "unselected" | "shadow";
+  /* SIDE (2026-08-16, side-aware calibration — Josh's word). Derived from `sub` with the
+     grader's own space-delimited vocabulary (grade.ts / U /): props are "O"/"U"; game
+     markets (ml_/rl_ lkeys) are null — their side lives in the lkey and the sided fit
+     is a props concept. Same additive passthrough shape as `pop`. */
+  side?: "O" | "U" | null;
   /* MARKET RANK (2026-08-07, picks ship): 1-based position among the market's PURE rows
      in the engine's own category order, stamped at generation — the day's top-50 cohort
      as an append-only fact. Absent on impure rows and on rows written before this ship
@@ -434,6 +439,7 @@ export function gradedFromBlob(blob: DayBlob | null): GradedFromBlob[] {
       // ev is the best-price fallback. Percent units — fitByEv divides by 100.
       ev: r.czEv ?? r.ev ?? null,
       ln: r.ln ?? lineOf(r.lkey),
+      side: String(r.lkey ?? "").split("|").length === 3 ? (/ U /.test(` ${r.sub} `) ? "U" : "O") : null,
       ...(r.susp ? { susp: true as const } : {}),
       ...(r.pop ? { pop: r.pop } : {}),
     });

@@ -16,17 +16,19 @@ export const ENGINE_SHA = createHash("sha256").update(LEGACY_SRC, "utf8").digest
 
 /**
  * The served-chunk engine hash last verified by the STEP-0 re-grep ritual (CLAUDE.md).
- * ⚠️ PENDING-LIVE-VERIFICATION 2026-07-31 ~02:40Z — the outs-flag ship moved the engine
- * string (f6cf1513… -> b862b2b2…, 280,466 -> 281,096 chars). The served artifact cannot
- * carry the new string until this commit deploys, so this constant is set to the RUNTIME
- * hash AHEAD of its live verification and tests/served-verification.json holds the pending
- * marker; the post-deploy re-grep confirms it and clears the marker within 24h (enforced).
+ * ⚠️ PENDING-LIVE-VERIFICATION 2026-08-16 — the SIDE-AWARE CALIBRATION ship moved the
+ * engine string (39fc8681… -> cb2cdebc…, 283,396 -> 284,032 chars): the props blend
+ * gained the dormant calW["mkt|u"] under-direction shrink (legacy L2453+, below the
+ * instrumented id region). The served artifact cannot carry the new string until this
+ * commit deploys, so this constant is set to the RUNTIME hash AHEAD of its live
+ * verification and tests/served-verification.json holds the pending marker; the
+ * post-deploy re-grep confirms it and clears the marker within 24h (enforced).
  * The guard fails the build when ENGINE_SHA diverges from this — i.e., when the repo
  * engine moves without the served-artifact verification moving with it. Update ONLY
  * alongside a fresh served-chunk verification, in the same commit.
  */
 export const SERVED_ENGINE_SHA_VERIFIED =
-  "39fc86814eb4e8be561278b48822810ee77f33ff822510a8b8f5c530c9acc0ce";
+  "cb2cdebc4c68c88488c405c1af066e790691a313773af092d7299606b675d637";
 
 export const sha256Text = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 

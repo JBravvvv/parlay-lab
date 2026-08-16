@@ -212,7 +212,35 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
     `biasDropped`. Side from prop text (" U "/" O ", the pinned production
     vocabulary); market from the 3-part lkey; ML/RL sideless, out of the denominator.
     Guards tests/under-bias.test.ts (red-first). SIDE-AWARE CALIBRATION (per-side
-    mults) noted as the durable fix — engine-feed change, queued behind Josh's word. CHECKLIST rewritten for the paper era (old text preserved in the
+    mults) noted as the durable fix — engine-feed change, queued behind Josh's word.
+    **SIDE-AWARE CALIBRATION SHIPPED 2026-08-16 (Josh's word: "Yes make the calibration
+    side-aware so it learns per-side too") — THE FIRST HASH-MOVING ENGINE SHIP SINCE THE
+    SINGLES FLIP.** Engine string `39fc8681…` → `cb2cdebc4c68c88488c405c1af066e79
+    0691a313773af092d7299606b675d637` (283,396 → 284,032 chars). THE DESIGN: the blend
+    picks the side AFTER weighting (p_under = 1−p_adj), so per-side calibration is an
+    ASYMMETRIC DEVIATION SHRINK — when pO < fair, `calW["mkt|u"]` multiplies extra
+    shrink onto the blend weight (legacy L2453+, BELOW the instrumented id region;
+    shrink-only, 0.05 floor, ABSENT KEY = VALUE-IDENTICAL). Dormancy is what kept
+    baseline43 (un-regenerable provenance) and every snapshot green — ZERO baselines
+    re-cut; the whole gate passed first run. FIT SIDE: GradedPick/GradedFromBlob gain
+    optional `side` ("O"/"U" from `sub` via the grader's own / U /; game markets null;
+    ledger-join derives from l.prop); computeCalibration emits `summary.perSide`
+    ("mkt|o"/"mkt|u" — SEPARATE keyspace from markets, so Stats/calibrationLine/mktN
+    untouched); applyWeeklyAdjustment walks the "|u" rollups under the SAME discipline
+    (ADJUST n≥150, Wilson-significant, ±10%/week, shrink-only, one lastAdjust clock).
+    First sided fit: Sunday 2026-08-23 (tomorrow 08-17's fit runs on rows that begin
+    carrying side only after this deploy — the training rows before it are side-null).
+    Guards tests/side-calibration.test.ts (11, red-first) incl. the LIVE-ENGINE A/B
+    (calW["mkt|u"]=0.15 moved under rows, overs byte-still) and the dormancy proof.
+    engine-echo pin → cb2cdebc… with the comment rewritten; served-verification
+    pending:true → post-deploy re-grep owed within 24h.
+    **RIDERS DEFERRED, DATED DECISION (the rider rows say "rides the next hash-moving
+    ship" — this is that ship by the letter):** items 2 (simJoint j2/pm), 5 (drop
+    counts), 5l (good-board-skip T check) do NOT ride. REASON: this ship's entire
+    verification rests on VALUE-DORMANCY (every un-regenerable baseline green because
+    outputs are unchanged); all three riders are value-moving or path-moving in their
+    own subsystems and would destroy exactly that property, forcing the baseline43
+    argument this ship avoided. They ride the next VALUE-MOVING engine ship instead. CHECKLIST rewritten for the paper era (old text preserved in the
     comment). Guards: tests/paper-epoch.test.ts (18) observed RED first; the fixture
     behavioral proof: gate-clears-nothing day → 5 forced tickets, exactly $150,
     gatedSum 0. Bonus catch this gate: the sha-references guard flagged `82262cf` (the

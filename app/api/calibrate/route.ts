@@ -369,6 +369,9 @@ export async function GET(req: NextRequest) {
               res,
               pMkt: null,
               ln: lineOf(l.lkey),
+              // side-aware calibration (2026-08-16): the grader's own vocabulary, from
+              // the leg's prop text; game markets (non-3-part lkeys) stay null
+              side: String(l.lkey).split("|").length === 3 ? (/ U /.test(` ${l.prop} `) ? "U" : "O") : null,
             };
             graded.push(pick);
             // the ledger join is already date-cut at SUMMARY_DAYS above, so these legs

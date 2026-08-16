@@ -35,6 +35,11 @@ export type GradedPick = {
      had to be captured: the prediction blob already stored czEv/ev per row, and only the
      projection into GradedPick dropped them. */
   ev?: number | null;
+  /* SIDE (2026-08-16, side-aware calibration — Josh's word: "make the calibration
+     side-aware so it learns per-side too"). "O"/"U" for props, null for game markets.
+     OPTIONAL by design: every existing producer and test helper keeps compiling, and
+     rows without it simply stay out of the per-side buckets. */
+  side?: "O" | "U" | null;
 };
 
 export const PROB_BUCKETS: [number, number][] = [
@@ -167,6 +172,15 @@ export type CalibrationSummary = {
   /* sanity breaker (any n>=30): stated edge 30%+ with actual below HALF the
      predicted rate → looks like a bug, not miscalibration. Quarantine. */
   quarantine: string[];
+  /* SIDE-AWARE (2026-08-16, Josh's word): per-(market, side) rollups under keys
+     "mkt|o" / "mkt|u" — a SEPARATE keyspace from `markets`, deliberately: the Stats
+     table and calibrationLine iterate `markets` and must not grow sided rows. The
+     weekly adjuster walks the "|u" keys (the engine's only sided consumer is the
+     under-direction blend shrink calW["mkt|u"]); the "|o" rows are visibility. */
+  perSide?: Record<
+    string,
+    { n: number; predicted: number; actual: number; tier: Tier; significant: boolean; direction: "hot" | "cold" | "ok" }
+  >;
   /* 2026-07-20: reliability slopes per market (+ pooled "all") and the fitted
      global model-confidence shrink — attached by the nightly cron */
   reliability?: Record<string, { n: number; slope: number | null; se: number | null }>;
@@ -291,7 +305,32 @@ export function computeCalibration(picks: GradedPick[]): CalibrationSummary {
       if (won / extreme.length < predicted / 2) quarantine.push(m);
     }
   }
-  return { at: Date.now(), graded: picks.length, markets, buckets, perMarket, quarantine };
+  /* SIDE-AWARE ROLLUPS (2026-08-16): same math as perMarket, on the (market, side)
+     subsets that carry a side. The 3-day read that motivated this: unders as a class
+     ran 5–9 points below stated while the per-market fit — side-blind — could not see
+     it (outs already sat at max shrink and unders still cleared the gate). */
+  const perSide: NonNullable<CalibrationSummary["perSide"]> = {};
+  for (const m of markets) {
+    for (const s of ["O", "U"] as const) {
+      const sel = picks.filter((x) => x.market === m && x.side === s);
+      const n = sel.length;
+      if (!n) continue;
+      const won = sel.filter((x) => x.res === "won").length;
+      const predicted = sel.reduce((a, x) => a + x.p, 0) / n / 100;
+      const actual = won / n;
+      const ci = wilson(won, n);
+      const significant = n >= SIG_MIN_N && (predicted < ci.lo || predicted > ci.hi);
+      perSide[`${m}|${s.toLowerCase()}`] = {
+        n,
+        predicted,
+        actual,
+        tier: tierFor(n),
+        significant,
+        direction: !significant ? "ok" : actual < predicted ? "hot" : "cold",
+      };
+    }
+  }
+  return { at: Date.now(), graded: picks.length, markets, buckets, perMarket, quarantine, perSide };
 }
 
 /* ---------- reliability slopes + global confidence shrink (2026-07-20) ----------
@@ -652,8 +691,15 @@ const MULT_FLOOR = 0.05 / 0.35; // model weight never below 5% absolute (props d
 export function applyWeeklyAdjustment(summary: CalibrationSummary, state: WeightState, now: number): WeightState {
   if (now - state.lastAdjust < WEEK_MS) return state;
   const next: WeightState = { mults: { ...state.mults }, lastAdjust: now, log: [...state.log] };
-  for (const m of summary.markets) {
-    const pm = summary.perMarket[m];
+  /* SIDE-AWARE (2026-08-16, Josh's word): the same weekly walk covers the per-side
+     "|u" rollups — one clock, one step size, same tier + significance discipline. Only
+     the "|u" keys act: the engine's sole sided consumer is the under-direction blend
+     shrink (calW["mkt|u"]); an over-side mult would be an inert key, so none is written. */
+  const rollups: [string, { n: number; predicted: number; actual: number; tier: Tier; significant: boolean; direction: "hot" | "cold" | "ok" }][] = [
+    ...summary.markets.map((m) => [m, summary.perMarket[m]] as [string, (typeof summary.perMarket)[string]]),
+    ...Object.entries(summary.perSide ?? {}).filter(([k]) => k.endsWith("|u")),
+  ];
+  for (const [m, pm] of rollups) {
     if (!pm || pm.tier !== "ADJUST") continue;
     const cur = next.mults[m] ?? 1;
     let after = cur;
