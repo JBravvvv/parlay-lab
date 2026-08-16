@@ -271,10 +271,24 @@ const CROSSINGS = [
       "k=6,627) — still below; the dissolved direction stays dissolved. Double brake " +
       "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 28-49.",
   },
+  { ump: "Alex Tosi", date: "2026-08-16", commit: "348cc95", kPerG: 17.6, braked: true,
+    note: "FIFTIETH. g 4->5, k 88. Bot refresh caught on a rebase re-gate mid-fun-composer " +
+      "ship — crossings 50-54 record." },
+  { ump: "Jacob Metz", date: "2026-08-16", commit: "348cc95", kPerG: 16.4, braked: true,
+    note: "FIFTY-FIRST. g 4->5, k 82." },
+  { ump: "Sean Barber", date: "2026-08-16", commit: "348cc95", kPerG: 16.8, braked: true,
+    note: "FIFTY-SECOND. g 4->5, k 84." },
+  { ump: "John Bacon", date: "2026-08-16", commit: "348cc95", kPerG: 17.0, braked: true,
+    note: "FIFTY-THIRD. g 4->5, k 85." },
+  { ump: "Mark Wegner", date: "2026-08-16", commit: "348cc95", kPerG: 16.0, braked: true,
+    note: "FIFTY-FOURTH. g 4->5, k 80. Armed mean at n=54: 16.46 vs league 16.63 (g=415, " +
+      "k=6,903) — still below; the dissolved direction stays dissolved. Double brake " +
+      "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 50-54.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 49;
+const FLOOR = 54;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

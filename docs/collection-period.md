@@ -7188,6 +7188,26 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 50 THROUGH 54 — DATED RECORD (2026-08-16)
+
+**Five crossings in one bot refresh (`348cc95`, 2026-08-16T17:19Z), found by the guard on
+a rebase re-gate mid-ship (the fun-composer push bounced on the refresh — the Marvin
+Hudson pattern again, working as designed):**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 50 | Alex Tosi | 2026-08-16 | `348cc95` | 5 / 88 | 17.6 |
+| 51 | Jacob Metz | 2026-08-16 | `348cc95` | 5 / 82 | 16.4 |
+| 52 | Sean Barber | 2026-08-16 | `348cc95` | 5 / 84 | 16.8 |
+| 53 | John Bacon | 2026-08-16 | `348cc95` | 5 / 85 | 17.0 |
+| 54 | Mark Wegner | 2026-08-16 | `348cc95` | 5 / 80 | 16.0 |
+
+**FIFTY-FOUR armed. Armed-set mean k/g at n = 54: 16.46 vs league 16.63 (g=415,
+k=6,903) — still below; the dissolved direction stays dissolved.**
+
+**DID ANY REACH A BOARD? NO — the double brake (`SH_CFG.umpKFrozen:true` + frozen
+`context.json`) re-ran green this gate. `FLOOR` raised 49 → 54 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 22 THROUGH 27 — DATED RECORD (2026-08-11)
 
 **Six crossings across two unintegrated bot refreshes on the deploy branch, found by the
