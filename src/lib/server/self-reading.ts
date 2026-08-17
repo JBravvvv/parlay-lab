@@ -116,6 +116,15 @@ export function buildReading(args: { entry: SyncEntry; gen: Gen | null; date: st
   const violations: string[] = [];
 
   for (const t of core) {
+    /* PAPER EPOCH (2026-08-16 correction — the 08-16 reading false-flagged every paper
+       ticket): paper tickets are BORN placed:false/actualStake:0 by Josh's standing word;
+       the null-means-unanswered rule now applies only to non-paper tickets. */
+    const paper = (t as { paper?: boolean }).paper === true;
+    if (paper) {
+      if (t.placed !== false) violations.push(`ticket ${t.id}: paper ticket with placed=${String(t.placed)} — the standing not-placed answer is missing`);
+      if (t.actualStake !== 0) violations.push(`ticket ${t.id}: paper ticket with actualStake=${String(t.actualStake)} — must be 0`);
+      continue;
+    }
     if (t.placed !== null && t.placed !== undefined) violations.push(`ticket ${t.id}: placed=${String(t.placed)} at lock time — must be null (UNANSWERED)`);
     if (t.actualStake !== null && t.actualStake !== undefined) violations.push(`ticket ${t.id}: actualStake=${String(t.actualStake)} at lock time — must be null`);
   }
