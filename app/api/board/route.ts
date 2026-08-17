@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, bestGen, decodeBoard, type GenIndexEntry } from "@/lib/server/board-store";
 import { getReading } from "@/lib/server/self-reading";
+import { publicCardView } from "@/lib/server/card-view";
+import { getLockEntry } from "@/lib/server/lock-card";
 import { PROGRESS_KEY } from "@/lib/server/grading-progress";
 import { redis, redisGetJson, storeEnv } from "@/lib/server/store";
 
@@ -58,12 +60,18 @@ export async function GET(req: NextRequest) {
        AND its reading. Present on the no-board path too: a reason-record day has a
        reading and no board. */
     const reading = await getReading(date);
+    /* THE PUBLIC PAPER CARD (2026-08-16, Josh's ask): the day's locked card, leg by
+       leg — hypothetical output, same publicity class as /api/picks. publicCardView
+       is the hard gate: a non-paper (real-money) entry serves null, always, and the
+       placement fields are stripped either way. This amends the header's "no stakes"
+       line for PAPER stakes only. */
+    const card = publicCardView(await getLockEntry(date));
     /* LEARNING PROGRESS (2026-08-06): the cumulative per-market graded state — n, hit
        rate vs implied, by-population split, days-to-150 — written by the daily grade-only
        passes. Same URL as the card: Josh watches the learning accumulate here. */
     const learning = await redisGetJson(PROGRESS_KEY);
-    if (!board) return NextResponse.json({ board: null, reason: "no-board-for-date", gens: index, reading, learning });
-    return NextResponse.json({ board, gens: index, reading, learning });
+    if (!board) return NextResponse.json({ board: null, reason: "no-board-for-date", gens: index, reading, learning, card });
+    return NextResponse.json({ board, gens: index, reading, learning, card });
   } catch (e) {
     // never a hard failure: the client falls back to generating, exactly as before
     return NextResponse.json({ board: null, reason: `store-unreachable: ${(e as Error).message}` });
