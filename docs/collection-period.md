@@ -7188,6 +7188,28 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 55 THROUGH 62 — DATED RECORD (2026-08-18)
+
+**Eight crossings across two bot refreshes, found by the guard on a rebase re-gate
+mid-ship (the core/fun-split push bounced on them — the standing pattern):**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 55 | Ramon De Jesus | 2026-08-17 | `431f847` | 5 / 75 | 15.0 |
+| 56 | Erich Bacchus | 2026-08-17 | `431f847` | 5 / 83 | 16.6 |
+| 57 | Hunter Wendelstedt | 2026-08-17 | `431f847` | 5 / 75 | 15.0 |
+| 58 | Jonathan Parra | 2026-08-17 | `431f847` | 5 / 88 | 17.6 |
+| 59 | Scott Barry | 2026-08-18 | `80cfbaf` | 5 / 86 | 17.2 |
+| 60 | Mark Ripperger | 2026-08-18 | `80cfbaf` | 5 / 82 | 16.4 |
+| 61 | Ben May | 2026-08-18 | `80cfbaf` | 5 / 94 | 18.8 |
+| 62 | Nic Lentz | 2026-08-18 | `80cfbaf` | 5 / 96 | 19.2 |
+
+**SIXTY-TWO armed. Armed-set mean k/g at n = 62: 16.49 vs league 16.59 (g=441,
+k=7,318) — still below; the dissolved direction stays dissolved.**
+
+**DID ANY REACH A BOARD? NO — the double brake re-ran green this gate. `FLOOR`
+raised 54 → 62 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 50 THROUGH 54 — DATED RECORD (2026-08-16)
 
 **Five crossings in one bot refresh (`348cc95`, 2026-08-16T17:19Z), found by the guard on

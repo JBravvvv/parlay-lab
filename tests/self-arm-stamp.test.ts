@@ -285,10 +285,30 @@ const CROSSINGS = [
       "k=6,903) — still below; the dissolved direction stays dissolved. Double brake " +
       "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 50-54.",
   },
+  { ump: "Ramon De Jesus", date: "2026-08-17", commit: "431f847", kPerG: 15.0, braked: true,
+    note: "FIFTY-FIFTH. g 4->5, k 75. Two refreshes caught on one rebase re-gate mid " +
+      "core/fun-split ship — crossings 55-62 record." },
+  { ump: "Erich Bacchus", date: "2026-08-17", commit: "431f847", kPerG: 16.6, braked: true,
+    note: "FIFTY-SIXTH. g 4->5, k 83." },
+  { ump: "Hunter Wendelstedt", date: "2026-08-17", commit: "431f847", kPerG: 15.0, braked: true,
+    note: "FIFTY-SEVENTH. g 4->5, k 75." },
+  { ump: "Jonathan Parra", date: "2026-08-17", commit: "431f847", kPerG: 17.6, braked: true,
+    note: "FIFTY-EIGHTH. g 4->5, k 88." },
+  { ump: "Scott Barry", date: "2026-08-18", commit: "80cfbaf", kPerG: 17.2, braked: true,
+    note: "FIFTY-NINTH. g 4->5, k 86." },
+  { ump: "Mark Ripperger", date: "2026-08-18", commit: "80cfbaf", kPerG: 16.4, braked: true,
+    note: "SIXTIETH. g 4->5, k 82." },
+  { ump: "Ben May", date: "2026-08-18", commit: "80cfbaf", kPerG: 18.8, braked: true,
+    note: "SIXTY-FIRST. g 4->5, k 94." },
+  { ump: "Nic Lentz", date: "2026-08-18", commit: "80cfbaf", kPerG: 19.2, braked: true,
+    note: "SIXTY-SECOND. g 4->5, k 96. Armed mean at n=62: 16.49 vs league 16.59 (g=441, " +
+      "k=7,318) — still below; the dissolved direction stays dissolved. Double brake " +
+      "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 55-62.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 54;
+const FLOOR = 62;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
