@@ -244,7 +244,10 @@ function DayCard({ e }: { e: LedgerEntry }) {
 
 export default function LedgerPage() {
   const { api, refresh } = useLedger();
-  const [scope, setScope] = useState<"all" | "core" | "fun">("all");
+  /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): the blended "all" view is gone —
+     a combined net is exactly the number he ruled out. Core is the default; FUN is its
+     own view, never folded in. */
+  const [scope, setScope] = useState<"core" | "fun">("core");
   const [grading, setGrading] = useState(false);
   const [note, setNote] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -469,7 +472,7 @@ export default function LedgerPage() {
       ) : (
         <div className="space-y-6">
           <div className="flex gap-2">
-            {(["all", "core", "fun"] as const).map((s) => (
+            {(["core", "fun"] as const).map((s) => (
               <FilterPill key={s} selected={scope === s} onClick={() => setScope(s)}>
                 {s.toUpperCase()}
               </FilterPill>

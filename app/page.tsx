@@ -205,7 +205,11 @@ export default function DashboardPage() {
   // fallback until mounted so hydration sees identical markup.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const stats = useMemo(() => (mounted ? api?.stats("all") : undefined), [api, mounted]);
+  /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): headline P/L, ROI, record and
+     the equity spark are core-only; fun is tracked and shown by itself, never blended
+     into the net. */
+  const stats = useMemo(() => (mounted ? api?.stats("core") : undefined), [api, mounted]);
+  const funStats = useMemo(() => (mounted ? api?.stats("fun") : undefined), [api, mounted]);
   const board = mounted ? cachedBoard() : null;
   const money = mounted ? getMoney() : { bankroll: 750, daily: 0, fun: 0 };
 
@@ -254,7 +258,7 @@ export default function DashboardPage() {
               <span className={(stats?.pl ?? 0) >= 0 ? "text-pos" : "text-neg"}>
                 {stats ? fmtMoneyExact(stats.pl) : "$0.00"}
               </span>{" "}
-              <span className="text-muted">season P/L · managed bankroll (base + logged moves + graded P/L)</span>
+              <span className="text-muted">core season P/L · fun money tracked separately below</span>
             </div>
             <div className="num mt-1 text-[12px] text-muted">
               today&apos;s exposure{" "}
@@ -283,7 +287,16 @@ export default function DashboardPage() {
                 {stats ? roiPct(stats.roi) : "—"}
               </div>
               <div className="num mt-1 text-[11px] text-muted">
-                {stats ? `${stats.w}-${stats.l}${stats.push ? `-${stats.push}` : ""} · ${stats.days.length} locked days` : "no locked days yet"}
+                {stats ? `${stats.w}-${stats.l}${stats.push ? `-${stats.push}` : ""} · ${stats.days.length} locked days · core only` : "no locked days yet"}
+              </div>
+              <div className="num mt-2 border-t border-white/[0.06] pt-2 text-[11px]">
+                <span className="font-bold uppercase tracking-[0.14em] text-gold">FUN</span>{" "}
+                <span className={(funStats?.pl ?? 0) >= 0 ? "text-pos" : "text-neg"}>
+                  {funStats ? fmtMoneyExact(funStats.pl) : "$0.00"}
+                </span>{" "}
+                <span className="text-muted">
+                  {funStats ? `${funStats.w}-${funStats.l} · not in the net` : "· not in the net"}
+                </span>
               </div>
             </Panel>
           </Reveal>
