@@ -13,7 +13,11 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-16:** `origin/frontend-rebuild` = `15287c0726d27aafc7647e13f9d0b47924954fa0`
+> - **STATE-CLAIM 2026-08-19:** `origin/frontend-rebuild` = `0970f70f223a7b66abff6401ced0e500963685c6`
+>
+> *(The 08-18 draft of this claim FABRICATED the 40-char tail of a real short sha —
+> `sha-currency` refused it as "ancestor of NO ref" before it could be committed. The
+> claim above is a fresh `git rev-parse origin/frontend-rebuild` read.)*
 > - **STATE-CLAIM 2026-08-10:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
@@ -30,7 +34,80 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
-## 0.000005 🎯 THE JOSH BLOCK, CURRENT — THE SYSTEM RUNS ITSELF; ONE SHIP AUTHORIZED AND QUEUED (2026-08-10T01:3xZ, pre-compaction)
+## 0.000004 🎯 THE JOSH BLOCK, CURRENT — THE PAPER ERA IS FULLY CONFIGURED AND RUNNING (2026-08-18, pre-compaction)
+
+**WHAT IS TRUE NOW — every line from this session's own reads and pushed commits. This
+supersedes §0.000005 below (kept as the 08-10 record). Between 08-10 and 08-18 Josh
+issued eleven direct instructions; every one is SHIPPED, DEPLOYED, and dated in the
+addenda under §0.000005 (search the quoted verbatim words):**
+
+1. **A–F TIERS** on every play (fixed EV cutoffs, `src/lib/grade.ts`) — live.
+2. **ONE SELECTION MODE SITE-WIDE** — Board TOP 50 (`board-order.ts`) + parlay sets
+   follow Settings; header/section name the order — live.
+3. **THE PAPER EPOCH (2026-08-15, verbatim in the addendum):** HRR + pitcher_outs
+   UNSUSPENDED on tickets (`paper-mode.ts`, runtime SH_CFG lift in both generators +
+   backfill) · LEDGER EPOCH 2 (real-money season archived server (`pl:ledger:archive:e1`)
+   + per-device; resurrection-gated PUTs; every blob writer carries `epoch`) ·
+   **$150/day hypothetical core, no matter what** (disciplined ev_gated first at $150,
+   shortfall FORCED via caesars_ev on the leg-disjoint remainder, `forced:true`,
+   `gatedSum` splits) · **$25/day fun** · every paper ticket `paper:true, placed:false,
+   actualStake:0` (his standing word) · PaperBanner on Builder + Ledger.
+4. **3–10 TICKETS for the $150/day** (`PAPER_TICKETS` + `ticketWindow`, pro-rata on
+   blocks, shapes only the forced pass) — live.
+5. **FUN = 2–5 HR-OVER LONGSHOT TICKETS, 3–8 hitters, ONE TEAM PER TICKET, repeatCap 2**
+   (`fun-hr.ts` composer; engine numbers only; thin pool → fewer + funNote). NOTE: the
+   08-16 fun went out pre-composer-deploy as the LAST old-style shFunPick ticket (a
+   4-leg outs-unders mix, LOST) — first true HR set fires 08-17+.
+6. **THE UNDER BIAS (2026-08-16, data-backed — the 3-day side read is in
+   `under-bias.ts`'s header):** outs-under tickets out of the paper pool (seatability
+   fallback only), staked card ≤25% under prop legs via the evict-and-rerun loop;
+   entry stamps `underShare` + `biasDropped`.
+7. **SIDE-AWARE CALIBRATION (2026-08-16)** — the ONLY hash-moving engine ship of the
+   era: engine `39fc8681…` → **`cb2cdebc…` (284,032 chars), SERVED-VERIFIED byte-for-byte
+   same session** (chunk 256-9d7d2affb2cfbcd6.js), pending marker CLEARED. Dormant
+   `calW["mkt|u"]` under-direction blend shrink (legacy L2453+, below the id region);
+   fit emits `summary.perSide`, weekly walks the `"|u"` rollups (same tier/Wilson/±10%
+   discipline). ZERO baselines re-cut (value-dormancy). Riders 2/5/5l DEFERRED by dated
+   decision (they are value-moving; they ride the next VALUE-MOVING ship).
+8. **READING CHECKER learned the paper doctrine** (placed:false is the standing answer;
+   the 08-16 false-violations are the recorded catch) — `4a4a34d`.
+9. **THE PUBLIC PAPER CARD** — `/api/board?date=` now serves `card` leg-by-leg through
+   `publicCardView` (`card-view.ts`): paper-only HARD GATE (epoch-1 real-money entries
+   → null, always; placed/actualStake stripped even on paper) — `58a6ef9`.
+10. **CORE IS THE MAIN CHECK (2026-08-18, verbatim: "The only +/- that matters to show
+    as the main check is the core money … see the fun money by itself … not calculated
+    into net"):** dashboard headline P/L/ROI/record/spark = `stats("core")` + separate
+    gold FUN line ("not in the net"); Ledger defaults CORE, toggle core/fun only, the
+    blended "all" view REMOVED — `7488536` (first cited pre-rebase as 16c635b; the
+    sha-references guard caught it AGAIN — same class as the 82262cf catch). Engine
+    unchanged (shLedgerStats always had scopes).
+11. **CAESARS ⓘ TOGGLE SYNC** (08-11) — authed wire confirmed by Josh ("Sync phrase
+    worked").
+
+**FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
+$10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
+unders — same-day vindication of instruction 6, which deployed ~1h after that card
+locked. First fully-ruled card: 08-17.
+
+**OWED READS / WATCH ITEMS (next session, in order):**
+- **The 08-17 Sunday fit RAN (10:00Z) and NOBODY HAS READ IT** — the 5j fit-vintage
+  verify was owed BEFORE it. Read `pl:cal:summary`/weights rev + mults (HR was the
+  likely first mover at 14.1% vs 20.3%, n≈972). First fit with SIDED training rows:
+  2026-08-23 (side stamps only exist post-08-16-deploy).
+- Read the 08-17/08-18 paper cards + underShare stamps (the bias's first live days)
+  and the first HR-longshot fun sets via the public `card` field.
+- Standing open: alt-lines unlock decision page (§12Z.12, Josh's word) · CLV
+  header-auth migration (security queue) · quota re-read before burn decisions ·
+  crossings at FLOOR 62 (records through 55–62 in collection-period.md, brakes green,
+  armed mean 16.49 vs league 16.59) · epoch-1 readings §0.0/2/4/15 (carried).
+- **Deploy pipeline fact:** git pushes do NOT deploy; `npx vercel --prod --yes` from
+  the worktree does (Josh authorized deploys this session, repeatedly). Bot
+  context-refresh commits land on origin ~17:20Z daily; every rebase over them is a
+  tree change → FULL RE-GATE (four crossing batches were caught exactly this way).
+- Stray uncommitted `.gitignore` `+.env*` line in the worktree — another session's,
+  protective, LEFT ALONE deliberately.
+
+## 0.000005 🔻 SUPERSEDED 2026-08-18 (kept as the 08-10 record) — THE JOSH BLOCK — THE SYSTEM RUNS ITSELF; ONE SHIP AUTHORIZED AND QUEUED (2026-08-10T01:3xZ, pre-compaction)
 
 **WHAT IS TRUE NOW, every line from this session's own reads and pushed commits:**
 
@@ -6351,7 +6428,21 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 17. PROTOCOL
 
-### 🔴 FIRST ACTION AFTER COMPACTION — 2026-08-10 (supersedes both lists below)
+### 🔴 FIRST ACTION AFTER COMPACTION — 2026-08-18 (supersedes every list below)
+
+1. **Re-read §0.000004 (the CURRENT Josh block) and `CLAUDE.md`.** Print
+   `git rev-parse HEAD`, confirm containment in `origin/frontend-rebuild`
+   (`sha-currency` + `push-state` score it). Expect bot context commits on origin.
+2. **READ THE 08-17 SUNDAY FIT** (it ran unobserved): `pl:cal:summary` rev/window/mults
+   via the public calibration route — did HR move? 5j fit-vintage verify owed. First
+   SIDED fit is 2026-08-23; before it, confirm side stamps are accumulating in the
+   pred blobs (post-08-16 rows).
+3. **Read the first fully-ruled paper cards** (08-17+) via the public `card` field:
+   underShare ≤ 0.25, outs-unders absent, 3–10 tickets, the first HR-longshot fun sets.
+4. Then the standing rhythm. Nothing else is queued; every Josh instruction through
+   2026-08-18 is shipped, deployed, and dated in §0.000004.
+
+### 🔻 SUPERSEDED — FIRST ACTION AFTER COMPACTION — 2026-08-10 (kept as history)
 
 1. **Re-read §0.000005 (the CURRENT Josh block) and §0.001, then `CLAUDE.md`.** Print
    `git rev-parse HEAD` and confirm containment in `origin/frontend-rebuild`

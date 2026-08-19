@@ -36,7 +36,7 @@ const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f
      mode-alignment addendum cited it before the ship was rebased onto bot commits and landed
      as a6d1ad0. The handoff keeps the bad sha inside its dated correction note (the catch is
      part of the record), so the literal must stay quotable without resolving. */
-  "82262cf",
+  "82262cf", "16c635b", /* 16c635b: the core/fun split's pre-rebase sha, kept in the dated correction note */
   /* 2026-08-16: ENGINE-STRING sha256 prefixes from the side-aware calibration ship
      (39fc8681… → cb2cdebc…) — same class as f6cf1513 above: hashes of the engine
      source, not commits. */

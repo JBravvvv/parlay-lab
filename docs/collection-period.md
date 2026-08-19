@@ -7188,6 +7188,24 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 63 THROUGH 66 — DATED RECORD (2026-08-19)
+
+**Four crossings in one bot refresh (`0970f70`, 2026-08-19T17:27Z), found by the guard
+on the PRE-COMPACTION re-gate:**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 63 | Brock Ballou | 2026-08-19 | `0970f70` | 5 / 88 | 17.6 |
+| 64 | Shane Livensparger | 2026-08-19 | `0970f70` | 5 / 88 | 17.6 |
+| 65 | John Tumpane | 2026-08-19 | `0970f70` | 5 / 77 | 15.4 |
+| 66 | D.J. Reyburn | 2026-08-19 | `0970f70` | 5 / 81 | 16.2 |
+
+**SIXTY-SIX armed. Armed-set mean k/g at n = 66: 16.50 vs league 16.55 (g=456,
+k=7,549) — still below; the dissolved direction stays dissolved.**
+
+**DID ANY REACH A BOARD? NO — the double brake re-ran green this gate. `FLOOR`
+raised 62 → 66 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 55 THROUGH 62 — DATED RECORD (2026-08-18)
 
 **Eight crossings across two bot refreshes, found by the guard on a rebase re-gate

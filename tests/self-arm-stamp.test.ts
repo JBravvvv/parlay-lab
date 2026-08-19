@@ -305,10 +305,22 @@ const CROSSINGS = [
       "k=7,318) — still below; the dissolved direction stays dissolved. Double brake " +
       "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 55-62.",
   },
+  { ump: "Brock Ballou", date: "2026-08-19", commit: "0970f70", kPerG: 17.6, braked: true,
+    note: "SIXTY-THIRD. g 4->5, k 88. Caught on the pre-compaction re-gate — crossings " +
+      "63-66 record." },
+  { ump: "Shane Livensparger", date: "2026-08-19", commit: "0970f70", kPerG: 17.6, braked: true,
+    note: "SIXTY-FOURTH. g 4->5, k 88." },
+  { ump: "John Tumpane", date: "2026-08-19", commit: "0970f70", kPerG: 15.4, braked: true,
+    note: "SIXTY-FIFTH. g 4->5, k 77." },
+  { ump: "D.J. Reyburn", date: "2026-08-19", commit: "0970f70", kPerG: 16.2, braked: true,
+    note: "SIXTY-SIXTH. g 4->5, k 81. Armed mean at n=66: 16.50 vs league 16.55 (g=456, " +
+      "k=7,549) — still below; the dissolved direction stays dissolved. Double brake " +
+      "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 63-66.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 62;
+const FLOOR = 66;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
