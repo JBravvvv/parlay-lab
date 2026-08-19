@@ -83,6 +83,17 @@ addenda under §0.000005 (search the quoted verbatim words):**
     unchanged (shLedgerStats always had scopes).
 11. **CAESARS ⓘ TOGGLE SYNC** (08-11) — authed wire confirmed by Josh ("Sync phrase
     worked").
+12. **CORE/FUN SECTIONS ON THE LOCKED CARD (added 2026-08-19, post-compaction —
+    verbatim: "The builder locked card needs to clearly define what bets are core
+    bets and what bets are fun bets. As of now they are just continuous"):** the
+    Builder's locked panel no longer concats core+funT into one grid — CORE MONEY
+    ("the main check — counts in net P/L") and FUN MONEY (gold, "HR longshots —
+    tracked by itself, never in the core net") render as labeled sections sharing
+    ONE ticket renderer (`renderLockedTicket`, so the split cannot fork the NV
+    price-confirm behavior); the header sum and the lock status message split
+    core + fun instead of one blended number; an empty fun section surfaces the
+    server's `funNote`. Guard: `tests/builder-card-sections.test.ts`. Shipped
+    `95c224c`, gate 115 files / 916 tests + tsc clean.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
@@ -99,7 +110,9 @@ locked. First fully-ruled card: 08-17.
 - Standing open: alt-lines unlock decision page (§12Z.12, Josh's word) · CLV
   header-auth migration (security queue) · quota re-read before burn decisions ·
   crossings at FLOOR 62 (records through 55–62 in collection-period.md, brakes green,
-  armed mean 16.49 vs league 16.59) · epoch-1 readings §0.0/2/4/15 (carried).
+  armed mean 16.49 vs league 16.59) **[CORRECTED 2026-08-19: FLOOR is 66 — crossings
+  63–66 stamped in `80071be` off the 0970f70 bot refresh; armed mean n=66 16.50 vs
+  league 16.55, g=456, k=7,549, brakes green]** · epoch-1 readings §0.0/2/4/15 (carried).
 - **Deploy pipeline fact:** git pushes do NOT deploy; `npx vercel --prod --yes` from
   the worktree does (Josh authorized deploys this session, repeatedly). Bot
   context-refresh commits land on origin ~17:20Z daily; every rebase over them is a
