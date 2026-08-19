@@ -1,6 +1,6 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { PAPER, ticketWindow } from "@/lib/paper-mode";
+import { PAPER, PAPER_TICKETS, ticketWindow } from "@/lib/paper-mode";
 import { buildFunHrTickets, type FunLegSrc } from "@/lib/fun-hr";
 import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 
@@ -121,12 +121,16 @@ export function buildLockEntry(args: {
     }
   }
 
-  let pool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data);
-  if (blockGkeys) {
-    /* the block's card draws only from tickets whose EVERY leg is a block game — a leg
-       without a gkey cannot prove membership and keeps the ticket out (conservative) */
-    pool = (pool as AllocPick[]).filter((p) => (p.w?.pl?.legs ?? []).every((l) => l.gkey && blockGkeys.has(l.gkey)));
-  }
+  /* THE POOL IS SLATE-WIDE, BY THE RECORD (corrected 2026-08-19): shCardPool returns
+     {pl,src,idx} wrappers, and the 08-08 per-block filter read `p.w?.pl` — undefined on
+     every pool item, so `(… ?? []).every(...)` was vacuously TRUE and the filter NEVER
+     FILTERED. Every block fire since 08-08 drew from the whole pregame pool; the tracked
+     record was built that way. The dead filter is REMOVED rather than "fixed": actually
+     scoping the pool to in-block games is exactly what would starve the paper budget,
+     and blocks remain what they have really been all along — fire-timing and budget
+     bookkeeping, not card scope. blockGkeys still guards the partition (TWO CARDS ONE
+     GAME above) and stamps the entry's blocks map. */
+  const pool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data);
   const shAllocate = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate");
   const tid = eng.get<(pl: unknown) => string>("shTicketId");
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
@@ -168,45 +172,72 @@ export function buildLockEntry(args: {
     czEv: (t.czEv as number | null) ?? null,
     legs: ((t.legs as { lkey?: string | null; prop?: string | null }[] | undefined) ?? []),
   }));
+  /* THE FORCED PASS IS CAPPED BY THE DAY, NOT THE BLOCK WINDOW (corrected 2026-08-19
+     after the 08-19 card deployed $49 of $150 — Josh: "I said $150 every day no matter
+     what"). The window's share-rounded maxNew zeroed the top-up on small blocks: a $10
+     block's window is 1 ticket, one gated pick made forcedMax 0, and the shortfall was
+     stranded. The ceiling that is actually Josh's rule is 10 tickets PER DAY — so the
+     forced pass may seat up to (10 − carried − gated) tickets on any fire; the window
+     keeps shaping only the floor. */
+  const dayAllowance = Math.max(0, PAPER_TICKETS.max - carriedCount);
   let alloc: AllocResult = { picks: [], sum: 0 };
   let forced: AllocResult = { picks: [], sum: 0 };
   let underShare = 0;
   let quotaEvicted = 0;
-  for (let attempt = 0; ; attempt++) {
-    alloc = shAllocate(biasPool, daily, cfg, false);
-    forced = { picks: [], sum: 0 };
-    const gatedIds = new Set<string>(alloc.picks.map((p) => p.id));
-    const gatedLegs = new Set<string>();
-    for (const p of alloc.picks) for (const l of p.w.pl.legs) gatedLegs.add(legKey(l));
+  type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
+  const runPasses = (p: PoolItem[]): { alloc: AllocResult; forced: AllocResult; staged: Staged[]; share: number } => {
+    const a = shAllocate(p, daily, cfg, false);
+    let f: AllocResult = { picks: [], sum: 0 };
+    const ids = new Set<string>(a.picks.map((x) => x.id));
+    const legs = new Set<string>();
+    for (const x of a.picks) for (const l of x.w.pl.legs) legs.add(legKey(l));
     for (const t of carry?.core ?? []) {
-      if (t.id) gatedIds.add(String(t.id));
-      for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) gatedLegs.add(legKey(l));
+      if (t.id) ids.add(String(t.id));
+      for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
     }
-    const shortfall = daily - alloc.sum;
-    const forcedMax = Math.max(0, win.maxNew - alloc.picks.length);
-    if (shortfall > 0 && forcedMax > 0) {
-      const rest = biasPool.filter(
-        (w) => !gatedIds.has(tid(w.pl)) && !w.pl.legs.some((l) => gatedLegs.has(legKey(l))),
-      );
-      forced = shAllocate(rest, shortfall, {
+    const short = daily - a.sum;
+    const fMax = Math.max(0, dayAllowance - a.picks.length);
+    if (short > 0 && fMax > 0) {
+      const rest = p.filter((w) => !ids.has(tid(w.pl)) && !w.pl.legs.some((l) => legs.has(legKey(l))));
+      f = shAllocate(rest, short, {
         ...cfg,
         selMode: "caesars_ev",
-        maxCoreTickets: forcedMax,
-        minCoreTickets: Math.max(1, win.minNew - alloc.picks.length),
+        maxCoreTickets: fMax,
+        minCoreTickets: Math.max(1, win.minNew - a.picks.length),
       }, false);
     }
-    const staged = [...alloc.picks, ...forced.picks].map((p) => ({
-      __id: p.id,
-      name: String(p.w.pl.name ?? ""),
-      czEv: (p.w.pl.czEv as number | null) ?? null,
-      legs: p.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
+    const staged: Staged[] = [...a.picks, ...f.picks].map((x) => ({
+      __id: x.id,
+      name: String(x.w.pl.name ?? ""),
+      czEv: (x.w.pl.czEv as number | null) ?? null,
+      legs: x.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
     }));
-    underShare = underStats([...carriedBias, ...staged]).share;
+    return { alloc: a, forced: f, staged, share: underStats([...carriedBias, ...staged]).share };
+  };
+  const poolBeforeQuota = biasPool;
+  for (let attempt = 0; ; attempt++) {
+    const r = runPasses(biasPool);
+    alloc = r.alloc;
+    forced = r.forced;
+    underShare = r.share;
     if (underShare <= 1 - UNDER_BIAS.overShare + 1e-9 || attempt >= 12) break;
-    const worst = worstUnderTicket(staged);
+    const worst = worstUnderTicket(r.staged);
     if (!worst) break;
     quotaEvicted++;
     biasPool = biasPool.filter((w) => tid(w.pl) !== worst.__id);
+  }
+  /* BUDGET OVER BIAS (2026-08-19). The under quota is a stated preference ("I would
+     prefer them not to be included very often"); the $150 is "no matter what". When the
+     quota's evictions leave the fire short of its budget, the evicted tickets come back
+     and the passes run once more without the quota — the entry stamps yieldedToBudget
+     so the conflict is on the record, never silent. */
+  let biasYielded = false;
+  if (alloc.sum + forced.sum < daily && quotaEvicted > 0) {
+    biasYielded = true;
+    const r = runPasses(poolBeforeQuota);
+    alloc = r.alloc;
+    forced = r.forced;
+    underShare = r.share;
   }
   const usedIds = new Set<string>(alloc.picks.map((p) => p.id));
   const usedLegs = new Set<string>();
@@ -217,7 +248,7 @@ export function buildLockEntry(args: {
   }
   const gatedCount = alloc.picks.length;
   const shortfall = daily - alloc.sum;
-  const forcedMax = Math.max(0, win.maxNew - gatedCount);
+  const forcedMax = Math.max(0, dayAllowance - gatedCount);
 
   const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
     const pl = p.w.pl;
@@ -339,8 +370,10 @@ export function buildLockEntry(args: {
     trigger,
     source: "server-lock",
     selMode: cfg.selMode ?? null,
-    /* the DAY ceiling, always — a block's own budget lives in blocks[key].budget */
-    daily: blockKey ? dayCeiling : daily,
+    /* the DAY ceiling, always — a fire's own budget lives in blocks[key].budget.
+       (Was `blockKey ? dayCeiling : daily`; since 2026-08-19 top-up fires append with a
+       reduced dailyOverride and no blockGkeys, so the ceiling is unconditional.) */
+    daily: dayCeiling,
     bankroll,
     /* PAPER: hypothetical throughout; gated vs forced split is per-ticket (forced:true) */
     paper: true,
@@ -356,7 +389,7 @@ export function buildLockEntry(args: {
        bias removed to get there (0/absent = the rules never had to act) */
     underShare: Math.round(underShare * 1000) / 1000,
     ...(prunedB.dropped + prunedB.readmitted + quotaEvicted > 0
-      ? { biasDropped: { outsUnder: prunedB.dropped, outsUnderReadmitted: prunedB.readmitted, quotaEvicted } }
+      ? { biasDropped: { outsUnder: prunedB.dropped, outsUnderReadmitted: prunedB.readmitted, quotaEvicted, ...(biasYielded ? { yieldedToBudget: true } : {}) } }
       : {}),
     ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
@@ -364,10 +397,14 @@ export function buildLockEntry(args: {
       ? { note: `paper day — $0 of $${daily} deployed: no CZ-playable pregame pool remained; blockedReasons is the histogram` }
       : deployed < daily
         ? {
+            /* the note is DAY-AWARE (2026-08-19): a fire's shortfall names its cause AND
+               where the day stands, because the deficit now carries forward — the next
+               fire's budget picks it up, and the scheduler's top-up sweep retries while
+               unstarted games remain. */
             note:
               shortfall > 0 && forcedMax === 0
-                ? `paper day — deployed $${deployed} of $${daily}: the ${ticketWindow(PAPER.daily, 0).maxNew}-ticket day ceiling was reached before the budget`
-                : `paper day — deployed $${deployed} of $${daily}: the leg-disjoint pool exhausted before the budget`,
+                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the ${PAPER_TICKETS.max}-ticket day ceiling was reached before the budget`
+                : `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the CZ-playable leg-disjoint pool exhausted before the budget; the deficit carries to the next fire or top-up sweep`,
           }
         : {}),
   };

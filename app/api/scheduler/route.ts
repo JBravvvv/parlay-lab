@@ -5,11 +5,11 @@ import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
-import { BLOCKS_KEY, decideBlock, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
+import { BLOCKS_KEY, decideBlock, decideTopUp, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
-import { applySuspensionLift } from "@/lib/paper-mode";
+import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
 import { decideGradePass } from "@/lib/server/grading-progress";
 
 /**
@@ -138,6 +138,38 @@ export async function GET(req: NextRequest) {
   }
 
   if (!target) {
+    /* TOP-UP SWEEP (2026-08-19, Josh's word, verbatim: "I said $150 every day no matter
+       what so we could track and calibrate off of it" — after the 08-19 card deployed
+       $49). When every block has fired or died, the paper day is still short, and
+       pregame games remain, forward a plain generate with ?topup=1 for fresh prices —
+       evening props post late, which is exactly when the earlier fires found a thin
+       pool. decideTopUp is pure and printed every poke; generate's 45-min limiter,
+       run-cap headroom, and TOPUP_MAX registry cap govern the actual spend. */
+    let topup: Record<string, unknown>;
+    const tu = decideTopUp({
+      entry: await getLockEntry(date),
+      blocks: blocksArr,
+      registry: reg,
+      starts,
+      now,
+      daily: PAPER.daily,
+      max: TOPUP_MAX,
+    });
+    if (tu.fire) {
+      const gen = await fetch(new URL("/api/generate?topup=1", req.nextUrl.origin), {
+        headers: { "x-cron-key": process.env.CRON_SECRET },
+        cache: "no-store",
+      });
+      let genBody: unknown = null;
+      try {
+        genBody = await gen.json();
+      } catch {
+        genBody = { error: "generate returned non-JSON" };
+      }
+      console.log(`[scheduler] TOP-UP fired for ${date}: owed $${tu.owed}, generate ${gen.status}`);
+      return NextResponse.json({ fired: true, topup: tu, generateStatus: gen.status, generate: genBody, lock, ...body });
+    }
+    topup = tu as unknown as Record<string, unknown>;
     /* DAILY GRADING TICKS (2026-08-06): on the first tick of hours 15 and 2 UTC, forward
        to /api/calibrate?grade=only — grades every board row + labels populations + writes
        the learning progress artifact, and touches NOTHING the engine reads (the mode's own
@@ -161,7 +193,7 @@ export async function GET(req: NextRequest) {
     } else {
       grading = { fired: false, reason: gp.reason };
     }
-    return NextResponse.json({ fired: false, grading, lock, ...body });
+    return NextResponse.json({ fired: false, topup, grading, lock, ...body });
   }
 
   /* Forward to the one spending route with the TARGET BLOCK, same header contract.

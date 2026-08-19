@@ -10,8 +10,8 @@ import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liv
 import { ptToday } from "@/lib/server/pt-date";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, writeLock } from "@/lib/server/lock-card";
-import { PAPER, applySuspensionLift } from "@/lib/paper-mode";
-import { BLOCKS_KEY, partitionBlocks, splitBudget, type BlockRegistry } from "@/lib/server/blocks";
+import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { BLOCKS_KEY, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
 /**
@@ -144,11 +144,25 @@ export async function GET(req: NextRequest) {
        registry is the record), and the day-level good-board skip must NOT block a second
        block's fire (that is exactly the one-shot-per-day defect this ship removes). */
     const blockKey = req.nextUrl.searchParams.get("block");
+    /* TOP-UP SWEEP (2026-08-19, Josh: "$150 every day no matter what"): a topup fire
+       buys FRESH prices for a day whose fires left it short — evening props post late,
+       which is exactly when the earlier fires found a thin pool. It bypasses the
+       good-board skip (the stored board's staleness is the problem being solved) but is
+       bounded by its own registry cap, the 45-min limiter, and the run-cap headroom. */
+    const topup = !blockKey && req.nextUrl.searchParams.get("topup") === "1";
+    let topupKey: string | null = null;
     if (blockKey) {
       const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
       if (reg[blockKey]?.firedAt) {
         return NextResponse.json({ ok: true, skipped: "block-already-locked", block: blockKey });
       }
+    } else if (topup) {
+      const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
+      const used = Object.keys(reg).filter((k) => k.startsWith("topup-")).length;
+      if (used >= TOPUP_MAX) {
+        return NextResponse.json({ ok: true, skipped: "topup-cap", used, cap: TOPUP_MAX });
+      }
+      topupKey = `topup-${used + 1}`;
     } else if (!force) {
       const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
       /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
@@ -182,7 +196,10 @@ export async function GET(req: NextRequest) {
        is set on the same line for the same reason — both are pessimistic on purpose. */
     const runs = Number(await redis(["INCR", runsKey])) || 0;
     if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
-    if (runs > MAX_RUNS_PER_DATE) {
+    /* top-up fires get TOPUP_MAX headroom above the cap (the block fires can lawfully
+       spend all four runs); their own registry cap above bounds them at TOPUP_MAX, so
+       the hard ceiling is MAX_RUNS_PER_DATE + TOPUP_MAX runs a day, leak or no leak. */
+    if (runs > MAX_RUNS_PER_DATE + (topup ? TOPUP_MAX : 0)) {
       console.warn(`[generate] run cap hit: ${runs} spending runs on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
       return NextResponse.json(
         { error: "run cap reached for this date", runs, cap: MAX_RUNS_PER_DATE },
@@ -394,10 +411,15 @@ export async function GET(req: NextRequest) {
          scheduler read — deterministic, same keys. */
       let blockGkeys: Set<string> | undefined;
       let blockBudget: number | undefined;
-      let carry: Awaited<ReturnType<typeof getLockEntry>> = null;
+      /* CARRY ALWAYS (2026-08-19): every lock fire appends to the date's entry. A plain
+         or top-up fire on an already-locked day used to build a competing whole-slate
+         entry and leave the outcome to richer-day-wins merging; now it tops the day up. */
+      const carry = await getLockEntry(date);
+      const bStarts = await slateStarts(date);
+      const bs = partitionBlocks(bStarts);
+      const reg0 = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
+      const allocSoFar = Number(carry?.allocSum ?? 0);
       if (blockKey) {
-        const bStarts = await slateStarts(date);
-        const bs = partitionBlocks(bStarts);
         const blk = bs.find((b) => b.key === blockKey);
         if (blk) {
           const win = new Set(blk.starts);
@@ -407,12 +429,19 @@ export async function GET(req: NextRequest) {
               .filter(([, g]) => g?.start && win.has(Date.parse(g.start)))
               .map(([k]) => k),
           );
-          /* the same ceiling buildLockEntry derives — PAPER.daily, the one shared constant */
-          blockBudget = splitBudget(PAPER.daily, bs)[blockKey];
-          carry = await getLockEntry(date);
+          /* DEFICIT CARRY-FORWARD (2026-08-19, Josh: "$150 every day no matter what"):
+             the fire's budget is everything the day still owes minus the shares reserved
+             for blocks that can still fire on their own — an earlier fire's shortfall
+             flows here instead of stranding (the 08-19 $49-of-$150 day). */
+          blockBudget = effectiveBlockBudget({ daily: PAPER.daily, blocks: bs, currentKey: blockKey, registry: reg0, now, allocSoFar }).budget;
         } else {
           console.warn(`[generate] block ${blockKey} not found in today's partition — locking whole-slate instead`);
         }
+      }
+      if (!blockGkeys && carry) {
+        /* top-up, plain re-fire, or partition-mismatch fallback on a locked day: the
+           day's remainder, still reserving any block that can fire for itself */
+        blockBudget = effectiveBlockBudget({ daily: PAPER.daily, blocks: bs, currentKey: "", registry: reg0, now, allocSoFar }).budget;
       }
       const entry = buildLockEntry({
         eng,
@@ -420,12 +449,15 @@ export async function GET(req: NextRequest) {
         date,
         now,
         trigger,
-        ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys, carry, dailyOverride: blockBudget } : {}),
+        ...(carry ? { carry } : {}),
+        ...(blockBudget != null ? { dailyOverride: blockBudget } : {}),
+        ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys } : topupKey ? { blockKey: topupKey } : {}),
       });
       const w = await writeLock(entry);
-      if (blockKey && blockGkeys) {
+      if ((blockKey && blockGkeys) || topupKey) {
+        const k = topupKey ?? (blockKey as string);
         const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
-        reg[blockKey] = { firedAt: now, tickets: (entry.blocks?.[blockKey]?.tickets ?? 0), budget: blockBudget, at: now };
+        reg[k] = { firedAt: now, tickets: (entry.blocks?.[k]?.tickets ?? 0), budget: blockBudget, at: now };
         await redisSetJson(BLOCKS_KEY(date), reg);
       }
       lockedEntry = entry;

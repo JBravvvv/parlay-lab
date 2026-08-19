@@ -116,3 +116,71 @@ export function decideBlock(args: { block: SlateBlock; now: number }): BlockDeci
 }
 
 export type BlockRegistry = Record<string, { firedAt?: number; tickets?: number; budget?: number; reason?: string; at: number }>;
+
+/**
+ * DEFICIT CARRY-FORWARD (2026-08-19, Josh's word: "I said $150 every day no matter what
+ * so we could track and calibrate off of it" — said after the 08-19 card deployed $49).
+ *
+ * The old scheme handed each block its static splitBudget share; a fire that could not
+ * seat its share simply STRANDED the difference — nothing later ever picked it up. A
+ * fire's effective budget is now everything the day still owes, minus what stays
+ * reserved for blocks that can still fire on their own:
+ *
+ *   budget = daily − allocSoFar − Σ shares(unfired, alive blocks other than this one)
+ *
+ * Pro-rata still shapes a normal day (each block fires into roughly its share); any
+ * under-deployment flows to the next fire; the day's last live fire gets exactly the
+ * remainder. Σ deployed ≤ daily by construction because allocSoFar subtracts. A block
+ * is "alive" while it has an unstarted game; fired and dead blocks reserve nothing.
+ * `currentKey: ""` prices a whole-slate or top-up fire (reserve every pending block).
+ */
+export function effectiveBlockBudget(args: {
+  daily: number;
+  blocks: SlateBlock[];
+  currentKey: string;
+  registry: BlockRegistry | null | undefined;
+  now: number;
+  allocSoFar: number;
+}): { budget: number; reserved: number } {
+  const { daily, blocks, currentKey, registry, now, allocSoFar } = args;
+  const shares = splitBudget(daily, blocks);
+  let reserved = 0;
+  for (const b of blocks) {
+    if (b.key === currentKey) continue;
+    if (registry?.[b.key]?.firedAt) continue; // already fired — its spend is inside allocSoFar
+    if (!b.starts.some((s) => s > now)) continue; // dead — nothing can seat there any more
+    reserved += shares[b.key] ?? 0;
+  }
+  return { budget: Math.max(0, daily - reserved - Math.max(0, allocSoFar)), reserved };
+}
+
+/**
+ * THE TOP-UP SWEEP DECISION (2026-08-19, same instruction). Fires a plain (no-block)
+ * generate when the paper day is short, no block fire is still coming to carry the
+ * deficit, pregame games remain to seat it, and the day's top-up cap is not spent.
+ * Pure — the scheduler passes what it already read; generate's own limiter, run cap
+ * and registry cap still govern the actual spend.
+ */
+export function decideTopUp(args: {
+  /** the date's locked SyncEntry (paper/allocSum read off its index signature) */
+  entry: Record<string, unknown> | null;
+  blocks: SlateBlock[];
+  registry: BlockRegistry | null | undefined;
+  starts: number[];
+  now: number;
+  daily: number;
+  max: number;
+}): { fire: boolean; reason: string; owed: number; used: number } {
+  const { entry, blocks, registry, starts, now, daily, max } = args;
+  const used = Object.keys(registry ?? {}).filter((k) => k.startsWith("topup-")).length;
+  if (entry?.paper !== true) return { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used };
+  const owed = daily - Number(entry.allocSum ?? 0);
+  if (owed <= 0) return { fire: false, reason: "day fully deployed", owed: 0, used };
+  const pending = blocks.some(
+    (b) => !registry?.[b.key]?.firedAt && !registry?.[b.key]?.reason && b.starts.some((s) => s > now),
+  );
+  if (pending) return { fire: false, reason: "a block is still pending — its own fire carries the deficit", owed, used };
+  if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to seat", owed, used };
+  if (used >= max) return { fire: false, reason: `top-up cap spent (${used}/${max})`, owed, used };
+  return { fire: true, reason: `day short $${owed} with no pending block and pregame games remaining`, owed, used };
+}

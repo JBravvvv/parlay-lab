@@ -132,20 +132,28 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).not.toMatch(/capFrac \* bankroll/); // the old bankroll-derived ceiling is gone
   });
 
-  it("the 3-10 window shapes ONLY the forced pass — the disciplined system's own cfg is never count-overridden", () => {
+  it("the window shapes the forced floor; the CEILING is the day allowance (2026-08-19) — the disciplined cfg is never count-overridden", () => {
     const src = read("src/lib/server/lock-card.ts");
     expect(src).toMatch(/ticketWindow\(/);
     // the forced call carries the count overrides…
     expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
     expect(src).toMatch(/minCoreTickets/);
-    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself;
-    // since 2026-08-16 it draws from the bias-pruned pool — see under-bias.test.ts)
-    expect(src).toMatch(/shAllocate\(\s*biasPool,\s*daily,\s*cfg,\s*false/s);
+    // …its ceiling is the DAY's remaining allowance, never the window's share-rounded
+    // maxNew (2026-08-19: a $10 block's window of 1 zeroed the top-up and stranded $1)…
+    expect(src).toMatch(/dayAllowance - a\.picks\.length/);
+    expect(src).not.toMatch(/win\.maxNew - a(lloc)?\.picks\.length/);
+    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself; since
+    // 2026-08-16 it draws from the bias-pruned pool — see under-bias.test.ts; since
+    // 2026-08-19 both passes live in runPasses so the budget-over-bias rerun cannot fork)
+    expect(src).toMatch(/shAllocate\(p, daily, cfg, false\)/);
   });
 
-  it("the generate route's block budgets split PAPER.daily, not a re-derived bankroll cap", () => {
+  it("the generate route prices every fire off PAPER.daily via the deficit-carrying budget (2026-08-19), not a re-derived bankroll cap", () => {
     const src = read("app/api/generate/route.ts");
-    expect(src).toMatch(/splitBudget\(PAPER\.daily/);
+    expect(src).toMatch(/effectiveBlockBudget\(\{ daily: PAPER\.daily/);
+    // the static splitBudget share is gone from the route — an under-deploying fire's
+    // money must flow forward, never strand (the 08-19 $49-of-$150 day)
+    expect(src).not.toMatch(/splitBudget\(PAPER\.daily/);
     expect(src).not.toMatch(/capFrac \* bankB/);
   });
 

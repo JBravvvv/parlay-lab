@@ -23,6 +23,16 @@ export const PAPER = {
 export const PAPER_TICKETS = { min: 3, max: 10 } as const;
 
 /**
+ * TOP-UP SWEEPS (2026-08-19, Josh's word after the 08-19 card deployed $49 of $150:
+ * "I said $150 every day no matter what so we could track and calibrate off of it").
+ * When every block has fired or died and the day is still short, the scheduler may buy
+ * up to this many extra generate runs (fresh prices — evening props post late, which is
+ * exactly when the earlier fires found a thin pool). Each run costs ~120 Odds credits;
+ * the cap bounds the spend, and the generate route's own registry enforces it.
+ */
+export const TOPUP_MAX = 2;
+
+/**
  * The day-level 3–10 window, expressed per allocation call. `blockBudget` is the money
  * this fire deploys (the whole $150 single-block, or the block's splitBudget share);
  * `carriedCount` is how many core tickets the day already locked. Pro-rata by budget
