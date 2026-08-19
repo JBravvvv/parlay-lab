@@ -83,6 +83,24 @@ addenda under §0.000005 (search the quoted verbatim words):**
     unchanged (shLedgerStats always had scopes).
 11. **CAESARS ⓘ TOGGLE SYNC** (08-11) — authed wire confirmed by Josh ("Sync phrase
     worked").
+13. **THE $150 ACTUALLY DEPLOYS (added 2026-08-19, same day — verbatim: "There is only
+    $49 of core money invested today. I said $150 every day no matter what so we could
+    track and calibrate off of it over time"):** the 08-19 card deployed $49 of $150.
+    Three compounding defects fixed in `90e1cb0`: (1) static splitBudget shares stranded
+    every fire's shortfall — now every fire's budget = 150 − deployed − reserved pending
+    shares (`effectiveBlockBudget`, blocks.ts, pure); (2) the block window's share-rounded
+    maxNew zeroed the forced pass (the "$9 of $10" note) — the cap is now the DAY's
+    remaining allowance (10 − carried − gated); (3) no retry after thin-pool fires (CZ
+    posts evening props near first pitch) — the scheduler now fires a TOP-UP SWEEP
+    (`decideTopUp` → `generate?topup=1`, fresh prices, TOPUP_MAX 2/day registry-capped,
+    ~120 credits each). Budget now OUTRANKS the under-bias quota on conflict
+    (`yieldedToBudget` stamped). Generate loads carry on EVERY fire (plain/top-up runs
+    append, never race richer-day-wins). **FORENSIC FINDING, same read: the 08-08
+    per-block pool filter was a NO-OP since it shipped** — it read `p.w?.pl` on
+    `{pl,src,idx}` wrappers, vacuously true; every block fire always drew the slate-wide
+    pool; the tracked record was built that way; the dead filter is DELETED with the
+    dated comment, not "fixed". Guards: `tests/paper-deficit.test.ts` (incl. the
+    $9-of-$10 mock reproduction); paper-epoch pins updated. Gate 116 files / 930 tests.
 12. **CORE/FUN SECTIONS ON THE LOCKED CARD (added 2026-08-19, post-compaction —
     verbatim: "The builder locked card needs to clearly define what bets are core
     bets and what bets are fun bets. As of now they are just continuous"):** the
@@ -107,6 +125,10 @@ locked. First fully-ruled card: 08-17.
   2026-08-23 (side stamps only exist post-08-16-deploy).
 - Read the 08-17/08-18 paper cards + underShare stamps (the bias's first live days)
   and the first HR-longshot fun sets via the public `card` field.
+- **Verify the 08-19 heal and the first fully-deficit-managed day (08-20):** after the
+  `90e1cb0` deploy (~23:45Z with 5 games unstarted) the next scheduler pokes should
+  have fired a top-up on the $101 owed — read the 08-19 card's allocSum and note, then
+  confirm 08-20 locks the full $150 across its fires (day-aware notes name any residue).
 - Standing open: alt-lines unlock decision page (§12Z.12, Josh's word) · CLV
   header-auth migration (security queue) · quota re-read before burn decisions ·
   crossings at FLOOR 62 (records through 55–62 in collection-period.md, brakes green,
