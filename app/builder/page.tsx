@@ -58,6 +58,8 @@ type LockedEntry = {
   games: Record<string, { pk: number | null; start: string }>;
   core: LockedTicket[];
   funT: LockedTicket[];
+  /* the server's honest note when the fun pool ran thin (fewer/zero HR longshots) */
+  funNote?: string;
   grading?: { tickets: Record<string, { result: string; payout: number }> } | null;
 };
 type LockedTicket = {
@@ -483,7 +485,9 @@ export default function BuilderPage() {
     eng.get<() => void>("shLockCard")();
     const e = eng.get<(dt: string) => LockedEntry | null>("shLedgerFind")(todayStr());
     if (e?.locked) {
-      setStatus(`Card locked — $${e.core.concat(e.funT).reduce((s, t) => s + t.stake, 0)} recorded. Grades post as games go final.`);
+      const coreS = e.core.reduce((s, t) => s + t.stake, 0);
+      const funS = e.funT.reduce((s, t) => s + t.stake, 0);
+      setStatus(`Card locked — $${coreS} core + $${funS} fun recorded. Grades post as games go final.`);
     } else {
       setStatus("Lock didn't take — set a DAILY $ or FUN $ amount and make sure today's board is generated.");
     }
@@ -494,6 +498,39 @@ export default function BuilderPage() {
     if (!eng) return;
     eng.get<(id: string, v: string) => void>("shConfirmPrice")(tid, val);
     setCardV((v) => v + 1);
+  };
+
+  /* one locked ticket + its NV price-confirm input — shared by the CORE and FUN sections
+     so splitting the panel (2026-08-19) could not fork the ticket behavior */
+  const renderLockedTicket = (t: LockedTicket) => {
+    if (!locked) return null;
+    const started = t.legs.some((l) => {
+      const gi = l.gkey ? locked.games[l.gkey] : null;
+      return gi?.start && new Date(gi.start).getTime() <= Date.now();
+    });
+    return (
+      <div key={t.id}>
+        <TicketCard
+          t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob } as never}
+          stake={t.stake}
+          grade={locked.grading?.tickets?.[t.id]}
+          tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}
+          basisMode={basisMode}
+          legNow={lockedLegNow}
+        />
+        {!started && !locked.grading?.tickets?.[t.id] && (
+          <div className="mt-1.5 flex items-center gap-2 px-1">
+            <span className="text-[10px] uppercase tracking-wide text-faint">NV price</span>
+            <input
+              defaultValue={t.confirmed ?? ""}
+              placeholder={String(t.czOdds ?? "")}
+              onBlur={(e) => e.target.value && confirmPrice(t.id, e.target.value)}
+              className="num w-20 rounded-full border border-line-2 bg-surface-2 px-2.5 py-1 text-[11px] text-gold outline-none focus:border-gold/60"
+            />
+          </div>
+        )}
+      </div>
+    );
   };
 
   /* ---------- manual slip ---------- */
@@ -638,40 +675,40 @@ export default function BuilderPage() {
             className="glow-gold"
           >
             <div className="mb-3 text-[11.5px] text-muted">
-              ${locked.core.concat(locked.funT).reduce((s, t) => s + t.stake, 0)} across{" "}
-              {locked.core.length + locked.funT.length} tickets · append-only, no retroactive edits. Confirm the NV
-              app&apos;s price on any ticket until its first pitch.
+              <b className="num text-text">{fmtMoney(locked.core.reduce((s, t) => s + t.stake, 0))}</b> core +{" "}
+              <b className="num text-gold">{fmtMoney(locked.funT.reduce((s, t) => s + t.stake, 0))}</b> fun ·
+              append-only, no retroactive edits. Confirm the NV app&apos;s price on any ticket until its first pitch.
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {locked.core.concat(locked.funT).map((t) => {
-                const started = t.legs.some((l) => {
-                  const gi = l.gkey ? locked.games[l.gkey] : null;
-                  return gi?.start && new Date(gi.start).getTime() <= Date.now();
-                });
-                return (
-                  <div key={t.id}>
-                    <TicketCard
-                      t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob } as never}
-                      stake={t.stake}
-                      grade={locked.grading?.tickets?.[t.id]}
-                      tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}
-                      basisMode={basisMode}
-                      legNow={lockedLegNow}
-                    />
-                    {!started && !locked.grading?.tickets?.[t.id] && (
-                      <div className="mt-1.5 flex items-center gap-2 px-1">
-                        <span className="text-[10px] uppercase tracking-wide text-faint">NV price</span>
-                        <input
-                          defaultValue={t.confirmed ?? ""}
-                          placeholder={String(t.czOdds ?? "")}
-                          onBlur={(e) => e.target.value && confirmPrice(t.id, e.target.value)}
-                          className="num w-20 rounded-full border border-line-2 bg-surface-2 px-2.5 py-1 text-[11px] text-gold outline-none focus:border-gold/60"
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            {/* CORE — the main check (2026-08-16: core is the only +/- that counts in net P/L) */}
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text">Core money</span>
+              <span className="num text-[11.5px] text-muted">
+                {fmtMoney(locked.core.reduce((s, t) => s + t.stake, 0))} · {locked.core.length}{" "}
+                {locked.core.length === 1 ? "ticket" : "tickets"}
+              </span>
+              <span className="text-[10px] text-faint">the main check — counts in net P/L</span>
+            </div>
+            {locked.core.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">{locked.core.map(renderLockedTicket)}</div>
+            ) : (
+              <div className="text-[12px] text-muted">No core tickets on this lock.</div>
+            )}
+            {/* FUN — its own block, gold like the dashboard's FUN line (2026-08-19, Josh: core and
+                fun bets on the locked card were "just continuous" — they must read as two buckets) */}
+            <div className="mt-5 border-t border-gold/25 pt-4">
+              <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fun money</span>
+                <span className="num text-[11.5px] text-muted">
+                  {fmtMoney(locked.funT.reduce((s, t) => s + t.stake, 0))} · {locked.funT.length}{" "}
+                  {locked.funT.length === 1 ? "ticket" : "tickets"}
+                </span>
+                <span className="text-[10px] text-faint">HR longshots — tracked by itself, never in the core net</span>
+              </div>
+              {locked.funT.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2">{locked.funT.map(renderLockedTicket)}</div>
+              ) : (
+                <div className="text-[12px] text-muted">{locked.funNote ?? "No fun tickets on today's card."}</div>
+              )}
             </div>
           </Panel>
         </Reveal>
