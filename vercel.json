@@ -4,5 +4,9 @@
       "main": false,
       "line-history": false
     }
-  }
+  },
+  "crons": [
+    { "path": "/api/scheduler", "schedule": "45 21 * * *" },
+    { "path": "/api/scheduler", "schedule": "0 0 * * *" }
+  ]
 }

@@ -73,8 +73,17 @@ export function cronKeyAuthed(req: { nextUrl: { searchParams: { get(k: string): 
  */
 export function cronHeaderAuthed(req: { headers: { get(k: string): string | null } }): boolean {
   const want = process.env.CRON_SECRET;
-  const got = req.headers.get("x-cron-key");
-  if (!want || !got) return false;
+  if (!want) return false;
   const h = (s: string) => createHash("sha256").update(s).digest();
-  return timingSafeEqual(h(want), h(got));
+  const got = req.headers.get("x-cron-key");
+  if (got && timingSafeEqual(h(want), h(got))) return true;
+  /* VERCEL CRON (2026-08-20): two days of live watching proved the external pokes go
+     dark in the evening — 08-19 and 08-20 both stranded the last block's budget with
+     games still pregame. vercel.json now schedules evening pokes, and Vercel invokes
+     cron paths with its own convention: `Authorization: Bearer <CRON_SECRET>` (the
+     platform injects the env var's value; the secret never appears in any file).
+     Same secret, same timing-safe comparison — a second spelling, not a second key. */
+  const auth = req.headers.get("authorization");
+  if (auth?.startsWith("Bearer ") && timingSafeEqual(h(want), h(auth.slice(7)))) return true;
+  return false;
 }
