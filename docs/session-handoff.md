@@ -129,6 +129,17 @@ locked. First fully-ruled card: 08-17.
   `90e1cb0` deploy (~23:45Z with 5 games unstarted) the next scheduler pokes should
   have fired a top-up on the $101 owed — read the 08-19 card's allocSum and note, then
   confirm 08-20 locks the full $150 across its fires (day-aware notes name any residue).
+  **WATCHED LIVE 23:47–00:20Z (2026-08-19): NO POKE ARRIVED — the card sat at $49
+  unchanged for 33 minutes.** Two consequences, both on the record: (1) **the deadlock
+  the watch exposed is FIXED and deployed (`5c65fac`)** — block C never fired, sat
+  burned-down (3 unstarted < minReady 4, window closed forever), and the aliveness-only
+  pending/reserve checks would have held the sweep and reserved C's $100 until nothing
+  was pregame; `canStillFire` (unstarted ≥ blockMinReady) now governs both. (2) **THE
+  POKE COVERAGE GAP IS JOSH'S ACTION**: today's fires stopped before block C's 21:40Z
+  window opened — the cron-job.org scheduler pokes evidently do not cover the evening.
+  For the sweep (and evening blocks at all) to work, the poke entries need coverage
+  through ~01:00Z (03:00Z on West-Coast-heavy slates). Josh creates/edits the entries
+  and types the secret; nothing server-side can substitute for a poke that never comes.
 - Standing open: alt-lines unlock decision page (§12Z.12, Josh's word) · CLV
   header-auth migration (security queue) · quota re-read before burn decisions ·
   crossings at FLOOR 62 (records through 55–62 in collection-period.md, brakes green,
