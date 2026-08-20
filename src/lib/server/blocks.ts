@@ -148,10 +148,22 @@ export function effectiveBlockBudget(args: {
   for (const b of blocks) {
     if (b.key === currentKey) continue;
     if (registry?.[b.key]?.firedAt) continue; // already fired — its spend is inside allocSoFar
-    if (!b.starts.some((s) => s > now)) continue; // dead — nothing can seat there any more
+    if (!canStillFire(b, now)) continue; // dead or burned down — no fire will ever spend there
     reserved += shares[b.key] ?? 0;
   }
   return { budget: Math.max(0, daily - reserved - Math.max(0, allocSoFar)), reserved };
+}
+
+/**
+ * A block can still fire only while its unstarted games can reach the scaled floor —
+ * ready never exceeds unstarted, and unstarted only shrinks, so once
+ * unstarted < blockMinReady the two-condition window is closed FOREVER even though
+ * games remain pregame. OBSERVED LIVE 2026-08-19: block C sat at 3 unstarted < floor 4
+ * ("burned down"), could never fire, and an aliveness-only check would have reserved
+ * its $100 and held the top-up sweep exactly while its last games were still seatable.
+ */
+export function canStillFire(b: SlateBlock, now: number): boolean {
+  return b.starts.filter((s) => s > now).length >= blockMinReady(b.starts.length);
 }
 
 /**
@@ -177,9 +189,9 @@ export function decideTopUp(args: {
   const owed = daily - Number(entry.allocSum ?? 0);
   if (owed <= 0) return { fire: false, reason: "day fully deployed", owed: 0, used };
   const pending = blocks.some(
-    (b) => !registry?.[b.key]?.firedAt && !registry?.[b.key]?.reason && b.starts.some((s) => s > now),
+    (b) => !registry?.[b.key]?.firedAt && !registry?.[b.key]?.reason && canStillFire(b, now),
   );
-  if (pending) return { fire: false, reason: "a block is still pending — its own fire carries the deficit", owed, used };
+  if (pending) return { fire: false, reason: "a block can still fire — its own fire carries the deficit", owed, used };
   if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to seat", owed, used };
   if (used >= max) return { fire: false, reason: `top-up cap spent (${used}/${max})`, owed, used };
   return { fire: true, reason: `day short $${owed} with no pending block and pregame games remaining`, owed, used };

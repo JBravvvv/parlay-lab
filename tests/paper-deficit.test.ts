@@ -72,11 +72,23 @@ describe("decideTopUp — the sweep that makes 'no matter what' true while games
     expect(d.fire).toBe(true);
     expect(d.owed).toBe(101);
   });
-  it("holds while a block is still pending — that block's own fire carries the deficit", () => {
-    const reg: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } }; // C unfired, alive
+  it("holds while a block can still fire — that block's own fire carries the deficit", () => {
+    const reg: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } }; // C unfired, 10 unstarted >= floor 4
     const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: T("2026-08-19T19:00:00Z"), daily: PAPER.daily, max: TOPUP_MAX });
     expect(d.fire).toBe(false);
-    expect(d.reason).toMatch(/pending/);
+    expect(d.reason).toMatch(/can still fire/);
+  });
+  it("THE OBSERVED DEADLOCK (2026-08-19 23:47Z, live): a burned-down block is NOT pending and reserves nothing", () => {
+    // C never fired; at 23:47Z it has 3 unstarted games < its minReady floor of 4 — the
+    // two-condition window is closed forever, yet 3 games are still seatable. An
+    // aliveness-only check held the top-up until nothing was pregame (watched happen).
+    const reg: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } };
+    const late = T("2026-08-19T23:47:00Z");
+    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: late, daily: PAPER.daily, max: TOPUP_MAX });
+    expect(d.fire, "the sweep must not wait on a block that can never fire").toBe(true);
+    expect(d.owed).toBe(101);
+    const r = effectiveBlockBudget({ daily: 150, blocks: BLOCKS, currentKey: "", registry: reg, now: late, allocSoFar: 49 });
+    expect(r, "a never-fireable block must not reserve its share away from the sweep").toEqual({ budget: 101, reserved: 0 });
   });
   it("holds on a fully-deployed day, a day with no paper lock, and a day with nothing pregame", () => {
     expect(decideTopUp({ entry: { paper: true, allocSum: 150 }, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
