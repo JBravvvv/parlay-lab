@@ -125,6 +125,27 @@ addenda under §0.000005 (search the quoted verbatim words):**
     (the hardcoded grid-cols-6 had been wrapping the 7th tab since /props landed).
     Guard `tests/parlay-calc.test.ts`; verified live on the deployed page (the classic
     $10 two-teamer at -110/-110 reads WINS $26.45 / PAYS $36.45, +264). `a287185`.
+14. **PRIMARY SELECTION → DK/FD BASIS, BOTH SELECTIONS TRACKED (2026-08-21, verbatim:
+    "Change it to 'DK/FD' basis but track bets for both internally so it can calibrate
+    either selection."):** CRON_SEL_MODE/LOCK_SEL_MODE ev_gated → dk_fd (arming-parity
+    pin observed RED on the flip, then updated — its job). buildLockEntry is now ONE
+    pipeline, TWO worlds (`buildModeCard`): the primary (dk_fd) feeds core/notes/fun
+    exactly as before; the other disciplined mode rides every entry as **`alt`**
+    (own carried world, same rules: day-capped forced top-up, under-bias loop,
+    budget-over-bias yield) — never in core, never in any net, never on the public
+    card; `mergeLedgers` preserves it against graded pre-ship client copies. **Alt
+    outcomes need no new grading**: alt tickets are pool parlays, and the grade-only
+    pass already settles ParlayPred rows — join `alt.core[].id` to the pred store's
+    parlay records (or by leg lkeys). **Market/side calibration is untouched** — the
+    fit trains on graded board ROWS, mode-independent; what this adds is the
+    SELECTION-level A/B (dk_fd card vs ev_gated card, same days, same rules).
+    **Vintage note: 2026-08-21 is the transition day** — fires before this deploy
+    selected ev_gated, fires after select dk_fd, and the entry's `selMode` stamp
+    reflects only the LAST fire; clean single-mode days start 2026-08-22. Ship
+    `a5243a6`, gate 118 files / 949 tests. NEXT READS: tomorrow's card should show
+    selMode dk_fd + an `alt` block with the ev_gated card + $150 full (the evening
+    crons' first day); the config echo on the next board is the outside instrument
+    for the flip.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
