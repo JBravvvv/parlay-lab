@@ -13,7 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-19:** `origin/frontend-rebuild` = `0970f70f223a7b66abff6401ced0e500963685c6`
+> - **STATE-CLAIM 2026-08-21:** `origin/frontend-rebuild` = `8bd1e4a7981d986038d7145caca497956ed743f4`
+>   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(The 08-18 draft of this claim FABRICATED the 40-char tail of a real short sha —
 > `sha-currency` refused it as "ancestor of NO ref" before it could be committed. The
@@ -140,6 +141,26 @@ locked. First fully-ruled card: 08-17.
   For the sweep (and evening blocks at all) to work, the poke entries need coverage
   through ~01:00Z (03:00Z on West-Coast-heavy slates). Josh creates/edits the entries
   and types the secret; nothing server-side can substitute for a poke that never comes.
+  **SUPERSEDED 2026-08-20 (same finding, second day, then FIXED PLATFORM-SIDE):** the
+  08-20 card repeated the shape — $101 deployed, ALL gated, no note (every daytime fire
+  hit its own budget exactly; the evening block's $49 was stranded by the same dark
+  evening, proving the deficit chain works and the pokes are the only gap). Josh's
+  word, second time: "It needs to do $150 every single day for the test no matter
+  what." **THE FIX NO LONGER WAITS ON JOSH: vercel.json now schedules two daily
+  /api/scheduler pokes (45 21 * * * and 0 0 * * *, the Hobby cap) and Vercel invokes
+  them with its own `Authorization: Bearer CRON_SECRET` convention — cronHeaderAuthed
+  accepts that spelling beside x-cron-key (same secret, timing-safe, never in the
+  repo).** Two platform facts paid for on the way: Vercel KEYS CRONS BY PATH (two
+  entries on the same literal path collapse to the last schedule — observed in
+  `vercel crons ls`; distinct query-string suffixes keep both), and both crons are
+  CONFIRMED REGISTERED post-deploy. Ships: `7c3c926` (crons + Bearer, guard
+  tests/vercel-cron-pokes.test.ts), `8bd1e4a` (distinct paths + uniqueness guard);
+  crossings 67–69 stamped off bot `e951b94` (Moscoso 18.6 / Hanahan 17.2 / Vondrak
+  16.4), **FLOOR 66 → 69**, armed mean n=69 16.61 vs league 16.40 — ABOVE league
+  (+0.21) for the first time since n=6 dissolved, recorded as a number, not a signal
+  (`3f13745`). First cron tick: 21:45Z 2026-08-21 — read the 08-21 card next session:
+  allocSum should finally print $150. cron-job.org evening coverage is now
+  belt-and-suspenders, still welcome, no longer load-bearing.
 - Standing open: alt-lines unlock decision page (§12Z.12, Josh's word) · CLV
   header-auth migration (security queue) · quota re-read before burn decisions ·
   crossings at FLOOR 62 (records through 55–62 in collection-period.md, brakes green,
