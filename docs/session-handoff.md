@@ -113,6 +113,18 @@ addenda under §0.000005 (search the quoted verbatim words):**
     core + fun instead of one blended number; an empty fun section surfaces the
     server's `funNote`. Guard: `tests/builder-card-sections.test.ts`. Shipped
     `95c224c`, gate 115 files / 916 tests + tsc clean.
+13. **PARLAY CALCULATOR TAB (added 2026-08-20, verbatim: "Add a parlay calculator tab
+    where you can enter any amount for the bet and it has lines for each bet of the
+    parlay to enter the odds. It should start with 2 lines for bets then have a
+    '+ a leg' button underneath … At the bottom it should have 'wins' and 'pays'
+    amounts."):** `/calc` — stake input, two starting legs, "+ a leg" appends, ✕
+    removes to the floor of 2, per-leg decimal as typed, WINS (profit) + PAYS (total
+    return) + the combined American/decimal line. Pure math on the user's own numbers
+    (`src/lib/parlay-calc.ts`; integers, nothing inside ±100) — no engine, no board.
+    Shell: Calc tab desktop+mobile; the mobile bottom bar now computes its columns
+    (the hardcoded grid-cols-6 had been wrapping the 7th tab since /props landed).
+    Guard `tests/parlay-calc.test.ts`; verified live on the deployed page (the classic
+    $10 two-teamer at -110/-110 reads WINS $26.45 / PAYS $36.45, +264). `a287185`.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
