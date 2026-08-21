@@ -57,6 +57,10 @@ export type SyncEntry = {
       TWO-CARDS-ONE-GAME check reads these), and when it fired. Additive; days locked
       before this ship simply have no blocks map. */
   blocks?: Record<string, { budget: number; tickets: number; gkeys?: string[]; firedAt?: number }>;
+  /** DUAL-MODE TRACKING (2026-08-21, Josh's word: "track bets for both internally so it
+      can calibrate either selection"): the OTHER disciplined selection's card for the same
+      day, built by the same server pipeline. Internal — never in core, never in any net. */
+  alt?: { selMode: string; core: SyncTicket[]; allocSum: number; gatedSum: number; underShare?: number };
   [k: string]: unknown;
 };
 
@@ -126,6 +130,9 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   const [base, other] = pickBase(x, y);
   const out: SyncEntry = JSON.parse(JSON.stringify(base));
   if (!out.grading && other.grading) out.grading = JSON.parse(JSON.stringify(other.grading));
+  /* ALT CARD (2026-08-21): the server's dual-mode shadow record rides the entry — a
+     pre-ship client copy that wins pickBase on grading richness must not drop it. */
+  if (!out.alt && other.alt) out.alt = JSON.parse(JSON.stringify(other.alt));
   if (other.clv) {
     out.clv = { ...JSON.parse(JSON.stringify(other.clv)), ...(out.clv ?? {}) };
   }

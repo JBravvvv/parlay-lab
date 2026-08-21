@@ -146,7 +146,12 @@ describe("arming call sites (structural, not value-based)", () => {
 
   it("the cron sets the frozen selection mode explicitly", () => {
     // SH_CFG has no engine-side selMode default; unset silently means legacy
-    expect(src(GEN)).toMatch(/CRON_SEL_MODE\s*=\s*"ev_gated"/);
+    /* FLIPPED ev_gated → dk_fd 2026-08-21 (Josh's word: "Change it to 'DK/FD' basis but
+       track bets for both internally so it can calibrate either selection.") This pin
+       was OBSERVED RED on the flip commit before being updated — the point of the pin
+       is that the mode never moves silently. The ev_gated card still exists on every
+       entry as `alt` (lock-card.test.ts covers it). */
+    expect(src(GEN)).toMatch(/CRON_SEL_MODE\s*=\s*"dk_fd"/);
     expect(src(GEN)).toMatch(/cfg\.selMode\s*=\s*CRON_SEL_MODE/);
   });
 

@@ -32,7 +32,13 @@ export const maxDuration = 300;
 
 /** docs/collection-period.md, frozen row "selection mode default". The cron has no
     localStorage to read pl_selmode from, so the frozen default is stated here. */
-const CRON_SEL_MODE = "ev_gated";
+/* FLIPPED ev_gated → dk_fd 2026-08-21 (Josh's word, verbatim: "Change it to 'DK/FD' basis
+   but track bets for both internally so it can calibrate either selection.") The primary
+   locked card now selects and gates on the DK/FD basis price; buildLockEntry records the
+   other disciplined mode's card on the same entry as `alt`. MIRROR: lock-card.ts
+   LOCK_SEL_MODE. Market/side calibration is unaffected — the fit trains on graded board
+   ROWS, which are written and graded regardless of selection mode. */
+const CRON_SEL_MODE = "dk_fd";
 
 const K_LASTGEN = "pl:gen:lastRun";
 const K_RUNS = "pl:gen:runs:";

@@ -31,8 +31,11 @@ import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/
 /** MIRROR of app/api/ledger/route.ts STORE_KEY — guarded by tests/lock-card.test.ts. */
 export const LEDGER_STORE_KEY = "pl:ledger:v1";
 
-/** MIRROR of app/api/generate/route.ts CRON_SEL_MODE — the one mode the system locks under. */
-export const LOCK_SEL_MODE = "ev_gated";
+/** MIRROR of app/api/generate/route.ts CRON_SEL_MODE — the PRIMARY mode the system locks
+    under. FLIPPED ev_gated → dk_fd 2026-08-21 (Josh's word, verbatim: "Change it to 'DK/FD'
+    basis but track bets for both internally so it can calibrate either selection.") — the
+    other disciplined mode's card now rides every entry as `alt`, same rules, own world. */
+export const LOCK_SEL_MODE = "dk_fd";
 
 /**
  * The record a day gets when NOTHING could be built any more — dead slate, no board, no lock.
@@ -154,7 +157,7 @@ export function buildLockEntry(args: {
     legs: w.pl.legs as { lkey?: string | null; prop?: string | null; label?: string | null }[],
   }));
   const prunedB = pruneOutsUnder(biasView, win.minNew);
-  let biasPool: PoolItem[] = prunedB.pool.map((b) => b.w);
+  const basePool: PoolItem[] = prunedB.pool.map((b) => b.w);
 
   /* PAPER EPOCH (2026-08-15, Josh's word): "$150 every single day no matter what." The
      disciplined ev_gated allocation runs FIRST — that is the calibrated system the
@@ -167,11 +170,6 @@ export function buildLockEntry(args: {
      may run at most 25% under prop legs — over quota, the most under-heavy picked
      ticket is EVICTED from the pool and both passes re-run. Bounded: every iteration
      removes a picked ticket, so the loop cannot spin. */
-  const carriedBias = (carry?.core ?? []).map((t) => ({
-    name: String(t.name ?? ""),
-    czEv: (t.czEv as number | null) ?? null,
-    legs: ((t.legs as { lkey?: string | null; prop?: string | null }[] | undefined) ?? []),
-  }));
   /* THE FORCED PASS IS CAPPED BY THE DAY, NOT THE BLOCK WINDOW (corrected 2026-08-19
      after the 08-19 card deployed $49 of $150 — Josh: "I said $150 every day no matter
      what"). The window's share-rounded maxNew zeroed the top-up on small blocks: a $10
@@ -180,65 +178,95 @@ export function buildLockEntry(args: {
      forced pass may seat up to (10 − carried − gated) tickets on any fire; the window
      keeps shaping only the floor. */
   const dayAllowance = Math.max(0, PAPER_TICKETS.max - carriedCount);
-  let alloc: AllocResult = { picks: [], sum: 0 };
-  let forced: AllocResult = { picks: [], sum: 0 };
-  let underShare = 0;
-  let quotaEvicted = 0;
   type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
-  const runPasses = (p: PoolItem[]): { alloc: AllocResult; forced: AllocResult; staged: Staged[]; share: number } => {
-    const a = shAllocate(p, daily, cfg, false);
-    let f: AllocResult = { picks: [], sum: 0 };
-    const ids = new Set<string>(a.picks.map((x) => x.id));
-    const legs = new Set<string>();
-    for (const x of a.picks) for (const l of x.w.pl.legs) legs.add(legKey(l));
-    for (const t of carry?.core ?? []) {
-      if (t.id) ids.add(String(t.id));
-      for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
-    }
-    const short = daily - a.sum;
-    const fMax = Math.max(0, dayAllowance - a.picks.length);
-    if (short > 0 && fMax > 0) {
-      const rest = p.filter((w) => !ids.has(tid(w.pl)) && !w.pl.legs.some((l) => legs.has(legKey(l))));
-      f = shAllocate(rest, short, {
-        ...cfg,
-        selMode: "caesars_ev",
-        maxCoreTickets: fMax,
-        minCoreTickets: Math.max(1, win.minNew - a.picks.length),
-      }, false);
-    }
-    const staged: Staged[] = [...a.picks, ...f.picks].map((x) => ({
-      __id: x.id,
-      name: String(x.w.pl.name ?? ""),
-      czEv: (x.w.pl.czEv as number | null) ?? null,
-      legs: x.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
+  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean };
+  const biasViewOf = (tix: SyncTicket[]) =>
+    tix.map((t) => ({
+      name: String(t.name ?? ""),
+      czEv: (t.czEv as number | null) ?? null,
+      legs: ((t.legs as { lkey?: string | null; prop?: string | null }[] | undefined) ?? []),
     }));
-    return { alloc: a, forced: f, staged, share: underStats([...carriedBias, ...staged]).share };
+
+  /* ONE PIPELINE, TWO WORLDS (2026-08-21, Josh's word, verbatim: "Change it to 'DK/FD'
+     basis but track bets for both internally so it can calibrate either selection.")
+     buildModeCard runs the full paper machinery — the gated pass in the given selection
+     mode, the day-capped caesars_ev forced top-up, the under-bias quota loop, and the
+     budget-over-bias yield — against its OWN carried tickets, so the primary selection
+     and the alt selection get identical rules and independent leg-disjoint worlds. */
+  const buildModeCard = (mode: string, carriedTix: SyncTicket[]): ModeCard => {
+    const carriedB = biasViewOf(carriedTix);
+    const allow = Math.max(0, PAPER_TICKETS.max - carriedTix.length);
+    const w = ticketWindow(daily, carriedTix.length);
+    const run = (p: PoolItem[]) => {
+      const a = shAllocate(p, daily, { ...cfg, selMode: mode }, false);
+      let f: AllocResult = { picks: [], sum: 0 };
+      const ids = new Set<string>(a.picks.map((x) => x.id));
+      const legs = new Set<string>();
+      for (const x of a.picks) for (const l of x.w.pl.legs) legs.add(legKey(l));
+      for (const t of carriedTix) {
+        if (t.id) ids.add(String(t.id));
+        for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
+      }
+      const short = daily - a.sum;
+      const fMax = Math.max(0, allow - a.picks.length);
+      if (short > 0 && fMax > 0) {
+        const rest = p.filter((x) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l))));
+        f = shAllocate(rest, short, {
+          ...cfg,
+          selMode: "caesars_ev",
+          maxCoreTickets: fMax,
+          minCoreTickets: Math.max(1, w.minNew - a.picks.length),
+        }, false);
+      }
+      const staged: Staged[] = [...a.picks, ...f.picks].map((x) => ({
+        __id: x.id,
+        name: String(x.w.pl.name ?? ""),
+        czEv: (x.w.pl.czEv as number | null) ?? null,
+        legs: x.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
+      }));
+      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share };
+    };
+    let pool = basePool;
+    let cur = run(pool);
+    let evicted = 0;
+    /* Rule 2 of the under bias: over quota, evict the most under-heavy picked ticket and
+       re-run. Bounded: every iteration removes a picked ticket, so the loop cannot spin. */
+    for (let attempt = 0; ; attempt++) {
+      if (cur.share <= 1 - UNDER_BIAS.overShare + 1e-9 || attempt >= 12) break;
+      const worst = worstUnderTicket(cur.staged);
+      if (!worst) break;
+      evicted++;
+      pool = pool.filter((x) => tid(x.pl) !== worst.__id);
+      cur = run(pool);
+    }
+    /* BUDGET OVER BIAS (2026-08-19). The under quota is a stated preference ("I would
+       prefer them not to be included very often"); the $150 is "no matter what". When the
+       quota's evictions leave the fire short of its budget, the evicted tickets come back
+       and the passes run once more without the quota — stamped yieldedToBudget, never silent. */
+    let yielded = false;
+    if (cur.alloc.sum + cur.forced.sum < daily && evicted > 0) {
+      yielded = true;
+      cur = run(basePool);
+    }
+    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded };
   };
-  const poolBeforeQuota = biasPool;
-  for (let attempt = 0; ; attempt++) {
-    const r = runPasses(biasPool);
-    alloc = r.alloc;
-    forced = r.forced;
-    underShare = r.share;
-    if (underShare <= 1 - UNDER_BIAS.overShare + 1e-9 || attempt >= 12) break;
-    const worst = worstUnderTicket(r.staged);
-    if (!worst) break;
-    quotaEvicted++;
-    biasPool = biasPool.filter((w) => tid(w.pl) !== worst.__id);
-  }
-  /* BUDGET OVER BIAS (2026-08-19). The under quota is a stated preference ("I would
-     prefer them not to be included very often"); the $150 is "no matter what". When the
-     quota's evictions leave the fire short of its budget, the evicted tickets come back
-     and the passes run once more without the quota — the entry stamps yieldedToBudget
-     so the conflict is on the record, never silent. */
-  let biasYielded = false;
-  if (alloc.sum + forced.sum < daily && quotaEvicted > 0) {
-    biasYielded = true;
-    const r = runPasses(poolBeforeQuota);
-    alloc = r.alloc;
-    forced = r.forced;
-    underShare = r.share;
-  }
+
+  const primaryMode = String(cfg.selMode ?? LOCK_SEL_MODE);
+  const primaryCard = buildModeCard(primaryMode, carry?.core ?? []);
+  const { alloc, forced } = primaryCard;
+  const underShare = primaryCard.underShare;
+  const quotaEvicted = primaryCard.quotaEvicted;
+  const biasYielded = primaryCard.biasYielded;
+
+  /* THE ALT SELECTION (2026-08-21, Josh's word above): the OTHER disciplined mode's card,
+     built by the same pipeline against its own carried world, recorded on the entry as
+     `alt` — never in core, never in any net, never on the public card. Its tickets are
+     pool parlays, so the prediction store's grade-only pass already settles their
+     outcomes (join by ticket id / leg lkeys); this record is what makes the
+     selection-level comparison readable. Fun money is mode-independent, primary-only. */
+  const ALT_MODE = primaryMode === "dk_fd" ? "ev_gated" : "dk_fd";
+  const altPrev = carry?.alt;
+  const altCard = buildModeCard(ALT_MODE, altPrev?.core ?? []);
   const usedIds = new Set<string>(alloc.picks.map((p) => p.id));
   const usedLegs = new Set<string>();
   for (const p of alloc.picks) for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
@@ -290,6 +318,16 @@ export function buildLockEntry(args: {
   /* block fires APPEND: the date's entry accumulates each block's card; dedupe by id */
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
   const core: SyncTicket[] = [...carried, ...newCore];
+
+  /* the alt world accumulates the same way, in its own lane */
+  const altNew: SyncTicket[] = [
+    ...altCard.alloc.picks.map((p) => toTicket(p, false)),
+    ...altCard.forced.picks.map((p) => toTicket(p, true)),
+  ];
+  const altCore: SyncTicket[] = [
+    ...(altPrev?.core ?? []).filter((t) => !altNew.some((n) => n.id === t.id)),
+    ...altNew,
+  ];
 
   /* $25 FUN, once per day — RESHAPED 2026-08-15 (Josh's word): 2–5 tickets of HR-over
      longshots, 3–8 hitters each, one team per ticket, players on at most 2 tickets.
@@ -391,6 +429,14 @@ export function buildLockEntry(args: {
     ...(prunedB.dropped + prunedB.readmitted + quotaEvicted > 0
       ? { biasDropped: { outsUnder: prunedB.dropped, outsUnderReadmitted: prunedB.readmitted, quotaEvicted, ...(biasYielded ? { yieldedToBudget: true } : {}) } }
       : {}),
+    /* the other selection's card, tracked internally (2026-08-21, Josh's word) */
+    alt: {
+      selMode: ALT_MODE,
+      core: altCore,
+      allocSum: Number(altPrev?.allocSum ?? 0) + altCard.alloc.sum + altCard.forced.sum,
+      gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.alloc.sum,
+      underShare: Math.round(altCard.underShare * 1000) / 1000,
+    },
     ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0

@@ -205,7 +205,10 @@ describe("wired — the sweep and the yield are in the routes (source scans, com
   });
   it("lock-card: budget-over-bias rerun exists and stamps yieldedToBudget (the $150 outranks the under preference)", () => {
     const src = read("src/lib/server/lock-card.ts");
-    expect(src).toMatch(/poolBeforeQuota/);
+    /* 2026-08-21: the rerun moved inside buildModeCard with the dual-mode ship — the
+       pre-eviction pool is `basePool` and the rerun is `run(basePool)`; same semantics,
+       now applied to BOTH selection worlds identically. */
+    expect(src).toMatch(/cur = run\(basePool\)/);
     expect(src).toMatch(/yieldedToBudget/);
   });
 });

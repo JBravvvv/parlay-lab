@@ -139,13 +139,15 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
     expect(src).toMatch(/minCoreTickets/);
     // …its ceiling is the DAY's remaining allowance, never the window's share-rounded
-    // maxNew (2026-08-19: a $10 block's window of 1 zeroed the top-up and stranded $1)…
-    expect(src).toMatch(/dayAllowance - a\.picks\.length/);
+    // maxNew (2026-08-19: a $10 block's window of 1 zeroed the top-up and stranded $1;
+    // 2026-08-21: per-world as `allow` inside buildModeCard — each selection world gets
+    // its own day allowance against its own carried tickets)…
+    expect(src).toMatch(/allow - a\.picks\.length/);
     expect(src).not.toMatch(/win\.maxNew - a(lloc)?\.picks\.length/);
-    // …and the gated call passes cfg UNTOUCHED (the tracked system stays itself; since
-    // 2026-08-16 it draws from the bias-pruned pool — see under-bias.test.ts; since
-    // 2026-08-19 both passes live in runPasses so the budget-over-bias rerun cannot fork)
-    expect(src).toMatch(/shAllocate\(p, daily, cfg, false\)/);
+    // …and the gated call carries cfg with ONLY the selection mode set (2026-08-21 dual
+    // tracking: `mode` is the selection under test — primary dk_fd or the alt world —
+    // never a count override; the tracked system's caps stay the engine's own)
+    expect(src).toMatch(/shAllocate\(p, daily, \{ \.\.\.cfg, selMode: mode \}, false\)/);
   });
 
   it("the generate route prices every fire off PAPER.daily via the deficit-carrying budget (2026-08-19), not a re-derived bankroll cap", () => {

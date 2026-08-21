@@ -138,6 +138,46 @@ describe("buildLockEntry — the card the system locks for itself", () => {
   }, T9);
 });
 
+describe("DUAL-MODE TRACKING (2026-08-21, Josh's word, verbatim: \"Change it to 'DK/FD' basis but track bets for both internally so it can calibrate either selection.\")", () => {
+  it("every entry carries the OTHER disciplined selection's card as `alt`, same paper stamps, own money lane", async () => {
+    const { entry } = await fixtureLock(); // probability primary → alt is dk_fd
+    const alt = (entry as SyncEntry).alt;
+    expect(alt, "the alt selection's card is missing from the entry").toBeTruthy();
+    expect(alt!.selMode).toBe("dk_fd");
+    for (const t of alt!.core) {
+      expect(t.paper, "an alt ticket without the paper stamp").toBe(true);
+      expect(t.placed).toBe(false);
+      expect(t.actualStake).toBe(0);
+    }
+    expect(alt!.gatedSum).toBeLessThanOrEqual(alt!.allocSum);
+    /* the alt world NEVER leaks into the day's money: allocSum is exactly the sum of
+       core stakes, with the alt card's stakes nowhere in it */
+    const coreSum = (entry.core as { stake: number }[]).reduce((s, t) => s + t.stake, 0);
+    expect((entry as { allocSum?: number }).allocSum).toBe(coreSum);
+  }, T9);
+
+  it("a dk_fd primary (production since 2026-08-21) tracks ev_gated as the alt", async () => {
+    const { entry } = await fixtureLock("dk_fd");
+    expect((entry as SyncEntry).alt?.selMode).toBe("ev_gated");
+  }, T9);
+
+  it("merge preserves `alt` when a graded pre-ship client copy wins pickBase", async () => {
+    const { entry } = await fixtureLock();
+    /* the client copy: pulled before the dual-mode ship (no alt), then graded — grading
+       richness makes it the pickBase winner, and it must NOT drop the server's alt */
+    const client = JSON.parse(JSON.stringify(entry)) as SyncEntry;
+    delete (client as Record<string, unknown>).alt;
+    const tix: Record<string, unknown> = {};
+    for (const t of [...client.core, ...(client.funT ?? [])]) if (t.id) tix[t.id] = { result: "won" };
+    client.grading = { done: true, tickets: tix, legs: {} };
+    for (const order of [[client, entry as SyncEntry], [entry as SyncEntry, client]] as const) {
+      const m = mergeLedgers([order[0]], [order[1]]);
+      expect(m[0].alt, "the graded client copy dropped the server's alt record").toBeTruthy();
+      expect(m[0].grading?.done, "preserving alt cost the grading accrual").toBe(true);
+    }
+  }, T9);
+});
+
 describe("needsLockAction — the self-check, every branch", () => {
   it("board without lock → backfill; neither on a dead slate → reason record; locked → nothing", () => {
     expect(needsLockAction({ boardExists: true, lockExists: false, deadSlate: false })).toBe("backfill");
