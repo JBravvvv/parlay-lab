@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import {
   IconBoard,
   IconBuilder,
+  IconCalc,
   IconDash,
   IconLedger,
   IconSettings,
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/builder", label: "Builder", icon: IconBuilder, mobile: true },
   { href: "/props", label: "Parlay Builder", icon: IconBoard, mobile: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, mobile: true },
+  { href: "/calc", label: "Calc", icon: IconCalc, mobile: true },
   { href: "/simulator", label: "Simulator", icon: IconSim, mobile: false },
   { href: "/settings", label: "Settings", icon: IconSettings, mobile: false },
 ] as const;
@@ -122,10 +124,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       )}
 
-      {/* mobile bottom tab bar */}
+      {/* mobile bottom tab bar — columns computed from the mobile entries (a hardcoded
+          grid-cols-6 was already wrapping the 7th tab onto a second row) */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-white/[0.05] bg-surface/70 backdrop-blur-xl md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="fixed inset-x-0 bottom-0 z-30 grid border-t border-white/[0.05] bg-surface/70 backdrop-blur-xl md:hidden"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom)",
+          gridTemplateColumns: `repeat(${NAV.filter((n) => n.mobile).length}, minmax(0, 1fr))`,
+        }}
       >
         {NAV.filter((n) => n.mobile).map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href);

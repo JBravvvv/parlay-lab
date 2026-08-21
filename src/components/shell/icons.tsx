@@ -65,6 +65,20 @@ export function IconSim({ className = "" }: P) {
     </svg>
   );
 }
+export function IconCalc({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8.5 7.5h7" />
+      <circle cx="8.75" cy="12" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15.25" cy="12" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="8.75" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15.25" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 export function IconSettings({ className = "" }: P) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
