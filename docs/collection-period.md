@@ -7188,6 +7188,27 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 67 THROUGH 69 — DATED RECORD (2026-08-20)
+
+**Three crossings in one bot refresh (`e951b94`, 2026-08-20T17:30Z), found by the guard
+on the rebase re-gate under the Vercel-cron-pokes push (the standing pattern —
+the push bounced on the bot commit):**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 67 | Edwin Moscoso | 2026-08-20 | `e951b94` | 5 / 93 | 18.6 |
+| 68 | Tom Hanahan | 2026-08-20 | `e951b94` | 5 / 86 | 17.2 |
+| 69 | Clint Vondrak | 2026-08-20 | `e951b94` | 5 / 82 | 16.4 |
+
+**SIXTY-NINE armed. Armed-set mean k/g at n = 69: 16.61 vs league 16.40 (g=477,
+k=7,825) — the armed mean now reads ABOVE league (+0.21) for the first time since
+the n=6 direction dissolved. Recorded as a number, not a signal: the whole armed-set
+drifts as every ump's g/k refreshes daily, and the double brake keeps all of it off
+every board regardless.**
+
+**DID ANY REACH A BOARD? NO — the double brake re-ran green this gate. `FLOOR`
+raised 66 → 69 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 63 THROUGH 66 — DATED RECORD (2026-08-19)
 
 **Four crossings in one bot refresh (`0970f70`, 2026-08-19T17:27Z), found by the guard

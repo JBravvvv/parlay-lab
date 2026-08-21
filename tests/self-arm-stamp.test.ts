@@ -317,10 +317,22 @@ const CROSSINGS = [
       "k=7,549) — still below; the dissolved direction stays dissolved. Double brake " +
       "re-ran green this gate. Record: docs/collection-period.md CROSSINGS 63-66.",
   },
+  { ump: "Edwin Moscoso", date: "2026-08-20", commit: "e951b94", kPerG: 18.6, braked: true,
+    note: "SIXTY-SEVENTH. g 4->5, k 93. Caught on the Vercel-cron-pokes rebase re-gate — " +
+      "crossings 67-69 record." },
+  { ump: "Tom Hanahan", date: "2026-08-20", commit: "e951b94", kPerG: 17.2, braked: true,
+    note: "SIXTY-EIGHTH. g 4->5, k 86." },
+  { ump: "Clint Vondrak", date: "2026-08-20", commit: "e951b94", kPerG: 16.4, braked: true,
+    note: "SIXTY-NINTH. g 4->5, k 82. Armed mean at n=69: 16.61 vs league 16.40 (g=477, " +
+      "k=7,825) — ABOVE league (+0.21) for the first time since the n=6 direction " +
+      "dissolved; recorded as a number, not a signal (the set drifts daily, the double " +
+      "brake holds regardless). Re-ran green this gate. Record: docs/collection-period.md " +
+      "CROSSINGS 67-69.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 66;
+const FLOOR = 69;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
