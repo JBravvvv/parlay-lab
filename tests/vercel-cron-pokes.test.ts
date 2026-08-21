@@ -58,7 +58,11 @@ describe("vercel.json — the evening pokes exist and stay inside the Hobby plan
   it("schedules /api/scheduler pokes covering the dark evening (one ~21:45Z, one ~00:00Z)", () => {
     const crons = cfg.crons ?? [];
     expect(crons.length, "the evening pokes vanished from vercel.json").toBeGreaterThanOrEqual(2);
-    expect(crons.every((c) => c.path === "/api/scheduler"), "a cron points somewhere other than the self-deciding scheduler").toBe(true);
+    expect(crons.every((c) => c.path.startsWith("/api/scheduler")), "a cron points somewhere other than the self-deciding scheduler").toBe(true);
+    /* Vercel keys crons BY PATH — two entries on the literal same path collapse to one
+       (observed in `vercel crons ls` 2026-08-20: one row, "0 0 * * * → 45 21 * * *").
+       Distinct query strings keep both alive; the route ignores the param. */
+    expect(new Set(crons.map((c) => c.path)).size, "duplicate cron paths collapse — only the last schedule survives").toBe(crons.length);
     const hours = crons.map((c) => Number(c.schedule.split(" ")[1]));
     expect(hours.some((h) => h >= 20 || h <= 1), "no cron lands in the evening gap the two watched days exposed").toBe(true);
   });

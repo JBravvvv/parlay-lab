@@ -6,7 +6,7 @@
     }
   },
   "crons": [
-    { "path": "/api/scheduler", "schedule": "45 21 * * *" },
-    { "path": "/api/scheduler", "schedule": "0 0 * * *" }
+    { "path": "/api/scheduler?poke=evening", "schedule": "45 21 * * *" },
+    { "path": "/api/scheduler?poke=night", "schedule": "0 0 * * *" }
   ]
 }
