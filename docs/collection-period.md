@@ -7188,6 +7188,27 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 70 THROUGH 73 — DATED RECORD (2026-08-22)
+
+**Four crossings in the 08-21 bot refresh (`e54a521`, 2026-08-21T17:29Z), found by the
+guard on the rebase re-gate under the 3–7-ticket reshape push — TWO refreshes sat under
+it (`e54a521`, `f487a83`); the 08-22 one armed nobody new:**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 70 | Ron Kulpa | 2026-08-21 | `e54a521` | 5 / 83 | 16.6 |
+| 71 | Chad Whitson | 2026-08-21 | `e54a521` | 5 / 89 | 17.8 |
+| 72 | Cory Blaser | 2026-08-21 | `e54a521` | 5 / 93 | 18.6 |
+| 73 | Quinn Wolcott | 2026-08-21 | `e54a521` | 5 / 101 | 20.2 |
+
+**SEVENTY-THREE armed. Armed-set mean k/g at n = 73: 16.72 vs league 16.47 (g=501,
+k=8,249) — above league (+0.25), the second consecutive read above. Still recorded as
+a number, not a signal: the set drifts daily, and the double brake keeps all of it off
+every board.**
+
+**DID ANY REACH A BOARD? NO — the double brake re-ran green this gate. `FLOOR`
+raised 69 → 73 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 67 THROUGH 69 — DATED RECORD (2026-08-20)
 
 **Three crossings in one bot refresh (`e951b94`, 2026-08-20T17:30Z), found by the guard

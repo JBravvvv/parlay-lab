@@ -329,10 +329,23 @@ const CROSSINGS = [
       "brake holds regardless). Re-ran green this gate. Record: docs/collection-period.md " +
       "CROSSINGS 67-69.",
   },
+  { ump: "Ron Kulpa", date: "2026-08-21", commit: "e54a521", kPerG: 16.6, braked: true,
+    note: "SEVENTIETH. g 4->5, k 83. Caught on the 08-22 reshape rebase re-gate (two bot " +
+      "refreshes under the push; f487a83 armed nobody new) — crossings 70-73 record." },
+  { ump: "Chad Whitson", date: "2026-08-21", commit: "e54a521", kPerG: 17.8, braked: true,
+    note: "SEVENTY-FIRST. g 4->5, k 89." },
+  { ump: "Cory Blaser", date: "2026-08-21", commit: "e54a521", kPerG: 18.6, braked: true,
+    note: "SEVENTY-SECOND. g 4->5, k 93." },
+  { ump: "Quinn Wolcott", date: "2026-08-21", commit: "e54a521", kPerG: 20.2, braked: true,
+    note: "SEVENTY-THIRD. g 4->5, k 101. Armed mean at n=73: 16.72 vs league 16.47 (g=501, " +
+      "k=8,249) — above league (+0.25), second read in a row above; still a number, not a " +
+      "signal (the set drifts daily, the double brake holds). Re-ran green this gate. " +
+      "Record: docs/collection-period.md CROSSINGS 70-73.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 69;
+const FLOOR = 73;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
