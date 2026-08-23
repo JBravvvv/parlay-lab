@@ -139,10 +139,11 @@ export function buildLockEntry(args: {
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
   const legKey = (l: { label?: string | null; prop?: string | null }) => `${l.label}|${l.prop}`;
 
-  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15).
-     The window shapes ONLY the forced pass — the disciplined call keeps its own cfg
-     (min 4 / max 6, the engine's numbers) because that system is the one being
-     tracked. Pro-rata on block days; ceiling hard; floor best-effort on thin pools. */
+  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15) —
+     RESHAPED to 3–7 on 2026-08-22 ("a max of 7 tickets for the daily core card"). The
+     window is pro-rata on block days; ceiling hard; floor best-effort on thin pools.
+     Since 2026-08-22 it caps BOTH passes of every fire (buildModeCard) — the 08-22
+     card reached 14 tickets while only the forced pass honored it. */
   const carriedCount = (carry?.core ?? []).length;
   const win = ticketWindow(daily, carriedCount);
 
@@ -177,9 +178,9 @@ export function buildLockEntry(args: {
      stranded. The ceiling that is actually Josh's rule is 10 tickets PER DAY — so the
      forced pass may seat up to (10 − carried − gated) tickets on any fire; the window
      keeps shaping only the floor. */
-  const dayAllowance = Math.max(0, PAPER_TICKETS.max - carriedCount);
   type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
-  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean };
+  type TopUp = { id: string; amount: number } | null;
+  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean; topUp: TopUp };
   const biasViewOf = (tix: SyncTicket[]) =>
     tix.map((t) => ({
       name: String(t.name ?? ""),
@@ -198,7 +199,22 @@ export function buildLockEntry(args: {
     const allow = Math.max(0, PAPER_TICKETS.max - carriedTix.length);
     const w = ticketWindow(daily, carriedTix.length);
     const run = (p: PoolItem[]) => {
-      const a = shAllocate(p, daily, { ...cfg, selMode: mode }, false);
+      /* THE GATED PASS HONORS THE WINDOW TOO (2026-08-22, after the 08-22 card reached
+         14 core tickets and stranded $18 — Josh: "a max of 7 tickets for the daily core
+         card. anywhere from 3-7 tickets"). Until now only the forced pass was
+         count-capped; the disciplined pass kept the engine's own 4–6 per FIRE, so four
+         fires stacked 14 and the last fire had no seats. The cap is the fire's pro-rata
+         window share, so later fires keep their seats; the engine's own ceiling still
+         applies underneath it. */
+      const gatedCap = Math.min(Number(cfg.maxCoreTickets ?? PAPER_TICKETS.max), w.maxNew);
+      const a: AllocResult = gatedCap > 0
+        ? shAllocate(p, daily, {
+            ...cfg,
+            selMode: mode,
+            maxCoreTickets: gatedCap,
+            minCoreTickets: Math.min(Number(cfg.minCoreTickets ?? 1), gatedCap),
+          }, false)
+        : { picks: [], sum: 0, blocked: [] };
       let f: AllocResult = { picks: [], sum: 0 };
       const ids = new Set<string>(a.picks.map((x) => x.id));
       const legs = new Set<string>();
@@ -208,7 +224,9 @@ export function buildLockEntry(args: {
         for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
       }
       const short = daily - a.sum;
-      const fMax = Math.max(0, allow - a.picks.length);
+      /* forced seats = the fire's window seats the gated pass left (the 08-19 zeroing
+         case is now closed by the residue top-up below, not by widening seats) */
+      const fMax = Math.max(0, w.maxNew - a.picks.length);
       if (short > 0 && fMax > 0) {
         const rest = p.filter((x) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l))));
         f = shAllocate(rest, short, {
@@ -224,7 +242,24 @@ export function buildLockEntry(args: {
         czEv: (x.w.pl.czEv as number | null) ?? null,
         legs: x.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
       }));
-      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share };
+      /* THE RESIDUE TOP-UP (2026-08-22, Josh: "$150 every single day no matter what").
+         The disciplined allocator sizes by Kelly and leaves the rest unallocated by
+         design; the forced pass fills it only while seats remain. Whatever is STILL
+         unstaked after both passes rides the fire's best new ticket (highest settling
+         EV, ties to the larger stake) — stamped `topUp` on the ticket so the allocator's
+         own sizing stays recoverable (stake − topUp). Never a carried ticket: those are
+         locked, and their games may have started. */
+      const residue = daily - a.sum - f.sum;
+      let topUp: TopUp = null;
+      if (residue > 0) {
+        const cands = [...a.picks, ...f.picks];
+        if (cands.length) {
+          const ev = (x: AllocPick) => (x.w.pl.czEv == null ? -Infinity : Number(x.w.pl.czEv));
+          const best = cands.reduce((b, x) => (ev(x) > ev(b) || (ev(x) === ev(b) && x.stake > b.stake) ? x : b));
+          topUp = { id: best.id, amount: residue };
+        }
+      }
+      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share, topUp };
     };
     let pool = basePool;
     let cur = run(pool);
@@ -244,11 +279,11 @@ export function buildLockEntry(args: {
        quota's evictions leave the fire short of its budget, the evicted tickets come back
        and the passes run once more without the quota — stamped yieldedToBudget, never silent. */
     let yielded = false;
-    if (cur.alloc.sum + cur.forced.sum < daily && evicted > 0) {
+    if (cur.alloc.sum + cur.forced.sum + (cur.topUp?.amount ?? 0) < daily && evicted > 0) {
       yielded = true;
       cur = run(basePool);
     }
-    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded };
+    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded, topUp: cur.topUp };
   };
 
   const primaryMode = String(cfg.selMode ?? LOCK_SEL_MODE);
@@ -276,7 +311,7 @@ export function buildLockEntry(args: {
   }
   const gatedCount = alloc.picks.length;
   const shortfall = daily - alloc.sum;
-  const forcedMax = Math.max(0, dayAllowance - gatedCount);
+  const forcedMax = Math.max(0, win.maxNew - gatedCount);
 
   const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
     const pl = p.w.pl;
@@ -302,6 +337,8 @@ export function buildLockEntry(args: {
     };
   };
 
+  const withTopUp = (t: SyncTicket, tu: TopUp): SyncTicket =>
+    tu && t.id === tu.id ? { ...t, stake: Number(t.stake) + tu.amount, topUp: tu.amount } : t;
   const newCore: SyncTicket[] = [
     ...alloc.picks.map((p, i) => {
       const stake = args.__plantStakeSkew && i === 0 ? p.stake + 1 : p.stake;
@@ -314,7 +351,7 @@ export function buildLockEntry(args: {
       return toTicket(p, false);
     }),
     ...forced.picks.map((p) => toTicket(p, true)),
-  ];
+  ].map((t) => withTopUp(t, primaryCard.topUp));
   /* block fires APPEND: the date's entry accumulates each block's card; dedupe by id */
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
   const core: SyncTicket[] = [...carried, ...newCore];
@@ -323,7 +360,7 @@ export function buildLockEntry(args: {
   const altNew: SyncTicket[] = [
     ...altCard.alloc.picks.map((p) => toTicket(p, false)),
     ...altCard.forced.picks.map((p) => toTicket(p, true)),
-  ];
+  ].map((t) => withTopUp(t, altCard.topUp));
   const altCore: SyncTicket[] = [
     ...(altPrev?.core ?? []).filter((t) => !altNew.some((n) => n.id === t.id)),
     ...altNew,
@@ -400,7 +437,8 @@ export function buildLockEntry(args: {
       }
     : carry?.blocks;
 
-  const deployed = alloc.sum + forced.sum;
+  const topUpAmt = primaryCard.topUp?.amount ?? 0;
+  const deployed = alloc.sum + forced.sum + topUpAmt;
   const entry: SyncEntry = {
     date,
     locked: true,
@@ -419,6 +457,8 @@ export function buildLockEntry(args: {
     allocSum: Number(carry?.allocSum ?? 0) + deployed,
     gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + alloc.sum,
     unallocated: alloc.unallocated ?? 0,
+    /* residue top-ups across the day's fires (0 = every fire seated its budget outright) */
+    topUpSum: Number((carry as { topUpSum?: number } | null | undefined)?.topUpSum ?? 0) + topUpAmt,
     core,
     funT,
     games: { ...(carry?.games ?? {}), ...games },
@@ -433,7 +473,7 @@ export function buildLockEntry(args: {
     alt: {
       selMode: ALT_MODE,
       core: altCore,
-      allocSum: Number(altPrev?.allocSum ?? 0) + altCard.alloc.sum + altCard.forced.sum,
+      allocSum: Number(altPrev?.allocSum ?? 0) + altCard.alloc.sum + altCard.forced.sum + (altCard.topUp?.amount ?? 0),
       gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.alloc.sum,
       underShare: Math.round(altCard.underShare * 1000) / 1000,
     },
@@ -449,7 +489,7 @@ export function buildLockEntry(args: {
                unstarted games remain. */
             note:
               shortfall > 0 && forcedMax === 0
-                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the ${PAPER_TICKETS.max}-ticket day ceiling was reached before the budget`
+                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the ${PAPER_TICKETS.max}-ticket day ceiling left this fire no seat and no new ticket to carry the residue`
                 : `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the CZ-playable leg-disjoint pool exhausted before the budget; the deficit carries to the next fire or top-up sweep`,
           }
         : {}),

@@ -139,7 +139,7 @@ const carryTicket = (i: number) => ({
   legs: [leg(`Carry${i} (T${i})`, "Hits O 0.5")],
 });
 
-describe("buildLockEntry — the forced pass is capped by the DAY, not the block window", () => {
+describe("buildLockEntry — the window caps the fire; the residue top-up carries the rest (was: forced pass capped by the day)", () => {
   const pool = [
     { pl: { name: "Gated 9", czEv: 2, type: "parlay", prob: 60, legs: [leg("Gate (GGG)", "TB O 1.5")] } },
     { pl: { name: "Forced seat", czEv: 1, type: "parlay", prob: 55, legs: [leg("Force (FFF)", "Hits O 0.5")] } },
@@ -149,7 +149,7 @@ describe("buildLockEntry — the forced pass is capped by the DAY, not the block
     funT: [{ id: "fun1", stake: 25, name: "HR Longshot", paper: true, placed: false, actualStake: 0, legs: [leg("HR (HHH)", "HR O 0.5")] }],
     games: {}, allocSum: 40, gatedSum: 17, blockedReasons: {},
   };
-  it("replays the 08-19 $10 block and deploys ALL of it: $9 gated + $1 forced (old code stranded the $1)", () => {
+  it("replays the 08-19 $10 block and deploys ALL of it: $9 gated + the $1 residue riding that ticket as topUp (2026-08-22 form; the 08-19 form seated a $1 forced ticket)", () => {
     const entry = buildLockEntry({
       eng: mockEng(pool) as never,
       data: { gameInfo: {}, categories: {} },
@@ -161,15 +161,15 @@ describe("buildLockEntry — the forced pass is capped by the DAY, not the block
       carry: carry5 as never,
     });
     expect(entry.allocSum, "the block's budget did not fully deploy — the stranding defect is back").toBe(50); // 40 carried + 10
-    const fresh = (entry.core as { id: string; stake: number; forced?: boolean }[]).filter((t) => !t.id.startsWith("c"));
-    expect(fresh.map((t) => [t.id, t.stake, t.forced === true])).toEqual([
-      ["Gated 9", 9, false],
-      ["Forced seat", 1, true],
-    ]);
+    const fresh = (entry.core as { id: string; stake: number; forced?: boolean; topUp?: number }[]).filter((t) => !t.id.startsWith("c"));
+    /* the $10 block's window is 1 seat (7-ceiling, 5 carried, share 10/150); the gated
+       pass takes it at $9 and the $1 residue rides the same ticket — no $1 forced
+       ticket any more, and no stranding either way */
+    expect(fresh.map((t) => [t.id, t.stake, t.forced === true, t.topUp ?? 0])).toEqual([["Gated 9", 10, false, 1]]);
     expect(entry.note, "a fully-deployed fire must not carry a shortfall note").toBeUndefined();
   });
-  it("the 10-ticket day ceiling is the one thing that still stops the top-up — and the note says so honestly", () => {
-    const carry10 = { ...carry5, core: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(carryTicket), allocSum: 80 };
+  it("a FULL day (7 carried — the 2026-08-22 ceiling) gives a fire no seat and no new ticket: nothing deploys, and the note says so honestly", () => {
+    const carry10 = { ...carry5, core: [1, 2, 3, 4, 5, 6, 7].map(carryTicket), allocSum: 80 };
     const entry = buildLockEntry({
       eng: mockEng(pool) as never,
       data: { gameInfo: {}, categories: {} },
@@ -180,10 +180,12 @@ describe("buildLockEntry — the forced pass is capped by the DAY, not the block
       blockKey: "B-test",
       carry: carry10 as never,
     });
-    // gated still runs (the tracked system is never count-capped); forced has no seat
-    expect((entry.core as unknown[]).length).toBe(11);
-    expect(entry.allocSum).toBe(89); // 80 + the $9 gated; the forced $1 has no allowance
-    expect(String(entry.note)).toMatch(/10-ticket day ceiling/);
+    /* 2026-08-22: the gated pass is window-capped too (the 08-22 card reached 14 while
+       only the forced pass honored the ceiling) — a full day adds NOTHING, and with no
+       new ticket there is nowhere honest for the residue to ride */
+    expect((entry.core as unknown[]).length).toBe(7);
+    expect(entry.allocSum).toBe(80);
+    expect(String(entry.note)).toMatch(/7-ticket day ceiling left this fire no seat/);
   });
 });
 

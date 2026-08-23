@@ -19,8 +19,11 @@ export const PAPER = {
   fun: 25,
 } as const;
 
-/** "It can be anywhere from 3-10 tickets for the $150 per day" — Josh, 2026-08-15. */
-export const PAPER_TICKETS = { min: 3, max: 10 } as const;
+/** "It can be anywhere from 3-10 tickets for the $150 per day" — Josh, 2026-08-15.
+    RESHAPED 2026-08-22 (Josh's word, verbatim: "It should also be doing a max of 7 tickets
+    for the daily core card. anywhere from 3-7 tickets"). The 08-22 card hit 14 tickets
+    because only the forced pass honored the ceiling — see lock-card.ts buildModeCard. */
+export const PAPER_TICKETS = { min: 3, max: 7 } as const;
 
 /**
  * TOP-UP SWEEPS (2026-08-19, Josh's word after the 08-19 card deployed $49 of $150:

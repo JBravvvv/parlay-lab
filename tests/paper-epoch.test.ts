@@ -41,23 +41,25 @@ describe("the paper constants are Josh's numbers, verbatim", () => {
   it("$150 core + $25 fun since 2026-08-15", () => {
     expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25 });
   });
-  it("3-10 tickets for the $150 per day (Josh's word, 2026-08-15 follow-up)", () => {
-    expect(PAPER_TICKETS).toEqual({ min: 3, max: 10 });
+  it("3-7 tickets for the $150 per day (Josh 2026-08-15: 3-10; RESHAPED 2026-08-22: 'a max of 7 tickets … anywhere from 3-7')", () => {
+    /* OBSERVED RED on the 08-22 reshape (was {3,10}) — the pin exists so the ceiling
+       never moves silently. */
+    expect(PAPER_TICKETS).toEqual({ min: 3, max: 7 });
   });
-  it("the day-share count window: single-block gets 3..10; a Sunday split pro-rates and every block keeps >=1", () => {
+  it("the day-share count window: single-block gets 3..7; a Sunday split pro-rates and every block keeps >=1", () => {
     // single block, empty day so far
-    expect(ticketWindow(150, 0)).toEqual({ maxNew: 10, minNew: 3 });
-    // Sunday-shaped budgets $110/$25/$15 pro-rate to 7/2/1 and sum to the ceiling
+    expect(ticketWindow(150, 0)).toEqual({ maxNew: 7, minNew: 3 });
+    // Sunday-shaped budgets $110/$25/$15 pro-rate to 5/1/1 under the 7-ceiling
     const a = ticketWindow(110, 0);
-    expect(a).toEqual({ maxNew: 7, minNew: 3 });
+    expect(a).toEqual({ maxNew: 5, minNew: 3 });
     const b = ticketWindow(25, 4); // block A locked 4 tickets
-    expect(b.maxNew).toBe(2);
+    expect(b.maxNew).toBe(1);
     expect(b.minNew).toBe(1);
     const c = ticketWindow(15, 6);
     expect(c.maxNew).toBe(1);
     expect(c.minNew).toBe(1);
     // the ceiling is HARD: a full day admits nothing more
-    expect(ticketWindow(50, 10)).toEqual({ maxNew: 0, minNew: 0 });
+    expect(ticketWindow(50, 7)).toEqual({ maxNew: 0, minNew: 0 });
     expect(ticketWindow(50, 12)).toEqual({ maxNew: 0, minNew: 0 }); // over-full never goes negative
   });
   it("the lift opens every HRR line and pitcher_outs", () => {
@@ -132,22 +134,24 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).not.toMatch(/capFrac \* bankroll/); // the old bankroll-derived ceiling is gone
   });
 
-  it("the window shapes the forced floor; the CEILING is the day allowance (2026-08-19) — the disciplined cfg is never count-overridden", () => {
+  it("the window caps BOTH passes of a fire (2026-08-22), and leftover budget rides the fire's best ticket as a stamped top-up", () => {
     const src = read("src/lib/server/lock-card.ts");
     expect(src).toMatch(/ticketWindow\(/);
-    // the forced call carries the count overrides…
+    /* HISTORY: 2026-08-19 widened the forced ceiling to the day allowance because a $10
+       block's window of 1 zeroed the top-up; 2026-08-21 made it per-world. 2026-08-22
+       the 14-ticket card showed the other half of the hole: the GATED pass was never
+       count-capped at all, so four fires stacked 14 and the last fire had no seats. Now
+       BOTH passes honor the fire's window (gated capped to its share, forced gets the
+       seats the gated pass left), and the money that seats cannot carry rides the best
+       new ticket as `topUp` — "$150 every single day no matter what" no longer depends
+       on seat arithmetic. */
+    expect(src).toMatch(/const gatedCap = Math\.min\(Number\(cfg\.maxCoreTickets \?\? PAPER_TICKETS\.max\), w\.maxNew\)/);
+    expect(src).toMatch(/selMode: mode,\s*maxCoreTickets: gatedCap/s);
     expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
-    expect(src).toMatch(/minCoreTickets/);
-    // …its ceiling is the DAY's remaining allowance, never the window's share-rounded
-    // maxNew (2026-08-19: a $10 block's window of 1 zeroed the top-up and stranded $1;
-    // 2026-08-21: per-world as `allow` inside buildModeCard — each selection world gets
-    // its own day allowance against its own carried tickets)…
-    expect(src).toMatch(/allow - a\.picks\.length/);
-    expect(src).not.toMatch(/win\.maxNew - a(lloc)?\.picks\.length/);
-    // …and the gated call carries cfg with ONLY the selection mode set (2026-08-21 dual
-    // tracking: `mode` is the selection under test — primary dk_fd or the alt world —
-    // never a count override; the tracked system's caps stay the engine's own)
-    expect(src).toMatch(/shAllocate\(p, daily, \{ \.\.\.cfg, selMode: mode \}, false\)/);
+    expect(src).toMatch(/const fMax = Math\.max\(0, w\.maxNew - a\.picks\.length\)/);
+    expect(src).toMatch(/const residue = daily - a\.sum - f\.sum/);
+    expect(src).toMatch(/topUp: tu\.amount/);
+    expect(src).toMatch(/topUpSum/);
   });
 
   it("the generate route prices every fire off PAPER.daily via the deficit-carrying budget (2026-08-19), not a re-derived bankroll cap", () => {

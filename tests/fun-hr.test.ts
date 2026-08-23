@@ -34,7 +34,9 @@ const WIDE = Array.from({ length: 20 }, (_, i) => P(`p${String(i).padStart(2, "0
 
 describe("the shape is Josh's, verbatim", () => {
   it("2-5 tickets · 3-8 players each · limited repeats", () => {
-    expect(FUN_SHAPE).toEqual({ tickets: { min: 2, max: 5 }, legs: { min: 3, max: 8 }, repeatCap: 2 });
+    /* 2026-08-22, Josh's word: "The fun money should be 3-5 tickets every day" (was 2-5;
+       OBSERVED RED on the reshape) */
+    expect(FUN_SHAPE).toEqual({ tickets: { min: 3, max: 5 }, legs: { min: 3, max: 8 }, repeatCap: 2 });
   });
 });
 

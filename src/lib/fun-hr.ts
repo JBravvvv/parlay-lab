@@ -27,7 +27,8 @@
  */
 
 export const FUN_SHAPE = {
-  tickets: { min: 2, max: 5 },
+  /* 2026-08-22, Josh's word: "The fun money should be 3-5 tickets every day" (was 2-5) */
+  tickets: { min: 3, max: 5 },
   legs: { min: 3, max: 8 },
   repeatCap: 2,
 } as const;

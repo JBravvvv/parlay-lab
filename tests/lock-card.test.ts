@@ -101,6 +101,9 @@ describe("buildLockEntry — the card the system locks for itself", () => {
     const deployed = core.reduce((a, t) => a + t.stake, 0);
     expect((entry as { allocSum?: number }).allocSum).toBe(deployed);
     expect(deployed, "caesars_ev top-up broke its exact-sum guarantee").toBe(entry.daily);
+    /* 2026-08-22, Josh's word: "a max of 7 tickets for the daily core card" — the
+       08-22 card reached 14 because only the forced pass honored the ceiling */
+    expect(core.length, "the core card exceeded the 7-ticket day ceiling").toBeLessThanOrEqual(7);
     const hist = (entry as { blockedReasons?: Record<string, number> }).blockedReasons;
     expect(hist, "the gated no-bet verdict lost its reasons — the decision record must survive the top-up").toBeTruthy();
     expect(typeof hist).toBe("object");
@@ -136,6 +139,66 @@ describe("buildLockEntry — the card the system locks for itself", () => {
       buildLockEntry({ eng: eng as never, data: d, date: "2026-07-10", now: FROZEN_NOW, trigger: "test", __plantStakeSkew: true }),
     ).toThrow(/two allocators/i);
   }, T9);
+});
+
+describe("THE RESIDUE TOP-UP (2026-08-22 — the 08-22 card: 14 tickets, $132 of $150, 'the 10-ticket day ceiling was reached before the budget')", () => {
+  /* A mock engine shaped like the failing fire: the disciplined allocator sizes ONE pick
+     at $12 of a $46 budget (Kelly leaves the rest unallocated by design) and the forced
+     pass finds no seat — six tickets are already carried, the window is 1. Before this
+     ship the fire deployed $12 and stranded $34; now the residue rides that pick. */
+  function mockEng(gatedStake: number) {
+    const pl = { name: "Mock single", czEv: 3.1, czDec: 2.2, legs: [{ label: "A (NYY)", prop: "Hits O 0.5", lkey: "a|batter_hits|0.5", gkey: "g1" }] };
+    return {
+      get<T>(k: string): T {
+        if (k === "SH_CFG") return { maxCoreTickets: 6, minCoreTickets: 4, selMode: "dk_fd" } as T;
+        if (k === "SH") return { bankroll: 750 } as T;
+        if (k === "shCardPool") return ((_b: unknown) => [{ pl, src: "p", idx: 0 }]) as T;
+        if (k === "shTicketId") return ((x: { name?: string }) => `id-${x.name ?? "fun"}`) as T;
+        if (k === "shAllocate") {
+          return ((_p: unknown, amount: number, cfg: { selMode?: string; maxCoreTickets?: number }) => {
+            if (cfg.selMode === "caesars_ev") return { picks: [], sum: 0, blocked: [] }; // no seat / nothing disjoint
+            if ((cfg.maxCoreTickets ?? 0) < 1) return { picks: [], sum: 0, blocked: [] };
+            const stake = Math.min(gatedStake, amount);
+            return { picks: [{ id: "id-Mock single", stake, w: { pl } }], sum: stake, blocked: [], unallocated: amount - stake };
+          }) as T;
+        }
+        return null as T;
+      },
+    };
+  }
+  const carry6 = {
+    date: "2026-08-22", locked: true, lockedAt: 1, allocSum: 86, gatedSum: 86,
+    core: Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, stake: 10, legs: [{ label: `P${i} (BOS)`, prop: "Hits O 0.5" }], paper: true, placed: false, actualStake: 0 })),
+    funT: [], games: {},
+  };
+  it("the fire deploys its WHOLE budget: the allocator's $12 pick carries the $34 residue as a stamped topUp", () => {
+    const entry = buildLockEntry({
+      eng: mockEng(12) as never,
+      data: { gameInfo: { g1: { pk: 1, start: "2026-08-23T00:05:00Z" } }, categories: {} } as never,
+      date: "2026-08-22", now: Date.parse("2026-08-22T23:40:00Z"), trigger: "test",
+      dailyOverride: 46, carry: carry6 as never,
+    });
+    const fresh = (entry.core as { id: string; stake: number; topUp?: number; forced?: boolean }[]).filter((t) => t.id === "id-Mock single");
+    expect(fresh.length, "the fire's new ticket is missing").toBe(1);
+    expect(fresh[0].stake, "the residue did not ride the ticket").toBe(46);
+    expect(fresh[0].topUp, "the allocator's own sizing must stay recoverable (stake − topUp)").toBe(34);
+    expect((entry as { allocSum?: number }).allocSum).toBe(86 + 46);
+    expect((entry as { gatedSum?: number }).gatedSum, "gatedSum records the allocator's sizing, not the top-up").toBe(86 + 12);
+    expect((entry as { topUpSum?: number }).topUpSum).toBe(34);
+    expect((entry as { note?: string }).note, "a fully-deployed fire must not carry a shortfall note").toBeUndefined();
+    expect((entry.core as unknown[]).length).toBeLessThanOrEqual(7);
+  });
+  it("a fire with NO seat and NO new ticket still cannot invent money — the shortfall note names it", () => {
+    const carry7 = { ...carry6, core: [...carry6.core, { id: "c6", stake: 10, legs: [{ label: "P6 (BOS)", prop: "Hits O 0.5" }], paper: true, placed: false, actualStake: 0 }] };
+    const entry = buildLockEntry({
+      eng: mockEng(12) as never,
+      data: { gameInfo: { g1: { pk: 1, start: "2026-08-23T00:05:00Z" } }, categories: {} } as never,
+      date: "2026-08-22", now: Date.parse("2026-08-22T23:40:00Z"), trigger: "test",
+      dailyOverride: 46, carry: carry7 as never,
+    });
+    expect((entry.core as unknown[]).length).toBe(7);
+    expect(String((entry as { note?: string }).note)).toMatch(/7-ticket day ceiling left this fire no seat/);
+  });
 });
 
 describe("DUAL-MODE TRACKING (2026-08-21, Josh's word, verbatim: \"Change it to 'DK/FD' basis but track bets for both internally so it can calibrate either selection.\")", () => {
