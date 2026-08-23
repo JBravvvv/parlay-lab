@@ -146,6 +146,28 @@ addenda under §0.000005 (search the quoted verbatim words):**
     selMode dk_fd + an `alt` block with the ev_gated card + $150 full (the evening
     crons' first day); the config echo on the next board is the outside instrument
     for the flip.
+15. **CORE 3–7 TICKETS, FUN 3–5, AND THE RESIDUE TOP-UP (2026-08-22, verbatim: "Parlay
+    Lab only did $132 core money today and it should be doing $150 every single day no
+    matter what. It should also be doing a max of 7 tickets for the daily core card.
+    anywhere from 3-7 tickets. The fun money should be 3-5 tickets every day"):** THE
+    08-22 READ — 14 core tickets, $132 of $150, note "the 10-ticket day ceiling was
+    reached before the budget"; the 08-21 card (first evening-cron day) had deployed the
+    full $150. Root cause: only the FORCED pass honored the ticket ceiling; the gated
+    pass kept the engine's 4–6 per FIRE, four fires stacked 14, and the last fire ($46
+    budget) had no seat for its residue (the dk_fd gate clears many more, smaller
+    tickets than ev_gated did). Ship: `PAPER_TICKETS` max 10→7 and `FUN_SHAPE` tickets
+    min 2→3 (pins observed RED, then updated with the word); in `buildModeCard` the
+    gated pass is capped to the fire's pro-rata window share, forced seats are what the
+    gated pass left, and whatever is STILL unstaked rides the fire's best new ticket
+    (highest settling EV) as a stamped `topUp` — the allocator's own sizing stays
+    recoverable (stake − topUp), `gatedSum` records the allocator's number, the entry
+    stamps `topUpSum`. Never a carried ticket. A fire with no seat AND no new ticket
+    still cannot invent money — the note names it. Both selection worlds get the same
+    rules. Guards: mock-engine replay of the 08-22 shape + the 08-19 replay rewritten to
+    the new form + the 7-ceiling asserted. Ship `29f689c` (rebased over bot e54a521 +
+    f487a83 → crossings 70–73 stamped, **FLOOR 69 → 73**, armed mean n=73 16.72 vs
+    league 16.47, `86e0503`). 08-22 closes at $132 on the record; first day under the
+    7-ceiling + top-up is 08-23.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
