@@ -1645,7 +1645,7 @@ function shParkF(venue,stand){if(!shV2Sim()||!(SH_PRIORS&&SH_PRIORS.parks)||!ven
   for(var i=0;i<keys.length;i++){if(pnorm(keys[i])===vn){row=P[keys[i]];break;}}
   if(!row)return null;
   function f(x){return x==null?1:shClamp(1+(x/100-1)*0.5,0.85,1.18,"1647");}
-  return {h:f(row.hits),hr:f(row.hr)};}
+  return {h:f(row.hits),hr:f(row.hr)};} /* ENV→CLOSED-FORM (2026-08-27, Josh's word: "Make sure the engine is taking into account daily ballpark factor and weather"): the recorded M1/M3 freeze-exit amendments, armed by SH_CFG.envCf — runtime config, absent = byte-identical legacy behavior (fixtures stay dormant; the cfSel/paper-lift precedent). shParkCf gates park×handedness into the closed form (the caller replaces the Coors flags — the double-counting rule, freeze-exit-bundle L614); shParkKf is the venue K index for pitcher K's; shWxTrim trims pitcher expectations when wind/temp favor hitters; shOutsEnvF adds the run-environment inverse for outs. Damping/clamps follow shParkF's own discipline. */ function shParkCf(venue,stand){return (SH_CFG&&SH_CFG.envCf)?shParkF(venue,stand):null;} function shParkIdx(venue,fld,damp,lo,hi){if(!(SH_CFG&&SH_CFG.envCf)||!shV2Sim()||!(SH_PRIORS&&SH_PRIORS.parks)||!venue)return 1;var P=SH_PRIORS.parks.R||{},ks=Object.keys(P),vn=pnorm(venue);for(var i2=0;i2<ks.length;i2++){if(pnorm(ks[i2])===vn){var x=P[ks[i2]][fld];return x==null?1:shClamp(1+(x/100-1)*damp,lo,hi,"pk-"+fld);}}return 1;} function shParkKf(venue){return shParkIdx(venue,"k",0.5,0.94,1.06);} function shWxTrim(w){if(!(SH_CFG&&SH_CFG.envCf))return 1;var f=(w&&isFinite(w.f))?w.f:1;return shClamp(1-(f-1)*0.25,0.97,1.03,"wxt");} function shOutsEnvF(w,venue){if(!(SH_CFG&&SH_CFG.envCf))return 1;return shClamp(shWxTrim(w)*(2-shParkIdx(venue,"runs",0.25,0.97,1.03)),0.94,1.06,"pev");}
 /* odds-ratio (log5) batter×pitcher blending: P(hit | this batter vs this pitcher)
    from the batter's rate, the pitcher's xBA-against, and the league rate. */
 function shLog5(pB,pP,pL){if(pB==null||pP==null||pL==null||!(pL>0)||!(pL<1)||!(pB>0)||!(pB<1)||!(pP>0)||!(pP<1))return pB;
@@ -2263,7 +2263,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(labF!==1){lam*=labF;var ppgX=shLaborPpg(st);
           tags.push(labF<1?"laboring":"efficient");
           bits.push("avg "+ppgX.toFixed(0)+" pitches/start ("+(labF<1?"labors through deep counts — late innings at risk":"efficient — earns extra outs")+")");}
-        bits.unshift((ip30x&&g30x?ip30x.toFixed(1)+" IP over "+g30x+" starts last 30 days":"season "+shIp(st.season.ip).toFixed(1)+" IP / "+st.season.g+" starts")+" → ~"+lam.toFixed(1)+" outs (Poisson est.)");
+        var _oef=shOutsEnvF(wind,g&&g.venue);if(_oef!==1){lam*=_oef;tags.push("park+wx");bits.push("venue/weather "+(_oef<1?"trims the start est":"adds to the start est")+" x"+_oef.toFixed(2));}bits.unshift((ip30x&&g30x?ip30x.toFixed(1)+" IP over "+g30x+" starts last 30 days":"season "+shIp(st.season.ip).toFixed(1)+" IP / "+st.season.g+" starts")+" → ~"+lam.toFixed(1)+" outs (Poisson est.)");
         var eraO=shPitchBlend(st,"era");if(eraO!=null)bits.push(eraO.toFixed(2)+" blended ERA");
       }else if(isK){
         var g30=st.last30&&Number(st.last30.g),k30=st.last30&&Number(st.last30.k);
@@ -2279,7 +2279,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(oppLineup&&oppLineup.length){var kr=0,c=0;oppLineup.forEach(function(nm){var hs=lookupStats[pnorm(nm)];var r=shBlend(hs,function(s){return Number(s.k);},"ab",10);if(r!=null){kr+=r;c++;}});
           if(c>=5){f=shClamp((kr/c)/0.235,.8,1.2,"2280");bits.push("opposing lineup K rate "+((kr/c)*100).toFixed(1)+"% ("+(f>1?"boost":"drag")+")");if(f!==1)tags.push("opp-offense");}}
         else riskBits.push("opposing lineup unconfirmed");
-        var uf=shUmpKf(g),wf=shOppWhiffF((oppLineup||[]).map(function(nm){return lookupStats[pnorm(nm)];}));lam=kps*f*uf*wf;if(uf!==1){tags.push("ump-zone");bits.push("HP ump K factor "+uf.toFixed(2)+" (db)");}if(wf!==1){tags.push("sv-pct");bits.push("opposing contact skill (Savant pct) x"+wf.toFixed(2));}
+        var uf=shUmpKf(g),wf=shOppWhiffF((oppLineup||[]).map(function(nm){return lookupStats[pnorm(nm)];}));lam=kps*f*uf*wf;if(uf!==1){tags.push("ump-zone");bits.push("HP ump K factor "+uf.toFixed(2)+" (db)");}if(wf!==1){tags.push("sv-pct");bits.push("opposing contact skill (Savant pct) x"+wf.toFixed(2));}var _pkk=shParkKf(g&&g.venue),_wxt=shWxTrim(wind);if(_pkk*_wxt!==1){lam*=_pkk*_wxt;tags.push("park+wx");bits.push("venue K factor x"+_pkk.toFixed(2)+" \u00b7 weather x"+_wxt.toFixed(2));}
         bits.unshift((k30&&g30?k30+" K in "+g30+" starts last 30 days":"season "+st.season.k+" K / "+st.season.g+" starts")+" → "+lam.toFixed(1)+" expected");
         var era=shPitchBlend(st,"era");if(era!=null)bits.push(era.toFixed(2)+" blended ERA");
       }else{
@@ -2323,7 +2323,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         /* v2: ERA-vs-xERA luck read — a flattered starter gets faded, an unlucky one credited */
         luck=shEraLuck(pst);var luckF=luck?luck.f:1;
         if(luck){tags.push(luck.tag);bits.push(luck.txt);}
-        var pq=shPitPctF(pst);var hrF=power*pq*wind.f*(coors?1.08:1)*luckF,tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(coors?1.10:1)*luckF,hF=contact*pq*(coors?1.07:1)*luckF;
+        var pq=shPitPctF(pst);var _pk=shParkCf(g&&g.venue,shStands(st));var hrF=power*pq*wind.f*(_pk?_pk.hr:(coors?1.08:1))*luckF,tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(_pk?1+(_pk.h-1)*0.7+(_pk.hr-1)*0.3:(coors?1.10:1))*luckF,hF=contact*pq*(_pk?_pk.h:(coors?1.07:1))*luckF;
         /* batter-vs-pitcher career history — doc discipline, hard-coded caps:
            under 15 PA = ignored in the math (context only on the card);
            15–30 PA = tiny nudge; 30+ = modest weight; total effect capped ±10%. */
@@ -2356,7 +2356,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(mkt==="batter_home_runs"){bn=shBlendN(st,function(s){return Number(s.hr);},"ab",25);
           rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,150,shPriorHR(st,Lhr))):null;rate=bvpRate(rate,bvp&&bvp.hr);lam=rate!=null?rate*expAB*hrF:null;}
         if(mkt==="batter_hits_runs_rbis"){bn=shBlendN(st,function(s){return (Number(s.h)||0)+(Number(s.r)||0)+(Number(s.rbi)||0);},"g",3);
-          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,10,Lhrr)):null;lam=rate!=null?rate*(coors?1.08:1)*power:null;
+          rate=bn?shrinkTag(bn.r,shShrink(bn.r,bn.n,10,Lhrr)):null;lam=rate!=null?((SH_CFG&&SH_CFG.envCf)?rate*(0.74*hF+0.26*tbF):rate*(coors?1.08:1)*power):null;
           /* PA-conditioning (2026-07-22 audit): the per-game H+R+RBI rate carries the
              player's historical PA volume, not tonight's batting-order slot — a counting
              stat priced without it overrates bottom-of-order alt lines. Re-base the rate
@@ -2372,7 +2372,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(lam==null)return;
         if(bvpUsed)tags.push("BvP");
         if(shrunk)tags.push("shrunk-to-mean");
-        if(wind.f!==1||coors)tags.push("park+wind");
+        if(wind.f!==1||coors||_pk)tags.push("park+wind");
         if(expAB>=4.3)tags.push("PA-volume");
         if(contact!==1||power!==1)tags.push("starter-quality");if(pq!==1)tags.push("sv-pct");var bpc=shPct("batters",st.id);if(bpc&&bpc.xwoba!=null)bits.push("Savant: xwOBA "+bpc.xwoba+"th pct"+(bpc.brl_percent!=null?" \u00b7 barrel "+bpc.brl_percent+"th":"")+(bpc.whiff_percent!=null?" \u00b7 contact "+bpc.whiff_percent+"th":""));
         nEff=bn?bn.n:null;

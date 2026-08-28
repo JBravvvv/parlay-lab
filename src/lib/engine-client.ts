@@ -8,6 +8,7 @@ import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
 import { liveCoverageOf, pricedGames, type GameInfoLike } from "./board-coverage";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 import { applySuspensionLift } from "./paper-mode";
+import { applyEnvClosedForm } from "@/lib/env-adjust";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -118,6 +119,7 @@ export function getEngine(): Engine {
       cfg.dirPref = getDirPref();
       /* PAPER EPOCH (2026-08-15, Josh's word): H+R+RBI and pitcher_outs back on tickets */
       applySuspensionLift(cfg);
+      applyEnvClosedForm(cfg); // park/weather -> closed form (2026-08-27, Josh's word)
     }
   }
   return engine;

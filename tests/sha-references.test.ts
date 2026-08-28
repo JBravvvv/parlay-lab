@@ -40,7 +40,8 @@ const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f
   /* 2026-08-16: ENGINE-STRING sha256 prefixes from the side-aware calibration ship
      (39fc8681… → cb2cdebc…) — same class as f6cf1513 above: hashes of the engine
      source, not commits. */
-  "39fc8681", "cb2cdebc"]);
+  "39fc8681", "cb2cdebc",
+  /* 2026-08-27: env->closed-form engine ship string sha */ "bb6be52d"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**

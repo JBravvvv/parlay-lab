@@ -10,6 +10,7 @@ import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockA
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { decideGradePass } from "@/lib/server/grading-progress";
 
 /**
@@ -109,6 +110,7 @@ export async function GET(req: NextRequest) {
       if (cfg) {
         cfg.selMode = LOCK_SEL_MODE;
         applySuspensionLift(cfg); // backfill locks re-run the allocator — same lift as generation
+        applyEnvClosedForm(cfg);
       }
       const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill" });
       await writeLock(entry);

@@ -11,6 +11,7 @@ import { ptToday } from "@/lib/server/pt-date";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { BLOCKS_KEY, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
@@ -287,6 +288,7 @@ export async function GET(req: NextRequest) {
       /* PAPER EPOCH (2026-08-15, Josh's word): H+R+RBI and pitcher_outs return to the
          ticket pool — hrrAltMax/outsSusp are runtime config, not an engine-hash move */
       applySuspensionLift(cfg);
+      applyEnvClosedForm(cfg); // park/weather -> closed form (2026-08-27, Josh's word)
     }
 
     const slate = await eng.collectSlate();

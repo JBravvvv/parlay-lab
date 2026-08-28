@@ -1,6 +1,6 @@
 {
   "_": "SERVED-ARTIFACT VERIFICATION STATE (2026-07-30, owner's item 3). Test-owned: no runtime code reads this file. `pending` is set TRUE by an engine ship (the served artifact cannot carry the new string until that ship deploys), and set FALSE by the post-deploy re-grep, which also updates SERVED_ENGINE_SHA_VERIFIED in src/lib/engine-echo.ts. The resolution guard in tests/engine-echo.test.ts FAILS THE BUILD once a pending marker is older than MAX_PENDING_H hours \u2014 so the exception cannot become permanent by default.",
-  "pending": false,
-  "since": "2026-08-16T19:55:00Z",
-  "note": "RESOLVED 2026-08-16, same session as the ship. Post-deploy re-grep via tools/verify-served-engine.mjs against a LIVE fetch of chunk 256-9d7d2affb2cfbcd6.js (renamed from 256-2c7681954a0ee8e7.js - deploy evidence): engine string BYTE-IDENTICAL to the repo, 284,032 chars, sha256 cb2cdebc4c68c88488c405c1af066e790691a313773af092d7299606b675d637. SIDE-AWARE CALIBRATION IS LIVE: the calW['mkt|u'] under-direction lookup greps in the SERVED bytes, so the dormant branch is in production awaiting its first fitted key (first sided fit: Sunday 2026-08-23, once post-deploy rows carry side). ZERO baselines re-cut - the ship is value-dormant and baseline43's provenance argument was never needed."
+  "pending": true,
+  "since": "2026-08-28T07:37:02Z",
+  "note": "PENDING: env->closed-form ship (2026-08-27). Engine string cb2cdebc... -> bb6be52dc0f203d2efe3ae5afeda01f9431687afb58e538e7f6f3cbb5adb8dc5 (286,016 chars). Cleared by the post-deploy re-grep via tools/verify-served-engine.mjs against the live chunk."
 }
