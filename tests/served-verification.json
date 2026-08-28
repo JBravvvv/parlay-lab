@@ -1,6 +1,6 @@
 {
   "_": "SERVED-ARTIFACT VERIFICATION STATE (2026-07-30, owner's item 3). Test-owned: no runtime code reads this file. `pending` is set TRUE by an engine ship (the served artifact cannot carry the new string until that ship deploys), and set FALSE by the post-deploy re-grep, which also updates SERVED_ENGINE_SHA_VERIFIED in src/lib/engine-echo.ts. The resolution guard in tests/engine-echo.test.ts FAILS THE BUILD once a pending marker is older than MAX_PENDING_H hours \u2014 so the exception cannot become permanent by default.",
-  "pending": true,
-  "since": "2026-08-28T07:37:02Z",
-  "note": "PENDING: env->closed-form ship (2026-08-27). Engine string cb2cdebc... -> bb6be52dc0f203d2efe3ae5afeda01f9431687afb58e538e7f6f3cbb5adb8dc5 (286,016 chars). Cleared by the post-deploy re-grep via tools/verify-served-engine.mjs against the live chunk."
+  "pending": false,
+  "since": "2026-08-28T07:50:10Z",
+  "note": "RESOLVED 2026-08-28T07:50:10Z, same session as the ship. Post-deploy re-grep via tools/verify-served-engine.mjs against a LIVE fetch of chunk 54-903e9644ebcc4011.js: engine string BYTE-IDENTICAL to the repo, 286,016 chars, sha256 bb6be52dc0f203d2efe3ae5afeda01f9431687afb58e538e7f6f3cbb5adb8dc5. ENV->CLOSED-FORM IS LIVE: shParkCf/shParkKf/shWxTrim/shOutsEnvF grep in the served bytes; both generators arm SH_CFG.envCf at runtime, so the first board generated after this deploy prices the closed form with park x handedness, the HRR blend lambda, venue-K and the weather trim. ZERO baselines re-cut - dormancy held (the side-aware strategy, second use)."
 }

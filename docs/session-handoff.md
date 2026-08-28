@@ -168,6 +168,30 @@ addenda under §0.000005 (search the quoted verbatim words):**
     f487a83 → crossings 70–73 stamped, **FLOOR 69 → 73**, armed mean n=73 16.72 vs
     league 16.47, `86e0503`). 08-22 closes at $132 on the record; first day under the
     7-ceiling + top-up is 08-23.
+16. **PARK FACTORS + WEATHER REACH THE CLOSED FORM (2026-08-27/28, verbatim: "Make sure
+    the engine is taking into account daily ballpark factor and weather. For example,
+    10mph in from CF @ Wrigley Field there probably wont be any HRs hit. … odds for HR,
+    H+R+RBI, Hits, Total Bases, RBI, Runs Scored etc most likely go up while theoretical
+    odds a pitcher goes over K's/outs goes down if hitters are doing better."):** the
+    audit (5-agent workflow sweep) found wind (±10% HR at ≥10mph out/in) and temperature
+    (+0.8%/°F over 70) ALREADY LIVE, and Savant park×handedness live but SIM-ONLY —
+    the closed form (84% of batter rows, 100% of pitcher rows) had only a Coors flag
+    and pitchers had NO venue/weather term (the recorded M1/M3 findings; HR error to
+    14.5%/venue). SHIPPED, dormant behind `SH_CFG.envCf` (armed at runtime by both
+    generators + scheduler backfill via `src/lib/env-adjust.ts`): shParkCf replaces the
+    Coors flags in hF/tbF/hrF (double-count rule honored; TB park = 0.7h+0.3hr), HRR λ
+    = rate×(0.74·hF+0.26·tbF) (the recorded corrected-λ blend), pitcher K's × venue-K
+    index (parks.k, 50% damp, 0.94–1.06) + weather trim, outs × weather trim × park
+    run-env inverse — all announced on card bits. Engine cb2cdebc→**bb6be52d** (286,016
+    chars), every id-region edit IN-PLACE (line count 4,280 preserved), **ZERO baselines
+    re-cut** (dormancy, second use), **SERVED-VERIFIED byte-for-byte same session**
+    (chunk 54-903e9644ebcc4011.js), pending marker set+cleared per protocol. Riders
+    2/5/5l STAY deferred (cannot be dormant; no baseline re-cut happened). ALSO CAUGHT:
+    the armed baseline embedded host-locale times (machine moved LA→Denver, propBoard
+    md5 red with counts identical) — vitest TZ pinned to America/Los_Angeles, stored
+    pins UNTOUCHED. Ships `606abde` (+`db3f9ce` crossings 74–78, FLOOR 73→78). NEXT
+    READ: the first envCf board's rows should tag "park+wind" on non-Coors venues and
+    K/outs rows should carry "venue K factor"/"venue/weather" bits.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
