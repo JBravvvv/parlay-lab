@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-21:** `origin/frontend-rebuild` = `8bd1e4a7981d986038d7145caca497956ed743f4`
+> - **STATE-CLAIM 2026-08-28:** `origin/frontend-rebuild` = `ff2c7d25c053ae11fbe51757111c4ba65bd1d0cd`
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(The 08-18 draft of this claim FABRICATED the 40-char tail of a real short sha —

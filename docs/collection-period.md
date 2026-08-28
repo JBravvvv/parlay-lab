@@ -7188,6 +7188,28 @@ the hottest arming yet recorded.**
 `context.json` (double-brake test re-ran green this gate). `FLOOR` raised 27 → 49 in
 the same commit.**
 
+## SELF-ARMING: CROSSINGS 74 THROUGH 78 — DATED RECORD (2026-08-28)
+
+**Five crossings across SIX bot refreshes (2026-08-23 → 08-28), integrated in one
+rebase under the env-closed-form engine ship after five idle days — the instrument's
+cadence, not the data's (the 08-05 precedent):**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 74 | Manny Gonzalez | 2026-08-23 | `e5ce9a2` | 5 / 85 | 17.0 |
+| 75 | Louie Krupa | 2026-08-24 | `21ad0fa` | 5 / 95 | 19.0 |
+| 76 | James Jean | 2026-08-24 | `21ad0fa` | 5 / 67 | 13.4 |
+| 77 | Chris Guccione | 2026-08-25 | `c79f211` | 5 / 66 | 13.2 |
+| 78 | Carlos Torres | 2026-08-26 | `001241a` | 5 / 89 | 17.8 |
+
+**SEVENTY-EIGHT armed. Armed-set mean k/g at n = 78: 16.59 vs league 16.42 (g=572,
+k=9,394) — above league (+0.17), the third consecutive read above. Still a number,
+not a signal: the set drifts daily, and the double brake keeps all of it off every
+board.**
+
+**DID ANY REACH A BOARD? NO — the double brake re-ran green this gate. `FLOOR`
+raised 73 → 78 in the same commit.**
+
 ## SELF-ARMING: CROSSINGS 70 THROUGH 73 — DATED RECORD (2026-08-22)
 
 **Four crossings in the 08-21 bot refresh (`e54a521`, 2026-08-21T17:29Z), found by the

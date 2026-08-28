@@ -342,10 +342,26 @@ const CROSSINGS = [
       "signal (the set drifts daily, the double brake holds). Re-ran green this gate. " +
       "Record: docs/collection-period.md CROSSINGS 70-73.",
   },
+  { ump: "Manny Gonzalez", date: "2026-08-23", commit: "e5ce9a2", kPerG: 17.0, braked: true,
+    note: "SEVENTY-FOURTH. g 4->5, k 85 at arming (now 6/97). Five crossings across SIX bot " +
+      "refreshes (08-23..08-28) integrated in one rebase under the env-closed-form ship — " +
+      "five idle days, the instrument's cadence, not the data's. Crossings 74-78 record." },
+  { ump: "Louie Krupa", date: "2026-08-24", commit: "21ad0fa", kPerG: 19.0, braked: true,
+    note: "SEVENTY-FIFTH. g 4->5, k 95." },
+  { ump: "James Jean", date: "2026-08-24", commit: "21ad0fa", kPerG: 13.4, braked: true,
+    note: "SEVENTY-SIXTH. g 4->5, k 67. Same refresh as Krupa." },
+  { ump: "Chris Guccione", date: "2026-08-25", commit: "c79f211", kPerG: 13.2, braked: true,
+    note: "SEVENTY-SEVENTH. g 4->5, k 66." },
+  { ump: "Carlos Torres", date: "2026-08-26", commit: "001241a", kPerG: 17.8, braked: true,
+    note: "SEVENTY-EIGHTH. g 4->5, k 89. Armed mean at n=78: 16.59 vs league 16.42 (g=572, " +
+      "k=9,394) — above league (+0.17), third read running above; a number, not a signal " +
+      "(the set drifts daily, the double brake holds). Re-ran green this gate. Record: " +
+      "docs/collection-period.md CROSSINGS 74-78.",
+  },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 73;
+const FLOOR = 78;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =
