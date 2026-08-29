@@ -13,7 +13,8 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-28:** `origin/frontend-rebuild` = `ff2c7d25c053ae11fbe51757111c4ba65bd1d0cd`
+> - **STATE-CLAIM 2026-08-29:** `origin/frontend-rebuild` = `3318d2cb02122cdfe5168ce99c0906877212fa11`
+>   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(The 08-18 draft of this claim FABRICATED the 40-char tail of a real short sha —
@@ -192,6 +193,15 @@ addenda under §0.000005 (search the quoted verbatim words):**
     pins UNTOUCHED. Ships `606abde` (+`db3f9ce` crossings 74–78, FLOOR 73→78). NEXT
     READ: the first envCf board's rows should tag "park+wind" on non-Coors venues and
     K/outs rows should carry "venue K factor"/"venue/weather" bits.
+    **READ 2026-08-29 05:09Z, THE FIRST envCf BOARD (08-28) — CONFIRMED LIVE IN FULL:**
+    315 prop rows; **200 tagged park+wind** (the tag now fires on every park-adjusted
+    row, not just Coors/wind); **37 of 37 K rows** carry "venue K factor x… · weather
+    x…" (e.g. Jackson Kent x0.97·x0.97, Christian Scott x1.02·x0.98); **34 of 34 outs
+    rows** carry "venue/weather trims the start est x…" (e.g. Jared Jones x0.98);
+    200 rows carry wind/temp case text ("wind temp-adjusted" = shTempF live). **AND
+    instruction 15 verified the same read: the 08-28 card locked $150 EXACTLY in 5
+    core tickets** (3–7 window ✓, full deployment ✓ — the first fully-working day
+    under every rule).
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
@@ -6574,7 +6584,41 @@ survives a **stopped** clock, i.e. one whose negative branch is informative. Tha
 
 ## 17. PROTOCOL
 
-### 🔴 FIRST ACTION AFTER COMPACTION — 2026-08-18 (supersedes every list below)
+### 🔴 FIRST ACTION AFTER COMPACTION — 2026-08-29 (supersedes every list below)
+
+1. **Re-read §0.000004 (the CURRENT Josh block, instructions 1–16) and `CLAUDE.md`.**
+   Print `git rev-parse HEAD`, confirm containment in `origin/frontend-rebuild`
+   (`sha-currency` + `push-state` score it). Expect a daily bot context commit on
+   origin ~17:20Z; every rebase over one is a tree change → FULL RE-GATE (the
+   crossings guard has caught arms on six straight integrations; FLOOR is monotone).
+2. **THE PAPER ERA'S "COUPLE WEEKS" IS UP (started 08-15) — assemble the era review
+   for Josh:** core record split gated vs forced (per-ticket `forced:true` and
+   `topUp` stamps), fun-money record by itself, day-by-day $-deployment (49 → 101 →
+   132 → 150 era once evening crons + 7-ceiling + residue top-up all landed 08-28),
+   and the dk_fd-vs-ev_gated A/B (entry `alt` since 08-21 — join `alt.core[].id` to
+   the pred store's graded ParlayPred rows; the primary flipped dk_fd 08-21).
+3. **TWO SUNDAY FITS RAN UNOBSERVED — READ BOTH:** 08-17 (the 5j fit-vintage verify
+   was owed BEFORE it) and 08-23 (**the FIRST SIDED FIT** — did any "mkt|u" key get
+   written, i.e. is the dormant under-direction engine branch live with a real
+   multiplier?). Next fit: Sunday 08-30 10:00Z. Read `pl:cal:summary` rev/window/mults
+   via the public calibration route.
+4. **envCf watch (instruction 16, live since 08-28):** boards should keep showing
+   park+wind tags on most prop rows and venue-K/weather bits on every pitcher row;
+   the first week of graded envCf rows is the earliest honest read on whether the
+   14.5%/venue HR error actually closed.
+5. Then the standing rhythm. Standing open: alt-lines unlock decision page (§12Z.12,
+   Josh's word) · CLV header-auth migration (security queue) · engine riders 2/5/5l
+   (defer until a ship that actually re-cuts baselines — two dormant ships have now
+   shipped without one).
+6. **SEVEN WORKFLOW-DRIFT WAIVERS EXPIRED AT THE 14-DAY LIMIT 2026-08-29 and were
+   RENEWED once** (tests/workflow-branch-sync.test.ts — schedules fire only from
+   origin/main; each waiver awaits JOSH'S decision): props-history redesign (dispatch
+   test or fold back), model.yml pause mirroring, context.yml weekend cron, ufc.yml
+   schedule-or-delete, and the comment-reconciliation sweep covering board-archive /
+   hr-overround / line-history (incl. the runs/day correction). These are decisions,
+   not code — bring them to Josh rather than renewing a second time.
+
+### 🔻 SUPERSEDED — FIRST ACTION AFTER COMPACTION — 2026-08-18 (kept as history)
 
 1. **Re-read §0.000004 (the CURRENT Josh block) and `CLAUDE.md`.** Print
    `git rev-parse HEAD`, confirm containment in `origin/frontend-rebuild`
