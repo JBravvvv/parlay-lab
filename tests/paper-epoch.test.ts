@@ -125,7 +125,11 @@ describe("wired — source scans, comment-stripped", () => {
   it("lock-card deploys PAPER.daily with a caesars_ev top-up, forced-flagged, and stakes PAPER.fun via shFunPick", () => {
     const src = read("src/lib/server/lock-card.ts");
     expect(src).toMatch(/PAPER\.daily/);
-    expect(src).toMatch(/"caesars_ev"/); // the no-gate exact-sum top-up mode
+    /* INSTRUCTION 18 (2026-09-03): the forced top-up now selects by TRUE PROBABILITY
+       (CORE_RULES.forcedSelMode = "probability") — the $915 caesars_ev forced pass ran
+       −27% over the 19 paper days. Pin updated, not deleted. */
+    expect(src).toMatch(/selMode: CORE_RULES\.forcedSelMode/);
+    expect(src).not.toMatch(/selMode:\s*"caesars_ev"/);
     expect(src).toMatch(/forced/);
     expect(src).toMatch(/buildFunHrTickets/); // fun reshaped 2026-08-15: HR-longshot composer (see tests/fun-hr.test.ts)
     expect(src).toMatch(/PAPER\.fun/);
@@ -147,10 +151,14 @@ describe("wired — source scans, comment-stripped", () => {
        on seat arithmetic. */
     expect(src).toMatch(/const gatedCap = Math\.min\(Number\(cfg\.maxCoreTickets \?\? PAPER_TICKETS\.max\), w\.maxNew\)/);
     expect(src).toMatch(/selMode: mode,\s*maxCoreTickets: gatedCap/s);
-    expect(src).toMatch(/selMode:\s*"caesars_ev",\s*maxCoreTickets/s);
+    /* INSTRUCTION 18 (2026-09-03): the forced pass runs in probability mode and the
+       residue is CAP-RESPECTING — a per-ticket map under the $25 ceiling, the rest
+       stamped capResidue. The 2026-08-22 "rides the best ticket" pin is updated here. */
+    expect(src).toMatch(/selMode: CORE_RULES\.forcedSelMode,\s*maxCoreTickets/s);
     expect(src).toMatch(/const fMax = Math\.max\(0, w\.maxNew - a\.picks\.length\)/);
-    expect(src).toMatch(/const residue = daily - a\.sum - f\.sum/);
-    expect(src).toMatch(/topUp: tu\.amount/);
+    expect(src).toMatch(/let residue = daily - capped/);
+    expect(src).toMatch(/topUp: tu\[t\.id\]/);
+    expect(src).toMatch(/capResidue/);
     expect(src).toMatch(/topUpSum/);
   });
 

@@ -12,6 +12,7 @@ import { UfcRankings } from "@/components/ufc/UfcRankings";
 import { CalibrationPanel } from "@/components/stats/CalibrationPanel";
 import { ClvPanel } from "@/components/stats/ClvPanel";
 import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
+import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -241,6 +242,7 @@ export default function StatsPage() {
   const [query, setQuery] = useState("");
   // calibration spec 3C: the reliability view lives under Stats as its own tab
   const [calView, setCalView] = useState(false);
+  const [pvtOpen, setPvtOpen] = useState(false);
 
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
@@ -359,13 +361,20 @@ export default function StatsPage() {
             : `${SPORTS[tableSport].label} · ${season} — every ${scope === "team" ? "team" : "player"}, live on open · tap any column to sort`
         }
         action={
-          sport !== "ufc" ? (
-            <Pill variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
-              {q.isFetching ? "Refreshing…" : "↻ Refresh"}
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill variant={pvtOpen ? "primary" : "ghost"} onClick={() => setPvtOpen((v) => !v)} aria-pressed={pvtOpen}>
+              ⚾ Pitcher vs Team
             </Pill>
-          ) : undefined
+            {sport !== "ufc" && (
+              <Pill variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
+                {q.isFetching ? "Refreshing…" : "↻ Refresh"}
+              </Pill>
+            )}
+          </div>
         }
       />
+
+      {pvtOpen && <PitcherVsTeam />}
 
       <Reveal>
         <Panel className="mb-4">

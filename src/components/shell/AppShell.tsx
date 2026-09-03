@@ -20,6 +20,7 @@ import { useLedgerSyncBeacon } from "@/lib/ledgerSync";
 const NAV = [
   { href: "/", label: "Dashboard", icon: IconDash, mobile: true },
   { href: "/stats", label: "Stats", icon: IconStats, mobile: true },
+  { href: "/games", label: "Games", icon: IconBoard, mobile: true },
   { href: "/board", label: "Board", icon: IconBoard, mobile: true },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, mobile: true },
   { href: "/builder", label: "Builder", icon: IconBuilder, mobile: true },

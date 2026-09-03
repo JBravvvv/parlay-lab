@@ -65,7 +65,11 @@ export function buildFunHrTickets(
   poolIn: FunLegSrc[],
   amount: number,
   usedLegKeys: Set<string>,
+  /* INSTRUCTION 18 (2026-09-03): the ladder takes one of the day's fun seats, so the HR
+     composer's ticket ceiling is reducible — the day stays within FUN_SHAPE.tickets.max */
+  maxTickets: number = FUN_SHAPE.tickets.max,
 ): { tickets: FunTicket[]; sum: number; note?: string } {
+  const tixMax = Math.max(1, Math.min(FUN_SHAPE.tickets.max, Math.floor(Number(maxTickets) || FUN_SHAPE.tickets.max)));
   const amt = Math.max(0, Math.round(Number(amount) || 0));
   const pool = poolIn
     .filter(
@@ -87,7 +91,7 @@ export function buildFunHrTickets(
   const appearances = new Map<string, number>();
   const built: FunLegSrc[][] = [];
   const seen = new Set<string>(); // leg-set signatures — no two identical tickets
-  for (let k = 0; k < FUN_SHAPE.tickets.max; k++) {
+  for (let k = 0; k < tixMax; k++) {
     const want = Math.min(SIZES[k] ?? FUN_SHAPE.legs.max, FUN_SHAPE.legs.max);
     const teams = new Set<string>();
     const legs: FunLegSrc[] = [];
@@ -135,5 +139,88 @@ export function buildFunHrTickets(
     ...(built.length < FUN_SHAPE.tickets.min
       ? { note: `fun: pool seated only ${built.length} legal ticket${built.length === 1 ? "" : "s"} (target ${FUN_SHAPE.tickets.min}-${FUN_SHAPE.tickets.max})` }
       : {}),
+  };
+}
+
+/**
+ * THE H+R+RBI LADDER (INSTRUCTION 18, 2026-09-03, Josh's word, verbatim: "Could maybe
+ * look into taking like. 8-15 leg H+R+RBI etc as one or more of the fun tickets daily
+ * as well. Could be other props or longshots as well." — and "I dont want to change that
+ * $25 fun money hypothetical per day").
+ *
+ * One 8–12 leg (target 10) ticket a day of the likeliest H+R+RBI O 0.5 and Hits O 0.5
+ * rows that carry a Caesars price, taken most-likely-first from the board's own rows:
+ *   - at most 2 legs per team (same-lineup overs correlate; the ladder is a longshot, not
+ *     a team stack);
+ *   - one leg per player;
+ *   - leg-disjoint from everything already staked today (`used`);
+ *   - rows flagged noParlay are skipped; the susp flag is IGNORED for fun money (the
+ *     HRR-over suspension is a CORE rule — fun money is where the longshot lives).
+ * Fewer than 8 seats → null, and the $25 goes to the HR composer exactly as before.
+ * Price and probability are naive products of the rows' own numbers — disclosed, never
+ * fabricated. The ladder's $10 comes out of the same $25: the fun total never moves.
+ */
+export const FUN_LADDER = {
+  since: "2026-09-03",
+  amount: 10,
+  legs: { min: 8, target: 10, max: 12 },
+  teamCap: 2,
+} as const;
+
+export type FunLadderTicket = {
+  name: string;
+  type: "fun_ladder";
+  stake: number;
+  czDec: number;
+  czOdds: string;
+  prob: number; // percent, naive product
+  czEv: number; // percent
+  legs: FunLegSrc[];
+};
+
+export function buildFunLadderTicket(
+  poolIn: FunLegSrc[],
+  amount: number,
+  used: Set<string>,
+): FunLadderTicket | null {
+  const amt = Math.max(0, Math.round(Number(amount) || 0));
+  if (amt <= 0) return null;
+  const pool = poolIn
+    .filter(
+      (l) =>
+        l.team &&
+        l.player &&
+        l.dec != null &&
+        Number(l.dec) > 1 &&
+        l.prob != null &&
+        Number(l.prob) > 0 &&
+        !used.has(legKeyOf(l)),
+    )
+    .sort((a, b) => Number(b.prob) - Number(a.prob) || a.player.localeCompare(b.player) || a.prop.localeCompare(b.prop));
+  const teams = new Map<string, number>();
+  const players = new Set<string>();
+  const legs: FunLegSrc[] = [];
+  for (const c of pool) {
+    if (legs.length >= FUN_LADDER.legs.target) break;
+    const t = c.team as string;
+    if ((teams.get(t) ?? 0) >= FUN_LADDER.teamCap) continue;
+    if (players.has(c.player)) continue;
+    teams.set(t, (teams.get(t) ?? 0) + 1);
+    players.add(c.player);
+    legs.push(c);
+  }
+  if (legs.length < FUN_LADDER.legs.min) return null;
+  const dec = legs.reduce((a, l) => a * Number(l.dec), 1);
+  const p = legs.reduce((a, l) => a * (Number(l.prob) / 100), 1);
+  const am = dec >= 2 ? Math.round((dec - 1) * 100) : -Math.round(100 / (dec - 1));
+  return {
+    name: `H+R+RBI Ladder · ${legs.length} hitters`,
+    type: "fun_ladder",
+    stake: amt,
+    czDec: dec,
+    czOdds: am > 0 ? `+${am}` : String(am),
+    prob: p * 100,
+    czEv: (p * dec - 1) * 100,
+    legs,
   };
 }

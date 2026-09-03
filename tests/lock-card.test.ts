@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
 import { validateLedger, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { buildLockEntry, needsLockAction, LEDGER_STORE_KEY } from "@/lib/server/lock-card";
+import { CORE_RULES, PAPER } from "@/lib/paper-mode";
 import { readFileSync } from "node:fs";
 import { stripComments } from "./helpers/source";
 
@@ -94,13 +95,20 @@ describe("buildLockEntry — the card the system locks for itself", () => {
        is recorded (gatedSum 0, forced flags) but hypothetical money still deploys. */
     const entry = buildLockEntry({ eng: eng as never, data: d, date: "2026-07-10", now: FROZEN_NOW, trigger: "test" });
     expect(entry.locked).toBe(true);
-    const core = entry.core as { stake: number; forced?: boolean }[];
-    expect(core.length, "the paper top-up deployed nothing on a pool the probability mode fills").toBeGreaterThan(0);
+    const core = entry.core as { stake: number; forced?: boolean; czDec?: number | null; bsDec?: number | null }[];
+    /* INSTRUCTION 18 (2026-09-03): the forced pass now seats ONLY tickets priced ≤ 1.75
+       (CORE_RULES.forcedMaxDec) by true probability. MEASURED on this fixture: the
+       cheapest ≤2-leg pool ticket settles at 1.9091, so the forced pass legitimately
+       finds nothing and the day is a $0 decision record with its histogram — the
+       "deploys anyway" half of this pin is retired; the forced-only/gatedSum-0 half
+       stays, asserted over whatever the pass seats (nothing here, by measurement). */
     expect(core.every((t) => t.forced === true), "a gate-cleared-nothing day produced an unforced ticket — two allocators disagree about the gate").toBe(true);
+    for (const t of core) expect(Math.max(Number(t.czDec ?? 0), Number(t.bsDec ?? 0))).toBeLessThanOrEqual(1.75);
     expect((entry as { gatedSum?: number }).gatedSum).toBe(0);
     const deployed = core.reduce((a, t) => a + t.stake, 0);
     expect((entry as { allocSum?: number }).allocSum).toBe(deployed);
-    expect(deployed, "caesars_ev top-up broke its exact-sum guarantee").toBe(entry.daily);
+    expect(deployed + Number((entry as { capResidue?: number }).capResidue ?? 0), "deployed + the cap-stranded residue must account for the whole budget").toBe(entry.daily);
+    expect(String((entry as { note?: string }).note), "a $0 day must say so").toMatch(/paper day/);
     /* 2026-08-22, Josh's word: "a max of 7 tickets for the daily core card" — the
        08-22 card reached 14 because only the forced pass honored the ceiling */
     expect(core.length, "the core card exceeded the 7-ticket day ceiling").toBeLessThanOrEqual(7);
@@ -180,12 +188,17 @@ describe("THE RESIDUE TOP-UP (2026-08-22 — the 08-22 card: 14 tickets, $132 of
     });
     const fresh = (entry.core as { id: string; stake: number; topUp?: number; forced?: boolean }[]).filter((t) => t.id === "id-Mock single");
     expect(fresh.length, "the fire's new ticket is missing").toBe(1);
-    expect(fresh[0].stake, "the residue did not ride the ticket").toBe(46);
-    expect(fresh[0].topUp, "the allocator's own sizing must stay recoverable (stake − topUp)").toBe(34);
-    expect((entry as { allocSum?: number }).allocSum).toBe(86 + 46);
+    /* INSTRUCTION 18 (2026-09-03, CORE_RULES.maxStake 25 — stakes ≥ $20 ran −33..−36%
+       ROI over the 19 paper days): the residue rides the ticket only UP TO the $25
+       ceiling ($12 + $13), and the $21 no ticket can absorb is stamped capResidue with
+       a note — never a $46 ticket. Pin updated, not deleted. */
+    expect(fresh[0].stake, "the residue breached the $25 ceiling").toBe(25);
+    expect(fresh[0].topUp, "the allocator's own sizing must stay recoverable (stake − topUp)").toBe(13);
+    expect((entry as { allocSum?: number }).allocSum).toBe(86 + 25);
     expect((entry as { gatedSum?: number }).gatedSum, "gatedSum records the allocator's sizing, not the top-up").toBe(86 + 12);
-    expect((entry as { topUpSum?: number }).topUpSum).toBe(34);
-    expect((entry as { note?: string }).note, "a fully-deployed fire must not carry a shortfall note").toBeUndefined();
+    expect((entry as { topUpSum?: number }).topUpSum).toBe(13);
+    expect((entry as { capResidue?: number }).capResidue).toBe(21);
+    expect(String((entry as { note?: string }).note)).toMatch(/\$21 left unallocated because the \$25 per-ticket ceiling/);
     expect((entry.core as unknown[]).length).toBeLessThanOrEqual(7);
   });
   it("a fire with NO seat and NO new ticket still cannot invent money — the shortfall note names it", () => {
@@ -259,4 +272,67 @@ describe("the store key mirror", () => {
     expect(m?.[1], "the ledger route's STORE_KEY literal moved").toBeTruthy();
     expect(LEDGER_STORE_KEY, "lock-card writes a DIFFERENT redis key than the ledger reads — locks would vanish").toBe(m?.[1]);
   });
+});
+
+/**
+ * INSTRUCTION 18 (2026-09-03, operator Josh, verbatim: "I would say change everything that
+ * you think is necessary to optimize this engine/website and get it on track to start
+ * making theoretical money. ... Lets make this app an UNSTOPPABLE theoretical money
+ * makin' machine"). The CORE_RULES in paper-mode.ts carry the diagnosis figures; these
+ * cases pin them on the armed fixture in "probability" mode (the mode that fills the
+ * card — every assertion below refuses to pass over an empty one).
+ * OBSERVED RED 2026-09-03 before the rules landed (3-leg tickets, dec 11.97, $150 singles).
+ */
+describe("INSTRUCTION 18 — the 2026-09-03 core rules on the locked card", () => {
+  it("2 legs max · dec ≤ 2.6 · no HRR over · every stake ≤ $25 · forced ≤ 1.75 · shrunk numbers with raw beside them · fun == $25", async () => {
+    const { entry } = await fixtureLock();
+    const core = entry.core as { stake: number; forced?: boolean; czDec?: number | null; bsDec?: number | null; prob?: number | null; probRaw?: number | null; czEvRaw?: number | null; topUp?: number; legs: { lkey?: string | null; prop?: string | null }[] }[];
+    expect(core.length, "ZERO picks — vacuous; the probability mode must fill the card").toBeGreaterThan(0);
+    for (const t of core) {
+      expect(t.legs.length, `${t.legs.length}-leg core ticket`).toBeLessThanOrEqual(CORE_RULES.maxLegs);
+      const settling = t.bsDec ?? t.czDec;
+      expect(Number(settling), "a core ticket priced above the 2.6 ceiling").toBeLessThanOrEqual(CORE_RULES.maxDec);
+      expect(Number(t.czDec)).toBeLessThanOrEqual(CORE_RULES.maxDec);
+      for (const l of t.legs) {
+        const mkt = String(l.lkey ?? "").split("|")[1];
+        expect(mkt === "batter_hits_runs_rbis" && String(l.prop ?? "").includes(" O "), `HRR over on core: ${l.prop}`).toBe(false);
+      }
+      expect(t.stake, "a core stake above $25").toBeLessThanOrEqual(CORE_RULES.maxStake);
+      if (t.forced) expect(Math.max(Number(t.czDec ?? 0), Number(t.bsDec ?? 0))).toBeLessThanOrEqual(CORE_RULES.forcedMaxDec);
+      expect(typeof t.probRaw, "probRaw missing — the pre-shrink number must stay recoverable").toBe("number");
+      expect(typeof t.prob).toBe("number");
+      expect("czEvRaw" in t).toBe(true);
+    }
+    /* the shrink moved the numbers: on this fixture at least one ticket's model prob sat
+       above its market read, so its shrunk prob is strictly below probRaw */
+    const moved = core.filter((t) => Number(t.prob) < Number(t.probRaw));
+    expect(moved.length, "no ticket shrank — the pool was not mapped through shrinkTicket").toBeGreaterThan(0);
+    const hist = (entry as { blockedReasons?: Record<string, unknown> }).blockedReasons ?? {};
+    expect(typeof hist.hrr_over_suspended, "hrr_over_suspended must be a number on every record").toBe("number");
+    expect(typeof hist.core_shape_rules).toBe("number");
+    expect((entry as { coreRules?: unknown }).coreRules).toEqual(CORE_RULES);
+    const fun = entry.funT as { type: string; stake: number }[];
+    expect(fun.reduce((a, t) => a + t.stake, 0)).toBe(PAPER.fun);
+    /* MEASURED on this fixture: the CZ-priced Hits O 0.5 rows span only 2 teams (WSH,
+       NYY) and no HRR row carries a CZ price, so the ladder cannot seat and the $25
+       falls back to the HR composer — the seated case is pinned in tests/fun-ladder.test.ts */
+    expect(fun.every((t) => t.type === "fun_hr" || t.type === "fun_ladder")).toBe(true);
+    /* the entry still validates with the extra fields */
+    expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
+  }, T9);
+
+  it("the alt world reads the same shrunk pool: every alt ticket carries probRaw too and obeys the same shape", async () => {
+    const { entry } = await fixtureLock();
+    const alt = (entry as SyncEntry).alt!;
+    for (const t of alt.core as { stake: number; probRaw?: unknown; legs: unknown[] }[]) {
+      expect(typeof t.probRaw).toBe("number");
+      expect(t.legs.length).toBeLessThanOrEqual(CORE_RULES.maxLegs);
+      expect(t.stake).toBeLessThanOrEqual(CORE_RULES.maxStake);
+    }
+  }, T9);
+
+  it("HRR overs are counted out of the pool on this fixture (3 pool tickets carry one)", async () => {
+    const { entry } = await fixtureLock();
+    expect((entry as { blockedReasons?: Record<string, number> }).blockedReasons?.hrr_over_suspended).toBe(3);
+  }, T9);
 });

@@ -1,7 +1,8 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { PAPER, PAPER_TICKETS, ticketWindow } from "@/lib/paper-mode";
-import { buildFunHrTickets, type FunLegSrc } from "@/lib/fun-hr";
+import { CORE_RULES, PAPER, PAPER_TICKETS, ticketWindow } from "@/lib/paper-mode";
+import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
+import { shrinkTicket } from "@/lib/shrink";
 import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 
 /**
@@ -133,7 +134,15 @@ export function buildLockEntry(args: {
      and blocks remain what they have really been all along — fire-timing and budget
      bookkeeping, not card scope. blockGkeys still guards the partition (TWO CARDS ONE
      GAME above) and stamps the entry's blocks map. */
-  const pool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data);
+  const rawPool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data);
+  /* INSTRUCTION 18 (2026-09-03) — the pool is SHRUNK ONCE, here, before the under-bias
+     prune, so the primary world, the alt world, the forced pass and the ticket record
+     all read the same market-blended numbers (shrink.ts carries the diagnosis: model
+     said 56.0 wins, 46 landed). Pure: the engine's own pool objects are untouched. */
+  const pool = (rawPool as { pl: Record<string, unknown> & { legs: Record<string, unknown>[] } }[]).map((w) => ({
+    ...w,
+    pl: shrinkTicket(w.pl as never, CORE_RULES.shrinkW) as unknown as Record<string, unknown> & { legs: Record<string, unknown>[] },
+  }));
   const shAllocate = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate");
   const tid = eng.get<(pl: unknown) => string>("shTicketId");
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
@@ -151,7 +160,37 @@ export function buildLockEntry(args: {
      under-bias.ts). Rule 1: tickets carrying a pitcher_outs UNDER leg leave the paper
      pool — re-admitted least-under-heavy first ONLY if the remainder cannot seat this
      fire's minimum ("not included very often", literally). */
-  const biasView = (pool as PoolItem[]).map((w) => ({
+  /* INSTRUCTION 18, rule 5 — H+R+RBI OVERS OUT OF CORE (121 of 231 core legs; 54% hit
+     vs 61% market-implied; the claimed-edge buckets hit WORSE the more edge was claimed).
+     Any ticket carrying an HRR over leaves the core pool before either pass, counted in
+     blockedReasons.hrr_over_suspended so a zero-ticket day still explains itself. HRR
+     unders, TB, hits, ML and RL stay. Rules 3 (maxLegs 2 / maxDec 2.6) are ALSO applied
+     here as a hard pool filter (counted as core_shape_rules) on top of the allocator's
+     own cfg gate — the cfg gate reads one price (basis under dk_fd, CZ elsewhere); the
+     pool filter holds BOTH the basis and the settling price under the ceiling, because
+     the diagnosis measured settlement (tickets settling above 2.6 went 11-38). */
+  const isHrrOver = (l: { lkey?: string | null; prop?: string | null }) =>
+    String(l.lkey ?? "").split("|")[1] === "batter_hits_runs_rbis" && String(l.prop ?? "").includes(" O ");
+  const decOf = (pl: Record<string, unknown>, k: "czDec" | "bsDec") => (typeof pl[k] === "number" && Number.isFinite(pl[k] as number) ? (pl[k] as number) : null);
+  const overDec = (pl: Record<string, unknown>, cap: number) => {
+    const cz = decOf(pl, "czDec");
+    const bs = decOf(pl, "bsDec");
+    return (cz != null && cz > cap) || (bs != null && bs > cap);
+  };
+  let hrrOverDropped = 0;
+  let shapeDropped = 0;
+  const rulePool = (pool as PoolItem[]).filter((w) => {
+    if (CORE_RULES.noHrrOver && w.pl.legs.some(isHrrOver)) {
+      hrrOverDropped++;
+      return false;
+    }
+    if (w.pl.legs.length > CORE_RULES.maxLegs || overDec(w.pl, CORE_RULES.maxDec)) {
+      shapeDropped++;
+      return false;
+    }
+    return true;
+  });
+  const biasView = rulePool.map((w) => ({
     w,
     name: String(w.pl.name ?? ""),
     czEv: (w.pl.czEv as number | null) ?? null,
@@ -179,8 +218,17 @@ export function buildLockEntry(args: {
      forced pass may seat up to (10 − carried − gated) tickets on any fire; the window
      keeps shaping only the floor. */
   type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
-  type TopUp = { id: string; amount: number } | null;
-  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean; topUp: TopUp };
+  /* INSTRUCTION 18, rule 3: the residue top-up is now a per-ticket map, cap-respecting;
+     what the $25 ceiling cannot absorb is `capResidue`, stamped, never breached. */
+  type TopUp = Record<string, number>;
+  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean; topUp: TopUp; capResidue: number; deployed: number };
+  /* the stake a pick may carry under the $25 ceiling (the allocator's own number is kept
+     on the pick; the trim is stamped on the ticket as capTrim) */
+  const cappedStake = (p: AllocPick) => Math.min(Number(p.stake), CORE_RULES.maxStake);
+  /* the allocator's cap logic: capG = max(cfg.perParlayCap, 1/n) × amount — a FRACTION of
+     the pass's amount, floored at an even split, so the fraction alone cannot hold $25
+     on a thin card; the clamp above is what actually guarantees the ceiling. */
+  const capFrac = (amount: number) => Math.min(Number(cfg.perParlayCap ?? 0.25), amount > 0 ? CORE_RULES.maxStake / amount : 1);
   const biasViewOf = (tix: SyncTicket[]) =>
     tix.map((t) => ({
       name: String(t.name ?? ""),
@@ -213,6 +261,10 @@ export function buildLockEntry(args: {
             selMode: mode,
             maxCoreTickets: gatedCap,
             minCoreTickets: Math.min(Number(cfg.minCoreTickets ?? 1), gatedCap),
+            /* INSTRUCTION 18 rules 2/3: 2 legs, dec ≤ 2.6 at the selection price, $25 cap */
+            coreMaxLegs: CORE_RULES.maxLegs,
+            coreMaxDec: CORE_RULES.maxDec,
+            perParlayCap: capFrac(daily),
           }, false)
         : { picks: [], sum: 0, blocked: [] };
       let f: AllocResult = { picks: [], sum: 0 };
@@ -223,17 +275,26 @@ export function buildLockEntry(args: {
         if (t.id) ids.add(String(t.id));
         for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
       }
-      const short = daily - a.sum;
+      const gatedSum = a.picks.reduce((acc, x) => acc + cappedStake(x), 0);
+      const short = daily - gatedSum;
       /* forced seats = the fire's window seats the gated pass left (the 08-19 zeroing
          case is now closed by the residue top-up below, not by widening seats) */
       const fMax = Math.max(0, w.maxNew - a.picks.length);
       if (short > 0 && fMax > 0) {
-        const rest = p.filter((x) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l))));
+        /* INSTRUCTION 18 rule 4: the forced pass selects by TRUE PROBABILITY ("probability"
+           mode — read in shAllocate: evGated=false, disciplined=false under that mode, so
+           force=false trips no gate, no nv_tax floor, no Kelly ceiling; exact-sum stays)
+           and only among tickets priced ≤ 1.75 at BOTH quotes (the $915 caesars_ev forced
+           pass ran −27%). */
+        const rest = p.filter((x) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l))) && !overDec(x.pl, CORE_RULES.forcedMaxDec));
         f = shAllocate(rest, short, {
           ...cfg,
-          selMode: "caesars_ev",
+          selMode: CORE_RULES.forcedSelMode,
           maxCoreTickets: fMax,
           minCoreTickets: Math.max(1, w.minNew - a.picks.length),
+          coreMaxLegs: CORE_RULES.maxLegs,
+          coreMaxDec: CORE_RULES.forcedMaxDec,
+          perParlayCap: capFrac(short),
         }, false);
       }
       const staged: Staged[] = [...a.picks, ...f.picks].map((x) => ({
@@ -249,17 +310,26 @@ export function buildLockEntry(args: {
          EV, ties to the larger stake) — stamped `topUp` on the ticket so the allocator's
          own sizing stays recoverable (stake − topUp). Never a carried ticket: those are
          locked, and their games may have started. */
-      const residue = daily - a.sum - f.sum;
-      let topUp: TopUp = null;
+      /* INSTRUCTION 18 rule 3 (2026-09-03): the top-up is CAP-RESPECTING. It rides the
+         fire's new tickets best-EV-first, each only up to the $25 ceiling; what no ticket
+         can absorb stays `capResidue` — stamped and noted, never a breach. */
+      const capped = [...a.picks, ...f.picks].reduce((acc, x) => acc + cappedStake(x), 0);
+      let residue = daily - capped;
+      const topUp: TopUp = {};
       if (residue > 0) {
-        const cands = [...a.picks, ...f.picks];
-        if (cands.length) {
-          const ev = (x: AllocPick) => (x.w.pl.czEv == null ? -Infinity : Number(x.w.pl.czEv));
-          const best = cands.reduce((b, x) => (ev(x) > ev(b) || (ev(x) === ev(b) && x.stake > b.stake) ? x : b));
-          topUp = { id: best.id, amount: residue };
+        const ev = (x: AllocPick) => (x.w.pl.czEv == null ? -Infinity : Number(x.w.pl.czEv));
+        const cands = [...a.picks, ...f.picks].sort((x, y) => ev(y) - ev(x) || y.stake - x.stake);
+        for (const c of cands) {
+          if (residue <= 0) break;
+          const room = CORE_RULES.maxStake - cappedStake(c);
+          if (room <= 0) continue;
+          const add = Math.min(room, residue);
+          topUp[c.id] = add;
+          residue -= add;
         }
       }
-      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share, topUp };
+      const deployed = daily - Math.max(0, residue);
+      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share, topUp, capResidue: Math.max(0, residue), deployed };
     };
     let pool = basePool;
     let cur = run(pool);
@@ -279,11 +349,11 @@ export function buildLockEntry(args: {
        quota's evictions leave the fire short of its budget, the evicted tickets come back
        and the passes run once more without the quota — stamped yieldedToBudget, never silent. */
     let yielded = false;
-    if (cur.alloc.sum + cur.forced.sum + (cur.topUp?.amount ?? 0) < daily && evicted > 0) {
+    if (cur.deployed < daily && evicted > 0) {
       yielded = true;
       cur = run(basePool);
     }
-    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded, topUp: cur.topUp };
+    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded, topUp: cur.topUp, capResidue: cur.capResidue, deployed: cur.deployed };
   };
 
   const primaryMode = String(cfg.selMode ?? LOCK_SEL_MODE);
@@ -310,19 +380,26 @@ export function buildLockEntry(args: {
     for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) usedLegs.add(legKey(l));
   }
   const gatedCount = alloc.picks.length;
-  const shortfall = daily - alloc.sum;
+  const gatedDeployed = alloc.picks.reduce((a, p) => a + cappedStake(p), 0);
+  const shortfall = daily - gatedDeployed;
   const forcedMax = Math.max(0, win.maxNew - gatedCount);
 
   const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
     const pl = p.w.pl;
+    const stake = cappedStake(p);
     return {
       id: p.id,
-      stake: p.stake,
+      stake,
+      /* INSTRUCTION 18: shrunk numbers on the record, raw numbers recoverable beside them */
       prob: pl.prob ?? null,
+      probRaw: pl.probRaw ?? null,
       czDec: pl.czDec ?? null,
       czEv: pl.czEv ?? null,
+      czEvRaw: pl.czEvRaw ?? null,
       bsDec: pl.bsDec ?? null,
       bsEv: pl.bsEv ?? null,
+      bsEvRaw: pl.bsEvRaw ?? null,
+      ...(stake !== Number(p.stake) ? { capTrim: Number(p.stake) - stake } : {}),
       name: pl.name ?? null,
       type: pl.type ?? null,
       tier: pl.tier ?? null,
@@ -338,7 +415,7 @@ export function buildLockEntry(args: {
   };
 
   const withTopUp = (t: SyncTicket, tu: TopUp): SyncTicket =>
-    tu && t.id === tu.id ? { ...t, stake: Number(t.stake) + tu.amount, topUp: tu.amount } : t;
+    t.id && tu[t.id] > 0 ? { ...t, stake: Number(t.stake) + tu[t.id], topUp: tu[t.id] } : t;
   const newCore: SyncTicket[] = [
     ...alloc.picks.map((p, i) => {
       const stake = args.__plantStakeSkew && i === 0 ? p.stake + 1 : p.stake;
@@ -398,9 +475,38 @@ export function buildLockEntry(args: {
           gkey: (r.gkey as string | undefined) ?? null,
         };
       });
-    const fun = buildFunHrTickets(funPool, PAPER.fun, usedLegs);
+    /* INSTRUCTION 18 rule 6 (2026-09-03, Josh: "8-15 leg H+R+RBI etc as one or more of
+       the fun tickets daily" / "I dont want to change that $25 fun money"): one 8–12 leg
+       H+R+RBI + Hits O 0.5 ladder takes $10 of the $25 when the board can seat it; the HR
+       composer gets the other $15 with one fewer seat so the day stays ≤ 5 fun tickets.
+       If the ladder cannot seat, the whole $25 goes to the HR tickets exactly as before.
+       The fun total is PAPER.fun every day, either way. */
+    const catRows = (k: string) => (((data.categories as Record<string, unknown[]> | undefined)?.[k] ?? []) as Array<Record<string, unknown>>);
+    const ladderPool: FunLegSrc[] = [...catRows("batter_hits_runs_rbis"), ...catRows("batter_hits")]
+      .filter((r) => !r.noParlay && /\bO 0\.5$/.test(String(r.sub ?? "")))
+      .map((r) => {
+        const label = String(r.label ?? "");
+        const team = /\(([A-Z]{2,3})\)\s*$/.exec(label)?.[1] ?? null;
+        const cz = r.cz == null ? null : Number(r.cz);
+        const dec = cz == null || !Number.isFinite(cz) || cz === 0 ? null : cz > 0 ? 1 + cz / 100 : 1 + 100 / Math.abs(cz);
+        return {
+          player: label.replace(/\s*\([A-Z]{2,3}\)\s*$/, ""),
+          team,
+          label,
+          prop: String(r.sub ?? ""),
+          prob: r.prob == null ? null : Number(r.prob),
+          dec,
+          cz,
+          lkey: (r.lkey as string | undefined) ?? null,
+          gkey: (r.gkey as string | undefined) ?? null,
+        };
+      });
+    const ladder = buildFunLadderTicket(ladderPool, FUN_LADDER.amount, usedLegs);
+    if (ladder) for (const l of ladder.legs) usedLegs.add(legKey(l));
+    const hrAmount = ladder ? PAPER.fun - FUN_LADDER.amount : PAPER.fun;
+    const fun = buildFunHrTickets(funPool, hrAmount, usedLegs, ladder ? FUN_SHAPE.tickets.max - 1 : FUN_SHAPE.tickets.max);
     funNote = fun.note;
-    funT = fun.tickets.map((t) => ({
+    funT = [...(ladder ? [ladder] : []), ...fun.tickets].map((t) => ({
       id: tid({ type: t.type, legs: t.legs.map((l) => ({ label: l.label, prop: l.prop })) }),
       stake: t.stake,
       prob: Math.round(t.prob * 100) / 100,
@@ -421,6 +527,9 @@ export function buildLockEntry(args: {
   /* blocked-reason histogram — the decision record on a no-bet day, present on every day;
      on block fires the day's histogram SUMS across blocks */
   const blockedReasons: Record<string, number> = { ...(carry?.blockedReasons ?? {}) };
+  /* INSTRUCTION 18: the rule counters are ALWAYS numbers on the record (0 included) */
+  blockedReasons.hrr_over_suspended = Number(blockedReasons.hrr_over_suspended ?? 0) + hrrOverDropped;
+  blockedReasons.core_shape_rules = Number(blockedReasons.core_shape_rules ?? 0) + shapeDropped;
   for (const b of alloc.blocked ?? []) {
     const r = b?.reason ?? "unknown";
     blockedReasons[r] = (blockedReasons[r] ?? 0) + 1;
@@ -437,8 +546,11 @@ export function buildLockEntry(args: {
       }
     : carry?.blocks;
 
-  const topUpAmt = primaryCard.topUp?.amount ?? 0;
-  const deployed = alloc.sum + forced.sum + topUpAmt;
+  const topUpAmt = Object.values(primaryCard.topUp).reduce((a, b) => a + b, 0);
+  const deployed = newCore.reduce((a, t) => a + Number(t.stake), 0);
+  if (deployed !== primaryCard.deployed) {
+    throw new Error(`TWO ALLOCATORS: locked card deploys $${deployed} but the cap-respecting pass computed $${primaryCard.deployed}. STOP.`);
+  }
   const entry: SyncEntry = {
     date,
     locked: true,
@@ -455,8 +567,11 @@ export function buildLockEntry(args: {
     paper: true,
     paperCfg: { daily: PAPER.daily, fun: PAPER.fun, since: PAPER.since },
     allocSum: Number(carry?.allocSum ?? 0) + deployed,
-    gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + alloc.sum,
+    gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + gatedDeployed,
     unallocated: alloc.unallocated ?? 0,
+    /* INSTRUCTION 18 rule 3: what the $25 per-ticket ceiling could not seat this fire */
+    capResidue: primaryCard.capResidue,
+    coreRules: CORE_RULES,
     /* residue top-ups across the day's fires (0 = every fire seated its budget outright) */
     topUpSum: Number((carry as { topUpSum?: number } | null | undefined)?.topUpSum ?? 0) + topUpAmt,
     core,
@@ -473,14 +588,14 @@ export function buildLockEntry(args: {
     alt: {
       selMode: ALT_MODE,
       core: altCore,
-      allocSum: Number(altPrev?.allocSum ?? 0) + altCard.alloc.sum + altCard.forced.sum + (altCard.topUp?.amount ?? 0),
-      gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.alloc.sum,
+      allocSum: Number(altPrev?.allocSum ?? 0) + altNew.reduce((a, t) => a + Number(t.stake), 0),
+      gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.alloc.picks.reduce((a, p) => a + cappedStake(p), 0),
       underShare: Math.round(altCard.underShare * 1000) / 1000,
     },
     ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0
-      ? { note: `paper day — $0 of $${daily} deployed: no CZ-playable pregame pool remained; blockedReasons is the histogram` }
+      ? { note: `paper day — $0 of $${daily} deployed: nothing cleared the CORE_RULES shape filter (≤2 legs, dec ≤2.6, no H+R+RBI overs) and the EV gate; blockedReasons is the histogram` }
       : deployed < daily
         ? {
             /* the note is DAY-AWARE (2026-08-19): a fire's shortfall names its cause AND
@@ -488,7 +603,9 @@ export function buildLockEntry(args: {
                fire's budget picks it up, and the scheduler's top-up sweep retries while
                unstarted games remain. */
             note:
-              shortfall > 0 && forcedMax === 0
+              primaryCard.capResidue > 0 && newCore.length > 0
+                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): $${primaryCard.capResidue} left unallocated because the $${CORE_RULES.maxStake} per-ticket ceiling (core rules ${CORE_RULES.since}) could not absorb it across the fire's new tickets; the deficit carries to the next fire or top-up sweep`
+                : shortfall > 0 && forcedMax === 0
                 ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the ${PAPER_TICKETS.max}-ticket day ceiling left this fire no seat and no new ticket to carry the residue`
                 : `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the CZ-playable leg-disjoint pool exhausted before the budget; the deficit carries to the next fire or top-up sweep`,
           }

@@ -70,3 +70,38 @@ export function applySuspensionLift(cfg: Record<string, unknown> | null | undefi
   cfg.hrrAltMax = SUSPENSIONS_LIFTED.hrrAltMax;
   cfg.outsSusp = SUSPENSIONS_LIFTED.outsSusp;
 }
+
+/**
+ * INSTRUCTION 18 — THE CORE RULE SET (2026-09-03, Josh's word, verbatim: "I would say
+ * change everything that you think is necessary to optimize this engine/website and get
+ * it on track to start making theoretical money. ... Lets make this app an UNSTOPPABLE
+ * theoretical money makin' machine").
+ *
+ * A PAPER-ERA RULE CHANGE, dated, so the record splits cleanly before/after 2026-09-03.
+ * Every number below is motivated by the 19 paper days 2026-08-15..09-02 (129 core
+ * tickets):
+ *   shrinkW 0.5   — model said 56.0 wins, 46 landed; HRR calibration: edge 5-10 bucket
+ *                   predicted .634 → actual .571, edge 10-20 predicted .671 → actual .443.
+ *                   Every leg prob is blended halfway to the de-vigged consensus (shrink.ts).
+ *   maxLegs 2     — 1-leg 25-22-6 (−15% ROI), 2-leg 18-32 (−18%), 3-leg 3-23 (−53%).
+ *   maxDec 2.6    — tickets settling above decimal 2.6 went 11-38 (−42%).
+ *   forcedMaxDec 1.75 — the forced pass ($915 at −27% under caesars_ev) now only tops
+ *                   up with short-priced tickets, selected by true probability.
+ *   maxStake 25   — stakes ≥ $20 ran −33..−36% ROI; stakes < $10 ran −2%. No core
+ *                   ticket, top-up included, may carry more than $25.
+ *   noHrrOver     — H+R+RBI OVER legs were 121 of 231 core legs and hit 54% vs 61%
+ *                   market-implied; they leave core (blockedReasons.hrr_over_suspended).
+ *                   HRR unders (63% vs 60%), TB unders (70% vs 63%), hits, ML, RL stay.
+ * The dk_fd basis stays: the alt ev_gated selection was worse (−35% vs −26%).
+ */
+export const CORE_RULES = {
+  since: "2026-09-03",
+  shrinkW: 0.5,
+  maxLegs: 2,
+  maxDec: 2.6,
+  forcedMaxDec: 1.75,
+  maxStake: 25,
+  noHrrOver: true,
+  /** the forced top-up selects/weights by true probability alone — not caesars_ev */
+  forcedSelMode: "probability",
+} as const;
