@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaperBanner } from "@/components/ui/PaperBanner";
 import { Panel } from "@/components/ui/Panel";
@@ -135,7 +136,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { t: Ticket & { tier?: string }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
+function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { t: Ticket & { tier?: string; confirmed?: number | null }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
   /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
      CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
   const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
@@ -159,6 +160,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
           <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
             {fmtMoney(stake)}
           </span>
+          <WonPaid t={{ stake, czDec: (t as { czDec?: number | null }).czDec ?? null, czOdds: t.czOdds ?? null, confirmed: t.confirmed ?? null }} grade={grade} />
           {t.simJoint && t.probNaive != null && Number(t.probNaive) !== Number(t.prob) && (
             <span
               className="num rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10.5px] font-bold text-pos"
@@ -511,7 +513,7 @@ export default function BuilderPage() {
     return (
       <div key={t.id}>
         <TicketCard
-          t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob } as never}
+          t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob, confirmed: t.confirmed ?? null } as never}
           stake={t.stake}
           grade={locked.grading?.tickets?.[t.id]}
           tag={t.supplemental ? (t.late ? "supplemental · late" : "supplemental") : undefined}

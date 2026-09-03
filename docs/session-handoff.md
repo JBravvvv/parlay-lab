@@ -203,6 +203,33 @@ addenda under §0.000005 (search the quoted verbatim words):**
     core tickets** (3–7 window ✓, full deployment ✓ — the first fully-working day
     under every rule).
 
+**INSTRUCTION 17 (2026-09-02, Josh's word, verbatim: "All of the parlays on builder, ledger
+etc should have 'Won' and 'Paid'") — SHIPPED 2026-09-02.** One reading on every parlay card:
+`src/lib/ticket-payout.ts` (`ticketPayout`: before a grade **Wins/Pays** = profit / total
+return at the settling price — confirmed NV beats the Caesars quote, cents rounded once like
+the calc tab; after a grade **Won/Paid** = the grader's payout, which is the TOTAL RETURN;
+lost pays $0, push returns the stake) rendered by `src/components/ui/WonPaid.tsx` on the
+builder `TicketCard` (locked CORE/FUN + candidate cards) and the ledger `TicketRow` summary
+line. The ledger's one-off "to win" math is retired (it rounded to whole dollars and read
+Caesars only when unconfirmed — same rule, now shared). `tests/ticket-payout.test.ts` (7).
+Same commit: crossings 79–80 (Rackley, Jaschinski — 08-31 refresh, found on this re-gate),
+FLOOR 78→80. THE ENGINE REVIEW Josh asked for in the same message was delivered in chat the
+same day from the PUBLIC card views (19 paper days, 08-15..09-02: core 46-77-6 −$536.81 on
+$2,530; fun 0-85 −$465) — see §0.000004 "PAPER-ERA READ 2026-09-02" below for the numbers
+that must not be re-derived.
+
+**PAPER-ERA READ 2026-09-02 (public `/api/board?date=` card views, 129 core / 87 fun tickets):**
+model said 56.0 wins on the 123 decided core tickets, 46 landed (−18% relative). By legs:
+1-leg 25-22-6 −$190 (−15%), 2-leg 18-32 −$175 (−18%), 3-leg 3-23 −$172 (−53%) — the
+coreMaxLegs:3 ceiling comment ("3+ legs went 1-25") was already the record and 26 more were
+built anyway. Gated 30-55-6 −$288 (−18%); forced 16-22 −$249 (−27%). By settling price:
+dec ≤2.6 35-39-6 −$229 (−13%); dec >2.6 11-38 −$308 (−42%). By market: HRR 19-30-6 −$232
+(55 tickets, 121 of 231 legs are HRR overs); ML 5-1 +$113 (6 tickets); K/outs 0-5 −$97.
+Calibration store (n=11,285): HRR edge[5,10] pred .634 act .571, edge[10,20] pred .671 act
+.443 — the more edge the model claims on HRR, the worse it does; HR pred .191 act .145;
+mults HR 0.656, HRR 0.81, K 0.81, outs|u 0.81. Fun: 3–7-leg HR longshots at 2.4%→0.02%
+model prob; 0-85 is the expected outcome of that shape, not a defect.
+
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
 unders — same-day vindication of instruction 6, which deployed ~1h after that card

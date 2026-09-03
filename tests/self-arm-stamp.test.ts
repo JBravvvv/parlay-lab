@@ -358,10 +358,18 @@ const CROSSINGS = [
       "(the set drifts daily, the double brake holds). Re-ran green this gate. Record: " +
       "docs/collection-period.md CROSSINGS 74-78.",
   },
+  { ump: "David Rackley", date: "2026-08-31", commit: "16cf941", kPerG: 18.0, braked: true,
+    note: "SEVENTY-NINTH. g 4->5, k 90. Caught 2026-09-02 on the rebase re-gate under the " +
+      "won/paid ship (instruction 17) — FIVE unintegrated refreshes (08-30..09-02), the " +
+      "instrument's cadence again, not the data's. Frozen: umpKFrozen true, context.json " +
+      "unchanged since 08-02 — reached no board." },
+  { ump: "Steven Jaschinski", date: "2026-08-31", commit: "16cf941", kPerG: 18.4, braked: true,
+    note: "EIGHTIETH. g 4->5, k 92. Same refresh and same re-gate as Rackley (79); armed " +
+      "mean k/g now 16.55 vs league 16.60 (n=80). Double-braked, reached no board." },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 78;
+const FLOOR = 80;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

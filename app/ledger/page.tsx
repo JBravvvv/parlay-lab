@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaperBanner } from "@/components/ui/PaperBanner";
 import { Panel } from "@/components/ui/Panel";
@@ -142,13 +143,6 @@ function TicketRow({
 }) {
   const legRes = e.grading?.legs ?? {};
   const pkOf = (gkey?: string | null) => (gkey && e.games ? e.games[gkey]?.pk ?? null : null);
-  const dec = t.confirmed != null ? undefined : t.czDec; // confirmed NV price supersedes
-  const toWin =
-    t.confirmed != null
-      ? Math.round(t.stake * ((t.confirmed > 0 ? t.confirmed / 100 : 100 / -t.confirmed) as number))
-      : dec
-        ? Math.round(t.stake * (dec - 1))
-        : null;
   return (
     <details className="group border-t border-white/[0.04] pt-2">
       <summary className="flex cursor-pointer select-none list-none flex-wrap items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
@@ -183,6 +177,7 @@ function TicketRow({
           <span className="num text-[11px] text-gold">
             {t.confirmed != null ? `${amSign(t.confirmed)} (NV)` : String(t.czOdds ?? "")}
           </span>
+          <WonPaid t={t} grade={g} />
           <GradePill g={g} />
         </div>
       </summary>
@@ -197,7 +192,6 @@ function TicketRow({
         ))}
         <div className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] pt-1.5 text-[10.5px] text-faint">
           <span>stake ${t.stake}</span>
-          {toWin != null && <span>to win ${toWin}</span>}
           {t.prob != null && <span>hit {String(t.prob)}%</span>}
           {t.tier && <span>{t.bucket === "fun" ? `FUN · ${t.tier}` : t.tier}</span>}
         </div>

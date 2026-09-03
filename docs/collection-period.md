@@ -7202,6 +7202,16 @@ cadence, not the data's (the 08-05 precedent):**
 | 77 | Chris Guccione | 2026-08-25 | `c79f211` | 5 / 66 | 13.2 |
 | 78 | Carlos Torres | 2026-08-26 | `001241a` | 5 / 89 | 17.8 |
 
+**Crossings 79–80 (recorded 2026-09-02, found on the rebase re-gate under the won/paid ship —
+five unintegrated bot refreshes 08-30..09-02; both crossed in the 08-31 refresh). Armed mean
+k/g at n=80: 16.55 vs league 16.60. Both double-braked (`umpKFrozen:true`, `context.json`
+unchanged since 08-02) — reached no board:**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 79 | David Rackley | 2026-08-31 | `16cf941` | 5 / 90 | 18.0 |
+| 80 | Steven Jaschinski | 2026-08-31 | `16cf941` | 5 / 92 | 18.4 |
+
 **SEVENTY-EIGHT armed. Armed-set mean k/g at n = 78: 16.59 vs league 16.42 (g=572,
 k=9,394) — above league (+0.17), the third consecutive read above. Still a number,
 not a signal: the set drifts daily, and the double brake keeps all of it off every
