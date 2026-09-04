@@ -1,0 +1,105 @@
+{
+  "copyright": "Copyright 2026 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+  "_source": "https://statsapi.mlb.com/api/v1/people/650333/stats?stats=byDateRange&group=hitting&startDate=2026-06-01&endDate=2026-09-03&season=2026 (captured 2026-09-03; Luis Arraez, traded PHI->SF inside the window)",
+  "stats": [
+    {
+      "type": {
+        "displayName": "byDateRange"
+      },
+      "group": {
+        "displayName": "hitting"
+      },
+      "splits": [
+        {
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "abbreviation": "MLB"
+          },
+          "numTeams": 1,
+          "numLeagues": 27,
+          "stat": {
+            "gamesPlayed": 27,
+            "atBats": 107,
+            "runs": 11,
+            "hits": 30,
+            "homeRuns": 2,
+            "rbi": 12,
+            "baseOnBalls": 3,
+            "stolenBases": 0,
+            "avg": ".280",
+            "obp": ".295",
+            "slg": ".383",
+            "ops": ".678",
+            "strikeOuts": 4,
+            "doubles": 5,
+            "triples": 0,
+            "plateAppearances": 112
+          },
+          "team": {
+            "id": 143,
+            "name": "Philadelphia Phillies"
+          }
+        },
+        {
+          "sport": {
+            "id": 1,
+            "link": "/api/v1/sports/1",
+            "abbreviation": "MLB"
+          },
+          "numTeams": 1,
+          "numLeagues": 49,
+          "stat": {
+            "gamesPlayed": 49,
+            "atBats": 202,
+            "runs": 23,
+            "hits": 66,
+            "homeRuns": 2,
+            "rbi": 20,
+            "baseOnBalls": 11,
+            "stolenBases": 5,
+            "avg": ".327",
+            "obp": ".358",
+            "slg": ".460",
+            "ops": ".818",
+            "strikeOuts": 12,
+            "doubles": 13,
+            "triples": 4,
+            "plateAppearances": 220
+          },
+          "team": {
+            "id": 137,
+            "name": "San Francisco Giants"
+          }
+        },
+        {
+          "sport": {
+            "id": 0,
+            "code": "All",
+            "link": "/api/v1/sports/0"
+          },
+          "numTeams": 2,
+          "numLeagues": 76,
+          "stat": {
+            "gamesPlayed": 76,
+            "atBats": 309,
+            "runs": 34,
+            "hits": 96,
+            "homeRuns": 4,
+            "rbi": 32,
+            "baseOnBalls": 14,
+            "stolenBases": 5,
+            "avg": ".311",
+            "obp": ".336",
+            "slg": ".434",
+            "ops": ".770",
+            "strikeOuts": 16,
+            "doubles": 18,
+            "triples": 4,
+            "plateAppearances": 332
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+ "copyright": "Copyright 2026 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+ "stats": [
+  {
+   "type": {
+    "displayName": "byDateRange"
+   },
+   "group": {
+    "displayName": "hitting"
+   },
+   "exemptions": [],
+   "splits": [
+    {
+     "stat": {
+      "gamesPlayed": 26,
+      "flyOuts": 10,
+      "groundOuts": 26,
+      "airOuts": 23,
+      "runs": 13,
+      "doubles": 3,
+      "triples": 0,
+      "homeRuns": 5,
+      "strikeOuts": 29,
+      "baseOnBalls": 9,
+      "intentionalWalks": 0,
+      "hits": 26,
+      "hitByPitch": 0,
+      "avg": ".250",
+      "atBats": 104,
+      "obp": ".310",
+      "slg": ".423",
+      "ops": ".733",
+      "caughtStealing": 1,
+      "stolenBases": 5,
+      "stolenBasePercentage": ".833",
+      "caughtStealingPercentage": ".167",
+      "groundIntoDoublePlay": 1,
+      "groundIntoTriplePlay": 0,
+      "numberOfPitches": 457,
+      "plateAppearances": 113,
+      "totalBases": 44,
+      "rbi": 15,
+      "leftOnBase": 54,
+      "sacBunts": 0,
+      "sacFlies": 0,
+      "babip": ".300",
+      "groundOutsToAirouts": "1.13",
+      "catchersInterference": 0,
+      "atBatsPerHomeRun": "20.80"
+     },
+     "team": {
+      "id": 144,
+      "name": "Atlanta Braves",
+      "link": "/api/v1/teams/144"
+     },
+     "sport": {
+      "id": 1,
+      "link": "/api/v1/sports/1",
+      "abbreviation": "MLB"
+     },
+     "numTeams": 1,
+     "numLeagues": 26
+    },
+    {
+     "stat": {
+      "gamesPlayed": 26,
+      "flyOuts": 10,
+      "groundOuts": 26,
+      "airOuts": 23,
+      "runs": 13,
+      "doubles": 3,
+      "triples": 0,
+      "homeRuns": 5,
+      "strikeOuts": 29,
+      "baseOnBalls": 9,
+      "intentionalWalks": 0,
+      "hits": 26,
+      "hitByPitch": 0,
+      "avg": ".250",
+      "atBats": 104,
+      "obp": ".310",
+      "slg": ".423",
+      "ops": ".733",
+      "caughtStealing": 1,
+      "stolenBases": 5,
+      "stolenBasePercentage": ".833",
+      "caughtStealingPercentage": ".167",
+      "groundIntoDoublePlay": 1,
+      "groundIntoTriplePlay": 0,
+      "numberOfPitches": 457,
+      "plateAppearances": 113,
+      "totalBases": 44,
+      "rbi": 15,
+      "leftOnBase": 54,
+      "sacBunts": 0,
+      "sacFlies": 0,
+      "babip": ".300",
+      "groundOutsToAirouts": "1.13",
+      "catchersInterference": 0,
+      "atBatsPerHomeRun": "20.80"
+     },
+     "team": {
+      "id": 144,
+      "name": "Atlanta Braves",
+      "link": "/api/v1/teams/144"
+     },
+     "sport": {
+      "id": 0,
+      "code": "All",
+      "link": "/api/v1/sports/0"
+     },
+     "numTeams": 1,
+     "numLeagues": 26
+    }
+   ]
+  }
+ ]
+}

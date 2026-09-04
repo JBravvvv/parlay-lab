@@ -16,6 +16,7 @@ import { getEngine, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client"
 import { useCalibration } from "@/lib/useCalibration";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import type { PickRow } from "@/engine";
+import { BoardLabel } from "@/components/player/PlayerName";
 
 /* The Sharp = the built-in quant engine's daily read. Same engine as the old
    GitHub app, running verbatim (parity-proven in tests/parity.test.ts) — free,
@@ -214,7 +215,7 @@ export default function SharpPage() {
                 <Panel key={`${r.label}|${r.sub}`} className={i === 0 ? "glow-pos" : ""}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="display text-[16px] text-text">{r.label}</div>
+                      <div className="display text-[16px] text-text"><BoardLabel label={r.label} /></div>
                       <div className="mt-0.5 text-[12px] text-muted">{r.sub}</div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -286,7 +287,7 @@ export default function SharpPage() {
                   {notOffered.map((r) => (
                     <div key={`${r.label}|${r.sub}`} className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
                       <span>
-                        <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
+                        <span className="text-text"><BoardLabel label={r.label} /></span> <span className="text-muted">{r.sub}</span>
                         {r.lu === "projected" && <span className="ml-1.5 text-[9.5px] font-bold text-gold">PROJ</span>}
                       </span>
                       <span className="num text-[11.5px] text-muted">

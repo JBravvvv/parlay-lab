@@ -33,15 +33,17 @@ export type Linescore = {
 };
 
 export type Decisions = {
-  w: { name: string; wl: string | null; era: string | null } | null;
-  l: { name: string; wl: string | null; era: string | null } | null;
-  s: { name: string; saves: number | null } | null;
+  w: { id: number; name: string; wl: string | null; era: string | null } | null;
+  l: { id: number; name: string; wl: string | null; era: string | null } | null;
+  s: { id: number; name: string; saves: number | null } | null;
 };
 
 export type ShapedGame = {
   pk: number;
   start: string;
   status: GameStatus;
+  /** 1 or 2 on a doubleheader day (schedule doubleHeader Y/S), else null */
+  gameNumber: number | null;
   detail: string;
   inning: { num: number; ordinal: string; state: string } | null;
   venue: string | null;
@@ -71,6 +73,10 @@ type ApiInningSide = { runs?: number; hits?: number; errors?: number };
 export type ApiGame = {
   gamePk: number;
   gameDate: string;
+  /** "N" single game, "Y" traditional doubleheader, "S" split doubleheader */
+  doubleHeader?: string;
+  /** 1, or 2 for the second game of a doubleheader */
+  gameNumber?: number;
   status: { abstractGameState?: string; detailedState?: string };
   teams: { away: ApiTeamSide; home: ApiTeamSide };
   linescore?: {
@@ -138,6 +144,23 @@ function amDec(v: number | string | null | undefined): number {
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /**
+ * Does a board gkey name this schedule game? The engine's gkey is
+ * "awayname@homename", with "gm1" / "gm2" appended on a doubleheader day
+ * (2026-09-03 reviewer note: the suffix used to defeat the match, so both DH
+ * games printed "—"). Strip the suffix before comparing; when it is present
+ * it must agree with the schedule's gameNumber so game 1's price never lands
+ * on game 2's card.
+ */
+export function gkeyMatches(gkey: string, g: ApiGame): boolean {
+  const k = norm(gkey);
+  const m = k.match(/gm(\d)$/);
+  const base = m ? k.slice(0, -m[0].length) : k;
+  if (base !== norm(g.teams.away.team.name) + norm(g.teams.home.team.name)) return false;
+  if (m && g.gameNumber != null && Number(m[1]) !== g.gameNumber) return false;
+  return true;
+}
+
+/**
  * Pick the board's ML rows for one team of one game. Match on the row label
  * ("New York Yankees ML") by team name, the short "NYY ML" form by abbreviation,
  * and — when the row carries a gkey — require the game to match too, so a
@@ -148,14 +171,13 @@ export function mlFor(rows: MlRow[] | undefined, g: ApiGame, sideKey: "away" | "
   const side = g.teams[sideKey];
   const nameN = norm(side.team.name);
   const abbrN = norm(side.team.abbreviation ?? "");
-  const gkey = norm(g.teams.away.team.name) + norm(g.teams.home.team.name);
   const hits = rows.filter((r) => {
     const label = norm(String(r.label ?? ""));
     if (!label.endsWith("ml")) return false;
     const team = label.slice(0, -2);
     const teamOk = team === nameN || (abbrN !== "" && team === abbrN);
     if (!teamOk) return false;
-    return r.gkey ? norm(String(r.gkey)) === gkey : true;
+    return r.gkey ? gkeyMatches(String(r.gkey), g) : true;
   });
   if (!hits.length) return null;
   const best = hits.reduce((a, b) => (amDec(b.odds) > amDec(a.odds) ? b : a));
@@ -207,10 +229,10 @@ export function linescoreOf(g: ApiGame, status: GameStatus): Linescore | null {
 function decisionsOf(g: ApiGame, status: GameStatus, stats: PitcherStatsMap): Decisions | null {
   if (status !== "final" || !g.decisions) return null;
   const d = g.decisions;
-  const wl = (p: ApiPerson) => (p ? { name: p.fullName, wl: wlOf(stats[p.id]), era: eraOf(stats[p.id]) } : null);
+  const wl = (p: ApiPerson) => (p ? { id: p.id, name: p.fullName, wl: wlOf(stats[p.id]), era: eraOf(stats[p.id]) } : null);
   const w = wl(d.winner);
   const l = wl(d.loser);
-  const s = d.save ? { name: d.save.fullName, saves: stats[d.save.id]?.saves ?? null } : null;
+  const s = d.save ? { id: d.save.id, name: d.save.fullName, saves: stats[d.save.id]?.saves ?? null } : null;
   if (!w && !l && !s) return null;
   return { w, l, s };
 }
@@ -238,6 +260,7 @@ export function shapeGame(g: ApiGame, stats: PitcherStatsMap, ml: MlRow[] | unde
   return {
     pk: g.gamePk,
     start: g.gameDate,
+    gameNumber: g.doubleHeader === "Y" || g.doubleHeader === "S" ? (g.gameNumber ?? null) : null,
     status,
     detail: g.status.detailedState ?? "",
     inning,
@@ -263,7 +286,44 @@ export function shapeGames(date: string, games: ApiGame[], stats: PitcherStatsMa
   return { date, games: shaped, counts };
 }
 
-/* ---------- date strip (client + server share it) ---------- */
+/* ---------- season window + date rail (client + server share it) ---------- */
+
+/**
+ * The Games tab's calendar (2026-09-03, Josh, verbatim): "the list should keep
+ * going through the last regular season game of the year which is Sunday Sept
+ * 27 … Only games from Sept 1 on need to be included in this tab." Inclusive
+ * on both ends; /api/games rejects anything outside it and the page clamps a
+ * URL date into it.
+ */
+export const SEASON_WINDOW = { start: "2026-09-01", end: "2026-09-27" } as const;
+
+export const inSeasonWindow = (date: string): boolean => date >= SEASON_WINDOW.start && date <= SEASON_WINDOW.end;
+
+/** the nearest in-window date (string compare is safe on YYYY-MM-DD) */
+export function clampToWindow(date: string): string {
+  if (date < SEASON_WINDOW.start) return SEASON_WINDOW.start;
+  if (date > SEASON_WINDOW.end) return SEASON_WINDOW.end;
+  return date;
+}
+
+/** every calendar day of the window, start → end, as YYYY-MM-DD; pure UTC arithmetic */
+export function seasonDates(win: { start: string; end: string } = SEASON_WINDOW): string[] {
+  const [y, m, d] = win.start.split("-").map(Number);
+  const out: string[] = [];
+  for (let i = 0; ; i++) {
+    const s = new Date(Date.UTC(y, m - 1, d + i)).toISOString().slice(0, 10);
+    if (s > win.end) break;
+    out.push(s);
+  }
+  return out;
+}
+
+/** "Tue 9/1" — the rail label */
+export function railLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const wd = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
+  return `${wd} ${m}/${d}`;
+}
 
 /** `date` ± n calendar days, as YYYY-MM-DD strings; pure string arithmetic. */
 export function dateStrip(date: string, n = 2): string[] {

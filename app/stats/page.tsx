@@ -13,6 +13,7 @@ import { CalibrationPanel } from "@/components/stats/CalibrationPanel";
 import { ClvPanel } from "@/components/stats/ClvPanel";
 import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
+import { PlayerName } from "@/components/player/PlayerName";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -335,7 +336,11 @@ export default function StatsPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={lg} alt="" className="h-[16px] w-[16px] shrink-0 object-contain" loading="lazy" />
               )}
-              <span className="truncate">{r.name}</span>
+              {tableSport === "mlb" && scope === "ind" ? (
+                <PlayerName id={Number(r.id)} name={r.name} team={r.team} className="truncate" />
+              ) : (
+                <span className="truncate">{r.name}</span>
+              )}
             </span>
           );
         },

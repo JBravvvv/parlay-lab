@@ -29,6 +29,8 @@ import { CzInfo } from "@/components/ui/CzInfo";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
+import { BoardLabel, PlayerName } from "@/components/player/PlayerName";
+import { parseBoardLabel } from "@/lib/player-card";
 
 const CAT_LABELS: Record<string, string> = {
   all: "TOP 50",
@@ -167,7 +169,7 @@ export default function BoardPage() {
           return (
             <div className={r.susp ? "opacity-50" : undefined}>
               <div className="font-medium text-text">
-                {r.label}
+                <BoardLabel label={r.label} />
                 <CzInfo pickKey={`${r.label}|${r.sub}`} offered={!cz.isHidden(`${r.label}|${r.sub}`)} onToggle={cz.toggle} />
               </div>
               <div className="text-[11px] text-muted">{r.sub}</div>
@@ -470,7 +472,7 @@ export default function BoardPage() {
                         <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />
                       </td>
                       <td className="py-1.5 pr-2 text-text">
-                        {p.player}{" "}
+                        {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
                         <span className="text-muted">
                           {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
                         </span>

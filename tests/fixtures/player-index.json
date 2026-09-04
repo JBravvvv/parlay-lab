@@ -1,0 +1,104 @@
+{
+ "people": [
+  {
+   "id": 682668,
+   "fullName": "Luisangel Acuña",
+   "currentTeam": {
+    "id": 145
+   },
+   "primaryPosition": {
+    "abbreviation": "SS"
+   }
+  },
+  {
+   "id": 660670,
+   "fullName": "Ronald Acuña Jr.",
+   "currentTeam": {
+    "id": 144
+   },
+   "primaryPosition": {
+    "abbreviation": "RF"
+   }
+  },
+  {
+   "id": 624413,
+   "fullName": "Pete Alonso",
+   "currentTeam": {
+    "id": 110
+   },
+   "primaryPosition": {
+    "abbreviation": "1B"
+   }
+  },
+  {
+   "id": 543037,
+   "fullName": "Gerrit Cole",
+   "currentTeam": {
+    "id": 147
+   },
+   "primaryPosition": {
+    "abbreviation": "P"
+   }
+  },
+  {
+   "id": 592450,
+   "fullName": "Aaron Judge",
+   "currentTeam": {
+    "id": 147
+   },
+   "primaryPosition": {
+    "abbreviation": "RF"
+   }
+  },
+  {
+   "id": 592518,
+   "fullName": "Manny Machado",
+   "currentTeam": {
+    "id": 135
+   },
+   "primaryPosition": {
+    "abbreviation": "3B"
+   }
+  },
+  {
+   "id": 660271,
+   "fullName": "Shohei Ohtani",
+   "currentTeam": {
+    "id": 119
+   },
+   "primaryPosition": {
+    "abbreviation": "TWP"
+   }
+  },
+  {
+   "id": 608070,
+   "fullName": "José Ramírez",
+   "currentTeam": {
+    "id": 114
+   },
+   "primaryPosition": {
+    "abbreviation": "3B"
+   }
+  },
+  {
+   "id": 694973,
+   "fullName": "Paul Skenes",
+   "currentTeam": {
+    "id": 134
+   },
+   "primaryPosition": {
+    "abbreviation": "P"
+   }
+  },
+  {
+   "id": 677951,
+   "fullName": "Bobby Witt Jr.",
+   "currentTeam": {
+    "id": 118
+   },
+   "primaryPosition": {
+    "abbreviation": "SS"
+   }
+  }
+ ]
+}

@@ -1,0 +1,76 @@
+{
+ "copyright": "Copyright 2026 MLB Advanced Media, L.P.  Use of any content on this page acknowledges agreement to the terms posted here http://gdx.mlb.com/components/copyright.txt",
+ "stats": [
+  {
+   "type": {
+    "displayName": "season"
+   },
+   "group": {
+    "displayName": "hitting"
+   },
+   "exemptions": [],
+   "splits": [
+    {
+     "season": "2026",
+     "stat": {
+      "age": 28,
+      "gamesPlayed": 87,
+      "groundOuts": 76,
+      "airOuts": 85,
+      "runs": 50,
+      "doubles": 13,
+      "triples": 1,
+      "homeRuns": 14,
+      "strikeOuts": 90,
+      "baseOnBalls": 47,
+      "intentionalWalks": 2,
+      "hits": 80,
+      "hitByPitch": 5,
+      "avg": ".243",
+      "atBats": 329,
+      "obp": ".345",
+      "slg": ".416",
+      "ops": ".761",
+      "caughtStealing": 8,
+      "stolenBases": 20,
+      "stolenBasePercentage": ".714",
+      "caughtStealingPercentage": ".286",
+      "groundIntoDoublePlay": 2,
+      "numberOfPitches": 1554,
+      "plateAppearances": 383,
+      "totalBases": 137,
+      "rbi": 39,
+      "leftOnBase": 117,
+      "sacBunts": 0,
+      "sacFlies": 2,
+      "babip": ".291",
+      "groundOutsToAirouts": "0.89",
+      "catchersInterference": 0,
+      "atBatsPerHomeRun": "23.50"
+     },
+     "team": {
+      "id": 144,
+      "name": "Atlanta Braves",
+      "link": "/api/v1/teams/144"
+     },
+     "player": {
+      "id": 660670,
+      "fullName": "Ronald Acuña Jr.",
+      "link": "/api/v1/people/660670"
+     },
+     "league": {
+      "id": 104,
+      "name": "National League",
+      "link": "/api/v1/league/104"
+     },
+     "sport": {
+      "id": 1,
+      "link": "/api/v1/sports/1",
+      "abbreviation": "MLB"
+     },
+     "gameType": "R"
+    }
+   ]
+  }
+ ]
+}

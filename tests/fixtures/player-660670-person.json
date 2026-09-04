@@ -1,0 +1,57 @@
+{
+ "people": [
+  {
+   "id": 660670,
+   "fullName": "Ronald Acuña Jr.",
+   "primaryNumber": "13",
+   "currentAge": 28,
+   "active": true,
+   "currentTeam": {
+    "id": 144,
+    "name": "Atlanta Braves",
+    "link": "/api/v1/teams/144"
+   },
+   "primaryPosition": {
+    "code": "9",
+    "name": "Outfielder",
+    "type": "Outfielder",
+    "abbreviation": "RF"
+   },
+   "batSide": {
+    "code": "R",
+    "description": "Right"
+   },
+   "pitchHand": {
+    "code": "R",
+    "description": "Right"
+   },
+   "rosterEntries": [
+    {
+     "jerseyNumber": "13",
+     "position": {
+      "code": "9",
+      "name": "Outfielder",
+      "type": "Outfielder",
+      "abbreviation": "RF"
+     },
+     "status": {
+      "code": "A",
+      "description": "Active"
+     },
+     "team": {
+      "id": 144,
+      "name": "Atlanta Braves",
+      "link": "/api/v1/teams/144",
+      "abbreviation": "ATL",
+      "teamName": "Braves",
+      "locationName": "Atlanta"
+     },
+     "isActive": true,
+     "startDate": "2018-04-25",
+     "statusDate": "2026-07-27",
+     "isActiveFortyMan": true
+    }
+   ]
+  }
+ ]
+}

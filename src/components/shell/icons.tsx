@@ -3,13 +3,25 @@
 type P = { className?: string };
 const base = "h-[20px] w-[20px]";
 
-export function IconDash({ className = "" }: P) {
+/** Games — a calendar tile, today's slate. */
+export function IconGames({ className = "" }: P) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
-      <rect x="3" y="3" width="7.5" height="9" rx="1.5" />
-      <rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5" />
-      <rect x="13.5" y="12" width="7.5" height="9" rx="1.5" />
-      <rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5" />
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+      <circle cx="8.5" cy="15" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="15" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="15" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+/** Parlay Builder — stacked legs on one ticket. */
+export function IconParlay({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h5M8 12h5M8 16h5" />
+      <path d="M15.5 8l1 1 1.7-2M15.5 12l1 1 1.7-2M15.5 16l1 1 1.7-2" />
     </svg>
   );
 }

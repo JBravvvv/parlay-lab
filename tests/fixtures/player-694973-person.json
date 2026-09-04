@@ -1,0 +1,57 @@
+{
+ "people": [
+  {
+   "id": 694973,
+   "fullName": "Paul Skenes",
+   "primaryNumber": "30",
+   "currentAge": 24,
+   "active": true,
+   "currentTeam": {
+    "id": 134,
+    "name": "Pittsburgh Pirates",
+    "link": "/api/v1/teams/134"
+   },
+   "primaryPosition": {
+    "code": "1",
+    "name": "Pitcher",
+    "type": "Pitcher",
+    "abbreviation": "P"
+   },
+   "batSide": {
+    "code": "R",
+    "description": "Right"
+   },
+   "pitchHand": {
+    "code": "R",
+    "description": "Right"
+   },
+   "rosterEntries": [
+    {
+     "jerseyNumber": "30",
+     "position": {
+      "code": "1",
+      "name": "Pitcher",
+      "type": "Pitcher",
+      "abbreviation": "P"
+     },
+     "status": {
+      "code": "A",
+      "description": "Active"
+     },
+     "team": {
+      "id": 134,
+      "name": "Pittsburgh Pirates",
+      "link": "/api/v1/teams/134",
+      "abbreviation": "PIT",
+      "teamName": "Pirates",
+      "locationName": "Pittsburgh"
+     },
+     "isActive": true,
+     "startDate": "2024-05-11",
+     "statusDate": "2026-04-16",
+     "isActiveFortyMan": true
+    }
+   ]
+  }
+ ]
+}

@@ -23,6 +23,7 @@ import { CAL_START } from "@/engine2/calibration";
 import { marketOf } from "@/lib/ledger-segments";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
+import { BoardLabel } from "@/components/player/PlayerName";
 
 /* ---------- engine card types ---------- */
 type CardPick = { id: string; stake: number; kelly?: number | null; tier?: number; w: { pl: Ticket & { tier?: string; fair?: string } } };
@@ -220,7 +221,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
         {t.legs.map((l, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11.5px]">
             <span className="text-muted">
-              <span className="text-text">{l.label}</span> {l.prop}
+              <span className="text-text"><BoardLabel label={l.label} /></span> {l.prop}
               {(l as { lu?: string }).lu === "projected" && (
                 <span
                   className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold text-gold"
@@ -1004,7 +1005,7 @@ export default function BuilderPage() {
                     return (
                       <div key={`${r.label}|${r.sub}`} className="flex items-center justify-between gap-2 text-[12.5px]">
                         <span>
-                          <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
+                          <span className="text-text"><BoardLabel label={r.label} /></span> <span className="text-muted">{r.sub}</span>
                           {worst && (
                             <span className="ml-2 rounded-full border border-neg/40 bg-neg/10 px-2 py-0.5 text-[9.5px] font-bold text-neg">
                               WORST PRICE VS FAIR

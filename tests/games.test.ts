@@ -10,8 +10,25 @@
  * the record string, ML matching by team name (and a game with no board), linescore
  * totals, and the live → upcoming → final ordering.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { dateStrip, fmtAm, mapStatus, mlFor, pitcherIds, shapeGames, type ApiGame, type MlRow } from "@/lib/games";
+import {
+  SEASON_WINDOW,
+  clampToWindow,
+  dateStrip,
+  fmtAm,
+  gkeyMatches,
+  inSeasonWindow,
+  mapStatus,
+  mlFor,
+  pitcherIds,
+  railLabel,
+  seasonDates,
+  shapeGames,
+  type ApiGame,
+  type MlRow,
+} from "@/lib/games";
 
 const side = (id: number, name: string, abbr: string, w: number, l: number, extra: Record<string, unknown> = {}) => ({
   team: { id, name, abbreviation: abbr, teamName: name.split(" ").pop() },
@@ -167,10 +184,11 @@ describe("games: shaping", () => {
     expect(byPk[3].home.score).toBeNull();
     expect(byPk[2].inning).toEqual({ num: 1, ordinal: "1st", state: "Top" });
     expect(byPk[1].inning).toBeNull();
+    // 2026-09-03 (integration): decisions carry the MLB person id so the list's W/L/S names open the profile sheet by id
     expect(byPk[1].decisions).toEqual({
-      w: { name: "Khristian Curtis", wl: "1-0", era: "1.64" },
-      l: { name: "Blade Tidwell", wl: "0-2", era: "4.43" },
-      s: { name: "Mason Montgomery", saves: 8 },
+      w: { id: 11, name: "Khristian Curtis", wl: "1-0", era: "1.64" },
+      l: { id: 10, name: "Blade Tidwell", wl: "0-2", era: "4.43" },
+      s: { id: 12, name: "Mason Montgomery", saves: 8 },
     });
     expect(byPk[2].decisions).toBeNull();
     expect(byPk[1].broadcasts).toEqual(["NBCS BA", "SNP"]);
@@ -200,5 +218,66 @@ describe("games: helpers", () => {
 
   it("builds the ±2 day strip across a month boundary", () => {
     expect(dateStrip("2026-09-01")).toEqual(["2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03"]);
+  });
+});
+
+/**
+ * SEASON WINDOW + DOUBLEHEADER GKEY (2026-09-03). Josh, verbatim: "the list should
+ * keep going through the last regular season game of the year which is Sunday Sept
+ * 27 … Only games from Sept 1 on need to be included in this tab."
+ */
+describe("games: season window", () => {
+  it("runs 2026-09-01 through 2026-09-27 inclusive — 27 days, Sunday last", () => {
+    expect(SEASON_WINDOW).toEqual({ start: "2026-09-01", end: "2026-09-27" });
+    const days = seasonDates();
+    expect(days).toHaveLength(27);
+    expect(days[0]).toBe("2026-09-01");
+    expect(days[26]).toBe("2026-09-27");
+    expect(railLabel("2026-09-01")).toBe("Tue 9/1");
+    expect(railLabel("2026-09-27")).toBe("Sun 9/27");
+  });
+
+  it("clamps an off-range date to the nearest edge and flags membership", () => {
+    expect(inSeasonWindow("2026-08-31")).toBe(false);
+    expect(inSeasonWindow("2026-09-01")).toBe(true);
+    expect(inSeasonWindow("2026-09-27")).toBe(true);
+    expect(inSeasonWindow("2026-09-28")).toBe(false);
+    expect(clampToWindow("2026-08-15")).toBe("2026-09-01");
+    expect(clampToWindow("2026-10-01")).toBe("2026-09-27");
+    expect(clampToWindow("2026-09-14")).toBe("2026-09-14");
+  });
+});
+
+describe("games: doubleheader gkeys", () => {
+  const dh = (n: number): ApiGame => ({ ...EARLIER, gamePk: 100 + n, gameNumber: n, doubleHeader: "S" });
+
+  it("strips a trailing gm1/gm2 and pins it to the schedule's gameNumber", () => {
+    expect(gkeyMatches("athletics@seattlemariners", EARLIER)).toBe(true);
+    expect(gkeyMatches("athletics@seattlemariners gm1", dh(1))).toBe(true);
+    expect(gkeyMatches("athletics@seattlemariners gm2", dh(1))).toBe(false);
+    expect(gkeyMatches("athletics@seattlemariners gm2", dh(2))).toBe(true);
+    expect(gkeyMatches("athletics@texasrangers gm1", dh(1))).toBe(false);
+  });
+
+  it("game 1's price lands on game 1 only", () => {
+    const rows: MlRow[] = [
+      { label: "Athletics ML", odds: -110, book: "DK", gkey: "athletics@seattlemariners gm1" },
+      { label: "Athletics ML", odds: "+130", book: "FD", gkey: "athletics@seattlemariners gm2" },
+    ];
+    expect(mlFor(rows, dh(1), "away")).toEqual({ odds: "-110", book: "DK", cz: null });
+    expect(mlFor(rows, dh(2), "away")).toEqual({ odds: "+130", book: "FD", cz: null });
+  });
+});
+
+describe("2026-09-03 polish pins", () => {
+  it("shapeGames carries gameNumber only on doubleheader days", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/lib/games.ts"), "utf8");
+    expect(src).toMatch(/gameNumber: g\.doubleHeader === "Y" \|\| g\.doubleHeader === "S"/);
+    const page = fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8");
+    expect(page).toMatch(/Game \{g\.gameNumber\}/);
+  });
+  it("blown saves are not coloured as wins in the pitching box", () => {
+    const src = fs.readFileSync(path.join(process.cwd(), "src/components/games/PitchingBox.tsx"), "utf8");
+    expect(src).toMatch(/\(L\|BS\)/);
   });
 });

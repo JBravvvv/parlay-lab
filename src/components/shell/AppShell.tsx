@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import {
   IconBoard,
   IconBuilder,
   IconCalc,
-  IconDash,
+  IconGames,
   IconLedger,
+  IconParlay,
   IconSettings,
   IconSharp,
   IconSim,
@@ -17,20 +18,35 @@ import {
 import { VideoBackdrop } from "./VideoBackdrop";
 import { useLedgerSyncBeacon } from "@/lib/ledgerSync";
 
-const NAV = [
-  { href: "/", label: "Dashboard", icon: IconDash, mobile: true },
-  { href: "/stats", label: "Stats", icon: IconStats, mobile: true },
-  { href: "/games", label: "Games", icon: IconBoard, mobile: true },
-  { href: "/board", label: "Board", icon: IconBoard, mobile: true },
-  { href: "/sharp", label: "The Sharp", icon: IconSharp, mobile: true },
-  { href: "/builder", label: "Builder", icon: IconBuilder, mobile: true },
-  { href: "/props", label: "Parlay Builder", icon: IconBoard, mobile: true },
-  { href: "/ledger", label: "Ledger", icon: IconLedger, mobile: true },
-  { href: "/calc", label: "Calc", icon: IconCalc, mobile: true },
-  { href: "/simulator", label: "Simulator", icon: IconSim, mobile: false },
-  { href: "/settings", label: "Settings", icon: IconSettings, mobile: false },
-] as const;
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  /** desktop side rail: "top" sits under the brand, "bottom" is pinned above the footer */
+  group: "top" | "bottom";
+  /** shows in the mobile bottom tab bar; everything else lands in the mobile top-bar icon row */
+  mobile: boolean;
+  /** shorter label for the 9.5px bottom-bar type (six tabs at 375px) */
+  mobileLabel?: string;
+};
 
+// Order is Josh's, verbatim (2026-09-03): "Games, Stats, Board, Builder, Parlay Builder,
+// Parlay Calculator (formerly Calc) on Top Left & Ledger, The Sharp, Simulator, Settings
+// on Bottom Left." Dashboard is gone — the brand logo already links "/".
+const NAV: readonly NavItem[] = [
+  { href: "/games", label: "Games", icon: IconGames, group: "top", mobile: true },
+  { href: "/stats", label: "Stats", icon: IconStats, group: "top", mobile: true },
+  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true },
+  { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true },
+  { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true, mobileLabel: "Parlays" },
+  { href: "/calc", label: "Parlay Calculator", icon: IconCalc, group: "top", mobile: false },
+  { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true },
+  { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "bottom", mobile: false },
+  { href: "/simulator", label: "Simulator", icon: IconSim, group: "bottom", mobile: false },
+  { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false },
+];
+
+// "/" is the landing and is never a rail entry, so it is never highlighted.
 function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
 }
@@ -41,6 +57,22 @@ function Brand() {
       <span className="text-[15px] font-bold tracking-tight text-text">PARLAY</span>
       <span className="text-gradient text-[15px] font-bold">//</span>
       <span className="text-[15px] font-bold tracking-tight text-text">LAB</span>
+    </Link>
+  );
+}
+
+function RailLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const { href, label, icon: Icon } = item;
+  const active = isActive(pathname, href);
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-(--dur-fast) ${
+        active ? "bg-pos/10 text-pos" : "text-muted hover:bg-white/[0.05] hover:text-text"
+      }`}
+    >
+      <Icon className={active ? "text-pos" : "text-faint"} />
+      {label}
     </Link>
   );
 }
@@ -59,7 +91,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           navigation); data pages get a dark scrim, the landing runs it raw */}
       <VideoBackdrop fixed scrim={!landing} />
 
-      {/* desktop side rail */}
+      {/* desktop side rail — two groups: the work tabs under the brand, the
+          bookkeeping/tools tabs pinned above the footer */}
       <aside className={`fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl ${landing ? "" : "md:flex"}`}>
         <div className="px-4 py-4">
           <Brand />
@@ -67,24 +100,18 @@ export function AppShell({ children }: { children: ReactNode }) {
             Betting terminal
           </div>
         </div>
-        <nav className="mt-2 flex flex-1 flex-col gap-0.5 px-2">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium transition-colors duration-(--dur-fast) ${
-                  active
-                    ? "bg-pos/10 text-pos"
-                    : "text-muted hover:bg-white/[0.05] hover:text-text"
-                }`}
-              >
-                <Icon className={active ? "text-pos" : "text-faint"} />
-                {label}
-              </Link>
-            );
-          })}
+        <nav className="mt-2 flex flex-1 flex-col px-2">
+          <div className="flex flex-col gap-0.5">
+            {NAV.filter((n) => n.group === "top").map((item) => (
+              <RailLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </div>
+          <div className="flex-1" aria-hidden />
+          <div className="flex flex-col gap-0.5 border-t border-white/[0.05] pb-2 pt-2">
+            {NAV.filter((n) => n.group === "bottom").map((item) => (
+              <RailLink key={item.href} item={item} pathname={pathname} />
+            ))}
+          </div>
         </nav>
         <div className="border-t border-line px-4 py-3 text-[10px] text-faint">
           MLB · informational only, not betting advice
@@ -92,27 +119,26 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* mobile top bar — reserves the iOS status-bar inset (the app draws
-          edge-to-edge under it); max() keeps the normal padding in browsers */}
+          edge-to-edge under it); max() keeps the normal padding in browsers.
+          Every route that is not a bottom tab gets an icon here, so all ten
+          pages stay reachable on a phone. */}
       <header
         className={`sticky top-0 z-30 items-center justify-between border-b border-white/[0.05] bg-bg/70 px-4 pb-3 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
         style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
       >
         <Brand />
-        <div className="flex items-center gap-1">
-          <Link
-            href="/simulator"
-            aria-label="Simulator"
-            className={`rounded-lg p-2 ${isActive(pathname, "/simulator") ? "text-pos" : "text-muted"}`}
-          >
-            <IconSim />
-          </Link>
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className={`rounded-lg p-2 ${isActive(pathname, "/settings") ? "text-pos" : "text-muted"}`}
-          >
-            <IconSettings />
-          </Link>
+        <div className="flex items-center gap-0.5">
+          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              title={label}
+              className={`rounded-lg p-2 ${isActive(pathname, href) ? "text-pos" : "text-muted"}`}
+            >
+              <Icon />
+            </Link>
+          ))}
         </div>
       </header>
 
@@ -134,18 +160,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           gridTemplateColumns: `repeat(${NAV.filter((n) => n.mobile).length}, minmax(0, 1fr))`,
         }}
       >
-        {NAV.filter((n) => n.mobile).map(({ href, label, icon: Icon }) => {
+        {NAV.filter((n) => n.mobile).map(({ href, label, mobileLabel, icon: Icon }) => {
           const active = isActive(pathname, href);
           return (
             <Link
               key={href}
               href={href}
+              aria-label={label}
               className={`flex flex-col items-center gap-0.5 py-2 text-[9.5px] font-semibold ${
                 active ? "text-pos" : "text-faint"
               }`}
             >
               <Icon />
-              {label}
+              {mobileLabel ?? label}
             </Link>
           );
         })}

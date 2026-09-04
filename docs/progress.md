@@ -1,3 +1,45 @@
+# Progress — 2026-09-03 (integration: player sheet on Games + Parlay Builder)
+
+## Click-any-player wired into the Games surfaces and the rebuilt Parlay Builder
+- Games list (app/games/page.tsx): probable pitchers and the W / L / S decisions are tappable
+  surnames that open the profile sheet by MLB id. src/lib/games.ts `Decisions` now carries
+  `id` (the schedule feed's person.id) so the list never has to resolve a name; the
+  tests/games.test.ts decisions pin was updated with a dated note. The card is a `<Link>`,
+  so PlayerName now calls `preventDefault()` as well as `stopPropagation()` — a name tap
+  opens the sheet and does not navigate (verified live: tapping "Williamson" on 9/2's
+  SD @ CIN card opened Brandon Williamson · CIN · P · 5.94 ERA with the URL unchanged).
+- Box score (src/components/games/BoxHeader.tsx, BattingBox.tsx, PitchingBox.tsx): every
+  batter and pitcher line, the W / L / S line and the pregame probables render PlayerName
+  with the boxscore's person.id; the printed text is still the feed's boxscoreName.
+- Parlay Builder (src/components/props/PlayerRow.tsx, Slip.tsx): the player row's name is
+  PlayerName with name + team (propBoard rows carry no MLB id; the sheet resolves through
+  /api/player/resolve — "Gunnar Henderson" + BAL → 683002 via exact). Slip legs print their
+  "Name (TEAM)" label through BoardLabel; ML / RL club labels stay plain text.
+- tests/player-wiring.test.ts (new, 4 pins): each surface imports and renders the tappable
+  name, box score names pass the id, list decisions are id-keyed, PlayerName prevents the
+  Link default. Full gate re-run after integration (see the session handoff for the line).
+- Dev-server caveat seen while verifying: with the full vitest run pegging the CPU
+  (load ~13), client hydration of /games and /games/[gamePk] stalled at the Suspense
+  fallback for tens of seconds; the SSR stream itself was complete (S:1 / S:2 chunks
+  present) and the pages hydrated once the load dropped.
+
+# Progress — 2026-09-03 (nav reorder)
+
+## Nav reorder — Josh's verbatim tab order, Dashboard removed
+- src/components/shell/AppShell.tsx: NAV is now a typed table with `group` (top | bottom) and
+  `mobile`. Desktop rail: Games, Stats, Board, Builder, Parlay Builder, Parlay Calculator under
+  the brand; flex spacer; Ledger, The Sharp, Simulator, Settings pinned above the footer
+  disclaimer. Dashboard entry deleted (brand logo still links "/"; "/" is never highlighted).
+- Mobile (375px): bottom bar = Games, Stats, Board, Builder, Parlays, Ledger (6 columns, grid
+  still derived from the mobile entry count). Parlay Calculator, The Sharp, Simulator, Settings
+  render as icons in the mobile top bar, derived from the same table (`!n.mobile`), so every
+  route stays reachable on a phone.
+- src/components/shell/icons.tsx: +IconGames (calendar), +IconParlay (ticket with checked
+  legs) so Games / Board / Parlay Builder no longer share one glyph; IconDash removed.
+- tests/nav.test.ts (new, 11 pins): rail order per group, no Dashboard, "Parlay Calculator"
+  label, bottom-group contents, mobile tab set + ≤9-char labels, top-bar derivation.
+  tests/parlay-calc.test.ts AppShell pin updated to the new label / top-bar placement.
+
 # Progress — 2026-07-24 (session end)
 
 ## Status: parlay-lab-hardening-instructions.md — ALL 4 PHASES DONE, deployed
@@ -59,6 +101,51 @@ an exit condition fires. Do not tune weights/gates/caps — check collection-per
   `git pull --rebase origin frontend-rebuild` before push; purge iCloud dupes with
   `find . -name "* [0-9].*" -not -path "./node_modules/*" -delete`.
 - Browser pane: unfocused clicks/form_input may not fire React handlers — DOM .click().
+
+## 2026-09-03 — PARLAY BUILDER UI REBUILD (density pass on /props)
+Josh's word, verbatim: "We need a massive UI rebuild on the 'parlay builder' tab. It looks EXTREMELY visually unappealing and I would hate to spend an hour looking at that building parlays. The tabs could be on two scrolls where you press on it still but can scroll the furthest ones like 1st 3 innings & 1st 5 innings from right to left. Actual pick choices on batter props tabs like 'Pete Alonso', 'Gunnar Henderson' when looking at their total bases, HRs etc are WAY TOO BIG." Display-only: `app/props/page.tsx` rewritten on top of a new `src/components/props/` (props-model.ts = the MARKETS/TABS tables and sidePrice/sideProb/sideLabel/oppRow/bothSides/groupByGame/legId moved verbatim; MarketNav = sticky segmented control + horizontally scrolling snap pill rail with a right-edge fade + 36px search; PlayerRow = 28px headshot, one-line name/team, two 32px O/U buttons with the win % and its model/mkt tag; GameCard = 36px collapsible header with 20px logos; Slip = collapsed bottom-sheet handle, ≤45vh when open, same combineTicket math plus Fair = the true % as an american price via decToAm). Measured from class sizes, not a screenshot: a batter row went from ≈102px to 41px, so a 375×812 phone shows ≈11 rows in Safari (≈10 in the installed PWA once the 34px home-indicator inset and the taller standalone top bar are counted) where it showed 4. Review pass the same day: O/U buttons narrowed 86→80px and the team tag moved under the name so the name column is ≈127px ("Gunnar Henderson" ≈106px renders whole; truncation is the last resort); Clear is a sibling button, not nested in the handle; Fair relabelled "Fair (true)" with a footnote that it is the break-even price, not a quote; insets read in a layout effect (no first-frame jump); slip aligned to the content column on md+; `tests/props-model.test.ts` runs the helpers on synthetic rows (CZ-first pricing, 100−% under flip, leg id/sub format, away-first order). No engine, ticket-math, board or feed code touched; every price still renders through amFmt from the board's posted quotes. Pins: `tests/props-ui.test.ts` (24 source-scan tests: same imports/helpers, snap rail, h-7 headshots, no fixed bottom-[64px] wall, copy preserved).
+
+## 2026-09-03 — CLICK-ANY-PLAYER PROFILE SHEET (Roster Lab-style card on every name)
+Josh, verbatim: "On the Stats tab and any other tab that lists a players name, you should be
+able to click on that players name & pull up a page that is identical to their Roster Lab
+profile." Roster Lab's card is fed by an ESPN fantasy league (FPTS, rank, % rostered, draft
+line, Rotowire news); Parlay Lab has none of that, so every figure is the MLB Stats API
+equivalent, labelled as such — nothing is invented and no fantasy fact is imitated.
+- `src/lib/player-card.ts` (pure): name normalisation (accents / punctuation / Jr.), the
+  "Name (TEAM)" label parser (club rows stay plain), the season-index resolver (exact →
+  team-disambiguated → last-name + initial; ambiguity returns null, a 404 beats a wrong
+  player), PT-date windows, and `shapeCard` — tiles OPS/HR/AVG (hitters) or ERA/K/WHIP
+  (pitchers), split table season + last 7/15/30 days via `stats=byDateRange`, per-game
+  bar chart (TB or K, last 30 days) and the newest-first game log from `stats=gameLog`
+  (hitters' per-game OBP/SLG computed from the game's own counts; the feed's rate fields
+  on a gameLog split are season-to-date). Roster status from the person's active
+  `rosterEntries` entry (Active / Injured 15-Day / Injured 60-Day …), or "not posted".
+- `app/api/player?id=` (card, 300 s cache) and `app/api/player/resolve?name=&team=`
+  (in-memory season index, 24 h) — statsapi only, no secrets.
+- `src/components/player/PlayerSheet.tsx` (provider + sheet: swipe-down, Escape, backdrop,
+  sticky identity header, tiles, split table, chart, game log, footer) and
+  `PlayerName.tsx` / `BoardLabel` (one-line swap at any name). Mounted in `app/providers.tsx`.
+- Wired: Stats table player cell (id passed straight through), Board pick labels + the
+  day's stamped picks, Builder ticket legs + manual slip, The Sharp plays + not-offered,
+  Parlays legs, Pitcher vs Team rows + picker chip. No number, sort or business logic
+  touched on any of them. Props / Games are wired by the integration step (other lanes).
+- OMITTED, honestly: the "Recent news" section. No free MLB-id-keyed news feed exists;
+  ESPN's athlete news needs an ESPN id mapping Parlay Lab does not have. Nothing fabricated.
+- `tests/player-card.test.ts` (fixtures `tests/fixtures/player-*.json` = trimmed real
+  statsapi responses captured 2026-09-03: Acuña 660670 hitting, Skenes 694973 pitching,
+  a 10-player index slice).
+- Review fixes (same day): `pickSplit` prefers the COMBINED byDateRange split (numTeams 2,
+  no team) — statsapi lists per-team partials first for a player traded inside the window
+  (real pin: Luis Arraez 650333, 2026-06-01..09-03, PHI 27 G / 107 AB vs combined
+  76 G / 309 AB, `tests/fixtures/player-650333-window.json`); an MLB 404 on `/people/{id}`
+  is now an honest 404 from `/api/player` (was 502); the day's stamped picks pass the
+  team parsed off their "Name (TEAM)" label (duplicate names like Max Muncy resolve);
+  the sheet pins the Split / Date column (`sticky left-0`) like Pitcher vs Team, always
+  renders the chart section (single bar OK, "No games in the last 30 days." when empty)
+  and fills bars from `var(--color-pos)`.
+
+## 2026-09-03 — INSTRUCTION 21 (Games lane): season-long date rail + clickable box scores
+Josh's word, verbatim: "On the Games tab, the list should keep going through the last regular season game of the year which is Sunday Sept 27. You should also be able to click on any game to see the box score. Only games from Sept 1 on need to be included in this tab." `SEASON_WINDOW` = 2026-09-01..2026-09-27 inclusive (`src/lib/games.ts`: `seasonDates`, `clampToWindow`, `inSeasonWindow`, `railLabel`); `/api/games` returns 400 outside it and the page clamps a URL date into it. Date rail: `src/components/games/DateRail.tsx` (27 pills, "Today" on the PT date, selected day auto-centred). Every card on `app/games/page.tsx` is now a Link to `/games/[gamePk]?date=`; the inline `<details>` linescore moved to the box page. Box score: `app/games/[gamePk]/page.tsx` (TanStack, 30 s refetch while live) over `app/api/games/[gamePk]/route.ts` (statsapi boxscore + linescore + schedule?gamePk, in parallel) shaped by pure `src/lib/boxscore.ts` — header with logos/records/score/status, linescore (1..max(9, scheduled) with R H E, "x" for an unbatted bottom on a final), W/L/S with W-L + ERA from the box's own seasonStats, team toggle over the batting box (AB R H RBI BB K AVG OPS, subs indented with the feed's a- note, Totals), the feed's BATTING/BASERUNNING/FIELDING strings verbatim, pitchers (IP H R ER BB K HR ERA with (W, 2-0)/(L, 2-2)/(S, n) tags — the feed's `stats.pitching.note` first, decisions as the fallback), and the game info block. Pregame: posted lineups with 0-0 lines + probables, else "Lineups not posted yet". Components in `src/components/games/`. Doubleheader fix: `gkeyMatches` strips the engine's trailing `gm1`/`gm2` and pins it to the schedule `gameNumber`. Tests: `tests/boxscore.test.ts` on three trimmed REAL payloads (`tests/fixtures/boxscore-{final-822686,live-824796,pregame-823907}.json`, fetched 2026-09-03) and the window/DH block in `tests/games.test.ts`. Live check on the dev server: `/api/games?date=2026-09-02` → 15 finals; `/api/games/822686` → ATL 9 @ WSH 0, W Hernández (2-0, 1.00), L Cornelio (2-2, 5.96), Acuña 3-for-5 3 RBI, WSH E Chaparro; `/api/games?date=2026-08-31` → 400.
 
 ## 2026-09-03 — INSTRUCTIONS 19 + 20: Pitcher vs Team (Stats) and the Games tab
 Josh's word, verbatim: "there should be a button called pitcher vs team where you can select a pitcher as well as a separate MLB team and it shows every active hitter on the roster with their career stats against that pitcher" / "There should be a tab called "Games" that has every game for the day listed kind of like the mlb app". Pitcher vs Team: `src/components/stats/PitcherVsTeam.tsx`, `app/api/pvt/route.ts`, `src/lib/pvt.ts`, `tests/pvt.test.ts`. Games: `app/games/page.tsx`, `app/api/games/route.ts`, `src/lib/games.ts`, `tests/games.test.ts`, NAV entry in AppShell. Both public, statsapi-only (Games also reads the stored board for ML prices). Reviewer minors listed under INSTRUCTIONS 19/20 in `docs/session-handoff.md`.

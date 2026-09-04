@@ -236,7 +236,7 @@ export default function DashboardPage() {
 
       <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 pt-10 md:px-8 md:pb-12">
       <PageHeader
-        title="Dashboard"
+        title="Parlay Lab"
         sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No board yet today"}
         action={
           <Link href="/board">

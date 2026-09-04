@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { PlayerSheetProvider } from "@/components/player/PlayerSheet";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(
@@ -12,5 +13,9 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      <PlayerSheetProvider>{children}</PlayerSheetProvider>
+    </QueryClientProvider>
+  );
 }

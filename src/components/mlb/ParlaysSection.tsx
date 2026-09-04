@@ -9,6 +9,7 @@ import { EvBadge } from "@/components/ui/EvBadge";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import type { Ticket } from "@/engine";
+import { BoardLabel } from "@/components/player/PlayerName";
 
 /* The engine's generated parlay sets, straight from BoardData — the old app's
    PARLAYS / MIXED PARLAYS / LIVE PARLAYS tabs. Display only: every number here
@@ -194,7 +195,7 @@ export function ParlaysSection({
                         const n = legNow ? legNow(l as { gkey?: string | null; lkey?: string | null }) : null;
                         return (
                           <li key={i} className="truncate">
-                            <span className="text-text">{l.label}</span> · {l.prop}
+                            <span className="text-text"><BoardLabel label={l.label} /></span> · {l.prop}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
                             {n && (
                               <span

@@ -7,6 +7,7 @@ import { Pill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { TEAM_ABBR, type PvtPitcher, type PvtResponse, type PvtRow } from "@/lib/pvt";
+import { PlayerName } from "@/components/player/PlayerName";
 
 /**
  * Pitcher vs Team (2026-09-03). Pick any active pitcher and any club; every
@@ -60,7 +61,7 @@ function PitcherPicker({ pitchers, value, onPick }: { pitchers: PvtPitcher[]; va
     return (
       <div className="flex items-center gap-2">
         <span className="flex-1 truncate rounded-full border border-pos/50 bg-pos/10 px-4 py-2 text-[13px] font-semibold text-text">
-          {value.name} <span className="text-muted">· {value.team}</span>
+          <PlayerName id={value.id} name={value.name} team={value.team} /> <span className="text-muted">· {value.team}</span>
         </span>
         <Pill variant="ghost" className="px-3 py-1.5 text-[11.5px]" onClick={() => onPick(null)} aria-label="Change pitcher">✕</Pill>
       </div>
@@ -195,7 +196,7 @@ export function PitcherVsTeam() {
                   {q.data.rows.map((r) => (
                     <tr key={r.id} className={`border-b border-white/[0.04] hover:bg-white/[0.04] ${r.pa === 0 ? "opacity-60" : ""}`}>
                       <td className="sticky left-0 z-10 bg-bg whitespace-nowrap px-3 py-2.5">
-                        <span className="font-medium text-text">{r.name}</span>
+                        <PlayerName id={r.id} name={r.name} className="font-medium text-text" />
                         <span className="ml-1.5 text-[10.5px] text-muted">{r.pos}</span>
                       </td>
                       {COLS.map((c) => (

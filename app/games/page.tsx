@@ -1,53 +1,48 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { FilterPill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
-import { teamLogo } from "@/lib/mlb-visuals";
-import { dateStrip, type GamesPayload, type GameTeam, type ShapedGame } from "@/lib/games";
+import { DateRail } from "@/components/games/DateRail";
+import { logoFor, ptToday, startLabel } from "@/components/games/logo";
+import { PlayerName } from "@/components/player/PlayerName";
+import { SEASON_WINDOW, clampToWindow, railLabel, seasonDates, type GamesPayload, type GameTeam, type ShapedGame } from "@/lib/games";
 
-/* GAMES TAB (2026-09-03, Josh): every game of the day, MLB-app style — date strip,
-   LIVE / UPCOMING / FINAL sections, a card per game with logos, records, the
-   engine board's moneyline (or the score), probables / decisions with season
-   lines, broadcasts, and an expandable linescore for live and final games.
-   Every figure is the feed's own; a missing one prints "—". */
+/* GAMES TAB (2026-09-03, Josh): every game of the day, MLB-app style — a date
+   rail over the whole September window (9/1 → the last regular-season day, Sun
+   9/27), LIVE / UPCOMING / FINAL sections, a card per game with logos, records,
+   the engine board's moneyline (or the score), probables / decisions with season
+   lines and broadcasts. Every card links to its box score. Every figure is the
+   feed's own; a missing one prints "—". */
 
-const PT = "America/Los_Angeles";
-
-function ptToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: PT }).format(new Date());
-}
-function stripLabel(ymd: string): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(
-    new Date(Date.UTC(y, m - 1, d)),
-  );
-}
-function startLabel(iso: string): string {
-  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: PT }).format(
-    new Date(iso),
-  );
-}
-const pitcherLine = (p: { name: string; wl: string | null; era: string | null }) =>
-  `${p.name.split(" ").slice(-1)[0]}${p.wl ? ` ${p.wl}` : ""}${p.era ? ` | ${p.era} ERA` : ""}`;
-
-/** ESPN's logo codes differ from statsapi abbreviations on a few clubs. */
-const LOGO_CODE: Record<string, string> = { ath: "oak", cws: "chw", az: "ari", was: "wsh" };
-const logoFor = (abbr: string) => {
-  const a = abbr.toLowerCase();
-  return teamLogo(LOGO_CODE[a] ?? a);
-};
+/** "Skubal 8-7 | 2.84 ERA" — the surname is tappable and opens the player profile sheet by MLB id. */
+const pitcherLine = (p: { id: number; name: string; wl: string | null; era: string | null }) => (
+  <>
+    <PlayerName id={p.id} name={p.name}>
+      {p.name.split(" ").slice(-1)[0]}
+    </PlayerName>
+    {`${p.wl ? ` ${p.wl}` : ""}${p.era ? ` | ${p.era} ERA` : ""}`}
+  </>
+);
 
 export default function GamesPage() {
+  // useSearchParams needs a Suspense boundary; it is read on both server and client so ?date= hydrates cleanly
+  return (
+    <Suspense fallback={null}>
+      <Games />
+    </Suspense>
+  );
+}
+
+function Games() {
   const today = useMemo(ptToday, []);
-  const [date, setDate] = useState<string>(() => {
-    if (typeof window === "undefined") return today;
-    const q = new URLSearchParams(window.location.search).get("date");
-    return q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : today;
-  });
-  const strip = useMemo(() => dateStrip(today, 2), [today]);
+  const qDate = useSearchParams().get("date");
+  // a URL date outside the window (or a today past 9/27) clamps to the nearest edge
+  const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
+  const rail = useMemo(() => seasonDates(), []);
 
   const q = useQuery<GamesPayload>({
     queryKey: ["games", date],
@@ -84,16 +79,7 @@ export default function GamesPage() {
         sub="Every game on the slate, from MLB's official feed. Moneylines are the day's board prices; scores and linescores update live."
       />
 
-      {/* date strip — one row, scrolls sideways inside itself on the narrowest phones */}
-      <div className="-mx-4 mb-5 overflow-x-auto px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
-        <div className="flex w-max gap-1.5">
-          {strip.map((d) => (
-            <FilterPill key={d} selected={d === date} onClick={() => pick(d)} className="whitespace-nowrap">
-              {d === today ? "Today" : stripLabel(d)}
-            </FilterPill>
-          ))}
-        </div>
-      </div>
+      <DateRail dates={rail} date={date} today={today} onPick={pick} />
 
       {q.isPending ? (
         <div className="space-y-3">
@@ -108,19 +94,22 @@ export default function GamesPage() {
       ) : q.isError ? (
         <ErrorState title="Couldn't load the slate" body={(q.error as Error).message} onRetry={() => void q.refetch()} />
       ) : games.length === 0 ? (
-        <EmptyState title="No games" body={`Nothing on the MLB schedule for ${stripLabel(date)}.`} />
+        <EmptyState title="No games" body={`Nothing on the MLB schedule for ${railLabel(date)}.`} />
       ) : (
         <div className="space-y-6">
-          <Section title="Live" games={live} tone="text-live" />
-          <Section title="Upcoming" games={upcoming} />
-          <Section title="Final" games={final} />
+          <Section title="Live" games={live} tone="text-live" date={date} />
+          <Section title="Upcoming" games={upcoming} date={date} />
+          <Section title="Final" games={final} date={date} />
         </div>
+      )}
+      {date === SEASON_WINDOW.end && (
+        <p className="mt-6 text-center text-[11px] text-faint">Sunday {railLabel(SEASON_WINDOW.end).slice(4)} is the last day of the regular season.</p>
       )}
     </div>
   );
 }
 
-function Section({ title, games, tone = "text-muted" }: { title: string; games: ShapedGame[]; tone?: string }) {
+function Section({ title, games, tone = "text-muted", date }: { title: string; games: ShapedGame[]; tone?: string; date: string }) {
   if (!games.length) return null;
   return (
     <section>
@@ -131,14 +120,14 @@ function Section({ title, games, tone = "text-muted" }: { title: string; games: 
       </h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {games.map((g) => (
-          <GameCard key={g.pk} g={g} />
+          <GameCard key={g.pk} g={g} date={date} />
         ))}
       </div>
     </section>
   );
 }
 
-function GameCard({ g }: { g: ShapedGame }) {
+function GameCard({ g, date }: { g: ShapedGame; date: string }) {
   const upcoming = g.status === "upcoming";
   const showScore = g.status === "live" || g.status === "final";
   const header =
@@ -156,6 +145,7 @@ function GameCard({ g }: { g: ShapedGame }) {
     ) : (
       <span className="text-text">{startLabel(g.start)}</span>
     );
+  const dh = g.gameNumber != null ? <span className="ml-1.5 rounded-full border border-line-2 px-1.5 py-px text-[9px] font-bold uppercase text-muted">Game {g.gameNumber}</span> : null;
 
   const sub =
     g.status === "final" && g.decisions ? (
@@ -165,7 +155,10 @@ function GameCard({ g }: { g: ShapedGame }) {
         {g.decisions.s && (
           <span>
             {" "}
-            · S: {g.decisions.s.name.split(" ").slice(-1)[0]}
+            · S:{" "}
+            <PlayerName id={g.decisions.s.id} name={g.decisions.s.name}>
+              {g.decisions.s.name.split(" ").slice(-1)[0]}
+            </PlayerName>
             {g.decisions.s.saves != null ? ` ${g.decisions.s.saves}` : ""}
           </span>
         )}
@@ -204,29 +197,20 @@ function GameCard({ g }: { g: ShapedGame }) {
 
   const head = (
     <div className="mb-2.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.12em]">
-      {header}
-      {showScore && g.linescore && <span className="text-[10px] font-medium normal-case tracking-normal text-faint">Linescore</span>}
+      <span className="flex items-center">{header}{dh}</span>
+      <span className="text-[10px] font-medium normal-case tracking-normal text-faint">{showScore ? "Box score ›" : "Preview ›"}</span>
     </div>
   );
 
-  if (showScore && g.linescore) {
-    return (
-      <details className="glass group min-w-0 p-4">
-        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-          {head}
-          {rows}
-          {meta}
-        </summary>
-        <LinescoreGrid g={g} />
-      </details>
-    );
-  }
   return (
-    <div className="glass min-w-0 p-4">
+    <Link
+      href={`/games/${g.pk}?date=${date}`}
+      className="glass block min-w-0 p-4 transition-[transform,background] duration-(--dur-fast) hover:bg-white/[0.04] active:scale-[0.99]"
+    >
       {head}
       {rows}
       {meta}
-    </div>
+    </Link>
   );
 }
 
@@ -257,49 +241,6 @@ function TeamRow({ t, score, upcoming, winner }: { t: GameTeam; score: boolean; 
           )}
         </span>
       ) : null}
-    </div>
-  );
-}
-
-function LinescoreGrid({ g }: { g: ShapedGame }) {
-  const ls = g.linescore!;
-  const n = Math.max(9, ls.innings.length);
-  const cells = Array.from({ length: n }, (_, i) => ls.innings[i] ?? { n: i + 1, away: null, home: null });
-  const cell = (v: number | null) => (v == null ? "" : String(v));
-  const row = (label: string, side: "away" | "home") => (
-    <tr>
-      <th className="sticky left-0 bg-surface/90 pr-3 text-left text-[11px] font-semibold text-text">{label}</th>
-      {cells.map((c) => (
-        <td key={c.n} className="num px-1.5 text-center text-[11.5px] text-muted">
-          {cell(c[side])}
-        </td>
-      ))}
-      <td className="num border-l border-white/[0.08] px-1.5 pl-2.5 text-center text-[11.5px] font-bold text-text">{ls.totals[side].r}</td>
-      <td className="num px-1.5 text-center text-[11.5px] text-muted">{ls.totals[side].h}</td>
-      <td className="num px-1.5 text-center text-[11.5px] text-muted">{ls.totals[side].e}</td>
-    </tr>
-  );
-  return (
-    <div className="-mx-4 mt-3 overflow-x-auto border-t border-white/[0.06] px-4 pt-3" style={{ scrollbarWidth: "none" }}>
-      <table className="w-max border-collapse">
-        <thead>
-          <tr>
-            <th className="sticky left-0 bg-surface/90" />
-            {cells.map((c) => (
-              <th key={c.n} className="num px-1.5 text-center text-[10px] font-semibold text-faint">
-                {c.n}
-              </th>
-            ))}
-            <th className="num border-l border-white/[0.08] px-1.5 pl-2.5 text-center text-[10px] font-semibold text-faint">R</th>
-            <th className="num px-1.5 text-center text-[10px] font-semibold text-faint">H</th>
-            <th className="num px-1.5 text-center text-[10px] font-semibold text-faint">E</th>
-          </tr>
-        </thead>
-        <tbody>
-          {row(g.away.abbr, "away")}
-          {row(g.home.abbr, "home")}
-        </tbody>
-      </table>
     </div>
   );
 }
