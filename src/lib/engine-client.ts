@@ -127,8 +127,10 @@ export function getEngine(): Engine {
 
 /** The engine's Monte Carlo depth (user rule 2026-07-20) — ONE constant feeds
     armV2's simN/simNHR and every piece of static UI copy, so the number shown
-    can never drift from the number run. */
-export const SIM_PATHS = 50000;
+    can never drift from the number run.
+    2026-09-04, Josh's word, verbatim: "Make everything like the Board refresh only
+    25K sims instead of 50K" — 50,000 → 25,000 (was 50,000 from 2026-07-20). */
+export const SIM_PATHS = 25000;
 export const SIM_PATHS_TXT = SIM_PATHS.toLocaleString("en-US");
 
 export type Board = { date: string; at: number; data: BoardData };

@@ -102,6 +102,9 @@ an exit condition fires. Do not tune weights/gates/caps — check collection-per
   `find . -name "* [0-9].*" -not -path "./node_modules/*" -delete`.
 - Browser pane: unfocused clicks/form_input may not fire React handlers — DOM .click().
 
+## 2026-09-04 — INSTRUCTION 27: sims 50K → 25K
+Josh's word, verbatim: "Make everything like the Board refresh only 25K sims instead of 50K". `SIM_PATHS` (`src/lib/engine-client.ts`) is now 25000; UI copy derives from it. `tests/sim-paths.test.ts`.
+
 ## 2026-09-04 — INSTRUCTIONS 25 + 26: Ledger back under "Parlay Calc"; ledger eras (9/4 → default, 8/15–9/3 tab)
 Josh's word, verbatim: "Move the Ledger tab back up right below Parlay Calc (Rename it from Parlay Calculator)" / "Create a new net P/L for Core & Fun money from today forward … Don't remove the old data … a tab that shows pre new ledger data which was 8/15-9/3". Nav: `src/components/shell/AppShell.tsx`. Eras: `src/lib/ledger-stats.ts` (pure port of `shLedgerStats` over an era's entries), `app/ledger/page.tsx` era pills; `tests/ledger-eras.test.ts`. Full write-up under INSTRUCTIONS 25/26 in `docs/session-handoff.md`.
 

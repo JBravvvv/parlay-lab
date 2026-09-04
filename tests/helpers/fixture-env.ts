@@ -102,7 +102,7 @@ export function armedFixtureEngine(opts: { pinned?: boolean } = {}): Engine {
   return eng;
 }
 
-/* Pinned low for baseline runtime. The production value is SIM_PATHS (50,000) — the
+/* Pinned low for baseline runtime. The production value is SIM_PATHS (25,000 since 2026-09-04; 50,000 before) — the
    inequality is deliberate and documented; what matters for a baseline is that the
    number is FIXED, since sim depth changes every probability. */
 export const SIM_PATHS_FIXTURE = 2000;

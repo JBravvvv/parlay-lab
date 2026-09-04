@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-08-29:** `origin/frontend-rebuild` = `3318d2cb02122cdfe5168ce99c0906877212fa11`
+> - **STATE-CLAIM 2026-09-04:** `origin/frontend-rebuild` = `24554931dc47553b1e6cb74429589aca489c9a46` (restated 2026-09-04 after instructions 17–26 shipped; the 2026-08-29 claim is history.)
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
@@ -267,6 +267,9 @@ Shipped same day. `src/components/shell/AppShell.tsx` NAV: /calc label is "Parla
 
 **INSTRUCTION 26 (2026-09-04, Josh's word, verbatim: "Create a new net P/L for Core & Fun money from today forward since things were changed. Don't remove the old data just make the default view for each today forward (9/4/26) and create the ability to click a tab that shows pre new ledger data which was 8/15-9/3")**
 Shipped same day. `src/lib/ledger-stats.ts`: `LEDGER_ERAS` (current = 2026-09-04 → open, default; v1 = 2026-08-15 → 2026-09-03), `eraEntries`, and `ledgerStats(entries, scope)` — a pure port of the engine's `shLedgerStats` over an explicit entry list (same won/push/pending/ungradable rules, cents rounding, drawdown, biggest FUN hit). The Ledger page keeps the CORE/FUN pills and adds era pills on the same row; Net P/L, ROI, Record, drawdown, equity/ROI charts, scoreboard, receipts and the Locked-days list all read the era's entries. Nothing is deleted: the v1 tab is the whole 8/15–9/3 record. Not era-scoped (engine-wide, unchanged): the CLV tile and the rest-of-season projection. The engine's own `shLedgerStats` is untouched. Pins: `tests/ledger-eras.test.ts` (synthetic entries only).
+
+**INSTRUCTION 27 (2026-09-04, Josh's word, verbatim: "Make everything like the Board refresh only 25K sims instead of 50K")**
+Shipped same day. `SIM_PATHS` in `src/lib/engine-client.ts` 50,000 → 25,000; it is the one constant behind armV2's `simN`/`simNHR` and every "paths per game" string on Board, The Sharp and Simulator, so the copy follows. Pinned by `tests/sim-paths.test.ts`. Untouched on purpose: the server `/api/generate` prediction-log run keeps its separately settled 10k/20k depth (Josh, 2026-07-24 — it never allocates), and the test fixture depth stays 2,000. Any pre-09-04 handoff line citing "SIM_PATHS = 50000" is historical.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
