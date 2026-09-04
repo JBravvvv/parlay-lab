@@ -35,7 +35,7 @@ export default function CalcPage() {
   return (
     <>
       <PageHeader
-        title="Parlay calculator"
+        title="Parlay Calc"
         sub="Your stake, your prices — American odds on every leg. Wins is profit; pays is the full return with the stake back in."
       />
       <div className="mx-auto max-w-[560px] space-y-5">

@@ -32,14 +32,17 @@ function navEntries() {
 
 describe("nav — desktop side rail", () => {
   const nav = navEntries();
-  it("top group is Games, Stats, Board, Builder, Parlay Builder, Parlay Calculator — in that order", () => {
+  // 2026-09-04 addendum, Josh: "Move the Ledger tab back up right below Parlay Calc
+  // (Rename it from Parlay Calculator)" — Ledger joins the top group after Parlay Calc.
+  it("top group is Games, Stats, Board, Builder, Parlay Builder, Parlay Calc, Ledger — in that order", () => {
     expect(nav.filter((n) => n.group === "top").map((n) => n.label)).toEqual([
       "Games",
       "Stats",
       "Board",
       "Builder",
       "Parlay Builder",
-      "Parlay Calculator",
+      "Parlay Calc",
+      "Ledger",
     ]);
     expect(nav.filter((n) => n.group === "top").map((n) => n.href)).toEqual([
       "/games",
@@ -48,17 +51,16 @@ describe("nav — desktop side rail", () => {
       "/builder",
       "/props",
       "/calc",
+      "/ledger",
     ]);
   });
-  it("bottom group is Ledger, The Sharp, Simulator, Settings — in that order", () => {
+  it("bottom group is The Sharp, Simulator, Settings — in that order (Ledger moved up 2026-09-04)", () => {
     expect(nav.filter((n) => n.group === "bottom").map((n) => n.label)).toEqual([
-      "Ledger",
       "The Sharp",
       "Simulator",
       "Settings",
     ]);
     expect(nav.filter((n) => n.group === "bottom").map((n) => n.href)).toEqual([
-      "/ledger",
       "/sharp",
       "/simulator",
       "/settings",
@@ -77,8 +79,9 @@ describe("nav — desktop side rail", () => {
     // the brand still links home
     expect(shell).toMatch(/<Link href="\/" className="flex items-baseline/);
   });
-  it("Calc was renamed Parlay Calculator", () => {
-    expect(nav.find((n) => n.href === "/calc")!.label).toBe("Parlay Calculator");
+  it("Calc was renamed Parlay Calc (2026-09-04; briefly 'Parlay Calculator' on 09-03)", () => {
+    expect(nav.find((n) => n.href === "/calc")!.label).toBe("Parlay Calc");
+    expect(nav.some((n) => n.label === "Parlay Calculator")).toBe(false);
     expect(nav.some((n) => n.label === "Calc")).toBe(false);
   });
   it("the rail renders the two groups with a flex spacer between them, above the footer disclaimer", () => {

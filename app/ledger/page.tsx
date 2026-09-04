@@ -24,6 +24,7 @@ import { ReceiptsPanel } from "@/components/ledger/ReceiptsPanel";
 import { SYNC_EVENT, syncNow, useSyncState } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
+import { DEFAULT_ERA, LEDGER_ERAS, eraEntries, ledgerStats, type LedgerEra } from "@/lib/ledger-stats";
 
 const TIP = {
   contentStyle: {
@@ -242,6 +243,11 @@ export default function LedgerPage() {
      a combined net is exactly the number he ruled out. Core is the default; FUN is its
      own view, never folded in. */
   const [scope, setScope] = useState<"core" | "fun">("core");
+  /* LEDGER ERAS (2026-09-04, Josh's word): the record splits at 9/4/26 when the
+     CORE_RULES set first governed a locked card. Default = today forward; the
+     8/15–9/3 record stays whole under its own tab, never removed, never blended. */
+  const [eraKey, setEraKey] = useState<LedgerEra["key"]>(DEFAULT_ERA);
+  const era = LEDGER_ERAS.find((e) => e.key === eraKey) ?? LEDGER_ERAS[0];
   const [grading, setGrading] = useState(false);
   const [note, setNote] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -269,7 +275,8 @@ export default function LedgerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
-  const stats = useMemo(() => api?.stats(scope), [api, scope]);
+  const eraList = useMemo(() => (api ? eraEntries(api.entries, era) : []), [api, era]);
+  const stats = useMemo(() => (api ? ledgerStats(eraList, scope) : undefined), [api, eraList, scope]);
   const proj = api?.projection ?? null;
   const clv = api?.clv;
 
@@ -465,12 +472,25 @@ export default function LedgerPage() {
         </Panel>
       ) : (
         <div className="space-y-6">
-          <div className="flex gap-2">
-            {(["core", "fun"] as const).map((s) => (
-              <FilterPill key={s} selected={scope === s} onClick={() => setScope(s)}>
-                {s.toUpperCase()}
-              </FilterPill>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-2">
+              {(["core", "fun"] as const).map((s) => (
+                <FilterPill key={s} selected={scope === s} onClick={() => setScope(s)}>
+                  {s.toUpperCase()}
+                </FilterPill>
+              ))}
+            </div>
+            <div className="flex items-center gap-2" data-testid="ledger-eras">
+              {LEDGER_ERAS.map((e) => (
+                <FilterPill key={e.key} selected={eraKey === e.key} onClick={() => setEraKey(e.key)}>
+                  {e.label}
+                </FilterPill>
+              ))}
+            </div>
+          </div>
+          <div className="-mt-4 text-[10.5px] text-faint">
+            {era.sub} · {eraList.length} locked day{eraList.length === 1 ? "" : "s"}
+            {era.key === "current" && eraList.length === 0 && " — the first card under the new rules locks today; the 8/15 – 9/3 tab holds the old record."}
           </div>
 
           <Reveal>
@@ -512,7 +532,7 @@ export default function LedgerPage() {
             </div>
           </Reveal>
 
-          <ProScoreboard entries={api ? api.entries : []} />
+          <ProScoreboard entries={eraList} />
 
           {equity.length > 0 && (
             <Reveal>
@@ -582,13 +602,14 @@ export default function LedgerPage() {
           )}
 
           <Reveal>
-            <ReceiptsPanel entries={api.entries as never} />
+            <ReceiptsPanel entries={eraList as never} />
           </Reveal>
 
           <Reveal>
             <div className="space-y-3">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Locked days</h2>
-              {[...api.entries].reverse().map((e) => (
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Locked days · {era.label}</h2>
+              {eraList.length === 0 && <div className="text-[12px] text-muted">No locked days in this era yet.</div>}
+              {[...eraList].reverse().map((e) => (
                 <DayCard key={e.date} e={e} />
               ))}
             </div>

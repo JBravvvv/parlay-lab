@@ -39,8 +39,9 @@ const NAV: readonly NavItem[] = [
   { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true },
   { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true },
   { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true, mobileLabel: "Parlays" },
-  { href: "/calc", label: "Parlay Calculator", icon: IconCalc, group: "top", mobile: false },
-  { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true },
+  { href: "/calc", label: "Parlay Calc", icon: IconCalc, group: "top", mobile: false },
+  // 2026-09-04, Josh: "Move the Ledger tab back up right below Parlay Calc (Rename it from Parlay Calculator)"
+  { href: "/ledger", label: "Ledger", icon: IconLedger, group: "top", mobile: true },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "bottom", mobile: false },
   { href: "/simulator", label: "Simulator", icon: IconSim, group: "bottom", mobile: false },
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false },

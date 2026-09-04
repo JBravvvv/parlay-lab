@@ -71,8 +71,8 @@ describe("wired — the tab and the page match the instruction", () => {
     expect(page).toMatch(/>Wins</);
     expect(page).toMatch(/>Pays</);
   });
-  it("the tab is in the shell nav as 'Parlay Calculator', reachable on mobile, and the bottom bar sizes itself", () => {
-    expect(shell).toMatch(/href: "\/calc", label: "Parlay Calculator"/);
+  it("the tab is in the shell nav as 'Parlay Calc' (renamed 2026-09-04 from Parlay Calculator), reachable on mobile, and the bottom bar sizes itself", () => {
+    expect(shell).toMatch(/href: "\/calc", label: "Parlay Calc"/);
     // not a bottom tab (six already fill 375px) — it rides the mobile top-bar icon row instead
     expect(shell).toMatch(/href: "\/calc".*mobile: false/);
     expect(shell).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
