@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
-import { isIntId, isPitcherPos, shapeCard, windowDates, type PersonDoc } from "@/lib/player-card";
+import { isIntId, isPitcherPos, shapeCard, type PersonDoc } from "@/lib/player-card";
 
 /**
  * Player profile card (2026-09-03). Read-only proxy over statsapi.mlb.com:
  *   ?id=<mlbId>[&group=hitting|pitching]
- * → person (team, position, roster status), season line, last 7/15/30-day
- * windows (byDateRange on Pacific dates), and the full season game log —
- * shaped by src/lib/player-card.ts. Public route: nothing but MLB's numbers.
+ * → person (team, position, roster status), season line and the full season
+ * game log — the game windows (hitters last 7/15/30 games played, SP last
+ * 3/5/10 starts, RP last 3/5/10 appearances; INSTRUCTION 37) are cut from the
+ * log by src/lib/player-card.ts. Public route: nothing but MLB's numbers.
  */
 const API = "https://statsapi.mlb.com/api/v1";
 const TTL = 300;
@@ -48,17 +49,8 @@ export async function GET(req: NextRequest) {
     const group = isPitcher ? "pitching" : "hitting";
     const today = ptToday();
     const stats = (kind: string, extra = "") => mlb(`/people/${pid}/stats?stats=${kind}&group=${group}&season=${SEASON}${extra}`);
-    const win = (days: number) => {
-      const { startDate, endDate } = windowDates(today, days);
-      return stats("byDateRange", `&startDate=${startDate}&endDate=${endDate}`);
-    };
-    const [seasonDoc, last7, last15, last30, gameLog] = await Promise.all([
-      stats("season"), win(7), win(15), win(30), stats("gameLog"),
-    ]);
-    const card = shapeCard({
-      person, isPitcher, season: SEASON, today,
-      seasonDoc: seasonDoc as never, last7: last7 as never, last15: last15 as never, last30: last30 as never, gameLog: gameLog as never,
-    });
+    const [seasonDoc, gameLog] = await Promise.all([stats("season"), stats("gameLog")]);
+    const card = shapeCard({ person, isPitcher, season: SEASON, today, seasonDoc: seasonDoc as never, gameLog: gameLog as never });
     if (!card) return NextResponse.json({ error: "unknown player id" }, { status: 404 });
     return NextResponse.json({ card, today });
   } catch (e) {

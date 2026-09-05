@@ -18,7 +18,7 @@ import { SkeletonRows, Skeleton } from "@/components/ui/states";
  * Tap any player name anywhere → the Roster Lab-style player card, fed by the
  * MLB Stats API: identity block (photo, team · position, roster status) with
  * three season tiles, the season + last 7/15/30-day split table, a per-game
- * bar chart over the last 30 days, and the full season game log.
+ * bar chart over the last 30 games (pitchers: last 10 starts / appearances), and the full season game log.
  *
  * Opening with only a name (board rows, ticket legs) first resolves it through
  * /api/player/resolve; a miss renders an honest "couldn't match" state, never a
@@ -242,7 +242,7 @@ function Sheet({ target, onClose }: { target: SheetTarget; onClose: () => void }
             <>
               {/* stats table: season + windows */}
               <section>
-                <SectionTitle>Stats — {c.season} season · last 7 / 15 / 30 days</SectionTitle>
+                <SectionTitle>Stats — {c.season} season · {windowTitle(c.splits)}</SectionTitle>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[560px]">
                     <thead>
@@ -279,7 +279,7 @@ function Sheet({ target, onClose }: { target: SheetTarget; onClose: () => void }
                 {c.chart.points.length > 0 ? (
                   <BarChart points={c.chart.points} />
                 ) : (
-                  <EmptyNote text="No games in the last 30 days." />
+                  <EmptyNote text="No games in the window yet." />
                 )}
               </section>
 
@@ -386,6 +386,17 @@ function HeaderStat({ label, value }: { label: string; value: string }) {
 
 function SectionTitle({ children }: { children: ReactNode }) {
   return <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-faint">{children}</div>;
+}
+
+/** "last 7 / 15 / 30 games" or "last 3 / 5 / 10 starts" from the split rows themselves (INSTRUCTION 37). */
+function windowTitle(splits: { label: string }[]): string {
+  const ns: string[] = [];
+  let unit = "games";
+  for (const s of splits) {
+    const m = /^Last (\d+) (\w+)$/.exec(s.label);
+    if (m) { ns.push(m[1]); unit = m[2]; }
+  }
+  return ns.length ? `last ${ns.join(" / ")} ${unit}` : "game windows";
 }
 
 function EmptyNote({ text }: { text: string }) {

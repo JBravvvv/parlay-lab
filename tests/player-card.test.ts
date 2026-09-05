@@ -8,7 +8,10 @@
  * Fixtures under tests/fixtures/player-*.json are TRIMMED REAL statsapi.mlb.com
  * responses captured 2026-09-03 (Ronald Acuña Jr. 660670 hitting, Paul Skenes
  * 694973 pitching, a 10-player slice of the season index). Every expected value
- * below is read off those files, not typed from memory. Plus source checks:
+ * below is read off those files, not typed from memory. Since INSTRUCTION 37
+ * (2026-09-04) the split rows are GAME windows summed from the game log — the
+ * trimmed logs hold 6 games each, so "Last 7 games" = all 6 for Acuña and
+ * "Last 3 starts" is Skenes' 08-19 / 08-25 / 09-01 starts. Plus source checks:
  * the provider is mounted in app/providers.tsx, both routes only talk to
  * statsapi.mlb.com, and every listed click surface imports PlayerName.
  */
@@ -30,7 +33,6 @@ import {
   resolvePlayer,
   shapeCard,
   statusFromPerson,
-  windowDates,
   type PersonDoc,
 } from "@/lib/player-card";
 
@@ -95,13 +97,8 @@ describe("player-card: name → MLB id", () => {
   });
 });
 
-/* ---------------- windows ---------------- */
-describe("player-card: date windows are calendar arithmetic", () => {
-  it("N-day window ends today and starts N-1 days back, across a month edge", () => {
-    expect(windowDates("2026-09-03", 7)).toEqual({ startDate: "2026-08-28", endDate: "2026-09-03" });
-    expect(windowDates("2026-09-03", 30)).toEqual({ startDate: "2026-08-05", endDate: "2026-09-03" });
-    expect(windowDates("2026-03-01", 15)).toEqual({ startDate: "2026-02-15", endDate: "2026-03-01" });
-  });
+/* ---------------- helpers ---------------- */
+describe("player-card: helpers", () => {
   it("helpers", () => {
     expect(ipToOuts("149.2")).toBe(449);
     expect(ipToOuts("6.0")).toBe(18);
@@ -120,8 +117,7 @@ describe("player-card: hitter card from real statsapi responses", () => {
   const person = fx("player-660670-person.json") as PersonDoc;
   const card = shapeCard({
     person, isPitcher: false, season: 2026, today: TODAY,
-    seasonDoc: fx("player-660670-season.json"), last7: null, last15: null,
-    last30: fx("player-660670-last30.json"), gameLog: fx("player-660670-gamelog.json"),
+    seasonDoc: fx("player-660670-season.json"), gameLog: fx("player-660670-gamelog.json"),
   })!;
 
   it("identity + roster status straight from the person doc", () => {
@@ -135,12 +131,26 @@ describe("player-card: hitter card from real statsapi responses", () => {
   it("tiles are OPS / HR / AVG from the season line (.761 / 14 / .243)", () => {
     expect(card.tiles).toEqual([{ label: "OPS", value: ".761" }, { label: "HR", value: "14" }, { label: "AVG", value: ".243" }]);
   });
-  it("split rows: season + last 30 carry the feed's counts; missing windows are null, not zeros", () => {
+  it("split rows: season from the feed; Last 7/15/30 GAMES summed from the log with rates recomputed", () => {
     expect(card.splitHeaders).toEqual(["AB", "R", "H", "HR", "RBI", "BB", "SB", "AVG", "OBP", "SLG"]);
-    expect(card.splits.map((s) => s.label)).toEqual(["2026", "Last 7", "Last 15", "Last 30"]);
+    expect(card.splits.map((s) => s.label)).toEqual(["2026", "Last 7 games", "Last 15 games", "Last 30 games"]);
     expect(card.splits[0]).toEqual({ label: "2026", games: 87, cells: ["329", "50", "80", "14", "39", "47", "20", ".243", ".345", ".416"] });
-    expect(card.splits[1].cells).toBeNull();
-    expect(card.splits[3]).toEqual({ label: "Last 30", games: 26, cells: ["104", "13", "26", "5", "15", "9", "5", ".250", ".310", ".423"] });
+    // the trimmed log holds 6 games: 22 AB, 6 R, 10 H, 1 HR, 4 RBI, 4 BB, 2 SB, 14 TB, 0 HBP/SF
+    // → AVG 10/22 .455, OBP 14/26 .538, SLG 14/22 .636 — NOT the feed's season-to-date rates
+    const six = ["22", "6", "10", "1", "4", "4", "2", ".455", ".538", ".636"];
+    expect(card.splits[1]).toEqual({ label: "Last 7 games", games: 6, cells: six });
+    expect(card.splits[3]).toEqual({ label: "Last 30 games", games: 6, cells: six });
+  });
+  it("a window is the last N games PLAYED, oldest→newest by date whatever order the feed sent", () => {
+    const shuffled = { stats: [{ splits: [...fx("player-660670-gamelog.json").stats[0].splits].reverse() }] };
+    const c = shapeCard({ person, isPitcher: false, season: 2026, today: TODAY, seasonDoc: fx("player-660670-season.json"), gameLog: shuffled })!;
+    expect(c.splits[1].cells).toEqual(card.splits[1].cells);
+    expect(c.chart.points.map((p) => p.date)).toEqual(card.chart.points.map((p) => p.date));
+  });
+  it("no game log → windows are null (no games in window), never zeros", () => {
+    const c = shapeCard({ person, isPitcher: false, season: 2026, today: TODAY, seasonDoc: fx("player-660670-season.json"), gameLog: null })!;
+    expect(c.splits[1]).toEqual({ label: "Last 7 games", games: 0, cells: null });
+    expect(c.chart.points).toEqual([]);
   });
   it("game log is newest first with @ for road games and per-game OBP/SLG from the game's own counts", () => {
     expect(card.logHeaders).toEqual(["H/AB", "R", "HR", "RBI", "SB", "OBP", "SLG", "K"]);
@@ -152,8 +162,8 @@ describe("player-card: hitter card from real statsapi responses", () => {
     expect(card.log[0].cells).toEqual(["3/5", "2", "1", "3", "1", ".600", "1.200", "1"]);
     expect(card.log[5].date).toBe("2026-08-28");
   });
-  it("chart: total bases per game over the last 30 days, chronological", () => {
-    expect(card.chart.label).toMatch(/^Total bases by game/);
+  it("chart: total bases per game over the last 30 games, chronological", () => {
+    expect(card.chart.label).toBe("Total bases by game — last 30 games");
     expect(card.chart.points.map((p) => p.date)).toEqual(["2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"]);
     expect(card.chart.points[5].v).toBe(6);
     expect(card.chart.points[4].v).toBe(0);
@@ -170,8 +180,7 @@ describe("player-card: pitcher card from real statsapi responses", () => {
   const person = fx("player-694973-person.json") as PersonDoc;
   const card = shapeCard({
     person, isPitcher: true, season: 2026, today: TODAY,
-    seasonDoc: fx("player-694973-season.json"), last7: null, last15: null,
-    last30: fx("player-694973-last30.json"), gameLog: fx("player-694973-gamelog.json"),
+    seasonDoc: fx("player-694973-season.json"), gameLog: fx("player-694973-gamelog.json"),
   })!;
 
   it("tiles are ERA / K / WHIP (3.97 / 179 / 1.16)", () => {
@@ -181,7 +190,28 @@ describe("player-card: pitcher card from real statsapi responses", () => {
   it("season split: G GS IP H ER BB K W-L SV ERA WHIP", () => {
     expect(card.splitHeaders).toEqual(["G", "GS", "IP", "H", "ER", "BB", "K", "W-L", "SV", "ERA", "WHIP"]);
     expect(card.splits[0].cells).toEqual(["28", "28", "149.2", "129", "66", "44", "179", "9-11", "0", "3.97", "1.16"]);
-    expect(card.splits[3].games).toBe(5);
+  });
+  it("a starter's windows are his last 3 / 5 / 10 STARTS, summed from the log", () => {
+    expect(card.splits.map((s) => s.label)).toEqual(["2026", "Last 3 starts", "Last 5 starts", "Last 10 starts"]);
+    // 08-19 (4.1 IP 3 ER 4 H 4 BB 5 K) + 08-25 (6.0, 0, 3, 0, 4) + 09-01 (4.2, 5, 8, 3, 4)
+    // = 45 outs → 15.0 IP, 8 ER → ERA 4.80, 15 H, 7 BB → WHIP 1.47, 13 K, 0-0
+    expect(card.splits[1]).toEqual({ label: "Last 3 starts", games: 3, cells: ["3", "3", "15.0", "15", "8", "7", "13", "0-0", "0", "4.80", "1.47"] });
+    // last 5: + 08-05 (5.0, 3, 2, 4, 6, L) + 08-11 (5.0, 1, 5, 1, 4, L) → 75 outs, 12 ER → 4.32, 22 H, 12 BB → 1.36, 23 K, 0-2
+    expect(card.splits[2]).toEqual({ label: "Last 5 starts", games: 5, cells: ["5", "5", "25.0", "22", "12", "12", "23", "0-2", "0", "4.32", "1.36"] });
+    // last 10 = all 6 in the trimmed log: 87 outs → 29.0, 17 ER → 5.28
+    expect(card.splits[3].games).toBe(6);
+    expect(card.splits[3].cells!.slice(0, 3)).toEqual(["6", "6", "29.0"]);
+    expect(card.splits[3].cells![9]).toBe("5.28");
+  });
+  it("a reliever's windows are appearances: Skenes' log re-labelled as a bullpen arm", () => {
+    const rp = shapeCard({
+      person, isPitcher: true, season: 2026, today: TODAY,
+      seasonDoc: { stats: [{ splits: [{ stat: { gamesPlayed: 28, gamesStarted: 0, era: "3.97", strikeOuts: 179, whip: "1.16" } }] }] },
+      gameLog: fx("player-694973-gamelog.json"),
+    })!;
+    expect(rp.splits.map((s) => s.label)).toEqual(["2026", "Last 3 games", "Last 5 games", "Last 10 games"]);
+    expect(rp.splits[1].cells![2]).toBe("15.0");
+    expect(rp.chart.label).toBe("Strikeouts by game — last 10 appearances");
   });
   it("game log: IP H ER BB K + decision; QS only on 6+ IP with ≤3 ER", () => {
     expect(card.logHeaders).toEqual(["IP", "H", "ER", "BB", "K", "DEC"]);
@@ -191,9 +221,9 @@ describe("player-card: pitcher card from real statsapi responses", () => {
     expect(aug25.cells.slice(0, 5)).toEqual(["6.0", "3", "0", "0", "4"]);
     expect(aug25.cells[5]).toContain("QS");
   });
-  it("chart is strikeouts by game", () => {
-    expect(card.chart.label).toMatch(/^Strikeouts by game/);
-    expect(card.chart.points.map((p) => p.v)).toEqual([6, 4, 5, 4, 4]);
+  it("chart is strikeouts per start over the last 10 starts — the 07-31 start is in now (it was outside 30 days)", () => {
+    expect(card.chart.label).toBe("Strikeouts by game — last 10 starts");
+    expect(card.chart.points.map((p) => p.v)).toEqual([7, 6, 4, 5, 4, 4]);
   });
   it("decision cells from counts", () => {
     expect(pitLogCells({ inningsPitched: "7.0", hits: 3, earnedRuns: 1, baseOnBalls: 0, strikeOuts: 9, wins: 1, gamesStarted: 1 })).toEqual(["7.0", "3", "1", "0", "9", "W,QS"]);
@@ -220,16 +250,15 @@ describe("player-card: traded-inside-window split (real Arraez byDateRange 2026-
     expect(pickSplit({ stats: [{ splits: [] }] })).toBeNull();
     expect(pickSplit(null)).toBeNull();
   });
-  it("shapeCard's Last-window row reads the combined split, not the 27 G / 107 AB partial", () => {
+  it("shapeCard's season row reads the combined split when a traded player's season doc lists per-team partials first", () => {
     const card = shapeCard({
       person: fx("player-660670-person.json") as PersonDoc, isPitcher: false, season: 2026, today: TODAY,
-      seasonDoc: fx("player-660670-season.json"), last7: null, last15: null, last30: win, gameLog: null,
+      seasonDoc: win, gameLog: null,
     })!;
-    const last30 = card.splits.find((r) => r.label === "Last 30")!;
-    expect(last30.games).toBe(76);
-    expect(last30.cells![0]).toBe("309"); // AB
-    expect(last30.cells![3]).toBe("4"); // HR
-    expect(last30.cells).not.toContain("107");
+    expect(card.splits[0].games).toBe(76);
+    expect(card.splits[0].cells![0]).toBe("309"); // AB
+    expect(card.splits[0].cells![3]).toBe("4"); // HR
+    expect(card.splits[0].cells).not.toContain("107");
   });
 });
 
@@ -249,7 +278,7 @@ describe("player-card: roster status tone", () => {
     expect(statusFromPerson({ id: 1, fullName: "x", rosterEntries: [{ isActive: false, status: { description: "Active" } }] })).toBeNull();
   });
   it("shapeCard returns null on an empty person doc", () => {
-    expect(shapeCard({ person: { people: [] }, isPitcher: false, season: 2026, today: TODAY, seasonDoc: null, last7: null, last15: null, last30: null, gameLog: null })).toBeNull();
+    expect(shapeCard({ person: { people: [] }, isPitcher: false, season: 2026, today: TODAY, seasonDoc: null, gameLog: null })).toBeNull();
   });
 });
 
@@ -268,6 +297,15 @@ describe("player-card: wiring", () => {
       expect(hosts.length).toBeGreaterThan(0);
       expect(new Set(hosts)).toEqual(new Set(["statsapi.mlb.com"]));
     }
+  });
+  it("INSTRUCTION 37: the card route no longer asks for calendar windows — season + game log only", () => {
+    const src = read("app/api/player/route.ts");
+    expect(src).not.toMatch(/byDateRange/);
+    expect(src).not.toMatch(/windowDates/);
+    expect(src).toMatch(/stats\("season"\), stats\("gameLog"\)/);
+    const sheet = read("src/components/player/PlayerSheet.tsx");
+    expect(sheet).not.toMatch(/days/i);
+    expect(sheet).toMatch(/windowTitle\(c\.splits\)/);
   });
   it("every listed click surface renders PlayerName / BoardLabel", () => {
     for (const f of [

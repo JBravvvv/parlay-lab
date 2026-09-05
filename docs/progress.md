@@ -102,6 +102,9 @@ an exit condition fires. Do not tune weights/gates/caps — check collection-per
   `find . -name "* [0-9].*" -not -path "./node_modules/*" -delete`.
 - Browser pane: unfocused clicks/form_input may not fire React handlers — DOM .click().
 
+## 2026-09-04 — INSTRUCTION 37: player card windows follow the Stats tab (games / starts, not days)
+Josh's word, verbatim: "Yes change everything that shows those stats to the new way". The player sheet's Last 7/15/30 DAY rows and 30-day chart become game windows cut from the game log (`src/lib/player-card.ts` via `aggregateHitting` / `aggregatePitching` in `src/lib/stats-window.ts`); `app/api/player/route.ts` drops its three `byDateRange` calls. Pins: `tests/player-card.test.ts`. Full write-up under INSTRUCTION 37 in `docs/session-handoff.md`.
+
 ## 2026-09-04 — INSTRUCTIONS 35–36: Stats tab timeframes become per-player GAME windows
 Josh's word, verbatim: "change Hitting filters from Last 7 Days, Last 15 Days, Last 30 Days, 2026 Season to Last 7 Games, Last 15 Games, Last 30 Games … this should only reflect games they played in" / "change Pitching filters … to Last 3 Games, Last 5 Games, Last 10 Games … for SP … his last 5 Games Started. For a player like Aroldis Chapman … his last 5 RP … only games he pitched in". New `app/api/stats/window/route.ts` batches every player id through MLB's people hydrate `lastXGames(limit=N)` (the league-wide endpoint pins X=10) and, for starters whose window holds a relief outing, sums their last N starts from the game log (`src/lib/stats-window.ts`). `app/stats/page.tsx`: game-window menu per group, position kept across groups, explanatory note. Pins: `tests/stats-window.test.ts` + fixture `tests/fixtures/stats-window-2026-09-05.json`. Full write-up under INSTRUCTIONS 35–36 in `docs/session-handoff.md`.
 

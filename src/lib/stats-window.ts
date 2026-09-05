@@ -111,29 +111,66 @@ const PITCH_SUMS = [
 
 const r = (v: number, d: number) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 
+export type LogGame = { date?: string; stat?: StatMap };
+/** Oldest→newest by date (MLB's game log already is; the sort makes it a contract). */
+const chronological = (games: LogGame[]) => [...games].sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
+
 /**
- * Sum a pitcher's last `n` STARTS from his season game log (MLB returns the log
- * oldest→newest; we take from the end). Derived rates are recomputed the way the
- * league endpoint reports them (strings: era "2.97", whip "1.05", avg ".246").
- * Returns null when he has no starts at all.
+ * Sum a pitcher's last `n` games from his season game log — his last `n`
+ * STARTS when `startsOnly`, else his last `n` appearances. Derived rates are
+ * recomputed the way the league endpoint reports them (strings: era "2.97",
+ * whip "1.05", avg ".246"). Returns null when nothing qualifies.
  */
-export function aggregateStarts(gameLog: { date?: string; stat?: StatMap }[], n: number): StatMap | null {
-  const starts = gameLog.filter((g) => num(g.stat, "gamesStarted") >= 1);
-  if (starts.length === 0) return null;
-  const last = starts.slice(-n);
+export function aggregatePitching(gameLog: LogGame[], n: number, startsOnly: boolean): StatMap | null {
+  const pool = chronological(gameLog).filter((g) => g.stat && (!startsOnly || num(g.stat, "gamesStarted") >= 1));
+  if (pool.length === 0) return null;
+  const last = pool.slice(-n);
   const out: StatMap = {};
   for (const k of PITCH_SUMS) out[k] = last.reduce((a, g) => a + num(g.stat, k), 0);
   // a game log row carries `outs`; fall back to its inningsPitched when it doesn't
   if (!num(out, "outs")) out.outs = last.reduce((a, g) => a + ipToOuts(g.stat?.inningsPitched), 0);
   const outs = num(out, "outs");
   out.gamesPlayed = last.length;
-  out.gamesStarted = last.length;
+  if (startsOnly) out.gamesStarted = last.length;
   out.inningsPitched = outsToIp(outs);
   out.era = outs > 0 ? r((num(out, "earnedRuns") * 27) / outs, 2) : "-.--";
   out.whip = outs > 0 ? r(((num(out, "hits") + num(out, "baseOnBalls")) * 3) / outs, 2) : "-.--";
   out.strikeoutsPer9Inn = outs > 0 ? r((num(out, "strikeOuts") * 27) / outs, 2) : "-.--";
   out.avg = num(out, "atBats") > 0 ? r(num(out, "hits") / num(out, "atBats"), 3).replace(/^0/, "") : ".---";
-  out.windowSource = "starts";
+  out.windowSource = startsOnly ? "starts" : "appearances";
+  return out;
+}
+/** The starts-only case the Stats table route needs. */
+export const aggregateStarts = (gameLog: LogGame[], n: number) => aggregatePitching(gameLog, n, true);
+
+const HIT_SUMS = [
+  "plateAppearances", "atBats", "runs", "hits", "doubles", "triples", "homeRuns", "totalBases", "rbi",
+  "baseOnBalls", "hitByPitch", "sacFlies", "stolenBases", "strikeOuts",
+] as const;
+
+/**
+ * Sum a hitter's last `n` games PLAYED from his game log (every log row is a
+ * game he appeared in) and recompute AVG/OBP/SLG/OPS from the sums — the feed's
+ * per-game avg/obp/slg are season-to-date, never the window's.
+ */
+export function aggregateHitting(gameLog: LogGame[], n: number): StatMap | null {
+  const pool = chronological(gameLog).filter((g) => g.stat);
+  if (pool.length === 0) return null;
+  const last = pool.slice(-n);
+  const out: StatMap = {};
+  for (const k of HIT_SUMS) out[k] = last.reduce((a, g) => a + num(g.stat, k), 0);
+  out.gamesPlayed = last.length;
+  const ab = num(out, "atBats"), h = num(out, "hits");
+  const obpDen = ab + num(out, "baseOnBalls") + num(out, "hitByPitch") + num(out, "sacFlies");
+  const avg = ab > 0 ? h / ab : NaN;
+  const obp = obpDen > 0 ? (h + num(out, "baseOnBalls") + num(out, "hitByPitch")) / obpDen : NaN;
+  const slg = ab > 0 ? num(out, "totalBases") / ab : NaN;
+  const r3 = (v: number) => (Number.isFinite(v) ? v.toFixed(3).replace(/^0/, "") : "—");
+  out.avg = r3(avg);
+  out.obp = r3(obp);
+  out.slg = r3(slg);
+  out.ops = Number.isFinite(obp) && Number.isFinite(slg) ? r3(obp + slg) : "—";
+  out.windowSource = "games";
   return out;
 }
 

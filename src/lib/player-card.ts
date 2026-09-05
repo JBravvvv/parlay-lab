@@ -8,11 +8,15 @@
  * Roster Lab's card is fed by an ESPN fantasy league; Parlay Lab has no league,
  * so every figure here maps to its MLB Stats API equivalent and is labelled
  * honestly: header tiles are OPS / HR / AVG (hitters) or ERA / K / WHIP
- * (pitchers), the split table is season + last 7 / 15 / 30 days via
- * `stats=byDateRange`, the bar chart is total bases (hitters) or strikeouts
- * (pitchers) per game over the last 30 days, and the game log is
- * `stats=gameLog`. Nothing is invented: a window statsapi answers empty for
- * renders as "no games in window", never as zeros.
+ * (pitchers), the split table is season + GAME windows cut from the game log
+ * (INSTRUCTION 37, 2026-09-04, Josh: "change everything that shows those stats
+ * to the new way" — hitters last 7 / 15 / 30 games PLAYED; starters last
+ * 3 / 5 / 10 STARTS; relievers last 3 / 5 / 10 appearances; rates recomputed
+ * from the sums in src/lib/stats-window.ts), the bar chart is total bases
+ * (hitters, last 30 games) or strikeouts (pitchers, last 10 starts /
+ * appearances) per game, and the game log is `stats=gameLog`. Nothing is
+ * invented: a window with no games renders as "no games in window", never as
+ * zeros. (Until 2026-09-04 the windows were `stats=byDateRange` calendar days.)
  *
  * Also here: name resolution. Most click sites carry only a printed name (and
  * sometimes a team abbreviation), not an MLB id — `resolvePlayer` matches a
@@ -21,6 +25,7 @@
  */
 
 import { TEAM_ABBR } from "@/lib/pvt";
+import { WINDOW_GAMES, aggregateHitting, aggregatePitching, isStarter } from "@/lib/stats-window";
 
 /* ---------------- name normalisation + resolution ---------------- */
 
@@ -112,15 +117,6 @@ export function resolvePlayer(index: IndexEntry[], name: string, team?: string |
     if (byTeam.length === 1) return pick(byTeam[0], "initial");
   }
   return null;
-}
-
-/* ---------------- date windows (PT calendar arithmetic, no clock read) ---------------- */
-
-export function windowDates(today: string, days: number): { startDate: string; endDate: string } {
-  const [y, m, d] = today.split("-").map(Number);
-  const start = new Date(Date.UTC(y, m - 1, d));
-  start.setUTCDate(start.getUTCDate() - (days - 1));
-  return { startDate: start.toISOString().slice(0, 10), endDate: today };
 }
 
 /* ---------------- statsapi shapes (only the fields read) ---------------- */
@@ -299,9 +295,6 @@ export function shapeCard(input: {
   isPitcher: boolean;
   season: number;
   seasonDoc: StatsDoc | null;
-  last7: StatsDoc | null;
-  last15: StatsDoc | null;
-  last30: StatsDoc | null;
   gameLog: StatsDoc | null;
   today: string;
 }): PlayerCard | null {
@@ -325,19 +318,20 @@ export function shapeCard(input: {
       ];
 
   const cellsOf = isPitcher ? pitSplitCells : batSplitCells;
-  const splitRow = (label: string, doc: StatsDoc | null): SplitRow => {
-    const s = firstSplit(doc);
-    return { label, cells: s ? cellsOf(s) : null, games: s ? num(s, "gamesPlayed") : 0 };
-  };
+  const rawLog = input.gameLog?.stats?.[0]?.splits ?? [];
+  const logGames = rawLog.filter((g) => g.stat && g.date).map((g) => ({ date: g.date, stat: g.stat }));
+  // starters' windows are starts — the same rule the Stats table applies (GS ≥ max(1, G/2))
+  const starter = isPitcher && !!seasonStat && isStarter(num(seasonStat, "gamesPlayed"), num(seasonStat, "gamesStarted"));
+  const unit = isPitcher ? (starter ? "starts" : "games") : "games";
+  const windowStat = (n: number): Stat | null =>
+    isPitcher ? aggregatePitching(logGames, n, starter) : aggregateHitting(logGames, n);
+  const rowOf = (label: string, s: Stat | null): SplitRow => ({ label, cells: s ? cellsOf(s) : null, games: s ? num(s, "gamesPlayed") : 0 });
   const splits: SplitRow[] = [
-    splitRow(String(input.season), input.seasonDoc),
-    splitRow("Last 7", input.last7),
-    splitRow("Last 15", input.last15),
-    splitRow("Last 30", input.last30),
+    rowOf(String(input.season), seasonStat),
+    ...WINDOW_GAMES[isPitcher ? "pitching" : "hitting"].map((n) => rowOf(`Last ${n} ${unit}`, windowStat(n))),
   ];
 
   const logCells = isPitcher ? pitLogCells : batLogCells;
-  const rawLog = input.gameLog?.stats?.[0]?.splits ?? [];
   const log: LogRow[] = rawLog
     .filter((g) => g.stat && g.date)
     .map((g) => {
@@ -354,12 +348,17 @@ export function shapeCard(input: {
     })
     .sort((a, b) => b.date.localeCompare(a.date) || (b.gamePk ?? 0) - (a.gamePk ?? 0));
 
-  const { startDate } = windowDates(input.today, 30);
+  // chart = the longest window, per game, chronological (hitters 30 games; pitchers 10 starts / appearances)
+  const chartN = WINDOW_GAMES[isPitcher ? "pitching" : "hitting"].at(-1)!;
   const chartKey = isPitcher ? "strikeOuts" : "totalBases";
-  const points: ChartPoint[] = rawLog
-    .filter((g) => g.stat && g.date && g.date >= startDate && g.date <= input.today)
+  const points: ChartPoint[] = logGames
+    .filter((g) => !starter || num(g.stat, "gamesStarted") >= 1)
     .map((g) => ({ date: g.date!, v: num(g.stat, chartKey) }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-chartN);
+  const chartLabel = isPitcher
+    ? `Strikeouts by game — last ${chartN} ${starter ? "starts" : "appearances"}`
+    : `Total bases by game — last ${chartN} games`;
 
   return {
     id: p.id,
@@ -377,7 +376,7 @@ export function shapeCard(input: {
     tiles,
     splitHeaders: isPitcher ? PIT_SPLIT_HEADERS : BAT_SPLIT_HEADERS,
     splits,
-    chart: { label: isPitcher ? "Strikeouts by game — last 30 days" : "Total bases by game — last 30 days", points },
+    chart: { label: chartLabel, points },
     logHeaders: isPitcher ? PIT_LOG_HEADERS : BAT_LOG_HEADERS,
     log,
   };
