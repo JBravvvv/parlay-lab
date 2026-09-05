@@ -395,7 +395,7 @@ export function CfbPicksBoard() {
                 {propsQ.data.live ? ` · ${propsQ.data.live} in play` : ""} · cached {cfbCacheLabel(propsQ.data)}
                 {propsQ.data.capped ? ` · capped at ${CFB_PROPS.maxEvents} priced games per slate` : ""}
                 {propsQ.data.stale
-                  ? ` · lines as priced at ${cfbPricedAtLabel(propsQ.data)} — today's props budget is used up`
+                  ? ` · ${propsQ.data.live || "some"} in-play game${propsQ.data.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(propsQ.data)}${propsQ.data.budgeted ? " — today's props budget is used up" : ""}`
                   : propsQ.data.budgeted
                     ? " · today's props budget is used up — more games price again tomorrow"
                     : ""}

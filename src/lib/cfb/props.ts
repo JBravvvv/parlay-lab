@@ -279,14 +279,23 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
  * Which games get a per-event props pull (INSTRUCTION 40, 2026-09-05: live games included).
  * A game qualifies when it is UPCOMING with its kickoff still ahead, or LIVE (in play) — never
  * final or postponed — AND it is matched to an odds event AND Caesars posts a price on at least
- * one side (no Caesars → nothing to settle at). Order: live games first (the in-play board Josh
- * asked for), then by kickoff, then ranked teams first (best rank of the two), then ESPN id;
- * sliced to `max`. Rows from a live game keep status "live" (parseEventProps copies the game's
- * status), so the Board's LIVE / MIXED parlays keep working off the same feed.
+ * one side (no Caesars → nothing to settle at).
+ *
+ * Two pools (2026-09-05, same-day follow-up to INSTRUCTION 40, read on prod: with one sorted list
+ * capped at `max`, nine in-play afternoon games filled the whole list and the twenty-plus evening
+ * kickoffs got no props at all): the in-play games, at most `liveMax` of them (`liveMaxEvents`),
+ * then the pre-kick games, at most `max` of them (`maxEvents`). Inside each pool the order is
+ * kickoff, then ranked teams first (best rank of the two), then ESPN id. `capped` is true when
+ * either pool overflowed. Rows from a live game keep status "live" (parseEventProps copies the
+ * game's status), so the Board's LIVE / MIXED parlays keep working off the same feed.
  */
-export function selectPropEvents(board: CfbBoard, now: number, max: number = CFB_PROPS.maxEvents): { events: CfbGame[]; capped: boolean } {
+export function selectPropEvents(
+  board: CfbBoard,
+  now: number,
+  max: number = CFB_PROPS.maxEvents,
+  liveMax: number = CFB_PROPS.liveMaxEvents,
+): { events: CfbGame[]; capped: boolean } {
   const bestRank = (g: CfbGame) => Math.min(g.home.rank ?? 99, g.away.rank ?? 99);
-  const liveRank = (g: CfbGame) => (g.status === "live" ? 0 : 1);
   const eligible = board.games.filter((g) => {
     if (!g.oddsEventId || !g.rows.some((r) => !!r.cz)) return false;
     if (g.status === "live") return true;
@@ -295,12 +304,18 @@ export function selectPropEvents(board: CfbBoard, now: number, max: number = CFB
   });
   eligible.sort(
     (a, b) =>
-      liveRank(a) - liveRank(b) ||
       Date.parse(a.start) - Date.parse(b.start) ||
       bestRank(a) - bestRank(b) ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
-  return { events: eligible.slice(0, Math.max(0, max)), capped: eligible.length > max };
+  const live = eligible.filter((g) => g.status === "live");
+  const upcoming = eligible.filter((g) => g.status !== "live");
+  const liveCap = Math.max(0, liveMax);
+  const upCap = Math.max(0, max);
+  return {
+    events: [...live.slice(0, liveCap), ...upcoming.slice(0, upCap)],
+    capped: live.length > liveCap || upcoming.length > upCap,
+  };
 }
 
 /** true when any of the priced events is in play */

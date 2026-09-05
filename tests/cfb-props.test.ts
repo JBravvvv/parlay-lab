@@ -365,6 +365,32 @@ describe("selectPropEvents", () => {
     const liveNoEvent: CfbBoard = { ...live, games: live.games.map((g) => (g.home.abbr === "OSU" ? { ...g, oddsEventId: null } : g)) };
     expect(selectPropEvents(liveNoEvent, NOW).events.map((g) => g.home.abbr)).not.toContain("OSU");
   });
+  /* 2026-09-05 (same-day follow-up, read on prod after the INSTRUCTION 40 deploy): nine in-play
+     afternoon games filled all 12 slots of the single sorted list, so the twenty-plus evening
+     kickoffs got no props at all. Live games and pre-kick games now have their own pools. */
+  it("live games never crowd out the pre-kick pool: at most liveMaxEvents live PLUS up to maxEvents upcoming", () => {
+    const upcomingIds = selectPropEvents(board, NOW).events.map((g) => g.id);
+    expect(upcomingIds.length).toBeGreaterThan(CFB_PROPS.liveMaxEvents + 1);
+    // flip more games live than the live pool holds (their kickoffs are still ahead of NOW — status is ESPN's word)
+    const liveIds = new Set(upcomingIds.slice(0, CFB_PROPS.liveMaxEvents + 2));
+    const many: CfbBoard = { ...board, games: board.games.map((g) => (liveIds.has(g.id) ? { ...g, status: "live" as const, detail: "1st 10:00" } : g)) };
+    const { events, capped } = selectPropEvents(many, NOW);
+    const live = events.filter((g) => g.status === "live");
+    const upcoming = events.filter((g) => g.status === "upcoming");
+    expect(live).toHaveLength(CFB_PROPS.liveMaxEvents);
+    expect(capped).toBe(true); // the live pool overflowed by two
+    expect(events.slice(0, live.length).every((g) => g.status === "live")).toBe(true); // live first
+    // every pre-kick game still gets its slot: the whole upcoming remainder, up to maxEvents
+    const upcomingLeft = upcomingIds.filter((id) => !liveIds.has(id));
+    expect(upcoming.map((g) => g.id)).toEqual(upcomingLeft.slice(0, CFB_PROPS.maxEvents));
+    expect(upcoming.length).toBeLessThanOrEqual(CFB_PROPS.maxEvents);
+    // the two pools are independent: a smaller live cap changes only the live count
+    const two = selectPropEvents(many, NOW, CFB_PROPS.maxEvents, 2);
+    expect(two.events.filter((g) => g.status === "live")).toHaveLength(2);
+    expect(two.events.filter((g) => g.status === "upcoming").map((g) => g.id)).toEqual(upcoming.map((g) => g.id));
+    // and with the live pool empty, `capped` is still an honest word on the upcoming pool alone
+    expect(selectPropEvents(board, NOW, 3).capped).toBe(true);
+  });
   it("rows parsed for a live game keep status 'live' (the Board's LIVE parlays read it) and are not 'playable' (no pre-kick Kelly)", () => {
     const liveAla = withStatus("ALA", "live", { detail: "3rd 4:12", homeScore: 21, awayScore: 7 }).games.find((g) => g.home.abbr === "ALA") as CfbGame;
     const liveRows = parseEventProps(EVENT, liveAla, { now: LATE, bankroll: 2500 });

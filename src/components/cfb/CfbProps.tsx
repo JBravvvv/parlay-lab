@@ -737,7 +737,7 @@ export function CfbProps() {
           <p className="px-1 text-[9.5px] leading-snug text-faint">
             props for {board.fetched} of {board.events} game{board.events === 1 ? "" : "s"}
             {board.live ? ` · ${board.live} in play` : ""} · cached {cacheLabel(board)}{board.capped ? ` · capped at ${CFB_PROPS.maxEvents}` : ""}
-            {board.stale ? ` · lines as priced at ${cfbPricedAtLabel(board)} — today's props budget is used up` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""} ·
+            {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — today's props budget is used up" : ""}` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""} ·
             prices are posted quotes, never invented · the % on a leg is the model&apos;s number for that line.
           </p>
         </div>

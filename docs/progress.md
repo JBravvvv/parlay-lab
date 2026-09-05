@@ -10,6 +10,10 @@
 - Stats shows only the current desk's sport; ESPN FPI lives behind a button → overlay.
 - Parlay Calc rebuilt on src/lib/calc-math.ts with a rolling PAYS hero, ladder, presets.
 - Workflow: 29 agents, 16 confirmed review findings fixed pre-gate. Details: docs/cfb-desk.md.
+- Same-day follow-up (read on prod): live games had filled all 12 props slots, starving the
+  evening kickoffs, and the footnote blamed the budget for a merely stale board. The selector now
+  keeps two pools (≤ 6 live, then ≤ 12 pre-kick), carried rows of a kicked-off game report live /
+  not playable, and the budget is blamed only when it refused the pull.
 
 # Progress — 2026-09-05 (College Football props, freeze fix, Picks board)
 

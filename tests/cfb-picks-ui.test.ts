@@ -116,6 +116,8 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(board).toMatch(/cached \{cfbCacheLabel\(propsQ\.data\)\}/);
     expect(board).toMatch(/propsQ\.data\.live \? ` · \$\{propsQ\.data\.live\} in play` : ""/);
     expect(board).toMatch(/propsQ\.data\.stale[\s\S]*?lines as priced at \$\{cfbPricedAtLabel\(propsQ\.data\)\}/);
+    // 2026-09-05 (same-day follow-up): the budget is blamed only when it actually refused the pull
+    expect(board).toMatch(/\$\{propsQ\.data\.budgeted \? " — today's props budget is used up" : ""\}/);
     expect(board).not.toMatch(/cached \{PROPS_CACHE_H\} h/);
     expect(board).toMatch(/player props \{propsQ\.data \? cfbCacheLabel\(propsQ\.data\) : `\$\{PROPS_CACHE_H\} h`\}/);
     // the pill's title can see no board, so it names both windows

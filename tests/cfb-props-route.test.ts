@@ -448,7 +448,16 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(body.budgeted).toBe(true);
     expect(body.stale).toBe(true);
     expect(body.rows.length).toBeGreaterThan(0);
-    expect(body.rows).toEqual(stored.rows);
+    // 2026-09-05 (same-day follow-up, read on prod): carried rows adopt the CURRENT slate's status —
+    // the game that kicked off since pricing is reported live and is no longer playable; the
+    // pre-kick games' rows are carried untouched
+    const liveGameId = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    const liveRows = body.rows.filter((row) => row.gameId === liveGameId);
+    expect(liveRows.length).toBeGreaterThan(0);
+    expect(liveRows.every((row) => row.status === "live" && row.playable === false)).toBe(true);
+    expect(stored.rows.filter((row) => row.gameId === liveGameId).every((row) => row.status === "upcoming")).toBe(true);
+    expect(body.rows.filter((row) => row.gameId !== liveGameId)).toEqual(stored.rows.filter((row) => row.gameId !== liveGameId));
+    expect(body.rows.map((row) => row.key)).toEqual(stored.rows.map((row) => row.key));
     expect(body.generatedAt).toBe(stored.generatedAt); // honestly dated
     expect(body.note).toMatch(/last priced lines/);
     expect(body.live).toBe(1);
@@ -464,7 +473,11 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     fakeRedis();
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
-    expect(body.events).toBeGreaterThan(CFB_PROPS.liveMaxEvents);
+    // 2026-09-05 (same-day follow-up): the live pool is capped INSIDE selectPropEvents now, so the
+    // board reports liveMaxEvents events (all of them in play) and flags the overflow as capped
+    expect(s.games.length).toBeGreaterThan(CFB_PROPS.liveMaxEvents);
+    expect(body.events).toBe(CFB_PROPS.liveMaxEvents);
+    expect(body.capped).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(CFB_PROPS.liveMaxEvents);
     expect(body.fetched).toBe(CFB_PROPS.liveMaxEvents);
     expect(body.live).toBe(CFB_PROPS.liveMaxEvents);
@@ -583,7 +596,9 @@ describe("source pins", () => {
     expect(store).toMatch(/Math\.min\(boardWindowSec\(board\), windowSec\)/);
     expect(store).not.toMatch(/"EX", CFB_PROPS\.revalidateSec/);
     expect(route).toMatch(/boardFresh\(stored, now, windowSec\)/);
-    expect(route).toMatch(/CFB_PROPS\.liveMaxEvents/);
+    // 2026-09-05 (same-day follow-up): the live cap lives in selectPropEvents (its own pool), not the route
+    expect(readSrc("src/lib/cfb/props.ts")).toMatch(/liveMax: number = CFB_PROPS\.liveMaxEvents/);
+    expect(route).not.toMatch(/liveTaken/);
     expect(store).toMatch(/"INCRBY"/);
     expect(route).toMatch(/CFB_PROPS\.dailyBudget/);
     expect(route).toMatch(/CFB_PROPS\.measuredCreditsPerEvent/);

@@ -172,16 +172,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(body satisfies CfbPropsBoard, { headers });
   }
 
-  // What needs a fresh price this pull: the in-play events (at most liveMaxEvents, live first)
-  // and any upcoming event the carried board has no rows for. Upcoming games priced within
-  // revalidateSec ride on the stored board — their lines did not move, their credits are saved.
+  // What needs a fresh price this pull: every in-play event selected (selectPropEvents already
+  // holds them to liveMaxEvents — 2026-09-05 follow-up: the live pool no longer crowds out the
+  // pre-kick pool) and any upcoming event the carried board has no rows for. Upcoming games
+  // priced within revalidateSec ride on the stored board — their lines did not move, their
+  // credits are saved.
   const carry = stored && boardFresh(stored, now, CFB_PROPS.revalidateSec) ? stored : null;
   const carriedIds = new Set(carry ? (carry.priced ?? carry.rows.map((r) => r.gameId)) : []);
-  let liveTaken = 0;
-  const need = events.filter((g) => {
-    if (g.status === "live") return liveTaken++ < CFB_PROPS.liveMaxEvents;
-    return !carriedIds.has(g.id);
-  });
+  const need = events.filter((g) => g.status === "live" || !carriedIds.has(g.id));
 
   // Rail 2: the daily budget. Without a store there is no tally, so the cap cannot apply.
   const spentBefore = store ? await quiet(store.readSpend(ptDate), 0) : 0;
@@ -192,7 +190,15 @@ export async function GET(req: NextRequest) {
   // the games this answer carries from the stored board: everything selected that is not fetched now
   const fetchIds = new Set(toFetch.map((g) => g.id));
   const carriedNow = stored ? events.filter((g) => !fetchIds.has(g.id) && (stored.priced ?? stored.rows.map((r) => r.gameId)).includes(g.id)) : [];
-  const carriedRows = stored ? stored.rows.filter((r) => carriedNow.some((g) => g.id === r.gameId)) : [];
+  // carried rows adopt the CURRENT slate's status: a game that kicked off since its rows were
+  // priced is reported live (the Board's LIVE parlays read it) and is no longer "playable" — a
+  // pre-kick Kelly on an in-play line would be a fiction (2026-09-05 follow-up)
+  const statusNow = new Map(carriedNow.map((g) => [g.id, g.status] as const));
+  const carriedRows: CfbPropRow[] = stored
+    ? stored.rows
+        .filter((r) => statusNow.has(r.gameId))
+        .map((r) => (statusNow.get(r.gameId) === "live" && r.status !== "live" ? { ...r, status: "live", playable: false } : r))
+    : [];
   // stale: a carried game whose lines the current window would have re-priced — one the budget
   // refused, or an in-play game riding on rows older than the live window (honestly dated)
   const stale = carriedNow.some((g) => g.status === "live" || refused.some((r) => r.id === g.id));
