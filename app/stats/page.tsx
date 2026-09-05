@@ -14,6 +14,7 @@ import { ClvPanel } from "@/components/stats/ClvPanel";
 import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
 import { PlayerName } from "@/components/player/PlayerName";
+import { WINDOW_GAMES, isWindowGroup, parseWindowValue, siblingWindow, windowNote, windowValue } from "@/lib/stats-window";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -163,7 +164,10 @@ function parseFootball(d: unknown, grp: string): StatRow[] {
   return [];
 }
 
-/* ---------- upstream URL builders (verbatim from legacy) ---------- */
+/* ---------- upstream URL builders (verbatim from legacy; MLB windows re-cut 2026-09-04) ----------
+   INSTRUCTIONS 35–36: the MLB timeframe is a GAME window, not a date range. Individual
+   windows go through /api/stats/window (each player's own last N games — see
+   src/lib/stats-window.ts); team windows are MLB's team lastXGames with limit=N. */
 function apiUrl(sport: TableSportId, scope: "ind" | "team", group: string, season: number, timeframe: string) {
   if (sport !== "mlb") {
     const lg = sport === "nfl" ? "nfl" : "college-football";
@@ -173,19 +177,16 @@ function apiUrl(sport: TableSportId, scope: "ind" | "team", group: string, seaso
     const srt = { passing: "passing.passingYards", rushing: "rushing.rushingYards", receiving: "receiving.receivingYards" }[group];
     return `https://site.web.api.espn.com/apis/common/v3/sports/football/${lg}/statistics/byathlete${q}&isqualified=true&page=1&limit=350&category=offense%3A${group}&sort=${srt}%3Adesc`;
   }
-  let stat = "season", dates = "";
-  if (timeframe !== "season") {
-    const days = timeframe === "last7" ? 7 : timeframe === "last15" ? 15 : 30;
-    const end = new Date(), start = new Date();
-    start.setDate(start.getDate() - days + 1);
-    const f = (d: Date) => d.toISOString().slice(0, 10);
-    stat = "byDateRange";
-    dates = `&startDate=${f(start)}&endDate=${f(end)}`;
+  const n = parseWindowValue(timeframe);
+  if (scope === "team") {
+    const stat = n ? `lastXGames&limit=${n}` : "season";
+    return `https://statsapi.mlb.com/api/v1/teams/stats?stats=${stat}&group=${group}&season=${season}&sportId=1`;
   }
-  if (scope === "team")
-    return `https://statsapi.mlb.com/api/v1/teams/stats?stats=${stat}&group=${group}&season=${season}&sportId=1${dates}`;
-  return `https://statsapi.mlb.com/api/v1/stats?stats=${stat}&group=${group}&season=${season}&sportId=1&playerPool=All&limit=2500${dates}`;
+  if (n && isWindowGroup(group)) return `/api/stats/window?group=${group}&n=${n}&season=${season}`;
+  return `https://statsapi.mlb.com/api/v1/stats?stats=season&group=${group}&season=${season}&sportId=1&playerPool=All&limit=2500`;
 }
+/** Upstream feeds ride the generic proxy; the window route is already ours. */
+const fetchUrl = (url: string) => (url.startsWith("/api/") ? url : `/api/stats?u=${encodeURIComponent(url)}`);
 
 /* ---------- helpers (verbatim behavior) ---------- */
 const statNum = (v: unknown) => {
@@ -271,16 +272,23 @@ export default function StatsPage() {
     try { localStorage.setItem("pl_sport", JSON.stringify(s)); } catch {}
   }
   function pickGroup(g: string) {
+    // keep the window's menu position across groups: Last 15 (hitting) ↔ Last 5 (pitching)
+    const n = parseWindowValue(timeframe);
+    if (n && isWindowGroup(group) && isWindowGroup(g)) {
+      const sib = siblingWindow(group, g, n);
+      setTimeframe(sib ? windowValue(sib) : "season");
+    } else if (n) setTimeframe("season");
     setGroup(g);
     setPosition("ALL");
     setMinVal(0);
   }
+  const windowN = tableSport === "mlb" ? parseWindowValue(timeframe) : null;
 
   const url = apiUrl(tableSport, scope, group, season, tableSport === "mlb" ? timeframe : "season");
   const q = useQuery({
     queryKey: ["stats", url],
     queryFn: async (): Promise<StatRow[]> => {
-      const r = await fetch(`/api/stats?u=${encodeURIComponent(url)}`);
+      const r = await fetch(fetchUrl(url));
       if (!r.ok) throw new Error(`stats feed ${r.status}`);
       const d = await r.json();
       return tableSport === "mlb" ? parseSplits(d) : parseFootball(d, group);
@@ -417,10 +425,10 @@ export default function StatsPage() {
               {SPORTS[tableSport].seasons.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
             {tableSport === "mlb" && (
-              <select className={selectCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
-                <option value="last7">Last 7 Days</option>
-                <option value="last15">Last 15 Days</option>
-                <option value="last30">Last 30 Days</option>
+              <select className={selectCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)} aria-label="Timeframe">
+                {(isWindowGroup(group) ? WINDOW_GAMES[group] : WINDOW_GAMES.hitting).map((n) => (
+                  <option key={n} value={windowValue(n)}>Last {n} Games</option>
+                ))}
                 <option value="season">{season} Season</option>
               </select>
             )}
@@ -442,13 +450,18 @@ export default function StatsPage() {
             )}
           </div>
 
-          <div className="num mt-3 flex items-center gap-2 text-[10.5px] text-faint">
+          <div className="num mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-faint">
             <span className={`inline-block h-[7px] w-[7px] rounded-full ${q.isFetching ? "animate-pulse bg-gold" : q.data ? "bg-pos" : "bg-neg"}`} />
             {q.isFetching
-              ? "Loading live data…"
+              ? windowN && scope === "ind" ? `Cutting every ${group === "hitting" ? "hitter" : "pitcher"}'s last ${windowN} games…` : "Loading live data…"
               : q.data
                 ? `Live · ${new Date(q.dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${all.length.toLocaleString()} ${scope === "team" ? "teams" : "players"}`
                 : "No data"}
+            {windowN && isWindowGroup(group) && (
+              <span className="text-muted" data-testid="window-note">
+                · {scope === "team" ? `Each team's last ${windowN} games` : windowNote(group, windowN)}
+              </span>
+            )}
           </div>
           </>)}
         </Panel>
