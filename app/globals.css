@@ -588,7 +588,10 @@ body::after {
 }
 
 /* ---- chip-row: a one-line horizontally scrolling chip strip (sport tabs, markets),
-   scrollbar hidden, edge padding so the first/last chip clears the screen edge */
+   scrollbar hidden, edge padding so the first/last chip clears the screen edge.
+   INSTRUCTION 42 (2026-09-05, review fix): only the BLOCK padding is set here — this rule is
+   unlayered, so a `padding` shorthand beat every layered Tailwind `px-*` on the element and
+   the first pill sat flush to the screen edge; the callers' own `px-4` now applies. */
 .chip-row {
   display: flex;
   gap: 8px;
@@ -597,7 +600,7 @@ body::after {
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 2px 0 6px;
+  padding-block: 2px 6px;
   scroll-padding-inline: 12px;
 }
 .chip-row::-webkit-scrollbar { display: none; }

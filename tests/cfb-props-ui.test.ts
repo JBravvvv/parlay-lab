@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { CFB_PROP_MARKETS } from "@/lib/cfb/props-types";
+import { CFB_PROPS } from "@/lib/cfb/rules";
 import { addCfbLeg, type CfbSlipLeg } from "@/components/cfb/CfbSlip";
 
 /**
@@ -145,6 +146,12 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).not.toMatch(/overflow-x-auto/);
     const css = read("app/globals.css");
     expect(css).toMatch(/\.odds-cell \{[^}]*min-height: 44px/);
+  });
+  it("the 'capped at N' footnote reads CFB_PROPS.maxEvents, never a literal (INSTRUCTION 42, 2026-09-05: 12 → 60)", () => {
+    expect(props).toMatch(/capped at \$\{CFB_PROPS\.maxEvents\}/);
+    expect(props).not.toMatch(/capped at 12/);
+    expect(CFB_PROPS.maxEvents).toBe(60);
+    expect(CFB_PROPS.liveMaxEvents).toBe(24);
   });
   it("no history-pushing navigation and no blur filter anywhere in the file", () => {
     expect(props).not.toMatch(/router\.push/);

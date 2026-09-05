@@ -115,26 +115,66 @@ export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/f
     for `boardRetainSec`, well past its window, and when the budget refuses a pull the route
     serves that last good board flagged `stale: true` instead of an empty one — lines a bettor
     can read, honestly dated, never fabricated. A Saturday with N games in play at once costs
-    about N × 31 credits per 10 min; the daily budget still caps the total. */
+    about N × 31 credits per 10 min; the daily budget still caps the total.
+
+    EVERY ELIGIBLE GAME PRICED (INSTRUCTION 42, 2026-09-05) — Josh: "Its only showing ANYTIME TD
+    picks for 3 games under 'ALL' ... There are a ton of games live and a ton of games the rest
+    of the day. It should be grading every possible pick available on the board that falls under
+    those props". The 12 / 6 caps were the bottleneck: a 60-plus-game Saturday priced twelve
+    pre-kick games and six in play. The pools are now `maxEvents` 60 pre-kick and `liveMaxEvents`
+    24 in play, so every game the slate can carry (odds event + a Caesars side) gets its props
+    pull, and `dailyBudget` rises to 2500 to pay for it. The cost math, worst case: 60 × 31 =
+    1860 credits per 2 h pre-kick re-price, plus up to 24 × 31 = 744 per 10-min live pull —
+    uncapped that is far past any day, so the 2500/day rail stays the hard stop (spend past it
+    serves the last board, stale). Two savers keep the real spend well under the worst case:
+    (a) the EMPTY-EVENT RULE (route) — an event whose last pull returned ZERO rows is not
+    re-pulled until `revalidateSec` after its own `pricedAt`, even when it is live, because many
+    small games carry no player props at the API and re-asking every 10 min bought nothing;
+    (b) per-event `pricedAt` on the stored board, so an upcoming game rides on its own 2 h window
+    whatever the board's window is. Josh's Odds API month had 16,480 credits left when read
+    2026-09-05.
+
+    WHAT THE 2500/DAY RAIL MEANS ON A FULL SATURDAY (2026-09-05, review finding — a contract
+    decision, not a code fix; the numbers below are pinned by the shared contract): one 60-game
+    pre-kick pull books 1860 credits and leaves 640 = 20 event-pulls for the rest of the day. The
+    first live pull with 24 in-play games that carry rows wants 744, so it gets 20 of them and every
+    10-min pull after that gets none — the props board then serves its last priced lines, flagged
+    `stale: true`, for the remainder of the Pacific day (the 2 h upcoming re-price is refused the
+    same way). A mid-day cold start needing 60 + 24 events (2604) prices 80 and is done. Uncapped,
+    24 live games for a 6-hour afternoon would be ~26,800 credits — more than the whole month left.
+    The rail, the stale flag and the budget note all behave as designed; what they cannot do is
+    fund a 24 × 10-min live cadence inside 2500 credits. Closing that gap means one of: a longer
+    live cadence (30 min ≈ 8,900 per afternoon), a smaller live pool, or a daily budget reconciled
+    with the monthly balance — and telling Josh plainly that live props freeze mid-afternoon until
+    one of those is chosen. */
 export const CFB_PROPS = {
-  maxEvents: 12,
+  /** pre-kick events priced per slate (INSTRUCTION 42, 2026-09-05: was 12 — every eligible game now) */
+  maxEvents: 60,
   revalidateSec: 7200,
   /** the cache window (s) when any priced event is in play — in-game lines move */
   liveRevalidateSec: 600,
-  /** in-play events a live re-price may fetch per pull (the upcoming games' rows are carried over) */
-  liveMaxEvents: 6,
+  /** in-play events a live re-price may fetch per pull (the upcoming games' rows are carried over; INSTRUCTION 42: was 6) */
+  liveMaxEvents: 24,
   /** how long the last good board stays in Redis past its window — the stale fallback once the budget is spent */
   boardRetainSec: 36 * 3600,
   regions: "us",
   minBooks: 2,
   settleBook: "williamhill_us",
-  /** credits the props route may spend per Pacific day */
-  dailyBudget: 1200,
+  /** credits the props route may spend per Pacific day (INSTRUCTION 42, 2026-09-05: was 1200) */
+  dailyBudget: 2500,
   /** measured 2026-09-05 (~753 credits / 24 events); the budget estimate's per-event cost */
   measuredCreditsPerEvent: 31,
 } as const;
 
-/** Suggested parlays by tier: leg counts, price bands, and the per-leg / per-game gates. */
+/** Suggested parlays by tier: leg counts, price bands, and the per-leg / per-game gates.
+
+    INSTRUCTION 42 (2026-09-05, Josh, verbatim): "Under the 'generated parlays' on board tab,
+    there needs to be A TON more. There should be 50 parlay options under each category (ML,
+    spread, Anytime TD, Pass TD, Pass Yards, Receiving Yards, Combos, etc) The live parlay
+    section and combo section (that has live & pregame picks on the same ticket) should still
+    be generating picks as well". `perCategory` (50) caps each of the twelve category sets in
+    CfbPicks.sets (CFB_PARLAY_CATEGORIES); `perView` stays for the legacy tiered "parlays"
+    view. Single-market sets hold one leg per game; combo / mixed / live keep `maxPerGame`. */
 export const CFB_PARLAYS = {
   safer: { legs: { min: 2, max: 3 }, minLegProb: 0.58, maxDec: 3.5 },
   longshot: { legs: { min: 4, max: 6 }, minDec: 8, maxDec: 60 },
@@ -142,7 +182,10 @@ export const CFB_PARLAYS = {
   /** a leg needs at least this % EV at Caesars (grade D or better, never an F) */
   minLegEvPct: -3,
   maxPerGame: 2,
+  /** legacy tiered view: tickets per tier */
   perView: 6,
+  /** INSTRUCTION 42: ranked tickets per category set */
+  perCategory: 50,
 } as const;
 
 export const CFB_ROUTES = {

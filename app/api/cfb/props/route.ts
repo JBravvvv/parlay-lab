@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
 import { ctxLookup, loadCfbPropsContext } from "@/lib/cfb/props-context";
 import { parseEventProps, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
-import { affordableEvents, boardFresh, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
+import { affordableEvents, boardFresh, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
 import { CFB_PROPS_ODDS_MARKETS, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_BANK_BASE, CFB_PROPS } from "@/lib/cfb/rules";
 import { espnEvents, quotaOf, slateFromEspn, type CfbQuota } from "@/lib/cfb/slate-server";
@@ -32,6 +32,16 @@ import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
  * live first) plus any upcoming event the stored board has no rows for; every other upcoming
  * game's rows are carried over from the stored board while that board is inside revalidateSec.
  * A full 12-event pull every 10 min would have spent the day's 1200 credits in four pulls.
+ *
+ * EVERY ELIGIBLE GAME, PER-GAME WINDOWS (INSTRUCTION 42, 2026-09-05): the pools are now 60 pre-kick
+ * and 24 in play (CFB_PROPS), the budget 2500/day. Two savers pay for that: (1) the stored board
+ * carries `pricedAt[gameId]` — the instant each game was last pulled — so an upcoming game rides on
+ * ITS OWN 2 h window (`pricedAgeMs`, falling back to `generatedAt` for boards written before the
+ * field existed) rather than the board's, which under a live slate was only 10 min and had every
+ * upcoming game re-priced each pull; (2) the EMPTY-EVENT RULE — an event whose last pull returned
+ * ZERO rows (many small games carry no player props at the API) is not asked again until
+ * revalidateSec after its pricedAt, live or not. A live event WITH rows still re-prices every
+ * liveRevalidateSec, as before.
  *
  * QUOTA (re-measured 2026-09-05 on prod): a fresh per-event call costs about 31 credits, not
  * the 6 the endpoint's pricing note suggests — a 24-event pull read ~753 credits off
@@ -148,6 +158,7 @@ export async function GET(req: NextRequest) {
     live: liveEvents,
     ttlSec: windowSec,
     priced: [],
+    pricedAt: {},
   });
   if (!key || slate.oddsMissing) {
     return NextResponse.json(empty(true, slate.quota), { headers });
@@ -172,14 +183,30 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(body satisfies CfbPropsBoard, { headers });
   }
 
-  // What needs a fresh price this pull: every in-play event selected (selectPropEvents already
-  // holds them to liveMaxEvents — 2026-09-05 follow-up: the live pool no longer crowds out the
-  // pre-kick pool) and any upcoming event the carried board has no rows for. Upcoming games
-  // priced within revalidateSec ride on the stored board — their lines did not move, their
-  // credits are saved.
-  const carry = stored && boardFresh(stored, now, CFB_PROPS.revalidateSec) ? stored : null;
-  const carriedIds = new Set(carry ? (carry.priced ?? carry.rows.map((r) => r.gameId)) : []);
-  const need = events.filter((g) => g.status === "live" || !carriedIds.has(g.id));
+  // What needs a fresh price this pull (INSTRUCTION 42, 2026-09-05 — per-game windows): a game is
+  // CARRIED from the stored board when it is on it and its own `pricedAt` (else the board's
+  // generatedAt) is inside revalidateSec — whatever window the board as a whole was written under.
+  // An UPCOMING game inside that window rides on its stored rows (lines did not move, credits
+  // saved). A LIVE game re-prices every pull — UNLESS its last pull returned zero rows: the
+  // EMPTY-EVENT RULE holds it for the same 2 h, because a game with no player props at the API
+  // does not grow any by being asked every 10 min. Never priced, or priced too long ago → fetched.
+  const storedIds = new Set(stored ? (stored.priced ?? stored.rows.map((r) => r.gameId)) : []);
+  const storedRowCount = new Map<string, number>();
+  for (const r of stored?.rows ?? []) storedRowCount.set(r.gameId, (storedRowCount.get(r.gameId) ?? 0) + 1);
+  const insideOwnWindow = (g: CfbGame): boolean => {
+    if (!stored || !storedIds.has(g.id)) return false;
+    const age = pricedAgeMs(stored, g.id, now);
+    return age != null && age <= CFB_PROPS.revalidateSec * 1000;
+  };
+  // live games held by the empty-event rule this pull (they are carried, and carry no stale lines)
+  const emptyHeld = new Set<string>();
+  const need = events.filter((g) => {
+    if (!insideOwnWindow(g)) return true;
+    if (g.status !== "live") return false;
+    if ((storedRowCount.get(g.id) ?? 0) > 0) return true;
+    emptyHeld.add(g.id);
+    return false;
+  });
 
   // Rail 2: the daily budget. Without a store there is no tally, so the cap cannot apply.
   const spentBefore = store ? await quiet(store.readSpend(ptDate), 0) : 0;
@@ -189,7 +216,7 @@ export async function GET(req: NextRequest) {
   const refused = need.slice(allowed);
   // the games this answer carries from the stored board: everything selected that is not fetched now
   const fetchIds = new Set(toFetch.map((g) => g.id));
-  const carriedNow = stored ? events.filter((g) => !fetchIds.has(g.id) && (stored.priced ?? stored.rows.map((r) => r.gameId)).includes(g.id)) : [];
+  const carriedNow = stored ? events.filter((g) => !fetchIds.has(g.id) && storedIds.has(g.id)) : [];
   // carried rows adopt the CURRENT slate's status: a game that kicked off since its rows were
   // priced is reported live (the Board's LIVE parlays read it) and is no longer "playable" — a
   // pre-kick Kelly on an in-play line would be a fiction (2026-09-05 follow-up)
@@ -201,13 +228,22 @@ export async function GET(req: NextRequest) {
     : [];
   // stale: a carried game whose lines the current window would have re-priced — one the budget
   // refused, or an in-play game riding on rows older than the live window (honestly dated)
-  const stale = carriedNow.some((g) => g.status === "live" || refused.some((r) => r.id === g.id));
+  const stale = carriedNow.some((g) => (g.status === "live" && !emptyHeld.has(g.id)) || refused.some((r) => r.id === g.id));
   const budgetNote = budgeted
     ? allowed === 0
       ? `today's props budget (${CFB_PROPS.dailyBudget} credits) is used up — ${stale ? "showing the last priced lines" : "more games price again tomorrow"}`
       : `today's props budget (${CFB_PROPS.dailyBudget} credits) covers ${allowed} of ${need.length} games — the rest ${stale ? "show their last priced lines" : "price again tomorrow"}`
     : undefined;
   const priced = (rows: CfbPropRow[], fetchedIds: string[]) => Array.from(new Set([...fetchedIds, ...rows.map((r) => r.gameId)]));
+  // when each game on the answer was last pulled: now for the games fetched this pull, the stored
+  // board's own stamp (else its generatedAt) for the carried ones (INSTRUCTION 42)
+  const nowIso = new Date(now).toISOString();
+  const pricedAt = (ids: string[], fetchedIds: string[]): Record<string, string> => {
+    const fetchedSet = new Set(fetchedIds);
+    const out: Record<string, string> = {};
+    for (const id of ids) out[id] = fetchedSet.has(id) ? nowIso : (stored?.pricedAt?.[id] ?? stored?.generatedAt ?? nowIso);
+    return out;
+  };
 
   if (toFetch.length === 0) {
     // nothing to fetch: the stored board (any age) with every selected game it carries, or an empty answer
@@ -221,7 +257,8 @@ export async function GET(req: NextRequest) {
         budgeted,
         stale,
         spentToday: store ? spentBefore : null,
-        priced: priced(carriedRows, []),
+        priced: priced(carriedRows, carriedNow.map((g) => g.id)),
+        pricedAt: pricedAt(priced(carriedRows, carriedNow.map((g) => g.id)), []),
         ...(budgetNote ? { note: budgetNote } : {}),
       };
       return NextResponse.json(body, { headers });
@@ -272,10 +309,13 @@ export async function GET(req: NextRequest) {
     spentToday,
     live,
     ttlSec: windowSec,
-    priced: priced(rows, fetchedIds),
+    priced: priced(rows, [...fetchedIds, ...carriedNow.map((g) => g.id)]),
+    pricedAt: pricedAt(priced(rows, [...fetchedIds, ...carriedNow.map((g) => g.id)]), fetchedIds),
     ...(budgetNote ? { note: budgetNote } : {}),
   };
-  if (store && fetched > 0) await quiet(store.writeBoard(date, body), undefined);
+  // INSTRUCTION 42 (2026-09-05, review fix): a failed board write is no longer swallowed silently —
+  // the answer says so, because the next request then has no carried rows or pricedAt to lean on
+  if (store && fetched > 0 && !(await quiet(store.writeBoard(date, body).then(() => true), false))) body.storeWriteFailed = true;
   const res = NextResponse.json(body, { headers });
   if (quota?.remaining != null) res.headers.set("x-requests-remaining", String(quota.remaining));
   if (quota?.used != null) res.headers.set("x-requests-used", String(quota.used));

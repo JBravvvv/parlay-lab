@@ -1,3 +1,13 @@
+# Progress — 2026-09-05 (every CFB game priced, live picks under ALL, 50 parlays per category)
+
+## INSTRUCTION 42 — grade every pick, 50 parlays per category
+- Props price every eligible game (60 pre-kick / 24 live pools, 2,500 credits a day); a game
+  with no props at the API is not re-pulled for 2 h; the stored board is chunked for Upstash.
+- Live sides and props are graded under ALL with a LIVE tag; twelve parlay categories with up
+  to 50 tickets each (ML … REC YDS, COMBOS, MIXED, LIVE); leg counts spread 2–6.
+- Open for Josh: 24 live games × 31 credits per 10 min spends the day cap in ~3 pulls, then
+  the board serves its last priced lines flagged stale — the cap / Odds API plan is his call.
+
 # Progress — 2026-09-05 (ALL scope shows only Caesars-posted lines)
 
 ## INSTRUCTION 41 — hide non-Caesars lines from ALL; Caesars stays the book

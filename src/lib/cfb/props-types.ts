@@ -103,10 +103,24 @@ export type CfbPropsBoard = {
   priced?: string[];
   /** true when the answer carries lines the current window would have re-priced but the daily budget refused — read `generatedAt` */
   stale?: boolean;
+  /** ISO instant each game in `priced` was last pulled from the API (INSTRUCTION 42, 2026-09-05) — the
+      empty-event rule and the per-game carry window read it; a game absent here (boards written
+      before the field existed) is dated by `generatedAt` */
+  pricedAt?: Record<string, string>;
+  /** INSTRUCTION 42 (2026-09-05, review fix): true when this answer's board could not be persisted to
+      the store (the write threw) — the next request then has no carried rows / pricedAt to lean on */
+  storeWriteFailed?: boolean;
 };
 
 export type CfbParlayTier = "SAFER" | "LONGSHOT" | "MIX";
 export type CfbParlayView = "parlays" | "mixed" | "live";
+
+/** INSTRUCTION 42 (2026-09-05): the twelve parlay category sets, in the Board's pill order —
+    one per side market, one per prop market, COMBOS (side + prop on one pregame ticket), MIXED
+    (a live leg beside pregame legs) and LIVE (in-play legs only). Up to CFB_PARLAYS.perCategory
+    ranked tickets each. */
+export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
+export type CfbParlayCategory = (typeof CFB_PARLAY_CATEGORIES)[number];
 
 export type CfbParlayLeg = {
   kind: "side" | "prop";
@@ -123,12 +137,17 @@ export type CfbParlayLeg = {
   market: string;
   player?: string | null;
   teamId?: string | null;
+  /** INSTRUCTION 42 (2026-09-05, review fix): true when the leg's game was in play when priced —
+      a MIXED ticket tags that leg instead of badging the whole ticket LIVE */
+  live?: boolean;
 };
 
 export type CfbParlay = {
   id: string;
   view: CfbParlayView;
   tier: CfbParlayTier;
+  /** INSTRUCTION 42: the category set the ticket belongs to (legacy tiered tickets are classified by their legs) */
+  category: CfbParlayCategory;
   /** "SIDES" | "PROPS" | "MIXED" | "LIVE" */
   type: string;
   name: string;
@@ -167,9 +186,16 @@ export type CfbPickRow = {
 export type CfbPicks = {
   date: string;
   generatedAt: string;
+  /** the legacy tiered upcoming set (SAFER / LONGSHOT / MIX, perView each) */
   parlays: CfbParlay[];
+  /** = sets.mixed */
   mixed: CfbParlay[];
+  /** = sets.live */
   live: CfbParlay[];
-  /** keys: all, ml, spread, total, anytime_td, pass_tds, pass_yds, receptions, rush_yds, rec_yds */
+  /** INSTRUCTION 42 (2026-09-05): up to CFB_PARLAYS.perCategory ranked tickets per category */
+  sets: Record<CfbParlayCategory, CfbParlay[]>;
+  /** INSTRUCTION 42: live rows admitted to the pick categories (kelly null, playable false) */
+  liveRows: number;
+  /** keys: all, ml, spread, total, anytime_td, pass_tds, pass_yds, receptions, rush_yds, rec_yds — upcoming AND live rows (INSTRUCTION 42) */
   categories: Record<string, CfbPickRow[]>;
 };

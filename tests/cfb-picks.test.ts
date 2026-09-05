@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { buildCfbBoard, evPct } from "@/lib/cfb/model";
-import { buildCfbPicks, CFB_PICK_CATEGORIES, rankPicks } from "@/lib/cfb/picks";
-import type { CfbPickRow } from "@/lib/cfb/props-types";
+import { buildCfbPicks, CFB_PICK_CATEGORIES, legFits, rankPicks } from "@/lib/cfb/picks";
+import { CFB_PARLAY_CATEGORIES, type CfbParlayCategory, type CfbPickRow } from "@/lib/cfb/props-types";
 import { CFB_PARLAYS } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
 import type { CfbParlay, CfbPropRow } from "@/lib/cfb/props-types";
@@ -15,6 +15,10 @@ import { amToDec, decToAm } from "@/lib/ticket-math";
  * CFB_PARLAYS. The board is the real 2026-09-05 fixture through the real model; the prop
  * rows are SYNTHETIC — hand-made test inputs on the fixture's games with prices chosen to
  * exercise the longshot and mix bands, not market claims.
+ *
+ * INSTRUCTION 42 (2026-09-05): the categories admit live rows (graded, kelly null) and the
+ * engine adds twelve category sets of up to CFB_PARLAYS.perCategory tickets — see the
+ * "INSTRUCTION 42" describe blocks and the fixture-scaled benchmark at the end.
  */
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
@@ -149,11 +153,13 @@ function oddsEvent(i: number, books: Book[], commence = "2026-09-05T16:00:00Z") 
     })),
   };
 }
-/** market −250 / +210 on the home ML, Caesars off-market at −180 → a ~70 % side priced +EV at Caesars */
+/** market −250 / +210 on the home ML, Caesars off-market at −180 → a ~70 % side priced +EV at Caesars.
+    Caesars' spread / total at even money (2026-09-05, INSTRUCTION 42 benchmark): at −110 those legs
+    grade about −4.5 % (pure vig) and never qualify, so the SPREAD / TOTAL sets had nothing to build from. */
 const favEdge: Book[] = [
   { key: "pinnacle", title: "Pinnacle", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
   { key: "draftkings", title: "DraftKings", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-  { key: "williamhill_us", title: "Caesars", h2h: [-180, 150], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+  { key: "williamhill_us", title: "Caesars", h2h: [-180, 150], spread: [-6.5, 100, 100], total: [50.5, 100, 100] },
 ];
 function synthBoard(n: number): CfbBoard {
   const idx = Array.from({ length: n }, (_, i) => i + 1);
@@ -250,17 +256,23 @@ describe("cfb parlays — every ticket", () => {
     // the F-grade synthetic prop is never a leg
     expect(tickets.some((t) => t.legs.some((l) => l.player === "WR Juliet"))).toBe(false);
   });
-  it("tickets in a view are distinct leg sets, at most perView per tier, ids numbered per view", () => {
-    for (const [view, list] of [["parlays", picks.parlays], ["mixed", picks.mixed], ["live", picks.live]] as const) {
+  it("tickets in a view are distinct leg sets, at most perView per tier in the legacy view (mixed / live now hold up to perCategory — INSTRUCTION 42, 2026-09-05), ids numbered per view", () => {
+    const liveP = buildCfbPicks(withLive(board, 3), props, OPTS);
+    for (const [view, list] of [["parlays", picks.parlays], ["mixed", liveP.mixed], ["live", liveP.live]] as const) {
       const keys = list.map((t) => t.legs.map((l) => l.rowKey).sort().join("+"));
       expect(new Set(keys).size).toBe(keys.length);
       list.forEach((t, i) => {
         expect(t.id).toBe(`cfb-${DATE}-${view}-${i + 1}`);
         expect(t.view).toBe(view);
       });
-      const perTier = new Map<string, number>();
-      for (const t of list) perTier.set(t.tier, (perTier.get(t.tier) ?? 0) + 1);
-      for (const n of perTier.values()) expect(n).toBeLessThanOrEqual(CFB_PARLAYS.perView);
+      if (view === "parlays") {
+        const perTier = new Map<string, number>();
+        for (const t of list) perTier.set(t.tier, (perTier.get(t.tier) ?? 0) + 1);
+        for (const n of perTier.values()) expect(n).toBeLessThanOrEqual(CFB_PARLAYS.perView);
+      } else {
+        // 2026-09-05 INSTRUCTION 42: the mixed / live views ARE the mixed / live category sets (up to 50 each)
+        expect(list.length).toBeLessThanOrEqual(CFB_PARLAYS.perCategory);
+      }
     }
   });
 });
@@ -356,14 +368,21 @@ describe("cfb parlays — mixed and live views", () => {
       expect(t.name).toBe(`MIXED · ${t.legs.length} legs`);
       expect(["SAFER", "LONGSHOT", "MIX"]).toContain(t.tier);
     }
-    // the "parlays" view never carries a live leg, and live rows are not picks
+    // the "parlays" view never carries a live leg
     for (const t of p.parlays) expect(t.legs.every((l) => !liveIds.has(l.gameId))).toBe(true);
-    expect(p.categories.all.some((r) => liveIds.has(r.gameId))).toBe(false);
+    // 2026-09-05 INSTRUCTION 42: live rows used to be excluded from the categories ("live rows
+    // are not picks"); Josh asked for every pick on the board to be graded, so they are admitted
+    // now — see "INSTRUCTION 42 — live rows in the categories"
+    expect(p.categories.all.some((r) => liveIds.has(r.gameId))).toBe(true);
   });
   it("games already kicked off (status upcoming but start ≤ now) never supply a leg", () => {
     const late = { ...board, games: board.games.map((g) => ({ ...g, start: new Date(NOW - 1000).toISOString() })) };
     const p = buildCfbPicks(late, props, OPTS);
     expect(allParlays(p)).toEqual([]);
+    // INSTRUCTION 42 (2026-09-05): nor a ticket in any category set, nor a pick row
+    for (const k of CFB_PARLAY_CATEGORIES) expect(p.sets[k]).toEqual([]);
+    expect(p.categories.all).toEqual([]);
+    expect(p.liveRows).toBe(0);
   });
 });
 
@@ -397,5 +416,350 @@ describe("cfb picks — determinism", () => {
   it("carries the slate date and the build instant", () => {
     expect(picks.date).toBe(DATE);
     expect(picks.generatedAt).toBe(new Date(NOW).toISOString());
+  });
+});
+
+/* ====================================================================================
+   INSTRUCTION 42 (2026-09-05, Josh, verbatim): "Its only showing ANYTIME TD picks for 3 games
+   under 'ALL' button on 'Board'. There are a ton of games live and a ton of games the rest of
+   the day. It should be grading every possible pick available on the board that falls under
+   those props and displaying them. If they aren't top 50 that's fine but they should but under
+   the 'ALL' tab. * Under the 'generated parlays' on board tab, there needs to be A TON more.
+   There should be 50 parlay options under each category (ML, spread, Anytime TD, Pass TD, Pass
+   Yards, Receiving Yards, Combos, etc) The live parlay section and combo section (that has
+   live & pregame picks on the same ticket) should still be generating picks as well"
+   ==================================================================================== */
+
+const SINGLE_MARKET_CATS = CFB_PARLAY_CATEGORIES.filter((k) => k !== "combo" && k !== "mixed" && k !== "live");
+const SET_LABELS: Record<CfbParlayCategory, string> = { ml: "ML", spread: "SPREAD", total: "TOTAL", anytime_td: "ANYTIME TD", pass_tds: "PASS TDS", pass_yds: "PASS YDS", receptions: "RECEPTIONS", rush_yds: "RUSH YDS", rec_yds: "REC YDS", combo: "COMBO", mixed: "MIXED", live: "LIVE" };
+const legKey = (t: CfbParlay) => t.legs.map((l) => l.rowKey).sort().join("+");
+
+describe("INSTRUCTION 42 — live rows in the categories", () => {
+  const liveBoard = withLive(board, 3);
+  const liveIds = new Set(liveBoard.games.filter((g) => g.status === "live").map((g) => g.id));
+  const p = buildCfbPicks(liveBoard, props, OPTS);
+  const liveRows = p.categories.all.filter((r) => liveIds.has(r.gameId));
+  it("live sides and live props (status adopted from the slate game) are admitted, counted in liveRows", () => {
+    expect(liveRows.length).toBeGreaterThan(0);
+    expect(p.liveRows).toBe(liveRows.length);
+    expect(liveRows.some((r) => r.kind === "side")).toBe(true);
+    // the synthetic props carry status "upcoming" from the pre-flip board; the engine reads the slate game's status
+    expect(liveRows.some((r) => r.kind === "prop")).toBe(true);
+    expect(picks.liveRows).toBe(0);
+  });
+  it("live rows are graded on the EV at Caesars like any row, with kelly null and playable false, status live, a Caesars price always", () => {
+    for (const r of liveRows) {
+      expect(r.cz).not.toBeNull();
+      expect(r.kelly).toBeNull();
+      expect(r.playable).toBe(false);
+      expect(r.status).toBe("live");
+      expect(r.grade).toBe(gradeFromEv(r.evCz));
+    }
+    // and they sit in the rank order with everyone else (S → F, then EV)
+    for (const rows of Object.values(p.categories)) {
+      for (let i = 1; i < rows.length; i++) {
+        const g = gradeRank(rows[i - 1].grade) - gradeRank(rows[i].grade);
+        expect(g).toBeGreaterThanOrEqual(0);
+        if (g === 0) expect((rows[i - 1].evCz ?? -Infinity) >= (rows[i].evCz ?? -Infinity)).toBe(true);
+      }
+    }
+  });
+  it("a live row only ever lands under its own market; upcoming rows are unchanged; final games never appear", () => {
+    for (const [k, rows] of Object.entries(p.categories)) if (k !== "all") for (const r of rows) expect(r.market).toBe(k);
+    const upcomingKeys = p.categories.all.filter((r) => !liveIds.has(r.gameId)).map((r) => r.key).sort();
+    const beforeKeys = picks.categories.all.filter((r) => !liveIds.has(r.gameId)).map((r) => r.key).sort();
+    expect(upcomingKeys).toEqual(beforeKeys);
+    const finalBoard: CfbBoard = { ...liveBoard, games: liveBoard.games.map((g) => (g.status === "live" ? { ...g, status: "final" } : g)) };
+    const f = buildCfbPicks(finalBoard, props, OPTS);
+    expect(f.liveRows).toBe(0);
+    expect(f.categories.all.some((r) => liveIds.has(r.gameId))).toBe(false);
+  });
+});
+
+describe("INSTRUCTION 42 — the category sets (fixture)", () => {
+  const liveP = buildCfbPicks(withLive(board, 3), props, OPTS);
+  const liveIds = new Set(withLive(board, 3).games.filter((g) => g.status === "live").map((g) => g.id));
+  it("every category key exists, each set holds at most perCategory distinct tickets, ids numbered per category, category stamped", () => {
+    for (const source of [picks, liveP]) {
+      for (const k of CFB_PARLAY_CATEGORIES) {
+        const list = source.sets[k];
+        expect(Array.isArray(list)).toBe(true);
+        expect(list.length).toBeLessThanOrEqual(CFB_PARLAYS.perCategory);
+        const keys = list.map(legKey);
+        expect(new Set(keys).size).toBe(keys.length);
+        list.forEach((t, i) => {
+          expect(t.category).toBe(k);
+          expect(t.id).toBe(`cfb-${DATE}-${k}-${i + 1}`);
+          expect(t.legs.length).toBeGreaterThanOrEqual(2);
+          expect(t.legs.length).toBeLessThanOrEqual(6);
+          expect(t.dec).toBeLessThanOrEqual(60 + 1e-6);
+          expect(["SAFER", "LONGSHOT", "MIX"]).toContain(t.tier);
+        });
+      }
+      expect(source.mixed).toBe(source.sets.mixed);
+      expect(source.live).toBe(source.sets.live);
+    }
+    // the legacy tiered tickets carry a category read off their legs
+    for (const t of picks.parlays) expect(CFB_PARLAY_CATEGORIES).toContain(t.category);
+  });
+  it("single-market sets: only that market, one leg per game, pregame legs only, dec ≥ 1.5, ranked by EV then prob", () => {
+    let any = 0;
+    for (const k of SINGLE_MARKET_CATS) {
+      const list = liveP.sets[k];
+      any += list.length;
+      for (const t of list) {
+        for (const l of t.legs) {
+          expect(l.market).toBe(k);
+          expect(liveIds.has(l.gameId)).toBe(false);
+        }
+        expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
+        expect(t.dec).toBeGreaterThanOrEqual(1.5 - 1e-6);
+        expect(t.name).toBe(`${SET_LABELS[k]} · ${t.legs.length} legs`);
+      }
+      for (let i = 1; i < list.length; i++) {
+        const a = list[i - 1];
+        const b = list[i];
+        expect(a.ev > b.ev || (a.ev === b.ev && a.prob >= b.prob)).toBe(true);
+      }
+    }
+    expect(any).toBeGreaterThan(0);
+    // the fixture's synthetic anytime-TD rows: RB Bravo and WR Golf qualify (distinct games), TE India is an F (−7 % EV) → exactly the pair
+    expect(picks.sets.anytime_td.length).toBe(1);
+    expect(picks.sets.anytime_td[0].legs.map((l) => l.player).sort()).toEqual(["RB Bravo", "WR Golf"]);
+  });
+  it("combo: pregame, at least one side AND one prop, 3–6 legs, dec 2–60", () => {
+    expect(picks.sets.combo.length).toBeGreaterThan(0);
+    for (const t of picks.sets.combo) {
+      expect(t.legs.some((l) => l.kind === "side")).toBe(true);
+      expect(t.legs.some((l) => l.kind === "prop")).toBe(true);
+      expect(t.legs.length).toBeGreaterThanOrEqual(3);
+      expect(t.dec).toBeGreaterThanOrEqual(2 - 1e-6);
+      expect(t.type).toBe("MIXED");
+      expect(t.name).toBe(`COMBO · ${t.legs.length} legs`);
+    }
+    // props null → no combo, no prop set
+    expect(sideOnly.sets.combo).toEqual([]);
+    for (const k of ["anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds"] as const) expect(sideOnly.sets[k]).toEqual([]);
+    expect(sideOnly.sets.ml.length + sideOnly.sets.spread.length + sideOnly.sets.total.length).toBeGreaterThan(0);
+  });
+  it("mixed: every ticket pairs a live leg with a pregame leg; live: live legs only; both empty with nothing live", () => {
+    expect(picks.sets.mixed).toEqual([]);
+    expect(picks.sets.live).toEqual([]);
+    expect(liveP.sets.mixed.length).toBeGreaterThan(0);
+    for (const t of liveP.sets.mixed) {
+      expect(t.legs.some((l) => liveIds.has(l.gameId))).toBe(true);
+      expect(t.legs.some((l) => !liveIds.has(l.gameId))).toBe(true);
+      expect(t.view).toBe("mixed");
+    }
+    expect(liveP.sets.live.length).toBeGreaterThan(0);
+    for (const t of liveP.sets.live) {
+      expect(t.legs.every((l) => liveIds.has(l.gameId))).toBe(true);
+      expect(t.view).toBe("live");
+      expect(t.type).toBe("LIVE");
+    }
+  });
+  it("every set ticket obeys the leg rules: Caesars-priced, EV ≥ minLegEvPct, no doubled market on a game, no doubled player, per-game cap", () => {
+    const all = CFB_PARLAY_CATEGORIES.flatMap((k) => liveP.sets[k]);
+    expect(all.length).toBeGreaterThan(0);
+    for (const t of all) {
+      const perGame = new Map<string, number>();
+      const markets = new Set<string>();
+      const players = t.legs.map((l) => l.player).filter((x): x is string => !!x);
+      expect(new Set(players).size).toBe(players.length);
+      for (const l of t.legs) {
+        const r = rowIndex.get(l.rowKey);
+        expect(r, l.rowKey).toBeTruthy();
+        expect(r!.evCz ?? -Infinity).toBeGreaterThanOrEqual(CFB_PARLAYS.minLegEvPct);
+        expect(l.dec).toBeCloseTo(amToDec(l.cz), 9);
+        perGame.set(l.gameId, (perGame.get(l.gameId) ?? 0) + 1);
+        // INSTRUCTION 42 (2026-09-05, review fix): one market per game for PROP legs too, not only sides
+        const k = `${l.gameId}|${l.market}`;
+        expect(markets.has(k), k).toBe(false);
+        markets.add(k);
+      }
+      for (const n of perGame.values()) expect(n).toBeLessThanOrEqual(CFB_PARLAYS.maxPerGame);
+      const prob = t.legs.reduce((p, l) => p * l.prob, 1);
+      const dec = t.legs.reduce((d, l) => d * l.dec, 1);
+      expect(t.prob).toBeCloseTo(prob, 9);
+      expect(t.dec).toBeCloseTo(dec, 3);
+      expect(t.am).toBe(decToAm(t.dec));
+    }
+  });
+  it("deterministic: reversed inputs build the same sets, byte for byte", () => {
+    const rev = { ...withLive(board, 3), games: [...withLive(board, 3).games].reverse().map((g) => ({ ...g, rows: [...g.rows].reverse() })) };
+    const a = JSON.stringify(liveP);
+    expect(JSON.stringify(buildCfbPicks(rev, [...props].reverse(), OPTS))).toBe(a);
+    expect(JSON.stringify(buildCfbPicks(withLive(board, 3), props, OPTS))).toBe(a);
+  });
+});
+
+describe("INSTRUCTION 42 (2026-09-05, review fix): legFits blocks a doubled market on one game for props, and legs keep `live`", () => {
+  const liveP = buildCfbPicks(withLive(board, 3), props, OPTS);
+  type L = Parameters<typeof legFits>[0];
+  const leg = (o: Partial<L>): L => ({ kind: "prop", rowKey: "k", gameId: "g1", label: "", sub: "", cz: -110, dec: 1.909, prob: 0.55, push: 0, market: "anytime_td", player: "RB One", teamId: null, evCz: 1, live: false, ...o });
+  it("two players' anytime TDs from the same game do not fit on one ticket (maxPerGame 2)", () => {
+    const a = leg({ rowKey: "a", player: "RB One" });
+    const b = leg({ rowKey: "b", player: "RB Two" });
+    expect(legFits(b, [a], 2)).toBe(false);
+    // a different market on the same game still fits under the cap
+    expect(legFits(leg({ rowKey: "c", player: "QB One", market: "pass_yds" }), [a], 2)).toBe(true);
+    // a side beside a prop on the same game still fits
+    expect(legFits(leg({ rowKey: "d", kind: "side", player: null, market: "ml" }), [a], 2)).toBe(true);
+  });
+  it("finished tickets carry `live` on each leg: MIXED tickets have both true and false legs, LIVE all true, pregame sets all false", () => {
+    for (const t of liveP.sets.mixed) {
+      expect(t.legs.some((l) => l.live === true)).toBe(true);
+      expect(t.legs.some((l) => l.live === false)).toBe(true);
+    }
+    for (const t of liveP.sets.live) expect(t.legs.every((l) => l.live === true)).toBe(true);
+    for (const t of liveP.sets.combo) expect(t.legs.every((l) => l.live === false)).toBe(true);
+    expect(liveP.sets.mixed.length).toBeGreaterThan(0);
+  });
+});
+
+/* ---------- a fixture-scaled Saturday: 68 games through the real model, ~3,000 synthetic prop rows ---------- */
+
+/** a tiny deterministic LCG so the scaled slate is the same on every run */
+function lcg(seed: number) {
+  let x = seed >>> 0;
+  return () => {
+    x = (x * 1664525 + 1013904223) >>> 0;
+    return x / 4294967296;
+  };
+}
+const PROP_SHAPE: { market: CfbPropRow["market"]; ou: boolean; players: string[] }[] = [
+  { market: "pass_yds", ou: true, players: ["QB1"] },
+  { market: "pass_tds", ou: true, players: ["QB1", "QB2"] },
+  { market: "rush_yds", ou: true, players: ["RB1", "RB2", "QB1", "WR1"] },
+  { market: "rec_yds", ou: true, players: ["WR1", "WR2", "WR3", "TE1", "RB1"] },
+  { market: "receptions", ou: true, players: ["WR1", "WR2", "WR3", "TE1", "RB1"] },
+  { market: "anytime_td", ou: false, players: ["RB1", "RB2", "RB3", "WR1", "WR2", "WR3", "TE1", "TE2", "QB1", "WR4"] },
+];
+/** ~44 rows per game: every over/under pair plus the anytime-TD yes rows */
+function scaledProps(board: CfbBoard, liveIds: Set<string>): CfbPropRow[] {
+  const rnd = lcg(42);
+  const rows: CfbPropRow[] = [];
+  for (const g of board.games) {
+    for (const shape of PROP_SHAPE) {
+      for (const who of shape.players) {
+        const player = `${who} ${g.home.abbr}`;
+        const line = shape.ou ? Math.round(rnd() * 200) / 2 + 0.5 : null;
+        const sides: CfbPropRow["side"][] = shape.ou ? ["over", "under"] : ["yes"];
+        const fairOver = shape.ou ? 0.42 + rnd() * 0.16 : 0.2 + rnd() * 0.5;
+        for (const side of sides) {
+          const fair = side === "under" ? 1 - fairOver : fairOver;
+          // Caesars' price: the fair price nudged ±6 % so the EV spreads across the grades
+          const dec = Math.max(1.05, (1 / fair) * (0.94 + rnd() * 0.12));
+          const cz = { book: "williamhill_us", title: "Caesars", price: decToAm(Math.round(dec * 1000) / 1000), line, dec };
+          const ev = evPct(fair, 0, dec);
+          const live = liveIds.has(g.id);
+          rows.push({
+            key: `${g.id}|${shape.market}|${player.toLowerCase().replace(/\s+/g, "-")}|${side}|${line ?? ""}`,
+            gameId: g.id,
+            oddsEventId: g.oddsEventId ?? "",
+            market: shape.market,
+            side,
+            player,
+            team: g.home.name,
+            teamId: g.home.id,
+            teamAbbr: g.home.abbr,
+            opp: g.away.abbr,
+            kickoff: g.start,
+            status: g.status,
+            label: `${player} ${side === "yes" ? "Anytime TD" : `${side === "over" ? "O" : "U"} ${line} ${shape.market}`}`,
+            sub: `${g.home.abbr} vs ${g.away.abbr}`,
+            line,
+            fair,
+            fairAm: decToAm(1 / fair),
+            books: 3,
+            cz,
+            best: cz,
+            dk: null,
+            fd: null,
+            evCz: ev,
+            evBest: ev,
+            grade: gradeFromEv(ev),
+            kelly: null,
+            playable: !live,
+            ctx: null,
+          });
+        }
+      }
+    }
+  }
+  return rows;
+}
+
+describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () => {
+  // 68 games: 20 in play, 48 still to kick — the real model prices every side row
+  const LIVE_N = 20;
+  const bigBoard = withLive(synthBoard(68), LIVE_N);
+  const liveIds = new Set(bigBoard.games.filter((g) => g.status === "live").map((g) => g.id));
+  const bigProps = scaledProps(bigBoard, liveIds);
+  const big = buildCfbPicks(bigBoard, bigProps, OPTS);
+  it("the slate is the size Josh described: 68 games, ~3,000 prop rows, 20 live", () => {
+    expect(bigBoard.games.length).toBe(68);
+    expect(liveIds.size).toBe(LIVE_N);
+    expect(bigProps.length).toBeGreaterThanOrEqual(2900);
+    expect(bigProps.length).toBeLessThanOrEqual(3100);
+  });
+  it("every category set fills to perCategory (50) with a spread of leg counts, and every ticket is distinct", () => {
+    for (const k of CFB_PARLAY_CATEGORIES) {
+      const list = big.sets[k];
+      expect(list.length, k).toBe(CFB_PARLAYS.perCategory);
+      expect(new Set(list.map(legKey)).size).toBe(list.length);
+      // not fifty near-identical six-leggers: at least three different leg counts in the set
+      expect(new Set(list.map((t) => t.legs.length)).size, k).toBeGreaterThanOrEqual(3);
+    }
+  });
+  it("every pick on the board is graded: live rows counted, every Caesars-priced side and prop from a live or upcoming game is a pick", () => {
+    const sides = bigBoard.games.filter((g) => g.status !== "final").flatMap((g) => g.rows.filter((r) => r.cz && (g.status === "live" || r.playable))).length;
+    const propsN = bigProps.filter((r) => r.cz).length;
+    expect(big.categories.all.length).toBe(sides + propsN);
+    const live = big.categories.all.filter((r) => liveIds.has(r.gameId));
+    expect(big.liveRows).toBe(live.length);
+    expect(live.length).toBeGreaterThan(0);
+    for (const r of live) {
+      expect(r.kelly).toBeNull();
+      expect(r.playable).toBe(false);
+    }
+  });
+  it("set rules hold at scale: single-market sets are one market on distinct pregame games; combo has side + prop; mixed has live + pregame; live is live only", () => {
+    for (const k of SINGLE_MARKET_CATS)
+      for (const t of big.sets[k]) {
+        expect(t.legs.every((l) => l.market === k && !liveIds.has(l.gameId))).toBe(true);
+        expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
+        expect(t.dec).toBeGreaterThanOrEqual(1.5 - 1e-6);
+        expect(t.dec).toBeLessThanOrEqual(60 + 1e-6);
+      }
+    for (const t of big.sets.combo) {
+      expect(t.legs.some((l) => l.kind === "side") && t.legs.some((l) => l.kind === "prop")).toBe(true);
+      expect(t.legs.every((l) => !liveIds.has(l.gameId))).toBe(true);
+      expect(t.legs.length).toBeGreaterThanOrEqual(3);
+      expect(t.dec).toBeGreaterThanOrEqual(2 - 1e-6);
+    }
+    for (const t of big.sets.mixed) expect(t.legs.some((l) => liveIds.has(l.gameId)) && t.legs.some((l) => !liveIds.has(l.gameId))).toBe(true);
+    for (const t of big.sets.live) expect(t.legs.every((l) => liveIds.has(l.gameId))).toBe(true);
+    for (const t of CFB_PARLAY_CATEGORIES.flatMap((k) => big.sets[k])) {
+      const players = t.legs.map((l) => l.player).filter((x): x is string => !!x);
+      expect(new Set(players).size).toBe(players.length);
+      const perGame = new Map<string, number>();
+      for (const l of t.legs) perGame.set(l.gameId, (perGame.get(l.gameId) ?? 0) + 1);
+      for (const n of perGame.values()) expect(n).toBeLessThanOrEqual(CFB_PARLAYS.maxPerGame);
+    }
+  });
+  it("deterministic at scale: two runs deep-equal", () => {
+    expect(buildCfbPicks(bigBoard, [...bigProps].reverse(), OPTS)).toEqual(big);
+  });
+  it("builds fast enough for the browser: best of 3 runs under 1000 ms (target ~150 ms in node)", () => {
+    let best = Infinity;
+    for (let i = 0; i < 3; i++) {
+      const t0 = performance.now();
+      buildCfbPicks(bigBoard, bigProps, OPTS);
+      best = Math.min(best, performance.now() - t0);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`buildCfbPicks × 68 games / ${bigProps.length} prop rows: best ${best.toFixed(1)} ms`);
+    expect(best).toBeLessThan(1000);
   });
 });

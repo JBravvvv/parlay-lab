@@ -6,8 +6,8 @@ import { stripComments } from "./helpers/source";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { CFB_PROPS } from "@/lib/cfb/rules";
 import { finalsOf } from "@/lib/cfb/slate-server";
-import { affordableEvents, boardFresh, boardWindowSec, propsBoardKey, propsSpendKey, pullCredits, CFB_PROPS_SPEND_TTL_SEC } from "@/lib/cfb/props-store";
-import type { CfbPropsBoard } from "@/lib/cfb/props-types";
+import { affordableEvents, assembleStoredBoard, boardFresh, boardWindowSec, encodeBoard, propsBoardKey, propsSpendKey, pullCredits, storedChunkKeys, CFB_PROPS_CHUNK_ROWS, CFB_PROPS_SPEND_TTL_SEC, UPSTASH_MAX_REQUEST_BYTES } from "@/lib/cfb/props-store";
+import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import type { CfbSlate } from "@/lib/cfb/types";
 
 /**
@@ -16,8 +16,12 @@ import type { CfbSlate } from "@/lib/cfb/types";
  * pull plus one 6-credit slate call), not the 6 the header comment assumed. The Next data cache
  * is per deployment, so every deploy re-spent it. The rails pinned here:
  *
- *   rules     — maxEvents 12, revalidateSec 7200, liveRevalidateSec 600, liveMaxEvents 6,
- *               dailyBudget 1200, measuredCreditsPerEvent 31, boardRetainSec 36 h
+ *   rules     — maxEvents 60, revalidateSec 7200, liveRevalidateSec 600, liveMaxEvents 24,
+ *               dailyBudget 2500, measuredCreditsPerEvent 31, boardRetainSec 36 h
+ *               (INSTRUCTION 42, 2026-09-05: was 12 / 6 / 1200 — every eligible game priced)
+ *   per-game  — the stored board carries pricedAt[gameId]; an upcoming game is carried inside ITS
+ *               OWN 2 h window, and a game whose last pull returned zero rows is not re-asked until
+ *               that window passes, even live (the EMPTY-EVENT RULE) — INSTRUCTION 42
  *   redis     — pl:cfb:props:v1:<date> (EX boardRetainSec — retained past its window) is read
  *               BEFORE any event fetch and written after a fetch; pl:cfb:props:spend:v1:<ptDate>
  *               (EX 36 h) is INCRBY'd by the credits the pull cost
@@ -100,6 +104,8 @@ function fakeRedis(seed: Record<string, string> = {}) {
     switch (op) {
       case "GET":
         return kv.get(key) ?? null;
+      case "MGET":
+        return [key, ...rest].map((k) => kv.get(String(k)) ?? null);
       case "SET": {
         kv.set(key, String(rest[0]));
         const ex = rest.indexOf("EX");
@@ -118,7 +124,14 @@ function fakeRedis(seed: Record<string, string> = {}) {
         throw new Error(`fake redis: ${op}`);
     }
   });
-  return { kv, ttl, calls, ops: (op: string) => calls.filter((c) => c[0] === op) };
+  /** INSTRUCTION 42 (2026-09-05, review fix): the board is stored chunked — the INDEX write under the board key is "the board SET" */
+  const boardSets = () => calls.filter((c) => c[0] === "SET" && c[1] === propsBoardKey(DATE));
+  /** the stored board reassembled the way readBoard does (index + MGET of its chunks) */
+  const board = (): CfbPropsBoard | null => {
+    const raw = kv.get(propsBoardKey(DATE)) ?? null;
+    return assembleStoredBoard(raw, storedChunkKeys(raw).map((k) => kv.get(k) ?? null));
+  };
+  return { kv, ttl, calls, ops: (op: string) => calls.filter((c) => c[0] === op), boardSets, board };
 }
 
 const fetchMock = vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
@@ -146,29 +159,43 @@ afterEach(() => {
 });
 
 describe("rules", () => {
-  it("12 events, a 2 h window (10 min live), a daily budget and the measured per-event cost", () => {
-    expect(CFB_PROPS.maxEvents).toBe(12);
+  it("60 pre-kick / 24 live events, a 2 h window (10 min live), a 2500-credit daily budget and the measured per-event cost", () => {
+    // INSTRUCTION 42 (2026-09-05): maxEvents 12 → 60, liveMaxEvents 6 → 24, dailyBudget 1200 → 2500
+    expect(CFB_PROPS.maxEvents).toBe(60);
     expect(CFB_PROPS.revalidateSec).toBe(7200);
     expect(CFB_PROPS.liveRevalidateSec).toBe(600);
-    expect(CFB_PROPS.liveMaxEvents).toBe(6);
+    expect(CFB_PROPS.liveMaxEvents).toBe(24);
     expect(CFB_PROPS.boardRetainSec).toBe(36 * 3600);
-    expect(CFB_PROPS.dailyBudget).toBe(1200);
+    expect(CFB_PROPS.dailyBudget).toBe(2500);
     expect(CFB_PROPS.measuredCreditsPerEvent).toBe(31);
-    // worst case per day: 12 events × 31 credits × (24 h / 2 h) pulls = 4464 — the budget caps it at 1200
-    expect(12 * 31 * (86400 / CFB_PROPS.revalidateSec)).toBe(4464);
-    expect(CFB_PROPS.dailyBudget).toBeLessThan(4464);
+    // the cost math (rules.ts doc): 60 × 31 = 1860 per 2 h pre-kick re-price; 24 × 31 = 744 per 10-min live pull
+    expect(CFB_PROPS.maxEvents * CFB_PROPS.measuredCreditsPerEvent).toBe(1860);
+    expect(CFB_PROPS.liveMaxEvents * CFB_PROPS.measuredCreditsPerEvent).toBe(744);
+    // worst case per day uncapped: 60 × 31 × (24 h / 2 h) = 22320 — the budget is the hard stop, far below it
+    expect(60 * 31 * (86400 / CFB_PROPS.revalidateSec)).toBe(22320);
+    expect(CFB_PROPS.dailyBudget).toBeLessThan(22320);
+    // one full pre-kick pull fits inside the day's budget; a second full one does not
+    expect(1860).toBeLessThanOrEqual(CFB_PROPS.dailyBudget);
+    expect(2 * 1860).toBeGreaterThan(CFB_PROPS.dailyBudget);
   });
 });
 
 describe("the pure helpers", () => {
   it("affordableEvents: all when it fits, the floor of the room otherwise, never negative", () => {
+    // INSTRUCTION 42 (2026-09-05): the default budget is CFB_PROPS.dailyBudget (2500, was 1200)
+    const B = CFB_PROPS.dailyBudget;
+    expect(B).toBe(2500);
     expect(affordableEvents(12, 0)).toBe(12);
-    expect(affordableEvents(12, 1200 - 12 * 31)).toBe(12);
-    expect(affordableEvents(12, 1200 - 12 * 31 + 1)).toBe(11);
-    expect(affordableEvents(12, 1200 - 4 * 31)).toBe(4);
-    expect(affordableEvents(12, 1200)).toBe(0);
+    expect(affordableEvents(60, 0)).toBe(60);
+    expect(affordableEvents(60, B - 60 * 31)).toBe(60);
+    expect(affordableEvents(60, B - 60 * 31 + 1)).toBe(59);
+    expect(affordableEvents(12, B - 4 * 31)).toBe(4);
+    expect(affordableEvents(12, B)).toBe(0);
+    expect(affordableEvents(12, B + 1)).toBe(0);
     expect(affordableEvents(12, 5000)).toBe(0);
     expect(affordableEvents(0, 0)).toBe(0);
+    // the old figures, explicitly at the old budget, still hold
+    expect(affordableEvents(12, 1200 - 12 * 31 + 1, 1200)).toBe(11);
   });
   it("pullCredits: the used delta plus the first call, zero when the cache answered, the measured rate without headers", () => {
     expect(pullCredits([1031, 1062, 1093], 3)).toBe(93);
@@ -227,12 +254,16 @@ describe("fresh fetch (nothing in redis, budget untouched)", () => {
     const gets = r.ops("GET").map((c) => c[1]);
     expect(gets).toContain(`pl:cfb:props:v1:${DATE}`);
     expect(gets).toContain(`pl:cfb:props:spend:v1:${DATE}`);
-    // the board write: SET key json EX boardRetainSec — retained past its window for the stale fallback
-    const set = r.ops("SET");
+    // the board write: SET key <index> EX boardRetainSec — retained past its window for the stale fallback
+    // (INSTRUCTION 42 review fix: rows live in gzip chunks under their own keys, each also EX boardRetainSec)
+    const set = r.boardSets();
     expect(set).toHaveLength(1);
     expect(set[0].slice(0, 2)).toEqual(["SET", `pl:cfb:props:v1:${DATE}`]);
     expect(set[0].slice(3)).toEqual(["EX", CFB_PROPS.boardRetainSec]);
-    const stored = JSON.parse(String(set[0][2])) as CfbPropsBoard;
+    for (const c of r.ops("SET")) expect(c.slice(3)).toEqual(["EX", CFB_PROPS.boardRetainSec]);
+    expect(r.ops("SET").length).toBe(1 + storedChunkKeys(String(set[0][2])).length);
+    const stored = r.board()!;
+    expect(stored).not.toBeNull();
     expect(stored.rows).toHaveLength(body.rows.length);
     expect(stored.fetched).toBe(body.fetched);
     expect(stored.generatedAt).toBe(body.generatedAt);
@@ -298,7 +329,7 @@ describe("redis has a fresh board", () => {
     expect(body.spentToday).toBe(372);
     expect(body.budgeted).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
   it("a stale stored board (older than the window, still retained) is re-priced in full", async () => {
@@ -330,10 +361,10 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     // every event call — live or not — sits on the shorter data-cache window for this pull
     for (const [, init] of fetchMock.mock.calls) expect(init).toEqual({ next: { revalidate: CFB_PROPS.liveRevalidateSec } });
     // the Redis write is retained past the window (the stale fallback); the board itself says 600
-    const set = r.ops("SET");
+    const set = r.boardSets();
     expect(set).toHaveLength(1);
     expect(set[0].slice(3)).toEqual(["EX", CFB_PROPS.boardRetainSec]);
-    const stored = JSON.parse(String(set[0][2])) as CfbPropsBoard;
+    const stored = r.board()!;
     expect(stored.ttlSec).toBe(600);
     expect(stored.live).toBe(1);
     // the live game's rows keep status "live" (the Board's LIVE parlays read it); the rest stay upcoming
@@ -388,7 +419,7 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(body.stale).toBe(false);
     expect(body.live).toBe(1); // the live game was SELECTED — the budget, not the selection, refused it
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
 
@@ -425,7 +456,7 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(body.fetched).toBe(body.events);
     expect(body.priced).toHaveLength(body.events);
     // the merged board is written back and only the live game's credits are spent
-    expect(r.ops("SET")).toHaveLength(1);
+    expect(r.boardSets()).toHaveLength(1);
     expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
     expect(body.spentToday).toBe(372 + PER);
   });
@@ -462,26 +493,29 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(body.note).toMatch(/last priced lines/);
     expect(body.live).toBe(1);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
 
-  it("a live re-price fetches at most liveMaxEvents in-play games per pull", async () => {
+  it("a live re-price fetches at most liveMaxEvents in-play games per pull — and under the 24 cap every fixture game in play is priced", async () => {
     const s = slate();
     const games = s.games.map((g) => ({ ...g, status: "live" as const, detail: "2nd 8:12", homeScore: 14, awayScore: 3 }));
     vi.mocked(slateFromEspn).mockResolvedValue({ ...s, games, finals: finalsOf(games) });
     fakeRedis();
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
-    // 2026-09-05 (same-day follow-up): the live pool is capped INSIDE selectPropEvents now, so the
-    // board reports liveMaxEvents events (all of them in play) and flags the overflow as capped
-    expect(s.games.length).toBeGreaterThan(CFB_PROPS.liveMaxEvents);
-    expect(body.events).toBe(CFB_PROPS.liveMaxEvents);
-    expect(body.capped).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(CFB_PROPS.liveMaxEvents);
-    expect(body.fetched).toBe(CFB_PROPS.liveMaxEvents);
-    expect(body.live).toBe(CFB_PROPS.liveMaxEvents);
+    // INSTRUCTION 42 (2026-09-05): the live pool holds 24 now (was 6, which left half of this 12-game
+    // fixture unpriced); every in-play game gets its pull and nothing is capped
+    expect(s.games.length).toBeLessThanOrEqual(CFB_PROPS.liveMaxEvents);
+    expect(body.events).toBe(s.games.length);
+    expect(body.capped).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(s.games.length);
+    expect(body.fetched).toBe(s.games.length);
+    expect(body.live).toBe(s.games.length);
     expect(body.ttlSec).toBe(CFB_PROPS.liveRevalidateSec);
+    // every game on the answer is stamped with this pull's instant
+    expect(Object.keys(body.pricedAt ?? {})).toHaveLength(s.games.length);
+    expect(Object.values(body.pricedAt ?? {}).every((t) => t === new Date(NOW).toISOString())).toBe(true);
   });
 
   it("the budget still buys only what it can: room for 2 events prices the live game plus one", async () => {
@@ -494,6 +528,166 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
     expect(body.ttlSec).toBe(600);
     expect(r.ops("INCRBY")[0][2]).toBe(2 * PER);
+  });
+});
+
+describe("INSTRUCTION 42 (2026-09-05) — per-game windows and the empty-event rule", () => {
+  const liveGameId = (): string => liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+
+  /** a real pre-kick pull, the board re-dated `ageSec` back (pricedAt stamps included), then the slate flipped live */
+  async function preKickBoard(ageSec: number): Promise<CfbPropsBoard> {
+    vi.mocked(slateFromEspn).mockResolvedValue(slate());
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    fetchMock.mockClear();
+    const at = new Date(NOW - ageSec * 1000).toISOString();
+    const pricedAt = Object.fromEntries(Object.keys(body.pricedAt ?? {}).map((id) => [id, at]));
+    return { ...body, generatedAt: at, pricedAt };
+  }
+
+  it("a fresh pull stamps pricedAt for every priced game with the pull's instant", async () => {
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.priced?.length).toBeGreaterThan(0);
+    expect(Object.keys(body.pricedAt ?? {}).sort()).toEqual([...(body.priced ?? [])].sort());
+    for (const t of Object.values(body.pricedAt ?? {})) expect(t).toBe(new Date(NOW).toISOString());
+  });
+
+  it("EMPTY-EVENT RULE: a live game whose last pull returned ZERO rows, priced 5 min ago, is NOT re-fetched on a live pull", async () => {
+    const stored = await preKickBoard(20 * 60);
+    const id = liveGameId();
+    // the stored board says: this game was pulled 5 min ago and the API had no player props for it
+    const held: CfbPropsBoard = {
+      ...stored,
+      rows: stored.rows.filter((r) => r.gameId !== id),
+      pricedAt: { ...stored.pricedAt, [id]: new Date(NOW - 5 * 60 * 1000).toISOString() },
+    };
+    expect(held.priced).toContain(id);
+    const r = fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(held), [`pl:cfb:props:spend:v1:${DATE}`]: "372" });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(body.source).toBe("redis");
+    expect(body.live).toBe(1); // the live game IS selected — it is held, not dropped
+    expect(body.budgeted).toBe(false);
+    expect(body.stale).toBe(false); // it carries no lines, so nothing on the answer is out of date
+    expect(body.rows).toEqual(held.rows);
+    expect(body.priced).toContain(id);
+    expect(body.pricedAt?.[id]).toBe(held.pricedAt?.[id]);
+    expect(body.spentToday).toBe(372); // not a credit spent
+    expect(r.boardSets()).toHaveLength(0);
+    expect(r.ops("INCRBY")).toHaveLength(0);
+  });
+
+  it("EMPTY-EVENT RULE: the same zero-row live game priced 2 h + 5 s ago IS re-fetched (and only it)", async () => {
+    const stored = await preKickBoard(20 * 60);
+    const id = liveGameId();
+    const held: CfbPropsBoard = {
+      ...stored,
+      rows: stored.rows.filter((r) => r.gameId !== id),
+      pricedAt: { ...stored.pricedAt, [id]: new Date(NOW - (CFB_PROPS.revalidateSec + 5) * 1000).toISOString() },
+    };
+    const r = fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(held), [`pl:cfb:props:spend:v1:${DATE}`]: "372" });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    expect(body.source).toBe("fetch");
+    expect(body.pricedAt?.[id]).toBe(new Date(NOW).toISOString()); // re-stamped now
+    // every upcoming game kept its own 20-min-old stamp
+    for (const [gid, t] of Object.entries(body.pricedAt ?? {})) if (gid !== id) expect(t).toBe(stored.generatedAt);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
+  });
+
+  it("a live game WITH rows still re-prices every live pull (the rule holds only empty events)", async () => {
+    const stored = await preKickBoard(20 * 60);
+    const id = liveGameId();
+    expect(stored.rows.some((r) => r.gameId === id)).toBe(true);
+    fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stored) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    expect(body.source).toBe("fetch");
+  });
+
+  it("PER-GAME WINDOW: a stored LIVE board (ttlSec 600) 11 min old re-prices only the live game — the upcoming games ride on their own 2 h pricedAt", async () => {
+    // before INSTRUCTION 42 the carry read the BOARD's window (600 s under a live slate), so every
+    // upcoming game was re-fetched each 10-min pull — 60 × 31 credits a pull at the new cap
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const first = await call();
+    expect(first.body.ttlSec).toBe(600);
+    const age = 11 * 60;
+    const at = new Date(NOW - age * 1000).toISOString();
+    const stored: CfbPropsBoard = { ...first.body, generatedAt: at, pricedAt: Object.fromEntries(Object.keys(first.body.pricedAt ?? {}).map((id) => [id, at])) };
+    const r = fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stored), [`pl:cfb:props:spend:v1:${DATE}`]: "372" });
+    fetchMock.mockClear();
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    expect(body.events).toBe(first.body.events);
+    expect(body.fetched).toBe(body.events);
+    expect(body.stale).toBe(false);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
+    // the carried games keep the 11-min-old stamp; the live game is re-stamped
+    expect(body.pricedAt?.[liveGameId()]).toBe(new Date(NOW).toISOString());
+    expect(Object.entries(body.pricedAt ?? {}).filter(([gid]) => gid !== liveGameId()).every(([, t]) => t === at)).toBe(true);
+  });
+
+  it("a board written BEFORE pricedAt existed falls back to generatedAt: 2 h + 5 s old → every game re-priced", async () => {
+    const stored = await preKickBoard(CFB_PROPS.revalidateSec + 5);
+    const legacy: CfbPropsBoard = { ...stored };
+    delete legacy.pricedAt;
+    fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(legacy) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(body.events);
+  });
+
+  it("the caps are pinned in the route's own answer: a 12-game fixture is never capped at 60 / 24", async () => {
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const pre = await call();
+    expect(pre.body.capped).toBe(false);
+    expect(pre.body.events).toBe(slate().games.length);
+    expect(pre.body.events).toBeLessThanOrEqual(CFB_PROPS.maxEvents);
+    expect(CFB_PROPS.maxEvents).toBe(60);
+    expect(CFB_PROPS.liveMaxEvents).toBe(24);
+    expect(CFB_PROPS.dailyBudget).toBe(2500);
+  });
+
+  it("the budget rail still refuses beyond 2500: room for one event buys exactly one; at or past 2500 buys none", async () => {
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(2500 - PER) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const one = await call();
+    expect(one.body.budgeted).toBe(true);
+    expect(one.body.fetched).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(one.body.spentToday).toBe(2500);
+
+    fetchMock.mockClear();
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: "2500" });
+    const none = await call();
+    expect(none.body.budgeted).toBe(true);
+    expect(none.body.fetched).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockClear();
+    const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: "2531" });
+    const past = await call();
+    expect(past.body.budgeted).toBe(true);
+    expect(past.body.fetched).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.ops("INCRBY")).toHaveLength(0);
+    expect(past.body.note).toMatch(/2500 credits/);
   });
 });
 
@@ -513,7 +707,7 @@ describe("the daily budget", () => {
     expect(body.note).toMatch(/budget/i);
     expect(r.ops("INCRBY")[0][2]).toBe(4 * PER);
     expect(body.spentToday).toBe(spent + 4 * PER);
-    expect(r.ops("SET")).toHaveLength(1); // the partial board is still cached for the window
+    expect(r.boardSets()).toHaveLength(1); // the partial board is still cached for the window
   });
   it("a used-up budget fetches nothing, writes no board, and answers source 'none'", async () => {
     const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget) });
@@ -525,7 +719,7 @@ describe("the daily budget", () => {
     expect(body.oddsMissing).toBe(false);
     expect(body.spentToday).toBe(CFB_PROPS.dailyBudget);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
   it("exactly at the line is allowed: spent + n × 31 == budget fetches all n", async () => {
@@ -568,7 +762,7 @@ describe("no store / no key", () => {
     expect(body.source).toBe("none");
     expect(body.budgeted).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
   it("slate oddsMissing → the same empty answer, nothing written", async () => {
@@ -577,8 +771,85 @@ describe("no store / no key", () => {
     const { body } = await call();
     expect(body.oddsMissing).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
+  });
+});
+
+describe("INSTRUCTION 42 (2026-09-05, review fix) — the stored board fits Upstash's 1 MB request cap, and a failed write is visible", () => {
+  /** a 60-game / ~3,000-row board built from the route's own parsed rows (real shape, real field widths) */
+  async function bigBoard(): Promise<CfbPropsBoard> {
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.rows.length).toBeGreaterThan(0);
+    const rows: CfbPropRow[] = [];
+    const games = 60;
+    for (let g = 0; g < games && rows.length < 3000; g++) {
+      for (const r of body.rows) {
+        if (rows.length >= 3000) break;
+        rows.push({ ...r, key: `${r.key}#${g}`, gameId: `${r.gameId}-${g}`, player: `${r.player} ${g}`, label: `${r.label} ${g}`, sub: `${r.sub} · game ${g}` });
+      }
+    }
+    return { ...body, rows, priced: Array.from(new Set(rows.map((r) => r.gameId))) };
+  }
+  it("a 3,000-row board is ~2.5 MB of JSON, yet every stored request (index + gzip chunks) is far under 1 MB and round-trips exactly", async () => {
+    const board = await bigBoard();
+    expect(board.rows.length).toBe(3000);
+    const whole = Buffer.byteLength(JSON.stringify(board), "utf8");
+    expect(whole).toBeGreaterThan(UPSTASH_MAX_REQUEST_BYTES); // the finding: one SET of the whole board would be refused
+    const { index, chunks } = encodeBoard(DATE, board);
+    expect(chunks).toHaveLength(Math.ceil(3000 / CFB_PROPS_CHUNK_ROWS));
+    for (const c of chunks) expect(Buffer.byteLength(c.value, "utf8")).toBeLessThan(UPSTASH_MAX_REQUEST_BYTES / 4);
+    expect(Buffer.byteLength(index, "utf8")).toBeLessThan(UPSTASH_MAX_REQUEST_BYTES / 10);
+    expect(new Set(chunks.map((c) => c.key)).size).toBe(chunks.length);
+    for (const c of chunks) expect(c.key.startsWith(`pl:cfb:props:v1:${DATE}:c:`)).toBe(true);
+    expect(storedChunkKeys(index)).toEqual(chunks.map((c) => c.key));
+    expect(assembleStoredBoard(index, chunks.map((c) => c.value))).toEqual(board);
+  });
+  it("a chunked index with a chunk missing reads as no board; a legacy plain-JSON board still reads as itself", async () => {
+    const board = await bigBoard();
+    const { index, chunks } = encodeBoard(DATE, board);
+    expect(assembleStoredBoard(index, chunks.map((c, i) => (i === 1 ? null : c.value)))).toBeNull();
+    expect(assembleStoredBoard(index, chunks.slice(1).map((c) => c.value))).toBeNull();
+    const legacy: CfbPropsBoard = { ...board, rows: board.rows.slice(0, 5) };
+    expect(storedChunkKeys(JSON.stringify(legacy))).toEqual([]);
+    expect(assembleStoredBoard(JSON.stringify(legacy), [])).toEqual(legacy);
+    expect(assembleStoredBoard("not json", [])).toBeNull();
+  });
+  it("the route writes chunks then the index, and the next request reads the whole board back through MGET with source 'redis'", async () => {
+    const r = fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const first = await call();
+    const sets = r.ops("SET").map((c) => String(c[1]));
+    expect(sets[sets.length - 1]).toBe(propsBoardKey(DATE)); // the index is the LAST write
+    expect(sets.length).toBeGreaterThan(1);
+    fetchMock.mockClear();
+    const second = await call();
+    expect(second.body.source).toBe("redis");
+    expect(second.body.rows).toEqual(first.body.rows);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.ops("MGET")).toHaveLength(1);
+    expect(r.ops("MGET")[0].slice(1)).toEqual(storedChunkKeys(r.kv.get(propsBoardKey(DATE)) ?? null));
+  });
+  it("a store that refuses the write no longer fails silently: the answer is still 200 with its rows, flagged storeWriteFailed", async () => {
+    const r = fakeRedis();
+    const base = vi.mocked(redis).getMockImplementation()!;
+    vi.mocked(redis).mockImplementation(async (cmd: unknown[]) => {
+      if (cmd[0] === "SET") throw new Error("store 413");
+      return base(cmd);
+    });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { status, body } = await call();
+    expect(status).toBe(200);
+    expect(body.rows.length).toBeGreaterThan(0);
+    expect(body.storeWriteFailed).toBe(true);
+    expect(r.boardSets()).toHaveLength(0);
+    // a good write carries no flag
+    const ok = fakeRedis();
+    const good = await call();
+    expect(good.body.storeWriteFailed).toBeUndefined();
+    expect(ok.boardSets()).toHaveLength(1);
   });
 });
 
@@ -600,6 +871,11 @@ describe("source pins", () => {
     expect(readSrc("src/lib/cfb/props.ts")).toMatch(/liveMax: number = CFB_PROPS\.liveMaxEvents/);
     expect(route).not.toMatch(/liveTaken/);
     expect(store).toMatch(/"INCRBY"/);
+    // INSTRUCTION 42 (2026-09-05): the carry decision is per game through pricedAgeMs, and the board stamps pricedAt
+    expect(store).toMatch(/export function pricedAgeMs\(/);
+    expect(route).toMatch(/pricedAgeMs\(stored, g\.id, now\)/);
+    expect(route).toMatch(/pricedAt: pricedAt\(/);
+    expect(route).not.toMatch(/boardFresh\(stored, now, CFB_PROPS\.revalidateSec\)/);
     expect(route).toMatch(/CFB_PROPS\.dailyBudget/);
     expect(route).toMatch(/CFB_PROPS\.measuredCreditsPerEvent/);
     expect(route).not.toMatch(/console\.(log|info|warn|error)/);

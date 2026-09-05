@@ -1,6 +1,7 @@
+import { gunzipSync, gzipSync } from "node:zlib";
 import { redis, storeEnv } from "@/lib/server/store";
 import { CFB_PROPS } from "./rules";
-import type { CfbPropsBoard } from "./props-types";
+import type { CfbPropRow, CfbPropsBoard } from "./props-types";
 
 /**
  * THE CFB PROPS BOARD'S PERSISTENCE + CREDIT LEDGER (2026-09-05).
@@ -22,6 +23,17 @@ import type { CfbPropsBoard } from "./props-types";
  *                                 game inside it kicks off.
  *   pl:cfb:props:spend:v1:<pt>    integer credits spent on props that Pacific day, EX 36 h
  *
+ *   CHUNKED + COMPRESSED (INSTRUCTION 42, 2026-09-05, review fix): a 60-game board is ~3,000
+ *   rows ≈ 2.5–3 MB of JSON, and Upstash's REST endpoint caps ONE request at 1 MB on the Free and
+ *   Pay-as-you-go plans — a single `SET key <json>` would be refused (silently: the route wraps
+ *   store errors), which would strip every credit saver (carried rows, per-game pricedAt, the
+ *   empty-event hold, the stale fallback) for the rest of the day. So the board is written as an
+ *   INDEX under the board key (`{ __chunks: [keys], board: {…board, rows: []} }`) plus one key
+ *   per chunk of `CFB_PROPS_CHUNK_ROWS` rows, each chunk gzip + base64 (JSON rows compress ~8×),
+ *   every key EX boardRetainSec. Chunk keys carry the board's generatedAt so a reader never mixes
+ *   an old board's chunks with a new index; a missing chunk reads as no board. A legacy plain-JSON
+ *   board under the same key still parses, so the deploy loses nothing already stored.
+ *
  * Everything here is best-effort: a missing store env → `propsStore()` is null and the route
  * behaves exactly as before (data cache only); a store error never breaks the route's answer.
  * Nothing in this file touches an MLB key (pl:ledger / pl:bank / pl:noplay) or the CFB ledger.
@@ -37,6 +49,82 @@ export const CFB_PROPS_SPEND_TTL_SEC = 36 * 3600;
 
 export const propsBoardKey = (date: string) => `${CFB_PROPS_REDIS.board}${date}`;
 export const propsSpendKey = (ptDate: string) => `${CFB_PROPS_REDIS.spend}${ptDate}`;
+
+/** rows per stored chunk: 400 rows ≈ 380 KB of JSON ≈ 50 KB gzip+base64 — far under Upstash's 1 MB request cap */
+export const CFB_PROPS_CHUNK_ROWS = 400;
+/** the hard rail every stored request must clear (Upstash Free / Pay-as-you-go REST request cap) */
+export const UPSTASH_MAX_REQUEST_BYTES = 1_000_000;
+
+type StoredIndex = { __chunks: string[]; board: CfbPropsBoard };
+
+const utf8Len = (s: string) => Buffer.byteLength(s, "utf8");
+export const encodeRows = (rows: CfbPropRow[]): string => gzipSync(Buffer.from(JSON.stringify(rows), "utf8")).toString("base64");
+export const decodeRows = (raw: string): CfbPropRow[] | null => {
+  try {
+    const rows = JSON.parse(gunzipSync(Buffer.from(raw, "base64")).toString("utf8")) as unknown;
+    return Array.isArray(rows) ? (rows as CfbPropRow[]) : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The board split for the store: the index value (under `propsBoardKey(date)`) and each chunk's
+ * key + value. Pure, so a test can check every value against UPSTASH_MAX_REQUEST_BYTES.
+ */
+export function encodeBoard(date: string, board: CfbPropsBoard): { index: string; chunks: { key: string; value: string }[] } {
+  const stamp = Number.isFinite(Date.parse(board.generatedAt)) ? String(Date.parse(board.generatedAt)) : "0";
+  const chunks: { key: string; value: string }[] = [];
+  for (let i = 0; i < board.rows.length; i += CFB_PROPS_CHUNK_ROWS) {
+    chunks.push({ key: `${propsBoardKey(date)}:c:${stamp}:${chunks.length}`, value: encodeRows(board.rows.slice(i, i + CFB_PROPS_CHUNK_ROWS)) });
+  }
+  const index: StoredIndex = { __chunks: chunks.map((c) => c.key), board: { ...board, rows: [] } };
+  return { index: JSON.stringify(index), chunks };
+}
+
+/** the chunk keys a stored index names — [] for a legacy plain-JSON board or unreadable input */
+export function storedChunkKeys(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const j = JSON.parse(raw) as Partial<StoredIndex>;
+    return Array.isArray(j.__chunks) && j.__chunks.every((k) => typeof k === "string") ? j.__chunks : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rebuild a board from the stored index value and its chunk values (in `storedChunkKeys` order):
+ * a legacy plain-JSON board reads as itself; a chunked index needs every chunk present and
+ * decodable, else null (treated as no stored board). Validates the shape the route relies on.
+ */
+export function assembleStoredBoard(raw: string | null, chunks: (string | null)[]): CfbPropsBoard | null {
+  if (!raw) return null;
+  let j: unknown;
+  try {
+    j = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!j || typeof j !== "object") return null;
+  let b: CfbPropsBoard;
+  if (Array.isArray((j as StoredIndex).__chunks)) {
+    const idx = j as StoredIndex;
+    if (!idx.board || typeof idx.board !== "object") return null;
+    if (chunks.length !== idx.__chunks.length) return null;
+    const rows: CfbPropRow[] = [];
+    for (const c of chunks) {
+      if (typeof c !== "string") return null;
+      const part = decodeRows(c);
+      if (!part) return null;
+      rows.push(...part);
+    }
+    b = { ...idx.board, rows };
+  } else b = j as CfbPropsBoard;
+  if (!Array.isArray(b.rows) || typeof b.generatedAt !== "string") return null;
+  if (!Number.isFinite(Date.parse(b.generatedAt))) return null;
+  return b;
+}
 
 /** the window a stored board is good for: its own `ttlSec` when it carries one, else the 2 h default */
 export function boardWindowSec(board: Pick<CfbPropsBoard, "ttlSec">): number {
@@ -62,6 +150,17 @@ export function boardFresh(board: Pick<CfbPropsBoard, "generatedAt" | "ttlSec">,
   return age <= window * 1000;
 }
 
+/**
+ * When was one game's props last pulled from the API? The board's own `pricedAt[gameId]`
+ * (INSTRUCTION 42, 2026-09-05), else the board's `generatedAt` for boards written before the field
+ * existed. Returns the age in ms, or null when unreadable / in the future (then treated as unpriced).
+ */
+export function pricedAgeMs(board: Pick<CfbPropsBoard, "generatedAt" | "pricedAt">, gameId: string, now: number): number | null {
+  const stamp = board.pricedAt?.[gameId] ?? board.generatedAt;
+  const age = now - Date.parse(stamp);
+  return Number.isFinite(age) && age >= 0 ? age : null;
+}
+
 export type CfbPropsStore = {
   /** the stored board for the date, or null when absent / unparsable — ANY age; the route decides freshness with `boardFresh` */
   readBoard(date: string): Promise<CfbPropsBoard | null>;
@@ -80,18 +179,16 @@ export function propsStore(): CfbPropsStore | null {
     async readBoard(date) {
       const raw = (await redis(["GET", propsBoardKey(date)])) as string | null;
       if (!raw) return null;
-      let b: CfbPropsBoard;
-      try {
-        b = JSON.parse(raw) as CfbPropsBoard;
-      } catch {
-        return null;
-      }
-      if (!b || typeof b !== "object" || !Array.isArray(b.rows) || typeof b.generatedAt !== "string") return null;
-      if (!Number.isFinite(Date.parse(b.generatedAt))) return null;
-      return b;
+      const keys = storedChunkKeys(raw);
+      const chunks = keys.length > 0 ? ((await redis(["MGET", ...keys])) as (string | null)[]) : [];
+      return assembleStoredBoard(raw, Array.isArray(chunks) ? chunks : []);
     },
     async writeBoard(date, board) {
-      await redis(["SET", propsBoardKey(date), JSON.stringify(board), "EX", CFB_PROPS.boardRetainSec]);
+      const { index, chunks } = encodeBoard(date, board);
+      for (const c of [...chunks.map((x) => x.value), index]) if (utf8Len(c) > UPSTASH_MAX_REQUEST_BYTES) throw new Error("store chunk over 1 MB");
+      // chunks first, then the index that names them — a reader never sees an index whose chunks are not there yet
+      await Promise.all(chunks.map((c) => redis(["SET", c.key, c.value, "EX", CFB_PROPS.boardRetainSec])));
+      await redis(["SET", propsBoardKey(date), index, "EX", CFB_PROPS.boardRetainSec]);
     },
     async readSpend(ptDate) {
       const raw = (await redis(["GET", propsSpendKey(ptDate)])) as string | number | null;

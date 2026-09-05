@@ -49,16 +49,19 @@ describe("the contract", () => {
     /* 2026-09-05 (INSTRUCTION 40): + liveRevalidateSec 600 — the window once any priced event is in play */
     /* 2026-09-05 (review fix): + liveMaxEvents 6 (a live pull re-prices only the in-play games) and
        boardRetainSec 36 h (the last board is retained past its window — the stale fallback at the budget cap) */
+    /* INSTRUCTION 42 (2026-09-05) — Josh: "It should be grading every possible pick available on the
+       board". maxEvents 12 → 60, liveMaxEvents 6 → 24, dailyBudget 1200 → 2500: every eligible game
+       is priced; the empty-event rule and per-game pricedAt (route) keep the real spend under the rail. */
     expect(CFB_PROPS).toEqual({
-      maxEvents: 12,
+      maxEvents: 60,
       revalidateSec: 7200,
       liveRevalidateSec: 600,
-      liveMaxEvents: 6,
+      liveMaxEvents: 24,
       boardRetainSec: 36 * 3600,
       regions: "us",
       minBooks: 2,
       settleBook: "williamhill_us",
-      dailyBudget: 1200,
+      dailyBudget: 2500,
       measuredCreditsPerEvent: 31,
     });
     expect(CFB_PROPS.liveRevalidateSec).toBeLessThan(CFB_PROPS.revalidateSec);
@@ -368,16 +371,19 @@ describe("selectPropEvents", () => {
   /* 2026-09-05 (same-day follow-up, read on prod after the INSTRUCTION 40 deploy): nine in-play
      afternoon games filled all 12 slots of the single sorted list, so the twenty-plus evening
      kickoffs got no props at all. Live games and pre-kick games now have their own pools. */
-  it("live games never crowd out the pre-kick pool: at most liveMaxEvents live PLUS up to maxEvents upcoming", () => {
+  it("live games never crowd out the pre-kick pool: at most liveMax live PLUS up to max upcoming", () => {
+    // INSTRUCTION 42 (2026-09-05): the defaults are now 60 / 24 — larger than the 12-game fixture — so the
+    // pool arithmetic is exercised with explicit caps (liveMax 3); the defaults are pinned in "the contract"
     const upcomingIds = selectPropEvents(board, NOW).events.map((g) => g.id);
-    expect(upcomingIds.length).toBeGreaterThan(CFB_PROPS.liveMaxEvents + 1);
+    const LIVE_CAP = 3;
+    expect(upcomingIds.length).toBeGreaterThan(LIVE_CAP + 1);
     // flip more games live than the live pool holds (their kickoffs are still ahead of NOW — status is ESPN's word)
-    const liveIds = new Set(upcomingIds.slice(0, CFB_PROPS.liveMaxEvents + 2));
+    const liveIds = new Set(upcomingIds.slice(0, LIVE_CAP + 2));
     const many: CfbBoard = { ...board, games: board.games.map((g) => (liveIds.has(g.id) ? { ...g, status: "live" as const, detail: "1st 10:00" } : g)) };
-    const { events, capped } = selectPropEvents(many, NOW);
+    const { events, capped } = selectPropEvents(many, NOW, CFB_PROPS.maxEvents, LIVE_CAP);
     const live = events.filter((g) => g.status === "live");
     const upcoming = events.filter((g) => g.status === "upcoming");
-    expect(live).toHaveLength(CFB_PROPS.liveMaxEvents);
+    expect(live).toHaveLength(LIVE_CAP);
     expect(capped).toBe(true); // the live pool overflowed by two
     expect(events.slice(0, live.length).every((g) => g.status === "live")).toBe(true); // live first
     // every pre-kick game still gets its slot: the whole upcoming remainder, up to maxEvents
@@ -390,6 +396,11 @@ describe("selectPropEvents", () => {
     expect(two.events.filter((g) => g.status === "upcoming").map((g) => g.id)).toEqual(upcoming.map((g) => g.id));
     // and with the live pool empty, `capped` is still an honest word on the upcoming pool alone
     expect(selectPropEvents(board, NOW, 3).capped).toBe(true);
+    // under the DEFAULT caps (60 / 24) every fixture game — all five live and the rest pre-kick — is priced
+    const all = selectPropEvents(many, NOW);
+    expect(all.events).toHaveLength(upcomingIds.length);
+    expect(all.capped).toBe(false);
+    expect(all.events.filter((g) => g.status === "live")).toHaveLength(LIVE_CAP + 2);
   });
   it("rows parsed for a live game keep status 'live' (the Board's LIVE parlays read it) and are not 'playable' (no pre-kick Kelly)", () => {
     const liveAla = withStatus("ALA", "live", { detail: "3rd 4:12", homeScore: 21, awayScore: 7 }).games.find((g) => g.home.abbr === "ALA") as CfbGame;

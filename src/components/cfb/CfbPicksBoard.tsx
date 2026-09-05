@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useIsFetching, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
@@ -17,7 +17,7 @@ import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps } from "@/lib/cfb/client";
 import { fmtLine } from "@/lib/cfb/model";
 import { buildCfbPicks, CFB_PICK_CATEGORIES } from "@/lib/cfb/picks";
-import { CFB_PROP_MARKETS, type CfbParlay, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
+import { CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_BANK_BASE, CFB_PARLAYS, CFB_PROPS } from "@/lib/cfb/rules";
 import { payout, profit } from "@/lib/calc-math";
 import { usd } from "@/lib/ticket-payout";
@@ -48,6 +48,20 @@ import { PairMark, TeamMark } from "./TeamMark";
  * stat tiles, TOP 50 / ALL scope, a category strip (sides, then one tab per player-prop
  * market), a search box, the ranked read-only table S → F on the EV at Caesars, and under it
  * the generated parlay sets in three views (PARLAYS / MIXED / LIVE) with tier and type filters.
+ *
+ * INSTRUCTION 42 (2026-09-05, Josh: "It should be grading every possible pick available on the
+ * board … there needs to be A TON more [parlays] — 50 parlay options under each category"):
+ * the pick categories now admit LIVE rows (graded like upcoming rows, no Kelly stake — the
+ * table prints a LIVE tag in its place), the PICKS tile counts them ("N sides · M props · L
+ * live"), and the parlay section is a chip-row of twelve category pills (ML … REC YDS, COMBOS,
+ * MIXED live+pregame, LIVE) read off `picks.sets`, each up to CFB_PARLAYS.perCategory (50)
+ * ranked tickets, with the tier filter underneath. Every count is the data's own.
+ *
+ * Review fixes (2026-09-05, INSTRUCTION 42): only the ACTIVE layout mounts (the phone carousel
+ * or the ≥768px grid, decided by `useIsDesktop`) instead of both in one tree; the carousel
+ * mounts PHONE_CHUNK tickets and appends more on a "Show more" tap up to SHOW_CAP; the sheen
+ * runs on the top SHINE_TOP ranks only; a MIXED ticket tags its in-play LEG instead of wearing
+ * a whole-ticket LIVE pill (only the LIVE set badges the ticket).
  *
  * Two feeds: the slate (sides — rows appear at once) and the props board (`/api/cfb/props`,
  * one query per date, stale for the board's own ttlSec (10 min live / 2 h pre-kick), never polled — a fresh pull costs
@@ -136,6 +150,15 @@ function teamOf(games: Map<string, CfbGame>, gameId: string, teamId: string | nu
   return teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null;
 }
 
+/** the small in-play tag the table prints in place of a stake on a live row (INSTRUCTION 42) */
+function LiveTag() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live" title="In play — graded on EV at Caesars, no ¼-Kelly stake on a live line" data-testid="cfb-live-tag">
+      <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" aria-hidden /> live
+    </span>
+  );
+}
+
 function Mark({ games, gameId, teamId, kind, size = "sm" }: { games: Map<string, CfbGame>; gameId: string; teamId: string | null | undefined; kind: "side" | "prop"; size?: "xs" | "sm" | "md" }) {
   const g = games.get(gameId);
   const team = teamOf(games, gameId, teamId);
@@ -194,8 +217,11 @@ export function CfbPicksBoard() {
   const top = plusEv[0] ?? null;
   /** the featured strip: the ranked +EV picks that carry a Caesars price (S → F, EV, fair) */
   const featured = useMemo(() => plusEv.filter((r) => r.cz != null).slice(0, FEATURED_N), [plusEv]);
-  const parlayCount = picks ? picks.parlays.length + picks.mixed.length + picks.live.length : 0;
-  const tierCount = (tier: string) => picks?.parlays.filter((t) => t.tier === tier).length ?? 0;
+  /** every ticket across the twelve category sets (INSTRUCTION 42) — the sets are disjoint by construction */
+  const setTickets = useMemo(() => (picks ? CFB_PARLAY_CATEGORIES.flatMap((k) => picks.sets[k] ?? []) : []), [picks]);
+  const parlayCount = setTickets.length;
+  const tierCount = (tier: string) => setTickets.filter((t) => t.tier === tier).length;
+  const liveRows = picks?.liveRows ?? 0;
   const liveGames = current?.games.filter((g) => g.status === "live").length ?? 0;
   const quota = quotaRemaining();
 
@@ -273,7 +299,8 @@ export function CfbPicksBoard() {
         header: "¼-Kelly",
         numeric: true,
         sortValue: (r) => r.kelly ?? -1,
-        cell: (r) => (r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="text-faint">—</span>),
+        // INSTRUCTION 42 (2026-09-05): live rows carry no stake — a LIVE tag sits where the ¼-Kelly chip would
+        cell: (r) => (r.status === "live" ? <LiveTag /> : r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="text-faint">—</span>),
       },
     ],
     [games, propRows],
@@ -287,7 +314,13 @@ export function CfbPicksBoard() {
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <StatTile label="Picks" value={picks ? String(all.length) : "—"} sub={picks ? `${sides} sides · ${propsPending ? "props pricing…" : `${propsN} props`}` : railLabel(date)} tone="cfb" icon="🏈" />
+        <StatTile
+          label="Picks"
+          value={picks ? String(all.length) : "—"}
+          sub={picks ? `${sides} sides · ${propsPending ? "props pricing…" : `${propsN} props`}${liveRows > 0 ? ` · ${liveRows} live` : ""}` : railLabel(date)}
+          tone="cfb"
+          icon="🏈"
+        />
         <StatTile label="+EV at Caesars" value={picks ? String(plusEv.length) : "—"} sub={picks ? `of ${all.length} priced picks` : undefined} tone={plusEv.length > 0 ? "pos" : "muted"} />
         <StatTile
           label="Best edge"
@@ -370,7 +403,7 @@ export function CfbPicksBoard() {
                           ? "The player-props feed did not answer — sides are still priced."
                           : catIsProp
                             ? `A prop needs ${CFB_PROPS.minBooks} books at a line and a Caesars price before it is a pick.`
-                            : "A pick needs a Caesars price on a game that has not kicked off."
+                            : "A pick needs a Caesars price on a game that is upcoming or in play."
                     }
                   />
                 )}
@@ -532,12 +565,25 @@ function propTeamId(r: CfbPickRow, propRows: CfbPropsBoard["rows"] | null): stri
 
 /* ---------- the generated parlays ---------- */
 
-type View = "parlays" | "mixed" | "live";
-const VIEWS: [View, string, string][] = [
-  ["parlays", "PARLAYS", "Tickets built only from games that haven't kicked off — SAFER, LONGSHOT and MIX tiers at Caesars' prices."],
-  ["mixed", "MIXED PARLAYS", "Cross-game tickets pairing a game in progress (in-play price) with games still to kick off."],
-  ["live", "LIVE PARLAYS", "In-game tickets from games in progress only, at the feed's live Caesars prices."],
-];
+/* INSTRUCTION 42 (2026-09-05): twelve category sets, each up to CFB_PARLAYS.perCategory (50)
+   ranked tickets — one pill per key of CFB_PARLAY_CATEGORIES, in the contract's order. The
+   pregame categories are the single-market sets + COMBOS; MIXED pairs a live leg with pregame
+   legs; LIVE is in-play legs only. */
+const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blurb: string; live: boolean }> = {
+  ml: { label: "ML", blurb: "Moneyline-only tickets, 2–6 legs on distinct games that haven't kicked off, at Caesars' prices.", live: false },
+  spread: { label: "SPREAD", blurb: "Spread-only tickets, 2–6 legs on distinct upcoming games, at Caesars' lines.", live: false },
+  total: { label: "TOTAL", blurb: "Totals-only tickets, 2–6 legs on distinct upcoming games, at Caesars' lines.", live: false },
+  anytime_td: { label: "ANYTIME TD", blurb: "Anytime-touchdown scorer tickets, 2–6 players from distinct upcoming games.", live: false },
+  pass_tds: { label: "PASS TDS", blurb: "Passing-touchdown tickets, 2–6 quarterbacks from distinct upcoming games.", live: false },
+  pass_yds: { label: "PASS YDS", blurb: "Passing-yards tickets, 2–6 quarterbacks from distinct upcoming games.", live: false },
+  receptions: { label: "RECEPTIONS", blurb: "Receptions tickets, 2–6 pass-catchers from distinct upcoming games.", live: false },
+  rush_yds: { label: "RUSH YDS", blurb: "Rushing-yards tickets, 2–6 rushers from distinct upcoming games.", live: false },
+  rec_yds: { label: "REC YDS", blurb: "Receiving-yards tickets, 2–6 pass-catchers from distinct upcoming games.", live: false },
+  combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, upcoming games only.", live: false },
+  mixed: { label: "MIXED", hint: "live+pregame", blurb: "Cross-game tickets pairing a game in progress (in-play price) with games still to kick off.", live: true },
+  live: { label: "LIVE", blurb: "In-game tickets from games in progress only, at the feed's live Caesars prices.", live: true },
+};
+const PREGAME_CATS = CFB_PARLAY_CATEGORIES.filter((k) => !PARLAY_CATS[k].live);
 const TIERS: [string, string][] = [
   ["all", "ALL"],
   ["SAFER", "SAFER"],
@@ -545,7 +591,35 @@ const TIERS: [string, string][] = [
   ["MIX", "MIXED"],
 ];
 const TYPES: Record<string, string> = { SIDES: "SIDES ONLY", PROPS: "PROPS ONLY", MIXED: "SIDES + PROPS" };
-const SHOW_CAP = 24;
+/** every ticket a category set can hold is shown — CFB_PARLAYS.perCategory (50) per INSTRUCTION 42 */
+const SHOW_CAP = 50;
+/** phones mount this many tickets first, then PHONE_CHUNK more per "Show more" tap (review fix: 100 eager articles was the hottest surface on the page) */
+const PHONE_CHUNK = 12;
+/** the S-grade sheen animates on the top ranks only — fifty infinite sweeps on one screen is a compositor tax, not a signal */
+const SHINE_TOP = 3;
+
+/** ≥768px (Tailwind `md`), false until the effect runs — phones first, so the carousel is the server-rendered layout */
+function useIsDesktop(): boolean {
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setDesktop(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  return desktop;
+}
+
+/** a leg priced while its game was in play (MIXED tickets — the rest of the slip is pregame) */
+function LiveLegTag() {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-live/50 bg-live/10 px-1.5 py-px text-[8px] font-bold uppercase tracking-[0.14em] text-live" data-testid="cfb-live-leg">
+      <span className="pulse-dot h-1 w-1 rounded-full bg-live" aria-hidden /> live
+    </span>
+  );
+}
 
 function TierTag({ tier }: { tier: CfbParlay["tier"] }) {
   const cls = tier === "SAFER" ? "border-pos/50 bg-pos/10 text-pos" : tier === "LONGSHOT" ? "border-gold/50 bg-gold/10 text-gold" : "border-cfb/50 bg-cfb/10 text-cfb";
@@ -553,10 +627,16 @@ function TierTag({ tier }: { tier: CfbParlay["tier"] }) {
 }
 
 export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { picks: CfbPicks; games: Map<string, CfbGame>; propsPending: boolean; liveGames: number }) {
-  const [view, setView] = useState<View>("parlays");
+  /** the user's tap, else the first non-empty pregame category (falls back to ML) — so the strip never opens on an empty set while another has tickets */
+  const [picked, setPicked] = useState<CfbParlayCategory | null>(null);
   const [filter, setFilter] = useState("all");
-  const lists: Record<View, CfbParlay[]> = { parlays: picks.parlays, mixed: picks.mixed, live: picks.live };
-  const all = lists[view];
+  /** tickets mounted in the phone carousel (grows by PHONE_CHUNK per tap, resets with the category / filter) */
+  const [phoneShown, setPhoneShown] = useState(PHONE_CHUNK);
+  const desktop = useIsDesktop();
+  const sets = picks.sets;
+  const cat: CfbParlayCategory = picked ?? PREGAME_CATS.find((k) => (sets[k]?.length ?? 0) > 0) ?? "ml";
+  const all: CfbParlay[] = sets[cat] ?? [];
+  const meta = PARLAY_CATS[cat];
 
   const filters = useMemo(() => {
     const types = Array.from(new Set(all.map((t) => t.type).filter((t) => t in TYPES)));
@@ -567,38 +647,54 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const shown = all.filter((t) => match(t, active));
 
   const empty =
-    view === "live"
-      ? { title: "No games in progress right now", body: "In-game tickets appear once a kickoff goes live and the feed carries in-play Caesars prices." }
-      : view === "mixed"
+    cat === "live"
+      ? liveGames === 0
+        ? { title: "No games in progress right now", body: "In-game tickets appear once a kickoff goes live and the feed carries in-play Caesars prices." }
+        : { title: "No live tickets yet", body: `Two in-play legs on different games each need a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
+      : cat === "mixed"
         ? liveGames === 0
           ? { title: "No games in progress right now", body: "Mixed tickets need a live game beside the upcoming ones — they appear the moment a kickoff goes live." }
-          : { title: "No mixed tickets yet", body: "A live leg and an upcoming leg each need a Caesars price and grade D or better (EV ≥ −3%)." }
-        : propsPending
-          ? { title: "Building parlays…", body: "SAFER tickets come from the sides; LONGSHOT and MIX fill in as player props finish pricing." }
-          : { title: "No parlays yet", body: `Not enough qualifying legs — a leg needs a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%), and SAFER legs must be ≥ ${Math.round(CFB_PARLAYS.safer.minLegProb * 100)}% to hit.` };
+          : { title: "No mixed tickets yet", body: `A live leg and an upcoming leg each need a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
+        : propsPending && cat !== "ml" && cat !== "spread" && cat !== "total"
+          ? { title: "Building parlays…", body: `${meta.label} tickets fill in as player props finish pricing at Caesars.` }
+          : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%) on a game that hasn't kicked off, and no two legs may share a game.` };
 
   return (
     <Reveal>
       <div className="mt-8" data-testid="cfb-parlays">
-        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Generated parlays — the desk&apos;s ticket sets at Caesars</h2>
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+          Generated parlays — the desk&apos;s ticket sets at Caesars <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
+        </h2>
 
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {VIEWS.map(([v, label]) => (
-            <FilterPill
-              key={v}
-              selected={view === v}
-              className="min-h-[40px]"
-              onClick={() => {
-                setView(v);
-                setFilter("all");
-              }}
-            >
-              {label}
-              <span className="num ml-1 text-[10px] opacity-70">{lists[v].length}</span>
-            </FilterPill>
-          ))}
+        {/* INSTRUCTION 42: one pill per category set, up to CFB_PARLAYS.perCategory tickets each; the row scrolls, the page never does */}
+        <div className="chip-row -mx-4 mb-2 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Parlay category" data-testid="cfb-parlay-cats">
+          {CFB_PARLAY_CATEGORIES.map((k) => {
+            const n = sets[k]?.length ?? 0;
+            const c = PARLAY_CATS[k];
+            return (
+              <FilterPill
+                key={k}
+                role="tab"
+                aria-selected={cat === k}
+                selected={cat === k}
+                className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap"
+                onClick={() => {
+                  setPicked(k);
+                  setFilter("all");
+                  setPhoneShown(PHONE_CHUNK);
+                }}
+              >
+                {c.live && <span className="pulse-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-live align-middle" aria-hidden />}
+                {c.label}
+                {c.hint && <span className="ml-1 text-[9px] font-medium normal-case tracking-normal opacity-70">{c.hint}</span>}
+                <span className="num ml-1 text-[9.5px] opacity-70">{!c.live && k !== "ml" && k !== "spread" && k !== "total" && propsPending && n === 0 ? "…" : n}</span>
+              </FilterPill>
+            );
+          })}
         </div>
-        <div className="mb-3 text-[11px] text-muted">{VIEWS.find(([v]) => v === view)![2]}</div>
+        <div className="mb-3 text-[11px] text-muted">
+          {meta.blurb} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV.</span>
+        </div>
 
         {all.length === 0 ? (
           <Panel>
@@ -611,7 +707,16 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
                 {filters.map(([k, label]) => {
                   const n = all.filter((t) => match(t, k)).length;
                   return (
-                    <FilterPill key={k} selected={active === k} onClick={() => setFilter(k)} disabled={!n} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap">
+                    <FilterPill
+                      key={k}
+                      selected={active === k}
+                      onClick={() => {
+                        setFilter(k);
+                        setPhoneShown(PHONE_CHUNK);
+                      }}
+                      disabled={!n}
+                      className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap"
+                    >
                       {label}
                       {n > 0 && <span className="num ml-1 text-[9.5px] opacity-70">{n}</span>}
                     </FilterPill>
@@ -620,18 +725,37 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
               </div>
             </div>
 
-            {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid */}
-            <div className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel">
-              {shown.slice(0, SHOW_CAP).map((t, i) => (
-                <CfbParlayFeature key={t.id} t={t} rank={i + 1} live={view !== "parlays"} />
-              ))}
+            {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid.
+                Only the active layout mounts (review fix) — the display classes stay for the first paint before the effect runs. */}
+            {!desktop && (
+              <div className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel">
+                {shown.slice(0, Math.min(phoneShown, SHOW_CAP)).map((t, i) => (
+                  <CfbParlayFeature key={t.id} t={t} rank={i + 1} live={cat === "live"} />
+                ))}
+                {phoneShown < Math.min(shown.length, SHOW_CAP) && (
+                  <button
+                    type="button"
+                    className="press flex min-h-[40px] w-[52vw] max-w-[220px] shrink-0 items-center justify-center rounded-[18px] border border-line-2 bg-white/[0.04] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted"
+                    onClick={() => setPhoneShown((n) => Math.min(SHOW_CAP, n + PHONE_CHUNK))}
+                    data-testid="cfb-parlay-more"
+                  >
+                    Show {Math.min(PHONE_CHUNK, Math.min(shown.length, SHOW_CAP) - phoneShown)} more
+                  </button>
+                )}
+              </div>
+            )}
+            {desktop && (
+              <div className="hidden gap-3 md:grid md:grid-cols-2">
+                {shown.slice(0, SHOW_CAP).map((t, i) => (
+                  <CfbParlayCard key={t.id} t={t} games={games} rank={i + 1} />
+                ))}
+              </div>
+            )}
+            <div className="mt-2 text-[11px] text-faint num">
+              {shown.length} {meta.label} ticket{shown.length === 1 ? "" : "s"}
+              {active !== "all" ? ` · ${filters.find(([k]) => k === active)?.[1] ?? active}` : ""}
+              {shown.length > SHOW_CAP ? ` · showing the first ${SHOW_CAP} — narrow with the filters above` : ""}
             </div>
-            <div className="hidden gap-3 md:grid md:grid-cols-2">
-              {shown.slice(0, SHOW_CAP).map((t) => (
-                <CfbParlayCard key={t.id} t={t} games={games} />
-              ))}
-            </div>
-            {shown.length > SHOW_CAP && <div className="mt-2 text-[11px] text-faint">+{shown.length - SHOW_CAP} more in this view — narrow with the filters above.</div>}
             {shown.length === 0 && (
               <Panel>
                 <EmptyState title="No parlays match this filter" />
@@ -659,7 +783,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
   const pays = payout(REF_STAKE, t.dec);
   return (
     <article
-      className={`press relative w-[82vw] max-w-[340px] rounded-[18px] border px-4 pb-3.5 pt-3.5 ${grade === "S" ? "shine" : ""} ${t.ev > 0 ? "ev-glow" : ""}`}
+      className={`press relative w-[82vw] max-w-[340px] rounded-[18px] border px-4 pb-3.5 pt-3.5 ${grade === "S" && rank <= SHINE_TOP ? "shine" : ""} ${t.ev > 0 ? "ev-glow" : ""}`}
       style={{
         borderColor: "color-mix(in srgb, var(--color-gold) 30%, rgba(255,255,255,0.08))",
         background:
@@ -708,6 +832,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
         {t.legs.map((leg: CfbParlayLeg) => (
           <li key={leg.rowKey} className="flex items-center gap-2 text-[11px]">
             <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+            {leg.live && !live && <LiveLegTag />}
             <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
             <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
           </li>
@@ -723,7 +848,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
  * mark · label · market · Caesars price, the tear line, then the money) on a SELF-TINTED
  * surface: no blur filter per card (the iOS freeze rule), the glow on a wrapper.
  */
-export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, CfbGame> }) {
+export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<string, CfbGame>; rank?: number }) {
   const grade = gradeFromEv(t.ev);
   const pct = t.prob * 100;
   const oneIn = pct > 0 ? Math.round(100 / pct) : null;
@@ -731,7 +856,7 @@ export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, C
   return (
     <div className={`rounded-[16px] ${t.ev > 0 ? "ev-glow" : ""}`} data-testid="cfb-parlay">
       <article
-        className={`relative rounded-[16px] border px-4 pb-3 pt-3 ${grade === "S" ? "shine" : ""}`}
+        className={`relative rounded-[16px] border px-4 pb-3 pt-3 ${grade === "S" && (rank ?? 1) <= SHINE_TOP ? "shine" : ""}`}
         style={{
           borderColor: "color-mix(in srgb, var(--color-cfb) 22%, rgba(255,255,255,0.07))",
           background:
@@ -749,7 +874,14 @@ export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, C
               {t.dec.toFixed(2)}× · {t.legs.length} legs at Caesars
             </div>
           </div>
-          <span className="num shrink-0 rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[12px] font-bold text-gold">{fmtAmerican(t.am)}</span>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span className="num rounded-full border border-gold/50 bg-gold/10 px-2.5 py-0.5 text-[12px] font-bold text-gold">{fmtAmerican(t.am)}</span>
+            {rank != null && (
+              <span className="num text-[9px] font-bold text-faint" aria-label={`rank ${rank}`}>
+                #{rank}
+              </span>
+            )}
+          </div>
         </header>
 
         <ul className="mt-3 space-y-1.5">
@@ -757,6 +889,7 @@ export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, C
             <li key={leg.rowKey} className="flex items-center gap-2 text-[11.5px]">
               <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && leg.market === "total" ? null : leg.teamId} kind={leg.kind} size="xs" />
               <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+              {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
               <span className="num shrink-0 text-[10px] text-muted">{fmtPct(leg.prob, 0)}</span>
               <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
