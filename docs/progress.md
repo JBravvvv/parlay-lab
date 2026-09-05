@@ -1,3 +1,16 @@
+# Progress — 2026-09-05 (CFB live props, Refresh Board, Caesars-grammar UI, FPI overlay, Calc)
+
+## INSTRUCTION 40 — in-game props, the Refresh pill, the UI upgrade, scoped Stats, the Calc
+- Props now price live games too (live first, 10-min window, only in-play events re-priced,
+  last board retained so the budget cap shows "lines as priced at H:MM" rather than nothing).
+  A live refresh costs ~31 credits per in-play game (≤ 6); the 1,200/day budget is unchanged.
+- Green "Refresh Board" pill back on the CFB Board (refreshes slate + props).
+- Shared Overlay (60 % sheet) and OddsGrid (Spread · Money · Total) primitives; Games cards,
+  Builder cards (bigger logos, shorter boxes), Board carousels, boost-style ticket cards.
+- Stats shows only the current desk's sport; ESPN FPI lives behind a button → overlay.
+- Parlay Calc rebuilt on src/lib/calc-math.ts with a rolling PAYS hero, ladder, presets.
+- Workflow: 29 agents, 16 confirmed review findings fixed pre-gate. Details: docs/cfb-desk.md.
+
 # Progress — 2026-09-05 (College Football props, freeze fix, Picks board)
 
 ## INSTRUCTION 39 — CFB player props, the iOS freeze, and the Board as a picks/parlay surface

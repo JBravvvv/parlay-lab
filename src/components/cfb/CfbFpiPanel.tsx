@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { EmptyState } from "@/components/ui/states";
 import type { CfbTeam } from "@/lib/cfb/types";
@@ -12,7 +12,9 @@ import { fmtSigned } from "./CfbGameCard";
  * slate only carries the day's teams, so the default title says so ("FPI · today's teams").
  * Sorted by FPI descending; a team ESPN does not rate (FCS, or an unlisted program) is counted
  * at the foot, never given a number. The bar is each rating's share of the strongest listed
- * team's |FPI| — a visual, not a probability. Reusable: The Sharp and the Stats page embed it.
+ * team's |FPI| — a visual, not a probability. Reusable: The Sharp embeds it as a glass panel;
+ * the Stats page (INSTRUCTION 40) mounts it `bare` + `searchable` inside the ESPN FPI overlay,
+ * where the sheet body — not this list — is the scroll container.
  */
 export function CfbFpiPanel({
   teams,
@@ -20,6 +22,8 @@ export function CfbFpiPanel({
   title = "FPI · today's teams",
   limit = 25,
   className = "",
+  bare = false,
+  searchable = false,
 }: {
   teams: readonly CfbTeam[];
   /** ESPN's `lastUpdated` stamp for the footnote */
@@ -28,7 +32,12 @@ export function CfbFpiPanel({
   /** how many rated teams to list (the rest are counted) */
   limit?: number;
   className?: string;
+  /** render the list without the glass Panel chrome (for use inside a sheet / overlay) */
+  bare?: boolean;
+  /** show a team filter box above the list */
+  searchable?: boolean;
 }) {
+  const [query, setQuery] = useState("");
   const { rated, unrated, scale } = useMemo(() => {
     const seen = new Set<string>();
     const unique: CfbTeam[] = [];
@@ -43,16 +52,31 @@ export function CfbFpiPanel({
     return { rated, unrated, scale };
   }, [teams]);
 
-  const shown = rated.slice(0, Math.max(0, limit));
-  const more = rated.length - shown.length;
+  // the rank column is the team's place on the full sorted list, so a filtered view keeps it
+  const qq = searchable ? query.trim().toLowerCase() : "";
+  const matches = (t: CfbTeam) =>
+    !qq || t.short.toLowerCase().includes(qq) || t.abbr.toLowerCase().includes(qq) || t.name.toLowerCase().includes(qq);
+  const shown = rated.map((t, i) => ({ t, i })).filter(({ t }) => matches(t)).slice(0, Math.max(0, limit));
+  const more = qq ? 0 : rated.length - shown.length;
 
-  return (
-    <Panel title={title} className={className} action={<span className="num text-[10px] text-faint">{rated.length} rated</span>}>
+  const body = (
+    <>
+      {searchable && rated.length > 0 && (
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="⌕ Find a team…"
+          aria-label="Find a team"
+          className="mb-3 w-full rounded-full border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] text-text outline-none transition-colors placeholder:text-faint focus:border-cfb/60"
+        />
+      )}
       {rated.length === 0 ? (
         <EmptyState title="No FPI on this slate" body="ESPN's power index was unavailable for this load, or none of these teams is rated (FCS programs are not)." />
+      ) : shown.length === 0 ? (
+        <EmptyState title="No team matches" body="Try the school's short name or abbreviation." />
       ) : (
         <ol className="space-y-1.5">
-          {shown.map((t, i) => {
+          {shown.map(({ t, i }) => {
             const fpi = t.fpi ?? 0;
             const w = Math.min(100, (Math.abs(fpi) / scale) * 100);
             return (
@@ -83,14 +107,32 @@ export function CfbFpiPanel({
               {unrated.length} unrated (FCS / not listed): {unrated.map((t) => t.abbr).join(", ")}
             </span>
           )}
-          {updated && <span className="ml-auto">ESPN FPI · updated {fmtUpdated(updated)}</span>}
+          {updated && <span className="ml-auto">ESPN FPI · updated {fmtFpiUpdated(updated)}</span>}
         </div>
       )}
+    </>
+  );
+
+  if (bare) {
+    return (
+      <div className={className}>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">{title}</span>
+          <span className="num text-[10px] text-faint">{rated.length} rated</span>
+        </div>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <Panel title={title} className={className} action={<span className="num text-[10px] text-faint">{rated.length} rated</span>}>
+      {body}
     </Panel>
   );
 }
 
-function fmtUpdated(iso: string): string {
+/** ESPN's `lastUpdated` stamp as a short Pacific-time label ("Sep 5, 9:12 AM"); the raw string when unparseable */
+export function fmtFpiUpdated(iso: string): string {
   const t = Date.parse(iso);
   if (!Number.isFinite(t)) return iso;
   return new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(t));

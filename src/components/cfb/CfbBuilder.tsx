@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useCfbDesk as useCfbSlateDesk } from "@/components/cfb/CfbBoard";
-import { CfbTicketCard, cfbGradingOf, cfbTicketsOf } from "@/components/cfb/CfbTicketCard";
+import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { Panel } from "@/components/ui/Panel";
@@ -15,7 +15,7 @@ import { cfbExposureOn } from "@/lib/cfb/ledger";
 import { CFB_BANK_BASE, CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
 import { useCfbLedger } from "@/lib/cfb/store";
 import { syncCfbNow } from "@/lib/cfb/sync";
-import type { CfbLedgerEntry, CfbSlate } from "@/lib/cfb/types";
+import type { CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import { fmtEv } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 
@@ -120,6 +120,33 @@ function gradeSummary(entry: CfbLedgerEntry): string | null {
   return `${parts.join(" · ")}${g.done ? "" : " — still grading"}`;
 }
 
+/**
+ * The day's tickets as a Caesars-style "boost card" carousel (INSTRUCTION 40): one snap per
+ * card, 82vw wide on a phone, 340px on wider screens, the .carousel strip from globals.css.
+ * `label` names the strip for the screen reader; the count sits beside the caller's heading.
+ */
+function TicketCarousel({
+  tickets,
+  board,
+  grading,
+  label,
+}: {
+  tickets: CfbTicket[];
+  board: CfbSlate | null;
+  grading?: CfbGradingView | null;
+  label: string;
+}) {
+  return (
+    <div className="carousel -mx-5 px-5" role="list" aria-label={label}>
+      {tickets.map((t) => (
+        <div key={t.id} role="listitem" className="w-[82vw] max-w-[360px] md:w-[340px]">
+          <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CfbBuilder() {
   const { today, date, dates, pick, slate, bankroll, loading, fetching, error, refetch } = useCfbDesk();
   const { entries, lock } = useCfbLedger();
@@ -171,7 +198,7 @@ export function CfbBuilder() {
       <Reveal>
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatTile label="Core" value={`$${CFB_PAPER.daily}`} sub="per slate day · counts in P/L" tone="cfb" />
-          <StatTile label="Fun" value={`$${CFB_PAPER.fun}`} sub="one favorites parlay" tone="gold" />
+          <StatTile label="Fun" value={`$${CFB_PAPER.fun}`} sub="one favorites parlay" tone="cfb" />
           <StatTile
             label="CFB bankroll"
             value={usdFull(bankroll)}
@@ -194,21 +221,19 @@ export function CfbBuilder() {
             {status && status !== lockedLine(locked) && <p className="mt-1 text-[11px] text-muted">{status}</p>}
             {lockedCore.length > 0 && (
               <>
-                <div className="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">Core money</div>
-                <div className="mt-2 grid gap-3 md:grid-cols-2">
-                  {lockedCore.map((t) => (
-                    <CfbTicketCard key={t.id} t={t} grade={lockedGrading?.tickets[t.id]} legResults={lockedGrading?.legs} board={slate} />
-                  ))}
+                <div className="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                  Core money <span className="num normal-case tracking-normal text-faint">· {lockedCore.length}</span>
+                </div>
+                <div className="mt-2">
+                  <TicketCarousel tickets={lockedCore} board={slate} grading={lockedGrading} label="Locked core tickets" />
                 </div>
               </>
             )}
             {lockedFun.length > 0 && (
-              <div className="mt-4 border-t border-gold/25 pt-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold">Fun money</div>
-                <div className="mt-2 grid gap-3 md:grid-cols-2">
-                  {lockedFun.map((t) => (
-                    <CfbTicketCard key={t.id} t={t} grade={lockedGrading?.tickets[t.id]} legResults={lockedGrading?.legs} board={slate} />
-                  ))}
+              <div className="mt-4 border-t border-cfb/25 pt-4">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cfb">Favorites parlay</div>
+                <div className="mt-2">
+                  <TicketCarousel tickets={lockedFun} board={slate} grading={lockedGrading} label="Locked favorites parlay" />
                 </div>
               </div>
             )}
@@ -245,8 +270,8 @@ export function CfbBuilder() {
             </div>
 
             {card.noPlay ? (
-              <div className="mt-3 rounded-[12px] border border-line-2 bg-white/[0.03] px-4 py-4">
-                <div className="text-[13px] font-bold text-text">NO-PLAY</div>
+              <div className="mt-3 rounded-[14px] border border-line-2 bg-white/[0.03] px-4 py-4">
+                <div className="display text-[18px] leading-none tracking-tight text-text">NO-PLAY</div>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
                   No playable side clears +{CFB_RULES.minEvPct}% EV at Caesars under {CFB_RULES.maxDec.toFixed(2)} on this slate.
                   Recommended core stake <b className="num text-text">$0</b> — record the day so the ledger shows the desk sat out.
@@ -258,11 +283,10 @@ export function CfbBuilder() {
                   {card.core.length} ticket{card.core.length === 1 ? "" : "s"} · ${card.coreSum} of ${CFB_PAPER.daily} deployed
                   {card.core.length > 0 && ` · avg EV ${fmtEv(card.core.reduce((s, t) => s + t.czEv, 0) / card.core.length)}`}
                 </div>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  {card.core.map((t) => (
-                    <CfbTicketCard key={t.id} t={t} board={slate} />
-                  ))}
+                <div className="mt-3">
+                  <TicketCarousel tickets={card.core} board={slate} label="Core tickets" />
                 </div>
+                {card.core.length > 1 && <div className="-mt-1 text-[9.5px] text-faint md:hidden">swipe for the next ticket →</div>}
               </>
             )}
 
@@ -300,15 +324,13 @@ export function CfbBuilder() {
               </details>
             )}
 
-            <div className="mt-4 border-t border-gold/25 pt-4">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-gold">
-                Fun money <span className="normal-case tracking-normal text-faint">— ${CFB_PAPER.fun} on one favorites parlay</span>
+            <div className="mt-4 border-t border-cfb/25 pt-4">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cfb">
+                Favorites parlay <span className="normal-case tracking-normal text-faint">— ${CFB_PAPER.fun} fun money, one ticket</span>
               </div>
               {card.funT.length > 0 ? (
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  {card.funT.map((t) => (
-                    <CfbTicketCard key={t.id} t={t} board={slate} />
-                  ))}
+                <div className="mt-3">
+                  <TicketCarousel tickets={card.funT} board={slate} label="Favorites parlay" />
                 </div>
               ) : (
                 <p className="mt-2 text-[11px] text-muted">

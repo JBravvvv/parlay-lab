@@ -89,7 +89,7 @@ export function Segmented<K extends string>({
             title={o.title}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(o.key)}
-            className={`press relative flex items-center justify-center whitespace-nowrap rounded-full font-semibold ${SIZE[size]} ${
+            className={`press hit-44 relative flex items-center justify-center whitespace-nowrap rounded-full font-semibold ${SIZE[size]} ${
               on ? lit : "text-muted hover:text-text"
             }`}
           >

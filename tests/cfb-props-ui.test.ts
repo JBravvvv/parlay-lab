@@ -14,7 +14,7 @@ const slip = read("src/components/cfb/CfbSlip.tsx");
 
 describe("CfbProps — wiring", () => {
   it("imports loadCfbProps (and the query key) from the CFB client", () => {
-    expect(props).toMatch(/import \{ CFB_PROPS_STALE_MS, cfbPropsQueryKey, loadCfbProps \} from "@\/lib\/cfb\/client"/);
+    expect(props).toMatch(/import \{ CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, loadCfbProps \} from "@\/lib\/cfb\/client"/);
     expect(props).toMatch(/loadCfbProps\(date, \{ bankroll \}\)/);
   });
   it("imports CFB_PROP_MARKETS and builds the market nav from it", () => {
@@ -37,11 +37,16 @@ describe("CfbProps — wiring", () => {
     /* the prop leg's market label and the empty state's market name both read the same table */
     expect(props).toMatch(/marketLabel: marketMeta\(row\.market\)\.label/);
   });
-  it("the props query never polls (no refetchInterval) and is stale for the route's window", () => {
+  it("the props query never polls (no refetchInterval) and is stale for the board's own window (ttlSec, else the route's 2 h)", () => {
     expect(props).not.toMatch(/refetchInterval/);
-    expect(props).toMatch(/staleTime: PROPS_STALE_MS/);
+    // 2026-09-05 (INSTRUCTION 40): a live board says ttlSec 600 — the query must not sit on it for 2 h
+    expect(props).toMatch(/staleTime: \(q\) => propsStaleMs\(q\.state\.data\)/);
+    // 2026-09-05 (review fix): staleness is what is LEFT of the window — the board's ttlSec less its age since generatedAt
+    expect(props).toMatch(/function propsStaleMs\(board: CfbPropsBoard \| undefined\): number \{\s*return board \? cfbPropsStaleMs\(board\) : PROPS_STALE_MS;/);
     expect(props).toMatch(/const PROPS_STALE_MS = CFB_PROPS_STALE_MS;/);
-    expect(read("src/lib/cfb/client.ts")).toMatch(/CFB_PROPS_STALE_MS = CFB_PROPS\.revalidateSec \* 1000/);
+    const client = read("src/lib/cfb/client.ts");
+    expect(client).toMatch(/CFB_PROPS_STALE_MS = CFB_PROPS\.revalidateSec \* 1000/);
+    expect(client).toMatch(/Math\.max\(0, winMs - age\)/);
   });
   it("the props query is only enabled on a prop tab", () => {
     expect(props).toMatch(/enabled: nav !== "sides" && !!date/);
@@ -62,6 +67,88 @@ describe("CfbProps — wiring", () => {
   it("keeps the Caesars / Best price toggle on props", () => {
     expect(props).toMatch(/function propQuote\(row: CfbPropRow, mode: PriceMode\)/);
     expect(props).toMatch(/if \(mode === "cz"\) return row\.cz;\s*return row\.best \?\? row\.cz;/);
+  });
+});
+
+/* INSTRUCTION 40 (2026-09-05) — Josh: "the logo sizes on the parlay builder page are so
+   disproportionate to the boxes. The boxes should be smaller vertically and the logos should be
+   slightly bigger". The SIDES card is now the shared OddsGrid (Caesars grammar); props are
+   OddsCellButton pills. Source pins on the rebuilt file. */
+describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
+  it("builds the SIDES card on the shared OddsGrid with Spread / Money / Total columns, amber tone", () => {
+    expect(props).toMatch(/import \{ OddsCellButton, OddsGrid, type OddsGridCell \} from "@\/components\/ui\/OddsGrid"/);
+    expect(props).toMatch(/\{ key: "spread", label: "Spread" \},\s*\{ key: "ml", label: "Money" \},\s*\{ key: "total", label: "Total" \}/);
+    expect(props).toMatch(/<OddsGrid\s+tone="cfb"\s+columns=\{COLUMN_LABELS\}/);
+    // two rows per card: away then home, each through sideCell → a real leg or a muted "—"
+    expect(props).toMatch(/team: <TeamBlock team=\{game\.away\}/);
+    expect(props).toMatch(/team: <TeamBlock team=\{game\.home\}/);
+    expect(props).toMatch(/function sideCell\(/);
+    expect(props).toMatch(/onClick: \(\) => onPick\(legOf\(game, row, q\)\)/);
+    expect(props).toMatch(/selected: picked === row\.key/);
+  });
+  it("logos are the 32 px 'md' mark on the card (no 'xs' anywhere) with the rank badge, abbreviation and record", () => {
+    expect(props).toMatch(/<TeamMark team=\{team\} size="md" showRank showAbbr=\{false\} \/>/);
+    expect(props).not.toMatch(/size="xs"/);
+    expect(props).toMatch(/team\.record \? ` · \$\{team\.record\}` : ""/);
+  });
+  it("a live game carries the pulsing LIVE pill with ESPN's clock and score; a final game collapses to one line with the score and no grid", () => {
+    expect(props).toMatch(/function LivePill\(/);
+    expect(props).toMatch(/pulse-dot[^"]*bg-live/);
+    expect(props).toMatch(/if \(game\.status === "final"\) return <FinalRow game=\{game\} \/>;/);
+    expect(props).toMatch(/function FinalRow\(/);
+    // the final row prints both scores and the word Final, and never mounts the grid
+    const finalRow = props.slice(props.indexOf("function FinalRow("), props.indexOf("function SlipGameCard("));
+    expect(finalRow).toMatch(/game\.awayScore/);
+    expect(finalRow).toMatch(/game\.homeScore/);
+    expect(finalRow).toMatch(/>Final</);
+    expect(finalRow).not.toMatch(/OddsGrid/);
+    // live pills stay tappable — only final / postponed cells are disabled
+    expect(props).toMatch(/const closed = game\.status === "final" \|\| game\.status === "postponed";/);
+    // live games sort first on the SIDES tab, finals last
+    expect(props).toMatch(/g\.status === "live" \? 0 : g\.status === "final" \? 2 : 1/);
+  });
+  it("prop rows: initials avatar, name, team, context line, Over / Under two-button cells; anytime TD one YES pill", () => {
+    expect(props).toMatch(/function Avatar\(/);
+    expect(props).toMatch(/function initials\(name: string\): string/);
+    expect(props).toMatch(/function propCell\(/);
+    expect(props).toMatch(/<OddsCellButton key=\{r\.key\} cell=\{propCell\(r, mode, pickedKeys\.has\(r\.key\), onPick\)\} \/>/);
+    expect(props).toMatch(/yes \? "w-\[74px\] grid-cols-1" : "w-\[150px\] grid-cols-2"/);
+    expect(props).toMatch(/yes \? "YES" :/);
+    // the empty-market game line, never a vanished card
+    expect(props).toMatch(/No \{marketMeta\(market\)\.label\} lines priced for this game\./);
+    expect(props).toMatch(/if \(!needle\) groupFor\(r\);/);
+  });
+  it("the cache footnote reads the board's own window (2 h / 10 min) and the in-play count — nothing hardcoded", () => {
+    // the label is the SHARED client helper (the Board footnote reads the same one — the two surfaces can never disagree)
+    expect(props).toMatch(/const cacheLabel = cfbCacheLabel;/);
+    const client = read("src/lib/cfb/client.ts");
+    expect(client).toMatch(/export function cfbCacheLabel\(board: Pick<CfbPropsBoard, "ttlSec">\): string/);
+    expect(client).toMatch(/board\.ttlSec \?\? CFB_PROPS\.revalidateSec/);
+    expect(props).toMatch(/cached \{cacheLabel\(board\)\}/);
+    expect(props).toMatch(/board\.live \? ` · \$\{board\.live\} in play` : ""/);
+    expect(props).not.toMatch(/PROPS_CACHE_H/);
+    // a stale board (budget spent) says WHEN its lines were priced, never pretends they are fresh
+    expect(props).toMatch(/board\.stale \? ` · lines as priced at \$\{cfbPricedAtLabel\(board\)\}/);
+  });
+  it("phone tap floors: the market strips are the 30px Segmented with the 44px hit-44 region, the search box is 44px / 16px text (no iOS focus zoom)", () => {
+    expect(props).toMatch(/<Segmented options=\{NAV_OPTIONS\}[^>]*size="md"/);
+    expect(props).toMatch(/<Segmented options=\{PRICE_OPTIONS\}[^>]*size="md"/);
+    expect(props).not.toMatch(/<Segmented[^>]*size="sm"/);
+    expect(props).toMatch(/aria-label="Search players"[\s\S]*?className="h-11 [^"]*text-\[16px\]/);
+    expect(read("src/components/ui/Segmented.tsx")).toMatch(/press hit-44 relative/);
+    const css = read("app/globals.css");
+    expect(css).toMatch(/\.hit-44::before \{[^}]*height: 44px/);
+  });
+  it("phone-first: the market strip is the shared chip-row (no page-level sideways scroll); every price is an .odds-cell (≥ 44 px by CSS)", () => {
+    expect(props).toMatch(/className="chip-row -mx-4 px-4 md:mx-0 md:px-0"/);
+    expect(props).not.toMatch(/overflow-x-auto/);
+    const css = read("app/globals.css");
+    expect(css).toMatch(/\.odds-cell \{[^}]*min-height: 44px/);
+  });
+  it("no history-pushing navigation and no blur filter anywhere in the file", () => {
+    expect(props).not.toMatch(/router\.push/);
+    expect(props).not.toMatch(/<Link/);
+    expect(props).not.toMatch(/backdrop/);
   });
 });
 

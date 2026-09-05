@@ -5,19 +5,19 @@ import { EdgeMeter } from "@/components/ui/EdgeMeter";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { KellyChip } from "@/components/ui/KellyChip";
+import { OddsGrid, type OddsGridCell, type OddsGridRow } from "@/components/ui/OddsGrid";
 import { fmtLine } from "@/lib/cfb/model";
 import { CFB_MODEL } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow } from "@/lib/cfb/types";
-import { fmtAmerican, fmtPct } from "@/lib/format";
+import { fmtAmerican, fmtEv, fmtPct } from "@/lib/format";
 import { TeamMark } from "./TeamMark";
 
 /**
- * CFB GAME CARD (INSTRUCTION 38, 2026-09-05): one game, every priced side. The header is the
- * matchup (away @ home — or "vs" on a neutral site — with ranks, records, the kickoff or the
- * live clock or the final score, TV and venue); under it the three markets sit side by side as
- * a 3-column grid, two cells each (away/home, away/home, over/under): the side's line, Caesars'
- * price, the EV chip at Caesars, the letter grade, the model's fair price and the ¼-Kelly stake.
- * Expanded, every side gets an edge meter (model vs de-vigged market) and the model's parts are
+ * CFB GAME CARD (INSTRUCTION 38, 2026-09-05; rebuilt on the Caesars grammar, INSTRUCTION 40):
+ * one game, every priced side. The header carries the status (kickoff, the live pill + clock,
+ * FINAL) and TV; the body is the shared OddsGrid — teams stacked left, Spread / Money / Total
+ * cells right, each Caesars' line over Caesars' price, +EV sides lit and listed with their grade,
+ * fair price and ¼-Kelly stake. Expanded, every side gets an edge meter (model vs de-vigged market) and the model's parts are
  * printed in full — the three P(home) inputs and their blend, the expected margin and total, the
  * book counts, FPI for both teams, and each side's best / DK / FD / Pinnacle quotes.
  *
@@ -123,6 +123,41 @@ export function StatusMark({ game, className = "" }: { game: CfbGame; className?
 
 /* ---------- the card ---------- */
 
+/**
+ * The Caesars grammar (INSTRUCTION 40, 2026-09-05): the two teams stacked on the left — mark,
+ * rank badge, abbreviation, the record (or the FPI rank when there is no record yet) — and a
+ * Spread / Money / Total grid on the right, one row per team (Over rides the away row, Under the
+ * home row). Every cell is Caesars' line above Caesars' price; a +EV side lights amber ("ev")
+ * and is listed under the grid with its grade, EV and ¼-Kelly stake. Live games carry the
+ * pulsing pill + clock and the running score beside each team; finals collapse to a score
+ * line (the grid closed at kickoff — the model still opens below).
+ *
+ * A price tap does what the card's own tap did before: with `onPick` (the sandbox) it picks
+ * the side; without it the tap opens the model, the same as tapping the header. No navigation.
+ */
+
+/** the Caesars price cell for one side, as the OddsGrid wants it */
+export function sideCell(
+  row: CfbRow | null,
+  opts: { picked?: boolean; onClick?: () => void; game: CfbGame },
+): OddsGridCell {
+  if (!row) return { aria: "no line" };
+  const line = row.market === "ml" ? undefined : row.market === "total" ? `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}` : row.line == null ? "—" : fmtLine(row.line);
+  if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no Caesars price` };
+  const czDiffers = row.market !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
+  const czLine = czDiffers ? (row.market === "spread" ? fmtLine(row.cz.line!) : `${row.side === "over" ? "O" : "U"} ${row.cz.line}`) : line;
+  const closed = !row.playable && opts.game.status !== "upcoming";
+  const tone: OddsGridCell["tone"] = closed ? "muted" : (row.evCz ?? -1) > 0 ? "ev" : row.cz.price > 0 ? "plus" : "minus";
+  return {
+    line: czLine,
+    price: fmtAmerican(row.cz.price),
+    tone,
+    selected: opts.picked,
+    onClick: opts.onClick,
+    aria: `${row.label} at Caesars ${fmtAmerican(row.cz.price)}${row.evCz != null ? `, EV ${fmtEv(row.evCz)}` : ""}${closed ? ", closed" : ""}`,
+  };
+}
+
 export function CfbGameCard({
   game,
   expanded,
@@ -142,8 +177,10 @@ export function CfbGameCard({
 }) {
   const sides = marketSides(game);
   const scored = game.status === "live" || game.status === "final";
-  const homeWon = game.status === "final" && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore;
-  const awayWon = game.status === "final" && game.homeScore != null && game.awayScore != null && game.awayScore > game.homeScore;
+  const isFinal = game.status === "final";
+  const isLive = game.status === "live";
+  const homeWon = isFinal && game.homeScore != null && game.awayScore != null && game.homeScore > game.awayScore;
+  const awayWon = isFinal && game.homeScore != null && game.awayScore != null && game.awayScore > game.homeScore;
   const unmatched = game.oddsEventId == null;
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -153,8 +190,32 @@ export function CfbGameCard({
     }
   };
 
+  /* a price tap: pick the side in the sandbox, else open the model (what the card did before) */
+  const tap = (row: CfbRow | null) => (row && onPick ? () => onPick(row) : onToggle);
+  const picked = (row: CfbRow | null) => (row != null && !!isPicked?.(row));
+  const cell = (row: CfbRow | null) => sideCell(row, { picked: picked(row), onClick: tap(row), game });
+
+  const rows: OddsGridRow[] = [
+    {
+      key: `${game.id}-away`,
+      team: <TeamBlock team={game.away} score={scored ? game.awayScore : null} scored={scored} winner={awayWon} loser={homeWon} />,
+      cells: [cell(sides.spread.away), cell(sides.ml.away), cell(sides.total.over)],
+    },
+    {
+      key: `${game.id}-home`,
+      team: <TeamBlock team={game.home} score={scored ? game.homeScore : null} scored={scored} winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />,
+      cells: [cell(sides.spread.home), cell(sides.ml.home), cell(sides.total.under)],
+    },
+  ];
+
+  /* the +EV sides at Caesars, best first — the everyday bettor's "what's the play here" */
+  const edges = orderedRows(game)
+    .filter((r) => (r.evCz ?? -1) > 0)
+    .sort((a, b) => (b.evCz ?? 0) - (a.evCz ?? 0));
+
   const meta: ReactNode[] = [];
-  if (game.tv) meta.push(<span key="tv">{game.tv}</span>);
+  // the header carries the network for upcoming / final games; live games show it here (the header holds the Live pill)
+  if (game.tv && isLive) meta.push(<span key="tv">{game.tv}</span>);
   if (game.venue) meta.push(<span key="venue">{game.venue}</span>);
   if (game.espnLine && (game.espnLine.details || game.espnLine.spread != null || game.espnLine.total != null)) {
     const parts = [
@@ -169,33 +230,69 @@ export function CfbGameCard({
   }
 
   return (
-    <article className={`glass card-lift min-w-0 overflow-hidden ${className}`}>
+    <article className={`glass card-lift min-w-0 overflow-hidden ${isLive ? "ring-1 ring-live/25" : ""} ${className}`}>
+      {/* header: status left (live pill · kickoff · FINAL), neutral tag + model toggle right */}
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
         onClick={onToggle}
         onKeyDown={onKey}
-        className="press cursor-pointer select-none px-4 pb-3 pt-3.5 outline-none focus-visible:ring-2 focus-visible:ring-cfb/60"
+        className="press flex cursor-pointer select-none items-center justify-between gap-3 px-3.5 pb-1.5 pt-3 outline-none focus-visible:ring-2 focus-visible:ring-cfb/60"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <TeamLine team={game.away} score={scored ? game.awayScore : null} scored={scored} winner={awayWon} loser={homeWon} />
-            <TeamLine team={game.home} score={scored ? game.homeScore : null} scored={scored} winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-1 text-right text-[11px] font-semibold uppercase tracking-[0.12em]">
+        <div className="flex min-w-0 items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
+          {isLive ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-live/40 bg-live/10 px-2 py-0.5 text-live">
+              <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
+              <span>Live</span>
+              <span className="num normal-case tracking-normal">{game.detail ?? (game.period != null ? `Q${game.period}${game.clock ? ` ${game.clock}` : ""}` : "")}</span>
+            </span>
+          ) : (
             <StatusMark game={game} />
-            <div className="flex items-center gap-1">
-              {game.neutral && (
-                <span className="rounded-full border border-cfb/40 bg-cfb/10 px-1.5 py-px text-[8.5px] font-bold tracking-[0.14em] text-cfb">Neutral</span>
-              )}
-              <span className="text-[9.5px] font-medium normal-case tracking-normal text-faint">{expanded ? "Less ▴" : "Model ▾"}</span>
-            </div>
-          </div>
+          )}
+          {game.neutral && (
+            <span className="rounded-full border border-cfb/40 bg-cfb/10 px-1.5 py-px text-[8.5px] font-bold tracking-[0.14em] text-cfb">Neutral</span>
+          )}
+          {game.tv && !isLive && <span className="truncate text-[9.5px] font-medium normal-case tracking-normal text-faint">{game.tv}</span>}
         </div>
+        <span className="shrink-0 text-[9.5px] font-medium text-faint">{expanded ? "Less ▴" : "Model ▾"}</span>
+      </div>
+
+      <div className="px-3 pb-3">
+        {isFinal ? (
+          <FinalLine game={game} homeWon={homeWon} awayWon={awayWon} />
+        ) : game.rows.length === 0 ? (
+          <>
+            <div className="space-y-2 py-1">
+              {rows.map((r) => (
+                <div key={r.key}>{r.team}</div>
+              ))}
+            </div>
+            <div className="mt-2 rounded-[10px] border border-dashed border-white/[0.08] px-3 py-2 text-center text-[10.5px] text-faint">
+              {unmatched ? "No odds-feed match yet — nothing priced." : "No market has a consensus yet (two books at a line are needed)."}
+            </div>
+          </>
+        ) : (
+          <OddsGrid tone="cfb" columns={["Spread", "Money", "Total"]} rows={rows} />
+        )}
+
+        {!isFinal && edges.length > 0 && (
+          <ul className="mt-2 space-y-1" aria-label="Edges at Caesars">
+            {edges.map((r) => (
+              <li key={r.key} className="flex items-center gap-2 rounded-[10px] border border-cfb/25 bg-cfb/[0.06] px-2 py-1 text-[11px]">
+                <GradeChip grade={r.grade} basis="EV @ Caesars" />
+                <span className="min-w-0 flex-1 truncate font-semibold text-text">{cellLabel(r, game)}</span>
+                <span className="num shrink-0 text-[10px] text-muted">fair {fmtAmerican(r.fairAm)}</span>
+                {r.evCz != null && <EvBadge ev={r.evCz} className="scale-90" />}
+                {r.playable ? <KellyChip stake={r.kelly} className="origin-right scale-90" /> : <span className="text-[9.5px] text-faint">closed</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+
         {(meta.length > 0 || unmatched) && (
-          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10.5px] leading-snug text-faint">
-            {unmatched && <span className="text-cfb">No odds-feed match — nothing priced</span>}
+          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-snug text-faint">
+            {unmatched && <span className="text-cfb">No odds-feed match</span>}
             {meta.map((m, i) => (
               <span key={i} className="inline-flex items-center gap-2">
                 {(i > 0 || unmatched) && <span aria-hidden>·</span>}
@@ -206,26 +303,13 @@ export function CfbGameCard({
         )}
       </div>
 
-      <div className="border-t border-white/[0.05] px-3 pb-3 pt-2.5">
-        {game.rows.length === 0 ? (
-          <div className="py-2 text-center text-[11px] text-faint">
-            {unmatched ? "The odds feed has no event for this game yet." : "No market has a consensus yet (two books at a line are needed)."}
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-1.5">
-            <MarketCol title="ML" top={sides.ml.away} bottom={sides.ml.home} topFallback={`${game.away.abbr} ML`} bottomFallback={`${game.home.abbr} ML`} game={game} onPick={onPick} isPicked={isPicked} />
-            <MarketCol title="Spread" top={sides.spread.away} bottom={sides.spread.home} topFallback={game.away.abbr} bottomFallback={game.home.abbr} game={game} onPick={onPick} isPicked={isPicked} />
-            <MarketCol title="Total" top={sides.total.over} bottom={sides.total.under} topFallback="Over" bottomFallback="Under" game={game} onPick={onPick} isPicked={isPicked} />
-          </div>
-        )}
-      </div>
-
       {expanded && <Expanded game={game} />}
     </article>
   );
 }
 
-function TeamLine({
+/** the team column of a grid row: mark + rank + abbreviation + record/FPI line, the score beside it in play */
+function TeamBlock({
   team,
   score,
   scored,
@@ -240,102 +324,31 @@ function TeamLine({
   loser: boolean;
   prefix?: string;
 }) {
+  const sub = team.record ?? (team.fpiRank != null ? `FPI #${team.fpiRank}` : team.fpi != null ? `FPI ${fmtSigned(team.fpi)}` : null);
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {prefix ? <span className="w-3 shrink-0 text-center text-[10px] font-bold text-faint">{prefix}</span> : <span className="w-3 shrink-0" aria-hidden />}
+    <div className="flex min-w-0 items-center gap-2">
       <TeamMark team={team} size="md" showRank showAbbr={false} />
-      <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <span className={`truncate text-[13.5px] font-semibold ${loser ? "text-muted" : "text-text"}`}>
-          {team.rank != null && <span className="num mr-1 text-[10.5px] font-bold text-cfb">#{team.rank}</span>}
-          {team.short}
-        </span>
-        <span className="num shrink-0 text-[10.5px] text-faint">{team.record ?? ""}</span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className={`flex items-baseline gap-1 truncate text-[13px] font-bold ${loser ? "text-muted" : "text-text"}`}>
+          {prefix && <span className="text-[9px] font-bold text-faint">{prefix}</span>}
+          {team.rank != null && <span className="num text-[10px] font-bold text-cfb">#{team.rank}</span>}
+          <span className="truncate">{team.abbr}</span>
+        </div>
+        <div className="num truncate text-[10px] text-faint">{sub ?? team.short}</div>
       </div>
-      {scored && <span className={`num shrink-0 text-[20px] font-bold leading-none ${winner ? "text-text" : "text-muted"}`}>{score ?? "—"}</span>}
+      {scored && <span className={`num shrink-0 pr-1 text-[18px] font-bold leading-none ${winner ? "text-text" : "text-muted"}`}>{score ?? "—"}</span>}
     </div>
   );
 }
 
-function MarketCol({
-  title,
-  top,
-  bottom,
-  topFallback,
-  bottomFallback,
-  game,
-  onPick,
-  isPicked,
-}: {
-  title: string;
-  top: CfbRow | null;
-  bottom: CfbRow | null;
-  topFallback: string;
-  bottomFallback: string;
-  game: CfbGame;
-  onPick?: (row: CfbRow) => void;
-  isPicked?: (row: CfbRow) => boolean;
-}) {
+/** a final: the two teams and the score, the winner lit — no grid (it closed at kickoff) */
+function FinalLine({ game, homeWon, awayWon }: { game: CfbGame; homeWon: boolean; awayWon: boolean }) {
   return (
-    <div className="min-w-0">
-      <div className="mb-1 px-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-faint">{title}</div>
-      <div className="space-y-1.5">
-        <SideCell row={top} fallback={topFallback} game={game} onPick={onPick} picked={top != null && !!isPicked?.(top)} />
-        <SideCell row={bottom} fallback={bottomFallback} game={game} onPick={onPick} picked={bottom != null && !!isPicked?.(bottom)} />
-      </div>
+    <div className="space-y-1.5 py-0.5">
+      <TeamBlock team={game.away} score={game.awayScore} scored winner={awayWon} loser={homeWon} />
+      <TeamBlock team={game.home} score={game.homeScore} scored winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />
     </div>
   );
-}
-
-function SideCell({ row, fallback, game, onPick, picked }: { row: CfbRow | null; fallback: string; game: CfbGame; onPick?: (row: CfbRow) => void; picked: boolean }) {
-  if (!row) {
-    return (
-      <div className="rounded-[10px] border border-dashed border-white/[0.06] px-2 py-1.5">
-        <div className="truncate text-[11px] font-semibold text-faint">{fallback}</div>
-        <div className="num mt-1 text-[12px] text-faint">—</div>
-        <div className="mt-1 text-[9.5px] text-faint">no line</div>
-      </div>
-    );
-  }
-  const czDiffers = row.cz != null && row.market !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
-  const lit = (row.evCz ?? -1) > 0;
-  const body = (
-    <>
-      <div className="flex items-center justify-between gap-1">
-        <span className={`truncate text-[11px] font-semibold ${row.playable ? "text-text" : "text-muted"}`}>{cellLabel(row, game)}</span>
-        <GradeChip grade={row.grade} basis="EV @ Caesars" />
-      </div>
-      <div className="mt-1 flex items-center justify-between gap-1">
-        <span className={`num text-[13px] font-bold leading-none ${row.cz ? "text-gold" : "text-faint"}`}>
-          {row.cz ? fmtAmerican(row.cz.price) : "—"}
-          {czDiffers && <span className="ml-0.5 text-[9px] font-medium text-cfb" title="Caesars' own line differs from the consensus line">@{row.market === "spread" ? fmtLine(row.cz!.line!) : row.cz!.line}</span>}
-        </span>
-        {row.evCz != null ? <EvBadge ev={row.evCz} /> : <span className="text-[10px] text-faint">no CZ</span>}
-      </div>
-      <div className="num mt-1 flex items-center justify-between gap-1 text-[9.5px] leading-none text-muted">
-        <span title={`Model: ${fmtPct(row.fair)} to win${row.push > 0 ? `, ${fmtPct(row.push)} push` : ""}`}>fair {fmtAmerican(row.fairAm)}</span>
-        {row.playable ? <KellyChip stake={row.kelly} className="scale-90 origin-right" /> : <span className="text-faint">{game.status === "upcoming" ? "—" : "closed"}</span>}
-      </div>
-    </>
-  );
-  const tone = picked
-    ? "border-cfb/70 bg-cfb/15 shadow-[0_0_16px_-6px_rgba(245,165,36,0.6)]"
-    : lit
-      ? "border-pos/30 bg-pos/[0.07]"
-      : "border-white/[0.06] bg-white/[0.03]";
-  if (onPick) {
-    return (
-      <button
-        type="button"
-        onClick={() => onPick(row)}
-        aria-pressed={picked}
-        aria-label={`${row.label} at Caesars ${row.cz ? fmtAmerican(row.cz.price) : "unpriced"}`}
-        className={`press block w-full rounded-[10px] border px-2 py-1.5 text-left transition-colors ${tone} hover:bg-white/[0.06]`}
-      >
-        {body}
-      </button>
-    );
-  }
-  return <div className={`rounded-[10px] border px-2 py-1.5 ${tone}`}>{body}</div>;
 }
 
 /* ---------- expanded: the model, in full ---------- */

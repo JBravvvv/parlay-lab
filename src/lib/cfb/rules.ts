@@ -96,10 +96,35 @@ export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/f
     Next data cache is per deployment, so every deploy re-spent it. Hence: 12 events, a 2 h
     window, the parsed board persisted in Redis across deploys (src/lib/cfb/props-store.ts),
     and a hard daily budget the route may spend, estimated at `measuredCreditsPerEvent` per
-    event (worst case without the budget: 12 × 31 × 12 pulls/day = 4464; with it, 1200). */
+    event (worst case without the budget: 12 × 31 × 12 pulls/day = 4464; with it, 1200).
+
+    LIVE WINDOW (INSTRUCTION 40, 2026-09-05): props used to vanish the moment the slate kicked
+    off — `selectPropEvents` admitted only pre-kick games. It now admits LIVE games too (never
+    final / postponed), live first. In-game lines move, so a board whose priced set holds a live
+    event is held for `liveRevalidateSec` (10 min) instead of the 2 h `revalidateSec`: the
+    stored board's staleness check and each event call's data-cache window read that shorter
+    figure through `propsWindowSec` (src/lib/cfb/props.ts).
+
+    SIZED FOR THE LIVE CADENCE (2026-09-05, review fix): a full 12-event re-price every 10 min
+    would burn the 1200-credit day in four pulls (12 × 31 = 372 each), after which the props
+    board used to collapse to nothing for the rest of the Pacific day — the same symptom
+    INSTRUCTION 40 asked to fix, only later in the afternoon. So (1) a live pull re-prices
+    ONLY the games that moved: the in-play events, at most `liveMaxEvents` of them, while the
+    upcoming games' rows are carried over from the stored board for as long as their own 2 h
+    window allows (the route merges the two sets); (2) the stored board is retained in Redis
+    for `boardRetainSec`, well past its window, and when the budget refuses a pull the route
+    serves that last good board flagged `stale: true` instead of an empty one — lines a bettor
+    can read, honestly dated, never fabricated. A Saturday with N games in play at once costs
+    about N × 31 credits per 10 min; the daily budget still caps the total. */
 export const CFB_PROPS = {
   maxEvents: 12,
   revalidateSec: 7200,
+  /** the cache window (s) when any priced event is in play — in-game lines move */
+  liveRevalidateSec: 600,
+  /** in-play events a live re-price may fetch per pull (the upcoming games' rows are carried over) */
+  liveMaxEvents: 6,
+  /** how long the last good board stays in Redis past its window — the stale fallback once the budget is spent */
+  boardRetainSec: 36 * 3600,
   regions: "us",
   minBooks: 2,
   settleBook: "williamhill_us",

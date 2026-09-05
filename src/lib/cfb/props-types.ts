@@ -95,6 +95,14 @@ export type CfbPropsBoard = {
   spentToday?: number | null;
   /** a plain-language remark on the answer (only set when there is something to say) */
   note?: string;
+  /** priced events that were in play when the board was built (INSTRUCTION 40) */
+  live?: number;
+  /** the cache window (s) this board was written under — CFB_PROPS.liveRevalidateSec when `live` > 0, else revalidateSec */
+  ttlSec?: number;
+  /** ids of the games whose rows are on this board (fetched this pull or carried over from the stored one) */
+  priced?: string[];
+  /** true when the answer carries lines the current window would have re-priced but the daily budget refused — read `generatedAt` */
+  stale?: boolean;
 };
 
 export type CfbParlayTier = "SAFER" | "LONGSHOT" | "MIX";

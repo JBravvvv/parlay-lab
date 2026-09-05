@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -14,14 +14,23 @@ import { FilterPill, Pill } from "@/components/ui/Pill";
 import { Segmented } from "@/components/ui/Segmented";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
-import { CFB_PROPS_STALE_MS, cfbPropsQueryKey, loadCfbProps } from "@/lib/cfb/client";
+import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps } from "@/lib/cfb/client";
 import { fmtLine } from "@/lib/cfb/model";
 import { buildCfbPicks, CFB_PICK_CATEGORIES } from "@/lib/cfb/picks";
 import { CFB_PROP_MARKETS, type CfbParlay, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_BANK_BASE, CFB_PARLAYS, CFB_PROPS } from "@/lib/cfb/rules";
+import { payout, profit } from "@/lib/calc-math";
+import { usd } from "@/lib/ticket-payout";
 
-/** the props route's cache window in hours (CFB_PROPS.revalidateSec) — the footnotes never hardcode it */
+/** the props route's PRE-KICK window in hours (CFB_PROPS.revalidateSec) — only the fallback before a board loads;
+    a loaded board prints its own window through cfbCacheLabel (10 min while a priced game is live) */
 const PROPS_CACHE_H = CFB_PROPS.revalidateSec / 3600;
+const LIVE_CACHE_MIN = CFB_PROPS.liveRevalidateSec / 60;
+
+/** the props query's staleTime: what is left of the loaded board's window (its ttlSec less its age), else CFB_PROPS_STALE_MS */
+function propsBoardStaleMs(board: CfbPropsBoard | undefined): number {
+  return board ? cfbPropsStaleMs(board) : CFB_PROPS_STALE_MS;
+}
 import type { CfbGame } from "@/lib/cfb/types";
 import { useCfbDesk } from "@/lib/cfb/useCfbDesk";
 import { quotaRemaining } from "@/lib/fetcher";
@@ -41,7 +50,7 @@ import { PairMark, TeamMark } from "./TeamMark";
  * the generated parlay sets in three views (PARLAYS / MIXED / LIVE) with tier and type filters.
  *
  * Two feeds: the slate (sides — rows appear at once) and the props board (`/api/cfb/props`,
- * one query per date, stale for CFB_PROPS.revalidateSec, never polled — a fresh pull costs
+ * one query per date, stale for the board's own ttlSec (10 min live / 2 h pre-kick), never polled — a fresh pull costs
  * quota per event, and the route holds a daily credit budget it will not spend past). Every
  * figure is the feed's own or the model's own at Caesars' price; a missing value says "—".
  * Read-only, like the MLB Board: the Builder writes tickets, this page never does.
@@ -67,9 +76,54 @@ const SCOPES = [
 ] as const;
 type Scope = (typeof SCOPES)[number]["key"];
 const TOP_N = 50;
+/** featured cards in the TOP EDGES carousel */
+const FEATURED_N = 8;
 
 const MARKET_WORD: Record<string, string> = { ml: "ML", spread: "Spread", total: "Total" };
 for (const m of CFB_PROP_MARKETS) MARKET_WORD[m.id] = m.label;
+
+/* ---------- the one refresh control (INSTRUCTION 40, 2026-09-05) ----------
+   Josh: "The green 'Refresh Board' button is gone from the Board screen". The page header
+   carries ONE green primary pill (the MLB desk's "Refresh MLB" placement) and it refetches
+   BOTH feeds: the slate (4-minute data cache) and the player-props board (Redis / a
+   CFB_PROPS.revalidateSec cache with a daily credit budget) — a refresh inside either window
+   spends no Odds API quota. The prefixes are the key builders' own first two segments, so a
+   renamed key can never strand one feed. */
+
+/** every ["cfb","slate",…] and ["cfb","props",…] query, whatever date / bankroll they carry */
+export const CFB_SLATE_KEY_PREFIX = cfbQueryKey(null, CFB_BANK_BASE).slice(0, 2);
+export const CFB_PROPS_KEY_PREFIX = cfbPropsQueryKey(null, CFB_BANK_BASE).slice(0, 2);
+
+/** invalidate (and refetch, where mounted) the slate AND the props board */
+export function refreshCfbBoard(qc: QueryClient): Promise<void> {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: CFB_SLATE_KEY_PREFIX }),
+    qc.invalidateQueries({ queryKey: CFB_PROPS_KEY_PREFIX }),
+  ]).then(() => undefined);
+}
+
+/** The header's green "Refresh Board" pill — app/board/page.tsx mounts it as the CFB PageHeader action. */
+export function CfbRefreshPill() {
+  const qc = useQueryClient();
+  const fetching = useIsFetching({ queryKey: CFB_SLATE_KEY_PREFIX }) + useIsFetching({ queryKey: CFB_PROPS_KEY_PREFIX }) > 0;
+  return (
+    <Pill
+      variant="primary"
+      onClick={() => void refreshCfbBoard(qc)}
+      disabled={fetching}
+      title={`Re-pulls the slate and the player props. Sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play — a refresh inside the window spends no Odds API quota.`}
+      data-testid="cfb-refresh-board"
+    >
+      {fetching ? "Pulling…" : "Refresh Board"}
+    </Pill>
+  );
+}
+
+/** "$10 wins $X" off the book's own decimal price — profit on a $10 stake, to the cent like every other payout on the desk */
+const WIN_STAKE = 10;
+function winsOn(dec: number): number {
+  return profit(WIN_STAKE, dec);
+}
 
 function rowMatches(r: CfbPickRow, needle: string): boolean {
   return !needle || r.label.toLowerCase().includes(needle) || r.sub.toLowerCase().includes(needle);
@@ -82,7 +136,7 @@ function teamOf(games: Map<string, CfbGame>, gameId: string, teamId: string | nu
   return teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null;
 }
 
-function Mark({ games, gameId, teamId, kind, size = "sm" }: { games: Map<string, CfbGame>; gameId: string; teamId: string | null | undefined; kind: "side" | "prop"; size?: "xs" | "sm" }) {
+function Mark({ games, gameId, teamId, kind, size = "sm" }: { games: Map<string, CfbGame>; gameId: string; teamId: string | null | undefined; kind: "side" | "prop"; size?: "xs" | "sm" | "md" }) {
   const g = games.get(gameId);
   const team = teamOf(games, gameId, teamId);
   if (team) return <TeamMark team={team} size={size} showRank showAbbr={false} />;
@@ -99,7 +153,6 @@ function Mark({ games, gameId, teamId, kind, size = "sm" }: { games: Map<string,
 
 export function CfbPicksBoard() {
   const { today, date, pick, rail, bankroll, q, slate } = useCfbDesk();
-  const qc = useQueryClient();
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
@@ -110,7 +163,10 @@ export function CfbPicksBoard() {
   const propsQ = useQuery<CfbPropsBoard>({
     queryKey: cfbPropsQueryKey(date, bankroll ?? CFB_BANK_BASE),
     queryFn: () => loadCfbProps(date, { bankroll: bankroll ?? undefined }),
-    staleTime: CFB_PROPS_STALE_MS,
+    // stale for the board's own window (ttlSec: 600 s while a priced game is live, else the
+    // route's 2 h) — after a live pull the LIVE / MIXED parlays must not sit on a 10-min board
+    // for 2 h (2026-09-05); still never polled
+    staleTime: (q) => propsBoardStaleMs(q.state.data),
     refetchInterval: false,
     retry: 0,
     enabled: propsOn,
@@ -136,6 +192,8 @@ export function CfbPicksBoard() {
   const propsN = all.length - sides;
   const plusEv = all.filter((r) => (r.evCz ?? -1) > 0);
   const top = plusEv[0] ?? null;
+  /** the featured strip: the ranked +EV picks that carry a Caesars price (S → F, EV, fair) */
+  const featured = useMemo(() => plusEv.filter((r) => r.cz != null).slice(0, FEATURED_N), [plusEv]);
   const parlayCount = picks ? picks.parlays.length + picks.mixed.length + picks.live.length : 0;
   const tierCount = (tier: string) => picks?.parlays.filter((t) => t.tier === tier).length ?? 0;
   const liveGames = current?.games.filter((g) => g.status === "live").length ?? 0;
@@ -246,7 +304,7 @@ export function CfbPicksBoard() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Segmented options={SCOPES} value={scope} onChange={setScope} size="sm" tone="cfb" label="Scope" />
+        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone="cfb" label="Scope" />
         <label className="relative min-w-0 flex-1 basis-[160px]">
           <span className="sr-only">Search picks</span>
           <input
@@ -256,32 +314,21 @@ export function CfbPicksBoard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
-            className="num h-[30px] w-full rounded-full border border-line-2 bg-white/[0.04] px-3.5 text-[12px] text-text outline-none placeholder:text-faint focus:border-cfb/60"
+            className="num h-11 w-full rounded-full border border-line-2 bg-white/[0.04] px-4 text-[16px] text-text outline-none placeholder:text-faint focus:border-cfb/60"
           />
         </label>
-        <Pill
-          variant="ghost"
-          className="press"
-          onClick={() => qc.invalidateQueries({ queryKey: ["cfb", "slate"] })}
-          disabled={q.isFetching}
-          title={`Sides cache up to 4 minutes per date — a refresh inside the window spends no Odds API quota. Player props hold for ${PROPS_CACHE_H} h.`}
-        >
-          {q.isFetching ? "Pulling…" : "↻ Refresh"}
-        </Pill>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }} role="tablist" aria-label="Pick category" data-testid="cfb-board-cats">
-        <div className="flex w-max gap-1.5">
+      <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Pick category" data-testid="cfb-board-cats">
           {CATS.map((c) => {
             const n = picks?.categories[c.key]?.length ?? 0;
             return (
-              <FilterPill key={c.key} role="tab" aria-selected={cat === c.key} selected={cat === c.key} onClick={() => setCat(c.key)} className="!px-2.5 !py-1 !text-[10.5px] whitespace-nowrap">
+              <FilterPill key={c.key} role="tab" aria-selected={cat === c.key} selected={cat === c.key} onClick={() => setCat(c.key)} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap">
                 {c.label}
                 <span className="num ml-1 text-[9.5px] opacity-70">{c.prop && propsPending ? "…" : n}</span>
               </FilterPill>
             );
           })}
-        </div>
       </div>
 
       {loading ? (
@@ -303,6 +350,8 @@ export function CfbPicksBoard() {
         </div>
       ) : (
         <>
+          {featured.length > 0 && <TopEdges rows={featured} total={plusEv.length} games={games} propRows={propRows} />}
+
           <Reveal>
             {rows.length === 0 ? (
               <Panel>
@@ -342,9 +391,14 @@ export function CfbPicksBoard() {
               </span>
             ) : propsQ.data ? (
               <span>
-                props for <span className="num">{propsQ.data.fetched}</span> of <span className="num">{propsQ.data.events}</span> games · cached {PROPS_CACHE_H} h
+                props for <span className="num">{propsQ.data.fetched}</span> of <span className="num">{propsQ.data.events}</span> games
+                {propsQ.data.live ? ` · ${propsQ.data.live} in play` : ""} · cached {cfbCacheLabel(propsQ.data)}
                 {propsQ.data.capped ? ` · capped at ${CFB_PROPS.maxEvents} priced games per slate` : ""}
-                {propsQ.data.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""}
+                {propsQ.data.stale
+                  ? ` · lines as priced at ${cfbPricedAtLabel(propsQ.data)} — today's props budget is used up`
+                  : propsQ.data.budgeted
+                    ? " · today's props budget is used up — more games price again tomorrow"
+                    : ""}
               </span>
             ) : null}
             {scope === "top" && catRows.filter((r) => rowMatches(r, needle)).length > TOP_N && (
@@ -363,7 +417,8 @@ export function CfbPicksBoard() {
                 Odds API quota remaining: <span className="num">{quota}</span> ·{" "}
               </>
             )}
-            Sides cache up to 4 min per date, player props {PROPS_CACHE_H} h — a refresh inside the window spends no quota. Caesars is the settlement
+            Sides cache up to 4 min per date, player props {propsQ.data ? cfbCacheLabel(propsQ.data) : `${PROPS_CACHE_H} h`}
+            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — a refresh inside the window spends no quota. Caesars is the settlement
             price (The Odds API&apos;s US feed); the NV app can differ — confirm at lock. Parlays multiply each leg&apos;s own probability
             (legs on different games are treated as independent). Setups that match criteria, not predictions. Informational only, not
             betting advice.
@@ -371,6 +426,94 @@ export function CfbPicksBoard() {
         </>
       )}
     </div>
+  );
+}
+
+/* ---------- TOP EDGES — the featured strip (INSTRUCTION 40, the Caesars "boost card" grammar) ----------
+   One card per ranked +EV pick with a Caesars price: the mark, the pick, the big price, the
+   grade + EV, and "$10 wins $X" off Caesars' own decimal. A horizontal snap carousel — the
+   strip scrolls, the page never does. Every figure is the row's own; nothing is estimated. */
+
+function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
+  return (
+    <Reveal>
+      <section aria-label="Top edges" data-testid="cfb-top-edges">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+            Top edges <span className="num ml-1 text-cfb">{total}</span> <span className="text-faint">+EV at Caesars</span>
+          </h2>
+          {total > rows.length && <span className="num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
+        </div>
+        <div className="carousel -mx-4 px-4 md:mx-0 md:px-0">
+          {rows.map((r, i) => (
+            <FeaturedPick key={r.key} r={r} rank={i + 1} games={games} propRows={propRows} />
+          ))}
+        </div>
+      </section>
+    </Reveal>
+  );
+}
+
+function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
+  const cz = r.cz!;
+  const teamId = r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows);
+  const s = r.grade === "S";
+  return (
+    <article
+      className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[18px] border px-4 pb-3.5 pt-3.5 md:w-[300px] ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
+      style={{
+        borderColor: "color-mix(in srgb, var(--color-cfb) 26%, rgba(255,255,255,0.08))",
+        background:
+          "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)",
+      }}
+      data-testid="cfb-featured-pick"
+    >
+      <header className="flex items-center gap-2.5">
+        <Mark games={games} gameId={r.gameId} teamId={teamId} kind={r.kind} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13.5px] font-bold text-text">{r.label}</div>
+          <div className="truncate text-[10.5px] text-faint">
+            <span className="mr-1 rounded-sm bg-cfb/15 px-1 text-[9px] font-bold uppercase tracking-wide text-cfb">{MARKET_WORD[r.market] ?? r.market}</span>
+            {r.sub}
+          </div>
+        </div>
+        <span className="num shrink-0 rounded-full border border-line-2 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-bold text-muted" aria-label={`rank ${rank}`}>
+          #{rank}
+        </span>
+      </header>
+
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-faint">Caesars</div>
+          <div className="hero-price is-cfb num mt-0.5">{fmtAmerican(cz.price)}</div>
+          {r.market !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
+            <div className="num mt-1 text-[9.5px] text-cfb" title="Caesars' own line differs from the consensus line">
+              at {r.market === "spread" ? fmtLine(cz.line) : cz.line}
+            </div>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5">
+            {r.evCz != null && <EvBadge ev={r.evCz} />}
+            <GradeChip grade={r.grade} basis="EV @ Caesars" />
+          </div>
+          {r.fair != null && (
+            <span className="num text-[10.5px] text-muted" title={r.push > 0 ? `${fmtPct(r.fair)} win · ${fmtPct(r.push)} push` : "model probability the pick hits"}>
+              {fmtPct(r.fair, 0)} to hit
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="ticket-tear my-3" aria-hidden />
+
+      <footer className="flex items-center justify-between gap-2">
+        <span className="num text-[11px] text-text">
+          <span className="text-[9.5px] uppercase tracking-wide text-faint">${WIN_STAKE} wins</span> <b className="text-pos">{usd(winsOn(cz.dec))}</b>
+        </span>
+        {r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="num text-[10px] text-faint">no ¼-Kelly stake</span>}
+      </footer>
+    </article>
   );
 }
 
@@ -444,6 +587,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
             <FilterPill
               key={v}
               selected={view === v}
+              className="min-h-[40px]"
               onClick={() => {
                 setView(v);
                 setFilter("all");
@@ -467,7 +611,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
                 {filters.map(([k, label]) => {
                   const n = all.filter((t) => match(t, k)).length;
                   return (
-                    <FilterPill key={k} selected={active === k} onClick={() => setFilter(k)} disabled={!n} className="!px-2.5 !py-1 !text-[10.5px] whitespace-nowrap">
+                    <FilterPill key={k} selected={active === k} onClick={() => setFilter(k)} disabled={!n} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap">
                       {label}
                       {n > 0 && <span className="num ml-1 text-[9.5px] opacity-70">{n}</span>}
                     </FilterPill>
@@ -476,7 +620,13 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid */}
+            <div className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel">
+              {shown.slice(0, SHOW_CAP).map((t, i) => (
+                <CfbParlayFeature key={t.id} t={t} rank={i + 1} live={view !== "parlays"} />
+              ))}
+            </div>
+            <div className="hidden gap-3 md:grid md:grid-cols-2">
               {shown.slice(0, SHOW_CAP).map((t) => (
                 <CfbParlayCard key={t.id} t={t} games={games} />
               ))}
@@ -498,15 +648,86 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
 const REF_STAKE = 25;
 
 /**
+ * The phone ticket (INSTRUCTION 40): the tier badge, the leg count, the +price as the hero,
+ * "$25 pays $Y", % to hit, EV and grade — a compact snap card in the parlay carousel. Legs
+ * are listed underneath so a tap never has to leave the strip to see what is in it.
+ */
+export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number; live: boolean }) {
+  const grade = gradeFromEv(t.ev);
+  const pct = t.prob * 100;
+  const oneIn = pct > 0 ? Math.round(100 / pct) : null;
+  const pays = payout(REF_STAKE, t.dec);
+  return (
+    <article
+      className={`press relative w-[82vw] max-w-[340px] rounded-[18px] border px-4 pb-3.5 pt-3.5 ${grade === "S" ? "shine" : ""} ${t.ev > 0 ? "ev-glow" : ""}`}
+      style={{
+        borderColor: "color-mix(in srgb, var(--color-gold) 30%, rgba(255,255,255,0.08))",
+        background:
+          "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-cfb) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)",
+      }}
+      data-testid="cfb-parlay-feature"
+    >
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <TierTag tier={t.tier} />
+          <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">{TYPES[t.type] ?? t.type}</span>
+          {live && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live">
+              <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" aria-hidden /> live
+            </span>
+          )}
+        </div>
+        <span className="num shrink-0 text-[9px] font-bold text-faint">#{rank}</span>
+      </header>
+
+      <div className="mt-2.5 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[13px] font-bold text-text">{t.name}</div>
+          <div className="num mt-0.5 text-[10.5px] text-faint">
+            {t.legs.length} legs · {t.dec.toFixed(2)}× at Caesars
+          </div>
+          <div className="hero-price is-gold num mt-2">{fmtAmerican(t.am)}</div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <EvBadge ev={t.ev} />
+            <GradeChip grade={grade} basis="EV at Caesars" />
+          </div>
+          <span className="num text-[10.5px] text-muted" title={oneIn ? `≈ 1 in ${oneIn}` : undefined}>
+            {pct.toFixed(1)}% to hit
+          </span>
+          <span className="num text-[11px] text-text">
+            <span className="text-[9.5px] uppercase tracking-wide text-faint">${REF_STAKE} pays</span> <b className="text-gold">{usd(pays)}</b>
+          </span>
+        </div>
+      </div>
+
+      <div className="ticket-tear my-3" aria-hidden />
+
+      <ul className="space-y-1">
+        {t.legs.map((leg: CfbParlayLeg) => (
+          <li key={leg.rowKey} className="flex items-center gap-2 text-[11px]">
+            <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
+            <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
+          </li>
+        ))}
+      </ul>
+      {t.note && <div className="mt-2 text-[10.5px] leading-relaxed text-faint">{t.note}</div>}
+    </article>
+  );
+}
+
+/**
  * The parlay slip — CfbTicketCard's layout (tier / type chips, name, one line per leg with the
  * mark · label · market · Caesars price, the tear line, then the money) on a SELF-TINTED
- * surface: no backdrop-filter per card (the iOS freeze rule), the glow on a wrapper.
+ * surface: no blur filter per card (the iOS freeze rule), the glow on a wrapper.
  */
 export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, CfbGame> }) {
   const grade = gradeFromEv(t.ev);
   const pct = t.prob * 100;
   const oneIn = pct > 0 ? Math.round(100 / pct) : null;
-  const pays = Math.round(REF_STAKE * t.dec);
+  const pays = payout(REF_STAKE, t.dec);
   return (
     <div className={`rounded-[16px] ${t.ev > 0 ? "ev-glow" : ""}`} data-testid="cfb-parlay">
       <article
@@ -547,7 +768,7 @@ export function CfbParlayCard({ t, games }: { t: CfbParlay; games: Map<string, C
 
         <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
           <span className="num text-[10.5px] text-muted">
-            <span className="uppercase tracking-wide text-faint">${REF_STAKE} pays</span> ${pays}
+            <span className="uppercase tracking-wide text-faint">${REF_STAKE} pays</span> {usd(pays)}
           </span>
           <div className="flex shrink-0 items-center gap-2">
             <span className="num text-[10.5px] text-muted" title={oneIn ? `≈ 1 in ${oneIn}` : undefined}>

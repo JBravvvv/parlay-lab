@@ -18,7 +18,7 @@ import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
-import { CfbPicksBoard } from "@/components/cfb/CfbPicksBoard";
+import { CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -506,6 +506,7 @@ export default function BoardPage() {
           eyebrow="College Football"
           chip={<CfbChip />}
           sub="Every playable side and player prop on the slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          action={<CfbRefreshPill />}
         />
         <CfbPicksBoard />
       </>

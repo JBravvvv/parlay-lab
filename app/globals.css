@@ -331,6 +331,22 @@ body::after {
   }
 }
 
+/* ---- .hit-44: a 44px-tall tap target on a control that stays visually short (the 26 / 30px
+   Segmented option) — the pseudo-element extends the hit region without moving the pill.
+   Phone floor for the market strip Josh switches SIDES ↔ props with. No filter, no blur. */
+.hit-44 {
+  position: relative;
+}
+.hit-44::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
 /* ---- segmented control (SportSwitch, Segmented): the container lays the
    options out on one pill track; the thumb is a motion layoutId element that
    lives inside the ACTIVE option and slides between options on change. */
@@ -480,4 +496,208 @@ body::after {
   .shine::after { animation: none !important; }
   .press:active,
   .card-lift:hover { transform: none !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   INSTRUCTION 40 (2026-09-05) — the Caesars-grammar layer: odds pills in a
+   Spread / Money / Total grid, horizontal chip strips and carousels, a hero
+   price, and the 60%-screen sheet overlay. ADDITIVE, tint-only: no
+   blur filter on any of these (per-item blur froze the iPhone compositor;
+   tests/nav-flat + tests/ui-overlay pin it).
+--------------------------------------------------------------------------- */
+
+/* ---- odds-cell: one tappable price pill. Line small above, price mono bold.
+   --odds-accent lights plus prices / the selected ring (lime; .is-cfb → amber). */
+.odds-grid { --odds-accent: var(--color-pos); }
+.odds-grid.is-cfb { --odds-accent: var(--color-cfb); }
+.odds-cell {
+  --odds-accent: var(--color-pos);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  min-height: 44px;
+  padding: 5px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-surface-2) 82%, transparent);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.odds-grid.is-cfb .odds-cell { --odds-accent: var(--color-cfb); }
+.odds-cell-line {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+.odds-cell-price {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.odds-cell.is-plus .odds-cell-price { color: var(--odds-accent); }
+.odds-cell.is-minus .odds-cell-price { color: var(--color-text); }
+.odds-cell.is-ev {
+  border-color: color-mix(in srgb, var(--odds-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--odds-accent) 12%, var(--color-surface-2));
+}
+.odds-cell.is-ev .odds-cell-price { color: var(--odds-accent); }
+.odds-cell.is-muted {
+  cursor: default;
+  color: var(--color-faint);
+  background: color-mix(in srgb, var(--color-surface-2) 40%, transparent);
+  border-color: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+}
+.odds-cell.is-muted .odds-cell-price { color: var(--color-faint); font-weight: 500; }
+.odds-cell:disabled:not(.is-muted) { opacity: 0.45; cursor: default; }
+.odds-cell.is-selected {
+  border-color: color-mix(in srgb, var(--odds-accent) 70%, transparent);
+  background: color-mix(in srgb, var(--odds-accent) 18%, var(--color-surface-2));
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--odds-accent) 60%, transparent),
+    0 0 18px -6px color-mix(in srgb, var(--odds-accent) 70%, transparent);
+}
+.odds-cell.is-selected .odds-cell-price,
+.odds-cell.is-selected .odds-cell-line { color: var(--odds-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .odds-cell:not(:disabled):hover { border-color: rgba(255, 255, 255, 0.18); }
+}
+
+/* ---- odds-grid: team column + N price columns; the caller sets grid-template-columns
+   inline (OddsGrid.tsx) so the count follows the `columns` prop */
+.odds-grid { display: grid; gap: 6px; }
+.odds-grid-head,
+.odds-grid-row {
+  display: grid;
+  align-items: center;
+  column-gap: 6px;
+}
+.odds-grid-head {
+  padding: 0 0 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+  text-align: center;
+}
+
+/* ---- chip-row: a one-line horizontally scrolling chip strip (sport tabs, markets),
+   scrollbar hidden, edge padding so the first/last chip clears the screen edge */
+.chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 2px 0 6px;
+  scroll-padding-inline: 12px;
+}
+.chip-row::-webkit-scrollbar { display: none; }
+.chip-row > * { flex: 0 0 auto; scroll-snap-align: start; }
+
+/* ---- carousel: horizontal snap scroll for featured/boost cards; each child is a
+   snap point (set the child width — 82vw on phones reads as "one and a peek") */
+.carousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 4px 0 10px;
+  scroll-padding-inline: 16px;
+}
+.carousel::-webkit-scrollbar { display: none; }
+.carousel > * { flex: 0 0 auto; scroll-snap-align: start; scroll-snap-stop: always; }
+
+/* ---- hero-price: the big display price on a featured card ("+5400") */
+.hero-price {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.9rem, 8.5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  color: var(--color-pos);
+  text-shadow: 0 0 24px rgba(182, 255, 61, 0.35);
+}
+.hero-price.is-cfb { color: var(--color-cfb); text-shadow: 0 0 24px rgba(245, 165, 36, 0.35); }
+.hero-price.is-gold { color: var(--color-gold); text-shadow: 0 0 24px rgba(199, 154, 59, 0.35); }
+
+/* ---- sheet overlay (Overlay.tsx). Backdrop is a flat rgba dim — no blur. Phone:
+   bottom sheet (.sheet-60 = 60vh, .sheet-full = 92dvh), rounded top; ≥768px: a centered
+   panel (.sheet-60 caps at 60vw × 60vh). The surface is opaque-ish so nothing below
+   needs blurring to read cleanly. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(4, 10, 7, 0.72);
+  overscroll-behavior: contain;
+}
+.sheet-60,
+.sheet-full {
+  --sheet-accent: var(--color-pos);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-radius: 24px 24px 0 0;
+  border: 1px solid color-mix(in srgb, var(--sheet-accent) 22%, rgba(255, 255, 255, 0.08));
+  border-bottom: 0;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--sheet-accent) 10%, transparent), transparent 55%),
+    color-mix(in srgb, var(--color-surface) 96%, transparent);
+  box-shadow:
+    inset 0 1px 1px color-mix(in srgb, var(--sheet-accent) 26%, rgba(255, 255, 255, 0.1)),
+    0 -18px 60px -24px rgba(0, 0, 0, 0.8);
+  outline: none;
+  overflow: hidden;
+}
+.sheet-60 { height: 60vh; height: 60dvh; }
+.sheet-full { height: 92vh; height: 92dvh; }
+.sheet-60.is-cfb, .sheet-full.is-cfb { --sheet-accent: var(--color-cfb); }
+.sheet-60.is-gold, .sheet-full.is-gold { --sheet-accent: var(--color-gold); }
+.sheet-grab { display: flex; justify-content: center; padding: 8px 0 0; }
+.sheet-grab > span { width: 40px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); }
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .sheet-backdrop { align-items: center; padding: 24px; }
+  .sheet-60,
+  .sheet-full {
+    border-radius: 24px;
+    border-bottom: 1px solid color-mix(in srgb, var(--sheet-accent) 22%, rgba(255, 255, 255, 0.08));
+    box-shadow:
+      inset 0 1px 1px color-mix(in srgb, var(--sheet-accent) 26%, rgba(255, 255, 255, 0.1)),
+      0 30px 80px -30px rgba(0, 0, 0, 0.85);
+  }
+  .sheet-60 { width: min(60vw, 720px); height: 60vh; min-width: 480px; }
+  .sheet-full { width: min(92vw, 720px); height: 88vh; }
 }

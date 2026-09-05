@@ -276,18 +276,44 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
 }
 
 /**
- * Which games get a per-event props pull: upcoming, matched to an odds event, and with a
- * Caesars price on at least one side (no Caesars → nothing to settle at). Ordered by kickoff,
- * then ranked teams first (best rank of the two), then ESPN id; sliced to `max`.
+ * Which games get a per-event props pull (INSTRUCTION 40, 2026-09-05: live games included).
+ * A game qualifies when it is UPCOMING with its kickoff still ahead, or LIVE (in play) — never
+ * final or postponed — AND it is matched to an odds event AND Caesars posts a price on at least
+ * one side (no Caesars → nothing to settle at). Order: live games first (the in-play board Josh
+ * asked for), then by kickoff, then ranked teams first (best rank of the two), then ESPN id;
+ * sliced to `max`. Rows from a live game keep status "live" (parseEventProps copies the game's
+ * status), so the Board's LIVE / MIXED parlays keep working off the same feed.
  */
 export function selectPropEvents(board: CfbBoard, now: number, max: number = CFB_PROPS.maxEvents): { events: CfbGame[]; capped: boolean } {
   const bestRank = (g: CfbGame) => Math.min(g.home.rank ?? 99, g.away.rank ?? 99);
+  const liveRank = (g: CfbGame) => (g.status === "live" ? 0 : 1);
   const eligible = board.games.filter((g) => {
+    if (!g.oddsEventId || !g.rows.some((r) => !!r.cz)) return false;
+    if (g.status === "live") return true;
     const t = Date.parse(g.start);
-    return g.status === "upcoming" && Number.isFinite(t) && t > now && !!g.oddsEventId && g.rows.some((r) => !!r.cz);
+    return g.status === "upcoming" && Number.isFinite(t) && t > now;
   });
   eligible.sort(
-    (a, b) => Date.parse(a.start) - Date.parse(b.start) || bestRank(a) - bestRank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    (a, b) =>
+      liveRank(a) - liveRank(b) ||
+      Date.parse(a.start) - Date.parse(b.start) ||
+      bestRank(a) - bestRank(b) ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   return { events: eligible.slice(0, Math.max(0, max)), capped: eligible.length > max };
+}
+
+/** true when any of the priced events is in play */
+export function hasLiveEvent(events: readonly Pick<CfbGame, "status">[]): boolean {
+  return events.some((g) => g.status === "live");
+}
+
+/**
+ * The cache window (seconds) a props board built from `events` may be held for: the 2 h
+ * `revalidateSec` for a pre-kick set, the 10 min `liveRevalidateSec` once any priced event is in
+ * play (in-game lines move). One helper feeds the Redis EX, the stored board's staleness check
+ * and each event call's data-cache revalidate, so the three can never disagree.
+ */
+export function propsWindowSec(events: readonly Pick<CfbGame, "status">[]): number {
+  return hasLiveEvent(events) ? CFB_PROPS.liveRevalidateSec : CFB_PROPS.revalidateSec;
 }

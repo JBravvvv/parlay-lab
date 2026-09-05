@@ -11,11 +11,12 @@ import { gradeFromEv } from "@/lib/grade";
 import { ticketPayout, usd } from "@/lib/ticket-payout";
 
 /**
- * The College Football ticket — a perforated `.ticket` slip (globals.css, owner D).
- * Bucket tag (CORE / FUN), name, one line per leg (team mark · label · Caesars price ·
- * market word), then the tear line and the money: stake, Wins/Pays (ticketPayout —
- * the same reading every MLB parlay card uses), hit probability, EV at Caesars and
- * the S–F grade on that EV.
+ * The College Football ticket — a perforated `.ticket` slip (globals.css, owner D) in the
+ * Caesars "boost card" grammar (INSTRUCTION 40, 2026-09-05): bucket tag (CORE / FAVORITES
+ * PARLAY — the favorites parlay is the amber card), name, the combined Caesars price as the
+ * hero figure, one line per leg (team mark · label · market word · Caesars price), then the
+ * tear line and the money: "$stake pays $payout" (ticketPayout — the same reading every MLB
+ * parlay card uses; Won/Paid once graded), "% to hit", EV at Caesars and the S–F grade.
  *
  * `ev-glow` rides a wrapper because the ticket's mask clips its own box-shadow;
  * `.shine` (the S-grade sweep) is on the slip itself. `board` is the slate the legs
@@ -70,14 +71,14 @@ function fallbackAbbr(leg: CfbTicketLeg): string {
 
 function LegMark({ leg, game }: { leg: CfbTicketLeg; game: LegGame | undefined }) {
   if (game) {
-    if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="xs" />;
+    if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
     const team = leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null;
-    if (team) return <TeamMark team={team} size="xs" showRank />;
+    if (team) return <TeamMark team={team} size="sm" showRank showAbbr={false} />;
   }
   const tone = leg.market === "total" ? "border-line-2 bg-surface-2 text-muted" : "border-cfb/40 bg-cfb/10 text-cfb";
   return (
     <span
-      className={`num inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full border px-1 text-[8.5px] font-bold ${tone}`}
+      className={`num inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border px-1 text-[9px] font-bold ${tone}`}
       aria-hidden
     >
       {fallbackAbbr(leg)}
@@ -92,6 +93,7 @@ export function CfbTicketCard({
   dimmed = false,
   board,
   legResults,
+  className = "",
 }: {
   t: CfbTicket;
   grade?: CfbGrade | null;
@@ -101,6 +103,8 @@ export function CfbTicketCard({
   board?: Pick<CfbBoard, "games"> | null;
   /** per-leg verdicts keyed by leg.lkey */
   legResults?: Record<string, CfbLegVerdict>;
+  /** width / snap classes from a carousel parent */
+  className?: string;
 }) {
   const games = useMemo(() => {
     const m = new Map<string, LegGame>();
@@ -114,38 +118,46 @@ export function CfbTicketCard({
   const toWin = Math.round(t.stake * (t.czDec - 1) * 100) / 100;
   const result = grade?.result ? RESULT_PILL[grade.result] : null;
   const oneIn = t.prob > 0 ? Math.round(100 / t.prob) : null;
-  const bucketCls = t.bucket === "core" ? "border-cfb/50 bg-cfb/10 text-cfb" : "border-gold/40 bg-gold/10 text-gold";
+  /* the favorites parlay (fun) is the amber card; core money is the desk's green */
+  const fun = t.bucket === "fun";
+  const bucketCls = fun ? "border-cfb/50 bg-cfb/12 text-cfb" : "border-pos/40 bg-pos/10 text-pos";
+  const rim = fun ? "ring-1 ring-cfb/35" : "";
+  const heroTone = fun ? "is-cfb" : "";
+  const settled = !!payout?.settled;
 
   return (
-    <div className={`rounded-[16px] ${glow} ${dimmed ? "opacity-55" : ""}`} data-testid="cfb-ticket">
-      <article className={`ticket ${shine} px-4 pt-3`}>
+    <div className={`rounded-[16px] ${glow} ${dimmed ? "opacity-55" : ""} ${className}`} data-testid="cfb-ticket">
+      <article className={`ticket ${shine} ${rim} px-4 pt-3`}>
         <header className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${bucketCls}`}>
-                {t.bucket === "core" ? "Core" : "Fun"}
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${bucketCls}`}>
+              {fun ? "Favorites parlay" : "Core"}
+            </span>
+            {tag && (
+              <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">
+                {tag}
               </span>
-              {tag && (
-                <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">
-                  {tag}
-                </span>
-              )}
-              {result && (
-                <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${result.cls}`}>
-                  {result.text}
-                </span>
-              )}
-            </div>
-            <div className="mt-1.5 truncate text-[13px] font-bold text-text">{t.name}</div>
-            <div className="num mt-0.5 text-[10.5px] text-faint">
-              <span className="text-gold">{fmtAmerican(t.czOdds)}</span> · {t.czDec.toFixed(2)}× · {t.legs.length} leg
-              {t.legs.length === 1 ? "" : "s"} at Caesars
-            </div>
+            )}
+            {result && (
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${result.cls}`}>
+                {result.text}
+              </span>
+            )}
           </div>
-          <span className="num shrink-0 rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
-            ${t.stake}
+          <span className="num shrink-0 text-[10.5px] text-faint">
+            {t.legs.length} leg{t.legs.length === 1 ? "" : "s"}
           </span>
         </header>
+
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-[13.5px] font-bold text-text">{t.name}</div>
+            <div className="num mt-0.5 text-[10px] text-faint">{t.czDec.toFixed(2)}× at Caesars</div>
+          </div>
+          <span className={`hero-price ${heroTone} shrink-0`} aria-label={`Caesars price ${fmtAmerican(t.czOdds)}`}>
+            {fmtAmerican(t.czOdds)}
+          </span>
+        </div>
 
         <ul className="mt-3 space-y-1.5">
           {t.legs.map((leg) => {
@@ -155,7 +167,7 @@ export function CfbTicketCard({
                 <LegMark leg={leg} game={games.get(leg.gkey)} />
                 <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
                 <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{leg.prop}</span>
-                <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
+                <span className={`num shrink-0 font-semibold ${leg.cz > 0 ? "text-pos" : "text-text"}`}>{fmtAmerican(leg.cz)}</span>
                 {v && (
                   <span
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${LEG_DOT[v.result] ?? "bg-muted"}`}
@@ -170,20 +182,34 @@ export function CfbTicketCard({
 
         <div className="ticket-tear my-3" aria-hidden />
 
-        <footer className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pb-1">
-          {payout ? (
-            <WonPaid t={{ stake: t.stake, czDec: t.czDec, czOdds: t.czOdds }} grade={grade} />
-          ) : (
-            <span className="num text-[10.5px] text-muted">
-              <span className="uppercase tracking-wide text-faint">To win</span> {usd(toWin)}
+        <footer className="pb-1.5">
+          <div className="flex items-baseline justify-between gap-3">
+            {payout && !settled ? (
+              <span className="num text-[13px] font-bold text-text">
+                ${t.stake} <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">pays</span>{" "}
+                <span className={fun ? "text-cfb" : "text-pos"}>{usd(payout.pays)}</span>
+              </span>
+            ) : payout ? (
+              <WonPaid t={{ stake: t.stake, czDec: t.czDec, czOdds: t.czOdds }} grade={grade} className="!text-[12px]" />
+            ) : (
+              <span className="num text-[12px] text-muted">
+                ${t.stake} <span className="uppercase tracking-wide text-faint">to win</span> {usd(toWin)}
+              </span>
+            )}
+            <span className="num shrink-0 text-[11px] font-semibold text-muted" title={oneIn ? `≈ 1 in ${oneIn} slates` : undefined}>
+              {t.prob.toFixed(1)}% <span className="text-[9.5px] font-medium uppercase tracking-wide text-faint">to hit</span>
             </span>
-          )}
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="num text-[10.5px] text-muted" title={oneIn ? `≈ 1 in ${oneIn} slates` : undefined}>
-              {t.prob.toFixed(1)}% to hit
-            </span>
-            <EvBadge ev={t.czEv} />
-            <GradeChip grade={evGrade} basis="EV at Caesars" />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            {payout && !settled ? (
+              <span className="num text-[10px] text-faint">wins {usd(payout.wins)} · stake ${t.stake}</span>
+            ) : (
+              <span className="num text-[10px] text-faint">stake ${t.stake}</span>
+            )}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <EvBadge ev={t.czEv} />
+              <GradeChip grade={evGrade} basis="EV at Caesars" />
+            </div>
           </div>
         </footer>
       </article>

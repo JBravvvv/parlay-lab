@@ -11,7 +11,15 @@ import type { CfbPropsBoard } from "./props-types";
  * its own keys, and the credits each pull costs are tallied per Pacific day so the route can
  * refuse to spend past CFB_PROPS.dailyBudget.
  *
- *   pl:cfb:props:v1:<date>        the CfbPropsBoard for a slate date, EX CFB_PROPS.revalidateSec
+ *   pl:cfb:props:v1:<date>        the CfbPropsBoard for a slate date, EX CFB_PROPS.boardRetainSec
+ *                                 (36 h) — RETAINED past its own window so the route can serve the
+ *                                 last good board, flagged stale, once the daily budget is spent
+ *                                 (2026-09-05 review fix). Freshness is decided by the reader:
+ *                                 `boardFresh(board, now, windowSec)` — the board's own window
+ *                                 (`board.ttlSec`: revalidateSec pre-kick, liveRevalidateSec when a
+ *                                 priced event was in play, INSTRUCTION 40) capped by the CURRENT
+ *                                 slate's window, so a pre-kick board stops being fresh the moment a
+ *                                 game inside it kicks off.
  *   pl:cfb:props:spend:v1:<pt>    integer credits spent on props that Pacific day, EX 36 h
  *
  * Everything here is best-effort: a missing store env → `propsStore()` is null and the route
@@ -30,9 +38,34 @@ export const CFB_PROPS_SPEND_TTL_SEC = 36 * 3600;
 export const propsBoardKey = (date: string) => `${CFB_PROPS_REDIS.board}${date}`;
 export const propsSpendKey = (ptDate: string) => `${CFB_PROPS_REDIS.spend}${ptDate}`;
 
+/** the window a stored board is good for: its own `ttlSec` when it carries one, else the 2 h default */
+export function boardWindowSec(board: Pick<CfbPropsBoard, "ttlSec">): number {
+  const t = board.ttlSec;
+  return typeof t === "number" && Number.isFinite(t) && t > 0 ? Math.round(t) : CFB_PROPS.revalidateSec;
+}
+
+/** age of a stored board in ms, or null when `generatedAt` is unreadable or in the future */
+export function boardAgeMs(board: Pick<CfbPropsBoard, "generatedAt">, now: number): number | null {
+  const age = now - Date.parse(board.generatedAt);
+  return Number.isFinite(age) && age >= 0 ? age : null;
+}
+
+/**
+ * Is a stored board still inside its window? The window is the board's OWN `ttlSec` capped by
+ * `windowSec` — the window the CURRENT slate calls for (`propsWindowSec(events)`), so a board
+ * written pre-kick (7200) is fresh for only liveRevalidateSec once a game inside it is in play.
+ */
+export function boardFresh(board: Pick<CfbPropsBoard, "generatedAt" | "ttlSec">, now: number, windowSec: number = Number.POSITIVE_INFINITY): boolean {
+  const age = boardAgeMs(board, now);
+  if (age == null) return false;
+  const window = Math.min(boardWindowSec(board), windowSec);
+  return age <= window * 1000;
+}
+
 export type CfbPropsStore = {
-  /** the stored board for the date, or null when absent, unparsable, or older than the window */
-  readBoard(date: string, now: number): Promise<CfbPropsBoard | null>;
+  /** the stored board for the date, or null when absent / unparsable — ANY age; the route decides freshness with `boardFresh` */
+  readBoard(date: string): Promise<CfbPropsBoard | null>;
+  /** persist the board, retained for CFB_PROPS.boardRetainSec (past its window — the stale fallback) */
   writeBoard(date: string, board: CfbPropsBoard): Promise<void>;
   /** credits spent on props this Pacific day (0 when nothing recorded) */
   readSpend(ptDate: string): Promise<number>;
@@ -44,7 +77,7 @@ export type CfbPropsStore = {
 export function propsStore(): CfbPropsStore | null {
   if (!storeEnv()) return null;
   return {
-    async readBoard(date, now) {
+    async readBoard(date) {
       const raw = (await redis(["GET", propsBoardKey(date)])) as string | null;
       if (!raw) return null;
       let b: CfbPropsBoard;
@@ -54,12 +87,11 @@ export function propsStore(): CfbPropsStore | null {
         return null;
       }
       if (!b || typeof b !== "object" || !Array.isArray(b.rows) || typeof b.generatedAt !== "string") return null;
-      const age = now - Date.parse(b.generatedAt);
-      if (!Number.isFinite(age) || age < 0 || age > CFB_PROPS.revalidateSec * 1000) return null;
+      if (!Number.isFinite(Date.parse(b.generatedAt))) return null;
       return b;
     },
     async writeBoard(date, board) {
-      await redis(["SET", propsBoardKey(date), JSON.stringify(board), "EX", CFB_PROPS.revalidateSec]);
+      await redis(["SET", propsBoardKey(date), JSON.stringify(board), "EX", CFB_PROPS.boardRetainSec]);
     },
     async readSpend(ptDate) {
       const raw = (await redis(["GET", propsSpendKey(ptDate)])) as string | number | null;

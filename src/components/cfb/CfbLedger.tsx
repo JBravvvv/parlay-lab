@@ -346,7 +346,7 @@ export function CfbLedger() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Segmented options={SCOPES} value={scope} onChange={setScope} size="sm" tone="cfb" label="Ledger scope" />
+        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone="cfb" label="Ledger scope" />
         <span className="num text-[10.5px] text-faint">
           {entries.length} locked day{entries.length === 1 ? "" : "s"} · ${s.staked.toFixed(2)} staked
         </span>

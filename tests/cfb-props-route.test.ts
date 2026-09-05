@@ -6,7 +6,7 @@ import { stripComments } from "./helpers/source";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { CFB_PROPS } from "@/lib/cfb/rules";
 import { finalsOf } from "@/lib/cfb/slate-server";
-import { affordableEvents, propsBoardKey, propsSpendKey, pullCredits, CFB_PROPS_SPEND_TTL_SEC } from "@/lib/cfb/props-store";
+import { affordableEvents, boardFresh, boardWindowSec, propsBoardKey, propsSpendKey, pullCredits, CFB_PROPS_SPEND_TTL_SEC } from "@/lib/cfb/props-store";
 import type { CfbPropsBoard } from "@/lib/cfb/props-types";
 import type { CfbSlate } from "@/lib/cfb/types";
 
@@ -16,12 +16,18 @@ import type { CfbSlate } from "@/lib/cfb/types";
  * pull plus one 6-credit slate call), not the 6 the header comment assumed. The Next data cache
  * is per deployment, so every deploy re-spent it. The rails pinned here:
  *
- *   rules     — maxEvents 12, revalidateSec 7200, dailyBudget 1200, measuredCreditsPerEvent 31
- *   redis     — pl:cfb:props:v1:<date> (EX revalidateSec) is read BEFORE any event fetch and
- *               written after a fetch; pl:cfb:props:spend:v1:<ptDate> (EX 36 h) is INCRBY'd by
- *               the credits the pull cost
+ *   rules     — maxEvents 12, revalidateSec 7200, liveRevalidateSec 600, liveMaxEvents 6,
+ *               dailyBudget 1200, measuredCreditsPerEvent 31, boardRetainSec 36 h
+ *   redis     — pl:cfb:props:v1:<date> (EX boardRetainSec — retained past its window) is read
+ *               BEFORE any event fetch and written after a fetch; pl:cfb:props:spend:v1:<ptDate>
+ *               (EX 36 h) is INCRBY'd by the credits the pull cost
  *   budget    — spent + eventsToFetch × 31 > 1200 → fetch only what the budget still buys
- *               (possibly none), `budgeted: true`
+ *               (possibly none), `budgeted: true`; the refused games keep their last priced
+ *               rows off the stored board, `stale: true` (2026-09-05 review fix — the board
+ *               used to collapse to rows: [] for the rest of the day)
+ *   live      — a stored pre-kick board is fresh only inside the CURRENT window once a game in
+ *               it kicks off; a live pull re-prices only the in-play events (≤ liveMaxEvents)
+ *               and carries the upcoming games' rows over
  *   no redis  — missing store env → the data-cache-only behaviour of before, no store calls
  *   no key    — the unchanged oddsMissing answer, and NOTHING is written
  *
@@ -63,6 +69,15 @@ function slate(oddsMissing = false): CfbSlate {
   const board = buildCfbBoard({ date: DATE, espnEvents: ESPN.events, oddsEvents: ODDS, fpi: FPI, now: NOW, bankroll: 2500 });
   return { ...board, finals: finalsOf(board.games), quota: { remaining: 9000, used: 1000 }, oddsMissing };
 }
+
+/** the same slate with one game flipped to LIVE (INSTRUCTION 40) — every fixture game is STATUS_SCHEDULED */
+const LIVE_ABBR = "OSU"; // kicks at 16:30Z, after every 16:00Z game — live it must still come FIRST
+function liveSlate(): CfbSlate {
+  const s = slate();
+  const games = s.games.map((g) => (g.home.abbr === LIVE_ABBR ? { ...g, status: "live" as const, detail: "2nd 8:12", homeScore: 14, awayScore: 3 } : g));
+  return { ...s, games, finals: finalsOf(games) };
+}
+const liveOddsEventId = (): string => liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.oddsEventId as string;
 
 /** a per-event odds answer; `used` feeds the x-requests-used header (null → no header) */
 function eventResponse(used: number | null): Response {
@@ -131,9 +146,12 @@ afterEach(() => {
 });
 
 describe("rules", () => {
-  it("12 events, a 2 h window, a daily budget and the measured per-event cost", () => {
+  it("12 events, a 2 h window (10 min live), a daily budget and the measured per-event cost", () => {
     expect(CFB_PROPS.maxEvents).toBe(12);
     expect(CFB_PROPS.revalidateSec).toBe(7200);
+    expect(CFB_PROPS.liveRevalidateSec).toBe(600);
+    expect(CFB_PROPS.liveMaxEvents).toBe(6);
+    expect(CFB_PROPS.boardRetainSec).toBe(36 * 3600);
     expect(CFB_PROPS.dailyBudget).toBe(1200);
     expect(CFB_PROPS.measuredCreditsPerEvent).toBe(31);
     // worst case per day: 12 events × 31 credits × (24 h / 2 h) pulls = 4464 — the budget caps it at 1200
@@ -164,6 +182,27 @@ describe("the pure helpers", () => {
     expect(propsSpendKey("2026-09-05")).toBe("pl:cfb:props:spend:v1:2026-09-05");
     expect(CFB_PROPS_SPEND_TTL_SEC).toBe(129600);
   });
+  it("boardWindowSec: the board's own ttlSec, else the 2 h default (a bad ttlSec never shortens or extends it)", () => {
+    expect(boardWindowSec({})).toBe(7200);
+    expect(boardWindowSec({ ttlSec: undefined })).toBe(7200);
+    expect(boardWindowSec({ ttlSec: 600 })).toBe(600);
+    expect(boardWindowSec({ ttlSec: 7200 })).toBe(7200);
+    expect(boardWindowSec({ ttlSec: 0 })).toBe(7200);
+    expect(boardWindowSec({ ttlSec: -5 })).toBe(7200);
+    expect(boardWindowSec({ ttlSec: Number.NaN })).toBe(7200);
+  });
+  it("boardFresh: inside min(own window, current window); a future or unreadable generatedAt is never fresh", () => {
+    const at = (ageSec: number) => new Date(NOW - ageSec * 1000).toISOString();
+    expect(boardFresh({ generatedAt: at(60), ttlSec: 7200 }, NOW)).toBe(true);
+    expect(boardFresh({ generatedAt: at(7201), ttlSec: 7200 }, NOW)).toBe(false);
+    // a pre-kick board under a live slate: the current 600 s window caps it
+    expect(boardFresh({ generatedAt: at(1200), ttlSec: 7200 }, NOW, 600)).toBe(false);
+    expect(boardFresh({ generatedAt: at(300), ttlSec: 7200 }, NOW, 600)).toBe(true);
+    // a live board under a pre-kick window keeps its own shorter window
+    expect(boardFresh({ generatedAt: at(700), ttlSec: 600 }, NOW, 7200)).toBe(false);
+    expect(boardFresh({ generatedAt: at(-5), ttlSec: 7200 }, NOW)).toBe(false);
+    expect(boardFresh({ generatedAt: "nope", ttlSec: 7200 }, NOW)).toBe(false);
+  });
 });
 
 describe("fresh fetch (nothing in redis, budget untouched)", () => {
@@ -188,16 +227,23 @@ describe("fresh fetch (nothing in redis, budget untouched)", () => {
     const gets = r.ops("GET").map((c) => c[1]);
     expect(gets).toContain(`pl:cfb:props:v1:${DATE}`);
     expect(gets).toContain(`pl:cfb:props:spend:v1:${DATE}`);
-    // the board write: SET key json EX revalidateSec
+    // the board write: SET key json EX boardRetainSec — retained past its window for the stale fallback
     const set = r.ops("SET");
     expect(set).toHaveLength(1);
     expect(set[0].slice(0, 2)).toEqual(["SET", `pl:cfb:props:v1:${DATE}`]);
-    expect(set[0].slice(3)).toEqual(["EX", CFB_PROPS.revalidateSec]);
+    expect(set[0].slice(3)).toEqual(["EX", CFB_PROPS.boardRetainSec]);
     const stored = JSON.parse(String(set[0][2])) as CfbPropsBoard;
     expect(stored.rows).toHaveLength(body.rows.length);
     expect(stored.fetched).toBe(body.fetched);
     expect(stored.generatedAt).toBe(body.generatedAt);
-    expect(r.ttl.get(`pl:cfb:props:v1:${DATE}`)).toBe(CFB_PROPS.revalidateSec);
+    expect(r.ttl.get(`pl:cfb:props:v1:${DATE}`)).toBe(CFB_PROPS.boardRetainSec);
+    // the games on the board are named, so a later live pull can carry them over
+    expect(body.priced).toHaveLength(body.events);
+    expect(body.stale).toBe(false);
+    // a pre-kick set: the 2 h window, nothing live
+    expect(body.ttlSec).toBe(CFB_PROPS.revalidateSec);
+    expect(body.live).toBe(0);
+    expect(stored.ttlSec).toBe(CFB_PROPS.revalidateSec);
     // the spend: the real delta of x-requests-used across the pull (last − first, plus the first call's own cost)
     const inc = r.ops("INCRBY");
     expect(inc).toHaveLength(1);
@@ -255,13 +301,186 @@ describe("redis has a fresh board", () => {
     expect(r.ops("SET")).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
-  it("a stale stored board (older than the window, TTL not yet swept) is ignored", async () => {
+  it("a stale stored board (older than the window, still retained) is re-priced in full", async () => {
     const stale = { date: DATE, events: 1, fetched: 1, capped: false, rows: [], quota: null, oddsMissing: false, generatedAt: new Date(NOW - (CFB_PROPS.revalidateSec + 5) * 1000).toISOString() };
     fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stale) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
     expect(body.source).toBe("fetch");
     expect(fetchMock).toHaveBeenCalled();
+  });
+});
+
+describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep populating)", () => {
+  beforeEach(() => {
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+  });
+
+  it("the live game is priced (fetched FIRST), its rows carry status 'live', and the whole board is held for liveRevalidateSec", async () => {
+    const r = fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(body.live).toBe(1);
+    expect(body.ttlSec).toBe(CFB_PROPS.liveRevalidateSec);
+    expect(body.ttlSec).toBe(600);
+    expect(body.fetched).toBe(body.events);
+    // live first: the very first per-event call is the live game's odds event
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    // every event call — live or not — sits on the shorter data-cache window for this pull
+    for (const [, init] of fetchMock.mock.calls) expect(init).toEqual({ next: { revalidate: CFB_PROPS.liveRevalidateSec } });
+    // the Redis write is retained past the window (the stale fallback); the board itself says 600
+    const set = r.ops("SET");
+    expect(set).toHaveLength(1);
+    expect(set[0].slice(3)).toEqual(["EX", CFB_PROPS.boardRetainSec]);
+    const stored = JSON.parse(String(set[0][2])) as CfbPropsBoard;
+    expect(stored.ttlSec).toBe(600);
+    expect(stored.live).toBe(1);
+    // the live game's rows keep status "live" (the Board's LIVE parlays read it); the rest stay upcoming
+    const liveGameId = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    const liveRows = body.rows.filter((row) => row.gameId === liveGameId);
+    expect(liveRows.length).toBeGreaterThan(0);
+    expect(liveRows.every((row) => row.status === "live")).toBe(true);
+    expect(body.rows.filter((row) => row.gameId !== liveGameId).every((row) => row.status === "upcoming")).toBe(true);
+    // the same slate WITHOUT the live game gets the 2 h window — the short TTL is the live set's alone
+    vi.mocked(slateFromEspn).mockResolvedValue(slate());
+    fakeRedis();
+    fetchMock.mockClear();
+    const pre = await call();
+    expect(pre.body.ttlSec).toBe(CFB_PROPS.revalidateSec);
+    expect(pre.body.live).toBe(0);
+    for (const [, init] of fetchMock.mock.calls) expect(init).toEqual({ next: { revalidate: CFB_PROPS.revalidateSec } });
+  });
+
+  it("a stored LIVE board is served inside its 10-minute window and ignored past it (never held for the 2 h default)", async () => {
+    const mk = (ageSec: number): CfbPropsBoard => ({
+      date: DATE,
+      events: 5,
+      fetched: 5,
+      capped: false,
+      rows: [],
+      quota: null,
+      oddsMissing: false,
+      generatedAt: new Date(NOW - ageSec * 1000).toISOString(),
+      live: 1,
+      ttlSec: 600,
+    });
+    fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(mk(500)) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const fresh = await call();
+    expect(fresh.body.source).toBe("redis");
+    expect(fresh.body.ttlSec).toBe(600);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(mk(700)) });
+    const stale = await call();
+    expect(stale.body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("a live slate at the daily cap with NOTHING stored fetches nothing and writes nothing", async () => {
+    const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget) });
+    const { body } = await call();
+    expect(body.budgeted).toBe(true);
+    expect(body.source).toBe("none");
+    expect(body.fetched).toBe(0);
+    expect(body.rows).toEqual([]);
+    expect(body.stale).toBe(false);
+    expect(body.live).toBe(1); // the live game was SELECTED — the budget, not the selection, refused it
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.ops("INCRBY")).toHaveLength(0);
+  });
+
+  /** a real pre-kick pull, re-dated `ageSec` back, as the stored board */
+  async function preKickBoard(ageSec: number): Promise<CfbPropsBoard> {
+    vi.mocked(slateFromEspn).mockResolvedValue(slate());
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(body.live).toBe(0);
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    fetchMock.mockClear();
+    return { ...body, generatedAt: new Date(NOW - ageSec * 1000).toISOString() };
+  }
+
+  it("a stored PRE-KICK board (ttlSec 7200) is NOT honoured past the live window once a game in it kicks off — the live game is re-priced, the upcoming rows are carried", async () => {
+    const stored = await preKickBoard(20 * 60);
+    const r = fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stored), [`pl:cfb:props:spend:v1:${DATE}`]: "372" });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(body.live).toBe(1);
+    expect(body.ttlSec).toBe(CFB_PROPS.liveRevalidateSec);
+    expect(body.stale).toBe(false);
+    // only the live game was fetched — every upcoming game rode on the stored board
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    const liveGameId = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    expect(body.rows.filter((row) => row.gameId === liveGameId).every((row) => row.status === "live")).toBe(true);
+    // the carried rows are the stored board's own, minus the live game's pre-kick rows
+    const carried = stored.rows.filter((row) => row.gameId !== liveGameId);
+    expect(body.rows.filter((row) => row.gameId !== liveGameId)).toEqual(carried);
+    expect(body.fetched).toBe(body.events);
+    expect(body.priced).toHaveLength(body.events);
+    // the merged board is written back and only the live game's credits are spent
+    expect(r.ops("SET")).toHaveLength(1);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
+    expect(body.spentToday).toBe(372 + PER);
+  });
+
+  it("the same stored pre-kick board only 5 min old is still served from redis under a live slate — with the live window as its ttlSec", async () => {
+    const stored = await preKickBoard(5 * 60);
+    fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stored) });
+    const { body } = await call();
+    expect(body.source).toBe("redis");
+    expect(body.ttlSec).toBe(CFB_PROPS.liveRevalidateSec);
+    expect(body.generatedAt).toBe(stored.generatedAt);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("at the daily cap the last stored board is served STALE (never rows: []), nothing fetched or written", async () => {
+    const stored = await preKickBoard(20 * 60);
+    const r = fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(stored), [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget) });
+    const { body } = await call();
+    expect(body.source).toBe("redis");
+    expect(body.budgeted).toBe(true);
+    expect(body.stale).toBe(true);
+    expect(body.rows.length).toBeGreaterThan(0);
+    expect(body.rows).toEqual(stored.rows);
+    expect(body.generatedAt).toBe(stored.generatedAt); // honestly dated
+    expect(body.note).toMatch(/last priced lines/);
+    expect(body.live).toBe(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.ops("SET")).toHaveLength(0);
+    expect(r.ops("INCRBY")).toHaveLength(0);
+  });
+
+  it("a live re-price fetches at most liveMaxEvents in-play games per pull", async () => {
+    const s = slate();
+    const games = s.games.map((g) => ({ ...g, status: "live" as const, detail: "2nd 8:12", homeScore: 14, awayScore: 3 }));
+    vi.mocked(slateFromEspn).mockResolvedValue({ ...s, games, finals: finalsOf(games) });
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.events).toBeGreaterThan(CFB_PROPS.liveMaxEvents);
+    expect(fetchMock).toHaveBeenCalledTimes(CFB_PROPS.liveMaxEvents);
+    expect(body.fetched).toBe(CFB_PROPS.liveMaxEvents);
+    expect(body.live).toBe(CFB_PROPS.liveMaxEvents);
+    expect(body.ttlSec).toBe(CFB_PROPS.liveRevalidateSec);
+  });
+
+  it("the budget still buys only what it can: room for 2 events prices the live game plus one", async () => {
+    const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget - 2 * PER) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.budgeted).toBe(true);
+    expect(body.fetched).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`/events/${liveOddsEventId()}/odds`);
+    expect(body.ttlSec).toBe(600);
+    expect(r.ops("INCRBY")[0][2]).toBe(2 * PER);
   });
 });
 
@@ -358,7 +577,13 @@ describe("source pins", () => {
     expect(store).toMatch(/"pl:cfb:props:spend:v1:"/);
     expect(store).toMatch(/from "@\/lib\/server\/store"/);
     expect(store).toMatch(/36 \* 3600/);
-    expect(store).toMatch(/"EX", CFB_PROPS\.revalidateSec/);
+    // 2026-09-05 (review fix): the board is RETAINED past its window; freshness is the reader's `boardFresh`
+    expect(store).toMatch(/"EX", CFB_PROPS\.boardRetainSec/);
+    expect(store).toMatch(/export function boardFresh\(/);
+    expect(store).toMatch(/Math\.min\(boardWindowSec\(board\), windowSec\)/);
+    expect(store).not.toMatch(/"EX", CFB_PROPS\.revalidateSec/);
+    expect(route).toMatch(/boardFresh\(stored, now, windowSec\)/);
+    expect(route).toMatch(/CFB_PROPS\.liveMaxEvents/);
     expect(store).toMatch(/"INCRBY"/);
     expect(route).toMatch(/CFB_PROPS\.dailyBudget/);
     expect(route).toMatch(/CFB_PROPS\.measuredCreditsPerEvent/);

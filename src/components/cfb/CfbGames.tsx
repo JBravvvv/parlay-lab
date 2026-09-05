@@ -17,8 +17,8 @@ import { CfbGameCard, timeLabelPT } from "./CfbGameCard";
 /**
  * CFB GAMES (INSTRUCTION 38, 2026-09-05): the schedule-and-scores view for a Pacific date —
  * every FBS game grouped by its kickoff hour, a live pulse on anything in progress, finals with
- * the score, and ESPN's embedded line on each card as context. Tapping a game opens its card
- * with the full model.
+ * the score, and ESPN's embedded line on each card as context. Each card is the Caesars-grammar
+ * OddsGrid (INSTRUCTION 40); tapping a game (or a price) opens its card with the full model.
  *
  * Scores come from two feeds so the odds quota stays untouched: the slate (one call per cache
  * window) carries clocks and lines; while any game is live, the finals endpoint (ESPN only, no
@@ -126,27 +126,32 @@ export function CfbGames() {
         </Panel>
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.14em]">
+          {/* the day at a glance — Caesars-style count chips on one scrolling strip */}
+          <div className="chip-row -mx-1 px-1 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
             {counts.live > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-live">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-live/40 bg-live/10 px-2.5 py-1 text-live">
                 <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
-                {counts.live} live
+                <span className="num">{counts.live}</span> live
               </span>
             )}
-            <span className="text-muted">
-              <span className="num text-text">{counts.upcoming}</span> upcoming
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-cfb/30 bg-cfb/[0.08] px-2.5 py-1 text-cfb">
+              <span className="num">{counts.upcoming}</span> upcoming
             </span>
-            <span className="text-muted">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-white/[0.04] px-2.5 py-1 text-muted">
               <span className="num text-text">{counts.final}</span> final
             </span>
             {counts.postponed > 0 && (
-              <span className="text-gold">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-gold">
                 <span className="num">{counts.postponed}</span> postponed
               </span>
             )}
-            {slate?.oddsMissing && <span className="text-neg normal-case tracking-normal">scores only — no odds feed this load</span>}
+            {slate?.oddsMissing && (
+              <span className="inline-flex items-center rounded-full border border-neg/40 bg-neg/10 px-2.5 py-1 normal-case tracking-normal text-neg">
+                scores only — no odds feed this load
+              </span>
+            )}
             {anyLive && (
-              <span className="ml-auto text-[10px] font-medium normal-case tracking-normal text-faint">
+              <span className="inline-flex items-center self-center text-[10px] font-medium normal-case tracking-normal text-faint">
                 scores refresh every minute{finalsQ.isFetching ? "…" : ""}
               </span>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -17,7 +17,9 @@ import { PlayerName } from "@/components/player/PlayerName";
 import { WINDOW_GAMES, isWindowGroup, parseWindowValue, siblingWindow, windowNote, windowValue } from "@/lib/stats-window";
 import { CFB_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
-import { CfbFpiPanel } from "@/components/cfb/CfbFpiPanel";
+import { calibrationFor, scopedStatsSport, sportsFor, statsQueryEnabled, type StatsSportId } from "@/lib/stats-scope";
+import { Overlay, useOverlay } from "@/components/ui/Overlay";
+import { CfbFpiPanel, fmtFpiUpdated } from "@/components/cfb/CfbFpiPanel";
 import { useCfbBankroll } from "@/components/cfb/CfbBoard";
 import { CFB_STALE_MS, cfbQueryKey, loadCfbSlate } from "@/lib/cfb/client";
 import { CFB_BANK_BASE } from "@/lib/cfb/rules";
@@ -29,8 +31,11 @@ import { ptToday } from "@/components/games/logo";
    same filters, timeframes and sort behavior. Data flows through /api/stats —
    free feeds, no keys, no quota. */
 
-/* ---------- sport registry (verbatim from legacy; ufc renders its own card view) ---------- */
-type SportId = "mlb" | "nfl" | "cfb" | "ufc";
+/* ---------- sport registry (verbatim from legacy; ufc renders its own card view) ----------
+   INSTRUCTION 40 (2026-09-05): the registry stays whole, but which pills a visitor sees is
+   decided by the global desk through src/lib/stats-scope.ts — CFB desk → NCAAF only, MLB desk
+   → MLB only. NFL / UFC stay wired for a desk that does not exist yet. */
+type SportId = StatsSportId;
 type TableSportId = Exclude<SportId, "ufc">;
 type GroupId = string;
 
@@ -252,7 +257,21 @@ function storedStatsSport(): SportId {
 
 /* ---------- page ---------- */
 export default function StatsPage() {
-  const [sport, setSport] = useState<SportId>("mlb");
+  /* SCOPED TO THE DESK (INSTRUCTION 40, 2026-09-05): the global SportSwitch decides which stat
+     sports this page may show — CFB desk → NCAAF only, MLB desk → MLB only (src/lib/stats-scope.ts).
+     `chosen` is the pill the user last tapped (remembered under "pl_stats_sport" — its key moved
+     off "pl_sport" on 2026-09-05; "pl_sport" is the global switch, a bare "mlb" | "cfb", and this
+     JSON-quoted pill must never read or overwrite it); `sport` is DERIVED from it and the desk on
+     every render, so the effective sport is right in the very first committed render — no
+     effect-driven re-scope, no frame on which the CFB desk mounts the MLB feed (review fix,
+     2026-09-05: the old useEffect re-scope let the 2500-row MLB query subscribe and fetch before
+     the flip to NCAAF). The desk default goes through the derived value, never the persisted
+     key, so a CFB-desk visit never leaks into the MLB desk and a CFB user can never land on MLB
+     stats. Markup depends only on `sport`, and useSport() reports "mlb" on the server and during
+     hydration on both sides, so a remembered "cfb" pill causes no hydration mismatch. */
+  const desk = useSport();
+  const [chosen, setChosen] = useState<SportId>(() => storedStatsSport());
+  const sport: SportId = scopedStatsSport(desk, chosen);
   const [scope, setScope] = useState<"ind" | "team">("ind");
   const [group, setGroup] = useState<GroupId>("hitting");
   const [season, setSeason] = useState(2026);
@@ -268,40 +287,30 @@ export default function StatsPage() {
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
 
-  // restore the persisted stat-desk choice. Its key moved from "pl_sport" to "pl_stats_sport"
-  // on 2026-09-05: "pl_sport" is now the global SportSwitch (src/lib/sport.ts), which stores a
-  // bare "mlb" | "cfb" — this JSON-quoted pill must never read or overwrite it.
+  /* the filter defaults belong to ONE table sport; until they are re-cut for the current one the
+     stats query stays off (a "hitting" group under the NCAAF feed would be a bogus request) */
+  const [filtersFor, setFiltersFor] = useState<TableSportId>("mlb");
   useEffect(() => {
-    const s = storedStatsSport();
-    if (s !== "mlb") applySport(s);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* CFB desk (2026-09-05): the global SportSwitch defaults the pill to NCAAF and puts the
-     FPI panel above the tables; flipping the switch back to MLB restores the pill the MLB
-     desk opens on (the one the user last tapped — MLB until they tap one). The desk default
-     goes through applySport, never the persisted key, and the MLB branch runs only on a real
-     CFB → MLB flip, reading the live pill through a ref rather than the mount closure — so a
-     restored choice is never clobbered and a CFB-desk visit never leaks into the MLB desk.
-     The stat tables themselves are unchanged — they still read ESPN through /api/stats. */
-  const desk = useSport();
+    if (filtersFor === tableSport) return;
+    setGroup(SPORTS[tableSport].groups[0][0]);
+    setSeason(SPORTS[tableSport].defSeason);
+    setTimeframe("season");
+    setTeam("ALL");
+    setPosition("ALL");
+    setMinVal(0);
+    setFiltersFor(tableSport);
+  }, [tableSport, filtersFor]);
+  /* nothing fetches during the hydration pass, where useSport() still reports "mlb" */
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  useEffect(() => {
+    if (!calibrationFor(desk)) setCalView(false);
+  }, [desk]);
   const cfbDesk = CFB_ENABLED && desk === "cfb";
-  const sportRef = useRef(sport);
-  useEffect(() => {
-    sportRef.current = sport;
-  }, [sport]);
-  const wasCfbDesk = useRef(cfbDesk);
-  useEffect(() => {
-    const was = wasCfbDesk.current;
-    wasCfbDesk.current = cfbDesk;
-    if (cfbDesk) {
-      if (sportRef.current !== "cfb") applySport("cfb");
-    } else if (was) {
-      const s = storedStatsSport();
-      if (s !== sportRef.current) applySport(s);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfbDesk]);
+  const deskSports = sportsFor(desk);
+  const showCalibration = calibrationFor(desk);
+  // the ESPN FPI board lives behind a button, in a 60% sheet (Josh: "it takes up too much space")
+  const fpi = useOverlay();
   // today's CFB slate feeds the FPI panel (same query key + TTL as the board, so it is one fetch)
   const today = useMemo(ptToday, []);
   const cfbBankroll = useCfbBankroll();
@@ -314,21 +323,9 @@ export default function StatsPage() {
   });
   const cfbSlate = cfbQ.data ?? null;
 
-  /** the pill and its default filters, without touching the persisted choice */
-  function applySport(s: SportId) {
-    setSport(s);
-    if (s !== "ufc") {
-      setGroup(SPORTS[s].groups[0][0]);
-      setSeason(SPORTS[s].defSeason);
-      setTimeframe("season");
-      setTeam("ALL");
-      setPosition("ALL");
-      setMinVal(0);
-    }
-  }
-  /** a tap on a pill: apply it and remember it as the user's choice */
+  /** a tap on a pill: choose it (the desk scopes it; the filters re-cut through the effect above) and remember it */
   function pickSport(s: SportId) {
-    applySport(s);
+    setChosen(s);
     try { localStorage.setItem("pl_stats_sport", JSON.stringify(s)); } catch {}
   }
   function pickGroup(g: string) {
@@ -355,7 +352,7 @@ export default function StatsPage() {
     },
     staleTime: 120_000,
     retry: 2,
-    enabled: sport !== "ufc",
+    enabled: statsQueryEnabled({ hydrated, sport, filtersReady: filtersFor === tableSport }),
   });
 
   const all = useMemo(() => q.data ?? [], [q.data]);
@@ -437,9 +434,27 @@ export default function StatsPage() {
         }
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Pill variant={pvtOpen ? "primary" : "ghost"} onClick={() => setPvtOpen((v) => !v)} aria-pressed={pvtOpen}>
-              ⚾ Pitcher vs Team
-            </Pill>
+            {cfbDesk && (
+              <Pill
+                variant="ghost"
+                onClick={fpi.show}
+                aria-haspopup="dialog"
+                aria-expanded={fpi.open}
+                className="press border-cfb/40 bg-cfb/10 text-cfb hover:bg-cfb/20 hover:border-cfb/60"
+              >
+                <span className="flex flex-col items-start leading-none">
+                  <span>📊 ESPN FPI</span>
+                  {cfbSlate?.fpiUpdated && (
+                    <span className="num mt-0.5 text-[9.5px] font-medium text-cfb/70">{fmtFpiUpdated(cfbSlate.fpiUpdated)}</span>
+                  )}
+                </span>
+              </Pill>
+            )}
+            {tableSport === "mlb" && (
+              <Pill variant={pvtOpen ? "primary" : "ghost"} onClick={() => setPvtOpen((v) => !v)} aria-pressed={pvtOpen}>
+                ⚾ Pitcher vs Team
+              </Pill>
+            )}
             {sport !== "ufc" && (
               <Pill variant="ghost" onClick={() => q.refetch()} disabled={q.isFetching}>
                 {q.isFetching ? "Refreshing…" : "↻ Refresh"}
@@ -449,17 +464,32 @@ export default function StatsPage() {
         }
       />
 
-      {pvtOpen && <PitcherVsTeam />}
+      {pvtOpen && tableSport === "mlb" && <PitcherVsTeam />}
+
+      {cfbDesk && (
+        <Overlay open={fpi.open} onClose={fpi.hide} size="sixty" tone="cfb" title="ESPN FPI">
+          <CfbFpiPanel
+            bare
+            searchable
+            limit={200}
+            teams={cfbSlate?.games.flatMap((g) => [g.home, g.away]) ?? []}
+            updated={cfbSlate?.fpiUpdated ?? null}
+            title={cfbSlate ? "Today's teams" : cfbQ.isError ? "Slate did not load" : "Loading slate…"}
+          />
+        </Overlay>
+      )}
 
       <Reveal>
         <Panel className="mb-4">
           <div className="flex flex-wrap items-center gap-2">
-            {(["mlb", "nfl", "cfb", "ufc"] as SportId[]).map((s) => (
+            {deskSports.map((s) => (
               <FilterPill key={s} selected={sport === s && !calView} onClick={() => { setCalView(false); pickSport(s); }}>
                 {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
               </FilterPill>
             ))}
-            <FilterPill selected={calView} onClick={() => setCalView(true)}>📐 CALIBRATION</FilterPill>
+            {showCalibration && (
+              <FilterPill selected={calView} onClick={() => setCalView(true)}>📐 CALIBRATION</FilterPill>
+            )}
             {sport !== "ufc" && !calView && (<>
             <span className="mx-1 h-5 w-px bg-line-2" />
             <FilterPill selected={scope === "ind"} onClick={() => setScope("ind")}>INDIVIDUAL</FilterPill>
@@ -529,17 +559,6 @@ export default function StatsPage() {
         </Panel>
       </Reveal>
 
-      {cfbDesk && !calView && sport === "cfb" && (
-        <Reveal>
-          <CfbFpiPanel
-            teams={cfbSlate?.games.flatMap((g) => [g.home, g.away]) ?? []}
-            updated={cfbSlate?.fpiUpdated ?? null}
-            title={cfbSlate ? "FPI · today's teams" : cfbQ.isError ? "FPI · slate did not load" : "FPI · —"}
-            className="mb-4"
-          />
-        </Reveal>
-      )}
-
       {calView ? (
         <div className="space-y-4">
           <ClvPanel />
@@ -593,7 +612,7 @@ export default function StatsPage() {
       )}
 
       <div className="mt-6 text-[10.5px] text-faint">
-        MLB Stats API + ESPN, live — the same feeds as the original Stats tab. Informational only, not betting advice.
+        {cfbDesk ? "ESPN college football stats + FPI, live" : "MLB Stats API, live — the same feeds as the original Stats tab"}. Informational only, not betting advice.
       </div>
     </>
   );
