@@ -5,6 +5,7 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
+import { useQuery } from "@tanstack/react-query";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
@@ -80,8 +81,28 @@ export default function PropsPage() {
   }, [d, cat, gameTab]);
   const gameGroups = useMemo(() => groupByGame(gameRows), [gameRows]);
 
-  /* player props: the FULL prop board — every player, both sides, uncapped */
-  const propBoard = (d?.propBoard ?? []) as PropBoardGame[];
+  /* player props: the FULL prop board — every player, both sides, uncapped.
+     INSTRUCTION 34 (2026-09-04, Josh: "Prop bets still aren't pulling up on 'Parlay Builder'.
+     Daily odds should generate along with the 'Board' generating"): a board this device
+     regenerated could come back with NO prop rows (the odds proxy 403'd the engine's props
+     call until the same-day fix in odds-shape.ts) and still win bestBoard on freshness. When
+     the chosen board has no prop board, fall back to the server-built one for today — its
+     props generate with the board — and say so. */
+  const ownProps = (d?.propBoard ?? []) as PropBoardGame[];
+  const ownEmpty = !!d && ownProps.length === 0;
+  const serverProps = useQuery<PropBoardGame[]>({
+    queryKey: ["server-props", q.data?.date ?? null],
+    enabled: ownEmpty,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const r = await fetch(`/api/board?date=${encodeURIComponent(q.data!.date)}`, { cache: "no-store" });
+      if (!r.ok) return [];
+      const j = (await r.json()) as { board?: { data?: { propBoard?: PropBoardGame[] } } | null };
+      return j?.board?.data?.propBoard ?? [];
+    },
+  });
+  const propBoard = ownEmpty ? serverProps.data ?? [] : ownProps;
+  const fromServer = ownEmpty && (serverProps.data?.length ?? 0) > 0;
   const propGames = useMemo(() => {
     if (!cat || gameTab) return [];
     const needle = norm(search.trim());
@@ -103,7 +124,7 @@ export default function PropsPage() {
   const headshots = useHeadshots(playerNames);
 
   /* a board generated before the full prop board shipped has no `propBoard` */
-  const legacyBoard = !!d && !d.propBoard && !gameTab;
+  const legacyBoard = !!d && !d.propBoard && !gameTab && !fromServer && !serverProps.isPending;
 
   const isSel = (id: string) => legs.some((l) => l.id === id);
   const toggle = (leg: SandboxLeg) =>
@@ -134,7 +155,12 @@ export default function PropsPage() {
         count={{ lines: totalRows, games: propGames.length }}
       />
 
-      {q.isPending ? (
+      {fromServer && !gameTab && (
+        <div className="mb-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">
+          Your device&apos;s board has no prop lines — showing the server-built prop board for today.
+        </div>
+      )}
+      {q.isPending || (ownEmpty && !gameTab && serverProps.isPending) ? (
         <BoardSkeleton />
       ) : cat == null ? (
         <Panel>

@@ -24,6 +24,18 @@ const PROP_MARKETS = new Set([
   "batter_hits_runs_rbis",
   "pitcher_strikeouts",
   "pitcher_outs",
+  /* INSTRUCTION 34 (2026-09-04, Josh: "Prop bets still aren't pulling up on 'Parlay
+     Builder'. Daily odds should generate along with the 'Board' generating"). The engine's
+     per-event props call has ALWAYS asked for SH_PROP_MARKETS + SH_PROP_ALT (the Caesars
+     milestone ladders — legacy @~132260), and the server generate sends that URL to the
+     Odds API directly. Through THIS proxy the same URL was 403 "market shape not allowed"
+     since the 08-02 hardening, so every device Refresh built a board with ZERO prop rows
+     and no propBoard (observed live 2026-09-05 01:05 UTC: 16/16 props calls 403, every
+     batter/pitcher category 0, propBoard 0 games) — the fresher props-less board then won
+     bestBoard and the Parlay Builder went empty. The three ladders are our own shape. */
+  "batter_hits_alternate",
+  "pitcher_strikeouts_alternate",
+  "batter_home_runs_alternate",
 ]);
 const SHARP_MARKETS = new Set(["h2h", "spreads", "totals"]);
 

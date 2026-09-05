@@ -30,12 +30,31 @@ import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
 import { BoardLabel, PlayerName } from "@/components/player/PlayerName";
-import { parseBoardLabel } from "@/lib/player-card";
+import { normalizeName, parseBoardLabel } from "@/lib/player-card";
+import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
 import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
 
+/* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
+   'ALL'; If I click on 'Top 50' then click on one of the categories (ie: hits) then all top
+   50 picks in that category will show; If I click on 'ALL' then click on one of the
+   categories (ie: hits) then it will show all daily hits props starting with S grade, then
+   A, B, C, etc down"). TOP 50 = the engine's ranked pool / the day's stamped picks (as
+   before); ALL = every priced line on the day's prop board (data.propBoard — the same
+   uncapped book the Parlay Builder browses), graded on model − fair and ordered S → F. */
+type Scope = "top" | "all";
+const MARKET_SHORT: Record<string, string> = {
+  batter_hits: "Hits",
+  batter_total_bases: "TB",
+  batter_home_runs: "HR",
+  batter_hits_runs_rbis: "H+R+RBI",
+  pitcher_strikeouts: "K",
+  pitcher_outs: "Outs",
+};
+const ALL_SCOPE_CAP = 400;
+
 const CAT_LABELS: Record<string, string> = {
-  all: "TOP 50",
+  all: "OVERALL",
   ml: "MONEYLINE",
   rl: "RUN LINE",
   batter_hits: "HITS",
@@ -51,6 +70,16 @@ export default function BoardPage() {
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
+  const [scope, setScope] = useState<Scope>("top");
+  /* INSTRUCTION 33 (2026-09-04, Josh: "There should be a search bar on right side of live tab
+     on board to search for a player within the prop i have highlighted or all of their daily
+     props if i search under 'All' tab") */
+  const [search, setSearch] = useState("");
+  const needle = normalizeName(search.trim());
+  const nameHit = useCallback(
+    (label: string | null | undefined) => !needle || normalizeName((label && parseBoardLabel(label)?.name) || label || "").includes(needle),
+    [needle],
+  );
   // ONE SELECTION MODE SITE-WIDE (2026-08-11, Josh's rule): the Board reads the
   // FULL Settings mode like The Sharp and the Builder do — mounted-gated
   // localStorage read (hydration rule). dk_fd additionally reprices the columns
@@ -110,8 +139,8 @@ export default function BoardPage() {
   );
   const rowOut = useCallback((r: PickRow) => isOut(r.label, marketOfLkey(r.lkey), r.gkey), [isOut]);
   const visibleRows = useMemo(
-    () => rows.filter((r) => !cz.isHidden(`${r.label}|${r.sub}`) && (showScratched || !rowOut(r))),
-    [rows, cz, showScratched, rowOut],
+    () => rows.filter((r) => nameHit(r.label) && !cz.isHidden(`${r.label}|${r.sub}`) && (showScratched || !rowOut(r))),
+    [rows, cz, showScratched, rowOut, nameHit],
   );
   const scratchedHere = useMemo(() => new Set(rows.filter(rowOut).map((r) => `${r.label}|${r.sub}`)).size, [rows, rowOut]);
   // distinct PICKS, not hidden row occurrences — one pick can sit in this list
@@ -132,6 +161,8 @@ export default function BoardPage() {
     prob: number | null; implied: number | null; edge: number | null;
     cz: number | null; odds: string | number | null; book: string | null;
     gkey: string | null; start: string | null; res: string | null; susp?: boolean;
+    /** ALL-scope rows only: the row's market (the "every market" view mixes them) */
+    market?: string;
   };
   type PicksPayload = {
     date?: string; servedDate?: string | null; staleNote?: string | null;
@@ -166,6 +197,38 @@ export default function BoardPage() {
     [],
   );
   const propRows = !live && PROP_TABS.has(cat) ? picksData?.picks?.[cat] ?? null : null;
+  /* ALL scope: every priced OVER line on the prop board for this market (or every market),
+     graded on pO − fO (the engine's model % minus the de-vigged fair — the same "edge" the
+     stamped picks grade on), ordered S → F then by edge. Rows the engine did not price
+     (pO null: bench bats, tiny samples) carry no grade and sink to the bottom. */
+  const allRows = useMemo<ApiPick[] | null>(() => {
+    if (scope !== "all" || live || !(PROP_TABS.has(cat) || cat === "all")) return null;
+    const pb = (d?.propBoard ?? []) as PropBoardGame[];
+    const mkts = cat === "all" ? Object.keys(MARKET_SHORT) : [cat];
+    const out: ApiPick[] = [];
+    for (const g of pb) {
+      for (const m of mkts) {
+        for (const r of g.markets?.[m] ?? []) {
+          const edge = r.pO != null && r.fO != null ? Math.round((r.pO - r.fO) * 10) / 10 : null;
+          const odds = r.o ?? r.cz?.o ?? null;
+          out.push({
+            rank: 0, player: `${r.p} (${r.tm})`, side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
+            cz: r.cz?.o ?? null, odds, book: r.o != null ? r.oBook : odds != null ? "Caesars" : null,
+            gkey: g.gkey, start: g.start, res: null, market: m,
+          });
+        }
+      }
+    }
+    out.sort(
+      (a, b) =>
+        gradeRank(gradeFromEv(b.edge)) - gradeRank(gradeFromEv(a.edge)) ||
+        (b.edge ?? -99) - (a.edge ?? -99) ||
+        (b.prob ?? -1) - (a.prob ?? -1),
+    );
+    out.forEach((r, i) => void (r.rank = i + 1));
+    return out;
+  }, [scope, live, cat, d, PROP_TABS]);
+  const pickRows = allRows ?? propRows;
 
   // live "now" stats for in-progress games — one shared poll for the whole page
   // (board rows, parlay legs); only live games fetch boxscores
@@ -345,7 +408,8 @@ export default function BoardPage() {
      like H+R+RBI, Hits, etc by clicking on the title of the column ie: 'Tier' or 'Edge
      Status'"): the stamped-picks table is now the same sortable DataTable the ML/RL tabs
      use — every column carries a sortValue, so every header is clickable (▲/▼). */
-  const pickOut = useCallback((p: ApiPick) => isOut(p.player, cat, p.gkey), [isOut, cat]);
+  const pickOut = useCallback((p: ApiPick) => isOut(p.player, p.market ?? cat, p.gkey), [isOut, cat]);
+  const pickKey = useCallback((p: ApiPick) => `${p.market ?? cat}|${p.player}|${p.line}|${p.side}`, [cat]);
   const pickColumns: Column<ApiPick>[] = useMemo(() => {
     const now = Date.now();
     const statusRank: Record<string, number> = { won: 0, live: 1, upcoming: 2, lost: 3, void: 4, ungradable: 5 };
@@ -362,12 +426,13 @@ export default function BoardPage() {
         header: "Pick",
         sortValue: (p) => p.player ?? "",
         cell: (p) => {
-          const pk = `${cat}|${p.player}|${p.line}|${p.side}`;
+          const pk = pickKey(p);
+          const mk = p.market && cat === "all" ? `${MARKET_SHORT[p.market] ?? p.market} ` : "";
           return (
             <div className={pickOut(p) ? "opacity-50" : undefined}>
               {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
               <span className="text-muted">
-                {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
+                {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>
               <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
               {pickOut(p) && <OutTag />}
@@ -413,12 +478,15 @@ export default function BoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut]);
-  const visiblePicks = useMemo(
-    () => (propRows ?? []).filter((p) => !cz.isHidden(`${cat}|${p.player}|${p.line}|${p.side}`) && (showScratched || !pickOut(p))),
-    [propRows, cz, cat, showScratched, pickOut],
+  }, [cat, cz.hidden, pickOut, pickKey]);
+  const visiblePicksAll = useMemo(
+    () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
+    [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
   );
-  const scratchedPicks = useMemo(() => (propRows ?? []).filter(pickOut).length, [propRows, pickOut]);
+  // the every-market ALL view is thousands of lines — cap the render, search narrows it
+  const capped = allRows != null && visiblePicksAll.length > ALL_SCOPE_CAP;
+  const visiblePicks = capped ? visiblePicksAll.slice(0, ALL_SCOPE_CAP) : visiblePicksAll;
+  const scratchedPicks = useMemo(() => (pickRows ?? []).filter(pickOut).length, [pickRows, pickOut]);
 
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
   const pickCount = d ? Object.entries(d.categories).filter(([k]) => k !== "all").reduce((s, [, v]) => s + v.length, 0) : 0;
@@ -470,15 +538,34 @@ export default function BoardPage() {
         </Reveal>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-full border border-white/[0.08] bg-surface-2 p-0.5" data-testid="board-scope" role="tablist">
+          {(["top", "all"] as Scope[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={scope === k}
+              onClick={() => setScope(k)}
+              className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                scope === k ? "bg-pos/20 text-pos" : "text-muted hover:text-text"
+              }`}
+              title={k === "top" ? "The engine's ranked top 50 per market — the day's stamped picks" : "Every priced line on today's prop board, graded S → F"}
+            >
+              {k === "top" ? "Top 50" : "All"}
+            </button>
+          ))}
+        </div>
         {Object.keys(cats)
           .sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : 0))
           .map((k) => (
             <FilterPill key={k} selected={cat === k} onClick={() => setCat(k)}>
-              {CAT_LABELS[k] ?? k.toUpperCase()}
-              <span className="num ml-1 text-[10px] opacity-70">{(cats[k] ?? []).length}</span>
+              {scope === "all" && k === "all" ? "EVERY MARKET" : CAT_LABELS[k] ?? k.toUpperCase()}
+              {scope === "top" && <span className="num ml-1 text-[10px] opacity-70">{(cats[k] ?? []).length}</span>}
             </FilterPill>
           ))}
+      </div>
+      <div className="mb-4 flex items-center gap-2">
         {d?.categoriesLive && Object.values(d.categoriesLive).some((v) => v.length) && (
           <FilterPill
             selected={live}
@@ -491,6 +578,27 @@ export default function BoardPage() {
             ● LIVE
           </FilterPill>
         )}
+        <label className="ml-auto flex h-8 w-full max-w-[240px] items-center gap-2 rounded-[10px] border border-white/[0.08] bg-surface-2 px-2.5 focus-within:border-pos/50">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0 text-faint" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={scope === "all" && cat === "all" ? "Search a player's props…" : "Search players…"}
+            inputMode="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            aria-label="Search players"
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-text outline-none placeholder:text-faint"
+          />
+          {search && (
+            <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] text-muted">
+              ✕
+            </button>
+          )}
+        </label>
       </div>
 
       {catRecord && catRecord.n > 0 && (
@@ -545,11 +653,21 @@ export default function BoardPage() {
           body="The odds feed or MLB stats API didn't answer. Nothing is fabricated on failure."
           onRetry={() => refetch()}
         />
-      ) : propRows && propRows.length > 0 ? (
+      ) : pickRows && pickRows.length > 0 ? (
         /* THE DAY'S PICKS (2026-08-08): stamped top-N from the stored board — the same
            cohort /api/picks serves and the grading records. Never empty by clock. */
         <Panel>
-          <DataTable columns={pickColumns} rows={visiblePicks} rowKey={(p) => `${p.rank}|${p.player}|${p.line}`} />
+          {allRows && (
+            <div className="mb-2 text-[11px] text-muted">
+              {cat === "all" ? "Every market" : CAT_LABELS[cat]} · {allRows.length} priced line{allRows.length === 1 ? "" : "s"} on today&apos;s board, graded S → F on model − fair
+              {capped ? ` · showing the top ${ALL_SCOPE_CAP} — search to narrow` : ""}
+            </div>
+          )}
+          {visiblePicks.length === 0 && needle ? (
+            <EmptyState title="No player matches that search" body="Clear the search to see every line in this view." />
+          ) : (
+            <DataTable columns={pickColumns} rows={visiblePicks} rowKey={(p) => `${p.market ?? cat}|${p.rank}|${p.player}|${p.line}`} />
+          )}
           {scratchedPicks > 0 && <ScratchedNote n={scratchedPicks} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {cz.count > 0 && (
             <div className="mt-3 flex items-center justify-between text-[11.5px] text-muted">

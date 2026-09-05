@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { shapeAllowed } from "@/lib/server/odds-shape";
 import { stripComments } from "./helpers/source";
 
@@ -35,6 +37,17 @@ describe("B — the shape allow-list", () => {
     expect(shapeAllowed(new URL(ev("pitcher_outs", "us")))).toBe(true);
   });
 
+  it("INSTRUCTION 34 (2026-09-04) — the ENGINE'S OWN props URL (SH_PROP_MARKETS + SH_PROP_ALT) passes; it was 403 since 08-02 and every device Refresh lost its props", () => {
+    const eng = fs.readFileSync(path.join(process.cwd(), "legacy/index.html"), "utf8");
+    const core = /var SH_PROP_MARKETS="([^"]+)"/.exec(eng)?.[1];
+    const alt = /var SH_PROP_ALT="([^"]+)"/.exec(eng)?.[1];
+    expect(core && alt, "engine market constants vanished — re-point this extraction").toBeTruthy();
+    const u = new URL(`https://api.the-odds-api.com/v4/sports/baseball_mlb/events/abc/odds?regions=us&oddsFormat=american&markets=${core},${alt}&apiKey=`);
+    expect(shapeAllowed(u)).toBe(true);
+    // the ladders are still OUR shape only — widening the region on them is still a foreign product
+    u.searchParams.set("regions", "us,eu");
+    expect(shapeAllowed(u)).toBe(false);
+  });
   it("allows the SharpDesk shape: h2h/spreads/totals x regions=us,eu", () => {
     expect(shapeAllowed(new URL(ev("h2h,spreads,totals", "us,eu")))).toBe(true);
   });

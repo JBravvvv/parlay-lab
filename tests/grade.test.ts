@@ -18,7 +18,9 @@ import { GRADE_CUTS, gradeFromEv, type Grade } from "@/lib/grade";
 
 describe("gradeFromEv — fixed cutoffs, boundaries land exactly where stated", () => {
   const cases: Array<[number, Grade]> = [
-    [10, "A"],
+    [10, "S"],
+    [6, "S"], // boundary: ≥ +6 is an S (2026-09-04, INSTRUCTION 32 — above A)
+    [5.999, "A"],
     [3, "A"], // boundary: ≥ +3 is an A
     [2.999, "B"],
     [1, "B"], // boundary: ≥ +1 is a B
@@ -39,7 +41,7 @@ describe("gradeFromEv — fixed cutoffs, boundaries land exactly where stated", 
     expect(gradeFromEv(Number.NaN)).toBeNull();
   });
   it("the cutoffs are the published ones", () => {
-    expect(GRADE_CUTS).toEqual({ A: 3, B: 1, C: -1, D: -3 });
+    expect(GRADE_CUTS).toEqual({ S: 6, A: 3, B: 1, C: -1, D: -3 });
   });
 });
 
@@ -59,6 +61,7 @@ describe("wired — source scans, comment-stripped", () => {
   });
   it("the chip explains itself — basis and cutoffs in the title", () => {
     const chip = fs.readFileSync(path.join(process.cwd(), "src/components/ui/GradeChip.tsx"), "utf8");
+    expect(chip).toMatch(/S ≥ \+6/);
     expect(chip).toMatch(/A ≥ \+3/);
     expect(chip).toMatch(/F below −3/);
   });
