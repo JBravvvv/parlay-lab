@@ -61,6 +61,10 @@ html {
   /* decorative halos may bleed past the viewport; they must never cause
      sideways page scroll (clip, not hidden — keeps position:sticky working) */
   overflow-x: clip;
+  /* iOS freeze guard (2026-09-05): `manipulation` kills the 300ms tap delay without
+     touching the scroll axes. NOT pan-x pan-y — that also wedged Safari's edge-swipe
+     recognizer, the same freeze Josh reported. Paired with replace-only navigation. */
+  touch-action: manipulation;
 }
 
 body {
@@ -72,6 +76,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
   overflow-x: clip;
+  touch-action: manipulation;
 }
 
 /* ---- background system: indigo/purple/amber ambient glows + grain */
@@ -122,7 +127,12 @@ body::after {
    green liquid glass THROUGHOUT every stats/picks box, not half green/half black; the
    gray-on-black text windows were hard to read). Tint stays low-teens alpha so white
    text keeps its contrast on the dark backdrop; the rim carries the lime, the body
-   carries a full-width wash — no fade-to-black midway. */
+   carries a full-width wash — no fade-to-black midway.
+   NO blur here (2026-09-05, iOS freeze): .glass is a PER-ITEM surface (a 68-card CFB
+   slate = 68 blur layers over a video), which froze the iPhone compositor. The surface
+   tint is heavier instead (78%, was 46% under a 16px blur) so the panel reads the same.
+   Blur is reserved for fixed shell chrome (header, tab bar, one slip, modals) — Tailwind
+   blur utilities on those elements only. */
 .glass {
   background:
     linear-gradient(
@@ -131,10 +141,8 @@ body::after {
       color-mix(in srgb, var(--color-acc-green) 8%, transparent) 55%,
       color-mix(in srgb, var(--color-acc-lime) 11%, transparent)
     ),
-    color-mix(in srgb, var(--color-surface) 46%, transparent);
+    color-mix(in srgb, var(--color-surface) 78%, transparent);
   background-blend-mode: normal, luminosity;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid color-mix(in srgb, var(--color-acc-lime) 24%, rgba(255, 255, 255, 0.07));
   border-radius: var(--radius-panel);
   box-shadow:
@@ -142,12 +150,11 @@ body::after {
     0 0 34px -14px rgba(182, 255, 61, 0.22);
 }
 
-/* ---- liquid glass (hero chips, CTAs): near-transparent with a lit rim */
+/* ---- liquid glass (hero chips, CTAs, desk chooser cards): a faint dark tint with a
+   lit rim. No blur (2026-09-05, iOS freeze guard — see .glass). */
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.01);
+  background: rgba(10, 14, 12, 0.42);
   background-blend-mode: luminosity;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   border: none;
   box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
   position: relative;
@@ -371,9 +378,7 @@ body::after {
       color-mix(in srgb, var(--color-acc-green) 6%, transparent) 60%,
       color-mix(in srgb, var(--color-acc-lime) 9%, transparent)
     ),
-    color-mix(in srgb, var(--color-surface) 64%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+    color-mix(in srgb, var(--color-surface) 84%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-acc-lime) 22%, rgba(255, 255, 255, 0.07));
   border-bottom: 0;
   padding-bottom: calc(var(--ticket-notch) + 8px);
@@ -427,9 +432,7 @@ body::after {
   border: 1px solid color-mix(in srgb, var(--color-acc-lime) 16%, rgba(255, 255, 255, 0.06));
   background:
     linear-gradient(150deg, color-mix(in srgb, var(--color-acc-lime) 9%, transparent), transparent 70%),
-    color-mix(in srgb, var(--color-surface) 58%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+    color-mix(in srgb, var(--color-surface) 80%, transparent);
   box-shadow: inset 0 1px 1px color-mix(in srgb, var(--color-acc-lime) 20%, rgba(255, 255, 255, 0.08));
 }
 .stat-tile::after {

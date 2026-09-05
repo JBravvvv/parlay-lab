@@ -130,7 +130,7 @@ function Sheet({ target, onClose }: { target: SheetTarget; onClose: () => void }
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center"
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 md:items-center"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -154,7 +154,7 @@ function Sheet({ target, onClose }: { target: SheetTarget; onClose: () => void }
         </div>
 
         {/* identity block */}
-        <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-surface/95 px-5 pb-4 pt-3 backdrop-blur-xl md:pt-5">
+        <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-surface/95 px-5 pb-4 pt-3 md:pt-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-4">
               {id != null ? <PlayerPhoto id={id} name={name} size={64} /> : <Skeleton className="h-16 w-16 shrink-0 rounded-full" />}

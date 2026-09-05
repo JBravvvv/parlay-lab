@@ -17,9 +17,14 @@ export type Column<T> = {
 /**
  * Dense-but-breathable table: sticky header, sortable columns, hover rows,
  * horizontal scroll contained inside the panel (the page never scrolls
- * sideways). `stagger` reveals rows with a fast cascade on first render;
+ * sideways). `stagger` reveals rows with a fast cascade on first render —
+ * the delay is capped at STAGGER_CAP rows so a long table (the CFB picks
+ * ALL scope, the MLB board) never leaves rows invisible for seconds;
  * `rowClassName` lets callers light rows up (e.g. .ev-glow on +EV rows).
  */
+/** rows past this index share one delay: 12 × 45 ms = 0.54 s, then everything is on screen */
+export const STAGGER_CAP = 12;
+
 export function DataTable<T>({
   columns,
   rows,
@@ -56,7 +61,7 @@ export function DataTable<T>({
       style={{ maxHeight }}
     >
       <table className="w-full border-collapse text-[12.5px]">
-        <thead className="sticky top-0 z-10 bg-surface-2/90 backdrop-blur">
+        <thead className="sticky top-0 z-10 bg-surface-2/95">
           <tr>
             {columns.map((c) => {
               const active = sort?.key === c.key;
@@ -94,7 +99,7 @@ export function DataTable<T>({
               className={`border-b border-white/[0.04] transition-colors duration-(--dur-fast) last:border-0 hover:bg-white/[0.04] ${
                 stagger ? "row-in" : ""
               } ${rowClassName?.(r) ?? ""}`}
-              style={stagger ? { animationDelay: `${i * 45}ms` } : undefined}
+              style={stagger ? { animationDelay: `${Math.min(i, STAGGER_CAP) * 45}ms` } : undefined}
             >
               {columns.map((c) => (
                 <td

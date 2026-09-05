@@ -117,6 +117,7 @@ function DeskChooser() {
           <Link
             key={d.sport}
             href="/board"
+            replace
             onClick={() => setSport(d.sport)}
             aria-current={on ? "true" : undefined}
             className={`liquid-glass press card-lift relative flex flex-col gap-1.5 rounded-[18px] px-4 pb-4 pt-3.5 text-left ${
@@ -178,7 +179,7 @@ function Hero() {
           style={{ paddingTop: "max(env(safe-area-inset-top), 1.25rem)" }}
         >
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex select-none items-baseline gap-0.5">
+            <Link replace href="/" className="flex select-none items-baseline gap-0.5">
               <span className="display text-[20px] font-semibold tracking-tight text-text">PARLAY</span>
               <span className="display text-gradient text-[20px] font-semibold">//</span>
               <span className="display text-[20px] font-semibold tracking-tight text-text">LAB</span>
@@ -188,6 +189,7 @@ function Hero() {
                 <Link
                   key={n.href}
                   href={n.href}
+                  replace
                   className="flex items-center gap-1 text-[14px] font-medium text-text/90 transition-colors duration-(--dur-fast) hover:text-text"
                 >
                   {n.label}
@@ -195,7 +197,7 @@ function Hero() {
                 </Link>
               ))}
             </nav>
-            <Link href="/sharp">
+            <Link replace href="/sharp">
               <Pill variant="hero" className="!px-4 !py-2">
                 The Sharp
               </Pill>
@@ -219,7 +221,7 @@ function Hero() {
               A 10,000-simulation quant engine for MLB &amp; College Football — sharp-anchored fair prices,
               ¼-Kelly sizing, every bet graded against the close.
             </p>
-            <Link href="/board" className="mt-[25px] inline-block">
+            <Link replace href="/board" className="mt-[25px] inline-block">
               <Pill variant="hero" className="!px-[29px] !py-6 text-[14px]">
                 Open Today&apos;s Board
               </Pill>
@@ -301,7 +303,7 @@ export default function DashboardPage() {
         }
         sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No board yet today"}
         action={
-          <Link href="/board">
+          <Link replace href="/board">
             <Pill variant="primary">{board ? "Open board" : "Generate today's board"}</Pill>
           </Link>
         }
@@ -414,7 +416,7 @@ export default function DashboardPage() {
                 </div>
               ))}
               <div className="pt-1 text-right">
-                <Link href="/board" className="text-[12px] font-semibold text-pos hover:underline">
+                <Link replace href="/board" className="text-[12px] font-semibold text-pos hover:underline">
                   Full board →
                 </Link>
               </div>
@@ -424,7 +426,7 @@ export default function DashboardPage() {
               title="No board yet today"
               body="Generate the board to see ranked edges here — everything is engine output, nothing is ever fabricated."
               action={
-                <Link href="/board">
+                <Link replace href="/board">
                   <Pill variant="primary">Generate board</Pill>
                 </Link>
               }

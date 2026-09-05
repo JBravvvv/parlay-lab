@@ -227,6 +227,7 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
   return (
     <Link
       href={`/games/${g.pk}?date=${date}`}
+      replace
       className="glass block min-w-0 p-4 transition-[transform,background] duration-(--dur-fast) hover:bg-white/[0.04] active:scale-[0.99]"
     >
       {head}

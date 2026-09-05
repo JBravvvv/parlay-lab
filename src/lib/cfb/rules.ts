@@ -86,3 +86,40 @@ export const CFB_ODDS_URL =
   "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds?regions=us,eu&markets=h2h,spreads,totals&oddsFormat=american";
 export const CFB_ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
 export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/football/college-football/powerindex?region=us&lang=en&limit=400";
+
+/** Player props (INSTRUCTION 39): the Odds API event-odds endpoint is one call per event,
+    so a slate is capped at `maxEvents` priced events; `settleBook` is Caesars, as everywhere.
+
+    QUOTA RAILS (2026-09-05, measured on prod): one fresh 24-event pull cost ~753 credits —
+    about 31 credits per event (x-requests-used 2428 → 3187 across the pull plus one 6-credit
+    slate call), NOT the 6 per event the endpoint's "[markets] × [regions]" note suggests. The
+    Next data cache is per deployment, so every deploy re-spent it. Hence: 12 events, a 2 h
+    window, the parsed board persisted in Redis across deploys (src/lib/cfb/props-store.ts),
+    and a hard daily budget the route may spend, estimated at `measuredCreditsPerEvent` per
+    event (worst case without the budget: 12 × 31 × 12 pulls/day = 4464; with it, 1200). */
+export const CFB_PROPS = {
+  maxEvents: 12,
+  revalidateSec: 7200,
+  regions: "us",
+  minBooks: 2,
+  settleBook: "williamhill_us",
+  /** credits the props route may spend per Pacific day */
+  dailyBudget: 1200,
+  /** measured 2026-09-05 (~753 credits / 24 events); the budget estimate's per-event cost */
+  measuredCreditsPerEvent: 31,
+} as const;
+
+/** Suggested parlays by tier: leg counts, price bands, and the per-leg / per-game gates. */
+export const CFB_PARLAYS = {
+  safer: { legs: { min: 2, max: 3 }, minLegProb: 0.58, maxDec: 3.5 },
+  longshot: { legs: { min: 4, max: 6 }, minDec: 8, maxDec: 60 },
+  mix: { legs: { min: 3, max: 5 }, minDec: 3, maxDec: 20 },
+  /** a leg needs at least this % EV at Caesars (grade D or better, never an F) */
+  minLegEvPct: -3,
+  maxPerGame: 2,
+  perView: 6,
+} as const;
+
+export const CFB_ROUTES = {
+  props: "/api/cfb/props",
+} as const;

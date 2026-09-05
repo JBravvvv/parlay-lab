@@ -30,7 +30,7 @@ export function CzInfo({ pickKey, offered, onToggle }: { pickKey: string; offere
         i
       </button>
       {open && (
-        <span className="liquid-glass absolute left-1/2 top-6 z-30 w-56 -translate-x-1/2 rounded-[14px] bg-surface-2/95 p-3 text-left shadow-xl backdrop-blur-xl">
+        <span className="liquid-glass absolute left-1/2 top-6 z-30 w-56 -translate-x-1/2 rounded-[14px] bg-surface-2/95 p-3 text-left shadow-xl">
           <span className="block text-[11px] leading-snug text-text">Is this pick offered at Caesars sportsbook right now?</span>
           <span className="mt-2 flex items-center gap-2">
             <button

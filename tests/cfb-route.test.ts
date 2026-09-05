@@ -9,10 +9,12 @@ import { CFB_STALE_MS, cfbQueryKey } from "@/lib/cfb/client";
  * THE CFB ROUTES + CLIENT + SYNC (INSTRUCTION 38, 2026-09-05) — source-scan pins on the
  * comment-stripped files, so a comment about a rule can never satisfy the rule.
  *
- *   /api/cfb          — Pacific date basis (ptToday), force-dynamic, the three cache windows,
- *                       the server key by env reference only (never a literal after apiKey=),
- *                       an odds failure degrades to `oddsMissing` instead of a 500, no-store,
- *                       finals mode returns before the odds call.
+ *   /api/cfb          — Pacific date basis (ptToday), force-dynamic, no-store, builds only
+ *                       through src/lib/cfb/slate-server.ts, finals mode returns before the
+ *                       slate call.
+ *   slate-server.ts   — the three cache windows, the server key by env reference only (never a
+ *                       literal after apiKey=), an odds failure degrades to `oddsMissing`
+ *                       instead of a 500. (Lifted out of the route 2026-09-05 for /api/cfb/props.)
  *   /api/cfb/ledger   — the same gate as the MLB route, the CFB blobs by their pinned literals,
  *                       validate → merge server-side (ledger + bank), 413 over MAX_BYTES,
  *                       every entry sport "cfb", and NONE of the MLB blobs or epoch machinery.
@@ -26,18 +28,68 @@ const read = (p: string) => stripComments(fs.readFileSync(path.join(root, p), "u
 
 describe("app/api/cfb/route.ts — the slate feed", () => {
   const src = read("app/api/cfb/route.ts");
+  /* 2026-09-05: the upstream fetches and the slate assembly moved to src/lib/cfb/slate-server.ts
+     so /api/cfb/props builds the same slate. The route keeps the HTTP shape; the feed pins now
+     scan the helper (next describe). */
+  const feed = read("src/lib/cfb/slate-server.ts");
 
   it("derives its date from the shared Pacific helper", () => {
     expect(src).toMatch(/ptToday\(/);
     expect(src).toMatch(/from "@\/lib\/server\/pt-date"/);
     expect(src).not.toMatch(/new Date\([^)]*\)\.toISOString\(\)\.slice\(0, ?10\)/);
     expect(src).not.toMatch(/timeZone: ?"America\/Los_Angeles"/);
+    expect(feed).not.toMatch(/timeZone: ?"America\/Los_Angeles"/);
   });
 
   it("is force-dynamic and never cached by the browser", () => {
     expect(src).toMatch(/export const dynamic = "force-dynamic"/);
     expect(src).toMatch(/"cache-control": "no-store"/);
   });
+
+  it("builds through the shared slate helper only — no fetch of its own", () => {
+    expect(src).toMatch(/from "@\/lib\/cfb\/slate-server"/);
+    expect(src).toMatch(/espnEvents\(date\)/);
+    expect(src).toMatch(/finalsFromEspn\(/);
+    expect(src).toMatch(/slateFromEspn\(/);
+    expect(src).not.toMatch(/\bfetch\(/);
+    expect(src).not.toMatch(/ODDS_API_KEY/);
+  });
+
+  it("an odds failure degrades to oddsMissing, never a 500", () => {
+    expect(feed).toMatch(/oddsMissing/);
+    expect(feed).toMatch(/missing: true/);
+    expect(src).not.toMatch(/status: 500/);
+    expect(feed).not.toMatch(/status: 500/);
+  });
+
+  it("forwards the quota as body and headers", () => {
+    expect(src).toMatch(/x-requests-remaining/);
+    expect(src).toMatch(/x-requests-used/);
+    expect(src).toMatch(/quota/);
+  });
+
+  it("validates the date and mode, and defaults the bankroll to CFB_BANK_BASE", () => {
+    expect(src).toMatch(/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$/);
+    expect(src).toMatch(/status: 400/);
+    expect(src).toMatch(/mode === "finals"/);
+    expect(src).toMatch(/CFB_BANK_BASE/);
+  });
+
+  it("finals mode returns before the slate (odds) call", () => {
+    const finalsBranch = src.indexOf('mode === "finals"');
+    const slateCall = src.lastIndexOf("slateFromEspn(");
+    expect(finalsBranch).toBeGreaterThan(0);
+    expect(slateCall).toBeGreaterThan(finalsBranch);
+    // the finals helper never reaches the odds feed
+    const finalsFn = feed.indexOf("export function finalsFromEspn");
+    const finalsEnd = feed.indexOf("}", feed.indexOf("return { date, finals", finalsFn));
+    expect(feed.slice(finalsFn, finalsEnd)).toMatch(/oddsEvents: \[\]/);
+    expect(feed.slice(finalsFn, finalsEnd)).not.toMatch(/oddsPayload/);
+  });
+});
+
+describe("src/lib/cfb/slate-server.ts — the three upstreams", () => {
+  const src = read("src/lib/cfb/slate-server.ts");
 
   it("uses the three cache windows: ESPN 60s, FPI 6h, odds 240s", () => {
     expect(src).toMatch(/revalidate: ESPN_TTL/);
@@ -54,35 +106,14 @@ describe("app/api/cfb/route.ts — the slate feed", () => {
     expect(src).not.toMatch(/apiKey=[A-Za-z0-9]/);
     // the key is appended through a template expression, not concatenated from a string
     expect(src).toMatch(/apiKey=\$\{/);
+    expect(src).not.toMatch(/console\.(log|info|warn|error)/);
   });
 
-  it("an odds failure degrades to oddsMissing, never a 500", () => {
-    expect(src).toMatch(/oddsMissing/);
-    expect(src).toMatch(/missing: true/);
-    expect(src).not.toMatch(/status: 500/);
-  });
-
-  it("forwards the quota as body and headers", () => {
+  it("builds through the pure model and fetches both ESPN dates (the US-Eastern bucketing rule)", () => {
+    expect(src).toMatch(/buildCfbBoard\(/);
+    expect(src).toMatch(/nextDate\(date\)/);
     expect(src).toMatch(/x-requests-remaining/);
     expect(src).toMatch(/x-requests-used/);
-    expect(src).toMatch(/quota/);
-  });
-
-  it("validates the date and mode, and defaults the bankroll to CFB_BANK_BASE", () => {
-    expect(src).toMatch(/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$/);
-    expect(src).toMatch(/status: 400/);
-    expect(src).toMatch(/mode === "finals"/);
-    expect(src).toMatch(/CFB_BANK_BASE/);
-  });
-
-  it("finals mode returns before the odds call and builds through the pure model", () => {
-    expect(src).toMatch(/buildCfbBoard\(/);
-    const finalsBranch = src.indexOf('mode === "finals"');
-    const oddsCall = src.lastIndexOf("oddsPayload()");
-    expect(finalsBranch).toBeGreaterThan(0);
-    expect(oddsCall).toBeGreaterThan(finalsBranch);
-    // both ESPN dates are fetched (the US-Eastern bucketing rule)
-    expect(src).toMatch(/nextDate\(date\)/);
   });
 });
 

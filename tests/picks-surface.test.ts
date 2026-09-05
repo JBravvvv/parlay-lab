@@ -89,4 +89,16 @@ describe("wired — source scans, comment-stripped", () => {
     const dt = read("src/components/ui/DataTable.tsx");
     expect(dt).toMatch(/glass-table/);
   });
+
+  it("row stagger is capped and the CFB picks ALL scope does not stagger (no multi-second invisible rows)", () => {
+    // row-in is opacity 0 until its delay; at i × 45 ms a 60-row ALL scope kept its last row hidden
+    // for 3.1 s (a 340-row Saturday ≈ 15 s) with a compositing layer per row over the video backdrop
+    const dt = read("src/components/ui/DataTable.tsx");
+    expect(dt).toMatch(/export const STAGGER_CAP = 12;/);
+    expect(dt).toMatch(/animationDelay: `\$\{Math\.min\(i, STAGGER_CAP\) \* 45\}ms`/);
+    expect(dt).not.toMatch(/animationDelay: `\$\{i \* 45\}ms`/);
+    const cfb = read("src/components/cfb/CfbPicksBoard.tsx");
+    expect(cfb).toMatch(/stagger=\{scope === "top"\}/);
+    expect(cfb).not.toMatch(/maxHeight="62vh" stagger rowClassName/);
+  });
 });

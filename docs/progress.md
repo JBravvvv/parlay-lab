@@ -1,3 +1,19 @@
+# Progress — 2026-09-05 (College Football props, freeze fix, Picks board)
+
+## INSTRUCTION 39 — CFB player props, the iOS freeze, and the Board as a picks/parlay surface
+- Six player-prop markets (anytime TD, pass TDs, pass yds, receptions, rush yds, rec yds) priced
+  in src/lib/cfb/props.ts from a per-event Odds API pull (app/api/cfb/props/route.ts), with ESPN
+  season context; the Parlay Builder has a market nav and only slips a prop leg at Caesars' line
+  when it matches the consensus line.
+- Freeze: every internal Link is `replace` (no history to swipe back to), touch-action
+  manipulation on html/body, backdrop blur only on shell chrome; guard tests/nav-flat.test.ts.
+- Board is now the Picks board (src/components/cfb/CfbPicksBoard.tsx, src/lib/cfb/picks.ts):
+  ranked categories + PARLAYS / MIXED / LIVE views with SAFER / LONGSHOTS / MIX tiers; SAFER
+  draws from sides and props (Caesars posts no moneyline on big favourites).
+- Quota: a prop pull costs ~31 credits per event (753 for 24 events on the first prod pull, read
+  from x-requests-used 2428 → 3187). CFB_PROPS now caps 12 events, caches 2 h in Redis and stops
+  fresh pulls past a 1200-credit day. Details in docs/cfb-desk.md.
+
 # Progress — 2026-09-05 (College Football desk)
 
 ## INSTRUCTION 38 — a fully separate CFB desk, an engine per sport, and the UI upgrade

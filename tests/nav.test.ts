@@ -76,8 +76,9 @@ describe("nav — desktop side rail", () => {
     expect(nav.some((n) => n.href === "/")).toBe(false);
     expect(nav.some((n) => /dashboard/i.test(n.label))).toBe(false);
     expect(shell).not.toMatch(/IconDash/);
-    // the brand still links home
-    expect(shell).toMatch(/<Link href="\/" className="flex items-baseline/);
+    // the brand still links home — `replace` since 2026-09-05 (iOS freeze fix: every
+    // internal Link is replace-only so the back-swipe recognizer never arms; see nav-flat.test.ts)
+    expect(shell).toMatch(/<Link replace href="\/" className="flex items-baseline/);
   });
   it("Calc was renamed Parlay Calc (2026-09-04; briefly 'Parlay Calculator' on 09-03)", () => {
     expect(nav.find((n) => n.href === "/calc")!.label).toBe("Parlay Calc");

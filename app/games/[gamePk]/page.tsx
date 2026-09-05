@@ -62,7 +62,7 @@ function BoxScore() {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <Link href={back} className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted transition-colors hover:text-text">
+        <Link replace href={back} className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-muted transition-colors hover:text-text">
           <span aria-hidden className="text-[15px] leading-none">‹</span> Games
         </Link>
         {g && (

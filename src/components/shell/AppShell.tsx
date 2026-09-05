@@ -65,7 +65,7 @@ const INSTANT: Transition = { duration: 0 };
 
 function Brand() {
   return (
-    <Link href="/" className="flex items-baseline gap-0.5 select-none">
+    <Link replace href="/" className="flex items-baseline gap-0.5 select-none">
       <span className="text-[14px] font-bold tracking-tight text-text md:text-[15px]">PARLAY</span>
       <span className="text-gradient text-[14px] font-bold md:text-[15px]">//</span>
       <span className="text-[14px] font-bold tracking-tight text-text md:text-[15px]">LAB</span>
@@ -79,6 +79,7 @@ function RailLink({ item, pathname, transition }: { item: NavItem; pathname: str
   return (
     <Link
       href={href}
+      replace
       className={`press relative flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium ${
         active ? "text-pos" : "text-muted hover:bg-white/[0.05] hover:text-text"
       }`}
@@ -175,6 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={href}
               href={href}
+              replace
               aria-label={label}
               title={label}
               className={`press rounded-lg p-[5px] ${isActive(pathname, href) ? "text-pos" : "text-muted"}`}
@@ -210,6 +212,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link
               key={href}
               href={href}
+              replace
               aria-label={label}
               className={`press relative flex flex-col items-center gap-0.5 py-2 text-[9.5px] font-semibold ${
                 active ? "text-pos" : "text-faint"

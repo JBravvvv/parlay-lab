@@ -116,7 +116,7 @@ export function UfcBuilder() {
           <div className="text-[13px] font-semibold text-text">{q.data?.eventName ?? "Next UFC card"}</div>
           <div className="text-[11px] text-muted">
             Pick any Caesars-priced sides and see the real combined math. Ready-made tickets live on the{" "}
-            <Link href="/board" className="text-pos underline underline-offset-2">Board&apos;s UFC tab</Link>.
+            <Link replace href="/board" className="text-pos underline underline-offset-2">Board&apos;s UFC tab</Link>.
           </div>
         </div>
         <Pill

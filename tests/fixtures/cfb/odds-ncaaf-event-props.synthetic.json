@@ -1,0 +1,751 @@
+{
+ "_note": "SYNTHETIC fixture (2026-09-05): shape of The Odds API per-event odds for East Carolina @ Alabama with the six CFB prop markets. Prices and lines are invented, plausible retail shapes for tests \u2014 NOT captured quotes, never to be shown as real prices.",
+ "id": "b10ebab18213ecdc575885bfa874b98d",
+ "sport_key": "americanfootball_ncaaf",
+ "sport_title": "NCAAF",
+ "commence_time": "2026-09-05T16:00:00Z",
+ "home_team": "Alabama Crimson Tide",
+ "away_team": "East Carolina Pirates",
+ "bookmakers": [
+  {
+   "key": "williamhill_us",
+   "title": "Caesars",
+   "last_update": "2026-09-05T11:30:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": -110,
+       "point": 249.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -110,
+       "point": 249.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": 105,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -135,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -125,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -105,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Jam Miller",
+       "price": -115,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Jam Miller",
+       "price": -105,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Rahsul Faison",
+       "price": -110,
+       "point": 45.5
+      },
+      {
+       "name": "Under",
+       "description": "Rahsul Faison",
+       "price": -110,
+       "point": 45.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -110,
+       "point": 22.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -120,
+       "point": 22.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -120,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -110,
+       "point": 5.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -110,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -120,
+       "point": 4.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -112,
+       "point": 78.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -108,
+       "point": 78.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -110,
+       "point": 52.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -110,
+       "point": 52.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Jam Miller",
+       "price": -140
+      },
+      {
+       "name": "Yes",
+       "description": "Ryan Williams",
+       "price": -125
+      },
+      {
+       "name": "Yes",
+       "description": "Germie Bernard",
+       "price": 130
+      },
+      {
+       "name": "Yes",
+       "description": "Rahsul Faison",
+       "price": 165
+      },
+      {
+       "name": "Yes",
+       "description": "Ty Simpson",
+       "price": 320
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "draftkings",
+   "title": "DraftKings",
+   "last_update": "2026-09-05T11:30:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": -115,
+       "point": 245.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -105,
+       "point": 245.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -110,
+       "point": 224.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -110,
+       "point": 224.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": 100,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -130,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -120,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -110,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Jam Miller",
+       "price": -110,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Jam Miller",
+       "price": -110,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Rahsul Faison",
+       "price": -115,
+       "point": 45.5
+      },
+      {
+       "name": "Under",
+       "description": "Rahsul Faison",
+       "price": -105,
+       "point": 45.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -125,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -105,
+       "point": 5.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -105,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -125,
+       "point": 4.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -110,
+       "point": 78.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -110,
+       "point": 78.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -115,
+       "point": 52.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -105,
+       "point": 52.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Jam Miller",
+       "price": -135
+      },
+      {
+       "name": "Yes",
+       "description": "Ryan Williams",
+       "price": -120
+      },
+      {
+       "name": "Yes",
+       "description": "Germie Bernard",
+       "price": 135
+      },
+      {
+       "name": "Yes",
+       "description": "Rahsul Faison",
+       "price": 160
+      },
+      {
+       "name": "Yes",
+       "description": "Ty Simpson",
+       "price": 300
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "fanduel",
+   "title": "FanDuel",
+   "last_update": "2026-09-05T11:30:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": -114,
+       "point": 245.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -106,
+       "point": 245.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -112,
+       "point": 224.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -108,
+       "point": 224.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": 104,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -132,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -118,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -112,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Jam Miller",
+       "price": -112,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Jam Miller",
+       "price": -108,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Rahsul Faison",
+       "price": -108,
+       "point": 45.5
+      },
+      {
+       "name": "Under",
+       "description": "Rahsul Faison",
+       "price": -112,
+       "point": 45.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -118,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -112,
+       "point": 5.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -108,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -122,
+       "point": 4.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -108,
+       "point": 78.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -112,
+       "point": 78.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -112,
+       "point": 52.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -108,
+       "point": 52.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Jam Miller",
+       "price": -138
+      },
+      {
+       "name": "Yes",
+       "description": "Ryan Williams",
+       "price": -118
+      },
+      {
+       "name": "Yes",
+       "description": "Germie Bernard",
+       "price": 128
+      },
+      {
+       "name": "Yes",
+       "description": "Rahsul Faison",
+       "price": 170
+      },
+      {
+       "name": "Yes",
+       "description": "Ty Simpson",
+       "price": 310
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "betmgm",
+   "title": "BetMGM",
+   "last_update": "2026-09-05T11:30:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": -110,
+       "point": 245.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -110,
+       "point": 245.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -115,
+       "point": 224.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -105,
+       "point": 224.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ty Simpson",
+       "price": 110,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Ty Simpson",
+       "price": -140,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Katin Houser",
+       "price": -115,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Katin Houser",
+       "price": -115,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Jam Miller",
+       "price": -115,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Jam Miller",
+       "price": -105,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Rahsul Faison",
+       "price": -110,
+       "point": 45.5
+      },
+      {
+       "name": "Under",
+       "description": "Rahsul Faison",
+       "price": -110,
+       "point": 45.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -115,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -115,
+       "point": 5.5
+      },
+      {
+       "name": "Over",
+       "description": "Germie Bernard",
+       "price": -110,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Germie Bernard",
+       "price": -120,
+       "point": 4.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ryan Williams",
+       "price": -115,
+       "point": 78.5
+      },
+      {
+       "name": "Under",
+       "description": "Ryan Williams",
+       "price": -105,
+       "point": 78.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-05T11:30:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Jam Miller",
+       "price": -130
+      },
+      {
+       "name": "Yes",
+       "description": "Ryan Williams",
+       "price": -115
+      },
+      {
+       "name": "Yes",
+       "description": "Germie Bernard",
+       "price": 140
+      },
+      {
+       "name": "Yes",
+       "description": "Rahsul Faison",
+       "price": 155
+      },
+      {
+       "name": "Yes",
+       "description": "Ty Simpson",
+       "price": 330
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { CfbPropMarket } from "@/lib/cfb/props-types";
 import type { CfbMarketKey } from "@/lib/cfb/types";
 import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
 
@@ -14,21 +15,56 @@ import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
  */
 
 export type CfbSlipLeg = {
-  /** the board row's key — the clash guard is `gameId`, one side per game */
+  /** "side" = a game row (ML / spread / total); "prop" = a player prop (INSTRUCTION 39) */
+  kind: "side" | "prop";
+  /** the board row's key — sides clash on `gameId` (one side per game), props on `player` (one leg per player) */
   key: string;
   gameId: string;
-  /** "Indiana -40.5" / "Over 56.5" — relabelled to the priced book's own line */
+  /** "Indiana -40.5" / "Over 56.5" / "Ty Simpson O 245.5" — relabelled to the priced book's own line */
   label: string;
   /** "IND @ OSU · Sat 9:00 AM" */
   sub: string;
-  market: CfbMarketKey;
+  /** the game market key for sides ("ml" / "spread" / "total"); the prop market id for props */
+  market: CfbMarketKey | CfbPropMarket;
   /** the American price the slip is priced at */
   cz: number;
   /** "CZ" for Caesars, else the book's short tag */
   book: string;
   /** model win probability at the priced line, PERCENT (0..100) */
   prob: number;
+  /** prop legs only: the player's name */
+  player?: string | null;
+  /** prop legs only: "Pass Yds" / "Anytime TD" — the market's display label */
+  marketLabel?: string;
 };
+
+export type CfbSlipAdd = {
+  legs: CfbSlipLeg[];
+  /** set when the tap was refused — the inline note the sandbox shows */
+  note: string | null;
+};
+
+/**
+ * The slip's clash rules, pure so they can be tested:
+ *  - tapping a leg already on the slip removes it (toggle);
+ *  - a SIDE replaces any other side on the same game (one side per game);
+ *  - a PROP is refused when the same player is already on the slip (one leg per player) —
+ *    the caller shows `note`; a prop and a side on the same game are allowed;
+ *  - the price math is untouched — legs are still combined by `combineTicket`.
+ */
+export function addCfbLeg(prev: CfbSlipLeg[], leg: CfbSlipLeg): CfbSlipAdd {
+  if (prev.some((l) => l.key === leg.key)) return { legs: prev.filter((l) => l.key !== leg.key), note: null };
+  if (leg.kind === "prop") {
+    const player = (leg.player ?? "").trim().toLowerCase();
+    const clash = player
+      ? prev.find((l) => l.kind === "prop" && l.gameId === leg.gameId && (l.player ?? "").trim().toLowerCase() === player)
+      : undefined;
+    if (clash) return { legs: prev, note: `${leg.player} is already on the slip (${clash.label}) — one leg per player.` };
+    return { legs: [...prev, leg], note: null };
+  }
+  /* one side per game — a new side on a game replaces the old side, props on that game stay */
+  return { legs: [...prev.filter((l) => l.kind === "prop" || l.gameId !== leg.gameId), leg], note: null };
+}
 
 export function CfbSlip({
   legs,
@@ -116,7 +152,10 @@ export function CfbSlip({
                     <div key={l.key} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
                       <span className="min-w-0 flex-1 leading-tight">
                         <span className="block truncate text-text">
-                          {l.label} <span className="text-[9.5px] uppercase text-faint">{l.market === "ml" ? "ML" : l.market}</span>
+                          {l.label}{" "}
+                          <span className="text-[9.5px] uppercase text-faint">
+                            {l.kind === "prop" ? l.marketLabel ?? l.market : l.market === "ml" ? "ML" : l.market}
+                          </span>
                         </span>
                         <span className="block truncate text-[9.5px] text-faint">{l.sub}</span>
                       </span>
@@ -172,8 +211,9 @@ export function CfbSlip({
                     </span>
                   </div>
                   <div className="mt-1.5 text-[9.5px] leading-snug text-faint">
-                    True % is the naive product of the model&apos;s win probabilities — legs are priced one side per game, so
-                    same-game correlation never enters. Fair (true) is the break-even price for that true %, a yardstick,
+                    True % is the naive product of the model&apos;s win probabilities — one side per game and one leg per
+                    player, so a prop and a side on the same game multiply as if independent (they are not; treat it as a
+                    yardstick). Fair (true) is the break-even price for that true %, a yardstick,
                     not a posted quote. Sandbox only — nothing here enters the CFB ledger.
                   </div>
                 </div>

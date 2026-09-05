@@ -1,5 +1,7 @@
 "use client";
 
+import type { CfbPropsBoard } from "./props-types";
+import { CFB_PROPS, CFB_ROUTES } from "./rules";
 import type { CfbFinals, CfbSlate } from "./types";
 
 /**
@@ -17,7 +19,14 @@ export function cfbQueryKey(date: string | null | undefined, bankroll: number) {
   return ["cfb", "slate", date ?? "today", bankroll] as const;
 }
 
-function rememberQuota(res: Response, body: { quota?: { remaining: number | null } } | null) {
+/** matches the props route's per-event revalidate window (CFB_PROPS.revalidateSec, 2 h since 2026-09-05) — the query never polls */
+export const CFB_PROPS_STALE_MS = CFB_PROPS.revalidateSec * 1000;
+
+export function cfbPropsQueryKey(date: string | null | undefined, bankroll: number) {
+  return ["cfb", "props", date ?? "today", bankroll] as const;
+}
+
+function rememberQuota(res: Response, body: { quota?: { remaining: number | null } | null } | null) {
   const fromHeader = res.headers.get("x-requests-remaining");
   const remaining = fromHeader ?? (body?.quota?.remaining != null ? String(body.quota.remaining) : null);
   if (remaining == null) return;
@@ -54,5 +63,20 @@ export async function loadCfbSlate(date?: string, opts?: { bankroll?: number }):
 export async function loadCfbFinals(date: string): Promise<{ date: string; finals: CfbFinals }> {
   const p = new URLSearchParams({ date, mode: "finals" });
   const { body } = await getJson<{ date: string; finals: CfbFinals }>(`/api/cfb?${p.toString()}`);
+  return body;
+}
+
+/** The player-props board for a Pacific date (today when omitted). One GET per (date, bankroll);
+    the route serves the board off Redis / a CFB_PROPS.revalidateSec data cache, so `staleTime`
+    mirrors it and there is NO refetchInterval anywhere — a fresh pull was measured at ~31 credits
+    per event (2026-09-05), and the route holds a daily budget it will not spend past. */
+export async function loadCfbProps(date?: string, opts?: { bankroll?: number }): Promise<CfbPropsBoard> {
+  const p = new URLSearchParams();
+  if (date) p.set("date", date);
+  const bankroll = opts?.bankroll;
+  if (bankroll != null && Number.isFinite(bankroll) && bankroll > 0) p.set("bankroll", String(Math.round(bankroll)));
+  const qs = p.toString();
+  const { res, body } = await getJson<CfbPropsBoard>(`${CFB_ROUTES.props}${qs ? `?${qs}` : ""}`);
+  rememberQuota(res, body);
   return body;
 }

@@ -1,0 +1,293 @@
+import { americanFromProb, decFromAmerican, devigProportional, impliedFromAmerican, weightedMedian } from "@/engine2/devig";
+import { gradeFromEv } from "@/lib/grade";
+import { kickoffLabel } from "@/lib/cfb/dates";
+import { evPct, kellyStake } from "@/lib/cfb/model";
+import { normTeam } from "@/lib/cfb/names";
+import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropSide } from "@/lib/cfb/props-types";
+import { CFB_PROPS } from "@/lib/cfb/rules";
+import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
+
+/**
+ * CFB PLAYER PROPS — the pure pricing (INSTRUCTION 39, 2026-09-05). `parseEventProps` turns one
+ * Odds API per-event payload (`/v4/sports/americanfootball_ncaaf/events/<id>/odds`) into priced
+ * rows for one ESPN game. No fetch, no clock, no storage: the route hands it the JSON, the
+ * shaped game, `now`, the bankroll and (optionally) the ESPN season context.
+ *
+ * How a prop is priced:
+ *   1. Outcomes are grouped by (market, player). Per book, an Over/Under pair AT THE SAME LINE
+ *      is de-vigged proportionally → P(over) at that book's line (P(under) = 1 − P(over)).
+ *   2. Anytime TD is a yes-only market at most US books. When a book posts Yes AND No they are
+ *      de-vigged as a pair; when only Yes exists, the raw implied probability is divided by
+ *      `ATD_YES_ONLY_OVERROUND` (1.08) — a stated ASSUMPTION about the hold a book carries on a
+ *      one-sided TD price (a two-way market's hold sits in the 4–8 % band; a yes-only price has
+ *      nowhere else to put it), not a measured figure. It is a constant, it is named, and The
+ *      Sharp can print it.
+ *   3. There is no distribution model for a player's yards or catches, so a fair probability
+ *      exists only AT A LINE THE BOOKS PRICED: the fair at line L is the median of the de-vigged
+ *      probabilities of the books posting exactly L, and it needs `CFB_PROPS.minBooks` books
+ *      else it is null. Every book counts equally (Pinnacle rarely posts CFB props). It is the
+ *      TRUE median (`median` below): on an even count the mean of the two middle reads, so the
+ *      Over and Under sides of one row are priced symmetrically (fair(under) = 1 − fair(over)
+ *      is then also the median of the under reads).
+ *   4. The row's `line` is the median of the books' lines (lower-middle on an even count, so it
+ *      is always a posted line); `fair` is the fair at that line.
+ *      Every book is quoted at ITS OWN line, and its EV is the shared `evPct` at the book's
+ *      price against the fair AT THE BOOK'S LINE — so a Caesars quote at a line no second book
+ *      posts carries a price but a null EV, a null grade and a $0 Kelly. Nothing is interpolated.
+ *   5. Push mass is not observable from a de-vigged pair, so `push` is 0 everywhere (half-point
+ *      lines cannot push; the rare whole-number line is priced as if it could not).
+ *   6. `best` = highest decimal among the books posting the consensus line (all books for the
+ *      line-less anytime TD); `cz` = Caesars; `dk` / `fd` for reference; `grade` =
+ *      gradeFromEv(evCz); `playable` = Caesars posts it ∧ status upcoming ∧ kickoff after `now`;
+ *      `kelly` = ¼-Kelly of the bankroll, capped at 2 %, only when playable and priced.
+ * Nothing here is a prediction. A row's `fair` is what the books, de-vigged, say the side is
+ * worth at that line; the EV is that fair against a posted price. Missing values are null.
+ */
+
+/** the assumed hold on a yes-only anytime-TD price (see the header, point 2) */
+export const ATD_YES_ONLY_OVERROUND = 1.08;
+
+export type CfbPropCtxLookup = (market: CfbPropMarket, player: string) => CfbPropRow["ctx"];
+
+export type ParsePropsOpts = {
+  /** ms epoch the rows are built at (kickoff-passed checks) */
+  now: number;
+  /** CFB bankroll for Kelly sizing */
+  bankroll: number;
+  /** optional ESPN season context join; null / omitted → every `ctx` is null */
+  ctx?: CfbPropCtxLookup | null;
+};
+
+type Rec = Record<string, unknown>;
+const rec = (x: unknown): Rec | null => (x && typeof x === "object" && !Array.isArray(x) ? (x as Rec) : null);
+const arr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
+const str = (x: unknown): string | null => (typeof x === "string" && x.trim() ? x.trim() : null);
+const num = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
+const round = (v: number, dp: number) => {
+  const k = 10 ** dp;
+  return Math.round(v * k) / k;
+};
+const validPrice = (p: number) => Number.isFinite(p) && Math.abs(p) >= 100;
+const sameLine = (a: number | null, b: number | null) => (a == null && b == null) || (a != null && b != null && Math.abs(a - b) < 1e-9);
+
+/** "ty-simpson" — the player's slug for row keys. */
+export function playerSlug(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u0027\u0060\u2018\u2019.]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const MARKET_BY_ODDS = new Map(CFB_PROP_MARKETS.map((m) => [m.odds, m] as const));
+
+/** one book's de-vigged reading of one (market, player) */
+type BookRead = { book: string; title: string; line: number | null; pOver: number; priceOver: number; priceUnder: number | null };
+
+type Group = { market: (typeof CFB_PROP_MARKETS)[number]; player: string; team: string | null; reads: BookRead[] };
+
+/** Group the payload's outcomes by (market, player) and de-vig each book's pair. */
+function readEvent(eventJson: unknown): Group[] {
+  const ev = rec(eventJson);
+  const groups = new Map<string, Group>();
+  if (!ev) return [];
+  for (const b of arr(ev.bookmakers)) {
+    const bk = rec(b);
+    const key = bk ? str(bk.key) : null;
+    if (!bk || !key) continue;
+    const title = str(bk.title) ?? key;
+    for (const m of arr(bk.markets)) {
+      const mk = rec(m);
+      const market = mk ? MARKET_BY_ODDS.get(str(mk.key) ?? "") : undefined;
+      if (!mk || !market) continue;
+      // per player: the book's Over/Yes and Under/No prices, by line
+      const perPlayer = new Map<string, { team: string | null; byLine: Map<string, { a: number | null; b: number | null; line: number | null }> }>();
+      for (const o of arr(mk.outcomes)) {
+        const oc = rec(o);
+        if (!oc) continue;
+        const player = str(oc.description);
+        const name = (str(oc.name) ?? "").toLowerCase();
+        const price = num(oc.price);
+        if (!player || price == null || !validPrice(price)) continue;
+        const line = market.kind === "ou" ? num(oc.point) : null;
+        if (market.kind === "ou" && line == null) continue;
+        const team = str(oc.team);
+        const entry = perPlayer.get(player) ?? { team: null, byLine: new Map() };
+        if (team && !entry.team) entry.team = team;
+        const lk = line == null ? "" : String(line);
+        const slot = entry.byLine.get(lk) ?? { a: null, b: null, line };
+        if (name === "over" || name === "yes") slot.a = price;
+        else if (name === "under" || name === "no") slot.b = price;
+        entry.byLine.set(lk, slot);
+        perPlayer.set(player, entry);
+      }
+      for (const [player, entry] of perPlayer) {
+        const gk = `${market.id}|${playerSlug(player)}`;
+        const g = groups.get(gk) ?? { market, player, team: null, reads: [] };
+        if (entry.team && !g.team) g.team = entry.team;
+        for (const slot of entry.byLine.values()) {
+          if (slot.a == null) continue;
+          let pOver: number;
+          if (slot.b != null) {
+            [pOver] = devigProportional([impliedFromAmerican(slot.a), impliedFromAmerican(slot.b)]);
+          } else if (market.kind === "yes") {
+            pOver = impliedFromAmerican(slot.a) / ATD_YES_ONLY_OVERROUND;
+          } else continue; // an Over with no Under at the same line is not a pair
+          if (!(pOver > 0 && pOver < 1)) continue;
+          // one reading per book per line (a duplicated outcome keeps the first)
+          if (g.reads.some((r) => r.book === key && sameLine(r.line, slot.line))) continue;
+          g.reads.push({ book: key, title, line: slot.line, pOver, priceOver: slot.a, priceUnder: slot.b });
+        }
+        groups.set(gk, g);
+      }
+    }
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The true equal-weight median: the middle value, or the MEAN of the two middle values on an even
+ * count. engine2's `weightedMedian` returns the lower-middle value on an even count; used on the
+ * over-side probabilities that biases fair(over) low and fair(under) = 1 − fair(over) high on the
+ * common 2- and 4-book slates, so the Under side would grade better than the Over side on the same
+ * quotes. This estimator is symmetric: median(1 − reads) = 1 − median(reads).
+ */
+export function median(values: number[]): number {
+  const s = [...values].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** median of the de-vigged over probabilities of the books posting exactly `line`; null under minBooks */
+function fairAt(reads: BookRead[], line: number | null): { p: number; n: number } | null {
+  const at = reads.filter((r) => sameLine(r.line, line));
+  if (at.length < CFB_PROPS.minBooks) return null;
+  return { p: median(at.map((r) => r.pOver)), n: at.length };
+}
+
+function quote(book: string, title: string, price: number, line: number | null): CfbPropQuote {
+  return { book, title, price, line, dec: decFromAmerican(price) };
+}
+
+const SHORT: Record<CfbPropMarket, string> = {
+  anytime_td: "Anytime TD",
+  pass_tds: "Pass TDs",
+  pass_yds: "Pass Yds",
+  receptions: "Receptions",
+  rush_yds: "Rush Yds",
+  rec_yds: "Rec Yds",
+};
+
+/** "Ty Simpson O 245.5 Pass Yds" · "Ty Simpson U 1.5 Pass TDs" · "Ryan Williams Anytime TD" */
+export function propLabel(player: string, market: CfbPropMarket, side: CfbPropSide, line: number | null): string {
+  if (side === "yes") return `${player} ${SHORT[market]}`;
+  return `${player} ${side === "over" ? "O" : "U"} ${line ?? "—"} ${SHORT[market]}`;
+}
+
+/**
+ * Every priced prop row of one game from one per-event odds payload. Rows come out grouped by
+ * player, over before under; a (market, player) with no de-vigged pair at any book yields nothing.
+ */
+export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePropsOpts): CfbPropRow[] {
+  const ev = rec(eventJson);
+  const oddsEventId = (ev && str(ev.id)) ?? game.oddsEventId ?? "";
+  const kickoff = Date.parse(game.start);
+  const upcoming = game.status === "upcoming" && Number.isFinite(kickoff) && kickoff > opts.now;
+  const sub = `${game.away.abbr} @ ${game.home.abbr} · ${kickoffLabel(game.start)}`;
+  const homeN = normTeam(game.home.name);
+  const awayN = normTeam(game.away.name);
+  const rows: CfbPropRow[] = [];
+
+  for (const g of readEvent(eventJson)) {
+    if (!g.reads.length) continue;
+    // the row's line must be a line some book POSTED (a fair exists only there), so the line median
+    // is engine2's lower-middle weightedMedian, never an average of two posted lines
+    const line = g.market.kind === "ou" ? weightedMedian(g.reads.map((r) => r.line as number), g.reads.map(() => 1)) : null;
+    const consensus = fairAt(g.reads, line);
+    const teamN = g.team ? normTeam(g.team) : null;
+    const teamObj = teamN === homeN ? game.home : teamN === awayN ? game.away : null;
+    const opp = teamObj ? (teamObj === game.home ? game.away.short : game.home.short) : null;
+    const sides: CfbPropSide[] = g.market.kind === "yes" ? ["yes"] : ["over", "under"];
+
+    for (const side of sides) {
+      const pOf = (p: number) => (side === "under" ? 1 - p : p);
+      const quotes: CfbPropQuote[] = [];
+      for (const r of g.reads) {
+        if (side === "under") {
+          if (r.priceUnder == null) continue;
+          quotes.push(quote(r.book, r.title, r.priceUnder, r.line));
+        } else quotes.push(quote(r.book, r.title, r.priceOver, r.line));
+      }
+      const find = (k: string) => quotes.find((q) => q.book === k) ?? null;
+      const cz = find(CFB_PROPS.settleBook);
+      let best: CfbPropQuote | null = null;
+      for (const q of quotes) {
+        if (!sameLine(q.line, line)) continue;
+        if (!best || q.dec > best.dec) best = q;
+      }
+      const evAt = (q: CfbPropQuote | null): { ev: number; p: number } | null => {
+        if (!q) return null;
+        const f = fairAt(g.reads, q.line);
+        if (!f) return null;
+        const p = pOf(f.p);
+        return { ev: round(evPct(p, 0, q.dec), 2), p };
+      };
+      const czEv = evAt(cz);
+      const bestEv = evAt(best);
+      const playable = !!cz && upcoming;
+      const fair = consensus ? pOf(consensus.p) : null;
+      const clamped = fair == null ? null : Math.min(1 - 1e-6, Math.max(1e-6, fair));
+      const kelly = playable && cz && czEv ? kellyStake(czEv.p, 0, cz.dec, opts.bankroll) : 0;
+      rows.push({
+        key: `${game.id}|${g.market.id}|${playerSlug(g.player)}|${side}|${line ?? ""}`,
+        gameId: game.id,
+        oddsEventId,
+        market: g.market.id,
+        side,
+        player: g.player,
+        team: teamObj?.name ?? g.team ?? null,
+        teamId: teamObj?.id ?? null,
+        teamAbbr: teamObj?.abbr ?? null,
+        opp,
+        kickoff: game.start,
+        status: game.status,
+        label: propLabel(g.player, g.market.id, side, line),
+        sub,
+        line,
+        fair,
+        fairAm: clamped == null ? null : americanFromProb(clamped),
+        books: consensus?.n ?? 0,
+        cz,
+        best,
+        dk: find("draftkings"),
+        fd: find("fanduel"),
+        evCz: czEv?.ev ?? null,
+        evBest: bestEv?.ev ?? null,
+        grade: gradeFromEv(czEv?.ev ?? null),
+        kelly: playable ? kelly : null,
+        playable,
+        ctx: opts.ctx ? opts.ctx(g.market.id, g.player) : null,
+      });
+    }
+  }
+  return rows;
+}
+
+/**
+ * Which games get a per-event props pull: upcoming, matched to an odds event, and with a
+ * Caesars price on at least one side (no Caesars → nothing to settle at). Ordered by kickoff,
+ * then ranked teams first (best rank of the two), then ESPN id; sliced to `max`.
+ */
+export function selectPropEvents(board: CfbBoard, now: number, max: number = CFB_PROPS.maxEvents): { events: CfbGame[]; capped: boolean } {
+  const bestRank = (g: CfbGame) => Math.min(g.home.rank ?? 99, g.away.rank ?? 99);
+  const eligible = board.games.filter((g) => {
+    const t = Date.parse(g.start);
+    return g.status === "upcoming" && Number.isFinite(t) && t > now && !!g.oddsEventId && g.rows.some((r) => !!r.cz);
+  });
+  eligible.sort(
+    (a, b) => Date.parse(a.start) - Date.parse(b.start) || bestRank(a) - bestRank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  return { events: eligible.slice(0, Math.max(0, max)), capped: eligible.length > max };
+}

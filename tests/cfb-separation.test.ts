@@ -11,7 +11,7 @@ import path from "node:path";
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
 const PAGES: Record<string, string> = {
-  "app/board/page.tsx": "CfbBoard",
+  "app/board/page.tsx": "CfbPicksBoard",
   "app/builder/page.tsx": "CfbBuilder",
   "app/props/page.tsx": "CfbProps",
   "app/ledger/page.tsx": "CfbLedger",
