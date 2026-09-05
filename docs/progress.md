@@ -102,6 +102,9 @@ an exit condition fires. Do not tune weights/gates/caps — check collection-per
   `find . -name "* [0-9].*" -not -path "./node_modules/*" -delete`.
 - Browser pane: unfocused clicks/form_input may not fire React handlers — DOM .click().
 
+## 2026-09-04 — INSTRUCTIONS 28–30: scratched batters off the Board; sortable prop tabs; Tier → Grade
+Josh's word, verbatim: "It keeps showing Jose Caballero on the board even with a refresh yet he's not in the yankees starting lineup so there's no bets available for him at any book" / "I should be able to sort each tab on the 'Board' like H+R+RBI, Hits, etc by clicking on the title of the column ie: 'Tier' or 'Edge Status'" / "Rename 'Tier' to 'Grade'". Render-time posted-lineup cross-check (`src/lib/lineup-check.ts`, `src/lib/useLineups.ts`) hides OUT batters on both Board tables with a show/hide toggle; the stamped-picks table is now a sortable `DataTable` (`pickColumns`); headers read "Grade". Pins: `tests/lineup-check.test.ts` + fixture `tests/fixtures/lineups-2026-09-04.json`. Full write-up under INSTRUCTIONS 28–30 in `docs/session-handoff.md`.
+
 ## 2026-09-04 — INSTRUCTION 27: sims 50K → 25K
 Josh's word, verbatim: "Make everything like the Board refresh only 25K sims instead of 50K". `SIM_PATHS` (`src/lib/engine-client.ts`) is now 25000; UI copy derives from it. `tests/sim-paths.test.ts`.
 

@@ -1,0 +1,144 @@
+{
+ "dates": [
+  {
+   "date": "2026-09-04",
+   "games": [
+    {
+     "gamePk": 824387,
+     "gameDate": "2026-09-04T23:15:00Z",
+     "status": {
+      "abstractGameState": "Live",
+      "codedGameState": "I",
+      "detailedState": "In Progress",
+      "statusCode": "I",
+      "startTimeTBD": false,
+      "abstractGameCode": "L"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 116,
+        "name": "Detroit Tigers",
+        "link": "/api/v1/teams/116"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 114,
+        "name": "Cleveland Guardians",
+        "link": "/api/v1/teams/114"
+       }
+      }
+     },
+     "lineups": {}
+    },
+    {
+     "gamePk": 823256,
+     "gameDate": "2026-09-05T01:40:00Z",
+     "status": {
+      "abstractGameState": "Preview",
+      "codedGameState": "P",
+      "detailedState": "Pre-Game",
+      "statusCode": "P",
+      "startTimeTBD": false,
+      "abstractGameCode": "P"
+     },
+     "teams": {
+      "away": {
+       "team": {
+        "id": 147,
+        "name": "New York Yankees",
+        "link": "/api/v1/teams/147"
+       }
+      },
+      "home": {
+       "team": {
+        "id": 135,
+        "name": "San Diego Padres",
+        "link": "/api/v1/teams/135"
+       }
+      }
+     },
+     "lineups": {
+      "homePlayers": [
+       {
+        "id": 665487,
+        "fullName": "Fernando Tatis Jr."
+       },
+       {
+        "id": 669392,
+        "fullName": "Samad Taylor"
+       },
+       {
+        "id": 592518,
+        "fullName": "Manny Machado"
+       },
+       {
+        "id": 664034,
+        "fullName": "Ty France"
+       },
+       {
+        "id": 701538,
+        "fullName": "Jackson Merrill"
+       },
+       {
+        "id": 669720,
+        "fullName": "Austin Hays"
+       },
+       {
+        "id": 593428,
+        "fullName": "Xander Bogaerts"
+       },
+       {
+        "id": 669134,
+        "fullName": "Luis Campusano"
+       },
+       {
+        "id": 630105,
+        "fullName": "Jake Cronenworth"
+       }
+      ],
+      "awayPlayers": [
+       {
+        "id": 700250,
+        "fullName": "Ben Rice"
+       },
+       {
+        "id": 641355,
+        "fullName": "Cody Bellinger"
+       },
+       {
+        "id": 671277,
+        "fullName": "Luis Garc\u00eda Jr."
+       },
+       {
+        "id": 682987,
+        "fullName": "Spencer Jones"
+       },
+       {
+        "id": 663757,
+        "fullName": "Trent Grisham"
+       },
+       {
+        "id": 665862,
+        "fullName": "Jazz Chisholm Jr."
+       },
+       {
+        "id": 806146,
+        "fullName": "George Lombard Jr."
+       },
+       {
+        "id": 641857,
+        "fullName": "Ryan McMahon"
+       },
+       {
+        "id": 669224,
+        "fullName": "Austin Wells"
+       }
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}

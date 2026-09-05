@@ -31,6 +31,8 @@ import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
 import { BoardLabel, PlayerName } from "@/components/player/PlayerName";
 import { parseBoardLabel } from "@/lib/player-card";
+import { useLineups } from "@/lib/useLineups";
+import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
 
 const CAT_LABELS: Record<string, string> = {
   all: "TOP 50",
@@ -91,7 +93,27 @@ export default function BoardPage() {
      Caesars price — off-book rows render with their best price and Josh's own ⓘ toggle
      ("offered at Caesars right now?") is the only thing that hides a pick. */
   const cz = useCzHidden();
-  const visibleRows = useMemo(() => rows.filter((r) => !cz.isHidden(`${r.label}|${r.sub}`)), [rows, cz]);
+  /* INSTRUCTION 28 (2026-09-04, Josh: "It keeps showing Jose Caballero on the board even
+     with a refresh yet he's not in the yankees starting lineup so there's no bets available
+     for him at any book"). The stored board — and the stamped picks, which ARE that board —
+     keep a batter the engine took from a PROJECTED lineup after the posted nine excluded
+     him. Render-time cross-check against statsapi's posted lineups (src/lib/lineup-check.ts):
+     an absent batter is SCRATCHED — hidden by default, one toggle shows him greyed with an
+     OUT tag. Nothing stored is touched; pitchers and unposted games are never judged. */
+  const lineups = useLineups(board?.date ?? null);
+  const [showScratched, setShowScratched] = useState(false);
+  const pkOf = useCallback((gkey: string | null | undefined) => (gkey ? d?.gameInfo?.[gkey]?.pk ?? null : null), [d]);
+  const isOut = useCallback(
+    (label: string | null | undefined, market: string | null, gkey: string | null | undefined) =>
+      lineupStatus(label ? parseBoardLabel(label)?.name ?? label : null, market, pkOf(gkey), lineups.data) === "out",
+    [pkOf, lineups.data],
+  );
+  const rowOut = useCallback((r: PickRow) => isOut(r.label, marketOfLkey(r.lkey), r.gkey), [isOut]);
+  const visibleRows = useMemo(
+    () => rows.filter((r) => !cz.isHidden(`${r.label}|${r.sub}`) && (showScratched || !rowOut(r))),
+    [rows, cz, showScratched, rowOut],
+  );
+  const scratchedHere = useMemo(() => new Set(rows.filter(rowOut).map((r) => `${r.label}|${r.sub}`)).size, [rows, rowOut]);
   // distinct PICKS, not hidden row occurrences — one pick can sit in this list
   // twice (TOP 50 + its category pool) and must still read "1 pick hidden"
   const czHiddenHere = new Set(
@@ -167,9 +189,10 @@ export default function BoardPage() {
         cell: (r) => {
           const n = legLive({ gkey: r.gkey, lkey: r.lkey });
           return (
-            <div className={r.susp ? "opacity-50" : undefined}>
+            <div className={r.susp || rowOut(r) ? "opacity-50" : undefined}>
               <div className="font-medium text-text">
                 <BoardLabel label={r.label} />
+                {rowOut(r) && <OutTag />}
                 <CzInfo pickKey={`${r.label}|${r.sub}`} offered={!cz.isHidden(`${r.label}|${r.sub}`)} onToggle={cz.toggle} />
               </div>
               <div className="text-[11px] text-muted">{r.sub}</div>
@@ -200,7 +223,7 @@ export default function BoardPage() {
       },
       {
         key: "grade",
-        header: "Tier",
+        header: "Grade",
         // grades the SAME EV the mode displays — czEv at Caesars, bsEv under dk_fd
         sortValue: (r) => gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv))),
         cell: (r) =>
@@ -315,8 +338,87 @@ export default function BoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bankroll, basisMode, legLive, cz.hidden],
+    [bankroll, basisMode, legLive, cz.hidden, rowOut],
   );
+
+  /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
+     like H+R+RBI, Hits, etc by clicking on the title of the column ie: 'Tier' or 'Edge
+     Status'"): the stamped-picks table is now the same sortable DataTable the ML/RL tabs
+     use — every column carries a sortValue, so every header is clickable (▲/▼). */
+  const pickOut = useCallback((p: ApiPick) => isOut(p.player, cat, p.gkey), [isOut, cat]);
+  const pickColumns: Column<ApiPick>[] = useMemo(() => {
+    const now = Date.now();
+    const statusRank: Record<string, number> = { won: 0, live: 1, upcoming: 2, lost: 3, void: 4, ungradable: 5 };
+    return [
+      { key: "rank", header: "#", numeric: true, sortValue: (p) => p.rank, cell: (p) => <span className="text-faint">{p.rank}</span> },
+      {
+        key: "grade",
+        header: "Grade",
+        sortValue: (p) => gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge))),
+        cell: (p) => <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />,
+      },
+      {
+        key: "pick",
+        header: "Pick",
+        sortValue: (p) => p.player ?? "",
+        cell: (p) => {
+          const pk = `${cat}|${p.player}|${p.line}|${p.side}`;
+          return (
+            <div className={pickOut(p) ? "opacity-50" : undefined}>
+              {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
+              <span className="text-muted">
+                {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
+              </span>
+              <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
+              {pickOut(p) && <OutTag />}
+              {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — shown always, never on a ticket</span>}
+            </div>
+          );
+        },
+      },
+      {
+        key: "price",
+        header: "Lock price",
+        sortValue: (p) => (p.odds == null || p.odds === "" ? -Infinity : Number(p.odds)),
+        cell: (p) => (
+          <span className="num text-muted">
+            {p.odds ?? "—"}
+            {p.book ? <span className="ml-1 text-[10px] text-faint">{p.book}</span> : null}
+          </span>
+        ),
+      },
+      { key: "model", header: "Model", numeric: true, sortValue: (p) => Number(p.prob ?? -1), cell: (p) => (p.prob == null ? "—" : `${Number(p.prob).toFixed(1)}%`) },
+      {
+        key: "implied",
+        header: "Implied",
+        numeric: true,
+        sortValue: (p) => Number(p.implied ?? -1),
+        cell: (p) => <span className="text-muted">{p.implied == null ? "—" : `${Number(p.implied).toFixed(1)}%`}</span>,
+      },
+      {
+        key: "edge",
+        header: "Edge",
+        numeric: true,
+        sortValue: (p) => Number(p.edge ?? -Infinity),
+        cell: (p) => (p.edge == null ? "—" : `${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)}`),
+      },
+      {
+        key: "status",
+        header: "Status",
+        sortValue: (p) => statusRank[pickStatus(p.start, p.res, now)] ?? 9,
+        cell: (p) => {
+          const st = pickStatus(p.start, p.res, now);
+          return <span className={`text-[11px] ${st === "won" ? "text-live" : st === "lost" ? "text-red-400" : "text-muted"}`}>{STATUS_LABEL[st]}</span>;
+        },
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cat, cz.hidden, pickOut]);
+  const visiblePicks = useMemo(
+    () => (propRows ?? []).filter((p) => !cz.isHidden(`${cat}|${p.player}|${p.line}|${p.side}`) && (showScratched || !pickOut(p))),
+    [propRows, cz, cat, showScratched, pickOut],
+  );
+  const scratchedPicks = useMemo(() => (propRows ?? []).filter(pickOut).length, [propRows, pickOut]);
 
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
   const pickCount = d ? Object.entries(d.categories).filter(([k]) => k !== "all").reduce((s, [, v]) => s + v.length, 0) : 0;
@@ -447,54 +549,8 @@ export default function BoardPage() {
         /* THE DAY'S PICKS (2026-08-08): stamped top-N from the stored board — the same
            cohort /api/picks serves and the grading records. Never empty by clock. */
         <Panel>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[12.5px]">
-              <thead>
-                <tr className="text-left text-[10.5px] uppercase tracking-wide text-faint">
-                  <th className="py-1.5 pr-2">#</th>
-                  <th className="py-1.5 pr-2">Tier</th>
-                  <th className="py-1.5 pr-2">Pick</th>
-                  <th className="py-1.5 pr-2">Lock price</th>
-                  <th className="py-1.5 pr-2 text-right">Model</th>
-                  <th className="py-1.5 pr-2 text-right">Implied</th>
-                  <th className="py-1.5 pr-2 text-right">Edge</th>
-                  <th className="py-1.5">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {propRows.filter((p) => !cz.isHidden(`${cat}|${p.player}|${p.line}|${p.side}`)).map((p) => {
-                  const st = pickStatus(p.start, p.res, Date.now());
-                  const pk = `${cat}|${p.player}|${p.line}|${p.side}`;
-                  return (
-                    <tr key={`${p.rank}|${p.player}|${p.line}`} className="border-t border-white/[0.04]">
-                      <td className="num py-1.5 pr-2 text-faint">{p.rank}</td>
-                      <td className="py-1.5 pr-2">
-                        <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />
-                      </td>
-                      <td className="py-1.5 pr-2 text-text">
-                        {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
-                        <span className="text-muted">
-                          {p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
-                        </span>
-                        <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
-                        {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — shown always, never on a ticket</span>}
-                      </td>
-                      <td className="num py-1.5 pr-2 text-muted">
-                        {p.odds ?? "—"}
-                        {p.book ? <span className="ml-1 text-[10px] text-faint">{p.book}</span> : null}
-                      </td>
-                      <td className="num py-1.5 pr-2 text-right">{p.prob == null ? "—" : `${Number(p.prob).toFixed(1)}%`}</td>
-                      <td className="num py-1.5 pr-2 text-right text-muted">{p.implied == null ? "—" : `${Number(p.implied).toFixed(1)}%`}</td>
-                      <td className="num py-1.5 pr-2 text-right">{p.edge == null ? "—" : `${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)}`}</td>
-                      <td className="py-1.5 text-[11px]">
-                        <span className={st === "won" ? "text-live" : st === "lost" ? "text-red-400" : "text-muted"}>{STATUS_LABEL[st]}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={pickColumns} rows={visiblePicks} rowKey={(p) => `${p.rank}|${p.player}|${p.line}`} />
+          {scratchedPicks > 0 && <ScratchedNote n={scratchedPicks} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {cz.count > 0 && (
             <div className="mt-3 flex items-center justify-between text-[11.5px] text-muted">
               <span>{cz.count} pick{cz.count === 1 ? "" : "s"} hidden by your Caesars toggle (all tabs)</span>
@@ -520,6 +576,7 @@ export default function BoardPage() {
             stagger
             rowClassName={(r) => (r.susp ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
+          {scratchedHere > 0 && <ScratchedNote n={scratchedHere} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {czHiddenHere > 0 && (
             <div className="mt-3 flex items-center justify-between rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-2 text-[11.5px] text-muted">
               <span>
@@ -556,5 +613,30 @@ export default function BoardPage() {
         </>
       )}
     </>
+  );
+}
+
+/** INSTRUCTION 28 — the OUT tag on a batter the posted lineup excludes. */
+function OutTag() {
+  return (
+    <span
+      className="ml-1 inline-block rounded-full border border-red-400/40 bg-red-400/10 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase tracking-wide text-red-400"
+      title={SCRATCHED_LABEL}
+    >
+      out
+    </span>
+  );
+}
+
+function ScratchedNote({ n, shown, onToggle }: { n: number; shown: boolean; onToggle: () => void }) {
+  return (
+    <div className="mt-3 flex items-center justify-between rounded-(--radius-panel) border border-red-400/20 bg-red-400/[0.06] px-4 py-2 text-[11.5px] text-muted">
+      <span>
+        {n} pick{n === 1 ? "" : "s"} scratched — not in the posted lineup, so no book offers them
+      </span>
+      <button type="button" onClick={onToggle} className="font-semibold text-pos hover:underline">
+        {shown ? "hide scratched" : "show scratched"}
+      </button>
+    </div>
   );
 }
