@@ -90,7 +90,8 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(board).not.toMatch(/Math\.round\(WIN_STAKE/);
     expect(board).not.toMatch(/Math\.round\(REF_STAKE/);
     expect(board.match(/const pays = payout\(REF_STAKE, t\.dec\);/g)?.length).toBe(2);
-    expect(board).toMatch(/import \{ payout, profit \} from "@\/lib\/calc-math"/);
+    // INSTRUCTION 43 widened the import with decimalToAmerican (the set blurbs print the band as American odds)
+    expect(board).toMatch(/import \{ decimalToAmerican, payout, profit \} from "@\/lib\/calc-math"/);
     expect(board).toMatch(/import \{ usd \} from "@\/lib\/ticket-payout"/);
   });
   it("the parlay section is a snap carousel on phones (tier, legs, hero price, $25 pays, % to hit) and the full slips ≥ md", () => {
@@ -119,6 +120,18 @@ describe("CFB Board — the Caesars grammar", () => {
     // 2026-09-05 (same-day follow-up): the budget is blamed only when it actually refused the pull
     expect(board).toMatch(/\$\{propsQ\.data\.budgeted \? " — today's props budget is used up" : ""\}/);
     expect(board).not.toMatch(/cached \{PROPS_CACHE_H\} h/);
+    // THE CAESARS-MISSING RULE (2026-09-05, review-fixed copy): the lead counts only games WITH rows (fetched − noProps —
+    // "props for 46 of 46" beside "29 have none" read as a contradiction); the Caesars-missing count says "other books",
+    // never "DK/FD" (rows come from any US book); the no-props count claims only what a zero-row game proves
+    expect(board).toMatch(/priced <span className="num">\{propsQ\.data\.fetched - propsQ\.data\.noProps\}<\/span> of <span className="num">\{propsQ\.data\.events\}<\/span> games/);
+    expect(board).not.toMatch(/props for <span/);
+    expect(board).toMatch(
+      /\{propsQ\.data\.czMissing\s*\? ` · \$\{propsQ\.data\.czMissing\} game\$\{propsQ\.data\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff`\s*: ""\}/,
+    );
+    expect(board).toMatch(/\{propsQ\.data\.noProps \? ` · \$\{propsQ\.data\.noProps\} game\$\{propsQ\.data\.noProps === 1 \? "" : "s"\} on the slate ha\$\{propsQ\.data\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);
+    expect(board).not.toMatch(/only at DK\/FD|at any book/);
+    expect(board).not.toMatch(/every 30 min/);
+    expect(board).not.toMatch(/inside 4 h/);
     expect(board).toMatch(/player props \{propsQ\.data \? cfbCacheLabel\(propsQ\.data\) : `\$\{PROPS_CACHE_H\} h`\}/);
     // the pill's title can see no board, so it names both windows
     expect(board).toMatch(/\$\{PROPS_CACHE_H\} h pre-kick \/ \$\{LIVE_CACHE_MIN\} min while a priced game is in play/);
@@ -271,5 +284,67 @@ describe("CFB Board — iOS rules", () => {
       expect(m![1]).not.toMatch(BLUR);
     }
     expect(css).toMatch(/\n\.carousel\s*\{[^}]*scroll-snap-type:\s*x mandatory/);
+  });
+});
+
+/**
+ * INSTRUCTION 43 (2026-09-05, Josh: "It should be showing 50+ Anytime TD parlays"): the picks
+ * engine extends a single-market set past the −3 leg gate (CFB_PARLAYS.setFloorEvPct) when tier 1
+ * cannot fill it and stamps each ticket `gated`. The Board must SAY which tickets loosened the
+ * gate — an EDGE − tag beside the tier chip, the EV chip dimmed, a count on the PARLAYS tile and
+ * under the blurb — and every leg-count / price figure in a set blurb must come off `setBandOf`.
+ */
+describe("CFB Board — INSTRUCTION 43 (2026-09-05): tickets past the leg gate are tagged, never hidden", () => {
+  const feature = board.slice(board.indexOf("export function CfbParlayFeature"), board.indexOf("export function CfbParlayCard"));
+  const desktopCard = board.slice(board.indexOf("export function CfbParlayCard"));
+  const section = board.slice(board.indexOf("export function CfbParlaysSection"), board.indexOf("const REF_STAKE"));
+  it("an OpenTag (data-testid cfb-parlay-open, muted line-2 style, not the live tone) renders on both cards only when t.gated is false", () => {
+    expect(board).toMatch(/function OpenTag\(\)/);
+    const tag = board.slice(board.indexOf("function OpenTag()"), board.indexOf("function TierTag"));
+    expect(tag).toMatch(/data-testid="cfb-parlay-open"/);
+    expect(tag).toMatch(/border-line-2/);
+    expect(tag).toMatch(/text-muted/);
+    expect(tag).not.toMatch(/text-live|bg-live|border-live/);
+    expect(tag).toMatch(/edge −/);
+    // the title names the two gates off the constants, never a literal −3 / −12
+    expect(tag).toMatch(/\$\{CFB_PARLAYS\.minLegEvPct\}% EV gate \(down to \$\{CFB_PARLAYS\.setFloorEvPct\}%\)/);
+    expect(tag).not.toMatch(/-3%|−3%|-12%|−12%/);
+    expect(feature).toMatch(/\{!t\.gated && <OpenTag \/>\}/);
+    expect(desktopCard).toMatch(/\{!t\.gated && <OpenTag \/>\}/);
+    // review fix: the tag sits in the ticket header beside TierTag and the type chip, so it takes their size — never the 8px leg-row tag
+    expect(tag).toMatch(/px-2 py-0\.5 text-\[9px\] font-bold uppercase tracking-\[0\.16em\]/);
+    expect(tag).not.toMatch(/text-\[8px\]|py-px|tracking-\[0\.14em\]/);
+  });
+  it("the EV chip is NOT dimmed on an ungated ticket (review fix: opacity-70 pushed 11px red below AA; the EDGE − tag and the red sign carry it)", () => {
+    expect(feature).toMatch(/<EvBadge ev=\{t\.ev\} \/>/);
+    expect(desktopCard).toMatch(/<EvBadge ev=\{t\.ev\} \/>/);
+    expect(board).not.toMatch(/opacity-70"\s*\}\s*\/>/);
+    expect(board).not.toMatch(/EvBadge[^\n]*opacity-70/);
+  });
+  it("the PARLAYS tile counts the below-gate tickets off the sets, only when > 0", () => {
+    expect(board).toMatch(/const openCount = setTickets\.filter\(\(t\) => !t\.gated\)\.length;/);
+    expect(board).toMatch(/\$\{openCount \? ` · \$\{openCount\} below gate` : ""\}/);
+  });
+  it("the set blurb adds the EDGE − note off the constants when the set holds ungated tickets, and the empty state names the extension", () => {
+    expect(section).toMatch(/const openN = all\.filter\(\(t\) => !t\.gated\)\.length;/);
+    expect(section).toMatch(/\{openN > 0 && \(/);
+    expect(section).toMatch(/data-testid="cfb-parlay-open-note"/);
+    expect(section).toMatch(
+      /Fewer than \{CFB_PARLAYS\.perCategory\} tickets clear the \{CFB_PARLAYS\.minLegEvPct\}% leg gate, so \{openN\} tagged EDGE − use Caesars-priced legs down to EV ≥ \{CFB_PARLAYS\.setFloorEvPct\}% — ranked after the gated ones\./,
+    );
+    expect(section).toMatch(/the set extends to Caesars-priced legs down to EV ≥ \$\{CFB_PARLAYS\.setFloorEvPct\}% \(tagged EDGE −\)/);
+    // the pinned blurb tail survives
+    expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV\./);
+  });
+  it("every single-market blurb reads its leg count off setBandOf; anytime TD also prints its price band as American odds — no literal 2–6", () => {
+    expect(board).toMatch(/import \{ buildCfbPicks, CFB_PICK_CATEGORIES, setBandOf \} from "@\/lib\/cfb\/picks"/);
+    expect(board).toMatch(/import \{ decimalToAmerican, payout, profit \} from "@\/lib\/calc-math"/);
+    const cats = board.slice(board.indexOf("const PARLAY_CATS"), board.indexOf("const PREGAME_CATS"));
+    for (const k of ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds"]) {
+      expect(cats, k).toMatch(new RegExp(`\\$\\{legsOf\\("${k}"\\)\\}`));
+    }
+    expect(cats).toMatch(/priced \$\{priceRangeOf\("anytime_td"\)\}/);
+    expect(cats).not.toMatch(/2–6/);
+    expect(board).toMatch(/return `\$\{fmtAmerican\(decimalToAmerican\(b\.minDec\)\)\} to \$\{fmtAmerican\(decimalToAmerican\(b\.maxDec\)\)\}`;/);
   });
 });

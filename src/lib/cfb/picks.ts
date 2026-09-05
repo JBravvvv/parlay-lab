@@ -63,6 +63,17 @@ import type { CfbParlay, CfbParlayCategory, CfbParlayLeg, CfbParlayTier, CfbParl
  *     "live"    live legs only (in-play prices), 2–6 legs, dec 1.5–60; empty when nothing is live.
  *   `picks.mixed` and `picks.live` are the same tickets as sets.mixed / sets.live.
  *
+ *   TIERED LEG POOL (2026-09-05, Josh: "It's also only showing 4 Anytime TD parlays in the
+ *   generated parlays. It should be showing 50+ Anytime TD parlays"): a single-market set builds
+ *   from tier 1 (the −3 gate above) first; when that yields fewer than perCategory tickets the
+ *   pool extends to tier 2 — Caesars-priced, upcoming, non-live legs of that market down to
+ *   CFB_PARLAYS.setFloorEvPct (−12) — and building continues (seeded fills, then a bounded
+ *   exhaustive walk) until fifty or the pool runs dry. Every-leg-tier-1 tickets rank first (by
+ *   EV), then the rest by EV; `gated` on the ticket says which. Per-market bands come from
+ *   CFB_PARLAYS.setBands (anytime TD: 2–4 legs, dec 4–250 — its legs price 3–8 each, so the
+ *   shared 60 cap forbade a third leg); other markets keep SET_BAND. The legacy tiered view,
+ *   combo, mixed and live never loosen — tier 1 only.
+ *
  *   Work is capped (seeds per set, seed pairs per axis) so a 68-game slate with ~3,000 prop
  *   rows builds in well under a second in the browser; ordering is total and deterministic.
  */
@@ -71,7 +82,7 @@ export const CFB_PROP_CATEGORIES = ["anytime_td", "pass_tds", "pass_yds", "recep
 export const CFB_PICK_CATEGORIES = ["all", "ml", "spread", "total", ...CFB_PROP_CATEGORIES] as const;
 
 type Leg = CfbParlayLeg & { evCz: number; live: boolean };
-type Draft = { legs: Leg[]; dec: number; prob: number; ev: number; key: string };
+type Draft = { legs: Leg[]; dec: number; prob: number; ev: number; key: string; gated: boolean };
 type Band = { legs: { min: number; max: number }; minDec: number; maxDec: number };
 
 const round = (v: number, dp: number) => {
@@ -155,8 +166,9 @@ export function rankPicks(rows: CfbPickRow[]): CfbPickRow[] {
 
 /* ---------- rows → legs ---------- */
 
-function sideLeg(row: CfbRow, game: CfbGame, live: boolean): Leg | null {
-  if (!row.cz || row.evCz == null || row.evCz < CFB_PARLAYS.minLegEvPct) return null;
+/** `floor` is the EV gate: minLegEvPct (tier 1) everywhere except the single-market sets' tier-2 pool (setFloorEvPct) */
+function sideLeg(row: CfbRow, game: CfbGame, live: boolean, floor: number = CFB_PARLAYS.minLegEvPct): Leg | null {
+  if (!row.cz || row.evCz == null || row.evCz < floor) return null;
   const line = row.market === "ml" ? null : row.cz.line;
   const p = rowProbAt(game.model, row.market, row.side, line) ?? { win: row.fair, push: row.push };
   const prob = p.win / Math.max(1e-9, 1 - p.push);
@@ -179,8 +191,8 @@ function sideLeg(row: CfbRow, game: CfbGame, live: boolean): Leg | null {
   };
 }
 
-function propLeg(row: CfbPropRow, live: boolean): Leg | null {
-  if (!row.cz || row.fair == null || row.evCz == null || row.evCz < CFB_PARLAYS.minLegEvPct) return null;
+function propLeg(row: CfbPropRow, live: boolean, floor: number = CFB_PARLAYS.minLegEvPct): Leg | null {
+  if (!row.cz || row.fair == null || row.evCz == null || row.evCz < floor) return null;
   if (!(row.fair > 0) || !(row.fair < 1)) return null;
   return {
     kind: "prop",
@@ -236,7 +248,7 @@ function draftOf(legs: Leg[]): Draft {
     .map((l) => l.rowKey)
     .sort()
     .join("+");
-  return { legs, dec, prob, ev: 100 * (prob * dec - 1), key };
+  return { legs, dec, prob, ev: 100 * (prob * dec - 1), key, gated: legs.every((l) => l.evCz >= CFB_PARLAYS.minLegEvPct) };
 }
 
 const inBand = (d: Draft, band: Band) => d.legs.length >= band.legs.min && d.legs.length <= band.legs.max && d.dec >= band.minDec && d.dec <= band.maxDec;
@@ -320,6 +332,42 @@ function spread(drafts: Draft[], cap: number): Draft[] {
   return out.sort(draftByEv);
 }
 
+/** The tiered ranking (2026-09-05): every-leg-tier-1 (`gated`) tickets first — spread across leg
+    counts and EV-ranked like any set — then, only when they fall short of `cap`, the tier-2
+    tickets the same way in the remaining slots. A leg set is either gated or not, so the two
+    halves never share a key. */
+function tieredSpread(drafts: Draft[], cap: number): Draft[] {
+  const gated = spread(
+    drafts.filter((d) => d.gated).sort(draftByEv),
+    cap,
+  );
+  if (gated.length >= cap) return gated;
+  const rest = spread(
+    drafts.filter((d) => !d.gated).sort(draftByEv),
+    cap - gated.length,
+  );
+  return [...gated, ...rest];
+}
+
+/** Bounded exhaustive walk over `pool` in its own order: every in-band combination that respects
+    the rules, until `budget` drafts are collected — the "until the pool runs dry" backstop when the
+    seeded fills alone leave a tiered set short. Deterministic (pool order is total). */
+function walk(pool: Leg[], band: Band, maxPerGame: number, budget: number): Draft[] {
+  const out: Draft[] = [];
+  const step = (start: number, legs: Leg[], dec: number) => {
+    for (let i = start; i < pool.length && out.length < budget; i++) {
+      const leg = pool[i];
+      if (!legFits(leg, legs, maxPerGame) || dec * leg.dec > band.maxDec) continue;
+      const next = [...legs, leg];
+      const nd = dec * leg.dec;
+      if (next.length >= band.legs.min && nd >= band.minDec) out.push(draftOf(next));
+      if (next.length < band.legs.max) step(i + 1, next, nd);
+    }
+  };
+  step(0, [], 1);
+  return out;
+}
+
 /** distinct leg sets, in order, capped */
 function distinct(drafts: Draft[], cap: number): Draft[] {
   const seen = new Set<string>();
@@ -375,6 +423,7 @@ function finish(d: Draft, view: CfbParlayView, tier: CfbParlayTier, category: Cf
     am: decToAm(round(d.dec, 4)), // from the rounded dec the card shows, so am and dec agree on the half-cent edge
     prob: d.prob,
     ev: round(d.ev, 2),
+    gated: d.gated,
   };
 }
 
@@ -388,6 +437,13 @@ const MIX_SEEDS = 8;
 const SET_LEGS = { min: 2, max: 6 } as const;
 /** single-market, mixed and live sets: any price from a modest two-leg favourite to a 60/1 shot */
 const SET_BAND: Band = { legs: SET_LEGS, minDec: 1.5, maxDec: 60 };
+/** the band a single-market set builds in: CFB_PARLAYS.setBands[market] when pinned there, else SET_BAND */
+export function setBandOf(category: CfbParlayCategory): Band {
+  const bands = CFB_PARLAYS.setBands as Partial<Record<CfbParlayCategory, Band>>;
+  return bands[category] ?? SET_BAND;
+}
+/** tier-2 exhaustive walk: raw in-band drafts collected before the walk stops (the pool "runs dry" inside this budget) */
+const WALK_BUDGET = 400;
 /** combo: the legacy mix band widened (3–6 legs, dec 2–60) */
 const COMBO_BAND: Band = { legs: { min: 3, max: SET_LEGS.max }, minDec: 2, maxDec: 60 };
 /** seed legs per single-seed set (each seed × leg counts 2..6 × three fill orders) */
@@ -415,21 +471,30 @@ const pushDraft = (out: Draft[], legs: Leg[] | null, band: Band) => {
   if (inBand(d, band)) out.push(d);
 };
 
-/** Single-seed sets: every seed (likeliest first, capped) at every leg count, filled three
-    ways — likeliest-first, forward from the seed's own position, highest-EV-first. */
+/** Single-seed sets: every seed at every leg count, filled three ways — likeliest-first, forward
+    from the seed's own position, highest-EV-first. Seeds are the SET_SEEDS likeliest legs AND the
+    SET_SEEDS highest-EV legs (2026-09-05: a band with a real price floor — anytime TD's 4 — never
+    saw a two-legger from the likeliest seeds alone, since two favourites' decimals fall short of it). */
 function seededSet(byP: Leg[], band: Band, maxPerGame: number): Draft[] {
   const out: Draft[] = [];
   if (byP.length < band.legs.min) return out;
   const byE = [...byP].sort(byEv);
   const seeds = Math.min(byP.length, SET_SEEDS);
-  for (let i = 0; i < seeds; i++) {
-    const seed = [byP[i]];
+  const seeded = new Set<string>();
+  const from = (order: Leg[], i: number) => {
+    const leg = order[i];
+    if (seeded.has(leg.rowKey)) return;
+    seeded.add(leg.rowKey);
+    const seed = [leg];
+    const at = byP.indexOf(leg);
     for (let n = band.legs.min; n <= band.legs.max; n++) {
       pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, 0), band);
-      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, i + 1), band);
+      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, at + 1), band);
       pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band);
     }
-  }
+  };
+  for (let i = 0; i < seeds; i++) from(byP, i);
+  for (let i = 0; i < seeds; i++) from(byE, i);
   return out;
 }
 
@@ -492,7 +557,10 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
   for (const k of Object.keys(categories)) categories[k] = rankPicks(categories[k]);
 
   /* ----- legs ----- */
-  const upcomingSides: Leg[] = [];
+  // upcoming legs are gathered down to the tier-2 floor; tier 1 (the −3 gate) is filtered from them.
+  // Live legs are tier 1 only — the tiered pool serves the single-market pregame sets alone.
+  const gate = (l: Leg) => l.evCz >= R.minLegEvPct;
+  const floorSides: Leg[] = [];
   const liveSides: Leg[] = [];
   for (const g of board.games) {
     const kicked = kickedOff(g.start);
@@ -500,12 +568,12 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     const isUpcoming = g.status === "upcoming" && !kicked;
     if (!isLive && !isUpcoming) continue;
     for (const r of g.rows) {
-      const leg = sideLeg(r, g, isLive);
+      const leg = sideLeg(r, g, isLive, isLive ? R.minLegEvPct : R.setFloorEvPct);
       if (!leg) continue;
-      (isLive ? liveSides : upcomingSides).push(leg);
+      (isLive ? liveSides : floorSides).push(leg);
     }
   }
-  const upcomingProps: Leg[] = [];
+  const floorProps: Leg[] = [];
   const liveProps: Leg[] = [];
   for (const r of props ?? []) {
     const g = games.get(r.gameId);
@@ -514,13 +582,15 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     const isLive = status === "live";
     const isUpcoming = status === "upcoming" && !kicked;
     if (!isLive && !isUpcoming) continue;
-    const leg = propLeg(r, isLive);
+    const leg = propLeg(r, isLive, isLive ? R.minLegEvPct : R.setFloorEvPct);
     if (!leg) continue;
-    (isLive ? liveProps : upcomingProps).push(leg);
+    (isLive ? liveProps : floorProps).push(leg);
   }
-  upcomingSides.sort(byProb);
-  upcomingProps.sort(byProb);
+  const upcomingSides = floorSides.filter(gate).sort(byProb);
+  const upcomingProps = floorProps.filter(gate).sort(byProb);
   const upcoming = [...upcomingSides, ...upcomingProps].sort(byProb);
+  /** tier 1 + tier 2 pregame legs (single-market sets only) */
+  const upcomingFloor = [...floorSides, ...floorProps].sort(byProb);
   const live = [...liveSides, ...liveProps].sort(byProb);
 
   /* ----- view "parlays" (legacy tiers) ----- */
@@ -562,22 +632,32 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
 
   /* ----- INSTRUCTION 42: the twelve category sets ----- */
   const sets = {} as Record<CfbParlayCategory, CfbParlay[]>;
-  const emit = (category: CfbParlayCategory, drafts: Draft[]) => {
+  const emit = (category: CfbParlayCategory, drafts: Draft[], pick: (drafts: Draft[], cap: number) => Draft[] = (d, cap) => spread(d.sort(draftByEv), cap)) => {
     const view: CfbParlayView = category === "mixed" ? "mixed" : category === "live" ? "live" : "parlays";
     const list: CfbParlay[] = [];
     let i = 0;
-    for (const d of spread(drafts.sort(draftByEv), R.perCategory)) {
+    for (const d of pick(drafts, R.perCategory)) {
       i++;
       list.push(finish(d, view, tierOf(d), category, `${SET_LABEL[category]} · ${d.legs.length} legs`, `cfb-${board.date}-${category}-${i}`));
     }
     sets[category] = list;
   };
 
-  // single-market pregame sets — one leg per game, only that market
+  // single-market pregame sets — one leg per game, only that market, the tiered pool:
+  // tier 1 first; tier 2 (down to setFloorEvPct) only when tier 1 leaves the set short of fifty
   for (const category of CFB_PARLAY_CATEGORIES) {
     if (category === "combo" || category === "mixed" || category === "live") continue;
-    const pool = upcoming.filter((l) => l.market === category); // already in byProb order
-    emit(category, seededSet(pool, SET_BAND, 1));
+    const band = setBandOf(category);
+    const tier1 = upcoming.filter((l) => l.market === category); // already in byProb order
+    let drafts = seededSet(tier1, band, 1);
+    if (tieredSpread(drafts, R.perCategory).length < R.perCategory) {
+      const pool = upcomingFloor.filter((l) => l.market === category);
+      if (pool.length > tier1.length) {
+        drafts = [...drafts, ...seededSet(pool, band, 1)];
+        if (tieredSpread(drafts, R.perCategory).length < R.perCategory) drafts = [...drafts, ...walk(pool, band, 1, WALK_BUDGET)];
+      }
+    }
+    emit(category, drafts, tieredSpread);
   }
 
   // combo — a side beside a prop on one pregame ticket

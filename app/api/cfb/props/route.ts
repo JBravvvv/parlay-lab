@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
 import { ctxLookup, loadCfbPropsContext } from "@/lib/cfb/props-context";
-import { parseEventProps, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
-import { affordableEvents, boardFresh, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
+import { czMissingGameIds, parseEventProps, propsCoverage, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
+import { affordableEvents, boardFresh, czMissingDue, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
 import { CFB_PROPS_ODDS_MARKETS, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_BANK_BASE, CFB_PROPS } from "@/lib/cfb/rules";
 import { espnEvents, quotaOf, slateFromEspn, type CfbQuota } from "@/lib/cfb/slate-server";
@@ -43,6 +43,31 @@ import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
  * revalidateSec after its pricedAt, live or not. A live event WITH rows still re-prices every
  * liveRevalidateSec, as before.
  *
+ * THE CAESARS-MISSING RULE (2026-09-05, Josh: "They are still 12 games today that haven't started w/
+ * current Anytime TD odds"): Caesars posts player props later than the other books, and an upcoming
+ * game priced before Caesars posted rode its Caesars-less rows for the whole 2 h carry. Now an
+ * UPCOMING game on the stored board that HAS rows and, on at least one MARKET with rows, carries no
+ * Caesars quote (`czMissingGameIds`, props.ts — keyed on the market, so a game with Caesars yardage
+ * props but no Caesars anytime TD yet still re-checks), with kickoff inside CFB_PROPS.czMissingWindowSec
+ * (4 h), is re-fetched once its own pricedAt is older than CFB_PROPS.czMissingRevalidateSec (30 min) —
+ * `czMissingDue` (props-store.ts). A game with ZERO rows is never Caesars-missing: it stays on the 2 h
+ * empty-event hold, upcoming or live (review fix — 29 of 46 priced games on the complaint day were
+ * FBS-vs-FCS games no book posts props on; re-asking them every 30 min would have cost ~7,200 credits
+ * against a 2,500 rail). That check runs BEFORE rail 1, because a whole-board "fresh" answer would
+ * otherwise hide it for 2 h — and skipping rail 1 does NOT re-queue the live games: a live game with
+ * rows is fetched only when its own pricedAt is older than liveRevalidateSec (`why`). The pull's
+ * "need" is ordered live → never priced → Caesars-missing → 2 h-expired, so a tight budget buys the
+ * cheapest wins first. THE DATA CACHE ON A RE-PULL: Next's data cache is stale-while-revalidate — a
+ * stale entry answers with the OLD body and refreshes in the background — so a Caesars-missing or
+ * live re-pull of a game already on the board is sent `cache: "no-store"` (the store and pricedAt
+ * already bound its cadence; a cached answer would have landed Caesars one interval late); a first
+ * pull, or a game whose 2 h carry expired, keeps `next.revalidate` at the pull's window. A re-pull
+ * that FAILS (non-2xx, network) keeps the game's stored rows and its old pricedAt on the answer and
+ * the written board — never dropped to "unpriced". The answer counts what it does not carry, over the
+ * priced games only: `czMissing` and `noProps` (zero rows) — `propsCoverage` — and when `czMissing`
+ * > 0 its `ttlSec` is min(window, czMissingRevalidateSec) so the phone's own staleness follows the
+ * 30-min rule (nothing else calls this route; a 2 h staleTime would have hidden the re-check).
+ *
  * QUOTA (re-measured 2026-09-05 on prod): a fresh per-event call costs about 31 credits, not
  * the 6 the endpoint's pricing note suggests — a 24-event pull read ~753 credits off
  * x-requests-used. And the Next data cache is per deployment, so every deploy re-spent it.
@@ -75,13 +100,16 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CONCURRENCY = 4;
 const EVENT_ODDS_BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events";
 
-/** one per-event odds call, cached by the Next data cache for `revalidateSec` (the pull's window) */
-async function eventOdds(id: string, key: string, revalidateSec: number): Promise<{ json: unknown; quota: CfbQuota } | null> {
+/** how one event call meets the Next data cache: a first / expired pull rides the pull's window; a re-pull bypasses it */
+type EventCache = { next: { revalidate: number } } | { cache: "no-store" };
+
+/** one per-event odds call, through the Next data cache per `cache` (see THE DATA CACHE ON A RE-PULL above) */
+async function eventOdds(id: string, key: string, cache: EventCache): Promise<{ json: unknown; quota: CfbQuota } | null> {
   const url =
     `${EVENT_ODDS_BASE}/${encodeURIComponent(id)}/odds?apiKey=${encodeURIComponent(key)}` +
     `&regions=${CFB_PROPS.regions}&markets=${CFB_PROPS_ODDS_MARKETS}&oddsFormat=american`;
   try {
-    const r = await fetch(url, { next: { revalidate: revalidateSec } });
+    const r = await fetch(url, cache);
     const quota = quotaOf(r);
     if (!r.ok) return null;
     const json = (await r.json().catch(() => null)) as unknown;
@@ -159,6 +187,8 @@ export async function GET(req: NextRequest) {
     ttlSec: windowSec,
     priced: [],
     pricedAt: {},
+    czMissing: 0,
+    noProps: 0,
   });
   if (!key || slate.oddsMissing) {
     return NextResponse.json(empty(true, slate.quota), { headers });
@@ -170,15 +200,35 @@ export async function GET(req: NextRequest) {
   const store: CfbPropsStore | null = propsStore();
   const ptDate = ptToday(new Date(now));
   const stored = store ? await quiet(store.readBoard(date), null) : null;
-  if (stored && boardFresh(stored, now, windowSec)) {
+
+  // What the stored board says about each selected game: is it on the board, how many rows, and is it
+  // Caesars-missing on some market it has rows for — the three facts every carry rule below reads.
+  const storedIds = new Set(stored ? (stored.priced ?? stored.rows.map((r) => r.gameId)) : []);
+  const storedRowCount = new Map<string, number>();
+  for (const r of stored?.rows ?? []) storedRowCount.set(r.gameId, (storedRowCount.get(r.gameId) ?? 0) + 1);
+  const storedCzMissing = czMissingGameIds(stored?.rows ?? []);
+  // THE CAESARS-MISSING RULE: an upcoming game on the board with rows, some market of which has no
+  // Caesars quote, inside 4 h of kickoff, whose own stamp is older than 30 min — due a re-pull now
+  const czDue = (g: CfbGame): boolean =>
+    !!stored && storedIds.has(g.id) && czMissingDue(stored, { id: g.id, status: g.status, kickoffMs: Date.parse(g.start) }, storedCzMissing.has(g.id), now);
+  const czDueIds = new Set(events.filter(czDue).map((g) => g.id));
+  // the window the answer is good for: the slate's, shortened to the 30-min rule while it counts a
+  // Caesars-missing game — the phone's staleTime reads it, and nothing else asks this route
+  const ttlFor = (czMissing: number): number => (czMissing > 0 ? Math.min(windowSec, CFB_PROPS.czMissingRevalidateSec) : windowSec);
+
+  // Rail 1 answers only when the board is fresh AND no game is due under the Caesars-missing rule —
+  // a fresh 2 h board would otherwise hide the 30-min re-check
+  if (stored && boardFresh(stored, now, windowSec) && czDueIds.size === 0) {
     const spentToday = await quiet(store!.readSpend(ptDate), null);
+    const coverage = propsCoverage(events, stored.rows, stored.priced ?? stored.rows.map((r) => r.gameId));
     const body: CfbPropsBoard = {
       ...stored,
       source: "redis",
       budgeted: stored.budgeted ?? false,
       stale: stored.stale ?? false,
       spentToday,
-      ttlSec: Math.min(windowSec, stored.ttlSec ?? windowSec),
+      ttlSec: Math.min(ttlFor(coverage.czMissing), stored.ttlSec ?? windowSec),
+      ...coverage,
     };
     return NextResponse.json(body satisfies CfbPropsBoard, { headers });
   }
@@ -187,26 +237,42 @@ export async function GET(req: NextRequest) {
   // CARRIED from the stored board when it is on it and its own `pricedAt` (else the board's
   // generatedAt) is inside revalidateSec — whatever window the board as a whole was written under.
   // An UPCOMING game inside that window rides on its stored rows (lines did not move, credits
-  // saved). A LIVE game re-prices every pull — UNLESS its last pull returned zero rows: the
-  // EMPTY-EVENT RULE holds it for the same 2 h, because a game with no player props at the API
-  // does not grow any by being asked every 10 min. Never priced, or priced too long ago → fetched.
-  const storedIds = new Set(stored ? (stored.priced ?? stored.rows.map((r) => r.gameId)) : []);
-  const storedRowCount = new Map<string, number>();
-  for (const r of stored?.rows ?? []) storedRowCount.set(r.gameId, (storedRowCount.get(r.gameId) ?? 0) + 1);
+  // saved) — UNLESS the Caesars-missing rule says it is due. A LIVE game with rows re-prices once its
+  // OWN pricedAt is older than liveRevalidateSec (review fix: it used to re-queue on every pull that
+  // got past rail 1, so one Caesars-missing game turning due re-fetched every fresh live game) —
+  // UNLESS its last pull returned zero rows: the EMPTY-EVENT RULE holds it for the same 2 h, because
+  // a game with no player props at the API does not grow any by being asked every 10 min. Never
+  // priced, or priced too long ago → fetched.
+  const ownAgeMs = (g: CfbGame): number | null => (stored && storedIds.has(g.id) ? pricedAgeMs(stored, g.id, now) : null);
   const insideOwnWindow = (g: CfbGame): boolean => {
-    if (!stored || !storedIds.has(g.id)) return false;
-    const age = pricedAgeMs(stored, g.id, now);
+    const age = ownAgeMs(g);
     return age != null && age <= CFB_PROPS.revalidateSec * 1000;
   };
-  // live games held by the empty-event rule this pull (they are carried, and carry no stale lines)
-  const emptyHeld = new Set<string>();
-  const need = events.filter((g) => {
-    if (!insideOwnWindow(g)) return true;
-    if (g.status !== "live") return false;
-    if ((storedRowCount.get(g.id) ?? 0) > 0) return true;
-    emptyHeld.add(g.id);
-    return false;
-  });
+  // live games carried this pull (held empty, or re-priced inside the last liveRevalidateSec) — they carry no stale lines
+  const liveCarried = new Set<string>();
+  // why a game is fetched — and the order the budget buys them in: live games first (lines moving),
+  // then games never priced (nothing to show at all), then the Caesars-missing re-checks, then the
+  // games whose 2 h carry simply expired (they still carry last-priced lines meanwhile)
+  type Why = "live" | "unpriced" | "czMissing" | "expired";
+  const WHY_RANK: Record<Why, number> = { live: 0, unpriced: 1, czMissing: 2, expired: 3 };
+  const why = (g: CfbGame): Why | null => {
+    if (!stored || !storedIds.has(g.id)) return "unpriced";
+    if (g.status === "live") {
+      if (!insideOwnWindow(g)) return "live";
+      const age = ownAgeMs(g) ?? Number.POSITIVE_INFINITY;
+      if ((storedRowCount.get(g.id) ?? 0) > 0 && age > CFB_PROPS.liveRevalidateSec * 1000) return "live";
+      liveCarried.add(g.id);
+      return null;
+    }
+    if (!insideOwnWindow(g)) return "expired";
+    return czDueIds.has(g.id) ? "czMissing" : null;
+  };
+  const whyOf = new Map<string, Why>();
+  const need = events
+    .map((g, i) => ({ g, i, why: why(g) }))
+    .filter((x): x is { g: CfbGame; i: number; why: Why } => x.why != null)
+    .sort((a, b) => WHY_RANK[a.why] - WHY_RANK[b.why] || a.i - b.i)
+    .map((x) => (whyOf.set(x.g.id, x.why), x.g));
 
   // Rail 2: the daily budget. Without a store there is no tally, so the cap cannot apply.
   const spentBefore = store ? await quiet(store.readSpend(ptDate), 0) : 0;
@@ -226,13 +292,16 @@ export async function GET(req: NextRequest) {
         .filter((r) => statusNow.has(r.gameId))
         .map((r) => (statusNow.get(r.gameId) === "live" && r.status !== "live" ? { ...r, status: "live", playable: false } : r))
     : [];
-  // stale: a carried game whose lines the current window would have re-priced — one the budget
-  // refused, or an in-play game riding on rows older than the live window (honestly dated)
-  const stale = carriedNow.some((g) => (g.status === "live" && !emptyHeld.has(g.id)) || refused.some((r) => r.id === g.id));
+  // stale: a carried game whose LINES the current window would have re-priced — one the budget
+  // refused while it carries rows, or an in-play game riding on rows older than the live window
+  // (honestly dated); a refused game with no stored rows carries nothing that could be out of date
+  const staleCarried = carriedNow.some(
+    (g) => (g.status === "live" && !liveCarried.has(g.id)) || (refused.some((r) => r.id === g.id) && (storedRowCount.get(g.id) ?? 0) > 0),
+  );
   const budgetNote = budgeted
     ? allowed === 0
-      ? `today's props budget (${CFB_PROPS.dailyBudget} credits) is used up — ${stale ? "showing the last priced lines" : "more games price again tomorrow"}`
-      : `today's props budget (${CFB_PROPS.dailyBudget} credits) covers ${allowed} of ${need.length} games — the rest ${stale ? "show their last priced lines" : "price again tomorrow"}`
+      ? `today's props budget (${CFB_PROPS.dailyBudget} credits) is used up — ${staleCarried ? "showing the last priced lines" : "more games price again tomorrow"}`
+      : `today's props budget (${CFB_PROPS.dailyBudget} credits) covers ${allowed} of ${need.length} games — the rest ${staleCarried ? "show their last priced lines" : "price again tomorrow"}`
     : undefined;
   const priced = (rows: CfbPropRow[], fetchedIds: string[]) => Array.from(new Set([...fetchedIds, ...rows.map((r) => r.gameId)]));
   // when each game on the answer was last pulled: now for the games fetched this pull, the stored
@@ -248,6 +317,8 @@ export async function GET(req: NextRequest) {
   if (toFetch.length === 0) {
     // nothing to fetch: the stored board (any age) with every selected game it carries, or an empty answer
     if (stored && carriedRows.length > 0) {
+      const carriedIds = priced(carriedRows, carriedNow.map((g) => g.id));
+      const coverage = propsCoverage(events, carriedRows, carriedIds);
       const body: CfbPropsBoard = {
         ...empty(false, stored.quota ?? slate.quota),
         fetched: 0,
@@ -255,10 +326,12 @@ export async function GET(req: NextRequest) {
         generatedAt: stored.generatedAt,
         source: "redis",
         budgeted,
-        stale,
+        stale: staleCarried,
         spentToday: store ? spentBefore : null,
-        priced: priced(carriedRows, carriedNow.map((g) => g.id)),
-        pricedAt: pricedAt(priced(carriedRows, carriedNow.map((g) => g.id)), []),
+        ttlSec: ttlFor(coverage.czMissing),
+        priced: carriedIds,
+        pricedAt: pricedAt(carriedIds, []),
+        ...coverage,
         ...(budgetNote ? { note: budgetNote } : {}),
       };
       return NextResponse.json(body, { headers });
@@ -271,14 +344,30 @@ export async function GET(req: NextRequest) {
   // a keyless/oddsMissing/budgeted-out call must not pull three season tables for an empty board.
   const lookup = ctxLookup(await loadCfbPropsContext());
   // the pull's window: 10 min once any event being priced is in play, else the 2 h default
-  const ttlSec = propsWindowSec(toFetch);
+  const pullSec = propsWindowSec(toFetch);
+  // THE DATA CACHE ON A RE-PULL: a Caesars-missing re-check, or a live game already on the board, is
+  // asked with `cache: "no-store"` — Next's data cache is stale-while-revalidate and would answer the
+  // re-pull with the body it is re-pulling to replace; a first pull or an expired carry rides the
+  // pull's window (Redis + pricedAt bound the re-pull cadence, so the cache buys nothing there)
+  const cacheFor = (g: CfbGame): EventCache => {
+    const w = whyOf.get(g.id);
+    return w === "czMissing" || (w === "live" && storedIds.has(g.id)) ? { cache: "no-store" } : { next: { revalidate: pullSec } };
+  };
+  // a re-pull that fails keeps the game's stored rows (re-stamped with the current status) — never dropped
+  const keptRows = (g: CfbGame): CfbPropRow[] =>
+    (stored?.rows ?? []).filter((r) => r.gameId === g.id).map((r) => (g.status === "live" && r.status !== "live" ? { ...r, status: "live", playable: false } : r));
   let quota: CfbQuota | null = slate.quota;
   let fetched = 0;
   const fetchedIds: string[] = [];
+  const kept: CfbGame[] = [];
   const usedReadings: number[] = [];
   const perEvent = await mapLimit(toFetch, CONCURRENCY, async (game: CfbGame): Promise<CfbPropRow[]> => {
-    const r = await eventOdds(game.oddsEventId as string, key, ttlSec);
-    if (!r) return [];
+    const r = await eventOdds(game.oddsEventId as string, key, cacheFor(game));
+    if (!r) {
+      if ((storedRowCount.get(game.id) ?? 0) === 0) return [];
+      kept.push(game);
+      return keptRows(game);
+    }
     fetched++;
     fetchedIds.push(game.id);
     if (r.quota.remaining != null) quota = r.quota;
@@ -292,6 +381,8 @@ export async function GET(req: NextRequest) {
   // fresh rows first (live games lead the selection), then the carried upcoming rows
   const rows = [...perEvent.flat(), ...carriedRows];
   const live = events.filter((g) => g.status === "live" && (fetchIds.has(g.id) || carriedNow.some((c) => c.id === g.id))).length;
+  // a live game whose re-pull failed rides rows older than the live window — honestly flagged
+  const stale = staleCarried || kept.some((g) => g.status === "live");
 
   // Rail 3 (after the pull): persist the merged board and tally what it cost.
   let spentToday: number | null = store ? spentBefore : null;
@@ -299,6 +390,8 @@ export async function GET(req: NextRequest) {
     const credits = pullCredits(usedReadings, fetched, CFB_PROPS.measuredCreditsPerEvent);
     spentToday = await quiet(store.addSpend(ptDate, credits), spentBefore + credits);
   }
+  const pricedIds = priced(rows, [...fetchedIds, ...carriedNow.map((g) => g.id)]);
+  const coverage = propsCoverage(events, rows, pricedIds);
   const body: CfbPropsBoard = {
     ...empty(false, quota),
     fetched: fetched + carriedNow.length,
@@ -308,9 +401,10 @@ export async function GET(req: NextRequest) {
     stale,
     spentToday,
     live,
-    ttlSec: windowSec,
-    priced: priced(rows, [...fetchedIds, ...carriedNow.map((g) => g.id)]),
-    pricedAt: pricedAt(priced(rows, [...fetchedIds, ...carriedNow.map((g) => g.id)]), fetchedIds),
+    ttlSec: ttlFor(coverage.czMissing),
+    priced: pricedIds,
+    pricedAt: pricedAt(pricedIds, fetchedIds),
+    ...coverage,
     ...(budgetNote ? { note: budgetNote } : {}),
   };
   // INSTRUCTION 42 (2026-09-05, review fix): a failed board write is no longer swallowed silently —

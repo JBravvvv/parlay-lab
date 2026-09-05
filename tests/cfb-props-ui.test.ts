@@ -147,6 +147,22 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     const css = read("app/globals.css");
     expect(css).toMatch(/\.odds-cell \{[^}]*min-height: 44px/);
   });
+  it("THE CAESARS-MISSING RULE (2026-09-05, review-fixed copy): the footnote leads with the games that HAVE rows, names the Caesars-missing games and the no-props games, only when > 0, figures off the constants", () => {
+    // "priced N of M games" where N = fetched − noProps: a zero-row game was asked, not priced ("props for 46 of 46 · 29 have none" contradicted itself)
+    expect(props).toMatch(/priced \{board\.fetched - board\.noProps\} of \{board\.events\} game\{board\.events === 1 \? "" : "s"\}/);
+    expect(props).not.toMatch(/props for \{board\.fetched\}/);
+    // "N games post player props at other books but no Caesars line yet — re-checked every 30 min inside 4 h of kickoff" (rows come from any US book, never "DK/FD" alone)
+    expect(props).toMatch(
+      /\{board\.czMissing \? ` · \$\{board\.czMissing\} game\$\{board\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff` : ""\}/,
+    );
+    // "M games on the slate have no player props posted at the books we price" — a zero-row game proves no more than that
+    expect(props).toMatch(/\{board\.noProps \? ` · \$\{board\.noProps\} game\$\{board\.noProps === 1 \? "" : "s"\} on the slate ha\$\{board\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);
+    expect(props).not.toMatch(/only at DK\/FD|at any book/);
+    expect(props).not.toMatch(/every 30 min/);
+    expect(props).not.toMatch(/inside 4 h/);
+    expect(CFB_PROPS.czMissingRevalidateSec / 60).toBe(30);
+    expect(CFB_PROPS.czMissingWindowSec / 3600).toBe(4);
+  });
   it("the 'capped at N' footnote reads CFB_PROPS.maxEvents, never a literal (INSTRUCTION 42, 2026-09-05: 12 → 60)", () => {
     expect(props).toMatch(/capped at \$\{CFB_PROPS\.maxEvents\}/);
     expect(props).not.toMatch(/capped at 12/);

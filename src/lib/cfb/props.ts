@@ -318,6 +318,53 @@ export function selectPropEvents(
   };
 }
 
+/**
+ * THE CAESARS-MISSING RULE'S TEST, keyed on the MARKET (2026-09-05 review fix): the ids of the games
+ * that have rows AND at least one market with rows on that game whose rows carry NO Caesars quote —
+ * so a game with Caesars yardage props but no Caesars anytime TD yet is missing, and a game with zero
+ * rows never is (it has no market to be missing on). One helper feeds `czMissingDue` (the re-check)
+ * and `propsCoverage` (the count), so the two can never disagree.
+ */
+export function czMissingGameIds(rows: readonly Pick<CfbPropRow, "gameId" | "market" | "cz">[]): Set<string> {
+  // gameId → market → has a Caesars quote on any row
+  const seen = new Map<string, Map<string, boolean>>();
+  for (const r of rows) {
+    const m = seen.get(r.gameId) ?? new Map<string, boolean>();
+    m.set(r.market, (m.get(r.market) ?? false) || !!r.cz);
+    seen.set(r.gameId, m);
+  }
+  const out = new Set<string>();
+  for (const [gameId, markets] of seen) for (const hasCz of markets.values()) if (!hasCz) out.add(gameId);
+  return out;
+}
+
+/**
+ * What the answer does NOT carry, honestly counted (2026-09-05, THE CAESARS-MISSING RULE) — over the
+ * PRICED games only (`pricedIds`: fetched this pull or carried from the store), never over games the
+ * budget refused, which are simply unpriced:
+ *   czMissing — upcoming games with rows where some market with rows has no Caesars quote on any of
+ *               them (`czMissingGameIds`: other books posted, Caesars not yet — on that market)
+ *   noProps   — games with zero rows (no two-sided quote on a tracked market at the books we price)
+ */
+export function propsCoverage(
+  events: readonly Pick<CfbGame, "id" | "status">[],
+  rows: readonly Pick<CfbPropRow, "gameId" | "market" | "cz">[],
+  pricedIds: Iterable<string>,
+): { czMissing: number; noProps: number } {
+  const total = new Map<string, number>();
+  for (const r of rows) total.set(r.gameId, (total.get(r.gameId) ?? 0) + 1);
+  const missing = czMissingGameIds(rows);
+  const priced = new Set(pricedIds);
+  let czMissing = 0;
+  let noProps = 0;
+  for (const g of events) {
+    if (!priced.has(g.id)) continue;
+    if ((total.get(g.id) ?? 0) === 0) noProps++;
+    else if (g.status === "upcoming" && missing.has(g.id)) czMissing++;
+  }
+  return { czMissing, noProps };
+}
+
 /** true when any of the priced events is in play */
 export function hasLiveEvent(events: readonly Pick<CfbGame, "status">[]): boolean {
   return events.some((g) => g.status === "live");

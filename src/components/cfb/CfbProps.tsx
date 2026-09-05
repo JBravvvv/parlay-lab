@@ -735,9 +735,11 @@ export function CfbProps() {
             </Reveal>
           ))}
           <p className="px-1 text-[9.5px] leading-snug text-faint">
-            props for {board.fetched} of {board.events} game{board.events === 1 ? "" : "s"}
+            priced {board.fetched - board.noProps} of {board.events} game{board.events === 1 ? "" : "s"}
             {board.live ? ` · ${board.live} in play` : ""} · cached {cacheLabel(board)}{board.capped ? ` · capped at ${CFB_PROPS.maxEvents}` : ""}
-            {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — today's props budget is used up" : ""}` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""} ·
+            {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — today's props budget is used up" : ""}` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""}
+            {board.czMissing ? ` · ${board.czMissing} game${board.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff` : ""}
+            {board.noProps ? ` · ${board.noProps} game${board.noProps === 1 ? "" : "s"} on the slate ha${board.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""} ·
             prices are posted quotes, never invented · the % on a leg is the model&apos;s number for that line.
           </p>
         </div>

@@ -16,10 +16,10 @@ import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps } from "@/lib/cfb/client";
 import { fmtLine } from "@/lib/cfb/model";
-import { buildCfbPicks, CFB_PICK_CATEGORIES } from "@/lib/cfb/picks";
+import { buildCfbPicks, CFB_PICK_CATEGORIES, setBandOf } from "@/lib/cfb/picks";
 import { CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_BANK_BASE, CFB_PARLAYS, CFB_PROPS } from "@/lib/cfb/rules";
-import { payout, profit } from "@/lib/calc-math";
+import { decimalToAmerican, payout, profit } from "@/lib/calc-math";
 import { usd } from "@/lib/ticket-payout";
 
 /** the props route's PRE-KICK window in hours (CFB_PROPS.revalidateSec) — only the fallback before a board loads;
@@ -62,6 +62,14 @@ import { PairMark, TeamMark } from "./TeamMark";
  * mounts PHONE_CHUNK tickets and appends more on a "Show more" tap up to SHOW_CAP; the sheen
  * runs on the top SHINE_TOP ranks only; a MIXED ticket tags its in-play LEG instead of wearing
  * a whole-ticket LIVE pill (only the LIVE set badges the ticket).
+ *
+ * INSTRUCTION 43 (2026-09-05, Josh: "It should be showing 50+ Anytime TD parlays"): a
+ * single-market set that tier 1 (every leg EV ≥ CFB_PARLAYS.minLegEvPct) cannot fill extends to
+ * Caesars-priced legs down to CFB_PARLAYS.setFloorEvPct; those tickets carry `gated: false`,
+ * rank after the gated ones, and wear an EDGE − tag (`OpenTag`) beside the tier chip with the
+ * EV chip dimmed — the Board says which tickets loosened the gate instead of hiding it. The
+ * PARLAYS tile and the blurb count them ("N below gate"); the set blurbs read their leg count
+ * and price band off `setBandOf` (anytime TD is 2–4 legs, +300 to +24900), never a literal.
  *
  * Two feeds: the slate (sides — rows appear at once) and the props board (`/api/cfb/props`,
  * one query per date, stale for the board's own ttlSec (10 min live / 2 h pre-kick), never polled — a fresh pull costs
@@ -221,6 +229,8 @@ export function CfbPicksBoard() {
   const setTickets = useMemo(() => (picks ? CFB_PARLAY_CATEGORIES.flatMap((k) => picks.sets[k] ?? []) : []), [picks]);
   const parlayCount = setTickets.length;
   const tierCount = (tier: string) => setTickets.filter((t) => t.tier === tier).length;
+  /** INSTRUCTION 43: tickets across the sets built past the −3 leg gate (`gated: false`) */
+  const openCount = setTickets.filter((t) => !t.gated).length;
   const liveRows = picks?.liveRows ?? 0;
   const liveGames = current?.games.filter((g) => g.status === "live").length ?? 0;
   const quota = quotaRemaining();
@@ -331,7 +341,7 @@ export function CfbPicksBoard() {
         <StatTile
           label="Parlays"
           value={picks ? String(parlayCount) : "—"}
-          sub={picks ? `${tierCount("SAFER")} safer · ${tierCount("LONGSHOT")} longshot · ${tierCount("MIX")} mix${liveGames ? ` · ${liveGames} live` : ""}` : undefined}
+          sub={picks ? `${tierCount("SAFER")} safer · ${tierCount("LONGSHOT")} longshot · ${tierCount("MIX")} mix${liveGames ? ` · ${liveGames} live` : ""}${openCount ? ` · ${openCount} below gate` : ""}` : undefined}
           tone={parlayCount > 0 ? "gold" : "muted"}
         />
       </div>
@@ -424,7 +434,7 @@ export function CfbPicksBoard() {
               </span>
             ) : propsQ.data ? (
               <span>
-                props for <span className="num">{propsQ.data.fetched}</span> of <span className="num">{propsQ.data.events}</span> games
+                priced <span className="num">{propsQ.data.fetched - propsQ.data.noProps}</span> of <span className="num">{propsQ.data.events}</span> games
                 {propsQ.data.live ? ` · ${propsQ.data.live} in play` : ""} · cached {cfbCacheLabel(propsQ.data)}
                 {propsQ.data.capped ? ` · capped at ${CFB_PROPS.maxEvents} priced games per slate` : ""}
                 {propsQ.data.stale
@@ -432,6 +442,10 @@ export function CfbPicksBoard() {
                   : propsQ.data.budgeted
                     ? " · today's props budget is used up — more games price again tomorrow"
                     : ""}
+                {propsQ.data.czMissing
+                  ? ` · ${propsQ.data.czMissing} game${propsQ.data.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff`
+                  : ""}
+                {propsQ.data.noProps ? ` · ${propsQ.data.noProps} game${propsQ.data.noProps === 1 ? "" : "s"} on the slate ha${propsQ.data.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""}
               </span>
             ) : null}
             {scope === "top" && catRows.filter((r) => rowMatches(r, needle)).length > TOP_N && (
@@ -569,16 +583,26 @@ function propTeamId(r: CfbPickRow, propRows: CfbPropsBoard["rows"] | null): stri
    ranked tickets — one pill per key of CFB_PARLAY_CATEGORIES, in the contract's order. The
    pregame categories are the single-market sets + COMBOS; MIXED pairs a live leg with pregame
    legs; LIVE is in-play legs only. */
+/** INSTRUCTION 43: a single-market set's leg count is its band's (`setBandOf`), so the blurb can never drift from the builder */
+const legsOf = (k: CfbParlayCategory) => {
+  const b = setBandOf(k);
+  return `${b.legs.min}–${b.legs.max}`;
+};
+/** the band's price range as the American odds the card prints (anytime TD: dec 4–250 → +300 to +24900) */
+const priceRangeOf = (k: CfbParlayCategory) => {
+  const b = setBandOf(k);
+  return `${fmtAmerican(decimalToAmerican(b.minDec))} to ${fmtAmerican(decimalToAmerican(b.maxDec))}`;
+};
 const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blurb: string; live: boolean }> = {
-  ml: { label: "ML", blurb: "Moneyline-only tickets, 2–6 legs on distinct games that haven't kicked off, at Caesars' prices.", live: false },
-  spread: { label: "SPREAD", blurb: "Spread-only tickets, 2–6 legs on distinct upcoming games, at Caesars' lines.", live: false },
-  total: { label: "TOTAL", blurb: "Totals-only tickets, 2–6 legs on distinct upcoming games, at Caesars' lines.", live: false },
-  anytime_td: { label: "ANYTIME TD", blurb: "Anytime-touchdown scorer tickets, 2–6 players from distinct upcoming games.", live: false },
-  pass_tds: { label: "PASS TDS", blurb: "Passing-touchdown tickets, 2–6 quarterbacks from distinct upcoming games.", live: false },
-  pass_yds: { label: "PASS YDS", blurb: "Passing-yards tickets, 2–6 quarterbacks from distinct upcoming games.", live: false },
-  receptions: { label: "RECEPTIONS", blurb: "Receptions tickets, 2–6 pass-catchers from distinct upcoming games.", live: false },
-  rush_yds: { label: "RUSH YDS", blurb: "Rushing-yards tickets, 2–6 rushers from distinct upcoming games.", live: false },
-  rec_yds: { label: "REC YDS", blurb: "Receiving-yards tickets, 2–6 pass-catchers from distinct upcoming games.", live: false },
+  ml: { label: "ML", blurb: `Moneyline-only tickets, ${legsOf("ml")} legs on distinct games that haven't kicked off, at Caesars' prices.`, live: false },
+  spread: { label: "SPREAD", blurb: `Spread-only tickets, ${legsOf("spread")} legs on distinct upcoming games, at Caesars' lines.`, live: false },
+  total: { label: "TOTAL", blurb: `Totals-only tickets, ${legsOf("total")} legs on distinct upcoming games, at Caesars' lines.`, live: false },
+  anytime_td: { label: "ANYTIME TD", blurb: `Anytime-touchdown scorer tickets, ${legsOf("anytime_td")} players from distinct upcoming games, priced ${priceRangeOf("anytime_td")}.`, live: false },
+  pass_tds: { label: "PASS TDS", blurb: `Passing-touchdown tickets, ${legsOf("pass_tds")} quarterbacks from distinct upcoming games.`, live: false },
+  pass_yds: { label: "PASS YDS", blurb: `Passing-yards tickets, ${legsOf("pass_yds")} quarterbacks from distinct upcoming games.`, live: false },
+  receptions: { label: "RECEPTIONS", blurb: `Receptions tickets, ${legsOf("receptions")} pass-catchers from distinct upcoming games.`, live: false },
+  rush_yds: { label: "RUSH YDS", blurb: `Rushing-yards tickets, ${legsOf("rush_yds")} rushers from distinct upcoming games.`, live: false },
+  rec_yds: { label: "REC YDS", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct upcoming games.`, live: false },
   combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, upcoming games only.", live: false },
   mixed: { label: "MIXED", hint: "live+pregame", blurb: "Cross-game tickets pairing a game in progress (in-play price) with games still to kick off.", live: true },
   live: { label: "LIVE", blurb: "In-game tickets from games in progress only, at the feed's live Caesars prices.", live: true },
@@ -621,6 +645,19 @@ function LiveLegTag() {
   );
 }
 
+/** INSTRUCTION 43: a ticket built past the −3 leg gate (some leg sits in (setFloorEvPct, minLegEvPct)) — worn beside the tier chip, never hidden */
+function OpenTag() {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted"
+      title={`At least one leg sits below the ${CFB_PARLAYS.minLegEvPct}% EV gate (down to ${CFB_PARLAYS.setFloorEvPct}%) — the set could not reach ${CFB_PARLAYS.perCategory} tickets on gated legs alone`}
+      data-testid="cfb-parlay-open"
+    >
+      edge −
+    </span>
+  );
+}
+
 function TierTag({ tier }: { tier: CfbParlay["tier"] }) {
   const cls = tier === "SAFER" ? "border-pos/50 bg-pos/10 text-pos" : tier === "LONGSHOT" ? "border-gold/50 bg-gold/10 text-gold" : "border-cfb/50 bg-cfb/10 text-cfb";
   return <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${cls}`}>{tier}</span>;
@@ -645,6 +682,8 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const match = (t: CfbParlay, f: string) => (f === "all" ? true : f === "SAFER" || f === "LONGSHOT" || f === "MIX" ? t.tier === f : t.type === f);
   const active = filters.some(([k]) => k === filter) ? filter : "all";
   const shown = all.filter((t) => match(t, active));
+  /** INSTRUCTION 43: tickets in this set built past the −3 leg gate (single-market sets only; the builder ranks them last) */
+  const openN = all.filter((t) => !t.gated).length;
 
   const empty =
     cat === "live"
@@ -657,7 +696,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           : { title: "No mixed tickets yet", body: `A live leg and an upcoming leg each need a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
         : propsPending && cat !== "ml" && cat !== "spread" && cat !== "total"
           ? { title: "Building parlays…", body: `${meta.label} tickets fill in as player props finish pricing at Caesars.` }
-          : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%) on a game that hasn't kicked off, and no two legs may share a game.` };
+          : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%) on a game that hasn't kicked off, and no two legs may share a game.${cat === "combo" ? "" : ` When fewer than ${CFB_PARLAYS.perCategory} tickets clear that gate, the set extends to Caesars-priced legs down to EV ≥ ${CFB_PARLAYS.setFloorEvPct}% (tagged EDGE −); none reached even that here.`}` };
 
   return (
     <Reveal>
@@ -694,6 +733,12 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
         </div>
         <div className="mb-3 text-[11px] text-muted">
           {meta.blurb} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV.</span>
+          {openN > 0 && (
+            <span className="text-faint" data-testid="cfb-parlay-open-note">
+              {" "}
+              Fewer than {CFB_PARLAYS.perCategory} tickets clear the {CFB_PARLAYS.minLegEvPct}% leg gate, so {openN} tagged EDGE − use Caesars-priced legs down to EV ≥ {CFB_PARLAYS.setFloorEvPct}% — ranked after the gated ones.
+            </span>
+          )}
         </div>
 
         {all.length === 0 ? (
@@ -795,6 +840,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <TierTag tier={t.tier} />
           <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">{TYPES[t.type] ?? t.type}</span>
+          {!t.gated && <OpenTag />}
           {live && (
             <span className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live">
               <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" aria-hidden /> live
@@ -868,6 +914,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
             <div className="flex flex-wrap items-center gap-1.5">
               <TierTag tier={t.tier} />
               <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">{TYPES[t.type] ?? t.type}</span>
+              {!t.gated && <OpenTag />}
             </div>
             <div className="mt-1.5 truncate text-[13px] font-bold text-text">{t.name}</div>
             <div className="num mt-0.5 text-[10.5px] text-faint">

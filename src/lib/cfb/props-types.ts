@@ -110,6 +110,14 @@ export type CfbPropsBoard = {
   /** INSTRUCTION 42 (2026-09-05, review fix): true when this answer's board could not be persisted to
       the store (the write threw) — the next request then has no carried rows / pricedAt to lean on */
   storeWriteFailed?: boolean;
+  /** THE CAESARS-MISSING RULE (2026-09-05): priced UPCOMING games on this answer that carry rows and, on
+      some market with rows, no Caesars quote (other books posted, Caesars not yet — `czMissingGameIds`) —
+      re-asked every CFB_PROPS.czMissingRevalidateSec inside czMissingWindowSec of kickoff, and while > 0
+      the board's `ttlSec` is shortened to that cadence. Counted over the games in `priced`, never over
+      unpriced ones; a game with zero rows is `noProps`, never `czMissing`. */
+  czMissing: number;
+  /** priced games on this answer with ZERO rows — no two-sided quote on a tracked market at the books we price (the small games) */
+  noProps: number;
 };
 
 export type CfbParlayTier = "SAFER" | "LONGSHOT" | "MIX";
@@ -158,6 +166,11 @@ export type CfbParlay = {
   prob: number;
   /** percent */
   ev: number;
+  /** true when EVERY leg cleared CFB_PARLAYS.minLegEvPct (−3, grade D or better). False only on a
+      single-market category-set ticket built from the tier-2 pool (legs down to `setFloorEvPct`)
+      once tier 1 could not fill the set (2026-09-05) — the Board labels those honestly. Legacy
+      tiered, combo, mixed and live tickets are always gated. */
+  gated: boolean;
   note?: string;
 };
 

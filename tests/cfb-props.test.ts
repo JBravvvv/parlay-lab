@@ -52,12 +52,18 @@ describe("the contract", () => {
     /* INSTRUCTION 42 (2026-09-05) — Josh: "It should be grading every possible pick available on the
        board". maxEvents 12 → 60, liveMaxEvents 6 → 24, dailyBudget 1200 → 2500: every eligible game
        is priced; the empty-event rule and per-game pricedAt (route) keep the real spend under the rail. */
+    /* THE CAESARS-MISSING RULE (2026-09-05) — Josh: "They are still 12 games today that haven't started
+       w/ current Anytime TD odds". + czMissingRevalidateSec 1800 / czMissingWindowSec 4 h: an upcoming
+       game with rows and some market with no Caesars quote is re-asked every 30 min inside 4 h of
+       kickoff (review fix: a game with NO rows is never re-asked early — it keeps the 2 h empty hold). */
     expect(CFB_PROPS).toEqual({
       maxEvents: 60,
       revalidateSec: 7200,
       liveRevalidateSec: 600,
       liveMaxEvents: 24,
       boardRetainSec: 36 * 3600,
+      czMissingRevalidateSec: 1800,
+      czMissingWindowSec: 4 * 3600,
       regions: "us",
       minBooks: 2,
       settleBook: "williamhill_us",
@@ -437,9 +443,17 @@ describe("app/api/cfb/props/route.ts + client — source pins", () => {
     expect(route).not.toMatch(/console\.(log|info|warn|error)/);
   });
   it("caches each event call for the pull's own window (propsWindowSec: 2 h pre-kick, 10 min live — INSTRUCTION 40) and builds the slate through the shared helper", () => {
-    expect(route).toMatch(/revalidate: revalidateSec/);
-    expect(route).toMatch(/const ttlSec = propsWindowSec\(toFetch\)/);
-    expect(route).toMatch(/eventOdds\(game\.oddsEventId as string, key, ttlSec\)/);
+    expect(route).toMatch(/const r = await fetch\(url, cache\)/);
+    expect(route).toMatch(/const pullSec = propsWindowSec\(toFetch\)/);
+    // THE CAESARS-MISSING RULE (2026-09-05, review fix): Next's data cache is stale-while-revalidate, so a re-pull
+    // (a Caesars-missing re-check, or a live game already on the board) bypasses it with cache: "no-store";
+    // a first pull or an expired carry keeps next.revalidate at the pull's window
+    expect(route).toMatch(/type EventCache = \{ next: \{ revalidate: number \} \} \| \{ cache: "no-store" \}/);
+    expect(route).toMatch(
+      /const cacheFor = \(g: CfbGame\): EventCache => \{\s*const w = whyOf\.get\(g\.id\);\s*return w === "czMissing" \|\| \(w === "live" && storedIds\.has\(g\.id\)\) \? \{ cache: "no-store" \} : \{ next: \{ revalidate: pullSec \} \};/,
+    );
+    expect(route).toMatch(/eventOdds\(game\.oddsEventId as string, key, cacheFor\(game\)\)/);
+    expect(route).not.toMatch(/const ttlFor = \(g: CfbGame\): number/);
     expect(route).not.toMatch(/PROPS_TTL/);
     expect(route).not.toMatch(/revalidate: CFB_PROPS\.revalidateSec/);
     expect(CFB_PROPS.revalidateSec).toBe(7200);

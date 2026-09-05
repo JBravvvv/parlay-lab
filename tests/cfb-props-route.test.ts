@@ -6,7 +6,8 @@ import { stripComments } from "./helpers/source";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { CFB_PROPS } from "@/lib/cfb/rules";
 import { finalsOf } from "@/lib/cfb/slate-server";
-import { affordableEvents, assembleStoredBoard, boardFresh, boardWindowSec, encodeBoard, propsBoardKey, propsSpendKey, pullCredits, storedChunkKeys, CFB_PROPS_CHUNK_ROWS, CFB_PROPS_SPEND_TTL_SEC, UPSTASH_MAX_REQUEST_BYTES } from "@/lib/cfb/props-store";
+import { czMissingGameIds, propsCoverage } from "@/lib/cfb/props";
+import { affordableEvents, assembleStoredBoard, boardFresh, boardWindowSec, czMissingDue, encodeBoard, propsBoardKey, propsSpendKey, pullCredits, storedChunkKeys, CFB_PROPS_CHUNK_ROWS, CFB_PROPS_SPEND_TTL_SEC, UPSTASH_MAX_REQUEST_BYTES } from "@/lib/cfb/props-store";
 import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import type { CfbSlate } from "@/lib/cfb/types";
 
@@ -32,6 +33,9 @@ import type { CfbSlate } from "@/lib/cfb/types";
  *   live      — a stored pre-kick board is fresh only inside the CURRENT window once a game in
  *               it kicks off; a live pull re-prices only the in-play events (≤ liveMaxEvents)
  *               and carries the upcoming games' rows over
+ *   cz rule   — a game with rows and a market with no Caesars quote re-checks every 30 min inside
+ *               4 h of kickoff (zero-row games never — the empty hold stands); re-pulls bypass the
+ *               data cache; a failed re-pull keeps the stored rows; czMissing > 0 shortens ttlSec
  *   no redis  — missing store env → the data-cache-only behaviour of before, no store calls
  *   no key    — the unchanged oddsMissing answer, and NOTHING is written
  *
@@ -168,6 +172,17 @@ describe("rules", () => {
     expect(CFB_PROPS.boardRetainSec).toBe(36 * 3600);
     expect(CFB_PROPS.dailyBudget).toBe(2500);
     expect(CFB_PROPS.measuredCreditsPerEvent).toBe(31);
+    // THE CAESARS-MISSING RULE (2026-09-05): a 30-min re-check inside 4 h of kickoff — shorter than the 2 h carry, longer than the live window
+    expect(CFB_PROPS.czMissingRevalidateSec).toBe(1800);
+    expect(CFB_PROPS.czMissingWindowSec).toBe(4 * 3600);
+    expect(CFB_PROPS.czMissingRevalidateSec).toBeLessThan(CFB_PROPS.revalidateSec);
+    expect(CFB_PROPS.czMissingRevalidateSec).toBeGreaterThan(CFB_PROPS.liveRevalidateSec);
+    // worst case PER GAME: at most 8 re-checks in its 4 h window, 248 credits — but in AGGREGATE the 12 such games Josh
+    // named on 2026-09-05 would want 2,976, MORE than the daily rail: the rail binds, the copy must not say "within" it
+    expect((CFB_PROPS.czMissingWindowSec / CFB_PROPS.czMissingRevalidateSec) * CFB_PROPS.measuredCreditsPerEvent).toBe(248);
+    expect(12 * 248).toBe(2976);
+    expect(12 * 248).toBeGreaterThan(CFB_PROPS.dailyBudget);
+    expect(readSrc("src/lib/cfb/rules.ts")).not.toMatch(/within the daily rail/);
     // the cost math (rules.ts doc): 60 × 31 = 1860 per 2 h pre-kick re-price; 24 × 31 = 744 per 10-min live pull
     expect(CFB_PROPS.maxEvents * CFB_PROPS.measuredCreditsPerEvent).toBe(1860);
     expect(CFB_PROPS.liveMaxEvents * CFB_PROPS.measuredCreditsPerEvent).toBe(744);
@@ -433,7 +448,10 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
     expect(body.live).toBe(0);
     vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
     fetchMock.mockClear();
-    return { ...body, generatedAt: new Date(NOW - ageSec * 1000).toISOString() };
+    // every stamp re-dated together (review fix: a live game re-prices off ITS OWN pricedAt, so a board whose
+    // generatedAt alone was aged read as "priced just now" and was carried)
+    const at = new Date(NOW - ageSec * 1000).toISOString();
+    return { ...body, generatedAt: at, pricedAt: Object.fromEntries(Object.keys(body.pricedAt ?? {}).map((id) => [id, at])) };
   }
 
   it("a stored PRE-KICK board (ttlSec 7200) is NOT honoured past the live window once a game in it kicks off — the live game is re-priced, the upcoming rows are carried", async () => {
@@ -603,7 +621,7 @@ describe("INSTRUCTION 42 (2026-09-05) — per-game windows and the empty-event r
     expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
   });
 
-  it("a live game WITH rows still re-prices every live pull (the rule holds only empty events)", async () => {
+  it("a live game WITH rows re-prices once its own stamp is older than the live window (20 min here; the empty-event rule holds only empty events)", async () => {
     const stored = await preKickBoard(20 * 60);
     const id = liveGameId();
     expect(stored.rows.some((r) => r.gameId === id)).toBe(true);
@@ -850,6 +868,388 @@ describe("INSTRUCTION 42 (2026-09-05, review fix) — the stored board fits Upst
     const good = await call();
     expect(good.body.storeWriteFailed).toBeUndefined();
     expect(ok.boardSets()).toHaveLength(1);
+  });
+});
+
+/**
+ * THE CAESARS-MISSING RULE (2026-09-05). Josh, verbatim: "It's still only showing ANYTIME TD picks for
+ * ARST @ MEM, WYO @ CSU, FIU @ USF, WMU @ MICH, SHSU @ TROY, BOISE @ ORE; They are still 12 games today
+ * that haven't started w/ current Anytime TD odds". Read on prod ~15:45 PT: 11 upcoming games carried
+ * DK / FD anytime-TD rows and NO Caesars quote on any row — priced once before Caesars posted, then
+ * ridden for the whole 2 h carry. The fixture kicks at 16:00Z / 16:30Z; the clock below sits at 13:00Z
+ * (3 h out — inside the 4 h window) or 11:00Z (5 h out — outside it). "Stripped" = the game's stored
+ * rows with cz nulled (DK / FD stay), "emptied" = the game's rows removed (no book posts props).
+ */
+describe("THE CAESARS-MISSING RULE (2026-09-05) — a 30-min re-check inside 4 h of kickoff", () => {
+  const IN = Date.parse("2026-09-05T13:00:00Z"); // every fixture kickoff 3–3.5 h ahead
+  const OUT = Date.parse("2026-09-05T11:00:00Z"); // 5–5.5 h ahead
+  const MIN = 60_000;
+  const iso = (t: number) => new Date(t).toISOString();
+
+  /** a real pre-kick pull at `at`, every stamp re-dated `ageMin` back */
+  async function boardAt(at: number, ageMin: number): Promise<CfbPropsBoard> {
+    vi.setSystemTime(at);
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(body.rows.some((r) => r.cz)).toBe(true);
+    fetchMock.mockClear();
+    const stamp = iso(at - ageMin * MIN);
+    return { ...body, generatedAt: stamp, pricedAt: Object.fromEntries(Object.keys(body.pricedAt ?? {}).map((id) => [id, stamp])) };
+  }
+  const strip = (b: CfbPropsBoard, id: string): CfbPropsBoard => ({ ...b, rows: b.rows.map((r) => (r.gameId === id ? { ...r, cz: null, evCz: null } : r)) });
+  const emptied = (b: CfbPropsBoard, id: string): CfbPropsBoard => ({ ...b, rows: b.rows.filter((r) => r.gameId !== id) });
+  const seed = (b: CfbPropsBoard, spend = "372") => fakeRedis({ [`pl:cfb:props:v1:${DATE}`]: JSON.stringify(b), [`pl:cfb:props:spend:v1:${DATE}`]: spend });
+  const oddsIdOf = (gameId: string) => slate().games.find((g) => g.id === gameId)?.oddsEventId as string;
+  const urlsFetched = () => fetchMock.mock.calls.map(([u]) => String(u));
+  // the pre-kick selection order (kickoff, then rank): game[1] is ECU@ALA, [2] ORST@HOU, [3] CCU@WVU
+  const G = "401856634";
+  const H = "401856778";
+  const I = "401856780";
+
+  it("czMissingDue (pure): upcoming + Caesars-missing (the caller's market verdict) + inside 4 h + stamp older than 30 min — and nothing else", () => {
+    const board = { generatedAt: iso(IN - 35 * MIN), pricedAt: { g: iso(IN - 35 * MIN), y: iso(IN - 25 * MIN) } };
+    const kick = IN + 3 * 3600_000;
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: kick }, true, IN)).toBe(true);
+    expect(czMissingDue(board, { id: "y", status: "upcoming", kickoffMs: kick }, true, IN)).toBe(false); // 25 min: not yet
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: kick }, false, IN)).toBe(false); // Caesars on every market it has (or no rows at all)
+    expect(czMissingDue(board, { id: "g", status: "live", kickoffMs: kick }, true, IN)).toBe(false); // live games keep their rule
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: IN + 5 * 3600_000 }, true, IN)).toBe(false); // 5 h out
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: IN + 4 * 3600_000 }, true, IN)).toBe(true); // 4 h exactly: inside
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: IN - 1 }, true, IN)).toBe(false); // already kicked
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: Number.NaN }, true, IN)).toBe(false);
+    // an unstamped game (boards written before pricedAt existed) reads the board's generatedAt — 35 min here → due
+    expect(czMissingDue(board, { id: "zz", status: "upcoming", kickoffMs: kick }, true, IN)).toBe(true);
+    expect(czMissingDue({ generatedAt: iso(IN - 25 * MIN) }, { id: "zz", status: "upcoming", kickoffMs: kick }, true, IN)).toBe(false);
+    expect(czMissingDue({ generatedAt: "nope" }, { id: "zz", status: "upcoming", kickoffMs: kick }, true, IN)).toBe(true); // unreadable → due
+    expect(czMissingDue(board, { id: "g", status: "upcoming", kickoffMs: kick }, true, IN - 6 * MIN)).toBe(false); // 29 min: not yet
+  });
+
+  it("czMissingGameIds (pure, review fix): keyed on the MARKET — a game is missing when some market with rows has no Caesars quote on any of them; zero rows is never missing", () => {
+    const q = { book: "x", title: "x", price: -110, line: null, dec: 1.91 };
+    const rows = [
+      { gameId: "a", market: "pass_yds" as const, cz: q },
+      { gameId: "a", market: "anytime_td" as const, cz: null }, // Caesars yardage, no Caesars anytime TD yet → missing
+      { gameId: "b", market: "pass_yds" as const, cz: q },
+      { gameId: "b", market: "pass_yds" as const, cz: null }, // one Caesars row on the market is enough → not missing
+      { gameId: "c", market: "anytime_td" as const, cz: null }, // no Caesars at all → missing
+      { gameId: "d", market: "anytime_td" as const, cz: q },
+    ];
+    expect([...czMissingGameIds(rows)].sort()).toEqual(["a", "c"]);
+    expect(czMissingGameIds([])).toEqual(new Set());
+  });
+
+  it("propsCoverage (pure): czMissing = priced upcoming games with rows and a Caesars-less market; noProps = priced games with zero rows; unpriced games count in neither", () => {
+    const ev = [
+      { id: "a", status: "upcoming" as const },
+      { id: "b", status: "upcoming" as const },
+      { id: "c", status: "live" as const },
+      { id: "d", status: "upcoming" as const },
+      { id: "e", status: "upcoming" as const },
+      { id: "f", status: "upcoming" as const },
+    ];
+    const q = { book: "x", title: "x", price: -110, line: null, dec: 1.91 };
+    const rows = [
+      { gameId: "a", market: "pass_yds" as const, cz: q },
+      { gameId: "a", market: "pass_yds" as const, cz: null },
+      { gameId: "b", market: "anytime_td" as const, cz: null },
+      { gameId: "b", market: "anytime_td" as const, cz: null },
+      { gameId: "c", market: "anytime_td" as const, cz: null },
+      { gameId: "f", market: "pass_yds" as const, cz: q },
+      { gameId: "f", market: "anytime_td" as const, cz: null }, // the mixed case the market key exists for
+    ];
+    expect(propsCoverage(ev, rows, ["a", "b", "c", "d", "f"])).toEqual({ czMissing: 2, noProps: 1 }); // b, f missing; d priced but empty; c is live; e unpriced
+    expect(propsCoverage(ev, rows, ["a", "b", "c", "d", "e", "f"])).toEqual({ czMissing: 2, noProps: 2 });
+    expect(propsCoverage(ev, rows, [])).toEqual({ czMissing: 0, noProps: 0 });
+    expect(propsCoverage([], rows, ["a"])).toEqual({ czMissing: 0, noProps: 0 });
+  });
+
+  it("a fresh pre-kick pull reports czMissing 0 / noProps 0 on the synthetic fixture (every game has Caesars rows)", async () => {
+    vi.setSystemTime(IN);
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.czMissing).toBe(0);
+    expect(body.noProps).toBe(0);
+  });
+
+  it("a stripped game (other books' rows, no Caesars) stamped 35 min ago, 3 h before kickoff, is re-fetched — ALONE, bypassing the data cache — even though the board as a whole is 'fresh'", async () => {
+    const held = strip(await boardAt(IN, 35), G);
+    expect(boardFresh(held, IN, CFB_PROPS.revalidateSec)).toBe(true); // rail 1 would have answered before this rule
+    const r = seed(held);
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(urlsFetched()[0]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    // review fix: Next's data cache is stale-while-revalidate — a `revalidate: 1800` re-check would have been answered
+    // with the very body it re-pulls to replace, landing Caesars one interval (~60 min) late; the re-pull bypasses it
+    expect(fetchMock.mock.calls[0][1]).toEqual({ cache: "no-store" });
+    expect(body.pricedAt?.[G]).toBe(iso(IN)); // re-stamped now
+    for (const [gid, t] of Object.entries(body.pricedAt ?? {})) if (gid !== G) expect(t).toBe(held.generatedAt); // the rest ride their stamps
+    expect(body.fetched).toBe(body.events);
+    expect(body.stale).toBe(false);
+    expect(body.budgeted).toBe(false);
+    expect(body.ttlSec).toBe(CFB_PROPS.revalidateSec); // the board's header window is unchanged once nothing is Caesars-missing
+    expect(body.czMissing).toBe(0); // the re-pull found Caesars rows (the fixture posts them)
+    expect(body.noProps).toBe(0);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER);
+    expect(r.boardSets()).toHaveLength(1);
+  });
+
+  it("the same stripped game stamped 25 min ago is NOT re-fetched: the board answers from redis and counts it — czMissing 1, and ttlSec drops to the 30-min rule so the phone re-asks", async () => {
+    const held = strip(await boardAt(IN, 25), G);
+    const r = seed(held);
+    const { body } = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(body.source).toBe("redis");
+    expect(body.czMissing).toBe(1);
+    expect(body.noProps).toBe(0);
+    // review fix: nothing else calls this route — with ttlSec 7200 the open phone's staleTime hid the re-check for 2 h
+    expect(body.ttlSec).toBe(Math.min(CFB_PROPS.revalidateSec, CFB_PROPS.czMissingRevalidateSec));
+    expect(body.ttlSec).toBe(1800);
+    expect(body.rows).toEqual(held.rows);
+    expect(r.boardSets()).toHaveLength(0);
+    expect(r.ops("INCRBY")).toHaveLength(0);
+  });
+
+  it("the 4 h window: the same stripped game 35 min old but 5 h before kickoff rides the 2 h carry (no fetch, czMissing 1, ttlSec 1800)", async () => {
+    const held = strip(await boardAt(OUT, 35), G);
+    seed(held);
+    const { body } = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(body.source).toBe("redis");
+    expect(body.czMissing).toBe(1);
+    expect(body.ttlSec).toBe(1800);
+    // …and once its 2 h carry expires it is fetched under the existing rule, at the pull's own window
+    const old = strip(await boardAt(OUT, CFB_PROPS.revalidateSec / 60 + 1), G);
+    seed(old);
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const again = await call();
+    expect(again.body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(again.body.events); // every game's carry expired together
+    for (const [, init] of fetchMock.mock.calls) expect(init).toEqual({ next: { revalidate: CFB_PROPS.revalidateSec } });
+  });
+
+  it("an EMPTIED upcoming game (zero stored rows) counts as noProps and is NOT Caesars-missing: inside 4 h it stays on the 2 h empty-event hold (review fix — 29 of 46 priced games that day were FBS-vs-FCS games no book posts props on; re-asking them every 30 min wanted ~7,200 credits)", async () => {
+    const fresh = emptied(await boardAt(IN, 25), G);
+    seed(fresh);
+    const first = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(first.body.source).toBe("redis");
+    expect(first.body.noProps).toBe(1);
+    expect(first.body.czMissing).toBe(0);
+    expect(first.body.ttlSec).toBe(CFB_PROPS.revalidateSec); // no Caesars-missing game: the 2 h window stands
+    expect(first.body.priced).toContain(G); // still a priced game — it simply has no rows
+    // 35 min old (would be due under the old rule), 65 min old, 119 min old: never re-asked inside the 2 h hold
+    for (const ageMin of [35, 65, CFB_PROPS.revalidateSec / 60 - 1]) {
+      const r = seed(emptied(await boardAt(IN, ageMin), G));
+      const { body } = await call();
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(body.source).toBe("redis");
+      expect(body.noProps).toBe(1);
+      expect(body.czMissing).toBe(0);
+      expect(body.priced).toContain(G);
+      expect(r.ops("INCRBY")).toHaveLength(0);
+    }
+    // …and once the 2 h hold passes it is fetched under the existing rule (every game's carry expired together here)
+    seed(emptied(await boardAt(IN, CFB_PROPS.revalidateSec / 60 + 1), G));
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const again = await call();
+    expect(again.body.source).toBe("fetch");
+    expect(urlsFetched()).toContain(`https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events/${oddsIdOf(G)}/odds?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds&oddsFormat=american`);
+    expect(again.body.noProps).toBe(0);
+  });
+
+  it("a MARKET-keyed miss (review fix): a game with Caesars yardage props but no Caesars anytime TD is counted AND re-checked — the rule is per market, not per game", async () => {
+    const stripAtd = (b: CfbPropsBoard, id: string): CfbPropsBoard => ({
+      ...b,
+      rows: b.rows.map((r) => (r.gameId === id && r.market === "anytime_td" ? { ...r, cz: null, evCz: null } : r)),
+    });
+    const fresh = stripAtd(await boardAt(IN, 25), G);
+    expect(fresh.rows.some((r) => r.gameId === G && r.market !== "anytime_td" && r.cz)).toBe(true); // Caesars IS on its other markets
+    seed(fresh);
+    const first = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(first.body.source).toBe("redis");
+    expect(first.body.czMissing).toBe(1); // under a per-game "any Caesars row" count this read 0 while the ANYTIME TD set lacked G
+    expect(first.body.ttlSec).toBe(1800);
+    const due = stripAtd(await boardAt(IN, 35), G);
+    seed(due);
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const second = await call();
+    expect(second.body.source).toBe("fetch");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(urlsFetched()[0]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    expect(fetchMock.mock.calls[0][1]).toEqual({ cache: "no-store" });
+    expect(second.body.czMissing).toBe(0);
+    expect(second.body.ttlSec).toBe(CFB_PROPS.revalidateSec);
+  });
+
+  it("a FAILED re-pull (review fix): when the odds call answers non-2xx for a game with stored rows, the answer keeps its stored rows and old pricedAt — never 'unpriced' — and nothing is booked", async () => {
+    const held = strip(await boardAt(IN, 35), G);
+    const heldRows = held.rows.filter((r) => r.gameId === G);
+    expect(heldRows.length).toBeGreaterThan(0);
+    const r = seed(held);
+    fetchMock.mockImplementation(async () => new Response("upstream down", { status: 502 }));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(urlsFetched()[0]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    expect(body.source).toBe("fetch");
+    expect(body.rows.filter((row) => row.gameId === G)).toEqual(heldRows);
+    expect(body.priced).toContain(G);
+    expect(body.pricedAt?.[G]).toBe(held.pricedAt?.[G]); // the old stamp: the next request tries again after its 30 min, not at once
+    expect(body.czMissing).toBe(1); // still honestly counted
+    expect(body.stale).toBe(false); // an upcoming game inside its 2 h carry — nothing out of date
+    expect(body.fetched).toBe(body.events - 1); // the failed event is not "fetched"
+    expect(r.ops("INCRBY")).toHaveLength(0); // nothing fetched, nothing booked, nothing written
+    expect(r.boardSets()).toHaveLength(0);
+  });
+
+  it("a FAILED re-pull beside a successful one: the WRITTEN board keeps the failed game's stored rows and old pricedAt too", async () => {
+    const base = await boardAt(IN, 35);
+    const mixed: CfbPropsBoard = { ...strip(base, G), pricedAt: { ...base.pricedAt, [H]: iso(IN - (CFB_PROPS.revalidateSec + 5) * 1000) } };
+    const gRows = mixed.rows.filter((row) => row.gameId === G);
+    const r = seed(mixed);
+    fetchMock.mockImplementation(async (input) => (String(input).includes(`/events/${oddsIdOf(G)}/odds`) ? new Response("", { status: 503 }) : eventResponse(null)));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body.pricedAt?.[G]).toBe(mixed.pricedAt?.[G]);
+    expect(body.pricedAt?.[H]).toBe(iso(IN));
+    expect(body.rows.filter((row) => row.gameId === G)).toEqual(gRows);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER); // only H cost anything
+    const stored = r.board()!;
+    expect(stored.rows.filter((row) => row.gameId === G)).toEqual(gRows);
+    expect(stored.pricedAt?.[G]).toBe(mixed.pricedAt?.[G]);
+    expect(stored.priced).toContain(G);
+    expect(stored.czMissing).toBe(1);
+  });
+
+  it("a FAILED live re-pull keeps the live game's stored rows, re-stamped live / unplayable, and flags the answer stale (its lines are older than the live window)", async () => {
+    const stored = await boardAt(IN, 20); // a pre-kick pull 20 min ago; the game kicks off (liveSlate) and its re-pull fails
+    const id = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    const liveRows = stored.rows.filter((row) => row.gameId === id);
+    expect(liveRows.length).toBeGreaterThan(0);
+    seed(stored);
+    fetchMock.mockImplementation(async () => new Response("", { status: 500 }));
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body.rows.filter((row) => row.gameId === id)).toEqual(liveRows.map((row) => ({ ...row, status: "live", playable: false })));
+    expect(body.pricedAt?.[id]).toBe(stored.pricedAt?.[id]);
+    expect(body.live).toBe(1);
+    expect(body.stale).toBe(true);
+  });
+
+  it("LIVE AGE GATE (review fix): a Caesars-missing game turning due skips rail 1 but does NOT re-queue a live game re-priced 1 min ago — only the due game is fetched", async () => {
+    const base = await boardAt(IN, 35);
+    const liveId = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    // the board: written 1 min ago under a live window, the live game re-priced then, G stripped and 35 min old
+    const board: CfbPropsBoard = { ...strip(base, G), generatedAt: iso(IN - 1 * MIN), ttlSec: CFB_PROPS.liveRevalidateSec, live: 1, pricedAt: { ...base.pricedAt, [liveId]: iso(IN - 1 * MIN) } };
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    expect(boardFresh(board, IN, CFB_PROPS.liveRevalidateSec)).toBe(true); // rail 1 is skipped ONLY because G is due
+    const r = seed(board, String(CFB_PROPS.dailyBudget - 1 * PER)); // room for exactly one event: before the fix the live game took it and G was refused
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(urlsFetched()[0]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    expect(body.budgeted).toBe(false);
+    expect(body.live).toBe(1); // the live game is carried, not dropped
+    expect(body.stale).toBe(false); // …and its 1-min-old lines are not stale
+    expect(body.pricedAt?.[liveId]).toBe(iso(IN - 1 * MIN));
+    expect(body.pricedAt?.[G]).toBe(iso(IN));
+    expect(body.czMissing).toBe(0);
+    expect(r.ops("INCRBY")[0][2]).toBe(1 * PER); // one real call booked — never the whole live pool
+    // the same live game 11 min old IS re-priced, first, ahead of G
+    const older: CfbPropsBoard = { ...board, pricedAt: { ...board.pricedAt, [liveId]: iso(IN - 11 * MIN) } };
+    seed(older);
+    fetchMock.mockClear();
+    const two = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(urlsFetched()[0]).toContain(`/events/${liveOddsEventId()}/odds`);
+    expect(urlsFetched()[1]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    expect(fetchMock.mock.calls[0][1]).toEqual({ cache: "no-store" }); // a live RE-pull bypasses the data cache too
+    expect(two.body.pricedAt?.[liveId]).toBe(iso(IN));
+  });
+
+  it("cache per game on one pre-kick pull: the Caesars-missing re-check bypasses the data cache, the 2 h-expired game rides the pull's 7200 — and the re-check is fetched FIRST", async () => {
+    const base = await boardAt(IN, 35);
+    const mixed: CfbPropsBoard = { ...strip(base, G), pricedAt: { ...base.pricedAt, [H]: iso(IN - (CFB_PROPS.revalidateSec + 5) * 1000) } };
+    seed(mixed);
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(urlsFetched()[0]).toContain(`/events/${oddsIdOf(G)}/odds`);
+    expect(urlsFetched()[1]).toContain(`/events/${oddsIdOf(H)}/odds`);
+    expect(fetchMock.mock.calls[0][1]).toEqual({ cache: "no-store" });
+    expect(fetchMock.mock.calls[1][1]).toEqual({ next: { revalidate: 7200 } });
+    expect(body.ttlSec).toBe(7200);
+    expect(body.pricedAt?.[G]).toBe(iso(IN));
+    expect(body.pricedAt?.[H]).toBe(iso(IN));
+  });
+
+  it("need is ordered live → never priced → Caesars-missing → 2 h-expired, so a tight budget buys the cheapest wins first", async () => {
+    // the stored board: OSU live (rows, re-prices every pull), I never priced, G stripped 35 min ago, H expired 2 h + 5 s ago
+    const base = await boardAt(IN, 35);
+    const liveId = liveSlate().games.find((g) => g.home.abbr === LIVE_ABBR)?.id as string;
+    const board: CfbPropsBoard = {
+      ...strip(base, G),
+      rows: strip(base, G).rows.filter((r) => r.gameId !== I),
+      priced: (base.priced ?? []).filter((id) => id !== I),
+      pricedAt: Object.fromEntries(Object.entries({ ...base.pricedAt, [H]: iso(IN - (CFB_PROPS.revalidateSec + 5) * 1000) }).filter(([id]) => id !== I)),
+    };
+    vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
+    const expectOrder = async (room: number, ids: string[]) => {
+      seed(board, String(CFB_PROPS.dailyBudget - room * PER));
+      fetchMock.mockClear();
+      fetchMock.mockImplementation(async () => eventResponse(null));
+      const { body } = await call();
+      expect(fetchMock).toHaveBeenCalledTimes(ids.length);
+      expect(urlsFetched().map((u) => u.match(/\/events\/([^/]+)\/odds/)?.[1])).toEqual(ids.map(oddsIdOf));
+      return body;
+    };
+    const full = await expectOrder(4, [liveId, I, G, H]);
+    expect(full.budgeted).toBe(false);
+    expect(full.stale).toBe(false);
+    // the re-pulls (the live game already on the board, the Caesars-missing re-check) bypass the data cache; the
+    // first pull (I) and the expired carry (H) sit on the pull's 10-min window
+    expect(fetchMock.mock.calls.map(([, init]) => init)).toEqual([
+      { cache: "no-store" },
+      { next: { revalidate: CFB_PROPS.liveRevalidateSec } },
+      { cache: "no-store" },
+      { next: { revalidate: CFB_PROPS.liveRevalidateSec } },
+    ]);
+    const two = await expectOrder(2, [liveId, I]);
+    expect(two.budgeted).toBe(true);
+    expect(two.stale).toBe(true); // G and H were refused and carry rows
+    expect(two.czMissing).toBe(1); // G still has no Caesars row on the answer
+    const three = await expectOrder(3, [liveId, I, G]);
+    expect(three.budgeted).toBe(true);
+    expect(three.czMissing).toBe(0);
+    const one = await expectOrder(1, [liveId]);
+    expect(one.budgeted).toBe(true);
+    expect(one.priced).not.toContain(I); // never priced, still not: absent, not counted as noProps
+    expect(one.noProps).toBe(0);
+  });
+
+  it("a refused game with NO stored rows does not flag the board stale (it carries nothing that could be out of date)", async () => {
+    // G emptied and its own 2 h carry expired (a zero-row game is never due under the Caesars-missing rule — review fix)
+    const base = await boardAt(IN, 35);
+    // (the board's own generatedAt is aged past 2 h too, so rail 1 does not answer; every other game rides its 35-min stamp)
+    const expired = iso(IN - (CFB_PROPS.revalidateSec + 5) * 1000);
+    const held: CfbPropsBoard = { ...emptied(base, G), generatedAt: expired, pricedAt: { ...base.pricedAt, [G]: expired } };
+    seed(held, String(CFB_PROPS.dailyBudget)); // budget spent: G is due (expired), refused
+    const { body } = await call();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(body.budgeted).toBe(true);
+    expect(body.stale).toBe(false);
+    expect(body.noProps).toBe(1);
+  });
+
+  it("the footnote copy's figures come from the constants: 30 min and 4 h", () => {
+    expect(CFB_PROPS.czMissingRevalidateSec / 60).toBe(30);
+    expect(CFB_PROPS.czMissingWindowSec / 3600).toBe(4);
   });
 });
 

@@ -1,3 +1,14 @@
+# Progress — 2026-09-05 (Caesars-missing re-check, 50 Anytime TD parlays, nav order + coloured tabs)
+
+## INSTRUCTION 43 — every game with Caesars ATD, 50 ATD parlays, nav
+- Upcoming games whose rows lack a Caesars quote on some market are re-priced every 30 min
+  inside 4 h of kickoff (no-store fetch, failed pull keeps old rows); empties keep the 2 h hold;
+  live games re-price only when their own stamp is over 10 min old. Footnotes count both.
+- Category sets fill to 50 with legs down to −12% EV after the −3% ones; those tickets are
+  tagged "edge −"; Anytime TD tickets run 2–4 legs at +300 to +24900.
+- Rail: Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc;
+  Ledger and Settings at the bottom; each tab title carries its own colour.
+
 # Progress — 2026-09-05 (every CFB game priced, live picks under ALL, 50 parlays per category)
 
 ## INSTRUCTION 42 — grade every pick, 50 parlays per category

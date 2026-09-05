@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { buildCfbBoard, evPct } from "@/lib/cfb/model";
-import { buildCfbPicks, CFB_PICK_CATEGORIES, legFits, rankPicks } from "@/lib/cfb/picks";
+import { buildCfbPicks, CFB_PICK_CATEGORIES, legFits, rankPicks, setBandOf } from "@/lib/cfb/picks";
 import { CFB_PARLAY_CATEGORIES, type CfbParlayCategory, type CfbPickRow } from "@/lib/cfb/props-types";
 import { CFB_PARLAYS } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
@@ -433,6 +433,8 @@ describe("cfb picks — determinism", () => {
 const SINGLE_MARKET_CATS = CFB_PARLAY_CATEGORIES.filter((k) => k !== "combo" && k !== "mixed" && k !== "live");
 const SET_LABELS: Record<CfbParlayCategory, string> = { ml: "ML", spread: "SPREAD", total: "TOTAL", anytime_td: "ANYTIME TD", pass_tds: "PASS TDS", pass_yds: "PASS YDS", receptions: "RECEPTIONS", rush_yds: "RUSH YDS", rec_yds: "REC YDS", combo: "COMBO", mixed: "MIXED", live: "LIVE" };
 const legKey = (t: CfbParlay) => t.legs.map((l) => l.rowKey).sort().join("+");
+/** the EV floor a set ticket's legs must clear: the −3 gate when `gated`, else the tier-2 floor (single-market sets only) */
+const legFloor = (t: CfbParlay) => (t.gated ? CFB_PARLAYS.minLegEvPct : CFB_PARLAYS.setFloorEvPct);
 
 describe("INSTRUCTION 42 — live rows in the categories", () => {
   const liveBoard = withLive(board, 3);
@@ -490,10 +492,12 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
         list.forEach((t, i) => {
           expect(t.category).toBe(k);
           expect(t.id).toBe(`cfb-${DATE}-${k}-${i + 1}`);
-          expect(t.legs.length).toBeGreaterThanOrEqual(2);
-          expect(t.legs.length).toBeLessThanOrEqual(6);
-          expect(t.dec).toBeLessThanOrEqual(60 + 1e-6);
+          const band = k === "combo" || k === "mixed" || k === "live" ? { legs: { min: 2, max: 6 }, minDec: 1.5, maxDec: 60 } : setBandOf(k);
+          expect(t.legs.length).toBeGreaterThanOrEqual(band.legs.min);
+          expect(t.legs.length).toBeLessThanOrEqual(band.legs.max);
+          expect(t.dec).toBeLessThanOrEqual(band.maxDec + 1e-6);
           expect(["SAFER", "LONGSHOT", "MIX"]).toContain(t.tier);
+          expect(typeof t.gated).toBe("boolean");
         });
       }
       expect(source.mixed).toBe(source.sets.mixed);
@@ -502,10 +506,11 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
     // the legacy tiered tickets carry a category read off their legs
     for (const t of picks.parlays) expect(CFB_PARLAY_CATEGORIES).toContain(t.category);
   });
-  it("single-market sets: only that market, one leg per game, pregame legs only, dec ≥ 1.5, ranked by EV then prob", () => {
+  it("single-market sets: only that market, one leg per game, pregame legs only, dec inside the set's band, gated tickets first then each half ranked by EV then prob", () => {
     let any = 0;
     for (const k of SINGLE_MARKET_CATS) {
       const list = liveP.sets[k];
+      const band = setBandOf(k);
       any += list.length;
       for (const t of list) {
         for (const l of t.legs) {
@@ -513,19 +518,32 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
           expect(liveIds.has(l.gameId)).toBe(false);
         }
         expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
-        expect(t.dec).toBeGreaterThanOrEqual(1.5 - 1e-6);
+        expect(t.dec).toBeGreaterThanOrEqual(band.minDec - 1e-6);
         expect(t.name).toBe(`${SET_LABELS[k]} · ${t.legs.length} legs`);
       }
       for (let i = 1; i < list.length; i++) {
         const a = list[i - 1];
         const b = list[i];
-        expect(a.ev > b.ev || (a.ev === b.ev && a.prob >= b.prob)).toBe(true);
+        // tiered ranking (2026-09-05): a gated ticket never follows an ungated one; inside a tier, EV then prob
+        expect(a.gated || !b.gated, `${t(a)} before ${t(b)}`).toBe(true);
+        if (a.gated === b.gated) expect(a.ev).toBeGreaterThanOrEqual(b.ev);
       }
     }
     expect(any).toBeGreaterThan(0);
-    // the fixture's synthetic anytime-TD rows: RB Bravo and WR Golf qualify (distinct games), TE India is an F (−7 % EV) → exactly the pair
-    expect(picks.sets.anytime_td.length).toBe(1);
-    expect(picks.sets.anytime_td[0].legs.map((l) => l.player).sort()).toEqual(["RB Bravo", "WR Golf"]);
+    // the fixture's synthetic anytime-TD rows: RB Bravo and WR Golf clear −3 (distinct games) → the one gated pair leads;
+    // TE India (−7 % EV, an F) is a tier-2 leg (≥ −12) now that tier 1 cannot fill the set → three more tickets, all ungated,
+    // all in the anytime-TD band (dec 4–250; the 2-leg Bravo + Golf prices 4.69)
+    const atd = picks.sets.anytime_td;
+    expect(atd.length).toBe(4);
+    expect(atd[0].gated).toBe(true);
+    expect(atd[0].legs.map((l) => l.player).sort()).toEqual(["RB Bravo", "WR Golf"]);
+    for (const x of atd.slice(1)) {
+      expect(x.gated).toBe(false);
+      expect(x.legs.some((l) => l.player === "TE India")).toBe(true);
+    }
+    function t(x: CfbParlay) {
+      return `${x.id}(${x.gated ? "gated" : "open"} ${x.ev})`;
+    }
   });
   it("combo: pregame, at least one side AND one prop, 3–6 legs, dec 2–60", () => {
     expect(picks.sets.combo.length).toBeGreaterThan(0);
@@ -558,7 +576,7 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
       expect(t.type).toBe("LIVE");
     }
   });
-  it("every set ticket obeys the leg rules: Caesars-priced, EV ≥ minLegEvPct, no doubled market on a game, no doubled player, per-game cap", () => {
+  it("every set ticket obeys the leg rules: Caesars-priced, EV ≥ minLegEvPct when gated (else ≥ setFloorEvPct, single-market sets only), no doubled market on a game, no doubled player, per-game cap", () => {
     const all = CFB_PARLAY_CATEGORIES.flatMap((k) => liveP.sets[k]);
     expect(all.length).toBeGreaterThan(0);
     for (const t of all) {
@@ -566,10 +584,13 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
       const markets = new Set<string>();
       const players = t.legs.map((l) => l.player).filter((x): x is string => !!x);
       expect(new Set(players).size).toBe(players.length);
+      if (t.category === "combo" || t.category === "mixed" || t.category === "live") expect(t.gated, t.id).toBe(true);
+      // `gated` is exactly "every leg cleared −3"
+      expect(t.gated).toBe(t.legs.every((l) => (rowIndex.get(l.rowKey)!.evCz ?? -Infinity) >= CFB_PARLAYS.minLegEvPct));
       for (const l of t.legs) {
         const r = rowIndex.get(l.rowKey);
         expect(r, l.rowKey).toBeTruthy();
-        expect(r!.evCz ?? -Infinity).toBeGreaterThanOrEqual(CFB_PARLAYS.minLegEvPct);
+        expect(r!.evCz ?? -Infinity).toBeGreaterThanOrEqual(legFloor(t));
         expect(l.dec).toBeCloseTo(amToDec(l.cz), 9);
         perGame.set(l.gameId, (perGame.get(l.gameId) ?? 0) + 1);
         // INSTRUCTION 42 (2026-09-05, review fix): one market per game for PROP legs too, not only sides
@@ -727,10 +748,14 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
   it("set rules hold at scale: single-market sets are one market on distinct pregame games; combo has side + prop; mixed has live + pregame; live is live only", () => {
     for (const k of SINGLE_MARKET_CATS)
       for (const t of big.sets[k]) {
+        const band = setBandOf(k);
         expect(t.legs.every((l) => l.market === k && !liveIds.has(l.gameId))).toBe(true);
         expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
-        expect(t.dec).toBeGreaterThanOrEqual(1.5 - 1e-6);
-        expect(t.dec).toBeLessThanOrEqual(60 + 1e-6);
+        expect(t.legs.length).toBeGreaterThanOrEqual(band.legs.min);
+        expect(t.legs.length).toBeLessThanOrEqual(band.legs.max);
+        expect(t.dec).toBeGreaterThanOrEqual(band.minDec - 1e-6);
+        expect(t.dec).toBeLessThanOrEqual(band.maxDec + 1e-6);
+        for (const l of t.legs) expect(l.dec).toBeGreaterThanOrEqual(1);
       }
     for (const t of big.sets.combo) {
       expect(t.legs.some((l) => l.kind === "side") && t.legs.some((l) => l.kind === "prop")).toBe(true);
@@ -761,5 +786,179 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
     // eslint-disable-next-line no-console
     console.log(`buildCfbPicks × 68 games / ${bigProps.length} prop rows: best ${best.toFixed(1)} ms`);
     expect(best).toBeLessThan(1000);
+  });
+});
+
+/* ====================================================================================
+   TIERED LEG POOL (2026-09-05, Josh, verbatim): "It's also only showing 4 Anytime TD parlays in
+   the generated parlays. It should be showing 50+ Anytime TD parlays"
+   ==================================================================================== */
+
+describe("CFB_PARLAYS — the pinned constants", () => {
+  it("deep-equal pin: change the constant and this pin together", () => {
+    expect(CFB_PARLAYS).toEqual({
+      safer: { legs: { min: 2, max: 3 }, minLegProb: 0.58, maxDec: 3.5 },
+      longshot: { legs: { min: 4, max: 6 }, minDec: 8, maxDec: 60 },
+      mix: { legs: { min: 3, max: 5 }, minDec: 3, maxDec: 20 },
+      minLegEvPct: -3,
+      setFloorEvPct: -12,
+      setBands: { anytime_td: { legs: { min: 2, max: 4 }, minDec: 4, maxDec: 250 } },
+      maxPerGame: 2,
+      perView: 6,
+      perCategory: 50,
+    });
+  });
+  it("setBandOf: anytime TD reads its own band, every other set the shared 2–6 / 1.5–60 band", () => {
+    expect(setBandOf("anytime_td")).toEqual({ legs: { min: 2, max: 4 }, minDec: 4, maxDec: 250 });
+    for (const k of CFB_PARLAY_CATEGORIES) if (k !== "anytime_td") expect(setBandOf(k)).toEqual({ legs: { min: 2, max: 6 }, minDec: 1.5, maxDec: 60 });
+  });
+});
+
+/** 6 upcoming games × 12 Caesars anytime-TD rows. Games 0–2: players 0 and 1 clear the −3 gate —
+    six tier-1 legs across three games, the prod shape (games 3–5 have none); the other players sit in the
+    tier-2 band (−4 … −11 %, Caesars' anytime-TD shade); players 10–11 fall below the −12 floor and
+    must never appear. Prices are the fair price shaded to hit those EVs, dec 1.3–8. */
+function atdSlate(): { board: CfbBoard; rows: CfbPropRow[] } {
+  const b = synthBoard(6);
+  const rows: CfbPropRow[] = [];
+  b.games.forEach((g, gi) => {
+    for (let pi = 0; pi < 12; pi++) {
+      const gated = gi < 3 && pi < 2;
+      // target EV%: gated +1..+4, tier 2 −4..−11, below floor −14 / −20
+      const ev = gated ? 1 + ((gi + pi) % 4) : pi >= 10 ? (pi === 10 ? -14 : -20) : -4 - ((gi * 3 + pi) % 8);
+      const fair = 0.13 + ((gi * 7 + pi * 5) % 10) * 0.05; // 0.13 … 0.58
+      const dec = (1 + ev / 100) / fair;
+      const player = `P${pi} ${g.home.abbr}`;
+      const cz = { book: "williamhill_us", title: "Caesars", price: decToAm(dec), line: null, dec };
+      const evCz = evPct(fair, 0, dec);
+      rows.push({
+        key: `${g.id}|anytime_td|${player.toLowerCase().replace(/\s+/g, "-")}|yes|`,
+        gameId: g.id,
+        oddsEventId: g.oddsEventId ?? "",
+        market: "anytime_td",
+        side: "yes",
+        player,
+        team: g.home.name,
+        teamId: g.home.id,
+        teamAbbr: g.home.abbr,
+        opp: g.away.abbr,
+        kickoff: g.start,
+        status: g.status,
+        label: `${player} Anytime TD`,
+        sub: `${g.home.abbr} vs ${g.away.abbr}`,
+        line: null,
+        fair,
+        fairAm: decToAm(1 / fair),
+        books: 3,
+        cz,
+        best: cz,
+        dk: null,
+        fd: null,
+        evCz,
+        evBest: evCz,
+        grade: gradeFromEv(evCz),
+        kelly: null,
+        playable: true,
+        ctx: null,
+      });
+    }
+  });
+  return { board: b, rows };
+}
+
+describe("TIERED LEG POOL — 50 anytime TD parlays from six −3 legs", () => {
+  const { board: atdBoard, rows: atdRows } = atdSlate();
+  const p = buildCfbPicks(atdBoard, atdRows, OPTS);
+  const atd = p.sets.anytime_td;
+  const evOf = new Map(atdRows.map((r) => [r.key, r.evCz ?? -Infinity]));
+  const band = setBandOf("anytime_td");
+  it("the fixture is the prod shape: 72 Caesars ATD rows, exactly 6 clear −3, 60 sit in the tier-2 band, 12 are below the floor", () => {
+    expect(atdRows.length).toBe(72);
+    expect(atdRows.filter((r) => r.evCz! >= CFB_PARLAYS.minLegEvPct).length).toBe(6);
+    expect(atdRows.filter((r) => r.evCz! < CFB_PARLAYS.minLegEvPct && r.evCz! >= CFB_PARLAYS.setFloorEvPct).length).toBe(54);
+    expect(atdRows.filter((r) => r.evCz! < CFB_PARLAYS.setFloorEvPct).length).toBe(12);
+    for (const r of atdRows) {
+      expect(r.cz!.dec).toBeGreaterThanOrEqual(1.3);
+      expect(r.cz!.dec).toBeLessThanOrEqual(8);
+    }
+  });
+  it("the anytime TD set reaches perCategory (50), distinct tickets, ids numbered per category", () => {
+    expect(atd.length).toBe(CFB_PARLAYS.perCategory);
+    expect(new Set(atd.map(legKey)).size).toBe(atd.length);
+    atd.forEach((t, i) => {
+      expect(t.id).toBe(`cfb-${DATE}-anytime_td-${i + 1}`);
+      expect(t.category).toBe("anytime_td");
+      expect(t.name).toBe(`ANYTIME TD · ${t.legs.length} legs`);
+    });
+  });
+  it("gated tickets (every leg ≥ −3) come first, EV-ranked; the ungated rest follow, EV-ranked; both kinds exist", () => {
+    const firstOpen = atd.findIndex((t) => !t.gated);
+    expect(firstOpen).toBeGreaterThan(0);
+    for (let i = 0; i < atd.length; i++) expect(atd[i].gated).toBe(i < firstOpen);
+    // the card's `ev` is rounded to 2 dp; ranking is on the unrounded figure, so the rounded one is monotone, never strictly ordered
+    for (const half of [atd.slice(0, firstOpen), atd.slice(firstOpen)]) for (let i = 1; i < half.length; i++) expect(half[i - 1].ev).toBeGreaterThanOrEqual(half[i].ev);
+    for (const t of atd) expect(t.gated).toBe(t.legs.every((l) => evOf.get(l.rowKey)! >= CFB_PARLAYS.minLegEvPct));
+  });
+  it("every ticket: 2–4 legs, dec within [4, 250], one leg per game, only anytime_td, no leg below the −12 floor", () => {
+    for (const t of atd) {
+      expect(t.legs.length).toBeGreaterThanOrEqual(band.legs.min);
+      expect(t.legs.length).toBeLessThanOrEqual(band.legs.max);
+      expect(t.dec).toBeGreaterThanOrEqual(band.minDec - 1e-6);
+      expect(t.dec).toBeLessThanOrEqual(band.maxDec + 1e-6);
+      expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
+      for (const l of t.legs) {
+        expect(l.market).toBe("anytime_td");
+        expect(l.live).toBe(false);
+        expect(evOf.get(l.rowKey)!).toBeGreaterThanOrEqual(CFB_PARLAYS.setFloorEvPct);
+      }
+      expect(t.legs.some((l) => /^P1[01] /.test(l.label))).toBe(false);
+    }
+    // a spread of leg counts, not fifty of one size
+    expect(new Set(atd.map((t) => t.legs.length)).size).toBeGreaterThanOrEqual(2);
+  });
+  it("the ungated half is not empty-handed EV: every ticket's ev is the honest product of its legs (negative on shaded legs)", () => {
+    for (const t of atd) {
+      const prob = t.legs.reduce((q, l) => q * l.prob, 1);
+      const dec = t.legs.reduce((d, l) => d * l.dec, 1);
+      expect(t.ev).toBeCloseTo(100 * (prob * dec - 1), 1);
+      expect(t.am).toBe(decToAm(t.dec));
+    }
+    expect(atd.some((t) => !t.gated && t.ev < 0)).toBe(true);
+  });
+  it("the other single-market sets are unchanged in kind: side sets build from the same −3 legs first and never admit a leg below the floor; prop sets with no rows stay empty", () => {
+    for (const k of ["pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds"] as const) expect(p.sets[k]).toEqual([]);
+    for (const k of ["ml", "spread", "total"] as const)
+      for (const t of p.sets[k]) {
+        expect(t.gated).toBe(true); // the synthetic board's Caesars sides all clear −3, so no tier-2 side ever enters
+        expect(t.dec).toBeLessThanOrEqual(60 + 1e-6);
+        expect(t.legs.length).toBeLessThanOrEqual(6);
+      }
+  });
+  it("legacy views, combo, mixed and live keep tier 1 only: no leg below −3 anywhere outside the single-market sets", () => {
+    const liveSlate = withLive(atdBoard, 2);
+    const liveRowsAtd = atdRows.map((r) => ({ ...r, status: liveSlate.games.find((g) => g.id === r.gameId)!.status }));
+    const lp = buildCfbPicks(liveSlate, liveRowsAtd, OPTS);
+    const outside = [...p.parlays, ...p.sets.combo, ...lp.parlays, ...lp.sets.combo, ...lp.sets.mixed, ...lp.sets.live];
+    expect(outside.length).toBeGreaterThan(0);
+    expect(lp.sets.live.length + lp.sets.mixed.length).toBeGreaterThan(0);
+    for (const t of outside) {
+      expect(t.gated).toBe(true);
+      for (const l of t.legs) if (l.market === "anytime_td") expect(evOf.get(l.rowKey)!).toBeGreaterThanOrEqual(CFB_PARLAYS.minLegEvPct);
+    }
+    // the tiered set is still tiered with games in play: live games' ATD legs never enter it
+    const liveIds = new Set(liveSlate.games.filter((g) => g.status === "live").map((g) => g.id));
+    for (const t of lp.sets.anytime_td) for (const l of t.legs) expect(liveIds.has(l.gameId)).toBe(false);
+  });
+  it("with tier 1 alone the set is small (the 4-ticket symptom): six −3 legs on three games cap at 12 pairs + 8 triples, one leg per game", () => {
+    const strict = atdRows.filter((r) => r.evCz! >= CFB_PARLAYS.minLegEvPct);
+    const s = buildCfbPicks(atdBoard, strict, OPTS);
+    expect(s.sets.anytime_td.length).toBeGreaterThan(0);
+    expect(s.sets.anytime_td.length).toBeLessThanOrEqual(20);
+    expect(s.sets.anytime_td.every((t) => t.gated)).toBe(true);
+    // the tiered build's gated half is exactly this set's tickets (same keys), so tier 2 only ever appends
+    expect(new Set(atd.filter((t) => t.gated).map(legKey))).toEqual(new Set(s.sets.anytime_td.map(legKey)));
+  });
+  it("deterministic: reversed rows build the same tiered set, byte for byte", () => {
+    expect(JSON.stringify(buildCfbPicks(atdBoard, [...atdRows].reverse(), OPTS).sets.anytime_td)).toBe(JSON.stringify(atd));
   });
 });

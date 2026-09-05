@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion, type Transition } from "motion/react";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, CSSProperties, ReactNode } from "react";
 import {
   IconBoard,
   IconBuilder,
@@ -32,24 +32,38 @@ type NavItem = {
   mobile: boolean;
   /** shorter label for the 9.5px bottom-bar type (six tabs at 375px) */
   mobileLabel?: string;
+  /** the tab's accent (2026-09-05, Josh: "Add color to the Tab titles") — a hex, distinct
+   *  per tab, pastel enough to read at 9.5px on the dark ground. Label + icon wear it
+   *  (70% when idle, full when active) and the active pill/bar glow takes it too. */
+  tone: `#${string}`;
 };
+
+/** `#RRGGBB` → `rgba(r, g, b, a)` — the tone at a given opacity (idle text, pill fill, glow) */
+function tint(hex: string, alpha: number) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 // Order is Josh's, verbatim (2026-09-03): "Games, Stats, Board, Builder, Parlay Builder,
 // Parlay Calculator (formerly Calc) on Top Left & Ledger, The Sharp, Simulator, Settings
 // on Bottom Left." Dashboard is gone — the brand logo already links "/".
+// 2026-09-04, Josh: "Move the Ledger tab back up right below Parlay Calc (Rename it from Parlay Calculator)"
+// 2026-09-05, Josh: "'The Sharp' & 'Simulator' tabs can go back up right above Parlay Builder"
+// + "'Ledger' tab can be moved down to bottom of page right above Settings"
+// + "Add color to the Tab titles (ie: Board, The Sharp, Simulator, etc)" — the `tone` column.
 const NAV: readonly NavItem[] = [
-  { href: "/games", label: "Games", icon: IconGames, group: "top", mobile: true },
-  { href: "/stats", label: "Stats", icon: IconStats, group: "top", mobile: true },
-  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true },
-  { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true },
-  { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true, mobileLabel: "Parlays" },
-  { href: "/calc", label: "Parlay Calc", icon: IconCalc, group: "top", mobile: false },
-  // 2026-09-04, Josh: "Move the Ledger tab back up right below Parlay Calc (Rename it from Parlay Calculator)"
-  { href: "/ledger", label: "Ledger", icon: IconLedger, group: "top", mobile: true },
-  { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "bottom", mobile: false },
-  { href: "/simulator", label: "Simulator", icon: IconSim, group: "bottom", mobile: false },
-  { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false },
+  { href: "/games", label: "Games", icon: IconGames, group: "top", mobile: true, tone: "#7DD3FC" },
+  { href: "/stats", label: "Stats", icon: IconStats, group: "top", mobile: true, tone: "#C4B5FD" },
+  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#B6FF3D" },
+  { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true, tone: "#FCD34D" },
+  { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "top", mobile: false, tone: "#FDA4AF" },
+  { href: "/simulator", label: "Simulator", icon: IconSim, group: "top", mobile: false, tone: "#67E8F9" },
+  { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true, mobileLabel: "Parlays", tone: "#FDBA74" },
+  { href: "/calc", label: "Parlay Calc", icon: IconCalc, group: "top", mobile: false, tone: "#5EEAD4" },
+  { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true, tone: "#FDE68A" },
+  { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
 ];
+
 
 // "/" is the landing and is never a rail entry, so it is never highlighted.
 function isActive(pathname: string, href: string) {
@@ -73,23 +87,34 @@ function Brand() {
   );
 }
 
+/* Tone opacities: idle label/icon sit at 70% / 55% of the tab's tone; the active
+   state is the full tone, and the pill fill, its inset ring and the glow are the
+   same hue at low alpha — so each tab lights up in its own colour, never always lime. */
+const IDLE_LABEL = 0.7;
+const IDLE_ICON = 0.55;
+
 function RailLink({ item, pathname, transition }: { item: NavItem; pathname: string; transition: Transition }) {
-  const { href, label, icon: Icon } = item;
+  const { href, label, icon: Icon, tone } = item;
   const active = isActive(pathname, href);
   return (
     <Link
       href={href}
       replace
-      className={`press relative flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium ${
-        active ? "text-pos" : "text-muted hover:bg-white/[0.05] hover:text-text"
+      className={`press group relative flex items-center gap-2.5 rounded-full px-3.5 py-2 text-[13px] font-medium ${
+        active ? "" : "hover:bg-white/[0.05]"
       }`}
+      style={{ "--tone": tone } as CSSProperties}
     >
       {active && (
         <motion.span
           layoutId="rail-active"
           initial={false}
           transition={transition}
-          className="absolute inset-0 rounded-full bg-pos/10 shadow-[inset_0_0_0_1px_rgba(182,255,61,0.16),0_0_18px_-8px_rgba(182,255,61,0.55)]"
+          className="absolute inset-0 rounded-full"
+          style={{
+            backgroundColor: tint(tone, 0.1),
+            boxShadow: `inset 0 0 0 1px ${tint(tone, 0.16)}, 0 0 18px -8px ${tint(tone, 0.55)}`,
+          }}
           aria-hidden
         />
       )}
@@ -98,12 +123,18 @@ function RailLink({ item, pathname, transition }: { item: NavItem; pathname: str
           layoutId="rail-bar"
           initial={false}
           transition={transition}
-          className="absolute -left-2 top-[calc(50%-8px)] h-4 w-[3px] rounded-full bg-pos shadow-[0_0_10px_rgba(182,255,61,0.7)]"
+          className="absolute -left-2 top-[calc(50%-8px)] h-4 w-[3px] rounded-full"
+          style={{ backgroundColor: tone, boxShadow: `0 0 10px ${tint(tone, 0.7)}` }}
           aria-hidden
         />
       )}
-      <Icon className={`relative ${active ? "text-pos" : "text-faint"}`} />
-      <span className="relative">{label}</span>
+      {/* desktop hover brightens the idle icon + label to the full tone (a CSS var, so the class can win over the inline idle colour) */}
+      <span className="relative flex group-hover:[color:var(--tone)]!" style={{ color: active ? tone : tint(tone, IDLE_ICON) }}>
+        <Icon />
+      </span>
+      <span className="relative group-hover:[color:var(--tone)]!" style={{ color: active ? tone : tint(tone, IDLE_LABEL) }}>
+        {label}
+      </span>
     </Link>
   );
 }
@@ -172,14 +203,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <SportSwitch size="sm" className="shrink-0" />
         <div className="flex shrink-0 items-center gap-0.5">
-          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon }) => (
+          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone }) => (
             <Link
               key={href}
               href={href}
               replace
               aria-label={label}
               title={label}
-              className={`press rounded-lg p-[5px] ${isActive(pathname, href) ? "text-pos" : "text-muted"}`}
+              className="press rounded-lg p-[5px]"
+              style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
             >
               <Icon />
             </Link>
@@ -206,7 +238,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           gridTemplateColumns: `repeat(${NAV.filter((n) => n.mobile).length}, minmax(0, 1fr))`,
         }}
       >
-        {NAV.filter((n) => n.mobile).map(({ href, label, mobileLabel, icon: Icon }) => {
+        {NAV.filter((n) => n.mobile).map(({ href, label, mobileLabel, icon: Icon, tone }) => {
           const active = isActive(pathname, href);
           return (
             <Link
@@ -214,16 +246,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               href={href}
               replace
               aria-label={label}
-              className={`press relative flex flex-col items-center gap-0.5 py-2 text-[9.5px] font-semibold ${
-                active ? "text-pos" : "text-faint"
-              }`}
+              className="press relative flex flex-col items-center gap-0.5 py-2 text-[9.5px] font-semibold"
+              style={{ color: active ? tone : tint(tone, IDLE_LABEL) }}
             >
               {active && (
                 <motion.span
                   layoutId="tab-active"
                   initial={false}
                   transition={slide}
-                  className="absolute left-[calc(50%-24px)] top-[3px] h-[30px] w-12 rounded-full bg-pos/15 shadow-[inset_0_0_0_1px_rgba(182,255,61,0.22),0_-6px_18px_-8px_rgba(182,255,61,0.6)]"
+                  className="absolute left-[calc(50%-24px)] top-[3px] h-[30px] w-12 rounded-full"
+                  style={{
+                    backgroundColor: tint(tone, 0.15),
+                    boxShadow: `inset 0 0 0 1px ${tint(tone, 0.22)}, 0 -6px 18px -8px ${tint(tone, 0.6)}`,
+                  }}
                   aria-hidden
                 />
               )}

@@ -146,7 +146,31 @@ export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/f
     fund a 24 × 10-min live cadence inside 2500 credits. Closing that gap means one of: a longer
     live cadence (30 min ≈ 8,900 per afternoon), a smaller live pool, or a daily budget reconciled
     with the monthly balance — and telling Josh plainly that live props freeze mid-afternoon until
-    one of those is chosen. */
+    one of those is chosen.
+
+    THE CAESARS-MISSING RULE (2026-09-05, Josh, verbatim: "It's still only showing ANYTIME TD picks
+    for ARST @ MEM, WYO @ CSU, FIU @ USF, WMU @ MICH, SHSU @ TROY, BOISE @ ORE; They are still 12
+    games today that haven't started w/ current Anytime TD odds"). Read on prod at ~15:45 PT: of 17
+    games with rows, 11 carried DK / FD anytime-TD rows but NO Caesars quote on any row, while
+    Caesars itself was posting those games. Caesars posts player props later than DK / FD, and an
+    upcoming game rode its stored rows for the whole 2 h carry — priced once before Caesars posted,
+    nothing re-asked. So: an UPCOMING game on the stored board that HAS rows and, on at least one
+    MARKET with rows, carries no Caesars quote (`czMissingGameIds` — keyed on the market, so Caesars
+    yardage props without a Caesars anytime TD still re-check), with kickoff inside
+    `czMissingWindowSec` (4 h) ahead, is re-fetched once its own pricedAt is older than
+    `czMissingRevalidateSec` (30 min) — instead of the 2 h carry. A game with ZERO rows is NOT
+    Caesars-missing (review fix): it stays on the 2 h empty-event hold, upcoming or live — 29 of the
+    46 priced games on the complaint day were FBS-vs-FCS games no book posts props on, and re-asking
+    them every 30 min would have wanted ~7,200 credits. Outside the 4 h window the 2 h rule stands;
+    live games keep theirs (a live game with rows re-prices only once ITS OWN pricedAt is older than
+    `liveRevalidateSec`). Those re-pulls are part of the pull's "need", ordered AFTER the live games
+    and the games never priced, so under a tight budget the cheapest wins still go first — which
+    also means that on a busy live afternoon the re-checks are bought only when the live pulls leave
+    room. Cost, honestly: per game at most one extra pull per 30 min in the 4 h before kickoff —
+    8 × 31 = 248 credits worst case — but in AGGREGATE the 12 such games Josh named would want
+    12 × 248 = 2,976, more than the 2,500 daily rail before a single live pull; the rail binds, and
+    the games it refuses simply keep their last priced rows. A board that counts a Caesars-missing
+    game answers `ttlSec` = min(window, 30 min) so the phone re-asks on the rule's cadence. */
 export const CFB_PROPS = {
   /** pre-kick events priced per slate (INSTRUCTION 42, 2026-09-05: was 12 — every eligible game now) */
   maxEvents: 60,
@@ -157,6 +181,10 @@ export const CFB_PROPS = {
   liveMaxEvents: 24,
   /** how long the last good board stays in Redis past its window — the stale fallback once the budget is spent */
   boardRetainSec: 36 * 3600,
+  /** an upcoming game with rows but NO Caesars quote on some market it has rows for is re-asked this often (s) — Caesars posts props late; a game with no rows is never re-asked early */
+  czMissingRevalidateSec: 1800,
+  /** …but only inside this many seconds before its kickoff; earlier, the 2 h carry stands */
+  czMissingWindowSec: 4 * 3600,
   regions: "us",
   minBooks: 2,
   settleBook: "williamhill_us",
@@ -174,13 +202,32 @@ export const CFB_PROPS = {
     section and combo section (that has live & pregame picks on the same ticket) should still
     be generating picks as well". `perCategory` (50) caps each of the twelve category sets in
     CfbPicks.sets (CFB_PARLAY_CATEGORIES); `perView` stays for the legacy tiered "parlays"
-    view. Single-market sets hold one leg per game; combo / mixed / live keep `maxPerGame`. */
+    view. Single-market sets hold one leg per game; combo / mixed / live keep `maxPerGame`. Tier 2
+    (below) applies to EVERY single-market set — ML, SPREAD and TOTAL included, not only anytime
+    TD — on purpose: INSTRUCTION 42 asked for 50 tickets under every category, and each loosened
+    ticket wears the EDGE − tag with its red EV, so nothing is passed off as a gated edge.
+
+    TIERED LEG POOL (2026-09-05, Josh, verbatim: "It's also only showing 4 Anytime TD parlays in
+    the generated parlays. It should be showing 50+ Anytime TD parlays"): Caesars shades anytime
+    TD, so on the opening Saturday only six ATD legs across two games cleared the −3 gate, and
+    SET_BAND's decimal cap of 60 made a third 3–8 leg impossible — four tickets. A single-market
+    category set now builds from tier 1 (Caesars-priced, EV ≥ `minLegEvPct`) first and, when that
+    yields fewer than `perCategory` tickets, extends its pool to tier 2 — any Caesars-priced,
+    upcoming, non-live leg of that market with EV ≥ `setFloorEvPct` — until fifty or the pool runs
+    dry. Tickets whose every leg passed the −3 gate rank first (by EV), then the rest by EV; each
+    ticket carries `gated` so the Board can label the loosened ones honestly. The legacy tiered
+    view, combo, mixed and live keep tier 1 only. `setBands` overrides the set band per market:
+    anytime TD legs price 3–8 decimal, so its tickets are 2–4 legs, decimal 4–250. */
 export const CFB_PARLAYS = {
   safer: { legs: { min: 2, max: 3 }, minLegProb: 0.58, maxDec: 3.5 },
   longshot: { legs: { min: 4, max: 6 }, minDec: 8, maxDec: 60 },
   mix: { legs: { min: 3, max: 5 }, minDec: 3, maxDec: 20 },
   /** a leg needs at least this % EV at Caesars (grade D or better, never an F) */
   minLegEvPct: -3,
+  /** tier 2 for the single-market category sets only: a Caesars-priced upcoming leg admitted down to this % EV once tier 1 cannot fill the set */
+  setFloorEvPct: -12,
+  /** per-market set bands (leg count + decimal price); a market absent here uses the shared set band (2–6 legs, decimal 1.5–60) */
+  setBands: { anytime_td: { legs: { min: 2, max: 4 }, minDec: 4, maxDec: 250 } },
   maxPerGame: 2,
   /** legacy tiered view: tickets per tier */
   perView: 6,

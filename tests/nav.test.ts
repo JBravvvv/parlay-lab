@@ -8,6 +8,16 @@ import { describe, expect, it } from "vitest";
  * Calc) on Top Left & Ledger, The Sharp, Simulator, Settings on Bottom Left. You can remove
  * Dashboard tab as it does the same thing as pressing the ... logo in top left of screen."
  *
+ * 2026-09-04 addendum: "Move the Ledger tab back up right below Parlay Calc (Rename it from
+ * Parlay Calculator)".
+ *
+ * 2026-09-05, Josh, verbatim (supersedes the two group splits above):
+ *   "'The Sharp' & 'Simulator' tabs can go back up right above Parlay Builder"
+ *   "'Ledger' tab can be moved down to bottom of page right above Settings"
+ *   "Add color to the Tab titles (ie: Board, The Sharp, Simulator, etc)"
+ * → top: Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc;
+ *   bottom: Ledger, Settings; every entry carries a distinct `tone` hex.
+ *
  * Source-scan pins on the NAV table in AppShell.tsx so a later edit cannot quietly reshuffle it.
  */
 
@@ -27,44 +37,53 @@ function navEntries() {
       group: /group: "(top|bottom)"/.exec(l)![1],
       mobile: /mobile: (true|false)/.exec(l)![1] === "true",
       mobileLabel: /mobileLabel: "([^"]+)"/.exec(l)?.[1],
+      tone: /tone: "(#[0-9A-Fa-f]{6})"/.exec(l)?.[1],
     }));
 }
 
 describe("nav — desktop side rail", () => {
   const nav = navEntries();
-  // 2026-09-04 addendum, Josh: "Move the Ledger tab back up right below Parlay Calc
-  // (Rename it from Parlay Calculator)" — Ledger joins the top group after Parlay Calc.
-  it("top group is Games, Stats, Board, Builder, Parlay Builder, Parlay Calc, Ledger — in that order", () => {
+  // 2026-09-05, Josh: "'The Sharp' & 'Simulator' tabs can go back up right above Parlay Builder"
+  // (this rewrites the 2026-09-04 pin "Ledger right below Parlay Calc" — Ledger now lives in
+  // the bottom group, see the next pin)
+  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc — in that order", () => {
     expect(nav.filter((n) => n.group === "top").map((n) => n.label)).toEqual([
       "Games",
       "Stats",
       "Board",
       "Builder",
+      "The Sharp",
+      "Simulator",
       "Parlay Builder",
       "Parlay Calc",
-      "Ledger",
     ]);
     expect(nav.filter((n) => n.group === "top").map((n) => n.href)).toEqual([
       "/games",
       "/stats",
       "/board",
       "/builder",
-      "/props",
-      "/calc",
-      "/ledger",
-    ]);
-  });
-  it("bottom group is The Sharp, Simulator, Settings — in that order (Ledger moved up 2026-09-04)", () => {
-    expect(nav.filter((n) => n.group === "bottom").map((n) => n.label)).toEqual([
-      "The Sharp",
-      "Simulator",
-      "Settings",
-    ]);
-    expect(nav.filter((n) => n.group === "bottom").map((n) => n.href)).toEqual([
       "/sharp",
       "/simulator",
-      "/settings",
+      "/props",
+      "/calc",
     ]);
+  });
+  it("The Sharp and Simulator sit immediately above Parlay Builder", () => {
+    const labels = nav.map((n) => n.label);
+    const pb = labels.indexOf("Parlay Builder");
+    expect(labels.slice(pb - 2, pb)).toEqual(["The Sharp", "Simulator"]);
+  });
+  // 2026-09-05, Josh: "'Ledger' tab can be moved down to bottom of page right above Settings"
+  it("bottom group is Ledger, Settings — in that order", () => {
+    expect(nav.filter((n) => n.group === "bottom").map((n) => n.label)).toEqual(["Ledger", "Settings"]);
+    expect(nav.filter((n) => n.group === "bottom").map((n) => n.href)).toEqual(["/ledger", "/settings"]);
+  });
+  it("Ledger is in the bottom group, immediately before Settings (the last entry)", () => {
+    const ledger = nav.find((n) => n.href === "/ledger")!;
+    expect(ledger.group).toBe("bottom");
+    const i = nav.indexOf(ledger);
+    expect(nav[i + 1]?.href).toBe("/settings");
+    expect(nav.at(-1)!.href).toBe("/settings");
   });
   it("the table is top group first, then bottom group (source order = render order)", () => {
     const groups = nav.map((n) => n.group);
@@ -112,7 +131,7 @@ describe("nav — mobile (375px)", () => {
     expect(shell).toMatch(/gridTemplateColumns: `repeat\(\$\{NAV\.filter\(\(n\) => n\.mobile\)\.length\}/);
   });
   it("every route not in the bottom bar is an icon in the mobile top bar (all 10 pages reachable on a phone)", () => {
-    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/calc", "/sharp", "/simulator", "/settings"]);
+    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/settings"]);
     // the header row derives from the same table, so nothing can fall off
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
     expect(header).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
@@ -120,5 +139,61 @@ describe("nav — mobile (375px)", () => {
   });
   it("isActive semantics are unchanged", () => {
     expect(shell).toMatch(/return href === "\/" \? pathname === "\/" : pathname\.startsWith\(href\);/);
+  });
+});
+
+describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab titles\")", () => {
+  const nav = navEntries();
+  it("every tab carries a tone hex, and every tone is distinct", () => {
+    for (const n of nav) expect(n.tone, n.label).toMatch(/^#[0-9A-F]{6}$/);
+    expect(new Set(nav.map((n) => n.tone)).size).toBe(nav.length);
+    expect(nav.length).toBe(10);
+  });
+  it("tones are the agreed palette (Board keeps the lime brand green)", () => {
+    expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
+      Games: "#7DD3FC",
+      Stats: "#C4B5FD",
+      Board: "#B6FF3D",
+      Builder: "#FCD34D",
+      "The Sharp": "#FDA4AF",
+      Simulator: "#67E8F9",
+      "Parlay Builder": "#FDBA74",
+      "Parlay Calc": "#5EEAD4",
+      Ledger: "#FDE68A",
+      Settings: "#D4D4D8",
+    });
+  });
+  it("the tone is the label colour in the rail and the phone bar, and the icon colour in the top-bar row — idle at 70%, active at full", () => {
+    expect(shell).toMatch(/const IDLE_LABEL = 0\.7;/);
+    expect(shell).toMatch(/function tint\(hex: string, alpha: number\)/);
+    const rail = shell.slice(shell.indexOf("function RailLink"), shell.indexOf("export function AppShell"));
+    expect(rail).toMatch(/<span className="relative group-hover:\[color:var\(--tone\)\]!" style=\{\{ color: active \? tone : tint\(tone, IDLE_LABEL\) \}\}>/);
+    // review fix: the desktop rail brightens on hover again — the tone rides a CSS variable on the Link (`group`), and the
+    // spans' group-hover colour is !important so it beats the inline idle colour (Tailwind v4 trailing-! syntax)
+    expect(rail).toMatch(/className=\{`press group relative flex/);
+    expect(rail).toMatch(/style=\{\{ "--tone": tone \} as CSSProperties\}/);
+    expect(rail).toMatch(/<span className="relative flex group-hover:\[color:var\(--tone\)\]!" style=\{\{ color: active \? tone : tint\(tone, IDLE_ICON\) \}\}>/);
+    expect((rail.match(/group-hover:\[color:var\(--tone\)\]!/g) ?? []).length).toBe(2);
+    const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
+    expect(header).toMatch(/style=\{\{ color: isActive\(pathname, href\) \? tone : tint\(tone, IDLE_LABEL\) \}\}/);
+    const bar = shell.slice(shell.lastIndexOf("<nav"), shell.lastIndexOf("</nav>"));
+    expect(bar).toMatch(/style=\{\{ color: active \? tone : tint\(tone, IDLE_LABEL\) \}\}/);
+    // the always-lime classes are gone from the nav surfaces
+    for (const seg of [rail, header, bar]) {
+      expect(seg).not.toMatch(/text-pos/);
+      expect(seg).not.toMatch(/bg-pos/);
+      expect(seg).not.toMatch(/182,255,61/);
+    }
+  });
+  it("the active pill and rail bar glow in the tab's tone (motion layoutId pills kept)", () => {
+    const rail = shell.slice(shell.indexOf("function RailLink"), shell.indexOf("export function AppShell"));
+    expect(rail).toMatch(/layoutId="rail-active"[\s\S]*?backgroundColor: tint\(tone, 0\.1\)/);
+    expect(rail).toMatch(/layoutId="rail-bar"[\s\S]*?backgroundColor: tone, boxShadow: `0 0 10px \$\{tint\(tone, 0\.7\)\}`/);
+    const bar = shell.slice(shell.lastIndexOf("<nav"), shell.lastIndexOf("</nav>"));
+    expect(bar).toMatch(/layoutId="tab-active"[\s\S]*?backgroundColor: tint\(tone, 0\.15\)/);
+  });
+  it("press affordance and reduced-motion (INSTANT transition) survive", () => {
+    expect(shell).toMatch(/const slide = reduced \? INSTANT : SLIDE;/);
+    expect((shell.match(/className="press |className=\{`press /g) ?? []).length).toBe(3);
   });
 });

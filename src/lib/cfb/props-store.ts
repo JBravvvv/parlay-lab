@@ -161,6 +161,30 @@ export function pricedAgeMs(board: Pick<CfbPropsBoard, "generatedAt" | "pricedAt
   return Number.isFinite(age) && age >= 0 ? age : null;
 }
 
+/**
+ * THE CAESARS-MISSING RULE (2026-09-05): is this UPCOMING game due a re-pull ahead of its 2 h carry?
+ * Yes when it is on the stored board, `czMissing` is true — the caller's `czMissingGameIds(rows)`
+ * verdict: the game HAS rows and some market with rows on it carries no Caesars quote (review fix:
+ * keyed on the market, and a game with ZERO rows is never missing — it stays on the 2 h empty-event
+ * hold, because a game no book posts props on does not grow any by being asked every 30 min) — its
+ * kickoff (`kickoffMs`) is inside CFB_PROPS.czMissingWindowSec ahead of `now`, and its own pricedAt
+ * is older than CFB_PROPS.czMissingRevalidateSec (an unreadable stamp reads as due). A live game, a
+ * game with Caesars on every market it has, or a kickoff past the window → false: the existing rules
+ * decide those.
+ */
+export function czMissingDue(
+  board: Pick<CfbPropsBoard, "generatedAt" | "pricedAt">,
+  game: { id: string; status: string; kickoffMs: number },
+  czMissing: boolean,
+  now: number,
+): boolean {
+  if (game.status !== "upcoming" || !czMissing) return false;
+  const ahead = game.kickoffMs - now;
+  if (!Number.isFinite(ahead) || ahead < 0 || ahead > CFB_PROPS.czMissingWindowSec * 1000) return false;
+  const age = pricedAgeMs(board, game.id, now);
+  return age == null || age > CFB_PROPS.czMissingRevalidateSec * 1000;
+}
+
 export type CfbPropsStore = {
   /** the stored board for the date, or null when absent / unparsable — ANY age; the route decides freshness with `boardFresh` */
   readBoard(date: string): Promise<CfbPropsBoard | null>;
