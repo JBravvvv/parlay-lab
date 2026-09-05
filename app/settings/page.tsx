@@ -8,6 +8,9 @@ import { getMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, D
 import type { BankStore } from "@/lib/bankroll";
 import { getSyncKey, setSyncKey, syncNow, useSyncState, SYNC_EVENT } from "@/lib/ledgerSync";
 import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
+import { CFB_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbBankPanel } from "@/components/cfb/CfbBankPanel";
 
 /* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
 function SelectionCalibrationPanel() {
@@ -307,6 +310,8 @@ export default function SettingsPage() {
   const [quotaAt, setQuotaAt] = useState<string | null>(null);
   const [sharpOk, setSharpOk] = useState<null | boolean>(null);
   const [saved, setSaved] = useState("");
+  const sport = useSport();
+  const cfbDesk = CFB_ENABLED && sport === "cfb";
 
   useEffect(() => {
     setBankroll(getMoney().bankroll);
@@ -356,11 +361,11 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
+      <PageHeader title="Settings" eyebrow={cfbDesk ? "College Football" : undefined} chip={cfbDesk ? <CfbChip /> : undefined} sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
       {saved && <div className="mb-3 text-[12px] text-pos">{saved}</div>}
 
       <div className="space-y-4">
-        <Panel title="Sizing">
+        <Panel title="Sizing · MLB bank">
           {/* Phase 6 (Correction 4): bankroll is MANAGED — $2,500 base + logged
               deposits/withdrawals + realized graded P/L. No free edits: hand-editing
               it ($750→$2,000→$2,500→$350 in a week) corrupted every Kelly figure;
@@ -419,6 +424,13 @@ export default function SettingsPage() {
           </Row>
         </Panel>
 
+        {/* CFB desk (2026-09-05): its own bank, its own keys — shown whichever sport the switch is on */}
+        {CFB_ENABLED && (
+          <Panel title="College Football bank">
+            <CfbBankPanel />
+          </Panel>
+        )}
+
         <SelectionCalibrationPanel />
 
         <LedgerSyncPanel />
@@ -474,5 +486,14 @@ export default function SettingsPage() {
 
       <div className="mt-4 text-[10.5px] text-faint">Informational only, not betting advice.</div>
     </>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

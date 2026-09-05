@@ -1,3 +1,33 @@
+# Progress — 2026-09-05 (College Football desk)
+
+## INSTRUCTION 38 — a fully separate CFB desk, an engine per sport, and the UI upgrade
+- Global switch src/lib/sport.ts (localStorage `pl_sport`, event `pl:sport`, `useSport()`); the
+  SportSwitch pill sits in the rail and the phone header; every page early-returns its CFB surface
+  on `cfb` and the MLB surface is untouched. `CFB_ENABLED` in src/lib/features.ts.
+- Engine: src/lib/cfb/model.ts is a market + FPI margin model (σ 16.5 margin / 18 total, HFA 2.6,
+  per-book proportional devig, Pinnacle-weighted median consensus, blends {.60/.25/.15} for win
+  probability and {.75/.25} for the margin, every book quoted at its own line, Caesars settles,
+  ¼-Kelly capped at 2%). Constants and paper rules in src/lib/cfb/rules.ts; names and matching in
+  src/lib/cfb/names.ts (10 aliases, three tiers, 3 h kickoff window); card in src/lib/cfb/card.ts;
+  grading in src/lib/cfb/grade.ts (48 h ungradable window).
+- Separate storage and routes: localStorage pl_cfb_ledger / pl_cfb_bank2, Redis pl:cfb:ledger:v1 /
+  pl:cfb:bank:v1, app/api/cfb/route.ts and app/api/cfb/ledger/route.ts, a $2,500 CFB bank with its
+  own adjustment log, a CFB ledger graded from ESPN finals at the Caesars line, its own sync beacon.
+- Fun-money decision: legs are the likeliest grade-D-or-better sides at Caesars' line, not the
+  EV-ranked underdogs the first fixture card produced (fixture data) — see docs/cfb-desk.md.
+- UI: app/template.tsx page-enter transition, rail active pill, SportSwitch, StatTile / Segmented /
+  EdgeMeter / Sparkline primitives, new tokens in app/globals.css, PageHeader eyebrow + chip, landing
+  desk chooser; the motion background and the palette are unchanged.
+- Tests: eight tests/cfb-*.test.ts files on captured fixtures in tests/fixtures/cfb/ (12 games, 14
+  odds events, 138 FPI teams — fixture captures). Gate after the doc write: tsc clean, 143 test files / 1317 tests green in 188 s (run alone, no dev server).
+- Prod read 2026-09-05 after the deploy: 68 games / 68 matched / 380 rows / 344 priced at Caesars,
+  oddsMissing false, quota 17578 → 17572 (one 6-credit pull). 375px walk in CFB mode: all eight
+  pages render; the Builder card was six $25 core singles ($150 of $150, avg EV +3.9%) plus a
+  FAVORITES PARLAY at +622 (4 legs). Switching back to MLB restored the MLB Board.
+- Dev-server caveat: /games (both desks) stalls at the Suspense placeholder in the local in-app
+  browser, with and without app/template.tsx, while the SSR stream is complete; prod hydrates. Local
+  dev has no ODDS_API_KEY, so /api/cfb returns oddsMissing: true locally.
+
 # Progress — 2026-09-03 (integration: player sheet on Games + Parlay Builder)
 
 ## Click-any-player wired into the Games surfaces and the rebuilt Parlay Builder

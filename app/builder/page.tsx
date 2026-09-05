@@ -13,7 +13,9 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbBuilder } from "@/components/cfb/CfbBuilder";
 import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr, generatesToday, GEN_CREDITS_EST } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
@@ -339,6 +341,8 @@ function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
 
 export default function BuilderPage() {
   const { data: board } = useBoard();
+  // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
+  const desk = useSport();
   const [money, setMoneyState] = useState({ daily: 0, fun: 0, bankroll: 750 });
   const [cardV, setCardV] = useState(0);
   const [status, setStatus] = useState("");
@@ -607,6 +611,22 @@ export default function BuilderPage() {
     }
     return { have: have.size, total };
   }, [d]);
+
+  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
+     card builder (it carries its own paper banner). Every hook above has already run. */
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Builder"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="A sized CFB paper card from the slate's +EV Caesars sides — its own bank and its own ledger, never mixed with MLB."
+        />
+        <CfbBuilder />
+      </>
+    );
+  }
 
   return (
     <>
@@ -1095,5 +1115,14 @@ export default function BuilderPage() {
         </>
       )}
     </>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

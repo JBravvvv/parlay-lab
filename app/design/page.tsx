@@ -13,6 +13,13 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
 import { fmtMoney } from "@/lib/format";
+import { GradeChip } from "@/components/ui/GradeChip";
+import { Segmented, type SegmentedOption } from "@/components/ui/Segmented";
+import { StatTile } from "@/components/ui/StatTile";
+import { EdgeMeter } from "@/components/ui/EdgeMeter";
+import { Sparkline } from "@/components/ui/Sparkline";
+import { SportSwitch } from "@/components/shell/SportSwitch";
+import type { Grade } from "@/lib/grade";
 
 /* Everything on this page is SAMPLE data for design review only —
    no real prices, players, or edges. The banner says so. */
@@ -64,10 +71,110 @@ const SWATCHES = [
 
 const MARKETS = ["ALL", "HITS", "TB", "KS", "HR", "ML / RL"];
 
+/* INSTRUCTION 38 (2026-09-05) — sample inputs for the desk primitives. Every figure in
+   this block is a made-up layout sample (the banner says so); the real desks only ever
+   render engine output. The ticket maths is internally consistent so the slip reads
+   right: $20 at 1.5 × 1.667 = 2.5 dec (+150) wins $30; 0.68 × 0.63 = 42.8% → EV +7.1%. */
+type SegKey = "all" | "ml" | "spread" | "total";
+const SEG_OPTIONS: readonly SegmentedOption<SegKey>[] = [
+  { key: "all", label: "ALL" },
+  { key: "ml", label: "ML" },
+  { key: "spread", label: "SPREAD" },
+  { key: "total", label: "TOTAL" },
+];
+const SAMPLE_EQUITY = [0, 14, 9, 23, 31, 26, 38, 44, 41, 52];
+type SampleTicket = {
+  grade: Grade;
+  bucket: "core" | "fun";
+  name: string;
+  legs: { abbr: string; label: string; cz: string; market: string }[];
+  stake: string;
+  toWin: string;
+  prob: string;
+  ev: string;
+  evPos: boolean;
+};
+const SAMPLE_TICKETS: SampleTicket[] = [
+  {
+    grade: "S",
+    bucket: "core",
+    name: "DOUBLE · Sample A −7.5 + Sample B ML",
+    legs: [
+      { abbr: "AAA", label: "Sample A −7.5", cz: "−200", market: "Spread" },
+      { abbr: "BBB", label: "Sample B ML", cz: "−150", market: "ML" },
+    ],
+    stake: "$20",
+    toWin: "$30",
+    prob: "42.8%",
+    ev: "+7.1%",
+    evPos: true,
+  },
+  {
+    grade: "A",
+    bucket: "core",
+    name: "SINGLE · Sample C −3.5",
+    legs: [{ abbr: "CCC", label: "Sample C −3.5", cz: "−105", market: "Spread" }],
+    stake: "$15",
+    toWin: "$14.29",
+    prob: "53.0%",
+    ev: "+3.5%",
+    evPos: true,
+  },
+];
+
+/* the .ticket slip: perforated stub edge (mask), dashed tear, S-grade sheen. A mask
+   clips box-shadow, so the +EV glow rides the wrapper. */
+function SampleSlip({ t }: { t: SampleTicket }) {
+  const s = t.grade === "S";
+  return (
+    <div className={`rounded-[16px] ${t.evPos ? "ev-glow" : ""}`}>
+      <div className={`ticket ${s ? "shine" : ""} px-4 pt-3.5`}>
+        <div className="flex items-center justify-between">
+          <span className="rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-pos">
+            {t.bucket} · sample
+          </span>
+          <GradeChip grade={t.grade} basis="sample EV%" />
+        </div>
+        <div className="display mt-2 text-[15px] leading-tight text-text">{t.name}</div>
+        <div className="mt-2.5 space-y-1.5">
+          {t.legs.map((l) => (
+            <div key={l.label} className="flex items-center gap-2 text-[12px]">
+              <span className="num inline-flex h-5 min-w-9 items-center justify-center rounded-md border border-white/[0.08] bg-white/[0.04] px-1 text-[9.5px] font-bold text-muted">
+                {l.abbr}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-text">{l.label}</span>
+              <span className="num font-semibold text-gold">{l.cz}</span>
+              <span className="w-11 text-right text-[10px] uppercase tracking-wide text-faint">{l.market}</span>
+            </div>
+          ))}
+        </div>
+        <div className="ticket-tear" />
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-faint">Stake</div>
+            <div className="num text-[15px] font-semibold text-text">{t.stake}</div>
+          </div>
+          <div>
+            <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-faint">To win</div>
+            <div className="num text-[15px] font-semibold text-pos">{t.toWin}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-faint">Prob · EV</div>
+            <div className="num text-[12px] text-muted">
+              {t.prob} · <span className={t.evPos ? "text-pos" : "text-neg"}>{t.ev}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DesignPage() {
   const [tick, setTick] = useState(0);
   const [market, setMarket] = useState("ALL");
   const [tableKey, setTableKey] = useState(0);
+  const [seg, setSeg] = useState<SegKey>("all");
   const movedOdds = [-310, -298, -325][tick % 3];
 
   return (
@@ -217,6 +324,87 @@ export default function DesignPage() {
             </div>
             <div className="text-[11px] text-faint">
               Hover brightens, press scales down 4% — every interactive element in the product is a pill.
+            </div>
+          </div>
+        </Panel>
+      </Reveal>
+
+      {/* ---- INSTRUCTION 38: the desk primitives (sample data) ---- */}
+      <Reveal>
+        <Panel
+          title="Desk primitives — SportSwitch, Segmented, StatTile, EdgeMeter, Sparkline, ticket slip"
+          action={
+            <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold">
+              sample data
+            </span>
+          }
+        >
+          <div className="space-y-7">
+            <div>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                SportSwitch <span className="text-faint">· live — this one really flips the app&apos;s desk (the rail and header carry the same control)</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <SportSwitch />
+                <SportSwitch size="sm" />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                Segmented <span className="text-faint">· local state · lime thumb, amber (CFB) thumb, two sizes</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <Segmented label="Market (sample)" options={SEG_OPTIONS} value={seg} onChange={setSeg} />
+                <Segmented label="Market (sample, CFB tone)" options={SEG_OPTIONS} value={seg} onChange={setSeg} tone="cfb" size="sm" />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                StatTile <span className="text-faint">· one focal number per tile, toned</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+                <StatTile label="Core · sample" value="$150" sub="per slate day" tone="pos" icon="⚾" />
+                <StatTile label="Fun · sample" value="$25" sub="one parlay" tone="gold" />
+                <StatTile label="CFB bank · sample" value="$2,500" sub="no adjustments logged" tone="cfb" icon="🏈" />
+                <StatTile label="Net P/L · sample" value="−$38.50" sub="4-6 · sample record" tone="neg" />
+                <StatTile label="Exposure · sample" value="—" sub="nothing locked" tone="muted" />
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                  EdgeMeter <span className="text-faint">· model vs market on one scale, sample probabilities</span>
+                </div>
+                <div className="space-y-3">
+                  <EdgeMeter fair={0.712} mkt={0.68} />
+                  <EdgeMeter fair={0.44} mkt={0.47} tone="cfb" />
+                  <EdgeMeter fair={0.55} mkt={null} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                  Sparkline <span className="text-faint">· a sample equity path; auto tone reads the ends; &lt; 2 points draws no curve</span>
+                </div>
+                <Sparkline values={SAMPLE_EQUITY} height={56} label="sample equity path, 10 points" />
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Sparkline values={[...SAMPLE_EQUITY].reverse()} height={36} label="sample equity path, reversed" />
+                  <Sparkline values={[]} height={36} />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                .ticket slip <span className="text-faint">· perforated stub edge, dashed tear, ev-glow on +EV, .shine on S</span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {SAMPLE_TICKETS.map((t) => (
+                  <SampleSlip key={t.name} t={t} />
+                ))}
+              </div>
             </div>
           </div>
         </Panel>

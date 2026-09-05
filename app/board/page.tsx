@@ -16,7 +16,9 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbBoard } from "@/components/cfb/CfbBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -67,6 +69,8 @@ const CAT_LABELS: Record<string, string> = {
 
 export default function BoardPage() {
   const { data: board, isPending, isError, refetch } = useBoard();
+  // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
+  const desk = useSport();
   const regen = useRegenerateBoard();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
@@ -492,6 +496,22 @@ export default function BoardPage() {
   const pickCount = d ? Object.entries(d.categories).filter(([k]) => k !== "all").reduce((s, [, v]) => s + v.length, 0) : 0;
   const quota = quotaRemaining();
 
+  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
+     board. Every hook above has already run, so this early return is hooks-safe. */
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Board"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="Every FBS game on the slate with a Caesars price — sides, totals and moneylines against the desk's market + FPI number."
+        />
+        <CfbBoard />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -757,5 +777,14 @@ function ScratchedNote({ n, shown, onToggle }: { n: number; shown: boolean; onTo
         {shown ? "hide scratched" : "show scratched"}
       </button>
     </div>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

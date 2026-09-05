@@ -19,6 +19,8 @@ import { cachedBoard, getMoney, getNoPlayLog, getTodayExposure, todayStr } from 
 import { discipline } from "@/lib/noplay";
 import { fmtMoneyExact } from "@/lib/format";
 import type { PickRow } from "@/engine";
+import { IconArrowRight } from "@/components/shell/icons";
+import { SPORT_META, setSport, useSport, type Sport } from "@/lib/sport";
 
 /* The books the engine's consensus actually reads (us + eu regions) — real
    sources, not decoration. */
@@ -94,6 +96,59 @@ function MonthOverrideLine({ entries }: { entries: SyncEntry[] }) {
   );
 }
 
+/* INSTRUCTION 38 (2026-09-05): the two desks. Each card sets the app-wide sport (the
+   same switch the shell carries) and opens the Board on it — spelled out here so a first
+   visit knows the College Football desk exists and is its own thing: own model, own
+   tickets, own ledger and bank. Blurbs describe the engines, never a number. */
+const DESKS: { sport: Sport; blurb: string }[] = [
+  { sport: "mlb", blurb: "10,000-path sims · props & game lines · Caesars settles" },
+  { sport: "cfb", blurb: "Consensus lines + ESPN FPI · ML, spread, total · own ledger & bank" },
+];
+
+function DeskChooser() {
+  const sport = useSport();
+  return (
+    <div className="mx-auto mt-7 grid w-full max-w-[520px] grid-cols-2 gap-2.5">
+      {DESKS.map((d) => {
+        const meta = SPORT_META[d.sport];
+        const on = sport === d.sport;
+        const amber = d.sport === "cfb";
+        return (
+          <Link
+            key={d.sport}
+            href="/board"
+            onClick={() => setSport(d.sport)}
+            aria-current={on ? "true" : undefined}
+            className={`liquid-glass press card-lift relative flex flex-col gap-1.5 rounded-[18px] px-4 pb-4 pt-3.5 text-left ${
+              on
+                ? amber
+                  ? "shadow-[inset_0_0_0_1px_rgba(245,165,36,0.55)]"
+                  : "shadow-[inset_0_0_0_1px_rgba(182,255,61,0.55)]"
+                : ""
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[20px] leading-none" aria-hidden>
+                {meta.emoji}
+              </span>
+              <span
+                className={`text-[9px] font-bold uppercase tracking-[0.2em] ${on ? (amber ? "text-cfb" : "text-pos") : "text-faint"}`}
+              >
+                {on ? "current desk" : "open desk"}
+              </span>
+            </div>
+            <div className="display text-[17px] leading-tight text-text">{meta.label}</div>
+            <div className="pr-6 text-[11px] leading-snug text-hero-sub/70">{d.blurb}</div>
+            <IconArrowRight
+              className={`absolute bottom-3.5 right-3.5 transition-transform duration-(--dur-fast) ${amber ? "text-cfb" : "text-pos"}`}
+            />
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 function Chevron() {
   return (
     <svg
@@ -161,7 +216,7 @@ function Hero() {
               Parlay <span className="text-gradient">Lab</span>
             </h1>
             <p className="mx-auto mt-[9px] max-w-md text-lg leading-8 text-hero-sub opacity-80">
-              A 10,000-simulation quant engine for MLB &amp; UFC — sharp-anchored fair prices,
+              A 10,000-simulation quant engine for MLB &amp; College Football — sharp-anchored fair prices,
               ¼-Kelly sizing, every bet graded against the close.
             </p>
             <Link href="/board" className="mt-[25px] inline-block">
@@ -169,6 +224,7 @@ function Hero() {
                 Open Today&apos;s Board
               </Pill>
             </Link>
+            <DeskChooser />
           </div>
         </section>
 
@@ -237,6 +293,12 @@ export default function DashboardPage() {
       <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 pt-10 md:px-8 md:pb-12">
       <PageHeader
         title="Parlay Lab"
+        eyebrow="MLB desk · season to date"
+        chip={
+          <span className="rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pos">
+            ⚾ MLB
+          </span>
+        }
         sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No board yet today"}
         action={
           <Link href="/board">

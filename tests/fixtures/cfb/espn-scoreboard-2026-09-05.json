@@ -1,0 +1,1578 @@
+{
+ "leagues": [
+  {
+   "id": "23",
+   "name": "NCAA - Football",
+   "abbreviation": "NCAAF"
+  }
+ ],
+ "season": null,
+ "week": {
+  "number": 1
+ },
+ "day": null,
+ "events": [
+  {
+   "id": "401858425",
+   "date": "2026-09-05T16:00Z",
+   "name": "North Texas Mean Green at Indiana Hoosiers",
+   "shortName": "UNT @ IU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401858425",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Memorial Stadium (Bloomington, IN)",
+      "address": {
+       "city": "Bloomington",
+       "state": "IN",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "84",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 6
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "84",
+        "location": "Indiana",
+        "name": "Hoosiers",
+        "abbreviation": "IU",
+        "displayName": "Indiana Hoosiers",
+        "shortDisplayName": "Indiana",
+        "color": "970310",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/84.png",
+        "conferenceId": "5"
+       }
+      },
+      {
+       "id": "249",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "249",
+        "location": "North Texas",
+        "name": "Mean Green",
+        "abbreviation": "UNT",
+        "displayName": "North Texas Mean Green",
+        "shortDisplayName": "North Texas",
+        "color": "068f33",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/249.png",
+        "conferenceId": "151"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "IU -40.5",
+       "overUnder": 56.5,
+       "spread": -40.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "FOX"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401856634",
+   "date": "2026-09-05T16:00Z",
+   "name": "East Carolina Pirates at Alabama Crimson Tide",
+   "shortName": "ECU @ ALA",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401856634",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Bryant-Denny Stadium",
+      "address": {
+       "city": "Tuscaloosa",
+       "state": "AL",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "333",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 13
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "333",
+        "location": "Alabama",
+        "name": "Crimson Tide",
+        "abbreviation": "ALA",
+        "displayName": "Alabama Crimson Tide",
+        "shortDisplayName": "Alabama",
+        "color": "9e1b32",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/333.png",
+        "conferenceId": "8"
+       }
+      },
+      {
+       "id": "151",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "151",
+        "location": "East Carolina",
+        "name": "Pirates",
+        "abbreviation": "ECU",
+        "displayName": "East Carolina Pirates",
+        "shortDisplayName": "East Carolina",
+        "color": "582c83",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/151.png",
+        "conferenceId": "151"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "ALA -27.5",
+       "overUnder": 52.5,
+       "spread": -27.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ABC"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401856778",
+   "date": "2026-09-05T16:00Z",
+   "name": "Oregon State Beavers at Houston Cougars",
+   "shortName": "ORST @ HOU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401856778",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "TDECU Stadium",
+      "address": {
+       "city": "Houston",
+       "state": "TX",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "248",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 23
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "248",
+        "location": "Houston",
+        "name": "Cougars",
+        "abbreviation": "HOU",
+        "displayName": "Houston Cougars",
+        "shortDisplayName": "Houston",
+        "color": "c8102e",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/248.png",
+        "conferenceId": "4"
+       }
+      },
+      {
+       "id": "204",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "204",
+        "location": "Oregon State",
+        "name": "Beavers",
+        "abbreviation": "ORST",
+        "displayName": "Oregon State Beavers",
+        "shortDisplayName": "Oregon St",
+        "color": "dc4405",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/204.png",
+        "conferenceId": "9"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "HOU -21",
+       "overUnder": 50.5,
+       "spread": -21.0,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ESPN",
+        "Disney+"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401856780",
+   "date": "2026-09-05T16:00Z",
+   "name": "Coastal Carolina Chanticleers at West Virginia Mountaineers",
+   "shortName": "CCU @ WVU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401856780",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Milan Puskar Stadium",
+      "address": {
+       "city": "Morgantown",
+       "state": "WV",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "277",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "277",
+        "location": "West Virginia",
+        "name": "Mountaineers",
+        "abbreviation": "WVU",
+        "displayName": "West Virginia Mountaineers",
+        "shortDisplayName": "West Virginia",
+        "color": "eaaa00",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/277.png",
+        "conferenceId": "4"
+       }
+      },
+      {
+       "id": "324",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "324",
+        "location": "Coastal Carolina",
+        "name": "Chanticleers",
+        "abbreviation": "CCU",
+        "displayName": "Coastal Carolina Chanticleers",
+        "shortDisplayName": "Coastal",
+        "color": "006f71",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/324.png",
+        "conferenceId": "37"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "WVU -21",
+       "overUnder": 54.5,
+       "spread": -21.0,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "TNT"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401858208",
+   "date": "2026-09-05T16:00Z",
+   "name": "New Hampshire Wildcats at Syracuse Orange",
+   "shortName": "UNH @ SYR",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401858208",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "JMA Wireless Dome",
+      "address": {
+       "city": "Syracuse",
+       "state": "NY",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "183",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "183",
+        "location": "Syracuse",
+        "name": "Orange",
+        "abbreviation": "SYR",
+        "displayName": "Syracuse Orange",
+        "shortDisplayName": "Syracuse",
+        "color": "000e54",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/183.png",
+        "conferenceId": "1"
+       }
+      },
+      {
+       "id": "160",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-1"
+        }
+       ],
+       "team": {
+        "id": "160",
+        "location": "New Hampshire",
+        "name": "Wildcats",
+        "abbreviation": "UNH",
+        "displayName": "New Hampshire Wildcats",
+        "shortDisplayName": "New Hampshire",
+        "color": "004990",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/160.png",
+        "conferenceId": "48"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "SYR -34.5",
+       "overUnder": 55.5,
+       "spread": -34.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ACC Network",
+        "ACCNX"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401858430",
+   "date": "2026-09-05T16:00Z",
+   "name": "Ohio Bobcats at Nebraska Cornhuskers",
+   "shortName": "OHIO @ NEB",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401858430",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Memorial Stadium (Lincoln, NE)",
+      "address": {
+       "city": "Lincoln",
+       "state": "NE",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "158",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "158",
+        "location": "Nebraska",
+        "name": "Cornhuskers",
+        "abbreviation": "NEB",
+        "displayName": "Nebraska Cornhuskers",
+        "shortDisplayName": "Nebraska",
+        "color": "e31937",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/158.png",
+        "conferenceId": "5"
+       }
+      },
+      {
+       "id": "195",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "195",
+        "location": "Ohio",
+        "name": "Bobcats",
+        "abbreviation": "OHIO",
+        "displayName": "Ohio Bobcats",
+        "shortDisplayName": "Ohio",
+        "color": "154734",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/195.png",
+        "conferenceId": "15"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "NEB -23.5",
+       "overUnder": 46.5,
+       "spread": -23.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "FS1"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401861962",
+   "date": "2026-09-05T16:00Z",
+   "name": "Lafayette Leopards at UConn Huskies",
+   "shortName": "LAF @ CONN",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401861962",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Pratt & Whitney Stadium",
+      "address": {
+       "city": "East Hartford",
+       "state": "CT",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "41",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "41",
+        "location": "UConn",
+        "name": "Huskies",
+        "abbreviation": "CONN",
+        "displayName": "UConn Huskies",
+        "shortDisplayName": "UConn",
+        "color": "0c2340",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/41.png",
+        "conferenceId": "18"
+       }
+      },
+      {
+       "id": "322",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "322",
+        "location": "Lafayette",
+        "name": "Leopards",
+        "abbreviation": "LAF",
+        "displayName": "Lafayette Leopards",
+        "shortDisplayName": "Lafayette",
+        "color": "790000",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/322.png",
+        "conferenceId": "27"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "CONN -19.5",
+       "overUnder": 51.5,
+       "spread": -19.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "home",
+       "names": [
+        "UConn+"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401862701",
+   "date": "2026-09-05T16:00Z",
+   "name": "Bryant Bulldogs at Army Black Knights",
+   "shortName": "BRY @ ARMY",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401862701",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Michie Stadium",
+      "address": {
+       "city": "West Point",
+       "state": "NY",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "349",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "349",
+        "location": "Army",
+        "name": "Black Knights",
+        "abbreviation": "ARMY",
+        "displayName": "Army Black Knights",
+        "shortDisplayName": "Army",
+        "color": "000000",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/349.png",
+        "conferenceId": "151"
+       }
+      },
+      {
+       "id": "2803",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "1-0"
+        }
+       ],
+       "team": {
+        "id": "2803",
+        "location": "Bryant",
+        "name": "Bulldogs",
+        "abbreviation": "BRY",
+        "displayName": "Bryant Bulldogs",
+        "shortDisplayName": "Bryant",
+        "color": "000000",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2803.png",
+        "conferenceId": "48"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "ARMY -37.5",
+       "overUnder": 50.5,
+       "spread": -37.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "CBSSN"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401866410",
+   "date": "2026-09-05T16:00Z",
+   "name": "Tarleton State Texans at Bowling Green Falcons",
+   "shortName": "TAR @ BGSU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401866410",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Doyt L. Perry Stadium",
+      "address": {
+       "city": "Bowling Green",
+       "state": "OH",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "189",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "189",
+        "location": "Bowling Green",
+        "name": "Falcons",
+        "abbreviation": "BGSU",
+        "displayName": "Bowling Green Falcons",
+        "shortDisplayName": "Bowling Green",
+        "color": "fd5000",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/189.png",
+        "conferenceId": "15"
+       }
+      },
+      {
+       "id": "2627",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "1-0"
+        }
+       ],
+       "team": {
+        "id": "2627",
+        "location": "Tarleton State",
+        "name": "Texans",
+        "abbreviation": "TAR",
+        "displayName": "Tarleton State Texans",
+        "shortDisplayName": "Tarleton St",
+        "color": "000000",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2627.png",
+        "conferenceId": "177"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "BGSU -1.5",
+       "overUnder": 47.5,
+       "spread": -1.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ESPN+"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401869960",
+   "date": "2026-09-05T16:00Z",
+   "name": "Liberty Flames at James Madison Dukes",
+   "shortName": "LIB @ JMU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:00 PM EDT",
+     "shortDetail": "9/5 - 12:00 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401869960",
+     "date": "2026-09-05T16:00Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Bridgeforth Stadium",
+      "address": {
+       "city": "Harrisonburg",
+       "state": "VA",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "256",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "256",
+        "location": "James Madison",
+        "name": "Dukes",
+        "abbreviation": "JMU",
+        "displayName": "James Madison Dukes",
+        "shortDisplayName": "James Madison",
+        "color": "450084",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/256.png",
+        "conferenceId": "37"
+       }
+      },
+      {
+       "id": "2335",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "2335",
+        "location": "Liberty",
+        "name": "Flames",
+        "abbreviation": "LIB",
+        "displayName": "Liberty Flames",
+        "shortDisplayName": "Liberty",
+        "color": "0a254e",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2335.png",
+        "conferenceId": "12"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "JMU -6",
+       "overUnder": 50.5,
+       "spread": -6.0,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "ESPNU"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:00 PM EDT",
+       "shortDetail": "9/5 - 12:00 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401858432",
+   "date": "2026-09-05T16:30Z",
+   "name": "Ball State Cardinals at Ohio State Buckeyes",
+   "shortName": "BALL @ OSU",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:30 PM EDT",
+     "shortDetail": "9/5 - 12:30 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401858432",
+     "date": "2026-09-05T16:30Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Ohio Stadium",
+      "address": {
+       "city": "Columbus",
+       "state": "OH",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "194",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 1
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "194",
+        "location": "Ohio State",
+        "name": "Buckeyes",
+        "abbreviation": "OSU",
+        "displayName": "Ohio State Buckeyes",
+        "shortDisplayName": "Ohio State",
+        "color": "ba0c2f",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/194.png",
+        "conferenceId": "5"
+       }
+      },
+      {
+       "id": "2050",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "2050",
+        "location": "Ball State",
+        "name": "Cardinals",
+        "abbreviation": "BALL",
+        "displayName": "Ball State Cardinals",
+        "shortDisplayName": "Ball State",
+        "color": "ba0c2f",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/2050.png",
+        "conferenceId": "15"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "OSU -49.5",
+       "overUnder": 56.5,
+       "spread": -49.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "BTN"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:30 PM EDT",
+       "shortDetail": "9/5 - 12:30 PM EDT"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "id": "401858207",
+   "date": "2026-09-05T16:30Z",
+   "name": "Miami (OH) RedHawks at Pittsburgh Panthers",
+   "shortName": "M-OH @ PITT",
+   "season": {
+    "year": 2026,
+    "type": 2,
+    "slug": "regular-season"
+   },
+   "week": {
+    "number": 1
+   },
+   "status": {
+    "type": {
+     "name": "STATUS_SCHEDULED",
+     "state": "pre",
+     "completed": false,
+     "detail": "Sat, September 5th at 12:30 PM EDT",
+     "shortDetail": "9/5 - 12:30 PM EDT"
+    },
+    "period": 0,
+    "displayClock": "0:00"
+   },
+   "competitions": [
+    {
+     "id": "401858207",
+     "date": "2026-09-05T16:30Z",
+     "neutralSite": false,
+     "conferenceCompetition": false,
+     "venue": {
+      "fullName": "Acrisure Stadium",
+      "address": {
+       "city": "Pittsburgh",
+       "state": "PA",
+       "country": "USA"
+      }
+     },
+     "competitors": [
+      {
+       "id": "221",
+       "homeAway": "home",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "221",
+        "location": "Pittsburgh",
+        "name": "Panthers",
+        "abbreviation": "PITT",
+        "displayName": "Pittsburgh Panthers",
+        "shortDisplayName": "Pitt",
+        "color": "003594",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/221.png",
+        "conferenceId": "1"
+       }
+      },
+      {
+       "id": "193",
+       "homeAway": "away",
+       "winner": null,
+       "score": "0",
+       "curatedRank": {
+        "current": 99
+       },
+       "records": [
+        {
+         "name": "overall",
+         "type": "total",
+         "summary": "0-0"
+        }
+       ],
+       "team": {
+        "id": "193",
+        "location": "Miami (OH)",
+        "name": "RedHawks",
+        "abbreviation": "M-OH",
+        "displayName": "Miami (OH) RedHawks",
+        "shortDisplayName": "Miami OH",
+        "color": "c41230",
+        "logo": "https://a.espncdn.com/i/teamlogos/ncaa/500/193.png",
+        "conferenceId": "15"
+       }
+      }
+     ],
+     "odds": [
+      {
+       "provider": {
+        "name": "Draft Kings"
+       },
+       "details": "PITT -16.5",
+       "overUnder": 47.5,
+       "spread": -16.5,
+       "homeTeamOdds": {
+        "favorite": true
+       },
+       "awayTeamOdds": {
+        "favorite": false
+       }
+      }
+     ],
+     "broadcasts": [
+      {
+       "market": "national",
+       "names": [
+        "CW"
+       ]
+      }
+     ],
+     "status": {
+      "type": {
+       "name": "STATUS_SCHEDULED",
+       "state": "pre",
+       "completed": false,
+       "detail": "Sat, September 5th at 12:30 PM EDT",
+       "shortDetail": "9/5 - 12:30 PM EDT"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -6,7 +6,9 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { UfcSharp } from "@/components/ufc/UfcSharp";
 import { AsgSharpTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbSharp } from "@/components/cfb/CfbSharp";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
@@ -39,6 +41,8 @@ function ConvChip({ c }: { c?: string }) {
 
 export default function SharpPage() {
   const { data: board, isPending } = useBoard();
+  // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
+  const desk = useSport();
   const regen = useRegenerateBoard();
   const d = board?.data;
   // localStorage only after mount — an initializer read would diverge from the
@@ -139,6 +143,22 @@ export default function SharpPage() {
       r.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[r.gkey]?.pk ?? null, r.lkey) : null,
     [d, liveNow],
   );
+
+  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
+     read. Every hook above has already run, so this early return is hooks-safe. */
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="The Sharp"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="The desk's College Football read — the market + FPI margin model that prices every slate, constants in the open."
+        />
+        <CfbSharp />
+      </>
+    );
+  }
 
   return (
     <>
@@ -444,5 +464,14 @@ function AiMode() {
       </Pill>
       {msg && <div className="text-[11.5px] text-gold">{msg}</div>}
     </div>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

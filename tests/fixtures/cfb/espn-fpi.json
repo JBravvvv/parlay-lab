@@ -1,0 +1,4167 @@
+{
+"lastUpdated": "2026-09-04T08:00Z",
+"categories": [
+{
+"name": "fpi",
+"names": [
+"fpi",
+"fpirank",
+"rankchange7days",
+"projectedw",
+"projectedl",
+"probwinout",
+"prob6wins",
+"probwindiv",
+"probmakeplayoffs",
+"probmaketitlegame",
+"probwintitle",
+"probwinconf",
+"numwins",
+"numlosses",
+"numties"
+]
+}
+],
+"teams": [
+{
+"team": {
+"id": "194",
+"abbreviation": "OSU",
+"nickname": "Ohio State",
+"displayName": "Ohio State Buckeyes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+28.676,
+1.0,
+0.0,
+10.288,
+2.303,
+10.0,
+99.6,
+0.0,
+76.6,
+28.299999999999997,
+16.900000000000002,
+39.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "251",
+"abbreviation": "TEX",
+"nickname": "Texas",
+"displayName": "Texas Longhorns"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+26.914,
+2.0,
+0.0,
+9.699,
+2.756,
+6.7,
+97.89999999999999,
+0.0,
+69.1,
+22.8,
+13.200000000000001,
+28.499999999999996,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "87",
+"abbreviation": "ND",
+"nickname": "Notre Dame",
+"displayName": "Notre Dame Fighting Irish"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+25.856,
+3.0,
+0.0,
+10.707,
+1.293,
+32.2,
+99.9,
+0.0,
+75.1,
+20.599999999999998,
+11.4,
+0.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2483",
+"abbreviation": "ORE",
+"nickname": "Oregon",
+"displayName": "Oregon Ducks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+25.276,
+4.0,
+0.0,
+10.257,
+2.208,
+9.5,
+99.5,
+0.0,
+65.8,
+18.0,
+9.6,
+25.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "61",
+"abbreviation": "UGA",
+"nickname": "Georgia",
+"displayName": "Georgia Bulldogs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+24.837,
+5.0,
+0.0,
+10.041,
+2.402,
+11.799999999999999,
+98.8,
+0.0,
+64.9,
+18.0,
+9.5,
+24.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "84",
+"abbreviation": "IU",
+"nickname": "Indiana",
+"displayName": "Indiana Hoosiers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+23.14,
+6.0,
+0.0,
+10.198,
+2.187,
+10.6,
+99.6,
+0.0,
+57.49999999999999,
+13.200000000000001,
+6.6000000000000005,
+19.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2390",
+"abbreviation": "MIA",
+"nickname": "Miami",
+"displayName": "Miami Hurricanes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+21.834,
+7.0,
+0.0,
+10.453,
+2.278,
+8.799999999999999,
+99.6,
+0.0,
+65.0,
+11.200000000000001,
+5.3,
+50.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "333",
+"abbreviation": "ALA",
+"nickname": "Alabama",
+"displayName": "Alabama Crimson Tide"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+20.126,
+8.0,
+0.0,
+8.631,
+3.593,
+1.6,
+92.80000000000001,
+0.0,
+42.1,
+8.1,
+3.8,
+9.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "99",
+"abbreviation": "LSU",
+"nickname": "LSU",
+"displayName": "LSU Tigers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+20.034,
+9.0,
+0.0,
+8.439,
+3.758,
+1.0999999999999999,
+92.10000000000001,
+0.0,
+40.8,
+7.9,
+3.8,
+9.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2641",
+"abbreviation": "TTU",
+"nickname": "Texas Tech",
+"displayName": "Texas Tech Red Raiders"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+20.016,
+10.0,
+0.0,
+10.835,
+1.817,
+25.6,
+99.6,
+0.0,
+58.199999999999996,
+8.4,
+3.5999999999999996,
+46.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "245",
+"abbreviation": "TA&M",
+"nickname": "Texas A&M",
+"displayName": "Texas A&M Aggies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+20.002,
+11.0,
+0.0,
+8.452,
+3.728,
+0.8,
+93.2,
+0.0,
+40.300000000000004,
+7.7,
+3.5999999999999996,
+8.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "201",
+"abbreviation": "OU",
+"nickname": "Oklahoma",
+"displayName": "Oklahoma Sooners"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+17.782,
+12.0,
+0.0,
+7.609,
+4.515,
+0.2,
+85.3,
+0.0,
+28.499999999999996,
+4.2,
+1.7000000000000002,
+5.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "145",
+"abbreviation": "MISS",
+"nickname": "Ole Miss",
+"displayName": "Ole Miss Rebels"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+16.029,
+13.0,
+1.0,
+7.404,
+4.69,
+0.1,
+82.19999999999999,
+0.0,
+23.5,
+3.2,
+1.3,
+3.8,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "130",
+"abbreviation": "MICH",
+"nickname": "Michigan",
+"displayName": "Michigan Wolverines"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+15.875,
+14.0,
+1.0,
+7.933,
+4.182,
+0.1,
+91.2,
+0.0,
+23.9,
+3.1,
+1.2,
+4.1000000000000005,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2633",
+"abbreviation": "TENN",
+"nickname": "Tennessee",
+"displayName": "Tennessee Volunteers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+15.058,
+15.0,
+1.0,
+7.329,
+4.757,
+0.1,
+80.7,
+0.0,
+21.0,
+2.5,
+1.0,
+3.4000000000000004,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "30",
+"abbreviation": "USC",
+"nickname": "USC",
+"displayName": "USC Trojans"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+13.961,
+16.0,
+-3.0,
+7.799,
+4.273,
+0.1,
+92.10000000000001,
+0.0,
+17.0,
+1.3,
+0.4,
+2.3,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "213",
+"abbreviation": "PSU",
+"nickname": "Penn State",
+"displayName": "Penn State Nittany Lions"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+13.716,
+17.0,
+0.0,
+9.11,
+3.048,
+3.1,
+96.8,
+0.0,
+22.400000000000002,
+2.1,
+0.8,
+4.3999999999999995,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "57",
+"abbreviation": "FLA",
+"nickname": "Florida",
+"displayName": "Florida Gators"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+13.575,
+18.0,
+0.0,
+6.797,
+5.258,
+0.0,
+73.0,
+0.0,
+15.5,
+1.7000000000000002,
+0.7000000000000001,
+2.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "228",
+"abbreviation": "CLEM",
+"nickname": "Clemson",
+"displayName": "Clemson Tigers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+13.421,
+19.0,
+0.0,
+8.18,
+4.079,
+0.5,
+89.5,
+0.0,
+22.900000000000002,
+2.1,
+0.8,
+12.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "252",
+"abbreviation": "BYU",
+"nickname": "BYU",
+"displayName": "BYU Cougars"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+13.125,
+20.0,
+0.0,
+8.608,
+3.728,
+1.2,
+92.60000000000001,
+0.0,
+25.4,
+2.1,
+0.7000000000000001,
+16.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2",
+"abbreviation": "AUB",
+"nickname": "Auburn",
+"displayName": "Auburn Tigers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+12.007,
+21.0,
+1.0,
+6.65,
+5.392,
+0.0,
+70.8,
+0.0,
+12.4,
+1.0999999999999999,
+0.3,
+1.4000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2579",
+"abbreviation": "SC",
+"nickname": "South Carolina",
+"displayName": "South Carolina Gamecocks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+11.692,
+22.0,
+1.0,
+6.426,
+5.612,
+0.0,
+66.7,
+0.0,
+10.6,
+0.8999999999999999,
+0.4,
+1.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2567",
+"abbreviation": "SMU",
+"nickname": "SMU",
+"displayName": "SMU Mustangs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+11.117,
+23.0,
+1.0,
+8.253,
+4.005,
+0.4,
+90.7,
+0.0,
+18.3,
+1.2,
+0.4,
+10.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2294",
+"abbreviation": "IOWA",
+"nickname": "Iowa",
+"displayName": "Iowa Hawkeyes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+10.569,
+24.0,
+1.0,
+7.623,
+4.435,
+0.1,
+85.39999999999999,
+0.0,
+12.1,
+0.8999999999999999,
+0.3,
+1.7000000000000002,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "258",
+"abbreviation": "UVA",
+"nickname": "Virginia",
+"displayName": "Virginia Cavaliers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+10.306,
+25.0,
+7.0,
+8.647,
+3.537,
+1.5,
+94.69999999999999,
+0.0,
+15.4,
+0.8,
+0.2,
+6.7,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "142",
+"abbreviation": "MIZ",
+"nickname": "Missouri",
+"displayName": "Missouri Tigers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+10.181,
+26.0,
+-5.0,
+6.195,
+5.83,
+0.0,
+62.8,
+0.0,
+7.6,
+0.5,
+0.2,
+0.8,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "254",
+"abbreviation": "UTAH",
+"nickname": "Utah",
+"displayName": "Utah Utes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+9.937,
+27.0,
+4.0,
+8.219,
+3.97,
+0.8999999999999999,
+89.8,
+0.0,
+14.299999999999999,
+0.7000000000000001,
+0.2,
+7.9,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "264",
+"abbreviation": "WASH",
+"nickname": "Washington",
+"displayName": "Washington Huskies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+9.893,
+28.0,
+-2.0,
+7.065,
+4.982,
+0.0,
+78.10000000000001,
+0.0,
+10.2,
+0.7000000000000001,
+0.2,
+1.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "97",
+"abbreviation": "LOU",
+"nickname": "Louisville",
+"displayName": "Louisville Cardinals"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+9.454,
+29.0,
+-2.0,
+7.677,
+4.514,
+0.4,
+83.1,
+0.0,
+13.100000000000001,
+0.7000000000000001,
+0.2,
+7.000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "238",
+"abbreviation": "VAN",
+"nickname": "Vanderbilt",
+"displayName": "Vanderbilt Commodores"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+8.986,
+30.0,
+-1.0,
+6.283,
+5.741,
+0.0,
+64.3,
+0.0,
+7.1,
+0.5,
+0.1,
+0.7000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "158",
+"abbreviation": "NEB",
+"nickname": "Nebraska",
+"displayName": "Nebraska Cornhuskers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+8.842,
+31.0,
+-1.0,
+6.938,
+5.089,
+0.0,
+79.10000000000001,
+0.0,
+7.5,
+0.5,
+0.1,
+0.7000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "52",
+"abbreviation": "FSU",
+"nickname": "Florida St",
+"displayName": "Florida State Seminoles"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+7.932,
+32.0,
+-4.0,
+6.456,
+5.612,
+0.0,
+67.60000000000001,
+0.0,
+6.5,
+0.3,
+0.1,
+2.5,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "259",
+"abbreviation": "VT",
+"nickname": "Virginia Tech",
+"displayName": "Virginia Tech Hokies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+7.384,
+33.0,
+0.0,
+6.966,
+5.105,
+0.0,
+75.5,
+0.0,
+7.1,
+0.4,
+0.1,
+2.8000000000000003,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "12",
+"abbreviation": "ARIZ",
+"nickname": "Arizona",
+"displayName": "Arizona Wildcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+7.155,
+34.0,
+0.0,
+7.29,
+4.809,
+0.1,
+80.2,
+0.0,
+7.7,
+0.3,
+0.1,
+4.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "248",
+"abbreviation": "HOU",
+"nickname": "Houston",
+"displayName": "Houston Cougars"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+7.12,
+35.0,
+0.0,
+7.292,
+4.805,
+0.1,
+79.9,
+0.0,
+7.8,
+0.3,
+0.1,
+3.8,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "221",
+"abbreviation": "PITT",
+"nickname": "Pitt",
+"displayName": "Pittsburgh Panthers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+6.616,
+36.0,
+0.0,
+7.062,
+5.0,
+0.1,
+76.5,
+0.0,
+6.3,
+0.4,
+0.1,
+2.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "239",
+"abbreviation": "BAY",
+"nickname": "Baylor",
+"displayName": "Baylor Bears"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+6.518,
+37.0,
+0.0,
+6.528,
+5.555,
+0.0,
+67.5,
+0.0,
+6.2,
+0.3,
+0.1,
+3.4000000000000004,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "153",
+"abbreviation": "UNC",
+"nickname": "North Carolina",
+"displayName": "North Carolina Tar Heels"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+5.785,
+38.0,
+4.0,
+6.604,
+5.44,
+0.0,
+72.1,
+0.0,
+4.9,
+0.2,
+0.0,
+1.6,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "356",
+"abbreviation": "ILL",
+"nickname": "Illinois",
+"displayName": "Illinois Fighting Illini"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+5.709,
+39.0,
+0.0,
+6.681,
+5.338,
+0.0,
+73.0,
+0.0,
+4.3,
+0.2,
+0.1,
+0.5,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "96",
+"abbreviation": "UK",
+"nickname": "Kentucky",
+"displayName": "Kentucky Wildcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+5.366,
+40.0,
+0.0,
+4.676,
+7.331,
+0.0,
+32.1,
+0.0,
+2.3,
+0.2,
+0.1,
+0.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2306",
+"abbreviation": "KSU",
+"nickname": "Kansas St",
+"displayName": "Kansas State Wildcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+5.057,
+41.0,
+0.0,
+7.066,
+5.027,
+0.1,
+74.4,
+0.0,
+6.0,
+0.2,
+0.0,
+3.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "38",
+"abbreviation": "COLO",
+"nickname": "Colorado",
+"displayName": "Colorado Buffaloes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.955,
+42.0,
+3.0,
+6.635,
+5.434,
+0.0,
+69.3,
+0.0,
+5.4,
+0.1,
+0.0,
+2.6,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "275",
+"abbreviation": "WIS",
+"nickname": "Wisconsin",
+"displayName": "Wisconsin Badgers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.818,
+43.0,
+0.0,
+6.646,
+5.388,
+0.0,
+71.89999999999999,
+0.0,
+3.6999999999999997,
+0.2,
+0.1,
+0.6,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2116",
+"abbreviation": "UCF",
+"nickname": "UCF",
+"displayName": "UCF Knights"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.813,
+44.0,
+13.0,
+6.868,
+5.214,
+0.1,
+73.4,
+0.0,
+4.8,
+0.2,
+0.1,
+2.6,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "9",
+"abbreviation": "ASU",
+"nickname": "Arizona St",
+"displayName": "Arizona State Sun Devils"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.76,
+45.0,
+-1.0,
+5.855,
+6.198,
+0.0,
+55.60000000000001,
+0.0,
+3.9,
+0.2,
+0.0,
+2.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2628",
+"abbreviation": "TCU",
+"nickname": "TCU",
+"displayName": "TCU Horned Frogs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.743,
+46.0,
+-8.0,
+5.808,
+6.251,
+0.0,
+55.400000000000006,
+0.0,
+2.4,
+0.1,
+0.0,
+2.0,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2132",
+"abbreviation": "CIN",
+"nickname": "Cincinnati",
+"displayName": "Cincinnati Bearcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.406,
+47.0,
+-1.0,
+6.314,
+5.74,
+0.0,
+64.0,
+0.0,
+4.1000000000000005,
+0.1,
+0.0,
+2.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "8",
+"abbreviation": "ARK",
+"nickname": "Arkansas",
+"displayName": "Arkansas Razorbacks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.396,
+48.0,
+-1.0,
+4.297,
+7.707,
+0.0,
+23.7,
+0.0,
+1.5,
+0.1,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "344",
+"abbreviation": "MSST",
+"nickname": "Mississippi St",
+"displayName": "Mississippi State Bulldogs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.082,
+49.0,
+0.0,
+4.605,
+7.398,
+0.0,
+29.4,
+0.0,
+1.6,
+0.1,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "68",
+"abbreviation": "BOIS",
+"nickname": "Boise St",
+"displayName": "Boise State Broncos"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+4.045,
+50.0,
+0.0,
+7.713,
+3.889,
+0.3,
+84.0,
+0.0,
+11.600000000000001,
+0.2,
+0.0,
+37.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "154",
+"abbreviation": "WAKE",
+"nickname": "Wake Forest",
+"displayName": "Wake Forest Demon Deacons"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+3.862,
+51.0,
+2.0,
+6.548,
+5.483,
+0.0,
+69.5,
+0.0,
+3.1,
+0.1,
+0.0,
+1.0999999999999999,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "150",
+"abbreviation": "DUKE",
+"nickname": "Duke",
+"displayName": "Duke Blue Devils"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+3.547,
+52.0,
+0.0,
+6.01,
+6.021,
+0.0,
+58.599999999999994,
+0.0,
+2.8000000000000003,
+0.1,
+0.0,
+1.0999999999999999,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "59",
+"abbreviation": "GT",
+"nickname": "Georgia Tech",
+"displayName": "Georgia Tech Yellow Jackets"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+3.353,
+53.0,
+-5.0,
+4.923,
+7.105,
+0.0,
+37.1,
+0.0,
+1.0999999999999999,
+0.0,
+0.0,
+0.8,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "197",
+"abbreviation": "OKST",
+"nickname": "Oklahoma St",
+"displayName": "Oklahoma State Cowboys"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+3.345,
+54.0,
+0.0,
+5.9,
+6.15,
+0.0,
+56.599999999999994,
+0.0,
+3.0,
+0.1,
+0.0,
+1.7000000000000002,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2305",
+"abbreviation": "KU",
+"nickname": "Kansas",
+"displayName": "Kansas Jayhawks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+2.759,
+55.0,
+0.0,
+6.05,
+5.992,
+0.0,
+58.699999999999996,
+0.0,
+2.4,
+0.1,
+0.0,
+1.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "135",
+"abbreviation": "MINN",
+"nickname": "Minnesota",
+"displayName": "Minnesota Golden Gophers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+2.313,
+56.0,
+7.0,
+5.671,
+6.335,
+0.0,
+52.5,
+0.0,
+1.5,
+0.0,
+0.0,
+0.1,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2655",
+"abbreviation": "TULN",
+"nickname": "Tulane",
+"displayName": "Tulane Green Wave"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+2.251,
+57.0,
+-1.0,
+8.153,
+4.205,
+0.7000000000000001,
+87.0,
+0.0,
+7.8,
+0.2,
+0.0,
+21.099999999999998,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "21",
+"abbreviation": "SDSU",
+"nickname": "San Diego St",
+"displayName": "San Diego State Aztecs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+1.426,
+58.0,
+1.0,
+7.519,
+3.958,
+1.0,
+81.0,
+0.0,
+7.6,
+0.1,
+0.0,
+25.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "77",
+"abbreviation": "NU",
+"nickname": "Northwestern",
+"displayName": "Northwestern Wildcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+1.414,
+59.0,
+1.0,
+4.922,
+7.081,
+0.0,
+37.5,
+0.0,
+1.0999999999999999,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "120",
+"abbreviation": "MD",
+"nickname": "Maryland",
+"displayName": "Maryland Terrapins"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+1.024,
+60.0,
+1.0,
+5.548,
+6.458,
+0.0,
+50.4,
+0.0,
+1.3,
+0.0,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "25",
+"abbreviation": "CAL",
+"nickname": "California",
+"displayName": "California Golden Bears"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+0.884,
+61.0,
+1.0,
+5.66,
+6.36,
+0.0,
+51.7,
+0.0,
+1.5,
+0.0,
+0.0,
+0.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "26",
+"abbreviation": "UCLA",
+"nickname": "UCLA",
+"displayName": "UCLA Bruins"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+0.472,
+62.0,
+2.0,
+5.065,
+6.941,
+0.0,
+41.3,
+0.0,
+1.0,
+0.0,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "127",
+"abbreviation": "MSU",
+"nickname": "Michigan St",
+"displayName": "Michigan State Spartans"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+0.281,
+63.0,
+2.0,
+4.825,
+7.181,
+0.0,
+36.199999999999996,
+0.0,
+0.6,
+0.0,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "277",
+"abbreviation": "WVU",
+"nickname": "West Virginia",
+"displayName": "West Virginia Mountaineers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+0.197,
+64.0,
+2.0,
+5.296,
+6.726,
+0.0,
+44.4,
+0.0,
+1.3,
+0.0,
+0.0,
+0.7000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "235",
+"abbreviation": "MEM",
+"nickname": "Memphis",
+"displayName": "Memphis Tigers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+0.023,
+65.0,
+9.0,
+8.166,
+4.09,
+0.4,
+90.5,
+0.0,
+7.1,
+0.0,
+0.0,
+13.700000000000001,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2439",
+"abbreviation": "UNLV",
+"nickname": "UNLV",
+"displayName": "UNLV Rebels"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.399,
+66.0,
+-8.0,
+7.568,
+4.855,
+1.2,
+82.1,
+0.0,
+1.3,
+0.0,
+0.0,
+24.7,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "151",
+"abbreviation": "ECU",
+"nickname": "East Carolina",
+"displayName": "East Carolina Pirates"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.564,
+67.0,
+1.0,
+7.946,
+4.347,
+0.1,
+87.5,
+0.0,
+5.4,
+0.0,
+0.0,
+15.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2426",
+"abbreviation": "NAVY",
+"nickname": "Navy",
+"displayName": "Navy Midshipmen"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.712,
+68.0,
+1.0,
+7.807,
+4.554,
+0.1,
+84.89999999999999,
+0.0,
+4.8,
+0.1,
+0.0,
+17.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "183",
+"abbreviation": "SYR",
+"nickname": "Syracuse",
+"displayName": "Syracuse Orange"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.808,
+69.0,
+1.0,
+4.846,
+7.165,
+0.0,
+35.5,
+0.0,
+0.7000000000000001,
+0.0,
+0.0,
+0.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2509",
+"abbreviation": "PUR",
+"nickname": "Purdue",
+"displayName": "Purdue Boilermakers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.929,
+70.0,
+1.0,
+4.244,
+7.759,
+0.0,
+24.2,
+0.0,
+0.5,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "66",
+"abbreviation": "ISU",
+"nickname": "Iowa State",
+"displayName": "Iowa State Cyclones"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.943,
+71.0,
+1.0,
+5.061,
+6.958,
+0.0,
+39.4,
+0.0,
+1.0,
+0.0,
+0.0,
+0.6,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "58",
+"abbreviation": "USF",
+"nickname": "South Florida",
+"displayName": "South Florida Bulls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-0.949,
+72.0,
+1.0,
+8.301,
+3.912,
+0.8999999999999999,
+90.10000000000001,
+0.0,
+5.3,
+0.0,
+0.0,
+11.200000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "24",
+"abbreviation": "STAN",
+"nickname": "Stanford",
+"displayName": "Stanford Cardinal"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-1.318,
+73.0,
+7.0,
+4.791,
+7.212,
+0.0,
+31.5,
+0.0,
+0.4,
+0.0,
+0.0,
+0.1,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "152",
+"abbreviation": "NCSU",
+"nickname": "NC State",
+"displayName": "NC State Wolfpack"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-1.391,
+74.0,
+-23.0,
+5.054,
+6.95,
+0.0,
+39.900000000000006,
+0.0,
+0.3,
+0.0,
+0.0,
+0.1,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2449",
+"abbreviation": "NDSU",
+"nickname": "N Dakota St",
+"displayName": "North Dakota State Bison"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-1.545,
+75.0,
+25.0,
+8.906,
+3.504,
+1.5,
+95.6,
+0.0,
+5.1,
+0.0,
+0.0,
+22.8,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "256",
+"abbreviation": "JMU",
+"nickname": "James Madison",
+"displayName": "James Madison Dukes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-2.026,
+76.0,
+-1.0,
+8.166,
+4.154,
+0.6,
+87.0,
+32.1,
+4.3999999999999995,
+0.0,
+0.0,
+20.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "278",
+"abbreviation": "FRES",
+"nickname": "Fresno St",
+"displayName": "Fresno State Bulldogs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-2.498,
+77.0,
+0.0,
+6.386,
+4.865,
+0.1,
+66.2,
+0.0,
+2.8000000000000003,
+0.0,
+0.0,
+11.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "103",
+"abbreviation": "BC",
+"nickname": "Boston College",
+"displayName": "Boston College Eagles"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-2.668,
+78.0,
+0.0,
+4.18,
+7.823,
+0.0,
+23.400000000000002,
+0.0,
+0.3,
+0.0,
+0.0,
+0.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2649",
+"abbreviation": "TOL",
+"nickname": "Toledo",
+"displayName": "Toledo Rockets"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-2.972,
+79.0,
+0.0,
+8.628,
+3.834,
+1.2,
+91.7,
+0.0,
+3.8,
+0.0,
+0.0,
+27.6,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "167",
+"abbreviation": "UNM",
+"nickname": "New Mexico",
+"displayName": "New Mexico Lobos"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-3.531,
+80.0,
+1.0,
+7.515,
+4.802,
+0.1,
+81.6,
+0.0,
+2.7,
+0.0,
+0.0,
+16.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "62",
+"abbreviation": "HAW",
+"nickname": "Hawai'i",
+"displayName": "Hawai'i Rainbow Warriors"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-3.976,
+81.0,
+-5.0,
+7.052,
+5.269,
+0.3,
+76.3,
+0.0,
+0.6,
+0.0,
+0.0,
+16.0,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2711",
+"abbreviation": "WMU",
+"nickname": "W Michigan",
+"displayName": "Western Michigan Broncos"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.037,
+82.0,
+0.0,
+7.77,
+4.615,
+0.1,
+84.8,
+0.0,
+2.7,
+0.0,
+0.0,
+22.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "265",
+"abbreviation": "WSU",
+"nickname": "Washington St",
+"displayName": "Washington State Cougars"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.054,
+83.0,
+0.0,
+5.131,
+6.061,
+0.0,
+40.1,
+0.0,
+1.3,
+0.0,
+0.0,
+8.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "326",
+"abbreviation": "TXST",
+"nickname": "Texas St",
+"displayName": "Texas State Bobcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.26,
+84.0,
+0.0,
+5.592,
+5.607,
+0.0,
+51.300000000000004,
+0.0,
+1.7000000000000002,
+0.0,
+0.0,
+8.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "295",
+"abbreviation": "ODU",
+"nickname": "Old Dominion",
+"displayName": "Old Dominion Monarchs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.435,
+85.0,
+0.0,
+7.225,
+5.009,
+0.1,
+76.2,
+23.400000000000002,
+2.1999999999999997,
+0.0,
+0.0,
+13.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "48",
+"abbreviation": "DEL",
+"nickname": "Delaware",
+"displayName": "Delaware Blue Hens"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.524,
+86.0,
+5.0,
+7.381,
+5.004,
+0.0,
+80.5,
+0.0,
+1.9,
+0.0,
+0.0,
+21.6,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "98",
+"abbreviation": "WKU",
+"nickname": "Western KY",
+"displayName": "Western Kentucky Hilltoppers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-4.859,
+87.0,
+-1.0,
+7.052,
+5.362,
+0.0,
+76.2,
+0.0,
+1.9,
+0.0,
+0.0,
+22.8,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2572",
+"abbreviation": "USM",
+"nickname": "Southern Miss",
+"displayName": "Southern Miss Golden Eagles"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-5.053,
+88.0,
+-1.0,
+6.943,
+5.303,
+0.0,
+73.5,
+24.6,
+1.7999999999999998,
+0.0,
+0.0,
+12.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2636",
+"abbreviation": "UTSA",
+"nickname": "UTSA",
+"displayName": "UTSA Roadrunners"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-5.31,
+89.0,
+-1.0,
+6.431,
+5.698,
+0.0,
+66.0,
+0.0,
+1.6,
+0.0,
+0.0,
+5.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "338",
+"abbreviation": "KENN",
+"nickname": "Kennesaw St",
+"displayName": "Kennesaw State Owls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-5.425,
+90.0,
+16.0,
+7.647,
+4.724,
+0.1,
+83.39999999999999,
+0.0,
+1.9,
+0.0,
+0.0,
+19.6,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "349",
+"abbreviation": "ARMY",
+"nickname": "Army",
+"displayName": "Army Black Knights"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-5.63,
+91.0,
+-2.0,
+6.444,
+5.667,
+0.0,
+65.4,
+0.0,
+1.4000000000000001,
+0.0,
+0.0,
+4.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "249",
+"abbreviation": "UNT",
+"nickname": "North Texas",
+"displayName": "North Texas Mean Green"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-6.401,
+92.0,
+-2.0,
+6.221,
+5.886,
+0.0,
+63.0,
+0.0,
+1.0,
+0.0,
+0.0,
+4.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "328",
+"abbreviation": "USU",
+"nickname": "Utah State",
+"displayName": "Utah State Aggies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-6.707,
+93.0,
+-1.0,
+4.686,
+6.434,
+0.0,
+32.300000000000004,
+0.0,
+0.7000000000000001,
+0.0,
+0.0,
+4.3999999999999995,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2005",
+"abbreviation": "AFA",
+"nickname": "Air Force",
+"displayName": "Air Force Falcons"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-6.842,
+94.0,
+-1.0,
+6.997,
+5.225,
+0.1,
+73.2,
+0.0,
+1.3,
+0.0,
+0.0,
+9.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "164",
+"abbreviation": "RUTG",
+"nickname": "Rutgers",
+"displayName": "Rutgers Scarlet Knights"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-6.902,
+95.0,
+-28.0,
+2.854,
+9.146,
+0.0,
+4.7,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "193",
+"abbreviation": "M-OH",
+"nickname": "Miami OH",
+"displayName": "Miami (OH) RedHawks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-6.994,
+96.0,
+-2.0,
+7.068,
+5.207,
+0.0,
+75.2,
+0.0,
+1.3,
+0.0,
+0.0,
+13.8,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2653",
+"abbreviation": "TROY",
+"nickname": "Troy",
+"displayName": "Troy Trojans"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-7.359,
+97.0,
+-2.0,
+6.584,
+5.581,
+0.0,
+68.30000000000001,
+16.6,
+0.8999999999999999,
+0.0,
+0.0,
+7.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2335",
+"abbreviation": "LIB",
+"nickname": "Liberty",
+"displayName": "Liberty Flames"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-7.748,
+98.0,
+-2.0,
+7.188,
+5.07,
+0.1,
+75.9,
+0.0,
+1.2,
+0.0,
+0.0,
+12.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "195",
+"abbreviation": "OHIO",
+"nickname": "Ohio",
+"displayName": "Ohio Bobcats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-7.957,
+99.0,
+-2.0,
+7.525,
+4.74,
+0.1,
+81.3,
+0.0,
+1.4000000000000001,
+0.0,
+0.0,
+12.9,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "204",
+"abbreviation": "ORST",
+"nickname": "Oregon St",
+"displayName": "Oregon State Beavers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.101,
+100.0,
+-2.0,
+4.401,
+6.716,
+0.0,
+28.299999999999997,
+0.0,
+0.5,
+0.0,
+0.0,
+4.1000000000000005,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "309",
+"abbreviation": "UL",
+"nickname": "Louisiana",
+"displayName": "Louisiana Ragin' Cajuns"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.278,
+101.0,
+-2.0,
+6.92,
+5.279,
+0.0,
+73.5,
+19.900000000000002,
+1.0,
+0.0,
+0.0,
+8.7,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "218",
+"abbreviation": "TEM",
+"nickname": "Temple",
+"displayName": "Temple Owls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.6,
+102.0,
+0.0,
+5.422,
+6.627,
+0.0,
+47.699999999999996,
+0.0,
+0.5,
+0.0,
+0.0,
+1.7999999999999998,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "290",
+"abbreviation": "GASO",
+"nickname": "GA Southern",
+"displayName": "Georgia Southern Eagles"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.701,
+103.0,
+0.0,
+5.927,
+6.195,
+0.0,
+56.39999999999999,
+12.2,
+0.6,
+0.0,
+0.0,
+6.1,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "276",
+"abbreviation": "MRSH",
+"nickname": "Marshall",
+"displayName": "Marshall Thundering Herd"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.786,
+104.0,
+0.0,
+6.494,
+5.633,
+0.0,
+67.2,
+12.7,
+0.8,
+0.0,
+0.0,
+5.8999999999999995,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "202",
+"abbreviation": "TLSA",
+"nickname": "Tulsa",
+"displayName": "Tulsa Golden Hurricane"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-8.963,
+105.0,
+0.0,
+5.754,
+6.305,
+0.0,
+53.300000000000004,
+0.0,
+0.5,
+0.0,
+0.0,
+2.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2032",
+"abbreviation": "ARST",
+"nickname": "Arkansas St",
+"displayName": "Arkansas State Red Wolves"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-9.153,
+106.0,
+1.0,
+6.18,
+5.975,
+0.0,
+60.6,
+15.5,
+0.7000000000000001,
+0.0,
+0.0,
+6.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2348",
+"abbreviation": "LT",
+"nickname": "Louisiana Tech",
+"displayName": "Louisiana Tech Bulldogs"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-9.556,
+107.0,
+1.0,
+5.556,
+6.563,
+0.0,
+49.2,
+11.899999999999999,
+0.4,
+0.0,
+0.0,
+5.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2026",
+"abbreviation": "APP",
+"nickname": "App State",
+"displayName": "App State Mountaineers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-9.767,
+108.0,
+1.0,
+6.198,
+5.919,
+0.0,
+60.8,
+11.700000000000001,
+0.5,
+0.0,
+0.0,
+5.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2623",
+"abbreviation": "MOST",
+"nickname": "Missouri St",
+"displayName": "Missouri State Bears"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-10.255,
+109.0,
+1.0,
+5.713,
+6.472,
+0.0,
+53.0,
+0.0,
+0.4,
+0.0,
+0.0,
+8.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "6",
+"abbreviation": "USA",
+"nickname": "South Alabama",
+"displayName": "South Alabama Jaguars"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-10.531,
+110.0,
+2.0,
+5.429,
+6.673,
+0.0,
+47.099999999999994,
+10.2,
+0.3,
+0.0,
+0.0,
+4.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "113",
+"abbreviation": "MASS",
+"nickname": "UMass",
+"displayName": "Massachusetts Minutemen"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-11.03,
+111.0,
+26.0,
+7.85,
+4.302,
+0.2,
+88.3,
+0.0,
+0.8999999999999999,
+0.0,
+0.0,
+6.2,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "41",
+"abbreviation": "CONN",
+"nickname": "UConn",
+"displayName": "UConn Huskies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-11.163,
+112.0,
+2.0,
+4.588,
+7.412,
+0.0,
+32.300000000000004,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2226",
+"abbreviation": "FAU",
+"nickname": "FAU",
+"displayName": "Florida Atlantic Owls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-11.256,
+113.0,
+2.0,
+5.07,
+6.96,
+0.0,
+40.6,
+0.0,
+0.3,
+0.0,
+0.0,
+1.0999999999999999,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "23",
+"abbreviation": "SJSU",
+"nickname": "San Jos\u00e9 St",
+"displayName": "San Jos\u00e9 State Spartans"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-11.697,
+114.0,
+10.0,
+5.461,
+7.626,
+0.0,
+47.8,
+0.0,
+0.1,
+0.0,
+0.0,
+2.8000000000000003,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2440",
+"abbreviation": "NEV",
+"nickname": "Nevada",
+"displayName": "Nevada Wolf Pack"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-11.931,
+115.0,
+1.0,
+4.676,
+7.4,
+0.0,
+34.599999999999994,
+0.0,
+0.1,
+0.0,
+0.0,
+2.9000000000000004,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "324",
+"abbreviation": "CCU",
+"nickname": "Coastal",
+"displayName": "Coastal Carolina Chanticleers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-12.093,
+116.0,
+1.0,
+5.11,
+6.944,
+0.0,
+40.8,
+5.4,
+0.2,
+0.0,
+0.0,
+2.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "36",
+"abbreviation": "CSU",
+"nickname": "Colorado St",
+"displayName": "Colorado State Rams"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-12.364,
+117.0,
+1.0,
+3.54,
+7.501,
+0.0,
+15.299999999999999,
+0.0,
+0.1,
+0.0,
+0.0,
+1.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2084",
+"abbreviation": "BUFF",
+"nickname": "Buffalo",
+"displayName": "Buffalo Bulls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-12.525,
+118.0,
+-5.0,
+6.149,
+5.938,
+0.0,
+61.6,
+0.0,
+0.2,
+0.0,
+0.0,
+3.8,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2229",
+"abbreviation": "FIU",
+"nickname": "FIU",
+"displayName": "Florida International Panthers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-12.58,
+119.0,
+0.0,
+5.698,
+6.409,
+0.0,
+51.800000000000004,
+0.0,
+0.2,
+0.0,
+0.0,
+4.6,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2117",
+"abbreviation": "CMU",
+"nickname": "C Michigan",
+"displayName": "Central Michigan Chippewas"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-12.806,
+120.0,
+0.0,
+5.754,
+6.358,
+0.0,
+54.0,
+0.0,
+0.2,
+0.0,
+0.0,
+4.3999999999999995,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2751",
+"abbreviation": "WYO",
+"nickname": "Wyoming",
+"displayName": "Wyoming Cowboys"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-13.069,
+121.0,
+0.0,
+5.301,
+6.763,
+0.0,
+44.7,
+0.0,
+0.2,
+0.0,
+0.0,
+2.1999999999999997,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "242",
+"abbreviation": "RICE",
+"nickname": "Rice",
+"displayName": "Rice Owls"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-13.439,
+122.0,
+0.0,
+3.967,
+8.048,
+0.0,
+21.099999999999998,
+0.0,
+0.1,
+0.0,
+0.0,
+0.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "189",
+"abbreviation": "BGSU",
+"nickname": "Bowling Green",
+"displayName": "Bowling Green Falcons"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-13.682,
+123.0,
+0.0,
+4.773,
+7.304,
+0.0,
+35.0,
+0.0,
+0.1,
+0.0,
+0.0,
+3.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "166",
+"abbreviation": "NMSU",
+"nickname": "New Mexico St",
+"displayName": "New Mexico State Aggies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-13.997,
+124.0,
+5.0,
+5.002,
+7.099,
+0.0,
+38.6,
+0.0,
+0.0,
+0.0,
+0.0,
+3.8,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "55",
+"abbreviation": "JVST",
+"nickname": "Jax State",
+"displayName": "Jacksonville State Gamecocks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-14.08,
+125.0,
+-24.0,
+4.975,
+7.104,
+0.0,
+39.0,
+0.0,
+0.0,
+0.0,
+0.0,
+3.0,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "5",
+"abbreviation": "UAB",
+"nickname": "UAB",
+"displayName": "UAB Blazers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-14.473,
+126.0,
+2.0,
+4.097,
+7.912,
+0.0,
+20.9,
+0.0,
+0.0,
+0.0,
+0.0,
+0.3,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2459",
+"abbreviation": "NIU",
+"nickname": "N Illinois",
+"displayName": "Northern Illinois Huskies"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-14.51,
+127.0,
+-2.0,
+4.119,
+7.931,
+0.0,
+24.2,
+0.0,
+0.1,
+0.0,
+0.0,
+1.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2429",
+"abbreviation": "CLT",
+"nickname": "Charlotte",
+"displayName": "Charlotte 49ers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-14.583,
+128.0,
+-2.0,
+3.856,
+8.155,
+0.0,
+19.5,
+0.0,
+0.1,
+0.0,
+0.0,
+0.3,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2199",
+"abbreviation": "EMU",
+"nickname": "E Michigan",
+"displayName": "Eastern Michigan Eagles"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-15.137,
+129.0,
+2.0,
+5.309,
+6.751,
+0.0,
+43.7,
+0.0,
+0.0,
+0.0,
+0.0,
+1.9,
+1.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2247",
+"abbreviation": "GAST",
+"nickname": "Georgia St",
+"displayName": "Georgia State Panthers"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-15.225,
+130.0,
+-3.0,
+4.414,
+7.612,
+0.0,
+27.500000000000004,
+2.6,
+0.0,
+0.0,
+0.0,
+0.8999999999999999,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2393",
+"abbreviation": "MTSU",
+"nickname": "MTSU",
+"displayName": "Middle Tennessee Blue Raiders"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-16.066,
+131.0,
+-1.0,
+4.746,
+7.318,
+0.0,
+34.5,
+0.0,
+0.1,
+0.0,
+0.0,
+2.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2638",
+"abbreviation": "UTEP",
+"nickname": "UTEP",
+"displayName": "UTEP Miners"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-16.605,
+132.0,
+0.0,
+3.823,
+8.205,
+0.0,
+17.299999999999997,
+0.0,
+0.0,
+0.0,
+0.0,
+0.7000000000000001,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2006",
+"abbreviation": "AKR",
+"nickname": "Akron",
+"displayName": "Akron Zips"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-16.831,
+133.0,
+0.0,
+4.115,
+7.924,
+0.0,
+22.1,
+0.0,
+0.0,
+0.0,
+0.0,
+1.3,
+0.0,
+1.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2050",
+"abbreviation": "BALL",
+"nickname": "Ball State",
+"displayName": "Ball State Cardinals"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-17.282,
+134.0,
+0.0,
+4.299,
+7.744,
+0.0,
+26.0,
+0.0,
+0.1,
+0.0,
+0.0,
+1.5,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2309",
+"abbreviation": "KENT",
+"nickname": "Kent State",
+"displayName": "Kent State Golden Flashes"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-17.891,
+135.0,
+0.0,
+3.906,
+8.13,
+0.0,
+20.0,
+0.0,
+0.0,
+0.0,
+0.0,
+1.0999999999999999,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2534",
+"abbreviation": "SHSU",
+"nickname": "Sam Houston",
+"displayName": "Sam Houston Bearkats"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-18.422,
+136.0,
+0.0,
+3.855,
+8.181,
+0.0,
+20.4,
+0.0,
+0.1,
+0.0,
+0.0,
+1.2,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "2433",
+"abbreviation": "ULM",
+"nickname": "UL Monroe",
+"displayName": "UL Monroe Warhawks"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-19.255,
+137.0,
+1.0,
+3.446,
+8.567,
+0.0,
+15.6,
+1.3,
+0.0,
+0.0,
+0.0,
+0.4,
+0.0,
+0.0,
+0.0
+]
+}
+]
+},
+{
+"team": {
+"id": "16",
+"abbreviation": "SAC",
+"nickname": "Sacramento St",
+"displayName": "Sacramento State Hornets"
+},
+"categories": [
+{
+"name": "fpi",
+"values": [
+-21.132,
+138.0,
+-27.0,
+3.439,
+8.568,
+0.0,
+11.1,
+0.0,
+0.0,
+0.0,
+0.0,
+0.2,
+0.0,
+1.0,
+0.0
+]
+}
+]
+}
+]
+}

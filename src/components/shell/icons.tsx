@@ -99,3 +99,15 @@ export function IconSettings({ className = "" }: P) {
     </svg>
   );
 }
+
+/* ---- INSTRUCTION 38 (2026-09-05) additions — append-only below this line ---- */
+
+/** Arrow → for "open the desk" links (landing chooser, design page). */
+export function IconArrowRight({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`${base} ${className}`}>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}

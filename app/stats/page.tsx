@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -15,6 +15,14 @@ import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
 import { PlayerName } from "@/components/player/PlayerName";
 import { WINDOW_GAMES, isWindowGroup, parseWindowValue, siblingWindow, windowNote, windowValue } from "@/lib/stats-window";
+import { CFB_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbFpiPanel } from "@/components/cfb/CfbFpiPanel";
+import { useCfbBankroll } from "@/components/cfb/CfbBoard";
+import { CFB_STALE_MS, cfbQueryKey, loadCfbSlate } from "@/lib/cfb/client";
+import { CFB_BANK_BASE } from "@/lib/cfb/rules";
+import type { CfbSlate } from "@/lib/cfb/types";
+import { ptToday } from "@/components/games/logo";
 
 /* The stat desk from the original app, ported feature-for-feature: every MLB
    player and all 30 teams (plus NFL / NCAAF via ESPN), live on open, with the
@@ -231,6 +239,17 @@ const CAP = 400;
 const selectCls =
   "rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[11.5px] font-semibold text-muted outline-none transition-colors hover:text-text focus:border-pos/60";
 
+/** The stat pill the user last tapped, "mlb" until they tap one. Only pickSport writes this
+    key — the SportSwitch's desk default is applied, never persisted — so a CFB-desk visit
+    cannot change the pill the MLB desk opens on. */
+function storedStatsSport(): SportId {
+  try {
+    const s = JSON.parse(localStorage.getItem("pl_stats_sport") || '"mlb"') as SportId;
+    if (s === "ufc" || SPORTS[s]) return s;
+  } catch {}
+  return "mlb";
+}
+
 /* ---------- page ---------- */
 export default function StatsPage() {
   const [sport, setSport] = useState<SportId>("mlb");
@@ -249,17 +268,54 @@ export default function StatsPage() {
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
 
-  // restore the legacy-persisted sport choice
+  // restore the persisted stat-desk choice. Its key moved from "pl_sport" to "pl_stats_sport"
+  // on 2026-09-05: "pl_sport" is now the global SportSwitch (src/lib/sport.ts), which stores a
+  // bare "mlb" | "cfb" — this JSON-quoted pill must never read or overwrite it.
   useEffect(() => {
-    try {
-      const s = JSON.parse(localStorage.getItem("pl_sport") || '"mlb"') as SportId;
-      if (s === "ufc") setSport("ufc");
-      else if (SPORTS[s] && s !== "mlb") pickSport(s);
-    } catch {}
+    const s = storedStatsSport();
+    if (s !== "mlb") applySport(s);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function pickSport(s: SportId) {
+  /* CFB desk (2026-09-05): the global SportSwitch defaults the pill to NCAAF and puts the
+     FPI panel above the tables; flipping the switch back to MLB restores the pill the MLB
+     desk opens on (the one the user last tapped — MLB until they tap one). The desk default
+     goes through applySport, never the persisted key, and the MLB branch runs only on a real
+     CFB → MLB flip, reading the live pill through a ref rather than the mount closure — so a
+     restored choice is never clobbered and a CFB-desk visit never leaks into the MLB desk.
+     The stat tables themselves are unchanged — they still read ESPN through /api/stats. */
+  const desk = useSport();
+  const cfbDesk = CFB_ENABLED && desk === "cfb";
+  const sportRef = useRef(sport);
+  useEffect(() => {
+    sportRef.current = sport;
+  }, [sport]);
+  const wasCfbDesk = useRef(cfbDesk);
+  useEffect(() => {
+    const was = wasCfbDesk.current;
+    wasCfbDesk.current = cfbDesk;
+    if (cfbDesk) {
+      if (sportRef.current !== "cfb") applySport("cfb");
+    } else if (was) {
+      const s = storedStatsSport();
+      if (s !== sportRef.current) applySport(s);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfbDesk]);
+  // today's CFB slate feeds the FPI panel (same query key + TTL as the board, so it is one fetch)
+  const today = useMemo(ptToday, []);
+  const cfbBankroll = useCfbBankroll();
+  const cfbQ = useQuery<CfbSlate>({
+    queryKey: cfbQueryKey(today, cfbBankroll ?? CFB_BANK_BASE),
+    queryFn: () => loadCfbSlate(today, { bankroll: cfbBankroll ?? CFB_BANK_BASE }),
+    staleTime: CFB_STALE_MS,
+    retry: 1,
+    enabled: cfbDesk && cfbBankroll != null,
+  });
+  const cfbSlate = cfbQ.data ?? null;
+
+  /** the pill and its default filters, without touching the persisted choice */
+  function applySport(s: SportId) {
     setSport(s);
     if (s !== "ufc") {
       setGroup(SPORTS[s].groups[0][0]);
@@ -269,7 +325,11 @@ export default function StatsPage() {
       setPosition("ALL");
       setMinVal(0);
     }
-    try { localStorage.setItem("pl_sport", JSON.stringify(s)); } catch {}
+  }
+  /** a tap on a pill: apply it and remember it as the user's choice */
+  function pickSport(s: SportId) {
+    applySport(s);
+    try { localStorage.setItem("pl_stats_sport", JSON.stringify(s)); } catch {}
   }
   function pickGroup(g: string) {
     // keep the window's menu position across groups: Last 15 (hitting) ↔ Last 5 (pitching)
@@ -368,6 +428,8 @@ export default function StatsPage() {
     <>
       <PageHeader
         title="Stats"
+        eyebrow={cfbDesk ? "College Football" : undefined}
+        chip={cfbDesk ? <CfbChip /> : undefined}
         sub={
           sport === "ufc"
             ? "UFC — official divisional rankings, pound-for-pound & the full active roster"
@@ -467,6 +529,17 @@ export default function StatsPage() {
         </Panel>
       </Reveal>
 
+      {cfbDesk && !calView && sport === "cfb" && (
+        <Reveal>
+          <CfbFpiPanel
+            teams={cfbSlate?.games.flatMap((g) => [g.home, g.away]) ?? []}
+            updated={cfbSlate?.fpiUpdated ?? null}
+            title={cfbSlate ? "FPI · today's teams" : cfbQ.isError ? "FPI · slate did not load" : "FPI · —"}
+            className="mb-4"
+          />
+        </Reveal>
+      )}
+
       {calView ? (
         <div className="space-y-4">
           <ClvPanel />
@@ -523,5 +596,14 @@ export default function StatsPage() {
         MLB Stats API + ESPN, live — the same feeds as the original Stats tab. Informational only, not betting advice.
       </div>
     </>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

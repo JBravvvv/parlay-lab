@@ -11,3 +11,9 @@ export const UFC_ENABLED = false;
    One-night event: flip to `true` on game day, back to `false` after — the
    components stay in the tree either way, this is the only edit. */
 export const ASG_ENABLED = false;
+
+/* The College Football desk (🏈 CFB on the global SportSwitch): Board / Builder /
+   Parlay Builder / Ledger / The Sharp / Games / Stats route to the CFB surfaces, with
+   their own bank and ledger keys (src/lib/cfb/rules.ts) — never the MLB ones. `false`
+   pins every page to MLB; the CFB components stay in the tree either way. */
+export const CFB_ENABLED = true;

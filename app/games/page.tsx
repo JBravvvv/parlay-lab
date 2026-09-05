@@ -10,6 +10,9 @@ import { DateRail } from "@/components/games/DateRail";
 import { logoFor, ptToday, startLabel } from "@/components/games/logo";
 import { PlayerName } from "@/components/player/PlayerName";
 import { SEASON_WINDOW, clampToWindow, railLabel, seasonDates, type GamesPayload, type GameTeam, type ShapedGame } from "@/lib/games";
+import { CFB_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbGames } from "@/components/cfb/CfbGames";
 
 /* GAMES TAB (2026-09-03, Josh): every game of the day, MLB-app style — a date
    rail over the whole September window (9/1 → the last regular-season day, Sun
@@ -39,6 +42,8 @@ export default function GamesPage() {
 
 function Games() {
   const today = useMemo(ptToday, []);
+  const sport = useSport();
+  const cfbDesk = CFB_ENABLED && sport === "cfb";
   const qDate = useSearchParams().get("date");
   // a URL date outside the window (or a today past 9/27) clamps to the nearest edge
   const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
@@ -46,6 +51,7 @@ function Games() {
 
   const q = useQuery<GamesPayload>({
     queryKey: ["games", date],
+    enabled: !cfbDesk, // the CFB desk never spends an MLB games fetch
     queryFn: async () => {
       const r = await fetch(`/api/games?date=${date}`);
       const j = (await r.json().catch(() => null)) as (GamesPayload & { error?: string }) | null;
@@ -71,6 +77,22 @@ function Games() {
   const live = games.filter((g) => g.status === "live");
   const upcoming = games.filter((g) => g.status === "upcoming" || g.status === "postponed");
   const final = games.filter((g) => g.status === "final");
+
+  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
+     slate. Every hook above has already run, so this early return is hooks-safe. */
+  if (cfbDesk) {
+    return (
+      <div>
+        <PageHeader
+          title="Games"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="Every FBS game by slate day — kickoffs, Caesars lines and finals from the desk's CFB feed."
+        />
+        <CfbGames />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -242,5 +264,14 @@ function TeamRow({ t, score, upcoming, winner }: { t: GameTeam; score: boolean; 
         </span>
       ) : null}
     </div>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }

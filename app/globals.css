@@ -32,6 +32,7 @@
   --color-neg: #ff5c45; /* red-orange — −EV, losses */
   --color-gold: #c79a3b; /* muted gold — Caesars layer only */
   --color-live: #5cc8ff; /* ice blue — live/in-game marker */
+  --color-cfb: #f5a524; /* amber — the College Football desk's accent (INSTRUCTION 38) */
 
   /* rounded, floating panels */
   --radius-panel: 20px;
@@ -282,6 +283,188 @@ body::after {
 *::-webkit-scrollbar-thumb { background: var(--color-line-2); border-radius: 3px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* ---------------------------------------------------------------------------
+   INSTRUCTION 38 (2026-09-05) — the CFB desk + the site-wide UI upgrade.
+   Everything below is ADDITIVE: the green theme, the video backdrop rule and
+   the body-no-background rule above are untouched. Amber (--color-cfb) marks
+   the College Football desk — a hint layered on the green, never a re-theme.
+   Un-layered rules beat Tailwind utilities, so these classes set only what a
+   caller should not need to override.
+--------------------------------------------------------------------------- */
+
+/* ---- press: haptic-feel tap feedback on any control — scale 0.97 on the
+   spring-back ease (a real tap, not a fade). Never will-change: a transform
+   hint would re-anchor position:fixed descendants. */
+.press {
+  transition:
+    transform var(--dur-fast) var(--ease-press),
+    filter var(--dur-fast) var(--ease-press),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.press:active { transform: scale(0.97); }
+
+/* ---- card-lift: desktop hover only (a phone has no hover — the lift would
+   stick after a tap). Lifts 2px and lights the lime rim. */
+@media (hover: hover) and (pointer: fine) {
+  .card-lift {
+    transition:
+      transform 240ms var(--ease-out),
+      box-shadow 240ms var(--ease-out),
+      border-color 240ms var(--ease-out);
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-acc-lime) 36%, rgba(255, 255, 255, 0.1));
+    box-shadow:
+      inset 0 1px 1px color-mix(in srgb, var(--color-acc-lime) 30%, rgba(255, 255, 255, 0.1)),
+      0 0 42px -10px rgba(182, 255, 61, 0.32),
+      0 16px 30px -18px rgba(0, 0, 0, 0.65);
+  }
+}
+
+/* ---- segmented control (SportSwitch, Segmented): the container lays the
+   options out on one pill track; the thumb is a motion layoutId element that
+   lives inside the ACTIVE option and slides between options on change. */
+.segmented {
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-chip);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: color-mix(in srgb, var(--color-surface-2) 84%, transparent);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.04),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.16);
+  isolation: isolate;
+}
+.segmented-thumb {
+  --seg-accent: var(--color-pos);
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: var(--radius-chip);
+  background: color-mix(in srgb, var(--seg-accent) 16%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--seg-accent) 44%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--seg-accent) 30%, transparent),
+    0 0 18px -6px color-mix(in srgb, var(--seg-accent) 70%, transparent);
+}
+.segmented-thumb.is-cfb { --seg-accent: var(--color-cfb); }
+
+/* ---- ticket: the betting slip. A repeating radial-gradient MASK scallops the
+   bottom edge into a perforated tear-off stub; .ticket-tear is the dashed
+   perforation between the legs and the stake. A mask clips box-shadow, so any
+   glow (ev-glow, glow-pos) belongs on a wrapper, not on .ticket itself. */
+.ticket {
+  --ticket-notch: 5px;
+  position: relative;
+  border-radius: 16px 16px 4px 4px;
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--color-acc-lime) 12%, transparent),
+      color-mix(in srgb, var(--color-acc-green) 6%, transparent) 60%,
+      color-mix(in srgb, var(--color-acc-lime) 9%, transparent)
+    ),
+    color-mix(in srgb, var(--color-surface) 64%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--color-acc-lime) 22%, rgba(255, 255, 255, 0.07));
+  border-bottom: 0;
+  padding-bottom: calc(var(--ticket-notch) + 8px);
+  -webkit-mask:
+    radial-gradient(circle at 50% 100%, transparent var(--ticket-notch), #000 calc(var(--ticket-notch) + 0.6px))
+    50% 100% / 16px 100% repeat-x;
+  mask:
+    radial-gradient(circle at 50% 100%, transparent var(--ticket-notch), #000 calc(var(--ticket-notch) + 0.6px))
+    50% 100% / 16px 100% repeat-x;
+}
+.ticket-tear {
+  position: relative;
+  height: 0;
+  margin: 10px 0;
+  border-top: 1.5px dashed color-mix(in srgb, var(--color-text) 24%, transparent);
+}
+
+/* ---- shine: a slow sheen sweeping across S-grade tickets (one pass every 7s) */
+@keyframes shine-sweep {
+  0% { transform: translateX(-140%) skewX(-18deg); }
+  32%, 100% { transform: translateX(340%) skewX(-18deg); }
+}
+.shine { position: relative; overflow: hidden; }
+.shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 34%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(255, 225, 140, 0.18) 50%,
+    rgba(255, 255, 255, 0.05) 65%,
+    transparent 100%
+  );
+  animation: shine-sweep 7s var(--ease-out) infinite;
+}
+
+/* ---- stat tile: one small focal number on its own glass, a corner glint in
+   the tile's tone (lime by default; .is-cfb / .is-gold / .is-neg recolor it) */
+.stat-tile {
+  --tile-glint: rgba(182, 255, 61, 0.11);
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-acc-lime) 16%, rgba(255, 255, 255, 0.06));
+  background:
+    linear-gradient(150deg, color-mix(in srgb, var(--color-acc-lime) 9%, transparent), transparent 70%),
+    color-mix(in srgb, var(--color-surface) 58%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--color-acc-lime) 20%, rgba(255, 255, 255, 0.08));
+}
+.stat-tile::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -18%;
+  width: 60%;
+  height: 130%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, var(--tile-glint), transparent 72%);
+}
+.stat-tile.is-cfb { --tile-glint: rgba(245, 165, 36, 0.16); }
+.stat-tile.is-gold { --tile-glint: rgba(199, 154, 59, 0.16); }
+.stat-tile.is-neg { --tile-glint: rgba(255, 92, 69, 0.13); }
+
+/* ---- rail glow: ambient light at the top of the desktop rail, in the desk's
+   accent (lime for MLB, amber for CFB) — the rail is position:fixed, so the
+   absolute pseudo-element rides it and stays out of its flex flow */
+.rail-glow { --rail-accent: var(--color-pos); }
+.rail-glow.is-cfb { --rail-accent: var(--color-cfb); }
+.rail-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 280px;
+  pointer-events: none;
+  background: radial-gradient(
+    280px 220px at 16% 0%,
+    color-mix(in srgb, var(--rail-accent) 15%, transparent),
+    transparent 72%
+  );
+  transition: background 600ms var(--ease-out);
+}
+
 /* ---- motion is identity, but never mandatory */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -290,4 +473,8 @@ body::after {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* INSTRUCTION 38 additions: no sheen, no lift, no press scale */
+  .shine::after { animation: none !important; }
+  .press:active,
+  .card-lift:hover { transform: none !important; }
 }

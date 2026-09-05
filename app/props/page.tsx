@@ -1,12 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useQuery } from "@tanstack/react-query";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { CFB_ENABLED } from "@/lib/features";
+import { useSport } from "@/lib/sport";
+import { CfbProps } from "@/components/cfb/CfbProps";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
 import { useHeadshots } from "@/lib/mlb-visuals";
@@ -52,6 +56,7 @@ import {
 
 export default function PropsPage() {
   const q = useBoard();
+  const sport = useSport();
   const regen = useRegenerateBoard();
   const ins = useShellInsets();
   const [tab, setTab] = useState<TabKey>("games");
@@ -133,6 +138,22 @@ export default function PropsPage() {
   const calc = useMemo(() => combineTicket(legs), [legs]);
 
   const empty = gameTab ? gameGroups.length === 0 : propGames.length === 0;
+
+  /* CFB desk (2026-09-05): the global SportSwitch routes the sandbox to the College Football
+     slip. Every hook above has already run, so this early return is hooks-safe. */
+  if (CFB_ENABLED && sport === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Parlay Builder"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="A CFB sandbox slip — sides, totals and moneylines from the slate, priced at Caesars or the best posted book."
+        />
+        <CfbProps />
+      </>
+    );
+  }
 
   return (
     <>
@@ -277,5 +298,14 @@ function BoardSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+/* CFB desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on College Football */
+function CfbChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
+      🏈 CFB
+    </span>
   );
 }
