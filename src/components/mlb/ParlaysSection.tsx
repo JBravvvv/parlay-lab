@@ -55,12 +55,16 @@ export function ParlaysSection({
   mixed,
   live,
   legNow,
+  legOut,
 }: {
   parlays: Ticket[];
   mixed: Ticket[];
   live: Ticket[];
   /** live "now" chip for a leg while its game is in progress (Board passes it) */
   legNow?: (l: { gkey?: string | null; lkey?: string | null }) => { txt: string; inning: string | null } | null;
+  /** INSTRUCTION 28 (2026-09-04): true when the leg's batter is absent from the POSTED
+      lineup — the ticket is flagged SCRATCHED LEG and dimmed (a book voids or pulls it) */
+  legOut?: (l: { label?: string | null; gkey?: string | null; lkey?: string | null }) => boolean;
 }) {
   const [view, setView] = useState<View>("parlays");
   const [pfilter, setPfilter] = useState("all");
@@ -136,8 +140,9 @@ export function ParlaysSection({
               {playable.slice(0, SHOW_CAP).map((t, ti) => {
                 const e = x(t);
                 const toWin = e.czDec && e.stake != null ? Math.round(e.stake * (e.czDec - 1)) : e.toWin;
+                const outLeg = legOut ? t.legs.some((l) => legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null })) : false;
                 return (
-                  <Panel key={`${view}|${ti}`} className={(modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}>
+                  <Panel key={`${view}|${ti}`} className={outLeg ? "opacity-60" : (modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="display text-[14px] text-text">{t.name}</div>
                       <span className="num shrink-0 text-[13.5px] font-bold text-gold">
@@ -147,6 +152,14 @@ export function ParlaysSection({
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <TierTag tier={e.tier} />
+                      {outLeg && (
+                        <span
+                          className="rounded-full border border-red-400/40 bg-red-400/10 px-2 py-0.5 text-[9.5px] font-bold text-red-400"
+                          title="A leg's batter is not in the posted lineup — the books void or pull this leg, so the ticket cannot be placed as built"
+                        >
+                          SCRATCHED LEG
+                        </span>
+                      )}
                       {basisMode && t.bsDec == null && (
                         <span
                           className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"
@@ -193,9 +206,11 @@ export function ParlaysSection({
                     <ul className="mt-2.5 space-y-1 text-[12px] text-muted">
                       {t.legs.map((l, i) => {
                         const n = legNow ? legNow(l as { gkey?: string | null; lkey?: string | null }) : null;
+                        const lo = legOut ? legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null }) : false;
                         return (
-                          <li key={i} className="truncate">
+                          <li key={i} className={lo ? "truncate line-through decoration-red-400/60" : "truncate"}>
                             <span className="text-text"><BoardLabel label={l.label} /></span> · {l.prop}
+                            {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
                             {n && (
                               <span

@@ -596,6 +596,7 @@ export default function BoardPage() {
           mixed={d.parlaysMixed ?? []}
           live={d.parlaysLive ?? []}
           legNow={legLive}
+          legOut={(l) => isOut(l.label, marketOfLkey(l.lkey), l.gkey)}
         />
       )}
 

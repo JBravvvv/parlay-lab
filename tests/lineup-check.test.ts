@@ -58,6 +58,12 @@ describe("Board page wiring (source scan)", () => {
     expect(src).toMatch(/lineupStatus\(/);
     expect(src).toMatch(/showScratched/);
   });
+  it("the Board's parlay cards get the same verdict per leg (a Caballero leg on a stored 3-leg ticket was the live case)", () => {
+    expect(src).toMatch(/legOut=\{/);
+    const ps = fs.readFileSync(path.join(process.cwd(), "src/components/mlb/ParlaysSection.tsx"), "utf8");
+    expect(ps).toMatch(/SCRATCHED LEG/);
+    expect(ps).toMatch(/legOut\?:/);
+  });
   it("INSTRUCTION 30 — the column is 'Grade', 'Tier' is gone from the Board", () => {
     expect(src).toMatch(/header: "Grade"/);
     expect(src).not.toMatch(/"Tier"|>Tier</);
