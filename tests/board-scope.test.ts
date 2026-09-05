@@ -36,6 +36,16 @@ describe("INSTRUCTION 31/33 — Board page wiring (source scan)", () => {
     expect(src).toMatch(/gradeRank\(gradeFromEv\(b\.edge\)\) - gradeRank\(gradeFromEv\(a\.edge\)\)/); // S → F order
     expect(src).toMatch(/EVERY MARKET/);
   });
+  /* INSTRUCTION 41 (2026-09-05, Josh: "run everything based on the current caesars lines; hide the
+     non-Caesars lines from ALL") — the "O 0.5 H+R+RBI" rows he saw were Bovada / BetOnline lines
+     Caesars did not post at that number. ALL now keeps only Caesars-priced lines and says how
+     many it hid. The settle book stays Caesars until Josh says he is on DK / FD in another state. */
+  it("INSTRUCTION 41: the ALL view drops lines Caesars does not post and counts them in the footnote", () => {
+    expect(src).toMatch(/if \(r\.cz\?\.o == null\) \{\s*noCz\+\+;\s*continue;\s*\}/);
+    expect(src).toMatch(/return \[out, noCz\];/);
+    expect(src).toMatch(/Caesars posts on today&apos;s board/);
+    expect(src).toMatch(/only other books post hidden/);
+  });
   it("the search box filters by normalized player name in both scopes", () => {
     expect(src).toMatch(/aria-label="Search players"/);
     expect(src).toMatch(/normalizeName\(search\.trim\(\)\)/);

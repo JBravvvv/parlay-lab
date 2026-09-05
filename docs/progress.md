@@ -1,3 +1,12 @@
+# Progress — 2026-09-05 (ALL scope shows only Caesars-posted lines)
+
+## INSTRUCTION 41 — hide non-Caesars lines from ALL; Caesars stays the book
+- The MLB Board's ALL scope keeps only lines Caesars posts (428 of 2,296 prop rows on the
+  2026-09-05 board had no Caesars price — the "O 0.5 H+R+RBI" rows Josh asked about). The
+  footnote counts the hidden lines. Top 50 unchanged.
+- Standing rule: the settle book stays Caesars until Josh says he is on DK / FD in another
+  state; the switch is made only for that trip.
+
 # Progress — 2026-09-05 (CFB live props, Refresh Board, Caesars-grammar UI, FPI overlay, Calc)
 
 ## INSTRUCTION 40 — in-game props, the Refresh pill, the UI upgrade, scoped Stats, the Calc

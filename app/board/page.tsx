@@ -43,7 +43,12 @@ import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check"
    categories (ie: hits) then it will show all daily hits props starting with S grade, then
    A, B, C, etc down"). TOP 50 = the engine's ranked pool / the day's stamped picks (as
    before); ALL = every priced line on the day's prop board (data.propBoard — the same
-   uncapped book the Parlay Builder browses), graded on model − fair and ordered S → F. */
+   uncapped book the Parlay Builder browses), graded on model − fair and ordered S → F.
+   INSTRUCTION 41 (2026-09-05, Josh: "run everything based on the current caesars lines; hide
+   the non-Caesars lines from ALL"): ALL keeps only the lines Caesars posts (`cz` priced) —
+   a line another book posts at a different number (the "O 0.5 H+R+RBI" rows Josh saw when
+   Caesars had 1.5) is hidden and counted in the footnote, never graded. The settle book
+   stays Caesars until Josh says he is in another state on DK / FD. */
 type Scope = "top" | "all";
 const MARKET_SHORT: Record<string, string> = {
   batter_hits: "Hits",
@@ -205,14 +210,19 @@ export default function BoardPage() {
      graded on pO − fO (the engine's model % minus the de-vigged fair — the same "edge" the
      stamped picks grade on), ordered S → F then by edge. Rows the engine did not price
      (pO null: bench bats, tiny samples) carry no grade and sink to the bottom. */
-  const allRows = useMemo<ApiPick[] | null>(() => {
-    if (scope !== "all" || live || !(PROP_TABS.has(cat) || cat === "all")) return null;
+  const [allRows, allNoCz] = useMemo<[ApiPick[] | null, number]>(() => {
+    if (scope !== "all" || live || !(PROP_TABS.has(cat) || cat === "all")) return [null, 0];
     const pb = (d?.propBoard ?? []) as PropBoardGame[];
     const mkts = cat === "all" ? Object.keys(MARKET_SHORT) : [cat];
     const out: ApiPick[] = [];
+    let noCz = 0; // INSTRUCTION 41: lines only other books post are hidden from ALL, counted here
     for (const g of pb) {
       for (const m of mkts) {
         for (const r of g.markets?.[m] ?? []) {
+          if (r.cz?.o == null) {
+            noCz++;
+            continue;
+          }
           const edge = r.pO != null && r.fO != null ? Math.round((r.pO - r.fO) * 10) / 10 : null;
           const odds = r.o ?? r.cz?.o ?? null;
           out.push({
@@ -230,7 +240,7 @@ export default function BoardPage() {
         (b.prob ?? -1) - (a.prob ?? -1),
     );
     out.forEach((r, i) => void (r.rank = i + 1));
-    return out;
+    return [out, noCz];
   }, [scope, live, cat, d, PROP_TABS]);
   const pickRows = allRows ?? propRows;
 
@@ -680,7 +690,8 @@ export default function BoardPage() {
         <Panel>
           {allRows && (
             <div className="mb-2 text-[11px] text-muted">
-              {cat === "all" ? "Every market" : CAT_LABELS[cat]} · {allRows.length} priced line{allRows.length === 1 ? "" : "s"} on today&apos;s board, graded S → F on model − fair
+              {cat === "all" ? "Every market" : CAT_LABELS[cat]} · {allRows.length} line{allRows.length === 1 ? "" : "s"} Caesars posts on today&apos;s board, graded S → F on model − fair
+              {allNoCz > 0 ? ` · ${allNoCz} line${allNoCz === 1 ? "" : "s"} only other books post hidden` : ""}
               {capped ? ` · showing the top ${ALL_SCOPE_CAP} — search to narrow` : ""}
             </div>
           )}
