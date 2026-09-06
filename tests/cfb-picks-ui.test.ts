@@ -348,3 +348,55 @@ describe("CFB Board — INSTRUCTION 43 (2026-09-05): tickets past the leg gate a
     expect(board).toMatch(/return `\$\{fmtAmerican\(decimalToAmerican\(b\.minDec\)\)\} to \$\{fmtAmerican\(decimalToAmerican\(b\.maxDec\)\)\}`;/);
   });
 });
+
+/**
+ * INSTRUCTION 44 (2026-09-05, Josh: "no they should be using in game lines as well; make it also
+ * use in game prop lines for all of the same props as they are available"): the single-market
+ * sets and COMBOS draw from pregame AND in-game legs and each ticket carries `liveLegs`. The
+ * Board tags such a ticket "N in-game" in its header chip row (live tone, pulse dot, OpenTag's
+ * size), keeps the whole-ticket LIVE pill for the LIVE set alone, appends "N with in-game legs"
+ * to the PARLAYS tile and says in every pregame-category blurb that the lines are pregame and
+ * in-game. Every N is read off the data.
+ */
+describe("CFB Board — INSTRUCTION 44 (2026-09-05): in-game legs in the category sets are tagged", () => {
+  const feature = board.slice(board.indexOf("export function CfbParlayFeature"), board.indexOf("export function CfbParlayCard"));
+  const desktopCard = board.slice(board.indexOf("export function CfbParlayCard"));
+  const section = board.slice(board.indexOf("export function CfbParlaysSection"), board.indexOf("const REF_STAKE"));
+  const cats = board.slice(board.indexOf("const PARLAY_CATS"), board.indexOf("const PREGAME_CATS"));
+  it("InGameTag: live tone with the pulse dot, OpenTag's chip size, data-testid cfb-parlay-ingame, the count from its prop", () => {
+    expect(board).toMatch(/function InGameTag\(\{ n \}: \{ n: number \}\)/);
+    const tag = board.slice(board.indexOf("function InGameTag("), board.indexOf("function OpenTag()"));
+    expect(tag).toMatch(/data-testid="cfb-parlay-ingame"/);
+    expect(tag).toMatch(/border-live\/50 bg-live\/10 px-2 py-0\.5 text-\[9px\] font-bold uppercase tracking-\[0\.16em\] text-live/);
+    expect(tag).toMatch(/<span className="pulse-dot h-1\.5 w-1\.5 rounded-full bg-live" aria-hidden \/> \{n\} in-game/);
+    expect(tag).not.toMatch(/text-\[8px\]|py-px|tracking-\[0\.14em\]/);
+    expect(tag).not.toMatch(/\d+ in-game/);
+  });
+  it("both cards render it from t.liveLegs only when > 0 and the ticket is a pregame-set ticket (not LIVE, not MIXED — those say it already); the whole-ticket LIVE pill stays cat === 'live'", () => {
+    expect(feature).toMatch(/\{t\.liveLegs > 0 && !live && t\.category !== "mixed" && <InGameTag n=\{t\.liveLegs\} \/>\}/);
+    expect(desktopCard).toMatch(/\{t\.liveLegs > 0 && t\.category !== "live" && t\.category !== "mixed" && <InGameTag n=\{t\.liveLegs\} \/>\}/);
+    expect(section).toMatch(/live=\{cat === "live"\}/);
+    // the per-leg tag survives beside it
+    expect(feature).toMatch(/\{leg\.live && !live && <LiveLegTag \/>\}/);
+    expect(desktopCard).toMatch(/\{leg\.live && t\.category !== "live" && <LiveLegTag \/>\}/);
+    // the engine's contract carries the count
+    expect(read("src/lib/cfb/props-types.ts")).toMatch(/\n  liveLegs: number;\n/);
+  });
+  it("the PARLAYS tile appends N with in-game legs off the ten pregame sets (MIXED / LIVE excluded), only when > 0", () => {
+    expect(board).toMatch(/const inGameCount = setTickets\.filter\(\(t\) => t\.liveLegs > 0 && t\.category !== "mixed" && t\.category !== "live"\)\.length;/);
+    expect(board).toMatch(/\$\{openCount \? ` · \$\{openCount\} below gate` : ""\}\$\{inGameCount \? ` · \$\{inGameCount\} with in-game legs` : ""\}/);
+  });
+  it("every pregame-category blurb says pregame and in-game Caesars lines; none says upcoming-only any more", () => {
+    for (const k of ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo"]) {
+      const line = cats.slice(cats.indexOf(`\n  ${k}: {`) + 1);
+      expect(line.slice(0, line.indexOf("\n")), k).toMatch(/pregame and in-game/);
+    }
+    expect(cats).not.toMatch(/upcoming games only|haven't kicked off|distinct upcoming games/);
+    // MIXED / LIVE keep their own copy and their live flag; the flag count is untouched (10 pregame categories)
+    expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
+    expect(cats.match(/live: false/g)?.length).toBe(10);
+    // the empty state no longer demands a game that hasn't kicked off
+    expect(section).toMatch(/a Caesars price \(pregame or in play\) and grade D or better/);
+    expect(section).not.toMatch(/on a game that hasn't kicked off/);
+  });
+});

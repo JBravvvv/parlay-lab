@@ -506,8 +506,9 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
     // the legacy tiered tickets carry a category read off their legs
     for (const t of picks.parlays) expect(CFB_PARLAY_CATEGORIES).toContain(t.category);
   });
-  it("single-market sets: only that market, one leg per game, pregame legs only, dec inside the set's band, gated tickets first then each half ranked by EV then prob", () => {
+  it("single-market sets: only that market, one leg per game, pregame AND in-game legs (INSTRUCTION 44 — was pregame only), dec inside the set's band, gated tickets first then each half ranked by EV then prob", () => {
     let any = 0;
+    let anyLive = 0;
     for (const k of SINGLE_MARKET_CATS) {
       const list = liveP.sets[k];
       const band = setBandOf(k);
@@ -515,8 +516,11 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
       for (const t of list) {
         for (const l of t.legs) {
           expect(l.market).toBe(k);
-          expect(liveIds.has(l.gameId)).toBe(false);
+          // INSTRUCTION 44 (2026-09-05): a live game's leg is admitted and says so
+          expect(l.live).toBe(liveIds.has(l.gameId));
         }
+        expect(t.liveLegs).toBe(t.legs.filter((l) => l.live).length);
+        anyLive += t.liveLegs;
         expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
         expect(t.dec).toBeGreaterThanOrEqual(band.minDec - 1e-6);
         expect(t.name).toBe(`${SET_LABELS[k]} · ${t.legs.length} legs`);
@@ -530,6 +534,7 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
       }
     }
     expect(any).toBeGreaterThan(0);
+    expect(anyLive).toBeGreaterThan(0);
     // the fixture's synthetic anytime-TD rows: RB Bravo and WR Golf clear −3 (distinct games) → the one gated pair leads;
     // TE India (−7 % EV, an F) is a tier-2 leg (≥ −12) now that tier 1 cannot fill the set → three more tickets, all ungated,
     // all in the anytime-TD band (dec 4–250; the 2-leg Bravo + Golf prices 4.69)
@@ -545,9 +550,12 @@ describe("INSTRUCTION 42 — the category sets (fixture)", () => {
       return `${x.id}(${x.gated ? "gated" : "open"} ${x.ev})`;
     }
   });
-  it("combo: pregame, at least one side AND one prop, 3–6 legs, dec 2–60", () => {
+  it("combo: pregame or in-game legs (INSTRUCTION 44 — was pregame only), at least one side AND one prop, 3–6 legs, dec 2–60", () => {
     expect(picks.sets.combo.length).toBeGreaterThan(0);
-    for (const t of picks.sets.combo) {
+    for (const t of picks.sets.combo) expect(t.liveLegs).toBe(0);
+    expect(liveP.sets.combo.some((t) => t.liveLegs > 0)).toBe(true);
+    for (const t of liveP.sets.combo) expect(t.liveLegs).toBe(t.legs.filter((l) => liveIds.has(l.gameId)).length);
+    for (const t of [...picks.sets.combo, ...liveP.sets.combo]) {
       expect(t.legs.some((l) => l.kind === "side")).toBe(true);
       expect(t.legs.some((l) => l.kind === "prop")).toBe(true);
       expect(t.legs.length).toBeGreaterThanOrEqual(3);
@@ -627,13 +635,15 @@ describe("INSTRUCTION 42 (2026-09-05, review fix): legFits blocks a doubled mark
     // a side beside a prop on the same game still fits
     expect(legFits(leg({ rowKey: "d", kind: "side", player: null, market: "ml" }), [a], 2)).toBe(true);
   });
-  it("finished tickets carry `live` on each leg: MIXED tickets have both true and false legs, LIVE all true, pregame sets all false", () => {
+  it("finished tickets carry `live` on each leg: MIXED tickets have both true and false legs, LIVE all true; combo / single-market legs read their game's status (INSTRUCTION 44 — used to be all false), legacy tiered tickets all false", () => {
+    const liveIds = new Set(withLive(board, 3).games.filter((g) => g.status === "live").map((g) => g.id));
     for (const t of liveP.sets.mixed) {
       expect(t.legs.some((l) => l.live === true)).toBe(true);
       expect(t.legs.some((l) => l.live === false)).toBe(true);
     }
     for (const t of liveP.sets.live) expect(t.legs.every((l) => l.live === true)).toBe(true);
-    for (const t of liveP.sets.combo) expect(t.legs.every((l) => l.live === false)).toBe(true);
+    for (const t of [...liveP.sets.combo, ...SINGLE_MARKET_CATS.flatMap((k) => liveP.sets[k])]) for (const l of t.legs) expect(l.live).toBe(liveIds.has(l.gameId));
+    for (const t of liveP.parlays) expect(t.legs.every((l) => l.live === false)).toBe(true);
     expect(liveP.sets.mixed.length).toBeGreaterThan(0);
   });
 });
@@ -745,11 +755,15 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
       expect(r.playable).toBe(false);
     }
   });
-  it("set rules hold at scale: single-market sets are one market on distinct pregame games; combo has side + prop; mixed has live + pregame; live is live only", () => {
+  it("set rules hold at scale: single-market sets are one market on distinct games, pregame or in play (INSTRUCTION 44 — was pregame only); combo has side + prop; mixed has live + pregame; live is live only", () => {
+    let anyLive = 0;
     for (const k of SINGLE_MARKET_CATS)
       for (const t of big.sets[k]) {
         const band = setBandOf(k);
-        expect(t.legs.every((l) => l.market === k && !liveIds.has(l.gameId))).toBe(true);
+        expect(t.legs.every((l) => l.market === k)).toBe(true);
+        for (const l of t.legs) expect(l.live).toBe(liveIds.has(l.gameId));
+        expect(t.liveLegs).toBe(t.legs.filter((l) => l.live).length);
+        anyLive += t.liveLegs;
         expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
         expect(t.legs.length).toBeGreaterThanOrEqual(band.legs.min);
         expect(t.legs.length).toBeLessThanOrEqual(band.legs.max);
@@ -759,10 +773,14 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
       }
     for (const t of big.sets.combo) {
       expect(t.legs.some((l) => l.kind === "side") && t.legs.some((l) => l.kind === "prop")).toBe(true);
-      expect(t.legs.every((l) => !liveIds.has(l.gameId))).toBe(true);
+      // INSTRUCTION 44: combo legs may be in play; the count on the ticket is exact
+      expect(t.liveLegs).toBe(t.legs.filter((l) => liveIds.has(l.gameId)).length);
       expect(t.legs.length).toBeGreaterThanOrEqual(3);
       expect(t.dec).toBeGreaterThanOrEqual(2 - 1e-6);
     }
+    expect(anyLive).toBeGreaterThan(0);
+    // the legacy tiered view stays pregame-only (INSTRUCTION 44 does not loosen it)
+    for (const t of big.parlays) expect(t.legs.every((l) => !liveIds.has(l.gameId) && l.live === false)).toBe(true);
     for (const t of big.sets.mixed) expect(t.legs.some((l) => liveIds.has(l.gameId)) && t.legs.some((l) => !liveIds.has(l.gameId))).toBe(true);
     for (const t of big.sets.live) expect(t.legs.every((l) => liveIds.has(l.gameId))).toBe(true);
     for (const t of CFB_PARLAY_CATEGORIES.flatMap((k) => big.sets[k])) {
@@ -934,7 +952,7 @@ describe("TIERED LEG POOL — 50 anytime TD parlays from six −3 legs", () => {
         expect(t.legs.length).toBeLessThanOrEqual(6);
       }
   });
-  it("legacy views, combo, mixed and live keep tier 1 only: no leg below −3 anywhere outside the single-market sets", () => {
+  it("legacy views, combo, mixed and live keep tier 1 only: no leg below −3 anywhere outside the single-market sets; the tiered set admits live games' ATD legs (INSTRUCTION 44 — used to exclude them)", () => {
     const liveSlate = withLive(atdBoard, 2);
     const liveRowsAtd = atdRows.map((r) => ({ ...r, status: liveSlate.games.find((g) => g.id === r.gameId)!.status }));
     const lp = buildCfbPicks(liveSlate, liveRowsAtd, OPTS);
@@ -945,9 +963,18 @@ describe("TIERED LEG POOL — 50 anytime TD parlays from six −3 legs", () => {
       expect(t.gated).toBe(true);
       for (const l of t.legs) if (l.market === "anytime_td") expect(evOf.get(l.rowKey)!).toBeGreaterThanOrEqual(CFB_PARLAYS.minLegEvPct);
     }
-    // the tiered set is still tiered with games in play: live games' ATD legs never enter it
+    // INSTRUCTION 44 (2026-09-05): the tiered set is still tiered with games in play AND live games' ATD legs enter it, flagged
     const liveIds = new Set(liveSlate.games.filter((g) => g.status === "live").map((g) => g.id));
-    for (const t of lp.sets.anytime_td) for (const l of t.legs) expect(liveIds.has(l.gameId)).toBe(false);
+    expect(lp.sets.anytime_td.length).toBe(CFB_PARLAYS.perCategory);
+    expect(lp.sets.anytime_td.some((t) => t.liveLegs > 0)).toBe(true);
+    for (const t of lp.sets.anytime_td) {
+      for (const l of t.legs) expect(l.live).toBe(liveIds.has(l.gameId));
+      expect(t.liveLegs).toBe(t.legs.filter((l) => l.live).length);
+    }
+    const firstOpen = lp.sets.anytime_td.findIndex((t) => !t.gated);
+    for (let i = 0; i < lp.sets.anytime_td.length; i++) expect(lp.sets.anytime_td[i].gated).toBe(firstOpen < 0 || i < firstOpen);
+    // the legacy view never takes a live leg
+    for (const t of lp.parlays) for (const l of t.legs) expect(liveIds.has(l.gameId)).toBe(false);
   });
   it("with tier 1 alone the set is small (the 4-ticket symptom): six −3 legs on three games cap at 12 pairs + 8 triples, one leg per game", () => {
     const strict = atdRows.filter((r) => r.evCz! >= CFB_PARLAYS.minLegEvPct);
@@ -961,4 +988,116 @@ describe("TIERED LEG POOL — 50 anytime TD parlays from six −3 legs", () => {
   it("deterministic: reversed rows build the same tiered set, byte for byte", () => {
     expect(JSON.stringify(buildCfbPicks(atdBoard, [...atdRows].reverse(), OPTS).sets.anytime_td)).toBe(JSON.stringify(atd));
   });
+});
+
+/* ====================================================================================
+   INSTRUCTION 44 (2026-09-05, Josh, verbatim): "no they should be using in game lines as well;
+   make it also use in game prop lines for all of the same props as they are available; which
+   is through 3rd quarter in most games"
+   Prod at 16:55 PT: Caesars anytime TD existed ONLY on two live games and the ANYTIME TD set
+   read 0. The single-market sets and combo now draw from pregame AND in-game legs.
+   ==================================================================================== */
+
+describe("INSTRUCTION 44 — in-game legs in the single-market sets (the only Caesars ATD rows are on live games)", () => {
+  const { board: atdBoard, rows: atdRows } = atdSlate();
+  const liveSlate = withLive(atdBoard, 2);
+  const liveIds = new Set(liveSlate.games.filter((g) => g.status === "live").map((g) => g.id));
+  /** the prod shape: Caesars ATD rows on the two live games only — nothing pregame */
+  const liveOnlyRows = atdRows.filter((r) => liveIds.has(r.gameId)).map((r) => ({ ...r, status: "live" as const, playable: false }));
+  const p = buildCfbPicks(liveSlate, liveOnlyRows, OPTS);
+  const atd = p.sets.anytime_td;
+  const evOf = new Map(atdRows.map((r) => [r.key, r.evCz ?? -Infinity]));
+  const band = setBandOf("anytime_td");
+  it("the fixture is the prod shape: 24 Caesars ATD rows, all on the two live games, four of them tier 1", () => {
+    expect(liveIds.size).toBe(2);
+    expect(liveOnlyRows.length).toBe(24);
+    expect(liveOnlyRows.every((r) => liveIds.has(r.gameId))).toBe(true);
+    expect(liveOnlyRows.filter((r) => r.evCz! >= CFB_PARLAYS.minLegEvPct).length).toBe(4);
+  });
+  it("the anytime TD set is NOT empty — it reaches perCategory (50) from in-game legs alone, ids numbered per category", () => {
+    expect(atd.length).toBe(CFB_PARLAYS.perCategory);
+    expect(new Set(atd.map(legKey)).size).toBe(atd.length);
+    atd.forEach((t, i) => {
+      expect(t.id).toBe(`cfb-${DATE}-anytime_td-${i + 1}`);
+      expect(t.category).toBe("anytime_td");
+      expect(t.view).toBe("parlays");
+      expect(t.type).toBe("PROPS");
+    });
+  });
+  it("every leg carries live: true, liveLegs is the exact count, one leg per game (so every ticket is a two-legger across the two live games)", () => {
+    for (const t of atd) {
+      expect(t.legs.every((l) => l.live === true && liveIds.has(l.gameId))).toBe(true);
+      expect(t.liveLegs).toBe(t.legs.length);
+      expect(new Set(t.legs.map((l) => l.gameId)).size).toBe(t.legs.length);
+      expect(t.legs.length).toBe(2);
+      expect(t.legs.every((l) => l.market === "anytime_td")).toBe(true);
+      expect(t.dec).toBeGreaterThanOrEqual(band.minDec - 1e-6);
+      expect(t.dec).toBeLessThanOrEqual(band.maxDec + 1e-6);
+      for (const l of t.legs) expect(evOf.get(l.rowKey)!).toBeGreaterThanOrEqual(CFB_PARLAYS.setFloorEvPct);
+    }
+  });
+  it("rank honesty: gated tickets first, then the rest, each half by EV — a live leg is never pushed up or down; ev is the honest product", () => {
+    const firstOpen = atd.findIndex((t) => !t.gated);
+    expect(firstOpen).toBeGreaterThan(0);
+    for (let i = 0; i < atd.length; i++) expect(atd[i].gated).toBe(i < firstOpen);
+    for (const half of [atd.slice(0, firstOpen), atd.slice(firstOpen)]) for (let i = 1; i < half.length; i++) expect(half[i - 1].ev).toBeGreaterThanOrEqual(half[i].ev);
+    for (const t of atd) {
+      expect(t.gated).toBe(t.legs.every((l) => evOf.get(l.rowKey)! >= CFB_PARLAYS.minLegEvPct));
+      const prob = t.legs.reduce((q, l) => q * l.prob, 1);
+      const dec = t.legs.reduce((d, l) => d * l.dec, 1);
+      expect(t.ev).toBeCloseTo(100 * (prob * dec - 1), 1);
+    }
+  });
+  it("MIXED (live + pregame on one ticket), LIVE (live only) and the legacy view are unchanged in kind; combo takes live props beside pregame sides", () => {
+    expect(p.sets.live.length).toBeGreaterThan(0);
+    for (const t of p.sets.live) {
+      expect(t.legs.every((l) => l.live === true)).toBe(true);
+      expect(t.liveLegs).toBe(t.legs.length);
+      expect(t.gated).toBe(true);
+    }
+    expect(p.sets.mixed.length).toBeGreaterThan(0);
+    for (const t of p.sets.mixed) {
+      expect(t.legs.some((l) => l.live) && t.legs.some((l) => !l.live)).toBe(true);
+      expect(t.liveLegs).toBe(t.legs.filter((l) => l.live).length);
+      expect(t.liveLegs).toBeLessThan(t.legs.length);
+      expect(t.gated).toBe(true);
+    }
+    // the legacy tiered view stays pregame-only: no live leg, no prop at all here (every prop row is live)
+    expect(p.parlays.length).toBeGreaterThan(0);
+    for (const t of p.parlays) expect(t.legs.every((l) => l.live === false && l.kind === "side")).toBe(true);
+    // combo: the only props are in play, so every combo ticket carries live prop legs beside pregame sides, tier 1 only
+    expect(p.sets.combo.length).toBeGreaterThan(0);
+    for (const t of p.sets.combo) {
+      expect(t.liveLegs).toBe(t.legs.filter((l) => l.live).length);
+      expect(t.liveLegs).toBeGreaterThan(0);
+      expect(t.gated).toBe(true);
+      for (const l of t.legs) if (l.kind === "prop") expect(evOf.get(l.rowKey)!).toBeGreaterThanOrEqual(CFB_PARLAYS.minLegEvPct);
+    }
+  });
+  it("with nothing live liveLegs is 0 on every ticket everywhere", () => {
+    for (const t of [...picks.parlays, ...CFB_PARLAY_CATEGORIES.flatMap((k) => picks.sets[k])]) expect(t.liveLegs).toBe(0);
+  });
+  it("deterministic: reversed rows build the same set, byte for byte", () => {
+    expect(JSON.stringify(buildCfbPicks(liveSlate, [...liveOnlyRows].reverse(), OPTS).sets.anytime_td)).toBe(JSON.stringify(atd));
+  });
+});
+
+describe("INSTRUCTION 44 review fix: the twelve sets stay disjoint (each leg set under one category only)", () => {
+  const key = (t: CfbParlay) =>
+    t.legs.map((l) => JSON.stringify(l)).sort().join("|");
+  for (const nLive of [2, 3, 6]) {
+    it(`${nLive} live games: no leg set appears in two sets; single-market > combo > mixed > live precedence`, () => {
+      const p = buildCfbPicks(withLive(board, nLive), props, OPTS);
+      const seen = new Map<string, string>();
+      for (const cat of CFB_PARLAY_CATEGORIES) {
+        for (const t of p.sets[cat] ?? []) {
+          const k = key(t);
+          expect(seen.get(k), `${k} in ${seen.get(k)} and ${cat}`).toBeUndefined();
+          seen.set(k, cat);
+        }
+      }
+      // the flat concatenation the Board counts from is exactly the distinct leg sets
+      expect(seen.size).toBe(CFB_PARLAY_CATEGORIES.reduce((n, c) => n + (p.sets[c]?.length ?? 0), 0));
+    });
+  }
 });

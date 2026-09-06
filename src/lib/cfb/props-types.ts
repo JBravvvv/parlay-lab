@@ -124,8 +124,9 @@ export type CfbParlayTier = "SAFER" | "LONGSHOT" | "MIX";
 export type CfbParlayView = "parlays" | "mixed" | "live";
 
 /** INSTRUCTION 42 (2026-09-05): the twelve parlay category sets, in the Board's pill order —
-    one per side market, one per prop market, COMBOS (side + prop on one pregame ticket), MIXED
-    (a live leg beside pregame legs) and LIVE (in-play legs only). Up to CFB_PARLAYS.perCategory
+    one per side market, one per prop market, COMBOS (side + prop on one ticket), MIXED
+    (a live leg beside pregame legs) and LIVE (in-play legs only). INSTRUCTION 44 (2026-09-05):
+    the single-market sets and COMBOS draw from pregame AND in-game legs. Up to CFB_PARLAYS.perCategory
     ranked tickets each. */
 export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
 export type CfbParlayCategory = (typeof CFB_PARLAY_CATEGORIES)[number];
@@ -171,6 +172,11 @@ export type CfbParlay = {
       once tier 1 could not fill the set (2026-09-05) — the Board labels those honestly. Legacy
       tiered, combo, mixed and live tickets are always gated. */
   gated: boolean;
+  /** INSTRUCTION 44 (2026-09-05): how many legs were priced while their game was in play. The
+      single-market sets and combo draw from pregame AND in-game legs, so a ticket here can carry
+      1..n live legs beside pregame ones; the Board says "N in-game" on the ticket. A ticket with
+      any live leg is never a paper stake — like a live pick row it carries no Kelly figure. */
+  liveLegs: number;
   note?: string;
 };
 

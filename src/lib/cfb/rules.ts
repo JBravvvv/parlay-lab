@@ -212,11 +212,12 @@ export const CFB_PROPS = {
     TD, so on the opening Saturday only six ATD legs across two games cleared the −3 gate, and
     SET_BAND's decimal cap of 60 made a third 3–8 leg impossible — four tickets. A single-market
     category set now builds from tier 1 (Caesars-priced, EV ≥ `minLegEvPct`) first and, when that
-    yields fewer than `perCategory` tickets, extends its pool to tier 2 — any Caesars-priced,
-    upcoming, non-live leg of that market with EV ≥ `setFloorEvPct` — until fifty or the pool runs
-    dry. Tickets whose every leg passed the −3 gate rank first (by EV), then the rest by EV; each
+    yields fewer than `perCategory` tickets, extends its pool to tier 2 — any Caesars-priced
+    leg of that market, pregame or in-game (INSTRUCTION 44), with EV ≥ `setFloorEvPct` — until
+    fifty or the pool runs dry. Tickets whose every leg passed the −3 gate rank first (by EV), then the rest by EV; each
     ticket carries `gated` so the Board can label the loosened ones honestly. The legacy tiered
-    view, combo, mixed and live keep tier 1 only. `setBands` overrides the set band per market:
+    view, combo, mixed and live keep tier 1 only (combo's tier 1 is pregame + in-game legs since
+    INSTRUCTION 44; the legacy view stays pregame-only). `setBands` overrides the set band per market:
     anytime TD legs price 3–8 decimal, so its tickets are 2–4 legs, decimal 4–250. */
 export const CFB_PARLAYS = {
   safer: { legs: { min: 2, max: 3 }, minLegProb: 0.58, maxDec: 3.5 },
@@ -224,7 +225,7 @@ export const CFB_PARLAYS = {
   mix: { legs: { min: 3, max: 5 }, minDec: 3, maxDec: 20 },
   /** a leg needs at least this % EV at Caesars (grade D or better, never an F) */
   minLegEvPct: -3,
-  /** tier 2 for the single-market category sets only: a Caesars-priced upcoming leg admitted down to this % EV once tier 1 cannot fill the set */
+  /** tier 2 for the single-market category sets only: a Caesars-priced pregame or in-game leg admitted down to this % EV once tier 1 cannot fill the set */
   setFloorEvPct: -12,
   /** per-market set bands (leg count + decimal price); a market absent here uses the shared set band (2–6 legs, decimal 1.5–60) */
   setBands: { anytime_td: { legs: { min: 2, max: 4 }, minDec: 4, maxDec: 250 } },

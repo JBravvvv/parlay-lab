@@ -1,3 +1,16 @@
+# Progress — 2026-09-05 (in-game legs in every parlay category)
+
+## INSTRUCTION 44 — in-game prop and side lines feed all the same parlay sets
+- Every single-market parlay set (ML, spread, total, anytime TD, the yardage / reception / TD
+  props) and COMBOS now draw from Caesars' in-game lines as well as pregame ones, for as long as
+  Caesars posts them; the tier rules, one-leg-per-game and price bands are unchanged.
+- A ticket carrying in-play legs wears an "N in-game" chip and never shows a Kelly stake; the
+  PARLAYS tile counts them. MIXED, LIVE and the legacy SAFER / LONGSHOT / MIX view are as before.
+- Review fix before ship: the twelve sets are kept disjoint (the first build duplicated
+  COMBO tickets into MIXED / LIVE).
+- iOS simulator helper: crashed once on the first screenshot after boot, works since
+  (attach, screenshot, tap verified); no repo change.
+
 # Progress — 2026-09-05 (Caesars-missing re-check, 50 Anytime TD parlays, nav order + coloured tabs)
 
 ## INSTRUCTION 43 — every game with Caesars ATD, 50 ATD parlays, nav

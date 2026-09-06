@@ -52,12 +52,12 @@ import type { CfbParlay, CfbParlayCategory, CfbParlayLeg, CfbParlayTier, CfbParl
  *   picks as well") — up to perCategory (50) distinct tickets per key of CFB_PARLAY_CATEGORIES,
  *   ranked by EV then probability (the fifty are chosen round-robin across leg counts so a slate
  *   of +EV legs does not fill the set with six-leggers), tier read off the finished ticket (tierOf):
- *     "ml" / "spread" / "total" / each prop market — pregame legs ALL from that one market,
+ *     "ml" / "spread" / "total" / each prop market — pregame + in-game legs ALL from that one market,
  *               2–6 legs on distinct games, dec 1.5–60. Built from every seed leg (likeliest
  *               first) at every leg count 2..6 three ways — filled likeliest-first, filled with
  *               the legs that follow the seed, filled highest-EV-first — then deduped, so the
  *               set carries a spread of leg counts rather than fifty near-identical six-leggers.
- *     "combo"   pregame, at least one side AND one prop, 3–6 legs, dec 2–60.
+ *     "combo"   pregame + in-game legs, at least one side AND one prop, 3–6 legs, dec 2–60.
  *     "mixed"   at least one live leg and one pregame leg, 2–6 legs, dec 1.5–60; empty when
  *               nothing is live.
  *     "live"    live legs only (in-play prices), 2–6 legs, dec 1.5–60; empty when nothing is live.
@@ -73,6 +73,17 @@ import type { CfbParlay, CfbParlayCategory, CfbParlayLeg, CfbParlayTier, CfbParl
  *   CFB_PARLAYS.setBands (anytime TD: 2–4 legs, dec 4–250 — its legs price 3–8 each, so the
  *   shared 60 cap forbade a third leg); other markets keep SET_BAND. The legacy tiered view,
  *   combo, mixed and live never loosen — tier 1 only.
+ *
+ *   INSTRUCTION 44 (2026-09-05, Josh, verbatim): "no they should be using in game lines as well;
+ *   make it also use in game prop lines for all of the same props as they are available; which
+ *   is through 3rd quarter in most games" — every single-market set AND combo now draws from
+ *   BOTH pregame and in-game legs: tier 1 = upcoming + live legs with EV ≥ minLegEvPct, tier 2
+ *   (single-market sets only) = upcoming + live legs down to setFloorEvPct. A live leg keeps
+ *   `live: true` and the ticket counts them in `liveLegs`; tickets are ranked by EV exactly as
+ *   before (a live leg is never pushed up or down), one leg per game and the per-market bands
+ *   hold. MIXED stays live + pregame on one ticket, LIVE stays live-only, and the legacy tiered
+ *   view (SAFER / LONGSHOT / MIX) stays pregame-only. Prod at 16:55 PT that day: Caesars anytime
+ *   TD existed only on two live games and the ANYTIME TD set read 0 — this is the fix.
  *
  *   Work is capped (seeds per set, seed pairs per axis) so a 68-game slate with ~3,000 prop
  *   rows builds in well under a second in the browser; ordering is total and deterministic.
@@ -166,7 +177,7 @@ export function rankPicks(rows: CfbPickRow[]): CfbPickRow[] {
 
 /* ---------- rows → legs ---------- */
 
-/** `floor` is the EV gate: minLegEvPct (tier 1) everywhere except the single-market sets' tier-2 pool (setFloorEvPct) */
+/** `floor` is the EV gate: minLegEvPct (tier 1) everywhere except the single-market sets' tier-2 pool (setFloorEvPct); the builder gathers at the floor and filters tier 1 from it */
 function sideLeg(row: CfbRow, game: CfbGame, live: boolean, floor: number = CFB_PARLAYS.minLegEvPct): Leg | null {
   if (!row.cz || row.evCz == null || row.evCz < floor) return null;
   const line = row.market === "ml" ? null : row.cz.line;
@@ -424,6 +435,7 @@ function finish(d: Draft, view: CfbParlayView, tier: CfbParlayTier, category: Cf
     prob: d.prob,
     ev: round(d.ev, 2),
     gated: d.gated,
+    liveLegs: d.legs.filter((l) => l.live).length,
   };
 }
 
@@ -557,24 +569,25 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
   for (const k of Object.keys(categories)) categories[k] = rankPicks(categories[k]);
 
   /* ----- legs ----- */
-  // upcoming legs are gathered down to the tier-2 floor; tier 1 (the −3 gate) is filtered from them.
-  // Live legs are tier 1 only — the tiered pool serves the single-market pregame sets alone.
+  // upcoming AND live legs are gathered down to the tier-2 floor; tier 1 (the −3 gate) is filtered
+  // from them. INSTRUCTION 44: the tiered pool serves the single-market sets with pregame and
+  // in-game legs alike; combo, mixed and live take tier 1 of their own axes.
   const gate = (l: Leg) => l.evCz >= R.minLegEvPct;
   const floorSides: Leg[] = [];
-  const liveSides: Leg[] = [];
+  const floorLiveSides: Leg[] = [];
   for (const g of board.games) {
     const kicked = kickedOff(g.start);
     const isLive = g.status === "live";
     const isUpcoming = g.status === "upcoming" && !kicked;
     if (!isLive && !isUpcoming) continue;
     for (const r of g.rows) {
-      const leg = sideLeg(r, g, isLive, isLive ? R.minLegEvPct : R.setFloorEvPct);
+      const leg = sideLeg(r, g, isLive, R.setFloorEvPct);
       if (!leg) continue;
-      (isLive ? liveSides : floorSides).push(leg);
+      (isLive ? floorLiveSides : floorSides).push(leg);
     }
   }
   const floorProps: Leg[] = [];
-  const liveProps: Leg[] = [];
+  const floorLiveProps: Leg[] = [];
   for (const r of props ?? []) {
     const g = games.get(r.gameId);
     const status = g?.status ?? r.status;
@@ -582,16 +595,24 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     const isLive = status === "live";
     const isUpcoming = status === "upcoming" && !kicked;
     if (!isLive && !isUpcoming) continue;
-    const leg = propLeg(r, isLive, isLive ? R.minLegEvPct : R.setFloorEvPct);
+    const leg = propLeg(r, isLive, R.setFloorEvPct);
     if (!leg) continue;
-    (isLive ? liveProps : floorProps).push(leg);
+    (isLive ? floorLiveProps : floorProps).push(leg);
   }
   const upcomingSides = floorSides.filter(gate).sort(byProb);
   const upcomingProps = floorProps.filter(gate).sort(byProb);
+  /** tier-1 pregame legs — the legacy tiered view's whole pool, and the pregame axis of mixed */
   const upcoming = [...upcomingSides, ...upcomingProps].sort(byProb);
-  /** tier 1 + tier 2 pregame legs (single-market sets only) */
-  const upcomingFloor = [...floorSides, ...floorProps].sort(byProb);
+  const liveSides = floorLiveSides.filter(gate).sort(byProb);
+  const liveProps = floorLiveProps.filter(gate).sort(byProb);
+  /** tier-1 in-game legs — the live set's whole pool, and the live axis of mixed */
   const live = [...liveSides, ...liveProps].sort(byProb);
+  /** INSTRUCTION 44: tier 1 pregame + in-game legs — the single-market sets' first pass and combo's pool */
+  const tier1Sides = [...upcomingSides, ...liveSides].sort(byProb);
+  const tier1Props = [...upcomingProps, ...liveProps].sort(byProb);
+  const tier1 = [...tier1Sides, ...tier1Props].sort(byProb);
+  /** tier 1 + tier 2 pregame + in-game legs (single-market sets only) */
+  const tieredFloor = [...floorSides, ...floorLiveSides, ...floorProps, ...floorLiveProps].sort(byProb);
 
   /* ----- view "parlays" (legacy tiers) ----- */
   const parlays: CfbParlay[] = [];
@@ -632,27 +653,36 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
 
   /* ----- INSTRUCTION 42: the twelve category sets ----- */
   const sets = {} as Record<CfbParlayCategory, CfbParlay[]>;
+  /** INSTRUCTION 44 review fix: since the single-market sets and combo draw in-game legs too, one
+      leg set could be built by a single-market set AND by LIVE, or by combo AND by MIXED / LIVE.
+      Every ticket is emitted under exactly one category — the first in CFB_PARLAY_CATEGORIES order
+      (single-market > combo > mixed > live) — so the twelve sets stay disjoint and the Board's
+      counts stay honest. A draft already taken is dropped BEFORE the pick, so the later set still
+      fills from its remaining candidates. */
+  const taken = new Set<string>();
   const emit = (category: CfbParlayCategory, drafts: Draft[], pick: (drafts: Draft[], cap: number) => Draft[] = (d, cap) => spread(d.sort(draftByEv), cap)) => {
     const view: CfbParlayView = category === "mixed" ? "mixed" : category === "live" ? "live" : "parlays";
     const list: CfbParlay[] = [];
     let i = 0;
-    for (const d of pick(drafts, R.perCategory)) {
+    for (const d of pick(drafts.filter((d) => !taken.has(d.key)), R.perCategory)) {
       i++;
+      taken.add(d.key);
       list.push(finish(d, view, tierOf(d), category, `${SET_LABEL[category]} · ${d.legs.length} legs`, `cfb-${board.date}-${category}-${i}`));
     }
     sets[category] = list;
   };
 
-  // single-market pregame sets — one leg per game, only that market, the tiered pool:
-  // tier 1 first; tier 2 (down to setFloorEvPct) only when tier 1 leaves the set short of fifty
+  // single-market sets — one leg per game, only that market, pregame AND in-game legs
+  // (INSTRUCTION 44), the tiered pool: tier 1 first; tier 2 (down to setFloorEvPct) only when
+  // tier 1 leaves the set short of fifty
   for (const category of CFB_PARLAY_CATEGORIES) {
     if (category === "combo" || category === "mixed" || category === "live") continue;
     const band = setBandOf(category);
-    const tier1 = upcoming.filter((l) => l.market === category); // already in byProb order
-    let drafts = seededSet(tier1, band, 1);
+    const first = tier1.filter((l) => l.market === category); // already in byProb order
+    let drafts = seededSet(first, band, 1);
     if (tieredSpread(drafts, R.perCategory).length < R.perCategory) {
-      const pool = upcomingFloor.filter((l) => l.market === category);
-      if (pool.length > tier1.length) {
+      const pool = tieredFloor.filter((l) => l.market === category);
+      if (pool.length > first.length) {
         drafts = [...drafts, ...seededSet(pool, band, 1)];
         if (tieredSpread(drafts, R.perCategory).length < R.perCategory) drafts = [...drafts, ...walk(pool, band, 1, WALK_BUDGET)];
       }
@@ -660,8 +690,8 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     emit(category, drafts, tieredSpread);
   }
 
-  // combo — a side beside a prop on one pregame ticket
-  emit("combo", pairedSet(upcomingSides, upcomingProps, upcoming, COMBO_BAND, R.maxPerGame));
+  // combo — a side beside a prop on one ticket, pregame or in-game legs (INSTRUCTION 44), tier 1 only
+  emit("combo", pairedSet(tier1Sides, tier1Props, tier1, COMBO_BAND, R.maxPerGame));
 
   // mixed — a live leg beside a pregame leg
   if (live.length > 0 && upcoming.length > 0) {
