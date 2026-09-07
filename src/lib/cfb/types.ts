@@ -202,7 +202,60 @@ export type CfbTicket = SyncTicket & {
 
 export type CfbGrade = { result: "won" | "lost" | "push" | "pending" | "ungradable"; payout: number; dec?: number; detail?: string };
 
-export type CfbLedgerEntry = SyncEntry & {
+/** The receipt a wager the merge REFUSED leaves on the day (INSTRUCTION 45, 2026-09-06). A
+    structural mirror of the kernel's module-local `DroppedPL` (src/lib/ledger-merge.ts, read this
+    turn: `type DroppedPL = { result: string; payout: number; stake: number; placed?: boolean;
+    actualStake?: number };`), which is not exported and so cannot be imported. `result` is a grade
+    word — an unsettled drop is recorded as `"pending"` by `receiptOf`, whose first line reads
+    `const r: DroppedPL = { result: v ? v.result : "pending", payout: v ? v.payout : 0, stake:
+    Number(t.stake) || 0 };`. The two placement answers are OMITTED when the ticket has neither, so
+    a settled drop carrying neither is byte-for-byte the receipt that shipped before them. */
+export type CfbMergeDropPL = { result: string; payout: number; stake: number; placed?: boolean; actualStake?: number };
+
+/** A refused stake raise, per shared ticket id: the stake that STANDS and the one the merge would
+    not honour. Mirrors the kernel's module-local `type StakeConflict = { kept: number; refused:
+    number };` (src/lib/ledger-merge.ts, read this turn). */
+export type CfbMergeStakeConflict = { kept: number; refused: number };
+
+/**
+ * CLOSING THE ENTRY SO THE MARKER NAMES ARE ACTUALLY CHECKED (INSTRUCTION 45, 2026-09-06, Josh
+ * verbatim: "Parlay Lab CFB should've been running the same $150 per day theoretical Core money
+ * and $25 Fun money per day").
+ *
+ * WHAT WENT WRONG. Declaring the seven merge markers on `CfbLedgerEntry` (below) bought LESS
+ * protection than the docblock beside them claimed. The INNER shapes are checked — a probe
+ * writing `{ id: { kept: 10, refusedd: 25 } }` into `stakeConflict` errors. The OUTER NAMES were
+ * not: `CfbLedgerEntry` was `SyncEntry & { … }`, `SyncEntry` ends in `[k: string]: unknown`
+ * (src/lib/ledger-merge.ts, read this turn), and an intersection inherits that index signature —
+ * so `e.coreDroped = ["a"]` (one dropped `p`) typechecked as a brand-new string-keyed member.
+ * MEASURED this turn, before this change: that exact probe compiled with `npx tsc --noEmit`
+ * exiting 0. A marker is a RECEIPT FOR REFUSED MONEY; a misspelled one is a refusal disclosed to
+ * nobody, which is the precise failure the declarations were added to stop.
+ *
+ * WHY THE FIX IS SHAPED THIS WAY. `NoIndex` drops ONLY the index signature from `SyncEntry`,
+ * keeping every one of its declared members (`date`, `locked`, `core`, `funT`, `grading`, `clv`,
+ * `blocks`, `alt`) with their optionality intact — it is homomorphic (`[K in keyof T as …]`), so
+ * `?` and `readonly` are preserved. The index signature is removed HERE ONLY, on the CFB entry;
+ * `SyncEntry` itself is untouched, so the MLB desk and the merge kernel are unaffected.
+ *
+ * NOTHING BREAKS BY DROPPING IT, and that was measured rather than assumed:
+ *   · ASSIGNABILITY IS KEPT. A type alias of object-literal shape gets an IMPLICIT index signature
+ *     when it is checked against one, so `CfbLedgerEntry` is still assignable to `SyncEntry` and
+ *     still satisfies the `T extends SyncEntry` constraint on `unionCore` / `unionFun` /
+ *     `mergeLedgers`. A probe asserting exactly that compiled clean this turn.
+ *   · THE `as Record<string, unknown>` READERS ARE UNAFFECTED — e.g. the settle queue's
+ *     `const stampOf = (e: CfbLedgerEntry, k: string) => Number((e as Record<string, unknown>)[k]) || 0;`
+ *     (app/api/cfb/lock/route.ts, grepped this turn) goes through a cast, not the index signature.
+ *   · ONE undeclared field was in real use and is now declared rather than smuggled: `gradedAt`
+ *     (see below). Closing the type is what SURFACED it; a whole-tree `npx tsc --noEmit` named it
+ *     as the single error, and it is the single addition made in response.
+ *
+ * This is purely a declaration change: no runtime behaviour moves, no existing field is widened
+ * or loosened, and no refusal is scoped any differently than it was.
+ */
+type NoIndex<T> = { [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K] };
+
+export type CfbLedgerEntry = NoIndex<SyncEntry> & {
   sport: "cfb";
   date: string;
   locked: true;
@@ -213,6 +266,110 @@ export type CfbLedgerEntry = SyncEntry & {
   lockedAt: number;
   /** true when the day locked with an empty core (NO-PLAY recorded, nothing staked) */
   noPlay?: boolean;
+  /** INSTRUCTION 45 (2026-09-05): "server-lock" when /api/cfb/lock wrote the day — the same
+      field name and value the MLB scheduler stamps (src/lib/server/lock-card.ts); absent on a
+      day a person locked in the Builder */
+  source?: "server-lock";
+  /** what fired the server lock ("cfb-lock"); absent on a Builder lock */
+  trigger?: string;
+  /** the server lock's one-line record of HOW the day locked (on time / after the first
+      kickoff / window missed) — shown under the locked card in the Builder */
+  note?: string;
+
+  /* ── THE MERGE MARKERS — DECLARED, NOT GUESSED ──────────────────────────────────────────────
+     INSTRUCTION 45 (2026-09-06), Josh verbatim: "Parlay Lab CFB should've been running the same
+     $150 per day theoretical Core money and $25 Fun money per day".
+
+     WHAT WENT WRONG. `mergeDay` (src/lib/ledger-merge.ts) writes SEVEN bookkeeping fields onto the
+     day it returns — every one of them a record of money it had to refuse — and NOT ONE was
+     declared anywhere. The CFB entry was a bare intersection with `SyncEntry`, which ends in
+     `[k: string]: unknown`, and an intersection INHERITS that index signature — so every write
+     typechecked whatever its shape and every read came back `unknown`; the consumer's only way
+     through was a cast. (Both halves of that are now closed: the seven fields are declared below,
+     and the `NoIndex` wrapper above drops the inherited index signature, so `CfbLedgerEntry` no
+     longer carries one. This paragraph describes the state BEFORE that, and the citations in it
+     are of the reader, which still validates values at runtime — see WHY A READER in
+     src/components/cfb/CfbLedger.tsx.) `cfbDayMarks` (src/components/cfb/CfbLedger.tsx) reads them
+     through casts to this day — grepped this turn:
+     `const cb = (e as { capBreach?: unknown }).capBreach;` and, beside it,
+     `const sc = (e as { stakeConflict?: unknown }).stakeConflict;`. A cast asserts a name; it does
+     not check one. So a typo on EITHER side — a kernel writing `capBreech`, a card reading
+     `funDropedPL` — compiled green and silently rendered nothing, which on these particular fields
+     means a refused wager disclosed to nobody.
+
+     MEASURED, this turn, against the tree as it stood: a probe assigning
+     `e.capBreach = { core: { sum: "one hundred and eighty", cap: 150 } }`, `e.stakeConflict =
+     { "id": { kept: 10, refusedd: 25 } }` and `e.coreDropped = 7` produced NO error from
+     `npx tsc --noEmit`; the only error in the probe was on the READ, TS2322 "Type 'unknown' is not
+     assignable to…". That is the whole defect in one run: garbage in, and nothing legible out.
+
+     WHY THE FIX IS SHAPED THIS WAY. Declaring the fields here — on the one entry type both the
+     kernel's CFB callers and the CFB card build against — makes producer and consumer answer to a
+     single declaration, so a mis-spelled or mis-shaped marker is a compile error rather than a
+     silent no-op. It is PURELY a declaration: no runtime behaviour changes, no existing field is
+     widened, and the `as` casts in files this change does not own keep working unchanged (they now
+     assert something the type actually says). Every shape below was read out of
+     src/lib/ledger-merge.ts this turn and is reproduced from its own source:
+       · `type DroppedPL = { result: string; payout: number; stake: number; placed?: boolean; actualStake?: number };`
+       · `type StakeConflict = { kept: number; refused: number };`
+       · `const breach: { core?: { sum: number; cap: number }; fun?: { sum: number; cap: number } } = {};`
+     Both `DroppedPL` and `StakeConflict` are module-local to the kernel (not exported), so they are
+     mirrored structurally here rather than imported; the two names below exist to keep that mirror
+     in one place. `betConflict` is the odd one out and is declared for the same reason as the rest:
+     the kernel writes it through a cast of its own — `if (stillBetConflict.length) (out as
+     Record<string, unknown>).betConflict = stillBetConflict;` — which is precisely the pattern that
+     leaves a name unchecked on both ends.
+
+     ALL SEVEN ARE OPTIONAL AND ARE DELETED WHEN THEY NO LONGER HOLD (the kernel pairs each write
+     with an `else delete`), so `undefined` is the normal state of a clean day and no writer of a
+     CfbLedgerEntry is obliged to produce one. */
+  /** core ids the day's allotment refused, sorted — never seated on the merged card. */
+  coreDropped?: string[];
+  /** what each refused CORE wager was worth, keyed by ticket id. */
+  coreDroppedPL?: Record<string, CfbMergeDropPL>;
+  /** fun ids the fun allotment refused, sorted. */
+  funDropped?: string[];
+  /** what each refused FUN wager was worth, keyed by ticket id. */
+  funDroppedPL?: Record<string, CfbMergeDropPL>;
+  /** A shared id whose two copies named different stakes and the merge would not seat the raise:
+      `kept` is the stake it SEATED, `refused` the one it turned away.
+
+      BOTH HALVES OF THIS DOC WERE FALSE UNTIL NOW (INSTRUCTION 45, defect U3, 2026-09-06 —
+      self-reported by two agents the round before and shipped anyway). It read "disagreed on stake
+      with no `topUp` receipt: the SMALLER stake stands as `kept`". `unionCore`
+      (src/lib/ledger-merge.ts) writes this record under TWO RULES, spread across the arms of one
+      chain, read again this turn:
+        · the RECEIPTLESS rule, the chain's last `else` — reached when no `topUp` receipt accounts
+          for the difference and no id on the day is disputed. `kept` is the smaller of the two stakes and
+          `refused` the larger, which is where the old sentence came from; and
+        · the KEPT-MINE rule, written from more than one arm above it — it keeps THIS card's own
+          stake (the base's), which is the LARGER whenever the base holds the larger of the two.
+          It is reached on RIVAL CARDS, where no receipt is consulted at all, and reached again WITH a valid receipt: a
+          receipted raise is honoured only while the projected core stays inside the day's
+          allotment, and is refused onto this channel when it would not.
+      So neither "the smaller stands" nor "with no receipt" is true of the channel. Consumers must
+      read `kept` as "what is seated", not as "the smaller": `cfbDayMarks`
+      (src/components/cfb/CfbLedger.tsx) does not trust either figure and re-measures the cut
+      against the ticket actually on the day, disclosing nothing when `refused` is not above it. */
+  stakeConflict?: Record<string, CfbMergeStakeConflict>;
+  /** shared ids the two copies mean DIFFERENT BETS by — rival cards are never mixed. */
+  betConflict?: string[];
+  /** the merged day is over an allotment and was KEPT, not truncated: the sum it carries and the
+      cap it broke, per bucket. Absent once the day fits again. */
+  capBreach?: { core?: { sum: number; cap: number }; fun?: { sum: number; cap: number } };
+  /** WHEN THE DAY WAS LAST GRADED. Written in exactly one place on the device —
+      `next[i] = { ...entries[i], grading: overlayGrading(entries[i].grading, grading, entries[i]), gradedAt: Date.now() };`
+      in `applyCfbGrading` (src/lib/cfb/store.ts, grepped this turn) — and cleared to `null` by the
+      kernel's `repairEntry` (`out.gradedAt = null;`, src/lib/ledger-merge.ts, grepped this turn),
+      which is why the type is `number | null` and not `number`. Undeclared until this turn: it rode
+      the index signature this file has now closed, and closing it is what surfaced the field. */
+  gradedAt?: number | null;
+  /** WHEN THE SETTLE SWEEP LAST *TRIED* the day, success or throw — the queue's tier, with
+      `gradedAt` as its pre-DEFECT-S2 fallback: `const attempted = (e: CfbLedgerEntry) =>
+      Math.max(stampOf(e, "attemptedAt"), stampOf(e, "gradedAt")) || (e.grading ? 1 : 0);`
+      (app/api/cfb/lock/route.ts, grepped this turn). Declared alongside `gradedAt` because it is
+      the same fact's other half; the route writes it through a `as SyncEntry` literal. */
+  attemptedAt?: number;
   games: Record<string, { pk: number; start: string; home: string; away: string }>;
   grading?: { tickets: Record<string, CfbGrade>; legs: Record<string, { result: string; detail: string }>; done: boolean } | null;
 };

@@ -70,17 +70,267 @@ export const CFB_MODEL = {
 /** Correction 4's figure, mirrored: the CFB paper bankroll initializes at the same base. */
 export const CFB_BANK_BASE = 2500;
 
+/**
+ * THE SERVER LOCK (INSTRUCTION 45, 2026-09-05, Josh, verbatim: "Parlay Lab CFB should've been
+ * running the same $150 per day theoretical Core money and $25 Fun money per day"). Until this
+ * ship the CFB card locked ONLY when a person tapped LOCK in the Builder, so the prod CFB ledger
+ * held zero entries while the MLB desk's scheduler wrote a 'server-lock' entry every day. Now
+ * `/api/cfb/lock` (poked by `/api/scheduler` on the same ~15-min pulse, same cron header) locks
+ * the day's card server-side, once per slate date, into `CFB_REDIS.ledger` by MERGE.
+ *
+ *   leadMs            the lock window opens this long before the date's FIRST kickoff — one
+ *                     hour, so Caesars' final pregame lines are on the board and every game on
+ *                     the slate is still ahead (buildCfbCard only prices games that have not
+ *                     kicked off). Before the window the poke answers `waiting`; a poke that
+ *                     lands after the first kickoff still locks, from the games still ahead, and
+ *                     the entry's note says so; a poke after the LAST kickoff locks a NO-PLAY
+ *                     entry whose note says the window was missed — never a card on lines that
+ *                     are gone.
+ *   forwardTimeoutMs  the scheduler's self-forward to /api/cfb/lock aborts after this long, so a
+ *                     slow ESPN / odds / Redis round trip can never hold the MLB poke open
+ *                     indefinitely. WHAT THAT DOES AND DOES NOT GUARANTEE (corrected 2026-09-06,
+ *                     verification pass, DEFECT 6 — the old wording claimed the 25 s cap meant
+ *                     the forward "can never cost the MLB poke its 90 s function budget (the
+ *                     generate forward alone can take ~60 s)", and the arithmetic does not
+ *                     support that): the generate forward in app/api/scheduler/route.ts is sent
+ *                     with NO signal and NO timeout at either call site, so a ~60 s generate plus
+ *                     this 25 s abort is 85 s of a 90 s maxDuration — FIVE seconds of headroom
+ *                     for the whole rest of the tick, and a generate slower than 65 s kills the
+ *                     invocation before this abort can ever bind. What IS guaranteed: this cap
+ *                     bounds the CFB forward's OWN share of the tick to 25 s, and the forward is
+ *                     the tick's LAST step — it runs after mlbTick has produced its answer and
+ *                     after /api/generate has already committed its own writes under its own
+ *                     300 s budget — so a platform kill here costs the poke its HTTP answer and
+ *                     that pulse's CFB lock, never an MLB write, and the next poke (~15 min)
+ *                     retries. Closing the 5 s gap for real means putting a timeout on the
+ *                     generate fetch, which lives in a file this change does not own; lowering
+ *                     this number instead would only shrink the CFB desk's own budget while
+ *                     leaving the untimed forward ahead of it exactly as it is.
+ *   The route's own maxDuration (app/api/cfb/lock/route.ts, 60 s) sits ABOVE this cap on purpose,
+ *   so the CALLER's abort is always the binding one and a poke the caller gave up on can still
+ *   finish writing the day.
+ */
+export const CFB_LOCK = {
+  leadMs: 60 * 60_000,
+  forwardTimeoutMs: 25_000,
+} as const;
+
+/**
+ * HOW MANY PREVIOUS PT DATES ONE POKE MAY SWEEP (2026-09-06, verification pass, DEFECT 3).
+ *
+ * The first cut swept `prevPtDates(date, 2)[1]` — exactly one PT date back. On CFB the week's
+ * entire meaningful slate IS Saturday, so a two-day ticker outage left the one day that carries
+ * the money silent forever: precisely the silence the sweep exists to abolish. The sweep now
+ * walks this many previous PT dates, newest first.
+ *
+ * WHY THREE: from any poke through Tuesday it still reaches back to Saturday (Tue − 3 = Sat), so
+ * the day that carries the money survives a full weekend outage. It is also the cost bound: at
+ * most three `espnEvents` reads per poke (six keyless ESPN scoreboard fetches) and ZERO Odds API
+ * credits, and only on a genuinely unrecorded history — the FREE ledger check runs first and the
+ * walk stops at the first date that already carries an entry, so a swept-clean desk (every normal
+ * day) spends nothing at all. Dates before CFB_PAPER.since are skipped without a fetch (DEFECT 2).
+ */
+export const CFB_SWEEP_DAYS = 3;
+
+/**
+ * HOW MANY TIMES ONE DATE MAY BE TOPPED UP (INSTRUCTION 45, THE OTHER HALF, 2026-09-06).
+ *
+ * Josh, verbatim: "Parlay Lab CFB should've been running the same $150 per day theoretical Core
+ * money and $25 Fun money per day". "The same" is what the MLB desk does, and the CFB lock was
+ * doing only half of it. The lock fires CFB_LOCK.leadMs before the FIRST kickoff — the moment the
+ * pool of posted Caesars prices is thinnest — and buildCfbCard says out loud when it cannot spend
+ * the whole allotment ("$75 of the $150 stayed undeployed", the note on the 2026-09-05 fixture,
+ * recorded in docs/cfb-desk.md). Every later poke hit the already-locked exit and returned, so the
+ * day ended permanently short while the ledger recorded it as a full paper day and cfbBankroll
+ * sized every later day off it.
+ *
+ * MLB settled this on Josh's own word — src/lib/paper-mode.ts TOPUP_MAX, quoting him: "I said $150
+ * every day no matter what so we could track and calibrate off of it" — with exactly this number.
+ * It is mirrored here rather than imported so the two desks can never silently drift into sharing
+ * a knob: CFB tops up at most twice per date, and each attempt is recorded on the entry itself
+ * (`topUps`), so the bound survives a cold start, a redeploy and an overlapping poke.
+ *
+ * WHY A BOUND AT ALL: every attempt that gets as far as pricing costs one game-lines pull (6 Odds
+ * credits, measured on prod 2026-09-05: the quota moved 17578 → 17572). Two is enough to catch the
+ * evening lines that post after a morning lock without letting a ~15-min ticker grind the quota all
+ * Saturday: the FREE checks in decideCfbTopUp (device lock, BOTH allotments closed, this cap, the
+ * CFB_TOPUP_RETRY_MS cooldown, no time passed since the lock) refuse before any fetch at all.
+ * The one refusal that is NOT free — every game on the date has kicked off — is not in that
+ * function: it needs the ESPN board and lives in `topUpDate` (app/api/cfb/lock/route.ts), past
+ * one KEYLESS scoreboard read and still above the priced board this number bounds.
+ *
+ * TWO ALLOTMENTS, AND EACH ARM COUNTS ITS OWN (2026-09-06, DEFECT M then L1). Josh's sentence
+ * names two pots of money — $150 core and $25 fun — and decideCfbTopUp gates them INDEPENDENTLY:
+ * a day may fire because the core has room, or because the fun bucket is still empty, or both.
+ *
+ * THE PARAGRAPH THAT STOOD HERE IS WITHDRAWN, not merely superseded (D1, this round; two critics
+ * flagged it). It said the two "do NOT get an attempt budget each" and that this number "is
+ * counted per DATE, over the `topUps` rows, whichever bucket the attempt was serving". That was
+ * true of DEFECT M(a) and L1 changed it: counting both arms in one undifferentiated total meant a
+ * fun attempt SPENT a core attempt, so an entry carrying two completed fun-only rows and $75 of
+ * core still owed answered "the top-up cap is spent (2 of 2)" and the core's own two chances were
+ * gone without ever having been offered. Each attempt now records which arms were OPEN when it
+ * fired (`arms` on CfbTopUpRecord), and `decideCfbTopUp` counts each arm against its own allowance
+ * of this number — `used` over the rows that could have served the core, `funUsed` over the rows
+ * that could have served the fun bucket. A row written before that change carries no `arms` and is
+ * counted against BOTH, the direction that refuses more spending rather than less.
+ *
+ * THE TOTAL SPEND IS UNCHANGED AT 2 PRICED BOARDS PER DATE, which is the invariant this number
+ * exists to state, because both arms only ever CLOSE: core room and ticket slots only shrink, and
+ * a fun bucket that has been seated is never empty again. So every attempt with the core arm open
+ * comes before every attempt without it, an attempt with both arms open charges BOTH counters, and
+ * no interleaving can reach a third board. One pull answers both questions at once, which is why
+ * the thing being bounded is the PRICED BOARD rather than the bucket. What widened is the set of
+ * dates that can reach the bound, since a day at full core with an empty fun bucket used to refuse
+ * for free. See `decideCfbTopUp` and `CfbTopUpRecord` in src/lib/cfb/lock-server.ts.
+ */
+export const CFB_TOPUP_MAX = 2;
+
+/**
+ * HOW LONG AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (INSTRUCTION 45, 2026-09-06).
+ *
+ * The critic's pass found the top-up cap bounding successful WRITES rather than attempts, so a day
+ * that stayed short — the COMMON case; the fixture slate locks $75 of the $150 and its rebuild then
+ * seats nothing — bought a fresh priced board on every one of the ~40 pokes of a Saturday, about
+ * 240 credits, none of it visible to CFB_PROPS.dailyBudget. The cap now counts attempts, which
+ * bounds that at two. This constant is the SECOND half of the same discipline, and it is what
+ * keeps the two attempts worth having: without it the two are spent within half an hour of the
+ * lock, on prices that have barely moved.
+ *
+ * The MLB desk's own limiter is the precedent and the number: app/api/generate/route.ts refuses a
+ * non-forced run inside 45 minutes of `pl:gen:lastRun` (`45 * 60_000`, "ran recently"). 45 minutes
+ * is roughly three ticker pulses — long enough for a book to post a game it had not priced, short
+ * enough that a top-up still lands well before a late-afternoon kickoff.
+ *
+ * WHAT THE GATE ACTUALLY TESTS (corrected 2026-09-06, INSTRUCTION 45, D1 — two critics flagged
+ * the sentence that stood here). It said: "it gates ONLY an attempt whose predecessor found
+ * nothing to seat (`core === 0`)". The first half is still exactly right and is the whole point
+ * of the constant; the parenthesis was the pre-DEFECT-M(b) reading and is now false, and it
+ * contradicted `decideCfbTopUp`'s own block in src/lib/cfb/lock-server.ts, which states the rule
+ * this file is supposed to be documenting.
+ *
+ * `decideCfbTopUp` asks `isClaimRow(last)` — is the LAST recorded attempt a row that is still
+ * UNFILLED — never `core === 0`. The two stopped meaning the same thing the moment a top-up could
+ * complete having seated the day's FUN parlay and no core ticket: such a row records `core: 0` and
+ * is a FINISHED attempt, so the old reading would have held the next attempt off after an attempt
+ * that seated $25. An attempt that seats nothing leaves an unfilled row instead — `topUpDate`
+ * returns `skipped` on an empty probe without calling `applyCfbTopUp`, so the row `claimCfbTopUp`
+ * wrote before the pull stays `filled: false` and IS the empty-attempt marker.
+ *
+ * So: it gates ONLY an attempt whose predecessor bought a board and seated nothing at all — in
+ * EITHER bucket. An attempt that seated anything says the board is moving, and the next one is
+ * allowed on the next pulse. The gate is deliberately arm-agnostic: it never asks which allotment
+ * the empty attempt was serving, which is what gives a fun-only attempt the same cooldown the core
+ * arm has, from one line, with no second rule to keep in step.
+ */
+export const CFB_TOPUP_RETRY_MS = 45 * 60_000;
+
+/**
+ * THE SETTLE PASS (INSTRUCTION 45, THE OTHER HALF, 2026-09-06) — its cost bound and its
+ * "is this day actually over" rule.
+ *
+ * Nothing settled a server-locked CFB day: the whole grading chain is browser-only (gradeCfbEntry
+ * ← gradeCfb ← gradeCfbPending ← the Ledger tab's button), and the scheduler's grading tick
+ * forwards to /api/calibrate?grade=only, which has no CFB code at all. So cfbLedgerStats reported
+ * 0-0 forever and cfbBankroll stayed pinned at CFB_BANK_BASE — every later day Kelly-sized off a
+ * bankroll that could never move, which is the calibration Josh asked for and did not get.
+ *
+ * maxDatesPerPoke  the whole cost of settling. A settle costs ONE keyless ESPN scoreboard read per
+ *                  date (finalsFromEspn builds its board with `oddsEvents: []`, the same trick the
+ *                  sweep uses) and ZERO Odds API credits — but a long backlog must not turn one
+ *                  poke into a dozen upstream reads. Two dates per poke drains any realistic
+ *                  backlog within a few pokes of the ~15-min ticker while adding at most two ESPN
+ *                  reads (four fetches — espnEvents reads the date AND the next date) to a poke.
+ *                  A date whose every ticket is won / lost / push is skipped on the FREE ledger
+ *                  check (`cfbSettleCandidate`) and never read again, so the steady state is zero.
+ *                  The one exception, added later the same day by DEFECT S1: a date whose only
+ *                  unsettled verdicts are 48-hour VOIDS stays readable for CFB_VOID_RECHECK_MS
+ *                  past its last kickoff, because such a game can still finalise — see that
+ *                  constant, which also states what that costs.
+ * finishMs         how long after the LAST kickoff of a date the day is treated as finished and
+ *                  worth reading. A college football game runs about three and a half hours; six
+ *                  hours clears a long one plus overtime and a weather delay, so a poke inside a
+ *                  live slate spends nothing at all instead of reading a scoreboard that cannot
+ *                  yet settle anything. Reading early is not unsafe — gradeCfbEntry reports a
+ *                  game with no final as `pending` and never invents a result — it is only waste,
+ *                  and the whole point of this pass is that it costs nothing.
+ */
+export const CFB_SETTLE = {
+  maxDatesPerPoke: 2,
+  finishMs: 6 * 3600_000,
+} as const;
+
+/**
+ * HOW LONG A 48-HOUR VOID STAYS PROVISIONAL (INSTRUCTION 45, 2026-09-06, DEFECT S1 — the second
+ * critic's regression pass).
+ *
+ * DEFECT I(a) widened the void so it escalates on the CLOCK alone: a leg still pending
+ * CFB_UNGRADABLE_MS (48 h) past its kickoff is `ungradable`, whatever ESPN last said about the
+ * game. That is right — it is what ends the "read this date on every poke, for ever" starvation —
+ * but it was made TERMINAL, and terminal is a stronger claim than the desk can support.
+ *
+ * MEASURED (the probe that found it): a CFB game suspended for weather at 20:00 on 2026-09-05 and
+ * RESUMED 50 hours later, which ESPN serves as `live` throughout. At K+48h−1ms the ticket is
+ * `pending`; at K+48h+1ms it is `ungradable` and, because `overlayCfbGrading`'s RESOLVED set counts
+ * a void as resolved, `grading.done` flips true — and `cfbSettleCandidate` refused a done date, so
+ * `settlePass`'s todo filter never selected that date again and NO LATER ESPN READ WAS EVER MADE.
+ * The honest verdict would have been accepted if anything had offered it (a void is not in SETTLED,
+ * so the overlay lets a real final overwrite it) — nothing offered it. The money: `ticketPL`
+ * (src/lib/bankroll.ts, the `push/void/pending → 0` arm) books a genuine winner as a wash, so
+ * realizedPL stays 0 for that ticket and cfbBankroll — which Kelly-sizes every later day — stays
+ * low by that amount PERMANENTLY.
+ *
+ * So the void is now PROVISIONAL for a bounded window: a date whose only unsettled verdicts are
+ * voids stays a settle candidate until this long past its LAST kickoff, and after that it is
+ * closed for good. Nothing about the 48-hour escalation changed — the desk still says "void" while
+ * it waits, and still stops waiting — only its permanence.
+ *
+ * WHY SEVEN DAYS. A resumed or rescheduled college game is played inside the same week: the NCAA's
+ * own make-up practice is the following weekend at the latest, and a game not replayed by then is
+ * not going to be. It also spans a full ticker week, so a date cannot be closed by an outage that
+ * happens to straddle a weekend.
+ *
+ * IT HAS A SECOND CONSUMER SINCE DEFECT C1 (2026-09-06), and a maintainer moving this number
+ * moves both. `voidWindowMs` (src/lib/cfb/grade.ts) hands THIS window — instead of the 48 hours
+ * every other pending shape gets — to the one leg shape that means "the result exists and our read
+ * of it failed": a game reported `final: true` whose score will not parse. The two are the same
+ * number on purpose, so the grader can never still be waiting for a result the settle pass has
+ * stopped fetching.
+ *
+ * WHAT IT COSTS, stated rather than buried: at most ONE keyless ESPN scoreboard read per voided
+ * date per poke (`finalsFromEspn` builds its board with `oddsEvents: []`) and ZERO Odds API
+ * credits — never a game-lines pull, which only the lock and the top-up path can buy. It cannot
+ * re-open the starvation DEFECT I(b) closed either: `settlePass` tiers its queue on the last read
+ * attempt, so a voided date read on this poke sorts to the BACK and every other candidate is still
+ * reached within one poke per two dates. A date with no void in it is never re-read at all, which
+ * is the steady state for every ordinary Saturday.
+ */
+export const CFB_VOID_RECHECK_MS = 7 * 24 * 3600_000;
+
 /** Device storage — DISTINCT from every MLB key (pl_ledger / pl_bank2 / pl_noplay). */
 export const CFB_KEYS = {
   ledger: "pl_cfb_ledger",
   bank: "pl_cfb_bank2",
 } as const;
 
-/** Cloud storage — DISTINCT from pl:ledger:v1 / pl:bank:v1 / pl:noplay:v1. */
+/** Cloud storage — DISTINCT from pl:ledger:v1 / pl:bank:v1 / pl:noplay:v1.
+
+    `oddsGap` is a PREFIX, not a blob: `${oddsGap}:${date}` is a short-lived marker the lock
+    route's odds-missing refusal leaves behind (2026-09-06, verification pass, DEFECT 4), so the
+    next day's sweep can tell a day the ticker never reached inside its window from a day that was
+    poked all day and refused for want of a Caesars price. It holds no money and no card — the
+    ledger is still the only record — and it expires on its own. */
 export const CFB_REDIS = {
   ledger: "pl:cfb:ledger:v1",
   bank: "pl:cfb:bank:v1",
+  oddsGap: "pl:cfb:oddsgap:v1",
 } as const;
+
+/** How long an odds-gap marker lives. Sized to outlast the sweep window itself
+    ((CFB_SWEEP_DAYS + 1) days), so a marker can never expire while the walk that reads it can
+    still reach its date — an expired marker would send the sweep back to the ticker-gap note for
+    a day the odds feed actually lost. */
+export const CFB_ODDS_GAP_TTL_SEC = (CFB_SWEEP_DAYS + 1) * 24 * 3600;
 
 export const CFB_ODDS_URL =
   "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds?regions=us,eu&markets=h2h,spreads,totals&oddsFormat=american";

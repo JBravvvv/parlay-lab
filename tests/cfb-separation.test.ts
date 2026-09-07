@@ -38,6 +38,9 @@ describe("cfb rules — the constants the desk runs on", () => {
   it("Caesars settles", () => {
     expect(rules).toMatch(/settleBook:\s*"williamhill_us"/);
   });
+  it("the server lock window (INSTRUCTION 45): one hour before the first kickoff, a 25 s forward budget", () => {
+    expect(rules).toMatch(/export const CFB_LOCK = \{\s*leadMs:\s*60 \* 60_000,\s*forwardTimeoutMs:\s*25_000,\s*\} as const;/);
+  });
 });
 
 describe("cfb feature flag + shell", () => {
@@ -80,6 +83,19 @@ describe("every page is wired to the global sport switch", () => {
     const src = read("app/stats/page.tsx");
     expect(src).not.toMatch(/localStorage\.(get|set)Item\("pl_sport"/);
     expect(src).toMatch(/"pl_stats_sport"/);
+  });
+});
+
+describe("the CFB server lock route (INSTRUCTION 45) stays on the CFB rails", () => {
+  it("app/api/cfb/lock/route.ts writes the CFB ledger blob only, gated by the cron header, never the sync phrase", () => {
+    const route = read("app/api/cfb/lock/route.ts");
+    expect(route).toMatch(/pl:cfb:ledger:v1/);
+    expect(route).toMatch(/pl:cfb:bank:v1/);
+    expect(route).toMatch(/cronHeaderAuthed\(/);
+    expect(route).not.toMatch(/pl:ledger:v1/);
+    expect(route).not.toMatch(/pl:bank:v1/);
+    expect(route).not.toMatch(/x-pl-sync/);
+    expect(route).not.toMatch(/syncAuthed\(/);
   });
 });
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useCfbDesk as useCfbSlateDesk } from "@/components/cfb/CfbBoard";
+import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
 import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
@@ -95,9 +96,17 @@ function sumStakes(tix: { stake: number }[]): number {
   return tix.reduce((s, t) => s + t.stake, 0);
 }
 
+/** "9:00 AM" in Pacific time for a lock instant */
+function ptClock(t: number): string {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }).format(new Date(t));
+}
+
+/** INSTRUCTION 45 (2026-09-05): a day /api/cfb/lock wrote says so — the server locks the card
+    an hour before the first kickoff; the manual LOCK below still refuses an already-locked day. */
 function lockedLine(entry: CfbLedgerEntry): string {
-  if (entry.noPlay) return "NO-PLAY recorded — nothing staked. The day stands in the CFB ledger.";
-  return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the CFB ledger. Grades post as games go final.`;
+  const by = entry.source === "server-lock" ? ` Locked by the server at ${ptClock(entry.lockedAt)} PT.` : "";
+  if (entry.noPlay) return `NO-PLAY recorded — nothing staked. The day stands in the CFB ledger.${by}`;
+  return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the CFB ledger. Grades post as games go final.${by}`;
 }
 
 function gradeSummary(entry: CfbLedgerEntry): string | null {
@@ -164,6 +173,46 @@ export function CfbBuilder() {
   const lockedCore = useMemo(() => (locked ? cfbTicketsOf(locked, "core") : []), [locked]);
   const lockedFun = useMemo(() => (locked ? cfbTicketsOf(locked, "fun") : []), [locked]);
   const lockedGrading = locked ? cfbGradingOf(locked) : null;
+  /* INSTRUCTION 45 (defect D1, 2026-09-06): `lockedLine` above states the day's money ("$180 core
+     + $25 fun recorded"), and until this shipped nothing said when that figure was OVER the $150
+     allotment or that the merge had deleted a fun ticket to fit. `cfbDayMarks` reads the merge's
+     own markers and returns null for a day carrying none, so an unmarked locked card renders
+     exactly what it rendered before. The reader and the note live in CfbLedger.tsx because both
+     CFB surfaces show a day's money and the marker must read the same on each; the import runs
+     THIS way because the Ledger's extra module graph is the ui primitives plus `loadCfbFinals`,
+     while the reverse would pull `buildCfbCard` and the Board's slate query into the ledger page.
+
+     BOTH BUCKETS AND BOTH REFUSAL KINDS, WITHOUT A LINE CHANGING HERE (INSTRUCTION 45, defect B2,
+     2026-09-06). `cfbDayMarks` was widened this round to read the core-side channels too — a core
+     wager the allotment refused (`coreDropped` / `coreDroppedPL`) and a stake raise the merge would
+     not seat (`stakeConflict`) — and `CfbDayMarksNote`
+     renders them in the breach's own gold sentence and the existing drop list. This surface picks
+     both up through the same guarded `lockedMarks` it already had, which is the whole reason the
+     reader and the note live in ONE file rather than once per screen.
+
+     AND THE THIRD REFUSAL, ALSO WITHOUT A LINE CHANGING HERE (INSTRUCTION 45, defect B2's second
+     half, 2026-09-06). `unionCore` names on `betConflict` every shared core id whose two copies
+     mean DIFFERENT bets, and refuses the append pass for the whole date on that finding — so this
+     locked card can be MISSING tickets the other copy holds. `cfbDayMarks` now carries those ids
+     on `rivals` and the note discloses one gold line each, so the panel whose headline says what
+     the day staked also says when a rival card was turned away. Nothing below changes: the day
+     either has markers or it does not, and `lockedMarks` is the one guard either way.
+
+     WHAT THE NOTE RENDERS IS NOW A VALUE (INSTRUCTION 45, defect B1, same day). `CfbDayMarksNote`
+     no longer decides anything at the JSX — `cfbDisclosureOf` in CfbLedger.tsx settles which lines
+     a day discloses and what each says, and tests/cfb-card-ui.test.ts pins that by value rather
+     than by matching the markup's spelling. This surface is unaffected: it still hands the note
+     the same `CfbDayMarks` it always did.
+
+     AND THE SENTENCES IT RENDERS NOW CLAIM ONLY WHAT THE KERNEL GUARANTEES (INSTRUCTION 45, defect
+     U1, same day). The refused-raise note used to blame a missing top-up receipt; `unionCore`
+     writes that same marker from a second branch that refuses a raise whose receipt it DID read
+     and accept — because seating it would carry the day past its allotment — so the locked card
+     here was printing a reason the code had not checked. (That branch was narrowed again inside
+     this round, which is why the note names REASONS and not branches.) The wording moved to the rule
+     both branches obey, and the refused-wager list's heading stopped blaming the cap for refusals
+     the cap did not make. Again nothing below changes — the decision is one function away. */
+  const lockedMarks = locked ? cfbDayMarks(locked) : null;
   const exposure = cfbExposureOn(entries, date);
   const card = useMemo(
     () => (slate ? buildCfbCard(slate, { bankroll, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now }) : null),
@@ -217,6 +266,8 @@ export function CfbBuilder() {
             action={<span className="num text-[10.5px] text-faint">{locked.date}</span>}
           >
             <p className="text-[12px] text-gold">{lockedLine(locked)}</p>
+            {lockedMarks && <CfbDayMarksNote marks={lockedMarks} />}
+            {locked.note && <p className="mt-1 text-[11px] text-muted">{locked.note}</p>}
             {gradeSummary(locked) && <p className="num mt-1 text-[11px] text-muted">{gradeSummary(locked)}</p>}
             {status && status !== lockedLine(locked) && <p className="mt-1 text-[11px] text-muted">{status}</p>}
             {lockedCore.length > 0 && (

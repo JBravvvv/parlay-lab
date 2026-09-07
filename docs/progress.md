@@ -1,3 +1,26 @@
+# Progress — 2026-09-06 (CFB locks its own $150 core / $25 fun on the server)
+
+## INSTRUCTION 45 — the football desk runs the same paper money as baseball
+- The CFB paper constants ($150 core, $25 fun, since 2026-09-05) existed all along but nothing
+  ever locked them server-side: a card existed only if a browser built one, so prod's CFB ledger
+  held 0 entries while MLB's held 22. The money was configured and never deployed.
+- New server lock rail mirroring MLB's: `/api/cfb/lock` (cron-header gated, never takes a key from
+  the query string), `src/lib/cfb/lock-server.ts` (lock, sweep, top-up, grading overlay, settle,
+  money assertions) and a forward the scheduler calls AFTER the untouched MLB tick — `mlbTick` is
+  byte-identical to HEAD's GET body, so the MLB rail is wrapped, never edited.
+- The ledger merge kernel is now shared by both desks, with receipt channels for every refusal
+  that moves money (`coreDropped`, `funDropped`, `stakeConflict`, `betConflict`, `capBreach`).
+- Two real money defects fixed and re-verified by probe in both orders: two copies of one day each
+  holding the full $150 merged to $170 or $130 (now exactly $150, idempotent); and a rival lock's
+  stake could cross onto this card unmarked (now refused and named).
+- On the repo's own fixture Saturday the lock seats $75 of the $150 core (three tickets at the $25
+  cap) plus the full $25 fun — the allocation rules, not a bug; the card prints the leftover and
+  the reason. Widening them is an owner decision, not yet made.
+- OPEN, AND IT DECIDES WHETHER ANY OF THIS DEPLOYS: both crons this repo declares (14:45 and 17:00
+  PT) fire after the lock window closes; the rail depends on the external cron-job.org poke, which
+  this repo cannot verify. A Saturday that fires late records $0 and cannot be re-locked.
+- The round-13 citation guard was deleted, not repaired: it silently read ~56% of files while the
+  docs claimed it read all of them. That class is now guarded by review only, and the doc says so.
 # Progress — 2026-09-05 (in-game legs in every parlay category)
 
 ## INSTRUCTION 44 — in-game prop and side lines feed all the same parlay sets

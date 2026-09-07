@@ -22,7 +22,48 @@ import type { CfbBoard, CfbCard, CfbCardOpts, CfbGame, CfbRow, CfbTicket, CfbTic
  *   fun         one parlay of the likeliest sides across distinct games (ML / spread preferred,
  *               grade D or better at Caesars), added until it pays ≥ fun.minDec, 3–5 legs; none
  *               under 3. Named FAVORITES PARLAY when the legs mostly are favorites, else FUN PARLAY.
- *   noPlay      zero candidates → empty core, empty fun, nothing staked, and the note says so.
+ *   noPlay      nothing staked at all — no core ticket AND no fun parlay — and the note says so.
+ */
+
+/**
+ * THE CORE GATE MUST NOT GATE THE FUN MONEY (INSTRUCTION 45, 2026-09-06). Josh, verbatim:
+ * "Parlay Lab CFB should've been running the same $150 per day theoretical Core money and $25
+ * Fun money per day". Both halves are money, and this function was throwing the second one away.
+ *
+ * WHAT WENT WRONG. `buildCfbCard` filtered `cands` off the CORE gate — R.minEvPct (+2% EV at
+ * Caesars) and R.maxDec (2.60) — and when `bestRows` came back empty it RETURNED, from inside the
+ * CORE section, `{ core: [], funT: [], noPlay: true }`. The fun section sits below that return and
+ * was never reached. But the fun parlay is priced off an entirely different and looser gate —
+ * CFB_RULES.fun.minEvPct = -3 (grade D or better at Caesars), its own 4–40 decimal band, 3–5 legs
+ * across distinct games — so a board that offers the core nothing routinely still carries a good
+ * $25 ticket. The core's verdict was being applied to money the core does not own.
+ *
+ * MEASURED on this repo's own real 2026-09-05 fixture, no synthetic uplift. The lock's card seats
+ * its core on three games; `planCfbTopUp` (src/lib/cfb/lock-server.ts) then re-prices exactly the
+ * games the core is not on — nine games, 46 priced sides, ZERO clearing the +2% / 2.60 core gate,
+ * SIX clearing the -3% fun gate across FIVE distinct games. That board answered noPlay with $0 of
+ * the $25. Rebuilt with `daily: 0` and with `daily: 150` it answered noPlay both times, so it was
+ * never a room problem — the fun bucket simply sat behind the core's gate. Each such attempt buys
+ * one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX = 2 per date, for nothing seated,
+ * every Saturday, against a 2500/day cap that already binds on Saturdays.
+ *
+ * THE SHAPE OF THE FIX. The early return is gone. The whole core body — `admit`, `raise`, the
+ * forced top-up, the undeployed / minimum-tickets notes and the bench sweep — is wrapped in
+ * `if (bestRows.length)`, so a core-empty board skips it exactly as the return used to, and then
+ * FALLS THROUGH to the fun section untouched. Nothing about the fun build changed: it still reads
+ * `playable` (not `cands`), still filters on R.fun.minEvPct, still honours R.fun.legs and
+ * R.fun.minDec / R.fun.maxDec, and still stakes exactly `opts.fun`. No gate was widened.
+ *
+ * `noPlay` KEEPS ITS MEANING — nothing was staked — and simply becomes true LESS OFTEN: it is the
+ * old condition (`!bestRows.length`) ANDed with "and the fun bucket stayed empty too". It can
+ * never become true on a board where it used to be false. THIS ALSO CHANGES THE LOCK PATH, not
+ * only the top-up: a locked day that previously recorded NO-PLAY may now record a $25 fun ticket,
+ * which is precisely what Josh asked for.
+ *
+ * THE NOTE, deferred to the end for the same reason. A core-empty day no longer claims a no-play
+ * it did not have: it says the core found nothing and that the fun parlay is the day's only money.
+ * The genuine no-play wording is unchanged, byte for byte, and is `unshift`ed so it stays
+ * `notes[0]` — `buildCfbLockEntry` and `buildCfbSweepEntry` both read `card.notes[0]`.
  */
 
 type Draft = { legs: CfbTicketLeg[]; games: string[]; dec: number; prob: number; ev: number; rows: CfbRow[] };
@@ -157,69 +198,69 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
   const cands = playable.filter((r) => (r.evCz ?? -Infinity) >= R.minEvPct && (r.cz?.dec ?? Infinity) <= R.maxDec);
   const bestRows = [...bestPerGame(cands, benched, (w) => `one leg per game — ${w.label} ranks higher`).values()];
 
-  if (!bestRows.length) {
-    notes.push(
-      `NO-PLAY — no playable side clears +${R.minEvPct}% EV at Caesars under ${R.maxDec.toFixed(2)} (${playable.length} priced sides on ${board.games.length} games). Nothing staked.`,
-    );
-    return { date: board.date, core: [], funT: [], coreSum: 0, funSum: 0, noPlay: true, notes, benched };
-  }
-
   type Pick = { d: Draft; stake: number };
   const picked: Pick[] = [];
-  const usedGames = new Set<string>();
-  let sum = 0;
-  const room = () => opts.daily - sum;
-  const admit = (list: Draft[]) => {
-    for (const d of list) {
-      if (picked.length >= R.tickets.max || room() < R.minStake) break;
-      if (d.games.some((g) => usedGames.has(g))) continue;
-      const stake = Math.min(clamp(ticketKelly(d, opts.bankroll), R.minStake, R.maxStake), room());
-      picked.push({ d, stake });
-      sum += stake;
-      for (const g of d.games) usedGames.add(g);
-    }
-  };
-  const raise = () => {
-    for (const p of [...picked].sort((a, b) => byProb(a.d, b.d))) {
-      if (room() <= 0) break;
-      const add = Math.min(R.maxStake - p.stake, room());
-      if (add <= 0) continue;
-      p.stake += add;
-      sum += add;
-    }
-  };
 
-  admit(drafts(bestRows, games, R.maxDec).sort(byEv));
+  /* A CORE-EMPTY BOARD SKIPS THE CORE AND FALLS THROUGH TO THE FUN SECTION (INSTRUCTION 45,
+     2026-09-06). This `if` replaces the early `return` that used to stand here; everything inside
+     it is the core body byte for byte. See the docblock above `buildCfbCard` for why the core's
+     verdict may not be applied to the fun bucket's money. */
+  if (bestRows.length) {
+    const usedGames = new Set<string>();
+    let sum = 0;
+    const room = () => opts.daily - sum;
+    const admit = (list: Draft[]) => {
+      for (const d of list) {
+        if (picked.length >= R.tickets.max || room() < R.minStake) break;
+        if (d.games.some((g) => usedGames.has(g))) continue;
+        const stake = Math.min(clamp(ticketKelly(d, opts.bankroll), R.minStake, R.maxStake), room());
+        picked.push({ d, stake });
+        sum += stake;
+        for (const g of d.games) usedGames.add(g);
+      }
+    };
+    const raise = () => {
+      for (const p of [...picked].sort((a, b) => byProb(a.d, b.d))) {
+        if (room() <= 0) break;
+        const add = Math.min(R.maxStake - p.stake, room());
+        if (add <= 0) continue;
+        p.stake += add;
+        sum += add;
+      }
+    };
 
-  /* the top-up: the $150 must deploy */
-  if (room() > 0) raise();
-  if (room() > 0 && picked.length < R.tickets.max) {
-    const forcedRows = playable.filter(
-      (r) => !usedGames.has(r.gameId) && (r.evCz ?? -Infinity) >= R.forcedMinEvPct && (r.cz?.dec ?? Infinity) <= R.forcedMaxDec,
-    );
-    const forcedBest = [...bestPerGame(forcedRows, [], () => "").values()];
-    const before = picked.length;
-    admit(drafts(forcedBest, games, R.forcedMaxDec).sort(byProb));
-    if (picked.length > before) {
-      notes.push(`Top-up: ${picked.length - before} short-priced ticket(s) (dec ≤ ${R.forcedMaxDec}, EV ≥ ${R.forcedMinEvPct}%) added by probability to deploy the $${opts.daily}.`);
-      if (room() > 0) raise();
+    admit(drafts(bestRows, games, R.maxDec).sort(byEv));
+
+    /* the top-up: the $150 must deploy */
+    if (room() > 0) raise();
+    if (room() > 0 && picked.length < R.tickets.max) {
+      const forcedRows = playable.filter(
+        (r) => !usedGames.has(r.gameId) && (r.evCz ?? -Infinity) >= R.forcedMinEvPct && (r.cz?.dec ?? Infinity) <= R.forcedMaxDec,
+      );
+      const forcedBest = [...bestPerGame(forcedRows, [], () => "").values()];
+      const before = picked.length;
+      admit(drafts(forcedBest, games, R.forcedMaxDec).sort(byProb));
+      if (picked.length > before) {
+        notes.push(`Top-up: ${picked.length - before} short-priced ticket(s) (dec ≤ ${R.forcedMaxDec}, EV ≥ ${R.forcedMinEvPct}%) added by probability to deploy the $${opts.daily}.`);
+        if (room() > 0) raise();
+      }
     }
-  }
-  if (room() > 0) {
-    const why =
-      picked.length >= R.tickets.max
-        ? `the ${R.tickets.max}-ticket cap`
-        : picked.every((p) => p.stake >= R.maxStake)
-          ? `every ticket is at the $${R.maxStake} max and no other game offers a side ≥ ${R.forcedMinEvPct}% EV under ${R.forcedMaxDec}`
-          : `no further stake fits the $${R.minStake}–$${R.maxStake} band`;
-    notes.push(`$${room()} of the $${opts.daily} stayed undeployed — ${why}.`);
-  }
-  if (picked.length < R.tickets.min) {
-    notes.push(`Only ${picked.length} core ticket${picked.length === 1 ? "" : "s"} (minimum ${R.tickets.min}) — the pool is exhausted: ${bestRows.length} game${bestRows.length === 1 ? "" : "s"} carry a +${R.minEvPct}% side.`);
-  }
-  for (const r of bestRows) {
-    if (!usedGames.has(r.gameId)) {
-      benched.push({ label: r.label, evCz: r.evCz ?? 0, reason: picked.length >= R.tickets.max ? "ticket cap reached" : "daily allotment reached" });
+    if (room() > 0) {
+      const why =
+        picked.length >= R.tickets.max
+          ? `the ${R.tickets.max}-ticket cap`
+          : picked.every((p) => p.stake >= R.maxStake)
+            ? `every ticket is at the $${R.maxStake} max and no other game offers a side ≥ ${R.forcedMinEvPct}% EV under ${R.forcedMaxDec}`
+            : `no further stake fits the $${R.minStake}–$${R.maxStake} band`;
+      notes.push(`$${room()} of the $${opts.daily} stayed undeployed — ${why}.`);
+    }
+    if (picked.length < R.tickets.min) {
+      notes.push(`Only ${picked.length} core ticket${picked.length === 1 ? "" : "s"} (minimum ${R.tickets.min}) — the pool is exhausted: ${bestRows.length} game${bestRows.length === 1 ? "" : "s"} carry a +${R.minEvPct}% side.`);
+    }
+    for (const r of bestRows) {
+      if (!usedGames.has(r.gameId)) {
+        benched.push({ label: r.label, evCz: r.evCz ?? 0, reason: picked.length >= R.tickets.max ? "ticket cap reached" : "daily allotment reached" });
+      }
     }
   }
 
@@ -265,13 +306,29 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
     notes.push(`Fun: no fun parlay — only ${legs.length} playable side${legs.length === 1 ? "" : "s"} grade D or better at Caesars (need ${R.fun.legs.min}).`);
   }
 
+  /* ---------- THE VERDICT ---------- */
+  /* NO-PLAY means NOTHING WAS STAKED — both buckets empty, not just the core's (INSTRUCTION 45,
+     2026-09-06). This is the old `!bestRows.length` condition ANDed with an empty fun bucket, so
+     it can only ever fire on a day the old code also called no-play. The note is decided here,
+     after the fun build, and `unshift`ed so the verdict stays `notes[0]` for the two callers that
+     read it by index (`buildCfbLockEntry`, `buildCfbSweepEntry` in src/lib/cfb/lock-server.ts). */
+  const noPlay = !bestRows.length && !funT.length;
+  if (!bestRows.length) {
+    const gate = `no playable side clears +${R.minEvPct}% EV at Caesars under ${R.maxDec.toFixed(2)} (${playable.length} priced sides on ${board.games.length} games)`;
+    notes.unshift(
+      noPlay
+        ? `NO-PLAY — ${gate}. Nothing staked.`
+        : `No core ticket — ${gate}. None of the $${opts.daily} core is staked; the $${opts.fun} fun parlay is the day's only money.`,
+    );
+  }
+
   return {
     date: board.date,
     core,
     funT,
     coreSum: core.reduce((s, t) => s + t.stake, 0),
     funSum: funT.reduce((s, t) => s + t.stake, 0),
-    noPlay: false,
+    noPlay,
     notes,
     benched,
   };

@@ -87,6 +87,13 @@ const flat: Book[] = [
   { key: "draftkings", title: "DraftKings", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
   { key: "williamhill_us", title: "Caesars", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
 ];
+/** the market is fair, Caesars quotes -200 on BOTH sides of everything: every side is graded F
+    (EV far under CFB_RULES.fun.minEvPct = -3), so neither bucket has anything to buy */
+const heavyVig: Book[] = [
+  { key: "pinnacle", title: "Pinnacle", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
+  { key: "draftkings", title: "DraftKings", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
+  { key: "williamhill_us", title: "Caesars", h2h: [-300, -200], spread: [-3, -200, -200], total: [48.5, -200, -200] },
+];
 function synthBoard(n: number, books: (i: number) => Book[]): CfbBoard {
   const idx = Array.from({ length: n }, (_, i) => i + 1);
   return buildCfbBoard({ date: DATE, espnEvents: idx.map((i) => espnEvent(i)), oddsEvents: idx.map((i) => oddsEvent(i, books(i))), fpi: null, now: NOW, bankroll: 2500 });
@@ -212,6 +219,76 @@ describe("the 2026-09-05 fixture card", () => {
   });
 });
 
+/* ========================================================================================
+ * INSTRUCTION 45 (2026-09-06), Josh, verbatim: "Parlay Lab CFB should've been running the same
+ * $150 per day theoretical Core money and $25 Fun money per day". BOTH halves are money.
+ *
+ * THE DEFECT: THE CORE GATE THREW THE $25 AWAY BEFORE THE PARLAY WAS EVER BUILT. `buildCfbCard`
+ * computed its candidate pool off the CORE gate alone — CFB_RULES.minEvPct (+2% EV at Caesars)
+ * and CFB_RULES.maxDec (2.60) — and, when that pool came back empty, returned
+ * `{ core: [], funT: [], noPlay: true }` from INSIDE the core section, above the fun section
+ * entirely. The fun parlay is priced off a different and looser gate (CFB_RULES.fun.minEvPct
+ * = -3, its own 4–40 decimal band, 3–5 legs across distinct games), so a board that offers the
+ * core nothing can still carry a perfectly good $25 ticket. It never got the chance to.
+ *
+ * MEASURED on this repo's own real 2026-09-05 fixture, with no synthetic uplift: the lock's card
+ * seats its core on three games, and the top-up path (`planCfbTopUp`, src/lib/cfb/lock-server.ts)
+ * then re-prices exactly the games the core is NOT on — nine games, 46 priced sides, ZERO of them
+ * clearing the +2% / 2.60 core gate, SIX of them clearing the -3% fun gate across FIVE distinct
+ * games. Rebuilt with `daily: 0` and with `daily: 150` that board answered `noPlay` both times,
+ * so it was never a room problem: the fun bucket simply sat behind the core's gate. Every such
+ * attempt costs one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX = 2 per date, for
+ * $0 seated — repeating every Saturday against a 2500/day cap that already binds on Saturdays.
+ *
+ * THE RULE THESE TESTS PIN: the two allotments are gated INDEPENDENTLY. A day is NO-PLAY only
+ * when the core AND the fun bucket are both empty; a core-empty day whose parlay clears seats the
+ * $25 and says so honestly instead of claiming a no-play. This is the same independence
+ * `decideCfbTopUp` already applies one level up (tests/cfb-lock-route.test.ts, DEFECT M) —
+ * `buildCfbCard` was the half that still collapsed the two into one.
+ * ======================================================================================== */
+describe("the fun allotment is gated independently of the core (INSTRUCTION 45)", () => {
+  const board = fixtureBoard();
+  /** exactly the board `planCfbTopUp` prices: the fixture minus the games the lock's core sits on */
+  const seated = new Set(buildCfbCard(board, OPTS).core.flatMap((t) => t.legs.map((l) => l.gkey)));
+  const rest: CfbBoard = { ...board, games: board.games.filter((g) => !seated.has(g.id)) };
+  const playable = rest.games.flatMap((g) => g.rows.filter((r) => r.playable && r.cz != null && r.evCz != null));
+
+  it("the top-up board is real: no core side clears, and the fun pool spans enough games for a parlay", () => {
+    expect(seated.size).toBe(3);
+    expect(rest.games).toHaveLength(9);
+    expect(playable).toHaveLength(46);
+    expect(playable.filter((r) => (r.evCz ?? -Infinity) >= CFB_RULES.minEvPct && r.cz!.dec <= CFB_RULES.maxDec)).toHaveLength(0);
+    const funPool = playable.filter((r) => (r.evCz ?? -Infinity) >= CFB_RULES.fun.minEvPct);
+    expect(funPool.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(funPool.map((r) => r.gameId)).size).toBeGreaterThanOrEqual(CFB_RULES.fun.legs.min);
+  });
+
+  it("0 core-clearing rows + a clearing fun pool → the $25 is seated, the core is empty, and it is NOT a no-play", () => {
+    const card = buildCfbCard(rest, OPTS);
+    expect(card.core).toEqual([]);
+    expect(card.coreSum).toBe(0);
+    expect(card.funT).toHaveLength(1);
+    expect(card.funSum).toBe(CFB_PAPER.fun);
+    expect(card.noPlay).toBe(false);
+    checkFun(card); // still inside CFB_RULES.fun's leg band, decimal band and -3% gate — nothing widened
+  });
+
+  it("the note tells the truth: no NO-PLAY claim on a day that staked the fun money", () => {
+    const card = buildCfbCard(rest, OPTS);
+    expect(card.notes.some((n) => /^NO-PLAY/.test(n))).toBe(false);
+    expect(card.notes.some((n) => /no playable side clears \+2% EV at Caesars/.test(n))).toBe(true);
+  });
+
+  it("the fun bucket does not depend on the core's room: daily $0 and daily $150 both seat the parlay", () => {
+    for (const daily of [0, CFB_PAPER.daily]) {
+      const card = buildCfbCard(rest, { ...OPTS, daily });
+      expect(card.core).toEqual([]);
+      expect(card.funSum).toBe(CFB_PAPER.fun);
+      expect(card.noPlay).toBe(false);
+    }
+  });
+});
+
 describe("synthetic slates through the real model", () => {
   it("NO-PLAY on an empty board: empty core, empty fun, nothing staked, the note says so", () => {
     const empty: CfbBoard = { date: DATE, slateDates: [DATE], games: [], unmatched: 0, fpiUpdated: null, generatedAt: NOW };
@@ -223,11 +300,49 @@ describe("synthetic slates through the real model", () => {
     expect(card.funSum).toBe(0);
     expect(card.notes[0]).toMatch(/^NO-PLAY/);
   });
-  it("NO-PLAY when every side is fair-priced (no +2% at Caesars), even with 8 games", () => {
+  /* REWRITTEN 2026-09-06 (INSTRUCTION 45), from:
+   *
+   *   it("NO-PLAY when every side is fair-priced (no +2% at Caesars), even with 8 games", () => {
+   *     const card = buildCfbCard(synthBoard(8, () => flat), OPTS);
+   *     expect(card.noPlay).toBe(true);
+   *     expect(card.core).toEqual([]);
+   *     expect(card.funT).toEqual([]);
+   *   });
+   *
+   * This is a REWRITE, not a loosening: the board did not change and neither did any gate, but the
+   * verdict it pinned was the defect itself. MEASURED on this exact board: all 8 games carry an
+   * away ML at -2.84% EV at Caesars (decimal 2.30) — INSIDE CFB_RULES.fun.minEvPct = -3, i.e.
+   * grade D, exactly the pool the fun money is defined to ride — while nothing anywhere clears the
+   * core's +2%. The old pin therefore froze "the core found nothing, so throw the $25 away", which
+   * is the half of "$150 Core money and $25 Fun money per day" this ship exists to restore. The
+   * rewrite asserts strictly MORE than the old one did about the same board: the core is still
+   * empty AND still $0 (new), the fun ticket is seated at exactly CFB_PAPER.fun and still obeys
+   * every fun rule via checkFun (new), and the day is no longer allowed to call itself a no-play.
+   * The "both buckets empty → NO-PLAY" case the old pin was standing in for is now covered
+   * directly, on a priced 8-game board, by the F-grade test immediately below. */
+  it("no +2% side but a grade-D fun pool: empty core, the $25 still rides, and it is NOT a no-play", () => {
     const card = buildCfbCard(synthBoard(8, () => flat), OPTS);
+    expect(card.core).toEqual([]);
+    expect(card.coreSum).toBe(0);
+    expect(card.noPlay).toBe(false);
+    expect(card.funT).toHaveLength(1);
+    expect(card.funSum).toBe(CFB_PAPER.fun);
+    checkFun(card);
+    expect(card.notes.some((n) => /^NO-PLAY/.test(n))).toBe(false);
+    expect(card.notes.some((n) => /^No core ticket/.test(n))).toBe(true);
+  });
+  it("NO-PLAY when every side is graded F at Caesars: both buckets empty on a fully priced 8-game slate", () => {
+    const board = synthBoard(8, () => heavyVig);
+    const priced = board.games.flatMap((g) => g.rows.filter((r) => r.playable && r.cz != null && r.evCz != null));
+    expect(priced.length).toBeGreaterThan(0); // the day IS priced — this is a no-bet day, not a no-price day
+    expect(priced.every((r) => r.evCz! < CFB_RULES.fun.minEvPct)).toBe(true);
+    const card = buildCfbCard(board, OPTS);
     expect(card.noPlay).toBe(true);
     expect(card.core).toEqual([]);
     expect(card.funT).toEqual([]);
+    expect(card.coreSum).toBe(0);
+    expect(card.funSum).toBe(0);
+    expect(card.notes[0]).toMatch(/^NO-PLAY/);
   });
   it("12 edged games: doubles ≤ 2.60 rank first, the $150 deploys exactly, ≤ 7 tickets, no game twice", () => {
     const board = synthBoard(12, () => favEdge());

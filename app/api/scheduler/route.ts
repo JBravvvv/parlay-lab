@@ -12,6 +12,8 @@ import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { decideGradePass } from "@/lib/server/grading-progress";
+import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
+import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -34,12 +36,84 @@ import { decideGradePass } from "@/lib/server/grading-progress";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90; // the generate forward can take ~60s on a full slate
+/* BUDGET, STATED HONESTLY (INSTRUCTION 45, 2026-09-06): this 90 s now also has to cover the CFB
+   forward added below. The generate forward is sent with NO signal and NO timeout at either call
+   site, so ~60 s of generate plus the CFB forward's 25 s abort (CFB_LOCK.forwardTimeoutMs) is
+   85 s — FIVE seconds of headroom, and a generate slower than 65 s kills the invocation before
+   that abort can bind. What IS guaranteed is that the CFB forward is the tick's LAST step, after
+   mlbTick has answered and after /api/generate has committed under its own 300 s budget: a
+   platform kill costs the poke its HTTP answer and that pulse's CFB lock, never an MLB write, and
+   the next pulse retries. Closing the 5 s gap for real means timing the generate fetch, which is
+   code this comments-only change does not touch. */
 
 /* slateStarts moved to src/lib/server/slate.ts 2026-08-06 (one copy of the feed URL) so
    /api/generate's gen.slate scope stamp reads the same population this decision does.
    Failure semantics here are unchanged: [] -> decide() reads VACUOUS empty-schedule. */
 
+/**
+ * THE CFB SELF-FORWARD (INSTRUCTION 45, 2026-09-05, Josh verbatim: "Parlay Lab CFB should've
+ * been running the same $150 per day theoretical Core money and $25 Fun money per day"). The
+ * MLB tick below is unchanged, byte for byte, and runs FIRST; only once it has answered does the
+ * poke forward to /api/cfb/lock with the same cron header (the pattern the generate forward
+ * uses) and report that answer under `cfb`. Fire-and-report: a CFB failure of any kind becomes
+ * `{ forwarded: false, error }` and never changes the MLB body or status.
+ *
+ * ── TWO DEFECTS FOUND IN REVIEW OF THE FIRST CUT (2026-09-06) ────────────────────────────────
+ *
+ * (1) THE FORWARD WAS NOT ACTUALLY CAUGHT. The first cut did a bare
+ *     `const cfb = await forwardCfbLock(...)`. forwardCfbLock is total today — its own try/catch
+ *     returns `{ forwarded: false, error }` — but the whole point of the fire-and-report contract
+ *     is that the CFB desk can never cost the MLB poke its answer, and a bare await makes that
+ *     property live in the OTHER file: one edit inside the helper (or an AbortSignal.timeout
+ *     construction throwing before the try) and a rejection escapes GET, Next renders the poke as
+ *     a bodyless 500, and the MLB tick's already-computed answer is destroyed by the CFB desk —
+ *     exactly what this wrapper claims is impossible. tests/scheduler-route.test.ts case (b)
+ *     pinned it and it FAILED with `Error: ECONNRESET`. The `.catch` below moves the guarantee
+ *     into this file, where the claim is made.
+ *
+ * (2) THE GATE WAS THE MLB OUTCOME, NOT AUTHORISATION. The first cut read
+ *     `if (res.status !== 200 || !process.env.CRON_SECRET) return res;`, so ANY non-200 from
+ *     mlbTick returned before the forward was ever attempted — the MLB-SIDE OUTAGES among them,
+ *     and those are the ones that must never cost the CFB day: mlbTick answers 503
+ *     `sync-not-configured` when storeEnv() is false, and Next renders any unhandled throw inside
+ *     it as a bodyless 500. vercel.json declares crons only for /api/scheduler, so there is
+ *     NO other path to /api/cfb/lock: one MLB-side outage silently cost the CFB desk the entire
+ *     $150/$25 day, nothing written, no CFB-side signal. That is the very failure INSTRUCTION 45
+ *     exists to stop. The gate is therefore AUTHORISATION and nothing else:
+ *       - CRON_SECRET unset  → return the tick's answer untouched; there is no secret to forward
+ *         with, and the CFB route carries the identical fails-closed gate and would 503 anyway.
+ *       - not cronHeaderAuthed → return untouched. THIS IS LOAD-BEARING: an unauthenticated public
+ *         poke must never be able to make the SERVER reach /api/cfb/lock carrying the real secret.
+ *
+ *     CORRECTION (2026-09-06): an earlier draft of this docblock listed the tick's 401 among the
+ *     MLB-SIDE outages above, which reads as though the new gate ought to forward a 401. It does
+ *     not, and it MUST NOT. The tick's 401 (a header problem) and its CRON_SECRET-unset 503 are
+ *     AUTHORISATION, not outage, and the gate refuses both BY NAME before the forward —
+ *     cronHeaderAuthed(req) is false in the first case, process.env.CRON_SECRET is unset in the
+ *     second — so the MLB answer returns untouched and the server never reaches /api/cfb/lock
+ *     carrying the real secret off an unauthenticated public poke. Read the two bullets above as
+ *     licence to "fix" the gate into letting a 401 through and you re-open precisely that attack.
+ *     What now forwards that did not before is the MLB-SIDE 503 and the 500, and nothing else.
+ *     Same correction, same day, in docs/cfb-desk.md (INSTRUCTION 45 bullet) and in the PIN
+ *     REWRITTEN note in tests/scheduler-route.test.ts; all three say this.
+ *
+ *     Past that gate the forward runs whatever the MLB tick answered, and attachCfb copies the MLB
+ *     status and every MLB field through untouched with `cfb` as the only added key — the 503
+ *     JSON body gets `cfb` and keeps its status; the bodyless 500, which attachCfb cannot parse,
+ *     is returned as-is.
+ */
 export async function GET(req: NextRequest) {
+  const res = await mlbTick(req);
+  if (!process.env.CRON_SECRET || !cronHeaderAuthed(req)) return res;
+  const cfb: CfbForwardResult = await forwardCfbLock(req.nextUrl.origin, process.env.CRON_SECRET).catch(
+    (e): CfbForwardResult => ({ forwarded: false, error: (e as Error).message }),
+  );
+  if (!cfb.forwarded) console.warn(`[scheduler] cfb lock forward failed: ${cfb.error}`);
+  const out = await attachCfb(res, cfb);
+  return out ? NextResponse.json(out.body, { status: out.status }) : res;
+}
+
+async function mlbTick(req: NextRequest): Promise<NextResponse> {
   /* FAILS CLOSED. /api/calibrate shipped `return !cron` — allow when the secret is unset —
      because its run was cheap and idempotent. This route SPENDS ~50-91 credits a fire, so an
      unset secret is a configuration error and nothing else: 503, before anything is read. */
