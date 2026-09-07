@@ -366,10 +366,21 @@ const CROSSINGS = [
   { ump: "Steven Jaschinski", date: "2026-08-31", commit: "16cf941", kPerG: 18.4, braked: true,
     note: "EIGHTIETH. g 4->5, k 92. Same refresh and same re-gate as Rackley (79); armed " +
       "mean k/g now 16.55 vs league 16.60 (n=80). Double-braked, reached no board." },
+  { ump: "Edwin Jimenez", date: "2026-09-06", commit: "4485f0a", kPerG: 18.4, braked: true,
+    note: "EIGHTY-FIRST. g 4->5, k 72->92. Caught on the rebase re-gate under the " +
+      "INSTRUCTION 45 CFB server-lock ship — ONE bot refresh, integrated the same evening " +
+      "(00:04Z / 17:04 PT), so the instrument's cadence matched the data's for once. The " +
+      "refresh touched data/ump_k.json alone and collided with none of the 25 paths under " +
+      "review; the re-gate-over-a-bot-commit rule is the whole reason it was seen. Armed " +
+      "mean k/g 16.60 vs league 16.44 (g=625, k=10,275) at n=81 — above league (+0.16), a " +
+      "fourth read running above, still a number and not a signal. Double-braked and " +
+      "reached no board: umpKFrozen:true present with zero umpKFrozen:false, and " +
+      "context.json unmoved since 64c42ad on 2026-07-29. Record: " +
+      "docs/collection-period.md CROSSING 81." },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 80;
+const FLOOR = 81;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

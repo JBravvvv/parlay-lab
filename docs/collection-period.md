@@ -7212,6 +7212,22 @@ unchanged since 08-02) — reached no board:**
 | 79 | David Rackley | 2026-08-31 | `16cf941` | 5 / 90 | 18.0 |
 | 80 | Steven Jaschinski | 2026-08-31 | `16cf941` | 5 / 92 | 18.4 |
 
+**Crossing 81 (recorded 2026-09-06, found on the rebase re-gate under the INSTRUCTION 45 CFB
+server-lock ship — ONE bot refresh, `4485f0a` "context: refresh (weather/umps/bullpen)",
+2026-09-07 00:04Z / 2026-09-06 17:04 PT, integrated the same evening). The re-gate over a bot
+commit is the only reason this was caught inside the hour rather than on the next ship: the
+refresh touched `data/ump_k.json` alone and collided with none of the 25 paths under review.
+Armed mean k/g at n=81: 16.60 vs league 16.44 (league g=625, k=10,275) — above league by +0.16,
+a fourth consecutive read above and still a number rather than a signal. Double-braked and
+reached no board, both halves measured this turn: `umpKFrozen:true` is present in
+`legacy/index.html` with zero `umpKFrozen:false`, and `public/model/context.json` carries
+`generated_at` 2026-07-29T20:31:58+00:00, last committed in `64c42ad` on 2026-07-29 — the
+carrier has not moved since, so nothing this crossing touches could reach a board:**
+
+| # | umpire | date | commit | g/k at arming | k/g |
+|---|---|---|---|---|---|
+| 81 | Edwin Jimenez | 2026-09-06 | `4485f0a` | 5 / 92 | 18.4 |
+
 **SEVENTY-EIGHT armed. Armed-set mean k/g at n = 78: 16.59 vs league 16.42 (g=572,
 k=9,394) — above league (+0.17), the third consecutive read above. Still a number,
 not a signal: the set drifts daily, and the double brake keeps all of it off every
