@@ -208,51 +208,50 @@ export const CFB_SWEEP_DAYS = 3;
  * (measured above; docs/cfb-desk.md), so the day's top-up lines spend is bounded at
  * 6 × 6 = 36 credits (42 with the lock's own pull) — arms only close, so the per-arm counters
  * share those attempts rather than each getting their own — noise beside CFB_PROPS.dailyBudget
- * (2500). CFB_TOPUP_RETRY_MS is unchanged and
- * remains the spacing that makes the attempts worth having. The card only grows: `applyTopUp`
+ * (2500). The card only grows: `applyTopUp`
  * appends and `assertAppendOnly` (src/lib/append-only.ts) throws before any write that would
  * drop or resize a seated ticket.
+ *
+ * INSTRUCTION 49 (2026-09-09), Josh verbatim: "It shouldn't be refreshing every 15 minutes. It
+ * should be 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it and it can
+ * function the same way whether I manually refresh it or it refreshes itself automatically".
+ * THE SLOT GATE: the already-locked branch of app/api/cfb/lock/route.ts asks `decideRefillTick`
+ * (src/lib/server/grading-progress.ts, REFILL_SLOTS_PT — the grading calendar) from its OWN clock
+ * and calls `topUpDate` only on the first ticker pulse inside [slot, slot + 15 min) for
+ * 08:00/09:30/12:00/15:00/16:45 PT, or on `?manual=1` (Josh's Refresh via POST /api/refill),
+ * which runs the identical pass with slot "manual". Every other pulse answers
+ * `skipped` before any feed is touched — zero ESPN reads, zero Odds credits. THE SAME-SLOT
+ * REFUSAL: each claim row is stamped with the `slot` it fired on, and `decideTopUp` refuses a
+ * second attempt whose slot a filled row already carries ("refill slot HH:MM PT already ran
+ * today"), free; a manual slot is never refused on that ground. Six is therefore the five slots
+ * plus one manual attempt after a full slot day, and CFB_TOPUP_RETRY_MS is 0 — the calendar is the
+ * only pacing.
  */
 export const CFB_TOPUP_MAX = 6;
 
 /**
- * HOW LONG AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (INSTRUCTION 45, 2026-09-06).
+ * HOW LONG AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF — 0 since INSTRUCTION 49 (2026-09-09) — the refill slot calendar
+ * (REFILL_SLOTS_PT, src/lib/server/grading-progress.ts: 08:00/09:30/12:00/15:00/16:45 PT) is the
+ * only pacing. The retry constant is kept so cfg.topUp.retryMs and the lock-server cooldown
+ * literal (`last && isClaimRow(last) && now - last.at < CFB_TOPUP_RETRY_MS`, pinned by
+ * tests/cfb-lock-route.test.ts) still type-check and a future tune is one line.
  *
- * The critic's pass found the top-up cap bounding successful WRITES rather than attempts, so a day
- * that stayed short — the COMMON case; the fixture slate locks $75 of the $150 (now $250) and its
- * rebuild then seats nothing — bought a fresh priced board on every one of the ~40 pokes of a Saturday, about
- * 240 credits, none of it visible to CFB_PROPS.dailyBudget. The cap now counts attempts, which
- * bounds that at two. This constant is the SECOND half of the same discipline, and it is what
- * keeps the two attempts worth having: without it the two are spent within half an hour of the
- * lock, on prices that have barely moved.
+ * WHY 0 AND NOT A RE-TUNE: with the slot gate in front of it a cooldown can only ever EAT a slot.
+ * The 08:00 → 09:30 gap is 90 minutes, and an empty 08:00 attempt under the old 45-minute
+ * value (INSTRUCTION 45, 2026-09-06, the MLB desk's `45 * 60_000` "ran recently" precedent) would
+ * have been harmless — but any value of 90 minutes or more, measured from the 08:00 attempt, could
+ * swallow the 09:30 slot whenever the 09:30 tick landed earlier in its 15-minute window than the
+ * 08:00 tick did, and the value had no reason left to exist once a slot tick is already
+ * gated to one attempt per slot (the same-slot refusal in `decideTopUp`).
  *
- * The MLB desk's own limiter is the precedent and the number: app/api/generate/route.ts refuses a
- * non-forced run inside 45 minutes of `pl:gen:lastRun` (`45 * 60_000`, "ran recently"). 45 minutes
- * is roughly three ticker pulses — long enough for a book to post a game it had not priced, short
- * enough that a top-up still lands well before a late-afternoon kickoff.
- *
- * WHAT THE GATE ACTUALLY TESTS (corrected 2026-09-06, INSTRUCTION 45, D1 — two critics flagged
- * the sentence that stood here). It said: "it gates ONLY an attempt whose predecessor found
- * nothing to seat (`core === 0`)". The first half is still exactly right and is the whole point
- * of the constant; the parenthesis was the pre-DEFECT-M(b) reading and is now false, and it
- * contradicted `decideCfbTopUp`'s own block in src/lib/cfb/lock-server.ts, which states the rule
- * this file is supposed to be documenting.
- *
- * `decideCfbTopUp` asks `isClaimRow(last)` — is the LAST recorded attempt a row that is still
- * UNFILLED — never `core === 0`. The two stopped meaning the same thing the moment a top-up could
- * complete having seated the day's FUN parlay and no core ticket: such a row records `core: 0` and
- * is a FINISHED attempt, so the old reading would have held the next attempt off after an attempt
- * that seated $25. An attempt that seats nothing leaves an unfilled row instead — `topUpDate`
- * returns `skipped` on an empty probe without calling `applyCfbTopUp`, so the row `claimCfbTopUp`
- * wrote before the pull stays `filled: false` and IS the empty-attempt marker.
- *
- * So: it gates ONLY an attempt whose predecessor bought a board and seated nothing at all — in
- * EITHER bucket. An attempt that seated anything says the board is moving, and the next one is
- * allowed on the next pulse. The gate is deliberately arm-agnostic: it never asks which allotment
- * the empty attempt was serving, which is what gives a fun-only attempt the same cooldown the core
- * arm has, from one line, with no second rule to keep in step.
+ * WHAT THE GATE TESTED while it was live (corrected 2026-09-06, INSTRUCTION 45, D1): the cooldown
+ * asked `isClaimRow(last)` — is the LAST recorded attempt a row that is still UNFILLED — never
+ * `core === 0`, because a top-up may complete having seated only the day's FUN parlay and such a
+ * row records `core: 0` as a FINISHED attempt. An attempt that seats nothing leaves an unfilled
+ * row instead (`topUpDate` returns `skipped` on an empty probe without calling `applyCfbTopUp`,
+ * so the row `claimCfbTopUp` wrote stays `filled: false`). That reading is unchanged; the window it measured is simply zero now.
  */
-export const CFB_TOPUP_RETRY_MS = 45 * 60_000;
+export const CFB_TOPUP_RETRY_MS = 0;
 
 /**
  * THE SETTLE PASS (INSTRUCTION 45, THE OTHER HALF, 2026-09-06) — its cost bound and its

@@ -381,7 +381,10 @@ export async function settlePass(cfg: LeagueConfig, keys: LockKeys, args: Settle
 
 /* ---------- THE TOP-UP ---------- */
 
-export type TopUpArgs = { now: number; dry: boolean; bankroll: number; feeds: LockFeeds };
+/** `slot` (INSTRUCTION 49, 2026-09-09): the refill slot this pass runs for — one of REFILL_SLOTS_PT or
+ *  "manual". The route decides it from its own clock (decideRefillTick) or from ?manual=1, so the
+ *  ticker and Josh's Refresh share one code path; decideTopUp refuses a repeated slot for free. */
+export type TopUpArgs = { now: number; dry: boolean; bankroll: number; feeds: LockFeeds; slot: string };
 
 /**
  * THE TOP-UP, on the already-locked exit (2026-09-06).
@@ -414,8 +417,8 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
   const isMine = isEntryOf(cfg);
   const { paper, rules } = cfg;
   try {
-    const d = decideTopUp(cfg, entry, args.now);
-    if (!d.fire) return { action: "skipped", reason: d.reason };
+    const d = decideTopUp(cfg, entry, args.now, { slot: args.slot });
+    if (!d.fire) return { action: "skipped", reason: d.reason, slot: args.slot };
 
     const espn = await args.feeds.espnEvents(entry.date);
     const free: CfbBoard = buildCfbBoard({ date: entry.date, espnEvents: espn, oddsEvents: [], fpi: null, now: args.now, bankroll: args.bankroll, league: cfg });
@@ -474,12 +477,12 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
       if (!held || !isMine(held)) {
         return { action: "skipped", reason: `${entry.date} no longer carries a locked ${cfg.short} entry — another writer changed the day before this attempt was claimed.`, raced: true };
       }
-      const fresh = decideTopUp(cfg, held, args.now);
-      if (!fresh.fire) return { action: "skipped", reason: fresh.reason, raced: true };
+      const fresh = decideTopUp(cfg, held, args.now, { slot: args.slot });
+      if (!fresh.fire) return { action: "skipped", reason: fresh.reason, raced: true, slot: args.slot };
       n = fresh.n;
       /* THE CLAIM RECORDS WHICH ARMS IT SPENT (2026-09-06, L1) — and it takes them from `fresh`,
          the decision made over the LIVE entry one line above, never from `d`. */
-      const claimed = claimTopUp(cfg, held, n, args.now, { core: fresh.core, fun: fresh.fun }) as SyncEntry;
+      const claimed = claimTopUp(cfg, held, n, args.now, { core: fresh.core, fun: fresh.fun }, args.slot) as SyncEntry;
       const withClaim = pre.map((e) => (e.date === entry.date && e.locked ? claimed : e));
       if (JSON.stringify(withClaim).length > MAX_BYTES) return { action: "error", error: "merged ledger too large" };
       await redis(["SET", keys.ledger, JSON.stringify({ ledger: withClaim, at: args.now } satisfies LockStored)]);
@@ -566,8 +569,8 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
        attempt against the cap. `decideTopUp` honours it only while the claim is still HELD (an
        unfilled row at that ordinal): if a racing writer completed or replaced it, this poke is no
        longer in flight, takes a fresh ordinal and mints fresh ids from it (2026-09-06, CRITIC 6). */
-    const again = decideTopUp(cfg, live, args.now, { claim: n });
-    if (!again.fire) return { action: "skipped", reason: again.reason, raced: true };
+    const again = decideTopUp(cfg, live, args.now, { claim: n, slot: args.slot });
+    if (!again.fire) return { action: "skipped", reason: again.reason, raced: true, slot: args.slot };
     const plan = planTopUp(cfg, slate, live, { now: args.now, bankroll: args.bankroll, room: again.room, slots: again.slots, n: again.n });
     /* BOTH BUCKETS, as above (2026-09-06, DEFECT M(b)): a plan carrying only the day's first fun
        parlay is a plan worth writing. The money guard inside `applyTopUp` runs over the MERGED

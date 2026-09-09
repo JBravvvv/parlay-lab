@@ -112,11 +112,11 @@ export const NFL_LOCK = {
 export const NFL_SWEEP_DAYS = 4;
 
 /** Top-up bound, mirrored as literals rather than imported so the desks can never share a knob.
- *  INSTRUCTION 48 (2026-09-09): max 2 → 6 per arm — the card only grows; see CFB_TOPUP_MAX. */
-export const NFL_TOPUP = {
-  max: 6,
-  retryMs: 45 * 60_000,
-} as const;
+ *  INSTRUCTION 48 (2026-09-09): max 2 → 6 per arm — the card only grows; see CFB_TOPUP_MAX.
+ *  INSTRUCTION 49 (2026-09-09): retryMs 45 min → 0 — the refill slot calendar (REFILL_SLOTS_PT:
+ *  08:00/09:30/12:00/15:00/16:45 PT, plus Josh's manual Refresh) is the only pacing; see
+ *  CFB_TOPUP_RETRY_MS. */
+export const NFL_TOPUP = { max: 6, retryMs: 0 } as const;
 
 /**
  * The settle pass: at most two dates read per poke (one keyless ESPN scoreboard read each, zero

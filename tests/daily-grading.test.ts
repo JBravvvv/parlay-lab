@@ -4,13 +4,16 @@ import path from "node:path";
 import {
   buildProgress,
   decideGradePass,
+  decideRefillTick,
   GRADE_SLOTS_PT,
+  REFILL_SLOTS_PT,
   GRADE_SLOT_WINDOW_MIN,
   ptMinutesOfDay,
   labelPopulation,
   makeSelectedMatcher,
   PROGRESS_KEY,
 } from "@/lib/server/grading-progress";
+import { TOPUP_MAX } from "@/lib/paper-mode";
 
 /**
  * DAILY FULL-POPULATION GRADING (2026-08-06, operator requirement: 150+/market needs
@@ -123,6 +126,70 @@ describe("decideGradePass — first tick after 08:00/09:30/12:00/15:00/16:45 PAC
   });
 });
 
+/**
+ * INSTRUCTION 49 (2026-09-09, Josh, verbatim: "It shouldn't be refreshing every 15 minutes. It
+ * should be 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it"). The refill
+ * calendar IS the grading calendar — one array object, one window, one clock helper.
+ */
+describe("INSTRUCTION 49 — decideRefillTick shares the grading calendar", () => {
+  const at = (iso: string) => Date.parse(iso);
+  const NOT_A_SLOT = "not a refill slot (automatic refills run on the first tick after 08:00/09:30/12:00/15:00/16:45 PT; Josh's own Refresh runs the same pass any time)";
+  it("REFILL_SLOTS_PT is GRADE_SLOTS_PT — the same array object, not a copy", () => {
+    expect(REFILL_SLOTS_PT).toBe(GRADE_SLOTS_PT);
+    expect(REFILL_SLOTS_PT).toEqual(["08:00", "09:30", "12:00", "15:00", "16:45"]);
+  });
+  it("TOPUP_MAX is the five slots plus one manual Refresh", () => {
+    expect(TOPUP_MAX).toBe(REFILL_SLOTS_PT.length + 1);
+  });
+  it("fires on the same clocks decideGradePass fires on, naming the slot", () => {
+    const cases: [string, string][] = [
+      ["2026-09-08T15:00:30Z", "08:00"],
+      ["2026-09-08T15:14:59Z", "08:00"],
+      ["2026-09-08T16:30:00Z", "09:30"],
+      ["2026-09-08T16:44:00Z", "09:30"],
+      ["2026-09-08T19:00:01Z", "12:00"],
+      ["2026-09-08T22:05:00Z", "15:00"],
+      ["2026-09-08T23:45:00Z", "16:45"],
+      ["2026-09-08T23:59:59Z", "16:45"],
+      ["2026-12-08T16:00:00Z", "08:00"], // PST
+      ["2026-12-09T00:45:00Z", "16:45"], // PST
+      ["2026-12-09T00:59:00Z", "16:45"],
+    ];
+    for (const [iso, slot] of cases) {
+      const r = decideRefillTick(at(iso));
+      expect(r.fire, iso).toBe(true);
+      expect(r.slot, iso).toBe(slot);
+      expect(r.reason).toBe(`refill slot ${slot} PT — the scheduler re-prices and appends on the first tick after each of 08:00/09:30/12:00/15:00/16:45 PT`);
+      expect(decideGradePass(at(iso)).fire).toBe(true);
+    }
+  });
+  it("does not fire on the clocks decideGradePass refuses — and says so in the exact words", () => {
+    for (const iso of [
+      "2026-09-08T15:15:00Z",
+      "2026-09-08T16:45:00Z",
+      "2026-09-08T18:27:00Z",
+      "2026-09-08T18:00:00Z",
+      "2026-09-08T20:45:00Z",
+      "2026-09-09T00:00:00Z",
+      "2026-09-09T02:01:00Z",
+      "2026-09-08T06:00:30Z",
+      "2026-09-08T14:59:59Z",
+      "2026-12-08T15:00:00Z",
+      "2026-12-09T01:00:00Z",
+      "2026-09-05T21:45:00Z", // vercel.json cron 21:45Z — never a refill
+      "2026-09-06T00:00:00Z", // vercel.json cron 00:00Z — never a refill
+      "2026-12-05T21:45:00Z", // ...under PST too
+      "2026-12-06T00:00:00Z",
+    ]) {
+      const r = decideRefillTick(at(iso));
+      expect(r.fire, iso).toBe(false);
+      expect(r.slot, iso).toBeNull();
+      expect(r.reason).toBe(NOT_A_SLOT);
+      expect(decideGradePass(at(iso)).fire, iso).toBe(false);
+    }
+  });
+});
+
 describe("buildProgress — per-market n, hit vs implied, days to 150, labels never pooled", () => {
   const g = (market: string, res: "won" | "lost", pMkt: number | null, pop?: string) =>
     ({ market, res, p: 55, pMkt, edge: null, lu: "confirmed" as const, ...(pop ? { pop } : {}) }) as never;
@@ -180,6 +247,7 @@ describe("wired — source scans, comment-stripped", () => {
   it("scheduler forwards grading ticks; board serves the learning block beside the card", () => {
     const sched = read("app/api/scheduler/route.ts");
     expect(sched).toMatch(/decideGradePass\(/);
+    expect(sched).toMatch(/decideRefillTick\(/);
     expect(sched).toMatch(/grade=only/);
     const board = read("app/api/board/route.ts");
     expect(board).toMatch(/learning/);

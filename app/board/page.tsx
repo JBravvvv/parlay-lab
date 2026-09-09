@@ -14,6 +14,8 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { getSyncKey } from "@/lib/ledgerSync";
+import { refillReason, useRefillDesk } from "@/lib/refill-client";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
@@ -80,6 +82,7 @@ export default function BoardPage() {
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
   const regen = useRegenerateBoard();
+  const refill = useRefillDesk();
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
   const [scope, setScope] = useState<Scope>("top");
@@ -576,12 +579,36 @@ export default function BoardPage() {
         }
         action={
           sport === "mlb" ? (
-            <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending || isPending}>
+            /* INSTRUCTION 49: with a board up and the sync phrase stored, Refresh runs the server's
+               refill pass (the same one the five slots run); otherwise the pre-49 browser generate */
+            <Pill
+              variant="primary"
+              onClick={() =>
+                d && getSyncKey()
+                  ? refill.mutate("mlb", {
+                      /* refused free for a reason a browser re-price CAN act on (no server lock yet
+                         this morning, or every game started) → fall back to the pre-49 generate so
+                         the pill still re-prices the visible board (fix round, 2026-09-09) */
+                      onSuccess: (r) => {
+                        const reason = String((r.body.topup as { reason?: unknown } | undefined)?.reason ?? "");
+                        if (r.body.fired === false && /no paper lock|every game started/.test(reason)) regen.mutate();
+                      },
+                    })
+                  : regen.mutate()
+              }
+              disabled={regen.isPending || refill.isPending || isPending}
+            >
               {regen.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
             </Pill>
           ) : undefined
         }
       />
+
+      {sport === "mlb" && ((refill.data && refillReason(refill.data.body)) || refill.error) && (
+        <p className="mb-3 text-xs text-muted" data-testid="mlb-refill-note">
+          {refill.error ? `refill failed: ${refill.error.message}` : refillReason(refill.data!.body)}
+        </p>
+      )}
 
       {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-4 flex items-center gap-2">

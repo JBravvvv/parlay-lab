@@ -24,3 +24,11 @@ export function useRegenerateBoard() {
     onSuccess: (b) => qc.setQueryData(["board"], b),
   });
 }
+
+/**
+ * INSTRUCTION 49: the manual refill mutation lives in src/lib/refill-client.ts (the Board page
+ * imports it from there — tests/board-overview-toggle.test.ts mocks THIS module with only
+ * useBoard / useRegenerateBoard, so the hook must not be one of this module's own exports the
+ * page depends on). Re-exported here for callers that read the desk's hooks off one module.
+ */
+export { useRefillDesk } from "@/lib/refill-client";

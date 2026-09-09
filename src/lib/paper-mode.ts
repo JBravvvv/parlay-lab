@@ -56,19 +56,27 @@ export const PAPER_TICKETS = { min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max } 
  * at this time which is completely fine. Throughout the rest of the day refresh, if it
  * analyzes more picks/parlays that meet the betting criteria, it can continue to add to the
  * card up to the daily allotted amount. It can lock multiple times per day, but it can never
- * remove a pick it can only add to it"). 2 → 4 (2026-09-09). Each sweep is a full generate
- * (114-150 credits measured, app/api/generate/route.ts:46); 4 bounds the day's sweep spend
- * at 600 and lifts the hard ceiling to MAX_RUNS_PER_DATE + TOPUP_MAX = 8 runs. The 45-min
- * limiter (generate/route.ts K_LASTGEN) and the two FREE refusals in decideTopUp
- * (src/lib/server/blocks.ts) — the empty-sweep cooldown TOPUP_EMPTY_RETRY_MS and slot-fit
- * (a sweep that cannot own an open slot of the day's shape is refused before it spends) —
- * are what make four attempts worth having. Every fire carries the day's locked tickets
- * verbatim and src/lib/append-only.ts throws before any write that would drop or resize one.
+ * remove a pick it can only add to it"). 2 → 4 (2026-09-09).
+ *
+ * INSTRUCTION 49 (2026-09-09, Josh's word, verbatim: "It shouldn't be refreshing every 15
+ * minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it
+ * and it can function the same way whether I manually refresh it or it refreshes itself
+ * automatically"). 4 → 6: six = the five refill slots (08:00/09:30/12:00/15:00/16:45 PT,
+ * REFILL_SLOTS_PT in src/lib/server/grading-progress.ts) plus one manual Refresh after a full
+ * slot day. Each sweep is a full generate (114-150 credits measured,
+ * app/api/generate/route.ts:47); hard ceiling MAX_RUNS_PER_DATE + TOPUP_MAX = 10 runs per date.
+ * The slot calendar (decideRefillTick) and the same-slot refusal in decideTopUp
+ * (src/lib/server/blocks.ts) are the pacing; slot-fit still refuses free a sweep that cannot
+ * own an open slot of the day's shape. Every fire carries the day's locked tickets verbatim
+ * and src/lib/append-only.ts throws before any write that would drop or resize one.
  */
-export const TOPUP_MAX = 4;
-/** TOPUP_EMPTY_RETRY_MS = 90 min = twice the limiter = six pokes: a sweep that priced a board
-    and seated nothing holds the next sweep off; a sweep that seated anything does not (the
-    board is moving) — the MLB twin of CFB_TOPUP_RETRY_MS, src/lib/cfb/rules.ts. */
+export const TOPUP_MAX = 6;
+/** TOPUP_EMPTY_RETRY_MS = 90 min: retained for the pure decideTopUp helper
+    (tests/paper-deficit.test.ts cooldown suite, passed as `emptyRetryMs`); NOT wired since
+    INSTRUCTION 49 — the slot calendar is the only pacing (08:00 → 09:30 is 90 min, so a
+    cooldown of ≥ 90 min would have swallowed the 09:30 slot after an empty 08:00 sweep whenever
+    the 09:30 tick landed earlier in its window than the 08:00 tick did). The scheduler no
+    longer passes it. */
 export const TOPUP_EMPTY_RETRY_MS = 90 * 60_000;
 
 /**

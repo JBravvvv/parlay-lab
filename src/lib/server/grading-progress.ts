@@ -110,17 +110,68 @@ const slotMinutes = (slot: string) => {
   return h * 60 + m;
 };
 
+/** INSTRUCTION 49 (2026-09-09, Josh's word, verbatim: "It shouldn't be refreshing every 15
+    minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm"): the five grading slots are ALSO the
+    refill slots — one calendar, the same array object, so the two can never drift apart. */
+export const REFILL_SLOTS_PT = GRADE_SLOTS_PT;
+export type RefillSlot = (typeof REFILL_SLOTS_PT)[number] | "manual";
+/** first tick inside [slot, slot + windowMin) for any slot — the one calendar grading and refills share */
+export function decideSlotTick(
+  nowMs: number,
+  slots: readonly string[] = GRADE_SLOTS_PT,
+  windowMin = GRADE_SLOT_WINDOW_MIN,
+): { fire: boolean; slot: string | null } {
+  const m = ptMinutesOfDay(nowMs);
+  const slot =
+    slots.find((s) => {
+      const sm = slotMinutes(s);
+      return m >= sm && m < sm + windowMin;
+    }) ?? null;
+  return { fire: slot !== null, slot };
+}
+/** How many named refill slots are still AHEAD of this instant today (Pacific) — the headroom a
+    manual refill must leave: a manual attempt is refused free when it would spend an attempt one of
+    the remaining automatic slots still needs (INSTRUCTION 49 fix round, 2026-09-09). After the 16:45
+    slot this is 0 and a manual click is always honoured up to the cap. */
+export function slotsAheadPT(nowMs: number, slots: readonly string[] = REFILL_SLOTS_PT): string[] {
+  const m = ptMinutesOfDay(nowMs);
+  return slots.filter((s) => slotMinutes(s) > m);
+}
+/** the headroom count itself: slots ahead that no recorded attempt is already stamped with (a
+    stamped slot has run and needs no reserve; in production a slot ahead in time is never stamped,
+    so this equals slotsAheadPT(now).length — the subtraction only matters to a replayed day) */
+export function unstampedSlotsAhead(nowMs: number, stamped: Iterable<string | undefined>): number {
+  const seen = new Set<string>();
+  for (const s of stamped) if (s) seen.add(s);
+  return slotsAheadPT(nowMs).filter((s) => !seen.has(s)).length;
+}
+/** the exact refusal string both deciders print for that case (blocks.ts and cfb/lock-server.ts) */
+export const manualHeadroomRefusal = (left: number, ahead: number) =>
+  `manual refill would spend a slot's attempt — ${left} attempt${left === 1 ? "" : "s"} left, ${ahead} automatic slot${ahead === 1 ? "" : "s"} still ahead today`;
+/** The scheduler's REFILL cadence (INSTRUCTION 49) — pure. Fires on the first tick inside
+    [slot, slot+15min) after each REFILL_SLOTS_PT time, Pacific; Josh's own Refresh runs the
+    same server pass with slot "manual" and is never gated by this. */
+export function decideRefillTick(nowMs: number): { fire: boolean; slot: string | null; reason: string } {
+  const t = decideSlotTick(nowMs, REFILL_SLOTS_PT);
+  return t.fire
+    ? {
+        fire: true,
+        slot: t.slot,
+        reason: `refill slot ${t.slot} PT — the scheduler re-prices and appends on the first tick after each of ${REFILL_SLOTS_PT.join("/")} PT`,
+      }
+    : {
+        fire: false,
+        slot: null,
+        reason: `not a refill slot (automatic refills run on the first tick after ${REFILL_SLOTS_PT.join("/")} PT; Josh's own Refresh runs the same pass any time)`,
+      };
+}
+
 /** The scheduler's grading cadence — pure, so the guard exercises it without a server.
     Fires on the first tick (within GRADE_SLOT_WINDOW_MIN minutes) after each GRADE_SLOTS_PT
-    time, Pacific. */
+    time, Pacific. A wrapper over decideSlotTick since INSTRUCTION 49; the strings are unchanged. */
 export function decideGradePass(nowMs: number): { fire: boolean; reason: string } {
-  const mod = ptMinutesOfDay(nowMs);
-  for (const slot of GRADE_SLOTS_PT) {
-    const sm = slotMinutes(slot);
-    if (mod >= sm && mod < sm + GRADE_SLOT_WINDOW_MIN) {
-      return { fire: true, reason: `first tick of grading slot ${slot} PT` };
-    }
-  }
+  const t = decideSlotTick(nowMs, GRADE_SLOTS_PT, GRADE_SLOT_WINDOW_MIN);
+  if (t.fire) return { fire: true, reason: `first tick of grading slot ${t.slot} PT` };
   return { fire: false, reason: `not a grading tick (grading runs on the first tick after ${GRADE_SLOTS_PT.join("/")} PT)` };
 }
 

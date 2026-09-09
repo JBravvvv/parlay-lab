@@ -200,12 +200,12 @@ describe("fix round — the routes that could shrink a locked day now guard it (
     expect(set).toBeGreaterThan(assert);
     expect(src).not.toMatch(/mergeLedgers\(stored\?\.ledger/);
   });
-  it("app/api/generate/route.ts records a top-up whose lock THREW as an empty fire (counts against TOPUP_MAX, arms the cooldown)", () => {
+  it("app/api/generate/route.ts records a top-up whose lock THREW as an empty fire (counts against TOPUP_MAX) and carries the refill slot (INSTRUCTION 49)", () => {
     const src = read("app/api/generate/route.ts");
     const c = src.indexOf("LOCK FAILED — the self-check will backfill");
     const tail = src.slice(c, c + 1500);
     expect(tail).toContain("if (topupKey) {");
-    expect(tail).toContain("reg[topupKey] = { firedAt: now, tickets: 0, reason: `lock failed: ${(e as Error).message}`, at: now };");
+    expect(tail).toContain("reg[topupKey] = { firedAt: now, tickets: 0, reason: `lock failed: ${(e as Error).message}`, at: now, ...(slot ? { slot } : {}) };");
     expect(tail).toContain("await redisSetJson(BLOCKS_KEY(dateNow), reg);");
   });
   it("app/api/scheduler/route.ts writes orphan rows additively — re-read then overlay, never a whole-object write-back", () => {

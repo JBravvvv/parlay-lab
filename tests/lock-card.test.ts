@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
 import { validateLedger, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { buildLockEntry, needsLockAction, writeLock, LEDGER_STORE_KEY } from "@/lib/server/lock-card";
-import { CORE_RULES, PAPER, slotMaxDec } from "@/lib/paper-mode";
+import { CORE_RULES, PAPER, TOPUP_MAX, slotMaxDec } from "@/lib/paper-mode";
+import { decideTopUp } from "@/lib/server/blocks";
 import { SHAPE_TICKETS, shapeById, type ShapeCalibration } from "@/lib/core-shapes";
 import { readFileSync } from "node:fs";
 import { stripComments } from "./helpers/source";
@@ -469,6 +470,23 @@ describe("INSTRUCTION 46 — slot filling on a mock pool (2026-09-08)", () => {
       expect(entry.allocSum).toBe(45 + 70);
       expect((entry as { slotUnderSum?: number }).slotUnderSum).toBe(35);
       expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
+    });
+
+    it("INSTRUCTION 49: a SIXTH top-up (blockKey topup-6) appends the same way; a seventh is refused by the cap before any lock is built", () => {
+      const entry = lock({ dailyOverride: 70, blockKey: "topup-6", carry: carry3 as never });
+      const core = entry.core as Tix[];
+      expect(core.slice(0, 3)).toEqual(carry3.core);
+      expect(entry.lockedAt).toBe(carry3.lockedAt);
+      expect(entry.blocks?.["topup-6"]).toMatchObject({ budget: 70, tickets: 2, slots: [1, 4] });
+      expect(entry.allocSum).toBe(45 + 70);
+      expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
+      /* the seventh: six topup-* rows in the registry is TOPUP_MAX — decideTopUp refuses free */
+      expect(TOPUP_MAX).toBe(6);
+      const registry = Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`topup-${i + 1}`, { firedAt: 1 + i, at: 1 + i, tickets: 1 }]));
+      const seventh = decideTopUp({ entry: { paper: true, allocSum: 45 }, blocks: [], registry, starts: [Date.now() + 3_600_000], now: Date.now(), daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+      expect(seventh.fire).toBe(false);
+      expect(seventh.used).toBe(6);
+      expect(seventh.reason).toBe("top-up cap spent (6/6)");
     });
 
     it("a rogue allocator that hands back a CARRIED id at a different stake is a THROW naming the site — never a quiet replace", () => {

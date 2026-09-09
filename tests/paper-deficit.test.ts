@@ -126,10 +126,85 @@ describe("decideTopUp — the sweep that makes 'no matter what' true while games
  * credits) to deploy $0. The refusal ORDER above (no lock → fully deployed → pending block →
  * every game started → cap) is unchanged and re-asserted at the end.
  */
-describe("INSTRUCTION 48 — the constants", () => {
-  it("TOPUP_MAX is 4 and TOPUP_EMPTY_RETRY_MS is 90 minutes (twice generate's 45-min limiter)", () => {
-    expect(TOPUP_MAX).toBe(4);
+describe("INSTRUCTION 48/49 — the constants", () => {
+  it("TOPUP_MAX is 6 (INSTRUCTION 49: five refill slots + one manual) and TOPUP_EMPTY_RETRY_MS keeps its 90-minute value for the pure helper", () => {
+    expect(TOPUP_MAX).toBe(6);
     expect(TOPUP_EMPTY_RETRY_MS).toBe(90 * 60_000);
+  });
+});
+
+/**
+ * INSTRUCTION 49 (2026-09-09, Josh: "It shouldn't be refreshing every 15 minutes. It should be
+ * 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it"). The slot a top-up ran
+ * on is RECORDED on its registry row, and a second automatic sweep inside the same slot is
+ * refused free. A manual sweep never trips the same-slot gate.
+ */
+describe("INSTRUCTION 49 — SAME-SLOT refusal (free, from the registry row's own `slot`)", () => {
+  const now = T("2026-08-19T23:11:00Z");
+  const starts = BLOCKS.flatMap((b) => b.starts);
+  const entry = { paper: true, allocSum: 49 };
+  const reg: BlockRegistry = {
+    A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 },
+    "topup-1": { firedAt: now - 5 * 60_000, at: now - 5 * 60_000, tickets: 1, slot: "12:00" } as BlockRegistry[string],
+  };
+  it("slot 12:00 with a topup-1 row already stamped 12:00 → refused, /already ran today/", () => {
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "12:00" });
+    expect(d.fire).toBe(false);
+    expect(d.reason).toMatch(/already ran today/);
+    expect(d.reason).toBe("refill slot 12:00 PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time");
+  });
+  it("slot 15:00 against the same row → not refused for that reason (fires)", () => {
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "15:00" });
+    expect(d.reason).not.toMatch(/already ran today/);
+    expect(d.fire).toBe(true);
+  });
+  it("slot manual against the same row → never the same-slot refusal (Josh's click is honoured)", () => {
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    expect(d.reason).not.toMatch(/already ran today/);
+    expect(d.fire).toBe(true);
+  });
+});
+
+/**
+ * FIX ROUND (2026-09-09): the five slots and Josh's clicks draw from ONE pool of TOPUP_MAX attempts,
+ * so a manual sweep is refused free when it would spend an attempt an automatic slot still ahead
+ * today needs (used + unstamped slots ahead >= max). Named slots are never held this way.
+ */
+describe("INSTRUCTION 49 fix round — MANUAL HEADROOM (free): a click never spends a slot's attempt", () => {
+  const starts = BLOCKS.flatMap((b) => b.starts);
+  const entry = { paper: true, allocSum: 49 };
+  const fired: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 } };
+  const withTopups = (n: number, slots: (string | undefined)[] = []): BlockRegistry => {
+    const r: BlockRegistry = { ...fired };
+    for (let i = 1; i <= n; i++) r[`topup-${i}`] = { firedAt: 10 + i, at: 10 + i, tickets: 1, ...(slots[i - 1] ? { slot: slots[i - 1] } : {}) } as BlockRegistry[string];
+    return r;
+  };
+  const morning = T("2026-08-19T16:00:00Z"); // 09:00 PT — four slots still ahead (09:30/12:00/15:00/16:45)
+  const late = T("2026-08-19T23:11:00Z"); // 16:11 PT — one slot ahead (16:45)
+  it("09:00 PT, one attempt used: 1 + 4 < 6 → the click fires", () => {
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(1), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+  });
+  it("09:00 PT, two used: 2 + 4 >= 6 → refused with the exact headroom string, free", () => {
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    expect(d.fire).toBe(false);
+    expect(d.reason).toBe("manual refill would spend a slot's attempt — 4 attempts left, 4 automatic slots still ahead today");
+    expect(d.used).toBe(2);
+  });
+  it("a slot ahead that a row already stamps needs no reserve (a replayed day): rows 08:00 + 09:30 at 09:00 PT → 2 + 3 < 6 fires", () => {
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2, ["08:00", "09:30"]), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+  });
+  it("16:11 PT: five used + the 16:45 slot ahead → refused; four used → fires; a NAMED slot is never held for headroom", () => {
+    const held = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    expect(held.fire).toBe(false);
+    expect(held.reason).toBe("manual refill would spend a slot's attempt — 1 attempt left, 1 automatic slot still ahead today");
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(4), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "16:45" }).fire).toBe(true);
+    // no slot at all (an off-slot ticker poke printing the day's reason) is never held either
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+  });
+  it("the cap still answers first: six used → /cap/, not the headroom string", () => {
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(6), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    expect(d.reason).toBe("top-up cap spent (6/6)");
   });
 });
 
@@ -391,11 +466,27 @@ describe("buildLockEntry — the block owns its slot; the slot top-up carries th
 describe("wired — the sweep and the yield are in the routes (source scans, comment-stripped)", () => {
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   const read = (p: string) => strip(fs.readFileSync(path.join(process.cwd(), p), "utf8"));
-  it("scheduler: decideTopUp printed every no-fire poke, ?topup=1 forwarded on fire", () => {
-    const src = read("app/api/scheduler/route.ts");
+  it("refill helper: decideTopUp is called from src/lib/server/refill.ts and the forward carries ?topup=1&slot= (INSTRUCTION 49)", () => {
+    const src = read("src/lib/server/refill.ts");
     expect(src).toMatch(/decideTopUp\(/);
-    expect(src).toMatch(/generate\?topup=1/);
+    expect(src).toMatch(/generate\?topup=1&slot=/);
+    expect(src).not.toMatch(/emptyRetryMs/);
+  });
+  it("scheduler: decideMlbRefill printed every no-fire poke; the cooldown is unwired and decideTopUp is no longer called there", () => {
+    const src = read("app/api/scheduler/route.ts");
+    expect(src).toMatch(/decideMlbRefill\(/);
+    expect(src).not.toMatch(/decideTopUp\(/);
+    expect(src).not.toMatch(/emptyRetryMs/);
     expect(src).toMatch(/topup/);
+  });
+  it("generate (fix round 2026-09-09): topup is CRON-PATH ONLY, the vercel-cron user-agent fallback is gone, and the topup-N row is claimed in flight BEFORE collectSlate", () => {
+    const src = read("app/api/generate/route.ts");
+    expect(src, "the keyless user-agent fallback is back — a forged header could burn the top-up headroom").not.toMatch(/vercel-cron/);
+    expect(src).toMatch(/const topup = !blockKey && scheduled && req\.nextUrl\.searchParams\.get\("topup"\) === "1";/);
+    expect(src).toMatch(/if \(!force && !topup && now - lastRun < 45 \* 60_000\)/);
+    expect(src).toMatch(/reason: "in flight"/);
+    expect(src).toMatch(/skipped: "topup-claimed"/);
+    expect(src.indexOf('reason: "in flight"'), "the in-flight claim must be written before the run-cap INCR and collectSlate").toBeLessThan(src.indexOf('["INCR", runsKey]'));
   });
   it("generate: topup param honored, registry-capped, run-cap headroom exactly TOPUP_MAX, carry loaded on every fire", () => {
     const src = read("app/api/generate/route.ts");

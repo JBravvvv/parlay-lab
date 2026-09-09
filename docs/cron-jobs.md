@@ -46,7 +46,7 @@
 
 
 **Josh types the secret. It is never entered on his behalf, never logged, never placed in a
-query string.** `/api/generate` spends 114-150 Odds credits per call (a block fire is a full-slate run; up to 4 top-up sweeps a day ≥45 min apart, an empty sweep holds the next off 90 min — INSTRUCTION 48, 2026-09-09), so the secret travels in a
+query string.** `/api/generate` spends 114-150 Odds credits per call (a block fire is a full-slate run; up to `TOPUP_MAX` 6 top-up refills a date, fired only on the five PT refill slots 08:00/09:30/12:00/15:00/16:45 or Josh's own Refresh — INSTRUCTION 49, 2026-09-09; the 45-min/90-min cooldowns of INSTRUCTION 48 are unwired), so the secret travels in a
 **header** only.
 
 `/api/generate` came out of `vercel.json` in the same change that created these — with the
@@ -753,13 +753,22 @@ four hours out. It now decides from the slate exactly as `_snapshot_kind` does �
 close is worse than a missing one**, because it attenuates the slope from inside the bucket that
 is supposed to be clean.
 
-## ✅ GRADING PASSES — FIVE PACIFIC SLOTS, NO cron-job.org CHANGE NEEDED (INSTRUCTION 46b, 2026-09-08)
+## ✅ GRADING AND REFILL SLOTS — FIVE PACIFIC SLOTS, NO cron-job.org CHANGE NEEDED (INSTRUCTION 46b, 2026-09-08; refills added by INSTRUCTION 49, 2026-09-09)
 
 Josh, verbatim: **"Widen the cron-job.org window to run grading @ 8am, 9:30am, 12pm, 3pm &
 4:45pm."** The passes are now **Pacific wall-clock slots** — `GRADE_SLOTS_PT =
 ["08:00","09:30","12:00","15:00","16:45"]` in `src/lib/server/grading-progress.ts` — each firing
 on the **first scheduler tick inside the 15 minutes after the slot** (`decideGradePass`,
 America/Los_Angeles via Intl, so the same five times hold through the PDT→PST flip).
+
+**The same five slots are the REFILL slots (INSTRUCTION 49, Josh verbatim: "It shouldn't be refreshing
+every 15 minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it").** `REFILL_SLOTS_PT` is the same array object as `GRADE_SLOTS_PT`; `decideRefillTick` fires on the
+first tick inside [slot, slot + 15 min). On that tick the MLB scheduler forwards
+`/api/generate?topup=1&slot=<slot>` and the football lock routes run `topUpDate` — every other
+tick top-ups nothing and touches no feed. Josh's own Refresh (`POST /api/refill?desk=…` behind the
+sync phrase) runs the identical pass with slot `manual` at any time. A slot that already ran today
+is refused free (the slot is recorded on the top-up row). Refill and grading forwards run
+together (`Promise.allSettled`) so a refill never starves the grading pass.
 
 **Nothing to change on cron-job.org.** The scheduler row already pokes every 15 min during UTC
 hours 15–23 and 0–2, and every slot lands inside that window under both offsets:
@@ -775,40 +784,34 @@ hours 15–23 and 0–2, and every slot lands inside that window under both offs
 Pinned in `tests/daily-grading.test.ts` (the five slots verbatim, the 15-minute window, PDT and
 PST firing, every slot inside the poke window at both offsets, the between-slot negatives). The
 19:00 PT (02:00Z) night pass from INSTRUCTION 46 is gone — 16:45 PT is now the last pass, and the
-08:00 pass the next morning finishes the evening block. Zero Odds credits, as before.
+08:00 pass the next morning finishes the evening block. Zero Odds credits for grading, as before;
+a refill that fires spends 114–150 (MLB full-slate generate) or 6 (football lines pull), and the
+**last automatic refill of a date is the 16:45 PT slot** (23:45Z PDT, 00:45Z PST — under PST that
+is itself a 0–2 UTC poke); every later poke still locks and grades but never tops up. The two
+`vercel.json` crons (21:45Z and 00:00Z = 14:45 / 17:00 PDT, 13:45 / 16:00 PST) fall outside every
+15-minute window in both DST regimes, so they never refill either.
 
-## ✅ GRADING PASSES RIDE THE SCHEDULER TICKER — FOUR PASSES, ALL INSIDE THE POKE WINDOW (2026-09-08)
+## ✅ GRADING AND REFILL SLOTS RIDE THE SCHEDULER TICKER — NO SEPARATE CRON (2026-09-08, restated 2026-09-09)
 
-There is **no separate grading cron**. The grade-only pass (`/api/calibrate?grade=only` —
-statsapi + Redis, zero Odds credits) is forwarded by `/api/scheduler` on the **first tick
-(minute :00–:14) of each `GRADE_HOURS` hour** (`src/lib/server/grading-progress.ts`,
-`decideGradePass`). So a grading hour can only fire if the **scheduler** row above actually
-pokes during it — and that row runs **every 15 min, UTC hours 15–23 and 0–2 only**.
+There is **no separate grading cron and no separate refill cron**. The grade-only pass
+(`/api/calibrate?grade=only` — statsapi + Redis, zero Odds credits) and the refill pass are both
+forwarded by `/api/scheduler` on the first tick inside a slot window (`decideGradePass` /
+`decideRefillTick`, `src/lib/server/grading-progress.ts`). So a slot can only fire if the
+**scheduler** row above actually pokes during it — and that row runs **every 15 min, UTC hours
+15–23 and 0–2 only**. History: INSTRUCTION 46 first tried UTC `GRADE_HOURS` (a "every 4 hours"
+cut put three passes outside the poke window and never ticked); INSTRUCTION 46b replaced the
+UTC hours with the five Pacific slots above, and INSTRUCTION 49 made those same slots the refill
+calendar. `GRADE_HOURS` no longer exists — do not re-add it.
 
-INSTRUCTION 46 (Josh, verbatim: "Core Money should be calibrating itself more often") asked for
-more passes. A first cut set "every 4 hours" (2/6/10/14/18/22 UTC); **6, 10 and 14 sit outside
-the poke window and would never have ticked, and the 15 UTC morning pass would have been lost.**
-Corrected the same day to the four hours the ticker can reach:
+The same row is the MLB top-up ticker (INSTRUCTION 49, 2026-09-09): up to `TOPUP_MAX` 6 refills a
+date (five slots + one manual), fired only on the first tick after 08:00 / 09:30 / 12:00 / 15:00 /
+16:45 PT — **the last automatic refill of a date is the 16:45 PT slot** (23:45Z PDT, 00:45Z PST —
+under PST that is itself a 0–2 UTC poke); every later poke still locks and grades but never tops up. **Nothing to change on cron-job.org.**
 
-| pass (UTC) | PT | what it sees |
-|---|---|---|
-| **15:00** | 08:00 | the whole previous slate, final — the pass the shape picker relies on for a fresh day |
-| **18:00** | 11:00 | matinees in progress; yesterday re-checked |
-| **22:00** | 15:00 | matinees final |
-| **02:00** | 19:00 | the evening block, partial (the 15:00 pass the next morning finishes it) |
-
-Pinned in `tests/daily-grading.test.ts`: `GRADE_HOURS === [15, 18, 22, 2]`, every entry inside the
-window, 6/10/14 as negatives. The calibrate route's own 10-minute limiter keeps a double tick
-from grading twice.
-
-The same row is the MLB top-up ticker (INSTRUCTION 48, 2026-09-09): up to `TOPUP_MAX` 4 sweeps a
-date, ≥45 min apart, an empty sweep holding the next off 90 min — and **the last MLB sweep chance
-of a date is the 02:45Z poke**, the final tick of the 0–2 hour band. No cron-job.org change.
-
-**Widening this is Josh's call on cron-job.org, not a code change.** Extending the scheduler row
-to more hours (e.g. 24×7, ~96 executions/day against the 100/day free tier that `/api/clv`
-already uses 48–96 of) is what would make hours like 6/10/14 reachable; until then, adding them to
-`GRADE_HOURS` only adds dead entries. If the row is widened, re-pin `GRADE_HOURS` and the test.
+**Widening the poke hours is Josh's call on cron-job.org, not a code change.** Extending the
+scheduler row to more hours (e.g. 24×7, ~96 executions/day against the 100/day free tier that
+`/api/clv` already uses 48–96 of) only matters for London-kickoff football locks; every refill
+slot is already inside the current window under both DST offsets.
 
 ## ✅ THE SCHEDULER NOW FORWARDS TO TWO FOOTBALL LOCK ROUTES — NFL (2026-09-08)
 

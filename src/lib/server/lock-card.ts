@@ -289,7 +289,7 @@ export function buildLockEntry(args: {
      client copy) is seated BY MONEY — best fit, the smallest free slot whose stake is at
      least the ticket's stake (fix round 2026-09-08: seating in shape order regardless of
      stake parked a $10 legacy ticket in a $60 slot, the fire could then never seat the
-     other $50, and decideTopUp kept buying top-ups — ~120 Odds credits each, TOPUP_MAX 2 —
+     other $50, and decideTopUp kept buying top-ups — ~120 Odds credits each, TOPUP_MAX 6 (INSTRUCTION 49) —
      that could not change the answer). A legacy ticket bigger than every free slot is
      STRANDED: it holds no slot, its money still counts against the day (the OVER THE DAY
      guard below sums every carried ticket), and the slots its money displaces are named

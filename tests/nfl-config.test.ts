@@ -76,8 +76,8 @@ describe("CFB — widened to $250 (Josh, 2026-09-08)", () => {
     expect(CFB_LEAGUE.keys).toEqual({ ledger: "pl_cfb_ledger", bank: "pl_cfb_bank2" });
   });
 
-  it("INSTRUCTION 48 (2026-09-09): CFB_LEAGUE.topUp is 6 attempts per arm, 45-min empty-attempt cooldown — the card only grows", () => {
-    expect(CFB_LEAGUE.topUp).toEqual({ max: 6, retryMs: 45 * 60_000 });
+  it("INSTRUCTION 49 (2026-09-09): CFB_LEAGUE.topUp is 6 attempts per arm with NO cooldown — the refill slot calendar is the only pacing", () => {
+    expect(CFB_LEAGUE.topUp).toEqual({ max: 6, retryMs: 0 });
   });
 });
 
@@ -114,8 +114,8 @@ describe("NFL — $350 core / $25 fun, its own keys, its own feeds", () => {
     expect(NFL_LEAGUE.lock).toBe(NFL_LOCK);
   });
 
-  it("INSTRUCTION 48 (2026-09-09): NFL_TOPUP is { max: 6, retryMs: 45 min } — a literal mirror of the CFB knob, wired as the league's topUp", () => {
-    expect(NFL_TOPUP).toEqual({ max: 6, retryMs: 45 * 60_000 });
+  it("INSTRUCTION 49 (2026-09-09): NFL_TOPUP is { max: 6, retryMs: 0 } — a literal mirror of the CFB knob, wired as the league's topUp; the slots pace it", () => {
+    expect(NFL_TOPUP).toEqual({ max: 6, retryMs: 0 });
     expect(NFL_LEAGUE.topUp).toBe(NFL_TOPUP);
     expect(NFL_LEAGUE.topUp).toEqual(CFB_LEAGUE.topUp); // equal by value, never the same object (the file's own no-shared-knob rule)
     expect(NFL_LEAGUE.topUp).not.toBe(CFB_LEAGUE.topUp);

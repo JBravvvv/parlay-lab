@@ -16,9 +16,14 @@ export type CfbForwardResult = { forwarded: true; status: number; result: unknow
 
 type FetchLike = (input: URL, init: RequestInit) => Promise<Response>;
 
-export async function forwardCfbLock(origin: string, secret: string, fetchImpl: FetchLike = (u, i) => fetch(u, i)): Promise<CfbForwardResult> {
+/** `slot` (INSTRUCTION 49 fix round, 2026-09-09): the refill slot the scheduler's tick decided at
+    ITS clock (decideRefillTick), forwarded as ?slot= so the lock route honours the same slot even
+    when this forward lands past slot + 15 min; null/undefined sends no query at all. */
+export async function forwardCfbLock(origin: string, secret: string, fetchImpl: FetchLike = (u, i) => fetch(u, i), slot?: string | null): Promise<CfbForwardResult> {
   try {
-    const r = await fetchImpl(new URL("/api/cfb/lock", origin), {
+    const url = new URL("/api/cfb/lock", origin);
+    if (slot) url.searchParams.set("slot", slot);
+    const r = await fetchImpl(url, {
       headers: { "x-cron-key": secret },
       cache: "no-store",
       signal: AbortSignal.timeout(CFB_LOCK.forwardTimeoutMs),

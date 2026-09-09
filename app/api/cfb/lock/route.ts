@@ -3,6 +3,7 @@ import { MAX_BYTES, mergeLedgers } from "@/lib/ledger-merge";
 import type { BankStore } from "@/lib/bankroll";
 import { cronHeaderAuthed, redis, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
+import { decideRefillTick, REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { CFB_BANK_BASE, CFB_LEAGUE, type CFB_REDIS } from "@/lib/cfb/rules";
 import { cfbBankroll } from "@/lib/cfb/ledger";
 import { buildLockEntry, cfbPricedAhead, decideCfbLock, type CfbMissCause } from "@/lib/cfb/lock-server";
@@ -331,11 +332,32 @@ export async function GET(req: NextRequest) {
 
   const existing = ledger.find((e) => e.date === date && e.locked);
   if (existing) {
+    /* INSTRUCTION 49 (2026-09-09), Josh: "It shouldn't be refreshing every 15 minutes. It should be
+       8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it and it can function the
+       same way whether I manually refresh it or it refreshes itself automatically". The refill runs
+       only on the first tick inside a REFILL_SLOTS_PT window, decided from THIS route's own clock,
+       or on ?manual=1 (POST /api/refill forwards Josh's Refresh here with the cron key, server-side)
+       — the same pass, slot "manual". Any other pulse skips BEFORE any feed is touched: zero ESPN
+       reads, zero Odds credits. Auth stays cron-only; ?date still suppresses sweep/settle. */
+    const manual = q.get("manual") === "1";
+    /* ?slot= (fix round, 2026-09-09): the scheduler decides the slot ONCE at its tick's clock and
+       forwards it, so this route honours the same slot even when the forward lands past
+       slot + 15 min; only a named REFILL_SLOTS_PT value is accepted (cron-authed callers only —
+       this branch is behind cronHeaderAuthed), anything else falls back to this route's own clock. */
+    const askedSlot = q.get("slot");
+    const carried = askedSlot && (REFILL_SLOTS_PT as readonly string[]).includes(askedSlot) ? askedSlot : null;
+    const rt = manual
+      ? { fire: true, slot: "manual", reason: "manual refill — Josh's Refresh runs the same pass the slots run" }
+      : carried
+        ? { fire: true, slot: carried, reason: `refill slot ${carried} PT — the scheduler re-prices and appends on the first tick after each of ${REFILL_SLOTS_PT.join("/")} PT` }
+        : decideRefillTick(now);
     /* A (2026-09-06), THE TOP-UP: the $250 must DEPLOY, not just be intended. See topUpDate. */
     const topUp = isCfb(existing)
-      ? await topUpDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS })
+      ? rt.fire
+        ? await topUpDate(CFB_LEAGUE, KEYS, existing, { now, dry, bankroll, feeds: FEEDS, slot: rt.slot! })
+        : { action: "skipped", reason: rt.reason, credits: 0 }
       : { action: "skipped", reason: `the stored entry for ${date} is not a CFB card — nothing here may touch it.` };
-    return say({ status: "already-locked", date, at, lockedAt: existing.lockedAt ?? null, source: existing.source ?? "device", dry, topUp });
+    return say({ status: "already-locked", date, at, lockedAt: existing.lockedAt ?? null, source: existing.source ?? "device", dry, topUp, refill: { trigger: manual ? "manual" : "slot", slot: rt.slot } });
   }
 
   let espn: unknown[];

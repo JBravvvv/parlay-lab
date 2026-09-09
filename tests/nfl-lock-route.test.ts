@@ -136,10 +136,12 @@ function fakeRedis(seed: Record<string, string> = {}) {
 }
 
 const setNow = (t: number) => vi.setSystemTime(t);
-const req = (opts: { date?: string; dry?: boolean; header?: Record<string, string> } = {}) => {
+const req = (opts: { date?: string; dry?: boolean; manual?: boolean; slot?: string; header?: Record<string, string> } = {}) => {
   const qs = new URLSearchParams();
   if (opts.date) qs.set("date", opts.date);
   if (opts.dry) qs.set("dry", "1");
+  if (opts.manual) qs.set("manual", "1"); // INSTRUCTION 49: Josh's Refresh, forwarded by POST /api/refill
+  if (opts.slot) qs.set("slot", opts.slot); // fix round 2026-09-09: the scheduler's tick carries its slot
   const url = `http://localhost/api/nfl/lock${qs.size ? `?${qs}` : ""}`;
   return new NextRequest(url, { headers: opts.header ?? { "x-cron-key": SECRET } });
 };
@@ -517,6 +519,10 @@ describe("the exported GET, CALLED on the week-1 Sunday fixture", () => {
     expect(body.status).toBe("already-locked");
     expect(body.source).toBe("server-lock");
     expect(body.topUp).toBeDefined();
+    /* INSTRUCTION 49: 16:05Z is 09:05 PT — not a refill slot, so the top-up is skipped FREE, before any feed */
+    expect(body.topUp).toEqual({ action: "skipped", reason: "not a refill slot (automatic refills run on the first tick after 08:00/09:30/12:00/15:00/16:45 PT; Josh's own Refresh runs the same pass any time)", credits: 0 });
+    expect(body.refill).toEqual({ trigger: "slot", slot: null });
+    expect(vi.mocked(slateFromEspnOf).mock.calls.length).toBe(1); // the lock's own pull only
     // the lock path was never re-entered: no second slate pull for a lock
     const led = fr.ledger();
     expect(led.length).toBe(1);
@@ -525,6 +531,69 @@ describe("the exported GET, CALLED on the week-1 Sunday fixture", () => {
     expect(JSON.stringify(led[0].core.slice(0, JSON.parse(first).length).map((t) => t.id))).toBe(first);
     expect(stakes(led[0])).toBeLessThanOrEqual(350);
     expect(led[0].core.length).toBeLessThanOrEqual(10);
+  });
+
+  /* INSTRUCTION 49 (2026-09-09) — the NFL mirror of the CFB D1 pins. LOCKS_AT is 16:00Z = 09:00 PT
+     (not a slot); 16:31Z is the 09:30 PT slot; `?manual=1` is Josh's click. The captured fixture
+     locks fun-only, so a later top-up on the SWEETENED board has $350 of core to seat. */
+  it("INSTRUCTION 49: the 09:30 PT slot tick (16:31Z) tops the fun-only lock up on the sweetened board — topped-up, refill { slot, 09:30 }", async () => {
+    setNow(LOCKS_AT);
+    const fr = fakeRedis();
+    await call();
+    expect(fr.ledger()[0].core).toHaveLength(0);
+    setNow(LOCKS_AT + 31 * 60_000);
+    vi.mocked(slateFromEspnOf).mockImplementation(async (_cfg, _d, _e, now) => sweetened(slateAt(now), now, GAMES));
+    const { status, body } = await call();
+    expect(status).toBe(200);
+    expect(body.status).toBe("already-locked");
+    expect((body.topUp as Record<string, unknown>).action).toBe("topped-up");
+    expect(body.refill).toEqual({ trigger: "slot", slot: "09:30" });
+    const e = fr.ledger()[0];
+    expect(e.core.length).toBeGreaterThan(0);
+    expect(stakes(e)).toBeLessThanOrEqual(350);
+    expect(e.funT).toHaveLength(1);
+    expect(((e as Record<string, unknown>).topUps as Record<string, unknown>[])[0]).toMatchObject({ n: 1, filled: true, slot: "09:30" });
+    // the same slot again (16:40Z) is refused free — the day's own state answers first (the
+    // sweetened board deploys the full $350), and a fully deployed day never re-prices
+    setNow(LOCKS_AT + 40 * 60_000);
+    const pulls = vi.mocked(slateFromEspnOf).mock.calls.length;
+    const again = await call();
+    expect((again.body.topUp as Record<string, unknown>).action).toBe("skipped");
+    expect(String((again.body.topUp as Record<string, unknown>).reason)).toMatch(/already ran today|fully deployed/);
+    expect(again.body.refill).toEqual({ trigger: "slot", slot: "09:30" });
+    expect(vi.mocked(slateFromEspnOf).mock.calls.length).toBe(pulls);
+  });
+
+  it("INSTRUCTION 49 fix round: the tick-carried ?slot=09:30 at 16:05Z (09:05 PT, not a slot on this route's clock) buys — refill { slot, 09:30 }", async () => {
+    setNow(LOCKS_AT);
+    const fr = fakeRedis();
+    await call();
+    setNow(LOCKS_AT + 5 * 60_000);
+    vi.mocked(slateFromEspnOf).mockImplementation(async (_cfg, _d, _e, now) => sweetened(slateAt(now), now, GAMES));
+    const { status, body } = await call(req({ date: DATE, slot: "09:30" }));
+    expect(status).toBe(200);
+    expect((body.topUp as Record<string, unknown>).action).toBe("topped-up");
+    expect(body.refill).toEqual({ trigger: "slot", slot: "09:30" });
+    expect(((fr.ledger()[0] as Record<string, unknown>).topUps as Record<string, unknown>[])[0]).toMatchObject({ slot: "09:30" });
+  });
+
+  it("INSTRUCTION 49: Josh's click — ?date&manual=1 at 16:05Z (not a slot) buys: topped-up, refill { manual, manual }, no sweep/settle", async () => {
+    setNow(LOCKS_AT);
+    const fr = fakeRedis();
+    await call();
+    setNow(LOCKS_AT + 5 * 60_000);
+    vi.mocked(slateFromEspnOf).mockImplementation(async (_cfg, _d, _e, now) => sweetened(slateAt(now), now, GAMES));
+    const { status, body } = await call(req({ date: DATE, manual: true }));
+    expect(status).toBe(200);
+    expect(body.status).toBe("already-locked");
+    expect((body.topUp as Record<string, unknown>).action).toBe("topped-up");
+    expect(body.refill).toEqual({ trigger: "manual", slot: "manual" });
+    expect(body.sweep).toBeUndefined();
+    expect(body.settle).toBeUndefined();
+    const e = fr.ledger()[0];
+    expect(e.core.length).toBeGreaterThan(0);
+    expect(stakes(e)).toBeLessThanOrEqual(350);
+    expect(((e as Record<string, unknown>).topUps as Record<string, unknown>[])[0]).toMatchObject({ slot: "manual" });
   });
 
   it("LATE poke at 18:00Z: the eight 17:00Z games have kicked, five are ahead — locks from those five and every leg sits on a game still ahead", async () => {

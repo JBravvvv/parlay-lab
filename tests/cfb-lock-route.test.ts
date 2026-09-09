@@ -161,17 +161,27 @@ function deviceEntry(date: string): CfbLedgerEntry {
 }
 
 const setNow = (t: number) => vi.setSystemTime(t);
-const req = (opts: { date?: string; dry?: boolean; header?: Record<string, string> } = {}) => {
+/** INSTRUCTION 49 (2026-09-09): the already-locked branch tops up ONLY on the first tick inside a
+    REFILL_SLOTS_PT window (08:00/09:30/12:00/15:00/16:45 PT) or on `?manual=1` — Josh's Refresh,
+    forwarded by POST /api/refill with the cron key. This fixture's clocks (LOCKS_AT 15:00Z = 08:00 PT,
+    then +5/+10/+15/+61… min) mostly fall OUTSIDE every window, so the top-up describes below drive the
+    route as Josh's own click (`manual: true` — the identical server pass, slot "manual"); the
+    slot-gated ticker path is exercised by `tick()` in D1. */
+const req = (opts: { date?: string; dry?: boolean; manual?: boolean; slot?: string; header?: Record<string, string> } = {}) => {
   const qs = new URLSearchParams();
   if (opts.date) qs.set("date", opts.date);
   if (opts.dry) qs.set("dry", "1");
+  if (opts.manual) qs.set("manual", "1");
+  if (opts.slot) qs.set("slot", opts.slot); // fix round 2026-09-09: the scheduler's tick carries its slot
   const url = `http://localhost/api/cfb/lock${qs.size ? `?${qs}` : ""}`;
   return new NextRequest(url, { headers: opts.header ?? { "x-cron-key": SECRET } });
 };
-const call = async (r: NextRequest = req({ date: DATE })): Promise<{ status: number; body: Record<string, unknown> }> => {
+const call = async (r: NextRequest = req({ date: DATE, manual: true })): Promise<{ status: number; body: Record<string, unknown> }> => {
   const res = await GET(r);
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
 };
+/** the scheduler's own poke for DATE — slot-gated, never manual */
+const tick = () => call(req({ date: DATE }));
 
 beforeEach(() => {
   vi.useFakeTimers({ now: LOCKS_AT, toFake: ["Date"] });
@@ -457,7 +467,7 @@ describe("the poke, branch by branch", () => {
 
   it("dry=1 builds and returns the card, writes nothing", async () => {
     const fr = fakeRedis();
-    const { status, body } = await call(req({ date: DATE, dry: true }));
+    const { status, body } = await call(req({ date: DATE, dry: true, manual: true }));
     expect(status).toBe(200);
     expect(body.status).toBe("locked");
     expect(body.dry).toBe(true);
@@ -600,7 +610,7 @@ describe("DEFECT 1 — an odds outage inside the window must never lock the day 
   it("dry=1 reports the refusal too, and never writes", async () => {
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => slateNoOdds(now, true));
     const fr = fakeRedis();
-    const { status, body } = await call(req({ date: DATE, dry: true }));
+    const { status, body } = await call(req({ date: DATE, dry: true, manual: true }));
     expect(status).toBe(502);
     expect(body.status).toBe("odds-missing");
     expect(body.dry).toBe(true);
@@ -1332,14 +1342,38 @@ const LOCK_GAMES = ["401858425", "401856634", "401856780"];
  * already consider are lifted (playable, Caesars-quoted, decimal ≤ CFB_RULES.maxDec), so nothing
  * here invents a price: it moves the model's EV on a real posted quote.
  */
-function richerSlate(now: number, extra: string[]): CfbSlate {
-  const s = slateAt(now);
+function liftPrices(s: CfbSlate, extra: string[]): CfbSlate {
   return {
     ...s,
     games: s.games.map((g) =>
       extra.includes(g.id) ? { ...g, rows: g.rows.map((r) => (r.playable && r.cz != null && r.cz.dec <= CFB_RULES.maxDec ? { ...r, evCz: 6 } : r)) } : g,
     ),
   };
+}
+function richerSlate(now: number, extra: string[]): CfbSlate {
+  return liftPrices(slateAt(now), extra);
+}
+/**
+ * INSTRUCTION 49 (2026-09-09): the fixture with an EVENING WAVE. The captured day kicks off at
+ * 16:00Z (10 games) and 16:30Z (2), so its whole top-up life — lock window 15:00Z to last kickoff
+ * 16:30Z — holds exactly ONE refill slot (08:00 PT = 15:00Z); the 09:30 PT slot (16:30Z) opens as
+ * the last game kicks. To pin "the next slot buys" the two 16:30Z games and the three EXTRA games
+ * (the ones no core ticket sits on) are moved to 18:00Z in the ESPN scoreboard. The 10-game 16:00Z
+ * wave stays, so the lock window still opens at 15:00Z and the 08:00 slot still buys the first
+ * board; at 16:31Z five games are ahead and a 3-leg fun parlay can seat. The odds payload is left
+ * untouched — names.ts matches by team name, commence_time only breaks ties.
+ */
+const EVENING_IDS = ["401858430", "401862701", "401869960"];
+const shiftedEvents = (): unknown[] =>
+  (JSON.parse(JSON.stringify(ESPN.events)) as Record<string, any>[]).map((e) => {
+    if (!(EVENING_IDS.includes(String(e.id)) || String(e.date).endsWith("T16:30Z"))) return e;
+    e.date = `${DATE}T18:00Z`;
+    if (e.competitions?.[0]) e.competitions[0].date = `${DATE}T18:00Z`;
+    return e;
+  });
+function shiftedSlate(now: number, extra: string[] = []): CfbSlate {
+  const board = buildCfbBoard({ date: DATE, espnEvents: shiftedEvents(), oddsEvents: ODDS, fpi: FPI, now, bankroll: 2500 });
+  return liftPrices({ ...board, finals: finalsOf(board.games), quota: { remaining: 9000, used: 1000 }, oddsMissing: false }, extra);
 }
 
 /** a SERVER-locked day staked exactly as asked, one single per game — the shape /api/cfb/lock writes */
@@ -1445,18 +1479,23 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
        over the three lock games (so the base slate seats nothing new), FOUR seating rounds of one
        fresh game each ($50 apiece → $225), then TWO empty attempts spaced past CFB_TOPUP_RETRY_MS
        (an empty attempt is a claim row and counts — CRITIC 1 below). Six attempts spent, $25 still
-       owed, two games still ahead, a fresh game priced: the cap is what refuses. */
+       owed, two games still ahead, a fresh game priced: the cap is what refuses.
+       RE-PINNED AGAIN (fix round 2026-09-09, manual headroom): a manual click may not spend an attempt
+       an automatic slot still ahead needs, so six MANUAL attempts before 09:30 PT are impossible by
+       design. The rounds are driven as the scheduler's own slot ticks (?slot=, the tick-carried
+       slot — honoured at any clock), one per named slot; the sixth attempt is Josh's click, which
+       has headroom once every slot is stamped; the seventh is the cap. */
     const fr = seed([serverEntry(DATE, { stakes: [5, 10, 10], games: LOCK_GAMES, lockedAt: LOCKS_AT, fun: CFB_PAPER.fun })]);
     const rounds = [
-      { at: 5, extra: ["401866410"], total: 75 },
-      { at: 10, extra: ["401858430"], total: 125 },
-      { at: 15, extra: ["401862701"], total: 175 },
-      { at: 20, extra: ["401869960"], total: 225 },
+      { at: 5, extra: ["401866410"], total: 75, slot: "08:00" },
+      { at: 10, extra: ["401858430"], total: 125, slot: "09:30" },
+      { at: 15, extra: ["401862701"], total: 175, slot: "12:00" },
+      { at: 20, extra: ["401869960"], total: 225, slot: "15:00" },
     ];
     for (const [i, r] of rounds.entries()) {
       setNow(LOCKS_AT + r.at * 60_000);
       vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, r.extra));
-      const { body } = await call();
+      const { body } = await call(req({ date: DATE, slot: r.slot }));
       expect(topUpOf(body).action, `round ${i + 1}`).toBe("topped-up");
       expect(topUpOf(body).n).toBe(i + 1);
       expect(topUpOf(body).stake).toBe(50);
@@ -1466,7 +1505,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
     for (const [i, m] of [25, 71].entries()) {
       setNow(LOCKS_AT + m * 60_000);
       vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => slateAt(now));
-      const { body } = await call();
+      const { body } = await call(i === 0 ? req({ date: DATE, slot: "16:45" }) : undefined);
       expect(topUpOf(body).action, `empty attempt ${5 + i}`).toBe("skipped");
       expect(topUpsOn(fr.ledger()[0])).toHaveLength(5 + i);
       expect(coreStakeOf(fr.ledger()[0])).toBe(225);
@@ -1609,7 +1648,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
     /* the arms are the WINNER'S: this is `sets()[1]`, the first claim written on the date, and the
        winner opened on a short core over a fun bucket the lock had already filled. That the row
        says `fun: false` is exactly why the loser is still allowed to serve the bucket below. */
-    expect(topUpsOn(claimed)).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
+    expect(topUpsOn(claimed)).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false }, slot: "manual" }]);
     expect(coreStakeOf(claimed)).toBe(150); // the claim never touches the tickets
   });
 
@@ -1654,7 +1693,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
        pin still states every field of it, including the two booleans that now decide whether a
        later poke may still fire. Not a loosening: the assertion is the same kind, over the same
        row, with one more field pinned than before. */
-    expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
+    expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false }, slot: "manual" }]);
   });
 
   it("dry=1 reports what it would add and writes nothing", async () => {
@@ -1662,7 +1701,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
     await call();
     setNow(LOCKS_AT + 15 * 60_000);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, ["401858430", "401862701", "401869960"]));
-    const { status, body } = await call(req({ dry: true }));
+    const { status, body } = await call(req({ dry: true, manual: true })); // INSTRUCTION 49: 08:15 PT is not a slot — Josh's dry click
     expect(status).toBe(200);
     expect(topUpOf(body).action).toBe("would-top-up");
     expect(topUpOf(body).stake).toBe(100);
@@ -1956,17 +1995,19 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(2);
     expect(topUpsOn(fr.ledger()[0]).every((r) => r.filled === false)).toBe(true); // both are claim rows: attempts that seated nothing
 
-    /* ...AND THE COOLDOWN HOLDS: every later poke inside CFB_TOPUP_RETRY_MS of attempt 2 costs
-       nothing at all — no priced board and not even the keyless ESPN read, because the refusal is
-       free and comes first. (Was the cap under CFB_TOPUP_MAX = 2.) */
+    /* ...AND THE TICKER IS HELD BY THE SLOT CALENDAR (INSTRUCTION 49; was the empty-attempt
+       cooldown, now retryMs 0): every later scheduler poke outside a REFILL_SLOTS_PT window
+       (16:05Z–16:20Z = 09:05–09:20 PT) costs nothing at all — no priced board and not even the
+       keyless ESPN read, because the refusal is free and comes first. */
     const espnAtCap = espnReads();
     for (const m of [65, 70, 75, 80]) {
       setNow(LOCKS_AT + m * 60_000);
-      const { status, body } = await call();
+      const { status, body } = await tick();
       expect(status).toBe(200);
       expect(topUpOf(body).action).toBe("skipped");
-      expect(String(topUpOf(body).reason)).toMatch(/found nothing|retry|wait/i);
+      expect(String(topUpOf(body).reason)).toMatch(/not a refill slot/);
       expect(String(topUpOf(body).reason)).not.toMatch(/cap/i);
+      expect(body.refill).toEqual({ trigger: "slot", slot: null });
     }
     expect(priced()).toBe(3);
     expect(espnReads()).toBe(espnAtCap);
@@ -1974,19 +2015,19 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     expect(coreStakeOf(fr.ledger()[0])).toBe(150);
   });
 
-  it("THE FREE PRE-CHECK: a poke inside the retry window after an empty attempt buys no second board", async () => {
+  it("THE FREE PRE-CHECK (re-pinned INSTRUCTION 49): a scheduler pulse outside a refill slot after an empty attempt buys no second board", async () => {
     const fr = fakeRedis();
     await call();
     setNow(LOCKS_AT + 15 * 60_000);
     await call();
     expect(priced()).toBe(2);
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
-    // the next pulse is 15 minutes later — the same prices, on the same games
+    // the next pulses are 15 minutes apart (08:30/08:45/08:59 PT) — none is a refill slot
     for (const m of [30, 45, 59]) {
       setNow(LOCKS_AT + m * 60_000);
-      const { body } = await call();
+      const { body } = await tick();
       expect(topUpOf(body).action).toBe("skipped");
-      expect(String(topUpOf(body).reason)).toMatch(/found nothing|retry|wait/i);
+      expect(String(topUpOf(body).reason)).toMatch(/not a refill slot/);
     }
     expect(priced()).toBe(2); // ...so nothing was bought, and no attempt was burnt for nothing
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
@@ -2017,7 +2058,7 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
        pin still states every field of it, including the two booleans that now decide whether a
        later poke may still fire. Not a loosening: the assertion is the same kind, over the same
        row, with one more field pinned than before. */
-    expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
+    expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false }, slot: "manual" }]);
     expect(coreStakeOf(fr.ledger()[0])).toBe(150);
 
     // ...and it counts against the cap like any other: a second rejected pull past the cooldown is a second row
@@ -2037,14 +2078,54 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
       topUps: Array.from({ length: cfbRulesMod.CFB_TOPUP_MAX }, (_, i) => ({ ...rows[i % rows.length], n: i + 1, at: LOCKS_AT + (15 + 46 * i) * 60_000 })),
     } as CfbLedgerEntry;
     const nowAfter = LOCKS_AT + (15 + 46 * cfbRulesMod.CFB_TOPUP_MAX) * 60_000;
-    const done = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, atCap, nowAfter);
+    const done = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, atCap, nowAfter, { slot: "manual" });
     expect(done.fire).toBe(false);
     expect(String(done.reason)).toMatch(/cap/i);
     expect(String(done.reason)).toContain(`(${cfbRulesMod.CFB_TOPUP_MAX} of ${cfbRulesMod.CFB_TOPUP_MAX})`);
-    /* one row fewer and the same clock still fires — the bound is exactly CFB_TOPUP_MAX */
+    /* one row fewer and the same clock still fires — the bound is exactly CFB_TOPUP_MAX. Driven as a
+       slot tick (16:45, which none of the manual rows stamp): nowAfter is 12:51 PT with two
+       automatic slots still ahead, so a MANUAL sixth attempt is refused for headroom (pinned below),
+       not the cap. */
     const oneShort = { ...atCap, topUps: (atCap as Record<string, unknown>).topUps as unknown[] } as CfbLedgerEntry;
     (oneShort as Record<string, unknown>).topUps = ((atCap as Record<string, unknown>).topUps as unknown[]).slice(0, -1);
-    expect(lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, oneShort, nowAfter).fire).toBe(true);
+    expect(lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, oneShort, nowAfter, { slot: "16:45" }).fire).toBe(true);
+    const held = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, oneShort, nowAfter, { slot: "manual" });
+    expect(held.fire).toBe(false);
+    expect(String(held.reason)).toBe("manual refill would spend a slot's attempt — 1 attempt left, 2 automatic slots still ahead today");
+  });
+
+  it("MANUAL HEADROOM (fix round 2026-09-09): a click never spends an attempt a slot still ahead needs; after 16:45 PT it is honoured to the cap", async () => {
+    const fr = fakeRedis();
+    await call();
+    const stored = fr.ledger()[0];
+    const row = (n: number, slot: string) => ({ at: LOCKS_AT + n * 60_000, n, core: 0, stake: 0, filled: false, arms: { core: true, fun: false }, slot });
+    /* 08:05 PT (15:05Z, past both rows): five slots ahead in time, four unstamped once 08:00 has run → 1 + 4 < 6 fires; 2 + 4 does not */
+    const morning = LOCKS_AT + 5 * 60_000;
+    const one = { ...stored, topUps: [row(1, "08:00")] } as CfbLedgerEntry;
+    expect(lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, one, morning, { slot: "manual" }).fire).toBe(true);
+    const two = { ...stored, topUps: [row(1, "08:00"), row(2, "manual")] } as CfbLedgerEntry;
+    const held = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, two, morning, { slot: "manual" });
+    expect(held.fire).toBe(false);
+    expect(String(held.reason)).toBe("manual refill would spend a slot's attempt — 4 attempts left, 4 automatic slots still ahead today");
+    /* the same two rows once every slot has run (17:00 PT = 00:00Z next day): nothing ahead, the click fires */
+    const evening = Date.parse(`${DATE}T23:59:00Z`) + 61 * 60_000;
+    const ev = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, two, evening, { slot: "manual" });
+    expect(ev.fire, String(ev.reason)).toBe(true);
+    /* a named slot is never held for headroom */
+    const named = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, two, morning, { slot: "09:30" });
+    expect(named.fire, String(named.reason)).toBe(true);
+  });
+
+  it("SAME SLOT counts an EMPTY attempt's unfilled claim, not only filled rows (fix round 2026-09-09)", async () => {
+    const fr = fakeRedis();
+    await call();
+    const stored = fr.ledger()[0];
+    const claim = { ...stored, topUps: [{ at: LOCKS_AT + 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false }, slot: "08:00" }] } as CfbLedgerEntry;
+    const now = LOCKS_AT + 9 * 60_000;
+    const dup = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, claim, now, { slot: "08:00" });
+    expect(dup.fire).toBe(false);
+    expect(String(dup.reason)).toBe("refill slot 08:00 PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time");
+    expect(lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, claim, now, { slot: "09:30" }).fire).toBe(true);
   });
 
   it("A SUCCESSFUL TOP-UP STILL COSTS EXACTLY ONE ATTEMPT — the record is the attempt, filled in", async () => {
@@ -2631,7 +2712,7 @@ describe("CRITIC 8 (2026-09-06) — an odds outage costs the top-up nothing, and
     await call();
     setNow(LOCKS_AT + 15 * 60_000);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => scoresOnly(now));
-    const { status, body } = await call(req({ date: DATE, dry: true }));
+    const { status, body } = await call(req({ date: DATE, dry: true, manual: true }));
     expect(status).toBe(200);
     expect(topUpOf(body).action).toBe("skipped");
     expect(topUpOf(body).oddsMissing).toBe(true);
@@ -2866,7 +2947,7 @@ describe("DEFECT J (2026-09-06) — the $25 fun money is topped up too, once, an
     const before = fr.sets().length;
     const dryDay = serverEntry(DATE, { stakes: [25, 25, 25], games: LOCK_GAMES, lockedAt: LOCKS_AT });
     fr.kv.set(CFB_REDIS.ledger, JSON.stringify({ ledger: [dryDay], at: LOCKS_AT }));
-    const dry = await call(req({ date: DATE, dry: true }));
+    const dry = await call(req({ date: DATE, dry: true, manual: true }));
     expect(topUpOf(dry.body).action).toBe("would-top-up");
     expect(topUpOf(dry.body).funStake).toBe(CFB_PAPER.fun);
     expect(topUpOf(dry.body).funRoom).toBe(0);
@@ -3764,34 +3845,34 @@ describe("L5 (2026-09-06) — three mutation survivors, pinned", () => {
 });
 
 /* ==========================================================================================
- * D1 (INSTRUCTION 45, 2026-09-06) — A FULL-CORE DAY WITH AN EMPTY FUN BUCKET MAY NOT BUY THE
- * SAME UNSEATABLE BOARD TWICE INSIDE THE RETRY WINDOW.
+ * D1 (INSTRUCTION 45, 2026-09-06; RE-PINNED 2026-09-09, INSTRUCTION 49) — A FULL-CORE DAY WITH AN
+ * EMPTY FUN BUCKET MAY NOT BUY THE SAME UNSEATABLE BOARD ON EVERY TICK.
  *
  * Josh, verbatim: "Parlay Lab CFB should've been running the same $150 per day theoretical Core
  * money and $25 Fun money per day". DEFECT M(a) made the fun arm fire on its own, which is what
  * that sentence asks for, and created a shape that had never existed before: a day whose CORE is
- * complete ($150, six tickets) and whose fun bucket is EMPTY fires with `{ core: false, fun: true }`
- * and pays for a priced board — one game-lines pull, 6 Odds credits — to learn that nothing on the
- * board clears CFB_RULES.fun (decimal 4-40, EV >= -3%). The route's own free refusal above the
- * pull (`!d.core && d.fun && openAhead < CFB_RULES.fun.legs.min`) cannot save it: that refusal is
- * arithmetic about DISTINCT GAMES, and this day has six unseated games still ahead carrying priced
- * sides. It is not a money defect — no path here stakes more than CFB_PAPER.daily or CFB_PAPER.fun
- * — but it is SPEND, on a Saturday where the 2500/day Odds cap already binds.
+ * complete and whose fun bucket is EMPTY fires with `{ core: false, fun: true }` and pays for a
+ * priced board — one game-lines pull, 6 Odds credits — to learn that nothing on the board clears
+ * CFB_RULES.fun. The route's own free refusal above the pull cannot save it: that refusal is
+ * arithmetic about DISTINCT GAMES, and this day has six unseated games still ahead.
  *
- * The bound is CFB_TOPUP_RETRY_MS, the cooldown the core arm already has, and the pins below state
- * it as a credit cost rather than as a code shape: ONE priced board inside the window however many
- * times the ~15-minute ticker pokes, and — because a cooldown that never lifts is a silent kill —
- * a SECOND board once the window has elapsed.
+ * The bound WAS CFB_TOPUP_RETRY_MS (a 45-min cooldown). INSTRUCTION 49 (2026-09-09, Josh verbatim:
+ * "It shouldn't be refreshing every 15 minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm.
+ * Other than that I can manually do it") replaced it with the REFILL SLOT CALENDAR: the ticker
+ * buys one board on the first tick inside each REFILL_SLOTS_PT window, a second poke inside the
+ * same window is refused free (the claim row carries `slot`), every off-slot poke is refused free
+ * BEFORE any feed is read, and Josh's own `?manual=1` buys any time. CFB_TOPUP_RETRY_MS is 0.
+ * This fixture's LOCKS_AT is 15:00Z = 08:00 PT — itself a slot start — so ATTEMPT1 (15:01Z) is
+ * inside the 08:00 window; 16:31Z is the 09:30 slot; 15:16Z/15:47Z are not slots.
  * ======================================================================================== */
-describe("D1 (2026-09-06) — an empty fun-only attempt holds the next one off; the window is a cooldown, not a kill", () => {
+describe("D1 (2026-09-06, re-pinned 2026-09-09) — the ticker buys on the slot, never between slots; Josh's click buys any time", () => {
   const gameIds = () => slateAt(LOCKS_AT).games.map((g) => g.id);
-  const ATTEMPT1 = LOCKS_AT + 60_000; // 15:01Z — past `lockedAt`, and 59 min before the first kickoff
+  const ATTEMPT1 = LOCKS_AT + 60_000; // 15:01Z — past `lockedAt`, INSIDE the 08:00 PT window, 59 min before the first kickoff
   const priced = () => vi.mocked(slateFromEspn).mock.calls.length;
   const EXTRA = ["401858430", "401862701", "401869960"];
   /** the shape DEFECT M(a) made reachable: every dollar of core deployed, $0 of the $25 */
-  /* 2026-09-08: six seated games still ($250 = four $50 + two $25), so the six open games ahead —
-     and the board that prices them and seats nothing — are exactly the ones the trap was measured on */
   const fullCoreEmptyFun = () => serverEntry(DATE, { stakes: [50, 50, 50, 50, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+  const NOT_A_SLOT = "not a refill slot (automatic refills run on the first tick after 08:00/09:30/12:00/15:00/16:45 PT; Josh's own Refresh runs the same pass any time)";
 
   it("D1: the trap is real — the day fires on the fun arm alone, six unseated games are still ahead, and the board seats NOTHING", () => {
     const day = fullCoreEmptyFun();
@@ -3810,28 +3891,31 @@ describe("D1 (2026-09-06) — an empty fun-only attempt holds the next one off; 
     expect(plan.pricedAhead).toBeGreaterThan(0);
     expect(plan.tickets).toHaveLength(0);
     expect(plan.fun).toHaveLength(0);
+    expect(cfbRulesMod.CFB_TOPUP_RETRY_MS).toBe(0); // the cooldown is gone; the calendar is the bound
   });
 
-  it("D1: ONE priced board inside CFB_TOPUP_RETRY_MS — every later poke in the window buys ZERO", async () => {
+  it("D1: ONE priced board on the 08:00 slot tick — every later ticker poke outside a window buys ZERO and reads no feed", async () => {
     const fr = seed([fullCoreEmptyFun()]);
     setNow(ATTEMPT1);
-    const first = await call();
+    const first = await tick();
     expect(topUpOf(first.body).action).toBe("skipped");
-    expect(priced()).toBe(1); // the one board this defect is allowed to buy
+    expect(priced()).toBe(1); // the one board the 08:00 slot is allowed to buy
+    expect(first.body.refill).toEqual({ trigger: "slot", slot: "08:00" });
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
-    expect(topUpsOn(fr.ledger()[0])[0]).toMatchObject({ n: 1, filled: false, arms: { core: false, fun: true } });
+    expect(topUpsOn(fr.ledger()[0])[0]).toMatchObject({ n: 1, filled: false, arms: { core: false, fun: true }, slot: "08:00" });
 
-    /* the ~15-minute ticker keeps poking, and the prices are the ones just paid for. THE PIN IS
-       THE CREDIT COUNT, asserted after EVERY poke rather than once at the end: the cost is what
-       this defect is about, and a refusal that arrives with the board already bought is not a
-       refusal. The reason is checked too, so the pin also says WHICH rule declined. */
+    /* the ~15-minute ticker keeps poking: 15:16Z/15:31Z/15:45Z = 08:16/08:31/08:45 PT, none a slot.
+       THE PIN IS THE CREDIT COUNT, asserted after EVERY poke: the refusal is the calendar's, and it
+       comes before slateFromEspn is even called. */
     for (const m of [16, 31, 45]) {
       setNow(LOCKS_AT + m * 60_000);
-      const { status, body } = await call();
+      const { status, body } = await tick();
       expect(status).toBe(200);
       expect(topUpOf(body).action).toBe("skipped");
+      expect(topUpOf(body).credits).toBe(0);
       expect(priced()).toBe(1); // ← ZERO further boards, poke by poke
-      expect(String(topUpOf(body).reason)).toMatch(/found nothing to seat|waits/i);
+      expect(String(topUpOf(body).reason)).toBe(NOT_A_SLOT);
+      expect(body.refill).toEqual({ trigger: "slot", slot: null });
     }
     expect(priced()).toBe(1);
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
@@ -3839,25 +3923,100 @@ describe("D1 (2026-09-06) — an empty fun-only attempt holds the next one off; 
     expect(coreStakeOf(fr.ledger()[0])).toBe(CFB_PAPER.daily);
   });
 
-  it("D1: it is a COOLDOWN, not a kill — past the window the fun arm buys its second board and seats the $25", async () => {
+  it("D1: the NEXT SLOT buys — at 16:31Z (09:31 PT) the fun arm buys its second board and seats the $25", async () => {
+    /* on the EVENING-WAVE fixture (see shiftedSlate): the 08:00 slot tick buys the empty board, the
+       09:30 slot tick buys the second with five games still ahead */
+    vi.mocked(espnEvents).mockResolvedValue(shiftedEvents());
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => shiftedSlate(now));
     const fr = seed([fullCoreEmptyFun()]);
     setNow(ATTEMPT1);
-    await call();
-    expect(priced()).toBe(1);
+    const first = await tick();
+    expect(topUpOf(first.body).action, JSON.stringify(topUpOf(first.body))).toBe("skipped");
+    expect(first.body.refill).toEqual({ trigger: "slot", slot: "08:00" });
+    expect(priced(), JSON.stringify(topUpOf(first.body))).toBe(1);
 
-    /* 46 minutes on — past CFB_TOPUP_RETRY_MS, still 13 minutes before the first kickoff — and the
+    /* 91 minutes on — the 09:30 slot; the 16:00Z wave has kicked, the 18:00Z wave is ahead, and the
        evening lines have posted on three games no core ticket sits on */
-    setNow(ATTEMPT1 + cfbRulesMod.CFB_TOPUP_RETRY_MS + 60_000);
-    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
-    const { body } = await call();
-    expect(topUpOf(body).action).toBe("topped-up");
+    setNow(LOCKS_AT + 91 * 60_000);
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => shiftedSlate(now, EXTRA));
+    const { body } = await tick();
+    expect(topUpOf(body).action, JSON.stringify(topUpOf(body))).toBe("topped-up");
     expect(topUpOf(body).buckets).toEqual({ core: false, fun: true });
+    expect(body.refill).toEqual({ trigger: "slot", slot: "09:30" });
     expect(priced()).toBe(2);
 
     const e = fr.ledger()[0];
     expect(e.funT).toHaveLength(1);
     expect(e.funT.reduce((s, t) => s + t.stake, 0)).toBe(CFB_PAPER.fun);
     expect(coreStakeOf(e)).toBe(CFB_PAPER.daily);
+    expect(topUpsOn(e).map((r) => r.slot)).toEqual(["08:00", "09:30"]);
+  });
+
+  it("D1: 15:47Z (08:47 PT — 46 min after the first attempt, past the OLD cooldown) is NOT a slot: skipped, zero slateFromEspn calls", async () => {
+    seed([fullCoreEmptyFun()]);
+    setNow(ATTEMPT1 + cfbRulesMod.CFB_TOPUP_RETRY_MS + 46 * 60_000);
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
+    const { status, body } = await tick();
+    expect(status).toBe(200);
+    expect(body.status).toBe("already-locked");
+    expect(topUpOf(body)).toEqual({ action: "skipped", reason: NOT_A_SLOT, credits: 0 });
+    expect(priced()).toBe(0);
+    expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled();
+  });
+
+  it("D1: Josh's click — ?date&manual=1 at 15:16Z (not a slot) BUYS: topped-up, refill { manual, manual }, and no sweep/settle", async () => {
+    const fr = seed([fullCoreEmptyFun()]);
+    setNow(LOCKS_AT + 16 * 60_000);
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
+    const { status, body } = await call(req({ date: DATE, manual: true }));
+    expect(status).toBe(200);
+    expect(body.status).toBe("already-locked");
+    expect(topUpOf(body).action).toBe("topped-up");
+    expect(body.refill).toEqual({ trigger: "manual", slot: "manual" });
+    expect(body.sweep).toBeUndefined();
+    expect(body.settle).toBeUndefined();
+    expect(priced()).toBe(1);
+    const e = fr.ledger()[0];
+    expect(e.funT).toHaveLength(1);
+    expect(topUpsOn(e)[0]).toMatchObject({ n: 1, filled: true, slot: "manual" });
+    expect(coreStakeOf(e)).toBe(CFB_PAPER.daily);
+  });
+
+  it("D1: the scheduler's tick-carried ?slot=08:00 at 15:16Z (08:16 PT — past the window on this route's own clock) still BUYS, refill { slot, 08:00 } (fix round 2026-09-09)", async () => {
+    const fr = seed([fullCoreEmptyFun()]);
+    setNow(LOCKS_AT + 16 * 60_000);
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
+    const { status, body } = await call(req({ date: DATE, slot: "08:00" }));
+    expect(status).toBe(200);
+    expect(topUpOf(body).action).toBe("topped-up");
+    expect(body.refill).toEqual({ trigger: "slot", slot: "08:00" });
+    expect(topUpsOn(fr.ledger()[0])[0]).toMatchObject({ n: 1, filled: true, slot: "08:00" });
+    /* an unknown ?slot value falls back to the route's own clock — 08:16 PT is not a slot */
+    vi.mocked(slateFromEspn).mockClear();
+    const bad = await call(req({ date: DATE, slot: "13:37" }));
+    expect(topUpOf(bad.body)).toEqual({ action: "skipped", reason: NOT_A_SLOT, credits: 0 });
+    expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled();
+  });
+
+  it("D1: SAME SLOT — a second ticker poke inside the 08:00 window (15:09Z after 15:01Z) is refused free, /already ran today/", async () => {
+    const fr = seed([fullCoreEmptyFun()]);
+    setNow(ATTEMPT1);
+    await tick();
+    expect(priced()).toBe(1);
+    setNow(LOCKS_AT + 9 * 60_000);
+    vi.mocked(slateFromEspn).mockClear();
+    const { body } = await tick();
+    expect(topUpOf(body).action).toBe("skipped");
+    expect(String(topUpOf(body).reason)).toMatch(/already ran today/);
+    expect(String(topUpOf(body).reason)).toBe("refill slot 08:00 PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time");
+    expect(body.refill).toEqual({ trigger: "slot", slot: "08:00" });
+    expect(vi.mocked(slateFromEspn)).not.toHaveBeenCalled(); // free
+    expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
+    /* ...and Josh's click inside the same window is NOT held by it */
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
+    const manual = await call();
+    expect(topUpOf(manual.body).action).toBe("topped-up");
+    expect(topUpsOn(fr.ledger()[0]).map((r) => r.slot)).toEqual(["08:00", "manual"]);
   });
 });
 

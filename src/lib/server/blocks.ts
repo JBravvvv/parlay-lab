@@ -1,6 +1,7 @@
 import { LINEUP_LEAD_MS } from "@/lib/board-coverage";
 import { SCHED_T } from "@/lib/server/scheduler-decide";
 import { shapeById } from "@/lib/core-shapes";
+import { manualHeadroomRefusal, unstampedSlotsAhead } from "@/lib/server/grading-progress";
 
 /**
  * PER-BLOCK LOCKING (2026-08-08, operator requirement: the lock adapts to each day's
@@ -116,7 +117,9 @@ export function decideBlock(args: { block: SlateBlock; now: number }): BlockDeci
   return { ...base, fire: false, reason: `achievable ${achievable.toFixed(3)} < ${SCHED_T} AND/OR ready ${ready} < ${minReady} — this block's lineups are not posted yet` };
 }
 
-export type BlockRegistry = Record<string, { firedAt?: number; tickets?: number; budget?: number; reason?: string; at: number }>;
+/** `slot` (INSTRUCTION 49): the refill slot a `topup-N` row was bought on — "08:00".."16:45" PT
+    or "manual"; a second poke inside the same slot window is refused free on it. */
+export type BlockRegistry = Record<string, { firedAt?: number; tickets?: number; budget?: number; reason?: string; at: number; slot?: string }>;
 
 /**
  * DEFICIT CARRY-FORWARD (2026-08-19, Josh's word: "I said $150 every day no matter what
@@ -183,7 +186,7 @@ export function canStillFire(b: SlateBlock, now: number): boolean {
  * releases the hold for burned-down blocks.
  *
  * INSTRUCTION 48 (2026-09-09, "it can lock multiple times per day, but it can never remove
- * a pick it can only add to it"): up to TOPUP_MAX (4) sweeps a day; two FREE refusals below
+ * a pick it can only add to it"): up to TOPUP_MAX (6 since INSTRUCTION 49) sweeps a day; FREE refusals below
  * (slot-fit, empty-sweep cooldown) keep the extra attempts from re-buying the same board.
  */
 /** THE DAY'S CONSUMED MONEY (cap at Kelly, Josh 2026-09-08). A seated slot is spent whether
@@ -241,10 +244,17 @@ export function decideTopUp(args: {
   daily: number;
   max: number;
   /** INSTRUCTION 48: an empty sweep (registry row `tickets: 0`) holds the next sweep off this
-      long; omitted/0 → no cooldown (the pre-09-09 behaviour and the test fixtures' rows). */
+      long; omitted/0 → no cooldown. NOT passed by the scheduler since INSTRUCTION 49 (the slot
+      calendar is the pacing) — kept for the pure-helper cooldown suite. */
   emptyRetryMs?: number;
+  /** INSTRUCTION 49: the refill slot this pass runs on ("08:00".."16:45" PT, or "manual").
+      A named slot that already bought a `topup-N` row today is refused free; "manual"
+      (Josh's own Refresh) and omitted never are. */
+  slot?: string;
 }): { fire: boolean; reason: string; owed: number; used: number } {
-  const { entry, blocks, registry, starts, now, daily, max, emptyRetryMs } = args;
+  /* refusal order: paper → owed → pending → every-started → cap → manual-headroom → same-slot → slot-fit →
+     (empty cooldown only if emptyRetryMs passed) → fire */
+  const { entry, blocks, registry, starts, now, daily, max, emptyRetryMs, slot } = args;
   const used = Object.keys(registry ?? {}).filter((k) => k.startsWith("topup-")).length;
   if (entry?.paper !== true) return { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used };
   const owed = daily - dayConsumed(entry);
@@ -255,6 +265,28 @@ export function decideTopUp(args: {
   if (pending) return { fire: false, reason: "a block can still fire — its own fire carries the deficit", owed, used };
   if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to seat", owed, used };
   if (used >= max) return { fire: false, reason: `top-up cap spent (${used}/${max})`, owed, used };
+  /* MANUAL HEADROOM (INSTRUCTION 49 fix round, 2026-09-09, free): the five slots and Josh's clicks
+     draw from ONE pool of `max` attempts, so a manual attempt is refused when it would spend one
+     an automatic slot still ahead today needs (used + ahead >= max). After the 16:45 slot nothing
+     is ahead and a click is honoured up to the cap. Only "manual" is gated this way. */
+  if (slot === "manual") {
+    const ahead = unstampedSlotsAhead(now, Object.entries(registry ?? {}).map(([k, row]) => (k.startsWith("topup-") ? row?.slot : undefined)));
+    if (used + ahead >= max) return { fire: false, reason: manualHeadroomRefusal(max - used, ahead), owed, used };
+  }
+  /* SAME-SLOT (INSTRUCTION 49, free): each named refill slot buys at most once a day — the
+     scheduler's ticker can land twice inside one 15-min window (a re-poke, a slow forward),
+     and the second must not re-buy the same prices. "manual" is never refused here. */
+  if (slot && slot !== "manual") {
+    const dup = Object.entries(registry ?? {}).some(([k, row]) => k.startsWith("topup-") && row?.slot === slot);
+    if (dup) {
+      return {
+        fire: false,
+        reason: `refill slot ${slot} PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time`,
+        owed,
+        used,
+      };
+    }
+  }
   /* SLOT-FIT (INSTRUCTION 48, free): a sweep's budget is effectiveBlockBudget(currentKey:"")
      = owed once no block is pending, and lock-card's ownSlots owns any open slot with
      stake ≤ that budget — so "some open slot ≤ owed" ⇔ "the sweep owns ≥ 1 slot". Otherwise

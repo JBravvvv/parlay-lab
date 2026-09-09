@@ -132,6 +132,16 @@ describe("the route file, comment-stripped", () => {
     expect(/x-cron-key/.test(src)).toBe(true);
   });
 
+  it("INSTRUCTION 49: the refill decision is decideMlbRefill gated by decideRefillTick, forwarded by forwardMlbRefill beside the grading pass (allSettled); decideTopUp and the empty cooldown are gone from here", () => {
+    expect(src).toMatch(/decideMlbRefill\(/);
+    expect(src).toMatch(/decideRefillTick\(/);
+    expect(src).toMatch(/forwardMlbRefill\(/);
+    expect(src).toMatch(/Promise\.allSettled/);
+    expect(src).not.toMatch(/decideTopUp\(/);
+    expect(src).not.toMatch(/emptyRetryMs/);
+    expect(src).not.toMatch(/TOPUP_EMPTY_RETRY_MS/);
+  });
+
   it("PLANT (invalid-by-value): the fails-closed regex catches the failed-open shape", () => {
     expect(/return !cron/.test("function authed(){ const cron = process.env.CRON_SECRET; return !cron; }")).toBe(true);
   });
@@ -155,9 +165,15 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
     expect(get).toBeGreaterThan(0);
     expect(tick).toBeGreaterThan(get);
     const wrapper = src.slice(get, tick);
-    // MLB first, always; the forward only after its answer, and only past the gate
+    /* PIN REWRITTEN 2026-09-09 (INSTRUCTION 49 fix round): the two football forwards used to START
+       only after mlbTick answered ("MLB first, always"). On a refill tick that answer carries a
+       ~60 s generate and the lock routes decided the slot from their own clock, so a slow MLB
+       generate silently cost CFB/NFL the slot. The forwards now start BEFORE mlbTick is awaited,
+       carrying the slot decided once at the tick's clock (?slot=), and the gate is the same two
+       predicates — nothing starts unless authed. */
     expect(wrapper).toMatch(/const res = await mlbTick\(req\);/);
-    expect(wrapper.indexOf("mlbTick(req)")).toBeLessThan(wrapper.indexOf("forwardCfbLock("));
+    expect(wrapper.indexOf("forwardCfbLock("), "the football forwards wait for the MLB tick again").toBeLessThan(wrapper.indexOf("mlbTick(req)"));
+    expect(wrapper).toMatch(/const tickSlot = decideRefillTick\(Date\.now\(\)\)\.slot;/);
     /* PIN REWRITTEN 2026-09-06 (INSTRUCTION 45, task 2). This assertion used to read
            expect(wrapper).toMatch(/if \(res\.status !== 200[^\n]*return res;/);
        — it pinned "any non-200 MLB answer short-circuits before the forward is attempted".
@@ -174,9 +190,12 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
        rather than by status: an unauthenticated poke must never make the SERVER reach
        /api/cfb/lock carrying the real secret. The gate is now AUTHORISATION, never the MLB
        outcome, and this pin says exactly that. */
-    expect(wrapper).toMatch(/if \(!process\.env\.CRON_SECRET \|\| !cronHeaderAuthed\(req\)\) return res;/);
+    expect(wrapper).toMatch(/const authed = !!process\.env\.CRON_SECRET && cronHeaderAuthed\(req\);/);
+    expect(wrapper).toMatch(/authed\s*\?\s*Promise\.allSettled\(\[forwardCfbLock\(/);
+    expect(wrapper).toMatch(/if \(!football\) return res;/);
     expect(wrapper, "the MLB outcome is gating the CFB forward again").not.toMatch(/res\.status !== 200/);
-    expect(wrapper).toMatch(/forwardCfbLock\(req\.nextUrl\.origin, process\.env\.CRON_SECRET\)/);
+    expect(wrapper).toMatch(/forwardCfbLock\(req\.nextUrl\.origin, secret, undefined, tickSlot\)/);
+    expect(wrapper).toMatch(/forwardNflLock\(req\.nextUrl\.origin, secret, undefined, tickSlot\)/);
     expect(wrapper).toMatch(/attachCfb\(res, cfb\)/);
     // the MLB tick itself is untouched: its fails-closed gate and generate forward still live in it
     const body = src.slice(tick);
@@ -190,6 +209,15 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
     expect(fwd).toMatch(/"x-cron-key": secret/);
     expect(fwd).toMatch(/AbortSignal\.timeout\(CFB_LOCK\.forwardTimeoutMs\)/);
     expect(fwd).not.toMatch(/x-pl-sync/);
+  });
+
+  it("forwardCfbLock carries the tick's slot as ?slot= (encoded) and sends no query without one (fix round 2026-09-09)", async () => {
+    const seen: string[] = [];
+    const f = async (u: URL) => { seen.push(String(u)); return new Response("{}", { status: 200 }); };
+    await forwardCfbLock("https://parlay.test", "s", f, "12:00");
+    await forwardCfbLock("https://parlay.test", "s", f, null);
+    await forwardCfbLock("https://parlay.test", "s", f);
+    expect(seen).toEqual(["https://parlay.test/api/cfb/lock?slot=12%3A00", "https://parlay.test/api/cfb/lock", "https://parlay.test/api/cfb/lock"]);
   });
 
   it("forwardCfbLock reports the CFB answer and NEVER throws — a thrown fetch becomes { forwarded: false, error }", async () => {
@@ -349,7 +377,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
   /** the MLB tick's whole answer on this pinned clock and empty slate — no CFB anywhere in it */
   const MLB_BODY = {
     fired: false,
-    topup: { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used: 0 },
+    topup: { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used: 0, slot: null },
     grading: { fired: false, reason: "not a grading tick (grading runs on the first tick after 08:00/09:30/12:00/15:00/16:45 PT)" },
     lock: { present: false, action: null },
     date: "2026-09-05",
@@ -394,6 +422,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
       reason: "cannot fill further — the day's 2 open slots hold no seat for the carried money; a top-up would change nothing",
       owed: 20,
       used: 0,
+      slot: null, // 11:27 PT is not a refill slot (INSTRUCTION 49)
     });
     expect((body.lock as { present?: boolean }).present).toBe(true);
   });
@@ -422,16 +451,24 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
 
   /**
    * INSTRUCTION 48 (2026-09-09, Josh's word, verbatim: "It can lock multiple times per day, but it
-   * can never remove a pick it can only add to it"). THE 09-09 DAY, replayed: a locked day at $25
-   * (one $25 ticket Kelly-sized into shape A's $60 slot 0, slotUnderSum 35 → owed $90), every block
-   * fired, THREE top-ups already spent, pregame games ahead. Under TOPUP_MAX = 2 this poke answered
-   * "top-up cap spent (3/2)"; under 4 it forwards a fourth generate. A fourth registry row refuses.
+   * can never remove a pick it can only add to it") made every sweep append-only and let the ticker
+   * top the card up all day. INSTRUCTION 49 (2026-09-09, Josh, verbatim: "It shouldn't be refreshing
+   * every 15 minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do
+   * it") paces it: the top-up fires ONLY on the first tick inside a REFILL_SLOTS_PT window, TOPUP_MAX
+   * is 6 (five slots + one manual), the empty-sweep cooldown is unwired, and the slot is stamped on
+   * the registry row so a second poke in the same window is refused free.
+   *
+   * THE 09-09 DAY, replayed: a locked day at $25 (one $25 ticket Kelly-sized into shape A's $60 slot
+   * 0, slotUnderSum 35 → owed $90), every block fired, THREE top-ups already spent, pregame games
+   * ahead. At 18:27Z (11:27 PT — not a slot) this poke is refused free; at 19:03Z (12:03 PT) it
+   * forwards the fourth generate with slot=12%3A00 AND the grading pass, together.
    */
-  describe("INSTRUCTION 48 — the fourth sweep of the day forwards; the fifth is the cap", () => {
+  describe("INSTRUCTION 49 — the sweep fires on the slot, not the tick; the seventh is the cap", () => {
     /* three evening starts inside one 90-min block (a fourth start ≥ 90 min later would be a SECOND,
        unfired block — "a block can still fire" would hold the sweep, which is the pre-48 rule and correct) */
     const LATE = [Date.parse("2026-09-05T23:05:00Z"), Date.parse("2026-09-05T23:10:00Z"), Date.parse("2026-09-05T23:40:00Z")];
     const BLOCK_KEY = "2026-09-05T23:05Z"; // partitionBlocks keys a block by its first start (ISO to the minute)
+    const SLOT_NOON = Date.parse("2026-09-05T19:03:00Z"); // 12:03 PT — inside the 12:00 window
     const day = {
       date: "2026-09-05", locked: true, paper: true, lockedAt: NOW - 3_600_000, daily: 150, allocSum: 25, slotUnderSum: 35,
       coreShape: { id: "A", label: "2x$60 2-leg + 3x$10 3-4 leg", pick: "rotation", slots: [{ stake: 60, legs: { min: 2, max: 2 } }, { stake: 60, legs: { min: 2, max: 2 } }, { stake: 10, legs: { min: 3, max: 4 } }, { stake: 10, legs: { min: 3, max: 4 } }, { stake: 10, legs: { min: 3, max: 4 } }] },
@@ -449,8 +486,26 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
     };
+    const urlsOf = (fetchMock: ReturnType<typeof vi.fn>) => fetchMock.mock.calls.map((c) => String((c as unknown[])[0]));
 
-    it("three sweeps spent, $90 owed, a $60 slot open, games ahead → body.topup.fire and /api/generate?topup=1 is forwarded", async () => {
+    it("at 18:27Z (11:27 PT — NOT a slot): the day is short $90 with games ahead, and the poke is still refused free — /not a refill slot/, nothing forwarded", async () => {
+      const { kv } = fakeRedis();
+      seedDay(kv, 3);
+      vi.mocked(slateStarts).mockResolvedValue(LATE);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { status, body } = await call();
+      expect(status).toBe(200);
+      expect(body.fired).toBe(false);
+      expect(body.topup).toMatchObject({ fire: false, owed: 90, used: 3, slot: null });
+      expect(String((body.topup as { reason: string }).reason)).toMatch(/^not a refill slot/);
+      expect(String((body.topup as { reason: string }).reason)).toBe("not a refill slot (automatic refills run on the first tick after 08:00/09:30/12:00/15:00/16:45 PT; Josh's own Refresh runs the same pass any time)");
+      expect(urlsOf(fetchMock).some((u) => u.includes("/api/generate")), `generate forwarded off-slot; fetched: ${urlsOf(fetchMock).join(", ")}`).toBe(false);
+      expect((body.grading as { fired: boolean }).fired).toBe(false);
+    });
+
+    it("fires on the first tick after 12:00 PT: /api/generate?topup=1&slot=12%3A00 AND /api/calibrate?grade=only are forwarded together", async () => {
+      vi.setSystemTime(SLOT_NOON);
       const { kv } = fakeRedis();
       seedDay(kv, 3);
       vi.mocked(slateStarts).mockResolvedValue(LATE);
@@ -459,40 +514,122 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
       const { status, body } = await call();
       expect(status).toBe(200);
       expect(body.fired).toBe(true);
-      expect(body.topup).toMatchObject({ fire: true, owed: 90, used: 3 });
+      expect(body.topup).toMatchObject({ fire: true, owed: 90, used: 3, slot: "12:00" });
       expect(String((body.topup as { reason: string }).reason)).toMatch(/day short \$90/);
-      const urls = fetchMock.mock.calls.map((c) => String((c as unknown[])[0]));
-      expect(urls.some((u) => u.includes("/api/generate?topup=1")), `generate not forwarded; fetched: ${urls.join(", ")}`).toBe(true);
+      const urls = urlsOf(fetchMock);
+      expect(urls.some((u) => /\/api\/generate\?topup=1&slot=12%3A00$/.test(u)), `generate not forwarded with the slot; fetched: ${urls.join(", ")}`).toBe(true);
+      expect(urls.some((u) => /\/api\/calibrate\?grade=only/.test(u)), `grading starved by the refill; fetched: ${urls.join(", ")}`).toBe(true);
       expect(body.generateStatus).toBe(200);
+      expect(body.grading).toMatchObject({ fired: true, status: 200 });
+      // the generate forward carries the cron header, never the query string
+      const gen = fetchMock.mock.calls.find((c) => String((c as unknown[])[0]).includes("/api/generate")) as unknown as [string, RequestInit];
+      expect((gen[1].headers as Record<string, string>)["x-cron-key"]).toBe(SECRET);
+      expect(String(gen[0])).not.toContain(SECRET);
     });
 
-    it("the same day with topup-4 already in the registry → refused on the cap, nothing forwarded", async () => {
+    it("the same day with topup-6 already in the registry → refused on the cap at the slot, nothing forwarded", async () => {
+      vi.setSystemTime(SLOT_NOON);
       const { kv } = fakeRedis();
-      seedDay(kv, 4);
+      seedDay(kv, 6);
       vi.mocked(slateStarts).mockResolvedValue(LATE);
       const fetchMock = stubGenerate();
       forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
       const { status, body } = await call();
       expect(status).toBe(200);
       expect(body.fired).toBe(false);
-      expect(body.topup).toMatchObject({ fire: false, owed: 90, used: 4 });
+      expect(body.topup).toMatchObject({ fire: false, owed: 90, used: 6, slot: "12:00" });
       expect(String((body.topup as { reason: string }).reason)).toMatch(/cap/);
-      expect(fetchMock.mock.calls.map((c) => String((c as unknown[])[0])).some((u) => u.includes("/api/generate"))).toBe(false);
+      expect(String((body.topup as { reason: string }).reason)).toBe("top-up cap spent (6/6)");
+      expect(urlsOf(fetchMock).some((u) => u.includes("/api/generate"))).toBe(false);
+      // five rows still fire — the bound is exactly TOPUP_MAX
+      seedDay(kv, 5);
+      const again = await call();
+      expect(again.body.fired).toBe(true);
     });
 
-    it("an EMPTY third sweep 30 min ago holds the fourth off (free) — TOPUP_EMPTY_RETRY_MS is wired into the route", async () => {
+    it("an EMPTY third sweep 30 min ago no longer holds the slot off — the cooldown is UNWIRED (INSTRUCTION 49); the 12:00 slot fires", async () => {
+      vi.setSystemTime(SLOT_NOON);
       const { kv } = fakeRedis();
       seedDay(kv, 3);
       const reg = JSON.parse(kv.get("pl:blocks:2026-09-05")!) as Record<string, Record<string, unknown>>;
-      reg["topup-3"] = { firedAt: NOW - 30 * 60_000, tickets: 0, budget: 90, at: NOW - 30 * 60_000 };
+      reg["topup-3"] = { firedAt: SLOT_NOON - 30 * 60_000, tickets: 0, budget: 90, at: SLOT_NOON - 30 * 60_000 };
+      kv.set("pl:blocks:2026-09-05", JSON.stringify(reg));
+      vi.mocked(slateStarts).mockResolvedValue(LATE);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { body } = await call();
+      expect(body.fired).toBe(true);
+      expect(String((body.topup as { reason: string }).reason)).not.toMatch(/seated nothing/);
+      expect(urlsOf(fetchMock).some((u) => u.includes("/api/generate?topup=1&slot=12%3A00"))).toBe(true);
+    });
+
+    it("SAME SLOT: a topup row already stamped slot 12:00 refuses a second poke inside the 12:00 window — /already ran today/, free", async () => {
+      vi.setSystemTime(SLOT_NOON + 9 * 60_000); // 12:12 PT — still inside the window
+      const { kv } = fakeRedis();
+      seedDay(kv, 3);
+      const reg = JSON.parse(kv.get("pl:blocks:2026-09-05")!) as Record<string, Record<string, unknown>>;
+      reg["topup-3"] = { firedAt: SLOT_NOON, tickets: 1, budget: 90, at: SLOT_NOON, slot: "12:00" };
       kv.set("pl:blocks:2026-09-05", JSON.stringify(reg));
       vi.mocked(slateStarts).mockResolvedValue(LATE);
       const fetchMock = stubGenerate();
       forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
       const { body } = await call();
       expect(body.fired).toBe(false);
-      expect(String((body.topup as { reason: string }).reason)).toMatch(/seated nothing/);
-      expect(fetchMock.mock.calls.map((c) => String((c as unknown[])[0])).some((u) => u.includes("/api/generate"))).toBe(false);
+      expect(body.topup).toMatchObject({ fire: false, slot: "12:00", used: 3 });
+      expect(String((body.topup as { reason: string }).reason)).toMatch(/already ran today/);
+      expect(String((body.topup as { reason: string }).reason)).toBe("refill slot 12:00 PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time");
+      expect(urlsOf(fetchMock).some((u) => u.includes("/api/generate"))).toBe(false);
+      // ...and the next slot (15:00 PT) is not held by a 12:00 row
+      vi.setSystemTime(Date.parse("2026-09-05T22:02:00Z"));
+      const next = await call();
+      expect(next.body.fired).toBe(true);
+      expect((next.body.topup as { slot: string }).slot).toBe("15:00");
+    });
+
+    it("a BLOCK FIRE on the 12:00 slot tick no longer eats the slot's grading: ?block= AND ?grade=only are forwarded together (fix round 2026-09-09)", async () => {
+      vi.setSystemTime(SLOT_NOON);
+      fakeRedis();
+      /* three starts 2 h ahead — inside LINEUP_LEAD_MS, so the block is ready 3/3 and fires */
+      const SOON = [Date.parse("2026-09-05T21:05:00Z"), Date.parse("2026-09-05T21:10:00Z"), Date.parse("2026-09-05T21:40:00Z")];
+      vi.mocked(slateStarts).mockResolvedValue(SOON);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { status, body } = await call();
+      expect(status).toBe(200);
+      expect(body.fired).toBe(true);
+      expect(body.block).toBe("2026-09-05T21:05Z");
+      const urls = urlsOf(fetchMock);
+      expect(urls.some((u) => /\/api\/generate\?block=/.test(u)), urls.join(", ")).toBe(true);
+      expect(urls.some((u) => /\/api\/calibrate\?grade=only/.test(u)), `grading lost to the block fire; fetched: ${urls.join(", ")}`).toBe(true);
+      expect(body.grading).toMatchObject({ fired: true, status: 200 });
+      expect(body.topup, "a block fire stands in for the slot's refill — no refill decision is printed").toBeUndefined();
+      // the football forwards carried the tick's slot
+      expect(forwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET, undefined, "12:00"]);
+    });
+
+    it("the two vercel.json crons (21:45Z, 00:00Z) never refill — both fall outside every window", async () => {
+      /* the free decision prints FIRST and the slot gate only overrides a would-fire, so each clock
+         needs a slate with games still ahead of it — the 00:00Z cron runs after the LATE trio */
+      const NIGHT = [Date.parse("2026-09-06T01:05:00Z"), Date.parse("2026-09-06T01:10:00Z"), Date.parse("2026-09-06T01:40:00Z")];
+      for (const [iso, slate] of [["2026-09-05T21:45:00Z", LATE], ["2026-09-06T00:00:00Z", NIGHT]] as [string, number[]][]) {
+        vi.setSystemTime(Date.parse(iso));
+        const { kv } = fakeRedis();
+        seedDay(kv, 3);
+        if (slate === NIGHT) {
+          // the NIGHT trio is its own block — mark it fired so a BLOCK fire does not take the poke first
+          const reg = JSON.parse(kv.get("pl:blocks:2026-09-05")!) as Record<string, unknown>;
+          reg["2026-09-06T01:05Z"] = { firedAt: NOW, tickets: 1, at: NOW };
+          kv.set("pl:blocks:2026-09-05", JSON.stringify(reg));
+        }
+        vi.mocked(slateStarts).mockResolvedValue(slate);
+        const fetchMock = stubGenerate();
+        forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+        const { body } = await call();
+        expect(body.fired, iso).toBe(false);
+        expect(body.topup, iso).toMatchObject({ fire: false, slot: null });
+        expect(String((body.topup as { reason: string }).reason), iso).toMatch(/not a refill slot/);
+        expect(urlsOf(fetchMock).some((u) => u.includes("/api/generate")), iso).toBe(false);
+      }
     });
   });
 
@@ -502,6 +639,8 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     expect(status).toBe(200);
     const { cfb: _cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb).toEqual(MLB_BODY);
+    expect((mlb.topup as { slot: unknown }).slot, "an off-slot poke must report slot null (INSTRUCTION 49)").toBeNull();
+    expect((mlb.grading as { fired: unknown }).fired).toBe(false);
     // `cfb` and `nfl` are the ONLY keys the wrapper adds, in that order (2026-09-08: the NFL forward)
     expect(Object.keys(body).filter((k) => !(k in MLB_BODY))).toEqual(["cfb", "nfl"]);
     expect(body.nfl).toEqual({ forwarded: true, status: 200, result: { status: "waiting" } });
@@ -727,9 +866,9 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     for (let i = 0; i < 50 && nflForwardMock.mock.calls.length === 0; i++) await Promise.resolve();
     expect(forwardMock.mock.calls.length, "the CFB forward was not started").toBe(1);
     expect(nflForwardMock.mock.calls.length, "the NFL forward waited for the CFB forward — sequential, not concurrent").toBe(1);
-    // both were sent the same origin and the real secret
-    expect(forwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET]);
-    expect(nflForwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET]);
+    // both were sent the same origin, the real secret, and the tick's slot (NOW is 11:27 PT — none)
+    expect(forwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET, undefined, null]);
+    expect(nflForwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET, undefined, null]);
     resolveNfl({ forwarded: true, status: 200, result: { status: "locked", core: 8 } });
     resolveCfb({ forwarded: true, status: 200, result: { status: "waiting" } });
     const { status, body } = await pending;

@@ -1,4 +1,23 @@
-# Progress — 2026-09-09 (INSTRUCTION 48: the card only grows)
+# Progress — 2026-09-09 (INSTRUCTION 49: refill on the five slots, or on Josh's own click)
+
+## Every desk — the card refills five times a day, or when Josh presses Refresh
+- Josh: "It shouldn't be refreshing every 15 minutes. It should be 8am, 9:30am, 12pm, 3pm & 4:45pm.
+  Other than that I can manually do it." Top-ups now fire only on the first scheduler tick after
+  08:00 / 09:30 / 12:00 / 15:00 / 16:45 PT — the same five slots grading already uses
+  (`REFILL_SLOTS_PT` = `GRADE_SLOTS_PT`) — or when Josh presses Refresh with his sync phrase stored
+  (`POST /api/refill?desk=mlb|cfb|nfl`, the identical server pass with slot `manual`).
+- First locks are unchanged (MLB lineup/first-pitch blocks, football 60-min lead). Nothing changes
+  on cron-job.org or in `vercel.json`; the 21:45Z / 00:00Z vercel crons never refill.
+- `TOPUP_MAX` 4 → 6 (five slots + one manual); the 45-min / 90-min cooldowns are unwired — the slot
+  calendar is the only pacing; a slot that already ran today is refused free (the slot is stamped
+  on the top-up row). Football `retryMs` → 0.
+- Budgets: none lowered, per Josh ("Don't lower any budgets") — the INSTRUCTION 48 props-budget
+  lever is countermanded; Josh buys credits instead. MLB hard ceiling 9 runs / 1,026–1,350
+  without a click, 10 runs / 1,140–1,500 with one, realistic 342–600; football slot-only
+  ≤ 5 attempts = 30 lines credits, 6 with one manual = 36, 42 including the lock's own pull.
+- Status: built on the shared tree, NOT committed, NOT deployed.
+
+# Earlier — 2026-09-09 (INSTRUCTION 48: the card only grows)
 
 ## Every desk — LOCKED is the first lock, not the end of the day
 - "Locked" now means the first lock happened, not that the day is closed: the desk keeps adding
@@ -6,6 +25,7 @@
   CFB/NFL card say "Still filling — $x of $y" while pregame games remain).
 - MLB sweeps up to 4 times a day (was 2), 45 min apart, an empty sweep waiting 90 min; a sweep
   that could not own an open slot is refused for free. Football: 6 attempts per arm (was 2).
+  (Cadence superseded the same day by INSTRUCTION 49 above: five PT slots + manual, TOPUP_MAX 6.)
 - A locked ticket is never removed or resized — enforced by `src/lib/append-only.ts` at every
   server write (MLB build + write, football top-up + write) and tested.
 - Credits: MLB worst case 6 → 8 full runs a date (912–1,200 at 114–150 each), football ≤42
@@ -55,4 +75,3 @@
   fair numbers, ¼-Kelly on a $250 season bank, season parlays, own store.
 - Parlay Calc left-aligned two-column from `lg`; Board overview collapsible.
 GATE: tsc clean, 165 files / 2358 tests green after two pin fixes.
-

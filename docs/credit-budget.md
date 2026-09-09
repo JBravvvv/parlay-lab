@@ -300,4 +300,39 @@ constants moved (`TOPUP_MAX` 2 → 4 with a 90-min empty-sweep cooldown, `CFB_TO
 | NFL | 18 | 42 | +24 | Sunday ≈ 1,000 props + 42; Thu/Mon dates lines-only ≤ 42 |
 | fixed rails (unchanged by this order) | ~231/day | ~231/day | 0 | `/api/clv` 45 + line-history 25 + props-history 161, this file's RE-MEASURED table |
 
-Remaining September (09-09..09-30: 22 MLB days, 3 Saturdays, 3 Sundays): MLB 22 × ~600 realistic = 13,200 (hard worst 26,400); fixed rails 22 × ~231 ≈ 5,080; CFB 3 × 2,542 = 7,626; NFL 3 × 1,042 + ~6 × 42 ≈ 3,380 — **≈ 29,300 realistic**. Against it: the plan is 20,000/month and the cycle resets ~10-01 (`docs/credit-budget.md`: "~24 days into the cycle" on 07-25); the last quota reading in the tree is **16,480 remaining on 2026-09-05** (`src/lib/cfb/rules.ts`, the `CFB_PROPS` docblock — its own line above records `x-requests-used` 2428 → 3187 in that Saturday's single props pull), read BEFORE that Saturday's spend and four further days, so the real 09-09 figure is materially lower and must be re-read off `/api/cfb`'s `quota.remaining` (a normal board read; this fix round made no Odds call) and dated. **On this arithmetic the month is ALREADY short by roughly 13,000 credits before the CFB Saturdays are counted** — MLB ~600/day + fixed ~231/day alone exceeds the ~630/day the 09-05 reading allowed — and exhausting the key takes `/api/clv` (the scoreboard) down with it. The month was over-subscribed by the PROPS rails before this order; this order adds ≤ +300/day on MLB and ≤ +24/date per football desk. The first lever is due NOW, pending Josh's word, in this order: `CFB_PROPS.dailyBudget` 2500 → 1500 (`src/lib/cfb/rules.ts`, the `CFB_PROPS` literal) → `NFL_PROPS.dailyBudget` 1000 (`src/lib/nfl/rules.ts`, the `NFL_PROPS` literal) → `TOPUP_MAX` 4 → 3 on Josh's word only.
+Remaining September (09-09..09-30: 22 MLB days, 3 Saturdays, 3 Sundays): MLB 22 × ~600 realistic = 13,200 (hard worst 26,400); fixed rails 22 × ~231 ≈ 5,080; CFB 3 × 2,542 = 7,626; NFL 3 × 1,042 + ~6 × 42 ≈ 3,380 — **≈ 29,300 realistic**. Against it: the plan is 20,000/month and the cycle resets ~10-01 (`docs/credit-budget.md`: "~24 days into the cycle" on 07-25); the last quota reading in the tree is **16,480 remaining on 2026-09-05** (`src/lib/cfb/rules.ts`, the `CFB_PROPS` docblock — its own line above records `x-requests-used` 2428 → 3187 in that Saturday's single props pull), read BEFORE that Saturday's spend and four further days, so the real 09-09 figure is materially lower and must be re-read off `/api/cfb`'s `quota.remaining` (a normal board read; this fix round made no Odds call) and dated. **On this arithmetic the month is ALREADY short by roughly 13,000 credits before the CFB Saturdays are counted** — MLB ~600/day + fixed ~231/day alone exceeds the ~630/day the 09-05 reading allowed — and exhausting the key takes `/api/clv` (the scoreboard) down with it. The month was over-subscribed by the PROPS rails before this order; this order adds ≤ +300/day on MLB and ≤ +24/date per football desk. ~~The first lever is due NOW, pending Josh's word, in this order: `CFB_PROPS.dailyBudget` 2500 → 1500 (`src/lib/cfb/rules.ts`, the `CFB_PROPS` literal) → `NFL_PROPS.dailyBudget` 1000 (`src/lib/nfl/rules.ts`, the `NFL_PROPS` literal) → `TOPUP_MAX` 4 → 3 on Josh's word only.~~ **COUNTERMANDED 2026-09-09 by INSTRUCTION 49** (Josh, verbatim: "I can purchase more credits. Don't lower any budgets.") — no props budget, top-up cap or any other budget is lowered; the shortfall is met by buying credits. See the section below.
+
+## 2026-09-09 INSTRUCTION 49 — refill on the five slots or Josh's click; budgets NOT lowered
+Josh, verbatim: "I can purchase more credits. Don't lower any budgets. I need high stakes days to
+really test the engine over time. It shouldn't be refreshing every 15 minutes. It should be 8am,
+9:30am, 12pm, 3pm & 4:45pm. Other than that I can manually do it and it can function the same way
+whether I manually refresh it or it refreshes itself automatically."
+
+What it does to spend: the top-up/refill pass now fires only on the first scheduler tick inside
+[slot, slot + 15 min) for 08:00 / 09:30 / 12:00 / 15:00 / 16:45 PT (`REFILL_SLOTS_PT` =
+`GRADE_SLOTS_PT`), or on Josh's own Refresh (`POST /api/refill` behind the sync phrase, slot
+`manual`). `TOPUP_MAX` 4 → **6** (five slots + one manual). The INSTRUCTION 48 cooldowns (MLB 45-min
+generate limiter for top-ups, 90-min empty-sweep hold, football 45-min retry) are unwired — the slot
+calendar is the only pacing. A refill refused BEFORE the pull (capped, same slot already ran, no
+paper lock, every game started, manual headroom) costs zero credits; an attempt that prices a board
+and seats nothing still costs that board — 6 credits on football, 114–150 on MLB — and, with the
+cooldowns unwired, may recur on the next slot. A manual click is refused free when it would spend
+an attempt an automatic slot still ahead today needs (`used + unstamped slots ahead >= TOPUP_MAX`).
+**No budget is lowered**: `CFB_PROPS.dailyBudget` stays 2500, `NFL_PROPS.dailyBudget` stays 1000,
+every allotment stays.
+
+| desk | hard ceiling per date | realistic |
+|---|---|---|
+| MLB | `MAX_RUNS_PER_DATE` 4 + `TOPUP_MAX` 6: **9 runs / 1,026–1,350 without a click, 10 runs / 1,140–1,500 with one** | 3–4 runs ≈ **342–600**; structurally the AUTOMATIC refills are 0–1 a date (the 16:45 slot, sometimes 15:00) because blocks fire through the afternoon and the last slot is 16:45 PT — the rest are Josh's clicks |
+| CFB | slot-only ≤ 5 attempts = **30** lines credits; 6 with one manual = **36**; **42** including the lock's own 6-credit pull | Saturday ≈ 2,500 props + lock 6 + whichever slots re-price |
+| NFL | same: **30 slot-only / 36 with one manual / 42 incl. the lock** | Sunday ≈ 1,000 props + lock 6 + slots; Thu/Mon lines-only |
+| fixed rails | ~231/day, unchanged | — |
+
+Versus INSTRUCTION 48: MLB's worst case rises from 8 to 10 runs a date (+228–300), but its realistic
+figure does not move (the slot calendar caps the day at five automatic passes where the 15-min
+ticker could have bought four back-to-back); football's ceiling is unchanged at 42 lines credits.
+The last quota reading in the tree is still **16,480 remaining on 2026-09-05** (`src/lib/cfb/rules.ts`,
+the `CFB_PROPS` docblock) — stale, no new reading was taken in this build; re-read it off
+`/api/cfb`'s `quota.remaining` on prod and date it. With the levers countermanded, the month's
+shortfall on the INSTRUCTION 48 arithmetic (≈ 29,300 realistic against a 20,000 plan) is met by
+purchasing credits, per Josh — the next tier above is documented earlier in this file.

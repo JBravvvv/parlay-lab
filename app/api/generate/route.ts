@@ -8,6 +8,7 @@ import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv, syncAuth
 import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-coverage";
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
+import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
@@ -49,8 +50,8 @@ const K_RUNS = "pl:gen:runs:";
     keeping a leak nearer the plan. NOTE: this bounds SERVER runs only — an in-app
     regenerate executes in the browser and never reaches this route, so the cap does
     not bound the spend most likely to run away. See docs/credit-budget.md.
-    Hard ceiling since 2026-09-09 (INSTRUCTION 48): MAX_RUNS_PER_DATE 4 + TOPUP_MAX 4 = 8
-    spending runs a day, 912-1,200 credits at the measured 114-150. */
+    Hard ceiling since 2026-09-09 (INSTRUCTION 49): MAX_RUNS_PER_DATE 4 + TOPUP_MAX 6 = 10
+    spending runs a day, 1,140-1,500 credits at the measured 114-150 (INSTRUCTION 48 had 8). */
 /* raised 3 → 4 (2026-08-08, per-block locking): the season's observed maximum is 4
    start-blocks/day at the derived 90-min partition (§12Z.15) — the cap = blocks-observed,
    and partitionBlocks coalesces beyond it so the cap keeps meaning */
@@ -109,18 +110,21 @@ export async function GET(req: NextRequest) {
   // travels in a HEADER, never the query string: this route spends money.
   const scheduled = !manual && cronHeaderAuthed(req);
   if (!manual && !scheduled) {
+    /* NO USER-AGENT FALLBACK (INSTRUCTION 49 fix round, 2026-09-09). This branch used to admit a
+       keyless request whose user-agent started with "vercel-cron" during UTC 12-20. vercel.json's
+       two crons target /api/scheduler (never this route) and Vercel authenticates them with
+       `Authorization: Bearer <CRON_SECRET>`, which cronHeaderAuthed already accepts — so the
+       fallback served no legitimate caller, only a forged header, and with the top-up limiter
+       bypass below it would have turned a curl into a fast credit burn. Unauthenticated is 401. */
     const ua = req.headers.get("user-agent") ?? "";
-    const hour = new Date().getUTCHours();
-    if (!ua.startsWith("vercel-cron") || hour < 12 || hour >= 21) {
-      // (c) leave a trail a probe would show up in — this endpoint spends quota,
-      // so repeated 401s here are worth noticing in the Vercel logs
-      console.warn(
-        `[generate] unauthorized attempt ua=${JSON.stringify(ua.slice(0, 80))} hour=${hour}UTC ` +
-          `key=${req.headers.get("x-cron-key") ? "header-bad" : req.nextUrl.searchParams.get("key") ? "query-attempt" : "none"} ` +
-          `ip=${req.headers.get("x-forwarded-for") ?? "?"}`,
-      );
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+    // (c) leave a trail a probe would show up in — this endpoint spends quota,
+    // so repeated 401s here are worth noticing in the Vercel logs
+    console.warn(
+      `[generate] unauthorized attempt ua=${JSON.stringify(ua.slice(0, 80))} ` +
+        `key=${req.headers.get("x-cron-key") ? "header-bad" : req.nextUrl.searchParams.get("key") ? "query-attempt" : "none"} ` +
+        `ip=${req.headers.get("x-forwarded-for") ?? "?"}`,
+    );
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   if (!process.env.ODDS_API_KEY) return NextResponse.json({ error: "no ODDS_API_KEY" }, { status: 503 });
 
@@ -128,7 +132,27 @@ export async function GET(req: NextRequest) {
     const now = Date.now();
     const lastRun = Number(await redis(["GET", K_LASTGEN])) || 0;
     const force = manual && req.nextUrl.searchParams.get("force") === "1";
-    if (!force && now - lastRun < 45 * 60_000) {
+    const blockKey = req.nextUrl.searchParams.get("block");
+    /* TOP-UP SWEEP (2026-08-19, Josh: "$150 every day no matter what"): a topup fire
+       buys FRESH prices for a day whose fires left it short — evening props post late,
+       which is exactly when the earlier fires found a thin pool. It bypasses the
+       good-board skip (the stored board's staleness is the problem being solved) but is
+       bounded by its own registry cap and the run-cap headroom.
+       INSTRUCTION 49 (2026-09-09): a top-up also bypasses the 45-min K_LASTGEN limiter —
+       the slot calendar (decideRefillTick) and decideTopUp's same-slot refusal are its
+       pacing, and Josh's manual Refresh right after a slot must be honoured. K_LASTGEN is
+       still SET below, so plain browser generates stay limited as before.
+       CRON PATH ONLY (fix round, 2026-09-09): `topup` — and with it the limiter bypass and the
+       TOPUP_MAX run-cap headroom — is honoured only for a cron-keyed caller. Josh's own Refresh
+       reaches it through POST /api/refill, which runs decideTopUp first and forwards with
+       x-cron-key; a sync-phrase GET ?topup=1 is a plain generate and stays 45-min limited. */
+    const topup = !blockKey && scheduled && req.nextUrl.searchParams.get("topup") === "1";
+    const slotRaw = req.nextUrl.searchParams.get("slot");
+    const slot: string | undefined = slotRaw ?? undefined;
+    if (topup && slot !== undefined && slot !== "manual" && !(REFILL_SLOTS_PT as readonly string[]).includes(slot)) {
+      return NextResponse.json({ ok: false, error: "bad slot" }, { status: 400 });
+    }
+    if (!force && !topup && now - lastRun < 45 * 60_000) {
       return NextResponse.json({ ok: true, skipped: "ran recently" });
     }
     /* PACIFIC, not server-local. On a UTC host every run after 00:00 UTC used to key
@@ -152,13 +176,6 @@ export async function GET(req: NextRequest) {
        becomes good-BLOCK-skip — a block that already fired never fires again (the
        registry is the record), and the day-level good-board skip must NOT block a second
        block's fire (that is exactly the one-shot-per-day defect this ship removes). */
-    const blockKey = req.nextUrl.searchParams.get("block");
-    /* TOP-UP SWEEP (2026-08-19, Josh: "$150 every day no matter what"): a topup fire
-       buys FRESH prices for a day whose fires left it short — evening props post late,
-       which is exactly when the earlier fires found a thin pool. It bypasses the
-       good-board skip (the stored board's staleness is the problem being solved) but is
-       bounded by its own registry cap, the 45-min limiter, and the run-cap headroom. */
-    const topup = !blockKey && req.nextUrl.searchParams.get("topup") === "1";
     let topupKey: string | null = null;
     if (blockKey) {
       const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
@@ -172,6 +189,21 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ ok: true, skipped: "topup-cap", used, cap: TOPUP_MAX });
       }
       topupKey = `topup-${used + 1}`;
+      /* CLAIM BEFORE SPEND (INSTRUCTION 49 fix round, 2026-09-09): football writes its claim row
+         before it pulls; MLB wrote the `topup-N` row only AFTER collectSlate (~60 s, 114-150
+         credits), so a second poke inside the same slot window — a ticker re-poke on the
+         scheduler's 90 s timeout, or Josh's click — found no row, passed decideTopUp again and
+         bought a second board. Record the attempt NOW, slot-stamped, as an in-flight row: it
+         counts toward `used` and the same-slot refusal from this instant; the success path and
+         the catch below overwrite the same key with the real outcome. A key that already holds
+         an in-flight row younger than the generate budget is another caller's claim — yield.
+         Not atomic (GET + SET), but the window shrinks from ~60 s to one round trip. */
+      const inflight = reg[topupKey];
+      if (inflight && inflight.reason === "in flight" && typeof inflight.at === "number" && now - inflight.at < 5 * 60_000) {
+        return NextResponse.json({ ok: true, skipped: "topup-claimed", key: topupKey, at: inflight.at });
+      }
+      reg[topupKey] = { at: now, tickets: 0, reason: "in flight", ...(slot ? { slot } : {}) };
+      await redisSetJson(BLOCKS_KEY(dateNow), reg);
     } else if (!force) {
       const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
       /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
@@ -208,8 +240,8 @@ export async function GET(req: NextRequest) {
     /* top-up fires get TOPUP_MAX headroom above the cap (the block fires can lawfully
        spend all four runs); their own registry cap above bounds them at TOPUP_MAX, so
        the hard ceiling is MAX_RUNS_PER_DATE + TOPUP_MAX runs a day, leak or no leak.
-       TOPUP_MAX headroom is 4 since INSTRUCTION 48 (2026-09-09) — hard ceiling 8 spending
-       runs a day, 912-1,200 credits at the measured 114-150. */
+       TOPUP_MAX headroom is 6 since INSTRUCTION 49 (2026-09-09) — hard ceiling 10 spending
+       runs a day, 1,140-1,500 credits at the measured 114-150. */
     if (runs > MAX_RUNS_PER_DATE + (topup ? TOPUP_MAX : 0)) {
       console.warn(`[generate] run cap hit: ${runs} spending runs on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
       return NextResponse.json(
@@ -484,7 +516,7 @@ export async function GET(req: NextRequest) {
       if ((blockKey && blockGkeys) || topupKey) {
         const k = topupKey ?? (blockKey as string);
         const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
-        reg[k] = { firedAt: now, tickets: (entry.blocks?.[k]?.tickets ?? 0), budget: blockBudget, at: now };
+        reg[k] = { firedAt: now, tickets: (entry.blocks?.[k]?.tickets ?? 0), budget: blockBudget, at: now, ...(topup && slot ? { slot } : {}) };
         await redisSetJson(BLOCKS_KEY(date), reg);
       }
       lockedEntry = entry;
@@ -505,14 +537,15 @@ export async function GET(req: NextRequest) {
          went at collectSlate() and K_RUNS was INCR'd at the point of commitment, but the
          `topup-N` registry row was only written on success — so a sweep whose lock threw
          (OVER THE DAY, TWO ALLOCATORS, validateLedger, and now APPEND ONLY) neither counted
-         against TOPUP_MAX nor armed TOPUP_EMPTY_RETRY_MS, and the next poke past the 45-min
-         limiter bought another full board. Mirror football's claim-before-spend: record the
+         against TOPUP_MAX nor armed TOPUP_EMPTY_RETRY_MS (the cooldown; unwired since
+         INSTRUCTION 49 — the row now carries `slot` so the same-slot refusal holds instead),
+         and the next poke bought another full board. Mirror football's claim-before-spend: record the
          attempt as an empty fire so it counts and cools down. Best-effort — a store error
          here must not mask the lock error already reported. */
       if (topupKey) {
         try {
           const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
-          reg[topupKey] = { firedAt: now, tickets: 0, reason: `lock failed: ${(e as Error).message}`, at: now };
+          reg[topupKey] = { firedAt: now, tickets: 0, reason: `lock failed: ${(e as Error).message}`, at: now, ...(slot ? { slot } : {}) };
           await redisSetJson(BLOCKS_KEY(dateNow), reg);
         } catch (e2) {
           console.warn(`[generate] could not record the failed top-up ${topupKey}: ${(e2 as Error).message}`);

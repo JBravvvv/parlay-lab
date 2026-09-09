@@ -2,6 +2,7 @@ import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
 import { CFB_LEAGUE, CFB_LOCK } from "@/lib/cfb/rules";
+import { manualHeadroomRefusal, unstampedSlotsAhead } from "@/lib/server/grading-progress";
 import type { CfbBoard, CfbCard, CfbGame, CfbLedgerEntry, CfbTicket } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
 
@@ -381,7 +382,10 @@ export const buildCfbSweepEntry = (board: CfbBoard, opts: SweepEntryOpts): CfbLe
  * that refuses MORE spending, never less — so an existing blob can never buy an extra priced board
  * on the deploy that ships this, exactly as a row with no `filled` keeps the old reading.
  */
-export type CfbTopUpRecord = { at: number; n: number; core: number; stake: number; fun?: number; filled?: boolean; arms?: { core: boolean; fun: boolean } };
+/** `slot` (INSTRUCTION 49, 2026-09-09): the refill slot the attempt fired on — one of REFILL_SLOTS_PT
+ *  ("08:00" … "16:45") or "manual" — stamped at the claim and carried into the filled row, so a
+ *  second poke inside the same slot window is refused for free. A row without it predates the field. */
+export type CfbTopUpRecord = { at: number; n: number; core: number; stake: number; fun?: number; filled?: boolean; arms?: { core: boolean; fun: boolean }; slot?: string };
 
 /**
  * `core` and `fun` say WHICH ALLOTMENT opened (INSTRUCTION 45, 2026-09-06, DEFECT M(a)). They are
@@ -503,7 +507,7 @@ export function cfbCoreGamesOf(entry: CfbLedgerEntry): Set<string> {
  * The one reason that is NOT free — every game has kicked off — needs the ESPN board and so lives
  * in the route, after this returns `fire: true`.
  */
-export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: number, opts?: { claim?: number }): CfbTopUpDecision {
+export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: number, opts?: { claim?: number; slot?: string }): CfbTopUpDecision {
   if (entry.source !== cfg.lockSource) {
     return { fire: false, reason: `${entry.date} was locked on the device (Builder) — Josh's own card is his; the server never adds tickets to it.` };
   }
@@ -606,7 +610,7 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
    * complete having seated the day's FUN parlay and no core ticket, `core === 0` no longer means
    * "in flight" — see `isClaimRow` and `CfbTopUpRecord`. MEASURED against the old reading: an entry
    * carrying a completed fun-only row at ordinal 1 and one further attempt answered `fire: true` to
-   * a poke passing `{ claim: 1 }`, handing out a THIRD attempt past CFB_TOPUP_MAX = 2.
+   * a poke passing `{ claim: 1 }`, handing out a THIRD attempt past CFB_TOPUP_MAX (then 2, 6 since INSTRUCTION 48).
    */
   const rows = cfbTopUpsOf(entry);
   const held = opts?.claim == null ? undefined : rows.find((r) => r.n === opts.claim && isClaimRow(r));
@@ -664,7 +668,34 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
       reason: `the top-up cap is spent (${n} of ${cfg.topUp.max}) — $${room} of the $${paper.daily} core and $${funRoom} of the $${paper.fun} fun stay undeployed rather than grind the odds quota all day.`,
     };
   }
-  /* AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (CFB_TOPUP_RETRY_MS, the MLB desk's own 45 minutes).
+  /* MANUAL HEADROOM (INSTRUCTION 49 fix round, 2026-09-09, free): the five slots and Josh's clicks
+     draw from ONE pool of cfg.topUp.max attempts per arm, so a manual attempt may only spend an arm
+     whose remaining attempts exceed the automatic slots still ahead today (used + ahead < max);
+     when neither arm has that headroom the click is refused with the shared exact string. After
+     the 16:45 slot nothing is ahead and a click is honoured up to the cap. */
+  const slot = opts?.slot;
+  const ahead = slot === "manual" ? unstampedSlotsAhead(now, others.map((r) => r.slot)) : 0;
+  const coreHeld = slot === "manual" && used + ahead >= cfg.topUp.max;
+  const funHeld = slot === "manual" && funUsed + ahead >= cfg.topUp.max;
+  if (slot === "manual" && (!coreOpen || coreSpent || coreHeld) && (!funOpen || funSpent || funHeld)) {
+    return { fire: false, reason: manualHeadroomRefusal(cfg.topUp.max - (coreOpen ? used : funUsed), ahead) };
+  }
+  /* ONE ATTEMPT PER REFILL SLOT (INSTRUCTION 49, 2026-09-09). The route computes the slot from its
+     own clock (decideRefillTick), takes a validated ?slot= from the scheduler's tick, or takes
+     "manual" from ?manual=1. ANY recorded attempt stamped with this slot — a filled row, OR an
+     empty attempt's unfilled claim (claimTopUp stamps `slot` before the pull and an empty probe
+     leaves it `filled: false`) — means the slot's attempt ran, and a second pulse inside the same
+     15-minute window is refused free. That is what makes "slot-only ≤ 5 attempts" true: narrowing
+     this to filled rows would re-open an empty slot to a second buy. Compared against `others`
+     (every row but this poke's own held claim); never applied to a manual attempt. */
+  if (slot && slot !== "manual" && others.some((r) => r.slot === slot)) {
+    return {
+      fire: false,
+      reason: `refill slot ${slot} PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time`,
+    };
+  }
+  /* AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (CFB_TOPUP_RETRY_MS — 0 since INSTRUCTION 49, 2026-09-09,
+     so this gate is inert; kept because the pin and the type read it, and a future tune is one line).
      The attempts are only worth having if they are spread: two spent inside half an hour of the
      lock price the same board twice. This gates ONLY a predecessor that seated nothing — an
      attempt that found tickets says the board is moving, and the next may run on the next pulse. */
@@ -736,8 +767,8 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
     used,
     funUsed,
     n: held ? (opts!.claim as number) : Math.max(attempts + 1, maxN + 1, idN + 1),
-    core: coreOpen && !coreSpent,
-    fun: funOpen && !funSpent,
+    core: coreOpen && !coreSpent && !coreHeld,
+    fun: funOpen && !funSpent && !funHeld,
   };
 }
 /** today's signature, CFB-bound */
@@ -764,7 +795,7 @@ export const decideCfbTopUp = (entry: CfbLedgerEntry, now: number, opts?: { clai
  * That is deliberate and stated rather than hidden: `dry` writes nothing at all by contract, and
  * it is reachable only by hand, with the cron secret — no ticker ever sends it.
  */
-export function claimTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }): CfbLedgerEntry {
+export function claimTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }, slot?: string): CfbLedgerEntry {
   /* `cfg` reads no knob here (2026-09-08): it is the seam's contract — every top-up write on this
      rail names its league, so a caller cannot claim on one desk and apply on the other. The
      source gate itself lives in `decideTopUp`, which runs before any claim is written. */
@@ -789,13 +820,13 @@ export function claimTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, n: number, 
      never actually spent. See `spentCoreAttempt` / `spentFunAttempt`. */
   (next as Record<string, unknown>).topUps = [
     ...cfbTopUpsOf(entry).filter((r) => !(r.n === n && isClaimRow(r))),
-    { at: now, n, core: 0, stake: 0, filled: false, arms: { core: arms.core, fun: arms.fun } },
+    { at: now, n, core: 0, stake: 0, filled: false, arms: { core: arms.core, fun: arms.fun }, ...(slot ? { slot } : {}) },
   ];
   return next;
 }
 /** today's signature, CFB-bound */
-export const claimCfbTopUp = (entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }): CfbLedgerEntry =>
-  claimTopUp(CFB_LEAGUE, entry, n, now, arms);
+export const claimCfbTopUp = (entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }, slot?: string): CfbLedgerEntry =>
+  claimTopUp(CFB_LEAGUE, entry, n, now, arms, slot);
 
 /**
  * GIVE THE ATTEMPT BACK (2026-09-06, the critic's second pass, CRITIC 8) — pure; the route writes
@@ -1081,7 +1112,7 @@ export function applyTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, plan: CfbTo
   const claim = rows.find((r) => r.n === n && isClaimRow(r));
   const topUps = [
     ...rows.filter((r) => !(r.n === n && isClaimRow(r))),
-    { at: now, n, core: plan.tickets.length, stake: plan.stake, fun: plan.fun.length, filled: true, ...(claim?.arms ? { arms: claim.arms } : {}) },
+    { at: now, n, core: plan.tickets.length, stake: plan.stake, fun: plan.fun.length, filled: true, ...(claim?.arms ? { arms: claim.arms } : {}), ...(claim?.slot ? { slot: claim.slot } : {}) },
   ];
   const core = [...entry.core, ...plan.tickets];
   const staked = cfbStakeOf(core);

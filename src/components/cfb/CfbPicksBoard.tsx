@@ -23,6 +23,8 @@ import { CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlay
 import { CFB_BANK_BASE } from "@/lib/cfb/rules";
 import { decimalToAmerican, payout, profit } from "@/lib/calc-math";
 import { usd } from "@/lib/ticket-payout";
+import { getSyncKey } from "@/lib/ledgerSync";
+import { refillDesk, refillReason } from "@/lib/refill-client";
 
 /**
  * THE LEAGUE SEAM (2026-09-08, the NFL build): this Board is the shared football picks surface.
@@ -163,21 +165,43 @@ export function CfbRefreshPill() {
   const propsKey = L.id === "cfb" ? CFB_PROPS_KEY_PREFIX : L.client.propsQueryKey(null, L.bankBase).slice(0, 2);
   const cfbFetching = useIsFetching({ queryKey: CFB_SLATE_KEY_PREFIX }) + useIsFetching({ queryKey: CFB_PROPS_KEY_PREFIX });
   const ownFetching = useIsFetching({ queryKey: slateKey }) + useIsFetching({ queryKey: propsKey });
-  const fetching = (L.id === "cfb" ? cfbFetching : ownFetching) > 0;
+  /* INSTRUCTION 49: the refill call counts as fetching — one pinned `disabled={fetching}`, one "Pulling…" label */
+  const [refilling, setRefilling] = useState(false);
+  const fetching = (L.id === "cfb" ? cfbFetching : ownFetching) > 0 || refilling;
   /** the props route's PRE-KICK window in hours (props.revalidateSec) and its in-play window in minutes — the pill's
       title can see no board, so it names both; a loaded board prints its own window through the cache label */
   const PROPS_CACHE_H = L.props.revalidateSec / 3600;
   const LIVE_CACHE_MIN = L.props.liveRevalidateSec / 60;
+  /* INSTRUCTION 49: after the re-price, with the sync phrase stored, run the desk's refill pass
+     (POST /api/refill — the same server pass the five slots run) and print its one-line answer */
+  const [note, setNote] = useState<string | null>(null);
+  const onClick = async () => {
+    await (L.id === "cfb" ? refreshCfbBoard(qc) : refreshLeagueBoard(qc, L));
+    if (!getSyncKey()) return;
+    setRefilling(true);
+    try {
+      const r = await refillDesk(L.id);
+      setNote(refillReason(r.body));
+      void L.sync.syncNow();
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefilling(false);
+    }
+  };
   return (
-    <Pill
-      variant="primary"
-      onClick={() => void (L.id === "cfb" ? refreshCfbBoard(qc) : refreshLeagueBoard(qc, L))}
-      disabled={fetching}
-      title={`Re-pulls the slate and the player props. Sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play — a refresh inside the window spends no Odds API quota.`}
-      data-testid="cfb-refresh-board"
-    >
-      {fetching ? "Pulling…" : "Refresh Board"}
-    </Pill>
+    <>
+      <Pill
+        variant="primary"
+        onClick={() => void onClick()}
+        disabled={fetching}
+        title={`Re-pulls the slate and the player props. Sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play — a refresh inside the window spends no Odds API quota. With your sync phrase stored it then runs the desk's refill pass (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run).`}
+        data-testid="cfb-refresh-board"
+      >
+        {fetching ? "Pulling…" : "Refresh Board"}
+      </Pill>
+      {note && <span className="ml-2 text-xs text-muted" data-testid="cfb-refill-note">{note}</span>}
+    </>
   );
 }
 

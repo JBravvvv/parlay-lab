@@ -5,13 +5,14 @@ import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
-import { BLOCKS_KEY, dayConsumed, decideBlock, decideTopUp, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
+import { BLOCKS_KEY, decideBlock, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, readShapeCalibration, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
-import { PAPER, TOPUP_EMPTY_RETRY_MS, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
-import { decideGradePass } from "@/lib/server/grading-progress";
+import { decideGradePass, decideRefillTick } from "@/lib/server/grading-progress";
+import { decideMlbRefill, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
@@ -42,13 +43,12 @@ export const maxDuration = 90; // the generate forward can take ~60s on a full s
    NO signal and NO timeout at either call site, so ~60 s of generate plus the football forwards'
    25 s abort (CFB_LOCK.forwardTimeoutMs, NFL_LOCK.forwardTimeoutMs — both 25_000) is
    25_000 + 60_000 = 85_000 — FIVE seconds of headroom, and a generate slower than 65 s kills
-   the invocation before that abort can bind. The 5 s headroom still holds with the NFL forward
-   added because the two forwards run CONCURRENTLY (Promise.allSettled): the tick's worst case is
-   max(cfb 25 s, nfl 25 s) + the ~60 s generate, not their sum. What IS guaranteed is that the
-   forwards are the tick's LAST step, after mlbTick has answered and after /api/generate has
-   committed under its own 300 s budget: a platform kill costs the poke its HTTP answer and that
-   pulse's football locks, never an MLB write, and the next pulse retries. Closing the 5 s gap for
-   real means timing the generate fetch, which this change does not touch. */
+   the invocation before that abort can bind. SUPERSEDED (INSTRUCTION 49 fix round, 2026-09-09):
+   the two football forwards now START TOGETHER WITH mlbTick (see GET), so the tick's worst case
+   is max(cfb 25 s, nfl 25 s, ~60 s generate) ≈ 60 s — 30 s of headroom, and a slow generate no
+   longer delays the football locks or their refill slot. What IS still guaranteed: /api/generate
+   commits under its own 300 s budget, so a platform kill costs the poke its HTTP answer, never
+   an MLB write; a football forward that already returned has already written its day. */
 
 /* slateStarts moved to src/lib/server/slate.ts 2026-08-06 (one copy of the feed URL) so
    /api/generate's gen.slate scope stamp reads the same population this decision does.
@@ -107,13 +107,28 @@ export const maxDuration = 90; // the generate forward can take ~60s on a full s
  *     is returned as-is.
  */
 export async function GET(req: NextRequest) {
+  /* THE GATE, BEFORE ANYTHING IS FORWARDED: the same two predicates as before (CRON_SECRET set,
+     cronHeaderAuthed) — an unauthenticated poke never makes the server reach a lock route
+     carrying the real secret. mlbTick still answers its own 503/401 for those pokes. */
+  const authed = !!process.env.CRON_SECRET && cronHeaderAuthed(req);
+  /* THE TWO FOOTBALL FORWARDS START WITH THE MLB TICK, NOT AFTER IT (INSTRUCTION 49 fix round,
+     2026-09-09). They used to wait for mlbTick's answer; on a refill tick that answer includes a
+     ~60 s generate, and the football routes decide the slot from their own clock — so a slow
+     MLB generate (or a platform kill at maxDuration 90) silently cost CFB/NFL the whole slot,
+     with no claim row and no retry until the next slot. Now: the slot is decided ONCE here, at
+     the tick's clock, and forwarded as ?slot= so both desks agree about which slot this tick
+     is; the forwards run concurrently with the MLB tick under allSettled (a REJECTED forward on
+     either desk degrades to { forwarded: false, error } instead of escaping GET); and the
+     tick's worst case is max(cfb 25 s, nfl 25 s, ~60 s generate), not their sum — see the
+     BUDGET note above maxDuration. The gate is unchanged: nothing starts unless authed. */
+  const secret = process.env.CRON_SECRET ?? "";
+  const tickSlot = decideRefillTick(Date.now()).slot;
+  const football = authed
+    ? Promise.allSettled([forwardCfbLock(req.nextUrl.origin, secret, undefined, tickSlot), forwardNflLock(req.nextUrl.origin, secret, undefined, tickSlot)])
+    : null;
   const res = await mlbTick(req);
-  if (!process.env.CRON_SECRET || !cronHeaderAuthed(req)) return res;
-  const secret = process.env.CRON_SECRET;
-  /* THE TWO FOOTBALL FORWARDS, CONCURRENT (2026-09-08): allSettled, so a REJECTED forward on
-     either desk degrades to { forwarded: false, error } instead of escaping GET, and the tick's
-     worst case stays max(cfb, nfl) + generate — see the BUDGET note above maxDuration. */
-  const [cfbR, nflR] = await Promise.allSettled([forwardCfbLock(req.nextUrl.origin, process.env.CRON_SECRET), forwardNflLock(req.nextUrl.origin, secret)]);
+  if (!football) return res;
+  const [cfbR, nflR] = await football;
   const cfb: CfbForwardResult = cfbR.status === "fulfilled" ? cfbR.value : { forwarded: false, error: (cfbR.reason as Error).message };
   const nfl: NflForwardResult = nflR.status === "fulfilled" ? nflR.value : { forwarded: false, error: (nflR.reason as Error).message };
   if (!cfb.forwarded) console.warn(`[scheduler] cfb lock forward failed: ${cfb.error}`);
@@ -245,80 +260,50 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        $49). When every block has fired or died, the paper day is still short, and
        pregame games remain, forward a plain generate with ?topup=1 for fresh prices —
        evening props post late, which is exactly when the earlier fires found a thin
-       pool. decideTopUp is pure and printed every poke; generate's 45-min limiter,
-       run-cap headroom, and TOPUP_MAX registry cap govern the actual spend.
+       pool. The decision (src/lib/server/refill.ts decideMlbRefill → decideTopUp) is
+       pure and printed every poke; generate's run-cap headroom and TOPUP_MAX registry
+       cap govern the actual spend.
        INSTRUCTION 48 (2026-09-09, Josh: "it can lock multiple times per day, but it can
-       never remove a pick it can only add to it"): up to TOPUP_MAX (4) sweeps a day, ≥45 min
-       apart (generate's limiter), an empty sweep holds the next off TOPUP_EMPTY_RETRY_MS
-       (90 min), and a sweep that cannot own an open slot is refused free (slot-fit). The
-       card only grows: every fire carries the day's tickets verbatim and assertAppendOnly
-       (src/lib/append-only.ts) throws before any write that would drop or resize one. */
-    let topup: Record<string, unknown>;
-    /* CANNOT FILL FURTHER IS TERMINAL (fix round 2026-09-08, INSTRUCTION 46 seating): when
-       every open slot the day still carries is named `cannot fill further` — carried legacy
-       money that no slot could seat is occupying their share of the $150 — a top-up would
-       rebuild the same seating, deploy $0 and spend a full generate (114-150 Odds credits measured, app/api/generate/route.ts:46) doing it. The sweep
-       stops here, before decideTopUp reads the shortfall as money it can still place. A day
-       whose open slots include ordinary shortfalls (thin pool, gate) still sweeps as before. */
-    const lockEntry = await getLockEntry(date);
-    const unfilled = ((lockEntry as { slotsUnfilled?: { reason?: unknown }[] } | null)?.slotsUnfilled ?? []).filter((u) => u && typeof u === "object");
-    const cannotFill = unfilled.length > 0 && unfilled.every((u) => String(u.reason ?? "").includes("cannot fill further"));
-    const tu = cannotFill
-      ? {
-          fire: false,
-          reason: `cannot fill further — the day's ${unfilled.length} open slot${unfilled.length === 1 ? "" : "s"} hold no seat for the carried money; a top-up would change nothing`,
-          owed: Math.max(0, PAPER.daily - dayConsumed(lockEntry as Record<string, unknown> | null)),
-          used: Object.keys(reg ?? {}).filter((k) => k.startsWith("topup-")).length,
-        }
-      : decideTopUp({
-          entry: lockEntry,
-          blocks: blocksArr,
-          registry: reg,
-          starts,
-          now,
-          daily: PAPER.daily,
-          max: TOPUP_MAX,
-          emptyRetryMs: TOPUP_EMPTY_RETRY_MS,
-        });
-    if (tu.fire) {
-      const gen = await fetch(new URL("/api/generate?topup=1", req.nextUrl.origin), {
-        headers: { "x-cron-key": process.env.CRON_SECRET },
-        cache: "no-store",
-      });
-      let genBody: unknown = null;
-      try {
-        genBody = await gen.json();
-      } catch {
-        genBody = { error: "generate returned non-JSON" };
-      }
-      console.log(`[scheduler] TOP-UP fired for ${date}: owed $${tu.owed}, generate ${gen.status}`);
-      return NextResponse.json({ fired: true, topup: tu, generateStatus: gen.status, generate: genBody, lock, ...body });
-    }
-    topup = tu as unknown as Record<string, unknown>;
+       never remove a pick it can only add to it"): the card only grows — every fire
+       carries the day's tickets verbatim and assertAppendOnly (src/lib/append-only.ts)
+       throws before any write that would drop or resize one.
+       INSTRUCTION 49 (2026-09-09, Josh: "It shouldn't be refreshing every 15 minutes. It
+       should be 8am, 9:30am, 12pm, 3pm & 4:45pm"): the sweep fires ONLY on the first tick
+       inside a REFILL_SLOTS_PT window (decideRefillTick — the grading calendar), up to
+       TOPUP_MAX (6) a day; the slot is carried to generate (?slot=) and stamped on the
+       registry row so a second poke in the same window is refused free. No cooldown any
+       more (TOPUP_EMPTY_RETRY_MS is unwired). Josh's own Refresh (POST /api/refill) runs
+       the identical pass with slot "manual" at any time. The free decision runs FIRST and
+       the slot gate is applied to its answer, so an off-slot poke still prints the day's
+       real refusal (no lock / owed / cap / …) when there is one. */
+    const rt = decideRefillTick(now);
+    /* readMlbDay re-reads the registry on purpose (not the `reg` above): the orphan overlay may
+       have just written, and a generate can land between the two reads — the fresh copy is the
+       one the same-slot / cap gates must see. One extra Redis GET a poke, deliberately. */
+    const day = await readMlbDay(date, { starts });
+    /* an off-slot tick prints the day's free reason with NO slot — never "manual", which would
+       apply the manual-headroom gate (Josh's clicks only) to the ticker */
+    const tu0 = decideMlbRefill({ ...day, now, ...(rt.slot ? { slot: rt.slot } : {}) });
+    const topup: Record<string, unknown> = tu0.fire && !rt.fire ? { ...tu0, fire: false, slot: null, reason: rt.reason } : { ...tu0, slot: rt.slot };
+    const refillFires = topup.fire === true;
     /* DAILY GRADING TICKS (2026-08-06; cadence re-pinned 2026-09-08, INSTRUCTION 46b): on the
        first tick after each GRADE_SLOTS_PT time — 08:00/09:30/12:00/15:00/16:45 Pacific, all
        inside the cron-job.org poke window (grading-progress.ts) — forward
        to /api/calibrate?grade=only — grades every board row + labels populations + writes
        the learning progress artifact, and touches NOTHING the engine reads (the mode's own
-       write gate). Runs only on no-fire pokes: a board fire outranks the grading tick, and
-       the next grading slot covers it. Zero Odds credits (statsapi + Redis). */
-    let grading: Record<string, unknown>;
+       write gate). Runs on no-fire pokes only (a block fire outranks it). Zero Odds credits.
+       INSTRUCTION 49: the refill and the grading share the same slots, so the two forwards
+       run TOGETHER (allSettled) — a refill no longer starves the grading pass. */
     const gp = decideGradePass(now);
-    if (gp.fire) {
-      try {
-        const res = await fetch(new URL("/api/calibrate?grade=only", req.nextUrl.origin), {
-          headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
-          cache: "no-store",
-        });
-        let gBody: unknown = null;
-        try { gBody = await res.json(); } catch { gBody = null; }
-        grading = { fired: true, status: res.status, result: gBody };
-        console.log(`[scheduler] grade-only pass: ${res.status}`);
-      } catch (e) {
-        grading = { fired: true, error: (e as Error).message };
-      }
-    } else {
-      grading = { fired: false, reason: gp.reason };
+    const [gen, cal] = await Promise.allSettled([
+      refillFires ? forwardMlbRefill({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: rt.slot! }) : Promise.resolve(null),
+      gp.fire ? gradeForward(req.nextUrl.origin, process.env.CRON_SECRET) : Promise.resolve(null),
+    ]);
+    const grading = await gradingReport(gp, cal);
+    if (refillFires) {
+      const g = gen.status === "fulfilled" && gen.value ? gen.value : { generateStatus: 0, generate: { error: gen.status === "rejected" ? (gen.reason as Error).message : "no forward" } };
+      console.log(`[scheduler] REFILL ${rt.slot} fired for ${date}: owed $${tu0.owed}, generate ${g.generateStatus}`);
+      return NextResponse.json({ fired: true, topup, grading, generateStatus: g.generateStatus, generate: g.generate, lock, ...body });
     }
     return NextResponse.json({ fired: false, topup, grading, lock, ...body });
   }
@@ -326,15 +311,49 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
   /* Forward to the one spending route with the TARGET BLOCK, same header contract.
      Its own limiter, good-BLOCK-skip and run cap still apply — a race between two pokes
      is settled there, not here. One fire per poke; the next poke serves the next block. */
-  const gen = await fetch(new URL(`/api/generate?block=${encodeURIComponent(target.key)}`, req.nextUrl.origin), {
-    headers: { "x-cron-key": process.env.CRON_SECRET },
-    cache: "no-store",
-  });
+  /* A BLOCK FIRE ON A SLOT TICK NO LONGER EATS THAT SLOT'S GRADING (INSTRUCTION 49 fix round,
+     2026-09-09): blocks become ready 3 h before first pitch, so a block target on the 08:00 or
+     09:30 tick is the common weekend shape, and the next tick is outside the window. The grading
+     forward runs beside the block generate under allSettled, exactly as in the no-target branch.
+     The slot's REFILL is deliberately not run here — a block fire is itself a full re-price that
+     appends, and decideTopUp would hold it anyway ("a block can still fire"). */
+  const gp = decideGradePass(now);
+  const [genR, calR] = await Promise.allSettled([
+    fetch(new URL(`/api/generate?block=${encodeURIComponent(target.key)}`, req.nextUrl.origin), {
+      headers: { "x-cron-key": process.env.CRON_SECRET },
+      cache: "no-store",
+    }),
+    gp.fire ? gradeForward(req.nextUrl.origin, process.env.CRON_SECRET) : Promise.resolve(null),
+  ]);
+  const grading = await gradingReport(gp, calR);
+  if (genR.status === "rejected") {
+    return NextResponse.json({ fired: true, block: target.key, generateStatus: 0, generate: { error: (genR.reason as Error).message }, grading, lock, ...body });
+  }
+  const gen = genR.value;
   let genBody: unknown = null;
   try {
     genBody = await gen.json();
   } catch {
     genBody = { error: "generate returned non-JSON" };
   }
-  return NextResponse.json({ fired: true, block: target.key, generateStatus: gen.status, generate: genBody, lock, ...body });
+  return NextResponse.json({ fired: true, block: target.key, generateStatus: gen.status, generate: genBody, grading, lock, ...body });
+}
+
+/** the grade-only forward — /api/calibrate?grade=only with the Bearer spelling; zero Odds credits */
+function gradeForward(origin: string, secret: string): Promise<Response> {
+  return fetch(new URL("/api/calibrate?grade=only", origin), {
+    headers: { authorization: `Bearer ${secret}` },
+    cache: "no-store",
+  });
+}
+
+/** the `grading` field both mlbTick branches print, from the pass decision and the settled forward */
+async function gradingReport(gp: { fire: boolean; reason: string }, cal: PromiseSettledResult<Response | null>): Promise<Record<string, unknown>> {
+  if (!gp.fire) return { fired: false, reason: gp.reason };
+  if (cal.status === "rejected") return { fired: true, error: (cal.reason as Error).message };
+  const res = cal.value as Response;
+  let gBody: unknown = null;
+  try { gBody = await res.json(); } catch { gBody = null; }
+  console.log(`[scheduler] grade-only pass: ${res.status}`);
+  return { fired: true, status: res.status, result: gBody };
 }
