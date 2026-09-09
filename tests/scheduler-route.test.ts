@@ -248,8 +248,8 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
  * deliberately: decide() reads it VACUOUS, so no block fires, no top-up fires, and the tick
  * cannot reach /api/generate — a poke that spends nothing and answers 200 identically every
  * time, which is what a byte-identity assertion needs. The clock is pinned to 18:27Z (11:27
- * PT, 2026-09-05) — hour 18 IS a grading hour since 2026-09-08 (GRADE_HOURS 15/18/22/2), but
- * only its FIRST tick (:00-:14) grades, so :27 is a non-grading minute and the /api/calibrate
+ * PT, 2026-09-05) — 11:27 PT sits between the 09:30 and 12:00 Pacific grading slots
+ * (GRADE_SLOTS_PT, INSTRUCTION 46b), so it is a non-grading minute and the /api/calibrate
  * forward is not reached. (Was 18:07Z until the 09-08 re-pin made that minute a grading tick.)
  *
  * MLB_BODY below is the tick's answer, pinned whole. Every case asserts the response body is
@@ -257,7 +257,7 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
  */
 describe("the exported GET, CALLED: the CFB forward rides along and can never change the MLB answer", () => {
   const SECRET = "cron-secret-for-this-test-only";
-  const NOW = Date.parse("2026-09-05T18:27:00Z"); // 11:27 PT — a grading hour, but past its first tick
+  const NOW = Date.parse("2026-09-05T18:27:00Z"); // 11:27 PT — between the 09:30 and 12:00 grading slots
   const forwardMock = vi.fn();
   let GET: (req: NextRequest) => Promise<Response>;
 
@@ -338,7 +338,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
   const MLB_BODY = {
     fired: false,
     topup: { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used: 0 },
-    grading: { fired: false, reason: "not a grading tick (grading runs on the first tick of hours 15/18/22/2 UTC)" },
+    grading: { fired: false, reason: "not a grading tick (grading runs on the first tick after 08:00/09:30/12:00/15:00/16:45 PT)" },
     lock: { present: false, action: null },
     date: "2026-09-05",
     at: "2026-09-05T18:27:00.000Z",

@@ -11,15 +11,15 @@ import { tabPure } from "@/lib/tab-purity";
  *    reviews read LABELED populations, never pooled silently. SHADOW OUTRANKS SELECTED:
  *    a suspended market's row is shadow even when an lkey collision matches a locked leg
  *    (suspension is a property of the market, not of the match).
- *  - decideGradePass: the scheduler's grading ticks — the FIRST tick of each GRADE_HOURS
- *    hour UTC. Was hours 15 and 2 (next morning / same night) through 2026-09-07;
- *    INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "Core Money should be calibrating
- *    itself more often") added passes INSIDE THE POKE WINDOW — 15/18/22/2 UTC — so the
- *    realized 2-leg vs 3+-leg record the shape picker tilts on is refreshed through the
- *    slate, not once a morning. The window is the only thing that can fire a pass: the
- *    cron-job.org ticker (docs/cron-jobs.md) pokes /api/scheduler every 15 min during UTC
- *    hours 15-23 and 0-2 ONLY, so an hour outside that window never ticks and a GRADE_HOURS
- *    entry there would be dead. Four passes/day x MAX_BOX_FETCHES=14 covers a full slate;
+ *  - decideGradePass: the scheduler's grading ticks — the FIRST tick after each GRADE_SLOTS_PT
+ *    time, Pacific clock. Was UTC hours 15 and 2 through 2026-09-07; INSTRUCTION 46
+ *    (2026-09-08, "Core Money should be calibrating itself more often") made it 15/18/22/2
+ *    UTC; INSTRUCTION 46b the same day (Josh's word, verbatim: "run grading @ 8am, 9:30am,
+ *    12pm, 3pm & 4:45pm") made it five Pacific slots, so the realized 2-leg vs 3+-leg record
+ *    the shape picker tilts on is refreshed through the slate. The window is the only thing
+ *    that can fire a pass: the cron-job.org ticker (docs/cron-jobs.md) pokes /api/scheduler
+ *    every 15 min during UTC hours 15-23 and 0-2 ONLY, so a slot outside that window never
+ *    ticks and would be dead. Five passes/day x MAX_BOX_FETCHES=14 covers a full slate;
  *    each pass reads ONLY statsapi.mlb.com (schedule + boxscore) and Redis — ZERO Odds
  *    credits (verified against app/api/calibrate/route.ts on 2026-09-08: grade=only returns
  *    before any Odds call). The fire path is untouched.
@@ -43,13 +43,18 @@ export const PROP_MARKETS = new Set([
 ]);
 /** the cohort size: the day's top-N overs per market (markets thinner than N ship whole) */
 export const TOP_N = 50;
-/** first tick of these UTC hours runs a grade-only pass. Was [15, 2] through 2026-09-07;
-    [15, 18, 22, 2] since 2026-09-08 (INSTRUCTION 46 — self-calibration reads a fresh record).
-    EVERY entry must sit inside the ticker's poke window (cron-job.org: every 15 min, UTC
-    hours 15-23 and 0-2 — docs/cron-jobs.md); an hour outside it would never be poked, so
-    it would never grade. Widening the window is Josh's call on cron-job.org, not a code
-    change. The calibrate route's own 10-minute limiter keeps a double tick from grading twice. */
-export const GRADE_HOURS = [15, 18, 22, 2] as const;
+/** INSTRUCTION 46b (2026-09-08, Josh's word, verbatim: "Widen the cron-job.org window to run
+    grading @ 8am, 9:30am, 12pm, 3pm & 4:45pm"): grading passes are now PACIFIC CLOCK SLOTS,
+    not UTC hours. Each slot fires on the FIRST scheduler tick inside [slot, slot+15min)
+    America/Los_Angeles, so the same five wall-clock times hold across the PDT->PST flip.
+    No cron-job.org change was needed: 08:00-16:45 PT is 15:00-23:45 UTC in PDT and
+    16:00-00:45 UTC in PST — every slot sits inside the ticker's window (every 15 min, UTC
+    hours 15-23 and 0-2; docs/cron-jobs.md). A slot outside that window would never be poked
+    and would be dead — tests/daily-grading.test.ts pins every slot inside it for BOTH
+    offsets. The calibrate route's own 10-minute limiter keeps a double tick from grading twice. */
+export const GRADE_SLOTS_PT = ["08:00", "09:30", "12:00", "15:00", "16:45"] as const;
+/** a tick is "first" while it lands inside this many minutes after the slot */
+export const GRADE_SLOT_WINDOW_MIN = 15;
 
 export type Pop = "selected" | "unselected" | "shadow";
 
@@ -87,15 +92,36 @@ export function labelPopulation(
   return selected(rec.lkey, rec.label) ? "selected" : "unselected";
 }
 
-/** The scheduler's grading cadence — pure, so the guard exercises it without a server. */
+/** Pacific wall-clock minutes-of-day for an instant (DST-correct via Intl). */
+export function ptMinutesOfDay(nowMs: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(nowMs));
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return h * 60 + m;
+}
+
+const slotMinutes = (slot: string) => {
+  const [h, m] = slot.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/** The scheduler's grading cadence — pure, so the guard exercises it without a server.
+    Fires on the first tick (within GRADE_SLOT_WINDOW_MIN minutes) after each GRADE_SLOTS_PT
+    time, Pacific. */
 export function decideGradePass(nowMs: number): { fire: boolean; reason: string } {
-  const d = new Date(nowMs);
-  const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
-  if ((GRADE_HOURS as readonly number[]).includes(h) && m < 15) {
-    return { fire: true, reason: `first tick of grading hour ${h}:00Z` };
+  const mod = ptMinutesOfDay(nowMs);
+  for (const slot of GRADE_SLOTS_PT) {
+    const sm = slotMinutes(slot);
+    if (mod >= sm && mod < sm + GRADE_SLOT_WINDOW_MIN) {
+      return { fire: true, reason: `first tick of grading slot ${slot} PT` };
+    }
   }
-  return { fire: false, reason: `not a grading tick (grading runs on the first tick of hours ${GRADE_HOURS.join("/")} UTC)` };
+  return { fire: false, reason: `not a grading tick (grading runs on the first tick after ${GRADE_SLOTS_PT.join("/")} PT)` };
 }
 
 type PickLike = { market: string; res: "won" | "lost"; pMkt?: number | null; p?: number; pop?: string };

@@ -265,13 +265,13 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ fired: true, topup: tu, generateStatus: gen.status, generate: genBody, lock, ...body });
     }
     topup = tu as unknown as Record<string, unknown>;
-    /* DAILY GRADING TICKS (2026-08-06; cadence re-pinned 2026-09-08, INSTRUCTION 46): on the
-       first tick of each GRADE_HOURS hour — 15/18/22/2 UTC, all inside the cron-job.org poke
-       window (grading-progress.ts) — forward
+    /* DAILY GRADING TICKS (2026-08-06; cadence re-pinned 2026-09-08, INSTRUCTION 46b): on the
+       first tick after each GRADE_SLOTS_PT time — 08:00/09:30/12:00/15:00/16:45 Pacific, all
+       inside the cron-job.org poke window (grading-progress.ts) — forward
        to /api/calibrate?grade=only — grades every board row + labels populations + writes
        the learning progress artifact, and touches NOTHING the engine reads (the mode's own
        write gate). Runs only on no-fire pokes: a board fire outranks the grading tick, and
-       the next grading hour covers it. Zero Odds credits (statsapi + Redis). */
+       the next grading slot covers it. Zero Odds credits (statsapi + Redis). */
     let grading: Record<string, unknown>;
     const gp = decideGradePass(now);
     if (gp.fire) {

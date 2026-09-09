@@ -90,8 +90,8 @@ async function serverFetchJson(url: string): Promise<{ ok: boolean; body: unknow
    and this route both partition the slate into blocks, and the partitions must agree on
    the population or the block keys diverge between the decision and the fire. */
 
-function memoryStorage() {
-  const m = new Map<string, string>();
+function memoryStorage(seed: Record<string, string> = {}) {
+  const m = new Map<string, string>(Object.entries(seed));
   return {
     getItem: (k: string) => m.get(k) ?? null,
     setItem: (k: string, v: string) => void m.set(k, v),
@@ -245,7 +245,15 @@ export async function GET(req: NextRequest) {
     /* `today` pins the engine's own shToday() to the Pacific date, so the schedule
        pull, slate.date and every downstream key agree with the ledger's basis. Safe
        now that the engine no longer calls obSameDay (which this option also stubs). */
-    const eng = createEngine({ fetchJson: serverFetchJson, storage: memoryStorage(), today: dateNow });
+    /* INSTRUCTION 46b (2026-09-08): the engine reads SH.bankroll from LS "pl_bankroll" at
+       boot (legacy L1065, JSON-parsed) and the allocator's Kelly ceiling is
+       kellyStakeMult x 1/4-Kelly x SH.bankroll — an empty storage meant the legacy $750
+       default sized every server ticket. Seed the paper bankroll so the lock prices off it. */
+    const eng = createEngine({
+      fetchJson: serverFetchJson,
+      storage: memoryStorage({ pl_bankroll: JSON.stringify(PAPER.bankroll) }),
+      today: dateNow,
+    });
     eng.set("SH_PRIORS", priors);
     eng.set("SH_CTX", ctx);
     eng.set("SH_V2", {

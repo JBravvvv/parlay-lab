@@ -6,8 +6,13 @@
   don't ride the full slot". What Kelly declines is retired (`slotUnderSum`), never re-bought.
 - Self-calibration: trailing-30-day 2-leg vs 3+-leg ROI (≥ 20 graded each, ≥ 10-point gap)
   tilts the rotation toward the winning bucket; thinner records keep the full rotation.
-- Grading passes now 15/18/22/2 UTC (all inside the cron-job.org poke window); the fix
-  round caught a stranded-money double count that would have frozen legacy days at $0.
+- Grading passes now fire at Josh's five Pacific times — 8:00, 9:30, 12:00, 3:00, 4:45 —
+  on the first ticker tick after each (INSTRUCTION 46b). No cron-job.org change: the existing
+  window already covers them in PDT and PST. The fix round earlier caught a stranded-money
+  double count that would have frozen legacy days at $0.
+- Kelly sized off the legacy $750 default on the server (max $60/ticket, so $75/$90 slots
+  could never fill). Paper bankroll is now $2,500 — the same base the app's bank uses —
+  seeded into the server engine; per-ticket ceiling $200, cap-at-Kelly rule unchanged.
 - Games tab compact/collapsible, "Game Preview" with AVG/OPS + batter-vs-pitcher,
   Parlay Builder All/Away/Home filter, ledger tap-anywhere + player deep links.
 

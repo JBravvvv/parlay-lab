@@ -167,7 +167,7 @@ export function buildLockEntry(args: {
   const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
   const cfg = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
   const sh = eng.get<{ bankroll?: number }>("SH") ?? {};
-  const bankroll = Number(sh.bankroll) > 0 ? Number(sh.bankroll) : 750;
+  const bankroll = Number(sh.bankroll) > 0 ? Number(sh.bankroll) : PAPER.bankroll;
   /* PAPER EPOCH (2026-08-15, Josh's word): the daily is a FIXED hypothetical $150 — it
      was round(dailyBankrollCap × bankroll) = $75 through epoch 1. On a block fire,
      dailyOverride carries the block's pro-rata share (splitBudget of PAPER.daily) and

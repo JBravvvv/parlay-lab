@@ -753,6 +753,30 @@ four hours out. It now decides from the slate exactly as `_snapshot_kind` does �
 close is worse than a missing one**, because it attenuates the slope from inside the bucket that
 is supposed to be clean.
 
+## ✅ GRADING PASSES — FIVE PACIFIC SLOTS, NO cron-job.org CHANGE NEEDED (INSTRUCTION 46b, 2026-09-08)
+
+Josh, verbatim: **"Widen the cron-job.org window to run grading @ 8am, 9:30am, 12pm, 3pm &
+4:45pm."** The passes are now **Pacific wall-clock slots** — `GRADE_SLOTS_PT =
+["08:00","09:30","12:00","15:00","16:45"]` in `src/lib/server/grading-progress.ts` — each firing
+on the **first scheduler tick inside the 15 minutes after the slot** (`decideGradePass`,
+America/Los_Angeles via Intl, so the same five times hold through the PDT→PST flip).
+
+**Nothing to change on cron-job.org.** The scheduler row already pokes every 15 min during UTC
+hours 15–23 and 0–2, and every slot lands inside that window under both offsets:
+
+| slot (PT) | UTC in PDT (now) | UTC in PST (from Nov 1) | in the window? |
+|---|---|---|---|
+| 08:00 | 15:00 | 16:00 | yes |
+| 09:30 | 16:30 | 17:30 | yes |
+| 12:00 | 19:00 | 20:00 | yes |
+| 15:00 | 22:00 | 23:00 | yes |
+| 16:45 | 23:45 | 00:45 | yes |
+
+Pinned in `tests/daily-grading.test.ts` (the five slots verbatim, the 15-minute window, PDT and
+PST firing, every slot inside the poke window at both offsets, the between-slot negatives). The
+19:00 PT (02:00Z) night pass from INSTRUCTION 46 is gone — 16:45 PT is now the last pass, and the
+08:00 pass the next morning finishes the evening block. Zero Odds credits, as before.
+
 ## ✅ GRADING PASSES RIDE THE SCHEDULER TICKER — FOUR PASSES, ALL INSIDE THE POKE WINDOW (2026-09-08)
 
 There is **no separate grading cron**. The grade-only pass (`/api/calibrate?grade=only` —

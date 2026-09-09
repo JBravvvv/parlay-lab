@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BANK_BASE } from "@/lib/bankroll";
 import fs from "node:fs";
 import path from "node:path";
 import { PAPER, PAPER_TICKETS, SUSPENSIONS_LIFTED, applySuspensionLift, ticketWindow } from "@/lib/paper-mode";
@@ -39,8 +40,14 @@ import type { SyncEntry } from "@/lib/ledger-merge";
  */
 
 describe("the paper constants are Josh's numbers, verbatim", () => {
-  it("$150 core + $25 fun since 2026-08-15", () => {
-    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25 });
+  it("$150 core + $25 fun since 2026-08-15; $2,500 paper bankroll since 2026-09-08 (INSTRUCTION 46b)", () => {
+    /* PIN UPDATED 2026-09-08 (INSTRUCTION 46b, Josh's word, verbatim: "How do we increase the
+       size of kelly? this is all hypothetical so cash flow can be much higher"): the server
+       lock priced Kelly off the legacy $750 default (empty in-memory storage), capping every
+       ticket at 8% = $60 while the browser's managed bankroll initialises at BANK_BASE $2,500.
+       OBSERVED RED against the three-key PAPER before this update. */
+    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25, bankroll: 2500 });
+    expect(PAPER.bankroll).toBe(BANK_BASE);
   });
   it("3-5 tickets for the $150 per day — DERIVED from Josh's shape menu since 2026-09-08 (was the pinned 3-7 of 2026-08-22)", () => {
     /* PIN UPDATED 2026-09-08 (INSTRUCTION 46, "Parlay Lab Baseball 1"): the ticket count

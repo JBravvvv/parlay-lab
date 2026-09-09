@@ -19,6 +19,15 @@ export const PAPER = {
   daily: 150,
   /** hypothetical fun-money longshot(s), every day */
   fun: 25,
+  /** INSTRUCTION 46b (2026-09-08, Josh's word, verbatim: "How do we increase the size of
+      kelly? this is all hypothetical so cash flow can be much higher"): the bankroll the
+      SERVER lock prices Kelly off. The server engine boots on an empty in-memory storage,
+      so it fell to the legacy $750 default while the browser's managed bankroll already
+      initialises at BANK_BASE $2,500 (src/lib/bankroll.ts). Per-ticket Kelly ceiling is
+      kellyStakeMult 4 x min(1/4 f*, 2%) x bankroll = at most 8% of this number: $60 at
+      $750 (the $75/$90 shape slots could never fill), $200 at $2,500. Seeded into the
+      generate route's engine storage as pl_bankroll and the lock's fallback. */
+  bankroll: 2500,
 } as const;
 
 /** "It can be anywhere from 3-10 tickets for the $150 per day" — Josh, 2026-08-15.
