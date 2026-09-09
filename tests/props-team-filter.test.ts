@@ -228,7 +228,7 @@ describe("groupByGame carries gkey — a Ledger ML/RL link finds its Games-tab c
 
 describe("the page — Suspense + useSearchParams, opens the right tab/market, marks the row", () => {
   it("a CFB ledger link (?cfb=1) flips the sport store to CFB so the CFB Builder renders", () => {
-    expect(page).toMatch(/import \{ setSport, useSport \} from "@\/lib\/sport"/);
+    expect(page).toMatch(/import \{ setSport \} from "@\/lib\/sport"/); // separate line: cfb-separation pins the bare useSport import
     expect(page).toMatch(/const wantCfb = params\.get\("cfb"\) === "1"/);
     expect(page).toMatch(/if \(CFB_ENABLED && wantCfb\) setSport\("cfb"\)/);
   });

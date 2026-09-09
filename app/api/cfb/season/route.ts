@@ -24,7 +24,8 @@ import { fpiPayload } from "@/lib/cfb/slate-server";
  * game markets and per-game player props only). This route never touches ODDS_API_KEY.
  */
 
-export const SEASON_ROUTE_TTL = CFB_CTX_TTL;
+// NOT exported: a Next route module may export only handlers/config — a stray export fails `next build` (caught by the dev server's generated types, 2026-09-08)
+const SEASON_ROUTE_TTL = CFB_CTX_TTL;
 const GROUPS = ["passing", "rushing", "receiving"] as const;
 
 async function athleteTables(): Promise<{ ctx: CfbPropsContext; meta: Map<string, SeasonPlayerMeta> }> {

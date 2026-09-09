@@ -4,7 +4,7 @@ import path from "node:path";
 import { normCdf } from "@/lib/cfb/normal";
 import { stripComments } from "./helpers/source";
 import { CFB_MODEL, CFB_KEYS } from "@/lib/cfb/rules";
-import { parseByAthlete } from "@/lib/cfb/props-context";
+import { CFB_CTX_TTL, parseByAthlete } from "@/lib/cfb/props-context";
 import {
   CFB_SEASON,
   addSeasonLeg,
@@ -387,7 +387,8 @@ describe("the season route — ESPN only, an hour on the data cache, no Odds API
   it("never names the Odds API key or host and revalidates at ≥ 3600 s", () => {
     expect(src).not.toMatch(/ODDS_API_KEY|the-odds-api|oddsPayload|CFB_ODDS_URL/);
     expect(src).toMatch(/revalidate: SEASON_ROUTE_TTL/);
-    expect(src).toMatch(/SEASON_ROUTE_TTL = CFB_CTX_TTL/);
+    expect(src).toMatch(/\nconst SEASON_ROUTE_TTL = CFB_CTX_TTL/);
+    expect(src).not.toMatch(/export const SEASON_ROUTE_TTL/);
   });
   it("GET assembles players from the three byathlete tables and teams from the FPI feed (fetch mocked)", async () => {
     const page = {
@@ -404,8 +405,9 @@ describe("the season route — ESPN only, an hour on the data cache, no Odds API
     });
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const { GET, SEASON_ROUTE_TTL } = await import("../app/api/cfb/season/route");
-      expect(SEASON_ROUTE_TTL).toBeGreaterThanOrEqual(3600);
+      const { GET } = await import("../app/api/cfb/season/route");
+      // the TTL is pinned by source scan above (not exported — Next forbids non-handler route exports)
+      expect(CFB_CTX_TTL).toBeGreaterThanOrEqual(3600);
       const res = await GET();
       const body = (await res.json()) as { season: number; players: SeasonPlayer[]; teams: SeasonTeam[]; avgFpi: number | null };
       expect(body.season).toBe(2026);
