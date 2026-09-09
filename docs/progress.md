@@ -11,8 +11,8 @@
   window already covers them in PDT and PST. The fix round earlier caught a stranded-money
   double count that would have frozen legacy days at $0.
 - Kelly sized off the legacy $750 default on the server (max $60/ticket, so $75/$90 slots
-  could never fill). Paper bankroll is now $2,500 — the same base the app's bank uses —
-  seeded into the server engine; per-ticket ceiling $200, cap-at-Kelly rule unchanged.
+  could never fill). Paper bankroll is now $10,000 (Josh: "Bump the bankroll to $10,000"),
+  seeded into the server engine; per-ticket ceiling $800, cap-at-Kelly rule unchanged.
 - Games tab compact/collapsible, "Game Preview" with AVG/OPS + batter-vs-pitcher,
   Parlay Builder All/Away/Home filter, ledger tap-anywhere + player deep links.
 

@@ -26,8 +26,11 @@ export const PAPER = {
       initialises at BANK_BASE $2,500 (src/lib/bankroll.ts). Per-ticket Kelly ceiling is
       kellyStakeMult 4 x min(1/4 f*, 2%) x bankroll = at most 8% of this number: $60 at
       $750 (the $75/$90 shape slots could never fill), $200 at $2,500. Seeded into the
-      generate route's engine storage as pl_bankroll and the lock's fallback. */
-  bankroll: 2500,
+      generate route's engine storage as pl_bankroll and the lock's fallback.
+      BUMPED the same day, Josh's word, verbatim: "Bump the bankroll to $10,000" — ceiling
+      is now 8% x $10,000 = $800/ticket, so every shape slot ($10-$90) is reachable and the
+      SLOT is the binding cap on most tickets; Kelly still trims thin edges (INSTRUCTION 46a). */
+  bankroll: 10000,
 } as const;
 
 /** "It can be anywhere from 3-10 tickets for the $150 per day" — Josh, 2026-08-15.

@@ -40,14 +40,16 @@ import type { SyncEntry } from "@/lib/ledger-merge";
  */
 
 describe("the paper constants are Josh's numbers, verbatim", () => {
-  it("$150 core + $25 fun since 2026-08-15; $2,500 paper bankroll since 2026-09-08 (INSTRUCTION 46b)", () => {
+  it("$150 core + $25 fun since 2026-08-15; $10,000 paper bankroll since 2026-09-08 (INSTRUCTION 46b, bumped same day)", () => {
     /* PIN UPDATED 2026-09-08 (INSTRUCTION 46b, Josh's word, verbatim: "How do we increase the
        size of kelly? this is all hypothetical so cash flow can be much higher"): the server
        lock priced Kelly off the legacy $750 default (empty in-memory storage), capping every
        ticket at 8% = $60 while the browser's managed bankroll initialises at BANK_BASE $2,500.
-       OBSERVED RED against the three-key PAPER before this update. */
-    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25, bankroll: 2500 });
-    expect(PAPER.bankroll).toBe(BANK_BASE);
+       OBSERVED RED against the three-key PAPER before this update. Set to BANK_BASE $2,500
+       first; Josh the same day, verbatim: "Bump the bankroll to $10,000" — OBSERVED RED
+       against 2500. The paper bankroll is deliberately NOT tied to BANK_BASE any more. */
+    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25, bankroll: 10000 });
+    expect(PAPER.bankroll).toBeGreaterThan(BANK_BASE);
   });
   it("3-5 tickets for the $150 per day — DERIVED from Josh's shape menu since 2026-09-08 (was the pinned 3-7 of 2026-08-22)", () => {
     /* PIN UPDATED 2026-09-08 (INSTRUCTION 46, "Parlay Lab Baseball 1"): the ticket count
