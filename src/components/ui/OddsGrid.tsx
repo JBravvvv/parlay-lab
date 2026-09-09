@@ -37,8 +37,8 @@ export type OddsGridRow = {
 export type OddsGridProps = {
   columns: string[];
   rows: OddsGridRow[];
-  /** "cfb" swaps the selected ring + plus tint to amber; default lime */
-  tone?: "pos" | "cfb";
+  /** "cfb" swaps the selected ring + plus tint to amber, "nfl" to blue; default lime */
+  tone?: "pos" | "cfb" | "nfl";
   /** width of the team column (CSS length); default "minmax(96px, 1fr)" — a floor, because the
       price tracks below grow to their max BEFORE the fr track is sized (CSS Grid §12.6 before
       §12.7): at 375px the team column collapsed to 49px and the abbreviation vanished */
@@ -87,7 +87,7 @@ export function OddsGrid({ columns, rows, tone = "pos", teamWidth = "minmax(96px
   // measured at a 319px card (375px phone): team 96px, three 68px price pills — the 32px mark + abbreviation + score fit
   const template = `${teamWidth} repeat(${n}, minmax(60px, 72px))`;
   return (
-    <div className={`odds-grid ${tone === "cfb" ? "is-cfb" : ""} ${className}`} role="table" aria-label="Odds">
+    <div className={`odds-grid ${tone === "cfb" ? "is-cfb" : tone === "nfl" ? "is-nfl" : ""} ${className}`} role="table" aria-label="Odds">
       <div className="odds-grid-head" role="row" style={{ gridTemplateColumns: template }}>
         <span aria-hidden />
         {columns.map((c) => (

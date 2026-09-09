@@ -14,6 +14,7 @@ import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { decideGradePass } from "@/lib/server/grading-progress";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
+import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
 
 /**
  * /api/scheduler — the brains of self-scheduling (2026-08-02, owner's architecture call:
@@ -36,15 +37,18 @@ import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90; // the generate forward can take ~60s on a full slate
-/* BUDGET, STATED HONESTLY (INSTRUCTION 45, 2026-09-06): this 90 s now also has to cover the CFB
-   forward added below. The generate forward is sent with NO signal and NO timeout at either call
-   site, so ~60 s of generate plus the CFB forward's 25 s abort (CFB_LOCK.forwardTimeoutMs) is
-   85 s — FIVE seconds of headroom, and a generate slower than 65 s kills the invocation before
-   that abort can bind. What IS guaranteed is that the CFB forward is the tick's LAST step, after
-   mlbTick has answered and after /api/generate has committed under its own 300 s budget: a
-   platform kill costs the poke its HTTP answer and that pulse's CFB lock, never an MLB write, and
-   the next pulse retries. Closing the 5 s gap for real means timing the generate fetch, which is
-   code this comments-only change does not touch. */
+/* BUDGET, STATED HONESTLY (INSTRUCTION 45, 2026-09-06; the NFL forward added 2026-09-08): this
+   90 s now also has to cover the TWO football forwards below. The generate forward is sent with
+   NO signal and NO timeout at either call site, so ~60 s of generate plus the football forwards'
+   25 s abort (CFB_LOCK.forwardTimeoutMs, NFL_LOCK.forwardTimeoutMs — both 25_000) is
+   25_000 + 60_000 = 85_000 — FIVE seconds of headroom, and a generate slower than 65 s kills
+   the invocation before that abort can bind. The 5 s headroom still holds with the NFL forward
+   added because the two forwards run CONCURRENTLY (Promise.allSettled): the tick's worst case is
+   max(cfb 25 s, nfl 25 s) + the ~60 s generate, not their sum. What IS guaranteed is that the
+   forwards are the tick's LAST step, after mlbTick has answered and after /api/generate has
+   committed under its own 300 s budget: a platform kill costs the poke its HTTP answer and that
+   pulse's football locks, never an MLB write, and the next pulse retries. Closing the 5 s gap for
+   real means timing the generate fetch, which this change does not touch. */
 
 /* slateStarts moved to src/lib/server/slate.ts 2026-08-06 (one copy of the feed URL) so
    /api/generate's gen.slate scope stamp reads the same population this decision does.
@@ -105,12 +109,20 @@ export const maxDuration = 90; // the generate forward can take ~60s on a full s
 export async function GET(req: NextRequest) {
   const res = await mlbTick(req);
   if (!process.env.CRON_SECRET || !cronHeaderAuthed(req)) return res;
-  const cfb: CfbForwardResult = await forwardCfbLock(req.nextUrl.origin, process.env.CRON_SECRET).catch(
-    (e): CfbForwardResult => ({ forwarded: false, error: (e as Error).message }),
-  );
+  const secret = process.env.CRON_SECRET;
+  /* THE TWO FOOTBALL FORWARDS, CONCURRENT (2026-09-08): allSettled, so a REJECTED forward on
+     either desk degrades to { forwarded: false, error } instead of escaping GET, and the tick's
+     worst case stays max(cfb, nfl) + generate — see the BUDGET note above maxDuration. */
+  const [cfbR, nflR] = await Promise.allSettled([forwardCfbLock(req.nextUrl.origin, process.env.CRON_SECRET), forwardNflLock(req.nextUrl.origin, secret)]);
+  const cfb: CfbForwardResult = cfbR.status === "fulfilled" ? cfbR.value : { forwarded: false, error: (cfbR.reason as Error).message };
+  const nfl: NflForwardResult = nflR.status === "fulfilled" ? nflR.value : { forwarded: false, error: (nflR.reason as Error).message };
   if (!cfb.forwarded) console.warn(`[scheduler] cfb lock forward failed: ${cfb.error}`);
-  const out = await attachCfb(res, cfb);
-  return out ? NextResponse.json(out.body, { status: out.status }) : res;
+  if (!nfl.forwarded) console.warn(`[scheduler] nfl lock forward failed: ${nfl.error}`);
+  /* attach in order: `cfb` then `nfl`, each the only key its step adds; the MLB status rides through */
+  const withCfb = await attachCfb(res, cfb);
+  const base = withCfb ? NextResponse.json(withCfb.body, { status: withCfb.status }) : res;
+  const out = await attachNfl(base, nfl);
+  return out ? NextResponse.json(out.body, { status: out.status }) : base;
 }
 
 async function mlbTick(req: NextRequest): Promise<NextResponse> {

@@ -537,8 +537,12 @@ describe("selectPropEvents", () => {
   });
 });
 
-describe("app/api/cfb/props/route.ts + client — source pins", () => {
-  const route = readSrc("app/api/cfb/props/route.ts");
+describe("app/api/cfb/props/route.ts + src/lib/server/football-props.ts + client — source pins", () => {
+  /* 2026-09-08 (the NFL build): the body moved to src/lib/server/football-props.ts and runs on a
+     LeagueConfig; the CFB route is a thin shell that keeps the route config and the CFB store keys.
+     The body pins scan the shared file; the shell pins scan the route. */
+  const route = readSrc("src/lib/server/football-props.ts");
+  const shell = readSrc("app/api/cfb/props/route.ts");
   const client = readSrc("src/lib/cfb/client.ts");
 
   it("reads the key from the environment only and appends it through a template", () => {
@@ -551,7 +555,7 @@ describe("app/api/cfb/props/route.ts + client — source pins", () => {
   });
   it("caches each event call for the pull's own window (propsWindowSec: 2 h pre-kick, 10 min live — INSTRUCTION 40) and builds the slate through the shared helper", () => {
     expect(route).toMatch(/const r = await fetch\(url, cache\)/);
-    expect(route).toMatch(/const pullSec = propsWindowSec\(toFetch\)/);
+    expect(route).toMatch(/const pullSec = propsWindowSec\(toFetch, cfg\.props\)/);
     // THE CAESARS-MISSING RULE (2026-09-05, review fix): Next's data cache is stale-while-revalidate, so a re-pull
     // (a Caesars-missing re-check, or a live game already on the board) bypasses it with cache: "no-store";
     // a first pull or an expired carry keeps next.revalidate at the pull's window
@@ -570,13 +574,23 @@ describe("app/api/cfb/props/route.ts + client — source pins", () => {
     expect(route).toMatch(/readBoard\(/);
     expect(route).toMatch(/affordableEvents\(/);
     expect(route.indexOf("readBoard(")).toBeLessThan(route.indexOf("eventOdds(game"));
-    expect(route).toMatch(/slateFromEspn\(/);
+    expect(route).toMatch(/slateFromEspnOf\(cfg, /);
+    expect(route).toMatch(/espnEventsOf\(cfg, /);
     expect(route).toMatch(/selectPropEvents\(/);
-    expect(route).toMatch(/CFB_PROPS_ODDS_MARKETS/);
-    expect(route).toMatch(/export const dynamic = "force-dynamic"/);
+    // the six markets come off the league's feed (CFB_LEAGUE copies CFB_PROPS_ODDS_MARKETS), never a CFB constant in the shared body
+    expect(route).toMatch(/feeds\.oddsPropMarkets/);
+    expect(route).toMatch(/feeds\.oddsEventBase/);
+    expect(route).not.toMatch(/CFB_PROPS/);
+    expect(route).not.toMatch(/americanfootball_ncaaf/);
     expect(route).toMatch(/"cache-control": "no-store"/);
     expect(route).toMatch(/ptToday\(/);
     expect(route).toMatch(/x-requests-remaining/);
+    // the shell: route config only, the body through the shared file on CFB_LEAGUE with the CFB store keys
+    expect(shell).toMatch(/export const dynamic = "force-dynamic"/);
+    expect(shell).toMatch(/footballPropsGet\(CFB_LEAGUE, req, \{ storeKeys: CFB_PROPS_REDIS \}\)/);
+    expect(shell).not.toMatch(/\bfetch\(/);
+    expect(shell).not.toMatch(/ODDS_API_KEY/);
+    expect(shell.match(/^export const /gm) ?? []).toEqual(["export const "]); // only route config is exported (Vercel build rule)
   });
   it("the client has no refetchInterval anywhere and mirrors the 2-hour window (was 30 min until 2026-09-05)", () => {
     expect(client).not.toMatch(/refetchInterval/);
@@ -586,8 +600,19 @@ describe("app/api/cfb/props/route.ts + client — source pins", () => {
     expect(cfbPropsQueryKey(undefined, 2500)).toEqual(["cfb", "props", "today", 2500]);
     expect(client).toMatch(/CFB_ROUTES\.props/);
   });
-  it("no CFB props module references an MLB key, route or store", () => {
-    for (const f of ["app/api/cfb/props/route.ts", "src/lib/cfb/props.ts", "src/lib/cfb/props-context.ts", "src/lib/cfb/props-types.ts", "src/lib/cfb/props-store.ts", "src/lib/cfb/slate-server.ts"]) {
+  it("no football props module — CFB, NFL or shared — references an MLB key, route or store", () => {
+    for (const f of [
+      "app/api/cfb/props/route.ts",
+      "src/lib/cfb/props.ts",
+      "src/lib/cfb/props-context.ts",
+      "src/lib/cfb/props-types.ts",
+      "src/lib/cfb/props-store.ts",
+      "src/lib/cfb/slate-server.ts",
+      "src/lib/server/football-props.ts",
+      "app/api/nfl/props/route.ts",
+      "app/api/nfl/route.ts",
+      "app/api/nfl/ledger/route.ts",
+    ]) {
       const src = readSrc(f);
       expect(src, f).not.toMatch(/pl_ledger|pl_bank2|pl_noplay/);
       expect(src, f).not.toMatch(/pl:ledger:v1|pl:bank:v1|pl:noplay/);

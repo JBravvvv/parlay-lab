@@ -227,3 +227,57 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
     expect((shell.match(/className="press |className=\{`press /g) ?? []).length).toBe(3);
   });
 });
+
+describe("nav — the NFL desk joins the shell (2026-09-08: three desks, one switch)", () => {
+  const sportSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/sport.ts"), "utf8");
+  const sw = fs.readFileSync(path.join(process.cwd(), "src/components/shell/SportSwitch.tsx"), "utf8");
+  it("SportSwitch renders three options in order mlb / cfb / nfl (it maps SPORTS verbatim)", () => {
+    expect(sportSrc).toMatch(/export const SPORTS: readonly Sport\[\] = \["mlb", "cfb", "nfl"\] as const;/);
+    expect(sw).toMatch(/SPORTS\.map\(\(s\) => \(\{/);
+    // the thumb tone follows the desk: amber on CFB, blue on NFL, lime otherwise
+    expect(sw).toMatch(/tone=\{sport === "cfb" \? "cfb" : sport === "nfl" \? "nfl" : "pos"\}/);
+    // label-only at BOTH sizes (2026-09-08 fix): the phone header needs it to fit 375px, and the
+    // 168px desktop rail overflows with three md emoji pills (measured 208px) but fits label-only
+    // (164px) — so there is one OPTIONS constant, no icon, and no size-keyed options switch
+    expect(sw).toMatch(/options=\{OPTIONS\}/);
+    expect(sw).not.toMatch(/OPTIONS_SM/);
+    expect(sw).not.toMatch(/icon:/);
+    expect(sw).toMatch(/label: SPORT_META\[s\]\.short,\n  title: `\$\{SPORT_META\[s\]\.label\} desk`,\n\}\)\);/);
+  });
+  it("the desktop rail mounts the switch at md, full width, label-only (three md emoji pills overflow the 168px rail)", () => {
+    expect(shell).toMatch(/<SportSwitch className="mt-3 w-full" \/>/);
+    expect(shell).toMatch(/hidden w-\[200px\] flex-col/);
+    expect(shell).toMatch(/<div className="relative px-4 py-4">\n\s+<Brand \/>/);
+  });
+  it("the phone header fits 375px on every desk: dense px-1 pills on the sm switch, 20px icons at p-[3px] (measured with Geist: 370px on the CFB desk's five-icon row)", () => {
+    expect(sw).toMatch(/dense=\{size === "sm"\}/);
+    const seg = fs.readFileSync(path.join(process.cwd(), "src/components/ui/Segmented.tsx"), "utf8");
+    expect(seg).toMatch(/dense\?: boolean;/);
+    expect(seg).toMatch(/const SIZE_SM_DENSE = "h-\[26px\] gap-\[3px\] px-1 text-\[10px\]";/);
+    expect(seg).toMatch(/\$\{dense && size === "sm" \? SIZE_SM_DENSE : SIZE\[size\]\}/);
+    // the regular sm pill is untouched for every other consumer (CfbSeason's scope switch, the design page)
+    expect(seg).toMatch(/sm: "h-\[26px\] gap-\[3px\] px-1\.5 text-\[10px\]",/);
+    // the top-bar icon row: one `p-[3px]` link per non-bottom-tab route, none left at p-[5px]
+    expect(shell).toMatch(/className="press rounded-lg p-\[3px\]"/);
+    expect(shell).not.toMatch(/className="[^"]*p-\[5px\]/);
+    expect(shell).toMatch(/<SportSwitch size="sm" className="shrink-0" \/>/);
+  });
+  it("AppShell mounts the NFL sync beacon on its own line and leaves the CFB beacon byte-identical", () => {
+    expect(shell).toMatch(/import \{ useCfbSyncBeacon \} from "@\/lib\/cfb\/sync";\nimport \{ useNflSyncBeacon \} from "@\/lib\/nfl\/sync";/);
+    expect(shell).toMatch(/\n  useLedgerSyncBeacon\(\);\n  useCfbSyncBeacon\(\);\n  useNflSyncBeacon\(\);\n/);
+    expect(shell).toMatch(/^  useNflSyncBeacon\(\);$/m);
+  });
+  it("the rail glow and eyebrow follow the NFL desk in its own blue; the footer names all three desks", () => {
+    expect(shell).toMatch(/const cfb = sport === "cfb";\n  const nfl = sport === "nfl";/);
+    expect(shell).toMatch(/rail-glow \$\{cfb \? "is-cfb" : nfl \? "is-nfl" : ""\}/);
+    expect(shell).toMatch(/\$\{cfb \? "text-cfb\/80" : nfl \? "text-nfl\/80" : "text-faint"\}/);
+    expect(shell).toMatch(/MLB, CFB & NFL · informational only, not betting advice/);
+  });
+  it("the NFL desk adds no nav entry, and CFB-only entries stay CFB-only (Season Lab is cut for NFL this ship)", () => {
+    const nav = navEntries();
+    expect(nav.length).toBe(11);
+    expect(nav.some((n) => /nfl/i.test(n.href) || /nfl/i.test(n.label))).toBe(false);
+    expect(shell).not.toMatch(/nflOnly/);
+    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly">\) => !n\.cfbOnly \|\| cfb;/);
+  });
+});

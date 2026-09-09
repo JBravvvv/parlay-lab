@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PairMark, PlayerMark, TeamMark, type TeamMarkTeam } from "@/components/cfb/TeamMark";
+import { useLeague } from "@/components/football/LeagueContext";
 import type { CfbPropMarket } from "@/lib/cfb/props-types";
 import type { CfbMarketKey } from "@/lib/cfb/types";
 import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
@@ -108,6 +109,10 @@ export function CfbSlip({
   copyText: string;
 }) {
   const [open, setOpen] = useState(false);
+  /* the league seam (2026-09-08): the accent and the ledger's name come off useLeague() (both class strings literal) */
+  const L = useLeague();
+  const nfl = L.id === "nfl";
+  const accentText = nfl ? "text-nfl" : "text-cfb";
   const [copied, setCopied] = useState<"ok" | "fail" | null>(null);
   const timer = useRef<number | null>(null);
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
@@ -129,7 +134,7 @@ export function CfbSlip({
     <div className="pointer-events-none fixed left-0 right-0 z-40 md:left-[calc(200px+2rem)] md:right-8" style={{ bottom }}>
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="pointer-events-auto flex max-h-[45vh] max-w-[720px] flex-col px-3 pb-2 md:px-0 md:pb-4">
-          <div className="flex max-h-full flex-col overflow-hidden rounded-[16px] border border-cfb/25 bg-surface/95 shadow-2xl backdrop-blur-xl">
+          <div className={`flex max-h-full flex-col overflow-hidden rounded-[16px] border ${nfl ? "border-nfl/25" : "border-cfb/25"} bg-surface/95 shadow-2xl backdrop-blur-xl`}>
             {/* handle — sibling buttons (expand/collapse, Clear), never nested */}
             <div className="flex h-12 shrink-0 items-center gap-1 pr-1">
               <button
@@ -138,11 +143,11 @@ export function CfbSlip({
                 aria-expanded={open}
                 aria-label={`${open ? "Collapse" : "Expand"} slip`}
               >
-                <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-cfb px-1.5 text-[11px] font-bold text-[#131a26]">
+                <span className={`flex h-6 min-w-6 items-center justify-center rounded-full ${nfl ? "bg-nfl" : "bg-cfb"} px-1.5 text-[11px] font-bold text-[#131a26]`}>
                   {calc.n}
                 </span>
                 <span className="num min-w-0 flex-1 truncate text-[12px] text-text">
-                  {calc.n} leg{calc.n > 1 ? "s" : ""} · <b className="text-cfb">{amFmt(calc.am)}</b> ·{" "}
+                  {calc.n} leg{calc.n > 1 ? "s" : ""} · <b className={accentText}>{amFmt(calc.am)}</b> ·{" "}
                   <span className="text-muted">true</span>{" "}
                   <b className={calc.trueProb > calc.impProb ? "text-pos" : "text-text"}>{(calc.trueProb * 100).toFixed(1)}%</b>
                 </span>
@@ -181,7 +186,7 @@ export function CfbSlip({
                         <span className="block truncate text-[9.5px] text-faint">{l.sub}</span>
                       </span>
                       <span className="num shrink-0 text-[11px] text-muted">{l.prob.toFixed(1)}%</span>
-                      <span className="num w-[58px] shrink-0 text-right text-cfb">
+                      <span className={`num w-[58px] shrink-0 text-right ${accentText}`}>
                         {amFmt(l.cz)}
                         {l.book !== "CZ" && <span className="ml-0.5 text-[8.5px] uppercase text-faint">{l.book}</span>}
                       </span>
@@ -199,7 +204,7 @@ export function CfbSlip({
                 {/* ticket math */}
                 <div className="shrink-0 border-t border-white/[0.06] px-3 py-2">
                   <div className="num grid grid-cols-4 gap-1 text-center">
-                    <Stat label="Odds" value={amFmt(calc.am)} sub={`${calc.dec.toFixed(2)}×`} tone="cfb" />
+                    <Stat label="Odds" value={amFmt(calc.am)} sub={`${calc.dec.toFixed(2)}×`} tone={L.id} />
                     <Stat
                       label="True"
                       value={`${(calc.trueProb * 100).toFixed(1)}%`}
@@ -235,7 +240,7 @@ export function CfbSlip({
                     True % is the naive product of the model&apos;s win probabilities — one side per game and one leg per
                     player, so a prop and a side on the same game multiply as if independent (they are not; treat it as a
                     yardstick). Fair (true) is the break-even price for that true %, a yardstick,
-                    not a posted quote. Sandbox only — nothing here enters the CFB ledger.
+                    not a posted quote. Sandbox only — nothing here enters the {L.short} ledger.
                   </div>
                 </div>
               </>
@@ -247,8 +252,8 @@ export function CfbSlip({
   );
 }
 
-function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: "pos" | "neg" | "cfb" | "text" }) {
-  const color = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : tone === "cfb" ? "text-cfb" : "text-text";
+function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: "pos" | "neg" | "cfb" | "nfl" | "text" }) {
+  const color = tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : tone === "cfb" ? "text-cfb" : tone === "nfl" ? "text-nfl" : "text-text";
   return (
     <div className="rounded-[8px] bg-white/[0.03] px-1 py-1.5 leading-none">
       <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-faint">{label}</div>

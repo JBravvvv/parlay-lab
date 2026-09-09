@@ -13,9 +13,10 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard } from "@/lib/useBoard";
 import { UfcBuilder } from "@/components/ufc/UfcBuilder";
 import { AsgBuilderTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbBuilder } from "@/components/cfb/CfbBuilder";
+import { NflBuilder } from "@/components/nfl/NflBuilder";
 import { getEngine, getMoney, setMoney, getSelectionMode, markNoPlay, todayStr, generatesToday, GEN_CREDITS_EST } from "@/lib/engine-client";
 import { syncNow } from "@/lib/ledgerSync";
 import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
@@ -628,6 +629,21 @@ export default function BuilderPage() {
     );
   }
 
+  /* NFL desk (2026-09-08): the shared football card builder on the NFL desk handles (its own paper banner, bank and ledger). */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Builder"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="A sized NFL paper card from the slate's +EV Caesars sides — its own bank and its own ledger, never mixed with MLB or CFB."
+        />
+        <NflBuilder />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -1123,6 +1139,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

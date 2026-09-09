@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mergeLedgers, unionCore, unionFun, validateLedger, type SyncEntry } from "../src/lib/ledger-merge";
 import { PAPER } from "@/lib/paper-mode";
 import { CFB_PAPER } from "@/lib/cfb/rules";
+import { NFL_PAPER } from "@/lib/nfl/rules";
 import { computeBankroll, realizedPL, todayExposure, type BankStore } from "@/lib/bankroll";
 import { decideTopUp } from "@/lib/server/blocks";
 
@@ -341,8 +342,10 @@ describe("core union — the CFB top-up survives a stale graded push (INSTRUCTIO
     });
     for (const m of [mergeLedgers([a], [b]), mergeLedgers([b], [a])]) {
       expect(stakeOf(m[0].core), "a `daily`-less merge staked the day past the CFB desk's own allotment").toBeLessThanOrEqual(CFB_PAPER.daily);
-      expect(stakeOf(m[0].core), "neither $100 ticket fits over the $75 base under a $150 ceiling").toBe(75);
-      expect(m[0].core).toHaveLength(3);
+      /* 2026-09-08, the $250 allotment: ONE $100 ticket now fits over the $75 base ($175), the second
+         does not ($275) — under the old $150 ceiling neither fit and the day stayed at $75 / 3 */
+      expect(stakeOf(m[0].core), "exactly one $100 ticket fits over the $75 base under the $250 ceiling").toBe(175);
+      expect(m[0].core).toHaveLength(4);
     }
   });
 
@@ -2161,32 +2164,35 @@ describe("a stored copy's own `daily` cannot raise the merged CORE ceiling (INST
   const dTix = (n: number, stake = 25) => ({
     id: `cfb-${DD}-core-${n}`, bucket: "core", name: "SINGLE · HOME ML", stake, czOdds: -110, confirmed: null, legs: [dLeg(`g${n}`)],
   });
-  const claim = (daily: number, ns: number[], over: Partial<SyncEntry> = {}): SyncEntry =>
-    ({ sport: "cfb", date: DD, locked: true, daily, fun: 25, core: ns.map((n) => dTix(n)), funT: [], games: {}, grading: null, ...over }) as SyncEntry;
+  const claim = (daily: number, ns: number[], over: Partial<SyncEntry> = {}, stake = 25): SyncEntry =>
+    ({ sport: "cfb", date: DD, locked: true, daily, fun: 25, core: ns.map((n) => dTix(n, stake)), funT: [], games: {}, grading: null, ...over }) as SyncEntry;
   const GRADED = { grading: { done: true, tickets: {}, legs: {} } } as Partial<SyncEntry>;
 
-  it("a `daily: 500` copy carrying eight $25 tickets cannot buy a ninth, in both merge orders", () => {
-    const rich = () => claim(500, [1, 2, 3, 4, 5, 6, 7, 8], GRADED);
-    const honest = () => claim(CFB_PAPER.daily, [9]);
+  /* 2026-09-08, the $250 allotment: the fixture is six $50 tickets ($300, over the desk's $250 the
+     way eight $25 was over $150) and a seventh — the same shape at the widened allotment and the
+     $50 max stake, so the case still exercises a base that is ALREADY over cap. */
+  it("a `daily: 500` copy carrying six $50 tickets cannot buy a seventh, in both merge orders", () => {
+    const rich = () => claim(500, [1, 2, 3, 4, 5, 6], GRADED, 50);
+    const honest = () => claim(CFB_PAPER.daily, [7], {}, 50);
     for (const m of [mergeLedgers([rich()], [honest()]), mergeLedgers([honest()], [rich()])]) {
-      expect(m[0].core, "the merge believed a stored blob's own $500 claim and seated a ninth ticket").toHaveLength(8);
-      expect(stakeOf(m[0].core), "$225 of core money on a $150 desk").toBe(200);
+      expect(m[0].core, "the merge believed a stored blob's own $500 claim and seated a seventh ticket").toHaveLength(6);
+      expect(stakeOf(m[0].core), "$350 of core money on a $250 desk").toBe(300);
       expect(
         (m[0] as { coreDropped?: string[] }).coreDropped,
         "the refused wager must be named — the desk's own allotment is what refused it",
-      ).toEqual([`cfb-${DD}-core-9`]);
+      ).toEqual([`cfb-${DD}-core-7`]);
       expect(
         (m[0] as { capBreach?: unknown }).capBreach,
-        "the breach must be measured against the DESK's $150, not against the blob's own claim",
-      ).toEqual({ core: { sum: 200, cap: CFB_PAPER.daily } });
+        "the breach must be measured against the DESK's $250, not against the blob's own claim",
+      ).toEqual({ core: { sum: 300, cap: CFB_PAPER.daily } });
     }
   });
 
   it("and the merged day does not carry the raised ceiling forward into the NEXT merge", () => {
-    const merged = mergeLedgers([claim(500, [1, 2, 3, 4, 5, 6, 7, 8], GRADED)], [claim(CFB_PAPER.daily, [9])]);
-    const later = mergeLedgers(merged, [claim(CFB_PAPER.daily, [10])]);
-    expect(stakeOf(later[0].core), "a tenth $25 ticket rode in on the ceiling the first merge inherited").toBe(200);
-    expect((later[0] as { coreDropped?: string[] }).coreDropped).toEqual([`cfb-${DD}-core-10`, `cfb-${DD}-core-9`]);
+    const merged = mergeLedgers([claim(500, [1, 2, 3, 4, 5, 6], GRADED, 50)], [claim(CFB_PAPER.daily, [7], {}, 50)]);
+    const later = mergeLedgers(merged, [claim(CFB_PAPER.daily, [8], {}, 50)]);
+    expect(stakeOf(later[0].core), "an eighth $50 ticket rode in on the ceiling the first merge inherited").toBe(300);
+    expect((later[0] as { coreDropped?: string[] }).coreDropped).toEqual([`cfb-${DD}-core-7`, `cfb-${DD}-core-8`]); // sorted, as the old [core-10, core-9] was
     expect((later[0] as { capBreach?: { core?: { cap: number } } }).capBreach?.core?.cap).toBe(CFB_PAPER.daily);
   });
 
@@ -2967,12 +2973,12 @@ describe("`allocSum` is derived from the seated core (INSTRUCTION 45, F3)", () =
   const rival = () =>
     fDay("server", [fTix(FID(1), "g99", 25), fTix(FID(2), "g2", 50, { topUp: 25 }), fTix(FID(3), "g3", 25), fTix(FID(4), "g4", 25)]);
 
-  /* A RAISE THE SAME $150 CANNOT AFFORD. `mine` already holds $100; lifting core-2 from 25 to 125
-     is a lift of 100, and 100 + 100 = 200 against Josh's $150, so `unionCore`'s per-id cap gate
-     refuses THIS id and records the receipt for it. Used by (1b) below, which is the half of the
-     original (1) that CLOSING K2 did not change. */
+  /* A RAISE THE SAME $250 CANNOT AFFORD (2026-09-08: was 125 with topUp 100 against $150). `mine`
+     already holds $100; lifting core-2 from 25 to 200 is a lift of 175, and 100 + 175 = 275 against
+     Josh's $250, so `unionCore`'s per-id cap gate refuses THIS id and records the receipt for it.
+     Used by (1b) below, which is the half of the original (1) that CLOSING K2 did not change. */
   const overRival = () =>
-    fDay("server", [fTix(FID(1), "g99", 25), fTix(FID(2), "g2", 125, { topUp: 100 }), fTix(FID(3), "g3", 25), fTix(FID(4), "g4", 25)]);
+    fDay("server", [fTix(FID(1), "g99", 25), fTix(FID(2), "g2", 200, { topUp: 175 }), fTix(FID(3), "g3", 25), fTix(FID(4), "g4", 25)]);
 
   /* ------------------------------------------------------------------------------------------
      THIS IS A REWRITE, NOT A LOOSENING — INSTRUCTION 45, 2026-09-06, CLOSING K2.
@@ -3020,11 +3026,11 @@ describe("`allocSum` is derived from the seated core (INSTRUCTION 45, F3)", () =
      required silence.
      ------------------------------------------------------------------------------------------ */
   it("(1) a rival's receipted raise on ANOTHER id is refused and named — both orders", () => {
-    expect(owedOf(mine()), "this card holds $100 of its $150").toBe(50);
+    expect(owedOf(mine()), "this card holds $100 of its $250 (2026-09-08: $50 of $150 before the widening)").toBe(150);
     for (const m of [mergeLedgers([mine()], [rival()]), mergeLedgers([rival()], [mine()])]) {
       expect((m[0] as { allocSum?: number }).allocSum, "the rival stake moved the day's recorded money").toBe(100);
       expect((m[0] as { allocSum?: number }).allocSum, "allocSum stopped being the seated core").toBe(stakeOf(m[0].core));
-      expect(owedOf(m[0]), "the merge invented owed out of a stake it refused").toBe(50);
+      expect(owedOf(m[0]), "the merge invented owed out of a stake it refused").toBe(150);
       expect((m[0] as { betConflict?: string[] }).betConflict, "the refusal named an id nobody disputed").toEqual([FID(1)]);
       expect(
         (m[0] as { stakeConflict?: unknown }).stakeConflict,
@@ -3034,19 +3040,19 @@ describe("`allocSum` is derived from the seated core (INSTRUCTION 45, F3)", () =
   });
 
   it("(1b) a refused rival raise manufactures no fresh `owed` — both orders", () => {
-    expect(owedOf(mine()), "this card holds $100 of its $150").toBe(50);
+    expect(owedOf(mine()), "this card holds $100 of its $250").toBe(150);
     for (const m of [mergeLedgers([mine()], [overRival()]), mergeLedgers([overRival()], [mine()])]) {
       expect((m[0] as { allocSum?: number }).allocSum, "the refused rival stake moved the day's recorded money").toBe(100);
       expect((m[0] as { allocSum?: number }).allocSum).toBe(stakeOf(m[0].core));
-      expect(owedOf(m[0]), "the merge invented owed out of a stake it refused").toBe(50);
-      expect((m[0] as { stakeConflict?: unknown }).stakeConflict, "the money the merge refused left no receipt").toEqual({ [FID(2)]: { kept: 25, refused: 125 } });
+      expect(owedOf(m[0]), "the merge invented owed out of a stake it refused").toBe(150);
+      expect((m[0] as { stakeConflict?: unknown }).stakeConflict, "the money the merge refused left no receipt").toEqual({ [FID(2)]: { kept: 25, refused: 200 } });
       expect((m[0] as { betConflict?: string[] }).betConflict).toEqual([FID(1)]);
     }
   });
 
-  it("(2) and the same short day still reaches the FULL $150 — owed is what the card is missing", () => {
+  it("(2) and the same short day still reaches the FULL $250 — owed is what the card is missing", () => {
     for (const m of [mergeLedgers([mine()], [rival()]), mergeLedgers([rival()], [mine()])]) {
-      expect(stakeOf(m[0].core) + owedOf(m[0]), "the day can no longer be topped up to Josh's $150").toBe(CFB_PAPER.daily);
+      expect(stakeOf(m[0].core) + owedOf(m[0]), "the day can no longer be topped up to Josh's $250").toBe(CFB_PAPER.daily);
     }
   });
 
@@ -3088,14 +3094,15 @@ describe("`allocSum` is derived from the seated core (INSTRUCTION 45, F3)", () =
 describe("the merged day's `daily` is the cap the merge used (INSTRUCTION 45, F4)", () => {
   const WD = "2026-09-05";
   const wLeg = (g: string) => ({ gkey: g, lkey: `${g}|ml|home|`, label: "HOME ML", prop: "ML", market: "ml", side: "home", line: null, cz: -110 });
-  const wTix = (n: number) => ({ id: `cfb-${WD}-core-${n}`, bucket: "core", name: "SINGLE · HOME ML", stake: 25, confirmed: null, legs: [wLeg(`g${n}`)] });
-  const claim = (daily: number, ns: number[], over: Partial<SyncEntry> = {}): SyncEntry =>
-    ({ sport: "cfb", date: WD, locked: true, daily, fun: 25, core: ns.map(wTix), funT: [], games: {}, grading: null, ...over }) as SyncEntry;
+  const wTix = (n: number, stake = 25) => ({ id: `cfb-${WD}-core-${n}`, bucket: "core", name: "SINGLE · HOME ML", stake, confirmed: null, legs: [wLeg(`g${n}`)] });
+  const claim = (daily: number, ns: number[], over: Partial<SyncEntry> = {}, stake = 25): SyncEntry =>
+    ({ sport: "cfb", date: WD, locked: true, daily, fun: 25, core: ns.map((n) => wTix(n, stake)), funT: [], games: {}, grading: null, ...over }) as SyncEntry;
   const GRADED = { grading: { done: true, tickets: {}, legs: {} } } as Partial<SyncEntry>;
 
   it("CFB: an inflated `daily: 500` is not carried onto the merged day, in both merge orders", () => {
-    const rich = () => claim(500, [1, 2, 3, 4, 5, 6, 7, 8], GRADED);
-    const honest = () => claim(CFB_PAPER.daily, [9]);
+    /* 2026-09-08: six $50 tickets ($300) over the $250 desk, the D1 shape at the widened allotment */
+    const rich = () => claim(500, [1, 2, 3, 4, 5, 6], GRADED, 50);
+    const honest = () => claim(CFB_PAPER.daily, [7], {}, 50);
     for (const m of [mergeLedgers([rich()], [honest()]), mergeLedgers([honest()], [rich()])]) {
       expect((m[0] as { daily?: number }).daily, "the merged day records a ceiling the merge itself refused to use").toBe(CFB_PAPER.daily);
       expect((m[0] as { daily?: number }).daily, "the day's own `daily` contradicts the cap the breach was measured against").toBe(
@@ -3317,7 +3324,7 @@ describe("a rival on ONE id no longer strands a receipted raise on ANOTHER (INST
       expect(stakeOf(m.core), `${order}: an UNRELATED ticket's drift deleted $25 of deployed money`).toBe(125);
       expect((m as { stakeConflict?: unknown }).stakeConflict, `${order}: a wager the two copies AGREE about was marked refused`).toBeUndefined();
       expect(Number((m as { allocSum?: unknown }).allocSum), order).toBe(125);
-      expect(CFB_PAPER.daily - stakeOf(m.core), `${order}: the desk was handed room to stake money it had already deployed`).toBe(25);
+      expect(CFB_PAPER.daily - stakeOf(m.core), `${order}: the desk was handed room to stake money it had already deployed`).toBe(125); // 2026-09-08: $250 − $125 (was $150 − $125 = 25)
     }
   });
 
@@ -3548,7 +3555,7 @@ describe("`allocSum` is restated from the seated core, not carried by a delta (I
   const k5Tix = (id: string, g: string, stake: number) => ({ id, bucket: "core", name: "SINGLE · HOME ML", stake, confirmed: null, legs: [k5Leg(g)] });
   const K5C = (n: number) => `cfb-${KD5}-core-${n}`;
   const k5Day = (core: ReturnType<typeof k5Tix>[], allocSum: number, over: Partial<SyncEntry> = {}): SyncEntry =>
-    ({ sport: "cfb", date: KD5, locked: true, daily: 150, fun: 25, allocSum, core, funT: [], games: {}, grading: null, ...over }) as SyncEntry;
+    ({ sport: "cfb", date: KD5, locked: true, daily: CFB_PAPER.daily, fun: 25, allocSum, core, funT: [], games: {}, grading: null, ...over }) as SyncEntry;
   /** the base: $50 of tickets under a stored allocSum of 999 — the two DISAGREE */
   const stale = (): SyncEntry => k5Day([k5Tix(K5C(1), "g1", 25), k5Tix(K5C(2), "g2", 25)], 999, { grading: { done: false, tickets: {}, legs: {} } });
   const fuller = (): SyncEntry => k5Day([k5Tix(K5C(1), "g1", 25), k5Tix(K5C(2), "g2", 25), k5Tix(K5C(3), "g3", 25)], 75);
@@ -3564,7 +3571,7 @@ describe("`allocSum` is restated from the seated core, not carried by a delta (I
         Number((m as { allocSum?: unknown }).allocSum),
         `${order}: the delta carry answers 999 + (75 − 50) = 1024 here; the restatement answers 75`,
       ).toBe(75);
-      expect(CFB_PAPER.daily - Number((m as { allocSum?: unknown }).allocSum), `${order}: what the day is owed`).toBe(75);
+      expect(CFB_PAPER.daily - Number((m as { allocSum?: unknown }).allocSum), `${order}: what the day is owed`).toBe(175); // 2026-09-08: $250 − $75
     }
   });
 });
@@ -3697,26 +3704,28 @@ describe("a receipted raise is bounded by the allotment on the ORDINARY path too
     id, bucket: "core", name: "SINGLE · HOME ML", stake, topUp, confirmed: null, legs: [fLeg(g)],
   });
   const C = (n: number) => `cfb-${FD}-core-${n}`;
-  const rest = () => [3, 4, 5, 6].map((n) => fTix(C(n), `g${n}`, 25, 0));
+  /* 2026-09-08, the $250 allotment: the four untouched tickets are $50 each ($200) so both copies
+     still land EXACTLY on CFB_PAPER.daily with the same $20 residue on core-1 or core-2. */
+  const rest = () => [3, 4, 5, 6].map((n) => fTix(C(n), `g${n}`, 50, 0));
   const fDay = (core: ReturnType<typeof fTix>[]): SyncEntry =>
-    ({ sport: "cfb", date: FD, locked: true, daily: 150, fun: 25, allocSum: stakeOf(core), core, funT: [], games: {}, grading: null }) as SyncEntry;
+    ({ sport: "cfb", date: FD, locked: true, daily: CFB_PAPER.daily, fun: 25, allocSum: stakeOf(core), core, funT: [], games: {}, grading: null }) as SyncEntry;
   /** copy A — the residue landed on core-2, raised from $5 to $25. Exactly CFB_PAPER.daily. */
   const copyA = (): SyncEntry => fDay([fTix(C(1), "g1", 25, 0), fTix(C(2), "g2", 25, 20), ...rest()]);
-  /** copy B — the same date and the same $150, with the residue on core-1 instead. */
+  /** copy B — the same date and the same $250, with the residue on core-1 instead. */
   const copyB = (): SyncEntry => fDay([fTix(C(1), "g1", 45, 20), fTix(C(2), "g2", 5, 0), ...rest()]);
   const orders = () => [
     [mergeLedgers([copyA()], [copyB()])[0], "A,B"],
     [mergeLedgers([copyB()], [copyA()])[0], "B,A"],
   ] as const;
 
-  it("both copies are $150 before the merge", () => {
+  it("both copies are $250 before the merge", () => {
     expect(stakeOf(copyA().core)).toBe(CFB_PAPER.daily);
     expect(stakeOf(copyB().core)).toBe(CFB_PAPER.daily);
   });
 
-  it("the merged day is still $150, and the refusal is recorded — both orders", () => {
+  it("the merged day is still $250, and the refusal is recorded — both orders", () => {
     for (const [m, order] of orders()) {
-      expect(stakeOf(m.core), `${order}: the merge staked the day past Josh's $150 with no rival card anywhere`).toBeLessThanOrEqual(
+      expect(stakeOf(m.core), `${order}: the merge staked the day past Josh's $250 with no rival card anywhere`).toBeLessThanOrEqual(
         CFB_PAPER.daily,
       );
       expect(stakeOf(m.core), order).toBe(CFB_PAPER.daily);
@@ -4086,9 +4095,11 @@ describe("a receipted raise the MERGED day has room for is not refused (INSTRUCT
     id, bucket: "core", name: "SINGLE · HOME ML", stake, topUp, confirmed: null, legs: [leg(g)],
   });
   const C = (n: number) => `cfb-${D}-core-${n}`;
-  const rest = () => [3, 4, 5].map((n) => tix(C(n), `g${n}`, 25, 0));
+  /* 2026-09-08, the $250 allotment: seven untouched $25 tickets ($175) beside core-1 and core-2,
+     so the phone (25 + 50 + 175) and the server (45 + 30 + 175) both hold EXACTLY CFB_PAPER.daily */
+  const rest = () => [3, 4, 5, 6, 7, 8, 9].map((n) => tix(C(n), `g${n}`, 25, 0));
   const mk = (core: ReturnType<typeof tix>[], over: Partial<SyncEntry> = {}): SyncEntry =>
-    ({ sport: "cfb", date: D, locked: true, daily: 150, fun: 25, allocSum: stakeOf(core), core, funT: [], games: {}, grading: null, ...over }) as SyncEntry;
+    ({ sport: "cfb", date: D, locked: true, daily: CFB_PAPER.daily, fun: 25, allocSum: stakeOf(core), core, funT: [], games: {}, grading: null, ...over }) as SyncEntry;
   /** the phone: core-2 still at the $50 its lock sized, and it GRADED the day — so it is the base */
   const phone = (): SyncEntry =>
     mk([tix(C(1), "g1", 25, 0), tix(C(2), "g2", 50, 0), ...rest()], { grading: { done: true, tickets: {}, legs: {} } });
@@ -4106,7 +4117,7 @@ describe("a receipted raise the MERGED day has room for is not refused (INSTRUCT
 
   it("the merged day is EXACTLY the allotment — neither over nor under, both orders", () => {
     for (const [m, order] of orders()) {
-      expect(stakeOf(m.core), `${order}: the merged day is not the $150 both copies hold`).toBe(CFB_PAPER.daily);
+      expect(stakeOf(m.core), `${order}: the merged day is not the $250 both copies hold`).toBe(CFB_PAPER.daily);
       expect(m.core.find((t) => t.id === C(1))?.stake, `${order}: a raise the merged day has room for was refused`).toBe(45);
       expect(m.core.find((t) => t.id === C(1))?.topUp, `${order}: the receipt must travel with the stake it explains`).toBe(20);
       expect(m.core.find((t) => t.id === C(2))?.stake, `${order}: the receiptless disagreement must still settle on the smaller`).toBe(30);
@@ -4398,5 +4409,159 @@ describe("INSTRUCTION 46 — the day's shape is DURABLE across mergeDay (fix rou
     const m = mergeLedgers([x], [y])[0];
     expect((m.core.find((t) => t.id === "t1") as { shapeSlot?: number }).shapeSlot).toBe(4); // y is the base (graded)
     expect(validateLedger([m]).ok).toBe(true);
+  });
+});
+
+/* ============================================================================================
+ * THE NFL DESK ON THE SAME KERNEL (2026-09-08, the NFL build — Josh, verbatim: "2. NFL needs to
+ * be built NOW  3. Allocation should be set to $350").
+ *
+ * `allotmentCap` / `funCap` (src/lib/ledger-merge.ts) key the ceiling on a DESK_PAPER table by the
+ * entry's `sport`: MLB → PAPER ($150), CFB → CFB_PAPER ($250), NFL → NFL_PAPER ($350). The cases
+ * below are the CFB block above re-run on `sport: "nfl"` ids (`nfl-<date>-core-<i>`, the same
+ * positional scheme) at the NFL allotment: the top-up survives the stale graded push, the ceiling
+ * holds at $350 in both orders, a stored copy claiming `daily: 500` is capped at $350, and an MLB
+ * day beside an NFL day keeps its own $150.
+ * ========================================================================================== */
+describe("the NFL desk — the merge kernel bounds an `nfl` day by NFL_PAPER.daily (2026-09-08)", () => {
+  const ND = "2026-09-13";
+  const NFL_LOCK_CORE = () => [
+    cfbTix(`nfl-${ND}-core-1`, "g1", "CIN", 50),
+    cfbTix(`nfl-${ND}-core-2`, "g2", "DET", 50),
+    cfbTix(`nfl-${ND}-core-3`, "g3", "BUF", 50),
+  ];
+  const NFL_TOPUP_CORE = () => [
+    cfbTix(`nfl-${ND}-topup1-core-1`, "g4", "PHI", 50),
+    cfbTix(`nfl-${ND}-topup1-core-2`, "g5", "MIN", 50),
+    cfbTix(`nfl-${ND}-topup1-core-3`, "g6", "LAC", 50),
+    cfbTix(`nfl-${ND}-topup1-core-4`, "g7", "DAL", 50),
+  ];
+  const nflFun = () => [{ id: `nfl-${ND}-fun-1`, bucket: "fun", name: "FAVORITES PARLAY", stake: 25, confirmed: null, legs: [cfbLeg("g1", "CIN"), cfbLeg("g2", "DET"), cfbLeg("g3", "BUF")] }];
+  const nflDay = (over: Partial<SyncEntry> = {}): SyncEntry =>
+    ({
+      sport: "nfl",
+      date: ND,
+      locked: true,
+      daily: NFL_PAPER.daily,
+      fun: NFL_PAPER.fun,
+      source: "server-lock",
+      trigger: "nfl-lock",
+      lockedAt: 1_757_700_000_000,
+      core: NFL_LOCK_CORE(),
+      funT: nflFun(),
+      games: {},
+      grading: null,
+      ...over,
+    }) as SyncEntry;
+  /** the phone's pull of the $150 lock, graded — rich, and STALE */
+  const staleGraded = (): SyncEntry =>
+    nflDay({
+      grading: {
+        done: true,
+        tickets: {
+          [`nfl-${ND}-core-1`]: { result: "won", payout: 83.33 },
+          [`nfl-${ND}-core-2`]: { result: "lost", payout: 0 },
+          [`nfl-${ND}-core-3`]: { result: "lost", payout: 0 },
+          [`nfl-${ND}-fun-1`]: { result: "lost", payout: 0 },
+        },
+        legs: {},
+      },
+      gradedAt: 1_757_800_000_000,
+    });
+  /** the server's top-up: the same lock plus four appended core tickets, the day at $350 */
+  const toppedUp = (): SyncEntry =>
+    nflDay({
+      core: [...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE()],
+      topUps: [{ at: 1_757_750_000_000, core: 4, stake: 200 }],
+      note: "Top-up 1: 4 core tickets for $200 — the day now carries $350 of the $350.",
+    });
+
+  it("the allotment is $350 core / $25 fun", () => {
+    expect(NFL_PAPER.daily).toBe(350);
+    expect(NFL_PAPER.fun).toBe(25);
+    expect(stakeOf(toppedUp().core)).toBe(NFL_PAPER.daily);
+  });
+
+  it("keeps all seven core tickets, sums to $350 exactly once, and keeps the stale copy's grading", () => {
+    const [m] = mergeLedgers([staleGraded()], [toppedUp()]);
+    expect(m.core).toHaveLength(7);
+    expect(idsOf(m.core)).toEqual(idsOf([...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE()]));
+    expect(new Set(idsOf(m.core)).size).toBe(7);
+    expect(stakeOf(m.core), "the merged day is not the $350 Josh asked for").toBe(350);
+    const g = m.grading?.tickets as Record<string, { result: string }>;
+    expect(g[`nfl-${ND}-core-1`].result).toBe("won");
+    expect(m.grading?.done, "an ungraded appended ticket must reopen grading for the auto-grader").toBe(false);
+    expect(stakeOf(m.funT ?? [])).toBe(25);
+  });
+
+  it("is commutative and idempotent", () => {
+    const ab = mergeLedgers([staleGraded()], [toppedUp()]);
+    const ba = mergeLedgers([toppedUp()], [staleGraded()]);
+    expect(JSON.stringify(ab)).toBe(JSON.stringify(ba));
+    expect(JSON.stringify(mergeLedgers(ab, [toppedUp()]))).toBe(JSON.stringify(ab));
+    expect(JSON.stringify(mergeLedgers(ab, ab))).toBe(JSON.stringify(ab));
+  });
+
+  it("never appends past $350 — an eighth $50 ticket on a full NFL day is refused, both orders", () => {
+    const full = { ...toppedUp(), grading: { done: true, tickets: {}, legs: {} } } as SyncEntry;
+    const over = nflDay({
+      core: [...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE(), cfbTix(`nfl-${ND}-topup2-core-1`, "g8", "KC", 50)],
+      grading: null,
+    });
+    for (const m of [mergeLedgers([full], [over]), mergeLedgers([over], [full])]) {
+      expect(stakeOf(m[0].core), "the merge staked the NFL day past its $350 allotment").toBe(350);
+      expect(m[0].core).toHaveLength(7);
+      expect((m[0] as { coreDropped?: string[] }).coreDropped).toEqual([`nfl-${ND}-topup2-core-1`]);
+    }
+  });
+
+  it("with no `daily` on either side the union falls back to NFL_PAPER.daily, not to CFB's $250 and not to unbounded", () => {
+    const a = nflDay({ daily: undefined, grading: { done: true, tickets: {}, legs: {} } }); // $150, wins pickBase
+    const b = nflDay({ daily: undefined, core: [...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE(), cfbTix(`nfl-${ND}-topup2-core-1`, "g8", "KC", 50)] });
+    for (const m of [mergeLedgers([a], [b]), mergeLedgers([b], [a])]) {
+      expect(stakeOf(m[0].core), "a `daily`-less NFL merge must stop at the NFL desk's own $350").toBe(350);
+      expect(m[0].core).toHaveLength(7);
+    }
+  });
+
+  it("a stored copy claiming `daily: 500` is capped at $350 in both orders, and the merged day records 350", () => {
+    const rich = () => nflDay({ daily: 500, core: [...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE()], grading: { done: true, tickets: {}, legs: {} } });
+    const honest = () => nflDay({ core: [...NFL_LOCK_CORE(), ...NFL_TOPUP_CORE(), cfbTix(`nfl-${ND}-topup2-core-1`, "g8", "KC", 50)] });
+    for (const m of [mergeLedgers([rich()], [honest()]), mergeLedgers([honest()], [rich()])]) {
+      expect(m[0].core, "the merge believed a stored blob's own $500 claim and seated an eighth ticket").toHaveLength(7);
+      expect(stakeOf(m[0].core)).toBe(350);
+      expect((m[0] as { coreDropped?: string[] }).coreDropped).toEqual([`nfl-${ND}-topup2-core-1`]);
+      expect((m[0] as { daily?: number }).daily, "the merged day carried the inflated ceiling forward").toBe(NFL_PAPER.daily);
+    }
+  });
+
+  it("an MLB day beside an NFL day keeps its own $150 — the caps are keyed per desk, not per ledger", () => {
+    /* `mergeLedgers` keys days by DATE (src/lib/ledger-merge.ts, `byDate`) — each desk owns its own
+       ledger key (pl_ledger / pl_cfb_ledger / pl_nfl_ledger), so two desks never share one array
+       in production; here the MLB day sits on the eve so the two days stay two days */
+    const MD = "2026-09-12";
+    const mLeg = (lkey: string) => ({ lkey, label: `${lkey} over`, prop: "batter_hits", cz: -130 });
+    const mTix = (n: number) => ({ id: `MIXED_${n}`, stake: 25, name: `MIXED · l${n}`, type: "MIXED", confirmed: null, placed: false, actualStake: 0, legs: [mLeg(`l${n}`)] });
+    const mlb = (ns: number[], over: Partial<SyncEntry> = {}): SyncEntry =>
+      ({ date: MD, locked: true, daily: PAPER.daily, core: ns.map(mTix), funT: [], ...over }) as SyncEntry;
+    const GRADED = { grading: { done: true, tickets: {}, legs: {} } } as Partial<SyncEntry>;
+    const A = () => [mlb([1, 2, 3, 4, 5, 6], GRADED), staleGraded()];
+    const B = () => [mlb([1, 2, 3, 4, 5, 6, 7]), toppedUp()];
+    for (const m of [mergeLedgers(A(), B()), mergeLedgers(B(), A())]) {
+      const mlbDay = m.find((e) => !("sport" in e) || (e as { sport?: string }).sport !== "nfl");
+      const nflDayM = m.find((e) => (e as { sport?: string }).sport === "nfl");
+      expect(mlbDay && stakeOf(mlbDay.core), "the MLB day borrowed the NFL desk's $350").toBe(PAPER.daily);
+      expect(mlbDay?.core).toHaveLength(6);
+      expect((mlbDay as { coreDropped?: string[] } | undefined)?.coreDropped).toEqual(["MIXED_7"]);
+      expect(nflDayM && stakeOf(nflDayM.core), "the NFL day was bounded by the MLB desk's $150").toBe(NFL_PAPER.daily);
+      expect(nflDayM?.core).toHaveLength(7);
+    }
+    expect(PAPER.daily).toBe(150);
+  });
+
+  it("the CFB desk beside it is still $250 — three desks, three ceilings", () => {
+    expect(CFB_PAPER.daily).toBe(250);
+    expect(NFL_PAPER.daily - CFB_PAPER.daily).toBe(100);
+    expect(CFB_PAPER.daily - PAPER.daily).toBe(100);
   });
 });

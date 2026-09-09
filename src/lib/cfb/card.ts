@@ -3,6 +3,7 @@ import { decToAm } from "@/lib/ticket-math";
 import { CFB_RULES } from "@/lib/cfb/rules";
 import { rowProbAt, sideLabel } from "@/lib/cfb/model";
 import type { CfbBoard, CfbCard, CfbCardOpts, CfbGame, CfbRow, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
+import type { LeagueRules } from "@/lib/football/league";
 
 /**
  * THE CFB PAPER CARD (INSTRUCTION 38, 2026-09-05) — `buildCfbCard`, pure, from a priced board
@@ -23,6 +24,13 @@ import type { CfbBoard, CfbCard, CfbCardOpts, CfbGame, CfbRow, CfbTicket, CfbTic
  *               grade D or better at Caesars), added until it pays ≥ fun.minDec, 3–5 legs; none
  *               under 3. Named FAVORITES PARLAY when the legs mostly are favorites, else FUN PARLAY.
  *   noPlay      nothing staked at all — no core ticket AND no fun parlay — and the note says so.
+ *
+ * ONE CARD BUILDER, TWO LEAGUES (2026-09-08, the NFL build). The rules object `R` is
+ * `opts.rules ?? CFB_RULES` — the component layer passes nothing and gets the CFB desk; the server
+ * seams pass their league's rules (NFL_RULES: $350 across ≤ 10 tickets of ≤ $50). Every helper that
+ * used to read CFB_RULES by name (`ticketKelly`, `drafts`) now takes `R`, so no NFL ticket can be
+ * sized on a CFB knob. Ticket ids are minted `${opts.idPrefix ?? "cfb"}-${date}-core-${i}` / `-fun-1`
+ * — the grading map is keyed on them, so a league's ids name the league they belong to.
  */
 
 /**
@@ -121,13 +129,13 @@ function draftOf(rows: CfbRow[], games: Map<string, CfbGame>): Draft | null {
   return { legs, games: rows.map((r) => r.gameId), dec, prob, ev: 100 * (prob * dec - 1), rows };
 }
 
-/** ¼-Kelly on the ticket's no-push probability, whole dollars, 2% cap. */
-function ticketKelly(d: Draft, bankroll: number): number {
+/** ¼-Kelly on the ticket's no-push probability, whole dollars, `R.kellyCap` (2%) cap. */
+function ticketKelly(d: Draft, bankroll: number, R: LeagueRules): number {
   const b = d.dec - 1;
   if (!(b > 0)) return 0;
-  const f = CFB_RULES.kellyFrac * ((d.prob * b - (1 - d.prob)) / b);
+  const f = R.kellyFrac * ((d.prob * b - (1 - d.prob)) / b);
   if (!(f > 0)) return 0;
-  return Math.round(Math.min(f, CFB_RULES.kellyCap) * bankroll);
+  return Math.round(Math.min(f, R.kellyCap) * bankroll);
 }
 
 function ticketName(d: Draft): string {
@@ -172,7 +180,7 @@ function bestPerGame(rows: CfbRow[], benched: CfbCard["benched"], reason: (winne
   return best;
 }
 
-function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number): Draft[] {
+function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number, maxLegs: number): Draft[] {
   const out: Draft[] = [];
   const singles = new Map<string, Draft>();
   for (const r of rows) {
@@ -182,7 +190,7 @@ function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number): Dr
       singles.set(r.key, d);
     }
   }
-  if (CFB_RULES.maxLegs >= 2) {
+  if (maxLegs >= 2) {
     for (let i = 0; i < rows.length; i++) {
       for (let j = i + 1; j < rows.length; j++) {
         if (rows[i].gameId === rows[j].gameId) continue;
@@ -198,7 +206,8 @@ function drafts(rows: CfbRow[], games: Map<string, CfbGame>, maxDec: number): Dr
 }
 
 export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
-  const R = CFB_RULES;
+  const R: LeagueRules = opts.rules ?? CFB_RULES;
+  const idPrefix = opts.idPrefix ?? "cfb";
   const notes: string[] = [];
   const benched: CfbCard["benched"] = [];
   const games = new Map(board.games.map((g) => [g.id, g]));
@@ -224,7 +233,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
       for (const d of list) {
         if (picked.length >= R.tickets.max || room() < R.minStake) break;
         if (d.games.some((g) => usedGames.has(g))) continue;
-        const stake = Math.min(clamp(ticketKelly(d, opts.bankroll), R.minStake, R.maxStake), room());
+        const stake = Math.min(clamp(ticketKelly(d, opts.bankroll, R), R.minStake, R.maxStake), room());
         picked.push({ d, stake });
         sum += stake;
         for (const g of d.games) usedGames.add(g);
@@ -240,9 +249,9 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
       }
     };
 
-    admit(drafts(bestRows, games, R.maxDec).sort(byEv));
+    admit(drafts(bestRows, games, R.maxDec, R.maxLegs).sort(byEv));
 
-    /* the top-up: the $150 must deploy */
+    /* the top-up: the whole `opts.daily` must deploy */
     if (room() > 0) raise();
     if (room() > 0 && picked.length < R.tickets.max) {
       const forcedRows = playable.filter(
@@ -250,7 +259,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
       );
       const forcedBest = [...bestPerGame(forcedRows, [], () => "").values()];
       const before = picked.length;
-      admit(drafts(forcedBest, games, R.forcedMaxDec).sort(byProb));
+      admit(drafts(forcedBest, games, R.forcedMaxDec, R.maxLegs).sort(byProb));
       if (picked.length > before) {
         notes.push(`Top-up: ${picked.length - before} short-priced ticket(s) (dec ≤ ${R.forcedMaxDec}, EV ≥ ${R.forcedMinEvPct}%) added by probability to deploy the $${opts.daily}.`);
         if (room() > 0) raise();
@@ -275,7 +284,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
     }
   }
 
-  const core = picked.map((p, i) => finish(`cfb-${board.date}-core-${i + 1}`, "core", ticketName(p.d), p.d, p.stake));
+  const core = picked.map((p, i) => finish(`${idPrefix}-${board.date}-core-${i + 1}`, "core", ticketName(p.d), p.d, p.stake));
 
   /* ---------- FUN ---------- */
   const funT: CfbTicket[] = [];
@@ -310,7 +319,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
       // "FAVORITES" only when the legs mostly are favorites (no-push probability ≥ ½ at Caesars' line)
       const favs = d.legs.filter((l) => l.prob / Math.max(1e-9, 1 - l.push) >= 0.5).length;
       const name = favs * 2 >= d.legs.length ? "FAVORITES PARLAY" : "FUN PARLAY";
-      funT.push(finish(`cfb-${board.date}-fun-1`, "fun", name, d, opts.fun));
+      funT.push(finish(`${idPrefix}-${board.date}-fun-1`, "fun", name, d, opts.fun));
       if (d.dec < R.fun.minDec) notes.push(`Fun: the ${name.toLowerCase()} pays ${d.dec.toFixed(2)} — under the ${R.fun.minDec}× target with the slate's ${legs.length} likeliest grade-D-or-better sides.`);
     }
   } else {

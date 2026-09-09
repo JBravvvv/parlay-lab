@@ -1,5 +1,6 @@
 import type { Grade } from "@/lib/grade";
 import type { SyncEntry, SyncTicket } from "@/lib/ledger-merge";
+import type { League, LeagueConfig, LeagueRules } from "@/lib/football/league";
 
 /**
  * COLLEGE FOOTBALL DESK — the shared contract (INSTRUCTION 38, 2026-09-05, Josh's word,
@@ -269,7 +270,8 @@ export type CfbMergeStakeConflict = { kept: number; refused: number };
 type NoIndex<T> = { [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K] };
 
 export type CfbLedgerEntry = NoIndex<SyncEntry> & {
-  sport: "cfb";
+  /** the football desk the day belongs to — "cfb" or, since the NFL build (2026-09-08), "nfl"; the shared engine stamps it from `cfg.id` */
+  sport: "cfb" | "nfl";
   date: string;
   locked: true;
   daily: number;
@@ -420,6 +422,8 @@ export type CfbBuildInput = {
   now: number;
   /** CFB bankroll for Kelly sizing */
   bankroll: number;
+  /** the league the board is for (model constants, aliases, match window); CFB_LEAGUE when absent (2026-09-08, the NFL build) */
+  league?: LeagueConfig;
 };
 
 /** What `loadCfbSlate` (src/lib/cfb/client.ts) resolves to — the route's full payload. */
@@ -430,4 +434,5 @@ export type CfbSlate = CfbBoard & {
   oddsMissing: boolean;
 };
 
-export type CfbCardOpts = { bankroll: number; daily: number; fun: number; now: number };
+/** `rules` / `idPrefix` default to the CFB desk at the component layer (2026-09-08, the NFL build); the server seams pass them from their LeagueConfig */
+export type CfbCardOpts = { bankroll: number; daily: number; fun: number; now: number; rules?: LeagueRules; idPrefix?: League };

@@ -28,8 +28,8 @@ export type OverlayProps = {
   title: ReactNode;
   children: ReactNode;
   size?: OverlaySize;
-  /** optional accent for the header rule: "cfb" (amber), "gold", default lime */
-  tone?: "pos" | "cfb" | "gold";
+  /** optional accent for the header rule: "cfb" (amber), "nfl" (blue), "gold", default lime */
+  tone?: "pos" | "cfb" | "nfl" | "gold";
   className?: string;
 };
 
@@ -40,6 +40,7 @@ const SIZE_CLASS: Record<OverlaySize, string> = {
 const TONE_CLASS: Record<NonNullable<OverlayProps["tone"]>, string> = {
   pos: "",
   cfb: "is-cfb",
+  nfl: "is-nfl",
   gold: "is-gold",
 };
 

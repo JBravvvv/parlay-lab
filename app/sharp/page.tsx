@@ -6,9 +6,10 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { UfcSharp } from "@/components/ufc/UfcSharp";
 import { AsgSharpTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbSharp } from "@/components/cfb/CfbSharp";
+import { NflSharp } from "@/components/nfl/NflSharp";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
@@ -156,6 +157,21 @@ export default function SharpPage() {
           sub="The desk's College Football read — the market + FPI margin model that prices every slate, constants in the open."
         />
         <CfbSharp />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football read on the NFL desk handles (its own model constants). */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="The Sharp"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="The desk's NFL read — the market + FPI margin model that prices every slate, constants in the open."
+        />
+        <NflSharp />
       </>
     );
   }
@@ -472,6 +488,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

@@ -16,8 +16,8 @@ export function EdgeMeter({
 }: {
   fair: number;
   mkt: number | null;
-  /** the model bar's accent — lime (default) or the CFB amber */
-  tone?: "pos" | "cfb";
+  /** the model bar's accent — lime (default), the CFB amber, or the NFL blue */
+  tone?: "pos" | "cfb" | "nfl";
   className?: string;
 }) {
   const f = clamp01(fair);
@@ -31,7 +31,7 @@ export function EdgeMeter({
 
   return (
     <div className={`min-w-0 ${className}`} role="img" aria-label={label}>
-      <Bar name="Model" p={f} fill={tone === "cfb" ? "bg-cfb" : "bg-pos"} />
+      <Bar name="Model" p={f} fill={tone === "cfb" ? "bg-cfb" : tone === "nfl" ? "bg-nfl" : "bg-pos"} />
       <Bar name="Market" p={m} fill="bg-text/40" className="mt-1" />
       <div className={`num mt-1 text-right text-[10px] leading-none ${gapTone}`}>
         {gapPts == null ? "— pts" : `${signed(gapPts)} pts`}

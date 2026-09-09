@@ -5,22 +5,23 @@ import type { ReactNode } from "react";
  * label on top, the figure in the display face, an optional sub-line, an optional icon.
  * `tone` colors the figure and the tile's corner glint (`.stat-tile` in globals.css):
  * pos = lime, neg = red-orange, gold = the Caesars layer, cfb = the College Football
- * amber, muted = a quiet grey. The default figure is plain text.
+ * amber, nfl = the NFL blue, muted = a quiet grey. The default figure is plain text.
  *
  * Nothing is formatted here — the caller passes the rendered value ("$150", "—", …),
  * so a missing feed value renders exactly as the caller says it should.
  */
-export type StatTone = "pos" | "neg" | "gold" | "cfb" | "muted";
+export type StatTone = "pos" | "neg" | "gold" | "cfb" | "nfl" | "muted";
 
 const TONE: Record<StatTone, string> = {
   pos: "text-pos",
   neg: "text-neg",
   gold: "text-gold",
   cfb: "text-cfb",
+  nfl: "text-nfl",
   muted: "text-muted",
 };
 
-const GLINT: Partial<Record<StatTone, string>> = { cfb: "is-cfb", gold: "is-gold", neg: "is-neg" };
+const GLINT: Partial<Record<StatTone, string>> = { cfb: "is-cfb", nfl: "is-nfl", gold: "is-gold", neg: "is-neg" };
 
 export function StatTile({
   label,

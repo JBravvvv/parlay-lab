@@ -16,19 +16,26 @@ import { calibrationFor, scopedStatsSport, sportsFor, statsQueryEnabled } from "
 const read = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
 
 describe("stats-scope: the desk decides which stat sports are reachable", () => {
-  it("CFB desk → NCAAF only; MLB desk → MLB only", () => {
+  it("CFB desk → NCAAF only; MLB desk → MLB only; NFL desk → NFL only (2026-09-08, the NFL build)", () => {
     expect(sportsFor("cfb")).toEqual(["cfb"]);
     expect(sportsFor("mlb")).toEqual(["mlb"]);
+    expect(sportsFor("nfl")).toEqual(["nfl"]);
   });
-  it("no desk exposes NFL or UFC today (kept wired for a future desk)", () => {
+  it("the MLB and CFB desks still expose neither NFL nor UFC; the NFL desk exposes neither UFC nor CFB", () => {
     for (const d of ["mlb", "cfb"] as const) {
       expect(sportsFor(d)).not.toContain("nfl");
       expect(sportsFor(d)).not.toContain("ufc");
     }
+    expect(sportsFor("nfl")).not.toContain("ufc");
+    expect(sportsFor("nfl")).not.toContain("cfb");
+    expect(sportsFor("nfl")).not.toContain("mlb");
   });
   it("a remembered pill is honoured only inside the desk — a CFB user never lands on MLB stats", () => {
     expect(scopedStatsSport("cfb", "mlb")).toBe("cfb");
     expect(scopedStatsSport("cfb", "nfl")).toBe("cfb");
+    expect(scopedStatsSport("nfl", "cfb")).toBe("nfl");
+    expect(scopedStatsSport("nfl", "mlb")).toBe("nfl");
+    expect(scopedStatsSport("nfl", "nfl")).toBe("nfl");
     expect(scopedStatsSport("cfb", "cfb")).toBe("cfb");
     expect(scopedStatsSport("mlb", "cfb")).toBe("mlb");
     expect(scopedStatsSport("mlb", "ufc")).toBe("mlb");
@@ -39,6 +46,7 @@ describe("stats-scope: the desk decides which stat sports are reachable", () => 
   it("the MLB-model calibration view is MLB-desk only", () => {
     expect(calibrationFor("mlb")).toBe(true);
     expect(calibrationFor("cfb")).toBe(false);
+    expect(calibrationFor("nfl")).toBe(false);
   });
   it("statsQueryEnabled: off during hydration, off for UFC, off until the filters are re-cut for the table sport", () => {
     expect(statsQueryEnabled({ hydrated: false, sport: "mlb", filtersReady: true })).toBe(false);

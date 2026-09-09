@@ -269,3 +269,13 @@ describe("the page — Suspense + useSearchParams, opens the right tab/market, m
     expect(page).toMatch(/onClick=\{\(\) => setLink\(null\)\}/);
   });
 });
+
+describe("the page — the NFL deep link (?nfl=1) mirrors ?cfb=1 (2026-09-08)", () => {
+  it("flips the sport store to NFL beside the CFB line, which stays byte-identical", () => {
+    expect(page).toMatch(/const wantCfb = params\.get\("cfb"\) === "1"/);
+    expect(page).toMatch(/if \(CFB_ENABLED && wantCfb\) setSport\("cfb"\)/);
+    expect(page).toMatch(/const wantNfl = params\.get\("nfl"\) === "1"/);
+    expect(page).toMatch(/if \(NFL_ENABLED && wantNfl\) setSport\("nfl"\)/);
+    expect(page).toMatch(/\}, \[wantNfl\]\);/);
+  });
+});

@@ -9,10 +9,11 @@ import { EmptyState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { useQuery } from "@tanstack/react-query";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
-import { CFB_ENABLED } from "@/lib/features";
+import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { setSport } from "@/lib/sport";
 import { CfbProps } from "@/components/cfb/CfbProps";
+import { NflProps } from "@/components/nfl/NflProps";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
 import { useHeadshots } from "@/lib/mlb-visuals";
@@ -90,6 +91,11 @@ function PropsDesk() {
   useEffect(() => {
     if (CFB_ENABLED && wantCfb) setSport("cfb");
   }, [wantCfb]);
+  /* NFL ledger deep links mirror it on ?nfl=1 (never cfb=1) — 2026-09-08 */
+  const wantNfl = params.get("nfl") === "1";
+  useEffect(() => {
+    if (NFL_ENABLED && wantNfl) setSport("nfl");
+  }, [wantNfl]);
   const [tab, setTab] = useState<TabKey>(link?.tab ?? "games");
   const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "ml");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
@@ -201,6 +207,21 @@ function PropsDesk() {
           sub="A CFB sandbox slip — sides, totals and moneylines from the slate, priced at Caesars or the best posted book."
         />
         <CfbProps />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football sandbox slip on the NFL desk handles. */
+  if (NFL_ENABLED && sport === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Parlay Builder"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="An NFL sandbox slip — sides, totals and moneylines from the slate, priced at Caesars or the best posted book."
+        />
+        <NflProps />
       </>
     );
   }
@@ -372,6 +393,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

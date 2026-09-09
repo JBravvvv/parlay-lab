@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { CfbTicketCard, cfbGradingOf, cfbLegLink, cfbTicketsOf, type CfbGradingView, type CfbLegVerdict } from "@/components/cfb/CfbTicketCard";
 import { CfbSyncChip } from "@/components/cfb/CfbSyncChip";
+import { useLeague } from "@/components/football/LeagueContext";
 import { Reveal } from "@/components/motion/Reveal";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
@@ -10,12 +11,10 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/ui/states";
-import { loadCfbFinals } from "@/lib/cfb/client";
 import { ptDateOf } from "@/lib/cfb/dates";
-import { CFB_BANK_BASE } from "@/lib/cfb/rules";
-import { CFB_SYNC_EVENT, gradeCfb, readCfbLedger, useCfbLedger } from "@/lib/cfb/store";
-import { syncCfbNow } from "@/lib/cfb/sync";
+import { CFB_DESK } from "@/lib/cfb/desk";
 import type { CfbLedgerEntry, CfbTicket } from "@/lib/cfb/types";
+import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtMoneyExact } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 import { roiPct } from "@/lib/useLedger";
@@ -28,6 +27,16 @@ import { roiPct } from "@/lib/useLedger";
  * sparkline, one collapsible card per day with the tickets and every leg's verdict, the
  * sync chip, and the page-header actions (`CfbLedgerActions`: grade / export / copy /
  * import / wipe) exported separately so the page can hand them to its PageHeader.
+ *
+ * THE NFL BUILD (2026-09-08): this is the SHARED football ledger. The desk's finals loader,
+ * bank base, store (grade / readLedger / useLedger / SYNC_EVENT) and sync kick are read through
+ * `useLeague()` (default CFB_DESK, so app/ledger/page.tsx mounting this bare is the CFB ledger
+ * unchanged); src/components/nfl/NflLedger.tsx mounts the same component under the NFL desk.
+ * The handles' hooks (`L.store.useLedger()`) are called unconditionally — the context value is
+ * fixed for a mount, so the hook order never changes. `gradePending(L)` takes the handles
+ * because it runs from effects and the header's button, outside any render. The pure marker
+ * readers below (`cfbDayMarks`, `cfbDisclosureOf`, …) know no league — a day's markers read
+ * the same on every desk.
  */
 
 type Scope = "core" | "fun";
@@ -548,34 +557,47 @@ function useImportOpen(): boolean {
 
 /* ---------- grading ---------- */
 
-let gradingRun: Promise<number> | null = null;
+/** one in-flight grading run per desk — the CFB and NFL ledgers grade independently */
+const gradingRuns = new Map<League, Promise<number>>();
 
-/** Grade every locked day on or before today whose grading is not done. Returns days touched. */
-export function gradeCfbPending(): Promise<number> {
-  if (gradingRun) return gradingRun;
-  gradingRun = (async () => {
+/**
+ * Grade every locked day on or before today whose grading is not done, on the desk `L` names
+ * (its ledger, its finals route, its grader). Returns days touched. Called from effects and the
+ * header's button, so the handles are passed in rather than read off a hook.
+ */
+export function gradePending(L: Pick<DeskHandles, "id" | "store" | "client">): Promise<number> {
+  const running = gradingRuns.get(L.id);
+  if (running) return running;
+  const run = (async () => {
     const today = todayPT();
-    const due = readCfbLedger().filter((e) => !e.grading?.done && e.date <= today && (e.core.length > 0 || e.funT.length > 0));
+    const due = L.store.readLedger().filter((e) => !e.grading?.done && e.date <= today && (e.core.length > 0 || e.funT.length > 0));
     let n = 0;
     for (const e of due) {
       try {
-        const { finals } = await loadCfbFinals(e.date);
-        if (gradeCfb(e.date, finals)) n++;
+        const { finals } = await L.client.loadFinals(e.date);
+        if (L.store.grade(e.date, finals)) n++;
       } catch {
         /* offline or the feed hiccupped — the next view retries */
       }
     }
     return n;
   })().finally(() => {
-    gradingRun = null;
+    gradingRuns.delete(L.id);
   });
-  return gradingRun;
+  gradingRuns.set(L.id, run);
+  return run;
+}
+
+/** the CFB grading run under its historical name (the CFB ledger's own desk) */
+export function gradeCfbPending(): Promise<number> {
+  return gradePending(CFB_DESK);
 }
 
 /* ---------- header actions ---------- */
 
 export function CfbLedgerActions() {
-  const { exportText, wipe } = useCfbLedger();
+  const L = useLeague();
+  const { exportText, wipe } = L.store.useLedger();
   const open = useImportOpen();
   const [armed, setArmed] = useState(false);
   const [grading, setGrading] = useState(false);
@@ -602,7 +624,7 @@ export function CfbLedgerActions() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `parlay-lab-cfb-ledger-${todayPT()}.json`;
+      a.download = `parlay-lab-${L.id}-ledger-${todayPT()}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -617,9 +639,9 @@ export function CfbLedgerActions() {
     if (grading) return;
     setGrading(true);
     try {
-      const n = await gradeCfbPending();
+      const n = await gradePending(L);
       flash(n ? `Graded ${n} day${n === 1 ? "" : "s"}.` : "Nothing new to grade.");
-      if (n) void syncCfbNow();
+      if (n) void L.sync.syncNow();
     } finally {
       setGrading(false);
     }
@@ -640,13 +662,13 @@ export function CfbLedgerActions() {
       setArmed(true);
       if (armTimer.current) window.clearTimeout(armTimer.current);
       armTimer.current = window.setTimeout(() => setArmed(false), 6000);
-      flash("Backup exported — tap again within 6s to wipe this device's CFB ledger.");
+      flash(`Backup exported — tap again within 6s to wipe this device's ${L.short} ledger.`);
       return;
     }
     wipe();
     setArmed(false);
     if (armTimer.current) window.clearTimeout(armTimer.current);
-    flash("CFB ledger wiped on this device. Sync refills it from the cloud copy.");
+    flash(`${L.short} ledger wiped on this device. Sync refills it from the cloud copy.`);
   };
 
   const small = "!px-3 !py-1 text-[11px]";
@@ -761,7 +783,7 @@ export function cfbBoxTapToggles(target: { closest(sel: string): unknown }, box:
   return inner === box; // a tap inside the nested markers <details> belongs to that disclosure
 }
 
-function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; open: boolean; today: string }) {
+function DayCard({ e, scope, open, today, league }: { e: CfbLedgerEntry; scope: Scope; open: boolean; today: string; league: League }) {
   const tix = cfbTicketsOf(e, scope);
   /* INSTRUCTION 46 (point 9): controlled so a body tap can collapse the box; native summary taps sync through onToggle */
   const [isOpen, setIsOpen] = useState(open);
@@ -814,7 +836,7 @@ function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; o
                 t={t}
                 grade={g?.tickets[t.id]}
                 legResults={g?.legs}
-                legLink={(leg) => cfbLegLink(leg, { date: e.date, today, verdict: g?.legs?.[leg.lkey] ?? null })}
+                legLink={(leg) => cfbLegLink(leg, { date: e.date, today, verdict: g?.legs?.[leg.lkey] ?? null, league })}
               />
               <LegResults t={t} legs={g?.legs} />
             </div>
@@ -826,7 +848,9 @@ function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; o
 }
 
 export function CfbLedger() {
-  const { entries, stats, bankroll, importText } = useCfbLedger();
+  /* the desk (CFB by default; NFL under NflLedger's provider) — fixed for the mount */
+  const L = useLeague();
+  const { entries, stats, bankroll, importText } = L.store.useLedger();
   const [scope, setScope] = useState<Scope>("core");
   const open = useImportOpen();
   const [paste, setPaste] = useState("");
@@ -841,16 +865,16 @@ export function CfbLedger() {
     const run = () => {
       if (graded.current) return;
       graded.current = true;
-      void gradeCfbPending();
+      void gradePending(L);
     };
     run();
     const rearm = () => {
       graded.current = false;
       run();
     };
-    window.addEventListener(CFB_SYNC_EVENT, rearm);
-    return () => window.removeEventListener(CFB_SYNC_EVENT, rearm);
-  }, []);
+    window.addEventListener(L.store.SYNC_EVENT, rearm);
+    return () => window.removeEventListener(L.store.SYNC_EVENT, rearm);
+  }, [L]);
 
   const days = useMemo(() => [...entries].sort((a, b) => b.date.localeCompare(a.date)), [entries]);
   const equity = useMemo(() => s.days.map((d) => d.cumPl), [s]);
@@ -861,7 +885,7 @@ export function CfbLedger() {
       setImportMsg(`Imported — ${r.added} added, ${r.merged} merged. ${r.entries.length} locked day${r.entries.length === 1 ? "" : "s"} on this device.`);
       setPaste("");
       setImportOpen(false);
-      void syncCfbNow();
+      void L.sync.syncNow();
     } else {
       setImportMsg(`Import refused — ${r.error}`);
     }
@@ -881,13 +905,13 @@ export function CfbLedger() {
       <CfbSyncChip />
 
       {(open || importMsg) && (
-        <Panel title="Import a CFB ledger backup" action={<span className="text-[10.5px] text-faint">merges — never erases a locked day</span>}>
+        <Panel title={`Import a ${L.short} ledger backup`} action={<span className="text-[10.5px] text-faint">merges — never erases a locked day</span>}>
           {open && (
             <>
               <textarea
                 value={paste}
                 onChange={(e) => setPaste(e.target.value)}
-                placeholder="Paste the exported CFB ledger JSON here"
+                placeholder={`Paste the exported ${L.short} ledger JSON here`}
                 rows={5}
                 className="num w-full rounded-[12px] border border-line-2 bg-surface-2 px-3 py-2 text-[11px] text-text"
               />
@@ -907,7 +931,7 @@ export function CfbLedger() {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone="cfb" label="Ledger scope" />
+        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Ledger scope" />
         {/* INSTRUCTION 45 (defect B4, 2026-09-06): TWO MONEY FIGURES, ONE WORD. This line renders
             `stats.staked`, which is SETTLED stakes only — src/lib/ledger-stats.ts `ledgerStats`
             does `if (!r || r.result === "pending") { d.pending++; pendT++; continue; }` (read this
@@ -927,12 +951,12 @@ export function CfbLedger() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           <StatTile label="Net P/L" value={fmtMoneyExact(s.pl)} sub={`$${s.ret.toFixed(2)} returned`} tone={plTone} />
           <StatTile label="ROI" value={roiPct(s.roi)} sub="on settled stakes" tone={s.roi == null ? "muted" : s.roi >= 0 ? "pos" : "neg"} />
-          <StatTile label="Record" value={record} sub={`${s.pending} pending · ${s.ungradable} void`} tone="cfb" />
+          <StatTile label="Record" value={record} sub={`${s.pending} pending · ${s.ungradable} void`} tone={L.id} />
           <StatTile label="Max drawdown" value={s.dd > 0 ? `-$${s.dd.toFixed(2)}` : "$0.00"} sub="from the running peak" tone={s.dd > 0 ? "neg" : "muted"} />
           <StatTile
-            label="CFB bankroll"
+            label={`${L.short} bankroll`}
             value={`$${bankroll.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            sub={`$${CFB_BANK_BASE.toLocaleString("en-US")} base · both buckets`}
+            sub={`$${L.bankBase.toLocaleString("en-US")} base · both buckets`}
             tone="gold"
             className="col-span-2 md:col-span-1"
           />
@@ -954,12 +978,12 @@ export function CfbLedger() {
       </Reveal>
 
       {days.length === 0 ? (
-        <EmptyState title="No locked CFB days yet" body="Lock a card on the Builder — each slate day lands here with its grades." />
+        <EmptyState title={`No locked ${L.short} days yet`} body="Lock a card on the Builder — each slate day lands here with its grades." />
       ) : (
         <div className="space-y-2">
           {days.map((e, i) => (
             <Reveal key={e.date} delay={Math.min(i, 6) * 0.04} y={10}>
-              <DayCard e={e} scope={scope} open={i === 0} today={today} />
+              <DayCard e={e} scope={scope} open={i === 0} today={today} league={L.id} />
             </Reveal>
           ))}
         </div>

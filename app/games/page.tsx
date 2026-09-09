@@ -22,9 +22,10 @@ import {
   type GameTeam,
   type ShapedGame,
 } from "@/lib/games";
-import { CFB_ENABLED } from "@/lib/features";
+import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbGames } from "@/components/cfb/CfbGames";
+import { NflGames } from "@/components/nfl/NflGames";
 
 /* GAMES TAB (2026-09-03, Josh): every game of the day, MLB-app style — a date
    rail over the whole September window (9/1 → the last regular-season day, Sun
@@ -66,6 +67,7 @@ function Games() {
   const today = useMemo(ptToday, []);
   const sport = useSport();
   const cfbDesk = CFB_ENABLED && sport === "cfb";
+  const nflDesk = NFL_ENABLED && sport === "nfl";
   const qDate = useSearchParams().get("date");
   // a URL date outside the window (or a today past 9/27) clamps to the nearest edge
   const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
@@ -73,7 +75,7 @@ function Games() {
 
   const q = useQuery<GamesPayload>({
     queryKey: ["games", date],
-    enabled: !cfbDesk, // the CFB desk never spends an MLB games fetch
+    enabled: !cfbDesk && !nflDesk, // the CFB and NFL desks never spend an MLB games fetch
     queryFn: async () => {
       const r = await fetch(`/api/games?date=${date}`);
       const j = (await r.json().catch(() => null)) as (GamesPayload & { error?: string }) | null;
@@ -112,6 +114,21 @@ function Games() {
           sub="Every FBS game by slate day — kickoffs, Caesars lines and finals from the desk's CFB feed."
         />
         <CfbGames />
+      </div>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football games list on the NFL desk handles. */
+  if (nflDesk) {
+    return (
+      <div>
+        <PageHeader
+          title="Games"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="Every NFL game by slate day — kickoffs, Caesars lines and finals from the desk's NFL feed."
+        />
+        <NflGames />
       </div>
     );
   }
@@ -310,6 +327,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

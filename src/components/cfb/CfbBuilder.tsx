@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useCfbDesk as useCfbSlateDesk } from "@/components/cfb/CfbBoard";
 import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
 import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
+import { useLeague } from "@/components/football/LeagueContext";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { useShellInsets } from "@/components/props/useShellInsets";
@@ -14,17 +14,15 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { ptDateOf } from "@/lib/cfb/dates";
 import { cfbExposureOn } from "@/lib/cfb/ledger";
-import { CFB_BANK_BASE, CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
-import { useCfbLedger } from "@/lib/cfb/store";
-import { syncCfbNow } from "@/lib/cfb/sync";
 import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
+import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtEv } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 
 /**
  * CFB BUILDER (INSTRUCTION 38, 2026-09-05): the College Football card desk. Loads the slate
  * for a date (Friday can build Saturday — the lock is per slate date), runs `buildCfbCard`
- * over it with the CFB paper allotment ($150 core + $25 fun) and the CFB bankroll, shows the
+ * over it with the CFB paper allotment ($250 core + $25 fun) and the CFB bankroll, shows the
  * core tickets and the fun parlay as perforated slips, the builder's notes and the benched
  * sides, and locks the card into the CFB ledger — its own record, its own bank, never the
  * MLB one. A day with nothing playable is recorded as NO-PLAY (a locked entry with an
@@ -53,7 +51,25 @@ import { railLabel } from "@/lib/games";
  *   · nothing on this surface is set below 11px any more (was 9.5px / 10px / 10.5px).
  * Every string a test asserts, the lock, NO-PLAY, the refused-lock message and the marks note
  * are unchanged; the layout is the only thing that moved.
+ *
+ * THE NFL BUILD (2026-09-08, Josh: "NFL needs to be built NOW"): this file is now the SHARED
+ * football card desk. Every league-specific handle — the paper allotment, the bank base, the
+ * rules, the ledger hook, the slate hook, the sync kick — is read through `useLeague()`
+ * (src/components/football/LeagueContext.tsx). The context's default is CFB_DESK, so this
+ * component mounted bare (app/builder/page.tsx) is the CFB Builder, byte for byte; mounted
+ * under `<LeagueProvider desk={NFL_DESK}>` (src/components/nfl/NflBuilder.tsx) it is the NFL
+ * Builder — $350 core + $25 fun, the NFL ledger and bank, `nfl-…` ticket ids, blue accents.
+ * The hooks the handles carry (`L.useDesk()`, `L.store.useLedger()`) are called unconditionally:
+ * the context value never changes within a mount (a page is one desk for its whole life), so
+ * the hook order is stable and the rules of hooks hold. The desk's accent classes are written
+ * out literally for both leagues (`ACCENT`) because Tailwind cannot see a template class.
  */
+
+/** the desk's accent utilities — both literals, so Tailwind emits each (H adds `--color-nfl`) */
+const ACCENT: Record<League, { text: string; banner: string; rule: string }> = {
+  cfb: { text: "text-cfb", banner: "border-cfb/40 bg-cfb/10 text-cfb", rule: "border-cfb/25" },
+  nfl: { text: "text-nfl", banner: "border-nfl/40 bg-nfl/10 text-nfl", rule: "border-nfl/25" },
+};
 
 /** the Pacific date the desk calls "today" */
 export function todayPT(): string {
@@ -74,15 +90,17 @@ export function dayLabel(date: string, today: string): string {
 }
 
 /**
- * The slate desk shared by the Builder and the sandbox — the Board's own date + slate hook
- * (src/components/cfb/CfbBoard.tsx), shaped for these views. That hook starts on today
- * (Pacific), advances ONCE to the next slate date when today's slate arrives with no games
- * — Friday builds Saturday's card — keys the query on the concrete date and waits for the
- * device's CFB bankroll to mount before the first fetch, so the Board, the Builder and the
- * sandbox share one cached fetch per 4-minute window and never fetch at the base figure.
+ * The slate desk shared by the Builder and the sandbox — the league's own date + slate hook
+ * (`L.useDesk()`: src/lib/cfb/useCfbDesk.ts for CFB, its NFL twin under src/lib/nfl), shaped
+ * for these views. That hook starts on today (Pacific), advances ONCE to the next slate date
+ * when today's slate arrives with no games — Friday builds Saturday's card — keys the query on
+ * the concrete date and waits for the device's bankroll to mount before the first fetch, so the
+ * Board, the Builder and the sandbox share one cached fetch per 4-minute window and never fetch
+ * at the base figure. Reads the desk off LeagueContext (CFB by default).
  */
 export function useCfbDesk() {
-  const { today, date, pick, rail, bankroll, q, slate } = useCfbSlateDesk();
+  const L = useLeague();
+  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
   /** the slate for the picked date only — anything else (rail mid-switch) reads as loading */
   const current: CfbSlate | null = slate && slate.date === date ? slate : null;
   return {
@@ -92,7 +110,7 @@ export function useCfbDesk() {
     pick,
     slate: current,
     /** the base until the device store mounts; the real figure right after */
-    bankroll: bankroll ?? CFB_BANK_BASE,
+    bankroll: bankroll ?? L.bankBase,
     loading: q.isPending || (slate != null && current == null && !q.isError),
     fetching: q.isFetching,
     error: q.error,
@@ -100,19 +118,20 @@ export function useCfbDesk() {
   };
 }
 
-/** The CFB paper-mode banner — the MLB PaperBanner's shape in the CFB amber, its own dates and
-    dollars. One line on a phone (INSTRUCTION 46, 2026-09-08): the "since" date and the
-    separate-ledger reminder show from sm up; the money never hides. */
+/** The football paper-mode banner — the MLB PaperBanner's shape in the desk's accent (CFB amber /
+    NFL blue), its own dates and dollars. One line on a phone (INSTRUCTION 46, 2026-09-08): the
+    "since" date and the separate-ledger reminder show from sm up; the money never hides. */
 export function CfbPaperBanner() {
+  const L = useLeague();
   return (
     <div
-      className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-panel) border border-cfb/40 bg-cfb/10 px-3.5 py-2 text-[12px] text-cfb md:mb-4 md:px-4 md:py-2.5"
+      className={`mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-panel) border ${ACCENT[L.id].banner} px-3.5 py-2 text-[12px] md:mb-4 md:px-4 md:py-2.5`}
       role="note"
     >
-      <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 CFB paper</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 {L.short} paper</span>
       <span className="num">
-        · ${CFB_PAPER.daily} core + ${CFB_PAPER.fun} fun per slate day
-        <span className="hidden sm:inline"> since {CFB_PAPER.since} · separate ledger &amp; bank</span>
+        · ${L.paper.daily} core + ${L.paper.fun} fun per slate day
+        <span className="hidden sm:inline"> since {L.paper.since} · separate ledger &amp; bank</span>
       </span>
     </div>
   );
@@ -127,12 +146,13 @@ function ptClock(t: number): string {
   return new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", minute: "2-digit" }).format(new Date(t));
 }
 
-/** INSTRUCTION 45 (2026-09-05): a day /api/cfb/lock wrote says so — the server locks the card
-    an hour before the first kickoff; the manual LOCK below still refuses an already-locked day. */
-function lockedLine(entry: CfbLedgerEntry): string {
+/** INSTRUCTION 45 (2026-09-05): a day /api/cfb/lock (or /api/nfl/lock) wrote says so — the server
+    locks the card an hour before the first kickoff; the manual LOCK below still refuses an
+    already-locked day. `short` names the desk's ledger ("CFB" / "NFL"). */
+function lockedLine(entry: CfbLedgerEntry, short: string): string {
   const by = entry.source === "server-lock" ? ` Locked by the server at ${ptClock(entry.lockedAt)} PT.` : "";
-  if (entry.noPlay) return `NO-PLAY recorded — nothing staked. The day stands in the CFB ledger.${by}`;
-  return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the CFB ledger. Grades post as games go final.${by}`;
+  if (entry.noPlay) return `NO-PLAY recorded — nothing staked. The day stands in the ${short} ledger.${by}`;
+  return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the ${short} ledger. Grades post as games go final.${by}`;
 }
 
 /** the day's ticket verdicts counted up — null until the grader has written anything */
@@ -174,16 +194,17 @@ export function avgCoreEv(card: Pick<CfbCard, "core">): number | null {
  * the phone tests can drive it without a DOM): calls the store's `lock` exactly once with the
  * card and its slate, and returns the line the panel prints — the refusal when a lock already
  * stands for the day (INSTRUCTION 45: "the first lock stands"), else `lockedLine` for the entry
- * that was written.
+ * that was written. `short` is the desk's ledger name ("CFB" by default, "NFL" on that desk).
  */
 export function lockOutcome(
   lock: (card: CfbCard, slate: CfbSlate) => { entry: CfbLedgerEntry; refused: boolean },
   card: CfbCard,
   slate: CfbSlate,
   today: string,
+  short = "CFB",
 ): string {
   const { entry, refused } = lock(card, slate);
-  return refused ? `Already locked for ${dayLabel(entry.date, today)} — the first lock stands.` : lockedLine(entry);
+  return refused ? `Already locked for ${dayLabel(entry.date, today)} — the first lock stands.` : lockedLine(entry, short);
 }
 
 /**
@@ -238,18 +259,19 @@ function StatCell({ label, value, sub, tone = "text-text", size = "md" }: { labe
 /**
  * THE PHONE MONEY STRIP (INSTRUCTION 46, 2026-09-08): the four stat tiles as one row — Core ·
  * Fun · Bank · Exposure — so the first screen at 375px reaches the card. md+ keeps the tiles.
- * The figures are the tiles' own: the paper allotment, the CFB bankroll, the day's exposure.
+ * The figures are the tiles' own: the paper allotment, the desk's bankroll, the day's exposure.
+ * The group is named for its desk ("CFB money" / `cfb-money-strip`, "NFL money" / `nfl-money-strip`).
  */
-function MoneyStrip({ bankroll, bankTone, exposure }: { bankroll: number; bankTone: "pos" | "neg"; exposure: number }) {
+function MoneyStrip({ L, bankroll, bankTone, exposure }: { L: DeskHandles; bankroll: number; bankTone: "pos" | "neg"; exposure: number }) {
   return (
     <div
       className="mb-3 grid grid-cols-4 divide-x divide-white/[0.06] rounded-[14px] border border-line-2 bg-surface-2/60 md:hidden"
       role="group"
-      aria-label="CFB money"
-      data-testid="cfb-money-strip"
+      aria-label={`${L.short} money`}
+      data-testid={`${L.id}-money-strip`}
     >
-      <StatCell label="Core" value={`$${CFB_PAPER.daily}`} tone="text-cfb" size="sm" />
-      <StatCell label="Fun" value={`$${CFB_PAPER.fun}`} tone="text-cfb" size="sm" />
+      <StatCell label="Core" value={`$${L.paper.daily}`} tone={ACCENT[L.id].text} size="sm" />
+      <StatCell label="Fun" value={`$${L.paper.fun}`} tone={ACCENT[L.id].text} size="sm" />
       <StatCell label="Bank" value={usdFull(bankroll)} tone={bankTone === "pos" ? "text-pos" : "text-neg"} size="sm" />
       <StatCell label="Exposure" value={`$${exposure}`} tone="text-muted" size="sm" />
     </div>
@@ -274,7 +296,7 @@ function FoldSummary({ children }: { children: ReactNode }) {
  * fun · record), then `lockedLine`'s sentence exactly as it stood — that `<p>` is pinned byte
  * for byte by tests/cfb-card-ui.test.ts ("an unmarked day keeps the chrome it has today").
  */
-function LockedSummary({ locked, today }: { locked: CfbLedgerEntry; today: string }) {
+function LockedSummary({ locked, today, L }: { locked: CfbLedgerEntry; today: string; L: DeskHandles }) {
   const record = gradeSummary(locked);
   const server = locked.source === "server-lock";
   return (
@@ -292,11 +314,11 @@ function LockedSummary({ locked, today }: { locked: CfbLedgerEntry; today: strin
       </div>
       <div className="mt-2 grid grid-cols-3 divide-x divide-white/[0.06] rounded-[12px] bg-white/[0.03]">
         <StatCell label="Core" value={locked.noPlay ? "$0" : `$${sumStakes(locked.core)}`} tone="text-pos" />
-        <StatCell label="Fun" value={`$${sumStakes(locked.funT)}`} tone="text-cfb" />
+        <StatCell label="Fun" value={`$${sumStakes(locked.funT)}`} tone={ACCENT[L.id].text} />
         <StatCell label="Record" value={record ? `${gradeCounts(locked)!.won}–${gradeCounts(locked)!.lost}` : "—"} tone="text-text" />
       </div>
       <div className="mt-2">
-        <p className="text-[12px] text-gold">{lockedLine(locked)}</p>
+        <p className="text-[12px] text-gold">{lockedLine(locked, L.short)}</p>
       </div>
       {record && (
         <p className="num mt-1 text-[11px] text-muted" data-testid="cfb-locked-record">
@@ -308,8 +330,12 @@ function LockedSummary({ locked, today }: { locked: CfbLedgerEntry; today: strin
 }
 
 export function CfbBuilder() {
+  /* the desk (CFB by default; NFL under NflBuilder's provider) — fixed for the mount, so the
+     hooks it hands out below are called in one stable order */
+  const L = useLeague();
+  const c = ACCENT[L.id];
   const { today, date, dates, pick, slate, bankroll, loading, fetching, error, refetch } = useCfbDesk();
-  const { entries, lock } = useCfbLedger();
+  const { entries, lock } = L.store.useLedger();
   const [status, setStatus] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -368,8 +394,8 @@ export function CfbBuilder() {
   const lockedMarks = locked ? cfbDayMarks(locked) : null;
   const exposure = cfbExposureOn(entries, date);
   const card = useMemo(
-    () => (slate ? buildCfbCard(slate, { bankroll, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now }) : null),
-    [slate, bankroll, now],
+    () => (slate ? buildCfbCard(slate, { bankroll, daily: L.paper.daily, fun: L.paper.fun, now, rules: L.rules, idPrefix: L.idPrefix }) : null),
+    [slate, bankroll, now, L],
   );
 
   const onPick = (d: string) => {
@@ -381,15 +407,15 @@ export function CfbBuilder() {
     if (!card || !slate || locking) return;
     setLocking(true);
     try {
-      setStatus(lockOutcome(lock, card, slate, today));
-      void syncCfbNow();
+      setStatus(lockOutcome(lock, card, slate, today, L.short));
+      void L.sync.syncNow();
     } finally {
       setLocking(false);
     }
   };
 
   const label = dayLabel(date, today);
-  const bankTone = bankroll >= CFB_BANK_BASE ? "pos" : "neg";
+  const bankTone = bankroll >= L.bankBase ? "pos" : "neg";
   const avgEv = card ? avgCoreEv(card) : null;
 
   return (
@@ -399,14 +425,14 @@ export function CfbBuilder() {
 
       <Reveal>
         {/* phones: one money strip; md+: the four tiles (INSTRUCTION 46, 2026-09-08) */}
-        <MoneyStrip bankroll={bankroll} bankTone={bankTone} exposure={exposure} />
-        <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4" data-testid="cfb-money-tiles">
-          <StatTile label="Core" value={`$${CFB_PAPER.daily}`} sub="per slate day · counts in P/L" tone="cfb" />
-          <StatTile label="Fun" value={`$${CFB_PAPER.fun}`} sub="one favorites parlay" tone="cfb" />
+        <MoneyStrip L={L} bankroll={bankroll} bankTone={bankTone} exposure={exposure} />
+        <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4" data-testid={`${L.id}-money-tiles`}>
+          <StatTile label="Core" value={`$${L.paper.daily}`} sub="per slate day · counts in P/L" tone={L.id} />
+          <StatTile label="Fun" value={`$${L.paper.fun}`} sub="one favorites parlay" tone={L.id} />
           <StatTile
-            label="CFB bankroll"
+            label={`${L.short} bankroll`}
             value={usdFull(bankroll)}
-            sub={`$${CFB_BANK_BASE.toLocaleString("en-US")} base + moves + graded P/L`}
+            sub={`$${L.bankBase.toLocaleString("en-US")} base + moves + graded P/L`}
             tone={bankTone}
           />
           <StatTile label="Exposure" value={`$${exposure}`} sub={`locked ${label === "Today" ? "today" : `on ${label}`}`} tone="muted" />
@@ -420,10 +446,10 @@ export function CfbBuilder() {
             className="glow-gold"
             action={<span className="num text-[11px] text-faint">{locked.date}</span>}
           >
-            <LockedSummary locked={locked} today={today} />
+            <LockedSummary locked={locked} today={today} L={L} />
             {lockedMarks && <CfbDayMarksNote marks={lockedMarks} />}
             {locked.note && <p className="mt-2 text-[11px] text-muted">{locked.note}</p>}
-            {status && status !== lockedLine(locked) && <p className="mt-2 text-[11px] text-muted">{status}</p>}
+            {status && status !== lockedLine(locked, L.short) && <p className="mt-2 text-[11px] text-muted">{status}</p>}
             {lockedCore.length > 0 && (
               <>
                 <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
@@ -435,8 +461,8 @@ export function CfbBuilder() {
               </>
             )}
             {lockedFun.length > 0 && (
-              <div className="mt-4 border-t border-cfb/25 pt-4">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cfb">Favorites parlay</div>
+              <div className={`mt-4 border-t ${c.rule} pt-4`}>
+                <div className={`text-[11px] font-bold uppercase tracking-[0.18em] ${c.text}`}>Favorites parlay</div>
                 <div className="mt-2">
                   <TicketStack tickets={lockedFun} board={slate} grading={lockedGrading} label="Locked favorites parlay" />
                 </div>
@@ -444,7 +470,7 @@ export function CfbBuilder() {
             )}
             {locked.noPlay && (
               <p className="mt-3 text-[12px] leading-relaxed text-muted">
-                No side cleared +{CFB_RULES.minEvPct}% EV at Caesars under {CFB_RULES.maxDec.toFixed(2)} that day — recommended stake $0.
+                No side cleared +{L.rules.minEvPct}% EV at Caesars under {L.rules.maxDec.toFixed(2)} that day — recommended stake $0.
               </p>
             )}
           </Panel>
@@ -454,11 +480,11 @@ export function CfbBuilder() {
           <SkeletonRows rows={6} />
         </Panel>
       ) : error ? (
-        <ErrorState title="The CFB slate did not load" body={error instanceof Error ? error.message : String(error)} onRetry={refetch} />
+        <ErrorState title={`The ${L.short} slate did not load`} body={error instanceof Error ? error.message : String(error)} onRetry={refetch} />
       ) : !slate || !card ? (
         <EmptyState title={`No slate for ${label}`} body="Pick another date on the rail." />
       ) : slate.games.length === 0 ? (
-        <EmptyState title={`No FBS games on ${label}`} body="Pick a slate day on the rail — Saturday is the card." />
+        <EmptyState title={`No ${L.noun} games on ${label}`} body={L.id === "nfl" ? "Pick a slate day on the rail — Sunday is the card." : "Pick a slate day on the rail — Saturday is the card."} />
       ) : (
         <Reveal delay={0.05}>
           <Panel
@@ -478,7 +504,7 @@ export function CfbBuilder() {
               <div className="mt-3 rounded-[14px] border border-line-2 bg-white/[0.03] px-4 py-4">
                 <div className="display text-[18px] leading-none tracking-tight text-text">NO-PLAY</div>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                  No playable side clears +{CFB_RULES.minEvPct}% EV at Caesars under {CFB_RULES.maxDec.toFixed(2)} on this slate.
+                  No playable side clears +{L.rules.minEvPct}% EV at Caesars under {L.rules.maxDec.toFixed(2)} on this slate.
                   Recommended core stake <b className="num text-text">$0</b> — record the day so the ledger shows the desk sat out.
                 </p>
               </div>
@@ -492,7 +518,7 @@ export function CfbBuilder() {
                   data-testid="cfb-card-headline"
                 >
                   <StatCell label={card.core.length === 1 ? "Ticket" : "Tickets"} value={String(card.core.length)} />
-                  <StatCell label="Deployed" value={`$${card.coreSum}`} sub={`/ $${CFB_PAPER.daily}`} tone="text-pos" />
+                  <StatCell label="Deployed" value={`$${card.coreSum}`} sub={`/ $${L.paper.daily}`} tone="text-pos" />
                   <StatCell label="Avg EV" value={avgEv == null ? "—" : fmtEv(avgEv)} tone={avgEv != null && avgEv > 0 ? "text-pos" : "text-text"} />
                 </div>
                 <div className="mt-3">
@@ -533,9 +559,9 @@ export function CfbBuilder() {
               </details>
             )}
 
-            <div className="mt-4 border-t border-cfb/25 pt-4">
-              <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cfb">
-                Favorites parlay <span className="normal-case tracking-normal text-faint">— ${CFB_PAPER.fun} fun money, one ticket</span>
+            <div className={`mt-4 border-t ${c.rule} pt-4`}>
+              <div className={`text-[11px] font-bold uppercase tracking-[0.18em] ${c.text}`}>
+                Favorites parlay <span className="normal-case tracking-normal text-faint">— ${L.paper.fun} fun money, one ticket</span>
               </div>
               {card.funT.length > 0 ? (
                 <div className="mt-3">
@@ -543,8 +569,8 @@ export function CfbBuilder() {
                 </div>
               ) : (
                 <p className="mt-2 text-[12px] text-muted">
-                  No fun parlay today — the builder needs {CFB_RULES.fun.legs.min}–{CFB_RULES.fun.legs.max} favorites paying{" "}
-                  {CFB_RULES.fun.minDec}×–{CFB_RULES.fun.maxDec}× combined.
+                  No fun parlay today — the builder needs {L.rules.fun.legs.min}–{L.rules.fun.legs.max} favorites paying{" "}
+                  {L.rules.fun.minDec}×–{L.rules.fun.maxDec}× combined.
                 </p>
               )}
             </div>

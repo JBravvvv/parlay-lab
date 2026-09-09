@@ -1,5 +1,26 @@
 import { PAPER } from "@/lib/paper-mode";
 import { CFB_PAPER } from "@/lib/cfb/rules";
+import { NFL_PAPER } from "@/lib/nfl/rules";
+
+/**
+ * THE DESK ALLOTMENT TABLE (2026-09-08, the NFL build). `allotmentCap` / `funCap` used to ask
+ * "is either side CFB?" and pick between two constants; with a third desk the question is "which
+ * desk is this entry?", answered off the entry's own `sport` (absent on MLB entries, "cfb" or
+ * "nfl" on the football ones). The fallback for an unknown or missing sport is the MLB PAPER set,
+ * exactly as before. Today's numbers: MLB 150 / 25, CFB 250 / 25, NFL 350 / 25.
+ */
+const DESK_PAPER: Record<string, { daily: number; fun: number }> = { mlb: PAPER, cfb: CFB_PAPER, nfl: NFL_PAPER };
+
+function sportOf(e: SyncEntry): string | null {
+  const s = (e as { sport?: unknown }).sport;
+  return typeof s === "string" ? s : null;
+}
+
+/** the desk's own paper set for a pair of copies of one date — the first readable `sport` decides */
+function deskPaperOf(base: SyncEntry, other: SyncEntry): { daily: number; fun: number } {
+  const s = sportOf(base) ?? sportOf(other);
+  return DESK_PAPER[s ?? "mlb"] ?? PAPER;
+}
 
 /**
  * Ledger sync — the shared merge kernel. Pure TypeScript, no browser, no
@@ -396,16 +417,18 @@ const byId = (p: SyncTicket, q: SyncTicket) => (String(p.id) < String(q.id) ? -1
  * every CFB entry.
  *
  * WHY THE INVERTED-DEFAULT ARGUMENT ABOVE SURVIVES UNCHANGED: a day with no readable `daily` still
- * falls back to the desk's allotment, which is the whole point of defect E, and both allotments are
- * $150 today (PAPER.daily in src/lib/paper-mode.ts, CFB_PAPER.daily in src/lib/cfb/rules.ts), so
- * this is about WHICH constant the bound follows, not about today's arithmetic. Every honest
- * writer is arithmetically unchanged: `lockCfbCard` (src/lib/cfb/ledger.ts) and `buildLockEntry`
- * (src/lib/server/lock-card.ts) both stamp the desk's own number, so `Math.min(desk, 150)` is 150.
- * What changes is only the direction that was never defensible — upward.
+ * falls back to the desk's allotment, which is the whole point of defect E. The allotments were
+ * both $150 when this was written; since 2026-09-08 they differ per desk (PAPER.daily 150 in
+ * src/lib/paper-mode.ts, CFB_PAPER.daily 250 in src/lib/cfb/rules.ts, NFL_PAPER.daily 350 in
+ * src/lib/nfl/rules.ts — the DESK_PAPER table above), which is exactly why the bound follows the
+ * entry's OWN desk rather than one shared number. Every honest writer is arithmetically unchanged:
+ * `lockCfbCard` (src/lib/cfb/ledger.ts) and `buildLockEntry` (src/lib/server/lock-card.ts) both
+ * stamp the desk's own number, so `Math.min(desk, recorded)` is the recorded daily — a CFB day
+ * locked at 150 before the widening still caps at its own 150. What changes is only the direction
+ * that was never defensible — upward.
  */
 function allotmentCap(base: SyncEntry, other: SyncEntry): number {
-  const cfb = (base as { sport?: unknown }).sport === "cfb" || (other as { sport?: unknown }).sport === "cfb";
-  const desk = cfb ? CFB_PAPER.daily : PAPER.daily;
+  const desk = deskPaperOf(base, other).daily;
   const recorded = [(base as { daily?: unknown }).daily, (other as { daily?: unknown }).daily]
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0);
@@ -475,8 +498,7 @@ function allotmentCap(base: SyncEntry, other: SyncEntry): number {
  * nine-ticket / coreSum-225 shape.
  */
 function funCap(base: SyncEntry, other: SyncEntry): number {
-  const cfb = (base as { sport?: unknown }).sport === "cfb" || (other as { sport?: unknown }).sport === "cfb";
-  const desk = cfb ? CFB_PAPER.fun : PAPER.fun;
+  const desk = deskPaperOf(base, other).fun;
   const recorded = [(base as { fun?: unknown }).fun, (other as { fun?: unknown }).fun]
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0);

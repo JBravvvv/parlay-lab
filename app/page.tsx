@@ -96,23 +96,33 @@ function MonthOverrideLine({ entries }: { entries: SyncEntry[] }) {
   );
 }
 
-/* INSTRUCTION 38 (2026-09-05): the two desks. Each card sets the app-wide sport (the
+/* INSTRUCTION 38 (2026-09-05): the desks. Each card sets the app-wide sport (the
    same switch the shell carries) and opens the Board on it — spelled out here so a first
    visit knows the College Football desk exists and is its own thing: own model, own
-   tickets, own ledger and bank. Blurbs describe the engines, never a number. */
+   tickets, own ledger and bank. Blurbs describe the engines, never a number.
+   2026-09-08: the NFL desk is the third card — 2 + 1 at 375px (the NFL card spans the row),
+   three across from `sm`. */
 const DESKS: { sport: Sport; blurb: string }[] = [
   { sport: "mlb", blurb: "10,000-path sims · props & game lines · Caesars settles" },
   { sport: "cfb", blurb: "Consensus lines + ESPN FPI · ML, spread, total · own ledger & bank" },
+  { sport: "nfl", blurb: "Consensus lines + ESPN FPI · ML, spread, total · own ledger & bank · Sundays, TNF, MNF" },
 ];
+
+/** each desk's ring (when it is the current desk) and text accent — lime / amber / blue */
+const DESK_TONE: Record<Sport, { ring: string; text: string }> = {
+  mlb: { ring: "shadow-[inset_0_0_0_1px_rgba(182,255,61,0.55)]", text: "text-pos" },
+  cfb: { ring: "shadow-[inset_0_0_0_1px_rgba(245,165,36,0.55)]", text: "text-cfb" },
+  nfl: { ring: "shadow-[inset_0_0_0_1px_rgba(79,140,255,0.55)]", text: "text-nfl" },
+};
 
 function DeskChooser() {
   const sport = useSport();
   return (
-    <div className="mx-auto mt-7 grid w-full max-w-[520px] grid-cols-2 gap-2.5">
+    <div className="mx-auto mt-7 grid w-full max-w-[560px] grid-cols-2 gap-2.5 [&>*:last-child]:col-span-2 sm:grid-cols-3 sm:[&>*:last-child]:col-span-1">
       {DESKS.map((d) => {
         const meta = SPORT_META[d.sport];
         const on = sport === d.sport;
-        const amber = d.sport === "cfb";
+        const tone = DESK_TONE[d.sport];
         return (
           <Link
             key={d.sport}
@@ -120,20 +130,14 @@ function DeskChooser() {
             replace
             onClick={() => setSport(d.sport)}
             aria-current={on ? "true" : undefined}
-            className={`liquid-glass press card-lift relative flex flex-col gap-1.5 rounded-[18px] px-4 pb-4 pt-3.5 text-left ${
-              on
-                ? amber
-                  ? "shadow-[inset_0_0_0_1px_rgba(245,165,36,0.55)]"
-                  : "shadow-[inset_0_0_0_1px_rgba(182,255,61,0.55)]"
-                : ""
-            }`}
+            className={`liquid-glass press card-lift relative flex flex-col gap-1.5 rounded-[18px] px-4 pb-4 pt-3.5 text-left ${on ? tone.ring : ""}`}
           >
             <div className="flex items-center justify-between">
               <span className="text-[20px] leading-none" aria-hidden>
                 {meta.emoji}
               </span>
               <span
-                className={`text-[9px] font-bold uppercase tracking-[0.2em] ${on ? (amber ? "text-cfb" : "text-pos") : "text-faint"}`}
+                className={`text-[9px] font-bold uppercase tracking-[0.2em] ${on ? tone.text : "text-faint"}`}
               >
                 {on ? "current desk" : "open desk"}
               </span>
@@ -141,7 +145,7 @@ function DeskChooser() {
             <div className="display text-[17px] leading-tight text-text">{meta.label}</div>
             <div className="pr-6 text-[11px] leading-snug text-hero-sub/70">{d.blurb}</div>
             <IconArrowRight
-              className={`absolute bottom-3.5 right-3.5 transition-transform duration-(--dur-fast) ${amber ? "text-cfb" : "text-pos"}`}
+              className={`absolute bottom-3.5 right-3.5 transition-transform duration-(--dur-fast) ${tone.text}`}
             />
           </Link>
         );
@@ -218,7 +222,7 @@ function Hero() {
               Parlay <span className="text-gradient">Lab</span>
             </h1>
             <p className="mx-auto mt-[9px] max-w-md text-lg leading-8 text-hero-sub opacity-80">
-              A 10,000-simulation quant engine for MLB &amp; College Football — sharp-anchored fair prices,
+              A 10,000-simulation quant engine for MLB, College Football &amp; the NFL — sharp-anchored fair prices,
               ¼-Kelly sizing, every bet graded against the close.
             </p>
             <Link replace href="/board" className="mt-[25px] inline-block">

@@ -380,7 +380,7 @@ describe("the pure ledger: lock → grade → stats / bankroll / validate", () =
     expect(locked.sport).toBe("cfb");
     expect(locked.locked).toBe(true);
     expect(locked.date).toBe("2026-09-05");
-    expect(locked.daily).toBe(150);
+    expect(locked.daily).toBe(250); // widened 150 → 250 on 2026-09-08 ("Widen the CFB allocation to $250")
     expect(locked.fun).toBe(25);
     expect(locked.lockedAt).toBe(NOW + 1000);
     expect(locked.core).toBe(card.core);
@@ -928,22 +928,24 @@ describe("C5 (2026-09-06) — the server passes against the kernel's newest mark
       expect(markedD.room).not.toBe(CFB_PAPER.daily - 25);
       expect(markedD.room).not.toBe(CFB_PAPER.daily - 35);
     }
-    /* and a day the merge left OVER its allotment opens no core arm at all */
+    /* and a day the merge left OVER its allotment opens no core arm at all — 12 × $25 = $300 over the
+       $250 allotment (2026-09-08: the old 9 × $25 = $225 fixture sat UNDER the widened allotment with
+       $25 of room, which is exactly one minStake ticket, so it would have opened the core arm) */
     const over = {
       ...entry(
-        Array.from({ length: 9 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 25, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `k${i}` })])),
+        Array.from({ length: 12 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 25, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `k${i}` })])),
         [],
         GAMES,
       ),
       source: "server-lock" as const,
-      capBreach: { core: { sum: 225, cap: 150 } },
+      capBreach: { core: { sum: 300, cap: 250 } },
     } as unknown as CfbLedgerEntry;
     const overD = decideCfbTopUp(over, LATER);
     expect(overD.fire).toBe(true);
     if (overD.fire) {
       expect(overD.core).toBe(false);
       expect(overD.fun).toBe(true);
-      expect(overD.room).toBe(CFB_PAPER.daily - 225);
+      expect(overD.room).toBe(CFB_PAPER.daily - 300);
     }
   });
 
@@ -1288,7 +1290,8 @@ describe("C7 (2026-09-06) — a refused wager is never re-offered as room, on ei
   });
 
   it("(c) the refusal names the RIGHT reason — a refused bucket is not a bucket carrying a parlay", () => {
-    const full = Array.from({ length: 6 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 25, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `k${i}` })]));
+    /* a FULL day is 5 × $50 = $250 since 2026-09-08 (was 6 × $25 = $150) */
+    const full = Array.from({ length: 5 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 50, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `k${i}` })]));
     const deployed = (over: Record<string, unknown>, funT: CfbTicket[] = []) =>
       ({ ...entry(full, funT, GAMES), source: "server-lock", ...over }) as unknown as CfbLedgerEntry;
 
@@ -1362,7 +1365,8 @@ describe("C7 (2026-09-06) — a refused wager is never re-offered as room, on ei
    * the guard is the bound.
    */
   it("(e) the core allotment bounds the offer AND the write — advice, then a loud guard", () => {
-    const six = Array.from({ length: 6 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 25, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `e${i}` })]));
+    /* the full $250 is 5 × $50 since 2026-09-08 (was 6 × $25 = $150) */
+    const six = Array.from({ length: 5 }, (_, i) => ticket(`cfb-2026-09-05-core-${i + 1}`, 50, [leg({ gkey: G1, side: "home", line: -40.5, lkey: `e${i}` })]));
     const deployed = { ...entry(six, [], GAMES), source: "server-lock" } as unknown as CfbLedgerEntry;
 
     const d = decideCfbTopUp(deployed, LATER);

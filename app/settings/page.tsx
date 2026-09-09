@@ -8,9 +8,10 @@ import { getMoney, getSelectionMode, setSelectionMode, getDirPref, setDirPref, D
 import type { BankStore } from "@/lib/bankroll";
 import { getSyncKey, setSyncKey, syncNow, useSyncState, SYNC_EVENT } from "@/lib/ledgerSync";
 import { invalidateCalibration, useCalibration } from "@/lib/useCalibration";
-import { CFB_ENABLED } from "@/lib/features";
+import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbBankPanel } from "@/components/cfb/CfbBankPanel";
+import { NflBankPanel } from "@/components/nfl/NflBankPanel";
 
 /* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
 function SelectionCalibrationPanel() {
@@ -312,6 +313,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState("");
   const sport = useSport();
   const cfbDesk = CFB_ENABLED && sport === "cfb";
+  const nflDesk = NFL_ENABLED && sport === "nfl";
 
   useEffect(() => {
     setBankroll(getMoney().bankroll);
@@ -361,7 +363,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" eyebrow={cfbDesk ? "College Football" : undefined} chip={cfbDesk ? <CfbChip /> : undefined} sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
+      <PageHeader title="Settings" eyebrow={cfbDesk ? "College Football" : nflDesk ? "National Football League" : undefined} chip={cfbDesk ? <CfbChip /> : nflDesk ? <NflChip /> : undefined} sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
       {saved && <div className="mb-3 text-[12px] text-pos">{saved}</div>}
 
       <div className="space-y-4">
@@ -431,6 +433,13 @@ export default function SettingsPage() {
           </Panel>
         )}
 
+        {/* NFL desk (2026-09-08): its own bank on its own keys — shown whichever sport the switch is on */}
+        {NFL_ENABLED && (
+          <Panel title="NFL bank">
+            <NflBankPanel />
+          </Panel>
+        )}
+
         <SelectionCalibrationPanel />
 
         <LedgerSyncPanel />
@@ -494,6 +503,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

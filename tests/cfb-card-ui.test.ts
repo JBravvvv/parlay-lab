@@ -27,9 +27,10 @@ const BLUR = /backdrop-filter|backdrop-blur/;
 
 describe("cfb-card-ui — the game card is built on the shared OddsGrid", () => {
   const src = read(FILES.card);
-  it("imports OddsGrid from the shared primitive and renders it in the CFB tone", () => {
+  it("imports OddsGrid from the shared primitive and renders it in the desk tone (CFB by default — LeagueContext defaults to CFB_DESK, so a bare mount is amber; the NFL wrapper flips it to blue)", () => {
     expect(src).toMatch(/import \{[^}]*\bOddsGrid\b[^}]*\} from "@\/components\/ui\/OddsGrid"/);
-    expect(src).toMatch(/<OddsGrid\s[^>]*tone="cfb"/);
+    expect(src).toMatch(/<OddsGrid\s[^>]*tone=(?:"cfb"|\{L\.id\})/);
+    expect(src).toMatch(/import \{[^}]*\buseLeague\b[^}]*\} from "@\/components\/football\/LeagueContext"/);
     expect(src).toMatch(/columns=\{\["Spread", "Money", "Total"\]\}/);
   });
   it("keeps the card's public surface (props + the helpers other CFB views import)", () => {
@@ -238,7 +239,7 @@ describe("cfb-card-ui — the markers are rendered where the day's money is, and
     ]) {
       expect(src, `unmarked-day chrome changed: ${frag}`).toContain(frag);
     }
-    expect(builder()).toContain(`<p className="text-[12px] text-gold">{lockedLine(locked)}</p>`);
+    expect(builder()).toContain(`<p className="text-[12px] text-gold">{lockedLine(locked, L.short)}</p>` /* the desk's ledger name — "CFB" on this render (2026-09-08) */);
   });
 });
 

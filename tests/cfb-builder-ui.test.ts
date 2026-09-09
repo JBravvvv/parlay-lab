@@ -23,6 +23,13 @@ import { stripComments } from "./helpers/source";
  *
  * vitest's esbuild transform compiles the app's .tsx with the classic JSX runtime under this
  * tsconfig (jsx: preserve), so a server render needs React on the global — stubbed once here.
+ *
+ * THE NFL BUILD (2026-09-08): the Builder now reads its desk through LeagueContext (default
+ * CFB_DESK, src/lib/cfb/desk.ts), whose handles are today's named exports — `useCfbDesk` from
+ * @/lib/cfb/useCfbDesk, `useCfbLedger` from @/lib/cfb/store, `syncCfbNow` from @/lib/cfb/sync.
+ * The mocks below sit on THOSE modules (the desk object picks the mocked exports up at import),
+ * and every assertion here is the CFB render, byte for byte as it was: "CFB money" /
+ * `cfb-money-strip`, "🏈 CFB paper", "the CFB ledger". The NFL twin is tests/nfl-money-ui.test.ts.
  */
 vi.stubGlobal("React", React);
 
@@ -54,10 +61,10 @@ const desk = {
   q: { isPending: false, isFetching: false, isError: false, error: null, refetch: vi.fn() },
   slate: SLATE as CfbSlate | null,
 };
-vi.mock("@/components/cfb/CfbBoard", () => ({ useCfbDesk: () => desk }));
+vi.mock("@/lib/cfb/useCfbDesk", async (orig) => ({ ...(await orig<object>()), useCfbDesk: () => desk }));
 const ledger = { entries: [] as CfbLedgerEntry[], lock: vi.fn() };
 vi.mock("@/lib/cfb/store", async (orig) => ({ ...(await orig<object>()), useCfbLedger: () => ledger }));
-vi.mock("@/lib/cfb/sync", () => ({ syncCfbNow: vi.fn() }));
+vi.mock("@/lib/cfb/sync", async (orig) => ({ ...(await orig<object>()), syncCfbNow: vi.fn() }));
 /* the scroll-reveal wrapper is motion; the markup under test is its children */
 vi.mock("@/components/motion/Reveal", () => ({ Reveal: ({ children }: { children: unknown }) => children }));
 
@@ -205,7 +212,8 @@ describe("cfb-builder-ui — the notes fold, the lock row is sticky and bottom-s
   it("the button's onClick is the lock: doLock → lockOutcome → the store's lock, once, with the card and its slate", async () => {
     const src = stripComments(read(BUILDER));
     expect(src).toMatch(/onClick=\{doLock\}/);
-    expect(src).toMatch(/setStatus\(lockOutcome\(lock, card, slate, today\)\)/);
+    /* the fifth argument is the desk's ledger name ("CFB" by default) — the sentence below is the CFB one */
+    expect(src).toMatch(/setStatus\(lockOutcome\(lock, card, slate, today, L\.short\)\)/);
     const { lockOutcome } = await import("@/components/cfb/CfbBuilder");
     const entry = await lockedEntry();
     const lock = vi.fn().mockReturnValue({ entry, refused: false });
@@ -251,7 +259,7 @@ describe("cfb-builder-ui — a LOCKED day renders the structured block", () => {
     expect(html).toContain(">1–0</div>");
     /* the pinned sentence, unchanged (tests/cfb-card-ui.test.ts) */
     expect(html).toContain(`<p class="text-[12px] text-gold">Card locked — $${CARD.coreSum} core + $${CARD.funSum} fun recorded to the CFB ledger. Grades post as games go final.</p>`);
-    expect(read(BUILDER)).toContain(`<p className="text-[12px] text-gold">{lockedLine(locked)}</p>`);
+    expect(read(BUILDER)).toContain(`<p className="text-[12px] text-gold">{lockedLine(locked, L.short)}</p>` /* the desk's ledger name — "CFB" on this render (2026-09-08) */);
     const rec = html.match(/<p class="[^"]*" data-testid="cfb-locked-record">([^<]*)<\/p>/);
     expect(rec).not.toBeNull();
     expect(rec![1]).toBe(`1 won · 0 lost · ${CARD.core.length + CARD.funT.length - 1} pending — still grading`);
@@ -307,6 +315,6 @@ describe("cfb-builder-ui — type floor and the Settings bank rows", () => {
     expect(src).toMatch(/aria-label="Note"\s*className="min-h-\[44px\] min-w-0 flex-1/);
     expect(src).toMatch(/<Pill variant="gold" className="min-h-\[44px\] w-full justify-center[^"]*" onClick=\{logIt\}>\s*Log it/);
     /* the strings the panel always had */
-    for (const s of ["Enter an amount above $0.", "Logged.", "CFB bankroll (managed — never hand-edited)", "Log a deposit / withdrawal", "Adjustment log (append-only)"]) expect(src).toContain(s);
+    for (const s of ["Enter an amount above $0.", "Logged.", "${L.short} bankroll (managed — never hand-edited)", "Log a deposit / withdrawal", "Adjustment log (append-only)"]) expect(src).toContain(s);
   });
 });

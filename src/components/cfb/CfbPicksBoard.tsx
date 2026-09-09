@@ -14,25 +14,36 @@ import { FilterPill, Pill } from "@/components/ui/Pill";
 import { Segmented } from "@/components/ui/Segmented";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
+import { useLeague } from "@/components/football/LeagueContext";
+import type { DeskClient, DeskHandles } from "@/lib/football/league";
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps } from "@/lib/cfb/client";
 import { fmtLine } from "@/lib/cfb/model";
 import { buildCfbPicks, CFB_PICK_CATEGORIES, setBandOf } from "@/lib/cfb/picks";
 import { CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
-import { CFB_BANK_BASE, CFB_PARLAYS, CFB_PROPS } from "@/lib/cfb/rules";
+import { CFB_BANK_BASE } from "@/lib/cfb/rules";
 import { decimalToAmerican, payout, profit } from "@/lib/calc-math";
 import { usd } from "@/lib/ticket-payout";
 
-/** the props route's PRE-KICK window in hours (CFB_PROPS.revalidateSec) — only the fallback before a board loads;
-    a loaded board prints its own window through cfbCacheLabel (10 min while a priced game is live) */
-const PROPS_CACHE_H = CFB_PROPS.revalidateSec / 3600;
-const LIVE_CACHE_MIN = CFB_PROPS.liveRevalidateSec / 60;
+/**
+ * THE LEAGUE SEAM (2026-09-08, the NFL build): this Board is the shared football picks surface.
+ * Every league-specific read — the props / parlays tables, the bank base, the client (query
+ * keys, loaders, the cache-label formatters), the desk hook and the accent tone — comes off
+ * `useLeague()` (default CFB_DESK, so an unwrapped render is the College Football Board it was;
+ * src/components/nfl/NflPicksBoard.tsx mounts it under the NFL provider). The pinned CFB
+ * names inside the components (`CFB_PROPS`, `CFB_PARLAYS`, `cfbCacheLabel`, `cfbPricedAtLabel`,
+ * `PROPS_CACHE_H`, `LIVE_CACHE_MIN`) are LOCALS read off the league in scope — under the NFL
+ * provider they are NFL_DESK's tables and formatters, not the CFB constants they shadow.
+ * The exported CFB_*_KEY_PREFIX constants and refreshCfbBoard stay the CFB desk's own contract.
+ */
 
-/** the props query's staleTime: what is left of the loaded board's window (its ttlSec less its age), else CFB_PROPS_STALE_MS */
-function propsBoardStaleMs(board: CfbPropsBoard | undefined): number {
-  return board ? cfbPropsStaleMs(board) : CFB_PROPS_STALE_MS;
+/** the props query's staleTime: what is left of the loaded board's window (its ttlSec less its age), else the league's
+    PROPS_STALE_MS (the CFB constant when no client is given). CfbPicksBoard binds this to its league's client as
+    its local `propsBoardStaleMs`. */
+function boardStaleMs(board: CfbPropsBoard | undefined, client?: DeskClient): number {
+  if (board) return (client?.propsStaleMs ?? cfbPropsStaleMs)(board);
+  return client ? client.PROPS_STALE_MS : CFB_PROPS_STALE_MS;
 }
 import type { CfbGame } from "@/lib/cfb/types";
-import { useCfbDesk } from "@/lib/cfb/useCfbDesk";
 import { quotaRemaining } from "@/lib/fetcher";
 import { fmtAmerican, fmtMoney, fmtPct } from "@/lib/format";
 import { railLabel } from "@/lib/games";
@@ -133,14 +144,34 @@ export function refreshCfbBoard(qc: QueryClient): Promise<void> {
   ]).then(() => undefined);
 }
 
-/** The header's green "Refresh Board" pill — app/board/page.tsx mounts it as the CFB PageHeader action. */
+/** the same two-prefix refresh for ANY league's board — the league's own key builders' first two segments
+    (the NFL desk's ["nfl","slate"] / ["nfl","props"]); the CFB desk keeps refreshCfbBoard above */
+export function refreshLeagueBoard(qc: QueryClient, L: Pick<DeskHandles, "client" | "bankBase">): Promise<void> {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: L.client.queryKey(null, L.bankBase).slice(0, 2) }),
+    qc.invalidateQueries({ queryKey: L.client.propsQueryKey(null, L.bankBase).slice(0, 2) }),
+  ]).then(() => undefined);
+}
+
+/** The header's green "Refresh Board" pill — app/board/page.tsx mounts it as the CFB PageHeader action
+    (the NFL page mounts it under the NFL provider through NflRefreshPill). */
 export function CfbRefreshPill() {
   const qc = useQueryClient();
-  const fetching = useIsFetching({ queryKey: CFB_SLATE_KEY_PREFIX }) + useIsFetching({ queryKey: CFB_PROPS_KEY_PREFIX }) > 0;
+  const L = useLeague();
+  /* the league's two feed prefixes: the pinned CFB constants, else the desk's own key builders */
+  const slateKey = L.id === "cfb" ? CFB_SLATE_KEY_PREFIX : L.client.queryKey(null, L.bankBase).slice(0, 2);
+  const propsKey = L.id === "cfb" ? CFB_PROPS_KEY_PREFIX : L.client.propsQueryKey(null, L.bankBase).slice(0, 2);
+  const cfbFetching = useIsFetching({ queryKey: CFB_SLATE_KEY_PREFIX }) + useIsFetching({ queryKey: CFB_PROPS_KEY_PREFIX });
+  const ownFetching = useIsFetching({ queryKey: slateKey }) + useIsFetching({ queryKey: propsKey });
+  const fetching = (L.id === "cfb" ? cfbFetching : ownFetching) > 0;
+  /** the props route's PRE-KICK window in hours (props.revalidateSec) and its in-play window in minutes — the pill's
+      title can see no board, so it names both; a loaded board prints its own window through the cache label */
+  const PROPS_CACHE_H = L.props.revalidateSec / 3600;
+  const LIVE_CACHE_MIN = L.props.liveRevalidateSec / 60;
   return (
     <Pill
       variant="primary"
-      onClick={() => void refreshCfbBoard(qc)}
+      onClick={() => void (L.id === "cfb" ? refreshCfbBoard(qc) : refreshLeagueBoard(qc, L))}
       disabled={fetching}
       title={`Re-pulls the slate and the player props. Sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play — a refresh inside the window spends no Odds API quota.`}
       data-testid="cfb-refresh-board"
@@ -201,12 +232,14 @@ function Mark({
   headshot?: string | null;
   pos?: string | null;
 }) {
+  const L = useLeague();
   const g = games.get(gameId);
   const team = teamOf(games, gameId, teamId);
   if (kind === "prop" && player) return <PlayerMark player={player} headshot={headshot ?? null} team={team} pos={pos ?? null} size={size} />;
   if (team) return <TeamMark team={team} size={size} showRank showAbbr={false} />;
   if (g && kind === "side" && teamId == null) return <PairMark away={g.away} home={g.home} size={size} />;
-  const tone = kind === "prop" ? "border-cfb/40 bg-cfb/10 text-cfb" : "border-line-2 bg-surface-2 text-muted";
+  const accent = L.id === "nfl" ? "border-nfl/40 bg-nfl/10 text-nfl" : "border-cfb/40 bg-cfb/10 text-cfb";
+  const tone = kind === "prop" ? accent : "border-line-2 bg-surface-2 text-muted";
   return (
     <span className={`num inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full border px-1 text-[8.5px] font-bold ${tone}`} aria-hidden>
       {kind === "prop" ? "P" : "—"}
@@ -217,7 +250,14 @@ function Mark({
 /* ---------- the desk ---------- */
 
 export function CfbPicksBoard() {
-  const { today, date, pick, rail, bankroll, q, slate } = useCfbDesk();
+  const L = useLeague();
+  /* the league's own tables and client under the pinned CFB names (see the seam note above) */
+  const { props: CFB_PROPS, parlays: CFB_PARLAYS } = L;
+  const { cacheLabel: cfbCacheLabel, pricedAtLabel: cfbPricedAtLabel } = L.client;
+  const PROPS_CACHE_H = CFB_PROPS.revalidateSec / 3600;
+  const LIVE_CACHE_MIN = CFB_PROPS.liveRevalidateSec / 60;
+  const propsBoardStaleMs = (board: CfbPropsBoard | undefined) => boardStaleMs(board, L.client);
+  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
@@ -226,8 +266,8 @@ export function CfbPicksBoard() {
   const current = slate && slate.date === date ? slate : null;
   const propsOn = bankroll != null && current != null && current.games.length > 0 && !current.oddsMissing;
   const propsQ = useQuery<CfbPropsBoard>({
-    queryKey: cfbPropsQueryKey(date, bankroll ?? CFB_BANK_BASE),
-    queryFn: () => loadCfbProps(date, { bankroll: bankroll ?? undefined }),
+    queryKey: L.client.propsQueryKey(date, bankroll ?? L.bankBase),
+    queryFn: () => L.client.loadProps(date, { bankroll: bankroll ?? undefined }),
     // stale for the board's own window (ttlSec: 600 s while a priced game is live, else the
     // route's 2 h) — after a live pull the LIVE / MIXED parlays must not sit on a 10-min board
     // for 2 h (2026-09-05); still never polled
@@ -241,8 +281,8 @@ export function CfbPicksBoard() {
 
   const games = useMemo(() => new Map((current?.games ?? []).map((g) => [g.id, g])), [current]);
   const picks: CfbPicks | null = useMemo(
-    () => (current ? buildCfbPicks(current, propRows, { now: Date.now(), bankroll: bankroll ?? CFB_BANK_BASE }) : null),
-    [current, propRows, bankroll],
+    () => (current ? buildCfbPicks(current, propRows, { now: Date.now(), bankroll: bankroll ?? L.bankBase, parlays: L.parlays, idPrefix: L.idPrefix, rules: L.rules }) : null),
+    [current, propRows, bankroll, L.bankBase, L.parlays, L.idPrefix, L.rules],
   );
 
   const needle = search.trim().toLowerCase();
@@ -271,6 +311,9 @@ export function CfbPicksBoard() {
   const liveRows = picks?.liveRows ?? 0;
   const liveGames = current?.games.filter((g) => g.status === "live").length ?? 0;
   const quota = quotaRemaining();
+  /* the desk's accent on the table's market chip and Caesars-line note (both literal class strings) */
+  const marketChip = L.id === "nfl" ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb";
+  const accentText = L.id === "nfl" ? "text-nfl" : "text-cfb";
 
   const columns: Column<CfbPickRow>[] = useMemo(
     () => [
@@ -285,7 +328,7 @@ export function CfbPicksBoard() {
             <div className="min-w-0">
               <div className="truncate font-medium text-text">{r.label}</div>
               <div className="truncate text-[10.5px] text-faint">
-                {r.kind === "prop" && <span className="mr-1 rounded-sm bg-cfb/15 px-1 text-[9px] font-bold uppercase tracking-wide text-cfb">{MARKET_WORD[r.market] ?? r.market}</span>}
+                {r.kind === "prop" && <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${marketChip}`}>{MARKET_WORD[r.market] ?? r.market}</span>}
                 {r.sub}
               </div>
             </div>
@@ -317,7 +360,7 @@ export function CfbPicksBoard() {
             <span className="inline-flex items-baseline gap-1">
               <OddsCell odds={r.cz.price} book="caesars" />
               {r.market !== "ml" && r.cz.line != null && r.line != null && Math.abs(r.cz.line - r.line) > 1e-9 && (
-                <span className="num text-[9.5px] text-cfb" title="Caesars' own line differs from the consensus line">
+                <span className={`num text-[9.5px] ${accentText}`} title="Caesars' own line differs from the consensus line">
                   @{r.market === "spread" ? fmtLine(r.cz.line) : r.cz.line}
                 </span>
               )}
@@ -350,7 +393,7 @@ export function CfbPicksBoard() {
         cell: (r) => (r.status === "live" ? <LiveTag /> : r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="text-faint">—</span>),
       },
     ],
-    [games, propRows],
+    [games, propRows, marketChip, accentText],
   );
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);
@@ -365,7 +408,7 @@ export function CfbPicksBoard() {
           label="Picks"
           value={picks ? String(all.length) : "—"}
           sub={picks ? `${sides} sides · ${propsPending ? "props pricing…" : `${propsN} props`}${liveRows > 0 ? ` · ${liveRows} live` : ""}` : railLabel(date)}
-          tone="cfb"
+          tone={L.id}
           icon="🏈"
         />
         <StatTile label="+EV at Caesars" value={picks ? String(plusEv.length) : "—"} sub={picks ? `of ${all.length} priced picks` : undefined} tone={plusEv.length > 0 ? "pos" : "muted"} />
@@ -384,7 +427,7 @@ export function CfbPicksBoard() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone="cfb" label="Scope" />
+        <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Scope" />
         <label className="relative min-w-0 flex-1 basis-[160px]">
           <span className="sr-only">Search picks</span>
           <input
@@ -394,7 +437,8 @@ export function CfbPicksBoard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
-            className="num h-11 w-full rounded-full border border-line-2 bg-white/[0.04] px-4 text-[16px] text-text outline-none placeholder:text-faint focus:border-cfb/60"
+            data-league={L.id}
+            className="num h-11 w-full rounded-full border border-line-2 bg-white/[0.04] px-4 text-[16px] text-text outline-none placeholder:text-faint focus:border-cfb/60 data-[league=nfl]:focus:border-nfl/60"
           />
         </label>
       </div>
@@ -417,11 +461,11 @@ export function CfbPicksBoard() {
         </Panel>
       ) : q.isError ? (
         <Panel>
-          <ErrorState title="Couldn't load the CFB slate" body={(q.error as Error).message} onRetry={() => void q.refetch()} />
+          <ErrorState title={`Couldn't load the ${L.short} slate`} body={(q.error as Error).message} onRetry={() => void q.refetch()} />
         </Panel>
       ) : !current || current.games.length === 0 ? (
         <Panel>
-          <EmptyState title={`No FBS games on ${railLabel(date)}`} body="Pick another date on the rail — it lists every date the odds feed has an upcoming kickoff." />
+          <EmptyState title={`No ${L.noun} games on ${railLabel(date)}`} body="Pick another date on the rail — it lists every date the odds feed has an upcoming kickoff." />
         </Panel>
       ) : current.oddsMissing ? (
         <div className="rounded-(--radius-panel) border border-neg/30 bg-neg/5 px-4 py-3 text-[12px] leading-relaxed text-muted">
@@ -445,7 +489,7 @@ export function CfbPicksBoard() {
                     title={needle ? `Nothing matches “${search.trim()}”` : cat === "all" ? "No playable picks yet" : `No ${CATS.find((c) => c.key === cat)?.label} picks yet`}
                     body={
                       needle
-                        ? "Try a school, a player or an abbreviation."
+                        ? `Try a ${L.id === "nfl" ? "team" : "school"}, a player or an abbreviation.`
                         : catIsProp && propsQ.isError
                           ? "The player-props feed did not answer — sides are still priced."
                           : catIsProp
@@ -519,12 +563,13 @@ export function CfbPicksBoard() {
    strip scrolls, the page never does. Every figure is the row's own; nothing is estimated. */
 
 function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
+  const L = useLeague();
   return (
     <Reveal>
       <section aria-label="Top edges" data-testid="cfb-top-edges">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Top edges <span className="num ml-1 text-cfb">{total}</span> <span className="text-faint">+EV at Caesars</span>
+            Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="text-faint">+EV at Caesars</span>
           </h2>
           {total > rows.length && <span className="num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
         </div>
@@ -539,6 +584,8 @@ function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total:
 }
 
 function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
+  const L = useLeague();
+  const nfl = L.id === "nfl";
   const cz = r.cz!;
   const teamId = r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows);
   const s = r.grade === "S";
@@ -546,9 +593,10 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
     <article
       className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[18px] border px-4 pb-3.5 pt-3.5 md:w-[300px] ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
       style={{
-        borderColor: "color-mix(in srgb, var(--color-cfb) 26%, rgba(255,255,255,0.08))",
-        background:
-          "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)",
+        borderColor: nfl ? "color-mix(in srgb, var(--color-nfl) 26%, rgba(255,255,255,0.08))" : "color-mix(in srgb, var(--color-cfb) 26%, rgba(255,255,255,0.08))",
+        background: nfl
+          ? "linear-gradient(160deg, color-mix(in srgb, var(--color-nfl) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)"
+          : "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)",
       }}
       data-testid="cfb-featured-pick"
     >
@@ -557,7 +605,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13.5px] font-bold text-text">{r.label}</div>
           <div className="truncate text-[10.5px] text-faint">
-            <span className="mr-1 rounded-sm bg-cfb/15 px-1 text-[9px] font-bold uppercase tracking-wide text-cfb">{MARKET_WORD[r.market] ?? r.market}</span>
+            <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
             {r.sub}
           </div>
         </div>
@@ -569,9 +617,9 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
       <div className="mt-3 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-faint">Caesars</div>
-          <div className="hero-price is-cfb num mt-0.5">{fmtAmerican(cz.price)}</div>
+          <div className={nfl ? "hero-price is-nfl num mt-0.5" : "hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
           {r.market !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
-            <div className="num mt-1 text-[9.5px] text-cfb" title="Caesars' own line differs from the consensus line">
+            <div className={`num mt-1 text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="Caesars' own line differs from the consensus line">
               at {r.market === "spread" ? fmtLine(cz.line) : cz.line}
             </div>
           )}
@@ -699,6 +747,7 @@ function InGameTag({ n }: { n: number }) {
 
 /** INSTRUCTION 43: a ticket built past the −3 leg gate (some leg sits in (setFloorEvPct, minLegEvPct)) — worn beside the tier chip, never hidden */
 function OpenTag() {
+  const { parlays: CFB_PARLAYS } = useLeague();
   return (
     <span
       className="inline-flex shrink-0 items-center rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted"
@@ -711,11 +760,15 @@ function OpenTag() {
 }
 
 function TierTag({ tier }: { tier: CfbParlay["tier"] }) {
-  const cls = tier === "SAFER" ? "border-pos/50 bg-pos/10 text-pos" : tier === "LONGSHOT" ? "border-gold/50 bg-gold/10 text-gold" : "border-cfb/50 bg-cfb/10 text-cfb";
+  const L = useLeague();
+  const mix = L.id === "nfl" ? "border-nfl/50 bg-nfl/10 text-nfl" : "border-cfb/50 bg-cfb/10 text-cfb";
+  const cls = tier === "SAFER" ? "border-pos/50 bg-pos/10 text-pos" : tier === "LONGSHOT" ? "border-gold/50 bg-gold/10 text-gold" : mix;
   return <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${cls}`}>{tier}</span>;
 }
 
 export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { picks: CfbPicks; games: Map<string, CfbGame>; propsPending: boolean; liveGames: number }) {
+  /* the league's parlay table under the pinned CFB name (NFL_PARLAYS under the NFL provider — perCategory 25 there) */
+  const { parlays: CFB_PARLAYS } = useLeague();
   /** the user's tap, else the first non-empty pregame category (falls back to ML) — so the strip never opens on an empty set while another has tickets */
   const [picked, setPicked] = useState<CfbParlayCategory | null>(null);
   const [filter, setFilter] = useState("all");
@@ -874,6 +927,7 @@ const REF_STAKE = 25;
  * are listed underneath so a tap never has to leave the strip to see what is in it.
  */
 export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number; live: boolean }) {
+  const nfl = useLeague().id === "nfl";
   const grade = gradeFromEv(t.ev);
   const pct = t.prob * 100;
   const oneIn = pct > 0 ? Math.round(100 / pct) : null;
@@ -883,8 +937,9 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
       className={`press relative w-[82vw] max-w-[340px] rounded-[18px] border px-4 pb-3.5 pt-3.5 ${grade === "S" && rank <= SHINE_TOP ? "shine" : ""} ${t.ev > 0 ? "ev-glow" : ""}`}
       style={{
         borderColor: "color-mix(in srgb, var(--color-gold) 30%, rgba(255,255,255,0.08))",
-        background:
-          "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-cfb) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)",
+        background: nfl
+          ? "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-nfl) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)"
+          : "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-cfb) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)",
       }}
       data-testid="cfb-parlay-feature"
     >
@@ -948,6 +1003,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
  * surface: no blur filter per card (the iOS freeze rule), the glow on a wrapper.
  */
 export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<string, CfbGame>; rank?: number }) {
+  const nfl = useLeague().id === "nfl";
   const grade = gradeFromEv(t.ev);
   const pct = t.prob * 100;
   const oneIn = pct > 0 ? Math.round(100 / pct) : null;
@@ -957,9 +1013,10 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
       <article
         className={`relative rounded-[16px] border px-4 pb-3 pt-3 ${grade === "S" && (rank ?? 1) <= SHINE_TOP ? "shine" : ""}`}
         style={{
-          borderColor: "color-mix(in srgb, var(--color-cfb) 22%, rgba(255,255,255,0.07))",
-          background:
-            "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 10%, transparent), color-mix(in srgb, var(--color-acc-green) 5%, transparent) 60%, color-mix(in srgb, var(--color-cfb) 7%, transparent)), color-mix(in srgb, var(--color-surface) 92%, transparent)",
+          borderColor: nfl ? "color-mix(in srgb, var(--color-nfl) 22%, rgba(255,255,255,0.07))" : "color-mix(in srgb, var(--color-cfb) 22%, rgba(255,255,255,0.07))",
+          background: nfl
+            ? "linear-gradient(160deg, color-mix(in srgb, var(--color-nfl) 10%, transparent), color-mix(in srgb, var(--color-acc-green) 5%, transparent) 60%, color-mix(in srgb, var(--color-nfl) 7%, transparent)), color-mix(in srgb, var(--color-surface) 92%, transparent)"
+            : "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 10%, transparent), color-mix(in srgb, var(--color-acc-green) 5%, transparent) 60%, color-mix(in srgb, var(--color-cfb) 7%, transparent)), color-mix(in srgb, var(--color-surface) 92%, transparent)",
         }}
       >
         <header className="flex items-start justify-between gap-2">

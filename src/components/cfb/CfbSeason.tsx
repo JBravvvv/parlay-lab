@@ -440,7 +440,7 @@ export function CfbSeason() {
                       Lock season ticket · {fmtMoney(stake)}
                     </Pill>
                     <div className="mt-2 text-[9.5px] leading-snug text-faint">
-                      Paper, on its own season key — never the daily $150 / $25 rails or the CFB ledger. True % is the independent product of the
+                      Paper, on its own season key — never the daily $250 / $25 rails or the CFB ledger. True % is the independent product of the
                       model&apos;s fair probabilities; a push counts against the ticket.
                     </div>
                   </div>

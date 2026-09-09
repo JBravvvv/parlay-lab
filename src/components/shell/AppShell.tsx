@@ -21,6 +21,7 @@ import { SportSwitch } from "./SportSwitch";
 import { VideoBackdrop } from "./VideoBackdrop";
 import { useLedgerSyncBeacon } from "@/lib/ledgerSync";
 import { useCfbSyncBeacon } from "@/lib/cfb/sync";
+import { useNflSyncBeacon } from "@/lib/nfl/sync";
 import { SPORT_META, useSport } from "@/lib/sport";
 
 type NavItem = {
@@ -151,15 +152,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sport = useSport();
   const reduced = useReducedMotion();
   // ledger cloud sync runs app-wide: on open, on refocus, and on a timer — one beacon
-  // per desk (the CFB ledger is its own record on its own keys)
+  // per desk (the CFB and NFL ledgers are their own records on their own keys)
   useLedgerSyncBeacon();
   useCfbSyncBeacon();
+  useNflSyncBeacon();
   // "/" is the immersive landing: full-bleed hero with its own navbar — no
   // side rail, no mobile top bar, no content gutters. Bottom tabs stay (PWA nav).
   const landing = pathname === "/";
   const slide = reduced ? INSTANT : SLIDE;
   const cfb = sport === "cfb";
-  /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB */
+  const nfl = sport === "nfl";
+  /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB or NFL
+   *  (NFL Season Lab is cut for the 2026-09-08 ship; the NFL desk adds no nav entry of its own) */
   const shown = (n: Pick<NavItem, "cfbOnly">) => !n.cfbOnly || cfb;
 
   return (
@@ -172,12 +176,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           bookkeeping/tools tabs pinned above the footer. The eyebrow and the
           rail glow follow the selected desk; the SportSwitch flips it. */}
       <aside
-        className={`rail-glow ${cfb ? "is-cfb" : ""} fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl ${landing ? "" : "md:flex"}`}
+        className={`rail-glow ${cfb ? "is-cfb" : nfl ? "is-nfl" : ""} fixed inset-y-0 left-0 z-30 hidden w-[200px] flex-col border-r border-white/[0.05] bg-surface/60 backdrop-blur-xl ${landing ? "" : "md:flex"}`}
       >
         <div className="relative px-4 py-4">
           <Brand />
           <div
-            className={`mt-0.5 truncate text-[9.5px] font-semibold uppercase tracking-[0.2em] ${cfb ? "text-cfb/80" : "text-faint"}`}
+            className={`mt-0.5 truncate text-[9.5px] font-semibold uppercase tracking-[0.2em] ${cfb ? "text-cfb/80" : nfl ? "text-nfl/80" : "text-faint"}`}
           >
             {SPORT_META[sport].eyebrow}
           </div>
@@ -197,14 +201,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </nav>
         <div className="border-t border-line px-4 py-3 text-[10px] text-faint">
-          MLB & CFB · informational only, not betting advice
+          MLB, CFB & NFL · informational only, not betting advice
         </div>
       </aside>
 
       {/* mobile top bar — reserves the iOS status-bar inset (the app draws
           edge-to-edge under it); max() keeps the normal padding in browsers.
           One row at 375px: brand · SportSwitch · every route that is not a
-          bottom tab as an icon, so all eleven pages stay reachable on a phone (Season Lab joined 2026-09-08). */}
+          bottom tab as an icon, so all eleven pages stay reachable on a phone (Season Lab joined 2026-09-08).
+          Measured with Geist at 375px (2026-09-08, three desks): brand 95px + the dense label-only
+          switch 101px + five 26px icons (20px glyph, p-[3px]) 138px + two 6px gaps + the 24px gutter
+          = 370px on the CFB desk (Season Lab is its fifth icon), 342px on MLB / NFL with four; at
+          p-[5px] the five icons were 158px and the CFB row overflowed even before the third pill. */}
       <header
         className={`sticky top-0 z-30 items-center justify-between gap-1.5 border-b border-white/[0.05] bg-bg/70 px-3 pb-2.5 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
         style={{ paddingTop: "max(env(safe-area-inset-top), 0.625rem)" }}
@@ -220,7 +228,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 replace
                 aria-label={label}
                 title={label}
-                className="press rounded-lg p-[5px]"
+                className="press rounded-lg p-[3px]"
                 style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
               >
                 <Icon />

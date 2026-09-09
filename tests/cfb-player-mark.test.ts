@@ -127,6 +127,11 @@ describe("ledger leg links (INSTRUCTION 46, point 9)", () => {
     expect(cfbLegHref(SIDE, "2026-09-06")).toBe("/props?cfb=1&date=2026-09-06&game=g1&mkt=spread&player=florida-state");
     expect(cfbLegHref(TOTAL, "2026-09-06")).toBe("/props?cfb=1&date=2026-09-06&game=g1&mkt=total&player=over");
     expect(cfbLegHref(PROP, "2026-09-06")).not.toContain("245.5");
+    /* the NFL desk flags its own query key and never carries cfb=1 (2026-09-08) */
+    expect(cfbLegHref(PROP, "2026-09-13", "nfl")).toBe("/props?nfl=1&date=2026-09-13&game=g1&mkt=spread&player=ty-simpson");
+    expect(cfbLegHref(PROP, "2026-09-13", "nfl")).not.toContain("cfb=1");
+    expect(cfbLegLink(PROP, { date: "2026-09-13", today: "2026-09-13", verdict: { result: "pending" }, league: "nfl" }).href).toMatch(/^\/props\?nfl=1&date=2026-09-13/);
+    expect(cfbLegLink(PROP, { date: "2026-09-13", today: "2026-09-13", verdict: { result: "pending" } }).href).toMatch(/^\/props\?cfb=1&/);
     expect(cfbLegSlug(leg({ label: "Indiana ML", player: null }))).toBe("indiana");
   });
   it("closed once graded, once the slate game is final / postponed, or once the slate day has passed", () => {
@@ -186,7 +191,8 @@ describe("ledger day box — tap anywhere toggles (INSTRUCTION 46, point 9)", ()
     expect(src).toMatch(/const \[isOpen, setIsOpen\] = useState\(open\)/);
     expect(src).toMatch(/onToggle=\{\(ev\) => setIsOpen\(ev\.currentTarget\.open\)\}/);
     expect(src).toMatch(/if \(cfbBoxTapToggles\(ev\.target as Element, ev\.currentTarget\)\) setIsOpen\(\(v\) => !v\)/);
-    expect(src).toMatch(/legLink=\{\(leg\) => cfbLegLink\(leg, \{ date: e\.date, today, verdict: g\?\.legs\?\.\[leg\.lkey\] \?\? null \}\)\}/);
+    /* `league` (the desk off LeagueContext) rides after the verdict so an NFL ledger's legs deep-link to /props?nfl=1 (2026-09-08) */
+    expect(src).toMatch(/legLink=\{\(leg\) => cfbLegLink\(leg, \{ date: e\.date, today, verdict: g\?\.legs\?\.\[leg\.lkey\] \?\? null, league \}\)\}/);
   });
 });
 

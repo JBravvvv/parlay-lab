@@ -47,18 +47,22 @@ vi.mock("@/lib/server/store", () => ({
   redis: vi.fn(),
   storeEnv: vi.fn(),
 }));
+/* 2026-09-08 (the NFL build): the body (src/lib/server/football-props.ts) builds the slate through the
+   league-taking helpers `espnEventsOf(cfg, date)` / `slateFromEspnOf(cfg, …)`, so those are the mocks. */
 vi.mock("@/lib/cfb/slate-server", async (orig) => {
   const real = await orig<typeof import("@/lib/cfb/slate-server")>();
-  return { ...real, espnEvents: vi.fn(), slateFromEspn: vi.fn() };
+  return { ...real, espnEventsOf: vi.fn(), slateFromEspnOf: vi.fn() };
 });
 vi.mock("@/lib/cfb/props-context", async (orig) => {
   const real = await orig<typeof import("@/lib/cfb/props-context")>();
-  return { ...real, loadCfbPropsContext: vi.fn(async () => null) };
+  return { ...real, loadPropsContext: vi.fn(async () => null) };
 });
 
 import { redis, storeEnv } from "@/lib/server/store";
-import { espnEvents, slateFromEspn } from "@/lib/cfb/slate-server";
+import { espnEventsOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import { GET } from "../app/api/cfb/props/route";
+const espnEvents = espnEventsOf;
+const slateFromEspn = slateFromEspnOf;
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
 const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
@@ -1254,7 +1258,10 @@ describe("THE CAESARS-MISSING RULE (2026-09-05) — a 30-min re-check inside 4 h
 });
 
 describe("source pins", () => {
-  const route = readSrc("app/api/cfb/props/route.ts");
+  /* 2026-09-08 (the NFL build): the body lives in src/lib/server/football-props.ts on a LeagueConfig — the
+     CFB_PROPS reads became `cfg.props.*` (CFB_LEAGUE.props IS CFB_PROPS); the thin CFB route keeps the keys */
+  const route = readSrc("src/lib/server/football-props.ts");
+  const shell = readSrc("app/api/cfb/props/route.ts");
   const store = readSrc("src/lib/cfb/props-store.ts");
   it("the keys and TTLs are the pinned literals, through the shared store client", () => {
     expect(store).toMatch(/"pl:cfb:props:v1:"/);
@@ -1276,9 +1283,12 @@ describe("source pins", () => {
     expect(route).toMatch(/pricedAgeMs\(stored, g\.id, now\)/);
     expect(route).toMatch(/pricedAt: pricedAt\(/);
     expect(route).not.toMatch(/boardFresh\(stored, now, CFB_PROPS\.revalidateSec\)/);
-    expect(route).toMatch(/CFB_PROPS\.dailyBudget/);
-    expect(route).toMatch(/CFB_PROPS\.measuredCreditsPerEvent/);
+    expect(route).toMatch(/cfg\.props\.dailyBudget/);
+    expect(route).toMatch(/cfg\.props\.measuredCreditsPerEvent/);
     expect(route).not.toMatch(/console\.(log|info|warn|error)/);
     expect(route).not.toMatch(/apiKey=[A-Za-z0-9]/);
+    // the shell hands the body the CFB keys, which ARE the pinned literals
+    expect(shell).toMatch(/storeKeys: CFB_PROPS_REDIS/);
+    expect(shell).toMatch(/footballPropsGet\(CFB_LEAGUE, /);
   });
 });

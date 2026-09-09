@@ -1,35 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ptToday } from "@/components/games/logo";
-import { CFB_STALE_MS, cfbQueryKey, loadCfbSlate } from "@/lib/cfb/client";
+import { useBankrollOf, useDeskOf, type DeskHookHandles } from "@/lib/football/useDesk";
+import {
+  CFB_STALE_MS,
+  CFB_PROPS_STALE_MS,
+  cfbQueryKey,
+  cfbPropsQueryKey,
+  loadCfbSlate,
+  loadCfbFinals,
+  loadCfbProps,
+  cfbPropsStaleMs,
+  cfbCacheLabel,
+  cfbPricedAtLabel,
+} from "@/lib/cfb/client";
 import { CFB_BANK_BASE } from "@/lib/cfb/rules";
-import { CFB_CHANGE_EVENT, CFB_SYNC_EVENT, getCfbBankroll } from "@/lib/cfb/store";
-import type { CfbGame, CfbRow, CfbSlate, CfbTeam } from "@/lib/cfb/types";
+import { CFB_STORE } from "@/lib/cfb/store";
+import type { CfbGame, CfbRow, CfbTeam } from "@/lib/cfb/types";
 import { gradeRank } from "@/lib/grade";
 
 /**
  * THE CFB DESK HOOKS (INSTRUCTION 38, 2026-09-05; moved out of CfbBoard.tsx when the Board
  * became the picks + parlays surface). Board, Games, Sharp, Builder and the sandbox share
  * one date, one bankroll and one cached slate query per (date, bankroll).
+ *
+ * SINCE 2026-09-08 (the NFL build) the hook bodies live in src/lib/football/useDesk.ts as
+ * `useDeskOf` / `useBankrollOf`; the two hooks below are the CFB bindings, built from the CFB
+ * client and device store DIRECTLY (not from src/lib/cfb/desk.ts, which imports this file — the
+ * CFB_DESK handle object is assembled there from these same exports).
  */
+
+const CFB_HANDLES: DeskHookHandles = {
+  client: {
+    STALE_MS: CFB_STALE_MS,
+    PROPS_STALE_MS: CFB_PROPS_STALE_MS,
+    queryKey: cfbQueryKey,
+    propsQueryKey: cfbPropsQueryKey,
+    loadSlate: loadCfbSlate,
+    loadFinals: loadCfbFinals,
+    loadProps: loadCfbProps,
+    propsStaleMs: cfbPropsStaleMs,
+    cacheLabel: cfbCacheLabel,
+    pricedAtLabel: cfbPricedAtLabel,
+  },
+  store: CFB_STORE,
+  bankBase: CFB_BANK_BASE,
+};
 
 /** The CFB bankroll off the device store — null until mount so SSR and the first client
     render agree (the slate query waits for it, so the first fetch carries the real figure). */
 export function useCfbBankroll(): number | null {
-  const [bankroll, setBankroll] = useState<number | null>(null);
-  useEffect(() => {
-    const read = () => setBankroll(getCfbBankroll());
-    read();
-    window.addEventListener(CFB_CHANGE_EVENT, read);
-    window.addEventListener(CFB_SYNC_EVENT, read);
-    return () => {
-      window.removeEventListener(CFB_CHANGE_EVENT, read);
-      window.removeEventListener(CFB_SYNC_EVENT, read);
-    };
-  }, []);
-  return bankroll;
+  return useBankrollOf(CFB_STORE);
 }
 
 /**
@@ -40,48 +60,9 @@ export function useCfbBankroll(): number | null {
  * while a new date loads. While any game is live the slate refetches every cache window.
  */
 export function useCfbDesk() {
-  const today = useMemo(ptToday, []);
-  const [date, setDate] = useState(today);
-  const [picked, setPicked] = useState(false);
-  const bankroll = useCfbBankroll();
-  const [known, setKnown] = useState<string[]>([]);
-
-  const q = useQuery<CfbSlate>({
-    queryKey: cfbQueryKey(date, bankroll ?? CFB_BANK_BASE),
-    queryFn: () => loadCfbSlate(date, { bankroll: bankroll ?? undefined }),
-    staleTime: CFB_STALE_MS,
-    retry: 1,
-    enabled: bankroll != null,
-    refetchInterval: (query) => (query.state.data?.games.some((g) => g.status === "live") ? CFB_STALE_MS : false),
-  });
-
-  const slate = q.data;
-  useEffect(() => {
-    if (!slate) return;
-    setKnown((prev) => {
-      const next = new Set(prev);
-      for (const d of slate.slateDates) next.add(d);
-      return next.size === prev.length ? prev : [...next].sort();
-    });
-  }, [slate]);
-
-  const advanced = useRef(false);
-  useEffect(() => {
-    if (advanced.current || picked || !slate || slate.date !== today) return;
-    advanced.current = true;
-    if (slate.games.length > 0) return;
-    const next = slate.slateDates.find((d) => d > today);
-    if (next) setDate(next);
-  }, [slate, picked, today]);
-
-  const rail = useMemo(() => [...new Set([today, date, ...known])].sort(), [today, date, known]);
-  const pick = useCallback((d: string) => {
-    setPicked(true);
-    setDate(d);
-  }, []);
-
-  return { today, date, pick, rail, bankroll, q, slate };
+  return useDeskOf(CFB_HANDLES);
 }
+
 
 /* ---------- the ranked side rows (The Sharp reads these) ---------- */
 

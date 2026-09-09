@@ -102,7 +102,8 @@ describe("src/lib/cfb/slate-server.ts — the three upstreams", () => {
 
   it("injects the server key by env reference only — never a literal after apiKey=", () => {
     expect(src).toMatch(/process\.env\.ODDS_API_KEY/);
-    expect(src).toMatch(/CFB_ODDS_URL/);
+    // 2026-09-08 (the NFL build): the game-lines URL is the league's `feeds.oddsUrl` (CFB_LEAGUE carries CFB_ODDS_URL)
+    expect(src).toMatch(/feeds\.oddsUrl/);
     expect(src).not.toMatch(/apiKey=[A-Za-z0-9]/);
     // the key is appended through a template expression, not concatenated from a string
     expect(src).toMatch(/apiKey=\$\{/);

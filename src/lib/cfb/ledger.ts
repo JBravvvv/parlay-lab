@@ -2,8 +2,9 @@ import { computeBankroll, todayExposure, type BankStore } from "@/lib/bankroll";
 import { validateLedger } from "@/lib/ledger-merge";
 import { ledgerStats } from "@/lib/ledger-stats";
 import type { LedgerEntry, LedgerStats } from "@/lib/useLedger";
-import { CFB_PAPER } from "@/lib/cfb/rules";
+import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbCard, CfbLedgerEntry } from "@/lib/cfb/types";
+import type { LeagueConfig } from "@/lib/football/league";
 
 /**
  * THE CFB LEDGER, PURE PART (INSTRUCTION 38, 2026-09-05). Storage, sync and the React hook
@@ -11,10 +12,16 @@ import type { CfbBoard, CfbCard, CfbLedgerEntry } from "@/lib/cfb/types";
  * how a card becomes a locked day, how locked days score, how the CFB bank is computed, and
  * what a valid CFB ledger is. The MLB kernels are reused where their shape fits, so the two
  * desks agree on what "net P/L", "drawdown" and "bankroll" mean while never sharing a key.
+ *
+ * ONE LEDGER SHAPE, TWO LEAGUES (2026-09-08, the NFL build). `lockCfbCard` stamps `sport: cfg.id`
+ * and the day's `daily` / `fun` from `cfg.paper`; `validateCfbLedger` refuses an entry whose sport
+ * is not `cfg.id`. Both default to CFB_LEAGUE for the component layer (sport "cfb", $250 / $25);
+ * the NFL seams pass NFL_LEAGUE (sport "nfl", $350 / $25), so an NFL card can never be booked as a
+ * CFB day and an NFL ledger can never accept a CFB entry.
  */
 
-/** A built card → the locked day. `now` is the lock instant (ms epoch). */
-export function lockCfbCard(card: CfbCard, board: CfbBoard, now: number): CfbLedgerEntry {
+/** A built card → the locked day. `now` is the lock instant (ms epoch); `cfg` the league (CFB_LEAGUE when omitted). */
+export function lockCfbCard(card: CfbCard, board: CfbBoard, now: number, cfg: LeagueConfig = CFB_LEAGUE): CfbLedgerEntry {
   const byId = new Map(board.games.map((g) => [g.id, g]));
   const games: CfbLedgerEntry["games"] = {};
   for (const t of [...card.core, ...card.funT]) {
@@ -26,11 +33,11 @@ export function lockCfbCard(card: CfbCard, board: CfbBoard, now: number): CfbLed
     }
   }
   const entry: CfbLedgerEntry = {
-    sport: "cfb",
+    sport: cfg.id,
     date: card.date,
     locked: true,
-    daily: CFB_PAPER.daily,
-    fun: CFB_PAPER.fun,
+    daily: cfg.paper.daily,
+    fun: cfg.paper.fun,
     core: card.core,
     funT: card.funT,
     lockedAt: now,
@@ -60,12 +67,12 @@ export function cfbExposureOn(entries: CfbLedgerEntry[], date: string): number {
   return todayExposure(entries, date);
 }
 
-/** `validateLedger` plus the one CFB rule: every entry is stamped `sport: "cfb"`. */
-export function validateCfbLedger(x: unknown): { ok: true; entries: CfbLedgerEntry[] } | { ok: false; error: string } {
+/** `validateLedger` plus the one league rule: every entry is stamped `sport: cfg.id` ("cfb" when `cfg` is omitted). */
+export function validateCfbLedger(x: unknown, cfg: LeagueConfig = CFB_LEAGUE): { ok: true; entries: CfbLedgerEntry[] } | { ok: false; error: string } {
   const v = validateLedger(x);
   if (!v.ok) return v;
   for (const e of v.entries) {
-    if ((e as { sport?: unknown }).sport !== "cfb") return { ok: false, error: `entry ${e.date} is not a CFB entry (sport must be "cfb")` };
+    if ((e as { sport?: unknown }).sport !== cfg.id) return { ok: false, error: `entry ${e.date} is not a ${cfg.short} entry (sport must be "${cfg.id}")` };
   }
   return { ok: true, entries: v.entries as CfbLedgerEntry[] };
 }

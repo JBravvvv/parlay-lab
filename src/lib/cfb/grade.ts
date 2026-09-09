@@ -1,6 +1,7 @@
 import { decFromAmerican } from "@/engine2/devig";
-import { CFB_VOID_RECHECK_MS } from "@/lib/cfb/rules";
+import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import type { CfbFinals, CfbGrade, CfbLedgerEntry, CfbTicketLeg } from "@/lib/cfb/types";
+import type { LeagueConfig } from "@/lib/football/league";
 
 /**
  * CFB GRADING (INSTRUCTION 38, 2026-09-05) — pure, from ESPN final scores to ticket results.
@@ -23,6 +24,13 @@ import type { CfbFinals, CfbGrade, CfbLedgerEntry, CfbTicketLeg } from "@/lib/cf
  * to grade as a genuine nil-all TIE and PUSH — the one wrong verdict neither overlay will ever
  * replace. A finite number (0 INCLUDED — a real 0-0 is a real tie) or a numeric string is a score;
  * everything else is a failed read. See `readScore` for the measurement and the money.
+ *
+ * ONE GRADER, TWO LEAGUES (2026-09-08, the NFL build). The two windows above are read from the
+ * league config handed to `gradeCfbEntry` — `cfg.ungradableMs` (48 h on both desks today) and
+ * `cfg.voidRecheckMs` (7 d on both) — with CFB_LEAGUE as the default for the component layer. The
+ * void detail prints the window it applied ("48h" / "7d") from the number, so a league that moves
+ * its window prints the window it actually used. CFB_UNGRADABLE_MS stays exported for the callers
+ * that pin the CFB constant.
  */
 
 export type CfbLegResult = { result: "won" | "lost" | "push" | "pending" | "ungradable"; detail: string };
@@ -212,10 +220,16 @@ export function gradeCfbLeg(leg: CfbTicketLeg, f: CfbFinals[string] | undefined)
  * `final: true` and `postponed` is contradictory, and the desk resolves the contradiction the
  * conservative way — postponed is a game that did not happen, so it takes the short window.
  */
-function voidWindowMs(f: CfbFinals[string] | undefined): number {
+function voidWindowMs(f: CfbFinals[string] | undefined, cfg: LeagueConfig): number {
   const finalButUnreadable =
     !!f && f.final === true && f.status !== "postponed" && (readScore(f.home) === null || readScore(f.away) === null);
-  return finalButUnreadable ? CFB_VOID_RECHECK_MS : CFB_UNGRADABLE_MS;
+  return finalButUnreadable ? cfg.voidRecheckMs : cfg.ungradableMs;
+}
+
+/** "48h" for a window under three days, else whole days ("7d") — the detail string's window label. */
+function fmtWindow(ms: number): string {
+  const hours = ms / 3600_000;
+  return hours < 72 ? `${Math.round(hours)}h` : `${Math.round(hours / 24)}d`;
 }
 
 function kickoffOf(entry: CfbLedgerEntry, gkey: string): number {
@@ -226,10 +240,11 @@ function kickoffOf(entry: CfbLedgerEntry, gkey: string): number {
 }
 
 /**
- * Grade every ticket of a locked day. `now` decides the 48-hour ungradable window and
- * defaults to the wall clock; tests pass it explicitly.
+ * Grade every ticket of a locked day. `now` decides the ungradable window (`cfg.ungradableMs`,
+ * 48 h) and defaults to the wall clock; tests pass it explicitly. `cfg` is the league the entry
+ * belongs to (CFB_LEAGUE when omitted — the component layer; the server seams pass theirs).
  */
-export function gradeCfbEntry(entry: CfbLedgerEntry, finals: CfbFinals, now: number = Date.now()): NonNullable<CfbLedgerEntry["grading"]> {
+export function gradeCfbEntry(entry: CfbLedgerEntry, finals: CfbFinals, now: number = Date.now(), cfg: LeagueConfig = CFB_LEAGUE): NonNullable<CfbLedgerEntry["grading"]> {
   const tickets: Record<string, CfbGrade> = {};
   const legs: Record<string, { result: string; detail: string }> = {};
   for (const t of [...entry.core, ...entry.funT]) {
@@ -291,9 +306,9 @@ export function gradeCfbEntry(entry: CfbLedgerEntry, finals: CfbFinals, now: num
        * suspended-at-`live` game still voids at 48 h, and the escalation still fires only on a
        * leg that is `pending`.
        */
-      const voidAfter = voidWindowMs(finals[leg.gkey]);
+      const voidAfter = voidWindowMs(finals[leg.gkey], cfg);
       if (r.result === "pending" && now - kickoffOf(entry, leg.gkey) > voidAfter) {
-        r = { result: "ungradable", detail: `${r.detail} · ${voidAfter === CFB_UNGRADABLE_MS ? "48h" : "7d"} past kickoff — void` };
+        r = { result: "ungradable", detail: `${r.detail} · ${fmtWindow(voidAfter)} past kickoff — void` };
       }
       legs[leg.lkey] = r;
       results.push(r);

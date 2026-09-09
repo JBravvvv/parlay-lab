@@ -33,6 +33,7 @@
   --color-gold: #c79a3b; /* muted gold — Caesars layer only */
   --color-live: #5cc8ff; /* ice blue — live/in-game marker */
   --color-cfb: #f5a524; /* amber — the College Football desk's accent (INSTRUCTION 38) */
+  --color-nfl: #4f8cff; /* blue — the NFL desk's accent (2026-09-08), distinct from CFB amber and MLB lime */
 
   /* rounded, floating panels */
   --radius-panel: 20px;
@@ -378,6 +379,7 @@ body::after {
     0 0 18px -6px color-mix(in srgb, var(--seg-accent) 70%, transparent);
 }
 .segmented-thumb.is-cfb { --seg-accent: var(--color-cfb); }
+.segmented-thumb.is-nfl { --seg-accent: var(--color-nfl); }
 
 /* ---- ticket: the betting slip. A repeating radial-gradient MASK scallops the
    bottom edge into a perforated tear-off stub; .ticket-tear is the dashed
@@ -462,14 +464,16 @@ body::after {
   background: radial-gradient(closest-side, var(--tile-glint), transparent 72%);
 }
 .stat-tile.is-cfb { --tile-glint: rgba(245, 165, 36, 0.16); }
+.stat-tile.is-nfl { --tile-glint: rgba(79, 140, 255, 0.16); }
 .stat-tile.is-gold { --tile-glint: rgba(199, 154, 59, 0.16); }
 .stat-tile.is-neg { --tile-glint: rgba(255, 92, 69, 0.13); }
 
 /* ---- rail glow: ambient light at the top of the desktop rail, in the desk's
-   accent (lime for MLB, amber for CFB) — the rail is position:fixed, so the
+   accent (lime for MLB, amber for CFB, blue for NFL) — the rail is position:fixed, so the
    absolute pseudo-element rides it and stays out of its flex flow */
 .rail-glow { --rail-accent: var(--color-pos); }
 .rail-glow.is-cfb { --rail-accent: var(--color-cfb); }
+.rail-glow.is-nfl { --rail-accent: var(--color-nfl); }
 .rail-glow::before {
   content: "";
   position: absolute;
@@ -507,9 +511,10 @@ body::after {
 --------------------------------------------------------------------------- */
 
 /* ---- odds-cell: one tappable price pill. Line small above, price mono bold.
-   --odds-accent lights plus prices / the selected ring (lime; .is-cfb → amber). */
+   --odds-accent lights plus prices / the selected ring (lime; .is-cfb → amber; .is-nfl → blue). */
 .odds-grid { --odds-accent: var(--color-pos); }
 .odds-grid.is-cfb { --odds-accent: var(--color-cfb); }
+.odds-grid.is-nfl { --odds-accent: var(--color-nfl); }
 .odds-cell {
   --odds-accent: var(--color-pos);
   display: inline-flex;
@@ -530,6 +535,7 @@ body::after {
   -webkit-tap-highlight-color: transparent;
 }
 .odds-grid.is-cfb .odds-cell { --odds-accent: var(--color-cfb); }
+.odds-grid.is-nfl .odds-cell { --odds-accent: var(--color-nfl); }
 .odds-cell-line {
   font-size: 10px;
   font-weight: 600;
@@ -635,6 +641,7 @@ body::after {
   text-shadow: 0 0 24px rgba(182, 255, 61, 0.35);
 }
 .hero-price.is-cfb { color: var(--color-cfb); text-shadow: 0 0 24px rgba(245, 165, 36, 0.35); }
+.hero-price.is-nfl { color: var(--color-nfl); text-shadow: 0 0 24px rgba(79, 140, 255, 0.35); }
 .hero-price.is-gold { color: var(--color-gold); text-shadow: 0 0 24px rgba(199, 154, 59, 0.35); }
 
 /* ---- sheet overlay (Overlay.tsx). Backdrop is a flat rgba dim — no blur. Phone:
@@ -672,6 +679,7 @@ body::after {
 .sheet-60 { height: 60vh; height: 60dvh; }
 .sheet-full { height: 92vh; height: 92dvh; }
 .sheet-60.is-cfb, .sheet-full.is-cfb { --sheet-accent: var(--color-cfb); }
+.sheet-60.is-nfl, .sheet-full.is-nfl { --sheet-accent: var(--color-nfl); }
 .sheet-60.is-gold, .sheet-full.is-gold { --sheet-accent: var(--color-gold); }
 .sheet-grab { display: flex; justify-content: center; padding: 8px 0 0; }
 .sheet-grab > span { width: 40px; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); }

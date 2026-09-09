@@ -1,5 +1,6 @@
 import { CFB_MODEL } from "@/lib/cfb/rules";
 import { ptDateOf } from "@/lib/cfb/dates";
+import { ALIASES } from "./aliases";
 
 /**
  * TEAM-NAME JOIN: ESPN ↔ The Odds API (INSTRUCTION 38, 2026-09-05).
@@ -95,23 +96,7 @@ export function normTeam(name: string): string {
     .join(" ");
 }
 
-/**
- * ESPN displayName → the odds feed's spelling. Every entry was read out of the raw
- * 2026-09-05 `americanfootball_ncaaf` capture (158 events); none is guessed. The two
- * apostrophe-only cases are listed for the record — `normTeam` alone already joins them.
- */
-export const ALIASES: Record<string, string> = {
-  "Sam Houston Bearkats": "Sam Houston State Bearkats",
-  "Southern Miss Golden Eagles": "Southern Mississippi Golden Eagles",
-  "Houston Christian Huskies": "Houston Baptist Huskies",
-  "App State Mountaineers": "Appalachian State Mountaineers",
-  "SE Louisiana Lions": "Southeastern Louisiana Lions",
-  "The Citadel Bulldogs": "Citadel Bulldogs",
-  "Youngstown State Penguins": "Youngstown St Penguins",
-  "Nicholls Colonels": "Nicholls State Colonels",
-  "Louisiana Ragin' Cajuns": "Louisiana Ragin Cajuns",
-  "Hawai'i Rainbow Warriors": "Hawaii Rainbow Warriors",
-};
+export { ALIASES };
 
 /** Tokens that say nothing about WHICH school a name is. */
 const GENERIC = new Set(["university", "state", "the", "of", "and", "at", "college", "a", "u"]);
@@ -152,11 +137,17 @@ export type MatchGame = { home: string; away: string; start: string };
  *   1. exact both names (normalised)
  *   2. alias both names (ALIASES applied, then normalised)
  *   3. one side exact (raw or alias) + the other side sharing ≥ 1 non-generic token, on the
- *      same Pacific date and with |commence − kickoff| ≤ CFB_MODEL.matchWindowMs
+ *      same Pacific date and with |commence − kickoff| ≤ `windowMs` (the league's
+ *      `model.matchWindowMs`; defaults to CFB_MODEL.matchWindowMs — both leagues are 3 h today)
  * Ties inside a tier go to the event whose commence_time is nearest the kickoff. A matched
  * id is added to `usedIds` here, so no two ESPN games can ever claim the same odds event.
  */
-export function matchOddsEvent(game: MatchGame, oddsEvents: OddsEvent[], usedIds: Set<string>): OddsEvent | null {
+export function matchOddsEvent(
+  game: MatchGame,
+  oddsEvents: OddsEvent[],
+  usedIds: Set<string>,
+  windowMs: number = CFB_MODEL.matchWindowMs,
+): OddsEvent | null {
   const kickoff = Date.parse(game.start);
   const homeRaw = normTeam(game.home);
   const awayRaw = normTeam(game.away);
@@ -184,7 +175,7 @@ export function matchOddsEvent(game: MatchGame, oddsEvents: OddsEvent[], usedIds
   const date = ptDateOf(game.start);
   const fuzzy = pool.filter((e) => {
     const t = Date.parse(e.commence_time);
-    if (!Number.isFinite(t) || Math.abs(t - kickoff) > CFB_MODEL.matchWindowMs) return false;
+    if (!Number.isFinite(t) || Math.abs(t - kickoff) > windowMs) return false;
     if (ptDateOf(e.commence_time) !== date) return false;
     const homeExact = homeAny.includes(normTeam(e.home_team));
     const awayExact = awayAny.includes(normTeam(e.away_team));

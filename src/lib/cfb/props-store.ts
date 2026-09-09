@@ -2,6 +2,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { redis, storeEnv } from "@/lib/server/store";
 import { CFB_PROPS } from "./rules";
 import type { CfbPropRow, CfbPropsBoard } from "./props-types";
+import type { LeagueProps } from "@/lib/football/league";
 
 /**
  * THE CFB PROPS BOARD'S PERSISTENCE + CREDIT LEDGER (2026-09-05).
@@ -37,6 +38,14 @@ import type { CfbPropRow, CfbPropsBoard } from "./props-types";
  * Everything here is best-effort: a missing store env → `propsStore()` is null and the route
  * behaves exactly as before (data cache only); a store error never breaks the route's answer.
  * Nothing in this file touches an MLB key (pl:ledger / pl:bank / pl:noplay) or the CFB ledger.
+ *
+ * TWO LEAGUES, ONE STORE (2026-09-08, the NFL build): `propsStore(keys)` takes the league's own
+ * board / spend prefixes (`PropsStoreKeys`, CFB_PROPS_REDIS by default — the NFL props route hands
+ * it its `pl:nfl:props:*` literals), and every key helper takes the same `keys`. The retention
+ * (EX CFB_PROPS.boardRetainSec, 36 h) and the Caesars-missing windows stay the CFB constants: both
+ * leagues carry the SAME figures (tests/nfl-props-route.test.ts pins NFL_PROPS.boardRetainSec,
+ * czMissingRevalidateSec and czMissingWindowSec equal to CFB_PROPS), and `czMissingDue` takes an
+ * optional `props` for the day one of them moves.
  */
 
 export const CFB_PROPS_REDIS = {
@@ -47,8 +56,11 @@ export const CFB_PROPS_REDIS = {
 /** the spend counter outlives its Pacific day by a margin, then is swept by Redis */
 export const CFB_PROPS_SPEND_TTL_SEC = 36 * 3600;
 
-export const propsBoardKey = (date: string) => `${CFB_PROPS_REDIS.board}${date}`;
-export const propsSpendKey = (ptDate: string) => `${CFB_PROPS_REDIS.spend}${ptDate}`;
+/** the board / spend key prefixes of one league's props store (date-suffixed below) */
+export type PropsStoreKeys = { board: string; spend: string };
+
+export const propsBoardKey = (date: string, keys: PropsStoreKeys = CFB_PROPS_REDIS) => `${keys.board}${date}`;
+export const propsSpendKey = (ptDate: string, keys: PropsStoreKeys = CFB_PROPS_REDIS) => `${keys.spend}${ptDate}`;
 
 /** rows per stored chunk: 400 rows ≈ 380 KB of JSON ≈ 50 KB gzip+base64 — far under Upstash's 1 MB request cap */
 export const CFB_PROPS_CHUNK_ROWS = 400;
@@ -72,11 +84,11 @@ export const decodeRows = (raw: string): CfbPropRow[] | null => {
  * The board split for the store: the index value (under `propsBoardKey(date)`) and each chunk's
  * key + value. Pure, so a test can check every value against UPSTASH_MAX_REQUEST_BYTES.
  */
-export function encodeBoard(date: string, board: CfbPropsBoard): { index: string; chunks: { key: string; value: string }[] } {
+export function encodeBoard(date: string, board: CfbPropsBoard, keys: PropsStoreKeys = CFB_PROPS_REDIS): { index: string; chunks: { key: string; value: string }[] } {
   const stamp = Number.isFinite(Date.parse(board.generatedAt)) ? String(Date.parse(board.generatedAt)) : "0";
   const chunks: { key: string; value: string }[] = [];
   for (let i = 0; i < board.rows.length; i += CFB_PROPS_CHUNK_ROWS) {
-    chunks.push({ key: `${propsBoardKey(date)}:c:${stamp}:${chunks.length}`, value: encodeRows(board.rows.slice(i, i + CFB_PROPS_CHUNK_ROWS)) });
+    chunks.push({ key: `${propsBoardKey(date, keys)}:c:${stamp}:${chunks.length}`, value: encodeRows(board.rows.slice(i, i + CFB_PROPS_CHUNK_ROWS)) });
   }
   const index: StoredIndex = { __chunks: chunks.map((c) => c.key), board: { ...board, rows: [] } };
   return { index: JSON.stringify(index), chunks };
@@ -177,12 +189,13 @@ export function czMissingDue(
   game: { id: string; status: string; kickoffMs: number },
   czMissing: boolean,
   now: number,
+  props: Pick<LeagueProps, "czMissingWindowSec" | "czMissingRevalidateSec"> = CFB_PROPS,
 ): boolean {
   if (game.status !== "upcoming" || !czMissing) return false;
   const ahead = game.kickoffMs - now;
-  if (!Number.isFinite(ahead) || ahead < 0 || ahead > CFB_PROPS.czMissingWindowSec * 1000) return false;
+  if (!Number.isFinite(ahead) || ahead < 0 || ahead > props.czMissingWindowSec * 1000) return false;
   const age = pricedAgeMs(board, game.id, now);
-  return age == null || age > CFB_PROPS.czMissingRevalidateSec * 1000;
+  return age == null || age > props.czMissingRevalidateSec * 1000;
 }
 
 export type CfbPropsStore = {
@@ -196,33 +209,33 @@ export type CfbPropsStore = {
   addSpend(ptDate: string, credits: number): Promise<number>;
 };
 
-/** The store, or null when the Upstash env is not configured (the route then runs data-cache only). */
-export function propsStore(): CfbPropsStore | null {
+/** The store for one league's `keys` (CFB_PROPS_REDIS by default), or null when the Upstash env is not configured (the route then runs data-cache only). */
+export function propsStore(keys: PropsStoreKeys = CFB_PROPS_REDIS): CfbPropsStore | null {
   if (!storeEnv()) return null;
   return {
     async readBoard(date) {
-      const raw = (await redis(["GET", propsBoardKey(date)])) as string | null;
+      const raw = (await redis(["GET", propsBoardKey(date, keys)])) as string | null;
       if (!raw) return null;
-      const keys = storedChunkKeys(raw);
-      const chunks = keys.length > 0 ? ((await redis(["MGET", ...keys])) as (string | null)[]) : [];
+      const chunkKeys = storedChunkKeys(raw);
+      const chunks = chunkKeys.length > 0 ? ((await redis(["MGET", ...chunkKeys])) as (string | null)[]) : [];
       return assembleStoredBoard(raw, Array.isArray(chunks) ? chunks : []);
     },
     async writeBoard(date, board) {
-      const { index, chunks } = encodeBoard(date, board);
+      const { index, chunks } = encodeBoard(date, board, keys);
       for (const c of [...chunks.map((x) => x.value), index]) if (utf8Len(c) > UPSTASH_MAX_REQUEST_BYTES) throw new Error("store chunk over 1 MB");
       // chunks first, then the index that names them — a reader never sees an index whose chunks are not there yet
       await Promise.all(chunks.map((c) => redis(["SET", c.key, c.value, "EX", CFB_PROPS.boardRetainSec])));
-      await redis(["SET", propsBoardKey(date), index, "EX", CFB_PROPS.boardRetainSec]);
+      await redis(["SET", propsBoardKey(date, keys), index, "EX", CFB_PROPS.boardRetainSec]);
     },
     async readSpend(ptDate) {
-      const raw = (await redis(["GET", propsSpendKey(ptDate)])) as string | number | null;
+      const raw = (await redis(["GET", propsSpendKey(ptDate, keys)])) as string | number | null;
       const n = Number(raw ?? 0);
       return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
     },
     async addSpend(ptDate, credits) {
       const n = Math.max(0, Math.round(credits));
-      const total = (await redis(["INCRBY", propsSpendKey(ptDate), n])) as number;
-      await redis(["EXPIRE", propsSpendKey(ptDate), CFB_PROPS_SPEND_TTL_SEC]);
+      const total = (await redis(["INCRBY", propsSpendKey(ptDate, keys), n])) as number;
+      await redis(["EXPIRE", propsSpendKey(ptDate, keys), CFB_PROPS_SPEND_TTL_SEC]);
       return Number.isFinite(Number(total)) ? Number(total) : n;
     },
   };

@@ -16,9 +16,10 @@ import { Reveal } from "@/components/motion/Reveal";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
-import { ASG_ENABLED, CFB_ENABLED, UFC_ENABLED } from "@/lib/features";
+import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
+import { NflPicksBoard, NflRefreshPill } from "@/components/nfl/NflPicksBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
@@ -542,6 +543,22 @@ export default function BoardPage() {
     );
   }
 
+  /* NFL desk (2026-09-08): the same shared football board on the NFL desk handles — its own slate, ledger and bank. */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Board"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="Every playable side and player prop on the NFL slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          action={<NflRefreshPill />}
+        />
+        <NflPicksBoard />
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
@@ -842,6 +859,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

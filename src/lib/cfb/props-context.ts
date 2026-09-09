@@ -1,5 +1,7 @@
 import type { CfbPropMarket, CfbPropRow } from "@/lib/cfb/props-types";
 import { playerSlug, type CfbPropCtxLookup, type CfbPropPlayerMeta } from "@/lib/cfb/props";
+import { CFB_LEAGUE } from "@/lib/cfb/rules";
+import type { LeagueConfig } from "@/lib/football/league";
 
 /**
  * ESPN SEASON CONTEXT FOR PROPS (INSTRUCTION 39, 2026-09-05) — best-effort, no key, never an
@@ -18,6 +20,12 @@ import { playerSlug, type CfbPropCtxLookup, type CfbPropPlayerMeta } from "@/lib
  * player's headshot with his OWN team's logo and, when the odds feed named no team, resolve the
  * team from ESPN's id against the game's home/away ids. Every field is ESPN's own value or null;
  * no extra fetch, no paid-API spend — the tables were already loading for the context join.
+ *
+ * TWO LEAGUES, ONE JOIN (2026-09-08, the NFL build): `loadPropsContext(cfg)` reads the three
+ * tables through the league's own `feeds.espnByAthleteUrl(group, ctx.season)` (the NFL tables live
+ * under football/nfl; `ctx.limit` is carried by that URL) on a `ctx.ttlSec` data-cache window;
+ * `loadCfbPropsContext()` is the CFB-bound call every existing caller keeps. `espnByAthleteUrl`
+ * below stays the CFB feed's URL builder (app/api/cfb/season/route.ts reads it).
  */
 
 export const CFB_CTX_TTL = 3600;
@@ -165,12 +173,12 @@ export function ctxLookup(ctx: CfbPropsContext | null): CfbPropCtxLookup | null 
   return lookup;
 }
 
-/** Fetch and merge the three season tables. Any failure → null (context is optional). */
-export async function loadCfbPropsContext(): Promise<CfbPropsContext | null> {
+/** Fetch and merge the league's three season tables. Any failure → null (context is optional). */
+export async function loadPropsContext(cfg: LeagueConfig): Promise<CfbPropsContext | null> {
   try {
     const pages = await Promise.all(
       CTX_GROUPS.map(async (group) => {
-        const r = await fetch(espnByAthleteUrl(group), { next: { revalidate: CFB_CTX_TTL } });
+        const r = await fetch(cfg.feeds.espnByAthleteUrl(group, cfg.ctx.season), { next: { revalidate: cfg.ctx.ttlSec } });
         if (!r.ok) return null;
         return (await r.json().catch(() => null)) as unknown;
       }),
@@ -181,4 +189,9 @@ export async function loadCfbPropsContext(): Promise<CfbPropsContext | null> {
   } catch {
     return null;
   }
+}
+
+/** The CFB desk's season context — `loadPropsContext(CFB_LEAGUE)`. */
+export function loadCfbPropsContext(): Promise<CfbPropsContext | null> {
+  return loadPropsContext(CFB_LEAGUE);
 }

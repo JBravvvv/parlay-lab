@@ -805,3 +805,33 @@ from grading twice.
 to more hours (e.g. 24×7, ~96 executions/day against the 100/day free tier that `/api/clv`
 already uses 48–96 of) is what would make hours like 6/10/14 reachable; until then, adding them to
 `GRADE_HOURS` only adds dead entries. If the row is widened, re-pin `GRADE_HOURS` and the test.
+
+## ✅ THE SCHEDULER NOW FORWARDS TO TWO FOOTBALL LOCK ROUTES — NFL (2026-09-08)
+
+Josh, verbatim: "2. NFL needs to be built NOW". **No new cron-job.org row and no vercel.json
+change.** The existing scheduler row (every 15 min, UTC hours 15–23 and 0–2) is what locks the
+NFL desk's cards, exactly as it locks the CFB desk's:
+
+- `/api/scheduler` now self-forwards to **`/api/cfb/lock` AND `/api/nfl/lock` CONCURRENTLY**
+  (`Promise.allSettled`, `app/api/scheduler/route.ts:116`; the NFL forward is
+  `src/lib/server/nfl-lock-forward.ts`, imported on its own line at `route.ts:17`). Each forward
+  aborts at 25 s (`CFB_LOCK.forwardTimeoutMs` / `NFL_LOCK.forwardTimeoutMs`,
+  `src/lib/nfl/rules.ts:102`), so the tick's worst case is max(cfb 25, nfl 25) + the ~60 s
+  generate = 85 s under the route's `maxDuration = 90` (`route.ts:39`) — not the sum. The
+  scheduler body gains an `nfl` key beside `cfb`; `mlbTick` is untouched
+  (`tests/scheduler-route.test.ts`, `tests/nfl-config.test.ts:104-110`).
+- The NFL lock window is 60 min before the PT date's first kickoff (`NFL_LOCK.leadMs`). What the
+  15–23Z / 0–2Z row reaches: the 17:00Z Sunday early window (16:00–17:00Z) ✅, the 20:20Z/20:25Z
+  late window ✅, SNF 00:20Z ✅, TNF/MNF 00:15Z–00:35Z ✅. **London / Germany 13:30Z kickoffs are
+  NOT reached** (window 12:30–13:30Z; the day's first poke is 15:00Z): the London game is excluded
+  from that date's card and the rest of the Sunday locks at 16:00Z; a London-only PT date is
+  swept as a missed-window NO-PLAY claim row. **Open item for Josh** — reaching 12:30Z means
+  widening this row's hours on cron-job.org (the free tier's 100 executions/day is the budget
+  this file already accounts for), not a code change. Full table in `docs/nfl-desk.md`.
+- Cost of the second forward per poke: zero Odds credits unless a date is actually locking (the
+  decision is made on the free ESPN board); the sweep (`NFL_SWEEP_DAYS` 4) and settle pass
+  (`NFL_SETTLE` 2 dates / poke) are keyless ESPN reads. Sunday props boards are a separate
+  budget: events × 31 credits per full re-price (13 × 31 = 403 on the week-1 fixture, 16 × 31 =
+  496 on a full Sunday, `NFL_PROPS.dailyBudget` 1000), with the 31 UNMEASURED on
+  `americanfootball_nfl` — read it off the first real Sunday's quota headers.
+

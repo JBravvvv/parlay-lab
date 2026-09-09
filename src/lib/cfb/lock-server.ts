@@ -1,7 +1,8 @@
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
-import { CFB_LOCK, CFB_PAPER, CFB_RULES, CFB_SETTLE, CFB_TOPUP_MAX, CFB_TOPUP_RETRY_MS, CFB_VOID_RECHECK_MS } from "@/lib/cfb/rules";
+import { CFB_LEAGUE, CFB_LOCK } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbCard, CfbGame, CfbLedgerEntry, CfbTicket } from "@/lib/cfb/types";
+import type { LeagueConfig } from "@/lib/football/league";
 
 /**
  * THE CFB SERVER LOCK, PURE PART (INSTRUCTION 45, 2026-09-05). `/api/cfb/lock` is the HTTP
@@ -42,6 +43,16 @@ import type { CfbBoard, CfbCard, CfbGame, CfbLedgerEntry, CfbTicket } from "@/li
  * `buildReasonRecord` exists to prevent on the MLB rails. `buildCfbSweepEntry` is the CFB
  * equivalent, written for the previous PT date on the next day's first poke, with its own
  * trigger so the ledger can tell a same-day missed window from a next-day sweep.
+ *
+ * THE LEAGUE SEAM (2026-09-08, Josh: "NFL needs to be built NOW"). Every function below that used
+ * to read CFB_PAPER / CFB_RULES / CFB_TOPUP_* / CFB_SETTLE / CFB_VOID_RECHECK_MS is now a GENERIC
+ * function taking `cfg: LeagueConfig` as its REQUIRED first argument, with NO default — this is a
+ * server money seam, so a forgotten league is a type error, never a CFB card on an NFL ledger.
+ * Every Cfb-named export keeps today's exact signature as a CFB_LEAGUE-bound wrapper, so nothing
+ * that imports this file by its old names moves. `decideCfbLock` and `cfbPricedAhead` were
+ * already league-free (a kickoff is a kickoff) and stay as they are; `overlayCfbGrading` reads no
+ * knob at all. src/lib/server/football-lock.ts is the shell both /api/cfb/lock and /api/nfl/lock
+ * drive these through.
  */
 
 export const CFB_LOCK_SOURCE = "server-lock" as const;
@@ -129,7 +140,7 @@ export function cfbPricedAhead(games: CfbGame[], now: number): number {
  * is not allowed, a rounding artifact of 1e-9 is not a defect.
  */
 const MONEY_EPS = 1e-9;
-export function assertCfbCardMoney(card: CfbCard): void {
+export function assertCardMoney(cfg: LeagueConfig, card: CfbCard): void {
   const sum = (t: CfbTicket[]) => t.reduce((a, x) => a + x.stake, 0);
   const coreSum = sum(card.core);
   const funSum = sum(card.funT);
@@ -152,28 +163,31 @@ export function assertCfbCardMoney(card: CfbCard): void {
   for (const t of [...card.core, ...card.funT]) {
     if (seen.has(t.id)) {
       throw new Error(
-        `CFB MONEY GUARD: ticket id ${t.id} appears twice on ${card.date} — the ids key the grading map, so two bets would share one verdict. Nothing written. STOP.`,
+        `${cfg.short} MONEY GUARD: ticket id ${t.id} appears twice on ${card.date} — the ids key the grading map, so two bets would share one verdict. Nothing written. STOP.`,
       );
     }
     seen.add(t.id);
   }
-  if (coreSum > CFB_PAPER.daily + MONEY_EPS) {
-    throw new Error(`CFB MONEY GUARD: the card deploys $${coreSum} of core but the day's core allotment is $${CFB_PAPER.daily}. Nothing written. STOP.`);
+  const { paper, rules } = cfg;
+  if (coreSum > paper.daily + MONEY_EPS) {
+    throw new Error(`${cfg.short} MONEY GUARD: the card deploys $${coreSum} of core but the day's core allotment is $${paper.daily}. Nothing written. STOP.`);
   }
-  if (funSum > CFB_PAPER.fun + MONEY_EPS) {
-    throw new Error(`CFB MONEY GUARD: the card deploys $${funSum} of fun money but the day's fun allotment is $${CFB_PAPER.fun}. Nothing written. STOP.`);
+  if (funSum > paper.fun + MONEY_EPS) {
+    throw new Error(`${cfg.short} MONEY GUARD: the card deploys $${funSum} of fun money but the day's fun allotment is $${paper.fun}. Nothing written. STOP.`);
   }
-  if (card.core.length > CFB_RULES.tickets.max) {
-    throw new Error(`CFB MONEY GUARD: the card carries ${card.core.length} core tickets but CFB_RULES.tickets.max is ${CFB_RULES.tickets.max}. Nothing written. STOP.`);
+  if (card.core.length > rules.tickets.max) {
+    throw new Error(`${cfg.short} MONEY GUARD: the card carries ${card.core.length} core tickets but ${cfg.short}_RULES.tickets.max is ${rules.tickets.max}. Nothing written. STOP.`);
   }
   for (const t of card.core) {
-    if (t.stake < CFB_RULES.minStake - MONEY_EPS || t.stake > CFB_RULES.maxStake + MONEY_EPS) {
+    if (t.stake < rules.minStake - MONEY_EPS || t.stake > rules.maxStake + MONEY_EPS) {
       throw new Error(
-        `CFB MONEY GUARD: core ticket ${t.id} carries $${t.stake}, outside the $${CFB_RULES.minStake}–$${CFB_RULES.maxStake} band CFB_RULES sets. Nothing written. STOP.`,
+        `${cfg.short} MONEY GUARD: core ticket ${t.id} carries $${t.stake}, outside the $${rules.minStake}–$${rules.maxStake} band ${cfg.short}_RULES sets. Nothing written. STOP.`,
       );
     }
   }
 }
+/** today's signature, CFB-bound */
+export const assertCfbCardMoney = (card: CfbCard): void => assertCardMoney(CFB_LEAGUE, card);
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
@@ -197,17 +211,16 @@ function missedWindowCard(board: CfbBoard, total: number, cause: CfbMissCause = 
   return { date: board.date, core: [], funT: [], coreSum: 0, funSum: 0, noPlay: true, notes: [note], benched: [] };
 }
 
-export function buildCfbLockEntry(
-  board: CfbBoard,
-  opts: { now: number; bankroll: number; ahead: number; total: number; firstKickoff: number; cause?: CfbMissCause },
-): { entry: CfbLedgerEntry; card: CfbCard } {
+export type LockEntryOpts = { now: number; bankroll: number; ahead: number; total: number; firstKickoff: number; cause?: CfbMissCause };
+
+export function buildLockEntry(cfg: LeagueConfig, board: CfbBoard, opts: LockEntryOpts): { entry: CfbLedgerEntry; card: CfbCard } {
   const { now, bankroll, ahead, total, firstKickoff } = opts;
   const missed = ahead === 0;
   const card = missed
     ? missedWindowCard(board, total, opts.cause ?? "no-lock")
-    : buildCfbCard(board, { bankroll, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now });
-  /* THE MONEY, before anything is stamped or serialized (2026-09-06) — see assertCfbCardMoney. */
-  assertCfbCardMoney(card);
+    : buildCfbCard(board, { bankroll, daily: cfg.paper.daily, fun: cfg.paper.fun, now, rules: cfg.rules, idPrefix: cfg.idPrefix });
+  /* THE MONEY, before anything is stamped or serialized (2026-09-06) — see assertCardMoney. */
+  assertCardMoney(cfg, card);
   const late = !missed && firstKickoff <= now;
   const headline = missed
     ? card.notes[0]
@@ -223,15 +236,17 @@ export function buildCfbLockEntry(
      it. Widened to "no core ticket seated", which subsumes the no-play case. */
   const detail = !missed && (card.noPlay || !card.core.length) ? card.notes[0] : null;
   const entry: CfbLedgerEntry = {
-    ...lockCfbCard(card, board, now),
-    source: CFB_LOCK_SOURCE,
-    trigger: missed && opts.cause === "odds-gap" ? CFB_LOCK_ODDS_TRIGGER : CFB_LOCK_TRIGGER,
+    ...lockCfbCard(card, board, now, cfg),
+    source: cfg.lockSource,
+    trigger: missed && opts.cause === "odds-gap" ? cfg.triggers.oddsGap : cfg.triggers.lock,
     note: detail ? `${headline} · ${detail}` : headline,
   };
-  const v = validateCfbLedger([entry]);
-  if (!v.ok) throw new Error(`server lock entry failed the CFB ledger's own validator: ${v.error}`);
+  const v = validateCfbLedger([entry], cfg);
+  if (!v.ok) throw new Error(`server lock entry failed the ${cfg.short} ledger's own validator: ${v.error}`);
   return { entry, card };
 }
+/** today's signature, CFB-bound */
+export const buildCfbLockEntry = (board: CfbBoard, opts: LockEntryOpts): { entry: CfbLedgerEntry; card: CfbCard } => buildLockEntry(CFB_LEAGUE, board, opts);
 
 /**
  * THE PREVIOUS-DATE SWEEP RECORD (DEFECT 2, 2026-09-05). The same missed-window NO-PLAY card,
@@ -249,7 +264,9 @@ export function buildCfbLockEntry(
  * Nothing is priced here, so the caller can (and does) build the board from ESPN alone with
  * `oddsEvents: []` and spend ZERO Odds API credits on it.
  */
-export function buildCfbSweepEntry(board: CfbBoard, opts: { now: number; total: number; cause?: CfbMissCause }): CfbLedgerEntry {
+export type SweepEntryOpts = { now: number; total: number; cause?: CfbMissCause };
+
+export function buildSweepEntry(cfg: LeagueConfig, board: CfbBoard, opts: SweepEntryOpts): CfbLedgerEntry {
   const cause = opts.cause ?? "no-lock";
   const card = missedWindowCard(board, opts.total, cause);
   /* WHAT THE NOTE MAY CLAIM (2026-09-06, DEFECT 4). The old text ended "because no scheduler poke
@@ -263,15 +280,17 @@ export function buildCfbSweepEntry(board: CfbBoard, opts: { now: number; total: 
       ? `Recorded by the sweep — swept on the following day's poke: ${board.date} was poked inside its lock window and every poke refused, because no Caesars price was ever available on the games still ahead. The day was lost to the odds feed, not to a gap in the ticker.`
       : `Recorded by the sweep — swept on the following day's poke: no lock ever landed for ${board.date} and no odds-outage refusal was recorded for it, so the day is recorded as missed rather than left silent.`;
   const entry: CfbLedgerEntry = {
-    ...lockCfbCard(card, board, opts.now),
-    source: CFB_LOCK_SOURCE,
-    trigger: cause === "odds-gap" ? CFB_SWEEP_ODDS_TRIGGER : CFB_SWEEP_TRIGGER,
+    ...lockCfbCard(card, board, opts.now, cfg),
+    source: cfg.lockSource,
+    trigger: cause === "odds-gap" ? cfg.triggers.sweepOdds : cfg.triggers.sweep,
     note: `${card.notes[0]} ${tail}`,
   };
-  const v = validateCfbLedger([entry]);
-  if (!v.ok) throw new Error(`sweep record failed the CFB ledger's own validator: ${v.error}`);
+  const v = validateCfbLedger([entry], cfg);
+  if (!v.ok) throw new Error(`sweep record failed the ${cfg.short} ledger's own validator: ${v.error}`);
   return entry;
 }
+/** today's signature, CFB-bound */
+export const buildCfbSweepEntry = (board: CfbBoard, opts: SweepEntryOpts): CfbLedgerEntry => buildSweepEntry(CFB_LEAGUE, board, opts);
 
 /* ==========================================================================================
  * INSTRUCTION 45, THE OTHER HALF (2026-09-06). Josh, verbatim: "Parlay Lab CFB should've been
@@ -483,13 +502,19 @@ export function cfbCoreGamesOf(entry: CfbLedgerEntry): Set<string> {
  * The one reason that is NOT free — every game has kicked off — needs the ESPN board and so lives
  * in the route, after this returns `fire: true`.
  */
-export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { claim?: number }): CfbTopUpDecision {
-  if (entry.source !== CFB_LOCK_SOURCE) {
+export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: number, opts?: { claim?: number }): CfbTopUpDecision {
+  if (entry.source !== cfg.lockSource) {
     return { fire: false, reason: `${entry.date} was locked on the device (Builder) — Josh's own card is his; the server never adds tickets to it.` };
   }
+  const { paper, rules } = cfg;
+  /* THE LOCAL NAME IS THE PIN'S (2026-09-08): tests/cfb-lock-route.test.ts D1 reads this file for
+     the literal `last && isClaimRow(last) && now - last.at < CFB_TOPUP_RETRY_MS`, so the league's
+     own cooldown is bound to that name here. It is cfg.topUp.retryMs — CFB_TOPUP_RETRY_MS for the
+     CFB desk, NFL_TOPUP.retryMs for the NFL — and nothing else in this function reads the constant. */
+  const CFB_TOPUP_RETRY_MS = cfg.topUp.retryMs;
   const staked = cfbStakeOf(entry.core);
-  const room = CFB_PAPER.daily - staked;
-  const slots = CFB_RULES.tickets.max - entry.core.length;
+  const room = paper.daily - staked;
+  const slots = rules.tickets.max - entry.core.length;
   /**
    * TWO ALLOTMENTS, TWO GATES (INSTRUCTION 45, 2026-09-06, DEFECT M(a)). Josh's sentence, verbatim:
    * "the same $150 per day theoretical Core money and $25 Fun money per day". This function used to
@@ -538,18 +563,18 @@ export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { clai
    * the same helper so the seat cannot be taken past this decision either.
    */
   const funRefused = cfbFunRefusedOf(entry);
-  const coreOpen = room >= CFB_RULES.minStake && slots > 0;
+  const coreOpen = room >= rules.minStake && slots > 0;
   const funOpen = entry.funT.length === 0 && funRefused.length === 0;
   if (!coreOpen && !funOpen) {
     const why =
-      room < CFB_RULES.minStake
-        ? `the day is fully deployed — $${staked} of the $${CFB_PAPER.daily} core is staked, less than one $${CFB_RULES.minStake} minimum short`
-        : `the ticket cap is spent — ${entry.core.length} of ${CFB_RULES.tickets.max} core tickets are already on the day`;
+      room < rules.minStake
+        ? `the day is fully deployed — $${staked} of the $${paper.daily} core is staked, less than one $${rules.minStake} minimum short`
+        : `the ticket cap is spent — ${entry.core.length} of ${rules.tickets.max} core tickets are already on the day`;
     /* THE FUN HALF SAYS WHICH KIND OF SHUT IT IS. Saying "already on a parlay" over an EMPTY
        bucket would be a false report of the day's own money — the parlay was refused, not placed. */
     const funWhy = entry.funT.length
-      ? `the day's $${CFB_PAPER.fun} fun money is already on a parlay`
-      : `the day's fun parlay was refused by the merge and its receipt still stands (${funRefused.join(", ")}), so that $${CFB_PAPER.fun} is spent rather than free`;
+      ? `the day's $${paper.fun} fun money is already on a parlay`
+      : `the day's fun parlay was refused by the merge and its receipt still stands (${funRefused.join(", ")}), so that $${paper.fun} is spent rather than free`;
     return { fire: false, reason: `${why}, and ${funWhy} — neither allotment has room, so no board is bought.` };
   }
   /**
@@ -606,8 +631,8 @@ export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { clai
    */
   const used = others.filter(spentCoreAttempt).length;
   const funUsed = others.filter(spentFunAttempt).length;
-  const coreSpent = used >= CFB_TOPUP_MAX;
-  const funSpent = funUsed >= CFB_TOPUP_MAX;
+  const coreSpent = used >= cfg.topUp.max;
+  const funSpent = funUsed >= cfg.topUp.max;
   /**
    * THE REFUSAL NAMES BOTH ALLOTMENTS (INSTRUCTION 45, 2026-09-06, D2 — the MONEY critic's pass).
    *
@@ -628,12 +653,12 @@ export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { clai
    * — a bucket that carries its parlay has $0 undeployed, and saying so is the honest report on a
    * day refused for the core's sake alone.
    */
-  const funRoom = CFB_PAPER.fun - cfbStakeOf(entry.funT);
+  const funRoom = paper.fun - cfbStakeOf(entry.funT);
   if ((!coreOpen || coreSpent) && (!funOpen || funSpent)) {
     const n = coreOpen ? used : funUsed;
     return {
       fire: false,
-      reason: `the top-up cap is spent (${n} of ${CFB_TOPUP_MAX}) — $${room} of the $${CFB_PAPER.daily} core and $${funRoom} of the $${CFB_PAPER.fun} fun stay undeployed rather than grind the odds quota all day.`,
+      reason: `the top-up cap is spent (${n} of ${cfg.topUp.max}) — $${room} of the $${paper.daily} core and $${funRoom} of the $${paper.fun} fun stay undeployed rather than grind the odds quota all day.`,
     };
   }
   /* AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (CFB_TOPUP_RETRY_MS, the MLB desk's own 45 minutes).
@@ -703,6 +728,8 @@ export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { clai
     fun: funOpen && !funSpent,
   };
 }
+/** today's signature, CFB-bound */
+export const decideCfbTopUp = (entry: CfbLedgerEntry, now: number, opts?: { claim?: number }): CfbTopUpDecision => decideTopUp(CFB_LEAGUE, entry, now, opts);
 
 /**
  * CLAIM THE ATTEMPT BEFORE THE SPEND (2026-09-06) — pure; the route writes what this returns.
@@ -725,7 +752,11 @@ export function decideCfbTopUp(entry: CfbLedgerEntry, now: number, opts?: { clai
  * That is deliberate and stated rather than hidden: `dry` writes nothing at all by contract, and
  * it is reachable only by hand, with the cron secret — no ticker ever sends it.
  */
-export function claimCfbTopUp(entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }): CfbLedgerEntry {
+export function claimTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }): CfbLedgerEntry {
+  /* `cfg` reads no knob here (2026-09-08): it is the seam's contract — every top-up write on this
+     rail names its league, so a caller cannot claim on one desk and apply on the other. The
+     source gate itself lives in `decideTopUp`, which runs before any claim is written. */
+  void cfg;
   const next: CfbLedgerEntry = { ...entry };
   /* ONLY AN UNFILLED ROW IS REPLACEABLE (2026-09-06, CRITIC 6). This used to filter `r.n !== n`,
      so claiming an ordinal another poke had already COMPLETED erased that poke's record — the
@@ -750,6 +781,9 @@ export function claimCfbTopUp(entry: CfbLedgerEntry, n: number, now: number, arm
   ];
   return next;
 }
+/** today's signature, CFB-bound */
+export const claimCfbTopUp = (entry: CfbLedgerEntry, n: number, now: number, arms: { core: boolean; fun: boolean }): CfbLedgerEntry =>
+  claimTopUp(CFB_LEAGUE, entry, n, now, arms);
 
 /**
  * GIVE THE ATTEMPT BACK (2026-09-06, the critic's second pass, CRITIC 8) — pure; the route writes
@@ -771,12 +805,16 @@ export function claimCfbTopUp(entry: CfbLedgerEntry, n: number, now: number, arm
  * carries `core: 0`). What is NOT released is a board that arrived and priced nothing this desk
  * wants: that attempt really did re-price the day, which is the spend `CFB_TOPUP_MAX` bounds.
  */
-export function releaseCfbTopUp(entry: CfbLedgerEntry, n: number): CfbLedgerEntry {
+export function releaseTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, n: number): CfbLedgerEntry {
+  /* same contract as claimTopUp — the league is named, no knob is read */
+  void cfg;
   const kept = cfbTopUpsOf(entry).filter((r) => !(r.n === n && isClaimRow(r)));
   const next: CfbLedgerEntry = { ...entry };
   (next as Record<string, unknown>).topUps = kept;
   return next;
 }
+/** today's signature, CFB-bound */
+export const releaseCfbTopUp = (entry: CfbLedgerEntry, n: number): CfbLedgerEntry => releaseTopUp(CFB_LEAGUE, entry, n);
 
 /**
  * THE MONEY GUARD OVER A WHOLE ENTRY (2026-09-06). `assertCfbCardMoney` guards the card the lock
@@ -791,8 +829,8 @@ export function releaseCfbTopUp(entry: CfbLedgerEntry, n: number): CfbLedgerEntr
  * key the grading map is built on. It is implemented inside `assertCfbCardMoney` so the lock's own
  * card is held to it too, and so there is exactly one place that decides what a duplicate is.
  */
-export function assertCfbEntryMoney(entry: CfbLedgerEntry): void {
-  assertCfbCardMoney({
+export function assertEntryMoney(cfg: LeagueConfig, entry: CfbLedgerEntry): void {
+  assertCardMoney(cfg, {
     date: entry.date,
     core: entry.core,
     funT: entry.funT,
@@ -803,6 +841,8 @@ export function assertCfbEntryMoney(entry: CfbLedgerEntry): void {
     benched: [],
   });
 }
+/** today's signature, CFB-bound */
+export const assertCfbEntryMoney = (entry: CfbLedgerEntry): void => assertEntryMoney(CFB_LEAGUE, entry);
 
 export type CfbTopUpPlan = {
   tickets: CfbTicket[];
@@ -881,18 +921,16 @@ export type CfbTopUpPlan = {
  * ALSO the same length — i.e. one that does not yet carry the tickets it would collide with —
  * which is a contradiction, and `assertCfbEntryMoney` throws if it ever stops being one.
  */
-export function planCfbTopUp(
-  board: CfbBoard,
-  entry: CfbLedgerEntry,
-  opts: { now: number; bankroll: number; room: number; slots: number; n: number },
-): CfbTopUpPlan {
+export type TopUpPlanOpts = { now: number; bankroll: number; room: number; slots: number; n: number };
+
+export function planTopUp(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEntry, opts: TopUpPlanOpts): CfbTopUpPlan {
   const seated = cfbCoreGamesOf(entry);
   const games = board.games.filter((g) => !seated.has(g.id));
   const pricedAhead = cfbPricedAhead(games, opts.now);
   if (!pricedAhead) return { tickets: [], stake: 0, fun: [], funStake: 0, games: {}, pricedAhead };
 
   const rest: CfbBoard = { ...board, games };
-  const card = buildCfbCard(rest, { bankroll: opts.bankroll, daily: opts.room, fun: CFB_PAPER.fun, now: opts.now });
+  const card = buildCfbCard(rest, { bankroll: opts.bankroll, daily: opts.room, fun: cfg.paper.fun, now: opts.now, rules: cfg.rules, idPrefix: cfg.idPrefix });
   const byId = new Map(games.map((g) => [g.id, g]));
   const tickets: CfbTicket[] = [];
   const gmap: CfbLedgerEntry["games"] = {};
@@ -901,7 +939,7 @@ export function planCfbTopUp(
     if (tickets.length >= opts.slots) break;
     if (stake + t.stake > opts.room + MONEY_EPS) break;
     if (t.legs.some((l) => seated.has(l.gkey))) continue;
-    tickets.push({ ...t, id: `cfb-${entry.date}-topup${opts.n}-core-${entry.core.length + tickets.length + 1}` });
+    tickets.push({ ...t, id: `${cfg.idPrefix}-${entry.date}-topup${opts.n}-core-${entry.core.length + tickets.length + 1}` });
     stake += t.stake;
     for (const l of t.legs) {
       seated.add(l.gkey);
@@ -964,7 +1002,7 @@ export function planCfbTopUp(
   const t = entry.funT.length || cfbFunRefusedOf(entry).length ? undefined : card.funT[0];
   const noStake = !t || !(t.stake > 0);
   if (t && !noStake) {
-    fun.push({ ...t, id: `cfb-${entry.date}-topup${opts.n}-fun-1` });
+    fun.push({ ...t, id: `${cfg.idPrefix}-${entry.date}-topup${opts.n}-fun-1` });
     funStake = t.stake;
     for (const l of t.legs) {
       const g = byId.get(l.gkey);
@@ -974,6 +1012,8 @@ export function planCfbTopUp(
 
   return { tickets, stake, fun, funStake, games: gmap, pricedAhead };
 }
+/** today's signature, CFB-bound */
+export const planCfbTopUp = (board: CfbBoard, entry: CfbLedgerEntry, opts: TopUpPlanOpts): CfbTopUpPlan => planTopUp(CFB_LEAGUE, board, entry, opts);
 
 /**
  * THE APPENDED ENTRY (2026-09-06). Append only: `lockedAt`, `source`, `daily`, `fun` and every
@@ -1001,7 +1041,7 @@ export function planCfbTopUp(
  * is REPLACED here, not appended to. It is the same `n` the plan minted its ids from, so the note
  * Josh reads, the ids on the ledger and the row in `topUps` all name the same attempt.
  */
-export function applyCfbTopUp(entry: CfbLedgerEntry, plan: CfbTopUpPlan, now: number, n: number): CfbLedgerEntry {
+export function applyTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, plan: CfbTopUpPlan, now: number, n: number): CfbLedgerEntry {
   /* REPLACE THIS POKE'S OWN CLAIM, don't append (2026-09-06): this attempt CLAIMED its record
      before it bought a board, so the row with this ordinal already exists and is being filled in.
      `topUps.length` is therefore the number of ATTEMPTS, which is what CFB_TOPUP_MAX bounds. The
@@ -1051,7 +1091,7 @@ export function applyCfbTopUp(entry: CfbLedgerEntry, plan: CfbTopUpPlan, now: nu
        card (src/components/cfb/CfbBuilder.tsx), so a day that gained fun money must say so — and a
        day that could not must say THAT, because the $0-of-$25 day is the one this defect lived on
        and its silence is what let it stand. */
-    note: `${entry.note ?? ""} · Top-up ${n} at ${new Date(now).toISOString()}: ${plural(plan.tickets.length, "core ticket")} for $${plan.stake} — the day now carries $${staked} of the $${CFB_PAPER.daily}. Fun: ${plan.fun.length ? `+$${plan.funStake}` : "nothing added"} — $${funStaked} of the $${CFB_PAPER.fun}.`.trim(),
+    note: `${entry.note ?? ""} · Top-up ${n} at ${new Date(now).toISOString()}: ${plural(plan.tickets.length, "core ticket")} for $${plan.stake} — the day now carries $${staked} of the $${cfg.paper.daily}. Fun: ${plan.fun.length ? `+$${plan.funStake}` : "nothing added"} — $${funStaked} of the $${cfg.paper.fun}.`.trim(),
   };
   (next as Record<string, unknown>).topUps = topUps;
   /**
@@ -1121,11 +1161,13 @@ export function applyCfbTopUp(entry: CfbLedgerEntry, plan: CfbTopUpPlan, now: nu
       next.grading = { ...grading, tickets: { ...graded }, legs: { ...(grading.legs ?? {}) }, done: false };
     }
   }
-  assertCfbEntryMoney(next);
-  const v = validateCfbLedger([next]);
-  if (!v.ok) throw new Error(`topped-up entry failed the CFB ledger's own validator: ${v.error}`);
+  assertEntryMoney(cfg, next);
+  const v = validateCfbLedger([next], cfg);
+  if (!v.ok) throw new Error(`topped-up entry failed the ${cfg.short} ledger's own validator: ${v.error}`);
   return next;
 }
+/** today's signature, CFB-bound */
+export const applyCfbTopUp = (entry: CfbLedgerEntry, plan: CfbTopUpPlan, now: number, n: number): CfbLedgerEntry => applyTopUp(CFB_LEAGUE, entry, plan, now, n);
 
 /* ---------- B. THE SETTLE PASS ---------- */
 
@@ -1479,7 +1521,7 @@ export function overlayCfbGrading(cur: CfbGrading | null | undefined, inc: CfbGr
  * src/lib/cfb/store.ts), both of which are outside what this change owns; it is written down here
  * rather than left for the next reader to rediscover.
  */
-export function cfbSettleCandidate(entry: CfbLedgerEntry, now: number = Date.now()): boolean {
+export function settleCandidate(cfg: LeagueConfig, entry: CfbLedgerEntry, now: number = Date.now()): boolean {
   const tix = [...entry.core, ...entry.funT];
   if (!tix.length) return false;
   if (tix.some((t) => !t.legs?.length)) return false;
@@ -1498,8 +1540,10 @@ export function cfbSettleCandidate(entry: CfbLedgerEntry, now: number = Date.now
      verdict lands the ticket is won or lost, no shape here is reopenable, and the date closes. */
   const reopenable = tix.some((t) => grading.tickets?.[t.id]?.result === "ungradable" || zeroReadTicket(grading, t));
   if (!reopenable) return false;
-  return now < cfbLastKickoffOf(entry) + CFB_VOID_RECHECK_MS;
+  return now < cfbLastKickoffOf(entry) + cfg.voidRecheckMs;
 }
+/** today's signature, CFB-bound */
+export const cfbSettleCandidate = (entry: CfbLedgerEntry, now: number = Date.now()): boolean => settleCandidate(CFB_LEAGUE, entry, now);
 
 /**
  * IS THE DAY OVER (2026-09-06)? The kickoffs come from the entry's OWN games snapshot — free, and
@@ -1509,9 +1553,11 @@ export function cfbSettleCandidate(entry: CfbLedgerEntry, now: number = Date.now
  * game grades `pending` and nothing settles on it) — it is simply a wasted upstream read on a day
  * that cannot yet score, and the point of this pass is that a settled desk costs nothing.
  */
-export function cfbSettleReady(entry: CfbLedgerEntry, now: number, finishMs: number = CFB_SETTLE.finishMs): boolean {
+export function settleReady(cfg: LeagueConfig, entry: CfbLedgerEntry, now: number, finishMs: number = cfg.settle.finishMs): boolean {
   return cfbLastKickoffOf(entry) + finishMs <= now;
 }
+/** today's signature, CFB-bound */
+export const cfbSettleReady = (entry: CfbLedgerEntry, now: number, finishMs: number = CFB_LEAGUE.settle.finishMs): boolean => settleReady(CFB_LEAGUE, entry, now, finishMs);
 
 /**
  * THE LAST KICKOFF THE ENTRY ITSELF RECORDS (extracted 2026-09-06, DEFECT S1). It was the body of

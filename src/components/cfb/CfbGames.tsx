@@ -7,11 +7,10 @@ import { Reveal } from "@/components/motion/Reveal";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, Skeleton } from "@/components/ui/states";
-import { loadCfbFinals } from "@/lib/cfb/client";
+import { useLeague } from "@/components/football/LeagueContext";
 import { addDays } from "@/lib/cfb/dates";
 import type { CfbFinals, CfbGame } from "@/lib/cfb/types";
 import { railLabel } from "@/lib/games";
-import { useCfbDesk } from "./CfbBoard";
 import { CfbGameCard, timeLabelPT } from "./CfbGameCard";
 
 /**
@@ -56,7 +55,9 @@ function groupByKickoff(games: CfbGame[]): Group[] {
 }
 
 export function CfbGames() {
-  const { today, date, pick, rail, bankroll, q, slate } = useCfbDesk();
+  /* the league seam (2026-09-08): desk hook, finals loader, query prefix and copy all come off useLeague() */
+  const L = useLeague();
+  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = useCallback((id: string) => {
     setOpen((prev) => {
@@ -69,8 +70,8 @@ export function CfbGames() {
 
   const anyLive = !!slate?.games.some((g) => g.status === "live");
   const finalsQ = useQuery({
-    queryKey: ["cfb", "finals", date],
-    queryFn: () => loadCfbFinals(date),
+    queryKey: [L.queryPrefix, "finals", date],
+    queryFn: () => L.client.loadFinals(date),
     enabled: anyLive,
     staleTime: 30_000,
     refetchInterval: anyLive ? FINALS_POLL_MS : false,
@@ -122,7 +123,7 @@ export function CfbGames() {
         </Panel>
       ) : games.length === 0 ? (
         <Panel>
-          <EmptyState title="No FBS games" body={`Nothing on ESPN's college football scoreboard for ${railLabel(date)}. Use the rail or the arrows to move days.`} />
+          <EmptyState title={`No ${L.noun} games`} body={`Nothing on ESPN's ${L.label} scoreboard for ${railLabel(date)}. Use the rail or the arrows to move days.`} />
         </Panel>
       ) : (
         <div className="space-y-6">
@@ -134,7 +135,7 @@ export function CfbGames() {
                 <span className="num">{counts.live}</span> live
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-cfb/30 bg-cfb/[0.08] px-2.5 py-1 text-cfb">
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${L.id === "nfl" ? "border-nfl/30 bg-nfl/[0.08] text-nfl" : "border-cfb/30 bg-cfb/[0.08] text-cfb"}`}>
               <span className="num">{counts.upcoming}</span> upcoming
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-white/[0.04] px-2.5 py-1 text-muted">
@@ -179,8 +180,8 @@ export function CfbGames() {
           })}
 
           <div className="text-[10.5px] leading-relaxed text-faint">
-            Schedule, scores, clocks and records are ESPN&apos;s college football scoreboard; ESPN&apos;s embedded line on a card is context,
-            not a priced quote. Prices, fair odds and grades are the CFB desk&apos;s own board (Caesars settles). Informational only, not
+            Schedule, scores, clocks and records are ESPN&apos;s {L.label} scoreboard; ESPN&apos;s embedded line on a card is context,
+            not a priced quote. Prices, fair odds and grades are the {L.short} desk&apos;s own board (Caesars settles). Informational only, not
             betting advice.
           </div>
         </div>

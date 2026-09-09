@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { PairMark, PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
+import { useLeagueTone } from "@/components/football/LeagueContext";
+import type { League } from "@/lib/football/league";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { WonPaid } from "@/components/ui/WonPaid";
@@ -36,7 +38,32 @@ import { ticketPayout, usd } from "@/lib/ticket-payout";
  * (`cfbLegHref` — game + market + player slug, never the line); a closed leg (graded, or a slate
  * day that has passed) stays plain text with a title saying the bet is no longer available.
  * Without `legLink` (the Builder's own locked panel) nothing changes.
+ *
+ * THE NFL BUILD (2026-09-08): this slip is the shared football ticket. The desk it renders on
+ * comes from `useLeagueTone()` (LeagueContext, default "cfb"), which picks the fun card's accent
+ * — `is-cfb` amber or `is-nfl` blue on the hero price, and the matching bucket pill / rim /
+ * link underline — and `cfbLegHref` takes the league so an NFL leg deep-links to `/props?nfl=1&…`
+ * (never `cfb=1`). Both class strings are written out literally because Tailwind cannot see a
+ * template; `is-nfl` / `--color-nfl` land in globals.css with the shell's colour work.
  */
+
+/** the fun card's accent classes per desk — literal strings, both, so Tailwind emits them */
+const FUN_ACCENT: Record<League, { bucket: string; rim: string; text: string; underline: string; abbr: string }> = {
+  cfb: {
+    bucket: "border-cfb/50 bg-cfb/12 text-cfb",
+    rim: "ring-1 ring-cfb/35",
+    text: "text-cfb",
+    underline: "decoration-cfb/50",
+    abbr: "border-cfb/40 bg-cfb/10 text-cfb",
+  },
+  nfl: {
+    bucket: "border-nfl/50 bg-nfl/12 text-nfl",
+    rim: "ring-1 ring-nfl/35",
+    text: "text-nfl",
+    underline: "decoration-nfl/50",
+    abbr: "border-nfl/40 bg-nfl/10 text-nfl",
+  },
+};
 
 /** a leg's verdict as the ledger stores it (the grader's result word + its detail line) */
 export type CfbLegVerdict = { result: string; detail?: string };
@@ -81,7 +108,7 @@ function fallbackAbbr(leg: CfbTicketLeg): string {
   return name.slice(0, 3).toUpperCase() || "—";
 }
 
-function LegMark({ leg, game }: { leg: CfbTicketLeg; game: LegGame | undefined }) {
+function LegMark({ leg, game, abbrCls }: { leg: CfbTicketLeg; game: LegGame | undefined; abbrCls: string }) {
   const team = game ? (leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null) : null;
   /* INSTRUCTION 46: a player leg is the player + HIS team — with or without the slate loaded, never the pair */
   if (leg.player) return <PlayerMark player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
@@ -89,7 +116,7 @@ function LegMark({ leg, game }: { leg: CfbTicketLeg; game: LegGame | undefined }
     if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
     if (team) return <TeamMark team={team} size="sm" showRank showAbbr={false} />;
   }
-  const tone = leg.market === "total" ? "border-line-2 bg-surface-2 text-muted" : "border-cfb/40 bg-cfb/10 text-cfb";
+  const tone = leg.market === "total" ? "border-line-2 bg-surface-2 text-muted" : abbrCls;
   return (
     <span
       className={`num inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border px-1 text-[9px] font-bold ${tone}`}
@@ -112,9 +139,10 @@ export function cfbLegSlug(leg: Pick<CfbTicketLeg, "label" | "player" | "market"
   return playerSlug(leg.label.replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim());
 }
 
-/** the Builder deep link: day + game + market + player slug — never the line ("even if the line has changed") */
-export function cfbLegHref(leg: Pick<CfbTicketLeg, "gkey" | "market" | "label" | "player" | "side">, date: string): string {
-  const q = new URLSearchParams({ cfb: "1", date, game: leg.gkey, mkt: leg.market, player: cfbLegSlug(leg) });
+/** the Builder deep link: day + game + market + player slug — never the line ("even if the line has changed").
+    `league` picks the desk flag (`cfb=1` / `nfl=1`) — an NFL link never carries `cfb=1`. */
+export function cfbLegHref(leg: Pick<CfbTicketLeg, "gkey" | "market" | "label" | "player" | "side">, date: string, league: League = "cfb"): string {
+  const q = new URLSearchParams({ [league]: "1", date, game: leg.gkey, mkt: leg.market, player: cfbLegSlug(leg) });
   return `/props?${q.toString()}`;
 }
 
@@ -133,9 +161,12 @@ export function cfbLegClosed(opts: { verdict?: CfbLegVerdict | null; date: strin
 export const CFB_LEG_CLOSED_TITLE = "Bet no longer available — the game is over or graded";
 
 /** the Ledger's `legLink`: href while open, else null with the closed title */
-export function cfbLegLink(leg: CfbTicketLeg, opts: { date: string; today: string; verdict?: CfbLegVerdict | null; status?: CfbGame["status"] | null }): CfbLegLink {
+export function cfbLegLink(
+  leg: CfbTicketLeg,
+  opts: { date: string; today: string; verdict?: CfbLegVerdict | null; status?: CfbGame["status"] | null; league?: League },
+): CfbLegLink {
   if (cfbLegClosed(opts)) return { href: null, title: CFB_LEG_CLOSED_TITLE };
-  return { href: cfbLegHref(leg, opts.date), title: "Open this bet on the Builder" };
+  return { href: cfbLegHref(leg, opts.date, opts.league ?? "cfb"), title: "Open this bet on the Builder" };
 }
 
 export function CfbTicketCard({
@@ -161,6 +192,9 @@ export function CfbTicketCard({
   /** width / snap classes from a carousel parent */
   className?: string;
 }) {
+  /* the desk this slip renders on — CFB unless an NFL page mounted it under its LeagueProvider */
+  const league = useLeagueTone();
+  const accent = FUN_ACCENT[league];
   const games = useMemo(() => {
     const m = new Map<string, LegGame>();
     for (const g of board?.games ?? []) m.set(g.id, g);
@@ -173,11 +207,11 @@ export function CfbTicketCard({
   const toWin = Math.round(t.stake * (t.czDec - 1) * 100) / 100;
   const result = grade?.result ? RESULT_PILL[grade.result] : null;
   const oneIn = t.prob > 0 ? Math.round(100 / t.prob) : null;
-  /* the favorites parlay (fun) is the amber card; core money is the desk's green */
+  /* the favorites parlay (fun) is the desk's accent card (CFB amber / NFL blue); core money is the desk's green */
   const fun = t.bucket === "fun";
-  const bucketCls = fun ? "border-cfb/50 bg-cfb/12 text-cfb" : "border-pos/40 bg-pos/10 text-pos";
-  const rim = fun ? "ring-1 ring-cfb/35" : "";
-  const heroTone = fun ? "is-cfb" : "";
+  const bucketCls = fun ? accent.bucket : "border-pos/40 bg-pos/10 text-pos";
+  const rim = fun ? accent.rim : "";
+  const heroTone = fun ? (league === "nfl" ? "is-nfl" : "is-cfb") : "";
   const settled = !!payout?.settled;
 
   return (
@@ -224,7 +258,7 @@ export function CfbTicketCard({
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
             return (
               <li key={leg.lkey} className="flex items-center gap-2 text-[11.5px]" title={v?.detail}>
-                <LegMark leg={leg} game={game} />
+                <LegMark leg={leg} game={game} abbrCls={accent.abbr} />
                 <span className="flex min-w-0 flex-1 flex-col">
                 {link?.href ? (
                   // the name is the one tap inside a ledger box that does NOT collapse it (INSTRUCTION 46, point 9)
@@ -233,7 +267,7 @@ export function CfbTicketCard({
                     href={link.href}
                     title={link.title}
                     onClick={(ev) => ev.stopPropagation()}
-                    className="min-w-0 flex-1 truncate text-text underline decoration-cfb/50 decoration-dotted underline-offset-2"
+                    className={`min-w-0 flex-1 truncate text-text underline ${accent.underline} decoration-dotted underline-offset-2`}
                     data-cfb-leg-link
                   >
                     {leg.label}
@@ -264,7 +298,7 @@ export function CfbTicketCard({
             {payout && !settled ? (
               <span className="num text-[13px] font-bold text-text">
                 ${t.stake} <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">pays</span>{" "}
-                <span className={fun ? "text-cfb" : "text-pos"}>{usd(payout.pays)}</span>
+                <span className={fun ? accent.text : "text-pos"}>{usd(payout.pays)}</span>
               </span>
             ) : payout ? (
               <WonPaid t={{ stake: t.stake, czDec: t.czDec, czOdds: t.czOdds }} grade={grade} className="!text-[12px]" />

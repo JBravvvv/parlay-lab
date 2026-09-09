@@ -4,8 +4,9 @@ import { kickoffLabel } from "@/lib/cfb/dates";
 import { evPct, kellyStake } from "@/lib/cfb/model";
 import { normTeam } from "@/lib/cfb/names";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropSide } from "@/lib/cfb/props-types";
-import { CFB_PROPS } from "@/lib/cfb/rules";
+import { CFB_PROPS, CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
+import type { LeagueProps, LeagueRules } from "@/lib/football/league";
 
 /**
  * CFB PLAYER PROPS — the pure pricing (INSTRUCTION 39, 2026-09-05). `parseEventProps` turns one
@@ -42,6 +43,14 @@ import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
  *      `kelly` = ¼-Kelly of the bankroll, capped at 2 %, only when playable and priced.
  * Nothing here is a prediction. A row's `fair` is what the books, de-vigged, say the side is
  * worth at that line; the EV is that fair against a posted price. Missing values are null.
+ *
+ * TWO LEAGUES, ONE PRICER (2026-09-08, the NFL build): the module is shared by the College
+ * Football and NFL desks. `parseEventProps` reads its knobs (`minBooks`, `settleBook`, the Kelly
+ * fraction and cap) from `opts.props` / `opts.rules` — a LeagueProps / LeagueRules — and defaults
+ * to CFB_PROPS / CFB_RULES so every existing CFB caller is unchanged; the server body
+ * (src/lib/server/football-props.ts) passes the league's own. The six market keys are the SAME
+ * six on both feeds (`CFB_PROP_MARKETS`; tests pin NFL_LEAGUE.feeds.oddsPropMarkets against
+ * CFB_PROPS_ODDS_MARKETS), so the market table and labels stay one copy.
  */
 
 /** the assumed hold on a yes-only anytime-TD price (see the header, point 2) */
@@ -75,6 +84,10 @@ export type ParsePropsOpts = {
   bankroll: number;
   /** optional ESPN season context join; null / omitted → every `ctx` is null */
   ctx?: CfbPropCtxLookup | null;
+  /** the league's props knobs (`minBooks`, `settleBook`); CFB_PROPS when omitted */
+  props?: LeagueProps;
+  /** the league's Kelly fraction / cap; CFB_RULES when omitted */
+  rules?: LeagueRules;
 };
 
 type Rec = Record<string, unknown>;
@@ -179,10 +192,10 @@ export function median(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-/** median of the de-vigged over probabilities of the books posting exactly `line`; null under minBooks */
-function fairAt(reads: BookRead[], line: number | null): { p: number; n: number } | null {
+/** median of the de-vigged over probabilities of the books posting exactly `line`; null under `minBooks` */
+function fairAt(reads: BookRead[], line: number | null, minBooks: number): { p: number; n: number } | null {
   const at = reads.filter((r) => sameLine(r.line, line));
-  if (at.length < CFB_PROPS.minBooks) return null;
+  if (at.length < minBooks) return null;
   return { p: median(at.map((r) => r.pOver)), n: at.length };
 }
 
@@ -210,6 +223,8 @@ export function propLabel(player: string, market: CfbPropMarket, side: CfbPropSi
  * player, over before under; a (market, player) with no de-vigged pair at any book yields nothing.
  */
 export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePropsOpts): CfbPropRow[] {
+  const P: LeagueProps = opts.props ?? CFB_PROPS;
+  const R: LeagueRules = opts.rules ?? CFB_RULES;
   const ev = rec(eventJson);
   const oddsEventId = (ev && str(ev.id)) ?? game.oddsEventId ?? "";
   const kickoff = Date.parse(game.start);
@@ -224,7 +239,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
     // the row's line must be a line some book POSTED (a fair exists only there), so the line median
     // is engine2's lower-middle weightedMedian, never an average of two posted lines
     const line = g.market.kind === "ou" ? weightedMedian(g.reads.map((r) => r.line as number), g.reads.map(() => 1)) : null;
-    const consensus = fairAt(g.reads, line);
+    const consensus = fairAt(g.reads, line, P.minBooks);
     const teamN = g.team ? normTeam(g.team) : null;
     // INSTRUCTION 46 (2026-09-08): the odds feed rarely names a prop's team; ESPN's season table
     // knows the player's teamId, and that id IS the slate's team id, so a row whose feed team is
@@ -254,7 +269,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
         } else quotes.push(quote(r.book, r.title, r.priceOver, r.line));
       }
       const find = (k: string) => quotes.find((q) => q.book === k) ?? null;
-      const cz = find(CFB_PROPS.settleBook);
+      const cz = find(P.settleBook);
       let best: CfbPropQuote | null = null;
       for (const q of quotes) {
         if (!sameLine(q.line, line)) continue;
@@ -262,7 +277,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
       }
       const evAt = (q: CfbPropQuote | null): { ev: number; p: number } | null => {
         if (!q) return null;
-        const f = fairAt(g.reads, q.line);
+        const f = fairAt(g.reads, q.line, P.minBooks);
         if (!f) return null;
         const p = pOf(f.p);
         return { ev: round(evPct(p, 0, q.dec), 2), p };
@@ -272,7 +287,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
       const playable = !!cz && upcoming;
       const fair = consensus ? pOf(consensus.p) : null;
       const clamped = fair == null ? null : Math.min(1 - 1e-6, Math.max(1e-6, fair));
-      const kelly = playable && cz && czEv ? kellyStake(czEv.p, 0, cz.dec, opts.bankroll) : 0;
+      const kelly = playable && cz && czEv ? kellyStake(czEv.p, 0, cz.dec, opts.bankroll, R) : 0;
       rows.push({
         key: `${game.id}|${g.market.id}|${playerSlug(g.player)}|${side}|${line ?? ""}`,
         gameId: game.id,
@@ -409,8 +424,9 @@ export function hasLiveEvent(events: readonly Pick<CfbGame, "status">[]): boolea
  * The cache window (seconds) a props board built from `events` may be held for: the 2 h
  * `revalidateSec` for a pre-kick set, the 10 min `liveRevalidateSec` once any priced event is in
  * play (in-game lines move). One helper feeds the Redis EX, the stored board's staleness check
- * and each event call's data-cache revalidate, so the three can never disagree.
+ * and each event call's data-cache revalidate, so the three can never disagree. `props` is the
+ * league's knobs (CFB_PROPS by default; the server body passes the league's own).
  */
-export function propsWindowSec(events: readonly Pick<CfbGame, "status">[]): number {
-  return hasLiveEvent(events) ? CFB_PROPS.liveRevalidateSec : CFB_PROPS.revalidateSec;
+export function propsWindowSec(events: readonly Pick<CfbGame, "status">[], props: Pick<LeagueProps, "revalidateSec" | "liveRevalidateSec"> = CFB_PROPS): number {
+  return hasLiveEvent(events) ? props.liveRevalidateSec : props.revalidateSec;
 }

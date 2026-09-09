@@ -41,9 +41,10 @@ describe("CfbProps — wiring", () => {
   it("the props query never polls (no refetchInterval) and is stale for the board's own window (ttlSec, else the route's 2 h)", () => {
     expect(props).not.toMatch(/refetchInterval/);
     // 2026-09-05 (INSTRUCTION 40): a live board says ttlSec 600 — the query must not sit on it for 2 h
-    expect(props).toMatch(/staleTime: \(q\) => propsStaleMs\(q\.state\.data\)/);
+    expect(props).toMatch(/staleTime: \(q\) => propsStaleMs\(q\.state\.data, L\.client\)/);
     // 2026-09-05 (review fix): staleness is what is LEFT of the window — the board's ttlSec less its age since generatedAt
-    expect(props).toMatch(/function propsStaleMs\(board: CfbPropsBoard \| undefined\): number \{\s*return board \? cfbPropsStaleMs\(board\) : PROPS_STALE_MS;/);
+    // the league seam (2026-09-08): the client is optional — CFB's own helpers when omitted, the league's under a provider
+    expect(props).toMatch(/function propsStaleMs\(board: CfbPropsBoard \| undefined, client\?: DeskClient\): number \{\s*if \(board\) return \(client\?\.propsStaleMs \?\? cfbPropsStaleMs\)\(board\);\s*return client \? client\.PROPS_STALE_MS : PROPS_STALE_MS;/);
     expect(props).toMatch(/const PROPS_STALE_MS = CFB_PROPS_STALE_MS;/);
     const client = read("src/lib/cfb/client.ts");
     expect(client).toMatch(/CFB_PROPS_STALE_MS = CFB_PROPS\.revalidateSec \* 1000/);
@@ -79,7 +80,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
   it("builds the SIDES card on the shared OddsGrid with Spread / Money / Total columns, amber tone", () => {
     expect(props).toMatch(/import \{ OddsCellButton, OddsGrid, type OddsGridCell \} from "@\/components\/ui\/OddsGrid"/);
     expect(props).toMatch(/\{ key: "spread", label: "Spread" \},\s*\{ key: "ml", label: "Money" \},\s*\{ key: "total", label: "Total" \}/);
-    expect(props).toMatch(/<OddsGrid\s+tone="cfb"\s+columns=\{COLUMN_LABELS\}/);
+    expect(props).toMatch(/<OddsGrid\s+tone=\{L\.id\}\s+columns=\{COLUMN_LABELS\}/);
     // two rows per card: away then home, each through sideCell → a real leg or a muted "—"
     expect(props).toMatch(/team: <TeamBlock team=\{game\.away\}/);
     expect(props).toMatch(/team: <TeamBlock team=\{game\.home\}/);
@@ -116,7 +117,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).toMatch(/<PlayerMark player=\{pl\.player\} headshot=\{pl\.headshot\} team=\{team\} pos=\{pl\.pos\} size="md" \/>/);
     expect(read("src/components/cfb/TeamMark.tsx")).toMatch(/export function initials\(name: string\): string/);
     expect(props).toMatch(/function propCell\(/);
-    expect(props).toMatch(/<OddsCellButton key=\{r\.key\} cell=\{propCell\(r, mode, pickedKeys\.has\(r\.key\), onPick\)\} \/>/);
+    expect(props).toMatch(/<OddsCellButton key=\{r\.key\} cell=\{propCell\(r, mode, pickedKeys\.has\(r\.key\), onPick, L\.rules\)\} \/>/);
     expect(props).toMatch(/yes \? "w-\[74px\] grid-cols-1" : "w-\[150px\] grid-cols-2"/);
     expect(props).toMatch(/yes \? "YES" :/);
     // the empty-market game line, never a vanished card

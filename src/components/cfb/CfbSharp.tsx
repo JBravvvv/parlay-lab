@@ -2,6 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLeague } from "@/components/football/LeagueContext";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { DataTable, type Column } from "@/components/ui/DataTable";
@@ -12,12 +13,12 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
-import { CFB_MODEL, CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbRow } from "@/lib/cfb/types";
+import type { DeskHandles, League } from "@/lib/football/league";
 import { fmtAmerican, fmtMoney, fmtPct } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 import { GRADE_CUTS } from "@/lib/grade";
-import { rankRows, useCfbDesk, fpiStamp, type BoardRow } from "./CfbBoard";
+import { rankRows, fpiStamp, type BoardRow } from "./CfbBoard";
 import { CfbFpiPanel } from "./CfbFpiPanel";
 import { bookShort, fmtSigned, numOrDash, pctOrDash, timeLabelPT } from "./CfbGameCard";
 import { TeamMark } from "./TeamMark";
@@ -29,7 +30,19 @@ import { TeamMark } from "./TeamMark";
  * the model with an edge meter each, tabulates every game's model parts (the three P(home)
  * inputs, the blend, the expected margin and total, σ), shows which books priced the slate,
  * and ends with ESPN's FPI for the day's teams. Setups, not predictions.
+ *
+ * THE NFL BUILD (2026-09-08): the shared football read. The model, the rules, the paper
+ * allotment, the slate hook and the react-query prefix come from `useLeague()` (CFB_DESK by
+ * default — app/sharp/page.tsx mounting this bare is the CFB read unchanged; NflSharp mounts
+ * it on the NFL desk, whose constants are NFL_MODEL / NFL_RULES, never CFB's by reference).
+ * `L.useDesk()` is called unconditionally — the context value is fixed for a mount.
  */
+
+/** the desk's accent utilities — both literals, so Tailwind emits each */
+const ACCENT: Record<League, { text: string; chip: string }> = {
+  cfb: { text: "text-cfb", chip: "border-cfb/40 bg-cfb/10 text-cfb" },
+  nfl: { text: "text-nfl", chip: "border-nfl/40 bg-nfl/10 text-nfl" },
+};
 
 type Coverage = { key: "cz" | "dk" | "fd" | "pin"; label: string; games: number };
 
@@ -45,7 +58,8 @@ function coverage(games: CfbGame[]): Coverage[] {
 }
 
 export function CfbSharp() {
-  const { today, date, pick, rail, bankroll, q, slate } = useCfbDesk();
+  const L = useLeague();
+  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
   const qc = useQueryClient();
 
   const ranked = useMemo(() => (slate ? rankRows(slate.games) : []), [slate]);
@@ -70,12 +84,12 @@ export function CfbSharp() {
   );
 
   const overview = slate
-    ? `${slate.games.length} FBS game${slate.games.length === 1 ? "" : "s"} on ${railLabel(date)}: ${matched} matched to the odds feed, ${withMl} with a two-book moneyline consensus, ${withFpi} with FPI on both sides. ` +
+    ? `${slate.games.length} ${L.noun} game${slate.games.length === 1 ? "" : "s"} on ${railLabel(date)}: ${matched} matched to the odds feed, ${withMl} with a two-book moneyline consensus, ${withFpi} with FPI on both sides. ` +
       (priced.length === 0
         ? "Caesars has not posted a price the desk can grade yet."
         : `Of ${priced.length} Caesars-priced sides, ${plusEv.length} clear${plusEv.length === 1 ? "s" : ""} the model's fair price and ${
-            plusEv.filter((r) => (r.row.evCz ?? 0) >= CFB_RULES.minEvPct).length
-          } clear${plusEv.filter((r) => (r.row.evCz ?? 0) >= CFB_RULES.minEvPct).length === 1 ? "s" : ""} the card's +${CFB_RULES.minEvPct}% bar. `) +
+            plusEv.filter((r) => (r.row.evCz ?? 0) >= L.rules.minEvPct).length
+          } clear${plusEv.filter((r) => (r.row.evCz ?? 0) >= L.rules.minEvPct).length === 1 ? "s" : ""} the card's +${L.rules.minEvPct}% bar. `) +
       "Every edge below is a gap between a posted price and the blend of the de-vigged market and ESPN FPI — a setup that matches criteria, not a prediction."
     : "";
 
@@ -134,16 +148,16 @@ export function CfbSharp() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-text">The CFB read · {railLabel(date)}</div>
+          <div className="text-[13px] font-semibold text-text">The {L.short} read · {railLabel(date)}</div>
           <div className="text-[11px] text-muted">Market + FPI margin model, priced at Caesars. Every constant below is the one the board runs on.</div>
         </div>
-        <Pill variant="ghost" className="press" onClick={() => qc.invalidateQueries({ queryKey: ["cfb", "slate"] })} disabled={q.isFetching}>
+        <Pill variant="ghost" className="press" onClick={() => qc.invalidateQueries({ queryKey: [L.queryPrefix, "slate"] })} disabled={q.isFetching}>
           {q.isFetching ? "Reading…" : "↻ Refresh read"}
         </Pill>
       </div>
 
       <Reveal>
-        <HowItPrices />
+        <HowItPrices L={L} />
       </Reveal>
 
       {loading ? (
@@ -152,11 +166,11 @@ export function CfbSharp() {
         </Panel>
       ) : q.isError ? (
         <Panel>
-          <ErrorState title="Couldn't load the CFB slate" body={(q.error as Error).message} onRetry={() => void q.refetch()} />
+          <ErrorState title={`Couldn't load the ${L.short} slate`} body={(q.error as Error).message} onRetry={() => void q.refetch()} />
         </Panel>
       ) : !slate || slate.games.length === 0 ? (
         <Panel>
-          <EmptyState title={`No FBS games on ${railLabel(date)}`} body="Pick a slate date on the rail — the read follows the board." />
+          <EmptyState title={`No ${L.noun} games on ${railLabel(date)}`} body="Pick a slate date on the rail — the read follows the board." />
         </Panel>
       ) : (
         <>
@@ -174,7 +188,7 @@ export function CfbSharp() {
               <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Best Caesars prices vs the model</h2>
               <div className="grid gap-3 md:grid-cols-2">
                 {value.map((r, i) => (
-                  <Spot key={r.row.key} r={r} lit={i === 0 && (r.row.evCz ?? -1) > 0} />
+                  <Spot key={r.row.key} r={r} lit={i === 0 && (r.row.evCz ?? -1) > 0} league={L.id} />
                 ))}
               </div>
             </Reveal>
@@ -222,8 +236,8 @@ export function CfbSharp() {
                   ))}
                 </div>
                 <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
-                  P(home) in probability points: the moneyline consensus alone vs the {Math.round(CFB_MODEL.blend.mkt * 100)}/{Math.round(CFB_MODEL.blend.spread * 100)}/
-                  {Math.round(CFB_MODEL.blend.fpi * 100)} blend with the spread-implied and FPI-implied figures. A big gap is where the desk&apos;s edges come from — and
+                  P(home) in probability points: the moneyline consensus alone vs the {Math.round(L.model.blend.mkt * 100)}/{Math.round(L.model.blend.spread * 100)}/
+                  {Math.round(L.model.blend.fpi * 100)} blend with the spread-implied and FPI-implied figures. A big gap is where the desk&apos;s edges come from — and
                   where it is most exposed to FPI being wrong.
                 </p>
               </Panel>
@@ -242,7 +256,7 @@ export function CfbSharp() {
                   <span
                     key={b.key}
                     className={`num inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                      b.key === "cz" ? "border-gold/40 bg-gold/10 text-gold" : b.key === "pin" ? "border-cfb/40 bg-cfb/10 text-cfb" : "border-line-2 bg-white/[0.03] text-text"
+                      b.key === "cz" ? "border-gold/40 bg-gold/10 text-gold" : b.key === "pin" ? ACCENT[L.id].chip : "border-line-2 bg-white/[0.03] text-text"
                     }`}
                   >
                     {b.label}
@@ -256,8 +270,8 @@ export function CfbSharp() {
                 </span>
               </div>
               <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
-                Games each book prices on this slate. Caesars settles every ticket; Pinnacle counts ×{CFB_MODEL.pinnacleWeight} in the consensus median; a
-                market needs {CFB_MODEL.minBooks} books at a line to exist at all.
+                Games each book prices on this slate. Caesars settles every ticket; Pinnacle counts ×{L.model.pinnacleWeight} in the consensus median; a
+                market needs {L.model.minBooks} books at a line to exist at all.
                 {slate.unmatched > 0 ? ` ${slate.unmatched} game${slate.unmatched === 1 ? "" : "s"} had no odds-feed event and priced nothing.` : ""}
               </p>
             </Panel>
@@ -286,7 +300,7 @@ function Pct({ p }: { p: number | null }) {
   return <span className={`num ${p == null ? "text-faint" : "text-muted"}`}>{pctOrDash(p)}</span>;
 }
 
-function Spot({ r, lit }: { r: BoardRow; lit: boolean }) {
+function Spot({ r, lit, league }: { r: BoardRow; lit: boolean; league: League }) {
   const { row, game, team } = r;
   return (
     <Panel className={lit ? "glow-pos" : ""}>
@@ -306,7 +320,7 @@ function Spot({ r, lit }: { r: BoardRow; lit: boolean }) {
           {row.cz && <OddsCell odds={row.cz.price} book="caesars" />}
         </div>
       </div>
-      <EdgeMeter fair={row.fair} mkt={row.mkt} tone="cfb" className="mt-3" />
+      <EdgeMeter fair={row.fair} mkt={row.mkt} tone={league} className="mt-3" />
       <div className="num mt-2.5 flex flex-wrap items-center gap-3 text-[11.5px]">
         <span className="text-text">fair {fmtAmerican(row.fairAm)}</span>
         {row.evCz != null && <EvBadge ev={row.evCz} />}
@@ -324,16 +338,17 @@ function Spot({ r, lit }: { r: BoardRow; lit: boolean }) {
 
 /* ---------- the constants, printed from the one copy ---------- */
 
-function HowItPrices() {
-  const m = CFB_MODEL;
-  const r = CFB_RULES;
+function HowItPrices({ L }: { L: DeskHandles }) {
+  const m = L.model;
+  const r = L.rules;
+  const nfl = L.id === "nfl";
   return (
     <details className="glass px-5 py-4" open>
       <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">How this desk prices a game</summary>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="space-y-2.5">
           <Term k={`σ = ${m.sigma} pts`} label="Margin spread">
-            FBS final margins scatter about the closing spread with this standard deviation — wider than the NFL&apos;s. A spread (or an FPI gap) becomes a
+            {L.noun} final margins scatter about the closing spread with this standard deviation — {nfl ? "tighter than college's" : "wider than the NFL's"}. A spread (or an FPI gap) becomes a
             win probability through a normal curve with this width; a cover probability at any other line comes from the same curve.
           </Term>
           <Term
@@ -367,16 +382,16 @@ function HowItPrices() {
             inform the consensus and the &quot;best&quot; column.
           </Term>
           <Term k={`¼-Kelly · cap ${Math.round(r.kellyCap * 100)}%`} label="Sizing">
-            Stake = {r.kellyFrac}× the Kelly fraction at Caesars, capped at {Math.round(r.kellyCap * 100)}% of the CFB bankroll, whole dollars, $0 when the edge is ≤ 0.
+            Stake = {r.kellyFrac}× the Kelly fraction at Caesars, capped at {Math.round(r.kellyCap * 100)}% of the {L.short} bankroll, whole dollars, $0 when the edge is ≤ 0.
             Passing is a position.
           </Term>
           <Term k={`S ≥ +${GRADE_CUTS.S} · A ≥ +${GRADE_CUTS.A} · B ≥ +${GRADE_CUTS.B} · C ≥ ${GRADE_CUTS.C} · D ≥ ${GRADE_CUTS.D} · F`} label="Grades">
             A label on the EV% at Caesars, fixed cutoffs, never curved — most of a retail board is −EV and the grade says so.
           </Term>
-          <Term k={`$${CFB_PAPER.daily} core + $${CFB_PAPER.fun} fun`} label="The card">
+          <Term k={`$${L.paper.daily} core + $${L.paper.fun} fun`} label="The card">
             Core legs need ≥ +{r.minEvPct}% EV at Caesars and a price ≤ {r.maxDec} decimal; singles and 2-leg cross-game parlays, one leg per game, no two core
             tickets on the same game, {r.tickets.min}–{r.tickets.max} tickets at ${r.minStake}–${r.maxStake} each. The fun ticket is a {r.fun.legs.min}–{r.fun.legs.max}-leg
-            favorites parlay at ≥ {r.fun.minDec}× — its own ledger and bank, separate from MLB, since {CFB_PAPER.since}.
+            favorites parlay at ≥ {r.fun.minDec}× — its own ledger and bank, separate from MLB, since {L.paper.since}.
           </Term>
           <Term k={`${Math.round(m.matchWindowMs / 3600_000)} h window`} label="Feed matching">
             An ESPN game and an odds event pair by exact name, then a curated alias, then one exact side + token overlap with kickoffs within this window.
@@ -389,11 +404,12 @@ function HowItPrices() {
 }
 
 function Term({ k, label, children }: { k: ReactNode; label: string; children: ReactNode }) {
+  const L = useLeague();
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-1 sm:grid-cols-[132px_minmax(0,1fr)] sm:gap-3">
       <div className="min-w-0">
         <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-faint">{label}</div>
-        <div className="num text-[12px] font-semibold text-cfb">{k}</div>
+        <div className={`num text-[12px] font-semibold ${ACCENT[L.id].text}`}>{k}</div>
       </div>
       <p className="text-[12px] leading-relaxed text-muted">{children}</p>
     </div>

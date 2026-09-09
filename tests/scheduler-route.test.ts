@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { NextRequest, NextResponse } from "next/server";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import { CFB_LOCK } from "@/lib/cfb/rules";
+import { NFL_LOCK } from "@/lib/nfl/rules";
 import { LINEUP_LEAD_MS } from "@/lib/board-coverage";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { stripComments } from "./helpers/source";
@@ -147,6 +148,8 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
 
   it("the route forwards to /api/cfb/lock only after the MLB tick, with the cron header, under `cfb`", () => {
     expect(src).toMatch(/import \{ attachCfb, forwardCfbLock \} from "@\/lib\/server\/cfb-lock-forward"/);
+    // the NFL forward rides beside it, ON ITS OWN import line (2026-09-08)
+    expect(src).toMatch(/import \{ attachNfl, forwardNflLock[^}]*\} from "@\/lib\/server\/nfl-lock-forward"/);
     const get = src.indexOf("export async function GET(");
     const tick = src.indexOf("async function mlbTick(");
     expect(get).toBeGreaterThan(0);
@@ -180,6 +183,7 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
     expect(/if \(!process\.env\.CRON_SECRET\)[\s\S]{0,120}?503/.test(body)).toBe(true);
     expect(body).toMatch(/\/api\/generate/);
     expect(body).not.toMatch(/cfb/i);
+    expect(body).not.toMatch(/nfl/i);
     // the forward helper sends the same header the generate forward sends, to the CFB lock path
     const fwd = stripComments(readFileSync("src/lib/server/cfb-lock-forward.ts", "utf8"));
     expect(fwd).toMatch(/"\/api\/cfb\/lock"/);
@@ -259,6 +263,8 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
   const SECRET = "cron-secret-for-this-test-only";
   const NOW = Date.parse("2026-09-05T18:27:00Z"); // 11:27 PT — between the 09:30 and 12:00 grading slots
   const forwardMock = vi.fn();
+  /** the NFL forward, mocked the same way; every case that does not name it gets a quiet `waiting` */
+  const nflForwardMock = vi.fn();
   let GET: (req: NextRequest) => Promise<Response>;
 
   /** an in-memory Redis behind the mocked `redis(cmd)` — the same shape tests/cfb-lock-route uses */
@@ -304,16 +310,22 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
       const real = await orig<typeof import("@/lib/server/cfb-lock-forward")>();
       return { ...real, forwardCfbLock: forwardMock }; // attachCfb stays REAL — it is the thing under test
     });
+    vi.doMock("@/lib/server/nfl-lock-forward", async (orig) => {
+      const real = await orig<typeof import("@/lib/server/nfl-lock-forward")>();
+      return { ...real, forwardNflLock: nflForwardMock }; // attachNfl stays REAL, like attachCfb
+    });
     ({ GET } = await import("../app/api/scheduler/route"));
   });
   afterAll(() => {
     vi.doUnmock("@/lib/server/cfb-lock-forward");
+    vi.doUnmock("@/lib/server/nfl-lock-forward");
   });
 
   beforeEach(() => {
     vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
     vi.stubEnv("CRON_SECRET", SECRET);
     forwardMock.mockReset();
+    nflForwardMock.mockReset().mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
     vi.mocked(redis).mockReset();
     vi.mocked(redisGetJson).mockReset();
     vi.mocked(redisSetJson).mockReset();
@@ -412,10 +424,11 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
     const { status, body } = await call();
     expect(status).toBe(200);
-    const { cfb: _cfb, ...mlb } = body;
+    const { cfb: _cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb).toEqual(MLB_BODY);
-    // `cfb` is the ONLY key the wrapper adds
-    expect(Object.keys(body).filter((k) => !(k in MLB_BODY))).toEqual(["cfb"]);
+    // `cfb` and `nfl` are the ONLY keys the wrapper adds, in that order (2026-09-08: the NFL forward)
+    expect(Object.keys(body).filter((k) => !(k in MLB_BODY))).toEqual(["cfb", "nfl"]);
+    expect(body.nfl).toEqual({ forwarded: true, status: 200, result: { status: "waiting" } });
     expect(body.cfb).toEqual({ forwarded: true, status: 200, result: { status: "waiting" } });
   });
 
@@ -424,7 +437,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockResolvedValue({ forwarded: false, error: err });
     const { status, body } = await call();
     expect(status, "a CFB forward failure changed the MLB status code").toBe(200);
-    const { cfb, ...mlb } = body;
+    const { cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb, "a CFB forward failure changed the MLB body").toEqual(MLB_BODY);
     expect(JSON.stringify(mlb)).toBe(JSON.stringify(MLB_BODY)); // byte-identical, key order included
     expect(cfb).toEqual({ forwarded: false, error: err });
@@ -447,7 +460,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockRejectedValue(new Error("ECONNRESET"));
     const { status, body } = await call();
     expect(status, "a thrown CFB forward escaped the wrapper and destroyed the MLB answer").toBe(200);
-    const { cfb: _cfb, ...mlb } = body;
+    const { cfb: _cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb).toEqual(MLB_BODY);
     expect(JSON.stringify(mlb)).toBe(JSON.stringify(MLB_BODY));
   });
@@ -456,7 +469,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockResolvedValue({ forwarded: true, status: 503, result: { error: "cfb-not-configured" } });
     const { status, body } = await call();
     expect(status, "a CFB 503 was allowed to become the MLB status").toBe(200);
-    const { cfb, ...mlb } = body;
+    const { cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb).toEqual(MLB_BODY);
     expect(JSON.stringify(mlb)).toBe(JSON.stringify(MLB_BODY));
     expect(cfb).toEqual({ forwarded: true, status: 503, result: { error: "cfb-not-configured" } });
@@ -474,7 +487,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
       forwardMock.mockResolvedValue(o);
       const { status, body } = await call();
       expect(status).toBe(200);
-      const { cfb: _cfb, ...mlb } = body;
+      const { cfb: _cfb, nfl: _nfl, ...mlb } = body;
       bodies.push(JSON.stringify(mlb));
     }
     expect(new Set(bodies).size, "the MLB answer moved with the CFB outcome").toBe(1);
@@ -570,10 +583,10 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "locked", core: 5 } });
     const { status, body } = await call();
     expect(status, "the CFB attach changed the MLB status code").toBe(503);
-    const { cfb, ...mlb } = body;
+    const { cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb, "the MLB error body was not carried through byte-identical").toEqual({ error: "sync-not-configured" });
     expect(JSON.stringify(mlb)).toBe(JSON.stringify({ error: "sync-not-configured" }));
-    expect(Object.keys(body), "`cfb` was not the only added key").toEqual(["error", "cfb"]);
+    expect(Object.keys(body), "`cfb` and `nfl` were not the only added keys").toEqual(["error", "cfb", "nfl"]);
     expect(forwardMock.mock.calls.length, "an MLB-side outage silently cost the CFB desk its $150/$25 day").toBe(1);
     expect(cfb).toEqual({ forwarded: true, status: 200, result: { status: "locked", core: 5 } });
   });
@@ -609,11 +622,71 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     forwardMock.mockResolvedValue({ forwarded: true, status: 502, result: REFUSAL });
     const { status, body } = await call();
     expect(status, "the CFB route's invented 502 became the poke's status").toBe(200);
-    const { cfb, ...mlb } = body;
+    const { cfb, nfl: _nfl, ...mlb } = body;
     expect(mlb, "a CFB refusal changed the MLB body").toEqual(MLB_BODY);
     expect(JSON.stringify(mlb)).toBe(JSON.stringify(MLB_BODY));
     expect(cfb).toEqual({ forwarded: true, status: 502, result: REFUSAL });
     // every diagnostic key survives — oddsMissing/pricedAhead/ahead/games/sweep, unchanged
     expect((cfb as { result: Record<string, unknown> }).result).toEqual(REFUSAL);
+  });
+
+  /**
+   * THE NFL FORWARD (2026-09-08, Josh: "2. NFL needs to be built NOW"). The poke now forwards to
+   * /api/nfl/lock as well, and the two football forwards run CONCURRENTLY — that is what keeps
+   * the tick's worst case at max(cfb 25 s, nfl 25 s) + the ~60 s generate = 85 s, the same five
+   * seconds of headroom under the 90 s maxDuration the CFB-only tick had (a sequential pair
+   * would be 110 s and kill the invocation). Pinned three ways below: both mocks are invoked
+   * before EITHER resolves; a REJECTED NFL forward degrades to { forwarded: false, error } while
+   * `cfb` is still attached and the MLB answer is untouched; and the NFL abort is 25 s.
+   */
+  it("(f) the CFB and NFL forwards run CONCURRENTLY — both are invoked before either resolves", async () => {
+    let resolveCfb!: (v: unknown) => void;
+    let resolveNfl!: (v: unknown) => void;
+    const cfbP = new Promise((r) => (resolveCfb = r));
+    const nflP = new Promise((r) => (resolveNfl = r));
+    forwardMock.mockReturnValue(cfbP);
+    nflForwardMock.mockReturnValue(nflP);
+    const pending = call();
+    // let the tick answer and reach the forwards — neither has resolved yet
+    for (let i = 0; i < 50 && nflForwardMock.mock.calls.length === 0; i++) await Promise.resolve();
+    expect(forwardMock.mock.calls.length, "the CFB forward was not started").toBe(1);
+    expect(nflForwardMock.mock.calls.length, "the NFL forward waited for the CFB forward — sequential, not concurrent").toBe(1);
+    // both were sent the same origin and the real secret
+    expect(forwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET]);
+    expect(nflForwardMock.mock.calls[0]).toEqual(["https://parlay.test", SECRET]);
+    resolveNfl({ forwarded: true, status: 200, result: { status: "locked", core: 8 } });
+    resolveCfb({ forwarded: true, status: 200, result: { status: "waiting" } });
+    const { status, body } = await pending;
+    expect(status).toBe(200);
+    const { cfb, nfl, ...mlb } = body;
+    expect(mlb).toEqual(MLB_BODY);
+    expect(cfb).toEqual({ forwarded: true, status: 200, result: { status: "waiting" } });
+    expect(nfl).toEqual({ forwarded: true, status: 200, result: { status: "locked", core: 8 } });
+    expect(Object.keys(body).filter((k) => !(k in MLB_BODY))).toEqual(["cfb", "nfl"]);
+  });
+
+  it("(g) a REJECTED NFL forward becomes nfl: { forwarded: false, error } — `cfb` still attached, MLB body byte-identical", async () => {
+    forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "locked", core: 5 } });
+    nflForwardMock.mockRejectedValue(new Error("ECONNRESET"));
+    const { status, body } = await call();
+    expect(status, "a thrown NFL forward escaped the wrapper and destroyed the MLB answer").toBe(200);
+    const { cfb, nfl, ...mlb } = body;
+    expect(mlb).toEqual(MLB_BODY);
+    expect(JSON.stringify(mlb)).toBe(JSON.stringify(MLB_BODY));
+    expect(cfb, "an NFL failure cost the CFB attach").toEqual({ forwarded: true, status: 200, result: { status: "locked", core: 5 } });
+    expect(nfl).toEqual({ forwarded: false, error: "ECONNRESET" });
+    // and the mirror: a rejected CFB forward never costs the NFL attach
+    forwardMock.mockRejectedValue(new Error("ETIMEDOUT"));
+    nflForwardMock.mockResolvedValue({ forwarded: true, status: 502, result: { status: "odds-missing" } });
+    const again = await call();
+    expect(again.status).toBe(200);
+    expect(again.body.cfb).toEqual({ forwarded: false, error: "ETIMEDOUT" });
+    expect(again.body.nfl).toEqual({ forwarded: true, status: 502, result: { status: "odds-missing" } });
+  });
+
+  it("(h) NFL_LOCK.forwardTimeoutMs is 25 s — concurrent with the CFB 25 s, the 85 s worst case and 5 s headroom hold", () => {
+    expect(NFL_LOCK.forwardTimeoutMs).toBe(25_000);
+    expect(Math.max(CFB_LOCK.forwardTimeoutMs, NFL_LOCK.forwardTimeoutMs) + 60_000).toBe(85_000);
+    expect(90_000 - (Math.max(CFB_LOCK.forwardTimeoutMs, NFL_LOCK.forwardTimeoutMs) + 60_000)).toBe(5_000);
   });
 });

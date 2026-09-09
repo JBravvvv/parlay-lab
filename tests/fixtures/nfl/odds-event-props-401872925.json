@@ -1,0 +1,1071 @@
+{
+ "_note": "SYNTHETIC — shaped from the CFB per-event props fixture (tests/fixtures/cfb/odds-ncaaf-event-props.synthetic.json) with the six NFL markets, never a real Odds API response. The event is ESPN 401872925 Tampa Bay Buccaneers @ Cincinnati Bengals (odds id = the synthetic game-lines id in odds-2026-09-13.json). Joe Burrow (CIN, 3915511) and Baker Mayfield (TB, 3052587) are rows in espn-byathlete.json (the passing table, 40 QBs) so their context join resolves; Chase Brown, Bucky Irving, Ja'Marr Chase, Tee Higgins, Mike Evans and Chris Godwin are NOT in that passing-only table, so their ctx is null — the miss path. Prices and lines are invented retail shapes, never captured quotes.",
+ "id": "d7ccf528f18a77434c56300f72d24379",
+ "sport_key": "americanfootball_nfl",
+ "sport_title": "NFL",
+ "commence_time": "2026-09-13T17:00:00Z",
+ "home_team": "Cincinnati Bengals",
+ "away_team": "Tampa Bay Buccaneers",
+ "bookmakers": [
+  {
+   "key": "williamhill_us",
+   "title": "Caesars",
+   "last_update": "2026-09-13T13:00:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -110,
+       "point": 274.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -110,
+       "point": 274.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -115,
+       "point": 249.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -105,
+       "point": 249.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": 120,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -150,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -140,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": 110,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Chase Brown",
+       "price": -112,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Chase Brown",
+       "price": -108,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Bucky Irving",
+       "price": -110,
+       "point": 69.5
+      },
+      {
+       "name": "Under",
+       "description": "Bucky Irving",
+       "price": -110,
+       "point": 69.5
+      },
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -105,
+       "point": 8.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -125,
+       "point": 8.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -115,
+       "point": 12.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -115,
+       "point": 12.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -110,
+       "point": 84.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -110,
+       "point": 84.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -115,
+       "point": 59.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": -105,
+       "point": 59.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -110,
+       "point": 62.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -110,
+       "point": 62.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": -112,
+       "point": 54.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -108,
+       "point": 54.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -125,
+       "point": 6.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -105,
+       "point": 6.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -130,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": 100,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -120,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -110,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": 105,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -135,
+       "point": 5.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Ja'Marr Chase",
+       "price": -150
+      },
+      {
+       "name": "Yes",
+       "description": "Chase Brown",
+       "price": -125
+      },
+      {
+       "name": "Yes",
+       "description": "Tee Higgins",
+       "price": 105
+      },
+      {
+       "name": "Yes",
+       "description": "Bucky Irving",
+       "price": -135
+      },
+      {
+       "name": "Yes",
+       "description": "Mike Evans",
+       "price": 120
+      },
+      {
+       "name": "Yes",
+       "description": "Joe Burrow",
+       "price": 600
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "draftkings",
+   "title": "DraftKings",
+   "last_update": "2026-09-13T13:00:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -107,
+       "point": 274.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -113,
+       "point": 274.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -112,
+       "point": 249.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -108,
+       "point": 249.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": 123,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -153,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -137,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": 107,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Chase Brown",
+       "price": -109,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Chase Brown",
+       "price": -111,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Bucky Irving",
+       "price": -107,
+       "point": 69.5
+      },
+      {
+       "name": "Under",
+       "description": "Bucky Irving",
+       "price": -113,
+       "point": 69.5
+      },
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -102,
+       "point": 8.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -128,
+       "point": 8.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -112,
+       "point": 12.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -118,
+       "point": 12.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -107,
+       "point": 84.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -113,
+       "point": 84.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -112,
+       "point": 59.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": -108,
+       "point": 59.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -107,
+       "point": 62.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -113,
+       "point": 62.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": -109,
+       "point": 54.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -111,
+       "point": 54.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -122,
+       "point": 6.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -108,
+       "point": 6.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -127,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": 97,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -117,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -113,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": 108,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -138,
+       "point": 5.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Ja'Marr Chase",
+       "price": -153
+      },
+      {
+       "name": "Yes",
+       "description": "Chase Brown",
+       "price": -128
+      },
+      {
+       "name": "Yes",
+       "description": "Tee Higgins",
+       "price": 102
+      },
+      {
+       "name": "Yes",
+       "description": "Bucky Irving",
+       "price": -138
+      },
+      {
+       "name": "Yes",
+       "description": "Mike Evans",
+       "price": 117
+      },
+      {
+       "name": "Yes",
+       "description": "Joe Burrow",
+       "price": 597
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "fanduel",
+   "title": "FanDuel",
+   "last_update": "2026-09-13T13:00:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -112,
+       "point": 274.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -108,
+       "point": 274.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -117,
+       "point": 249.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -103,
+       "point": 249.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": 118,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -148,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -142,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": 112,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Chase Brown",
+       "price": -114,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Chase Brown",
+       "price": -106,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Bucky Irving",
+       "price": -112,
+       "point": 69.5
+      },
+      {
+       "name": "Under",
+       "description": "Bucky Irving",
+       "price": -108,
+       "point": 69.5
+      },
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -107,
+       "point": 8.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -123,
+       "point": 8.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -117,
+       "point": 12.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -113,
+       "point": 12.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -112,
+       "point": 84.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -108,
+       "point": 84.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -117,
+       "point": 59.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": -103,
+       "point": 59.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -112,
+       "point": 62.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -108,
+       "point": 62.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": -114,
+       "point": 54.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -106,
+       "point": 54.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -127,
+       "point": 6.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -103,
+       "point": 6.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -132,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": 102,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -122,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -108,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": 103,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -133,
+       "point": 5.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Ja'Marr Chase",
+       "price": -148
+      },
+      {
+       "name": "Yes",
+       "description": "Chase Brown",
+       "price": -123
+      },
+      {
+       "name": "Yes",
+       "description": "Tee Higgins",
+       "price": 107
+      },
+      {
+       "name": "Yes",
+       "description": "Bucky Irving",
+       "price": -133
+      },
+      {
+       "name": "Yes",
+       "description": "Mike Evans",
+       "price": 122
+      },
+      {
+       "name": "Yes",
+       "description": "Joe Burrow",
+       "price": 602
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "betmgm",
+   "title": "BetMGM",
+   "last_update": "2026-09-13T13:00:00Z",
+   "markets": [
+    {
+     "key": "player_pass_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -105,
+       "point": 274.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -115,
+       "point": 274.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -110,
+       "point": 249.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -110,
+       "point": 249.5
+      }
+     ]
+    },
+    {
+     "key": "player_pass_tds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": 125,
+       "point": 2.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -155,
+       "point": 2.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -135,
+       "point": 1.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": 105,
+       "point": 1.5
+      }
+     ]
+    },
+    {
+     "key": "player_rush_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Chase Brown",
+       "price": -107,
+       "point": 64.5
+      },
+      {
+       "name": "Under",
+       "description": "Chase Brown",
+       "price": -113,
+       "point": 64.5
+      },
+      {
+       "name": "Over",
+       "description": "Bucky Irving",
+       "price": -105,
+       "point": 69.5
+      },
+      {
+       "name": "Under",
+       "description": "Bucky Irving",
+       "price": -115,
+       "point": 69.5
+      },
+      {
+       "name": "Over",
+       "description": "Joe Burrow",
+       "price": -100,
+       "point": 8.5
+      },
+      {
+       "name": "Under",
+       "description": "Joe Burrow",
+       "price": -130,
+       "point": 8.5
+      },
+      {
+       "name": "Over",
+       "description": "Baker Mayfield",
+       "price": -110,
+       "point": 12.5
+      },
+      {
+       "name": "Under",
+       "description": "Baker Mayfield",
+       "price": -120,
+       "point": 12.5
+      }
+     ]
+    },
+    {
+     "key": "player_reception_yds",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -105,
+       "point": 84.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -115,
+       "point": 84.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -110,
+       "point": 59.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": -110,
+       "point": 59.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -105,
+       "point": 62.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -115,
+       "point": 62.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": -107,
+       "point": 54.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -113,
+       "point": 54.5
+      }
+     ]
+    },
+    {
+     "key": "player_receptions",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Over",
+       "description": "Ja'Marr Chase",
+       "price": -120,
+       "point": 6.5
+      },
+      {
+       "name": "Under",
+       "description": "Ja'Marr Chase",
+       "price": -110,
+       "point": 6.5
+      },
+      {
+       "name": "Over",
+       "description": "Tee Higgins",
+       "price": -125,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Tee Higgins",
+       "price": 95,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Mike Evans",
+       "price": -115,
+       "point": 4.5
+      },
+      {
+       "name": "Under",
+       "description": "Mike Evans",
+       "price": -115,
+       "point": 4.5
+      },
+      {
+       "name": "Over",
+       "description": "Chris Godwin",
+       "price": 110,
+       "point": 5.5
+      },
+      {
+       "name": "Under",
+       "description": "Chris Godwin",
+       "price": -140,
+       "point": 5.5
+      }
+     ]
+    },
+    {
+     "key": "player_anytime_td",
+     "last_update": "2026-09-13T13:00:00Z",
+     "outcomes": [
+      {
+       "name": "Yes",
+       "description": "Ja'Marr Chase",
+       "price": -155
+      },
+      {
+       "name": "Yes",
+       "description": "Chase Brown",
+       "price": -130
+      },
+      {
+       "name": "Yes",
+       "description": "Tee Higgins",
+       "price": 100
+      },
+      {
+       "name": "Yes",
+       "description": "Bucky Irving",
+       "price": -140
+      },
+      {
+       "name": "Yes",
+       "description": "Mike Evans",
+       "price": 115
+      },
+      {
+       "name": "Yes",
+       "description": "Joe Burrow",
+       "price": 595
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

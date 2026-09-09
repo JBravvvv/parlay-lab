@@ -7,14 +7,16 @@ import type { Sport } from "@/lib/sport";
  *
  * The Stats page keeps its full registry (MLB / NFL / NCAAF tables, the UFC card view) so no
  * code path breaks, but which of those a visitor can reach is decided HERE, from the global
- * SportSwitch desk (src/lib/sport.ts). Today each desk maps to exactly one stat sport; a
- * future desk (NFL, UFC) adds a row without touching the page. Pure — no React, no storage.
+ * SportSwitch desk (src/lib/sport.ts). Each desk maps to exactly one stat sport — the NFL desk
+ * (2026-09-08) to the NFL table, exactly the row this comment once promised; a future UFC desk
+ * adds its own without touching the page. Pure — no React, no storage.
  */
 export type StatsSportId = "mlb" | "nfl" | "cfb" | "ufc";
 
 const DESK_STATS: Record<Sport, readonly StatsSportId[]> = {
   mlb: ["mlb"],
   cfb: ["cfb"],
+  nfl: ["nfl"],
 };
 
 /** the stat sports the current desk may show, first = the desk's default */

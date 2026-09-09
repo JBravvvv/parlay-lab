@@ -312,13 +312,13 @@ describe("device upsertCfbEntries — the server's top-up reaches the phone (def
   });
 
   it("ALLOTMENT: appends may never carry the merged core past the day's own recorded daily", () => {
-    const device = day(3, 25, { grading: OPEN() }); // $75
-    const server = day(7, 25); // $175 — one ticket more than the $150 allotment allows
+    const device = day(3, 50, { grading: OPEN() }); // $150 of the $250 (2026-09-08: $50 tickets keep the ids single-digit — the kernel appends in id order, and `core-10` sorts before `core-4`)
+    const server = day(6, 50); // $300 — one $50 ticket more than the $250 allotment allows (2026-09-08: was day(7, 25), one $25 over $150)
     const r = upsertCfbEntries([device], server);
-    expect(r.entry.daily).toBe(150);
-    expect(stakeSum(r.entry.core)).toBe(150);
-    expect(r.entry.core).toHaveLength(6);
-    expect(r.entry.core.map((t) => t.id)).not.toContain(cid(7));
+    expect(r.entry.daily).toBe(250);
+    expect(stakeSum(r.entry.core)).toBe(250);
+    expect(r.entry.core).toHaveLength(5);
+    expect(r.entry.core.map((t) => t.id)).not.toContain(cid(6));
   });
 
   it("a day with no numeric daily is bounded by the DESK'S OWN allotment, not left unbounded", () => {
@@ -330,18 +330,18 @@ describe("device upsertCfbEntries — the server's top-up reaches the phone (def
        side carried a numeric `daily` — while the sync rail's `allotmentCap`
        (src/lib/ledger-merge.ts) had already had that default INVERTED (defect E) to fall back to
        the desk's own allotment. So the two rails produced different core SETS on exactly the
-       legacy days the fallback exists for: $175 here, $150 there. The union is now the kernel's
-       one `unionCore` on both rails, so the bound is CFB_PAPER.daily and the seventh $25 ticket
+       legacy days the fallback exists for: $300 here, $250 there (the $150 / $175 figures of the original pin, re-derived for the $250 allotment on 2026-09-08). The union is now the kernel's
+       one `unionCore` on both rails, so the bound is CFB_PAPER.daily and the sixth $50 ticket
        does not fit. The assertion is STRICTLY TIGHTER than the one it replaces — an unbounded
        union became a bounded one — and the pin it protects (that an append is not silently lost)
-       is re-asserted below: six of the seven still seat. */
-    const device = { ...day(3, 25, { grading: OPEN() }), daily: Number.NaN } as CfbLedgerEntry;
-    const server = { ...day(7, 25), daily: Number.NaN } as CfbLedgerEntry;
+       is re-asserted below: five of the six still seat. */
+    const device = { ...day(3, 50, { grading: OPEN() }), daily: Number.NaN } as CfbLedgerEntry;
+    const server = { ...day(6, 50), daily: Number.NaN } as CfbLedgerEntry;
     const r = upsertCfbEntries([device], server);
-    expect(CFB_PAPER.daily).toBe(150);
-    expect(r.entry.core).toHaveLength(6);
-    expect(stakeSum(r.entry.core)).toBe(150);
-    expect(r.entry.core.map((t) => t.id)).toEqual([1, 2, 3, 4, 5, 6].map(cid));
+    expect(CFB_PAPER.daily).toBe(250);
+    expect(r.entry.core).toHaveLength(5);
+    expect(stakeSum(r.entry.core)).toBe(250);
+    expect(r.entry.core.map((t) => t.id)).toEqual([1, 2, 3, 4, 5].map(cid));
   });
 
   it("an append is NOT a re-lock: refused stays true and every lock-instant field is the phone's own", () => {
@@ -447,12 +447,12 @@ describe("device rail vs sync rail — the SAME core, one union, one set of gate
     },
     {
       /* the legacy day the device rail used to union UNBOUNDED. Both sides' `daily` is unreadable,
-         so the ceiling is the desk's own CFB_PAPER.daily and the seventh $25 ticket does not fit. */
+         so the ceiling is the desk's own CFB_PAPER.daily and the sixth $50 ticket does not fit (2026-09-08: $250 = five $50 tickets). */
       name: "a legacy day carrying no numeric daily — both rails fall back to the desk's allotment",
-      device: { ...day(3, 25, { grading: OPEN() }), daily: Number.NaN },
-      incoming: { ...day(7, 25), daily: Number.NaN },
-      ids: [1, 2, 3, 4, 5, 6].map(cid),
-      stake: 150,
+      device: { ...day(3, 50, { grading: OPEN() }), daily: Number.NaN },
+      incoming: { ...day(6, 50), daily: Number.NaN },
+      ids: [1, 2, 3, 4, 5].map(cid),
+      stake: 250,
     },
     {
       /* AGREEMENT: CFB core ids are positional, so two independent locks of one date both mint
@@ -471,12 +471,12 @@ describe("device rail vs sync rail — the SAME core, one union, one set of gate
       stake: 150,
     },
     {
-      /* ALLOTMENT: $75 + seven $25 tickets is $250 on a $150 day; three seat, the seventh does not. */
+      /* ALLOTMENT: $150 + six $50 tickets is $300 on a $250 day; two seat, the sixth does not (2026-09-08: was $75 + seven $25 on a $150 day). */
       name: "an append that would breach the day's own recorded daily is refused on both rails",
-      device: day(3, 25, { grading: OPEN() }),
-      incoming: day(7, 25),
-      ids: [1, 2, 3, 4, 5, 6].map(cid),
-      stake: 150,
+      device: day(3, 50, { grading: OPEN() }),
+      incoming: day(6, 50),
+      ids: [1, 2, 3, 4, 5].map(cid),
+      stake: 250,
     },
   ];
 
@@ -669,19 +669,19 @@ describe("device rail vs sync rail — the fun bucket and the no-play flag (defe
     /* The device rail's old private union skipped its bound whenever no side carried a numeric
        `daily`; the fun bucket had no bound on this rail at all. Both ceilings now come from the
        one kernel pair (`allotmentCap` / `funCap`), so a legacy day is bounded by the desk's own
-       $150 / $25 and the two rails seat exactly the same tickets. */
-    const device = { ...day(3, 25, { grading: OPEN() }), daily: Number.NaN, fun: Number.NaN };
+       $250 / $25 (2026-09-08; was $150 / $25) and the two rails seat exactly the same tickets. */
+    const device = { ...day(3, 50, { grading: OPEN() }), daily: Number.NaN, fun: Number.NaN };
     const incoming = {
-      ...day(7, 25),
+      ...day(6, 50),
       daily: Number.NaN,
       fun: Number.NaN,
       funT: [funTix(TOPUP1_FUN, 25, "g1"), funTix(TOPUP2_FUN, 25, "g2")],
     };
     const { viaDevice, viaSync } = rails(device, incoming);
-    expect(CFB_PAPER.daily).toBe(150);
+    expect(CFB_PAPER.daily).toBe(250);
     expect(CFB_PAPER.fun).toBe(25);
-    expect(idsOf(viaDevice.core)).toEqual([1, 2, 3, 4, 5, 6].map(cid));
-    expect(sumOf(viaDevice.core)).toBe(150);
+    expect(idsOf(viaDevice.core)).toEqual([1, 2, 3, 4, 5].map(cid));
+    expect(sumOf(viaDevice.core)).toBe(250);
     expect(idsOf(viaDevice.funT)).toEqual([TOPUP1_FUN]);
     expect(sumOf(viaDevice.funT)).toBe(25);
     expect(viaDevice.funDropped).toEqual([TOPUP2_FUN]);
@@ -1008,12 +1008,12 @@ describe("device rail vs sync rail — core, the markers, and the device grader 
 
   it("an already-over-cap stored blob converges on ONE core and ONE capBreach — both argument orders", () => {
     const a = day(3, 25); // $75
-    const b = day(7, 25); // $175 — the shape mergeDay's own K3 docblock calls a blob already over cap
+    const b = day(11, 25); // $275 (2026-09-08: was day(7, 25), $175 over $150) — the shape mergeDay's own K3 docblock calls a blob already over cap
     expect(sumOf(a.core)).toBe(75);
-    expect(sumOf(b.core)).toBe(175);
+    expect(sumOf(b.core)).toBe(275);
     for (const [cur, inc, order] of [
-      [a, b, "stored $75 · incoming $175"],
-      [b, a, "stored $175 · incoming $75"],
+      [a, b, "stored $75 · incoming $275"],
+      [b, a, "stored $275 · incoming $75"],
     ] as [CfbLedgerEntry, CfbLedgerEntry, string][]) {
       const viaDevice = upsertCfbEntries([cur], inc).entry;
       const viaSync = mergeLedgers([cur], [inc])[0] as CfbLedgerEntry;
@@ -1023,8 +1023,8 @@ describe("device rail vs sync rail — core, the markers, and the device grader 
       expect(viaDevice.capBreach, order).toEqual(viaSync.capBreach);
       /* and what that one answer actually IS, so a mutant cannot satisfy the pin by breaking
          both rails the same way */
-      expect(sumOf(viaDevice.core), order).toBe(175);
-      expect(viaDevice.capBreach, order).toEqual({ core: { sum: 175, cap: 150 } });
+      expect(sumOf(viaDevice.core), order).toBe(275);
+      expect(viaDevice.capBreach, order).toEqual({ core: { sum: 275, cap: 250 } });
     }
   });
 
@@ -1032,7 +1032,7 @@ describe("device rail vs sync rail — core, the markers, and the device grader 
     const PAIRS: [string, CfbLedgerEntry, CfbLedgerEntry][] = [
       ["the plain top-up append", day(3, 25), day(6, 25)],
       ["a rival card disagreeing on a shared id", day(3, 25), { ...day(6, 25), core: [ticket(cid(1), 25, "g99"), ...day(6, 25).core.slice(1)] }],
-      ["a legacy day carrying no numeric daily", { ...day(3, 25), daily: Number.NaN }, { ...day(7, 25), daily: Number.NaN }],
+      ["a legacy day carrying no numeric daily", { ...day(3, 25), daily: Number.NaN }, { ...day(11, 25), daily: Number.NaN }],
       ["a re-quoted, re-staked shared ticket with no receipt", day(3, 25), { ...day(6, 25), core: [{ ...ticket(cid(1), 40, "g1"), czOdds: -125 }, ...day(6, 25).core.slice(1)] }],
     ];
     for (const [name, a, b] of PAIRS) {
@@ -1061,10 +1061,10 @@ describe("device rail vs sync rail — core, the markers, and the device grader 
 
   it("a day that BECOMES over cap gains the marker the sync rail gives it", () => {
     const cur = day(3, 25);
-    const inc = day(7, 25);
+    const inc = day(11, 25);
     expect(cur.capBreach).toBeUndefined();
     const r = upsertCfbEntries([cur], inc).entry;
-    expect(r.capBreach).toEqual({ core: { sum: 175, cap: 150 } });
+    expect(r.capBreach).toEqual({ core: { sum: 275, cap: 250 } });
   });
 
   /* ------------------------------- B3 ------------------------------- */
@@ -1191,12 +1191,12 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
    */
   const marked = (): { a: CfbLedgerEntry; b: CfbLedgerEntry } => ({
     a: {
-      ...day(7, 25),
+      ...day(11, 25),
       funT: [funTix(OWN_FUN, 25, "g1")],
       grading: { tickets: { [OWN_FUN]: { result: "won", payout: 47.73 } }, legs: {}, done: false },
     },
     b: {
-      ...day(7, 25),
+      ...day(11, 25),
       funT: [funTix(TOPUP1_FUN, 25, "g2")],
       grading: { tickets: { [TOPUP1_FUN]: { result: "won", payout: 30 } }, legs: {}, done: false },
     },
@@ -1224,7 +1224,7 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
       expect(viaDevice.funDropped, order).toEqual(viaSync.funDropped);
       expect(viaDevice.funDroppedPL, order).toEqual(viaSync.funDroppedPL);
       expect(viaDevice.capBreach, order).toEqual(viaSync.capBreach);
-      expect(viaDevice.capBreach, order).toEqual({ core: { sum: 175, cap: 150 } });
+      expect(viaDevice.capBreach, order).toEqual({ core: { sum: 275, cap: 250 } });
     }
   });
 
@@ -1288,12 +1288,12 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
    * merged day IS the device record now. This fixture makes all three fire and re-runs the same
    * equality over them, so that claim is measured rather than asserted.
    *
-   * THE FIXTURE. One date. The stored copy is the whole $150 desk — six ids at $25 — and carries
-   * grading, so `gradeScore` seats IT as the base in BOTH argument orders. The other copy holds a
-   * SEVENTH ticket and stakes the first id at $30 with no `topUp` stamp anywhere. The raise has no
-   * receipt, so the reconciliation keeps the smaller stake and records the refusal; the seventh
-   * ticket does not fit under the day's own allotment, so the append is refused and NAMED with the
-   * money it represented.
+   * THE FIXTURE. One date. The stored copy is the whole $250 desk — five ids at $50 (2026-09-08:
+   * was six at $25 on the $150 desk) — and carries grading, so `gradeScore` seats IT as the base
+   * in BOTH argument orders. The other copy holds a SIXTH ticket and stakes the first id at $60
+   * with no `topUp` stamp anywhere. The raise has no receipt, so the reconciliation keeps the
+   * smaller stake and records the refusal; the sixth ticket does not fit under the day's own
+   * allotment, so the append is refused and NAMED with the money it represented.
    *
    * THE KEY ASSERTION IS A UNION ACROSS BOTH ORDERS AND STAYS `arrayContaining`, so a marker the
    * kernel adds NEXT is carried by the same deep equality without this pin being edited. The
@@ -1301,9 +1301,9 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
    * answer); this shape makes a RE-INTRODUCED hand-written carry list fail LOUD.
    */
   it("the markers the kernel added this round reach the phone too — stakeConflict and the core drop channel", () => {
-    const a = day(6, 25, { grading: { tickets: {}, legs: {}, done: false } });
-    const b = day(7, 25);
-    b.core[0] = { ...b.core[0], stake: 30 };
+    const a = day(5, 50, { grading: { tickets: {}, legs: {}, done: false } });
+    const b = day(6, 50);
+    b.core[0] = { ...b.core[0], stake: 60 };
     const seen = new Set<string>();
     for (const [cur, inc, order] of both(a, b)) {
       const viaDevice = upsertCfbEntries([cur], inc).entry;
@@ -1311,9 +1311,9 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
       for (const k of Object.keys(mergeOwned(viaSync))) seen.add(k);
       expect(mergeOwned(viaDevice), order).toEqual(mergeOwned(viaSync));
       /* and what the answer IS, so a mutant cannot satisfy the equality by breaking both rails */
-      expect(viaDevice.core.find((t) => t.id === cid(1))?.stake, order).toBe(25);
-      expect(idsOf(viaDevice.core), order).toEqual([1, 2, 3, 4, 5, 6].map(cid));
-      expect(sumOf(viaDevice.core), order).toBe(150);
+      expect(viaDevice.core.find((t) => t.id === cid(1))?.stake, order).toBe(50);
+      expect(idsOf(viaDevice.core), order).toEqual([1, 2, 3, 4, 5].map(cid));
+      expect(sumOf(viaDevice.core), order).toBe(250);
     }
     expect([...seen].sort()).toEqual(expect.arrayContaining(["coreDropped", "coreDroppedPL", "stakeConflict"]));
   });
@@ -1334,7 +1334,7 @@ describe("device rail vs sync rail — the merge's answer is the default (C1, C2
     const r = upsertCfbEntries([device], server);
     expect(r.refused).toBe(true);
     expect(r.entry.lockedAt).toBe(1);
-    expect(r.entry.daily).toBe(150);
+    expect(r.entry.daily).toBe(250);
     expect(r.entry.fun).toBe(25);
     expect(r.entry.source).toBeUndefined();
     expect(r.entry.trigger).toBeUndefined();

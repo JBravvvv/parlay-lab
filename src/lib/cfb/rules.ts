@@ -1,10 +1,15 @@
+import type { LeagueConfig } from "@/lib/football/league";
+import { ALIASES } from "./aliases";
+
 /**
  * THE CFB DESK'S CONSTANTS — one copy, imported everywhere (INSTRUCTION 38, 2026-09-05).
  *
  * Allotment: "Ledger & Allotted $ for College Football should be separate (But still $150
- * Core & $25 Fun money)" — the same daily paper allotment as MLB's PAPER set, on its own
- * ledger, its own bank and its own storage keys. A CFB slate day is a Pacific date with
- * at least one kickoff; the allotment is per locked slate day.
+ * Core & $25 Fun money)" — originally the same daily paper allotment as MLB's PAPER set, on its
+ * own ledger, its own bank and its own storage keys (widened to $250 on 2026-09-08, Josh:
+ * "Widen the CFB allocation to $250" — core $250 / day, $50 max per ticket, 3–10 tickets; the
+ * $25 fun allotment is unchanged). A CFB slate day is a Pacific date with at least one
+ * kickoff; the allotment is per locked slate day.
  *
  * Model constants are MODEL CONSTANTS, stated here so The Sharp can print them:
  *   sigma 16.5     — the standard deviation of FBS final margins about the closing spread
@@ -28,7 +33,8 @@
  */
 export const CFB_PAPER = {
   since: "2026-09-05",
-  daily: 150,
+  /** widened 150 → 250 on 2026-09-08 (Josh: "Widen the CFB allocation to $250"); a day locked before that keeps its own recorded `daily` */
+  daily: 250,
   fun: 25,
 } as const;
 
@@ -38,11 +44,14 @@ export const CFB_RULES = {
   maxLegs: 2,
   /** no core ticket settles above this decimal price */
   maxDec: 2.6,
-  /** no core ticket carries more than this, top-up included */
-  maxStake: 25,
+  /** no core ticket carries more than this, top-up included — 25 → 50 on 2026-09-08 with the $250
+      allotment: kellyCap 0.02 × CFB_BANK_BASE 2500 = $50, so the Kelly ceiling at the base bankroll
+      IS the per-ticket max (assertLeagueConfig pins the equality) */
+  maxStake: 50,
   minStake: 5,
-  tickets: { min: 3, max: 7 },
-  /** the forced top-up (the $150 must deploy) only adds short-priced tickets, by probability */
+  /** 3–7 → 3–10 on 2026-09-08: 10 × $50 = $500 ≥ the $250 allotment, so the day can always deploy in full */
+  tickets: { min: 3, max: 10 },
+  /** the forced top-up (the $250 must deploy) only adds short-priced tickets, by probability */
   forcedMaxDec: 1.75,
   /** the forced top-up admits legs down to this EV% at Caesars (never negative EV) */
   forcedMinEvPct: 0,
@@ -136,11 +145,13 @@ export const CFB_SWEEP_DAYS = 3;
  * HOW MANY TIMES ONE DATE MAY BE TOPPED UP (INSTRUCTION 45, THE OTHER HALF, 2026-09-06).
  *
  * Josh, verbatim: "Parlay Lab CFB should've been running the same $150 per day theoretical Core
- * money and $25 Fun money per day". "The same" is what the MLB desk does, and the CFB lock was
- * doing only half of it. The lock fires CFB_LOCK.leadMs before the FIRST kickoff — the moment the
- * pool of posted Caesars prices is thinnest — and buildCfbCard says out loud when it cannot spend
- * the whole allotment ("$75 of the $150 stayed undeployed", the note on the 2026-09-05 fixture,
- * recorded in docs/cfb-desk.md). Every later poke hit the already-locked exit and returned, so the
+ * money and $25 Fun money per day" (the core allotment is CFB_PAPER.daily — widened to $250 on
+ * 2026-09-08, Josh: "Widen the CFB allocation to $250"; the rule is unchanged, the number moved).
+ * "The same" is what the MLB desk does, and the CFB lock was doing only half of it. The lock fires
+ * CFB_LOCK.leadMs before the FIRST kickoff — the moment the pool of posted Caesars prices is
+ * thinnest — and buildCfbCard says out loud when it cannot spend the whole allotment ("$75 of the
+ * $150 stayed undeployed", the note on the 2026-09-05 fixture, recorded in docs/cfb-desk.md — under
+ * the $250 allotment the same note reads "$175 of the $250 stayed undeployed"). Every later poke hit the already-locked exit and returned, so the
  * day ended permanently short while the ledger recorded it as a full paper day and cfbBankroll
  * sized every later day off it.
  *
@@ -160,7 +171,8 @@ export const CFB_SWEEP_DAYS = 3;
  * one KEYLESS scoreboard read and still above the priced board this number bounds.
  *
  * TWO ALLOTMENTS, AND EACH ARM COUNTS ITS OWN (2026-09-06, DEFECT M then L1). Josh's sentence
- * names two pots of money — $150 core and $25 fun — and decideCfbTopUp gates them INDEPENDENTLY:
+ * names two pots of money — the core allotment (CFB_PAPER.daily, $250 since 2026-09-08) and $25
+ * fun — and decideCfbTopUp gates them INDEPENDENTLY:
  * a day may fire because the core has room, or because the fun bucket is still empty, or both.
  *
  * THE PARAGRAPH THAT STOOD HERE IS WITHDRAWN, not merely superseded (D1, this round; two critics
@@ -190,8 +202,8 @@ export const CFB_TOPUP_MAX = 2;
  * HOW LONG AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (INSTRUCTION 45, 2026-09-06).
  *
  * The critic's pass found the top-up cap bounding successful WRITES rather than attempts, so a day
- * that stayed short — the COMMON case; the fixture slate locks $75 of the $150 and its rebuild then
- * seats nothing — bought a fresh priced board on every one of the ~40 pokes of a Saturday, about
+ * that stayed short — the COMMON case; the fixture slate locks $75 of the $150 (now $250) and its
+ * rebuild then seats nothing — bought a fresh priced board on every one of the ~40 pokes of a Saturday, about
  * 240 credits, none of it visible to CFB_PROPS.dailyBudget. The cap now counts attempts, which
  * bounds that at two. This constant is the SECOND half of the same discipline, and it is what
  * keeps the two attempts worth having: without it the two are spent within half an hour of the
@@ -420,7 +432,12 @@ export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/f
     8 × 31 = 248 credits worst case — but in AGGREGATE the 12 such games Josh named would want
     12 × 248 = 2,976, more than the 2,500 daily rail before a single live pull; the rail binds, and
     the games it refuses simply keep their last priced rows. A board that counts a Caesars-missing
-    game answers `ttlSec` = min(window, 30 min) so the phone re-asks on the rule's cadence. */
+    game answers `ttlSec` = min(window, 30 min) so the phone re-asks on the rule's cadence.
+
+    THE CREDIT ARITHMETIC ABOVE IS UNCHANGED BY THE $250 ALLOTMENT (2026-09-08): the props route
+    spends per EVENT, never per dollar staked, so widening the core from $150 / $25 max / 3–7
+    tickets to $250 / $50 max / 3–10 tickets moves no credit figure here — the lock and the two
+    top-up boards still cost one 6-credit game-lines pull each. */
 export const CFB_PROPS = {
   /** pre-kick events priced per slate (INSTRUCTION 42, 2026-09-05: was 12 — every eligible game now) */
   maxEvents: 60,
@@ -488,4 +505,64 @@ export const CFB_PARLAYS = {
 
 export const CFB_ROUTES = {
   props: "/api/cfb/props",
+} as const;
+
+/**
+ * THE CFB LEAGUE CONFIG (2026-09-08, the NFL build — Josh: "NFL needs to be built NOW"). The
+ * shared football engine (src/lib/cfb/*, the server bodies under src/lib/server/football-*.ts)
+ * reads every league-specific number through one `LeagueConfig` object; this is the CFB one,
+ * built FROM the constants above — the SAME objects (CFB_PAPER, CFB_RULES, CFB_MODEL, …), never
+ * copies, so a maintainer moving a number above moves the desk, and every literal-regex pin on
+ * this file (tests/cfb-separation.test.ts) keeps matching. The NFL twin, NFL_LEAGUE, is written
+ * as literals in src/lib/nfl/rules.ts. `assertLeagueConfig` (tests/nfl-config.test.ts) pins the
+ * money invariants for both: kellyCap × bankBase === maxStake and tickets.max × maxStake ≥ daily.
+ *
+ * `feeds.oddsPropMarkets` copies src/lib/cfb/props-types.ts CFB_PROPS_ODDS_MARKETS (the six
+ * market keys in CFB_PROP_MARKETS order) and `feeds.espnByAthleteUrl` copies
+ * src/lib/cfb/props-context.ts espnByAthleteUrl, both as literals so this module stays a leaf
+ * that imports nothing but its own alias table and a type.
+ */
+export const CFB_LEAGUE: LeagueConfig = {
+  id: "cfb",
+  idPrefix: "cfb",
+  label: "College Football",
+  short: "CFB",
+  noun: "FBS",
+  paper: CFB_PAPER,
+  rules: CFB_RULES,
+  model: CFB_MODEL,
+  bankBase: CFB_BANK_BASE,
+  lock: CFB_LOCK,
+  sweepDays: CFB_SWEEP_DAYS,
+  settle: CFB_SETTLE,
+  ungradableMs: 48 * 3600_000,
+  voidRecheckMs: CFB_VOID_RECHECK_MS,
+  topUp: { max: CFB_TOPUP_MAX, retryMs: CFB_TOPUP_RETRY_MS },
+  props: CFB_PROPS,
+  parlays: CFB_PARLAYS,
+  ctx: { season: 2026, limit: 250, ttlSec: 3600 },
+  keys: CFB_KEYS,
+  events: { change: "pl:cfb-ledger-change", sync: "pl:cfb-ledger-sync" },
+  redis: { ...CFB_REDIS, propsBoard: "pl:cfb:props:v1:", propsSpend: "pl:cfb:props:spend:v1:" },
+  oddsGapTtlSec: CFB_ODDS_GAP_TTL_SEC,
+  queryPrefix: "cfb",
+  routes: { slate: "/api/cfb", ledger: "/api/cfb/ledger", lock: "/api/cfb/lock", props: CFB_ROUTES.props },
+  feeds: {
+    oddsSportKey: "americanfootball_ncaaf",
+    oddsUrl: CFB_ODDS_URL,
+    oddsEventBase: "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events",
+    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds",
+    espnScoreboard: CFB_ESPN_SCOREBOARD,
+    espnScoreboardQuery: "groups=80&limit=400",
+    espnFpi: CFB_ESPN_FPI,
+    espnByAthleteUrl: (group, season = 2026) => {
+      const q = `?region=us&lang=en&contentorigin=espn&season=${season}&seasontype=2`;
+      const srt = { passing: "passing.passingYards", rushing: "rushing.rushingYards", receiving: "receiving.receivingYards" }[group];
+      return `https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/statistics/byathlete${q}&isqualified=true&page=1&limit=250&category=offense%3A${group}&sort=${srt}%3Adesc`;
+    },
+    headshotUrl: (athleteId) => `https://a.espncdn.com/i/headshots/college-football/players/full/${athleteId}.png`,
+  },
+  lockSource: "server-lock",
+  triggers: { lock: "cfb-lock", oddsGap: "cfb-lock-odds-gap", sweep: "cfb-lock-sweep", sweepOdds: "cfb-lock-sweep-odds" },
+  aliases: ALIASES,
 } as const;

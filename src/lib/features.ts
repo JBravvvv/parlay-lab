@@ -24,3 +24,13 @@ export const CFB_ENABLED = true;
    season parlays on typed lines, with its own paper ledger key (pl_cfb_season). `false` turns the
    page into a plain notice; the nav entry and the components stay in the tree either way. */
 export const CFB_SEASON_ENABLED = true;
+
+/* THE NFL DESK (2026-09-08, Josh, verbatim: "NFL needs to be built NOW"; "Allocation should be set
+   to $350"). 🏈 NFL on the global SportSwitch: Board / Builder / Parlay Builder / Ledger / The
+   Sharp / Games / Stats route to the NFL wrappers (src/components/nfl/*), which render the shared
+   football surfaces under an NFL LeagueContext with their own bank and ledger keys
+   (src/lib/nfl/rules.ts) — never the CFB or MLB ones. `false` hides the pill and pins every page
+   to the other desks; the components stay in the tree either way. NFL SEASON LAB IS CUT FOR THIS
+   SHIP: Season Lab (/season) stays CFB-only under CFB_SEASON_ENABLED, and the nav's cfbOnly gate
+   is unchanged. */
+export const NFL_ENABLED = true;

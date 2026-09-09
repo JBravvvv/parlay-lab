@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLeague } from "@/components/football/LeagueContext";
 import { Pill } from "@/components/ui/Pill";
-import { CFB_BANK_BASE } from "@/lib/cfb/rules";
-import { useCfbLedger } from "@/lib/cfb/store";
-import { syncCfbNow } from "@/lib/cfb/sync";
+import type { League } from "@/lib/football/league";
 
 /**
  * CFB BANK (INSTRUCTION 38, 2026-09-05): the College Football bankroll's adjustments —
@@ -18,7 +17,15 @@ import { syncCfbNow } from "@/lib/cfb/sync";
  * the amount and note inputs are 44px tall (the tap target the props sandbox uses); the
  * Deposit / Withdrawal pair and "Log it" fill their own lines. md+ keeps the label-left,
  * controls-right rows the MLB bank has. Nothing here is set below 11px.
+ *
+ * THE NFL BUILD (2026-09-08): the shared football bank panel — the store, the base and the sync
+ * kick come from `useLeague()` (CFB_DESK by default, so Settings mounting this bare is the CFB
+ * bank unchanged; src/components/nfl/NflBankPanel.tsx mounts it on the NFL desk). The desk's
+ * hook (`L.store.useLedger()`) is called unconditionally: the context value is fixed per mount.
  */
+
+/** the bankroll figure's accent per desk — both literals so Tailwind emits each */
+const ACCENT: Record<League, string> = { cfb: "text-cfb", nfl: "text-nfl" };
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -32,7 +39,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function CfbBankPanel() {
-  const { bankStore, bankroll, addAdjustment } = useCfbLedger();
+  const L = useLeague();
+  const { bankStore, bankroll, addAdjustment } = L.store.useLedger();
   const [kind, setKind] = useState<"deposit" | "withdrawal">("deposit");
   const [amt, setAmt] = useState("");
   const [note, setNote] = useState("");
@@ -56,7 +64,7 @@ export function CfbBankPanel() {
     setAmt("");
     setNote("");
     flash("Logged.");
-    void syncCfbNow();
+    void L.sync.syncNow();
   };
 
   const log = [...bankStore.log].sort((a, b) => b.ts - a.ts);
@@ -64,10 +72,10 @@ export function CfbBankPanel() {
 
   return (
     <div>
-      <Row label="CFB bankroll (managed — never hand-edited)">
-        <span className="num text-[16px] font-bold text-cfb md:text-[14px]">{money(bankroll)}</span>
+      <Row label={`${L.short} bankroll (managed — never hand-edited)`}>
+        <span className={`num text-[16px] font-bold ${ACCENT[L.id]} md:text-[14px]`}>{money(bankroll)}</span>
         <span className="num text-[11px] text-faint">
-          = ${CFB_BANK_BASE.toLocaleString("en-US")} base ({bankStore.asOf}) {moves >= 0 ? "+" : "−"} ${Math.abs(moves).toFixed(2)} logged moves + graded CFB P/L
+          = ${L.bankBase.toLocaleString("en-US")} base ({bankStore.asOf}) {moves >= 0 ? "+" : "−"} ${Math.abs(moves).toFixed(2)} logged moves + graded {L.short} P/L
         </span>
       </Row>
       <Row label="Log a deposit / withdrawal">
@@ -119,7 +127,7 @@ export function CfbBankPanel() {
       </Row>
       <Row label="Adjustment log (append-only)">
         {log.length === 0 ? (
-          <span className="text-[11px] text-faint">No moves logged — the CFB bank sits at its ${CFB_BANK_BASE.toLocaleString("en-US")} base.</span>
+          <span className="text-[11px] text-faint">No moves logged — the {L.short} bank sits at its ${L.bankBase.toLocaleString("en-US")} base.</span>
         ) : (
           <ul className="w-full space-y-1.5">
             {log.map((a) => (

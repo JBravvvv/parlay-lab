@@ -27,9 +27,10 @@ import { legPhase, nowLabel, useLiveNow, type GameNow, type LegNow } from "@/lib
 import { deepLinkHref, legDeepLink } from "@/components/props/props-model";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 import { DEFAULT_ERA, LEDGER_ERAS, eraEntries, ledgerStats, type LedgerEra } from "@/lib/ledger-stats";
-import { CFB_ENABLED } from "@/lib/features";
+import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbLedger, CfbLedgerActions } from "@/components/cfb/CfbLedger";
+import { NflLedger, NflLedgerActions } from "@/components/nfl/NflLedger";
 
 const TIP = {
   contentStyle: {
@@ -455,6 +456,22 @@ export default function LedgerPage() {
     );
   }
 
+  /* NFL desk (2026-09-08): the shared football ledger on the NFL desk handles — pl_nfl_* keys, /api/nfl/ledger, never the MLB or CFB record. */
+  if (NFL_ENABLED && sport === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Ledger"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="Locked NFL paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
+          action={<NflLedgerActions />}
+        />
+        <NflLedger />
+      </>
+    );
+  }
+
   if (!api) return null;
   const empty = api.entries.length === 0;
 
@@ -705,6 +722,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

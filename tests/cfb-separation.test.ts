@@ -23,8 +23,8 @@ const PAGES: Record<string, string> = {
 
 describe("cfb rules — the constants the desk runs on", () => {
   const rules = read("src/lib/cfb/rules.ts");
-  it("paper amounts: $150 daily / $25 fun", () => {
-    expect(rules).toMatch(/daily:\s*150\b/);
+  it("paper amounts: $250 daily / $25 fun (widened from $150 on 2026-09-08)", () => {
+    expect(rules).toMatch(/daily:\s*250\b/);
     expect(rules).toMatch(/fun:\s*25\b/);
   });
   it("localStorage keys are the CFB ones", () => {

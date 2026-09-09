@@ -5,6 +5,7 @@ import { kellyStake, rowProbAt } from "@/lib/cfb/model";
 import type { CfbBoard, CfbGame, CfbRow } from "@/lib/cfb/types";
 import { CFB_PARLAY_CATEGORIES } from "@/lib/cfb/props-types";
 import type { CfbParlay, CfbParlayCategory, CfbParlayLeg, CfbParlayTier, CfbParlayView, CfbPickRow, CfbPicks, CfbPropRow } from "@/lib/cfb/props-types";
+import type { League, LeagueParlays, LeagueRules } from "@/lib/football/league";
 
 /**
  * THE CFB PICKS + PARLAYS ENGINE (2026-09-05, Josh: "what should be on the 'Board' tab is all
@@ -87,6 +88,14 @@ import type { CfbParlay, CfbParlayCategory, CfbParlayLeg, CfbParlayTier, CfbParl
  *
  *   Work is capped (seeds per set, seed pairs per axis) so a 68-game slate with ~3,000 prop
  *   rows builds in well under a second in the browser; ordering is total and deterministic.
+ *
+ *   ONE PICKS ENGINE, TWO LEAGUES (2026-09-08, the NFL build). The parlay knobs `R` are
+ *   `opts.parlays ?? CFB_PARLAYS` and are THREADED through every helper below (`sideLeg`, `propLeg`,
+ *   `draftOf`'s gate, `fill`, `combos`, `walk`, the seeded / paired set builders, `tierOf`,
+ *   `setBandOf`) — nothing inside the build reads CFB_PARLAYS by name, so an NFL set (perCategory
+ *   25) can never fill to the CFB fifty. The exported helpers keep CFB defaults for the CFB
+ *   components and tests. Ids are `${opts.idPrefix ?? "cfb"}-${date}-${view}-${n}` and
+ *   `-${category}-${i}`; `opts.rules` (Kelly) sizes a prop pick's stake for the league.
  */
 
 export const CFB_PROP_CATEGORIES = ["anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds"] as const;
@@ -95,6 +104,8 @@ export const CFB_PICK_CATEGORIES = ["all", "ml", "spread", "total", ...CFB_PROP_
 type Leg = CfbParlayLeg & { evCz: number; live: boolean };
 type Draft = { legs: Leg[]; dec: number; prob: number; ev: number; key: string; gated: boolean };
 type Band = { legs: { min: number; max: number }; minDec: number; maxDec: number };
+/** the knobs a leg / draft / set builder needs — CFB_PARLAYS or NFL_PARLAYS */
+type Knobs = LeagueParlays;
 
 const round = (v: number, dp: number) => {
   const k = 10 ** dp;
@@ -133,13 +144,13 @@ function sidePick(row: CfbRow, game: CfbGame, live: boolean): CfbPickRow {
   };
 }
 
-function propPick(row: CfbPropRow, bankroll: number, live: boolean): CfbPickRow {
+function propPick(row: CfbPropRow, bankroll: number, live: boolean, rules?: LeagueRules): CfbPickRow {
   const kelly = live
     ? null
     : row.kelly != null
       ? row.kelly
       : row.playable && row.fair != null && row.cz
-        ? kellyStake(row.fair, 0, row.cz.dec, bankroll)
+        ? kellyStake(row.fair, 0, row.cz.dec, bankroll, rules)
         : null;
   return {
     kind: "prop",
@@ -260,7 +271,7 @@ export function legFits(leg: Leg, legs: Leg[], maxPerGame: number = CFB_PARLAYS.
   return perGame < maxPerGame;
 }
 
-function draftOf(legs: Leg[]): Draft {
+function draftOf(legs: Leg[], R: Knobs): Draft {
   let dec = 1;
   let prob = 1;
   for (const l of legs) {
@@ -271,25 +282,25 @@ function draftOf(legs: Leg[]): Draft {
     .map((l) => l.rowKey)
     .sort()
     .join("+");
-  return { legs, dec, prob, ev: 100 * (prob * dec - 1), key, gated: legs.every((l) => l.evCz >= CFB_PARLAYS.minLegEvPct) };
+  return { legs, dec, prob, ev: 100 * (prob * dec - 1), key, gated: legs.every((l) => l.evCz >= R.minLegEvPct) };
 }
 
 const inBand = (d: Draft, band: Band) => d.legs.length >= band.legs.min && d.legs.length <= band.legs.max && d.dec >= band.minDec && d.dec <= band.maxDec;
 
 /** Seeded greedy fill: from the seed legs, add the next-likeliest legs that fit until the
     ticket has the minimum legs AND clears minDec; never past maxDec or the leg cap. */
-function fill(seed: Leg[], pool: Leg[], band: Band): Draft | null {
+function fill(seed: Leg[], pool: Leg[], band: Band, R: Knobs): Draft | null {
   const legs = [...seed];
   let dec = legs.reduce((d, l) => d * l.dec, 1);
   for (const leg of pool) {
     if (legs.length >= band.legs.max) break;
     if (legs.length >= band.legs.min && dec >= band.minDec) break;
-    if (!legFits(leg, legs)) continue;
+    if (!legFits(leg, legs, R.maxPerGame)) continue;
     if (dec * leg.dec > band.maxDec) continue;
     legs.push(leg);
     dec *= leg.dec;
   }
-  const d = draftOf(legs);
+  const d = draftOf(legs, R);
   return inBand(d, band) ? d : null;
 }
 
@@ -310,14 +321,14 @@ function fillTo(seed: Leg[], pool: Leg[], n: number, maxDec: number, maxPerGame:
 }
 
 /** every 2..max-leg combination of the pool that respects the rules and the price cap */
-function combos(pool: Leg[], maxLegs: number, maxDec: number): Draft[] {
+function combos(pool: Leg[], maxLegs: number, maxDec: number, R: Knobs): Draft[] {
   const out: Draft[] = [];
   const walk = (start: number, legs: Leg[], dec: number) => {
     for (let i = start; i < pool.length; i++) {
       const leg = pool[i];
-      if (!legFits(leg, legs) || dec * leg.dec > maxDec) continue;
+      if (!legFits(leg, legs, R.maxPerGame) || dec * leg.dec > maxDec) continue;
       const next = [...legs, leg];
-      if (next.length >= 2) out.push(draftOf(next));
+      if (next.length >= 2) out.push(draftOf(next, R));
       if (next.length < maxLegs) walk(i + 1, next, dec * leg.dec);
     }
   };
@@ -375,7 +386,7 @@ function tieredSpread(drafts: Draft[], cap: number): Draft[] {
 /** Bounded exhaustive walk over `pool` in its own order: every in-band combination that respects
     the rules, until `budget` drafts are collected — the "until the pool runs dry" backstop when the
     seeded fills alone leave a tiered set short. Deterministic (pool order is total). */
-function walk(pool: Leg[], band: Band, maxPerGame: number, budget: number): Draft[] {
+function walk(pool: Leg[], band: Band, maxPerGame: number, budget: number, R: Knobs): Draft[] {
   const out: Draft[] = [];
   const step = (start: number, legs: Leg[], dec: number) => {
     for (let i = start; i < pool.length && out.length < budget; i++) {
@@ -383,7 +394,7 @@ function walk(pool: Leg[], band: Band, maxPerGame: number, budget: number): Draf
       if (!legFits(leg, legs, maxPerGame) || dec * leg.dec > band.maxDec) continue;
       const next = [...legs, leg];
       const nd = dec * leg.dec;
-      if (next.length >= band.legs.min && nd >= band.minDec) out.push(draftOf(next));
+      if (next.length >= band.legs.min && nd >= band.minDec) out.push(draftOf(next, R));
       if (next.length < band.legs.max) step(i + 1, next, nd);
     }
   };
@@ -410,8 +421,7 @@ function typeOf(legs: Leg[]): string {
   return sides && props ? "MIXED" : props ? "PROPS" : "SIDES";
 }
 
-function tierOf(d: Draft): CfbParlayTier {
-  const R = CFB_PARLAYS;
+function tierOf(d: Draft, R: Knobs): CfbParlayTier {
   if (d.dec <= R.safer.maxDec && d.legs.every((l) => l.prob >= R.safer.minLegProb)) return "SAFER";
   if (d.dec >= R.longshot.minDec) return "LONGSHOT";
   return "MIX";
@@ -461,9 +471,9 @@ const MIX_SEEDS = 8;
 const SET_LEGS = { min: 2, max: 6 } as const;
 /** single-market, mixed and live sets: any price from a modest two-leg favourite to a 60/1 shot */
 const SET_BAND: Band = { legs: SET_LEGS, minDec: 1.5, maxDec: 60 };
-/** the band a single-market set builds in: CFB_PARLAYS.setBands[market] when pinned there, else SET_BAND */
-export function setBandOf(category: CfbParlayCategory): Band {
-  const bands = CFB_PARLAYS.setBands as Partial<Record<CfbParlayCategory, Band>>;
+/** the band a single-market set builds in: `parlays.setBands[market]` (CFB_PARLAYS when omitted) when pinned there, else SET_BAND */
+export function setBandOf(category: CfbParlayCategory, parlays: Knobs = CFB_PARLAYS): Band {
+  const bands = parlays.setBands as Partial<Record<CfbParlayCategory, Band>>;
   return bands[category] ?? SET_BAND;
 }
 /** tier-2 exhaustive walk: raw in-band drafts collected before the walk stops (the pool "runs dry" inside this budget) */
@@ -489,9 +499,9 @@ const SET_LABEL: Record<CfbParlayCategory, string> = {
   live: "LIVE",
 };
 
-const pushDraft = (out: Draft[], legs: Leg[] | null, band: Band) => {
+const pushDraft = (out: Draft[], legs: Leg[] | null, band: Band, R: Knobs) => {
   if (!legs) return;
-  const d = draftOf(legs);
+  const d = draftOf(legs, R);
   if (inBand(d, band)) out.push(d);
 };
 
@@ -499,7 +509,7 @@ const pushDraft = (out: Draft[], legs: Leg[] | null, band: Band) => {
     from the seed's own position, highest-EV-first. Seeds are the SET_SEEDS likeliest legs AND the
     SET_SEEDS highest-EV legs (2026-09-05: a band with a real price floor — anytime TD's 4 — never
     saw a two-legger from the likeliest seeds alone, since two favourites' decimals fall short of it). */
-function seededSet(byP: Leg[], band: Band, maxPerGame: number): Draft[] {
+function seededSet(byP: Leg[], band: Band, maxPerGame: number, R: Knobs): Draft[] {
   const out: Draft[] = [];
   if (byP.length < band.legs.min) return out;
   const byE = [...byP].sort(byEv);
@@ -512,9 +522,9 @@ function seededSet(byP: Leg[], band: Band, maxPerGame: number): Draft[] {
     const seed = [leg];
     const at = byP.indexOf(leg);
     for (let n = band.legs.min; n <= band.legs.max; n++) {
-      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, 0), band);
-      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, at + 1), band);
-      pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band);
+      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, 0), band, R);
+      pushDraft(out, fillTo(seed, byP, n, band.maxDec, maxPerGame, at + 1), band, R);
+      pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band, R);
     }
   };
   for (let i = 0; i < seeds; i++) from(byP, i);
@@ -524,7 +534,7 @@ function seededSet(byP: Leg[], band: Band, maxPerGame: number): Draft[] {
 
 /** Paired sets: one leg from each axis seeds the ticket (so the set's defining pair is on every
     ticket), then every leg count is filled likeliest-first and highest-EV-first from `pool`. */
-function pairedSet(a: Leg[], b: Leg[], pool: Leg[], band: Band, maxPerGame: number): Draft[] {
+function pairedSet(a: Leg[], b: Leg[], pool: Leg[], band: Band, maxPerGame: number, R: Knobs): Draft[] {
   const out: Draft[] = [];
   if (a.length === 0 || b.length === 0) return out;
   const byE = [...pool].sort(byEv);
@@ -533,8 +543,8 @@ function pairedSet(a: Leg[], b: Leg[], pool: Leg[], band: Band, maxPerGame: numb
       if (!legFits(y, [x], maxPerGame) || x.dec * y.dec > band.maxDec) continue;
       const seed = [x, y];
       for (let n = Math.max(2, band.legs.min); n <= band.legs.max; n++) {
-        pushDraft(out, fillTo(seed, pool, n, band.maxDec, maxPerGame, 0), band);
-        pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band);
+        pushDraft(out, fillTo(seed, pool, n, band.maxDec, maxPerGame, 0), band, R);
+        pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band, R);
       }
     }
   }
@@ -543,8 +553,13 @@ function pairedSet(a: Leg[], b: Leg[], pool: Leg[], band: Band, maxPerGame: numb
 
 /* ---------- the builder ---------- */
 
-export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts: { now: number; bankroll: number }): CfbPicks {
-  const R = CFB_PARLAYS;
+export function buildCfbPicks(
+  board: CfbBoard,
+  props: CfbPropRow[] | null,
+  opts: { now: number; bankroll: number; parlays?: LeagueParlays; idPrefix?: League; rules?: LeagueRules },
+): CfbPicks {
+  const R: Knobs = opts.parlays ?? CFB_PARLAYS;
+  const idPrefix = opts.idPrefix ?? "cfb";
   const games = new Map(board.games.map((g) => [g.id, g]));
   const kickedOff = (start: string) => !(Date.parse(start) > opts.now);
 
@@ -573,7 +588,7 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     if (!isLive && !isUpcoming) continue;
     if (!r.cz || !(r.market in categories)) continue;
     if (!isLive && !r.playable) continue;
-    const pick = propPick(r, opts.bankroll, isLive);
+    const pick = propPick(r, opts.bankroll, isLive, opts.rules);
     if (isLive) liveRows++;
     categories.all.push(pick);
     categories[r.market].push(pick);
@@ -633,7 +648,7 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     for (const d of drafts) {
       n++;
       const legs = `${d.legs.length} legs`;
-      list.push(finish(d, view, tier, categoryOf(d.legs), name ? name(d) : `${tier} · ${legs}`, `cfb-${board.date}-${view}-${n}`));
+      list.push(finish(d, view, tier, categoryOf(d.legs), name ? name(d) : `${tier} · ${legs}`, `${idPrefix}-${board.date}-${view}-${n}`));
     }
   };
 
@@ -641,13 +656,13 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
   // sides-only pool was empty on the opening slate; the likeliest anytime-TD favourites qualify),
   // likeliest legs, every qualifying pair / triple, by combined probability
   const saferPool = upcoming.filter((l) => l.prob >= R.safer.minLegProb).slice(0, SAFER_POOL);
-  const safer = distinct(combos(saferPool, R.safer.legs.max, R.safer.maxDec).filter((d) => d.legs.length >= R.safer.legs.min).sort(draftByProb), R.perView);
+  const safer = distinct(combos(saferPool, R.safer.legs.max, R.safer.maxDec, R).filter((d) => d.legs.length >= R.safer.legs.min).sort(draftByProb), R.perView);
   push(safer, "SAFER", "parlays", parlays);
 
   // LONGSHOT — sides + props, each candidate starts on a different leg, filled likeliest-first, by EV
   const longshotSeeds = upcoming.slice(0, SEED_POOL);
   const longshot = distinct(
-    longshotSeeds.map((seed) => fill([seed], upcoming, R.longshot)).filter((d): d is Draft => d != null).sort(draftByEv),
+    longshotSeeds.map((seed) => fill([seed], upcoming, R.longshot, R)).filter((d): d is Draft => d != null).sort(draftByEv),
     R.perView,
   );
   push(longshot, "LONGSHOT", "parlays", parlays);
@@ -656,8 +671,8 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
   const mixDrafts: Draft[] = [];
   for (const s of upcomingSides.slice(0, MIX_SEEDS)) {
     for (const p of upcomingProps.slice(0, MIX_SEEDS)) {
-      if (!legFits(p, [s]) || s.dec * p.dec > R.mix.maxDec) continue;
-      const d = fill([s, p], upcoming, R.mix);
+      if (!legFits(p, [s], R.maxPerGame) || s.dec * p.dec > R.mix.maxDec) continue;
+      const d = fill([s, p], upcoming, R.mix, R);
       if (d) mixDrafts.push(d);
     }
   }
@@ -679,7 +694,7 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
     for (const d of pick(drafts.filter((d) => !taken.has(d.key)), R.perCategory)) {
       i++;
       taken.add(d.key);
-      list.push(finish(d, view, tierOf(d), category, `${SET_LABEL[category]} · ${d.legs.length} legs`, `cfb-${board.date}-${category}-${i}`));
+      list.push(finish(d, view, tierOf(d, R), category, `${SET_LABEL[category]} · ${d.legs.length} legs`, `${idPrefix}-${board.date}-${category}-${i}`));
     }
     sets[category] = list;
   };
@@ -689,30 +704,30 @@ export function buildCfbPicks(board: CfbBoard, props: CfbPropRow[] | null, opts:
   // tier 1 leaves the set short of fifty
   for (const category of CFB_PARLAY_CATEGORIES) {
     if (category === "combo" || category === "mixed" || category === "live") continue;
-    const band = setBandOf(category);
+    const band = setBandOf(category, R);
     const first = tier1.filter((l) => l.market === category); // already in byProb order
-    let drafts = seededSet(first, band, 1);
+    let drafts = seededSet(first, band, 1, R);
     if (tieredSpread(drafts, R.perCategory).length < R.perCategory) {
       const pool = tieredFloor.filter((l) => l.market === category);
       if (pool.length > first.length) {
-        drafts = [...drafts, ...seededSet(pool, band, 1)];
-        if (tieredSpread(drafts, R.perCategory).length < R.perCategory) drafts = [...drafts, ...walk(pool, band, 1, WALK_BUDGET)];
+        drafts = [...drafts, ...seededSet(pool, band, 1, R)];
+        if (tieredSpread(drafts, R.perCategory).length < R.perCategory) drafts = [...drafts, ...walk(pool, band, 1, WALK_BUDGET, R)];
       }
     }
     emit(category, drafts, tieredSpread);
   }
 
   // combo — a side beside a prop on one ticket, pregame or in-game legs (INSTRUCTION 44), tier 1 only
-  emit("combo", pairedSet(tier1Sides, tier1Props, tier1, COMBO_BAND, R.maxPerGame));
+  emit("combo", pairedSet(tier1Sides, tier1Props, tier1, COMBO_BAND, R.maxPerGame, R));
 
   // mixed — a live leg beside a pregame leg
   if (live.length > 0 && upcoming.length > 0) {
     const both = [...live, ...upcoming].sort(byProb);
-    emit("mixed", pairedSet(live, upcoming, both, SET_BAND, R.maxPerGame));
+    emit("mixed", pairedSet(live, upcoming, both, SET_BAND, R.maxPerGame, R));
   } else sets.mixed = [];
 
   // live — in-play legs only
-  if (live.length > 0) emit("live", seededSet(live, SET_BAND, R.maxPerGame));
+  if (live.length > 0) emit("live", seededSet(live, SET_BAND, R.maxPerGame, R));
   else sets.live = [];
 
   return {

@@ -7,7 +7,7 @@ import { GradeChip } from "@/components/ui/GradeChip";
 import { KellyChip } from "@/components/ui/KellyChip";
 import { OddsGrid, type OddsGridCell, type OddsGridRow } from "@/components/ui/OddsGrid";
 import { fmtLine } from "@/lib/cfb/model";
-import { CFB_MODEL } from "@/lib/cfb/rules";
+import { useLeague } from "@/components/football/LeagueContext";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow } from "@/lib/cfb/types";
 import { fmtAmerican, fmtEv, fmtPct } from "@/lib/format";
 import { TeamMark } from "./TeamMark";
@@ -175,6 +175,10 @@ export function CfbGameCard({
   isPicked?: (row: CfbRow) => boolean;
   className?: string;
 }) {
+  /* the league seam (2026-09-08): the accent classes come off useLeague() — both class strings literal */
+  const L = useLeague();
+  const nfl = L.id === "nfl";
+  const accentText = nfl ? "text-nfl" : "text-cfb";
   const sides = marketSides(game);
   const scored = game.status === "live" || game.status === "final";
   const isFinal = game.status === "final";
@@ -223,7 +227,7 @@ export function CfbGameCard({
       game.espnLine.total != null ? `O/U ${game.espnLine.total}` : null,
     ].filter(Boolean);
     meta.push(
-      <span key="espn" className={unmatched ? "text-cfb" : ""} title="ESPN's embedded line — context only, not a priced quote">
+      <span key="espn" className={unmatched ? accentText : ""} title="ESPN's embedded line — context only, not a priced quote">
         ESPN line {parts.join(" · ")}
       </span>,
     );
@@ -238,7 +242,7 @@ export function CfbGameCard({
         aria-expanded={expanded}
         onClick={onToggle}
         onKeyDown={onKey}
-        className="press flex cursor-pointer select-none items-center justify-between gap-3 px-3.5 pb-1.5 pt-3 outline-none focus-visible:ring-2 focus-visible:ring-cfb/60"
+        className={`press flex cursor-pointer select-none items-center justify-between gap-3 px-3.5 pb-1.5 pt-3 outline-none focus-visible:ring-2 ${nfl ? "focus-visible:ring-nfl/60" : "focus-visible:ring-cfb/60"}`}
       >
         <div className="flex min-w-0 items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
           {isLive ? (
@@ -251,7 +255,7 @@ export function CfbGameCard({
             <StatusMark game={game} />
           )}
           {game.neutral && (
-            <span className="rounded-full border border-cfb/40 bg-cfb/10 px-1.5 py-px text-[8.5px] font-bold tracking-[0.14em] text-cfb">Neutral</span>
+            <span className={`rounded-full border px-1.5 py-px text-[8.5px] font-bold tracking-[0.14em] ${nfl ? "border-nfl/40 bg-nfl/10 text-nfl" : "border-cfb/40 bg-cfb/10 text-cfb"}`}>Neutral</span>
           )}
           {game.tv && !isLive && <span className="truncate text-[9.5px] font-medium normal-case tracking-normal text-faint">{game.tv}</span>}
         </div>
@@ -273,13 +277,13 @@ export function CfbGameCard({
             </div>
           </>
         ) : (
-          <OddsGrid tone="cfb" columns={["Spread", "Money", "Total"]} rows={rows} />
+          <OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} />
         )}
 
         {!isFinal && edges.length > 0 && (
           <ul className="mt-2 space-y-1" aria-label="Edges at Caesars">
             {edges.map((r) => (
-              <li key={r.key} className="flex items-center gap-2 rounded-[10px] border border-cfb/25 bg-cfb/[0.06] px-2 py-1 text-[11px]">
+              <li key={r.key} className={`flex items-center gap-2 rounded-[10px] border px-2 py-1 text-[11px] ${nfl ? "border-nfl/25 bg-nfl/[0.06]" : "border-cfb/25 bg-cfb/[0.06]"}`}>
                 <GradeChip grade={r.grade} basis="EV @ Caesars" />
                 <span className="min-w-0 flex-1 truncate font-semibold text-text">{cellLabel(r, game)}</span>
                 <span className="num shrink-0 text-[10px] text-muted">fair {fmtAmerican(r.fairAm)}</span>
@@ -292,7 +296,7 @@ export function CfbGameCard({
 
         {(meta.length > 0 || unmatched) && (
           <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-snug text-faint">
-            {unmatched && <span className="text-cfb">No odds-feed match</span>}
+            {unmatched && <span className={accentText}>No odds-feed match</span>}
             {meta.map((m, i) => (
               <span key={i} className="inline-flex items-center gap-2">
                 {(i > 0 || unmatched) && <span aria-hidden>·</span>}
@@ -324,6 +328,7 @@ function TeamBlock({
   loser: boolean;
   prefix?: string;
 }) {
+  const rankText = useLeague().id === "nfl" ? "text-nfl" : "text-cfb";
   const sub = team.record ?? (team.fpiRank != null ? `FPI #${team.fpiRank}` : team.fpi != null ? `FPI ${fmtSigned(team.fpi)}` : null);
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -331,7 +336,7 @@ function TeamBlock({
       <div className="min-w-0 flex-1 leading-tight">
         <div className={`flex items-baseline gap-1 truncate text-[13px] font-bold ${loser ? "text-muted" : "text-text"}`}>
           {prefix && <span className="text-[9px] font-bold text-faint">{prefix}</span>}
-          {team.rank != null && <span className="num text-[10px] font-bold text-cfb">#{team.rank}</span>}
+          {team.rank != null && <span className={`num text-[10px] font-bold ${rankText}`}>#{team.rank}</span>}
           <span className="truncate">{team.abbr}</span>
         </div>
         <div className="num truncate text-[10px] text-faint">{sub ?? team.short}</div>
@@ -354,13 +359,15 @@ function FinalLine({ game, homeWon, awayWon }: { game: CfbGame; homeWon: boolean
 /* ---------- expanded: the model, in full ---------- */
 
 function Expanded({ game }: { game: CfbGame }) {
+  const L = useLeague();
+  const CFB_MODEL = L.model;
   const m = game.model;
   const p = m.parts;
   const rows = orderedRows(game);
   const hfaNote = game.neutral ? "neutral site, no HFA" : `HFA +${CFB_MODEL.hfa}`;
   return (
     <div className="border-t border-white/[0.05] px-4 pb-4 pt-3">
-      <div className="text-[9.5px] font-bold uppercase tracking-[0.2em] text-cfb">The model</div>
+      <div className={`text-[9.5px] font-bold uppercase tracking-[0.2em] ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>The model</div>
       <dl className="num mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 text-[11.5px] leading-snug sm:grid-cols-2">
         <Line k={`P(${game.home.abbr} wins)`}>
           <span className="text-muted">Market {pctOrDash(p.mkt)} · Spread {pctOrDash(p.spread)} · FPI {pctOrDash(p.fpi)}</span>
@@ -413,6 +420,7 @@ function Line({ k, children }: { k: string; children: ReactNode }) {
 }
 
 function RowDetail({ row, game }: { row: CfbRow; game: CfbGame }) {
+  const L = useLeague();
   const lit = (row.evCz ?? -1) > 0;
   return (
     <div className={`rounded-[12px] border px-3 py-2.5 ${lit ? "border-pos/25 bg-pos/[0.05]" : "border-white/[0.06] bg-white/[0.03]"}`}>
@@ -426,7 +434,7 @@ function RowDetail({ row, game }: { row: CfbRow; game: CfbGame }) {
           {row.push > 0 ? ` · push ${fmtPct(row.push)}` : ""}
         </span>
       </div>
-      <EdgeMeter fair={row.fair} mkt={row.mkt} tone="cfb" className="mt-2" />
+      <EdgeMeter fair={row.fair} mkt={row.mkt} tone={L.id} className="mt-2" />
       <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-muted">
         <span>
           CZ <span className={row.cz ? "text-gold" : "text-faint"}>{quoteText(row.cz, row)}</span>

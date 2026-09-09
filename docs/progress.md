@@ -1,3 +1,18 @@
+# Progress — 2026-09-08 (INSTRUCTION 47: CFB $250, the NFL desk, NFL $350)
+
+## Football — one engine now runs two desks
+- NFL is the third pill on the sport switch. Board, Builder, Parlay Builder, Ledger, The Sharp,
+  Games, Stats and Settings bank all have an NFL surface; the server locks an NFL card once
+  per slate date ($350 core + $25 fun, tickets $5–$50, 3–10 of them, one side per game) and
+  grades it from ESPN finals at the Caesars line. Own ledger, bank and keys — nothing shared
+  with CFB or MLB money.
+- CFB core widened to $250 a day; ticket max $50 and up to 10 tickets so the money can
+  actually deploy (7 × $25 could never hold $250).
+- Not built: an NFL Season Lab (the CFB one stays). Not covered: London 13:30Z kickoffs —
+  the scheduler ticker's hours would need widening on cron-job.org (Josh's account).
+- First live NFL slate: Thursday 2026-09-10 (49ers at Rams). Nothing has been read from prod
+  for the NFL yet; the props credit cost per game is the CFB figure until measured.
+
 # Progress — 2026-09-08 (INSTRUCTION 46: shaped core, CFB headshots, Season Lab, ten UI fixes)
 
 ## Baseball — the core runs Josh's six $150 shapes and tilts on its own record

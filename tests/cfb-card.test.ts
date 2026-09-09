@@ -374,7 +374,7 @@ describe("synthetic slates through the real model", () => {
     expect(card.funSum).toBe(0);
     expect(card.notes[0]).toMatch(/^NO-PLAY/);
   });
-  it("12 edged games: doubles ≤ 2.60 rank first, the $150 deploys exactly, ≤ 7 tickets, no game twice", () => {
+  it("12 edged games: doubles ≤ 2.60 rank first, the $250 deploys exactly, ≤ 10 tickets, no game twice", () => {
     const board = synthBoard(12, () => favEdge());
     // every home ML clears the gate: fair ≈ 0.70 vs Caesars −180
     const homeMl = board.games.map((g) => g.rows.find((r) => r.market === "ml" && r.side === "home")!);
@@ -388,7 +388,7 @@ describe("synthetic slates through the real model", () => {
     expect(card.noPlay).toBe(false);
     expect(card.coreSum).toBe(CFB_PAPER.daily);
     expect(card.core.every((t) => t.legs.length === 2)).toBe(true); // two −180s = 2.42 ≤ 2.60, and the EV compounds
-    expect(card.core.length).toBe(6); // 6 × $25 = $150
+    expect(card.core.length).toBe(5); // 5 × $50 = $250 (2026-09-08: was 6 × $25 = $150)
     expect(card.notes.some((n) => n.includes("undeployed"))).toBe(false);
     // EV-ranked: non-increasing czEv down the card
     for (let i = 1; i < card.core.length; i++) expect(card.core[i].czEv).toBeLessThanOrEqual(card.core[i - 1].czEv + 1e-9);
@@ -397,7 +397,7 @@ describe("synthetic slates through the real model", () => {
     expect(fun.czDec).toBeGreaterThanOrEqual(CFB_RULES.fun.minDec);
     expect(fun.legs.every((l) => l.market === "ml" && l.side === "home")).toBe(true);
   });
-  it("3 edged games: three singles, stakes raised to the $25 max, the rest honestly undeployed", () => {
+  it("3 edged games: three singles, stakes raised to the $50 max, the rest honestly undeployed", () => {
     const card = buildCfbCard(synthBoard(3, () => favEdge()), OPTS);
     checkCore(card);
     expect(card.core.length).toBeGreaterThanOrEqual(2);

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { buildCfbBoard, coverProb, evPct, kellyStake, rowProbAt, sideLabel } from "@/lib/cfb/model";
+import { buildCfbBoard, coverProb, evPct, fpiIndex, kellyStake, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { CFB_MODEL } from "@/lib/cfb/rules";
+import { NFL_LEAGUE } from "@/lib/nfl/rules";
 import { ptDateOf, kickoffLabel, espnDateParam, nextDate } from "@/lib/cfb/dates";
 import { normCdf } from "@/lib/cfb/normal";
 import type { CfbBoard, CfbBuildInput, CfbGame } from "@/lib/cfb/types";
@@ -448,5 +449,69 @@ describe("skeleton rules", () => {
     expect(nt.evCz!).toBeCloseTo(evPct(atCz.win, atCz.push, nt.cz!.dec), 2);
     expect(rowProbAt(iu.model, "ml", "away", null)!.win).toBeCloseTo(1 - iu.model.pHome!, 12);
     expect(rowProbAt({ ...iu.model, muTotal: null }, "total", "over", 56)).toBeNull();
+  });
+});
+
+/* ==========================================================================================
+   FPI COLUMNS BY NAME (2026-09-08, the NFL build). ESPN's powerindex names its columns once at
+   the root (`categories[].names`) and lays the "fpi" category out differently per league — FBS
+   [fpi, fpirank, …], NFL [fpi, epaoffense, epadefense, epaspecialteams, fpirank, …] — so the old
+   positional read (values[1] = rank) was right for FBS by coincidence and wrong for the NFL.
+   ========================================================================================== */
+describe("fpiIndex reads the fpi / fpirank columns by NAME from the root categories", () => {
+  const NFL_FPI = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tests", "fixtures", "nfl", "espn-fpi.json"), "utf8")) as Record<string, unknown>;
+
+  it("CFB fixture: the by-name read returns exactly what the positional read did (Indiana 23.14, rank 6)", () => {
+    const { index, updated } = fpiIndex(FPI);
+    const iu = index.get("84");
+    expect(iu).toEqual({ fpi: 23.14, fpiRank: 6 });
+    expect(typeof updated).toBe("string");
+    // the root header really does put fpirank second on the college feed
+    const root = (FPI as { categories: Array<{ name: string; names: string[] }> }).categories.find((c) => c.name === "fpi")!;
+    expect(root.names.indexOf("fpi")).toBe(0);
+    expect(root.names.indexOf("fpirank")).toBe(1);
+    // and the whole board is unchanged
+    expect(game(build(), "IU").home.fpiRank).toBe(6);
+  });
+
+  it("CFB fixture without the root header falls back to (0, 1) — the same index, byte for byte", () => {
+    const { categories: _drop, ...headerless } = FPI as Record<string, unknown>;
+    expect(headerless.categories).toBeUndefined();
+    const a = fpiIndex(FPI).index;
+    const b = fpiIndex(headerless).index;
+    expect(b.size).toBe(a.size);
+    expect(a.size).toBeGreaterThan(100);
+    for (const [id, v] of a) expect(b.get(id)).toEqual(v);
+  });
+
+  it("NFL fixture: fpirank is column 4, not 1 — the Rams read rating 5.854 / rank 1 (positional would have said rank 4, their offensive EPA)", () => {
+    const root = (NFL_FPI as { categories: Array<{ name: string; names: string[] }> }).categories.find((c) => c.name === "fpi")!;
+    expect(root.names.indexOf("fpi")).toBe(0);
+    expect(root.names.indexOf("fpirank")).toBe(4);
+    expect(root.names[1]).toBe("epaoffense");
+    const { index } = fpiIndex(NFL_FPI);
+    expect(index.size).toBe(32);
+    const rams = index.get("14");
+    expect(rams).toEqual({ fpi: 5.854, fpiRank: 1 });
+    // the positional misread this replaces: values[1] of the Rams' fpi category is 4.114
+    const ramsRow = (NFL_FPI as { teams: Array<{ team: { id: string }; categories: Array<{ name: string; values: number[] }> }> }).teams.find((t) => t.team.id === "14")!;
+    expect(ramsRow.categories.find((c) => c.name === "fpi")!.values[1]).toBe(4.114);
+    expect(rams!.fpiRank).not.toBe(4);
+    // every NFL team has a rating and a rank in 1..32, and the ranks are a permutation
+    const ranks = [...index.values()].map((v) => v.fpiRank);
+    expect(ranks.every((r) => r != null && r >= 1 && r <= 32)).toBe(true);
+    expect(new Set(ranks).size).toBe(32);
+  });
+
+  it("an NFL board carries the by-name FPI onto both teams of every game", () => {
+    const NFL_ESPN = JSON.parse(fs.readFileSync(path.join(process.cwd(), "tests", "fixtures", "nfl", "espn-scoreboard-2026-09-13.json"), "utf8")) as { events: unknown[] };
+    const b = buildCfbBoard({ date: "2026-09-13", espnEvents: NFL_ESPN.events, oddsEvents: [], fpi: NFL_FPI, now: Date.parse("2026-09-13T14:00Z"), bankroll: 2500, league: NFL_LEAGUE });
+    expect(b.games.length).toBe(13);
+    for (const g of b.games) {
+      expect(g.home.fpi).not.toBeNull();
+      expect(g.away.fpi).not.toBeNull();
+      expect(g.home.fpiRank).toBeGreaterThanOrEqual(1);
+      expect(g.away.fpiRank).toBeLessThanOrEqual(32);
+    }
   });
 });

@@ -13,12 +13,14 @@ import { GradeChip } from "@/components/ui/GradeChip";
 import { OddsCellButton, OddsGrid, type OddsGridCell } from "@/components/ui/OddsGrid";
 import { Segmented } from "@/components/ui/Segmented";
 import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/states";
+import { useLeague } from "@/components/football/LeagueContext";
+import type { DeskClient, LeagueRules } from "@/lib/football/league";
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, loadCfbProps } from "@/lib/cfb/client";
 import { kickoffLabel } from "@/lib/cfb/dates";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
-import { CFB_MODEL, CFB_PROPS, CFB_RULES } from "@/lib/cfb/rules";
+import { CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
 import { gradeFromEv } from "@/lib/grade";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
@@ -146,14 +148,23 @@ function lineText(market: CfbMarketKey, side: CfbSideKey, line: number | null): 
   return line == null ? "—" : fmtLine(line);
 }
 
+/**
+ * THE LEAGUE SEAM (2026-09-08, the NFL build): this sandbox is the shared football props surface —
+ * the league's props table, client, model, rules and accent come off `useLeague()` (default the
+ * CFB desk; src/components/nfl/NflProps.tsx mounts it under the NFL provider). The pinned CFB
+ * names inside CfbProps (`CFB_PROPS`, `cfbPropsQueryKey`, `loadCfbProps`, `cacheLabel`,
+ * `cfbPricedAtLabel`) are LOCALS read off the league in scope — NFL_DESK's under the NFL provider.
+ * The pure cell builders take the league's rules as a trailing argument (CFB_RULES when omitted).
+ */
+
 /** a price pill's tone: lit whole when it clears the core EV gate, accent price when plus, plain when minus */
-function priceTone(price: number, ev: number | null): OddsGridCell["tone"] {
-  if (ev != null && ev >= CFB_RULES.minEvPct) return "ev";
+function priceTone(price: number, ev: number | null, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES): OddsGridCell["tone"] {
+  if (ev != null && ev >= rules.minEvPct) return "ev";
   return price > 0 ? "plus" : "minus";
 }
 
 /** one grid cell for (market, side) of a game — a real leg when priced, a muted "—" otherwise */
-function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: PriceMode, picked: string | null, onPick: (leg: CfbSlipLeg) => void): OddsGridCell {
+function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: PriceMode, picked: string | null, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES): OddsGridCell {
   const row = rowFor(game, market, side);
   if (!row) return {};
   const q = quoteFor(row, mode);
@@ -164,7 +175,7 @@ function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: P
   return {
     line,
     price: amFmt(q.price),
-    tone: priceTone(q.price, sideEv(row, mode)),
+    tone: priceTone(q.price, sideEv(row, mode), rules),
     selected: picked === row.key,
     disabled: closed,
     aria: `${row.label} ${amFmt(q.price)}${tag !== "CZ" ? ` at ${tag}` : ""}`,
@@ -234,14 +245,16 @@ function SlipGameCard({
   picked: string | null;
   onPick: (leg: CfbSlipLeg) => void;
 }) {
+  const L = useLeague();
   if (game.status === "final") return <FinalRow game={game} />;
   const live = game.status === "live";
   const postponed = game.status === "postponed";
   const score = game.homeScore != null && game.awayScore != null ? `${game.awayScore}–${game.homeScore}` : null;
   const cells = (side: "away" | "home"): OddsGridCell[] =>
-    GRID_COLUMNS.map((c) => sideCell(game, c.key, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick));
+    GRID_COLUMNS.map((c) => sideCell(game, c.key, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick, L.rules));
+  const pickedRing = L.id === "nfl" ? "ring-1 ring-nfl/40" : "ring-1 ring-cfb/40";
   return (
-    <article className={`glass card-lift px-3 pb-2.5 pt-2 ${picked ? "ring-1 ring-cfb/40" : ""}`}>
+    <article className={`glass card-lift px-3 pb-2.5 pt-2 ${picked ? pickedRing : ""}`}>
       <header className="mb-1.5 flex items-center justify-between gap-2">
         {live ? (
           <LivePill detail={game.detail} score={score} />
@@ -254,7 +267,7 @@ function SlipGameCard({
         <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-faint">{game.neutral ? "neutral site" : `${game.away.abbr} @ ${game.home.abbr}`}</span>
       </header>
       <OddsGrid
-        tone="cfb"
+        tone={L.id}
         columns={COLUMN_LABELS}
         rows={[
           { key: `${game.id}|away`, team: <TeamBlock team={game.away} score={game.awayScore} live={live} />, cells: cells("away") },
@@ -291,8 +304,9 @@ const PROPS_STALE_MS = CFB_PROPS_STALE_MS;
  * its window, and the route answers from Redis inside its window, so this never spends quota
  * the route would not have spent anyway.
  */
-function propsStaleMs(board: CfbPropsBoard | undefined): number {
-  return board ? cfbPropsStaleMs(board) : PROPS_STALE_MS;
+function propsStaleMs(board: CfbPropsBoard | undefined, client?: DeskClient): number {
+  if (board) return (client?.propsStaleMs ?? cfbPropsStaleMs)(board);
+  return client ? client.PROPS_STALE_MS : PROPS_STALE_MS;
 }
 
 /** "2 h" / "10 min" — the window the board itself says it was cached for (never hardcoded) */
@@ -428,7 +442,7 @@ function ctxLine(row: CfbPropRow): string | null {
 /* prop-rows:start — plain surfaces only on per-item rows (the iOS freeze rule: no blur filters here) */
 
 /** one Over / Under / YES pill for a prop row — a real leg when priced at the row's line, else muted */
-function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (leg: CfbSlipLeg) => void): OddsGridCell {
+function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES): OddsGridCell {
   const q = propQuote(row, mode);
   const yes = row.side === "yes";
   const closed = row.status === "final" || row.status === "postponed";
@@ -440,7 +454,7 @@ function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (
   return {
     line,
     price: amFmt(q.price),
-    tone: priceTone(q.price, propEv(row, mode)),
+    tone: priceTone(q.price, propEv(row, mode), rules),
     selected,
     disabled: closed,
     aria: `${leg.label} ${amFmt(q.price)}${tag !== "CZ" ? ` at ${tag}` : ""}`,
@@ -450,6 +464,11 @@ function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (
 
 /** the amber ring a deep-linked row / card wears while the Builder scrolls to it (INSTRUCTION 46, point 9) */
 const FOCUS_RING = "rounded-[12px] ring-2 ring-cfb/70 ring-offset-2 ring-offset-bg";
+const FOCUS_RING_NFL = "rounded-[12px] ring-2 ring-nfl/70 ring-offset-2 ring-offset-bg";
+/** the deep-link ring in the league's accent (both class strings literal, so Tailwind emits both) */
+function focusRing(league: "cfb" | "nfl"): string {
+  return league === "nfl" ? FOCUS_RING_NFL : FOCUS_RING;
+}
 
 function PropRow({
   pl,
@@ -470,6 +489,7 @@ function PropRow({
   pickedKeys: Set<string>;
   onPick: (leg: CfbSlipLeg) => void;
 }) {
+  const L = useLeague();
   /* INSTRUCTION 46: the leg leaves with the team object so the slip draws the same mark */
   const onPick = (leg: CfbSlipLeg) => pickLeg({ ...leg, team });
   /* the row's headline number is its best-EV side at the chosen price */
@@ -482,7 +502,7 @@ function PropRow({
     <div
       data-prop-game={gameId}
       data-prop-player={playerSlug(pl.player)}
-      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? FOCUS_RING : ""}`}
+      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? focusRing(L.id) : ""}`}
     >
       <PlayerMark player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
       <div className="min-w-0 flex-1 leading-tight">
@@ -499,9 +519,9 @@ function PropRow({
         </div>
       </div>
       <GradeChip grade={grade} basis={mode === "cz" ? "EV @ Caesars" : "EV @ best price"} />
-      <div className={`odds-grid is-cfb shrink-0 ${yes ? "w-[74px] grid-cols-1" : "w-[150px] grid-cols-2"}`}>
+      <div className={`${L.id === "nfl" ? "odds-grid is-nfl" : "odds-grid is-cfb"} shrink-0 ${yes ? "w-[74px] grid-cols-1" : "w-[150px] grid-cols-2"}`}>
         {pl.sides.map((r) => (
-          <OddsCellButton key={r.key} cell={propCell(r, mode, pickedKeys.has(r.key), onPick)} />
+          <OddsCellButton key={r.key} cell={propCell(r, mode, pickedKeys.has(r.key), onPick, L.rules)} />
         ))}
       </div>
     </div>
@@ -632,6 +652,10 @@ function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
 }
 
 export function CfbProps() {
+  const L = useLeague();
+  /* the league's props table and client under the pinned CFB names (see the seam note above) */
+  const { props: CFB_PROPS } = L;
+  const { propsQueryKey: cfbPropsQueryKey, loadProps: loadCfbProps, cacheLabel, pricedAtLabel: cfbPricedAtLabel } = L.client;
   const { today, date, dates, pick, slate, bankroll, loading, error, refetch } = useCfbDesk();
   const { top, bottom } = useShellInsets();
   const [mode, setMode] = useState<PriceMode>("cz");
@@ -658,7 +682,7 @@ export function CfbProps() {
     queryKey: cfbPropsQueryKey(date, bankroll),
     queryFn: () => loadCfbProps(date, { bankroll }),
     enabled: nav !== "sides" && !!date,
-    staleTime: (q) => propsStaleMs(q.state.data),
+    staleTime: (q) => propsStaleMs(q.state.data, L.client),
     retry: 1,
   });
 
@@ -719,13 +743,13 @@ export function CfbProps() {
   const copyText = useMemo(() => {
     if (!calc) return "";
     const lines = [
-      `CFB slip · ${railLabel(date)} · ${calc.n} leg${calc.n === 1 ? "" : "s"} · ${amFmt(calc.am)} (${calc.dec.toFixed(2)}x)`,
+      `${L.short} slip · ${railLabel(date)} · ${calc.n} leg${calc.n === 1 ? "" : "s"} · ${amFmt(calc.am)} (${calc.dec.toFixed(2)}x)`,
       ...legs.map((l) => `• ${l.label}${l.kind === "prop" ? ` (${l.marketLabel ?? l.market})` : ""} · ${l.sub} · ${amFmt(l.cz)} ${l.book}`),
       `$${stake} → pays $${calc.payout(stake).toFixed(2)} · true ${(calc.trueProb * 100).toFixed(1)}% · EV ${calc.ev >= 0 ? "+" : ""}${(calc.ev * 100).toFixed(1)}%`,
-      "Sandbox — not tracked, not in the CFB ledger.",
+      `Sandbox — not tracked, not in the ${L.short} ledger.`,
     ];
     return lines.join("\n");
-  }, [calc, legs, stake, date]);
+  }, [calc, legs, stake, date, L.short]);
 
   const label = date === today ? "Today" : railLabel(date);
   const navLabel = nav === "sides" ? "Sides" : marketMeta(nav).label;
@@ -735,16 +759,16 @@ export function CfbProps() {
       <Suspense fallback={null}>
         <PropsLinkReader onLink={onLink} />
       </Suspense>
-      <p className="mb-3 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the CFB ledger.</p>
+      <p className="mb-3 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the {L.short} ledger.</p>
       <DateRail dates={dates} date={date} today={today} onPick={pick} />
 
       {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
       <div className="sticky z-20 -mx-4 mb-3 border-b border-white/[0.06] bg-bg/95 px-4 py-2 md:mx-0 md:px-0" style={{ top }}>
         <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
-          <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone="cfb" label="Market" className="w-max" />
+          <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
         </div>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1">
-          <Segmented options={PRICE_OPTIONS} value={mode} onChange={setMode} size="md" tone="cfb" label="Price at" />
+          <Segmented options={PRICE_OPTIONS} value={mode} onChange={setMode} size="md" tone={L.id} label="Price at" />
           <span className="num flex items-center gap-2 text-[10.5px] text-faint">
             {liveGames > 0 && nav === "sides" && (
               <span className="inline-flex items-center gap-1 text-live">
@@ -752,7 +776,7 @@ export function CfbProps() {
                 {liveGames} live
               </span>
             )}
-            {mode === "cz" ? "Caesars settles" : `best of ${CFB_MODEL.minBooks}+ books · Caesars settles`}
+            {mode === "cz" ? "Caesars settles" : `best of ${L.model.minBooks}+ books · Caesars settles`}
           </span>
         </div>
         {nav !== "sides" && (
@@ -784,9 +808,9 @@ export function CfbProps() {
         loading ? (
           <SkeletonRows rows={6} />
         ) : error ? (
-          <ErrorState title="The CFB slate did not load" body={error instanceof Error ? error.message : String(error)} onRetry={refetch} />
+          <ErrorState title={`The ${L.short} slate did not load`} body={error instanceof Error ? error.message : String(error)} onRetry={refetch} />
         ) : games.length === 0 ? (
-          <EmptyState title={`No FBS games on ${label}`} body="Pick a slate day on the rail." />
+          <EmptyState title={`No ${L.noun} games on ${label}`} body="Pick a slate day on the rail." />
         ) : (
           <div className="space-y-2">
             {slate?.oddsMissing && (
@@ -794,7 +818,7 @@ export function CfbProps() {
             )}
             {games.map((g, i) => (
               <Reveal key={g.id} delay={Math.min(i, 8) * 0.03} y={10}>
-                <div data-cfb-game={g.id} className={focus?.market === "sides" && focus.gameId === g.id ? FOCUS_RING : undefined}>
+                <div data-cfb-game={g.id} className={focus?.market === "sides" && focus.gameId === g.id ? focusRing(L.id) : undefined}>
                   <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} />
                 </div>
               </Reveal>

@@ -212,7 +212,7 @@ describe("CFB_LOCK — the window", () => {
     expect(CFB_LOCK.forwardTimeoutMs + 60_000).toBe(85_000);
     expect(90_000 - (CFB_LOCK.forwardTimeoutMs + 60_000)).toBe(5_000);
     // the paper allotment the lock deploys is the one Josh named
-    expect(CFB_PAPER.daily).toBe(150);
+    expect(CFB_PAPER.daily).toBe(250); // widened from $150 on 2026-09-08
     expect(CFB_PAPER.fun).toBe(25);
   });
 
@@ -291,7 +291,7 @@ describe("the poke, branch by branch", () => {
     expect(e.locked).toBe(true);
     expect(e.source).toBe("server-lock");
     expect(e.trigger).toBe("cfb-lock");
-    expect(e.daily).toBe(150);
+    expect(e.daily).toBe(250);
     expect(e.fun).toBe(25);
     expect(e.lockedAt).toBe(LOCKS_AT);
     expect(e.noPlay).toBeUndefined();
@@ -1247,19 +1247,19 @@ describe("THE MONEY GUARD (2026-09-06) — a skewed card crashes; it is never wr
     expect(guard(card)).not.toThrow();
   });
 
-  it("core over the day's $150: throws, printing BOTH numbers", () => {
+  it("core over the day's $250: throws, printing BOTH numbers", () => {
     const card = realCard();
     const t = { ...card.core[0], stake: CFB_RULES.maxStake };
-    const core = Array.from({ length: 7 }, (_, i) => ({ ...t, id: `${t.id}-p${i}` })); // 7 × $25 = $175
-    expect(core.reduce((s, x) => s + x.stake, 0)).toBe(175);
-    expect(guard({ ...card, core })).toThrow(/175/);
-    expect(guard({ ...card, core })).toThrow(/150/);
+    const core = Array.from({ length: 7 }, (_, i) => ({ ...t, id: `${t.id}-p${i}` })); // 7 × $50 = $350 (2026-09-08: was 7 × $25 = $175 over $150)
+    expect(core.reduce((s, x) => s + x.stake, 0)).toBe(350);
+    expect(guard({ ...card, core })).toThrow(/350/);
+    expect(guard({ ...card, core })).toThrow(/250/);
   });
 
-  it("a core ticket outside the $5–$25 band: throws, printing BOTH numbers", () => {
+  it("a core ticket outside the $5–$50 band: throws, printing BOTH numbers", () => {
     const card = realCard();
-    const core = [{ ...card.core[0], stake: 40 }];
-    expect(guard({ ...card, core })).toThrow(/40/);
+    const core = [{ ...card.core[0], stake: 60 }]; // 2026-09-08: $40 is inside the widened band, $60 is not
+    expect(guard({ ...card, core })).toThrow(/60/);
     expect(guard({ ...card, core })).toThrow(new RegExp(String(CFB_RULES.maxStake)));
     expect(guard({ ...card, core: [{ ...card.core[0], stake: 1 }] })).toThrow(new RegExp(String(CFB_RULES.minStake)));
   });
@@ -1289,8 +1289,8 @@ describe("THE MONEY GUARD (2026-09-06) — a skewed card crashes; it is never wr
     const { status, body } = await call();
     expect(status).toBe(502);
     expect(String(body.error)).toMatch(/lock build failed/);
-    expect(String(body.error)).toMatch(/175/);
-    expect(String(body.error)).toMatch(/150/);
+    expect(String(body.error)).toMatch(/350/);
+    expect(String(body.error)).toMatch(/250/);
     expect(fr.sets().length).toBe(0);
     expect(fr.ledger()).toEqual([]);
   });
@@ -1372,20 +1372,20 @@ const seed = (entries: CfbLedgerEntry[]) => fakeRedis({ [CFB_REDIS.ledger]: JSON
 const topUpOf = (body: Record<string, unknown>) => body.topUp as Record<string, unknown>;
 const coreStakeOf = (e: CfbLedgerEntry) => e.core.reduce((s, t) => s + t.stake, 0);
 
-describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be intended", () => {
+describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be intended", () => {
   it("the cap is a constant beside CFB_LOCK, mirroring the MLB desk's TOPUP_MAX", () => {
     expect(cfbRulesMod.CFB_TOPUP_MAX).toBe(2);
     // ...and the gap it exists to close is real on this very fixture
     expect(
       buildCfbCard(slateAt(LOCKS_AT) as CfbBoard, { bankroll: 2500, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now: LOCKS_AT }).coreSum,
-    ).toBe(75);
+    ).toBe(150); // 2026-09-08: three $50 singles of the $250 (was three $25 of the $150)
   });
 
-  it("A THIN SLATE LOCKS UNDER $150 AND A LATER POKE TOPS IT UP — to exactly the $150", async () => {
+  it("A THIN SLATE LOCKS UNDER $250 AND A LATER POKE TOPS IT UP — to exactly the $250", async () => {
     const fr = fakeRedis();
     const first = await call();
     expect(first.body.status).toBe("locked");
-    expect(first.body.coreStake).toBe(75);
+    expect(first.body.coreStake).toBe(150);
     const locked = fr.ledger()[0];
     expect(locked.core.length).toBe(3);
 
@@ -1398,9 +1398,9 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     const t = topUpOf(body);
     expect(t.action).toBe("topped-up");
     expect(t.n).toBe(1);
-    expect(t.core).toBe(3);
-    expect(t.stake).toBe(75);
-    expect(t.coreStake).toBe(150);
+    expect(t.core).toBe(3); // 2026-09-08: the three evening singles split the $100 of room (was three $25 into $75 of room)
+    expect(t.stake).toBe(100);
+    expect(t.coreStake).toBe(250);
 
     const e = fr.ledger()[0];
     expect(coreStakeOf(e)).toBe(CFB_PAPER.daily);
@@ -1424,15 +1424,18 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     // and the entry says a top-up ran, when, and how much it added
     expect((e as Record<string, unknown>).topUps).toHaveLength(1);
     expect(String(e.note)).toMatch(/Top-up 1/);
-    expect(String(e.note)).toMatch(/\$75/);
+    expect(String(e.note)).toMatch(/\$100/);
   });
 
   it("THE CAP refuses the third attempt, even with money still owed", async () => {
-    const fr = fakeRedis();
-    await call();
+    /* 2026-09-08: the fixture's own lock is now $150 of the $250, and every evening single is
+       raised to the $50 max, so two top-ups off the real lock would FILL the day and the third
+       poke would answer "fully deployed" instead of the cap. The seeded $75 lock keeps the case
+       what it is: two attempts spent, $75 still owed, the cap is what refuses. */
+    const fr = seed([serverEntry(DATE, { stakes: [25, 25, 25], games: LOCK_GAMES, lockedAt: LOCKS_AT, fun: CFB_PAPER.fun })]);
     const rounds = [
-      { at: 5, extra: ["401866410"], stake: 25, total: 100 },
-      { at: 10, extra: ["401858430"], stake: 25, total: 125 },
+      { at: 5, extra: ["401866410"], stake: 50, total: 125 },
+      { at: 10, extra: ["401858430"], stake: 50, total: 175 },
     ];
     for (const [i, r] of rounds.entries()) {
       setNow(LOCKS_AT + r.at * 60_000);
@@ -1442,14 +1445,14 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
       expect(topUpOf(body).n).toBe(i + 1);
       expect(coreStakeOf(fr.ledger()[0])).toBe(r.total);
     }
-    // a third poke: $25 is still owed and a fresh game is priced, but the cap is spent
+    // a third poke: $75 is still owed and a fresh game is priced, but the cap is spent
     setNow(LOCKS_AT + 20 * 60_000);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, ["401862701"]));
     const { status, body } = await call();
     expect(status).toBe(200);
     expect(topUpOf(body).action).toBe("skipped");
     expect(String(topUpOf(body).reason)).toMatch(/cap/i);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(125);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(175);
     expect((fr.ledger()[0] as Record<string, unknown>).topUps).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
   });
 
@@ -1468,9 +1471,9 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     expect(fr.ledger()).toEqual([dev]);
   });
 
-  it("A DAY ALREADY AT $150 is untouched and issues no rebuild at all", async () => {
-    const full = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: slateAt(LOCKS_AT).games.slice(0, 6).map((g) => g.id), lockedAt: LOCKS_AT, fun: 25 });
-    expect(coreStakeOf(full)).toBe(150);
+  it("A DAY ALREADY AT $250 is untouched and issues no rebuild at all", async () => {
+    const full = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: slateAt(LOCKS_AT).games.slice(0, 5).map((g) => g.id), lockedAt: LOCKS_AT, fun: 25 });
+    expect(coreStakeOf(full)).toBe(250);
     const fr = seed([full]);
     setNow(LOCKS_AT + 15 * 60_000);
     const { status, body } = await call();
@@ -1492,7 +1495,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     expect(topUpOf(body).action).toBe("skipped");
     expect(String(topUpOf(body).reason)).toMatch(/kicked off/i);
     expect(slateFromEspn).not.toHaveBeenCalled();
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
   });
 
   /**
@@ -1531,7 +1534,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => {
       const cur = fr.ledger();
       if (coreStakeOf(cur[0]) < CFB_PAPER.daily) {
-        const other = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: slateAt(now).games.slice(0, 6).map((g) => g.id), lockedAt: LOCKS_AT, topUps: [{ at: now, core: 3, stake: 75 }] });
+        const other = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: slateAt(now).games.slice(0, 5).map((g) => g.id), lockedAt: LOCKS_AT, topUps: [{ at: now, core: 2, stake: 100 }] });
         fr.kv.set(CFB_REDIS.ledger, JSON.stringify({ ledger: [other], at: now }));
       }
       return richerSlate(now, ["401858430", "401862701", "401869960"]);
@@ -1541,7 +1544,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     /* THE CORE HALF, unchanged and still the point: the winner's $150 stands, the loser adds no
        core money to it, and the six tickets on the day are the winner's card, not this poke's. */
     expect(coreStakeOf(fr.ledger()[0])).toBe(CFB_PAPER.daily);
-    expect(fr.ledger()[0].core.length).toBe(6);
+    expect(fr.ledger()[0].core.length).toBe(5);
     expect(topUpOf(body).core).toBe(0);
     expect(topUpOf(body).stake).toBe(0);
     /* THE FUN HALF, the same rule on the other allotment: the loser serves the bucket the winner
@@ -1573,7 +1576,7 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
        winner opened on a short core over a fun bucket the lock had already filled. That the row
        says `fun: false` is exactly why the loser is still allowed to serve the bucket below. */
     expect(topUpsOn(claimed)).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
-    expect(coreStakeOf(claimed)).toBe(75); // the claim never touches the tickets
+    expect(coreStakeOf(claimed)).toBe(150); // the claim never touches the tickets
   });
 
   it("THE MONEY GUARD runs over the TOPPED-UP entry: a skewed top-up card is refused, nothing written", async () => {
@@ -1585,17 +1588,18 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
       const card = cardReal.build!(board, opts);
       return { ...card, core: card.core.map((t) => ({ ...t, stake: CFB_RULES.maxStake })) , coreSum: card.core.length * CFB_RULES.maxStake };
     });
-    // three $25 tickets appended to a day already carrying $75 is $150 — legal; skew one past the band
+    // two $50 tickets appended to a day already carrying $150 is $250 — legal; skew one past the band
+    // (2026-09-08: $40 sits inside the widened $5–$50 band, so the skew is $60)
     vi.mocked(buildCfbCard).mockImplementationOnce((board, opts) => {
       const card = cardReal.build!(board, opts);
-      return { ...card, core: card.core.map((t) => ({ ...t, stake: 40 })) };
+      return { ...card, core: card.core.map((t) => ({ ...t, stake: 60 })) };
     });
     const { status, body } = await call();
     expect(status).toBe(200);
     expect(body.status).toBe("already-locked");
     expect(topUpOf(body).action).toBe("error");
     expect(String(topUpOf(body).error)).toMatch(/MONEY GUARD/);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
     /* PIN REWRITTEN 2026-09-06 (CRITIC 1), from 1 to 2 — same reason as the racing test above:
        the attempt claimed its record before it paid for the board it then refused to seat. The
        guard's contract is that NO MONEY was written, which is asserted on the line above and
@@ -1627,9 +1631,9 @@ describe("A. THE TOP-UP (2026-09-06) — the $150 must deploy, not just be inten
     const { status, body } = await call(req({ dry: true }));
     expect(status).toBe(200);
     expect(topUpOf(body).action).toBe("would-top-up");
-    expect(topUpOf(body).stake).toBe(75);
+    expect(topUpOf(body).stake).toBe(100);
     expect(fr.sets().length).toBe(1);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
   });
 });
 
@@ -1887,7 +1891,7 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
 
   it("A SHORT DAY THAT PLANS NOTHING STILL BURNS AN ATTEMPT, and the cap then binds for the whole day", async () => {
     const fr = fakeRedis();
-    expect((await call()).body.coreStake).toBe(75); // the fixture's $75 of the $150 — the short day
+    expect((await call()).body.coreStake).toBe(150); // the fixture's $150 of the $250 — the short day
     expect(priced()).toBe(1);
 
     /* ATTEMPT 1: 15 minutes on, nothing new clears the card's gate. It bought a board to find
@@ -1897,7 +1901,7 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     expect(topUpOf(a1.body).action).toBe("skipped");
     expect(priced()).toBe(2);
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75); // and it moved no money doing it
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150); // and it moved no money doing it
 
     /* ATTEMPT 2, past the retry window. */
     setNow(LOCKS_AT + 61 * 60_000);
@@ -1918,7 +1922,7 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     }
     expect(priced()).toBe(3);
     expect(espnReads()).toBe(espnAtCap);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
   });
 
   it("THE FREE PRE-CHECK: a poke inside the retry window after an empty attempt buys no second board", async () => {
@@ -1965,7 +1969,7 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
        later poke may still fire. Not a loosening: the assertion is the same kind, over the same
        row, with one more field pinned than before. */
     expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
 
     // ...and it counts against the cap like any other: one more attempt, then the day is done
     setNow(LOCKS_AT + 61 * 60_000);
@@ -1986,8 +1990,8 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     expect(topUpOf(body).action).toBe("topped-up");
     expect(topUpOf(body).n).toBe(1);
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(1);
-    expect(topUpsOn(fr.ledger()[0])[0]).toMatchObject({ core: 3, stake: 75 });
-    expect(coreStakeOf(fr.ledger()[0])).toBe(150);
+    expect(topUpsOn(fr.ledger()[0])[0]).toMatchObject({ core: 3, stake: 100 });
+    expect(coreStakeOf(fr.ledger()[0])).toBe(250);
   });
 });
 
@@ -2311,13 +2315,15 @@ const finalsFixtureFor = (d: string) =>
  * count and the per-ticket band — never id uniqueness — so nothing caught it.
  */
 describe("CRITIC 6 (2026-09-06) — an overlapping top-up can never re-mint an id that is already seated", () => {
-  /** A's two games, then B's third — the evening lines posting one after another */
-  const A_EXTRA = ["401866410", "401858430"];
+  /** A's game, then B's second — the evening lines posting one after another (2026-09-08: A had
+      two games; at the $50 max two singles would fill the $250 and B would be refused "fully
+      deployed" before it could claim, which is not the race this case is about) */
+  const A_EXTRA = ["401866410"];
   const B_EXTRA = "401862701";
 
   it("TWO OVERLAPPING POKES: every id is unique, BOTH attempts are counted, and the cap then binds", async () => {
     const fr = fakeRedis();
-    expect((await call()).body.coreStake).toBe(75);
+    expect((await call()).body.coreStake).toBe(150);
     const locked = fr.ledger()[0];
     expect(locked.core.length).toBe(3);
 
@@ -2355,7 +2361,7 @@ describe("CRITIC 6 (2026-09-06) — an overlapping top-up can never re-mint an i
     expect(topUpsOn(e).every((r) => Number(r.core) > 0)).toBe(true);
     /* ...and the money still lands exactly where the rules allow. */
     expect(coreStakeOf(e)).toBe(CFB_PAPER.daily);
-    expect(e.core.length).toBe(6);
+    expect(e.core.length).toBe(5);
     const gkeys = e.core.flatMap((t) => t.legs.map((l) => l.gkey));
     expect(new Set(gkeys).size).toBe(gkeys.length);
 
@@ -2398,7 +2404,7 @@ describe("CRITIC 6 (2026-09-06) — an overlapping top-up can never re-mint an i
 describe("CRITIC 7 (2026-09-06) — a top-up reopens a day that was already marked done", () => {
   const games = () => slateAt(LOCKS_AT).games.map((g) => g.id);
   const gradedDay = () => {
-    const e = serverEntry(DATE, { stakes: [25, 25, 25], games: games().slice(0, 3), lockedAt: LOCKS_AT });
+    const e = serverEntry(DATE, { stakes: [50, 50, 50], games: games().slice(0, 3), lockedAt: LOCKS_AT }); // 2026-09-08: $150 of the $250
     return {
       ...e,
       grading: {
@@ -2414,10 +2420,10 @@ describe("CRITIC 7 (2026-09-06) — a top-up reopens a day that was already mark
      describe is unchanged; the CORE-only plan is what these three cases are about, so the fun half
      is empty here and is exercised on its own below. */
   const planFor = (n: number, fun: CfbTicket[] = []) => {
-    const donor = serverEntry(DATE, { stakes: [25, 25, 25], games: games().slice(3, 6), lockedAt: LOCKS_AT });
+    const donor = serverEntry(DATE, { stakes: [50, 50], games: games().slice(3, 5), lockedAt: LOCKS_AT }); // the $100 that fills the $250
     return {
       tickets: donor.core.map((t, i) => ({ ...t, id: `cfb-${DATE}-topup${n}-core-${i + 4}` })),
-      stake: 75,
+      stake: 100,
       fun,
       funStake: fun.reduce((a, t) => a + t.stake, 0),
       games: donor.games,
@@ -2430,7 +2436,7 @@ describe("CRITIC 7 (2026-09-06) — a top-up reopens a day that was already mark
     expect(lockServerMod.cfbSettleCandidate(done)).toBe(false);
     const next = lockServerMod.applyCfbTopUp(done, planFor(1), LOCKS_AT + 15 * 60_000, 1);
     expect(coreStakeOf(next)).toBe(CFB_PAPER.daily);
-    expect(next.grading!.done, "the day deployed $75 more and still called itself finished").toBe(false);
+    expect(next.grading!.done, "the day deployed $100 more and still called itself finished").toBe(false);
     expect(lockServerMod.cfbSettleCandidate(next), "the settle pass can never list this date again").toBe(true);
     // the verdicts already scored are kept, untouched
     expect(next.grading!.tickets[done.core[0].id]).toEqual({ result: "won", payout: 47.5, detail: "graded" });
@@ -2490,7 +2496,7 @@ describe("CRITIC 8 (2026-09-06) — an odds outage costs the top-up nothing, and
 
   it("TWO OUTAGE POKES SPEND ZERO ATTEMPTS and stamp the odds-gap marker; both attempts survive for the prices", async () => {
     const fr = fakeRedis();
-    expect((await call()).body.coreStake).toBe(75);
+    expect((await call()).body.coreStake).toBe(150);
 
     for (const m of [15, 30]) {
       setNow(LOCKS_AT + m * 60_000);
@@ -2502,7 +2508,7 @@ describe("CRITIC 8 (2026-09-06) — an odds outage costs the top-up nothing, and
       expect(t.oddsMissing, "the answer must name the outage, not blame the rules").toBe(true);
       expect(String(t.reason)).toMatch(/odds/i);
       expect(topUpsOn(fr.ledger()[0]), `an outage spent a top-up attempt at +${m} min`).toEqual([]);
-      expect(coreStakeOf(fr.ledger()[0])).toBe(75);
+      expect(coreStakeOf(fr.ledger()[0])).toBe(150);
     }
     /* the same dated marker the LOCK path stamps, so the sweep's cause-reading agrees with what
        actually happened — one per refusal, on the date that was refused */
@@ -2514,14 +2520,14 @@ describe("CRITIC 8 (2026-09-06) — an odds outage costs the top-up nothing, and
     const a1 = await call();
     expect(topUpOf(a1.body).action).toBe("topped-up");
     expect(topUpOf(a1.body).n).toBe(1);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(100);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(200);
 
     setNow(LOCKS_AT + 50 * 60_000);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, ["401858430"]));
     const a2 = await call();
     expect(topUpOf(a2.body).action).toBe("topped-up");
     expect(topUpOf(a2.body).n).toBe(2);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(125);
+    expect(coreStakeOf(fr.ledger()[0])).toBe(250);
     expect(topUpsOn(fr.ledger()[0])).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
   });
 
@@ -2722,7 +2728,8 @@ describe("DEFECT J (2026-09-06) — the $25 fun money is topped up too, once, an
   const funStakeOf = (e: CfbLedgerEntry) => funT(e).reduce((s, t) => s + t.stake, 0);
 
   it("J(a): A LOCKED DAY WITH AN EMPTY FUN BUCKET gains exactly ONE fun ticket, at or under $25", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25], games: LOCK_GAMES, lockedAt: LOCKS_AT });
+    /* 2026-09-08: $100 of the $250, so the three evening singles below (each raised to the $50 max) land the core exactly on the allotment */
+    const day = serverEntry(DATE, { stakes: [50, 25, 25], games: LOCK_GAMES, lockedAt: LOCKS_AT });
     expect(funT(day)).toHaveLength(0); // $0 of the $25, and nothing said so
     const fr = seed([day]);
 
@@ -2842,8 +2849,8 @@ describe("DEFECT M (2026-09-06) — the core and fun allotments are INDEPENDENT 
   /** the evening lines, on games no seeded core ticket sits on */
   const EXTRA = ["401858430", "401862701", "401869960"];
 
-  it("M(a): A DAY AT THE FULL $150 CORE WITH AN EMPTY FUN BUCKET still fires — on the fun arm alone", () => {
-    const full = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+  it("M(a): A DAY AT THE FULL $250 CORE WITH AN EMPTY FUN BUCKET still fires — on the fun arm alone", () => {
+    const full = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     expect(coreStakeOf(full)).toBe(CFB_PAPER.daily);
     expect(full.funT).toHaveLength(0); // $0 of the $25, and the core gate never let anything ask
     const d = lockServerMod.decideCfbTopUp(full, LATER);
@@ -2852,28 +2859,28 @@ describe("DEFECT M (2026-09-06) — the core and fun allotments are INDEPENDENT 
   });
 
   it("M(a): THE TICKET CAP strands the core, but it may not strand the fun money too", () => {
-    const seven = serverEntry(DATE, { stakes: [5, 5, 5, 5, 5, 5, 5], games: gameIds().slice(0, 7), lockedAt: LOCKS_AT });
+    const seven = serverEntry(DATE, { stakes: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], games: gameIds().slice(0, 10), lockedAt: LOCKS_AT }); // 2026-09-08: ten $5 singles fill the widened ticket cap
     expect(seven.core).toHaveLength(CFB_RULES.tickets.max);
-    expect(coreStakeOf(seven)).toBe(35); // $115 of core owed, and no slot to seat it in
+    expect(coreStakeOf(seven)).toBe(50); // $200 of core owed, and no slot to seat it in
     const d = lockServerMod.decideCfbTopUp(seven, LATER);
     expect(d.fire).toBe(true);
     expect(d).toMatchObject({ fire: true, core: false, fun: true });
   });
 
   it("M(a): BOTH BUCKETS FULL is still a free refusal, and it names BOTH of them", () => {
-    const done = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun });
+    const done = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun });
     const d = lockServerMod.decideCfbTopUp(done, LATER);
     expect(d.fire).toBe(false);
     expect(String((d as { reason: string }).reason)).toMatch(/fully deployed/i);
     expect(String((d as { reason: string }).reason)).toMatch(/fun/i);
     /* ...and the core arm alone is not enough to fire when the core is full: */
-    const d2 = lockServerMod.decideCfbTopUp(serverEntry(DATE, { stakes: [5, 5, 5, 5, 5, 5, 5], games: gameIds().slice(0, 7), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun }), LATER);
+    const d2 = lockServerMod.decideCfbTopUp(serverEntry(DATE, { stakes: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5], games: gameIds().slice(0, 10), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun }), LATER);
     expect(d2.fire).toBe(false);
     expect(String((d2 as { reason: string }).reason)).toMatch(/ticket cap/i);
   });
 
   it("M(b): A FUN-ONLY PLAN IS REAL: no core ticket fits, and the parlay still clears", () => {
-    const full = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const full = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     const plan = lockServerMod.planCfbTopUp(richerSlate(LATER, EXTRA) as CfbBoard, full, { now: LATER, bankroll: 2500, room: 0, slots: 1, n: 1 });
     expect(plan.tickets).toHaveLength(0);
     expect(plan.fun).toHaveLength(1);
@@ -2882,7 +2889,7 @@ describe("DEFECT M (2026-09-06) — the core and fun allotments are INDEPENDENT 
   });
 
   it("M(a)+M(b): THE POINT — a full-core day gains its $25, the core is untouched, and the attempt is recorded FILLED", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const day = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     const fr = seed([day]);
     setNow(LATER);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
@@ -2918,7 +2925,7 @@ describe("DEFECT M (2026-09-06) — the core and fun allotments are INDEPENDENT 
   });
 
   it("M(b): TWO OVERLAPPING POKES CANNOT SEAT TWO FUN TICKETS — the loser reads the parlay that stands", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const day = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     const fr = seed([day]);
     setNow(LATER);
     /* poke A runs end to end inside poke B's own keyless ESPN read — the window between B's GET
@@ -3276,7 +3283,7 @@ describe("L1 (2026-09-06) — a fun arm that provably cannot seat refuses for FR
   });
 
   it("L1: A FUN-ONLY FIRE THAT CANNOT SEAT ANYTHING COSTS ZERO PRICED BOARDS, and claims no attempt", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: KICKED, lockedAt: LOCKS_AT });
+    const day = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: KICKED.slice(0, 5), lockedAt: LOCKS_AT });
     expect(coreStakeOf(day)).toBe(CFB_PAPER.daily); // the core arm is shut
     expect(day.funT).toHaveLength(0); // ...and the fun arm is the only one open
     const fr = seed([day]);
@@ -3319,7 +3326,7 @@ describe("L1 (2026-09-06) — a fun arm that provably cannot seat refuses for FR
     ];
     const now = LOCKS_AT + 2 * 3600_000; // past CFB_TOPUP_RETRY_MS, so the retry window is not what answers
     const e = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun, topUps: funRows });
-    expect(coreStakeOf(e)).toBe(75); // $75 of the $150 still owed
+    expect(coreStakeOf(e)).toBe(75); // $175 of the $250 still owed
     const d = lockServerMod.decideCfbTopUp(e, now);
     expect(d).toMatchObject({ fire: true, core: true, fun: false });
     expect((d as { used: number }).used).toBe(0);
@@ -3348,14 +3355,14 @@ describe("L1 (2026-09-06) — a fun arm that provably cannot seat refuses for FR
     expect(a.fire).toBe(false);
     expect(String((a as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
 
-    const withFunRoom = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT, topUps: legacy });
+    const withFunRoom = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT, topUps: legacy });
     const b = lockServerMod.decideCfbTopUp(withFunRoom, now);
     expect(b.fire).toBe(false);
     expect(String((b as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
   });
 
   it("L1: THE ROW SAYS WHICH ARM IT SERVED — a fun-only attempt is recorded as one", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const day = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     const fr = seed([day]);
     setNow(LATER);
     vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, EXTRA));
@@ -3578,7 +3585,7 @@ describe("L5 (2026-09-06) — three mutation survivors, pinned", () => {
     expect(lockServerMod.decideCfbTopUp(short, LATER)).toMatchObject({ fire: true, core: true, fun: false });
 
     /* ...and with the core shut too, the day refuses for FREE rather than write a second parlay */
-    const full = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT, fun: 10 });
+    const full = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT, fun: 10 });
     const d = lockServerMod.decideCfbTopUp(full, LATER);
     expect(d.fire).toBe(false);
     expect(String((d as { reason: string }).reason)).toMatch(/fun money is already on a parlay/);
@@ -3689,7 +3696,9 @@ describe("D1 (2026-09-06) — an empty fun-only attempt holds the next one off; 
   const priced = () => vi.mocked(slateFromEspn).mock.calls.length;
   const EXTRA = ["401858430", "401862701", "401869960"];
   /** the shape DEFECT M(a) made reachable: every dollar of core deployed, $0 of the $25 */
-  const fullCoreEmptyFun = () => serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+  /* 2026-09-08: six seated games still ($250 = four $50 + two $25), so the six open games ahead —
+     and the board that prices them and seats nothing — are exactly the ones the trap was measured on */
+  const fullCoreEmptyFun = () => serverEntry(DATE, { stakes: [50, 50, 50, 50, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
 
   it("D1: the trap is real — the day fires on the fun arm alone, six unseated games are still ahead, and the board seats NOTHING", () => {
     const day = fullCoreEmptyFun();
@@ -3828,7 +3837,7 @@ describe("D3 (2026-09-06) — a fun-only seat is never re-flagged NO-PLAY by the
   });
 
   it("D3(c): A FULL-CORE DAY THAT GAINS ONLY THE $25 is not flagged either — the route adds no flag of its own", async () => {
-    const day = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const day = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     expect(day.noPlay).toBeUndefined();
     const fr = seed([day]);
     setNow(LATER);
@@ -3943,8 +3952,8 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
   it("D2: A DAY THAT HAS STRANDED ITS WHOLE $25 refuses in words that name BOTH allotments", () => {
     /* the shape: every dollar of core deployed, the fun bucket EMPTY, and both fun attempts spent */
     const day = serverEntry(DATE, {
-      stakes: [25, 25, 25, 25, 25, 25],
-      games: gameIds().slice(0, 6),
+      stakes: [50, 50, 50, 50, 50],
+      games: gameIds().slice(0, 5),
       lockedAt: LOCKS_AT,
       topUps: [spentRow(1, { core: false, fun: true }), spentRow(2, { core: false, fun: true })],
     });
@@ -3957,12 +3966,12 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
     /* the cap and its ordinal are unchanged — the CONDITION did not move, only the reporting */
     expect(reason).toMatch(/cap is spent \(2 of 2\)/);
     /* THE PIN: $0 of core is true, and saying only that hides the $25 the day actually stranded */
-    expect(reason).toMatch(/\$0 of the \$150 core/);
+    expect(reason).toMatch(/\$0 of the \$250 core/);
     expect(reason).toMatch(/\$25 of the \$25 fun/);
   });
 
   it("D2: A JOINT CORE+FUN STRANDING names both figures, and a day whose parlay stands reports $0 of fun", () => {
-    /* core $75 owed AND the $25 bucket empty, both arms' attempts spent */
+    /* core $175 owed AND the $25 bucket empty, both arms' attempts spent */
     const both = serverEntry(DATE, {
       stakes: [25, 25, 25],
       games: gameIds().slice(0, 3),
@@ -3971,7 +3980,7 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
     });
     const r1 = String((lockServerMod.decideCfbTopUp(both, LOCKS_AT + 3 * 3600_000) as { reason: string }).reason);
     expect(r1).toMatch(/cap is spent \(2 of 2\)/);
-    expect(r1).toMatch(/\$75 of the \$150 core/);
+    expect(r1).toMatch(/\$175 of the \$250 core/);
     expect(r1).toMatch(/\$25 of the \$25 fun/);
 
     /* the same day once its parlay stands: the fun figure is $0, and it is still stated */
@@ -3983,7 +3992,7 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
       topUps: [spentRow(1, { core: true, fun: true }), spentRow(2, { core: true, fun: true })],
     });
     const r2 = String((lockServerMod.decideCfbTopUp(seated, LOCKS_AT + 3 * 3600_000) as { reason: string }).reason);
-    expect(r2).toMatch(/\$75 of the \$150 core/);
+    expect(r2).toMatch(/\$175 of the \$250 core/);
     expect(r2).toMatch(/\$0 of the \$25 fun/);
   });
 
@@ -4423,34 +4432,34 @@ describe("C4 (2026-09-06) — the decider's room, the settle passes under a merg
   const gameIds = () => slateAt(LOCKS_AT).games.map((g) => g.id);
   const LATER = LOCKS_AT + 15 * 60_000;
 
-  it("(a) the decider offers exactly the room to $150 — and a REFUSED raise hands it MORE room, bounded by the money guard", () => {
-    /* a legitimately short day: three $25 singles, $75 of the $150 deployed */
+  it("(a) the decider offers exactly the room to $250 — and a REFUSED raise hands it MORE room, bounded by the money guard", () => {
+    /* a legitimately short day: three $25 singles, $75 of the $250 deployed */
     const short = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT });
     expect(coreStakeOf(short)).toBe(75);
     const d = lockServerMod.decideCfbTopUp(short, LATER);
     expect(d).toMatchObject({ fire: true, core: true });
-    expect((d as { room: number }).room).toBe(CFB_PAPER.daily - coreStakeOf(short)); // the FULL remainder, $75
+    expect((d as { room: number }).room).toBe(CFB_PAPER.daily - coreStakeOf(short)); // the FULL remainder, $175
     expect((d as { room: number }).room + coreStakeOf(short)).toBe(CFB_PAPER.daily);
 
     /* ...and a day with every dollar seated offers none of it */
-    const full = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const full = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     expect(coreStakeOf(full)).toBe(CFB_PAPER.daily);
     expect(lockServerMod.decideCfbTopUp(full, LATER)).toMatchObject({ room: 0, core: false });
 
     /* THE REFUSED RAISE. Two copies of one day disagree about core-1's stake with no `topUp`
        receipt on either; the kernel keeps the SMALLER and names the refusal. */
-    const lo = serverEntry(DATE, { stakes: [15, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
-    const hi = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    const lo = serverEntry(DATE, { stakes: [15, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT }); // 2026-09-08: $215 of the $250
+    const hi = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT });
     const merged = mergeLedgers([lo], [hi])[0] as CfbLedgerEntry;
     const conflict = (merged as unknown as { stakeConflict?: Record<string, { kept: number; refused: number }> }).stakeConflict;
-    expect(conflict?.[`cfb-${DATE}-core-1`]).toEqual({ kept: 15, refused: 25 });
-    expect(coreStakeOf(merged)).toBe(140);
+    expect(conflict?.[`cfb-${DATE}-core-1`]).toEqual({ kept: 15, refused: 50 });
+    expect(coreStakeOf(merged)).toBe(215);
     expect(merged.source).toBe("server-lock");
 
-    /* the decider does not read the marker, so the refused $10 comes back as fresh owed */
+    /* the decider does not read the marker, so the refused $35 comes back as fresh owed */
     const dm = lockServerMod.decideCfbTopUp(merged, LATER);
     expect(dm).toMatchObject({ fire: true, core: true });
-    expect((dm as { room: number }).room).toBe(CFB_PAPER.daily - coreStakeOf(merged)); // $10
+    expect((dm as { room: number }).room).toBe(CFB_PAPER.daily - coreStakeOf(merged)); // $35
     expect((dm as { room: number }).room).toBeGreaterThan(0);
 
     /* THE BOUND, which is what actually protects the money: the offer is capped by the allotment */
@@ -4458,8 +4467,8 @@ describe("C4 (2026-09-06) — the decider's room, the settle passes under a merg
     expect((dm as { room: number }).room + coreStakeOf(merged)).toBe(CFB_PAPER.daily);
     /* ...and a RECORDED day over the allotment is refused outright, marker or no marker */
     expect(() => lockServerMod.assertCfbEntryMoney(merged)).not.toThrow();
-    const over = serverEntry(DATE, { stakes: [25, 25, 25, 25, 25, 25, 25], games: gameIds().slice(0, 7), lockedAt: LOCKS_AT });
-    expect(coreStakeOf(over)).toBe(175);
+    const over = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50, 50], games: gameIds().slice(0, 6), lockedAt: LOCKS_AT });
+    expect(coreStakeOf(over)).toBe(300);
     expect(() => lockServerMod.assertCfbEntryMoney(over)).toThrow(/MONEY GUARD/);
   });
 

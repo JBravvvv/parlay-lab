@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { EmptyState } from "@/components/ui/states";
+import { useLeague } from "@/components/football/LeagueContext";
 import type { CfbTeam } from "@/lib/cfb/types";
 import { TeamMark } from "./TeamMark";
 import { fmtSigned } from "./CfbGameCard";
@@ -38,6 +39,8 @@ export function CfbFpiPanel({
   searchable?: boolean;
 }) {
   const [query, setQuery] = useState("");
+  /* the league seam (2026-09-08): the bar / focus accent and the FCS wording come off useLeague() */
+  const nfl = useLeague().id === "nfl";
   const { rated, unrated, scale } = useMemo(() => {
     const seen = new Set<string>();
     const unique: CfbTeam[] = [];
@@ -67,11 +70,11 @@ export function CfbFpiPanel({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="⌕ Find a team…"
           aria-label="Find a team"
-          className="mb-3 w-full rounded-full border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] text-text outline-none transition-colors placeholder:text-faint focus:border-cfb/60"
+          className={`mb-3 w-full rounded-full border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] text-text outline-none transition-colors placeholder:text-faint ${nfl ? "focus:border-nfl/60" : "focus:border-cfb/60"}`}
         />
       )}
       {rated.length === 0 ? (
-        <EmptyState title="No FPI on this slate" body="ESPN's power index was unavailable for this load, or none of these teams is rated (FCS programs are not)." />
+        <EmptyState title="No FPI on this slate" body={`ESPN's power index was unavailable for this load, or none of these teams is rated${nfl ? "" : " (FCS programs are not)"}.`} />
       ) : shown.length === 0 ? (
         <EmptyState title="No team matches" body="Try the school's short name or abbreviation." />
       ) : (
@@ -90,7 +93,7 @@ export function CfbFpiPanel({
                     {t.fpiRank != null && <span className="num ml-auto shrink-0 text-[10px] text-muted">FPI #{t.fpiRank}</span>}
                   </div>
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-3">
-                    <div className={`h-full rounded-full ${fpi >= 0 ? "bg-cfb" : "bg-neg/70"}`} style={{ width: `${w}%` }} />
+                    <div className={`h-full rounded-full ${fpi >= 0 ? (nfl ? "bg-nfl" : "bg-cfb") : "bg-neg/70"}`} style={{ width: `${w}%` }} />
                   </div>
                 </div>
                 <span className={`num w-12 shrink-0 text-right text-[13px] font-bold ${fpi >= 0 ? "text-text" : "text-neg"}`}>{fmtSigned(fpi)}</span>
@@ -104,7 +107,7 @@ export function CfbFpiPanel({
           {more > 0 && <span>+{more} more rated</span>}
           {unrated.length > 0 && (
             <span title={unrated.map((t) => t.short).join(", ")}>
-              {unrated.length} unrated (FCS / not listed): {unrated.map((t) => t.abbr).join(", ")}
+              {unrated.length} unrated ({nfl ? "not listed" : "FCS / not listed"}): {unrated.map((t) => t.abbr).join(", ")}
             </span>
           )}
           {updated && <span className="ml-auto">ESPN FPI · updated {fmtFpiUpdated(updated)}</span>}

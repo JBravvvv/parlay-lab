@@ -15,7 +15,7 @@ import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
 import { PlayerName } from "@/components/player/PlayerName";
 import { WINDOW_GAMES, isWindowGroup, parseWindowValue, siblingWindow, windowNote, windowValue } from "@/lib/stats-window";
-import { CFB_ENABLED } from "@/lib/features";
+import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { calibrationFor, scopedStatsSport, sportsFor, statsQueryEnabled, type StatsSportId } from "@/lib/stats-scope";
 import { Overlay, useOverlay } from "@/components/ui/Overlay";
@@ -23,6 +23,10 @@ import { CfbFpiPanel, fmtFpiUpdated } from "@/components/cfb/CfbFpiPanel";
 import { useCfbBankroll } from "@/components/cfb/CfbBoard";
 import { CFB_STALE_MS, cfbQueryKey, loadCfbSlate } from "@/lib/cfb/client";
 import { CFB_BANK_BASE } from "@/lib/cfb/rules";
+import { NflFpiPanel } from "@/components/nfl/NflFpiPanel";
+import { useNflBankroll } from "@/lib/nfl/useNflDesk";
+import { NFL_STALE_MS, nflQueryKey, loadNflSlate } from "@/lib/nfl/client";
+import { NFL_BANK_BASE } from "@/lib/nfl/rules";
 import type { CfbSlate } from "@/lib/cfb/types";
 import { ptToday } from "@/components/games/logo";
 
@@ -307,6 +311,7 @@ export default function StatsPage() {
     if (!calibrationFor(desk)) setCalView(false);
   }, [desk]);
   const cfbDesk = CFB_ENABLED && desk === "cfb";
+  const nflDesk = NFL_ENABLED && desk === "nfl";
   const deskSports = sportsFor(desk);
   const showCalibration = calibrationFor(desk);
   // the ESPN FPI board lives behind a button, in a 60% sheet (Josh: "it takes up too much space")
@@ -322,6 +327,16 @@ export default function StatsPage() {
     enabled: cfbDesk && cfbBankroll != null,
   });
   const cfbSlate = cfbQ.data ?? null;
+  // the NFL desk's slate feeds its own FPI panel the same way (2026-09-08) — one fetch, shared with the NFL board
+  const nflBankroll = useNflBankroll();
+  const nflQ = useQuery<CfbSlate>({
+    queryKey: nflQueryKey(today, nflBankroll ?? NFL_BANK_BASE),
+    queryFn: () => loadNflSlate(today, { bankroll: nflBankroll ?? NFL_BANK_BASE }),
+    staleTime: NFL_STALE_MS,
+    retry: 1,
+    enabled: nflDesk && nflBankroll != null,
+  });
+  const nflSlate = nflQ.data ?? null;
 
   /** a tap on a pill: choose it (the desk scopes it; the filters re-cut through the effect above) and remember it */
   function pickSport(s: SportId) {
@@ -425,8 +440,8 @@ export default function StatsPage() {
     <>
       <PageHeader
         title="Stats"
-        eyebrow={cfbDesk ? "College Football" : undefined}
-        chip={cfbDesk ? <CfbChip /> : undefined}
+        eyebrow={cfbDesk ? "College Football" : nflDesk ? "National Football League" : undefined}
+        chip={cfbDesk ? <CfbChip /> : nflDesk ? <NflChip /> : undefined}
         sub={
           sport === "ufc"
             ? "UFC — official divisional rankings, pound-for-pound & the full active roster"
@@ -434,18 +449,24 @@ export default function StatsPage() {
         }
         action={
           <div className="flex flex-wrap items-center gap-2">
-            {cfbDesk && (
+            {(cfbDesk || nflDesk) && (
               <Pill
                 variant="ghost"
                 onClick={fpi.show}
                 aria-haspopup="dialog"
                 aria-expanded={fpi.open}
-                className="press border-cfb/40 bg-cfb/10 text-cfb hover:bg-cfb/20 hover:border-cfb/60"
+                className={`press ${
+                  nflDesk
+                    ? "border-nfl/40 bg-nfl/10 text-nfl hover:bg-nfl/20 hover:border-nfl/60"
+                    : "border-cfb/40 bg-cfb/10 text-cfb hover:bg-cfb/20 hover:border-cfb/60"
+                }`}
               >
                 <span className="flex flex-col items-start leading-none">
                   <span>📊 ESPN FPI</span>
-                  {cfbSlate?.fpiUpdated && (
-                    <span className="num mt-0.5 text-[9.5px] font-medium text-cfb/70">{fmtFpiUpdated(cfbSlate.fpiUpdated)}</span>
+                  {(nflDesk ? nflSlate : cfbSlate)?.fpiUpdated && (
+                    <span className={`num mt-0.5 text-[9.5px] font-medium ${nflDesk ? "text-nfl/70" : "text-cfb/70"}`}>
+                      {fmtFpiUpdated((nflDesk ? nflSlate : cfbSlate)!.fpiUpdated!)}
+                    </span>
                   )}
                 </span>
               </Pill>
@@ -475,6 +496,20 @@ export default function StatsPage() {
             teams={cfbSlate?.games.flatMap((g) => [g.home, g.away]) ?? []}
             updated={cfbSlate?.fpiUpdated ?? null}
             title={cfbSlate ? "Today's teams" : cfbQ.isError ? "Slate did not load" : "Loading slate…"}
+          />
+        </Overlay>
+      )}
+
+      {/* NFL desk (2026-09-08): its own FPI sheet in the NFL blue — NflFpiPanel is CfbFpiPanel on the NFL desk handles */}
+      {nflDesk && (
+        <Overlay open={fpi.open} onClose={fpi.hide} size="sixty" tone="nfl" title="ESPN FPI">
+          <NflFpiPanel
+            bare
+            searchable
+            limit={40}
+            teams={nflSlate?.games.flatMap((g) => [g.home, g.away]) ?? []}
+            updated={nflSlate?.fpiUpdated ?? null}
+            title={nflSlate ? "Today's teams" : nflQ.isError ? "Slate did not load" : "Loading slate…"}
           />
         </Overlay>
       )}
@@ -612,7 +647,7 @@ export default function StatsPage() {
       )}
 
       <div className="mt-6 text-[10.5px] text-faint">
-        {cfbDesk ? "ESPN college football stats + FPI, live" : "MLB Stats API, live — the same feeds as the original Stats tab"}. Informational only, not betting advice.
+        {cfbDesk ? "ESPN college football stats + FPI, live" : nflDesk ? "ESPN NFL stats + FPI, live" : "MLB Stats API, live — the same feeds as the original Stats tab"}. Informational only, not betting advice.
       </div>
     </>
   );
@@ -623,6 +658,15 @@ function CfbChip() {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-cfb/40 bg-cfb/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cfb">
       🏈 CFB
+    </span>
+  );
+}
+
+/* NFL desk chip — the 🏈 badge beside the h1 whenever the global SportSwitch is on the NFL (2026-09-08) */
+function NflChip() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-nfl/40 bg-nfl/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-nfl">
+      🏈 NFL
     </span>
   );
 }

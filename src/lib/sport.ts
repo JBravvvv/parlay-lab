@@ -11,8 +11,12 @@ import { useSyncExternalStore } from "react";
  *
  * Persisted per device under `pl_sport`. Read through useSyncExternalStore with an "mlb"
  * server snapshot so the first client render matches SSR (the hydration rule).
+ *
+ * THE THIRD DESK (2026-09-08, Josh: "NFL needs to be built NOW"): "nfl" joins the switch as its
+ * own pill, its own ledger / bank / keys (src/lib/nfl/rules.ts) and its own accent colour; the
+ * football surfaces are shared with CFB through a LeagueContext, never the constants.
  */
-export type Sport = "mlb" | "cfb";
+export type Sport = "mlb" | "cfb" | "nfl";
 
 export const SPORT_KEY = "pl_sport";
 export const SPORT_EVENT = "pl:sport";
@@ -20,12 +24,13 @@ export const SPORT_EVENT = "pl:sport";
 export const SPORT_META: Record<Sport, { label: string; short: string; emoji: string; eyebrow: string; feed: string }> = {
   mlb: { label: "MLB", short: "MLB", emoji: "⚾", eyebrow: "Major League Baseball", feed: "official MLB box scores" },
   cfb: { label: "College Football", short: "CFB", emoji: "🏈", eyebrow: "College Football · FBS", feed: "ESPN final scores" },
+  nfl: { label: "NFL", short: "NFL", emoji: "🏈", eyebrow: "National Football League", feed: "ESPN final scores" },
 };
 
-export const SPORTS: readonly Sport[] = ["mlb", "cfb"] as const;
+export const SPORTS: readonly Sport[] = ["mlb", "cfb", "nfl"] as const;
 
 export function isSport(x: unknown): x is Sport {
-  return x === "mlb" || x === "cfb";
+  return x === "mlb" || x === "cfb" || x === "nfl";
 }
 
 export function getSport(): Sport {

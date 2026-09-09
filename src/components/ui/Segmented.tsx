@@ -39,12 +39,18 @@ const SIZE = {
   sm: "h-[26px] gap-[3px] px-1.5 text-[10px]",
   md: "h-[30px] gap-1.5 px-3 text-[11.5px]",
 } as const;
+/* `dense` on sm (2026-09-08, the three-desk SportSwitch): px-1 instead of px-1.5. Measured with Geist at
+   375px — brand 95px + three label-only pills 101px + five 26px top-bar icons 138px + two 6px gaps + 24px
+   gutter = 370px; at px-1.5 the switch is 113px and the CFB desk's row (Season Lab is its fifth icon)
+   overflows by 7px. Opt-in, so every other sm Segmented keeps its padding. */
+const SIZE_SM_DENSE = "h-[26px] gap-[3px] px-1 text-[10px]";
 
 export function Segmented<K extends string>({
   options,
   value,
   onChange,
   size = "md",
+  dense = false,
   tone = "pos",
   label,
   className = "",
@@ -53,8 +59,10 @@ export function Segmented<K extends string>({
   value: K;
   onChange: (key: K) => void;
   size?: "sm" | "md";
-  /** the thumb's accent — lime (default) or the CFB amber */
-  tone?: "pos" | "cfb";
+  /** sm only: the tighter px-1 pill (the phone header's three-desk SportSwitch) */
+  dense?: boolean;
+  /** the thumb's accent — lime (default), the CFB amber, or the NFL blue */
+  tone?: "pos" | "cfb" | "nfl";
   /** accessible name for the group */
   label?: string;
   className?: string;
@@ -64,7 +72,7 @@ export function Segmented<K extends string>({
   const ready = useReady();
   const group = useRef<HTMLDivElement>(null);
   const transition = ready && !reduced ? SNAP : INSTANT;
-  const lit = tone === "cfb" ? "text-cfb" : "text-pos";
+  const lit = tone === "cfb" ? "text-cfb" : tone === "nfl" ? "text-nfl" : "text-pos";
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
@@ -89,7 +97,7 @@ export function Segmented<K extends string>({
             title={o.title}
             tabIndex={on ? 0 : -1}
             onClick={() => onChange(o.key)}
-            className={`press hit-44 relative flex items-center justify-center whitespace-nowrap rounded-full font-semibold ${SIZE[size]} ${
+            className={`press hit-44 relative flex items-center justify-center whitespace-nowrap rounded-full font-semibold ${dense && size === "sm" ? SIZE_SM_DENSE : SIZE[size]} ${
               on ? lit : "text-muted hover:text-text"
             }`}
           >
@@ -98,7 +106,7 @@ export function Segmented<K extends string>({
                 layoutId={`segmented-thumb-${id}`}
                 initial={false}
                 transition={transition}
-                className={`segmented-thumb ${tone === "cfb" ? "is-cfb" : ""}`}
+                className={`segmented-thumb ${tone === "cfb" ? "is-cfb" : tone === "nfl" ? "is-nfl" : ""}`}
                 aria-hidden
               />
             )}
