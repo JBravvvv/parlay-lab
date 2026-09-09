@@ -1039,9 +1039,9 @@
    "latestRaw": 1600520
   },
   {
-   "bestAt": 1788711307785,
-   "bestGz": 167396,
-   "bestRaw": 1417184,
+   "bestAt": 1788742812415,
+   "bestGz": 28097,
+   "bestRaw": 272128,
    "date": "2026-09-06",
    "genIndex": [
     {
@@ -1081,7 +1081,7 @@
     }
    ],
    "gens": 5,
-   "identical": false,
+   "identical": true,
    "latestAt": 1788742812415,
    "latestGz": 28097,
    "latestRaw": 272128
