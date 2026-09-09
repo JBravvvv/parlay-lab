@@ -237,7 +237,7 @@ describe("the 2026-09-05 fixture card", () => {
  * clearing the +2% / 2.60 core gate, SIX of them clearing the -3% fun gate across FIVE distinct
  * games. Rebuilt with `daily: 0` and with `daily: 150` that board answered `noPlay` both times,
  * so it was never a room problem: the fun bucket simply sat behind the core's gate. Every such
- * attempt costs one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX = 2 per date, for
+ * attempt costs one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX per date (2 when measured; 6 since INSTRUCTION 48, 2026-09-09), for
  * $0 seated — repeating every Saturday against a 2500/day cap that already binds on Saturdays.
  *
  * THE RULE THESE TESTS PIN: the two allotments are gated INDEPENDENTLY. A day is NO-PLAY only

@@ -46,7 +46,7 @@
 
 
 **Josh types the secret. It is never entered on his behalf, never logged, never placed in a
-query string.** `/api/generate` spends ~120 Odds credits per call, so the secret travels in a
+query string.** `/api/generate` spends 114-150 Odds credits per call (a block fire is a full-slate run; up to 4 top-up sweeps a day ≥45 min apart, an empty sweep holds the next off 90 min — INSTRUCTION 48, 2026-09-09), so the secret travels in a
 **header** only.
 
 `/api/generate` came out of `vercel.json` in the same change that created these — with the
@@ -800,6 +800,10 @@ Corrected the same day to the four hours the ticker can reach:
 Pinned in `tests/daily-grading.test.ts`: `GRADE_HOURS === [15, 18, 22, 2]`, every entry inside the
 window, 6/10/14 as negatives. The calibrate route's own 10-minute limiter keeps a double tick
 from grading twice.
+
+The same row is the MLB top-up ticker (INSTRUCTION 48, 2026-09-09): up to `TOPUP_MAX` 4 sweeps a
+date, ≥45 min apart, an empty sweep holding the next off 90 min — and **the last MLB sweep chance
+of a date is the 02:45Z poke**, the final tick of the 0–2 hour band. No cron-job.org change.
 
 **Widening this is Josh's call on cron-job.org, not a code change.** Extending the scheduler row
 to more hours (e.g. 24×7, ~96 executions/day against the 100/day free tier that `/api/clv`

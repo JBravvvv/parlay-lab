@@ -286,3 +286,18 @@ present ~20,500/month, upgrading buys ~5× headroom for $29/month more and requi
 instrument to be gutted — including keeping both archives *and* running the second pass.
 Given that the archives' only cost is money and their only alternative is deletion, this
 is a reasonable thing to buy rather than engineer around.
+
+## 2026-09-09 INSTRUCTION 48 — top-ups all day
+Josh: the locked card keeps growing to the daily allotment; nothing is ever removed. Cadence
+constants moved (`TOPUP_MAX` 2 → 4 with a 90-min empty-sweep cooldown, `CFB_TOPUP_MAX` 2 → 6,
+`NFL_TOPUP.max` 2 → 6); a block fire is a full-slate generate at 114–150 credits (the old
+"~50-91" figure is retired), a football lines pull is 6. Worst-case arithmetic:
+
+| desk | per date BEFORE (worst) | per date AFTER (worst) | delta | realistic |
+|---|---|---|---|---|
+| MLB | 4 + 2 = 6 runs → 684–900 | 4 + 4 = 8 runs → 912–1,200 | +228–300 | 1 block fire + 2–3 sweeps ≈ 342–600 (empty sweep holds 90 min, slot-fit refuses free) |
+| CFB | lock 6 + CFB_TOPUP_MAX (2) × 6 = 18 | 6 + 6 × 6 = 42 | +24 | Saturday ≈ 2,500 props + 42 (arms only close, so the two per-arm counters share CFB_TOPUP_MAX priced boards — not 2 × 6; a fix-round draft said 78) |
+| NFL | 18 | 42 | +24 | Sunday ≈ 1,000 props + 42; Thu/Mon dates lines-only ≤ 42 |
+| fixed rails (unchanged by this order) | ~231/day | ~231/day | 0 | `/api/clv` 45 + line-history 25 + props-history 161, this file's RE-MEASURED table |
+
+Remaining September (09-09..09-30: 22 MLB days, 3 Saturdays, 3 Sundays): MLB 22 × ~600 realistic = 13,200 (hard worst 26,400); fixed rails 22 × ~231 ≈ 5,080; CFB 3 × 2,542 = 7,626; NFL 3 × 1,042 + ~6 × 42 ≈ 3,380 — **≈ 29,300 realistic**. Against it: the plan is 20,000/month and the cycle resets ~10-01 (`docs/credit-budget.md`: "~24 days into the cycle" on 07-25); the last quota reading in the tree is **16,480 remaining on 2026-09-05** (`src/lib/cfb/rules.ts`, the `CFB_PROPS` docblock — its own line above records `x-requests-used` 2428 → 3187 in that Saturday's single props pull), read BEFORE that Saturday's spend and four further days, so the real 09-09 figure is materially lower and must be re-read off `/api/cfb`'s `quota.remaining` (a normal board read; this fix round made no Odds call) and dated. **On this arithmetic the month is ALREADY short by roughly 13,000 credits before the CFB Saturdays are counted** — MLB ~600/day + fixed ~231/day alone exceeds the ~630/day the 09-05 reading allowed — and exhausting the key takes `/api/clv` (the scoreboard) down with it. The month was over-subscribed by the PROPS rails before this order; this order adds ≤ +300/day on MLB and ≤ +24/date per football desk. The first lever is due NOW, pending Josh's word, in this order: `CFB_PROPS.dailyBudget` 2500 → 1500 (`src/lib/cfb/rules.ts`, the `CFB_PROPS` literal) → `NFL_PROPS.dailyBudget` 1000 (`src/lib/nfl/rules.ts`, the `NFL_PROPS` literal) → `TOPUP_MAX` 4 → 3 on Josh's word only.

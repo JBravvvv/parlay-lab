@@ -1,3 +1,4 @@
+import { assertAppendOnly } from "@/lib/append-only";
 import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { validateBankStore, type BankStore } from "@/lib/bankroll";
 import { redis } from "@/lib/server/store";
@@ -580,6 +581,8 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
       };
     }
     const next = applyTopUp(cfg, live, plan, args.now, again.n);
+    /* INSTRUCTION 48 (2026-09-09): a locked ticket is never dropped or resized — throw before the SET. */
+    assertAppendOnly(live, next, "topUpDate/write");
     const merged = cur.map((e) => (e.date === next.date && e.locked ? (next as SyncEntry) : e));
     if (JSON.stringify(merged).length > MAX_BYTES) return { action: "error", error: "merged ledger too large" };
     await redis(["SET", keys.ledger, JSON.stringify({ ledger: merged, at: args.now } satisfies LockStored)]);

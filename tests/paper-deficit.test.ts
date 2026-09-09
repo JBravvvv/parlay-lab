@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { effectiveBlockBudget, decideTopUp, type SlateBlock, type BlockRegistry } from "@/lib/server/blocks";
-import { TOPUP_MAX, PAPER } from "@/lib/paper-mode";
+import { effectiveBlockBudget, decideTopUp, openSlotStakes, type SlateBlock, type BlockRegistry } from "@/lib/server/blocks";
+import { TOPUP_MAX, TOPUP_EMPTY_RETRY_MS, PAPER } from "@/lib/paper-mode";
+import { CORE_SHAPES } from "@/lib/core-shapes";
 import { buildLockEntry } from "@/lib/server/lock-card";
 
 /**
@@ -95,12 +96,172 @@ describe("decideTopUp — the sweep that makes 'no matter what' true while games
     expect(decideTopUp({ entry: null, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
     expect(decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: allFired, starts, now: T("2026-08-20T02:00:00Z"), daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
   });
-  it("the cap is the registry's topup count — spent means spent", () => {
-    const reg: BlockRegistry = { ...allFired, "topup-1": { firedAt: 4, at: 4 }, "topup-2": { firedAt: 5, at: 5 } };
+  it("the cap is the registry's topup count — spent means spent (TOPUP_MAX rows, whatever TOPUP_MAX is)", () => {
+    /* RE-PINNED 2026-09-09 (INSTRUCTION 48): was a literal two rows against a literal 2. */
+    const reg: BlockRegistry = { ...allFired };
+    for (let i = 1; i <= TOPUP_MAX; i++) reg[`topup-${i}`] = { firedAt: 3 + i, at: 3 + i };
     const d = decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX });
     expect(d.fire).toBe(false);
     expect(d.reason).toMatch(/cap/);
-    expect(d.used).toBe(2);
+    expect(d.used).toBe(TOPUP_MAX);
+    /* one row short of the cap still fires (no coreShape on this entry → slot-fit skipped; rows carry no `tickets` → no cooldown) */
+    const one: BlockRegistry = { ...allFired };
+    for (let i = 1; i < TOPUP_MAX; i++) one[`topup-${i}`] = { firedAt: 3 + i, at: 3 + i };
+    expect(decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: one, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+  });
+});
+
+/**
+ * INSTRUCTION 48 (2026-09-09, Josh's word, verbatim: "The Card for today is 'locked' which is
+ * fine, but it only played $25 today. I understand thats all it had meeting the criteria at this
+ * time which is completely fine. Throughout the rest of the day refresh, if it analyzes more
+ * picks/parlays that meet the betting criteria, it can continue to add to the card up to the
+ * daily allotted amount. It can lock multiple times per day, but it can never remove a pick it
+ * can only add to it").
+ *
+ * What changed on the MLB rail is CADENCE, not the engine: TOPUP_MAX 2 → 4, and two FREE
+ * refusals in decideTopUp that make four attempts worth having — an empty sweep (registry row
+ * `tickets: 0`) holds the next off TOPUP_EMPTY_RETRY_MS, and a sweep whose budget (= owed) cannot
+ * own any open slot of the day's shape is refused before it spends a full generate (114-150
+ * credits) to deploy $0. The refusal ORDER above (no lock → fully deployed → pending block →
+ * every game started → cap) is unchanged and re-asserted at the end.
+ */
+describe("INSTRUCTION 48 — the constants", () => {
+  it("TOPUP_MAX is 4 and TOPUP_EMPTY_RETRY_MS is 90 minutes (twice generate's 45-min limiter)", () => {
+    expect(TOPUP_MAX).toBe(4);
+    expect(TOPUP_EMPTY_RETRY_MS).toBe(90 * 60_000);
+  });
+});
+
+describe("INSTRUCTION 48 — the EMPTY-SWEEP COOLDOWN (free, from the registry's own rows)", () => {
+  const now = T("2026-08-19T23:11:00Z");
+  const allFired: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 } };
+  const starts = BLOCKS.flatMap((b) => b.starts);
+  const entry = { paper: true, allocSum: 49 };
+  const run = (reg: BlockRegistry) => decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
+
+  it("a sweep that priced a board 30 min ago and seated nothing holds the next one off", () => {
+    const d = run({ ...allFired, "topup-1": { firedAt: now - 30 * 60_000, tickets: 0, at: now - 30 * 60_000 } });
+    expect(d.fire).toBe(false);
+    expect(d.reason).toMatch(/seated nothing|waits/);
+    expect(d.reason).toMatch(/topup-1/);
+    expect(d.reason).toMatch(/30 min ago/);
+    expect(d.reason).toMatch(/60 more min/);
+    expect(d).toMatchObject({ owed: 101, used: 1 });
+  });
+  it("the same empty row 91 min ago no longer holds — the cooldown is a window, not a kill", () => {
+    expect(run({ ...allFired, "topup-1": { firedAt: now - 91 * 60_000, tickets: 0, at: now - 91 * 60_000 } }).fire).toBe(true);
+  });
+  it("a sweep that SEATED something 20 min ago does not arm it — the board is moving", () => {
+    expect(run({ ...allFired, "topup-1": { firedAt: now - 20 * 60_000, tickets: 2, at: now - 20 * 60_000 } }).fire).toBe(true);
+  });
+  it("only the LATEST topup row counts: an old empty one behind a fresh seated one does not hold", () => {
+    const reg: BlockRegistry = {
+      ...allFired,
+      "topup-1": { firedAt: now - 80 * 60_000, tickets: 0, at: now - 80 * 60_000 },
+      "topup-2": { firedAt: now - 20 * 60_000, tickets: 1, at: now - 20 * 60_000 },
+    };
+    expect(run(reg).fire).toBe(true);
+    const flipped: BlockRegistry = {
+      ...allFired,
+      "topup-1": { firedAt: now - 80 * 60_000, tickets: 1, at: now - 80 * 60_000 },
+      "topup-2": { firedAt: now - 20 * 60_000, tickets: 0, at: now - 20 * 60_000 },
+    };
+    expect(run(flipped).fire).toBe(false);
+    expect(run(flipped).reason).toMatch(/topup-2/);
+  });
+  it("rows without a numeric `tickets` (the legacy fixtures) never arm it, and omitting emptyRetryMs is the pre-09-09 behaviour", () => {
+    expect(run({ ...allFired, "topup-1": { firedAt: now - 5 * 60_000, at: now - 5 * 60_000 } }).fire).toBe(true);
+    const reg: BlockRegistry = { ...allFired, "topup-1": { firedAt: now - 5 * 60_000, tickets: 0, at: now - 5 * 60_000 } };
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+  });
+});
+
+describe("INSTRUCTION 48 — SLOT-FIT (free): a sweep must be able to OWN an open slot or it is refused", () => {
+  const now = T("2026-08-19T23:11:00Z");
+  const allFired: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 } };
+  const starts = BLOCKS.flatMap((b) => b.starts);
+  /* shape A: 2x$60 2-leg + 3x$10 3-4 leg (slots [60, 60, 10, 10, 10]) */
+  const A = { id: "A", slots: CORE_SHAPES[0].slots };
+  expect(CORE_SHAPES[0].id).toBe("A");
+  const seat = (stake: number, shapeSlot: number) => ({ id: `t${shapeSlot}`, stake, shapeSlot });
+  const run = (entry: Record<string, unknown>) => decideTopUp({ entry, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
+
+  it("$60 in slot 0, allocSum 60 → owed 90, the other $60 slot fits → fires", () => {
+    const d = run({ paper: true, allocSum: 60, slotUnderSum: 0, coreShape: A, core: [seat(60, 0)] });
+    expect(d).toMatchObject({ fire: true, owed: 90 });
+  });
+  it("two $60s in slots 0 and 1, allocSum 120 → owed 30 ≥ the $10 slots → fires", () => {
+    const d = run({ paper: true, allocSum: 120, coreShape: A, core: [seat(60, 0), seat(60, 1)] });
+    expect(d).toMatchObject({ fire: true, owed: 30 });
+  });
+  it("every slot seated (allocSum 150) → 'fully deployed' — owed 0 precedes slot-fit", () => {
+    const d = run({ paper: true, allocSum: 150, coreShape: A, core: [seat(60, 0), seat(60, 1), seat(10, 2), seat(10, 3), seat(10, 4)] });
+    expect(d).toEqual({ fire: false, reason: "day fully deployed", owed: 0, used: 0 });
+  });
+  it("every slot seated under Kelly (allocSum 90 + slotUnderSum 60) → still 'fully deployed' by the 09-08 cap-at-Kelly rule", () => {
+    const d = run({ paper: true, allocSum: 90, slotUnderSum: 60, coreShape: A, core: [seat(30, 0), seat(30, 1), seat(10, 2), seat(10, 3), seat(10, 4)] });
+    expect(d).toEqual({ fire: false, reason: "day fully deployed", owed: 0, used: 0 });
+  });
+  it("every slot seated but the entry's sums are short (allocSum 140, no slotUnderSum) → 'every slot … is seated', not a $10 sweep", () => {
+    const d = run({ paper: true, allocSum: 140, coreShape: A, core: [seat(60, 0), seat(60, 1), seat(10, 2), seat(10, 3), seat(10, 4)] });
+    expect(d.fire).toBe(false);
+    expect(d.reason).toMatch(/every slot of the day's shape is seated/);
+    expect(d.owed).toBe(10);
+  });
+  it("THE 09-09 DAY: a $25 ticket in slot 0 (allocSum 25, slotUnderSum 35) → owed 90, open [60, 10, 10, 10] → fires", () => {
+    const entry = { paper: true, allocSum: 25, slotUnderSum: 35, coreShape: A, core: [seat(25, 0)] };
+    expect(openSlotStakes(entry)).toEqual([60, 10, 10, 10]);
+    const d = run(entry);
+    expect(d).toMatchObject({ fire: true, owed: 90 });
+  });
+  it("owed $5 with only $10 slots open → refused, naming the smallest open slot — the shortfall is Kelly sizing, not an empty seat", () => {
+    const entry = { paper: true, allocSum: 100, slotUnderSum: 45, coreShape: A, core: [seat(50, 0), seat(40, 1), seat(10, 2)] };
+    expect(openSlotStakes(entry)).toEqual([10, 10]);
+    const d = run(entry);
+    expect(d.fire).toBe(false);
+    expect(d.reason).toMatch(/smallest open slot/);
+    expect(d.reason).toMatch(/\$5 /);
+    expect(d.reason).toMatch(/\$10;/);
+    expect(d).toMatchObject({ owed: 5, used: 0 });
+  });
+  it("owed exactly the smallest open slot fires (≤, not <)", () => {
+    const entry = { paper: true, allocSum: 100, slotUnderSum: 40, coreShape: A, core: [seat(50, 0), seat(40, 1), seat(10, 2)] };
+    expect(run(entry)).toMatchObject({ fire: true, owed: 10 });
+  });
+  it("a day without coreShape (pre-09-08) skips slot-fit entirely — behaves as before", () => {
+    expect(run({ paper: true, allocSum: 145 })).toMatchObject({ fire: true, owed: 5 });
+    expect(openSlotStakes({ paper: true, allocSum: 145 })).toBeNull();
+    expect(openSlotStakes(null)).toBeNull();
+  });
+  it("coreShape with only an id resolves the slots off the menu", () => {
+    expect(openSlotStakes({ coreShape: { id: "A" }, core: [seat(60, 1)] })).toEqual([60, 10, 10, 10]);
+    expect(openSlotStakes({ coreShape: { id: "not-a-shape" }, core: [] })).toBeNull();
+  });
+  it("openSlotStakes seats a shapeSlot-less $30 legacy ticket into the SMALLEST fitting slot ($60) — exactly as lock-card's seatCarried", () => {
+    expect(openSlotStakes({ coreShape: A, core: [{ id: "legacy", stake: 30 }] })).toEqual([60, 10, 10, 10]);
+    /* two $10 legacy tickets take the $10 slots, not the $60s */
+    expect(openSlotStakes({ coreShape: A, core: [{ id: "l1", stake: 10 }, { id: "l2", stake: 10 }] })).toEqual([60, 60, 10]);
+    /* a $100 legacy ticket fits nowhere: stranded, ignored — every slot stays open */
+    expect(openSlotStakes({ coreShape: A, core: [{ id: "big", stake: 100 }] })).toEqual([60, 60, 10, 10, 10]);
+    /* an out-of-range shapeSlot falls back to best-fit; a duplicate shapeSlot too */
+    expect(openSlotStakes({ coreShape: A, core: [{ id: "x", stake: 10, shapeSlot: 9 }] })).toEqual([60, 60, 10, 10]);
+    expect(openSlotStakes({ coreShape: A, core: [seat(60, 0), { id: "dup", stake: 60, shapeSlot: 0 }] })).toEqual([10, 10, 10]);
+  });
+  it("the refusal ORDER still holds: no lock → fully deployed → pending block → every game started → cap → slot-fit → cooldown", () => {
+    const tight = { paper: true, allocSum: 100, slotUnderSum: 45, coreShape: A, core: [seat(50, 0), seat(40, 1), seat(10, 2)] }; // slot-fit would refuse
+    const base = { blocks: BLOCKS, starts, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS };
+    expect(decideTopUp({ ...base, entry: null, registry: allFired, now }).reason).toMatch(/no paper lock/);
+    expect(decideTopUp({ ...base, entry: { ...tight, allocSum: 150 }, registry: allFired, now }).reason).toBe("day fully deployed");
+    const pendingC: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } };
+    expect(decideTopUp({ ...base, entry: tight, registry: pendingC, now: T("2026-08-19T19:00:00Z") }).reason).toMatch(/can still fire/);
+    expect(decideTopUp({ ...base, entry: tight, registry: allFired, now: T("2026-08-20T02:00:00Z") }).reason).toMatch(/every game started/);
+    const capped: BlockRegistry = { ...allFired };
+    for (let i = 1; i <= TOPUP_MAX; i++) capped[`topup-${i}`] = { firedAt: now - 5 * 60_000, tickets: 0, at: now - 5 * 60_000 };
+    expect(decideTopUp({ ...base, entry: tight, registry: capped, now }).reason).toMatch(/cap/);
+    const cooling: BlockRegistry = { ...allFired, "topup-1": { firedAt: now - 5 * 60_000, tickets: 0, at: now - 5 * 60_000 } };
+    expect(decideTopUp({ ...base, entry: tight, registry: cooling, now }).reason).toMatch(/smallest open slot/);
+    expect(decideTopUp({ ...base, entry: { ...tight, slotUnderSum: 30 }, registry: cooling, now }).reason).toMatch(/seated nothing/);
   });
 });
 

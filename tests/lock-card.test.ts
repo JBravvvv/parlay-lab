@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
 import { validateLedger, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
-import { buildLockEntry, needsLockAction, LEDGER_STORE_KEY } from "@/lib/server/lock-card";
+import { buildLockEntry, needsLockAction, writeLock, LEDGER_STORE_KEY } from "@/lib/server/lock-card";
 import { CORE_RULES, PAPER, slotMaxDec } from "@/lib/paper-mode";
 import { SHAPE_TICKETS, shapeById, type ShapeCalibration } from "@/lib/core-shapes";
 import { readFileSync } from "node:fs";
 import { stripComments } from "./helpers/source";
+
+/* INSTRUCTION 48 (2026-09-09): `writeLock` is exercised below against an in-memory Redis. Nothing
+   else in this file reaches the store (buildLockEntry is pure; the shape-calibration cases are
+   source scans), so the mock is inert for every other describe. */
+vi.mock("@/lib/server/store", async (orig) => {
+  const real = await orig<typeof import("@/lib/server/store")>();
+  return { ...real, redis: vi.fn(), storeEnv: vi.fn() };
+});
+import { redis } from "@/lib/server/store";
 
 /**
  * LOCK-AT-GENERATION (2026-08-05, operator requirement: EVERY day produces a locked card).
@@ -419,6 +428,79 @@ describe("INSTRUCTION 46 — slot filling on a mock pool (2026-09-08)", () => {
     expect(() => lock({ carry: carry as never })).toThrow(/OVER THE DAY/);
   });
 
+  /**
+   * INSTRUCTION 48 (2026-09-09, Josh's word, verbatim: "It can lock multiple times per day, but it
+   * can never remove a pick it can only add to it"). The engine already carried tickets verbatim
+   * (`core = [...carried, ...newCore]`); what is new is that the contract is ASSERTED —
+   * `assertAppendOnly` in buildLockEntry throws before the entry exists, and in writeLock before
+   * the SET — so a racing writer or a rogue allocator can never shrink a locked day.
+   */
+  describe("INSTRUCTION 48 — the card only ever grows", () => {
+    const carried = (id: string, stake: number, shapeSlot: number, labels: [string, string], blockKey: string) => ({
+      id, stake, shapeSlot, name: `Carried ${id}`, paper: true, placed: false, actualStake: 0, blockKey,
+      legs: [leg(labels[0]), leg(labels[1])],
+    });
+    /* three tickets locked by three earlier sweeps: $25 Kelly-sized in the $60 slot 0, $10 in slot 2, $10 in slot 3 */
+    const carry3 = {
+      date: DATE, locked: true, lockedAt: 1_700_000_000_000, trigger: "topup-1", allocSum: 45, gatedSum: 45, slotUnderSum: 35,
+      coreShape: { id: "A", label: "2x$60 2-leg + 3x$10 3-4 leg", pick: "rotation", slots: shapeById("A")!.slots },
+      core: [
+        carried("old-1", 25, 0, ["Z1", "Z2"], "topup-1"),
+        carried("old-2", 10, 2, ["Y1", "Y2"], "topup-2"),
+        carried("old-3", 10, 3, ["X1", "X2"], "topup-3"),
+      ],
+      funT: [{ id: "fun-1", stake: 25, name: "HR Longshot", paper: true, placed: false, actualStake: 0, legs: [leg("W1")] }],
+      games: {},
+    };
+
+    it("a FOURTH top-up (blockKey topup-4) appends: every carried ticket rides through byte-for-byte, lockedAt is the first lock's", () => {
+      const entry = lock({ dailyOverride: 70, blockKey: "topup-4", carry: carry3 as never });
+      const core = entry.core as Tix[];
+      for (const t of carry3.core) {
+        expect(core.find((x) => x.id === t.id), `${t.id} was dropped by the fourth sweep`).toEqual(t);
+      }
+      expect(core.slice(0, 3)).toEqual(carry3.core); // carried FIRST, in their own order
+      expect(entry.lockedAt).toBe(carry3.lockedAt);
+      expect(entry.funT).toEqual(carry3.funT);
+      /* the sweep owned what fit its $70: the open $60 slot 1 and the $10 slot 4 */
+      const fresh = core.filter((t) => !t.id.startsWith("old"));
+      expect(fresh.map((t) => [t.id, t.shapeSlot, t.stake])).toEqual([["id-T2a", 1, 60], ["id-T4a", 4, 10]]);
+      expect(entry.blocks?.["topup-4"]).toMatchObject({ budget: 70, tickets: 2, slots: [1, 4] });
+      expect(entry.allocSum).toBe(45 + 70);
+      expect((entry as { slotUnderSum?: number }).slotUnderSum).toBe(35);
+      expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
+    });
+
+    it("a rogue allocator that hands back a CARRIED id at a different stake is a THROW naming the site — never a quiet replace", () => {
+      /* the pool filter `free` excludes carried ids and legs from BOTH passes, so a sound allocator
+         cannot re-pick old-1; this mock ignores the pool it was handed and mints old-1 at the slot's
+         $60 (the "TWO ALLOCATORS" shape). Before INSTRUCTION 48 `carried.filter(!newCore.has(id))`
+         let the $60 copy REPLACE the locked $25 one — the exact ledger-merge.ts N3 story. */
+      const rogue = {
+        get<T>(k: string): T {
+          if (k === "SH_CFG") return { maxCoreTickets: 6, minCoreTickets: 4, selMode: "dk_fd", perParlayCap: 0.25 } as T;
+          if (k === "SH") return { bankroll: 750 } as T;
+          if (k === "shCardPool") return ((_b: unknown) => POOL) as T;
+          if (k === "shTicketId") return ((x: { name?: string }) => `id-${x.name ?? "fun"}`) as T;
+          if (k === "shAllocate") {
+            return ((p: W[], amount: number) => {
+              const c = p[0];
+              if (!c || amount <= 0) return { picks: [], sum: 0, blocked: [] };
+              return { picks: [{ id: "old-1", stake: amount, w: { pl: c.pl } }], sum: amount, blocked: [] };
+            }) as T;
+          }
+          return null as T;
+        },
+      };
+      expect(() => lock({ eng: rogue, dailyOverride: 70, blockKey: "topup-4", carry: carry3 as never })).toThrow(/APPEND ONLY \(buildLockEntry\)/);
+      expect(() => lock({ eng: rogue, dailyOverride: 70, blockKey: "topup-4", carry: carry3 as never })).toThrow(/old-1/);
+    });
+
+    it("a carry with a DROPPED ticket relative to nothing is fine — the first lock has nothing to preserve", () => {
+      expect(() => lock({ dailyOverride: 70, blockKey: "topup-1" })).not.toThrow();
+    });
+  });
+
   it("a fresh day with a thick record TILTS: 2-leg running better walks B/E/F, and the entry records the pick and its reason", () => {
     const tilt: ShapeCalibration = { bucketRoi: { two: -0.18, long: -0.53 }, n: { two: 50, long: 26 }, window: "2026-08-09..2026-09-09" };
     const entry = lock({ shapeCal: tilt }); // 20706 % 3 == 0 → B: 5x$30 2-leg
@@ -484,6 +566,67 @@ describe("needsLockAction — the self-check, every branch", () => {
     expect(needsLockAction({ boardExists: false, lockExists: false, deadSlate: false })).toBe(null);
     expect(needsLockAction({ boardExists: true, lockExists: true, deadSlate: false })).toBe(null);
     expect(needsLockAction({ boardExists: false, lockExists: true, deadSlate: true })).toBe(null);
+  });
+});
+
+/**
+ * INSTRUCTION 48 — writeLock is the LAST gate before the SET. The merge kernel (ledger-merge.ts)
+ * has lowering paths a verbatim carry can never trip; a racing second writer could. Both directions
+ * are asserted: the STORED day may not lose a ticket to the merged result, and the FIRE's own entry
+ * may not either. On a violation the SET is never issued.
+ */
+describe("INSTRUCTION 48 — writeLock refuses to store a day that shrank", () => {
+  const ticket = (id: string, stake: number, labels: string[]) => ({
+    id, stake, name: `T ${id}`, paper: true, placed: false, actualStake: 0,
+    legs: labels.map((l) => ({ label: l, prop: "Hits O 0.5", lkey: `${l}|batter_hits|0.5`, cz: -110, gkey: "g-1" })),
+  });
+  const dayWith = (core: ReturnType<typeof ticket>[], extra: Record<string, unknown> = {}) => ({
+    date: "2026-09-10", locked: true, paper: true, lockedAt: 1_700_000_000_000, trigger: "server-lock", daily: 150, allocSum: core.reduce((a, t) => a + t.stake, 0),
+    core, funT: [], games: {}, ...extra,
+  });
+  function fakeStore(seed: unknown) {
+    const kv = new Map<string, string>();
+    if (seed) kv.set(LEDGER_STORE_KEY, JSON.stringify(seed));
+    const sets: unknown[][] = [];
+    vi.mocked(redis).mockReset().mockImplementation(async (cmd: unknown[]) => {
+      const [op, key, ...rest] = cmd as [string, string, ...unknown[]];
+      if (op === "GET") return kv.get(key) ?? null;
+      if (op === "SET") {
+        sets.push(cmd);
+        kv.set(key, String(rest[0]));
+        return "OK";
+      }
+      throw new Error(`fake redis: ${op}`);
+    });
+    return { kv, sets };
+  }
+
+  it("stored X@$30 vs a fire carrying X@$20 → throws APPEND ONLY (writeLock/…) and redis SET is never called", async () => {
+    const { sets } = fakeStore({ epoch: 2, ledger: [dayWith([ticket("X", 30, ["A1", "A2"])])] });
+    const fire = dayWith([ticket("X", 20, ["A1", "A2"])]);
+    await expect(writeLock(fire as unknown as SyncEntry)).rejects.toThrow(/APPEND ONLY \(writeLock/);
+    await expect(writeLock(fire as unknown as SyncEntry)).rejects.toThrow(/\bX\b/);
+    expect(sets).toEqual([]);
+  });
+
+  it("a fire that only ADDS to the stored day writes: the stored ticket and the new one both land, epoch intact", async () => {
+    const { kv, sets } = fakeStore({ epoch: 2, ledger: [dayWith([ticket("X", 30, ["A1", "A2"])])] });
+    const fire = dayWith([ticket("X", 30, ["A1", "A2"]), ticket("Y", 10, ["B1", "B2", "B3"])]);
+    const r = await writeLock(fire as unknown as SyncEntry);
+    expect(r.existedBefore).toBe(true);
+    expect(sets).toHaveLength(1);
+    const stored = JSON.parse(kv.get(LEDGER_STORE_KEY)!) as { epoch?: number; ledger: { date: string; core: { id: string; stake: number }[] }[] };
+    expect(stored.epoch).toBe(2);
+    const day = stored.ledger.find((e) => e.date === "2026-09-10")!;
+    expect(day.core.map((t) => [t.id, t.stake])).toEqual(expect.arrayContaining([["X", 30], ["Y", 10]]));
+    expect(day.core).toHaveLength(2);
+  });
+
+  it("a first lock (nothing stored for the date) writes — there is nothing to preserve", async () => {
+    const { sets } = fakeStore({ epoch: 2, ledger: [] });
+    const r = await writeLock(dayWith([ticket("X", 30, ["A1", "A2"])]) as unknown as SyncEntry);
+    expect(r.existedBefore).toBe(false);
+    expect(sets).toHaveLength(1);
   });
 });
 

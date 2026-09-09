@@ -391,6 +391,11 @@ export default function BuilderPage() {
     const e = eng.get<(dt: string) => LockedEntry | null>("shLedgerFind")(todayStr());
     return e?.locked ? e : null;
   }, [eng, cardV]);
+  /* INSTRUCTION 48 (2026-09-09): "LOCKED" is the first lock, not the day closed — the server
+     keeps appending sweeps while pregame games remain. `now` refreshes with every locked
+     recompute so the "still filling" line retires once the last first pitch has passed. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => setNow(Date.now()), [cardV, locked]);
 
   // live "now" stats on the locked card's legs while games are in progress
   const liveReqs = useMemo(
@@ -718,6 +723,16 @@ export default function BuilderPage() {
               <b className="num text-gold">{fmtMoney(locked.funT.reduce((s, t) => s + t.stake, 0))}</b> fun ·
               append-only, no retroactive edits. Confirm the NV app&apos;s price on any ticket until its first pitch.
             </div>
+            {(() => {
+              const coreSum = locked.core.reduce((s, t) => s + t.stake, 0);
+              const pregame = Object.values(locked.games ?? {}).some((g) => g?.start && Date.parse(g.start) > now);
+              return coreSum < locked.daily && pregame ? (
+                <p data-testid="mlb-locked-filling" className="mt-1 text-[11px] text-gold">
+                  Still filling — {fmtMoney(coreSum)} of {fmtMoney(locked.daily)} core placed. The desk keeps adding
+                  while pregame games remain; a locked ticket never changes.
+                </p>
+              ) : null;
+            })()}
             {/* CORE — the main check (2026-08-16: core is the only +/- that counts in net P/L) */}
             <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-text">Core money</span>

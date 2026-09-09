@@ -56,6 +56,14 @@ vi.mock("@/lib/cfb/slate-server", async (orig) => {
   const real = await orig<typeof import("@/lib/cfb/slate-server")>();
   return { ...real, espnEvents: vi.fn(), slateFromEspn: vi.fn() };
 });
+/* INSTRUCTION 48 (2026-09-09): the append-only assert is REAL here — wrapped in a spy only so the
+   applyTopUp case below can pin that the site is reached, with which arguments, and before the
+   money guard. The wrapper calls through; nothing in this file changes what it throws. */
+vi.mock("@/lib/append-only", async (orig) => {
+  const real = await orig<typeof import("@/lib/append-only")>();
+  return { ...real, assertAppendOnly: vi.fn(real.assertAppendOnly) };
+});
+import { assertAppendOnly } from "@/lib/append-only";
 /* buildCfbCard is mocked ONLY so the money guard can be driven a skewed card (the MLB rails
    plant theirs through `__plantStakeSkew` in src/lib/server/lock-card.ts); `beforeEach` puts
    the REAL implementation back, so every other test in this file runs the real card builder. */
@@ -1373,8 +1381,9 @@ const topUpOf = (body: Record<string, unknown>) => body.topUp as Record<string, 
 const coreStakeOf = (e: CfbLedgerEntry) => e.core.reduce((s, t) => s + t.stake, 0);
 
 describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be intended", () => {
-  it("the cap is a constant beside CFB_LOCK, mirroring the MLB desk's TOPUP_MAX", () => {
-    expect(cfbRulesMod.CFB_TOPUP_MAX).toBe(2);
+  it("the cap is a constant beside CFB_LOCK, mirroring the MLB desk's TOPUP_MAX — 6 per arm since INSTRUCTION 48 (2026-09-09)", () => {
+    expect(cfbRulesMod.CFB_TOPUP_MAX).toBe(6);
+    expect(cfbRulesMod.CFB_LEAGUE.topUp.max).toBe(cfbRulesMod.CFB_TOPUP_MAX);
     // ...and the gap it exists to close is real on this very fixture
     expect(
       buildCfbCard(slateAt(LOCKS_AT) as CfbBoard, { bankroll: 2500, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now: LOCKS_AT }).coreSum,
@@ -1427,33 +1436,58 @@ describe("A. THE TOP-UP (2026-09-06) — the $250 must deploy, not just be inten
     expect(String(e.note)).toMatch(/\$100/);
   });
 
-  it("THE CAP refuses the third attempt, even with money still owed", async () => {
-    /* 2026-09-08: the fixture's own lock is now $150 of the $250, and every evening single is
-       raised to the $50 max, so two top-ups off the real lock would FILL the day and the third
-       poke would answer "fully deployed" instead of the cap. The seeded $75 lock keeps the case
-       what it is: two attempts spent, $75 still owed, the cap is what refuses. */
-    const fr = seed([serverEntry(DATE, { stakes: [25, 25, 25], games: LOCK_GAMES, lockedAt: LOCKS_AT, fun: CFB_PAPER.fun })]);
+  it("THE CAP refuses the (CFB_TOPUP_MAX + 1)th attempt, even with money still owed", async () => {
+    /* 2026-09-08: the fixture's own lock is $150 of the $250, and every evening single is raised
+       to the $50 max, so two top-ups off the real lock would FILL the day and the next poke would
+       answer "fully deployed" instead of the cap. RE-PINNED 2026-09-09 (INSTRUCTION 48, the cap is
+       6 per arm): a $75 seed + 6 × $50 = $375 cannot stay under $250 either, and the fixture cannot
+       hold six empty attempts apart at 45 min before its last kickoff (+90). So: a $25 seed spread
+       over the three lock games (so the base slate seats nothing new), FOUR seating rounds of one
+       fresh game each ($50 apiece → $225), then TWO empty attempts spaced past CFB_TOPUP_RETRY_MS
+       (an empty attempt is a claim row and counts — CRITIC 1 below). Six attempts spent, $25 still
+       owed, two games still ahead, a fresh game priced: the cap is what refuses. */
+    const fr = seed([serverEntry(DATE, { stakes: [5, 10, 10], games: LOCK_GAMES, lockedAt: LOCKS_AT, fun: CFB_PAPER.fun })]);
     const rounds = [
-      { at: 5, extra: ["401866410"], stake: 50, total: 125 },
-      { at: 10, extra: ["401858430"], stake: 50, total: 175 },
+      { at: 5, extra: ["401866410"], total: 75 },
+      { at: 10, extra: ["401858430"], total: 125 },
+      { at: 15, extra: ["401862701"], total: 175 },
+      { at: 20, extra: ["401869960"], total: 225 },
     ];
     for (const [i, r] of rounds.entries()) {
       setNow(LOCKS_AT + r.at * 60_000);
       vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, r.extra));
       const { body } = await call();
-      expect(topUpOf(body).action).toBe("topped-up");
+      expect(topUpOf(body).action, `round ${i + 1}`).toBe("topped-up");
       expect(topUpOf(body).n).toBe(i + 1);
+      expect(topUpOf(body).stake).toBe(50);
       expect(coreStakeOf(fr.ledger()[0])).toBe(r.total);
     }
-    // a third poke: $75 is still owed and a fresh game is priced, but the cap is spent
-    setNow(LOCKS_AT + 20 * 60_000);
-    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, ["401862701"]));
+    /* attempts 5 and 6: the base slate again — nothing new clears, the claim row stays unfilled */
+    for (const [i, m] of [25, 71].entries()) {
+      setNow(LOCKS_AT + m * 60_000);
+      vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => slateAt(now));
+      const { body } = await call();
+      expect(topUpOf(body).action, `empty attempt ${5 + i}`).toBe("skipped");
+      expect(topUpsOn(fr.ledger()[0])).toHaveLength(5 + i);
+      expect(coreStakeOf(fr.ledger()[0])).toBe(225);
+    }
+    expect(rounds.length + 2).toBe(cfbRulesMod.CFB_TOPUP_MAX);
+    // the seventh poke: $25 is still owed, two games are still ahead and a fresh one is priced, but the cap is spent
+    setNow(LOCKS_AT + 76 * 60_000);
+    vi.mocked(slateFromEspn).mockClear();
+    vi.mocked(slateFromEspn).mockImplementation(async (_d, _e, now) => richerSlate(now, ["401858432"]));
     const { status, body } = await call();
     expect(status).toBe(200);
     expect(topUpOf(body).action).toBe("skipped");
     expect(String(topUpOf(body).reason)).toMatch(/cap/i);
-    expect(coreStakeOf(fr.ledger()[0])).toBe(175);
+    expect(String(topUpOf(body).reason)).toMatch(new RegExp(`\\(${cfbRulesMod.CFB_TOPUP_MAX} of ${cfbRulesMod.CFB_TOPUP_MAX}\\)`));
+    expect(slateFromEspn).not.toHaveBeenCalled(); // the refusal is free
+    expect(coreStakeOf(fr.ledger()[0])).toBe(225);
     expect((fr.ledger()[0] as Record<string, unknown>).topUps).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
+    /* and the card only grew: every seeded ticket is still there, byte for byte */
+    const seeded = serverEntry(DATE, { stakes: [5, 10, 10], games: LOCK_GAMES, lockedAt: LOCKS_AT, fun: CFB_PAPER.fun });
+    expect(fr.ledger()[0].core.slice(0, 3)).toEqual(seeded.core);
+    expect(fr.ledger()[0].funT).toEqual(seeded.funT);
   });
 
   it("A DEVICE (Builder) LOCK IS NEVER TOPPED UP — Josh's own card is his, and it costs no fetch", async () => {
@@ -1868,6 +1902,12 @@ describe("B. THE SETTLE PASS (2026-09-06) — a server-locked day scores without
 /** the entry's own top-up log — the ledger blob is the only thing a cold start, a redeploy and
     an overlapping poke all share, which is why the bound lives there and not in a counter */
 const topUpsOn = (e: CfbLedgerEntry) => ((e as Record<string, unknown>).topUps ?? []) as Record<string, unknown>[];
+/** the cap refusal's own ordinal, `(n of CFB_TOPUP_MAX)` — RE-PINNED 2026-09-09 (INSTRUCTION 48, 2 → 6): every
+    pure cap case below pads its rows to CFB_TOPUP_MAX rather than to a literal two, so the pins follow the knob */
+const CAP_N = cfbRulesMod.CFB_TOPUP_MAX;
+const capSpent = new RegExp(`cap is spent \\(${CAP_N} of ${CAP_N}\\)`);
+/** `n` rows numbered 1..n from a row template — `at` spaced a minute apart so a "last row" is well defined */
+const padRows = <R extends { n: number; at: number }>(template: (n: number) => R, n: number = CAP_N): R[] => Array.from({ length: n }, (_, i) => template(i + 1));
 
 /**
  * CRITIC 1 — THE CAP BOUNDED SUCCESSFUL WRITES, SO A SHORT DAY BOUGHT A BOARD ON EVERY POKE.
@@ -1889,7 +1929,12 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
   const priced = () => vi.mocked(slateFromEspn).mock.calls.length;
   const espnReads = () => vi.mocked(espnEvents).mock.calls.length;
 
-  it("A SHORT DAY THAT PLANS NOTHING STILL BURNS AN ATTEMPT, and the cap then binds for the whole day", async () => {
+  it("A SHORT DAY THAT PLANS NOTHING STILL BURNS AN ATTEMPT, and the cooldown then holds the next one off", async () => {
+    /* RE-PINNED 2026-09-09 (INSTRUCTION 48): the cap is 6 per arm, and this fixture's last kickoff is
+       LOCKS_AT + 90 min, so six EMPTY attempts 45 min apart cannot fit inside the day — after the two
+       below, the pokes that used to hit the cap now hit the empty-attempt cooldown, which is just as
+       free. The cap itself is pinned on a seeded day in "THE CAP refuses the (CFB_TOPUP_MAX + 1)th
+       attempt" above. */
     const fr = fakeRedis();
     expect((await call()).body.coreStake).toBe(150); // the fixture's $150 of the $250 — the short day
     expect(priced()).toBe(1);
@@ -1908,20 +1953,24 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     const a2 = await call();
     expect(topUpOf(a2.body).action).toBe("skipped");
     expect(priced()).toBe(3);
-    expect(topUpsOn(fr.ledger()[0])).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
+    expect(topUpsOn(fr.ledger()[0])).toHaveLength(2);
+    expect(topUpsOn(fr.ledger()[0]).every((r) => r.filled === false)).toBe(true); // both are claim rows: attempts that seated nothing
 
-    /* ...AND THE CAP BINDS: every later poke of the day costs nothing at all — no priced board
-       and not even the keyless ESPN read, because the refusal is free and comes first. */
+    /* ...AND THE COOLDOWN HOLDS: every later poke inside CFB_TOPUP_RETRY_MS of attempt 2 costs
+       nothing at all — no priced board and not even the keyless ESPN read, because the refusal is
+       free and comes first. (Was the cap under CFB_TOPUP_MAX = 2.) */
     const espnAtCap = espnReads();
     for (const m of [65, 70, 75, 80]) {
       setNow(LOCKS_AT + m * 60_000);
       const { status, body } = await call();
       expect(status).toBe(200);
       expect(topUpOf(body).action).toBe("skipped");
-      expect(String(topUpOf(body).reason)).toMatch(/cap/i);
+      expect(String(topUpOf(body).reason)).toMatch(/found nothing|retry|wait/i);
+      expect(String(topUpOf(body).reason)).not.toMatch(/cap/i);
     }
     expect(priced()).toBe(3);
     expect(espnReads()).toBe(espnAtCap);
+    expect(topUpsOn(fr.ledger()[0])).toHaveLength(2);
     expect(coreStakeOf(fr.ledger()[0])).toBe(150);
   });
 
@@ -1971,14 +2020,31 @@ describe("CRITIC 1 (2026-09-06) — the top-up cap bounds ATTEMPTS, not successf
     expect(topUpsOn(fr.ledger()[0])).toEqual([{ at: LOCKS_AT + 15 * 60_000, n: 1, core: 0, stake: 0, filled: false, arms: { core: true, fun: false } }]);
     expect(coreStakeOf(fr.ledger()[0])).toBe(150);
 
-    // ...and it counts against the cap like any other: one more attempt, then the day is done
+    // ...and it counts against the cap like any other: a second rejected pull past the cooldown is a second row
     setNow(LOCKS_AT + 61 * 60_000);
     vi.mocked(slateFromEspn).mockRejectedValueOnce(new Error("odds upstream 429"));
     await call();
-    expect(topUpsOn(fr.ledger()[0])).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
-    setNow(LOCKS_AT + 65 * 60_000);
-    const done = await call();
-    expect(String(topUpOf(done.body).reason)).toMatch(/cap/i);
+    expect(topUpsOn(fr.ledger()[0])).toHaveLength(2);
+    expect(topUpsOn(fr.ledger()[0]).map((r) => r.n)).toEqual([1, 2]);
+    /* RE-PINNED 2026-09-09 (INSTRUCTION 48, cap 6 per arm): the fixture's last kickoff is +90 min,
+       so six rejected pulls 45 min apart cannot fit inside the day through the route. The cap is
+       therefore shown on the pure decision over the SAME rows this day wrote, replicated to
+       CFB_TOPUP_MAX ordinals — every one a claim row, every one charged to the core arm. */
+    const stored = fr.ledger()[0];
+    const rows = topUpsOn(stored);
+    const atCap = {
+      ...stored,
+      topUps: Array.from({ length: cfbRulesMod.CFB_TOPUP_MAX }, (_, i) => ({ ...rows[i % rows.length], n: i + 1, at: LOCKS_AT + (15 + 46 * i) * 60_000 })),
+    } as CfbLedgerEntry;
+    const nowAfter = LOCKS_AT + (15 + 46 * cfbRulesMod.CFB_TOPUP_MAX) * 60_000;
+    const done = lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, atCap, nowAfter);
+    expect(done.fire).toBe(false);
+    expect(String(done.reason)).toMatch(/cap/i);
+    expect(String(done.reason)).toContain(`(${cfbRulesMod.CFB_TOPUP_MAX} of ${cfbRulesMod.CFB_TOPUP_MAX})`);
+    /* one row fewer and the same clock still fires — the bound is exactly CFB_TOPUP_MAX */
+    const oneShort = { ...atCap, topUps: (atCap as Record<string, unknown>).topUps as unknown[] } as CfbLedgerEntry;
+    (oneShort as Record<string, unknown>).topUps = ((atCap as Record<string, unknown>).topUps as unknown[]).slice(0, -1);
+    expect(lockServerMod.decideTopUp(cfbRulesMod.CFB_LEAGUE, oneShort, nowAfter).fire).toBe(true);
   });
 
   it("A SUCCESSFUL TOP-UP STILL COSTS EXACTLY ONE ATTEMPT — the record is the attempt, filled in", async () => {
@@ -2431,6 +2497,35 @@ describe("CRITIC 7 (2026-09-06) — a top-up reopens a day that was already mark
     };
   };
 
+  it("INSTRUCTION 48 (2026-09-09): applyTopUp asserts APPEND ONLY over (entry, next) BEFORE the money guard — a plan that collides with a seated id at a different stake never lands", () => {
+    /* applyTopUp APPENDS (`[...entry.core, ...plan.tickets]`), so by construction it cannot drop a
+       ticket; what the assert pins at this site is the contract itself, evaluated on every write
+       with the day's own entry as `prev`. A colliding id at a different stake reaches the assert
+       with the seated copy still first in `next` (so the append-only read is satisfied) and is then
+       refused by assertEntryMoney's one-id-space rule — nothing is written either way. */
+    vi.mocked(assertAppendOnly).mockClear();
+    const done = gradedDay();
+    const ok = lockServerMod.applyCfbTopUp(done, planFor(1), LOCKS_AT + 15 * 60_000, 1);
+    expect(assertAppendOnly).toHaveBeenCalledTimes(1);
+    const [prev, next, where] = vi.mocked(assertAppendOnly).mock.calls[0];
+    expect(where).toBe("applyTopUp");
+    expect(prev).toBe(done);
+    expect(next).toBe(ok);
+    for (const t of done.core) expect(ok.core.find((x) => x.id === t.id)).toEqual(t);
+
+    const collide = planFor(2);
+    collide.tickets = [{ ...done.core[0], stake: 20 }];
+    collide.stake = 20;
+    vi.mocked(assertAppendOnly).mockClear();
+    expect(() => lockServerMod.applyCfbTopUp(done, collide, LOCKS_AT + 30 * 60_000, 2)).toThrow(/duplicate|twice|one id|id/i);
+    expect(assertAppendOnly, "the append-only assert must run before the money guard refuses the collision").toHaveBeenCalledTimes(1);
+    expect(vi.mocked(assertAppendOnly).mock.calls[0][2]).toBe("applyTopUp");
+    /* ...and the contract the site enforces, shown on the same shapes through the real function:
+       the seated $50 lowered to $20 under its own id is exactly the resize it refuses */
+    expect(() => assertAppendOnly(done, { ...done, core: [{ ...done.core[0], stake: 20 }, ...done.core.slice(1)] }, "applyTopUp")).toThrow(/^APPEND ONLY \(applyTopUp\)/);
+    expect(() => assertAppendOnly(done, { ...done, core: done.core.slice(1) }, "applyTopUp")).toThrow(/^APPEND ONLY \(applyTopUp\).*missing/);
+  });
+
   it("A DONE DAY THAT GAINS TICKETS IS NOT DONE — it settles again, and the input entry is not mutated", () => {
     const done = gradedDay();
     expect(lockServerMod.cfbSettleCandidate(done)).toBe(false);
@@ -2483,7 +2578,7 @@ describe("CRITIC 7 (2026-09-06) — a top-up reopens a day that was already mark
  * claim is written before the pull, by CRITIC 1's own design) recorded as `core: 0`, and armed the
  * CFB_TOPUP_RETRY_MS window — while the LOCK path treats the same condition as a REFUSAL: 502,
  * no entry written, an odds-gap marker stamped. Two transient outages therefore stranded the day's
- * whole undeployed core: CFB_TOPUP_MAX is 2, so from the second outage to the last kickoff every
+ * whole undeployed core: CFB_TOPUP_MAX was 2 when this was measured (6 since INSTRUCTION 48, 2026-09-09), so from the second outage to the last kickoff every
  * poke was refused "the top-up cap is spent" and the day ended short though Caesars prices were
  * posted all afternoon — recorded on the ledger as a full paper day, with nothing saying the money
  * was lost to the feed rather than to the rules.
@@ -2528,7 +2623,7 @@ describe("CRITIC 8 (2026-09-06) — an odds outage costs the top-up nothing, and
     expect(topUpOf(a2.body).action).toBe("topped-up");
     expect(topUpOf(a2.body).n).toBe(2);
     expect(coreStakeOf(fr.ledger()[0])).toBe(250);
-    expect(topUpsOn(fr.ledger()[0])).toHaveLength(cfbRulesMod.CFB_TOPUP_MAX);
+    expect(topUpsOn(fr.ledger()[0])).toHaveLength(2); // two attempts happened (was CFB_TOPUP_MAX while that was 2)
   });
 
   it("dry=1 on an outage writes nothing at all — no claim to release and no marker", async () => {
@@ -2956,27 +3051,29 @@ describe("DEFECT M (2026-09-06) — the core and fun allotments are INDEPENDENT 
   });
 
   it("M(b): A FILLED FUN-ONLY ROW IS SOMEBODY'S COMPLETED ATTEMPT — only an UNFILLED row is a claim", () => {
+    /* CFB_TOPUP_MAX − 1 completed FUN-ONLY attempts (ordinals 1..max−1), then somebody's claim at
+       ordinal max, still in flight (was one of each while the cap was 2) */
     const rows = [
-      { at: LOCKS_AT, n: 1, core: 0, stake: 0, fun: 1, filled: true }, // a completed FUN-ONLY attempt
-      { at: LOCKS_AT, n: 2, core: 0, stake: 0, filled: false }, // somebody's claim, still in flight
+      ...padRows((n) => ({ at: LOCKS_AT + n * 60_000, n, core: 0, stake: 0, fun: 1, filled: true }), CAP_N - 1),
+      { at: LOCKS_AT + CAP_N * 60_000, n: CAP_N, core: 0, stake: 0, filled: false },
     ];
     const e = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT, topUps: rows });
     const now = LOCKS_AT + 60 * 60_000; // past CFB_TOPUP_RETRY_MS, so the retry window is not what refuses
 
-    /* a poke holding NO claim counts both rows: the cap is spent */
+    /* a poke holding NO claim counts every row: the cap is spent */
     const none = lockServerMod.decideCfbTopUp(e, now);
     expect(none.fire).toBe(false);
-    expect(String((none as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((none as { reason: string }).reason)).toMatch(capSpent);
 
-    /* the poke that HOLDS the unfilled ordinal 2 does not count its own attempt in flight */
-    const own = lockServerMod.decideCfbTopUp(e, now, { claim: 2 });
-    expect(own).toMatchObject({ fire: true, n: 2 });
+    /* the poke that HOLDS the unfilled last ordinal does not count its own attempt in flight */
+    const own = lockServerMod.decideCfbTopUp(e, now, { claim: CAP_N });
+    expect(own).toMatchObject({ fire: true, n: CAP_N });
 
     /* THE POINT: ordinal 1 carries `core: 0` and is NOT a claim — it is a finished fun-only
        attempt, and it must count against the cap for everyone, including a poke that names it */
     const stale = lockServerMod.decideCfbTopUp(e, now, { claim: 1 });
     expect(stale.fire).toBe(false);
-    expect(String((stale as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((stale as { reason: string }).reason)).toMatch(capSpent);
   });
 });
 
@@ -3009,19 +3106,17 @@ describe("MUTANTS (2026-09-06) — two correct lines nothing was asserting", () 
    * COMPLETED attempt and must count for everyone. A row from before `filled` existed carries none
    * — every such row was written on success and carries `core > 0`, so it reads as filled too.
    */
-  it("M1: a COMPLETED row at the claimed ordinal still counts — a third attempt is refused", () => {
+  it("M1: a COMPLETED row at the claimed ordinal still counts — the (CFB_TOPUP_MAX + 1)th attempt is refused", () => {
+    /* CFB_TOPUP_MAX completed attempts (was two while the cap was 2); the first seated $75, the rest $25 each */
     const e = serverEntry(DATE, {
       stakes: [25, 25, 25],
       games: gameIds().slice(0, 3),
       lockedAt: LOCKS_AT,
-      topUps: [
-        { at: LOCKS_AT, n: 1, core: 3, stake: 75 },
-        { at: LOCKS_AT, n: 2, core: 1, stake: 25 },
-      ],
+      topUps: padRows((n) => (n === 1 ? { at: LOCKS_AT, n, core: 3, stake: 75 } : { at: LOCKS_AT, n, core: 1, stake: 25 })),
     });
     const d = lockServerMod.decideCfbTopUp(e, LOCKS_AT + 15 * 60_000, { claim: 1 });
     expect(d.fire).toBe(false);
-    expect(String((d as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((d as { reason: string }).reason)).toMatch(capSpent);
   });
 
   /**
@@ -3331,34 +3426,32 @@ describe("L1 (2026-09-06) — a fun arm that provably cannot seat refuses for FR
     expect(d).toMatchObject({ fire: true, core: true, fun: false });
     expect((d as { used: number }).used).toBe(0);
 
-    /* ...and the core's OWN two attempts still bind it */
-    const coreRows = [
-      { at: LOCKS_AT, n: 1, core: 0, stake: 0, fun: 0, filled: true, arms: { core: true, fun: false } },
-      { at: LOCKS_AT + 60_000, n: 2, core: 1, stake: 25, fun: 0, filled: true, arms: { core: true, fun: false } },
-    ];
+    /* ...and the core's OWN CFB_TOPUP_MAX attempts still bind it */
+    const coreRows = padRows((n) =>
+      n === 1
+        ? { at: LOCKS_AT, n, core: 0, stake: 0, fun: 0, filled: true, arms: { core: true, fun: false } }
+        : { at: LOCKS_AT + n * 60_000, n, core: 1, stake: 25, fun: 0, filled: true, arms: { core: true, fun: false } },
+    );
     const spent = lockServerMod.decideCfbTopUp(
       serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun, topUps: coreRows }),
       now,
     );
     expect(spent.fire).toBe(false);
-    expect(String((spent as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((spent as { reason: string }).reason)).toMatch(capSpent);
   });
 
   it("L1: A LEGACY ROW CARRYING NO ARMS COUNTS AGAINST BOTH — an old blob never buys extra spending", () => {
-    const legacy = [
-      { at: LOCKS_AT, n: 1, core: 0, stake: 0, filled: true },
-      { at: LOCKS_AT + 60_000, n: 2, core: 1, stake: 25, filled: true },
-    ];
+    const legacy = padRows((n) => (n === 1 ? { at: LOCKS_AT, n, core: 0, stake: 0, filled: true } : { at: LOCKS_AT + n * 60_000, n, core: 1, stake: 25, filled: true }));
     const now = LOCKS_AT + 2 * 3600_000;
     const withCoreRoom = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT, fun: CFB_PAPER.fun, topUps: legacy });
     const a = lockServerMod.decideCfbTopUp(withCoreRoom, now);
     expect(a.fire).toBe(false);
-    expect(String((a as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((a as { reason: string }).reason)).toMatch(capSpent);
 
     const withFunRoom = serverEntry(DATE, { stakes: [50, 50, 50, 50, 50], games: gameIds().slice(0, 5), lockedAt: LOCKS_AT, topUps: legacy });
     const b = lockServerMod.decideCfbTopUp(withFunRoom, now);
     expect(b.fire).toBe(false);
-    expect(String((b as { reason: string }).reason)).toMatch(/cap is spent \(2 of 2\)/);
+    expect(String((b as { reason: string }).reason)).toMatch(capSpent);
   });
 
   it("L1: THE ROW SAYS WHICH ARM IT SERVED — a fun-only attempt is recorded as one", async () => {
@@ -3937,8 +4030,11 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
     /* the check that is NOT free and does NOT live in decideCfbTopUp was listed as though it were */
     expect(doc).not.toContain("no time passed since the lock, every game kicked off");
     expect(doc).toMatch(/every game on the date has kicked off/);
-    /* the invariant the paragraph exists to state must still be there */
-    expect(doc).toMatch(/unchanged at (2|two) (priced )?boards/i);
+    /* the invariant the paragraph exists to state must still be there — stated on the CONSTANT since
+       INSTRUCTION 48 (2026-09-09) raised it 2 → 6 ("unchanged at 2 priced boards" was the literal);
+       a fix-round draft withdrew it as "2 × CFB_TOPUP_MAX", which double-counts, and it is reinstated */
+    expect(doc).toMatch(/BOUNDED AT CFB_TOPUP_MAX PRICED TOP-UP BOARDS PER DATE/);
+    expect(doc).not.toMatch(/2 × CFB_TOPUP_MAX priced boards/);
     const code = readSrc("src/lib/cfb/lock-server.ts");
     expect(code).toMatch(/const used = others\.filter\(spentCoreAttempt\)\.length/);
     expect(code).toMatch(/const funUsed = others\.filter\(spentFunAttempt\)\.length/);
@@ -3955,7 +4051,7 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
       stakes: [50, 50, 50, 50, 50],
       games: gameIds().slice(0, 5),
       lockedAt: LOCKS_AT,
-      topUps: [spentRow(1, { core: false, fun: true }), spentRow(2, { core: false, fun: true })],
+      topUps: padRows((n) => spentRow(n, { core: false, fun: true })),
     });
     expect(coreStakeOf(day)).toBe(CFB_PAPER.daily);
     expect(day.funT).toHaveLength(0);
@@ -3964,7 +4060,7 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
     expect(d.fire).toBe(false);
     const reason = String((d as { reason: string }).reason);
     /* the cap and its ordinal are unchanged — the CONDITION did not move, only the reporting */
-    expect(reason).toMatch(/cap is spent \(2 of 2\)/);
+    expect(reason).toMatch(capSpent);
     /* THE PIN: $0 of core is true, and saying only that hides the $25 the day actually stranded */
     expect(reason).toMatch(/\$0 of the \$250 core/);
     expect(reason).toMatch(/\$25 of the \$25 fun/);
@@ -3976,10 +4072,10 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
       stakes: [25, 25, 25],
       games: gameIds().slice(0, 3),
       lockedAt: LOCKS_AT,
-      topUps: [spentRow(1, { core: true, fun: true }), spentRow(2, { core: true, fun: true })],
+      topUps: padRows((n) => spentRow(n, { core: true, fun: true })),
     });
     const r1 = String((lockServerMod.decideCfbTopUp(both, LOCKS_AT + 3 * 3600_000) as { reason: string }).reason);
-    expect(r1).toMatch(/cap is spent \(2 of 2\)/);
+    expect(r1).toMatch(capSpent);
     expect(r1).toMatch(/\$175 of the \$250 core/);
     expect(r1).toMatch(/\$25 of the \$25 fun/);
 
@@ -3989,7 +4085,7 @@ describe("THE CLOSING ROUND (2026-09-06) — D1 the docblocks, D2 the refusal, D
       games: gameIds().slice(0, 3),
       lockedAt: LOCKS_AT,
       fun: CFB_PAPER.fun,
-      topUps: [spentRow(1, { core: true, fun: true }), spentRow(2, { core: true, fun: true })],
+      topUps: padRows((n) => spentRow(n, { core: true, fun: true })),
     });
     const r2 = String((lockServerMod.decideCfbTopUp(seated, LOCKS_AT + 3 * 3600_000) as { reason: string }).reason);
     expect(r2).toMatch(/\$175 of the \$250 core/);
@@ -4536,5 +4632,24 @@ describe("C4 (2026-09-06) — the decider's room, the settle passes under a merg
     const overFun = { ...short, funT: [{ ...short.core[0], id: `cfb-${DATE}-fun-1`, bucket: "fun" as const, stake: CFB_PAPER.fun + 5 }] };
     expect(overFun.funT[0].stake).toBeGreaterThan(CFB_PAPER.fun);
     expect(() => lockServerMod.assertCfbEntryMoney(overFun)).toThrow(/fun money/);
+  });
+});
+
+/* ── FIX ROUND 2026-09-09 (INSTRUCTION 48, defect 3): a lost `topUps` row can never re-mint a seated id ── */
+describe("decideCfbTopUp derives the next ordinal from seated `-topup<n>-` ids as well as the attempt log", () => {
+  const gameIds = () => slateAt(LOCKS_AT).games.map((g) => g.id);
+  it("a day carrying cfb-<date>-topup2-core-1 with NO topUps rows takes ordinal 3, not 1", () => {
+    const e = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT });
+    e.core[2] = { ...e.core[2], id: `cfb-${DATE}-topup2-core-1` };
+    const d = lockServerMod.decideCfbTopUp(e, LOCKS_AT + 60 * 60_000);
+    expect(d.fire, JSON.stringify(d)).toBe(true);
+    expect((d as { n: number }).n).toBe(3);
+  });
+  it("the attempt log still wins when it is the larger", () => {
+    const e = serverEntry(DATE, { stakes: [25, 25, 25], games: gameIds().slice(0, 3), lockedAt: LOCKS_AT, topUps: padRows((n) => ({ at: LOCKS_AT + n * 60_000, n, core: 1, stake: 25, filled: true }), 2) });
+    e.core[2] = { ...e.core[2], id: `cfb-${DATE}-topup1-core-1` };
+    const d = lockServerMod.decideCfbTopUp(e, LOCKS_AT + 60 * 60_000);
+    expect(d.fire).toBe(true);
+    expect((d as { n: number }).n).toBe(3);
   });
 });

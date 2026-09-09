@@ -1,3 +1,4 @@
+import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
 import { CFB_LEAGUE, CFB_LOCK } from "@/lib/cfb/rules";
@@ -537,8 +538,10 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
    * WHAT IT COSTS, stated rather than buried: a fun-only fire buys a priced board (one game-lines
    * pull, 6 Odds credits) for a day that needs no core money — days that used to refuse for free.
    * It is bounded by the SAME CFB_TOPUP_MAX attempts as everything else on this path (the two arms
-   * share one budget; they do not each get their own), so the worst case per date is unchanged at
-   * two priced boards, and only the SET of dates that can reach it widens.
+   * share one budget; they do not each get their own), so the worst case per date is at most
+   * CFB_TOPUP_MAX priced boards (2 → 6, INSTRUCTION 48 2026-09-09 — arms only close, so the two
+   * counters cannot be played off against each other), and only the SET of dates that can reach
+   * it widens.
    */
   /**
    * AN EMPTY BUCKET IS NOT ALWAYS A FREE BUCKET (INSTRUCTION 45, 2026-09-06, S2 — DECIDED, not
@@ -716,6 +719,15 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
    * `used`). Ordinals are never re-used, so `cfb-<date>-topup<n>-core-<i>` cannot be re-minted.
    */
   const maxN = rows.reduce((m, r) => (Number.isFinite(r.n) && r.n > m ? r.n : m), 0);
+  /* AND THE ORDINALS THE TICKET IDS THEMSELVES CARRY (INSTRUCTION 48 fix round, 2026-09-09,
+     defect 3): a `topUps` row lost to a device write-back (the merge kernel now unions the log, but
+     a blob written before that fix may already lack rows) must never let a fresh ordinal re-mint
+     `<prefix>-<date>-topup<n>-core-<i>` onto a ticket that is seated under it. */
+  const idN = [...entry.core, ...(entry.funT ?? [])].reduce((m, t) => {
+    const hit = /-topup(\d+)-/.exec(String(t.id ?? ""));
+    const k = hit ? Number(hit[1]) : 0;
+    return k > m ? k : m;
+  }, 0);
   const attempts = others.length;
   return {
     fire: true,
@@ -723,7 +735,7 @@ export function decideTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, now: numbe
     slots,
     used,
     funUsed,
-    n: held ? (opts!.claim as number) : Math.max(attempts + 1, maxN + 1),
+    n: held ? (opts!.claim as number) : Math.max(attempts + 1, maxN + 1, idN + 1),
     core: coreOpen && !coreSpent,
     fun: funOpen && !funSpent,
   };
@@ -1161,6 +1173,8 @@ export function applyTopUp(cfg: LeagueConfig, entry: CfbLedgerEntry, plan: CfbTo
       next.grading = { ...grading, tickets: { ...graded }, legs: { ...(grading.legs ?? {}) }, done: false };
     }
   }
+  /* INSTRUCTION 48 (2026-09-09): "it can never remove a pick it can only add to it". */
+  assertAppendOnly(entry, next, "applyTopUp");
   assertEntryMoney(cfg, next);
   const v = validateCfbLedger([next], cfg);
   if (!v.ok) throw new Error(`topped-up entry failed the ${cfg.short} ledger's own validator: ${v.error}`);

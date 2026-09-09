@@ -261,6 +261,8 @@ function TicketRow({
 function DayCard({ e }: { e: LedgerEntry }) {
   const g = e.grading?.tickets ?? {};
   const tix = [...e.core, ...e.funT];
+  // INSTRUCTION 48 (2026-09-09): show what was actually placed against the allotment
+  const deployed = tix.reduce((s, t) => s + (Number(t.stake) || 0), 0);
   // live "now" stats: only days that still have something ungraded poll (a
   // fully graded day requests nothing and the hook goes dormant)
   const liveReqs = useMemo(
@@ -282,7 +284,7 @@ function DayCard({ e }: { e: LedgerEntry }) {
             </span>
           )}
           {e.lateLock && <span className="text-gold">late lock</span>}
-          <span className="num">{tix.length} tickets · ${e.daily + e.fun}</span>
+          <span className="num">{tix.length} tickets · ${Math.round(deployed * 100) / 100} of ${e.daily + e.fun}</span>
         </span>
       </summary>
       <div className="mt-3 space-y-2">

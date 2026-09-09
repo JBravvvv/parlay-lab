@@ -111,9 +111,10 @@ export const NFL_LOCK = {
  */
 export const NFL_SWEEP_DAYS = 4;
 
-/** Top-up bound, mirrored as literals rather than imported so the desks can never share a knob. */
+/** Top-up bound, mirrored as literals rather than imported so the desks can never share a knob.
+ *  INSTRUCTION 48 (2026-09-09): max 2 → 6 per arm — the card only grows; see CFB_TOPUP_MAX. */
 export const NFL_TOPUP = {
-  max: 2,
+  max: 6,
   retryMs: 45 * 60_000,
 } as const;
 

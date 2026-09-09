@@ -812,13 +812,22 @@ describe("the fun union is bounded by the day's own fun allotment (INSTRUCTION 4
  * (2026-09-06).
  *
  * LARGER-WINS was justified as "no writer on either desk ever LOWERS a stake under a fixed id".
- * That is not true on the MLB rail. `buildModeCard` (src/lib/server/lock-card.ts) runs
- * `shAllocate` over the whole slate pool, and the ids/legs exclusion built from `carriedTix` is
- * applied only to the FORCED pass's `rest` — so a later block fire re-picks a bet an earlier fire
- * already staked. MLB ids are content-addressed, so it re-mints the SAME id at a smaller pro-rata
- * stake, and `const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id))`
- * lets the new copy REPLACE the carried one. The stored day then holds p:abc at $12 where an
- * earlier fire recorded $40.
+ * That WAS true of the MLB rail when this was written (2026-09-06): `buildModeCard`
+ * (src/lib/server/lock-card.ts) ran `shAllocate` over the whole slate pool and the ids/legs
+ * exclusion built from the carried tickets was applied only to the FORCED pass, so a later block
+ * fire could re-pick a bet an earlier fire already staked; MLB ids are content-addressed, so it
+ * re-minted the SAME id at a smaller pro-rata stake, and
+ * `const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id))` let the
+ * new copy REPLACE the carried one — p:abc at $12 where an earlier fire recorded $40.
+ *
+ * CORRECTED 2026-09-09 (INSTRUCTION 48, Josh: "it can never remove a pick it can only add to it"):
+ * since the INSTRUCTION 46 slot pass the `free` filter in lock-card.ts (`!ids.has(tid) &&
+ * !legs.some(...)`) is applied to BOTH the gated pool and the forced pool of every slot, so a
+ * carried id or leg can no longer be re-picked at any stake, and `assertAppendOnly`
+ * (src/lib/append-only.ts) in buildLockEntry and writeLock THROWS before any write that would
+ * drop or resize a carried ticket. The re-mint path below is therefore closed on the server; the
+ * merge rule this suite pins still matters for the DEVICE channel, where two copies of one day can
+ * still disagree on a stake.
  *
  * MEASURED: a device that pulled before block 2 still holds $40 and PUTs it. The merge raised the
  * stored $12 back to $40 — merged core sum 90 on a day whose own `allocSum` records 62, and
@@ -4563,5 +4572,41 @@ describe("the NFL desk — the merge kernel bounds an `nfl` day by NFL_PAPER.dai
     expect(CFB_PAPER.daily).toBe(250);
     expect(NFL_PAPER.daily - CFB_PAPER.daily).toBe(100);
     expect(CFB_PAPER.daily - PAPER.daily).toBe(100);
+  });
+});
+
+/* ── FIX ROUND 2026-09-09 (INSTRUCTION 48, defect 3): the fields a stale base used to erase ────── */
+describe("mergeDay carries the football attempt log, the alt world's appends and the open-slot report", () => {
+  const rows = (ns: number[]) => ns.map((n) => ({ at: 1_000 + n, n, core: 1, stake: 25, filled: true }));
+  it("unions `topUps` by ordinal — base wins per ordinal, rows only the other copy holds are copied in, sorted by n", () => {
+    const graded = day("2026-09-05", { grading: { tickets: { t1: { result: "won", payout: 10, detail: "" } }, legs: {}, done: false } as never });
+    (graded as Record<string, unknown>).topUps = rows([1]);
+    const server = day("2026-09-05");
+    (server as Record<string, unknown>).topUps = [...rows([1, 2, 3]).map((r, i) => (i === 0 ? { ...r, stake: 99 } : r))];
+    for (const [a, b] of [[graded, server], [server, graded]] as const) {
+      const out = mergeLedgers([a], [b])[0] as Record<string, unknown>;
+      const tu = out.topUps as { n: number; stake: number }[];
+      expect(tu.map((r) => r.n)).toEqual([1, 2, 3]);
+      /* the graded copy is the base (gradeScore); its own ordinal-1 row stands over the server's */
+      expect(tu[0].stake).toBe(25);
+    }
+  });
+  it("appends `alt.core` tickets the other copy holds under unseen ids and re-derives alt.allocSum", () => {
+    const a = day("2026-09-05", { alt: { selMode: "x", core: [{ id: "a1", bucket: "core", name: "n", stake: 20, confirmed: null }], allocSum: 20, gatedSum: 0 } as never });
+    const b = day("2026-09-05", { alt: { selMode: "x", core: [{ id: "a1", bucket: "core", name: "n", stake: 20, confirmed: null }, { id: "a2", bucket: "core", name: "n", stake: 30, confirmed: null }], allocSum: 50, gatedSum: 0 } as never });
+    for (const [x, y] of [[a, b], [b, a]] as const) {
+      const out = mergeLedgers([x], [y])[0];
+      expect(out.alt!.core.map((t) => t.id)).toEqual(["a1", "a2"]);
+      expect(out.alt!.allocSum).toBe(50);
+    }
+  });
+  it("carries `slotsOpen` / `slotsUnfilled` from the copy with the larger allocSum", () => {
+    const pre = day("2026-09-05", { allocSum: 40, slotsOpen: [{ slot: 2, stake: 10 }], slotsUnfilled: [{ slot: 2, reason: "thin" }] } as never);
+    const post = day("2026-09-05", { allocSum: 50, core: [...day("x").core, { id: "t3", bucket: "core", name: "n", stake: 10, confirmed: null }], slotsOpen: [], slotsUnfilled: [] } as never);
+    for (const [x, y] of [[pre, post], [post, pre]] as const) {
+      const out = mergeLedgers([x], [y])[0] as Record<string, unknown>;
+      expect(out.slotsOpen).toEqual([]);
+      expect(out.slotsUnfilled).toEqual([]);
+    }
   });
 });

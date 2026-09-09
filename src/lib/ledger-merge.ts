@@ -1487,6 +1487,50 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   const osu = other as { slotUnderSum?: unknown };
   const a = Number(su.slotUnderSum), b = Number(osu.slotUnderSum);
   if (Number.isFinite(b) && (!Number.isFinite(a) || b > a)) su.slotUnderSum = b;
+  /* THE FOOTBALL ATTEMPT LOG IS UNIONED BY ORDINAL (INSTRUCTION 48 fix round, 2026-09-09,
+     defect 3). `topUps` (src/lib/cfb/lock-server.ts claim/apply rows) was base-only, so a stale
+     phone copy winning pickBase on a graded early game erased the server's later attempt rows:
+     `used` under-counted (the cap re-opened) and the ordinal regressed, so the next plan re-minted
+     `<prefix>-<date>-topup<n>-core-1` onto a seated id and assertCardMoney threw on every poke.
+     Base wins per ordinal; rows only the other copy holds are deep-copied in; sorted by `n`. */
+  {
+    const rowsOf = (e: SyncEntry): { n?: unknown }[] => {
+      const v = (e as Record<string, unknown>).topUps;
+      return Array.isArray(v) ? (v as { n?: unknown }[]) : [];
+    };
+    const mine = rowsOf(out), theirs = rowsOf(other);
+    if (theirs.length) {
+      const seen = new Set(mine.map((r) => Number(r?.n)));
+      const extra = theirs.filter((r) => !seen.has(Number(r?.n))).map((r) => JSON.parse(JSON.stringify(r)) as { n?: unknown });
+      if (extra.length || !mine.length) {
+        (out as Record<string, unknown>).topUps = [...mine, ...extra].sort((a, b) => (Number(a?.n) || 0) - (Number(b?.n) || 0));
+      }
+    }
+  }
+  /* THE ALT WORLD APPENDS TOO (same round): `alt.core` was base-only once both copies carried an
+     `alt`, so a merge whose base predates a fire lost the shadow card's appended tickets. Tickets
+     the other copy's alt holds under an unseen id are appended; the base's own are never touched. */
+  if (out.alt && other.alt && Array.isArray(other.alt.core)) {
+    const have = new Set((out.alt.core ?? []).map((t) => t.id));
+    const add = other.alt.core.filter((t) => t.id && !have.has(t.id));
+    if (add.length) {
+      out.alt.core = [...(out.alt.core ?? []), ...add.map((t) => JSON.parse(JSON.stringify(t)) as SyncTicket)];
+      out.alt.allocSum = money(out.alt.core.reduce((sum, t) => sum + (Number(t.stake) || 0), 0));
+    }
+  }
+  /* THE OPEN-SLOT REPORT FOLLOWS THE COPY THAT SEATED MORE (same round): `slotsOpen` /
+     `slotsUnfilled` are written by buildLockEntry for the seating it just did, so the copy with
+     the LARGER allocSum is the one whose report is current; a base that won on grading richness
+     otherwise kept a pre-fire report and showed slots as open that a later fire had seated. */
+  {
+    const oa = Number((other as { allocSum?: unknown }).allocSum), ba = Number((out as { allocSum?: unknown }).allocSum);
+    const o = other as Record<string, unknown>, b = out as Record<string, unknown>;
+    if (Number.isFinite(oa) && (!Number.isFinite(ba) || oa > ba)) {
+      for (const k of ["slotsOpen", "slotsUnfilled"] as const) {
+        if (o[k] != null) b[k] = JSON.parse(JSON.stringify(o[k]));
+      }
+    }
+  }
   if (other.clv) {
     out.clv = { ...JSON.parse(JSON.stringify(other.clv)), ...(out.clv ?? {}) };
   }

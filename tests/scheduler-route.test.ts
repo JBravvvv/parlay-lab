@@ -46,7 +46,7 @@ import { slateStarts } from "@/lib/server/slate";
  *
  * ── THE FAILS-CLOSED GATE, AND THE ANTI-PATTERN IT REFUSES ───────────────────────────
  * `/api/calibrate` shipped `return !cron` — ALLOW when CRON_SECRET is unset — reasoning that the
- * run was idempotent and cheap. This route SPENDS (~50-91 credits a fire), so the same shape
+ * run was idempotent and cheap. This route SPENDS (a full generate a fire, 114-150 Odds credits measured, app/api/generate/route.ts:46), so the same shape
  * here would let any stranger fire a board the day the env var slipped. The gate is therefore:
  * CRON_SECRET unset → 503, always, before anything else. Asserted on comment-stripped source
  * below, per the standing rule that a presence assertion over raw source is satisfiable by prose.
@@ -418,6 +418,82 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     // decideTopUp's own answer on the empty slate — the terminal short-circuit did not take it
     expect((body.topup as { reason: string }).reason).toBe("every game started — nothing pregame left to seat");
     expect((body.topup as { owed: number }).owed).toBe(30);
+  });
+
+  /**
+   * INSTRUCTION 48 (2026-09-09, Josh's word, verbatim: "It can lock multiple times per day, but it
+   * can never remove a pick it can only add to it"). THE 09-09 DAY, replayed: a locked day at $25
+   * (one $25 ticket Kelly-sized into shape A's $60 slot 0, slotUnderSum 35 → owed $90), every block
+   * fired, THREE top-ups already spent, pregame games ahead. Under TOPUP_MAX = 2 this poke answered
+   * "top-up cap spent (3/2)"; under 4 it forwards a fourth generate. A fourth registry row refuses.
+   */
+  describe("INSTRUCTION 48 — the fourth sweep of the day forwards; the fifth is the cap", () => {
+    /* three evening starts inside one 90-min block (a fourth start ≥ 90 min later would be a SECOND,
+       unfired block — "a block can still fire" would hold the sweep, which is the pre-48 rule and correct) */
+    const LATE = [Date.parse("2026-09-05T23:05:00Z"), Date.parse("2026-09-05T23:10:00Z"), Date.parse("2026-09-05T23:40:00Z")];
+    const BLOCK_KEY = "2026-09-05T23:05Z"; // partitionBlocks keys a block by its first start (ISO to the minute)
+    const day = {
+      date: "2026-09-05", locked: true, paper: true, lockedAt: NOW - 3_600_000, daily: 150, allocSum: 25, slotUnderSum: 35,
+      coreShape: { id: "A", label: "2x$60 2-leg + 3x$10 3-4 leg", pick: "rotation", slots: [{ stake: 60, legs: { min: 2, max: 2 } }, { stake: 60, legs: { min: 2, max: 2 } }, { stake: 10, legs: { min: 3, max: 4 } }, { stake: 10, legs: { min: 3, max: 4 } }, { stake: 10, legs: { min: 3, max: 4 } }] },
+      core: [{ id: "p:one", stake: 25, shapeSlot: 0, name: "the one that cleared", paper: true, placed: false, actualStake: 0, legs: [{ label: "A (AAA)", prop: "Hits O 0.5" }, { label: "B (BBB)", prop: "Hits O 0.5" }] }],
+      funT: [], games: {},
+    };
+    const seedDay = (kv: Map<string, string>, topups: number) => {
+      kv.set("pl:ledger:v1", JSON.stringify({ epoch: LEDGER_EPOCH, ledger: [day] }));
+      const reg: Record<string, unknown> = { [BLOCK_KEY]: { firedAt: NOW - 3_600_000, tickets: 1, at: NOW - 3_600_000 } };
+      for (let i = 1; i <= topups; i++) reg[`topup-${i}`] = { firedAt: NOW - (4 - i) * 50 * 60_000, tickets: 1, budget: 90, at: NOW - (4 - i) * 50 * 60_000 };
+      kv.set("pl:blocks:2026-09-05", JSON.stringify(reg));
+    };
+    const stubGenerate = () => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, topup: true }), { status: 200, headers: { "content-type": "application/json" } }));
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    };
+
+    it("three sweeps spent, $90 owed, a $60 slot open, games ahead → body.topup.fire and /api/generate?topup=1 is forwarded", async () => {
+      const { kv } = fakeRedis();
+      seedDay(kv, 3);
+      vi.mocked(slateStarts).mockResolvedValue(LATE);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { status, body } = await call();
+      expect(status).toBe(200);
+      expect(body.fired).toBe(true);
+      expect(body.topup).toMatchObject({ fire: true, owed: 90, used: 3 });
+      expect(String((body.topup as { reason: string }).reason)).toMatch(/day short \$90/);
+      const urls = fetchMock.mock.calls.map((c) => String((c as unknown[])[0]));
+      expect(urls.some((u) => u.includes("/api/generate?topup=1")), `generate not forwarded; fetched: ${urls.join(", ")}`).toBe(true);
+      expect(body.generateStatus).toBe(200);
+    });
+
+    it("the same day with topup-4 already in the registry → refused on the cap, nothing forwarded", async () => {
+      const { kv } = fakeRedis();
+      seedDay(kv, 4);
+      vi.mocked(slateStarts).mockResolvedValue(LATE);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { status, body } = await call();
+      expect(status).toBe(200);
+      expect(body.fired).toBe(false);
+      expect(body.topup).toMatchObject({ fire: false, owed: 90, used: 4 });
+      expect(String((body.topup as { reason: string }).reason)).toMatch(/cap/);
+      expect(fetchMock.mock.calls.map((c) => String((c as unknown[])[0])).some((u) => u.includes("/api/generate"))).toBe(false);
+    });
+
+    it("an EMPTY third sweep 30 min ago holds the fourth off (free) — TOPUP_EMPTY_RETRY_MS is wired into the route", async () => {
+      const { kv } = fakeRedis();
+      seedDay(kv, 3);
+      const reg = JSON.parse(kv.get("pl:blocks:2026-09-05")!) as Record<string, Record<string, unknown>>;
+      reg["topup-3"] = { firedAt: NOW - 30 * 60_000, tickets: 0, budget: 90, at: NOW - 30 * 60_000 };
+      kv.set("pl:blocks:2026-09-05", JSON.stringify(reg));
+      vi.mocked(slateStarts).mockResolvedValue(LATE);
+      const fetchMock = stubGenerate();
+      forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+      const { body } = await call();
+      expect(body.fired).toBe(false);
+      expect(String((body.topup as { reason: string }).reason)).toMatch(/seated nothing/);
+      expect(fetchMock.mock.calls.map((c) => String((c as unknown[])[0])).some((u) => u.includes("/api/generate"))).toBe(false);
+    });
   });
 
   it("BASELINE: the tick answers 200 with no `cfb` of its own — the whole body, pinned", async () => {

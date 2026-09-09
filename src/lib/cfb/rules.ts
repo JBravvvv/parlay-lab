@@ -187,16 +187,33 @@ export const CFB_SWEEP_DAYS = 3;
  * that could have served the fun bucket. A row written before that change carries no `arms` and is
  * counted against BOTH, the direction that refuses more spending rather than less.
  *
- * THE TOTAL SPEND IS UNCHANGED AT 2 PRICED BOARDS PER DATE, which is the invariant this number
- * exists to state, because both arms only ever CLOSE: core room and ticket slots only shrink, and
- * a fun bucket that has been seated is never empty again. So every attempt with the core arm open
- * comes before every attempt without it, an attempt with both arms open charges BOTH counters, and
- * no interleaving can reach a third board. One pull answers both questions at once, which is why
- * the thing being bounded is the PRICED BOARD rather than the bucket. What widened is the set of
- * dates that can reach the bound, since a day at full core with an empty fun bucket used to refuse
- * for free. See `decideCfbTopUp` and `CfbTopUpRecord` in src/lib/cfb/lock-server.ts.
+ * THE TOTAL SPEND IS BOUNDED AT CFB_TOPUP_MAX PRICED TOP-UP BOARDS PER DATE (the sentence read
+ * "2 priced boards" when the constant was 2; INSTRUCTION 48, 2026-09-09, raised the constant, not
+ * the shape — a fix-round draft withdrew this invariant as "2 × CFB_TOPUP_MAX", which double-counts,
+ * and it is reinstated here). Why the per-arm counters cannot be played off against each other: both arms only ever
+ * CLOSE — core room and ticket slots only shrink, and a fun bucket that has been seated is never
+ * empty again — so every attempt with the core arm open comes before every attempt without it, an
+ * attempt with both arms open charges BOTH counters, and no interleaving can exceed the per-arm
+ * allowance. One pull answers both questions at once, which is why the thing being bounded is the
+ * PRICED BOARD rather than the bucket. What widened on 2026-09-06 is the set of dates that can
+ * reach the bound, since a day at full core with an empty fun bucket used to refuse for free.
+ * See `decideCfbTopUp` and `CfbTopUpRecord` in src/lib/cfb/lock-server.ts.
+ *
+ * INSTRUCTION 48 (2026-09-09), Josh verbatim: "The Card for today is 'locked' which is fine, but it
+ * only played $25 today. I understand thats all it had meeting the criteria at this time which is
+ * completely fine. Throughout the rest of the day refresh, if it analyzes more picks/parlays that
+ * meet the betting criteria, it can continue to add to the card up to the daily allotted amount.
+ * It can lock multiple times per day, but it can never remove a pick it can only add to it".
+ * 2 → 6 per arm on 2026-09-09. Each attempt that reaches pricing costs one 6-credit lines pull
+ * (measured above; docs/cfb-desk.md), so the day's top-up lines spend is bounded at
+ * 6 × 6 = 36 credits (42 with the lock's own pull) — arms only close, so the per-arm counters
+ * share those attempts rather than each getting their own — noise beside CFB_PROPS.dailyBudget
+ * (2500). CFB_TOPUP_RETRY_MS is unchanged and
+ * remains the spacing that makes the attempts worth having. The card only grows: `applyTopUp`
+ * appends and `assertAppendOnly` (src/lib/append-only.ts) throws before any write that would
+ * drop or resize a seated ticket.
  */
-export const CFB_TOPUP_MAX = 2;
+export const CFB_TOPUP_MAX = 6;
 
 /**
  * HOW LONG AN EMPTY ATTEMPT HOLDS THE NEXT ONE OFF (INSTRUCTION 45, 2026-09-06).

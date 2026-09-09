@@ -9,7 +9,7 @@ import { BLOCKS_KEY, dayConsumed, decideBlock, decideTopUp, partitionBlocks, typ
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, readShapeCalibration, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
-import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { PAPER, TOPUP_EMPTY_RETRY_MS, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { decideGradePass } from "@/lib/server/grading-progress";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
@@ -127,8 +127,10 @@ export async function GET(req: NextRequest) {
 
 async function mlbTick(req: NextRequest): Promise<NextResponse> {
   /* FAILS CLOSED. /api/calibrate shipped `return !cron` — allow when the secret is unset —
-     because its run was cheap and idempotent. This route SPENDS ~50-91 credits a fire, so an
-     unset secret is a configuration error and nothing else: 503, before anything is read. */
+     because its run was cheap and idempotent. This route SPENDS a full generate a fire
+     (114-150 Odds credits measured, app/api/generate/route.ts:46; a block fire prices the
+     whole slate — collectSlate takes no scope), so an unset secret is a configuration error
+     and nothing else: 503, before anything is read. */
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "scheduler-not-configured: CRON_SECRET unset — failing closed" }, { status: 503 });
   }
@@ -164,7 +166,16 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
     }
     return { ...dec, locked, orphaned: orphaned || (!locked && dec.reason.startsWith("dead-block")), fire: dec.fire && !locked };
   });
-  if (regDirty) await redisSetJson(BLOCKS_KEY(date), reg);
+  if (regDirty) {
+    /* ADDITIVE, NOT A WRITE-BACK (INSTRUCTION 48 fix round, 2026-09-09, defect 10): writing the
+       whole object read above would drop a `topup-N` row a concurrent generate wrote in between
+       (a re-poke while the previous poke's forwarded sweep is still running) — under-counting
+       `used` by one and losing the empty-sweep marker. Re-read and overlay only the orphan rows. */
+    const orphanRows: BlockRegistry = {};
+    for (const b of blocksArr) if (reg[b.key]?.reason && !reg[b.key]?.firedAt) orphanRows[b.key] = reg[b.key];
+    const fresh = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
+    await redisSetJson(BLOCKS_KEY(date), { ...fresh, ...orphanRows });
+  }
   const target = blockViews.find((v) => v.fire) ?? null;
 
   // BOTH conditions in every response, fired or not, PER BLOCK — the standing rule.
@@ -235,12 +246,18 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        pregame games remain, forward a plain generate with ?topup=1 for fresh prices —
        evening props post late, which is exactly when the earlier fires found a thin
        pool. decideTopUp is pure and printed every poke; generate's 45-min limiter,
-       run-cap headroom, and TOPUP_MAX registry cap govern the actual spend. */
+       run-cap headroom, and TOPUP_MAX registry cap govern the actual spend.
+       INSTRUCTION 48 (2026-09-09, Josh: "it can lock multiple times per day, but it can
+       never remove a pick it can only add to it"): up to TOPUP_MAX (4) sweeps a day, ≥45 min
+       apart (generate's limiter), an empty sweep holds the next off TOPUP_EMPTY_RETRY_MS
+       (90 min), and a sweep that cannot own an open slot is refused free (slot-fit). The
+       card only grows: every fire carries the day's tickets verbatim and assertAppendOnly
+       (src/lib/append-only.ts) throws before any write that would drop or resize one. */
     let topup: Record<string, unknown>;
     /* CANNOT FILL FURTHER IS TERMINAL (fix round 2026-09-08, INSTRUCTION 46 seating): when
        every open slot the day still carries is named `cannot fill further` — carried legacy
        money that no slot could seat is occupying their share of the $150 — a top-up would
-       rebuild the same seating, deploy $0 and spend ~120 Odds credits doing it. The sweep
+       rebuild the same seating, deploy $0 and spend a full generate (114-150 Odds credits measured, app/api/generate/route.ts:46) doing it. The sweep
        stops here, before decideTopUp reads the shortfall as money it can still place. A day
        whose open slots include ordinary shortfalls (thin pool, gate) still sweeps as before. */
     const lockEntry = await getLockEntry(date);
@@ -261,6 +278,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
           now,
           daily: PAPER.daily,
           max: TOPUP_MAX,
+          emptyRetryMs: TOPUP_EMPTY_RETRY_MS,
         });
     if (tu.fire) {
       const gen = await fetch(new URL("/api/generate?topup=1", req.nextUrl.origin), {

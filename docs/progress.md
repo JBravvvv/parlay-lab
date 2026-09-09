@@ -1,3 +1,19 @@
+# Progress — 2026-09-09 (INSTRUCTION 48: the card only grows)
+
+## Every desk — LOCKED is the first lock, not the end of the day
+- "Locked" now means the first lock happened, not that the day is closed: the desk keeps adding
+  tickets across the day's refreshes until the daily allotment is placed (the Builder and the
+  CFB/NFL card say "Still filling — $x of $y" while pregame games remain).
+- MLB sweeps up to 4 times a day (was 2), 45 min apart, an empty sweep waiting 90 min; a sweep
+  that could not own an open slot is refused for free. Football: 6 attempts per arm (was 2).
+- A locked ticket is never removed or resized — enforced by `src/lib/append-only.ts` at every
+  server write (MLB build + write, football top-up + write) and tested.
+- Credits: MLB worst case 6 → 8 full runs a date (912–1,200 at 114–150 each), football ≤42
+  lines credits a date (lock + at most 6 top-up boards); with the fixed rails (~231/day) September
+  reads ≈ 29,300 realistic against a 20,000/month plan whose last reading (16,480 on 09-05) is
+  stale — the month is already short on paper, so the props rails
+  are the lever, not the caps. Not committed.
+
 # Progress — 2026-09-08 (INSTRUCTION 47: CFB $250, the NFL desk, NFL $350)
 
 ## Football — one engine now runs two desks

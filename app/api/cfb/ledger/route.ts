@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, validateLedger, type SyncEntry } from "@/lib/ledger-merge";
+import { restoreShrunkDays } from "@/lib/append-only";
 import { mergeBankStores, validateBankStore, type BankStore } from "@/lib/bankroll";
 import { redis, redisGetJson, redisSetJson, syncAuthed, syncConfigMissing } from "@/lib/server/store";
 import type { CFB_REDIS } from "@/lib/cfb/rules";
@@ -94,7 +95,14 @@ export async function PUT(req: NextRequest) {
   }
   try {
     const cur = await readStore();
-    const merged = mergeLedgers(cur?.ledger ?? [], v.entries);
+    const merged0 = mergeLedgers(cur?.ledger ?? [], v.entries);
+    /* INSTRUCTION 48 (2026-09-09, Josh: "it can never remove a pick it can only add to it"):
+       a device copy that wins the merge must not shrink or resize a locked day the server
+       wrote — see restoreShrunkDays. The reply carries the corrected ledger and the client
+       adopts it, so the phone converges on the server card. */
+    const guarded = restoreShrunkDays(cur?.ledger ?? [], merged0, (e) => e.source === "server-lock");
+    for (const r of guarded.restored) console.warn(`[cfb-ledger] APPEND ONLY: kept the stored ${r.date} card over the device copy — ${r.violation}`);
+    const merged = guarded.ledger;
     if (JSON.stringify(merged).length > MAX_BYTES) {
       return NextResponse.json({ error: "merged ledger too large" }, { status: 413 });
     }

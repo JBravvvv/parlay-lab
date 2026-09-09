@@ -320,6 +320,20 @@ function LockedSummary({ locked, today, L }: { locked: CfbLedgerEntry; today: st
       <div className="mt-2">
         <p className="text-[12px] text-gold">{lockedLine(locked, L.short)}</p>
       </div>
+      {/* INSTRUCTION 48 (2026-09-09): a locked day keeps growing until the last kickoff; a seated ticket never
+          changes. Gated (fix round, defects 4/15) on what the server will actually do: only a SERVER-locked day
+          is ever topped up (lock-server.ts refuses any other `source`), and only while a game is still ahead
+          (decideTopUp/topUpDate refuse once every game has kicked off) — a promise the server has declined
+          must not render. */}
+      {locked.source === L.lockSource &&
+        !locked.noPlay &&
+        sumStakes(locked.core) < locked.daily &&
+        Object.values(locked.games ?? {}).some((g) => g?.start && Date.parse(g.start) > Date.now()) && (
+        <p data-testid="cfb-locked-filling" className="num mt-1 text-[11px] text-gold">
+          Still filling — ${sumStakes(locked.core)} of ${locked.daily} core placed; the server keeps adding until the
+          last kickoff. Locked tickets never change.
+        </p>
+      )}
       {record && (
         <p className="num mt-1 text-[11px] text-muted" data-testid="cfb-locked-record">
           {record}

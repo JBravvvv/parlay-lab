@@ -13,6 +13,7 @@ import {
 } from "@/lib/core-shapes";
 import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
 import { shrinkTicket } from "@/lib/shrink";
+import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 
 /**
@@ -748,6 +749,10 @@ export function buildLockEntry(args: {
   if (carriedSum + deployed > dayCeiling + 1e-9) {
     throw new Error(`OVER THE DAY: carried $${carriedSum} + this fire's $${deployed} exceeds the $${dayCeiling} day — a second writer or a broken carry exists. STOP.`);
   }
+  /* APPEND ONLY (INSTRUCTION 48, 2026-09-09, Josh: "it can never remove a pick it can only
+     add to it"): every ticket the day already locked must ride through this fire at the
+     same stake. Throws before the entry exists, so nothing is written. */
+  assertAppendOnly(carry as AoDay, { core, funT } as AoDay, "buildLockEntry");
   const dayAt = Number(carry?.allocSum ?? 0) + deployed;
   /* the day's slot map after this fire: which slots hold a ticket, which are still open */
   const filledAfter = seatCarried(core).filled;
@@ -845,6 +850,14 @@ export async function writeLock(entry: SyncEntry): Promise<{ merged: number; exi
   }
   const existedBefore = cur.some((e) => e.date === entry.date);
   const merged = mergeLedgers(cur, [entry]);
+  /* APPEND ONLY (INSTRUCTION 48): the merge kernel has lowering paths (rival lock, allotment
+     overflow, receiptless smaller stake) that cannot arise from a verbatim carry; if a racing
+     second writer ever makes one fire, throw BEFORE the SET — generate reports lock.error,
+     the registry key is not written, and the next poke retries on a fresh carry. */
+  const stored = cur.find((e) => e.date === entry.date);
+  const out = merged.find((e) => e.date === entry.date);
+  assertAppendOnly(stored as AoDay, out as AoDay, "writeLock/stored");
+  assertAppendOnly(entry as unknown as AoDay, out as AoDay, "writeLock/fire");
   await redis(["SET", LEDGER_STORE_KEY, JSON.stringify({ ledger: merged, at: entry.lockedAt, ...(epoch != null ? { epoch } : {}) })]);
   return { merged: merged.length, existedBefore };
 }

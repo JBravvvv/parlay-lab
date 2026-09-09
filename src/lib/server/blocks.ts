@@ -1,5 +1,6 @@
 import { LINEUP_LEAD_MS } from "@/lib/board-coverage";
 import { SCHED_T } from "@/lib/server/scheduler-decide";
+import { shapeById } from "@/lib/core-shapes";
 
 /**
  * PER-BLOCK LOCKING (2026-08-08, operator requirement: the lock adapts to each day's
@@ -172,14 +173,63 @@ export function canStillFire(b: SlateBlock, now: number): boolean {
  * deficit, pregame games remain to seat it, and the day's top-up cap is not spent.
  * Pure — the scheduler passes what it already read; generate's own limiter, run cap
  * and registry cap still govern the actual spend.
+ *
+ * WHY THE `pending` HOLD STAYS (INSTRUCTION 48 correction, 2026-09-09): a block fire is a
+ * FULL-SLATE generate (collectSlate takes no scope) at the same 114-150-credit cost a sweep
+ * pays — it is not cheaper. The hold stays because the pending block's own fire ALREADY
+ * carries the whole deficit (effectiveBlockBudget = daily − reserved − dayConsumed), so a
+ * sweep before it would buy a second board for money the block fire seats anyway, and
+ * could seat a late-block game before that block's own gate has judged it. canStillFire
+ * releases the hold for burned-down blocks.
+ *
+ * INSTRUCTION 48 (2026-09-09, "it can lock multiple times per day, but it can never remove
+ * a pick it can only add to it"): up to TOPUP_MAX (4) sweeps a day; two FREE refusals below
+ * (slot-fit, empty-sweep cooldown) keep the extra attempts from re-buying the same board.
  */
 /** THE DAY'S CONSUMED MONEY (cap at Kelly, Josh 2026-09-08). A seated slot is spent whether
     Kelly used all of it or not: allocSum is what the tickets carry, slotUnderSum is what
     Kelly declined inside seated slots — their sum is the slot money gone from the $150.
     Every budget read (block share, top-up owed) uses THIS, never allocSum alone, or the
-    sweep would buy top-ups (~120 credits each) to re-fill slots that are already seated. */
+    sweep would buy top-ups (a full generate, 114-150 credits each) to re-fill slots that are already seated. */
 export const dayConsumed = (entry: Record<string, unknown> | null | undefined): number =>
   Number(entry?.allocSum ?? 0) + Number(entry?.slotUnderSum ?? 0);
+
+/**
+ * OPEN SLOTS OF A LOCKED DAY (INSTRUCTION 48, 2026-09-09). Mirrors lock-card.ts seatCarried
+ * exactly: a ticket with an integer `shapeSlot` in range takes that slot if free; every other
+ * ticket takes the SMALLEST free slot whose stake ≥ its own; a ticket that fits nowhere is
+ * stranded (ignored here). Returns the stakes of the slots still free, in shape order; null
+ * when the entry carries no `coreShape` (a pre-09-08 day — the caller behaves as before).
+ * Pure: `@/lib/core-shapes` is pure, so no cycle and no I/O.
+ */
+export function openSlotStakes(entry: Record<string, unknown> | null | undefined): number[] | null {
+  const cs = entry?.coreShape as { id?: unknown; slots?: unknown } | null | undefined;
+  if (!cs || typeof cs !== "object") return null;
+  let slots: { stake: number }[] | null = null;
+  if (Array.isArray(cs.slots) && cs.slots.length) slots = cs.slots as { stake: number }[];
+  else if (typeof cs.id === "string") slots = shapeById(cs.id)?.slots ?? null;
+  if (!slots) return null;
+  const core = Array.isArray(entry?.core) ? (entry!.core as { stake?: unknown; shapeSlot?: unknown }[]) : [];
+  const filled = new Set<number>();
+  const unslotted: { stake?: unknown }[] = [];
+  for (const t of core) {
+    const s = t?.shapeSlot;
+    if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < slots.length && !filled.has(s)) filled.add(s);
+    else unslotted.push(t);
+  }
+  for (const t of unslotted) {
+    const stake = Number(t?.stake) || 0;
+    let best = -1;
+    for (let i = 0; i < slots.length; i++) {
+      if (filled.has(i)) continue;
+      const st = slots[i].stake;
+      if (st + 1e-9 < stake) continue;
+      if (best < 0 || st < slots[best].stake) best = i;
+    }
+    if (best >= 0) filled.add(best); // else stranded — ignored
+  }
+  return slots.map((s, i) => (filled.has(i) ? null : s.stake)).filter((x): x is number => x != null);
+}
 
 export function decideTopUp(args: {
   /** the date's locked SyncEntry (paper/allocSum read off its index signature) */
@@ -190,8 +240,11 @@ export function decideTopUp(args: {
   now: number;
   daily: number;
   max: number;
+  /** INSTRUCTION 48: an empty sweep (registry row `tickets: 0`) holds the next sweep off this
+      long; omitted/0 → no cooldown (the pre-09-09 behaviour and the test fixtures' rows). */
+  emptyRetryMs?: number;
 }): { fire: boolean; reason: string; owed: number; used: number } {
-  const { entry, blocks, registry, starts, now, daily, max } = args;
+  const { entry, blocks, registry, starts, now, daily, max, emptyRetryMs } = args;
   const used = Object.keys(registry ?? {}).filter((k) => k.startsWith("topup-")).length;
   if (entry?.paper !== true) return { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used };
   const owed = daily - dayConsumed(entry);
@@ -202,5 +255,44 @@ export function decideTopUp(args: {
   if (pending) return { fire: false, reason: "a block can still fire — its own fire carries the deficit", owed, used };
   if (!starts.some((s) => s > now)) return { fire: false, reason: "every game started — nothing pregame left to seat", owed, used };
   if (used >= max) return { fire: false, reason: `top-up cap spent (${used}/${max})`, owed, used };
+  /* SLOT-FIT (INSTRUCTION 48, free): a sweep's budget is effectiveBlockBudget(currentKey:"")
+     = owed once no block is pending, and lock-card's ownSlots owns any open slot with
+     stake ≤ that budget — so "some open slot ≤ owed" ⇔ "the sweep owns ≥ 1 slot". Otherwise
+     the run would deploy $0 for a full generate (114-150 credits) and write the shortfall
+     note. No coreShape (pre-09-08 day) → skipped. */
+  const open = openSlotStakes(entry);
+  if (open !== null && open.length === 0) {
+    return { fire: false, reason: "every slot of the day's shape is seated — nothing more to fill", owed, used };
+  }
+  if (open !== null && open.length > 0) {
+    const min = Math.min(...open);
+    if (owed + 1e-9 < min) {
+      return {
+        fire: false,
+        reason: `no open slot fits the day's remaining $${owed} — the smallest open slot is $${min}; the shortfall is Kelly sizing inside seated slots, not an unfilled seat`,
+        owed,
+        used,
+      };
+    }
+  }
+  /* EMPTY-SWEEP COOLDOWN (INSTRUCTION 48, free): the latest topup-* row that priced a board
+     and seated nothing (numeric `tickets === 0`, written by generate) holds the next sweep
+     off emptyRetryMs; a sweep that seated anything does not — the board is moving. Rows
+     without a numeric `tickets` never arm it. */
+  let last: { key: string; firedAt: number; tickets?: unknown } | null = null;
+  for (const [k, row] of Object.entries(registry ?? {})) {
+    if (!k.startsWith("topup-") || typeof row?.firedAt !== "number") continue;
+    if (!last || row.firedAt > last.firedAt) last = { key: k, firedAt: row.firedAt, tickets: row.tickets };
+  }
+  if (last && last.tickets === 0 && (emptyRetryMs ?? 0) > 0 && now - last.firedAt < (emptyRetryMs ?? 0)) {
+    const m = Math.round((now - last.firedAt) / 60_000);
+    const w = Math.ceil(((emptyRetryMs ?? 0) - (now - last.firedAt)) / 60_000);
+    return {
+      fire: false,
+      reason: `top-up ${last.key} priced a board ${m} min ago and seated nothing — the next sweep waits ${w} more min rather than re-buy the same prices`,
+      owed,
+      used,
+    };
+  }
   return { fire: true, reason: `day short $${owed} with no pending block and pregame games remaining`, owed, used };
 }

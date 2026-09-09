@@ -48,7 +48,9 @@ const K_RUNS = "pl:gen:runs:";
     (the cron, plus one lock-guard regenerate), so 3 leaves room for one mistake while
     keeping a leak nearer the plan. NOTE: this bounds SERVER runs only — an in-app
     regenerate executes in the browser and never reaches this route, so the cap does
-    not bound the spend most likely to run away. See docs/credit-budget.md. */
+    not bound the spend most likely to run away. See docs/credit-budget.md.
+    Hard ceiling since 2026-09-09 (INSTRUCTION 48): MAX_RUNS_PER_DATE 4 + TOPUP_MAX 4 = 8
+    spending runs a day, 912-1,200 credits at the measured 114-150. */
 /* raised 3 → 4 (2026-08-08, per-block locking): the season's observed maximum is 4
    start-blocks/day at the derived 90-min partition (§12Z.15) — the cap = blocks-observed,
    and partitionBlocks coalesces beyond it so the cap keeps meaning */
@@ -205,7 +207,9 @@ export async function GET(req: NextRequest) {
     if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
     /* top-up fires get TOPUP_MAX headroom above the cap (the block fires can lawfully
        spend all four runs); their own registry cap above bounds them at TOPUP_MAX, so
-       the hard ceiling is MAX_RUNS_PER_DATE + TOPUP_MAX runs a day, leak or no leak. */
+       the hard ceiling is MAX_RUNS_PER_DATE + TOPUP_MAX runs a day, leak or no leak.
+       TOPUP_MAX headroom is 4 since INSTRUCTION 48 (2026-09-09) — hard ceiling 8 spending
+       runs a day, 912-1,200 credits at the measured 114-150. */
     if (runs > MAX_RUNS_PER_DATE + (topup ? TOPUP_MAX : 0)) {
       console.warn(`[generate] run cap hit: ${runs} spending runs on ${dateNow} (cap ${MAX_RUNS_PER_DATE})`);
       return NextResponse.json(
@@ -497,6 +501,23 @@ export async function GET(req: NextRequest) {
     } catch (e) {
       lock = { error: (e as Error).message };
       console.warn(`[generate] LOCK FAILED — the self-check will backfill: ${(e as Error).message}`);
+      /* A FAILED SWEEP STILL SPENT (INSTRUCTION 48 fix round, 2026-09-09, defect 6). The credits
+         went at collectSlate() and K_RUNS was INCR'd at the point of commitment, but the
+         `topup-N` registry row was only written on success — so a sweep whose lock threw
+         (OVER THE DAY, TWO ALLOCATORS, validateLedger, and now APPEND ONLY) neither counted
+         against TOPUP_MAX nor armed TOPUP_EMPTY_RETRY_MS, and the next poke past the 45-min
+         limiter bought another full board. Mirror football's claim-before-spend: record the
+         attempt as an empty fire so it counts and cools down. Best-effort — a store error
+         here must not mask the lock error already reported. */
+      if (topupKey) {
+        try {
+          const reg = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(dateNow))) ?? {}) as BlockRegistry;
+          reg[topupKey] = { firedAt: now, tickets: 0, reason: `lock failed: ${(e as Error).message}`, at: now };
+          await redisSetJson(BLOCKS_KEY(dateNow), reg);
+        } catch (e2) {
+          console.warn(`[generate] could not record the failed top-up ${topupKey}: ${(e2 as Error).message}`);
+        }
+      }
     }
     /* SELF-READING (2026-08-06, operator: nothing waits on a human paste). The same run
        writes the card's READING to pl:reading:{date}, served by /api/board beside the

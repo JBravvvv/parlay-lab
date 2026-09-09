@@ -52,7 +52,8 @@ import type { LeagueRules } from "@/lib/football/league";
  * SIX clearing the -3% fun gate across FIVE distinct games. That board answered noPlay with $0 of
  * the $25. Rebuilt with `daily: 0` and with `daily: 150` it answered noPlay both times, so it was
  * never a room problem — the fun bucket simply sat behind the core's gate. Each such attempt buys
- * one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX = 2 per date, for nothing seated,
+ * one CFB game-lines pull (6 Odds credits), up to CFB_TOPUP_MAX per date (2 when this was
+ * measured; 6 since INSTRUCTION 48, 2026-09-09), for nothing seated,
  * every Saturday, against a 2500/day cap that already binds on Saturdays.
  *
  * THE SHAPE OF THE FIX. The early return is gone. The whole core body — `admit`, `raise`, the

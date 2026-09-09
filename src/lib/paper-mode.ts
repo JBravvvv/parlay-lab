@@ -48,10 +48,28 @@ export const PAPER_TICKETS = { min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max } 
  * "I said $150 every day no matter what so we could track and calibrate off of it").
  * When every block has fired or died and the day is still short, the scheduler may buy
  * up to this many extra generate runs (fresh prices — evening props post late, which is
- * exactly when the earlier fires found a thin pool). Each run costs ~120 Odds credits;
- * the cap bounds the spend, and the generate route's own registry enforces it.
+ * exactly when the earlier fires found a thin pool). The cap bounds the spend, and the
+ * generate route's own registry enforces it.
+ *
+ * INSTRUCTION 48 (2026-09-09, Josh's word, verbatim: "The Card for today is 'locked' which
+ * is fine, but it only played $25 today. I understand thats all it had meeting the criteria
+ * at this time which is completely fine. Throughout the rest of the day refresh, if it
+ * analyzes more picks/parlays that meet the betting criteria, it can continue to add to the
+ * card up to the daily allotted amount. It can lock multiple times per day, but it can never
+ * remove a pick it can only add to it"). 2 → 4 (2026-09-09). Each sweep is a full generate
+ * (114-150 credits measured, app/api/generate/route.ts:46); 4 bounds the day's sweep spend
+ * at 600 and lifts the hard ceiling to MAX_RUNS_PER_DATE + TOPUP_MAX = 8 runs. The 45-min
+ * limiter (generate/route.ts K_LASTGEN) and the two FREE refusals in decideTopUp
+ * (src/lib/server/blocks.ts) — the empty-sweep cooldown TOPUP_EMPTY_RETRY_MS and slot-fit
+ * (a sweep that cannot own an open slot of the day's shape is refused before it spends) —
+ * are what make four attempts worth having. Every fire carries the day's locked tickets
+ * verbatim and src/lib/append-only.ts throws before any write that would drop or resize one.
  */
-export const TOPUP_MAX = 2;
+export const TOPUP_MAX = 4;
+/** TOPUP_EMPTY_RETRY_MS = 90 min = twice the limiter = six pokes: a sweep that priced a board
+    and seated nothing holds the next sweep off; a sweep that seated anything does not (the
+    board is moving) — the MLB twin of CFB_TOPUP_RETRY_MS, src/lib/cfb/rules.ts. */
+export const TOPUP_EMPTY_RETRY_MS = 90 * 60_000;
 
 /**
  * The day-level 3–10 window, expressed per allocation call. `blockBudget` is the money

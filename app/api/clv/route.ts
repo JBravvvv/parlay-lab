@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
+import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { cronKeyAuthed, redis, storeEnv, syncAuthed } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import {
@@ -119,9 +120,22 @@ export async function GET(req: NextRequest) {
       const applied = applySights(entry, sights);
       updated = applied.updated;
       if (updated > 0) {
-        const merged = mergeLedgers(stored?.ledger ?? [], [applied.entry]);
+        /* INSTRUCTION 48 fix round (2026-09-09, defect 2): `stored` was read BEFORE the odds pulls
+           above (seconds), and a top-up sweep's writeLock SET can land inside that window — this
+           route is poked on the same :00/:30 minutes as the scheduler. Merging against the stale
+           read and SETting the whole blob overwrote the sweep's freshly seated tickets out of the
+           store, invisibly to every append-only assert (the next carry simply lacked them). So:
+           re-read immediately before the merge, merge against THAT, and assert the locked day
+           only grew. pickBase seats `applied.entry` (higher clvCount) and unionCore appends the
+           fresh day's newer tickets under the cap, so sightings and seats both survive. */
+        const freshRaw = (await redis(["GET", STORE_KEY])) as string | null;
+        const fresh: Stored | null = freshRaw ? (JSON.parse(freshRaw) as Stored) : stored;
+        const merged = mergeLedgers(fresh?.ledger ?? [], [applied.entry]);
+        const before = fresh?.ledger?.find((e) => e.date === date && e.locked);
+        const after = merged.find((e) => e.date === date);
+        assertAppendOnly(before as unknown as AoDay, after as unknown as AoDay, "clv");
         // the epoch rides through — a CLV write must never strip the paper-era marker
-        const blob = JSON.stringify({ ledger: merged, at: Date.now(), ...(stored?.epoch != null ? { epoch: stored.epoch } : {}) } satisfies Stored);
+        const blob = JSON.stringify({ ledger: merged, at: Date.now(), ...(fresh?.epoch != null ? { epoch: fresh.epoch } : {}) } satisfies Stored);
         if (blob.length <= MAX_BYTES) await redis(["SET", STORE_KEY, blob]);
       }
     }
