@@ -1457,6 +1457,14 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   } else if (shp.coreShape != null && typeof shp.shapeLine !== "string" && typeof oshp.shapeLine === "string") {
     shp.shapeLine = oshp.shapeLine;
   }
+  /* slotUnderSum (cap at Kelly, 2026-09-08): money Kelly declined inside seated slots. It
+     only grows within a day and cannot be re-derived from tickets (the slot stake is not on
+     the ticket), so the merge keeps the LARGER of the two copies — dropping it would let the
+     top-up sweep read seated slots as money still owed. */
+  const su = out as { slotUnderSum?: unknown };
+  const osu = other as { slotUnderSum?: unknown };
+  const a = Number(su.slotUnderSum), b = Number(osu.slotUnderSum);
+  if (Number.isFinite(b) && (!Number.isFinite(a) || b > a)) su.slotUnderSum = b;
   if (other.clv) {
     out.clv = { ...JSON.parse(JSON.stringify(other.clv)), ...(out.clv ?? {}) };
   }

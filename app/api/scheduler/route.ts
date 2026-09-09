@@ -5,7 +5,7 @@ import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
-import { BLOCKS_KEY, decideBlock, decideTopUp, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
+import { BLOCKS_KEY, dayConsumed, decideBlock, decideTopUp, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, readShapeCalibration, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
@@ -238,7 +238,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
       ? {
           fire: false,
           reason: `cannot fill further — the day's ${unfilled.length} open slot${unfilled.length === 1 ? "" : "s"} hold no seat for the carried money; a top-up would change nothing`,
-          owed: Math.max(0, PAPER.daily - Number((lockEntry as { allocSum?: unknown } | null)?.allocSum ?? 0)),
+          owed: Math.max(0, PAPER.daily - dayConsumed(lockEntry as Record<string, unknown> | null)),
           used: Object.keys(reg ?? {}).filter((k) => k.startsWith("topup-")).length,
         }
       : decideTopUp({

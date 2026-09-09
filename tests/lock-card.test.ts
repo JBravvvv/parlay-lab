@@ -256,18 +256,21 @@ describe("INSTRUCTION 46 — slot filling on a mock pool (2026-09-08)", () => {
     expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
   });
 
-  it("a Kelly-sized pick rides up to its slot on the same ticket: stake == slot, topUp stamped, gatedSum keeps the allocator's own sizing", () => {
+  it("CAP AT KELLY (Josh, 2026-09-08, verbatim: \"Cap at Kelly, don't ride the full slot\"): a Kelly-$12 pick in a $60 slot stays $12, topUp 0, the $48 the slot had left is retired (slotUnderSum), the slot still counts as consumed", () => {
     const entry = lock({ eng: mockEng({ kelly: 12 }) });
     const core = entry.core as Tix[];
     expect(core.map((t) => [t.id, t.stake, t.topUp ?? 0])).toEqual([
-      ["id-T2a", 60, 48],
-      ["id-T2b", 60, 48],
+      ["id-T2a", 12, 0],
+      ["id-T2b", 12, 0],
       ["id-T4a", 10, 0], // min(12, 10) — the slot is smaller than the Kelly ceiling
-      ["id-T4b", 10, 0], // forced: exact-sum, no top-up
+      ["id-T4b", 10, 0], // forced: exact-sum to the slot
     ]);
-    expect(entry.allocSum).toBe(140);
+    expect(entry.allocSum).toBe(12 + 12 + 10 + 10);
     expect((entry as { gatedSum?: number }).gatedSum).toBe(12 + 12 + 10);
-    expect((entry as { topUpSum?: number }).topUpSum).toBe(96);
+    expect((entry as { topUpSum?: number }).topUpSum).toBe(0);
+    expect((entry as { slotUnderSum?: number }).slotUnderSum).toBe(48 + 48);
+    // the seated $60 slots are consumed: only the genuinely unfilled slot is residue, so a top-up fire has nothing to buy here
+    expect((entry as { capResidue?: number }).capResidue).toBe(10);
   });
 
   it("IMPOSSIBLE BRANCH: an allocator handing back more than the slot is a THROW naming two allocators — never a clamp", () => {

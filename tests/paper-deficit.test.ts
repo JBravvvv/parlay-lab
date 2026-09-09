@@ -186,7 +186,7 @@ describe("buildLockEntry — the block owns its slot; the slot top-up carries th
     /* nothing is `cannot fill further` — the $126 of room is real, a $40+ fire can take it */
     expect((entry as { slotsUnfilled?: { reason: string }[] }).slotsUnfilled ?? []).toEqual([]);
   });
-  it("the $10 slot the gated pick would have topped up still works when it IS open: $9 gated + $1 residue riding the same ticket as topUp", () => {
+  it("the $10 slot is a CEILING (cap at Kelly, Josh 2026-09-08): the $9 gated pick seats at $9, the $1 the slot had left is retired — no top-up, no shortfall note", () => {
     /* the original 08-19 mechanics, on a carry that leaves the $10 slot free: two legacy
        $8 tickets → the $10 and $20 slots… so use $30 tickets, which best-fit into the $40s */
     const carry30 = { ...carry3, core: [1, 2, 3].map((i) => ({ ...carryTicket(i), stake: 30 })), allocSum: 90, gatedSum: 90 };
@@ -200,11 +200,12 @@ describe("buildLockEntry — the block owns its slot; the slot top-up carries th
       blockKey: "B-test",
       carry: carry30 as never,
     });
-    expect(entry.allocSum, "the block's budget did not fully deploy — the stranding defect is back").toBe(100); // 90 carried + 10
+    expect(entry.allocSum, "the slot seated (90 carried + $9 Kelly-sized) — the stranding defect is back if this is 90").toBe(99);
     const fresh = (entry.core as { id: string; stake: number; forced?: boolean; topUp?: number; shapeSlot?: number }[]).filter((t) => !t.id.startsWith("c"));
-    expect(fresh.map((t) => [t.id, t.stake, t.forced === true, t.topUp ?? 0, t.shapeSlot])).toEqual([["Gated 9", 10, false, 1, 4]]);
+    expect(fresh.map((t) => [t.id, t.stake, t.forced === true, t.topUp ?? 0, t.shapeSlot])).toEqual([["Gated 9", 9, false, 0, 4]]);
     expect(entry.blocks?.["B-test"]).toMatchObject({ budget: 10, tickets: 1, slots: [4] });
-    expect(entry.note, "a fully-deployed fire must not carry a shortfall note").toBeUndefined();
+    expect((entry as { slotUnderSum?: number }).slotUnderSum, "the $1 Kelly declined is recorded, not re-bought").toBe(1);
+    expect(entry.note, "a seated slot is a consumed slot — no shortfall note for Kelly sizing under it").toBeUndefined();
   });
   it("a FULL day (every slot of the shape carried) gives a fire no slot and no new ticket: nothing deploys, and the note says so honestly", () => {
     const carry5 = { ...carry3, core: [1, 2, 3, 4, 5].map(carryTicket), allocSum: 40 };

@@ -12,7 +12,7 @@ import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
-import { BLOCKS_KEY, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
+import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
 /**
@@ -426,7 +426,7 @@ export async function GET(req: NextRequest) {
       const bStarts = await slateStarts(date);
       const bs = partitionBlocks(bStarts);
       const reg0 = ((await redisGetJson<BlockRegistry>(BLOCKS_KEY(date))) ?? {}) as BlockRegistry;
-      const allocSoFar = Number(carry?.allocSum ?? 0);
+      const allocSoFar = dayConsumed(carry as Record<string, unknown> | null); // allocSum + slotUnderSum: seated slots are spent even where Kelly sized under them
       if (blockKey) {
         const blk = bs.find((b) => b.key === blockKey);
         if (blk) {

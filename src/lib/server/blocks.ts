@@ -173,6 +173,14 @@ export function canStillFire(b: SlateBlock, now: number): boolean {
  * Pure — the scheduler passes what it already read; generate's own limiter, run cap
  * and registry cap still govern the actual spend.
  */
+/** THE DAY'S CONSUMED MONEY (cap at Kelly, Josh 2026-09-08). A seated slot is spent whether
+    Kelly used all of it or not: allocSum is what the tickets carry, slotUnderSum is what
+    Kelly declined inside seated slots — their sum is the slot money gone from the $150.
+    Every budget read (block share, top-up owed) uses THIS, never allocSum alone, or the
+    sweep would buy top-ups (~120 credits each) to re-fill slots that are already seated. */
+export const dayConsumed = (entry: Record<string, unknown> | null | undefined): number =>
+  Number(entry?.allocSum ?? 0) + Number(entry?.slotUnderSum ?? 0);
+
 export function decideTopUp(args: {
   /** the date's locked SyncEntry (paper/allocSum read off its index signature) */
   entry: Record<string, unknown> | null;
@@ -186,7 +194,7 @@ export function decideTopUp(args: {
   const { entry, blocks, registry, starts, now, daily, max } = args;
   const used = Object.keys(registry ?? {}).filter((k) => k.startsWith("topup-")).length;
   if (entry?.paper !== true) return { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used };
-  const owed = daily - Number(entry.allocSum ?? 0);
+  const owed = daily - dayConsumed(entry);
   if (owed <= 0) return { fire: false, reason: "day fully deployed", owed: 0, used };
   const pending = blocks.some(
     (b) => !registry?.[b.key]?.firedAt && !registry?.[b.key]?.reason && canStillFire(b, now),

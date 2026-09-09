@@ -4336,6 +4336,17 @@ describe("the grading LEG map is base-over-other, and the loser's extra legs sti
 });
 
 describe("INSTRUCTION 46 — the day's shape is DURABLE across mergeDay (fix round 2026-09-08)", () => {
+  it("slotUnderSum (cap at Kelly, 2026-09-08) survives the merge as the LARGER copy in both orders — a merged day never reads seated slots as money still owed", () => {
+    const e1 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.daily, allocSum: 24, slotUnderSum: 96, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
+    const e2 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.daily, allocSum: 24, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
+    for (const [x, y] of [[e1, e2], [e2, e1]] as const) {
+      const m = mergeLedgers([JSON.parse(JSON.stringify(x))], [JSON.parse(JSON.stringify(y))])[0] as unknown as { slotUnderSum?: number };
+      expect(m.slotUnderSum).toBe(96);
+    }
+    const e3 = { ...JSON.parse(JSON.stringify(e1)), slotUnderSum: 120 } as SyncEntry;
+    expect((mergeLedgers([JSON.parse(JSON.stringify(e1))], [e3])[0] as unknown as { slotUnderSum?: number }).slotUnderSum).toBe(120);
+  });
+  const T2 = (id: string, stake: number, extra: Record<string, unknown> = {}) => ({ id, stake, name: id, paper: true, placed: false, actualStake: 0, legs: [{ label: `${id}-L1`, prop: "Hits O 0.5" }, { label: `${id}-L2`, prop: "Hits O 0.5" }], ...extra });
   /* OBSERVED RED before the fix: coreShape/shapeLine were neither in ACCRUAL_FIELDS nor adopted
      like `alt`, so whichever copy won pickBase decided the day's shape — a mid-day tilt that
      re-picked shape E on a later fire could flip a day already locked under B. shapeSlot on a

@@ -2,7 +2,8 @@
 
 ## Baseball — the core runs Josh's six $150 shapes and tilts on its own record
 - `src/lib/core-shapes.ts`: his six examples verbatim, one per day in rotation; `lock-card.ts`
-  seats one ticket per slot at the slot's stake (a $90 2-leg rides to $90 — his decision).
+  seats one ticket per slot CAPPED at the slot's stake — Josh's same-day call: "Cap at Kelly,
+  don't ride the full slot". What Kelly declines is retired (`slotUnderSum`), never re-bought.
 - Self-calibration: trailing-30-day 2-leg vs 3+-leg ROI (≥ 20 graded each, ≥ 10-point gap)
   tilts the rotation toward the winning bucket; thinner records keep the full rotation.
 - Grading passes now 15/18/22/2 UTC (all inside the cron-job.org poke window); the fix

@@ -377,7 +377,7 @@ export function buildLockEntry(args: {
      ticket is EVICTED from the pool and the fill re-runs. Bounded: every iteration
      removes a picked ticket, so the loop cannot spin. */
   type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
-  type Seat = { slot: number; pick: AllocPick; forced: boolean; topUp: number };
+  type Seat = { slot: number; pick: AllocPick; forced: boolean; topUp: number; slotUnder: number };
   type Unfilled = { slot: number; name: string; reason: string };
   type ModeCard = {
     seated: Seat[];
@@ -388,6 +388,7 @@ export function buildLockEntry(args: {
     quotaEvicted: number;
     biasYielded: boolean;
     capResidue: number;
+    slotUnderSum: number;
     deployed: number;
     gatedSizing: number;
     unallocated: number;
@@ -478,8 +479,16 @@ export function buildLockEntry(args: {
         if (Number(pick.stake) > slot.stake + 1e-9) {
           throw new Error(`TWO ALLOCATORS: allocator sized $${pick.stake} into the $${slot.stake} slot ${si} (${String(pick.w.pl.name)}) — a ticket may never carry more than its slot. STOP.`);
         }
-        const topUp = Math.max(0, slot.stake - Number(pick.stake));
-        seated.push({ slot: si, pick, forced, topUp });
+        /* CAP AT KELLY (Josh, 2026-09-08, verbatim: "Cap at Kelly, don't ride the full slot;
+           I was just suggesting that if there was a reason for a ticket to be much larger
+           than another one day that's okay"). The slot's stake is a CEILING, not a target:
+           the ticket carries the allocator's own sizing (Kelly under the disciplined modes,
+           exact-sum on the forced pass), and the gap between that and the slot is RETIRED
+           for the day — it is not a top-up, not residue, and never a second ticket. topUp
+           is stamped 0 so the ledger's shared-id raise (ledger-merge.ts) has nothing to
+           raise; `slotUnder` records what Kelly declined. */
+        const slotUnder = Math.max(0, slot.stake - Number(pick.stake));
+        seated.push({ slot: si, pick, forced, topUp: 0, slotUnder });
         ids.add(pick.id);
         for (const l of pick.w.pl.legs) legs.add(legKey(l));
         if (!forced) unallocated += Number(a.unallocated ?? 0);
@@ -490,13 +499,15 @@ export function buildLockEntry(args: {
         czEv: (s.pick.w.pl.czEv as number | null) ?? null,
         legs: s.pick.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
       }));
-      /* the fire's money: every seated slot deploys its whole stake (pick + topUp); what
-         the fire could not seat — unfilled owned slots, and any budget no unfilled slot
-         fits — is the residue, stamped capResidue (the field keeps its 09-03 name: the
-         cap is now the slot, and the residue carries forward exactly as before) */
-      const deployed = seated.reduce((acc, s) => acc + shape.slots[s.slot].stake, 0);
+      /* the fire's money: every seated slot deploys the TICKET's stake (Kelly-capped);
+         the slot's own money is CONSUMED whether or not Kelly used all of it, so the
+         residue (capResidue, the 09-03 name) is only the UNFILLED owned slots — money
+         Kelly declined inside a seated slot is retired, never re-bought by a top-up fire */
+      const deployed = seated.reduce((acc, s) => acc + Number(s.pick.stake), 0);
+      const slotsConsumed = seated.reduce((acc, s) => acc + shape.slots[s.slot].stake, 0);
+      const slotUnderSum = seated.reduce((acc, s) => acc + s.slotUnder, 0);
       const gatedSizing = seated.filter((s) => !s.forced).reduce((acc, s) => acc + Number(s.pick.stake), 0);
-      return { seated, unfilled, blocked, staged, share: underStats([...carriedB, ...staged]).share, deployed, capResidue: Math.max(0, daily - deployed), gatedSizing, unallocated };
+      return { seated, unfilled, blocked, staged, share: underStats([...carriedB, ...staged]).share, deployed, capResidue: Math.max(0, daily - slotsConsumed), slotUnderSum, gatedSizing, unallocated };
     };
     let pool = basePool;
     let cur = run(pool);
@@ -516,7 +527,8 @@ export function buildLockEntry(args: {
        quota's evictions leave the fire short of its budget, the evicted tickets come back
        and the passes run once more without the quota — stamped yieldedToBudget, never silent. */
     let yielded = false;
-    if (cur.deployed < daily && evicted > 0) {
+    /* short = an owned slot left unfilled (capResidue), NOT Kelly sizing under a seated slot */
+    if (cur.capResidue > 0 && evicted > 0) {
       yielded = true;
       cur = run(basePool);
     }
@@ -529,6 +541,7 @@ export function buildLockEntry(args: {
       quotaEvicted: evicted,
       biasYielded: yielded,
       capResidue: cur.capResidue,
+      slotUnderSum: cur.slotUnderSum,
       deployed: cur.deployed,
       gatedSizing: cur.gatedSizing,
       unallocated: cur.unallocated,
@@ -589,18 +602,12 @@ export function buildLockEntry(args: {
     };
   };
 
-  /* the slot top-up (INSTRUCTION 46): a pick the allocator sized under its slot rides up
-     to the slot's stake on the same ticket — `topUp` stamped, allocator sizing recoverable
-     as stake − topUp, never past the slot (the top-up IS the slot remainder).
-
-     THIS IS A DECISION, NOT A BUG (documented fix round 2026-09-08). One ticket rides to
-     the FULL slot stake: a Kelly-$12 pick in a $90 slot is staked $90 with topUp 78, and a
-     $60 slot on a $12 pick is $60 with topUp 48. That is Josh's INSTRUCTION 46 shape
-     decision — the day is SHAPED (six $150 menus, each slot a fixed stake) and the shape is
-     what the record calibrates, so the slot's money goes on the slot's ticket whatever the
-     allocator's own ceiling said. The allocator's sizing is never lost (gatedSum accrues
-     stake − topUp), so gated performance at Kelly size and the shaped deployment can always
-     be split. Do not "fix" this by splitting the slot across tickets or capping at Kelly. */
+  /* NO SLOT TOP-UP (Josh, 2026-09-08: "Cap at Kelly, don't ride the full slot"). The
+     INSTRUCTION 46 build first rode a pick up to its slot's stake (a Kelly-$12 pick in a
+     $90 slot staked $90, topUp 78); Josh reversed that the same day — the shapes say how
+     BIG a ticket MAY be, not how big it must be. withTopUp is kept (topUp is always 0 from
+     the slot pass now) so the ledger-merge raise contract and the legacy entries that carry
+     topUp stamps keep reading the same way. */
   const withTopUp = (t: SyncTicket, tu: number): SyncTicket => (tu > 0 ? { ...t, stake: Number(t.stake) + tu, topUp: tu } : t);
   const newCore: SyncTicket[] = primaryCard.seated
     .map((s, i) => {
@@ -729,7 +736,7 @@ export function buildLockEntry(args: {
       }
     : carry?.blocks;
 
-  const topUpAmt = primaryCard.seated.reduce((a, s) => a + s.topUp, 0);
+  const topUpAmt = primaryCard.seated.reduce((a, s) => a + s.topUp, 0); // always 0 since the cap-at-Kelly reversal
   const deployed = newCore.reduce((a, t) => a + Number(t.stake), 0);
   if (deployed !== primaryCard.deployed) {
     throw new Error(`TWO ALLOCATORS: locked card deploys $${deployed} but the slot-filling pass computed $${primaryCard.deployed}. STOP.`);
@@ -775,6 +782,8 @@ export function buildLockEntry(args: {
     slotsUnfilled: primaryCard.unfilled.map((u) => ({ slot: u.slot, name: u.name, reason: u.reason })),
     /* residue top-ups across the day's fires (0 = every pick was sized to its slot outright) */
     topUpSum: Number((carry as { topUpSum?: number } | null | undefined)?.topUpSum ?? 0) + topUpAmt,
+    /* money Kelly declined inside seated slots today (slot stake − ticket stake), retired */
+    slotUnderSum: Number((carry as { slotUnderSum?: number } | null | undefined)?.slotUnderSum ?? 0) + primaryCard.slotUnderSum,
     core,
     funT,
     games: { ...(carry?.games ?? {}), ...games },
@@ -799,7 +808,7 @@ export function buildLockEntry(args: {
       ? {
           note: `paper day — $0 of $${daily} deployed under ${shapeLine(shape)}: ${unfilledNames.length ? unfilledNames.join("; ") : "no slot fit this fire's budget"} (H+R+RBI overs out, per-slot leg range and price ceiling, then the EV gate); blockedReasons is the histogram`,
         }
-      : deployed < daily
+      : primaryCard.capResidue > 0 // an owned slot went unfilled — Kelly sizing under a seated slot is not a shortfall
         ? {
             /* the note is DAY-AWARE (2026-08-19): a fire's shortfall names its cause AND
                where the day stands, because the deficit now carries forward — the next
