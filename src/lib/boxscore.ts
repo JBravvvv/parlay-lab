@@ -7,6 +7,10 @@
  *                                  pitchers[], battingOrder[], info[], note[]; info[]
  *   /api/v1/game/{pk}/linescore  — innings[], totals, current inning/state
  *   /api/v1/schedule?gamePk=…    — status, records, decisions, probables, start time
+ *   /api/v1/people/{pitcher}/stats?stats=vsPlayer&opposingTeamId=… — GAME PREVIEW
+ *                                  (INSTRUCTION 46, 2026-09-08) batter-vs-pitcher
+ *                                  splits, one per batter PER SEASON; aggregated here
+ *                                  into career lines (see aggregateVsPlayer)
  *
  * Nothing here invents a figure: every number and every note string is copied from
  * the feed. A figure the feed does not carry is null and renders as "—"; a note block
@@ -69,6 +73,22 @@ export type ApiLinescore = {
 /** the schedule game for this pk; the same shape the Games list reads plus officialDate */
 export type ApiScheduleGame = ApiGame & { officialDate?: string; scheduledInnings?: number };
 
+/**
+ * /people/{pitcherId}/stats?stats=vsPlayer&group=pitching&opposingTeamId={teamId}
+ * (read live 2026-09-08): stats[] carries a `vsPlayer` type with ONE split per
+ * batter per season, and a `vsPlayerTotal` type that is the pitcher's total vs the
+ * whole club (no batter on it — ignored here). Only the fields we read.
+ */
+export type ApiVsPlayerSplit = {
+  season?: string;
+  stat: Record<string, number | string | undefined>;
+  batter?: { id: number; fullName: string };
+  pitcher?: { id: number; fullName: string };
+};
+export type ApiVsPlayer = { stats?: { type?: { displayName?: string }; splits?: ApiVsPlayerSplit[] }[] };
+/** the two vsPlayer feeds keyed by the BATTING side: away = the away lineup vs the home probable */
+export type ApiVsPlayerPair = { away: ApiVsPlayer | null; home: ApiVsPlayer | null };
+
 /* ---------- output ---------- */
 
 export type BoxBatter = {
@@ -123,6 +143,12 @@ export type BoxTeam = {
   record: string;
   score: number | null;
   probable: { id: number; name: string; wl: string | null; era: string | null } | null;
+  /**
+   * GAME PREVIEW (INSTRUCTION 46, 2026-09-08): the probable's season line from the
+   * box's own seasonStats.pitching — GS, IP, K, BB, HR, WHIP. Null when there is no
+   * probable; each figure null when the feed does not carry it.
+   */
+  probableLine: { gs: number | null; ip: string | null; k: number | null; bb: number | null; hr: number | null; whip: string | null } | null;
   /** true once the feed has a battingOrder for the club */
   lineupPosted: boolean;
   batters: BoxBatter[];
@@ -168,7 +194,41 @@ export type BoxscorePayload = {
   /** game info block (WP, Pitches-strikes, Umpires, Weather, …) — every labelled item the feed carries */
   info: { label: string; value: string }[];
   pitchingNotes: string[];
+  /**
+   * GAME PREVIEW matchups (INSTRUCTION 46, 2026-09-08, Josh: "it should also have
+   * batter vs pitcher matchup data on that page"). Keyed by the BATTING side: `away`
+   * is the away lineup vs the home probable. Null when the route did not fetch the
+   * vsPlayer feeds (live / final / postponed); a side is null when that club faces
+   * no probable pitcher or its feed did not load.
+   */
+  matchups: BoxMatchups | null;
 };
+
+/** one batter's career line vs the probable, or `history: false` with every figure null */
+export type MatchupLine = {
+  id: number;
+  name: string;
+  boxName: string;
+  /** lineup slot (100…900) when the lineup is posted, else null */
+  order: number | null;
+  history: boolean;
+  /** how many seasons the feed listed for this pair — 1 means the line is the feed's own split verbatim */
+  seasons: number;
+  ab: number | null;
+  h: number | null;
+  hr: number | null;
+  bb: number | null;
+  k: number | null;
+  avg: string | null;
+  ops: string | null;
+};
+export type MatchupSide = {
+  pitcher: { id: number; name: string };
+  /** true: rows are the posted lineup in AB-desc order; false: every batter on the roster with history vs this arm */
+  lineupPosted: boolean;
+  lines: MatchupLine[];
+};
+export type BoxMatchups = { away: MatchupSide | null; home: MatchupSide | null };
 
 /* ---------- helpers ---------- */
 
@@ -186,6 +246,11 @@ function wlOf(p: ApiBoxPlayer | undefined): string | null {
   return w != null && l != null ? `${w}-${l}` : null;
 }
 const eraOf = (p: ApiBoxPlayer | undefined): string | null => str(p?.seasonStats?.pitching?.era);
+/** the probable's season line, every figure the box's seasonStats.pitching carries (GS IP K BB HR WHIP) */
+function probableLineOf(p: ApiBoxPlayer | undefined): NonNullable<BoxTeam["probableLine"]> {
+  const s = p?.seasonStats?.pitching ?? {};
+  return { gs: num(s.gamesStarted), ip: str(s.inningsPitched), k: num(s.strikeOuts), bb: num(s.baseOnBalls), hr: num(s.homeRuns), whip: str(s.whip) };
+}
 
 export function playerOf(box: ApiBoxscore, id: number): ApiBoxPlayer | undefined {
   return box.teams.away.players[`ID${id}`] ?? box.teams.home.players[`ID${id}`];
@@ -316,6 +381,7 @@ export function shapeTeam(game: ApiScheduleGame, box: ApiBoxscore, side: "away" 
     record: recordOf(sg),
     score: played ? num(sg.score) : null,
     probable: pp ? { id: pp.id, name: pp.fullName, wl: wlOf(ppPlayer), era: eraOf(ppPlayer) } : null,
+    probableLine: pp ? probableLineOf(ppPlayer) : null,
     lineupPosted: (t.battingOrder ?? []).length > 0,
     batters: battingRows(t),
     battingTotals: totalsOf(t),
@@ -347,7 +413,149 @@ export function shapeLinescore(ls: ApiLinescore | null | undefined, status: Game
   return { innings, totals: { away: tot(ls.teams.away), home: tot(ls.teams.home) }, xBottom };
 }
 
-export function shapeBoxscore(game: ApiScheduleGame, box: ApiBoxscore, ls: ApiLinescore | null | undefined): BoxscorePayload {
+/* ---------- GAME PREVIEW matchups (INSTRUCTION 46, 2026-09-08) ---------- */
+
+/** ".333" / "1.000" — MLB's own printing of a rate (leading zero dropped, three places) */
+export const fmt3 = (n: number): string => {
+  const s = n.toFixed(3);
+  return s.startsWith("0.") ? s.slice(1) : s;
+};
+
+/** a batter's counting stats vs one pitcher summed over every season split the feed listed */
+export type VsAgg = {
+  id: number;
+  name: string;
+  seasons: number;
+  ab: number | null;
+  h: number | null;
+  doubles: number | null;
+  triples: number | null;
+  hr: number | null;
+  bb: number | null;
+  k: number | null;
+  hbp: number | null;
+  sf: number | null;
+  tb: number | null;
+};
+
+/** null + null stays null (the feed never carried the key); otherwise a plain sum */
+const add = (a: number | null, v: number | string | undefined): number | null => {
+  const n = num(v);
+  return n == null ? a : (a ?? 0) + n;
+};
+
+/**
+ * Career line per batter. The feed splits one row per batter PER SEASON (the
+ * 2026-09-08 read had 2020…2026 rows for the same hitters), so the counting stats
+ * are summed across seasons; nothing here is invented. `vsPlayerTotal` is the
+ * pitcher's line vs the whole club, carries no batter, and is skipped.
+ */
+export function aggregateVsPlayer(feed: ApiVsPlayer | null | undefined): Map<number, VsAgg> {
+  const out = new Map<number, VsAgg>();
+  for (const block of feed?.stats ?? []) {
+    if (block.type?.displayName !== "vsPlayer") continue;
+    for (const sp of block.splits ?? []) {
+      const b = sp.batter;
+      if (!b?.id) continue;
+      const cur = out.get(b.id) ?? { id: b.id, name: b.fullName, seasons: 0, ab: null, h: null, doubles: null, triples: null, hr: null, bb: null, k: null, hbp: null, sf: null, tb: null };
+      const st = sp.stat ?? {};
+      out.set(b.id, {
+        ...cur,
+        seasons: cur.seasons + 1,
+        ab: add(cur.ab, st.atBats),
+        h: add(cur.h, st.hits),
+        doubles: add(cur.doubles, st.doubles),
+        triples: add(cur.triples, st.triples),
+        hr: add(cur.hr, st.homeRuns),
+        bb: add(cur.bb, st.baseOnBalls),
+        k: add(cur.k, st.strikeOuts),
+        hbp: add(cur.hbp, st.hitByPitch),
+        sf: add(cur.sf, st.sacFlies),
+        tb: add(cur.tb, st.totalBases),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * AVG / OPS from the summed counts, the way MLB prints them: AVG = H/AB, OBP =
+ * (H+BB+HBP)/(AB+BB+HBP+SF), SLG = TB/AB, and OPS = the ROUNDED OBP plus the
+ * ROUNDED SLG (the feed's own single-season rows print .333 + .333 = .666, and
+ * .667 + .500 = 1.167 — verified on the 2026-09-08 read, so a one-season line
+ * here equals the feed's own string). A zero denominator prints ".000" as the
+ * feed does; a missing count prints null.
+ */
+export function vsRates(a: VsAgg): { avg: string | null; ops: string | null } {
+  if (a.ab == null || a.h == null) return { avg: null, ops: null };
+  const bb = a.bb ?? 0;
+  const hbp = a.hbp ?? 0;
+  const sf = a.sf ?? 0;
+  const tb = a.tb ?? a.h + (a.doubles ?? 0) + 2 * (a.triples ?? 0) + 3 * (a.hr ?? 0);
+  const avg = a.ab > 0 ? a.h / a.ab : 0;
+  const den = a.ab + bb + hbp + sf;
+  const obp = den > 0 ? (a.h + bb + hbp) / den : 0;
+  const slg = a.ab > 0 ? tb / a.ab : 0;
+  const ops = Number(obp.toFixed(3)) + Number(slg.toFixed(3));
+  return { avg: fmt3(avg), ops: fmt3(ops) };
+}
+
+function matchupLine(id: number, name: string, boxName: string, order: number | null, a: VsAgg | undefined): MatchupLine {
+  if (!a) return { id, name, boxName, order, history: false, seasons: 0, ab: null, h: null, hr: null, bb: null, k: null, avg: null, ops: null };
+  const r = vsRates(a);
+  return { id, name, boxName, order, history: true, seasons: a.seasons, ab: a.ab, h: a.h, hr: a.hr, bb: a.bb, k: a.k, avg: r.avg, ops: r.ops };
+}
+
+/** history first by AB desc, then lineup order; the "no history" rows keep lineup order at the bottom */
+const byAbDesc = (x: MatchupLine, y: MatchupLine) =>
+  Number(y.history) - Number(x.history) || (y.ab ?? -1) - (x.ab ?? -1) || (x.order ?? 0) - (y.order ?? 0) || x.name.localeCompare(y.name);
+
+/**
+ * One batting side's matchup table vs the OTHER club's probable. With a posted
+ * lineup the rows are exactly those nine (a hitter the feed never listed is
+ * "no history"); without one, only the hitters in the box's players map (the
+ * roster) that the feed has history for — departed players the feed still
+ * lists are dropped — so the table is still real but not a lineup. Null when there is no probable or the feed did
+ * not load.
+ */
+export function shapeMatchupSide(game: ApiScheduleGame, box: ApiBoxscore, side: "away" | "home", feed: ApiVsPlayer | null | undefined): MatchupSide | null {
+  const pp = game.teams[side === "away" ? "home" : "away"].probablePitcher;
+  if (!pp || feed == null) return null;
+  const agg = aggregateVsPlayer(feed);
+  const t = box.teams[side];
+  const lineup = t.battingOrder ?? [];
+  let lines: MatchupLine[];
+  if (lineup.length > 0) {
+    lines = lineup.flatMap((id) => {
+      const p = t.players[`ID${id}`];
+      const a = agg.get(id);
+      const name = p?.person.fullName ?? a?.name;
+      if (!name) return [];
+      return [matchupLine(id, name, p?.person.boxscoreName ?? name, num(p?.battingOrder), a)];
+    });
+  } else {
+    // 2026-09-08 fix round: the feed returns everyone who ever faced the arm while with this club
+    // (traded / released / retired included), so keep only ids in the box's players map — the
+    // active roster + bench the caption calls "hitters on the roster".
+    lines = [...agg.values()].flatMap((a) => {
+      const p = t.players[`ID${a.id}`];
+      if (!p) return [];
+      return [matchupLine(a.id, p.person.fullName ?? a.name, p.person.boxscoreName ?? a.name, null, a)];
+    });
+  }
+  return { pitcher: { id: pp.id, name: pp.fullName }, lineupPosted: lineup.length > 0, lines: lines.sort(byAbDesc) };
+}
+
+export function shapeMatchups(game: ApiScheduleGame, box: ApiBoxscore, vs: ApiVsPlayerPair | null | undefined): BoxMatchups | null {
+  if (!vs) return null;
+  return { away: shapeMatchupSide(game, box, "away", vs.away), home: shapeMatchupSide(game, box, "home", vs.home) };
+}
+
+/**
+ * @param vs the two vsPlayer feeds (GAME PREVIEW), keyed by batting side; omit /
+ *           null for a box score — `matchups` is then null and nothing else changes
+ */
+export function shapeBoxscore(game: ApiScheduleGame, box: ApiBoxscore, ls: ApiLinescore | null | undefined, vs?: ApiVsPlayerPair | null): BoxscorePayload {
   const status = mapStatus(game.status);
   const decisions = shapeDecisions(game, box, status);
   const inning =
@@ -377,5 +585,6 @@ export function shapeBoxscore(game: ApiScheduleGame, box: ApiBoxscore, ls: ApiLi
     decisions,
     info: (box.info ?? []).filter((i): i is { label: string; value: string } => !!i.label && !!i.value),
     pitchingNotes: box.pitchingNotes ?? [],
+    matchups: shapeMatchups(game, box, vs),
   };
 }

@@ -109,8 +109,12 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).toMatch(/g\.status === "live" \? 0 : g\.status === "final" \? 2 : 1/);
   });
   it("prop rows: initials avatar, name, team, context line, Over / Under two-button cells; anytime TD one YES pill", () => {
-    expect(props).toMatch(/function Avatar\(/);
-    expect(props).toMatch(/function initials\(name: string\): string/);
+    // INSTRUCTION 46 (2026-09-08): the initials disc moved into TeamMark's PlayerMark (headshot + the
+    // player's own team logo; initials only when no headshot loads) — the row draws PlayerMark now
+    expect(props).not.toMatch(/function Avatar\(/);
+    expect(props).not.toMatch(/function initials\(/);
+    expect(props).toMatch(/<PlayerMark player=\{pl\.player\} headshot=\{pl\.headshot\} team=\{team\} pos=\{pl\.pos\} size="md" \/>/);
+    expect(read("src/components/cfb/TeamMark.tsx")).toMatch(/export function initials\(name: string\): string/);
     expect(props).toMatch(/function propCell\(/);
     expect(props).toMatch(/<OddsCellButton key=\{r\.key\} cell=\{propCell\(r, mode, pickedKeys\.has\(r\.key\), onPick\)\} \/>/);
     expect(props).toMatch(/yes \? "w-\[74px\] grid-cols-1" : "w-\[150px\] grid-cols-2"/);

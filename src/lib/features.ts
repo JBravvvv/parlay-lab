@@ -17,3 +17,10 @@ export const ASG_ENABLED = false;
    their own bank and ledger keys (src/lib/cfb/rules.ts) — never the MLB ones. `false`
    pins every page to MLB; the CFB components stay in the tree either way. */
 export const CFB_ENABLED = true;
+
+/* SEASON LAB (INSTRUCTION 46, 2026-09-08, Josh: "Should be evaluating season long props and season
+   long prop parlays so I can mess around and have fun with a bunch of season long tickets").
+   The /season page (Season Lab in the rail) — season-long CFB player props, team win totals and
+   season parlays on typed lines, with its own paper ledger key (pl_cfb_season). `false` turns the
+   page into a plain notice; the nav entry and the components stay in the tree either way. */
+export const CFB_SEASON_ENABLED = true;

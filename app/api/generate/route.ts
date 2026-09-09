@@ -9,7 +9,7 @@ import { achievableCoverage, liveCoverageOf, pricedGames } from "@/lib/board-cov
 import { BOARD_GEN_KEY, BOARD_GENS_KEY, BOARD_KEY, decodeBoard, encodeBoard, liveCoverage, mergeGenIndex, type GenIndexEntry } from "@/lib/server/board-store";
 import { ptToday } from "@/lib/server/pt-date";
 import { slateScope, slateStarts } from "@/lib/server/slate";
-import { buildLockEntry, getLockEntry, writeLock } from "@/lib/server/lock-card";
+import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
 import { BLOCKS_KEY, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
@@ -451,12 +451,19 @@ export async function GET(req: NextRequest) {
            day's remainder, still reserving any block that can fire for itself */
         blockBudget = effectiveBlockBudget({ daily: PAPER.daily, blocks: bs, currentKey: "", registry: reg0, now, allocSoFar }).budget;
       }
+      /* INSTRUCTION 46 self-calibration (wired fix round 2026-09-08 — readShapeCalibration
+         existed but nothing called it): the realized 2-leg vs 3+-leg record the shape picker
+         tilts on. Fail-safe: readShapeCalibration never throws (an unreadable store is null),
+         and null means the plain rotation. Ignored by buildLockEntry when `carry` already
+         holds the day's shape. */
+      const shapeCal = await readShapeCalibration(date).catch(() => null);
       const entry = buildLockEntry({
         eng,
         data: data as unknown as Record<string, unknown>,
         date,
         now,
         trigger,
+        shapeCal,
         ...(carry ? { carry } : {}),
         ...(blockBudget != null ? { dailyOverride: blockBudget } : {}),
         ...(blockGkeys ? { blockKey: blockKey as string, blockGkeys } : topupKey ? { blockKey: topupKey } : {}),

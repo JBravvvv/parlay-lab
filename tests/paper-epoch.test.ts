@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { PAPER, PAPER_TICKETS, SUSPENSIONS_LIFTED, applySuspensionLift, ticketWindow } from "@/lib/paper-mode";
+import { SHAPE_TICKETS, SHAPE_TOTAL } from "@/lib/core-shapes";
 import { LEDGER_EPOCH, decideEpochMigration, mergeAllowed } from "@/lib/ledger-epoch";
 import { discipline, type NoPlayLog } from "@/lib/noplay";
 import type { SyncEntry } from "@/lib/ledger-merge";
@@ -41,25 +42,30 @@ describe("the paper constants are Josh's numbers, verbatim", () => {
   it("$150 core + $25 fun since 2026-08-15", () => {
     expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25 });
   });
-  it("3-7 tickets for the $150 per day (Josh 2026-08-15: 3-10; RESHAPED 2026-08-22: 'a max of 7 tickets … anywhere from 3-7')", () => {
-    /* OBSERVED RED on the 08-22 reshape (was {3,10}) — the pin exists so the ceiling
-       never moves silently. */
-    expect(PAPER_TICKETS).toEqual({ min: 3, max: 7 });
+  it("3-5 tickets for the $150 per day — DERIVED from Josh's shape menu since 2026-09-08 (was the pinned 3-7 of 2026-08-22)", () => {
+    /* PIN UPDATED 2026-09-08 (INSTRUCTION 46, "Parlay Lab Baseball 1"): the ticket count
+       is no longer a rule of its own — the day runs one of the six CORE_SHAPES and the
+       count IS the slot count. min/max are read off the menu (SHAPE_TICKETS); the pin
+       below is the menu's fewest (E: 3 slots) and most (A/B/C/D: 5 slots) so a menu edit
+       moving the count is visible here. OBSERVED RED against the 2026-08-22 {3,7} pin. */
+    expect(PAPER_TICKETS).toEqual({ min: 3, max: 5 });
+    expect(PAPER_TICKETS).toEqual({ min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max });
+    expect(SHAPE_TOTAL, "the shape total and the paper daily must be the same $150").toBe(PAPER.daily);
   });
-  it("the day-share count window: single-block gets 3..7; a Sunday split pro-rates and every block keeps >=1", () => {
+  it("the day-share count window pro-rates the derived 3..5 (values re-pinned 2026-09-08; lock-card now fills by slot, the window stays for its other readers)", () => {
     // single block, empty day so far
-    expect(ticketWindow(150, 0)).toEqual({ maxNew: 7, minNew: 3 });
-    // Sunday-shaped budgets $110/$25/$15 pro-rate to 5/1/1 under the 7-ceiling
+    expect(ticketWindow(150, 0)).toEqual({ maxNew: 5, minNew: 3 });
+    // Sunday-shaped budgets $110/$25/$15 pro-rate to 4/1/0 under the 5-ceiling
     const a = ticketWindow(110, 0);
-    expect(a).toEqual({ maxNew: 5, minNew: 3 });
+    expect(a).toEqual({ maxNew: 4, minNew: 3 });
     const b = ticketWindow(25, 4); // block A locked 4 tickets
     expect(b.maxNew).toBe(1);
     expect(b.minNew).toBe(1);
-    const c = ticketWindow(15, 6);
-    expect(c.maxNew).toBe(1);
-    expect(c.minNew).toBe(1);
+    const c = ticketWindow(15, 6); // over-full day: nothing more
+    expect(c.maxNew).toBe(0);
+    expect(c.minNew).toBe(0);
     // the ceiling is HARD: a full day admits nothing more
-    expect(ticketWindow(50, 7)).toEqual({ maxNew: 0, minNew: 0 });
+    expect(ticketWindow(50, 5)).toEqual({ maxNew: 0, minNew: 0 });
     expect(ticketWindow(50, 12)).toEqual({ maxNew: 0, minNew: 0 }); // over-full never goes negative
   });
   it("the lift opens every HRR line and pitcher_outs", () => {
@@ -128,7 +134,9 @@ describe("wired — source scans, comment-stripped", () => {
     /* INSTRUCTION 18 (2026-09-03): the forced top-up now selects by TRUE PROBABILITY
        (CORE_RULES.forcedSelMode = "probability") — the $915 caesars_ev forced pass ran
        −27% over the 19 paper days. Pin updated, not deleted. */
-    expect(src).toMatch(/selMode: CORE_RULES\.forcedSelMode/);
+    /* PIN UPDATED 2026-09-08 (INSTRUCTION 46): the forced pass is now the per-slot
+       fallback — its mode is handed to the slot cfg builder as slotCfg(CORE_RULES.forcedSelMode, …) */
+    expect(src).toMatch(/slotCfg\(CORE_RULES\.forcedSelMode/);
     expect(src).not.toMatch(/selMode:\s*"caesars_ev"/);
     expect(src).toMatch(/forced/);
     expect(src).toMatch(/buildFunHrTickets/); // fun reshaped 2026-08-15: HR-longshot composer (see tests/fun-hr.test.ts)
@@ -138,30 +146,38 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).not.toMatch(/capFrac \* bankroll/); // the old bankroll-derived ceiling is gone
   });
 
-  it("the window caps BOTH passes of a fire (2026-08-22), and leftover budget rides the fire's best ticket as a stamped top-up", () => {
+  it("SLOT FILLING (2026-09-08, INSTRUCTION 46): every slot of the day's shape is filled ONE ticket at a time, gated then forced, at the slot's stake — the count window no longer caps the passes", () => {
     const src = read("src/lib/server/lock-card.ts");
-    expect(src).toMatch(/ticketWindow\(/);
-    /* HISTORY: 2026-08-19 widened the forced ceiling to the day allowance because a $10
-       block's window of 1 zeroed the top-up; 2026-08-21 made it per-world. 2026-08-22
-       the 14-ticket card showed the other half of the hole: the GATED pass was never
-       count-capped at all, so four fires stacked 14 and the last fire had no seats. Now
-       BOTH passes honor the fire's window (gated capped to its share, forced gets the
-       seats the gated pass left), and the money that seats cannot carry rides the best
-       new ticket as `topUp` — "$150 every single day no matter what" no longer depends
-       on seat arithmetic. */
-    expect(src).toMatch(/const gatedCap = Math\.min\(Number\(cfg\.maxCoreTickets \?\? PAPER_TICKETS\.max\), w\.maxNew\)/);
-    expect(src).toMatch(/selMode: mode,\s*maxCoreTickets: gatedCap/s);
-    /* INSTRUCTION 18 (2026-09-03): the forced pass runs in probability mode and the
-       residue is CAP-RESPECTING — a per-ticket map under the $25 ceiling, the rest
-       stamped capResidue. The 2026-08-22 "rides the best ticket" pin is updated here. */
-    expect(src).toMatch(/selMode: CORE_RULES\.forcedSelMode,\s*maxCoreTickets/s);
-    expect(src).toMatch(/const fMax = Math\.max\(0, w\.maxNew - a\.picks\.length\)/);
-    expect(src).toMatch(/let residue = daily - capped/);
-    expect(src).toMatch(/topUp: tu\[t\.id\]/);
+    /* HISTORY: 2026-08-19 widened the forced ceiling to the day allowance; 2026-08-21
+       made it per-world; 2026-08-22 count-capped BOTH passes by ticketWindow and rode
+       the leftover budget on the best ticket as a topUp; 2026-09-03 capped every ticket
+       at $25 and stamped the rest capResidue. 2026-09-08 (Josh's word, verbatim: "Should
+       consider doing some higher $ 2 team parlays … 2 $60 2 leg parlays one day w/ 3
+       $10 3-4 leg parlays") replaced the count window and the $25 cap with SLOTS: the
+       gated pass asks the allocator for ONE ticket per slot at the slot's stake
+       (maxCoreTickets 1, perParlayCap 1, coreMaxLegs = the slot's max), the forced pass
+       takes the slot when the gate cannot, and what no slot could seat is capResidue.
+       The 08-22/09-03 source pins are RETIRED here, not deleted — replaced by the slot
+       pins. ticketWindow leaves lock-card (its other readers keep it in paper-mode). */
+    expect(src).not.toMatch(/ticketWindow\(/);
+    expect(src).not.toMatch(/const gatedCap = /);
+    expect(src).toMatch(/shapeForDay\(/);
+    expect(src).toMatch(/shapeById\(/);
+    expect(src).toMatch(/maxCoreTickets: 1,\s*minCoreTickets: 1,\s*coreMaxLegs: slot\.legs\.max/s);
+    expect(src).toMatch(/perParlayCap: 1/);
+    expect(src).toMatch(/slotCfg\(mode, gCeil\)/);
+    expect(src).toMatch(/slotCfg\(CORE_RULES\.forcedSelMode, fCeil\)/);
+    expect(src).toMatch(/slotMaxDec\(slot\.legs, "gated"\)/);
+    expect(src).toMatch(/slotMaxDec\(slot\.legs, "forced"\)/);
+    expect(src).toMatch(/shapeSlot: s\.slot/);
+    expect(src).toMatch(/coreShape: shapeRecord/);
+    expect(src).toMatch(/slotsUnfilled/);
     expect(src).toMatch(/capResidue/);
     expect(src).toMatch(/topUpSum/);
+    /* the two impossible branches this ship adds: a pick over its slot, and a day over $150 */
+    expect(src).toMatch(/a ticket may never carry more than its slot/);
+    expect(src).toMatch(/OVER THE DAY/);
   });
-
   it("the generate route prices every fire off PAPER.daily via the deficit-carrying budget (2026-08-19), not a re-derived bankroll cap", () => {
     const src = read("app/api/generate/route.ts");
     expect(src).toMatch(/effectiveBlockBudget\(\{ daily: PAPER\.daily/);

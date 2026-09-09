@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
-import { PairMark, TeamMark } from "@/components/cfb/TeamMark";
+import { PairMark, PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { WonPaid } from "@/components/ui/WonPaid";
 import type { CfbBoard, CfbGame, CfbGrade, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
+import { playerSlug } from "@/lib/cfb/props";
 import { fmtAmerican } from "@/lib/format";
 import { gradeFromEv } from "@/lib/grade";
 import { ticketPayout, usd } from "@/lib/ticket-payout";
@@ -24,6 +26,16 @@ import { ticketPayout, usd } from "@/lib/ticket-payout";
  * locked day whose slate is not loaded — the mark falls back to the letters of the
  * label. `grade` is the ledger's settled result for the ticket, `legResults` the
  * per-leg verdicts keyed by `leg.lkey` (the grader's own key).
+ *
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "it should be the team logo the player
+ * plays for not both team logos"): a PROP leg draws the player's headshot with HIS team's logo
+ * (PlayerMark), a side its team, and the pair is only ever a total. Point 9 of the same
+ * instruction ("clicking the players name in the bet which should take you to that bet if it is
+ * currently available pregame or live; even if the line has changed"): the Ledger hands the card
+ * `legLink`, and a leg that is still open renders its label as a replace-Link into the Builder
+ * (`cfbLegHref` — game + market + player slug, never the line); a closed leg (graded, or a slate
+ * day that has passed) stays plain text with a title saying the bet is no longer available.
+ * Without `legLink` (the Builder's own locked panel) nothing changes.
  */
 
 /** a leg's verdict as the ledger stores it (the grader's result word + its detail line) */
@@ -70,9 +82,11 @@ function fallbackAbbr(leg: CfbTicketLeg): string {
 }
 
 function LegMark({ leg, game }: { leg: CfbTicketLeg; game: LegGame | undefined }) {
+  const team = game ? (leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null) : null;
+  /* INSTRUCTION 46: a player leg is the player + HIS team — with or without the slate loaded, never the pair */
+  if (leg.player) return <PlayerMark player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
   if (game) {
     if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
-    const team = leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null;
     if (team) return <TeamMark team={team} size="sm" showRank showAbbr={false} />;
   }
   const tone = leg.market === "total" ? "border-line-2 bg-surface-2 text-muted" : "border-cfb/40 bg-cfb/10 text-cfb";
@@ -86,6 +100,44 @@ function LegMark({ leg, game }: { leg: CfbTicketLeg; game: LegGame | undefined }
   );
 }
 
+/* ---------- INSTRUCTION 46, point 9: the leg → Builder link, pure so the tests pin the strings ---------- */
+
+/** what a leg's label renders as: a Link to the Builder while the bet is open, else plain text with a reason */
+export type CfbLegLink = { href: string | null; title: string };
+
+/** "Ohio State -6.5" → "ohio-state" — the team slug a side leg carries in `player=` */
+export function cfbLegSlug(leg: Pick<CfbTicketLeg, "label" | "player" | "market" | "side">): string {
+  if (leg.player) return playerSlug(leg.player);
+  if (leg.market === "total") return leg.side;
+  return playerSlug(leg.label.replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim());
+}
+
+/** the Builder deep link: day + game + market + player slug — never the line ("even if the line has changed") */
+export function cfbLegHref(leg: Pick<CfbTicketLeg, "gkey" | "market" | "label" | "player" | "side">, date: string): string {
+  const q = new URLSearchParams({ cfb: "1", date, game: leg.gkey, mkt: leg.market, player: cfbLegSlug(leg) });
+  return `/props?${q.toString()}`;
+}
+
+/**
+ * A leg is CLOSED (no link) once it is graded (won / lost / push / void), once its game is final or
+ * postponed on a loaded slate, or once its slate day is behind today's — a bet on a day that has
+ * passed is never "currently available pregame or live". Pending on today's / a later slate → open.
+ */
+export function cfbLegClosed(opts: { verdict?: CfbLegVerdict | null; date: string; today: string; status?: CfbGame["status"] | null }): boolean {
+  const r = opts.verdict?.result;
+  if (r === "won" || r === "lost" || r === "push" || r === "ungradable") return true;
+  if (opts.status === "final" || opts.status === "postponed") return true;
+  return opts.date < opts.today;
+}
+
+export const CFB_LEG_CLOSED_TITLE = "Bet no longer available — the game is over or graded";
+
+/** the Ledger's `legLink`: href while open, else null with the closed title */
+export function cfbLegLink(leg: CfbTicketLeg, opts: { date: string; today: string; verdict?: CfbLegVerdict | null; status?: CfbGame["status"] | null }): CfbLegLink {
+  if (cfbLegClosed(opts)) return { href: null, title: CFB_LEG_CLOSED_TITLE };
+  return { href: cfbLegHref(leg, opts.date), title: "Open this bet on the Builder" };
+}
+
 export function CfbTicketCard({
   t,
   grade,
@@ -93,6 +145,7 @@ export function CfbTicketCard({
   dimmed = false,
   board,
   legResults,
+  legLink,
   className = "",
 }: {
   t: CfbTicket;
@@ -103,6 +156,8 @@ export function CfbTicketCard({
   board?: Pick<CfbBoard, "games"> | null;
   /** per-leg verdicts keyed by leg.lkey */
   legResults?: Record<string, CfbLegVerdict>;
+  /** INSTRUCTION 46 (point 9): the Ledger's leg → Builder link; absent on the Builder's own panel */
+  legLink?: (leg: CfbTicketLeg) => CfbLegLink | null;
   /** width / snap classes from a carousel parent */
   className?: string;
 }) {
@@ -162,10 +217,32 @@ export function CfbTicketCard({
         <ul className="mt-3 space-y-1.5">
           {t.legs.map((leg) => {
             const v = legResults?.[leg.lkey];
+            const link = legLink?.(leg) ?? null;
+            const game = games.get(leg.gkey);
+            // INSTRUCTION 46 fix round (2026-09-08): a player leg prints the matchup under the name
+            // (his own team's logo is the mark; the other team is still named here)
+            const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
             return (
               <li key={leg.lkey} className="flex items-center gap-2 text-[11.5px]" title={v?.detail}>
-                <LegMark leg={leg} game={games.get(leg.gkey)} />
-                <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+                <LegMark leg={leg} game={game} />
+                <span className="flex min-w-0 flex-1 flex-col">
+                {link?.href ? (
+                  // the name is the one tap inside a ledger box that does NOT collapse it (INSTRUCTION 46, point 9)
+                  <Link
+                    replace
+                    href={link.href}
+                    title={link.title}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="min-w-0 flex-1 truncate text-text underline decoration-cfb/50 decoration-dotted underline-offset-2"
+                    data-cfb-leg-link
+                  >
+                    {leg.label}
+                  </Link>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate text-text" title={link?.title}>{leg.label}</span>
+                )}
+                {matchup && <span className="truncate text-[9.5px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
+                </span>
                 <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{leg.prop}</span>
                 <span className={`num shrink-0 font-semibold ${leg.cz > 0 ? "text-pos" : "text-text"}`}>{fmtAmerican(leg.cz)}</span>
                 {v && (

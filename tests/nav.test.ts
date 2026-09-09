@@ -18,6 +18,10 @@ import { describe, expect, it } from "vitest";
  * → top: Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc;
  *   bottom: Ledger, Settings; every entry carries a distinct `tone` hex.
  *
+ * 2026-09-08, INSTRUCTION 46 (Josh: "Should be evaluating season long props and season long prop
+ * parlays"): Season Lab (/season) joins the END of the top group, desktop rail + phone top-bar icon
+ * (not a bottom tab — a 7th does not fit at 375px), tone #F5A524 (the CFB amber). Eleven entries.
+ *
  * Source-scan pins on the NAV table in AppShell.tsx so a later edit cannot quietly reshuffle it.
  */
 
@@ -38,6 +42,8 @@ function navEntries() {
       mobile: /mobile: (true|false)/.exec(l)![1] === "true",
       mobileLabel: /mobileLabel: "([^"]+)"/.exec(l)?.[1],
       tone: /tone: "(#[0-9A-Fa-f]{6})"/.exec(l)?.[1],
+      icon: /icon: (Icon\w+)/.exec(l)![1],
+      cfbOnly: /cfbOnly: true/.test(l),
     }));
 }
 
@@ -46,7 +52,8 @@ describe("nav — desktop side rail", () => {
   // 2026-09-05, Josh: "'The Sharp' & 'Simulator' tabs can go back up right above Parlay Builder"
   // (this rewrites the 2026-09-04 pin "Ledger right below Parlay Calc" — Ledger now lives in
   // the bottom group, see the next pin)
-  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc — in that order", () => {
+  // 2026-09-08 (INSTRUCTION 46): Season Lab appended after Parlay Calc — the eight-entry order above is unchanged ahead of it
+  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc, Season Lab — in that order", () => {
     expect(nav.filter((n) => n.group === "top").map((n) => n.label)).toEqual([
       "Games",
       "Stats",
@@ -56,6 +63,7 @@ describe("nav — desktop side rail", () => {
       "Simulator",
       "Parlay Builder",
       "Parlay Calc",
+      "Season Lab",
     ]);
     expect(nav.filter((n) => n.group === "top").map((n) => n.href)).toEqual([
       "/games",
@@ -66,6 +74,7 @@ describe("nav — desktop side rail", () => {
       "/simulator",
       "/props",
       "/calc",
+      "/season",
     ]);
   });
   it("The Sharp and Simulator sit immediately above Parlay Builder", () => {
@@ -130,8 +139,9 @@ describe("nav — mobile (375px)", () => {
     expect(shell).toMatch(/\{mobileLabel \?\? label\}/);
     expect(shell).toMatch(/gridTemplateColumns: `repeat\(\$\{NAV\.filter\(\(n\) => n\.mobile\)\.length\}/);
   });
-  it("every route not in the bottom bar is an icon in the mobile top bar (all 10 pages reachable on a phone)", () => {
-    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/settings"]);
+  // 2026-09-08 (INSTRUCTION 46): /season rides the top-bar icon row — 11 pages now
+  it("every route not in the bottom bar is an icon in the mobile top bar (all 11 pages reachable on a phone)", () => {
+    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/season", "/settings"]);
     // the header row derives from the same table, so nothing can fall off
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
     expect(header).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
@@ -142,12 +152,30 @@ describe("nav — mobile (375px)", () => {
   });
 });
 
+describe("nav — Season Lab (INSTRUCTION 46 fix round, 2026-09-08)", () => {
+  const nav = navEntries();
+  it("every entry has its own glyph — Season Lab wears IconSeason, not the Ledger's", () => {
+    expect(nav.find((n) => n.href === "/season")!.icon).toBe("IconSeason");
+    expect(new Set(nav.map((n) => n.icon)).size).toBe(nav.length);
+    expect(fs.readFileSync(path.join(process.cwd(), "src/components/shell/icons.tsx"), "utf8")).toMatch(/export function IconSeason\(/);
+  });
+  it("Season Lab is the only CFB-only entry, and both nav surfaces drop CFB-only entries while the switch is on MLB", () => {
+    expect(nav.filter((n) => n.cfbOnly).map((n) => n.href)).toEqual(["/season"]);
+    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly">\) => !n\.cfbOnly \|\| cfb;/);
+    const rail = shell.slice(shell.indexOf('NAV.filter((n) => n.group === "top")'), shell.indexOf('<div className="flex-1" aria-hidden />'));
+    expect(rail).toMatch(/shown\(item\) \? <RailLink/);
+    const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
+    expect(header).toMatch(/shown\(\{ cfbOnly \}\) \? \(/);
+  });
+});
+
 describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab titles\")", () => {
   const nav = navEntries();
   it("every tab carries a tone hex, and every tone is distinct", () => {
     for (const n of nav) expect(n.tone, n.label).toMatch(/^#[0-9A-F]{6}$/);
     expect(new Set(nav.map((n) => n.tone)).size).toBe(nav.length);
-    expect(nav.length).toBe(10);
+    // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab)
+    expect(nav.length).toBe(11);
   });
   it("tones are the agreed palette (Board keeps the lime brand green)", () => {
     expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
@@ -159,6 +187,8 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
       Simulator: "#67E8F9",
       "Parlay Builder": "#FDBA74",
       "Parlay Calc": "#5EEAD4",
+      // 2026-09-08 (INSTRUCTION 46): the CFB amber, --color-cfb — Season Lab is a CFB-only page
+      "Season Lab": "#F5A524",
       Ledger: "#FDE68A",
       Settings: "#D4D4D8",
     });

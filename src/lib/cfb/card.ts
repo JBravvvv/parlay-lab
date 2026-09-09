@@ -74,12 +74,13 @@ const round = (v: number, dp: number) => {
   return Math.round(v * k) / k;
 };
 
-function legOf(row: CfbRow, game: CfbGame): CfbTicketLeg | null {
+/** INSTRUCTION 46 fix round (2026-09-08): exported so the identity copy below is pinned directly. */
+export function legOf(row: CfbRow, game: CfbGame): CfbTicketLeg | null {
   if (!row.cz) return null;
   const line = row.market === "ml" ? null : row.cz.line;
   const p = rowProbAt(game.model, row.market, row.side, row.market === "ml" ? null : line);
   if (!p) return null;
-  return {
+  const leg: CfbTicketLeg = {
     label: sideLabel(game, row.market, row.side, line),
     prop: row.market === "ml" ? "ML" : row.market === "spread" ? "Spread" : "Total",
     cz: row.cz.price,
@@ -92,6 +93,16 @@ function legOf(row: CfbRow, game: CfbGame): CfbTicketLeg | null {
     prob: p.win,
     push: p.push,
   };
+  // INSTRUCTION 46 fix round: a pick that names a player carries his headshot / position / team
+  // abbreviation onto the leg so the Ledger and ticket cards draw the PlayerMark (his face + HIS
+  // team's logo). Side rows carry none of these and the leg stays byte-identical to before.
+  if (row.player) {
+    leg.player = row.player;
+    leg.headshot = row.headshot ?? null;
+    leg.pos = row.pos ?? null;
+    if (row.teamAbbr != null) leg.teamAbbr = row.teamAbbr;
+  }
+  return leg;
 }
 
 function draftOf(rows: CfbRow[], games: Map<string, CfbGame>): Draft | null {

@@ -38,7 +38,7 @@ import { fmtAmerican, fmtMoney, fmtPct } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 import { gradeFromEv, gradeRank } from "@/lib/grade";
 import { bookShort } from "./CfbGameCard";
-import { PairMark, TeamMark } from "./TeamMark";
+import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
 
 /**
  * THE CFB BOARD — picks + parlays (2026-09-05, Josh: "The games list doesn't need to be on the
@@ -176,11 +176,36 @@ function LiveTag() {
   );
 }
 
-function Mark({ games, gameId, teamId, kind, size = "sm" }: { games: Map<string, CfbGame>; gameId: string; teamId: string | null | undefined; kind: "side" | "prop"; size?: "xs" | "sm" | "md" }) {
+/**
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "Board & Builder should have player headshot
+ * as well as team logo" / "it should be the team logo the player plays for not both team logos"):
+ * a PROP pick is the player's headshot with HIS team's logo (PlayerMark — initials in the team
+ * colour when ESPN has no headshot for him); a side is its team; the pair is ONLY a total.
+ */
+function Mark({
+  games,
+  gameId,
+  teamId,
+  kind,
+  size = "sm",
+  player,
+  headshot,
+  pos,
+}: {
+  games: Map<string, CfbGame>;
+  gameId: string;
+  teamId: string | null | undefined;
+  kind: "side" | "prop";
+  size?: "xs" | "sm" | "md";
+  player?: string | null;
+  headshot?: string | null;
+  pos?: string | null;
+}) {
   const g = games.get(gameId);
   const team = teamOf(games, gameId, teamId);
+  if (kind === "prop" && player) return <PlayerMark player={player} headshot={headshot ?? null} team={team} pos={pos ?? null} size={size} />;
   if (team) return <TeamMark team={team} size={size} showRank showAbbr={false} />;
-  if (g) return <PairMark away={g.away} home={g.home} size={size} />;
+  if (g && kind === "side" && teamId == null) return <PairMark away={g.away} home={g.home} size={size} />;
   const tone = kind === "prop" ? "border-cfb/40 bg-cfb/10 text-cfb" : "border-line-2 bg-surface-2 text-muted";
   return (
     <span className={`num inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full border px-1 text-[8.5px] font-bold ${tone}`} aria-hidden>
@@ -256,7 +281,7 @@ export function CfbPicksBoard() {
         sortValue: (r) => r.label,
         cell: (r) => (
           <div className="flex max-w-[176px] items-center gap-2 md:max-w-none">
-            <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} />
+            <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} player={r.player} headshot={r.headshot} pos={r.pos} />
             <div className="min-w-0">
               <div className="truncate font-medium text-text">{r.label}</div>
               <div className="truncate text-[10.5px] text-faint">
@@ -528,7 +553,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
       data-testid="cfb-featured-pick"
     >
       <header className="flex items-center gap-2.5">
-        <Mark games={games} gameId={r.gameId} teamId={teamId} kind={r.kind} size="md" />
+        <Mark games={games} gameId={r.gameId} teamId={teamId} kind={r.kind} size="md" player={r.player} headshot={r.headshot} pos={r.pos} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13.5px] font-bold text-text">{r.label}</div>
           <div className="truncate text-[10.5px] text-faint">
@@ -584,6 +609,7 @@ function sideTeamId(r: CfbPickRow, games: Map<string, CfbGame>): string | null {
 }
 
 function propTeamId(r: CfbPickRow, propRows: CfbPropsBoard["rows"] | null): string | null {
+  if (r.teamId) return r.teamId; // INSTRUCTION 46: the pick row carries its own team now
   if (!propRows) return null;
   const row = propRows.find((x) => x.key === r.key);
   return row?.teamId ?? null;
@@ -962,7 +988,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
         <ul className="mt-3 space-y-1.5">
           {t.legs.map((leg: CfbParlayLeg) => (
             <li key={leg.rowKey} className="flex items-center gap-2 text-[11.5px]">
-              <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && leg.market === "total" ? null : leg.teamId} kind={leg.kind} size="xs" />
+              <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && leg.market === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
               <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
               {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>

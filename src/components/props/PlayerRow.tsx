@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PropBoardGame, PropBoardRow } from "@/engine";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
-import { GameHeader } from "./GameCard";
+import { parseMatchup } from "@/lib/mlb-visuals";
+import { GameHeader, TeamSidePills } from "./GameCard";
 import { PlayerName } from "@/components/player/PlayerName";
-import { MKT_LABEL, playerLeg, sidePrice, sideProb, sideShort, type Side } from "./props-model";
+import { MKT_LABEL, filterSide, playerLeg, playerMatches, sidePrice, sideProb, sideShort, type Side, type TeamSide } from "./props-model";
 
 /* ------------------------------------------------------------------- visuals */
 
@@ -119,6 +120,7 @@ export function PlayerRow({
   headshot,
   isSel,
   onToggle,
+  hit = false,
 }: {
   r: PropBoardRow;
   cat: string;
@@ -127,10 +129,20 @@ export function PlayerRow({
   headshot: string | null;
   isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
+  /** INSTRUCTION 46 deep link: this is the ledger bet's player — ring the row and scroll it into view once */
+  hit?: boolean;
 }) {
   const sides: Side[] = ["o", "u"];
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hit) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [hit]);
   return (
-    <div className="flex items-center gap-1.5 border-t border-white/[0.04] py-1">
+    <div
+      ref={ref}
+      data-deeplink={hit ? "hit" : undefined}
+      className={"flex items-center gap-1.5 border-t border-white/[0.04] py-1" + (hit ? " rounded-[8px] bg-gold/[0.08] ring-1 ring-gold/50" : "")}
+    >
       <Avatar src={headshot} label={r.p} />
       <div className="min-w-0 flex-1 leading-none">
         {/* propBoard rows carry no MLB id — the sheet resolves name + team itself */}
@@ -175,6 +187,7 @@ export function PropGameCard({
   headshots,
   isSel,
   onToggle,
+  hitPlayer = null,
 }: {
   g: PropBoardGame;
   cat: string;
@@ -182,15 +195,26 @@ export function PropGameCard({
   headshots: Record<string, string>;
   isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
+  /** INSTRUCTION 46 deep link: the ledger bet's player name — his row(s) get ringed, the list opens far enough to show him */
+  hitPlayer?: string | null;
 }) {
   const [open, setOpen] = useState(true);
   const [shown, setShown] = useState(FIRST);
+  /* INSTRUCTION 46 (2026-09-08): All / <away> / <home> — per game, and back to All whenever the
+     market changes (a Giants filter on H+R+RBI must not silently carry into Hits). */
+  const [side, setSide] = useState<TeamSide>("all");
+  useEffect(() => setSide("all"), [cat]);
+  const m = useMemo(() => parseMatchup(g.game), [g.game]);
+  const visible = useMemo(() => filterSide(rows, side, m.away, m.home), [rows, side, m]);
+  const hitAt = hitPlayer ? visible.findIndex((r) => playerMatches(r.p, hitPlayer)) : -1;
+  const limit = hitAt >= shown ? hitAt + 1 : shown;
   return (
     <section className="glass overflow-hidden">
-      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} count={`${rows.length} line${rows.length === 1 ? "" : "s"}`} />
+      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} count={`${visible.length} line${visible.length === 1 ? "" : "s"}`} />
       {open && (
         <div className="px-1.5 pb-1">
-          {rows.slice(0, shown).map((r) => (
+          <TeamSidePills away={m.away} home={m.home} side={side} onSide={setSide} />
+          {visible.slice(0, limit).map((r) => (
             <PlayerRow
               key={`${r.lkey}|${r.alt ? "a" : "s"}`}
               r={r}
@@ -200,14 +224,20 @@ export function PropGameCard({
               headshot={headshots[r.p] ?? null}
               isSel={isSel}
               onToggle={onToggle}
+              hit={!!hitPlayer && playerMatches(r.p, hitPlayer)}
             />
           ))}
-          {rows.length > shown && (
+          {visible.length === 0 && (
+            <div className="border-t border-white/[0.04] py-2 text-center text-[10.5px] text-faint">
+              No {side === "away" ? m.away : m.home} lines posted for {MKT_LABEL[cat] ?? cat}
+            </div>
+          )}
+          {visible.length > limit && (
             <button
               className="mt-0.5 h-8 w-full border-t border-white/[0.04] text-center text-[11px] font-semibold text-pos"
-              onClick={() => setShown(rows.length)}
+              onClick={() => setShown(visible.length)}
             >
-              Show all {rows.length} ▾
+              Show all {visible.length} ▾
             </button>
           )}
         </div>

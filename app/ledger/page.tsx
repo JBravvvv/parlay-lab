@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Area,
   AreaChart,
@@ -22,7 +23,8 @@ import { ProScoreboard } from "@/components/mlb/ProScoreboard";
 import { useLedger, roiPct, type LedgerEntry, type TicketGrade } from "@/lib/useLedger";
 import { ReceiptsPanel } from "@/components/ledger/ReceiptsPanel";
 import { SYNC_EVENT, syncNow, useSyncState } from "@/lib/ledgerSync";
-import { nowLabel, useLiveNow, type LegNow } from "@/lib/liveNow";
+import { legPhase, nowLabel, useLiveNow, type GameNow, type LegNow } from "@/lib/liveNow";
+import { deepLinkHref, legDeepLink } from "@/components/props/props-model";
 import { fmtMoneyExact, fmtMoney } from "@/lib/format";
 import { DEFAULT_ERA, LEDGER_ERAS, eraEntries, ledgerStats, type LedgerEra } from "@/lib/ledger-stats";
 import { CFB_ENABLED } from "@/lib/features";
@@ -101,20 +103,46 @@ function LegLine({
   l,
   r,
   now,
+  game,
+  dayDone = false,
 }: {
-  l: { label: string; prop: string; cz?: number | null };
+  l: { label: string; prop: string; cz?: number | null; lkey?: string | null; gkey?: string | null };
   r?: { result: string; detail: string };
   now?: LegNow | null;
+  /** the leg's game from the live schedule poll (undefined until it answers / for a graded day) */
+  game?: GameNow | null;
+  dayDone?: boolean;
 }) {
   const tone =
     r?.result === "won" ? "text-pos" : r?.result === "lost" ? "text-neg" : r ? "text-gold" : "";
   // an undecided leg (no grade yet, or graded "pending" mid-game) shows the live
   // number instead of a bare "pending" label
   const undecided = !r || r.result === "pending";
+  /* INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "clicking the players name in the bet
+     which should take you to that bet if it is currently available pregame or live; even if
+     the line has changed"): the name is a link into the Parlay Builder at that player +
+     market (props-model's deep-link contract) while the game is pregame or live — a final
+     game prints plain text. stopPropagation keeps the tap from also toggling the ticket. */
+  const phase = legPhase(game, r?.result, dayDone);
+  const deep = phase === "final" ? null : legDeepLink(l);
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11.5px]">
       <span className="min-w-0 text-text">
-        {l.label} <span className="text-muted">· {l.prop}</span>
+        {deep ? (
+          <Link
+            replace
+            href={deepLinkHref(deep)}
+            data-testid="leg-link"
+            onClick={(e) => e.stopPropagation()}
+            title={phase === "live" ? "Open this bet in the Parlay Builder — the game is live, the line may have moved" : "Open this bet in the Parlay Builder — today's line may have moved"}
+            className="font-medium text-pos underline decoration-pos/40 underline-offset-2 hover:decoration-pos"
+          >
+            {l.label}
+          </Link>
+        ) : (
+          <span title={phase === "final" ? "game is final" : undefined}>{l.label}</span>
+        )}{" "}
+        <span className="text-muted">· {l.prop}</span>
       </span>
       <span className="num flex shrink-0 items-center gap-2">
         <span className="text-gold">{l.cz != null ? amSign(Number(l.cz)) : "no CZ price"}</span>
@@ -134,25 +162,44 @@ function LegLine({
   );
 }
 
+/**
+ * One ticket in a day's card. INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "On
+ * Ledger, when expanding/collapsing an individual parlay or pick it should collapse no
+ * matter where you click inside that singular box; besides clicking the players name in
+ * the bet"): the whole box is the toggle — one click handler on the container, the header
+ * is a real <button aria-expanded> so the keyboard still works (its Enter/Space click
+ * bubbles to the same handler), and the only thing inside that does NOT toggle is a leg's
+ * player/team link, which stops propagation. Replaces the <details>/<summary> (whose
+ * body never toggled).
+ */
 function TicketRow({
   t,
   e,
   g,
   legNow,
+  gameNow,
 }: {
   t: LedgerEntry["core"][number];
   e: LedgerEntry;
   g?: TicketGrade;
   legNow?: (pk: number | null | undefined, lkey: string | null | undefined) => LegNow | null;
+  gameNow?: (pk: number | null | undefined) => GameNow | null;
 }) {
+  const [open, setOpen] = useState(false);
+  const toggle = () => setOpen((o) => !o);
   const legRes = e.grading?.legs ?? {};
   const pkOf = (gkey?: string | null) => (gkey && e.games ? e.games[gkey]?.pk ?? null : null);
+  const dayDone = !!e.grading?.done;
   return (
-    <details className="group border-t border-white/[0.04] pt-2">
-      <summary className="flex cursor-pointer select-none list-none flex-wrap items-center justify-between gap-2 [&::-webkit-details-marker]:hidden">
+    <div data-testid="ticket-row" data-open={open ? "1" : "0"} onClick={toggle} className="cursor-pointer select-none border-t border-white/[0.04] pt-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 text-left"
+      >
         <div className="min-w-0">
           <div className="text-[12px] font-medium text-text">
-            <span className="mr-1 inline-block text-[9px] text-faint transition-transform group-open:rotate-90">▶</span>
+            <span className={`mr-1 inline-block text-[9px] text-faint transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
             {t.bucket === "fun" && <span className="mr-1 text-gold">🎟</span>}
             {t.name}
             {t.supplemental && (
@@ -172,9 +219,11 @@ function TicketRow({
               </span>
             )}
           </div>
-          <div className="text-[10.5px] text-muted group-open:hidden">
-            {t.legs.map((l) => l.label).join(" · ")}
-          </div>
+          {!open && (
+            <div className="text-[10.5px] text-muted">
+              {t.legs.map((l) => l.label).join(" · ")}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="num text-[11px] text-muted">${t.stake}</span>
@@ -184,23 +233,27 @@ function TicketRow({
           <WonPaid t={t} grade={g} />
           <GradePill g={g} />
         </div>
-      </summary>
-      <div className="mt-2 space-y-1.5 rounded-[12px] bg-white/[0.03] px-3 py-2.5">
-        {t.legs.map((l, i) => (
-          <LegLine
-            key={`${l.label}|${l.prop}|${i}`}
-            l={l}
-            r={legRes[`${l.label}|${l.prop}`]}
-            now={legNow ? legNow(pkOf(l.gkey), l.lkey) : null}
-          />
-        ))}
-        <div className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] pt-1.5 text-[10.5px] text-faint">
-          <span>stake ${t.stake}</span>
-          {t.prob != null && <span>hit {String(t.prob)}%</span>}
-          {t.tier && <span>{t.bucket === "fun" ? `FUN · ${t.tier}` : t.tier}</span>}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5 rounded-[12px] bg-white/[0.03] px-3 py-2.5">
+          {t.legs.map((l, i) => (
+            <LegLine
+              key={`${l.label}|${l.prop}|${i}`}
+              l={l}
+              r={legRes[`${l.label}|${l.prop}`]}
+              now={legNow ? legNow(pkOf(l.gkey), l.lkey) : null}
+              game={gameNow ? gameNow(pkOf(l.gkey)) : null}
+              dayDone={dayDone}
+            />
+          ))}
+          <div className="num flex flex-wrap gap-x-3 border-t border-white/[0.04] pt-1.5 text-[10.5px] text-faint">
+            <span>stake ${t.stake}</span>
+            {t.prob != null && <span>hit {String(t.prob)}%</span>}
+            {t.tier && <span>{t.bucket === "fun" ? `FUN · ${t.tier}` : t.tier}</span>}
+          </div>
         </div>
-      </div>
-    </details>
+      )}
+    </div>
   );
 }
 
@@ -233,7 +286,7 @@ function DayCard({ e }: { e: LedgerEntry }) {
       </summary>
       <div className="mt-3 space-y-2">
         {tix.map((t) => (
-          <TicketRow key={t.id} t={t} e={e} g={g[t.id]} legNow={live.legNow} />
+          <TicketRow key={t.id} t={t} e={e} g={g[t.id]} legNow={live.legNow} gameNow={(pk) => (pk != null ? live.games[pk] ?? null : null)} />
         ))}
       </div>
     </details>

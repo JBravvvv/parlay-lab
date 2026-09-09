@@ -125,6 +125,11 @@ function sidePick(row: CfbRow, game: CfbGame, live: boolean): CfbPickRow {
     status: live ? "live" : game.status,
     prob: row.fair,
     push: row.push,
+    // INSTRUCTION 46 (2026-09-08): a side pick is marked with the team it is on; a total has none
+    player: null,
+    teamId: row.market === "total" ? null : row.teamId,
+    headshot: null,
+    pos: null,
   };
 }
 
@@ -156,6 +161,11 @@ function propPick(row: CfbPropRow, bankroll: number, live: boolean): CfbPickRow 
     status: live ? "live" : row.status,
     prob: row.fair,
     push: 0,
+    // INSTRUCTION 46 (2026-09-08): the player's own headshot + HIS team, never both logos
+    player: row.player,
+    teamId: row.teamId,
+    headshot: row.headshot,
+    pos: row.pos,
   };
 }
 
@@ -218,6 +228,8 @@ function propLeg(row: CfbPropRow, live: boolean, floor: number = CFB_PARLAYS.min
     market: row.market,
     player: row.player,
     teamId: row.teamId,
+    headshot: row.headshot,
+    pos: row.pos,
     evCz: row.evCz,
     live,
   };

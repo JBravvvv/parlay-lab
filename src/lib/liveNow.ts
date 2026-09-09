@@ -159,3 +159,24 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
 export function nowLabel(n: LegNow): string {
   return `now ${n.txt}${n.inning ? ` · ${n.inning}` : ""}`;
 }
+
+/* ------------------------------------------------ leg phase (INSTRUCTION 46) */
+
+export type LegPhase = "pre" | "live" | "final";
+
+/**
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "clicking the players name in the bet
+ * which should take you to that bet if it is currently available pregame or live") — is a
+ * ledger leg's game still open for a bet? Decided from what the Ledger already knows:
+ *   - a fully graded day, or a leg already graded won/lost/push/void → "final"
+ *   - the schedule says the game is final → "final"; in progress → "live"
+ *   - otherwise (not started, or the schedule has not answered yet) → "pre"
+ * Additive helper; the polling hook above is untouched.
+ */
+export function legPhase(g: GameNow | null | undefined, legResult?: string | null, dayDone?: boolean): LegPhase {
+  if (dayDone) return "final";
+  if (legResult === "won" || legResult === "lost" || legResult === "push" || legResult === "void") return "final";
+  if (g?.final) return "final";
+  if (g?.live) return "live";
+  return "pre";
+}

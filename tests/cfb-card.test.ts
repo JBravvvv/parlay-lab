@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { buildCfbBoard } from "@/lib/cfb/model";
-import { buildCfbCard } from "@/lib/cfb/card";
+import { buildCfbCard, legOf } from "@/lib/cfb/card";
 import { CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbCard, CfbTicket } from "@/lib/cfb/types";
 
@@ -286,6 +286,36 @@ describe("the fun allotment is gated independently of the core (INSTRUCTION 45)"
       expect(card.funSum).toBe(CFB_PAPER.fun);
       expect(card.noPlay).toBe(false);
     }
+  });
+});
+
+/* INSTRUCTION 46 fix round (2026-09-08): a pick naming a player carries his identity onto the leg */
+describe("legOf copies the pick's player identity onto the ticket leg (INSTRUCTION 46)", () => {
+  const board = synthBoard(1, () => favEdge());
+  const game = board.games[0];
+  const row = game.rows.find((r) => r.market === "ml" && r.side === "home")!;
+  it("a side row yields a leg with no player fields at all (byte-identical to before)", () => {
+    const leg = legOf(row, game)!;
+    expect(leg).not.toBeNull();
+    expect("player" in leg).toBe(false);
+    expect("headshot" in leg).toBe(false);
+    expect("pos" in leg).toBe(false);
+    expect("teamAbbr" in leg).toBe(false);
+    expect(leg.teamId).toBe(row.teamId);
+  });
+  it("a row naming a player carries player / headshot / pos / teamAbbr onto the leg", () => {
+    const hs = "https://a.espncdn.com/i/headshots/college-football/players/full/4685454.png";
+    const leg = legOf({ ...row, player: "Ty Simpson", headshot: hs, pos: "QB", teamAbbr: "H1" }, game)!;
+    expect(leg.player).toBe("Ty Simpson");
+    expect(leg.headshot).toBe(hs);
+    expect(leg.pos).toBe("QB");
+    expect(leg.teamAbbr).toBe("H1");
+    expect(leg.teamId).toBe(row.teamId);
+    // unknown headshot / position are null, never undefined, so the ledger's `?? null` reads are honest
+    const bare = legOf({ ...row, player: "Ty Simpson" }, game)!;
+    expect(bare.headshot).toBeNull();
+    expect(bare.pos).toBeNull();
+    expect("teamAbbr" in bare).toBe(false);
   });
 });
 

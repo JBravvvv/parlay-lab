@@ -47,7 +47,26 @@ import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
 /** the assumed hold on a yes-only anytime-TD price (see the header, point 2) */
 export const ATD_YES_ONLY_OVERROUND = 1.08;
 
-export type CfbPropCtxLookup = (market: CfbPropMarket, player: string) => CfbPropRow["ctx"];
+/** A player's ESPN identity from the season tables (INSTRUCTION 46, 2026-09-08) — values or null. */
+export type CfbPropPlayerMeta = {
+  athleteId: string | null;
+  /** ESPN's full-size headshot href; `headshotThumb` in TeamMark sizes it through the combiner */
+  headshot: string | null;
+  /** ESPN team id — the slate's `CfbTeam.id` */
+  teamId: string | null;
+  teamAbbr: string | null;
+  pos: string | null;
+};
+
+/**
+ * The season-context join. A plain function still works (older callers / tests); the route's
+ * `ctxLookup` also hangs `.player` on it so one lookup carries both the stat line and the
+ * identity (INSTRUCTION 46) without changing the `parseEventProps` call shape.
+ */
+export type CfbPropCtxLookup = {
+  (market: CfbPropMarket, player: string): CfbPropRow["ctx"];
+  player?: (player: string) => CfbPropPlayerMeta | null;
+};
 
 export type ParsePropsOpts = {
   /** ms epoch the rows are built at (kickoff-passed checks) */
@@ -207,7 +226,21 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
     const line = g.market.kind === "ou" ? weightedMedian(g.reads.map((r) => r.line as number), g.reads.map(() => 1)) : null;
     const consensus = fairAt(g.reads, line);
     const teamN = g.team ? normTeam(g.team) : null;
-    const teamObj = teamN === homeN ? game.home : teamN === awayN ? game.away : null;
+    // INSTRUCTION 46 (2026-09-08): the odds feed rarely names a prop's team; ESPN's season table
+    // knows the player's teamId, and that id IS the slate's team id, so a row whose feed team is
+    // missing (or unrecognised) resolves to the game side ESPN puts him on. Never a guess: a
+    // teamId matching neither side leaves the team null and the row draws initials, not a logo.
+    const found = opts.ctx?.player?.(g.player) ?? null;
+    const byName = teamN === homeN ? game.home : teamN === awayN ? game.away : null;
+    const espnId = found?.teamId == null ? null : String(found.teamId);
+    const byEspn = espnId == null ? null : espnId === String(game.home.id) ? game.home : espnId === String(game.away.id) ? game.away : null;
+    // INSTRUCTION 46 fix round (2026-09-08): the ESPN line is joined on NAME, so a same-named
+    // player on a FOREIGN roster (teamId on neither side of this game) — or one ESPN puts on the
+    // other side from the odds feed — is not this man. His headshot / position are dropped with
+    // the team, so the row draws initials rather than the wrong face.
+    const trusted = found != null && (espnId == null || byEspn != null) && (byName == null || byEspn == null || byName === byEspn);
+    const meta = trusted ? found : null;
+    const teamObj = byName ?? byEspn;
     const opp = teamObj ? (teamObj === game.home ? game.away.short : game.home.short) : null;
     const sides: CfbPropSide[] = g.market.kind === "yes" ? ["yes"] : ["over", "under"];
 
@@ -250,6 +283,8 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
         team: teamObj?.name ?? g.team ?? null,
         teamId: teamObj?.id ?? null,
         teamAbbr: teamObj?.abbr ?? null,
+        headshot: meta?.headshot ?? null,
+        pos: meta?.pos ?? null,
         opp,
         kickoff: game.start,
         status: game.status,

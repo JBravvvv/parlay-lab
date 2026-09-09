@@ -1444,6 +1444,19 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   /* ALT CARD (2026-08-21): the server's dual-mode shadow record rides the entry — a
      pre-ship client copy that wins pickBase on grading richness must not drop it. */
   if (!out.alt && other.alt) out.alt = JSON.parse(JSON.stringify(other.alt));
+  /* THE DAY'S SHAPE IS CHOSEN ONCE (INSTRUCTION 46, 2026-09-08; durability fix round the same
+     day). `coreShape` / `shapeLine` ride the entry the way `alt` does: adopted from the other
+     copy when this one has none, NEVER replaced once held — a mid-day calibration tilt that
+     re-picked the shape on a later fire cannot switch a day that already carries one, because
+     buildLockEntry reads `carry.coreShape` and the merge keeps the first shape the day held. */
+  const shp = out as { coreShape?: unknown; shapeLine?: unknown };
+  const oshp = other as { coreShape?: unknown; shapeLine?: unknown };
+  if (shp.coreShape == null && oshp.coreShape != null) {
+    shp.coreShape = JSON.parse(JSON.stringify(oshp.coreShape));
+    if (typeof oshp.shapeLine === "string") shp.shapeLine = oshp.shapeLine;
+  } else if (shp.coreShape != null && typeof shp.shapeLine !== "string" && typeof oshp.shapeLine === "string") {
+    shp.shapeLine = oshp.shapeLine;
+  }
   if (other.clv) {
     out.clv = { ...JSON.parse(JSON.stringify(other.clv)), ...(out.clv ?? {}) };
   }
@@ -1465,6 +1478,20 @@ function mergeDay(x: SyncEntry, y: SyncEntry): SyncEntry {
   };
   fill(out.core, other.core);
   fill(out.funT ?? [], other.funT);
+  /* PER-TICKET `shapeSlot` (INSTRUCTION 46) — fill-only like the accruals above, kept OUT of
+     ACCRUAL_FIELDS on purpose: that list is the placement-answer contract (tests/placed-field)
+     and a slot index is not an answer Josh gave. A ticket this copy holds without a slot takes
+     the slot the other copy stamped for the same id; a stamped slot is never overwritten.
+     Tickets unionCore APPENDS from the other side are deep clones, so their slot rides along. */
+  const fillSlot = (mine: SyncTicket[], theirs: SyncTicket[] | undefined) => {
+    if (!theirs) return;
+    for (const t of mine) {
+      if (!t.id || typeof (t as { shapeSlot?: unknown }).shapeSlot === "number") continue;
+      const m = theirs.find((o) => o.id === t.id) as { shapeSlot?: unknown } | undefined;
+      if (m && typeof m.shapeSlot === "number") (t as Record<string, unknown>).shapeSlot = m.shapeSlot;
+    }
+  };
+  fillSlot(out.core, other.core);
   /* CORE UNION (INSTRUCTION 45, 2026-09-06) — the CFB top-up appends core tickets to an
      already-locked day and MLB's residue top-up raises a shared ticket's stake under its own id,
      so core is now more than what funT has always been: two sides of one date holding different

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
 import { parseMatchup, teamAbbr, teamCode, teamLogo, teamLogoFromLabel } from "@/lib/mlb-visuals";
-import { legId, type GameGroup } from "./props-model";
+import { legId, playerMatches, type GameGroup, type TeamSide } from "./props-model";
 
 /* ----------------------------------------------------------- the game header */
 
@@ -59,6 +59,53 @@ export function GameHeader({
   );
 }
 
+/* ------------------------------------------------- the team filter pills */
+
+/**
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "there should be 3 buttons: All,
+ * Giants & Rockies"). Styled like the Board's scope tablist (role=tablist / aria-selected):
+ * All / <away abbr> / <home abbr>, one per game card, on the prop-market tabs only.
+ */
+export function TeamSidePills({
+  away,
+  home,
+  side,
+  onSide,
+}: {
+  away: string;
+  home: string;
+  side: TeamSide;
+  onSide: (s: TeamSide) => void;
+}) {
+  const opts: { k: TeamSide; label: string; title: string }[] = [
+    { k: "all", label: "All", title: "Every posted line in this game" },
+    { k: "away", label: teamAbbr(away), title: `Only ${away} lines` },
+    { k: "home", label: teamAbbr(home), title: `Only ${home} lines` },
+  ];
+  return (
+    <div className="flex items-center gap-2 py-1">
+      {/* 36px-tall pills (min-h-9): a thumb target on a 375px phone, same tokens as the Board's scope tablist */}
+      <div className="flex rounded-full border border-white/[0.08] bg-surface-2 p-0.5" data-testid="team-side" role="tablist">
+        {opts.map((o) => (
+          <button
+            key={o.k}
+            type="button"
+            role="tab"
+            aria-selected={side === o.k}
+            onClick={() => onSide(o.k)}
+            title={o.title}
+            className={`min-h-9 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+              side === o.k ? "bg-pos/20 text-pos" : "text-muted hover:text-text"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ ML / RL rows */
 
 function TeamAvatar({ label }: { label: string }) {
@@ -79,13 +126,20 @@ export function GameMarketCard({
   market,
   isSel,
   onToggle,
+  hitPlayer = null,
 }: {
   g: GameGroup;
   market: string;
   isSel: (id: string) => boolean;
   onToggle: (leg: SandboxLeg) => void;
+  /** INSTRUCTION 46 deep link: the ledger bet's team name — that side's row gets ringed and scrolled to */
+  hitPlayer?: string | null;
 }) {
   const [open, setOpen] = useState(true);
+  const hitRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hitPlayer) hitRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [hitPlayer]);
   return (
     <section className="glass overflow-hidden">
       <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} />
@@ -96,8 +150,14 @@ export function GameMarketCard({
             const prob = typeof r.prob === "number" ? r.prob : null;
             const id = legId(r);
             const sel = isSel(id);
+            const hit = !!hitPlayer && playerMatches(String(r.label ?? ""), hitPlayer);
             return (
-              <div key={id} className="flex items-center gap-2 border-t border-white/[0.04] py-1">
+              <div
+                key={id}
+                ref={hit ? hitRef : undefined}
+                data-deeplink={hit ? "hit" : undefined}
+                className={"flex items-center gap-2 border-t border-white/[0.04] py-1" + (hit ? " rounded-[8px] bg-gold/[0.08] ring-1 ring-gold/50" : "")}
+              >
                 <TeamAvatar label={r.label} />
                 <div className="min-w-0 flex-1 leading-none">
                   <div className="truncate text-[12px] font-medium text-text">{r.label}</div>

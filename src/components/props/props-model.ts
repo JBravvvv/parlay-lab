@@ -10,7 +10,7 @@
 
 import type { PickRow, PropBoardRow } from "@/engine";
 import type { SandboxLeg } from "@/lib/ticket-math";
-import { parseMatchup } from "@/lib/mlb-visuals";
+import { parseMatchup, teamAbbr } from "@/lib/mlb-visuals";
 
 export const TABS = [
   { key: "games", label: "Games" },
@@ -79,6 +79,129 @@ const BOOK_AB: Record<string, string> = {
 export const bookAb = (b: string) => BOOK_AB[b.trim().toLowerCase()] ?? b.slice(0, 4).toUpperCase();
 
 export const isGameMarket = (cat: string) => cat === "ml" || cat === "rl";
+
+/* ------------------------------------------------------ team filter (INSTRUCTION 46) */
+
+/**
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "On 'Parlay Builder' when looking at
+ * a game's prop bets say Giants/Rockies H+R+RBI there should be 3 buttons: All, Giants &
+ * Rockies. If I click Giants or Rockies it only shows that teams available picks for that
+ * prop etc").
+ *
+ * A prop row's `tm` is the ENGINE's team tag — it comes off the slate's player_stats key
+ * "Name (TEAM)", which the engine spells from its own id→abbr table (ATH, CWS, KC, SD, SF,
+ * TB, WSH …). The card header spells the matchup through mlb-visuals' teamAbbr(), which
+ * differs for two clubs: the Athletics (engine ATH, visuals OAK) and the White Sox
+ * (engine CWS, visuals CHW). Both spellings are folded here so the pill and the row agree.
+ */
+const TEAM_TAG_ALIAS: Record<string, string> = { OAK: "ATH", CHW: "CWS" };
+export const teamTag = (abbrOrName: string): string => {
+  const ab = abbrOrName.length <= 4 ? abbrOrName.toUpperCase() : teamAbbr(abbrOrName);
+  return TEAM_TAG_ALIAS[ab] ?? ab;
+};
+
+export type TeamSide = "all" | "away" | "home";
+
+/** Which side of the matchup a row belongs to — null when its team tag is unknown or matches neither. */
+export function rowSide(r: { tm: string | null }, away: string, home: string): Exclude<TeamSide, "all"> | null {
+  if (!r.tm) return null;
+  const t = teamTag(r.tm);
+  if (t === teamTag(away)) return "away";
+  if (t === teamTag(home)) return "home";
+  return null;
+}
+
+/** The rows for one side of the matchup; "all" is the untouched list (rows with no team tag only appear there). */
+export function filterSide<T extends { tm: string | null }>(rows: T[], side: TeamSide, away: string, home: string): T[] {
+  if (side === "all") return rows;
+  return rows.filter((r) => rowSide(r, away, home) === side);
+}
+
+/* ------------------------------------------------------- deep link (INSTRUCTION 46) */
+
+/**
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "… clicking the players name in the
+ * bet which should take you to that bet if it is currently available pregame or live; even
+ * if the line has changed").
+ *
+ * THE CONTRACT — /props?tab=<TabKey>&mkt=<market key>&game=<game key>&player=<name>
+ *   tab    "games" | "batter" | "pitcher"                      (TABS)
+ *   mkt    the MARKETS[tab] key — "ml", "rl", "hr", "hits", "tb", "hrr", "k", "outs"
+ *   game   the engine's gkey ("sanfranciscogiants@coloradorockies", "…gm2" for a nightcap)
+ *          OR "AWAY@HOME" in team abbreviations ("SF@COL"); matched against the board's
+ *          gkey first, then the parsed matchup's abbreviations (aliases folded)
+ *   player the bet's name as the ledger printed it ("Jake Mangum" — the "(PIT)" suffix is
+ *          dropped by the builder); for ML/RL it is the team's name. Matched on nameKey(),
+ *          NEVER on the line or the lkey, so a moved line still lands on the player.
+ * The page opens that tab + market, filters the board to that game, scrolls to and rings
+ * the player's row. A game or player not on the current board shows the notice
+ * "That bet is not on today's board" and the whole board underneath.
+ */
+export type PropsDeepLink = { tab: TabKey; mkt: string; game: string | null; player: string /* "" = no player, just the market/game */ };
+
+/** Space/accent/punctuation-proof identity for a player or team name ("José Ramírez" → "joseramirez"). */
+export const nameKey = (s: string) => norm(s).replace(/\s+/g, "");
+
+/** "Gunnar Henderson (BAL)" → "Gunnar Henderson"; a bare name passes through. */
+export const stripTeamSuffix = (label: string) => label.replace(/\s*\([A-Za-z]{2,4}\)\s*$/, "").trim();
+
+/**
+ * The deep link for one ledger leg, from its engine leg key:
+ *   "name|batter_hits|0.5"  → batter tab, Hits market, that player
+ *   "name|pitcher_outs|16.5" → pitcher tab, Outs market
+ *   "ml_home" / "ml_away" / "rl_home" / "rl_away" → Games tab, ML / RL, the team's name
+ * null when the leg carries no recognisable key (an old hand-typed leg) or the market is
+ * one the sandbox does not price.
+ */
+export function legDeepLink(leg: { label: string; lkey?: string | null; gkey?: string | null }): PropsDeepLink | null {
+  const lk = leg.lkey ?? "";
+  if (!lk) return null;
+  const game = leg.gkey ?? null;
+  if (/^(ml|rl)_(home|away)$/.test(lk)) {
+    return { tab: "games", mkt: lk.slice(0, 2), game, player: stripTeamSuffix(leg.label) };
+  }
+  const parts = lk.split("|");
+  if (parts.length !== 3) return null;
+  const cat = parts[1];
+  const tab: TabKey = cat.startsWith("pitcher") ? "pitcher" : "batter";
+  const m = MARKETS[tab].find((x) => x.cat === cat);
+  if (!m) return null;
+  return { tab, mkt: m.key, game, player: stripTeamSuffix(leg.label) };
+}
+
+export function deepLinkHref(d: PropsDeepLink): string {
+  const q = new URLSearchParams({ tab: d.tab, mkt: d.mkt });
+  if (d.game) q.set("game", d.game);
+  q.set("player", d.player);
+  return `/props?${q.toString()}`;
+}
+
+/** Validate the query string back into a deep link (unknown tab/market → null, nothing is guessed). */
+export function parseDeepLink(get: (k: string) => string | null): PropsDeepLink | null {
+  const tab = get("tab");
+  const mkt = get("mkt");
+  /* player is optional: tab + mkt alone just opens that market (game alone narrows to the game) */
+  const player = (get("player") ?? "").trim();
+  if (!tab || !mkt) return null;
+  if (!TABS.some((t) => t.key === tab)) return null;
+  const t = tab as TabKey;
+  if (!MARKETS[t].some((m) => m.key === mkt)) return null;
+  const game = (get("game") ?? "").trim() || null;
+  return { tab: t, mkt, game, player };
+}
+
+/** Does a board game match the link's `game` — by gkey, or by "AWAY@HOME" abbreviations. */
+export function gameMatches(g: { game: string; gkey?: string | null }, want: string | null): boolean {
+  if (!want) return true;
+  const w = want.trim();
+  if (g.gkey && g.gkey.toLowerCase() === w.toLowerCase()) return true;
+  const m = parseMatchup(g.game);
+  const [a = "", h = ""] = w.split("@");
+  if (!a || !h) return false;
+  return teamTag(a) === teamTag(m.away) && teamTag(h) === teamTag(m.home);
+}
+
+export const playerMatches = (name: string, want: string) => nameKey(name) === nameKey(want);
 export const legId = (r: PickRow) => `${r.lkey ?? ""}|${r.label}|${r.sub}`;
 /** accent/punctuation-proof search key */
 export const norm = (s: string) =>
@@ -90,7 +213,9 @@ export const norm = (s: string) =>
 
 /* ---------------------------------------------------------------- game markets */
 
-export type GameGroup = { game: string; away: string; home: string; time: string; rows: PickRow[] };
+/** gkey is carried so a Ledger ML/RL deep link (game=<engine gkey>) matches via gameMatches' gkey branch
+    (2026-09-08 fix: without it the AWAY@HOME fallback compared "SAN" to "SF" and reported the game missing). */
+export type GameGroup = { game: string; away: string; home: string; time: string; gkey: string | null; rows: PickRow[] };
 
 export function groupByGame(rows: PickRow[]): GameGroup[] {
   const by = new Map<string, GameGroup>();
@@ -103,7 +228,7 @@ export function groupByGame(rows: PickRow[]): GameGroup[] {
       continue;
     }
     const m = parseMatchup(g);
-    by.set(g, { game: g, away: m.away, home: m.home, time: m.time, rows: [r] });
+    by.set(g, { game: g, away: m.away, home: m.home, time: m.time, gkey: (r.gkey as string | null | undefined) ?? null, rows: [r] });
   }
   return [...by.values()].sort((a, b) => (a.game < b.game ? -1 : 1));
 }

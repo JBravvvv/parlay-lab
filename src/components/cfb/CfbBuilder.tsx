@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useCfbDesk as useCfbSlateDesk } from "@/components/cfb/CfbBoard";
 import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
 import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
+import { useShellInsets } from "@/components/props/useShellInsets";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { StatTile } from "@/components/ui/StatTile";
@@ -16,7 +17,7 @@ import { cfbExposureOn } from "@/lib/cfb/ledger";
 import { CFB_BANK_BASE, CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
 import { useCfbLedger } from "@/lib/cfb/store";
 import { syncCfbNow } from "@/lib/cfb/sync";
-import type { CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
+import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import { fmtEv } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 
@@ -30,6 +31,28 @@ import { railLabel } from "@/lib/games";
  * empty core) so the ledger shows the desk sat out rather than forgot.
  *
  * Every figure on this page is the slate's or the card's own; a missing one renders "—".
+ *
+ * PHONE-FIRST RELAYOUT (INSTRUCTION 46, 2026-09-08, Josh's word, verbatim: "Builder UI on phone
+ * app version is atrocious (screenshot 9/7/26 4:11pm)"). Diagnosis read from the pre-change
+ * source; the screenshot was not seen by anyone in the session that made this change. At a
+ * 375px viewport the pre-change source put the paper banner, the date rail and FOUR stat tiles
+ * in a 2×2 grid on the first screen; the
+ * first ticket sat below the fold, as an 82vw carousel slip with a "swipe" hint, and the LOCK
+ * button was a wrapped row at the very bottom of a long panel. What changed, phone only (md+
+ * keeps the tiles and the carousel it had):
+ *   · the four tiles collapse to ONE money strip (Core · Fun · Bank · Exposure) on phones;
+ *   · the card's headline (tickets · $ deployed · avg EV) is a three-cell stat row, not prose;
+ *   · tickets stack full-width on phones (the .carousel strip survives at md+ — same DOM, the
+ *     phone overrides are `max-md:` utilities marked important because globals.css is unlayered);
+ *   · a LOCKED day renders a structured block — status pill, money cells, record line — with
+ *     `lockedLine`'s sentence kept byte for byte beneath it (tests/cfb-card-ui.test.ts pins it);
+ *   · the builder's notes fold into a "Builder notes (N)" details, collapsed by default;
+ *   · the LOCK button is a full-width 48px pill in a sticky row that rides the bottom tab bar
+ *     (useShellInsets — the same measured inset the props slip uses), so locking never needs a
+ *     scroll to the panel's end; on md+ it is the static row it was;
+ *   · nothing on this surface is set below 11px any more (was 9.5px / 10px / 10.5px).
+ * Every string a test asserts, the lock, NO-PLAY, the refused-lock message and the marks note
+ * are unchanged; the layout is the only thing that moved.
  */
 
 /** the Pacific date the desk calls "today" */
@@ -77,16 +100,19 @@ export function useCfbDesk() {
   };
 }
 
-/** The CFB paper-mode banner — the MLB PaperBanner's shape in the CFB amber, its own dates and dollars. */
+/** The CFB paper-mode banner — the MLB PaperBanner's shape in the CFB amber, its own dates and
+    dollars. One line on a phone (INSTRUCTION 46, 2026-09-08): the "since" date and the
+    separate-ledger reminder show from sm up; the money never hides. */
 export function CfbPaperBanner() {
   return (
     <div
-      className="mb-4 flex flex-wrap items-center gap-2 rounded-(--radius-panel) border border-cfb/40 bg-cfb/10 px-4 py-2.5 text-[12px] text-cfb"
+      className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-(--radius-panel) border border-cfb/40 bg-cfb/10 px-3.5 py-2 text-[12px] text-cfb md:mb-4 md:px-4 md:py-2.5"
       role="note"
     >
-      <span className="text-[10px] font-bold uppercase tracking-[0.18em]">🏈 CFB paper</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.18em]">🏈 CFB paper</span>
       <span className="num">
-        · ${CFB_PAPER.daily} core + ${CFB_PAPER.fun} fun per slate day since {CFB_PAPER.since} · separate ledger &amp; bank
+        · ${CFB_PAPER.daily} core + ${CFB_PAPER.fun} fun per slate day
+        <span className="hidden sm:inline"> since {CFB_PAPER.since} · separate ledger &amp; bank</span>
       </span>
     </div>
   );
@@ -109,7 +135,8 @@ function lockedLine(entry: CfbLedgerEntry): string {
   return `Card locked — $${sumStakes(entry.core)} core + $${sumStakes(entry.funT)} fun recorded to the CFB ledger. Grades post as games go final.${by}`;
 }
 
-function gradeSummary(entry: CfbLedgerEntry): string | null {
+/** the day's ticket verdicts counted up — null until the grader has written anything */
+export function gradeCounts(entry: CfbLedgerEntry): { won: number; lost: number; push: number; void: number; pending: number; done: boolean } | null {
   const g = entry.grading;
   if (!g) return null;
   const all = [...entry.core, ...entry.funT];
@@ -122,19 +149,54 @@ function gradeSummary(entry: CfbLedgerEntry): string | null {
     else if (r === "ungradable") v++;
     else pend++;
   }
-  const parts = [`${w} won`, `${l} lost`];
-  if (p) parts.push(`${p} push`);
-  if (v) parts.push(`${v} void`);
-  if (pend) parts.push(`${pend} pending`);
-  return `${parts.join(" · ")}${g.done ? "" : " — still grading"}`;
+  return { won: w, lost: l, push: p, void: v, pending: pend, done: g.done };
+}
+
+/** "2 won · 1 lost · 1 pending — still grading" — the record line under a locked card */
+export function gradeSummary(entry: CfbLedgerEntry): string | null {
+  const c = gradeCounts(entry);
+  if (!c) return null;
+  const parts = [`${c.won} won`, `${c.lost} lost`];
+  if (c.push) parts.push(`${c.push} push`);
+  if (c.void) parts.push(`${c.void} void`);
+  if (c.pending) parts.push(`${c.pending} pending`);
+  return `${parts.join(" · ")}${c.done ? "" : " — still grading"}`;
+}
+
+/** the mean Caesars EV across the card's core tickets, or null on an empty core */
+export function avgCoreEv(card: Pick<CfbCard, "core">): number | null {
+  if (card.core.length === 0) return null;
+  return card.core.reduce((s, t) => s + t.czEv, 0) / card.core.length;
 }
 
 /**
- * The day's tickets as a Caesars-style "boost card" carousel (INSTRUCTION 40): one snap per
- * card, 82vw wide on a phone, 340px on wider screens, the .carousel strip from globals.css.
- * `label` names the strip for the screen reader; the count sits beside the caller's heading.
+ * The manual LOCK, as a value (INSTRUCTION 46, 2026-09-08 — split out of the click handler so
+ * the phone tests can drive it without a DOM): calls the store's `lock` exactly once with the
+ * card and its slate, and returns the line the panel prints — the refusal when a lock already
+ * stands for the day (INSTRUCTION 45: "the first lock stands"), else `lockedLine` for the entry
+ * that was written.
  */
-function TicketCarousel({
+export function lockOutcome(
+  lock: (card: CfbCard, slate: CfbSlate) => { entry: CfbLedgerEntry; refused: boolean },
+  card: CfbCard,
+  slate: CfbSlate,
+  today: string,
+): string {
+  const { entry, refused } = lock(card, slate);
+  return refused ? `Already locked for ${dayLabel(entry.date, today)} — the first lock stands.` : lockedLine(entry);
+}
+
+/**
+ * The day's tickets. On md+ the Caesars-style "boost card" carousel (INSTRUCTION 40): one snap
+ * per card, 340px wide, the .carousel strip from globals.css. On a phone the same element
+ * STACKS full-width (INSTRUCTION 46, 2026-09-08): the 82vw slip-and-a-peek plus a "swipe" hint
+ * is the likeliest culprit — diagnosis read from the pre-change source; screenshot not seen —
+ * and the MLB builder already stacks its tickets on phones. The phone overrides are `max-md:` utilities marked important because
+ * globals.css is unlayered (its `.carousel { display:flex; overflow-x:auto; scroll-snap-type }`
+ * would otherwise beat any layered Tailwind utility); the bleed (`-mx-5 px-5`) is md+ only so a
+ * stacked slip sits inside the panel's own padding. `label` names the list for the screen reader.
+ */
+function TicketStack({
   tickets,
   board,
   grading,
@@ -146,12 +208,101 @@ function TicketCarousel({
   label: string;
 }) {
   return (
-    <div className="carousel -mx-5 px-5" role="list" aria-label={label}>
+    <div className="carousel max-md:flex-col! max-md:overflow-visible! max-md:snap-none! md:-mx-5 md:px-5" role="list" aria-label={label}>
       {tickets.map((t) => (
-        <div key={t.id} role="listitem" className="w-[82vw] max-w-[360px] md:w-[340px]">
+        <div key={t.id} role="listitem" className="max-md:w-full md:w-[340px]">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * one cell of the phone money strip / the card's headline row — label over a tabular figure.
+ * `sub` is an optional 11px line under the figure ("/ $150"): a 3-across row at 375px leaves
+ * ~89px per cell, and "$150 / $150" at 18px mono bold measures ~114px, so the big figure holds
+ * only the number that matters and the denominator drops to the sub-line. The figure is mono
+ * (`.num`), never `display` — money reads as tabular digits.
+ */
+function StatCell({ label, value, sub, tone = "text-text", size = "md" }: { label: string; value: string; sub?: string; tone?: string; size?: "sm" | "md" }) {
+  return (
+    <div className="min-w-0 px-1.5 py-2 text-center">
+      <div className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</div>
+      <div className={`num mt-0.5 font-bold leading-none ${size === "sm" ? "text-[13px] truncate" : "text-[18px] tracking-tight whitespace-nowrap"} ${tone}`}>{value}</div>
+      {sub && <div className="num mt-1 text-[11px] leading-none text-muted">{sub}</div>}
+    </div>
+  );
+}
+
+/**
+ * THE PHONE MONEY STRIP (INSTRUCTION 46, 2026-09-08): the four stat tiles as one row — Core ·
+ * Fun · Bank · Exposure — so the first screen at 375px reaches the card. md+ keeps the tiles.
+ * The figures are the tiles' own: the paper allotment, the CFB bankroll, the day's exposure.
+ */
+function MoneyStrip({ bankroll, bankTone, exposure }: { bankroll: number; bankTone: "pos" | "neg"; exposure: number }) {
+  return (
+    <div
+      className="mb-3 grid grid-cols-4 divide-x divide-white/[0.06] rounded-[14px] border border-line-2 bg-surface-2/60 md:hidden"
+      role="group"
+      aria-label="CFB money"
+      data-testid="cfb-money-strip"
+    >
+      <StatCell label="Core" value={`$${CFB_PAPER.daily}`} tone="text-cfb" size="sm" />
+      <StatCell label="Fun" value={`$${CFB_PAPER.fun}`} tone="text-cfb" size="sm" />
+      <StatCell label="Bank" value={usdFull(bankroll)} tone={bankTone === "pos" ? "text-pos" : "text-neg"} size="sm" />
+      <StatCell label="Exposure" value={`$${exposure}`} tone="text-muted" size="sm" />
+    </div>
+  );
+}
+
+/** the small "▶ Heading (N)" summary line every folded section on this surface uses */
+function FoldSummary({ children }: { children: ReactNode }) {
+  return (
+    <summary className="flex min-h-[40px] cursor-pointer list-none items-center text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+      <span className="mr-1.5 inline-block transition-transform duration-(--dur-fast) group-open:rotate-90" aria-hidden>
+        ▶
+      </span>
+      {children}
+    </summary>
+  );
+}
+
+/**
+ * A LOCKED DAY AS A STRUCTURED BLOCK (INSTRUCTION 46, 2026-09-08): status pill (LOCKED /
+ * NO-PLAY, plus the server clock when /api/cfb/lock wrote the day), the money as cells (core ·
+ * fun · record), then `lockedLine`'s sentence exactly as it stood — that `<p>` is pinned byte
+ * for byte by tests/cfb-card-ui.test.ts ("an unmarked day keeps the chrome it has today").
+ */
+function LockedSummary({ locked, today }: { locked: CfbLedgerEntry; today: string }) {
+  const record = gradeSummary(locked);
+  const server = locked.source === "server-lock";
+  return (
+    <div className="rounded-[14px] border border-gold/30 bg-gold/[0.06] px-3.5 py-3" data-testid="cfb-locked-summary">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-gold/50 bg-gold/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.14em] text-gold">
+          {locked.noPlay ? "No-play" : "Locked"}
+        </span>
+        {server && (
+          <span className="num rounded-full border border-line-2 bg-white/[0.04] px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+            Server · {ptClock(locked.lockedAt)} PT
+          </span>
+        )}
+        <span className="num ml-auto text-[11px] text-faint">{dayLabel(locked.date, today)}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-3 divide-x divide-white/[0.06] rounded-[12px] bg-white/[0.03]">
+        <StatCell label="Core" value={locked.noPlay ? "$0" : `$${sumStakes(locked.core)}`} tone="text-pos" />
+        <StatCell label="Fun" value={`$${sumStakes(locked.funT)}`} tone="text-cfb" />
+        <StatCell label="Record" value={record ? `${gradeCounts(locked)!.won}–${gradeCounts(locked)!.lost}` : "—"} tone="text-text" />
+      </div>
+      <div className="mt-2">
+        <p className="text-[12px] text-gold">{lockedLine(locked)}</p>
+      </div>
+      {record && (
+        <p className="num mt-1 text-[11px] text-muted" data-testid="cfb-locked-record">
+          {record}
+        </p>
+      )}
     </div>
   );
 }
@@ -162,6 +313,8 @@ export function CfbBuilder() {
   const [status, setStatus] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  /* the bottom tab bar's measured height (0 on md+) — the sticky LOCK row rides just above it */
+  const insets = useShellInsets();
 
   /* the card excludes games that have kicked off — keep `now` honest while the tab is open */
   useEffect(() => {
@@ -228,8 +381,7 @@ export function CfbBuilder() {
     if (!card || !slate || locking) return;
     setLocking(true);
     try {
-      const { entry, refused } = lock(card, slate);
-      setStatus(refused ? `Already locked for ${dayLabel(entry.date, today)} — the first lock stands.` : lockedLine(entry));
+      setStatus(lockOutcome(lock, card, slate, today));
       void syncCfbNow();
     } finally {
       setLocking(false);
@@ -238,6 +390,7 @@ export function CfbBuilder() {
 
   const label = dayLabel(date, today);
   const bankTone = bankroll >= CFB_BANK_BASE ? "pos" : "neg";
+  const avgEv = card ? avgCoreEv(card) : null;
 
   return (
     <div>
@@ -245,7 +398,9 @@ export function CfbBuilder() {
       <DateRail dates={dates} date={date} today={today} onPick={onPick} />
 
       <Reveal>
-        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {/* phones: one money strip; md+: the four tiles (INSTRUCTION 46, 2026-09-08) */}
+        <MoneyStrip bankroll={bankroll} bankTone={bankTone} exposure={exposure} />
+        <div className="mb-4 hidden gap-3 md:grid md:grid-cols-4" data-testid="cfb-money-tiles">
           <StatTile label="Core" value={`$${CFB_PAPER.daily}`} sub="per slate day · counts in P/L" tone="cfb" />
           <StatTile label="Fun" value={`$${CFB_PAPER.fun}`} sub="one favorites parlay" tone="cfb" />
           <StatTile
@@ -263,33 +418,32 @@ export function CfbBuilder() {
           <Panel
             title={`${label}'s card — LOCKED`}
             className="glow-gold"
-            action={<span className="num text-[10.5px] text-faint">{locked.date}</span>}
+            action={<span className="num text-[11px] text-faint">{locked.date}</span>}
           >
-            <p className="text-[12px] text-gold">{lockedLine(locked)}</p>
+            <LockedSummary locked={locked} today={today} />
             {lockedMarks && <CfbDayMarksNote marks={lockedMarks} />}
-            {locked.note && <p className="mt-1 text-[11px] text-muted">{locked.note}</p>}
-            {gradeSummary(locked) && <p className="num mt-1 text-[11px] text-muted">{gradeSummary(locked)}</p>}
-            {status && status !== lockedLine(locked) && <p className="mt-1 text-[11px] text-muted">{status}</p>}
+            {locked.note && <p className="mt-2 text-[11px] text-muted">{locked.note}</p>}
+            {status && status !== lockedLine(locked) && <p className="mt-2 text-[11px] text-muted">{status}</p>}
             {lockedCore.length > 0 && (
               <>
-                <div className="mt-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+                <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
                   Core money <span className="num normal-case tracking-normal text-faint">· {lockedCore.length}</span>
                 </div>
                 <div className="mt-2">
-                  <TicketCarousel tickets={lockedCore} board={slate} grading={lockedGrading} label="Locked core tickets" />
+                  <TicketStack tickets={lockedCore} board={slate} grading={lockedGrading} label="Locked core tickets" />
                 </div>
               </>
             )}
             {lockedFun.length > 0 && (
               <div className="mt-4 border-t border-cfb/25 pt-4">
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cfb">Favorites parlay</div>
+                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cfb">Favorites parlay</div>
                 <div className="mt-2">
-                  <TicketCarousel tickets={lockedFun} board={slate} grading={lockedGrading} label="Locked favorites parlay" />
+                  <TicketStack tickets={lockedFun} board={slate} grading={lockedGrading} label="Locked favorites parlay" />
                 </div>
               </div>
             )}
             {locked.noPlay && (
-              <p className="mt-3 text-[11px] text-muted">
+              <p className="mt-3 text-[12px] leading-relaxed text-muted">
                 No side cleared +{CFB_RULES.minEvPct}% EV at Caesars under {CFB_RULES.maxDec.toFixed(2)} that day — recommended stake $0.
               </p>
             )}
@@ -310,61 +464,65 @@ export function CfbBuilder() {
           <Panel
             title={`${label}'s card`}
             action={
-              <span className="num text-[10.5px] text-faint">
+              <span className="num text-[11px] text-faint">
                 {slate.games.length} games{slate.oddsMissing ? " · Caesars prices missing" : ""}
                 {fetching ? " · refreshing" : ""}
               </span>
             }
           >
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted">
               Core money <span className="normal-case tracking-normal text-faint">— the main check, counts in net P/L</span>
             </div>
 
             {card.noPlay ? (
               <div className="mt-3 rounded-[14px] border border-line-2 bg-white/[0.03] px-4 py-4">
                 <div className="display text-[18px] leading-none tracking-tight text-text">NO-PLAY</div>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-muted">
+                <p className="mt-1 text-[12px] leading-relaxed text-muted">
                   No playable side clears +{CFB_RULES.minEvPct}% EV at Caesars under {CFB_RULES.maxDec.toFixed(2)} on this slate.
                   Recommended core stake <b className="num text-text">$0</b> — record the day so the ledger shows the desk sat out.
                 </p>
               </div>
             ) : (
               <>
-                <div className="num mt-1 text-[11px] text-muted">
-                  {card.core.length} ticket{card.core.length === 1 ? "" : "s"} · ${card.coreSum} of ${CFB_PAPER.daily} deployed
-                  {card.core.length > 0 && ` · avg EV ${fmtEv(card.core.reduce((s, t) => s + t.czEv, 0) / card.core.length)}`}
+                {/* the card's headline as a stat row, not a sentence (INSTRUCTION 46, 2026-09-08) */}
+                <div
+                  className="mt-2 grid grid-cols-3 divide-x divide-white/[0.06] rounded-[12px] bg-white/[0.03]"
+                  role="group"
+                  aria-label="Core card headline"
+                  data-testid="cfb-card-headline"
+                >
+                  <StatCell label={card.core.length === 1 ? "Ticket" : "Tickets"} value={String(card.core.length)} />
+                  <StatCell label="Deployed" value={`$${card.coreSum}`} sub={`/ $${CFB_PAPER.daily}`} tone="text-pos" />
+                  <StatCell label="Avg EV" value={avgEv == null ? "—" : fmtEv(avgEv)} tone={avgEv != null && avgEv > 0 ? "text-pos" : "text-text"} />
                 </div>
                 <div className="mt-3">
-                  <TicketCarousel tickets={card.core} board={slate} label="Core tickets" />
+                  <TicketStack tickets={card.core} board={slate} label="Core tickets" />
                 </div>
-                {card.core.length > 1 && <div className="-mt-1 text-[9.5px] text-faint md:hidden">swipe for the next ticket →</div>}
               </>
             )}
 
             {card.notes.length > 0 && (
-              <ul className="mt-3 space-y-1 text-[11px] leading-snug text-muted">
-                {card.notes.map((n, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="text-faint" aria-hidden>
-                      ·
-                    </span>
-                    <span>{n}</span>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 rounded-[12px] bg-white/[0.03] px-3" data-testid="cfb-builder-notes">
+                <FoldSummary>Builder notes ({card.notes.length})</FoldSummary>
+                <ul className="space-y-1.5 pb-3 text-[12px] leading-snug text-muted">
+                  {card.notes.map((n, i) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="text-faint" aria-hidden>
+                        ·
+                      </span>
+                      <span>{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
 
             {card.benched.length > 0 && (
-              <details className="group mt-3 rounded-[12px] bg-white/[0.03] px-3 py-2">
-                <summary className="cursor-pointer list-none text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted">
-                  <span className="mr-1 inline-block transition-transform duration-(--dur-fast) group-open:rotate-90" aria-hidden>
-                    ▶
-                  </span>
-                  Benched · {card.benched.length}
-                </summary>
-                <ul className="mt-2 space-y-1">
+              <details className="group mt-3 rounded-[12px] bg-white/[0.03] px-3" data-testid="cfb-builder-benched">
+                <FoldSummary>Benched ({card.benched.length})</FoldSummary>
+                <ul className="space-y-1.5 pb-3">
                   {card.benched.map((b, i) => (
-                    <li key={`${b.label}-${i}`} className="flex items-baseline justify-between gap-2 text-[11px]">
+                    <li key={`${b.label}-${i}`} className="flex items-baseline justify-between gap-2 text-[12px]">
                       <span className="min-w-0 truncate text-text">{b.label}</span>
                       <span className="num shrink-0 text-muted">
                         {fmtEv(b.evCz)} <span className="text-faint">· {b.reason}</span>
@@ -376,30 +534,48 @@ export function CfbBuilder() {
             )}
 
             <div className="mt-4 border-t border-cfb/25 pt-4">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cfb">
+              <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-cfb">
                 Favorites parlay <span className="normal-case tracking-normal text-faint">— ${CFB_PAPER.fun} fun money, one ticket</span>
               </div>
               {card.funT.length > 0 ? (
                 <div className="mt-3">
-                  <TicketCarousel tickets={card.funT} board={slate} label="Favorites parlay" />
+                  <TicketStack tickets={card.funT} board={slate} label="Favorites parlay" />
                 </div>
               ) : (
-                <p className="mt-2 text-[11px] text-muted">
+                <p className="mt-2 text-[12px] text-muted">
                   No fun parlay today — the builder needs {CFB_RULES.fun.legs.min}–{CFB_RULES.fun.legs.max} favorites paying{" "}
                   {CFB_RULES.fun.minDec}×–{CFB_RULES.fun.maxDec}× combined.
                 </p>
               )}
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Pill variant="gold" onClick={doLock} disabled={locking} aria-label={card.noPlay ? "Record NO-PLAY" : "Lock card"}>
-                {card.noPlay ? "Record NO-PLAY" : "🔒 Lock card"}
-              </Pill>
-              <span className="num text-[11px] text-muted">
-                {card.noPlay ? "Locks the day with $0 staked" : `Locks $${card.coreSum} core + $${card.funSum} fun for ${label}`}
-              </span>
+            {/* THE LOCK ROW (INSTRUCTION 46, 2026-09-08): on a phone a sticky, bottom-safe box that
+                sits `insets.bottom` (the measured tab bar) + 8px above the viewport edge while the
+                panel is on screen, with a full-width 48px pill — no scrolling to the panel's end to
+                lock. It is the panel's last child, so once the panel's bottom scrolls up the row
+                takes its natural place. md+ is the static row it always was. No blur here (the iOS
+                compositor rule) — a near-opaque surface tint carries the row over the slips. */}
+            <div
+              className="sticky z-20 -mx-2 mt-5 rounded-[18px] border border-gold/30 bg-surface/95 p-2 shadow-[0_-10px_28px_-14px_rgba(0,0,0,0.7)] md:static md:mx-0 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none"
+              style={{ bottom: insets.bottom + 8 }}
+              data-testid="cfb-lock-row"
+            >
+              <div className="flex flex-col gap-1.5 md:flex-row md:flex-wrap md:items-center md:gap-3">
+                <Pill
+                  variant="gold"
+                  className="min-h-[48px] w-full justify-center text-[14px] md:min-h-0 md:w-auto md:text-[12.5px]"
+                  onClick={doLock}
+                  disabled={locking}
+                  aria-label={card.noPlay ? "Record NO-PLAY" : "Lock card"}
+                >
+                  {card.noPlay ? "Record NO-PLAY" : "🔒 Lock card"}
+                </Pill>
+                <span className="num text-center text-[11px] text-muted md:text-left">
+                  {card.noPlay ? "Locks the day with $0 staked" : `Locks $${card.coreSum} core + $${card.funSum} fun for ${label}`}
+                </span>
+              </div>
+              {status && <p className="mt-2 text-center text-[12px] text-gold md:text-left">{status}</p>}
             </div>
-            {status && <p className="mt-2 text-[11.5px] text-gold">{status}</p>}
           </Panel>
         </Reveal>
       )}

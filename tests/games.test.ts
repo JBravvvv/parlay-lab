@@ -15,6 +15,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   SEASON_WINDOW,
+  cardExpansion,
+  cardLinkLabel,
   clampToWindow,
   dateStrip,
   fmtAm,
@@ -26,9 +28,11 @@ import {
   railLabel,
   seasonDates,
   shapeGames,
+  xBottomOf,
   type ApiGame,
   type MlRow,
 } from "@/lib/games";
+import { stripComments } from "./helpers/source";
 
 const side = (id: number, name: string, abbr: string, w: number, l: number, extra: Record<string, unknown> = {}) => ({
   team: { id, name, abbreviation: abbr, teamName: name.split(" ").pop() },
@@ -279,5 +283,75 @@ describe("2026-09-03 polish pins", () => {
   it("blown saves are not coloured as wins in the pitching box", () => {
     const src = fs.readFileSync(path.join(process.cwd(), "src/components/games/PitchingBox.tsx"), "utf8");
     expect(src).toMatch(/\(L\|BS\)/);
+  });
+});
+
+/**
+ * INSTRUCTION 46 (2026-09-08), Josh's word, verbatim: "On 'Games' tab on phone app
+ * version, game boxes can be significantly smaller to fit more on one screen. They
+ * can also be expandable/collapsible. I would start with them collapsed how they
+ * are and allow them to be clicked to expand down to show box score preview. To go
+ * to full box score, just click 'box score' button in top right of each box" —
+ * and "'Preview' should be named 'Game Preview'".
+ *
+ * The card's decisions are pure helpers (tested on the shaped fixture above); the
+ * card itself is pinned by source scan — vitest here has no JSX runtime, the same
+ * pattern as tests/calc-ui.test.ts.
+ */
+describe("games: list card (INSTRUCTION 46)", () => {
+  const out = shapeGames("2026-09-03", ALL, STATS, ML);
+  const byPk = Object.fromEntries(out.games.map((g) => [g.pk, g]));
+
+  it("the top-right button reads 'Box score' for a played game and 'Game Preview' for an unplayed one", () => {
+    expect(cardLinkLabel("live")).toBe("Box score");
+    expect(cardLinkLabel("final")).toBe("Box score");
+    expect(cardLinkLabel("upcoming")).toBe("Game Preview");
+    expect(cardLinkLabel("postponed")).toBe("Game Preview");
+  });
+
+  it("the expanded body: linescore + W/L/S for a final, linescore + probables while live, probables + venue pregame", () => {
+    expect(cardExpansion(byPk[1])).toEqual({ linescore: true, decisions: true, probables: false, venue: true });
+    expect(cardExpansion(byPk[2])).toEqual({ linescore: true, decisions: false, probables: true, venue: true });
+    expect(cardExpansion(byPk[3])).toEqual({ linescore: false, decisions: false, probables: true, venue: false });
+    // no probables, no venue, no linescore → nothing the feed did not carry
+    expect(cardExpansion(byPk[4])).toEqual({ linescore: false, decisions: false, probables: false, venue: false });
+    expect(cardExpansion(byPk[5])).toEqual({ linescore: false, decisions: false, probables: false, venue: false });
+  });
+
+  it("xBottomOf marks the unplayed bottom of a final's last inning, nothing while live", () => {
+    const ls = { innings: [{ n: 9, away: 1, home: null }], totals: { away: { r: 1, h: 1, e: 0 }, home: { r: 0, h: 0, e: 0 } } };
+    expect(xBottomOf(ls, "final")).toBe(9);
+    expect(xBottomOf(ls, "live")).toBeNull();
+    expect(xBottomOf(byPk[1].linescore, "final")).toBeNull();
+    expect(xBottomOf(null, "final")).toBeNull();
+  });
+
+  it("the card renders collapsed (useState(false)), toggles on the body button, and only mounts the detail panel when open", () => {
+    const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
+    expect(page).toMatch(/const \[open, setOpen\] = useState\(false\);/);
+    expect(page).toMatch(/<button\s+type="button"\s+aria-expanded=\{open\}\s+aria-controls=\{panelId\}\s+onClick=\{\(\) => setOpen\(\(o\) => !o\)\}/);
+    expect(page).toMatch(/\{open && \(\s*<div id=\{panelId\}/);
+    // the expansion is decided by the pure helper and prints the linescore through the box page's own table
+    expect(page).toMatch(/const ex = cardExpansion\(g\);/);
+    expect(page).toMatch(/import \{ LinescoreTable \} from "@\/components\/games\/LinescoreTable"/);
+    expect(page).toMatch(/\{ex\.linescore && g\.linescore && \(\s*<LinescoreTable/);
+  });
+
+  it("the top-right Link is the only navigation and carries the per-status label; the card is no longer one big Link", () => {
+    const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
+    expect(page).toMatch(/<Link\s+href=\{`\/games\/\$\{g\.pk\}\?date=\$\{date\}`\}\s+replace[\s\S]*?\{cardLinkLabel\(g\.status\)\} ›\s*<\/Link>/);
+    expect(page.match(/<Link\b/g)?.length).toBe(1);
+    // 2026-09-08 fix round: the pill is a thumb target — at least 32px tall, inline-flex centred, px-3 py-1.5
+    const link = page.match(/<Link\s+href=\{`\/games\/\$\{g\.pk\}\?date=\$\{date\}`\}[\s\S]*?className="([^"]+)"/)?.[1] ?? "";
+    for (const cls of ["inline-flex", "items-center", "min-h-[32px]", "px-3", "py-1.5"]) expect(link.split(/\s+/), cls).toContain(cls);
+    // 2026-09-08: the old footer caption "Preview ›" / "Box score ›" is gone with the full-card Link
+    expect(page).not.toMatch(/"Preview ›"/);
+  });
+
+  it("compact rows: a 20px logo, the abbreviation on the phone with the club name only from md up", () => {
+    const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
+    expect(page).toMatch(/width=\{20\} height=\{20\} className="h-5 w-5 shrink-0 object-contain"/);
+    expect(page).toMatch(/hidden text-\[12px\] font-medium text-muted md:inline">\{t\.name\}/);
+    expect(page).toMatch(/className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"/);
   });
 });

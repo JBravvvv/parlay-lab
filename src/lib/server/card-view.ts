@@ -23,10 +23,16 @@ export type CardTicketView = {
   prob: number | null;
   czEv: number | null;
   forced?: true;
+  /** INSTRUCTION 46 (2026-09-08): the shape slot this ticket seats (absent on pre-shape days) */
+  shapeSlot?: number;
   res?: string;
   payout?: number;
   legs: CardLeg[];
 };
+/** INSTRUCTION 46: the day's shape as the public card reads it — id, label, how it was
+    picked and why; slots are rehydrated from the menu by id, never trusted off the wire */
+export type CardShapeView = { id: string; label: string; pick: string; reason: string };
+export type CardSlotUnfilled = { slot: number; name: string; reason: string };
 export type CardView = {
   date: string;
   paper: true;
@@ -36,6 +42,12 @@ export type CardView = {
   underShare: number | null;
   note: string | null;
   funNote: string | null;
+  /** INSTRUCTION 46 (2026-09-08): the day's shape, its one-line print, which slots are still
+      open and which the last fire could not fill — all optional so pre-shape days still serve */
+  coreShape?: CardShapeView;
+  shapeLine?: string;
+  slotsOpen?: number[];
+  slotsUnfilled?: CardSlotUnfilled[];
   core: CardTicketView[];
   funT: CardTicketView[];
 };
@@ -55,6 +67,7 @@ export function publicCardView(entry: SyncEntry | null | undefined): CardView | 
       prob: (t.prob as number) ?? null,
       czEv: (t.czEv as number) ?? null,
       ...((t as { forced?: boolean }).forced === true ? { forced: true as const } : {}),
+      ...(typeof (t as { shapeSlot?: unknown }).shapeSlot === "number" ? { shapeSlot: (t as { shapeSlot: number }).shapeSlot } : {}),
       ...(g?.result ? { res: g.result, ...(g.payout != null ? { payout: g.payout } : {}) } : {}),
       legs: ((t.legs ?? []) as CardLeg[]).map((l) => ({
         lkey: l.lkey ?? null,
@@ -74,7 +87,31 @@ export function publicCardView(entry: SyncEntry | null | undefined): CardView | 
     underShare: ((entry as { underShare?: number }).underShare as number) ?? null,
     note: ((entry as { note?: string }).note as string) ?? null,
     funNote: ((entry as { funNote?: string }).funNote as string) ?? null,
+    ...shapeFields(entry),
     core: (entry.core ?? []).map(project),
     funT: ((entry.funT ?? []) as SyncTicket[]).map(project),
   };
+}
+
+/** the shape fields, projected only when the entry carries them (typed, never invented) */
+function shapeFields(entry: SyncEntry): Pick<CardView, "coreShape" | "shapeLine" | "slotsOpen" | "slotsUnfilled"> {
+  const e = entry as {
+    coreShape?: { id?: unknown; label?: unknown; pick?: unknown; reason?: unknown };
+    shapeLine?: unknown;
+    slotsOpen?: unknown;
+    slotsUnfilled?: unknown;
+  };
+  const out: Pick<CardView, "coreShape" | "shapeLine" | "slotsOpen" | "slotsUnfilled"> = {};
+  const cs = e.coreShape;
+  if (cs && typeof cs.id === "string" && typeof cs.label === "string") {
+    out.coreShape = { id: cs.id, label: cs.label, pick: String(cs.pick ?? "rotation"), reason: String(cs.reason ?? "") };
+  }
+  if (typeof e.shapeLine === "string") out.shapeLine = e.shapeLine;
+  if (Array.isArray(e.slotsOpen)) out.slotsOpen = (e.slotsOpen as unknown[]).filter((x): x is number => typeof x === "number");
+  if (Array.isArray(e.slotsUnfilled)) {
+    out.slotsUnfilled = (e.slotsUnfilled as unknown[])
+      .filter((u): u is { slot: number; name?: unknown; reason?: unknown } => !!u && typeof u === "object" && typeof (u as { slot?: unknown }).slot === "number")
+      .map((u) => ({ slot: u.slot, name: String(u.name ?? ""), reason: String(u.reason ?? "") }));
+  }
+  return out;
 }

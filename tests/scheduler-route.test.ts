@@ -6,6 +6,7 @@ import { CFB_LOCK } from "@/lib/cfb/rules";
 import { LINEUP_LEAD_MS } from "@/lib/board-coverage";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
 import { stripComments } from "./helpers/source";
+import { LEDGER_EPOCH } from "@/lib/ledger-epoch";
 
 /* The exported GET's behavioural describe (bottom of this file) drives the REAL mlbTick.
    Only its two edges are faked: the Upstash REST store (an in-memory Redis behind the same
@@ -246,15 +247,17 @@ describe("the CFB self-forward rides under `cfb` and can never change the MLB ou
  * `redis` (in-memory) and `slateStarts` (the keyless statsapi read). An EMPTY slate is used
  * deliberately: decide() reads it VACUOUS, so no block fires, no top-up fires, and the tick
  * cannot reach /api/generate — a poke that spends nothing and answers 200 identically every
- * time, which is what a byte-identity assertion needs. The clock is pinned to 18:07Z (11:07
- * PT, 2026-09-05) — not a grading hour, so the /api/calibrate forward is not reached either.
+ * time, which is what a byte-identity assertion needs. The clock is pinned to 18:27Z (11:27
+ * PT, 2026-09-05) — hour 18 IS a grading hour since 2026-09-08 (GRADE_HOURS 15/18/22/2), but
+ * only its FIRST tick (:00-:14) grades, so :27 is a non-grading minute and the /api/calibrate
+ * forward is not reached. (Was 18:07Z until the 09-08 re-pin made that minute a grading tick.)
  *
  * MLB_BODY below is the tick's answer, pinned whole. Every case asserts the response body is
  * MLB_BODY plus one key, `cfb`, and the status is the tick's 200.
  */
 describe("the exported GET, CALLED: the CFB forward rides along and can never change the MLB answer", () => {
   const SECRET = "cron-secret-for-this-test-only";
-  const NOW = Date.parse("2026-09-05T18:07:00Z"); // 11:07 PT — not a grading hour, mid-day
+  const NOW = Date.parse("2026-09-05T18:27:00Z"); // 11:27 PT — a grading hour, but past its first tick
   const forwardMock = vi.fn();
   let GET: (req: NextRequest) => Promise<Response>;
 
@@ -335,10 +338,10 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
   const MLB_BODY = {
     fired: false,
     topup: { fire: false, reason: "no paper lock for the date yet — block fires come first", owed: 0, used: 0 },
-    grading: { fired: false, reason: "not a grading tick (grading runs on the first tick of hours 15/2 UTC)" },
+    grading: { fired: false, reason: "not a grading tick (grading runs on the first tick of hours 15/18/22/2 UTC)" },
     lock: { present: false, action: null },
     date: "2026-09-05",
-    at: "2026-09-05T18:07:00.000Z",
+    at: "2026-09-05T18:27:00.000Z",
     T: 0.8,
     minReady: MIN_READY,
     blocks: [],
@@ -350,6 +353,60 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     achievable: 0,
     costEstimate: 0,
   };
+
+  it("CANNOT FILL FURTHER IS TERMINAL (fix round 2026-09-08): a locked day whose every open slot is displaced by stranded carried money gets NO top-up — the sweep says so before decideTopUp", async () => {
+    /* OBSERVED RED before the fix: the body carried decideTopUp's own verdict ("every game
+       started — nothing pregame left to seat" on this empty slate; on a live slate it would
+       have FIRED a ~120-credit generate that re-seats the same stranded day). */
+    const { kv } = fakeRedis();
+    kv.set(
+      "pl:ledger:v1",
+      JSON.stringify({
+        epoch: LEDGER_EPOCH, // without the paper-epoch stamp the tick's migration would reset this seed
+        ledger: [
+          {
+            date: "2026-09-05", locked: true, paper: true, lockedAt: NOW - 3_600_000, daily: 150, allocSum: 130, core: [],
+            slotsUnfilled: [
+              { slot: 0, name: "$60 2-leg slot", reason: "$60 2-leg slot unfilled — cannot fill further: $100 of carried money sits outside the shape's slots (1 legacy ticket no slot could seat), so the day has no room left for it" },
+              { slot: 1, name: "$60 2-leg slot", reason: "$60 2-leg slot unfilled — cannot fill further: $100 of carried money sits outside the shape's slots (1 legacy ticket no slot could seat), so the day has no room left for it" },
+            ],
+          },
+        ],
+      }),
+    );
+    forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+    const { status, body } = await call();
+    expect(status).toBe(200);
+    expect(body.topup).toEqual({
+      fire: false,
+      reason: "cannot fill further — the day's 2 open slots hold no seat for the carried money; a top-up would change nothing",
+      owed: 20,
+      used: 0,
+    });
+    expect((body.lock as { present?: boolean }).present).toBe(true);
+  });
+
+  it("a locked day with an ORDINARY open slot (thin pool) beside a terminal one still goes to decideTopUp", async () => {
+    const { kv } = fakeRedis();
+    kv.set(
+      "pl:ledger:v1",
+      JSON.stringify({
+        epoch: LEDGER_EPOCH, // without the paper-epoch stamp the tick's migration would reset this seed
+        ledger: [{
+          date: "2026-09-05", locked: true, paper: true, lockedAt: NOW - 3_600_000, daily: 150, allocSum: 120, core: [],
+          slotsUnfilled: [
+            { slot: 4, name: "$10 3-4 leg slot", reason: "$10 3-4 leg slot unfilled — no leg-disjoint 3-4 leg ticket priced under 9.38 in the pool" },
+            { slot: 0, name: "$60 2-leg slot", reason: "$60 2-leg slot unfilled — cannot fill further: $100 of carried money sits outside the shape's slots (1 legacy ticket no slot could seat), so the day has no room left for it" },
+          ],
+        }],
+      }),
+    );
+    forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
+    const { body } = await call();
+    // decideTopUp's own answer on the empty slate — the terminal short-circuit did not take it
+    expect((body.topup as { reason: string }).reason).toBe("every game started — nothing pregame left to seat");
+    expect((body.topup as { owed: number }).owed).toBe(30);
+  });
 
   it("BASELINE: the tick answers 200 with no `cfb` of its own — the whole body, pinned", async () => {
     forwardMock.mockResolvedValue({ forwarded: true, status: 200, result: { status: "waiting" } });
@@ -540,7 +597,7 @@ describe("the exported GET, CALLED: the CFB forward rides along and can never ch
     const REFUSAL = {
       status: "odds-missing",
       date: "2026-09-05",
-      at: "2026-09-05T18:07:00.000Z",
+      at: "2026-09-05T18:27:00.000Z",
       dry: false,
       oddsMissing: true,
       pricedAhead: 0,

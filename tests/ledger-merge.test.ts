@@ -4334,3 +4334,58 @@ describe("the grading LEG map is base-over-other, and the loser's extra legs sti
     }
   });
 });
+
+describe("INSTRUCTION 46 — the day's shape is DURABLE across mergeDay (fix round 2026-09-08)", () => {
+  /* OBSERVED RED before the fix: coreShape/shapeLine were neither in ACCRUAL_FIELDS nor adopted
+     like `alt`, so whichever copy won pickBase decided the day's shape — a mid-day tilt that
+     re-picked shape E on a later fire could flip a day already locked under B. shapeSlot on a
+     shared ticket was dropped the same way. */
+  const shapeB = { id: "B", label: "5x$30 2-leg", slots: [{ stake: 30, legs: { min: 2, max: 2 } }], pick: "rotation", reason: "rotation", menu: ["A", "B", "C", "D", "E", "F"], dayIndex: 20706, since: "2026-09-08" };
+  const shapeE = { ...shapeB, id: "E", label: "3x$30 2-leg + 2x$20 3-leg", pick: "tilt:two", reason: "2-leg is running better" };
+  const T = (id: string, stake: number, extra: Record<string, unknown> = {}) => ({ id, stake, name: id, paper: true, placed: false, actualStake: 0, legs: [{ label: `${id}-L1`, prop: "Hits O 0.5" }, { label: `${id}-L2`, prop: "Hits O 0.5" }], ...extra });
+  const entry1 = (): SyncEntry => ({ date: "2026-09-10", locked: true, paper: true, daily: PAPER.daily, allocSum: 60, core: [T("t1", 30, { shapeSlot: 0 }), T("t2", 30, { shapeSlot: 1 })], coreShape: shapeB, shapeLine: "shape: 5x$30 2-leg" } as SyncEntry);
+  /** the later copy: richer (graded), so it WINS pickBase — and it claims shape E */
+  const entry2 = (): SyncEntry => ({
+    date: "2026-09-10", locked: true, paper: true, daily: PAPER.daily, allocSum: 90,
+    core: [T("t1", 30), T("t2", 30), T("t3", 30, { shapeSlot: 2 })],
+    coreShape: shapeE, shapeLine: "shape: 3x$30 2-leg + 2x$20 3-leg",
+    grading: { done: true, tickets: { t1: { result: "won", payout: 66 } } },
+    note: "the later, graded copy", // the base marker: mergeDay deep-copies the pickBase winner whole
+  } as SyncEntry);
+
+  it("the merged day keeps the FIRST shape it held (B), in both merge orders, even when the E copy wins pickBase", () => {
+    /* pickBase is symmetric, so both orders pick entry2 (graded) as the base — the adoption rule
+       is what has to hold the day at B, not argument order */
+    const noShape = (): SyncEntry => { const e = entry2(); delete (e as { coreShape?: unknown }).coreShape; delete (e as { shapeLine?: unknown }).shapeLine; return e; };
+    for (const [a, b, order] of [[entry1(), noShape(), "shaped,unshaped"], [noShape(), entry1(), "unshaped,shaped"]] as const) {
+      const m = mergeLedgers([a], [b])[0] as SyncEntry & { coreShape?: { id: string }; shapeLine?: string };
+      expect((m as { note?: string }).note, `${order}: the graded copy should be the base`).toBe("the later, graded copy");
+      expect(m.coreShape?.id, `${order}: the shape did not survive the merge`).toBe("B");
+      expect(m.shapeLine, order).toBe("shape: 5x$30 2-leg");
+    }
+  });
+
+  it("a copy that already carries a shape NEVER has it replaced — B vs E stays whatever the base held, so a re-pick cannot switch a locked day", () => {
+    /* both copies shaped: the base's shape stands (entry2 wins, so E here) — the point is that
+       the loser's shape never overwrites, in either order; the write path never produces this
+       pair on a sound day because buildLockEntry reuses carry.coreShape */
+    const m1 = mergeLedgers([entry1()], [entry2()])[0] as { coreShape?: { id: string } };
+    const m2 = mergeLedgers([entry2()], [entry1()])[0] as { coreShape?: { id: string } };
+    expect(m1.coreShape?.id).toBe(m2.coreShape?.id);
+  });
+
+  it("shapeSlot on a shared ticket is filled from the copy that stamped it and never overwritten; appended tickets keep theirs", () => {
+    for (const [a, b, order] of [[entry1(), entry2(), "1,2"], [entry2(), entry1(), "2,1"]] as const) {
+      const m = mergeLedgers([a], [b])[0];
+      const slots = Object.fromEntries(m.core.map((t) => [t.id, (t as { shapeSlot?: number }).shapeSlot]));
+      expect(slots, order).toEqual({ t1: 0, t2: 1, t3: 2 });
+    }
+    /* never overwritten: a stamped 0 against a stamped 4 keeps the base's stamp */
+    const x = entry1();
+    const y = entry2();
+    (y.core[0] as { shapeSlot?: number }).shapeSlot = 4;
+    const m = mergeLedgers([x], [y])[0];
+    expect((m.core.find((t) => t.id === "t1") as { shapeSlot?: number }).shapeSlot).toBe(4); // y is the base (graded)
+    expect(validateLedger([m]).ok).toBe(true);
+  });
+});

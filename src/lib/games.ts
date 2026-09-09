@@ -335,3 +335,49 @@ export function dateStrip(date: string, n = 2): string[] {
   }
   return out;
 }
+
+/* ---------- Games list card (INSTRUCTION 46, 2026-09-08) ---------- */
+
+/**
+ * INSTRUCTION 46 (2026-09-08), Josh's word, verbatim: "On 'Games' tab on phone
+ * app version, game boxes can be significantly smaller to fit more on one
+ * screen. They can also be expandable/collapsible. I would start with them
+ * collapsed how they are and allow them to be clicked to expand down to show
+ * box score preview. To go to full box score, just click 'box score' button in
+ * top right of each box" — and "'Preview' should be named 'Game Preview'".
+ *
+ * The top-right button's label per status: a played (live / final) game opens
+ * its box score; an unplayed one opens the Game Preview.
+ */
+export type CardLinkLabel = "Box score" | "Game Preview";
+export function cardLinkLabel(status: GameStatus): CardLinkLabel {
+  return status === "live" || status === "final" ? "Box score" : "Game Preview";
+}
+
+/**
+ * What the tapped-open card shows, decided from the shaped game alone so the
+ * page renders nothing the feed did not carry: the linescore (live / final,
+ * when the feed has one), the W/L/S line (a final with decisions), the
+ * probables (any game that names one), and venue / TV when known.
+ */
+export type CardExpansion = { linescore: boolean; decisions: boolean; probables: boolean; venue: boolean };
+export function cardExpansion(g: ShapedGame): CardExpansion {
+  const played = g.status === "live" || g.status === "final";
+  return {
+    linescore: played && g.linescore != null,
+    decisions: g.status === "final" && g.decisions != null,
+    probables: !(g.status === "final" && g.decisions != null) && (g.away.probable != null || g.home.probable != null),
+    venue: g.venue != null || g.broadcasts.length > 0,
+  };
+}
+
+/**
+ * The list feed's linescore lacks the box page's `xBottom`; derive it the same
+ * way shapeLinescore does — a final whose last listed inning has an away run
+ * total but no home one is the bottom the home club never batted, printed "x".
+ */
+export function xBottomOf(ls: Linescore | null, status: GameStatus): number | null {
+  if (status !== "final" || !ls) return null;
+  const last = ls.innings[ls.innings.length - 1];
+  return last && last.away != null && last.home == null ? last.n : null;
+}

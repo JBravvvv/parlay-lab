@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
@@ -10,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { CFB_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
+import { setSport } from "@/lib/sport";
 import { CfbProps } from "@/components/cfb/CfbProps";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
@@ -22,11 +24,15 @@ import { useShellInsets } from "@/components/props/useShellInsets";
 import {
   MARKETS,
   bothSides,
+  gameMatches,
   groupByGame,
   isGameMarket,
   legId,
   norm,
+  parseDeepLink,
+  playerMatches,
   rankOf,
+  type PropsDeepLink,
   type TabKey,
 } from "@/components/props/props-model";
 
@@ -52,18 +58,44 @@ import {
  * two-row sticky market nav (segmented control + scrolling pill rail), 40px
  * player rows with 32px price buttons, collapsible compact game cards, and the
  * slip as a collapsed bottom-sheet handle. Data flow is unchanged.
+ *
+ * INSTRUCTION 46 (2026-09-08) deep link — the Ledger's player names open this page at the
+ * bet: /props?tab=<TabKey>&mkt=<market key>&game=<gkey or AWAY@HOME>&player=<name>. The
+ * contract (and the matching rules — name, never the line) is documented on
+ * parseDeepLink / legDeepLink in props-model.ts.
  */
 
 export default function PropsPage() {
+  // useSearchParams needs a Suspense boundary; it is read on both server and client so the deep link hydrates cleanly
+  return (
+    <Suspense fallback={null}>
+      <PropsDesk />
+    </Suspense>
+  );
+}
+
+function PropsDesk() {
   const q = useBoard();
   const sport = useSport();
   const regen = useRegenerateBoard();
   const ins = useShellInsets();
-  const [tab, setTab] = useState<TabKey>("games");
-  const [mktKey, setMktKey] = useState<string>("ml");
+  const params = useSearchParams();
+  /* the deep link is read once, on open; the market nav takes over from there. `link` stays
+     set while the reader is still on the linked tab+market so the ring survives a re-render,
+     and clears the moment they move on (or tap "Show all games"). */
+  const [link, setLink] = useState<PropsDeepLink | null>(() => parseDeepLink((k) => params.get(k)));
+  /* CFB ledger deep links (/props?cfb=1&game=&mkt=&player=) must land on the CFB Builder no
+     matter which sport the switch was left on: flip the sport store once on open. */
+  const wantCfb = params.get("cfb") === "1";
+  useEffect(() => {
+    if (CFB_ENABLED && wantCfb) setSport("cfb");
+  }, [wantCfb]);
+  const [tab, setTab] = useState<TabKey>(link?.tab ?? "games");
+  const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "ml");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [search, setSearch] = useState("");
+  const linkOn = !!link && link.tab === tab && link.mkt === mktKey;
 
   const d = q.data?.data;
   const mkt = MARKETS[tab].find((m) => m.key === mktKey) ?? MARKETS[tab][0];
@@ -84,7 +116,7 @@ export default function PropsPage() {
     });
     return bothSides(base);
   }, [d, cat, gameTab]);
-  const gameGroups = useMemo(() => groupByGame(gameRows), [gameRows]);
+  const allGameGroups = useMemo(() => groupByGame(gameRows), [gameRows]);
 
   /* player props: the FULL prop board — every player, both sides, uncapped.
      INSTRUCTION 34 (2026-09-04, Josh: "Prop bets still aren't pulling up on 'Parlay Builder'.
@@ -108,7 +140,7 @@ export default function PropsPage() {
   });
   const propBoard = ownEmpty ? serverProps.data ?? [] : ownProps;
   const fromServer = ownEmpty && (serverProps.data?.length ?? 0) > 0;
-  const propGames = useMemo(() => {
+  const allPropGames = useMemo(() => {
     if (!cat || gameTab) return [];
     const needle = norm(search.trim());
     return propBoard
@@ -120,6 +152,24 @@ export default function PropsPage() {
       })
       .filter((x) => x.rows.length > 0);
   }, [propBoard, cat, gameTab, search]);
+
+  /* INSTRUCTION 46 deep link: narrow the board to the linked game and find the player's row.
+     found = the bet is on today's board (game AND player, name-matched — the line may have
+     moved); otherwise the whole board stays up under a "not on today's board" notice. */
+  const deep = useMemo(() => {
+    if (!linkOn || !link || !d) return { games: null as null | typeof allGameGroups, props: null as null | typeof allPropGames, found: false, hit: null as string | null };
+    if (gameTab) {
+      const games = allGameGroups.filter((g) => gameMatches(g, link.game));
+      const found = link.player ? games.some((g) => g.rows.some((r) => playerMatches(String(r.label ?? ""), link.player))) : games.length > 0;
+      return { games: found ? games : null, props: null, found, hit: found && link.player ? link.player : null };
+    }
+    const props = allPropGames.filter((x) => gameMatches(x.g, link.game));
+    const found = link.player ? props.some((x) => x.rows.some((r) => playerMatches(r.p, link.player))) : props.length > 0;
+    return { games: null, props: found ? props : null, found, hit: found && link.player ? link.player : null };
+  }, [linkOn, link, d, gameTab, allGameGroups, allPropGames]);
+  const gameGroups = deep.games ?? allGameGroups;
+  const propGames = deep.props ?? allPropGames;
+  const linkMissing = linkOn && !!d && !q.isPending && !deep.found && !(ownEmpty && !gameTab && serverProps.isPending);
 
   const totalRows = propGames.reduce((n, x) => n + x.rows.length, 0);
   const playerNames = useMemo(
@@ -181,6 +231,22 @@ export default function PropsPage() {
           Your device&apos;s board has no prop lines — showing the server-built prop board for today.
         </div>
       )}
+      {linkMissing && link && (
+        <div data-testid="deeplink-missing" className="mb-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">
+          That bet is not on today&apos;s board — {link.player ? <span className="font-semibold">{link.player}</span> : "that game"} has no {mkt.label} line posted
+          {link.player && link.game ? " for that game" : ""}. Showing everything the book posts instead.
+        </div>
+      )}
+      {linkOn && deep.found && link && !!link.player && (
+        <div data-testid="deeplink-hit" className="mb-2 flex items-center justify-between gap-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">
+          <span className="min-w-0 truncate">
+            From your ledger: <span className="font-semibold">{link.player}</span> · {mkt.label} — the ringed row is today&apos;s line, which may have moved.
+          </span>
+          <button type="button" onClick={() => setLink(null)} className="shrink-0 font-semibold text-text hover:underline">
+            Show all games
+          </button>
+        </div>
+      )}
       {q.isPending || (ownEmpty && !gameTab && serverProps.isPending) ? (
         <BoardSkeleton />
       ) : cat == null ? (
@@ -225,12 +291,12 @@ export default function PropsPage() {
           {gameTab
             ? gameGroups.map((g) => (
                 <Reveal key={g.game} y={10}>
-                  <GameMarketCard g={g} market={cat} isSel={isSel} onToggle={toggle} />
+                  <GameMarketCard g={g} market={cat} isSel={isSel} onToggle={toggle} hitPlayer={deep.hit} />
                 </Reveal>
               ))
             : propGames.map(({ g, rows }) => (
                 <Reveal key={g.game} y={10}>
-                  <PropGameCard g={g} cat={cat} rows={rows} headshots={headshots} isSel={isSel} onToggle={toggle} />
+                  <PropGameCard g={g} cat={cat} rows={rows} headshots={headshots} isSel={isSel} onToggle={toggle} hitPlayer={deep.hit} />
                 </Reveal>
               ))}
           <details className="group rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2 text-[10px] leading-relaxed text-faint">

@@ -1,0 +1,1141 @@
+{
+ "_source": "statsapi.mlb.com fetched 2026-09-08: /api/v1/people/669373/stats?stats=vsPlayer&group=pitching&opposingTeamId=138 (Skubal vs the STL lineup of boxscore-pregame-823907.json = vsPlayer.away) and /api/v1/people/687273/stats?stats=vsPlayer&group=pitching&opposingTeamId=119 (Mathews vs the LAD lineup = vsPlayer.home, no splits) — trimmed to the fields src/lib/boxscore.ts reads. Pairs with boxscore-pregame-823907.json for the multi-season aggregation test.",
+ "vsPlayer": {
+  "away": {
+   "stats": [
+    {
+     "type": {
+      "displayName": "vsPlayer"
+     },
+     "splits": [
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 0,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": "1.000",
+        "slg": ".000",
+        "ops": "1.000"
+       },
+       "batter": {
+        "id": 592660,
+        "fullName": "Rangel Ravelo"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 1,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 1,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 4,
+        "avg": "1.000",
+        "obp": "1.000",
+        "slg": "4.000",
+        "ops": "5.000"
+       },
+       "batter": {
+        "id": 425877,
+        "fullName": "Yadier Molina"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 0,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": "1.000",
+        "slg": ".000",
+        "ops": "1.000"
+       },
+       "batter": {
+        "id": 641933,
+        "fullName": "Tyler O'Neill"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 2,
+        "hits": 1,
+        "doubles": 1,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 2,
+        "avg": ".500",
+        "obp": ".500",
+        "slg": "1.000",
+        "ops": "1.500"
+       },
+       "batter": {
+        "id": 669242,
+        "fullName": "Tommy Edman"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".500",
+        "slg": ".000",
+        "ops": ".500"
+       },
+       "batter": {
+        "id": 502671,
+        "fullName": "Paul Goldschmidt"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 2,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".500",
+        "obp": ".500",
+        "slg": ".500",
+        "ops": "1.000"
+       },
+       "batter": {
+        "id": 657557,
+        "fullName": "Paul DeJong"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 657041,
+        "fullName": "Lane Thomas"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 664056,
+        "fullName": "Harrison Bader"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2020",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".500",
+        "slg": ".000",
+        "ops": ".500"
+       },
+       "batter": {
+        "id": 543939,
+        "fullName": "Kolten Wong"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 1,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 663457,
+        "fullName": "Lars Nootbaar"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".500",
+        "slg": ".000",
+        "ops": ".500"
+       },
+       "batter": {
+        "id": 425877,
+        "fullName": "Yadier Molina"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 5,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".200",
+        "obp": ".200",
+        "slg": ".200",
+        "ops": ".400"
+       },
+       "batter": {
+        "id": 666185,
+        "fullName": "Dylan Carlson"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 641933,
+        "fullName": "Tyler O'Neill"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 4,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 571448,
+        "fullName": "Nolan Arenado"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 6,
+        "hits": 2,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 2,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 669242,
+        "fullName": "Tommy Edman"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 6,
+        "hits": 3,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 2,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 9,
+        "avg": ".500",
+        "obp": ".500",
+        "slg": "1.500",
+        "ops": "2.000"
+       },
+       "batter": {
+        "id": 502671,
+        "fullName": "Paul Goldschmidt"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 452657,
+        "fullName": "Jon Lester"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".500",
+        "slg": ".333",
+        "ops": ".833"
+       },
+       "batter": {
+        "id": 657557,
+        "fullName": "Paul DeJong"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 2,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".500",
+        "slg": ".000",
+        "ops": ".500"
+       },
+       "batter": {
+        "id": 624641,
+        "fullName": "Edmundo Sosa"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 0,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": "1.000",
+        "slg": ".000",
+        "ops": "1.000"
+       },
+       "batter": {
+        "id": 602922,
+        "fullName": "José Rondon"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 664056,
+        "fullName": "Harrison Bader"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2021",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 668800,
+        "fullName": "Andrew Knizner"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 686780,
+        "fullName": "Pedro Pagés"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 691026,
+        "fullName": "Masyn Winn"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 3,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 663457,
+        "fullName": "Lars Nootbaar"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 2,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 1,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 4,
+        "avg": ".500",
+        "obp": ".500",
+        "slg": "2.000",
+        "ops": "2.500"
+       },
+       "batter": {
+        "id": 571448,
+        "fullName": "Nolan Arenado"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 2,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 691023,
+        "fullName": "Jordan Walker"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 575929,
+        "fullName": "Willson Contreras"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 3,
+        "hits": 2,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 2,
+        "avg": ".667",
+        "obp": ".667",
+        "slg": ".667",
+        "ops": "1.334"
+       },
+       "batter": {
+        "id": 671056,
+        "fullName": "Iván Herrera"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 3,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 680977,
+        "fullName": "Brendan Donovan"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2025",
+       "stat": {
+        "atBats": 1,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".500",
+        "slg": ".000",
+        "ops": ".500"
+       },
+       "batter": {
+        "id": 687363,
+        "fullName": "Victor Scott II"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 0,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 0,
+        "avg": ".000",
+        "obp": ".000",
+        "slg": ".000",
+        "ops": ".000"
+       },
+       "batter": {
+        "id": 701675,
+        "fullName": "Nathan Church"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 2,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".500",
+        "obp": ".500",
+        "slg": ".500",
+        "ops": "1.000"
+       },
+       "batter": {
+        "id": 686780,
+        "fullName": "Pedro Pagés"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 2,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 2,
+        "avg": ".667",
+        "obp": ".667",
+        "slg": ".667",
+        "ops": "1.334"
+       },
+       "batter": {
+        "id": 699024,
+        "fullName": "Leo Bernal"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 2,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 1,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".500",
+        "obp": ".667",
+        "slg": ".500",
+        "ops": "1.167"
+       },
+       "batter": {
+        "id": 695336,
+        "fullName": "Thomas Saggese"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 2,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 691023,
+        "fullName": "Jordan Walker"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 2,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 0,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 2,
+        "avg": ".667",
+        "obp": ".667",
+        "slg": ".667",
+        "ops": "1.334"
+       },
+       "batter": {
+        "id": 671056,
+        "fullName": "Iván Herrera"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 665877,
+        "fullName": "José Fermín"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 695491,
+        "fullName": "Joshua Báez"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      },
+      {
+       "season": "2026",
+       "stat": {
+        "atBats": 3,
+        "hits": 1,
+        "doubles": 0,
+        "triples": 0,
+        "homeRuns": 0,
+        "baseOnBalls": 0,
+        "strikeOuts": 1,
+        "hitByPitch": 0,
+        "sacFlies": 0,
+        "totalBases": 1,
+        "avg": ".333",
+        "obp": ".333",
+        "slg": ".333",
+        "ops": ".666"
+       },
+       "batter": {
+        "id": 602104,
+        "fullName": "Ramón Urías"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      }
+     ]
+    },
+    {
+     "type": {
+      "displayName": "vsPlayerTotal"
+     },
+     "splits": [
+      {
+       "stat": {
+        "atBats": 65,
+        "hits": 18,
+        "doubles": 1,
+        "triples": 0,
+        "homeRuns": 1,
+        "baseOnBalls": 7,
+        "strikeOuts": 21,
+        "hitByPitch": 0,
+        "sacFlies": 1,
+        "totalBases": 22,
+        "avg": ".277",
+        "obp": ".342",
+        "slg": ".338",
+        "ops": ".680"
+       },
+       "pitcher": {
+        "id": 669373,
+        "fullName": "Tarik Skubal"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "home": {
+   "stats": [
+    {
+     "type": {
+      "displayName": "vsPlayerTotal"
+     },
+     "splits": []
+    },
+    {
+     "type": {
+      "displayName": "vsPlayer"
+     },
+     "splits": []
+    }
+   ]
+  }
+ }
+}

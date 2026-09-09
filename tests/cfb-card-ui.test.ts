@@ -225,7 +225,10 @@ describe("cfb-card-ui — the markers are rendered where the day's money is, and
   it("an unmarked day keeps the chrome it has today, byte for byte", () => {
     const src = ledger();
     for (const frag of [
-      `<details className="glass px-4 py-3" open={open}>`,
+      // INSTRUCTION 46, point 9 (2026-09-08): the day box is controlled (`open={isOpen}`) so a tap
+      // anywhere inside it toggles — the opening tag is now multi-line; its class and the summary are pinned
+      `className="glass cursor-pointer px-4 py-3"`,
+      `open={isOpen}`,
       `<summary className="flex cursor-pointer list-none items-center justify-between gap-2">`,
       `<span className="min-w-0">`,
       `{e.noPlay && <span className="ml-2 rounded-full border border-line-2 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted">No-play</span>}`,

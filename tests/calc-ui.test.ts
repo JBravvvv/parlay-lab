@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import React, { createElement } from "react";
+import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { stripComments } from "./helpers/source";
 
@@ -179,5 +181,50 @@ describe("calc-ui — phone rules (375px, 44px targets, numeric keypad, no blur,
     const quick = stripComments(read(`${CALC_DIR}/QuickAdd.tsx`));
     expect(stakeSrc).toMatch(/h-\[44px\]/);
     expect(quick).toMatch(/h-\[44px\]/);
+  });
+});
+
+/* INSTRUCTION 46 (2026-09-08), Josh's word, verbatim: "Don't like how Parlay Calc is centered in
+   screen and is the only page that is centered in screen on desktop. Would rather have it be
+   aligned left side of screen and be larger extending right. Just looks weird." The centered
+   560px column is gone: flush left, a two-column instrument from lg up (inputs left, read-outs
+   right) capped at 1100px, one phone column in the old order. Pinned at source AND on a server
+   render of the real page. */
+describe("calc-ui — INSTRUCTION 46: left-aligned, two columns on desktop, one on the phone", () => {
+  const page = stripComments(read(PAGE));
+  it("no centering wrapper survives — no mx-auto, no max-w-[560px]", () => {
+    expect(page).not.toMatch(/mx-auto/);
+    expect(page).not.toMatch(/max-w-\[560px\]/);
+  });
+  it("the layout is a phone column that becomes a two-column lg grid (2026-09-08: lg not md — the md shell leaves ~504px, too narrow for two columns), capped at 1100px", () => {
+    expect(page).toMatch(/data-testid="calc-layout"/);
+    expect(page).toMatch(/max-w-\[1100px\]/);
+    expect(page).toMatch(/lg:grid lg:grid-cols-\[minmax\(0,1fr\)_minmax\(320px,420px\)\]/);
+    // inputs left (spanning both rows), hero + read-outs right
+    expect(page).toMatch(/lg:col-start-1 lg:row-start-1 lg:row-span-2/);
+    expect(page).toMatch(/lg:col-start-2 lg:row-start-1/);
+    expect(page).toMatch(/lg:col-start-2 lg:row-start-2/);
+  });
+  it("server render: the layout div carries the grid classes and nothing is centered", () => {
+    // the page's JSX compiles under the classic runtime here (tsconfig jsx: preserve)
+    (globalThis as { React?: typeof React }).React = React;
+    return import("../app/calc/page").then((mod) => {
+      const html = renderToString(createElement(mod.default));
+      expect(html).not.toContain("mx-auto");
+      const m = /<div data-testid="calc-layout" class="([^"]*)"/.exec(html);
+      expect(m, "the calc-layout wrapper renders").not.toBeNull();
+      const cls = m![1];
+      for (const c of ["flex", "flex-col", "max-w-[1100px]", "lg:grid", "lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]", "lg:items-start"]) {
+        expect(cls, c).toContain(c);
+      }
+      // the phone order is the DOM order: hero, then stake + legs, then the numbers
+      const idx = (needle: string) => html.indexOf(needle);
+      expect(idx("Stake")).toBeGreaterThan(-1);
+      expect(idx("Stake")).toBeLessThan(idx("Legs"));
+      expect(idx("Legs")).toBeLessThan(idx("The ticket in numbers"));
+      expect(idx("The ticket in numbers")).toBeLessThan(idx("Payout ladder"));
+      // the hero prints Wins too — the bottom tiles are the LAST Wins / Pays on the page
+      expect(idx("Payout ladder")).toBeLessThan(html.lastIndexOf(">Wins<"));
+    });
   });
 });

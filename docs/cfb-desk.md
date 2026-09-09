@@ -123,3 +123,9 @@ Companion to INSTRUCTION 38 in `session-handoff.md`. Every constant below is the
 - Local dev `/games` (both desks) can sit on the Suspense placeholder in the in-app browser while the SSR stream is complete; prod hydrates (walked 2026-09-05). Recorded in `progress.md`.
 - "no CZ" moneyline rows show the fair price but no grade and no Kelly.
 - A fresh slate odds pull costs 6 credits and `/api/cfb` caches for 240 s; a props pull costs about 31 credits per event and is capped, cached in Redis for 2 h pre-kick / 10 min while any priced game is live, and budgeted (see Quota).
+
+## Headshots, own-team logos, Season Lab (INSTRUCTION 46, 2026-09-08)
+- `props-context.ts` keeps `athleteId / headshot / teamId / teamAbbr / pos` per ESPN byathlete row; `props.ts parseEventProps` adopts them only when the ESPN teamId is one of the game's two teams (a same-name player on another roster gets nothing). `card.ts legOf` copies player/headshot/pos/teamId onto `CfbTicketLeg`.
+- `TeamMark.tsx PlayerMark`: headshot (ESPN combiner URL) over the player's own team logo; `PairMark` is for game-level picks (spread/total/ML) or the no-team fallback only.
+- Ledger deep link: `/props?cfb=1&game=<id>&mkt=<key>&player=<name>` — `app/props/page.tsx` flips the sport to CFB on `cfb=1`; `CfbProps` reads the params.
+- Season Lab: `src/lib/cfb/season.ts` (`CFB_SEASON` kellyBank 250, ticketDefault 5, ticketMax 25, sameTeamHaircut 0.9; `paceOf` on pace / behind / cleared / dead), `season-store.ts` (`pl_cfb_season`), `CfbSeason.tsx`, `app/season/page.tsx`, `app/api/cfb/season/route.ts` (ESPN byathlete + FPI only — the Odds API has no NCAAF season markets, lines are typed by hand). Nav entry `/season` is `cfbOnly` and hidden while the switch is on MLB.

@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   buildProgress,
   decideGradePass,
+  GRADE_HOURS,
   labelPopulation,
   makeSelectedMatcher,
   PROGRESS_KEY,
@@ -55,20 +56,43 @@ describe("labelPopulation — the three-label taxonomy", () => {
   });
 });
 
-describe("decideGradePass — first tick of hours 15 and 2 UTC", () => {
+describe("decideGradePass — first tick of hours 15/18/22/2 UTC (the poke window only)", () => {
   const at = (iso: string) => Date.parse(iso);
-  it("fires on the first tick of the morning hour (15:00-15:14Z) and the late hour (02:00-02:14Z)", () => {
-    expect(decideGradePass(at("2026-08-07T15:00:30Z")).fire).toBe(true);
-    expect(decideGradePass(at("2026-08-07T15:14:59Z")).fire).toBe(true);
-    expect(decideGradePass(at("2026-08-07T02:01:00Z")).fire).toBe(true);
+  /* PIN UPDATED 2026-09-08 (INSTRUCTION 46, Josh's word, verbatim: "Core Money should be
+     calibrating itself more often"): the cadence was the first tick of hours 15 and 2 UTC
+     through 2026-09-07. A first cut of this ship set "every 4 hours" (2/6/10/14/18/22) — but
+     the cron-job.org ticker only pokes /api/scheduler every 15 min during UTC hours 15-23
+     and 0-2 (docs/cron-jobs.md), so 6/10/14 would NEVER have ticked and the 15:00Z morning
+     pass would have been lost. The pin is now the four hours inside the window: 15/18/22/2.
+     OBSERVED RED against the 2/6/10/14/18/22 GRADE_HOURS before this update (15:00Z did not
+     fire; 10:00Z did). Hours outside the poke window are kept as NEGATIVES so a dead entry
+     cannot silently return. Zero Odds credits: grade=only reads statsapi + Redis only
+     (app/api/calibrate/route.ts). */
+  const POKE_WINDOW_HOURS = new Set([15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2]);
+  it("fires on the first tick (:00-:14) of each grading hour", () => {
+    expect(GRADE_HOURS).toEqual([15, 18, 22, 2]);
+    expect(decideGradePass(at("2026-09-08T15:00:30Z")).fire).toBe(true); // the morning pass, back
+    expect(decideGradePass(at("2026-09-08T15:14:59Z")).fire).toBe(true);
+    expect(decideGradePass(at("2026-09-08T18:05:00Z")).fire).toBe(true);
+    expect(decideGradePass(at("2026-09-08T22:00:01Z")).fire).toBe(true);
+    expect(decideGradePass(at("2026-09-08T02:01:00Z")).fire).toBe(true);
   });
-  it("does not fire mid-hour or in other hours — the fire path stays undisturbed", () => {
-    expect(decideGradePass(at("2026-08-07T15:15:00Z")).fire).toBe(false);
-    expect(decideGradePass(at("2026-08-07T20:45:00Z")).fire).toBe(false);
-    expect(decideGradePass(at("2026-08-07T10:00:00Z")).fire).toBe(false);
+  it("every grading hour sits inside the cron-job.org poke window (15-23, 0-2 UTC) — an hour outside it would never tick", () => {
+    for (const h of GRADE_HOURS) expect(POKE_WINDOW_HOURS.has(h), `grading hour ${h} is outside the poke window — it can never fire`).toBe(true);
+  });
+  it("does not fire mid-hour, in other window hours, or in the hours the ticker never pokes (6/10/14 were dead entries)", () => {
+    expect(decideGradePass(at("2026-09-08T02:15:00Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T18:27:00Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T20:45:00Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T16:00:00Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T06:00:30Z")).fire).toBe(false); // outside the window — never poked
+    expect(decideGradePass(at("2026-09-08T10:00:00Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T14:14:59Z")).fire).toBe(false);
+    expect(decideGradePass(at("2026-09-08T11:00:00Z")).fire).toBe(false);
   });
   it("every decision names its reason", () => {
-    expect(decideGradePass(at("2026-08-07T20:45:00Z")).reason).toMatch(/not a grading tick/);
+    expect(decideGradePass(at("2026-09-08T20:45:00Z")).reason).toBe("not a grading tick (grading runs on the first tick of hours 15/18/22/2 UTC)");
+    expect(decideGradePass(at("2026-09-08T18:05:00Z")).reason).toBe("first tick of grading hour 18:00Z");
   });
 });
 

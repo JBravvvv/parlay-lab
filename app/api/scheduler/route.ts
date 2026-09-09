@@ -6,7 +6,7 @@ import { cronHeaderAuthed, redis, redisGetJson, redisSetJson, storeEnv } from "@
 import { ptToday } from "@/lib/server/pt-date";
 import { slateStarts } from "@/lib/server/slate";
 import { BLOCKS_KEY, decideBlock, decideTopUp, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
-import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
+import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockAction, readShapeCalibration, writeLock, LOCK_SEL_MODE } from "@/lib/server/lock-card";
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
@@ -186,7 +186,10 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
         applySuspensionLift(cfg); // backfill locks re-run the allocator — same lift as generation
         applyEnvClosedForm(cfg);
       }
-      const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill" });
+      /* INSTRUCTION 46 self-calibration (wired fix round 2026-09-08): same read as generate —
+         fail-safe null → rotation only */
+      const shapeCal = await readShapeCalibration(date).catch(() => null);
+      const entry = buildLockEntry({ eng, data: board.data as unknown as Record<string, unknown>, date, now, trigger: "self-check-backfill", shapeCal });
       await writeLock(entry);
       await writeReading(buildReadingSafe({ entry, gen: ((board.data as Record<string, unknown>).gen as never) ?? null, date, now, kind: "backfill" }));
       lock = { present: true, action: "backfilled", tickets: (entry.core as unknown[]).length };
@@ -222,15 +225,31 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        pool. decideTopUp is pure and printed every poke; generate's 45-min limiter,
        run-cap headroom, and TOPUP_MAX registry cap govern the actual spend. */
     let topup: Record<string, unknown>;
-    const tu = decideTopUp({
-      entry: await getLockEntry(date),
-      blocks: blocksArr,
-      registry: reg,
-      starts,
-      now,
-      daily: PAPER.daily,
-      max: TOPUP_MAX,
-    });
+    /* CANNOT FILL FURTHER IS TERMINAL (fix round 2026-09-08, INSTRUCTION 46 seating): when
+       every open slot the day still carries is named `cannot fill further` — carried legacy
+       money that no slot could seat is occupying their share of the $150 — a top-up would
+       rebuild the same seating, deploy $0 and spend ~120 Odds credits doing it. The sweep
+       stops here, before decideTopUp reads the shortfall as money it can still place. A day
+       whose open slots include ordinary shortfalls (thin pool, gate) still sweeps as before. */
+    const lockEntry = await getLockEntry(date);
+    const unfilled = ((lockEntry as { slotsUnfilled?: { reason?: unknown }[] } | null)?.slotsUnfilled ?? []).filter((u) => u && typeof u === "object");
+    const cannotFill = unfilled.length > 0 && unfilled.every((u) => String(u.reason ?? "").includes("cannot fill further"));
+    const tu = cannotFill
+      ? {
+          fire: false,
+          reason: `cannot fill further — the day's ${unfilled.length} open slot${unfilled.length === 1 ? "" : "s"} hold no seat for the carried money; a top-up would change nothing`,
+          owed: Math.max(0, PAPER.daily - Number((lockEntry as { allocSum?: unknown } | null)?.allocSum ?? 0)),
+          used: Object.keys(reg ?? {}).filter((k) => k.startsWith("topup-")).length,
+        }
+      : decideTopUp({
+          entry: lockEntry,
+          blocks: blocksArr,
+          registry: reg,
+          starts,
+          now,
+          daily: PAPER.daily,
+          max: TOPUP_MAX,
+        });
     if (tu.fire) {
       const gen = await fetch(new URL("/api/generate?topup=1", req.nextUrl.origin), {
         headers: { "x-cron-key": process.env.CRON_SECRET },
@@ -246,7 +265,9 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ fired: true, topup: tu, generateStatus: gen.status, generate: genBody, lock, ...body });
     }
     topup = tu as unknown as Record<string, unknown>;
-    /* DAILY GRADING TICKS (2026-08-06): on the first tick of hours 15 and 2 UTC, forward
+    /* DAILY GRADING TICKS (2026-08-06; cadence re-pinned 2026-09-08, INSTRUCTION 46): on the
+       first tick of each GRADE_HOURS hour — 15/18/22/2 UTC, all inside the cron-job.org poke
+       window (grading-progress.ts) — forward
        to /api/calibrate?grade=only — grades every board row + labels populations + writes
        the learning progress artifact, and touches NOTHING the engine reads (the mode's own
        write gate). Runs only on no-fire pokes: a board fire outranks the grading tick, and

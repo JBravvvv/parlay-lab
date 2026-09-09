@@ -111,3 +111,15 @@ export function IconArrowRight({ className = "" }: P) {
     </svg>
   );
 }
+
+/** Season Lab (INSTRUCTION 46, 2026-09-08) — a rising season-total curve on a ruled sheet. */
+export function IconSeason({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={`${base} ${className}`}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M6 17c3-1 4-4 6-5s3 2 6-1" />
+      <circle cx="18" cy="11" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

@@ -11,6 +11,7 @@ import {
   IconGames,
   IconLedger,
   IconParlay,
+  IconSeason,
   IconSettings,
   IconSharp,
   IconSim,
@@ -36,6 +37,9 @@ type NavItem = {
    *  per tab, pastel enough to read at 9.5px on the dark ground. Label + icon wear it
    *  (70% when idle, full when active) and the active pill/bar glow takes it too. */
   tone: `#${string}`;
+  /** INSTRUCTION 46 fix round: a CFB-only page — the entry is hidden (rail + phone top bar) while the
+   *  SportSwitch sits on MLB, so the MLB desk never shows a tab whose page ignores it. */
+  cfbOnly?: boolean;
 };
 
 /** `#RRGGBB` → `rgba(r, g, b, a)` — the tone at a given opacity (idle text, pill fill, glow) */
@@ -60,6 +64,9 @@ const NAV: readonly NavItem[] = [
   { href: "/simulator", label: "Simulator", icon: IconSim, group: "top", mobile: false, tone: "#67E8F9" },
   { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true, mobileLabel: "Parlays", tone: "#FDBA74" },
   { href: "/calc", label: "Parlay Calc", icon: IconCalc, group: "top", mobile: false, tone: "#5EEAD4" },
+  // INSTRUCTION 46 (2026-09-08): Season Lab — season-long CFB props / win totals / parlays on typed lines. Desktop rail + the
+  // phone's top-bar icon row (a 7th bottom tab does not fit at 375px); the tone is the CFB amber (--color-cfb) since the page is CFB-only.
+  { href: "/season", label: "Season Lab", icon: IconSeason, group: "top", mobile: false, tone: "#F5A524", cfbOnly: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true, tone: "#FDE68A" },
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
 ];
@@ -152,6 +159,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const landing = pathname === "/";
   const slide = reduced ? INSTANT : SLIDE;
   const cfb = sport === "cfb";
+  /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB */
+  const shown = (n: Pick<NavItem, "cfbOnly">) => !n.cfbOnly || cfb;
 
   return (
     <div className="min-h-dvh">
@@ -176,9 +185,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="mt-2 flex flex-1 flex-col px-2">
           <div className="flex flex-col gap-0.5">
-            {NAV.filter((n) => n.group === "top").map((item) => (
-              <RailLink key={item.href} item={item} pathname={pathname} transition={slide} />
-            ))}
+            {NAV.filter((n) => n.group === "top").map((item) =>
+              shown(item) ? <RailLink key={item.href} item={item} pathname={pathname} transition={slide} /> : null,
+            )}
           </div>
           <div className="flex-1" aria-hidden />
           <div className="flex flex-col gap-0.5 border-t border-white/[0.05] pb-2 pt-2">
@@ -195,7 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* mobile top bar — reserves the iOS status-bar inset (the app draws
           edge-to-edge under it); max() keeps the normal padding in browsers.
           One row at 375px: brand · SportSwitch · every route that is not a
-          bottom tab as an icon, so all ten pages stay reachable on a phone. */}
+          bottom tab as an icon, so all eleven pages stay reachable on a phone (Season Lab joined 2026-09-08). */}
       <header
         className={`sticky top-0 z-30 items-center justify-between gap-1.5 border-b border-white/[0.05] bg-bg/70 px-3 pb-2.5 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
         style={{ paddingTop: "max(env(safe-area-inset-top), 0.625rem)" }}
@@ -203,19 +212,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <SportSwitch size="sm" className="shrink-0" />
         <div className="flex shrink-0 items-center gap-0.5">
-          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone }) => (
-            <Link
-              key={href}
-              href={href}
-              replace
-              aria-label={label}
-              title={label}
-              className="press rounded-lg p-[5px]"
-              style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
-            >
-              <Icon />
-            </Link>
-          ))}
+          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone, cfbOnly }) =>
+            shown({ cfbOnly }) ? (
+              <Link
+                key={href}
+                href={href}
+                replace
+                aria-label={label}
+                title={label}
+                className="press rounded-lg p-[5px]"
+                style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
+              >
+                <Icon />
+              </Link>
+            ) : null,
+          )}
         </div>
       </header>
 

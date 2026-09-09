@@ -11,9 +11,18 @@ import { tabPure } from "@/lib/tab-purity";
  *    reviews read LABELED populations, never pooled silently. SHADOW OUTRANKS SELECTED:
  *    a suspended market's row is shadow even when an lkey collision matches a locked leg
  *    (suspension is a property of the market, not of the match).
- *  - decideGradePass: the scheduler's grading ticks — the FIRST tick of hour 15 UTC
- *    (next morning: everything settled) and hour 2 UTC (same night: east-coast finals).
- *    Two passes/day x MAX_BOX_FETCHES=14 covers a full slate; the fire path is untouched.
+ *  - decideGradePass: the scheduler's grading ticks — the FIRST tick of each GRADE_HOURS
+ *    hour UTC. Was hours 15 and 2 (next morning / same night) through 2026-09-07;
+ *    INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "Core Money should be calibrating
+ *    itself more often") added passes INSIDE THE POKE WINDOW — 15/18/22/2 UTC — so the
+ *    realized 2-leg vs 3+-leg record the shape picker tilts on is refreshed through the
+ *    slate, not once a morning. The window is the only thing that can fire a pass: the
+ *    cron-job.org ticker (docs/cron-jobs.md) pokes /api/scheduler every 15 min during UTC
+ *    hours 15-23 and 0-2 ONLY, so an hour outside that window never ticks and a GRADE_HOURS
+ *    entry there would be dead. Four passes/day x MAX_BOX_FETCHES=14 covers a full slate;
+ *    each pass reads ONLY statsapi.mlb.com (schedule + boxscore) and Redis — ZERO Odds
+ *    credits (verified against app/api/calibrate/route.ts on 2026-09-08: grade=only returns
+ *    before any Odds call). The fire path is untouched.
  *  - buildProgress: the LEARNING PROGRESS artifact — per-market graded n, hit rate vs
  *    implied, by-population split, days-to-150 at the measured 7-day rate. Vacuity rule:
  *    an empty settled population declares itself. Contradictions (a stored grade a fresh
@@ -34,8 +43,13 @@ export const PROP_MARKETS = new Set([
 ]);
 /** the cohort size: the day's top-N overs per market (markets thinner than N ship whole) */
 export const TOP_N = 50;
-/** first tick of these UTC hours runs a grade-only pass (ticker: every 15 min, hours 15-23,0-2) */
-export const GRADE_HOURS = [15, 2] as const;
+/** first tick of these UTC hours runs a grade-only pass. Was [15, 2] through 2026-09-07;
+    [15, 18, 22, 2] since 2026-09-08 (INSTRUCTION 46 — self-calibration reads a fresh record).
+    EVERY entry must sit inside the ticker's poke window (cron-job.org: every 15 min, UTC
+    hours 15-23 and 0-2 — docs/cron-jobs.md); an hour outside it would never be poked, so
+    it would never grade. Widening the window is Josh's call on cron-job.org, not a code
+    change. The calibrate route's own 10-minute limiter keeps a double tick from grading twice. */
+export const GRADE_HOURS = [15, 18, 22, 2] as const;
 
 export type Pop = "selected" | "unselected" | "shadow";
 

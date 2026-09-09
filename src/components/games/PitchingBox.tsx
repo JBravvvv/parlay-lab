@@ -10,6 +10,18 @@ const td = "num px-1 py-[5px] text-right text-[11px]";
 export function PitchingBox({ t, pregame }: { t: BoxTeam; pregame: boolean }) {
   const tot = t.pitchingTotals;
   if (pregame) {
+    // GAME PREVIEW (INSTRUCTION 46, 2026-09-08): the probable's season line — W-L, ERA, then GS IP K BB HR WHIP from the box's own seasonStats
+    const sl = t.probableLine;
+    const season: [string, string][] = sl
+      ? [
+          ["GS", dash(sl.gs)],
+          ["IP", dash(sl.ip)],
+          ["K", dash(sl.k)],
+          ["BB", dash(sl.bb)],
+          ["HR", dash(sl.hr)],
+          ["WHIP", dash(sl.whip)],
+        ]
+      : [];
     return (
       <div className="px-4 py-3 text-[12px]">
         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-faint">Probable</span>
@@ -26,6 +38,16 @@ export function PitchingBox({ t, pregame }: { t: BoxTeam; pregame: boolean }) {
             <span className="text-muted">TBD</span>
           )}
         </div>
+        {t.probable && season.length > 0 && (
+          <dl className="num mt-2 grid grid-cols-6 gap-1 text-center">
+            {season.map(([k, v]) => (
+              <div key={k}>
+                <dt className="text-[9px] font-semibold uppercase tracking-[0.1em] text-faint">{k}</dt>
+                <dd className="text-[12px] text-text">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
       </div>
     );
   }

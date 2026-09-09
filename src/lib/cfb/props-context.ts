@@ -1,5 +1,5 @@
 import type { CfbPropMarket, CfbPropRow } from "@/lib/cfb/props-types";
-import { playerSlug, type CfbPropCtxLookup } from "@/lib/cfb/props";
+import { playerSlug, type CfbPropCtxLookup, type CfbPropPlayerMeta } from "@/lib/cfb/props";
 
 /**
  * ESPN SEASON CONTEXT FOR PROPS (INSTRUCTION 39, 2026-09-05) — best-effort, no key, never an
@@ -9,6 +9,15 @@ import { playerSlug, type CfbPropCtxLookup } from "@/lib/cfb/props";
  * feed's `description` are two spellings of one player and can disagree (a "Jr.", an initial) —
  * so a miss is a null `ctx`, never a guess. A fetch failure is a null context; every row then
  * renders "—" for context and the prices are untouched.
+ *
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "Board & Builder should have player headshot
+ * as well as team logo"): the same byathlete rows carry the player's identity — `athlete.id`,
+ * `athlete.headshot.href` (verified 2026-09-08: the full-size PNG answers 200), `athlete.teamId`
+ * (ESPN's team id, the SAME id the slate's `CfbTeam.id` carries), `athlete.teamShortName` and
+ * `athlete.position.abbreviation`. They ride along in the season line so a prop row can draw the
+ * player's headshot with his OWN team's logo and, when the odds feed named no team, resolve the
+ * team from ESPN's id against the game's home/away ids. Every field is ESPN's own value or null;
+ * no extra fetch, no paid-API spend — the tables were already loading for the context join.
  */
 
 export const CFB_CTX_TTL = 3600;
@@ -39,6 +48,12 @@ export type CfbSeasonLine = {
   rec: number | null;
   recYds: number | null;
   recTds: number | null;
+  /** INSTRUCTION 46 identity — ESPN's own values or null */
+  athleteId: string | null;
+  headshot: string | null;
+  teamId: string | null;
+  teamAbbr: string | null;
+  pos: string | null;
 };
 
 export type CfbPropsContext = Map<string, CfbSeasonLine>;
@@ -47,6 +62,8 @@ type Rec = Record<string, unknown>;
 const rec = (x: unknown): Rec | null => (x && typeof x === "object" && !Array.isArray(x) ? (x as Rec) : null);
 const arr = (x: unknown): unknown[] => (Array.isArray(x) ? x : []);
 const num = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
+/** ESPN sends ids as strings, sometimes numbers — either way a non-empty string or null */
+const idStr = (x: unknown): string | null => (typeof x === "string" && x.trim() ? x.trim() : typeof x === "number" && Number.isFinite(x) ? String(x) : null);
 
 /**
  * Parse one byathlete payload into (slug → season line). The top-level `categories[].names`
@@ -74,12 +91,13 @@ export function parseByAthlete(json: unknown, into: CfbPropsContext = new Map())
     const ar = rec(a);
     const ath = ar ? rec(ar.athlete) : null;
     const name = ath && typeof ath.displayName === "string" ? ath.displayName : null;
-    if (!ar || !name) continue;
+    if (!ar || !ath || !name) continue;
     const cats = arr(ar.categories).map(rec).filter((c): c is Rec => !!c);
     const g = pick(cats, "general", "gamesPlayed");
     if (g == null || g <= 0) continue;
     const slug = playerSlug(name);
     const prev = into.get(slug);
+    const headshot = idStr(rec(ath.headshot)?.href);
     const line: CfbSeasonLine = {
       g,
       passYds: pick(cats, "passing", "passingYards") ?? prev?.passYds ?? null,
@@ -89,6 +107,13 @@ export function parseByAthlete(json: unknown, into: CfbPropsContext = new Map())
       rec: pick(cats, "receiving", "receptions") ?? prev?.rec ?? null,
       recYds: pick(cats, "receiving", "receivingYards") ?? prev?.recYds ?? null,
       recTds: pick(cats, "receiving", "receivingTouchdowns") ?? prev?.recTds ?? null,
+      // identity (INSTRUCTION 46): only http(s) headshots are kept; a table that lacks the field
+      // keeps whatever an earlier table already said about the same player
+      athleteId: idStr(ath.id) ?? prev?.athleteId ?? null,
+      headshot: (headshot && /^https?:\/\//.test(headshot) ? headshot : null) ?? prev?.headshot ?? null,
+      teamId: idStr(ath.teamId) ?? prev?.teamId ?? null,
+      teamAbbr: idStr(ath.teamShortName) ?? prev?.teamAbbr ?? null,
+      pos: idStr(rec(ath.position)?.abbreviation) ?? prev?.pos ?? null,
     };
     into.set(slug, line);
   }
@@ -123,10 +148,21 @@ export function ctxFor(line: CfbSeasonLine | undefined, market: CfbPropMarket): 
   return { g: line.g, perGame, season };
 }
 
-/** A lookup over the merged context, for `parseEventProps`. */
+/** The player's identity from a season line (INSTRUCTION 46) — null when the line is unknown. */
+export function playerMetaFor(line: CfbSeasonLine | undefined): CfbPropPlayerMeta | null {
+  if (!line) return null;
+  return { athleteId: line.athleteId, headshot: line.headshot, teamId: line.teamId, teamAbbr: line.teamAbbr, pos: line.pos };
+}
+
+/**
+ * A lookup over the merged context, for `parseEventProps`. The callable is the season-stat join
+ * the route has always passed; `.player` (INSTRUCTION 46) is the identity join on the same map.
+ */
 export function ctxLookup(ctx: CfbPropsContext | null): CfbPropCtxLookup | null {
   if (!ctx || !ctx.size) return null;
-  return (market, player) => ctxFor(ctx.get(playerSlug(player)), market);
+  const lookup: CfbPropCtxLookup = (market, player) => ctxFor(ctx.get(playerSlug(player)), market);
+  lookup.player = (player) => playerMetaFor(ctx.get(playerSlug(player)));
+  return lookup;
 }
 
 /** Fetch and merge the three season tables. Any failure → null (context is optional). */

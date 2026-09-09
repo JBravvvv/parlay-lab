@@ -46,6 +46,11 @@ export type CfbPropRow = {
   team: string | null;
   teamId: string | null;
   teamAbbr: string | null;
+  /** INSTRUCTION 46 (2026-09-08): ESPN's full-size headshot href from the season tables, or null
+      (name miss / table lacks it) — the UI draws initials in the team colour then, never a stock face */
+  headshot: string | null;
+  /** ESPN position abbreviation ("QB") or null */
+  pos: string | null;
   opp: string | null;
   /** ISO kickoff instant */
   kickoff: string;
@@ -146,6 +151,10 @@ export type CfbParlayLeg = {
   market: string;
   player?: string | null;
   teamId?: string | null;
+  /** INSTRUCTION 46 (2026-09-08): a prop leg's headshot / position so the Board draws the player
+      with HIS team's logo, never the matchup pair (ESPN values or null) */
+  headshot?: string | null;
+  pos?: string | null;
   /** INSTRUCTION 42 (2026-09-05, review fix): true when the leg's game was in play when priced —
       a MIXED ticket tags that leg instead of badging the whole ticket LIVE */
   live?: boolean;
@@ -200,6 +209,12 @@ export type CfbPickRow = {
   status: CfbStatus;
   prob: number | null;
   push: number;
+  /** INSTRUCTION 46 (2026-09-08): the pick's identity for the mark — a prop's player / headshot /
+      position, and (both kinds) the team the pick is ON (null for a total) — ESPN values or null */
+  player?: string | null;
+  teamId?: string | null;
+  headshot?: string | null;
+  pos?: string | null;
 };
 
 export type CfbPicks = {

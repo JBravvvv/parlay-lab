@@ -118,6 +118,13 @@ export type CfbRow = {
   kelly: number;
   /** cz posted AND the game has not kicked off */
   playable: boolean;
+  /** INSTRUCTION 46 fix round (2026-09-08, additive, optional): a PROP pick carries its player /
+      headshot / position / team abbreviation so `legOf` (card.ts) can copy them onto the ticket
+      leg and the Ledger draws the PlayerMark. Side rows never set these. */
+  player?: string | null;
+  headshot?: string | null;
+  pos?: string | null;
+  teamAbbr?: string | null;
 };
 
 export type CfbGame = {
@@ -179,6 +186,12 @@ export type CfbTicketLeg = {
   side: CfbSideKey;
   line: number | null;
   teamId: string | null;
+  /** INSTRUCTION 46 (2026-09-08, additive): a PROP leg's player / headshot / position — absent
+      on every side leg and on tickets locked before this shipped */
+  player?: string | null;
+  headshot?: string | null;
+  pos?: string | null;
+  teamAbbr?: string | null;
   /** model win probability (0..1) at lock */
   prob: number;
   push: number;

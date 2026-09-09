@@ -752,3 +752,32 @@ a close, so a 16:00 fire against a 20:10 first pitch would have entered Phase 2'
 four hours out. It now decides from the slate exactly as `_snapshot_kind` does — **a mislabelled
 close is worse than a missing one**, because it attenuates the slope from inside the bucket that
 is supposed to be clean.
+
+## ✅ GRADING PASSES RIDE THE SCHEDULER TICKER — FOUR PASSES, ALL INSIDE THE POKE WINDOW (2026-09-08)
+
+There is **no separate grading cron**. The grade-only pass (`/api/calibrate?grade=only` —
+statsapi + Redis, zero Odds credits) is forwarded by `/api/scheduler` on the **first tick
+(minute :00–:14) of each `GRADE_HOURS` hour** (`src/lib/server/grading-progress.ts`,
+`decideGradePass`). So a grading hour can only fire if the **scheduler** row above actually
+pokes during it — and that row runs **every 15 min, UTC hours 15–23 and 0–2 only**.
+
+INSTRUCTION 46 (Josh, verbatim: "Core Money should be calibrating itself more often") asked for
+more passes. A first cut set "every 4 hours" (2/6/10/14/18/22 UTC); **6, 10 and 14 sit outside
+the poke window and would never have ticked, and the 15 UTC morning pass would have been lost.**
+Corrected the same day to the four hours the ticker can reach:
+
+| pass (UTC) | PT | what it sees |
+|---|---|---|
+| **15:00** | 08:00 | the whole previous slate, final — the pass the shape picker relies on for a fresh day |
+| **18:00** | 11:00 | matinees in progress; yesterday re-checked |
+| **22:00** | 15:00 | matinees final |
+| **02:00** | 19:00 | the evening block, partial (the 15:00 pass the next morning finishes it) |
+
+Pinned in `tests/daily-grading.test.ts`: `GRADE_HOURS === [15, 18, 22, 2]`, every entry inside the
+window, 6/10/14 as negatives. The calibrate route's own 10-minute limiter keeps a double tick
+from grading twice.
+
+**Widening this is Josh's call on cron-job.org, not a code change.** Extending the scheduler row
+to more hours (e.g. 24×7, ~96 executions/day against the 100/day free tier that `/api/clv`
+already uses 48–96 of) is what would make hours like 6/10/14 reachable; until then, adding them to
+`GRADE_HOURS` only adds dead entries. If the row is widened, re-pin `GRADE_HOURS` and the test.

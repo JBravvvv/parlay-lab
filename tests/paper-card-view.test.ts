@@ -88,3 +88,38 @@ describe("wired — source scans, comment-stripped", () => {
     expect((src.match(/card/g) ?? []).length).toBeGreaterThanOrEqual(2); // both responses carry it
   });
 });
+
+describe("INSTRUCTION 46 — the day's shape is projected on the public card (fix round 2026-09-08)", () => {
+  /* OBSERVED RED before the fix: publicCardView dropped coreShape / shapeLine / slotsOpen /
+     slotsUnfilled and every ticket's shapeSlot, so the phone could not print the shape line
+     or name the open slots the ledger already carried. */
+  const shaped = {
+    ...(paperEntry as unknown as Record<string, unknown>),
+    core: [{ ...(paperEntry.core[0] as object), shapeSlot: 0 }, { ...(paperEntry.core[1] as object), shapeSlot: 3 }],
+    coreShape: { id: "A", label: "2x$60 2-leg + 3x$10 3-4 leg", slots: [{ stake: 60, legs: { min: 2, max: 2 } }], pick: "rotation", reason: "day 3 of the A..F rotation", menu: ["A", "B"], dayIndex: 20706, since: "2026-09-08" },
+    shapeLine: "shape: 2x$60 2-leg + 3x$10 3-4 leg",
+    slotsOpen: [4],
+    slotsUnfilled: [{ slot: 4, name: "$10 3-4 leg slot", reason: "$10 3-4 leg slot unfilled — no leg-disjoint 3-4 leg ticket priced under 9.38 in the pool" }],
+  } as unknown as SyncEntry;
+
+  it("projects the shape, its line, the open and unfilled slots, and each ticket's slot — typed, nothing else of the record", () => {
+    const v = publicCardView(shaped)!;
+    expect(v.coreShape).toEqual({ id: "A", label: "2x$60 2-leg + 3x$10 3-4 leg", pick: "rotation", reason: "day 3 of the A..F rotation" });
+    expect(v.shapeLine).toBe("shape: 2x$60 2-leg + 3x$10 3-4 leg");
+    expect(v.slotsOpen).toEqual([4]);
+    expect(v.slotsUnfilled).toEqual([{ slot: 4, name: "$10 3-4 leg slot", reason: "$10 3-4 leg slot unfilled — no leg-disjoint 3-4 leg ticket priced under 9.38 in the pool" }]);
+    expect(v.core.map((t) => t.shapeSlot)).toEqual([0, 3]);
+    // the menu/slot internals and the calibration record stay off the wire
+    expect(Object.keys(v.coreShape!).sort()).toEqual(["id", "label", "pick", "reason"]);
+  });
+
+  it("a pre-shape day (no shape fields on the entry) serves exactly as before — no invented shape, no shapeSlot", () => {
+    const v = publicCardView(paperEntry)!;
+    expect(v.coreShape).toBeUndefined();
+    expect(v.shapeLine).toBeUndefined();
+    expect(v.slotsOpen).toBeUndefined();
+    expect(v.slotsUnfilled).toBeUndefined();
+    expect(v.core.every((t) => !("shapeSlot" in t))).toBe(true);
+    expect("coreShape" in v).toBe(false);
+  });
+});

@@ -310,6 +310,113 @@ describe("season context join", () => {
     expect(ctxLookup(null)).toBeNull();
     expect(parseByAthlete(null).size).toBe(0);
   });
+
+  /* INSTRUCTION 46 (2026-09-08): the same tables carry the player's identity — headshot href, ESPN
+     team id (= the slate's CfbTeam.id), short name, position — and the odds feed names no team on
+     any fixture row, so the team is resolved from ESPN's id against the game's home / away ids. */
+  const identityPage = {
+    ...espnPage,
+    athletes: [
+      {
+        athlete: {
+          id: "4685454",
+          displayName: "Ty Simpson",
+          headshot: { href: "https://a.espncdn.com/i/headshots/college-football/players/full/4685454.png" },
+          teamId: ala.home.id,
+          teamShortName: ala.home.abbr,
+          position: { abbreviation: "QB" },
+        },
+        categories: espnPage.athletes[0].categories,
+      },
+      {
+        // a team id that is NEITHER side of the game, and a headshot that is not a URL → nothing guessed
+        athlete: { id: "2", displayName: "Ryan Williams", headshot: { href: "not-a-url" }, teamId: "999999999", position: {} },
+        categories: espnPage.athletes[1].categories,
+      },
+    ],
+  };
+  it("carries ESPN's identity in the season line — headshot, teamId, teamAbbr, pos — or null", () => {
+    const ctx = parseByAthlete(identityPage);
+    const ts = ctx.get("ty-simpson")!;
+    expect(ts.athleteId).toBe("4685454");
+    expect(ts.headshot).toBe("https://a.espncdn.com/i/headshots/college-football/players/full/4685454.png");
+    expect(ts.teamId).toBe(ala.home.id);
+    expect(ts.teamAbbr).toBe(ala.home.abbr);
+    expect(ts.pos).toBe("QB");
+    const rw = ctx.get("ryan-williams")!;
+    expect(rw.headshot).toBeNull();
+    expect(rw.pos).toBeNull();
+    expect(rw.teamId).toBe("999999999");
+    const lookup = ctxLookup(ctx)!;
+    expect(lookup.player!("Ty Simpson")).toEqual({ athleteId: "4685454", headshot: ts.headshot, teamId: ala.home.id, teamAbbr: ala.home.abbr, pos: "QB" });
+    expect(lookup.player!("Nobody Here")).toBeNull();
+  });
+  it("a prop row with no odds-feed team resolves its team from ESPN's teamId against the game's sides; a miss stays null", () => {
+    const withCtx = parseEventProps(EVENT, ala, { now: NOW, bankroll: 2500, ctx: ctxLookup(parseByAthlete(identityPage)) });
+    const simpson = withCtx.find((r) => r.player === "Ty Simpson" && r.market === "pass_yds" && r.side === "over") as CfbPropRow;
+    expect(simpson.teamId).toBe(ala.home.id);
+    expect(simpson.teamAbbr).toBe(ala.home.abbr);
+    expect(simpson.team).toBe(ala.home.name);
+    expect(simpson.opp).toBe(ala.away.short);
+    expect(simpson.headshot).toBe("https://a.espncdn.com/i/headshots/college-football/players/full/4685454.png");
+    expect(simpson.pos).toBe("QB");
+    // the stat join is untouched by the identity join
+    expect(simpson.ctx).toEqual({ g: 2, perGame: 305.5, season: 611 });
+    const williams = withCtx.find((r) => r.player === "Ryan Williams") as CfbPropRow;
+    expect(williams.teamId).toBeNull();
+    expect(williams.team).toBeNull();
+    expect(williams.headshot).toBeNull();
+    // no context at all → identity fields null, the same as before this shipped
+    const bare = find("pass_yds", "Ty Simpson", "over");
+    expect(bare.headshot).toBeNull();
+    expect(bare.pos).toBeNull();
+    expect(bare.teamId).toBeNull();
+    // a plain-function lookup (no `.player`) still joins the stat and never throws
+    const plain = parseEventProps(EVENT, ala, { now: NOW, bankroll: 2500, ctx: (m, p) => ctxFor(parseByAthlete(espnPage).get(playerSlug(p)), m) });
+    expect((plain.find((r) => r.player === "Ty Simpson" && r.market === "pass_yds") as CfbPropRow).ctx?.season).toBe(611);
+  });
+  // INSTRUCTION 46 fix round (2026-09-08, verifier probe): the ESPN join is by NAME, so a same-named
+  // athlete on a FOREIGN roster used to hand his (valid) headshot and position to the row while the
+  // team was correctly left null — the wrong man's face with the initials fallback disabled.
+  it("a same-name athlete whose ESPN teamId is on NEITHER side of the game lends the row nothing — no headshot, no position, no team", () => {
+    const foreignPage = {
+      ...identityPage,
+      athletes: [
+        identityPage.athletes[0],
+        {
+          athlete: {
+            id: "77",
+            displayName: "Ryan Williams",
+            headshot: { href: "https://a.espncdn.com/i/headshots/college-football/players/full/77.png" },
+            teamId: "999999999",
+            teamShortName: "XYZ",
+            position: { abbreviation: "WR" },
+          },
+          categories: espnPage.athletes[1].categories,
+        },
+      ],
+    };
+    const ctx = parseByAthlete(foreignPage);
+    // the context itself still carries what ESPN said (the gate lives in parseEventProps)
+    expect(ctx.get("ryan-williams")!.headshot).toBe("https://a.espncdn.com/i/headshots/college-football/players/full/77.png");
+    const rows = parseEventProps(EVENT, ala, { now: NOW, bankroll: 2500, ctx: ctxLookup(ctx) });
+    const williams = rows.filter((r) => r.player === "Ryan Williams");
+    expect(williams.length).toBeGreaterThan(0);
+    for (const w of williams) {
+      expect(w.headshot).toBeNull();
+      expect(w.pos).toBeNull();
+      expect(w.teamId).toBeNull();
+      expect(w.teamAbbr).toBeNull();
+      expect(w.team).toBeNull();
+    }
+    // the stat join is untouched by the identity gate
+    expect(williams[0].ctx).not.toBeNull();
+    // the man ESPN puts on this game keeps his identity (numeric id compared as a string, too)
+    const numericIds = { ...foreignPage, athletes: [{ ...foreignPage.athletes[0], athlete: { ...foreignPage.athletes[0].athlete, teamId: Number(ala.home.id) } }] };
+    const simpson = parseEventProps(EVENT, ala, { now: NOW, bankroll: 2500, ctx: ctxLookup(parseByAthlete(numericIds)) }).find((r) => r.player === "Ty Simpson") as CfbPropRow;
+    expect(simpson.headshot).toBe("https://a.espncdn.com/i/headshots/college-football/players/full/4685454.png");
+    expect(simpson.teamId).toBe(ala.home.id);
+  });
 });
 
 describe("selectPropEvents", () => {

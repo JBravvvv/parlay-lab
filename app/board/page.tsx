@@ -59,6 +59,8 @@ const MARKET_SHORT: Record<string, string> = {
   pitcher_outs: "Outs",
 };
 const ALL_SCOPE_CAP = 400;
+/** INSTRUCTION 46 (2026-09-08): where the Board remembers whether the engine notes are open */
+const OVERVIEW_OPEN_KEY = "pl:board:overview-open";
 
 const CAT_LABELS: Record<string, string> = {
   all: "OVERALL",
@@ -109,6 +111,23 @@ export default function BoardPage() {
   const pickSport = (s: "mlb" | "ufc" | "asg") => {
     setSport(s);
     try { localStorage.setItem("pl_board_sport", s); } catch {}
+  };
+  /* INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "On 'Board' tab, The engine description
+     below 'Refresh MLB' button should be expandable/collapsible to reduce space it takes up
+     initially"). The engine overview starts COLLAPSED — one truncated preview line behind an
+     "Engine notes" toggle; a tap opens the full text. The choice is remembered in localStorage
+     (OVERVIEW_OPEN_KEY) and read only after mount — the hydration rule again: the server always
+     renders it collapsed, so an initializer read would mismatch. */
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(OVERVIEW_OPEN_KEY) === "1") setOverviewOpen(true);
+    } catch { /* fresh device / storage blocked */ }
+  }, []);
+  const toggleOverview = () => {
+    const next = !overviewOpen;
+    setOverviewOpen(next);
+    try { localStorage.setItem(OVERVIEW_OPEN_KEY, next ? "1" : "0"); } catch {}
   };
 
   const d = board?.data;
@@ -561,10 +580,36 @@ export default function BoardPage() {
         <AsgBoardTab />
       ) : (
         <>
+      {/* INSTRUCTION 46: engine notes — collapsed by default, one preview line, tap to open */}
       {typeof d?.overview === "string" && d.overview && (
         <Reveal>
-          <div className="mb-4 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3 text-[12.5px] leading-relaxed text-muted">
-            {d.overview}
+          <div
+            data-testid="board-overview"
+            data-open={overviewOpen ? "1" : "0"}
+            className="mb-4 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-1 text-[12.5px] leading-relaxed text-muted"
+          >
+            <button
+              type="button"
+              aria-expanded={overviewOpen}
+              aria-controls={overviewOpen ? "board-overview-text" : undefined}
+              onClick={toggleOverview}
+              className="flex min-h-[44px] w-full items-center gap-2.5 text-left"
+            >
+              <span
+                className={`inline-block shrink-0 text-[10px] text-faint transition-transform duration-(--dur-fast) ${overviewOpen ? "rotate-90" : ""}`}
+                aria-hidden
+              >
+                ▶
+              </span>
+              <span className="shrink-0 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted">Engine notes</span>
+              {!overviewOpen && <span className="min-w-0 flex-1 truncate text-faint">{d.overview}</span>}
+              <span className="ml-auto shrink-0 text-[10.5px] text-faint">{overviewOpen ? "Hide" : "Show"}</span>
+            </button>
+            {overviewOpen && (
+              <div id="board-overview-text" className="pb-2 pt-1">
+                {d.overview}
+              </div>
+            )}
           </div>
         </Reveal>
       )}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
-import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView, type CfbLegVerdict } from "@/components/cfb/CfbTicketCard";
+import { CfbTicketCard, cfbGradingOf, cfbLegLink, cfbTicketsOf, type CfbGradingView, type CfbLegVerdict } from "@/components/cfb/CfbTicketCard";
 import { CfbSyncChip } from "@/components/cfb/CfbSyncChip";
 import { Reveal } from "@/components/motion/Reveal";
 import { Panel } from "@/components/ui/Panel";
@@ -745,8 +745,26 @@ export function cfbDaySettlement(tix: CfbTicket[], g: CfbGradingView | null): Cf
   };
 }
 
+/**
+ * INSTRUCTION 46, point 9 (2026-09-08, Josh's word, verbatim: "when expanding/collapsing an
+ * individual parlay or pick it should collapse no matter where you click inside that singular
+ * box; besides clicking the players name in the bet"): a tap ANYWHERE in a day's box toggles it.
+ * The summary already toggles natively; a tap in the body toggles too — unless it landed on a
+ * control (the leg-name Link, a button, an input) or inside the nested markers note, which has its
+ * own disclosure. Pure so the rule is pinned by a test without a DOM.
+ */
+export function cfbBoxTapToggles(target: { closest(sel: string): unknown }, box: unknown): boolean {
+  const summary = target.closest("summary");
+  if (summary) return false; // native toggle
+  if (target.closest("a, button, input, textarea, select, label")) return false;
+  const inner = target.closest("details");
+  return inner === box; // a tap inside the nested markers <details> belongs to that disclosure
+}
+
 function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; open: boolean; today: string }) {
   const tix = cfbTicketsOf(e, scope);
+  /* INSTRUCTION 46 (point 9): controlled so a body tap can collapse the box; native summary taps sync through onToggle */
+  const [isOpen, setIsOpen] = useState(open);
   const g = cfbGradingOf(e);
   const { pending, pl, settled } = cfbDaySettlement(tix, g);
   const plTone = pl > 0 ? "text-pos" : pl < 0 ? "text-neg" : "text-muted";
@@ -757,7 +775,14 @@ function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; o
   const dayMarks = cfbDayMarks(e);
   const breach = dayMarks?.breaches.find((b) => b.bucket === scope) ?? null;
   return (
-    <details className="glass px-4 py-3" open={open}>
+    <details
+      className="glass cursor-pointer px-4 py-3"
+      open={isOpen}
+      onToggle={(ev) => setIsOpen(ev.currentTarget.open)}
+      onClick={(ev) => {
+        if (cfbBoxTapToggles(ev.target as Element, ev.currentTarget)) setIsOpen((v) => !v);
+      }}
+    >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2">
         <span className="min-w-0">
           <span className="text-[13px] font-bold text-text">{e.date === today ? "Today" : railLabel(e.date)}</span>
@@ -785,7 +810,12 @@ function DayCard({ e, scope, open, today }: { e: CfbLedgerEntry; scope: Scope; o
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           {tix.map((t) => (
             <div key={t.id}>
-              <CfbTicketCard t={t} grade={g?.tickets[t.id]} legResults={g?.legs} />
+              <CfbTicketCard
+                t={t}
+                grade={g?.tickets[t.id]}
+                legResults={g?.legs}
+                legLink={(leg) => cfbLegLink(leg, { date: e.date, today, verdict: g?.legs?.[leg.lkey] ?? null })}
+              />
               <LegResults t={t} legs={g?.legs} />
             </div>
           ))}

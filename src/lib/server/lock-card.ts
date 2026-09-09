@@ -1,6 +1,16 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { CORE_RULES, PAPER, PAPER_TICKETS, ticketWindow } from "@/lib/paper-mode";
+import { CORE_RULES, PAPER, slotMaxDec } from "@/lib/paper-mode";
+import {
+  CORE_SHAPES_SINCE,
+  bucketRecordFromLedger,
+  shapeById,
+  shapeForDay,
+  shapeLine,
+  slotName,
+  type CoreShape,
+  type ShapeCalibration,
+} from "@/lib/core-shapes";
 import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
 import { shrinkTicket } from "@/lib/shrink";
 import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
@@ -27,6 +37,21 @@ import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/
  * Locked stakes differing from the allocator's computed stakes would mean TWO ALLOCATORS.
  * buildLockEntry re-reads each pick's stake at assembly and THROWS on any mismatch, printing
  * both numbers — a crash, never a quietly wrong card.
+ *
+ * ── THE SHAPED CORE (INSTRUCTION 46, 2026-09-08, "Parlay Lab Baseball 1") ───────────
+ * Josh's word, verbatim: "Core Money should be calibrating itself more often. It is doing
+ * horrible. Should consider doing some higher $ 2 team parlays. Hypothetically could be 2
+ * $60 2 leg parlays one day w/ 3 $10 3-4 leg parlays one day, 5 $30 2 leg parlays the next,
+ * …". The flat "3-7 tickets, ≤ $25 each, 2 legs" core (INSTRUCTION 18) is replaced by SLOT
+ * FILLING: the day runs one of his six shapes (core-shapes.ts), each slot is a stake and a
+ * leg range, and buildModeCard seats exactly one ticket per slot — leg count inside the
+ * slot's range, leg-disjoint from everything already seated, never more than the slot's
+ * stake. A slot the gated pass cannot fill falls to the forced (true-probability) pass
+ * under the same leg range; a slot neither can fill carries to the next fire or top-up
+ * sweep and is NAMED on the entry ("$20 3-leg slot unfilled — …"). Block fires own the
+ * unfilled slots that fit inside their budget share. The day's shape is chosen once
+ * (rotation, tilted by the realized 2-leg vs 3+-leg record when it is thick enough) and
+ * persisted on the entry so every fire of the day fills the same shape.
  */
 
 /** MIRROR of app/api/ledger/route.ts STORE_KEY — guarded by tests/lock-card.test.ts. */
@@ -73,8 +98,22 @@ type AllocPick = {
 type AllocResult = {
   picks: AllocPick[];
   sum: number;
-  blocked?: { reason?: string }[];
+  blocked?: { name?: string; reason?: string }[];
   unallocated?: number;
+};
+
+/** the shape as it rides the entry (`coreShape`) — the menu id plus the pick's reason,
+    so a day's shape always explains itself; slots are rehydrated from the menu by id */
+export type CoreShapeRecord = {
+  id: string;
+  label: string;
+  slots: CoreShape["slots"];
+  pick: "rotation" | "tilt:two" | "tilt:long";
+  reason: string;
+  menu: string[];
+  dayIndex: number;
+  since: string;
+  calibration?: ShapeCalibration | null;
 };
 
 export function needsLockAction(s: { boardExists: boolean; lockExists: boolean; deadSlate: boolean }): "backfill" | "reason-record" | null {
@@ -82,6 +121,27 @@ export function needsLockAction(s: { boardExists: boolean; lockExists: boolean; 
   if (s.boardExists) return "backfill"; // a board without a lock is the exact 08-02..08-05 gap
   if (s.deadSlate) return "reason-record"; // nothing can be built any more — the day still gets a record
   return null; // slate alive, no board yet: generation (scheduler/entry 1) is still the path
+}
+
+/**
+ * The realized 2-leg vs 3+-leg record the shape picker tilts on (INSTRUCTION 46). Reads
+ * the ledger blob once and hands back the small pure record; callers pass it to
+ * buildLockEntry as `shapeCal`. Trailing window: SHAPE_CAL_DAYS days ending the day
+ * before `date` (today's tickets are pending by definition). Never throws — an unreadable
+ * store reads as "no record", and the picker then runs the plain rotation.
+ */
+export const SHAPE_CAL_DAYS = 30;
+export async function readShapeCalibration(date: string): Promise<ShapeCalibration | null> {
+  try {
+    const raw = (await redis(["GET", LEDGER_STORE_KEY])) as string | null;
+    const s = raw ? (JSON.parse(raw) as { ledger?: SyncEntry[] }) : null;
+    if (!s?.ledger) return null;
+    const to = new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+    const from = new Date(Date.parse(`${date}T00:00:00Z`) - SHAPE_CAL_DAYS * 86_400_000).toISOString().slice(0, 10);
+    return bucketRecordFromLedger(s.ledger as never, { from, to });
+  } catch {
+    return null;
+  }
 }
 
 export function buildLockEntry(args: {
@@ -97,6 +157,10 @@ export function buildLockEntry(args: {
   blockKey?: string;
   blockGkeys?: Set<string>;
   carry?: SyncEntry | null;
+  /** INSTRUCTION 46 (2026-09-08): the realized 2-leg vs 3+-leg record the shape picker
+      tilts on (readShapeCalibration). Optional — absent means the plain rotation. Ignored
+      when `carry` already carries the day's shape (a day never changes shape mid-day). */
+  shapeCal?: ShapeCalibration | null;
   /** PLANT hook for the impossible branch — skews one stake so the throw is observable */
   __plantStakeSkew?: boolean;
 }): SyncEntry {
@@ -148,13 +212,29 @@ export function buildLockEntry(args: {
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
   const legKey = (l: { label?: string | null; prop?: string | null }) => `${l.label}|${l.prop}`;
 
-  /* "It can be anywhere from 3-10 tickets for the $150 per day" (Josh, 2026-08-15) —
-     RESHAPED to 3–7 on 2026-08-22 ("a max of 7 tickets for the daily core card"). The
-     window is pro-rata on block days; ceiling hard; floor best-effort on thin pools.
-     Since 2026-08-22 it caps BOTH passes of every fire (buildModeCard) — the 08-22
-     card reached 14 tickets while only the forced pass honored it. */
-  const carriedCount = (carry?.core ?? []).length;
-  const win = ticketWindow(daily, carriedCount);
+  /* THE DAY'S SHAPE (INSTRUCTION 46, 2026-09-08). Chosen ONCE per day: a fire that
+     appends to a locked day reuses the shape the day already carries (`carry.coreShape`,
+     rehydrated from the menu by id so the slots are always the menu's own), so the
+     calibration moving between fires cannot split a day across two shapes — the $150
+     proof below depends on every fire filling the same slot list. A fresh day asks the
+     picker: rotation by date, tilted by the realized record when it is thick enough. */
+  const storedShape = (carry as { coreShape?: CoreShapeRecord } | null | undefined)?.coreShape;
+  const storedMenuShape = storedShape ? shapeById(storedShape.id) : null;
+  const shapePick = storedMenuShape ? null : shapeForDay(date, args.shapeCal);
+  const shape: CoreShape = storedMenuShape ?? shapePick!.shape;
+  const shapeRecord: CoreShapeRecord = storedMenuShape
+    ? { ...(storedShape as CoreShapeRecord), slots: storedMenuShape.slots }
+    : {
+        id: shape.id,
+        label: shape.label,
+        slots: shape.slots,
+        pick: shapePick!.pick,
+        reason: shapePick!.reason,
+        menu: shapePick!.menu,
+        dayIndex: shapePick!.dayIndex,
+        since: CORE_SHAPES_SINCE,
+        calibration: args.shapeCal ?? null,
+      };
 
   /* THE UNDER BIAS (2026-08-16, Josh's word; the 3-day side-split behind it lives in
      under-bias.ts). Rule 1: tickets carrying a pitcher_outs UNDER leg leave the paper
@@ -164,11 +244,15 @@ export function buildLockEntry(args: {
      vs 61% market-implied; the claimed-edge buckets hit WORSE the more edge was claimed).
      Any ticket carrying an HRR over leaves the core pool before either pass, counted in
      blockedReasons.hrr_over_suspended so a zero-ticket day still explains itself. HRR
-     unders, TB, hits, ML and RL stay. Rules 3 (maxLegs 2 / maxDec 2.6) are ALSO applied
-     here as a hard pool filter (counted as core_shape_rules) on top of the allocator's
-     own cfg gate — the cfg gate reads one price (basis under dk_fd, CZ elsewhere); the
-     pool filter holds BOTH the basis and the settling price under the ceiling, because
-     the diagnosis measured settlement (tickets settling above 2.6 went 11-38). */
+     unders, TB, hits, ML and RL stay. */
+  /* INSTRUCTION 46 (2026-09-08): the shape filter is now PER SLOT — a ticket is eligible
+     for a slot when its leg count sits inside the slot's range and BOTH its prices sit
+     under the slot's ceiling (slotMaxDec: 2.6 for 2-leg slots, 1.75^legs for 3+-leg
+     slots; the 09-03 diagnosis measured settlement, so the settling price is held under
+     the ceiling here as well as the allocator's own selection-price gate). A ticket that
+     fits NO slot of the day's shape leaves the pool up front, counted as
+     core_shape_rules — the counter keeps its name so the histogram reads across the
+     09-08 split. */
   const isHrrOver = (l: { lkey?: string | null; prop?: string | null }) =>
     String(l.lkey ?? "").split("|")[1] === "batter_hits_runs_rbis" && String(l.prop ?? "").includes(" O ");
   const decOf = (pl: Record<string, unknown>, k: "czDec" | "bsDec") => (typeof pl[k] === "number" && Number.isFinite(pl[k] as number) ? (pl[k] as number) : null);
@@ -177,6 +261,8 @@ export function buildLockEntry(args: {
     const bs = decOf(pl, "bsDec");
     return (cz != null && cz > cap) || (bs != null && bs > cap);
   };
+  const inRange = (w: PoolItem, legs: { min: number; max: number }) => w.pl.legs.length >= legs.min && w.pl.legs.length <= legs.max;
+  const fitsSomeSlot = (w: PoolItem) => shape.slots.some((s) => inRange(w, s.legs) && !overDec(w.pl, slotMaxDec(s.legs, "gated")));
   let hrrOverDropped = 0;
   let shapeDropped = 0;
   const rulePool = (pool as PoolItem[]).filter((w) => {
@@ -184,7 +270,7 @@ export function buildLockEntry(args: {
       hrrOverDropped++;
       return false;
     }
-    if (w.pl.legs.length > CORE_RULES.maxLegs || overDec(w.pl, CORE_RULES.maxDec)) {
+    if (!fitsSomeSlot(w)) {
       shapeDropped++;
       return false;
     }
@@ -196,39 +282,116 @@ export function buildLockEntry(args: {
     czEv: (w.pl.czEv as number | null) ?? null,
     legs: w.pl.legs as { lkey?: string | null; prop?: string | null; label?: string | null }[],
   }));
-  const prunedB = pruneOutsUnder(biasView, win.minNew);
+
+  /* SLOT BOOKKEEPING (INSTRUCTION 46). Carried tickets fill slots: a ticket stamped
+     `shapeSlot` keeps its slot; a ticket without one (a day locked before 2026-09-08, or a
+     client copy) is seated BY MONEY — best fit, the smallest free slot whose stake is at
+     least the ticket's stake (fix round 2026-09-08: seating in shape order regardless of
+     stake parked a $10 legacy ticket in a $60 slot, the fire could then never seat the
+     other $50, and decideTopUp kept buying top-ups — ~120 Odds credits each, TOPUP_MAX 2 —
+     that could not change the answer). A legacy ticket bigger than every free slot is
+     STRANDED: it holds no slot, its money still counts against the day (the OVER THE DAY
+     guard below sums every carried ticket), and the slots its money displaces are named
+     `cannot fill further` in slotsUnfilled — the scheduler reads that phrase as TERMINAL
+     for the top-up sweep, because no later fire under the same shape can seat them either.
+     A fire OWNS the unfilled slots, walked in shape order, whose stake fits inside what
+     remains of its budget share AFTER the stranded money — the same pro-rating
+     ticketWindow did by count, now by money: a $10 block takes a $10 slot, a $46 top-up
+     takes what it can, a whole-day fire takes every slot. Σ(stranded + owned stakes) ≤
+     daily by construction, so a day can never seat more than $150 across its fires. */
+  type Filled = Map<number, SyncTicket>;
+  type Seating = { filled: Filled; stranded: SyncTicket[] };
+  const seatCarried = (tix: SyncTicket[]): Seating => {
+    const filled: Filled = new Map();
+    const unslotted: SyncTicket[] = [];
+    const stranded: SyncTicket[] = [];
+    for (const t of tix) {
+      const s = (t as { shapeSlot?: unknown }).shapeSlot;
+      if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < shape.slots.length && !filled.has(s)) filled.set(s, t);
+      else unslotted.push(t);
+    }
+    for (const t of unslotted) {
+      const stake = Number(t.stake) || 0;
+      let best = -1;
+      for (let i = 0; i < shape.slots.length; i++) {
+        if (filled.has(i)) continue;
+        const st = shape.slots[i].stake;
+        if (st + 1e-9 < stake) continue; // the ticket carries more than this slot holds
+        if (best < 0 || st < shape.slots[best].stake) best = i;
+      }
+      if (best < 0) stranded.push(t); // no seat fits — an over-full or over-sized legacy day
+      else filled.set(best, t);
+    }
+    return { filled, stranded };
+  };
+  const strandedSum = (st: Seating) => st.stranded.reduce((a, t) => a + (Number(t.stake) || 0), 0);
+  const ownSlots = (seating: Seating): number[] => {
+    /* STRANDED MONEY IS SUBTRACTED ONCE (fix round 2026-09-08): a block fire's dailyOverride
+       is already PAPER.daily − reserved − allocSoFar, and allocSoFar holds the stranded
+       tickets' stakes — subtracting them again froze a partly-fillable legacy day at $0
+       with every slot named `cannot fill further`. Only a whole-day fire (no override,
+       daily = the ceiling) has to net the stranded money itself. */
+    let rem = args.dailyOverride != null ? daily : daily - strandedSum(seating);
+    const out: number[] = [];
+    for (let i = 0; i < shape.slots.length; i++) {
+      if (seating.filled.has(i)) continue;
+      const st = shape.slots[i].stake;
+      if (st <= rem + 1e-9) {
+        out.push(i);
+        rem -= st;
+      }
+    }
+    return out;
+  };
+  /* the `cannot fill further` list: open slots a fire does NOT own because stranded money
+     already occupies their share of the day. Named once per fire so the entry (and the
+     scheduler's top-up decision) can read the day as finished rather than short. */
+  const strandedUnfilled = (seating: Seating, owned: number[]): { slot: number; name: string; reason: string }[] => {
+    const money = strandedSum(seating);
+    if (money <= 0) return [];
+    const out: { slot: number; name: string; reason: string }[] = [];
+    for (let i = 0; i < shape.slots.length; i++) {
+      if (seating.filled.has(i) || owned.includes(i)) continue;
+      const nm = slotName(shape.slots[i]);
+      out.push({
+        slot: i,
+        name: nm,
+        reason: `${nm} unfilled — cannot fill further: $${money} of carried money sits outside the shape's slots (${seating.stranded.length} legacy ticket${seating.stranded.length === 1 ? "" : "s"} no slot could seat), so the day has no room left for it`,
+      });
+    }
+    return out;
+  };
+  const primarySeating = seatCarried(carry?.core ?? []);
+  const primaryOwned = ownSlots(primarySeating);
+  const prunedB = pruneOutsUnder(biasView, Math.max(1, primaryOwned.length));
   const basePool: PoolItem[] = prunedB.pool.map((b) => b.w);
 
   /* PAPER EPOCH (2026-08-15, Josh's word): "$150 every single day no matter what." The
-     disciplined ev_gated allocation runs FIRST — that is the calibrated system the
-     record exists to track. Whatever the gate leaves unstaked is then FORCED onto the
-     remaining pool via the legacy caesars_ev allocator: no EV gate, exact-sum guarantee,
-     the engine's own dedupe/cap rules. Leg-disjointness across the two passes is
-     enforced HERE. Forced tickets carry forced:true so gated performance and forced
-     deployment can always be split.
-     Rule 2 of the under bias wraps both passes: the staked card (carried legs included)
+     disciplined allocation runs FIRST for every slot — that is the calibrated system the
+     record exists to track. A slot it cannot fill is then FORCED under the same leg range
+     by true probability (INSTRUCTION 18 rule 4). Forced tickets carry forced:true so gated
+     performance and forced deployment can always be split. Leg-disjointness across slots,
+     passes and carried tickets is enforced HERE.
+     Rule 2 of the under bias wraps the whole fill: the staked card (carried legs included)
      may run at most 25% under prop legs — over quota, the most under-heavy picked
-     ticket is EVICTED from the pool and both passes re-run. Bounded: every iteration
+     ticket is EVICTED from the pool and the fill re-runs. Bounded: every iteration
      removes a picked ticket, so the loop cannot spin. */
-  /* THE FORCED PASS IS CAPPED BY THE DAY, NOT THE BLOCK WINDOW (corrected 2026-08-19
-     after the 08-19 card deployed $49 of $150 — Josh: "I said $150 every day no matter
-     what"). The window's share-rounded maxNew zeroed the top-up on small blocks: a $10
-     block's window is 1 ticket, one gated pick made forcedMax 0, and the shortfall was
-     stranded. The ceiling that is actually Josh's rule is 10 tickets PER DAY — so the
-     forced pass may seat up to (10 − carried − gated) tickets on any fire; the window
-     keeps shaping only the floor. */
   type Staged = { __id: string; name: string; czEv: number | null; legs: { lkey?: string | null; prop?: string | null }[] };
-  /* INSTRUCTION 18, rule 3: the residue top-up is now a per-ticket map, cap-respecting;
-     what the $25 ceiling cannot absorb is `capResidue`, stamped, never breached. */
-  type TopUp = Record<string, number>;
-  type ModeCard = { alloc: AllocResult; forced: AllocResult; underShare: number; quotaEvicted: number; biasYielded: boolean; topUp: TopUp; capResidue: number; deployed: number };
-  /* the stake a pick may carry under the $25 ceiling (the allocator's own number is kept
-     on the pick; the trim is stamped on the ticket as capTrim) */
-  const cappedStake = (p: AllocPick) => Math.min(Number(p.stake), CORE_RULES.maxStake);
-  /* the allocator's cap logic: capG = max(cfg.perParlayCap, 1/n) × amount — a FRACTION of
-     the pass's amount, floored at an even split, so the fraction alone cannot hold $25
-     on a thin card; the clamp above is what actually guarantees the ceiling. */
-  const capFrac = (amount: number) => Math.min(Number(cfg.perParlayCap ?? 0.25), amount > 0 ? CORE_RULES.maxStake / amount : 1);
+  type Seat = { slot: number; pick: AllocPick; forced: boolean; topUp: number };
+  type Unfilled = { slot: number; name: string; reason: string };
+  type ModeCard = {
+    seated: Seat[];
+    unfilled: Unfilled[];
+    owned: number[];
+    blocked: { name?: string; reason?: string }[];
+    underShare: number;
+    quotaEvicted: number;
+    biasYielded: boolean;
+    capResidue: number;
+    deployed: number;
+    gatedSizing: number;
+    unallocated: number;
+  };
   const biasViewOf = (tix: SyncTicket[]) =>
     tix.map((t) => ({
       name: String(t.name ?? ""),
@@ -238,98 +401,102 @@ export function buildLockEntry(args: {
 
   /* ONE PIPELINE, TWO WORLDS (2026-08-21, Josh's word, verbatim: "Change it to 'DK/FD'
      basis but track bets for both internally so it can calibrate either selection.")
-     buildModeCard runs the full paper machinery — the gated pass in the given selection
-     mode, the day-capped caesars_ev forced top-up, the under-bias quota loop, and the
-     budget-over-bias yield — against its OWN carried tickets, so the primary selection
-     and the alt selection get identical rules and independent leg-disjoint worlds. */
+     buildModeCard runs the full paper machinery — slot filling in the given selection
+     mode with the true-probability forced fallback per slot, the under-bias quota loop,
+     and the budget-over-bias yield — against its OWN carried tickets, so the primary
+     selection and the alt selection get identical rules and independent leg-disjoint
+     worlds. */
   const buildModeCard = (mode: string, carriedTix: SyncTicket[]): ModeCard => {
     const carriedB = biasViewOf(carriedTix);
-    const allow = Math.max(0, PAPER_TICKETS.max - carriedTix.length);
-    const w = ticketWindow(daily, carriedTix.length);
+    const seating = seatCarried(carriedTix);
+    const owned = ownSlots(seating);
+    const terminal = strandedUnfilled(seating, owned);
     const run = (p: PoolItem[]) => {
-      /* THE GATED PASS HONORS THE WINDOW TOO (2026-08-22, after the 08-22 card reached
-         14 core tickets and stranded $18 — Josh: "a max of 7 tickets for the daily core
-         card. anywhere from 3-7 tickets"). Until now only the forced pass was
-         count-capped; the disciplined pass kept the engine's own 4–6 per FIRE, so four
-         fires stacked 14 and the last fire had no seats. The cap is the fire's pro-rata
-         window share, so later fires keep their seats; the engine's own ceiling still
-         applies underneath it. */
-      const gatedCap = Math.min(Number(cfg.maxCoreTickets ?? PAPER_TICKETS.max), w.maxNew);
-      const a: AllocResult = gatedCap > 0
-        ? shAllocate(p, daily, {
-            ...cfg,
-            selMode: mode,
-            maxCoreTickets: gatedCap,
-            minCoreTickets: Math.min(Number(cfg.minCoreTickets ?? 1), gatedCap),
-            /* INSTRUCTION 18 rules 2/3: 2 legs, dec ≤ 2.6 at the selection price, $25 cap */
-            coreMaxLegs: CORE_RULES.maxLegs,
-            coreMaxDec: CORE_RULES.maxDec,
-            perParlayCap: capFrac(daily),
-          }, false)
-        : { picks: [], sum: 0, blocked: [] };
-      let f: AllocResult = { picks: [], sum: 0 };
-      const ids = new Set<string>(a.picks.map((x) => x.id));
+      const ids = new Set<string>();
       const legs = new Set<string>();
-      for (const x of a.picks) for (const l of x.w.pl.legs) legs.add(legKey(l));
       for (const t of carriedTix) {
         if (t.id) ids.add(String(t.id));
         for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) legs.add(legKey(l));
       }
-      const gatedSum = a.picks.reduce((acc, x) => acc + cappedStake(x), 0);
-      const short = daily - gatedSum;
-      /* forced seats = the fire's window seats the gated pass left (the 08-19 zeroing
-         case is now closed by the residue top-up below, not by widening seats) */
-      const fMax = Math.max(0, w.maxNew - a.picks.length);
-      if (short > 0 && fMax > 0) {
-        /* INSTRUCTION 18 rule 4: the forced pass selects by TRUE PROBABILITY ("probability"
-           mode — read in shAllocate: evGated=false, disciplined=false under that mode, so
-           force=false trips no gate, no nv_tax floor, no Kelly ceiling; exact-sum stays)
-           and only among tickets priced ≤ 1.75 at BOTH quotes (the $915 caesars_ev forced
-           pass ran −27%). */
-        const rest = p.filter((x) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l))) && !overDec(x.pl, CORE_RULES.forcedMaxDec));
-        f = shAllocate(rest, short, {
+      const seated: Seat[] = [];
+      const unfilled: Unfilled[] = [];
+      const blocked: { name?: string; reason?: string }[] = [];
+      let unallocated = 0;
+      for (const si of owned) {
+        const slot = shape.slots[si];
+        const free = (x: PoolItem) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l)));
+        const gCeil = slotMaxDec(slot.legs, "gated");
+        const fCeil = slotMaxDec(slot.legs, "forced");
+        const ranged = p.filter((x) => inRange(x, slot.legs) && free(x));
+        const gPool = ranged.filter((x) => !overDec(x.pl, gCeil));
+        /* one seat, the slot's stake as the amount, cap = 100% of the slot (perParlayCap 1
+           → capG = amount). The allocator's own leg cap is the slot's max; the slot's min
+           is held by the `ranged` filter (the engine has no lower bound). Under the
+           disciplined modes the Kelly ceiling may size the pick UNDER the slot — the
+           difference rides the same ticket as a stamped topUp (allocator sizing stays
+           recoverable as stake − topUp), never a second ticket, never past the slot. */
+        const slotCfg = (sel: string, maxDec: number) => ({
           ...cfg,
-          selMode: CORE_RULES.forcedSelMode,
-          maxCoreTickets: fMax,
-          minCoreTickets: Math.max(1, w.minNew - a.picks.length),
-          coreMaxLegs: CORE_RULES.maxLegs,
-          coreMaxDec: CORE_RULES.forcedMaxDec,
-          perParlayCap: capFrac(short),
-        }, false);
-      }
-      const staged: Staged[] = [...a.picks, ...f.picks].map((x) => ({
-        __id: x.id,
-        name: String(x.w.pl.name ?? ""),
-        czEv: (x.w.pl.czEv as number | null) ?? null,
-        legs: x.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
-      }));
-      /* THE RESIDUE TOP-UP (2026-08-22, Josh: "$150 every single day no matter what").
-         The disciplined allocator sizes by Kelly and leaves the rest unallocated by
-         design; the forced pass fills it only while seats remain. Whatever is STILL
-         unstaked after both passes rides the fire's best new ticket (highest settling
-         EV, ties to the larger stake) — stamped `topUp` on the ticket so the allocator's
-         own sizing stays recoverable (stake − topUp). Never a carried ticket: those are
-         locked, and their games may have started. */
-      /* INSTRUCTION 18 rule 3 (2026-09-03): the top-up is CAP-RESPECTING. It rides the
-         fire's new tickets best-EV-first, each only up to the $25 ceiling; what no ticket
-         can absorb stays `capResidue` — stamped and noted, never a breach. */
-      const capped = [...a.picks, ...f.picks].reduce((acc, x) => acc + cappedStake(x), 0);
-      let residue = daily - capped;
-      const topUp: TopUp = {};
-      if (residue > 0) {
-        const ev = (x: AllocPick) => (x.w.pl.czEv == null ? -Infinity : Number(x.w.pl.czEv));
-        const cands = [...a.picks, ...f.picks].sort((x, y) => ev(y) - ev(x) || y.stake - x.stake);
-        for (const c of cands) {
-          if (residue <= 0) break;
-          const room = CORE_RULES.maxStake - cappedStake(c);
-          if (room <= 0) continue;
-          const add = Math.min(room, residue);
-          topUp[c.id] = add;
-          residue -= add;
+          selMode: sel,
+          maxCoreTickets: 1,
+          minCoreTickets: 1,
+          coreMaxLegs: slot.legs.max,
+          coreMaxDec: maxDec,
+          perParlayCap: 1,
+        });
+        const a: AllocResult = gPool.length ? shAllocate(gPool, slot.stake, slotCfg(mode, gCeil), false) : { picks: [], sum: 0, blocked: [] };
+        blocked.push(...(a.blocked ?? []));
+        let pick: AllocPick | null = a.picks[0] ?? null;
+        let forced = false;
+        let fPoolN = 0;
+        if (!pick) {
+          /* INSTRUCTION 18 rule 4: the forced pass selects by TRUE PROBABILITY ("probability"
+             mode — read in shAllocate: evGated=false, disciplined=false under that mode, so
+             force=false trips no gate, no nv_tax floor, no Kelly ceiling; exact-sum stays)
+             and only among tickets priced under the slot's forced ceiling at BOTH quotes
+             (1.75 for 2-leg slots — the $915 caesars_ev forced pass ran −27%; the 1.75^legs
+             product for 3+-leg slots). */
+          const fPool = ranged.filter((x) => !overDec(x.pl, fCeil));
+          fPoolN = fPool.length;
+          const f: AllocResult = fPool.length ? shAllocate(fPool, slot.stake, slotCfg(CORE_RULES.forcedSelMode, fCeil), false) : { picks: [], sum: 0 };
+          pick = f.picks[0] ?? null;
+          forced = pick != null;
         }
+        if (!pick) {
+          const why =
+            ranged.length === 0
+              ? `no leg-disjoint ${slot.legs.min === slot.legs.max ? `${slot.legs.min}-leg` : `${slot.legs.min}-${slot.legs.max} leg`} ticket priced under ${gCeil} in the pool`
+              : gPool.length === 0 && fPoolN === 0
+                ? `every candidate priced above the ${fCeil} forced ceiling`
+                : `no ticket cleared the gate and none priced under ${fCeil} for the forced pass`;
+          unfilled.push({ slot: si, name: slotName(slot), reason: `${slotName(slot)} unfilled — ${why}` });
+          continue;
+        }
+        /* IMPOSSIBLE BRANCH: the allocator was asked for the slot's stake and handed back
+           more — a ticket carrying more than its slot is exactly what this ship forbids,
+           so it is a THROW with both numbers, never a clamp. */
+        if (Number(pick.stake) > slot.stake + 1e-9) {
+          throw new Error(`TWO ALLOCATORS: allocator sized $${pick.stake} into the $${slot.stake} slot ${si} (${String(pick.w.pl.name)}) — a ticket may never carry more than its slot. STOP.`);
+        }
+        const topUp = Math.max(0, slot.stake - Number(pick.stake));
+        seated.push({ slot: si, pick, forced, topUp });
+        ids.add(pick.id);
+        for (const l of pick.w.pl.legs) legs.add(legKey(l));
+        if (!forced) unallocated += Number(a.unallocated ?? 0);
       }
-      const deployed = daily - Math.max(0, residue);
-      return { alloc: a, forced: f, staged, share: underStats([...carriedB, ...staged]).share, topUp, capResidue: Math.max(0, residue), deployed };
+      const staged: Staged[] = seated.map((s) => ({
+        __id: s.pick.id,
+        name: String(s.pick.w.pl.name ?? ""),
+        czEv: (s.pick.w.pl.czEv as number | null) ?? null,
+        legs: s.pick.w.pl.legs as { lkey?: string | null; prop?: string | null }[],
+      }));
+      /* the fire's money: every seated slot deploys its whole stake (pick + topUp); what
+         the fire could not seat — unfilled owned slots, and any budget no unfilled slot
+         fits — is the residue, stamped capResidue (the field keeps its 09-03 name: the
+         cap is now the slot, and the residue carries forward exactly as before) */
+      const deployed = seated.reduce((acc, s) => acc + shape.slots[s.slot].stake, 0);
+      const gatedSizing = seated.filter((s) => !s.forced).reduce((acc, s) => acc + Number(s.pick.stake), 0);
+      return { seated, unfilled, blocked, staged, share: underStats([...carriedB, ...staged]).share, deployed, capResidue: Math.max(0, daily - deployed), gatedSizing, unallocated };
     };
     let pool = basePool;
     let cur = run(pool);
@@ -353,12 +520,23 @@ export function buildLockEntry(args: {
       yielded = true;
       cur = run(basePool);
     }
-    return { alloc: cur.alloc, forced: cur.forced, underShare: cur.share, quotaEvicted: evicted, biasYielded: yielded, topUp: cur.topUp, capResidue: cur.capResidue, deployed: cur.deployed };
+    return {
+      seated: cur.seated,
+      unfilled: [...cur.unfilled, ...terminal],
+      owned,
+      blocked: cur.blocked,
+      underShare: cur.share,
+      quotaEvicted: evicted,
+      biasYielded: yielded,
+      capResidue: cur.capResidue,
+      deployed: cur.deployed,
+      gatedSizing: cur.gatedSizing,
+      unallocated: cur.unallocated,
+    };
   };
 
   const primaryMode = String(cfg.selMode ?? LOCK_SEL_MODE);
   const primaryCard = buildModeCard(primaryMode, carry?.core ?? []);
-  const { alloc, forced } = primaryCard;
   const underShare = primaryCard.underShare;
   const quotaEvicted = primaryCard.quotaEvicted;
   const biasYielded = primaryCard.biasYielded;
@@ -372,21 +550,17 @@ export function buildLockEntry(args: {
   const ALT_MODE = primaryMode === "dk_fd" ? "ev_gated" : "dk_fd";
   const altPrev = carry?.alt;
   const altCard = buildModeCard(ALT_MODE, altPrev?.core ?? []);
-  const usedIds = new Set<string>(alloc.picks.map((p) => p.id));
   const usedLegs = new Set<string>();
-  for (const p of alloc.picks) for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
+  for (const s of primaryCard.seated) for (const l of s.pick.w.pl.legs) usedLegs.add(legKey(l));
   for (const t of carry?.core ?? []) {
-    if (t.id) usedIds.add(String(t.id));
     for (const l of (t.legs as { label?: string | null; prop?: string | null }[] | undefined) ?? []) usedLegs.add(legKey(l));
   }
-  const gatedCount = alloc.picks.length;
-  const gatedDeployed = alloc.picks.reduce((a, p) => a + cappedStake(p), 0);
-  const shortfall = daily - gatedDeployed;
-  const forcedMax = Math.max(0, win.maxNew - gatedCount);
+  const gatedDeployed = primaryCard.gatedSizing;
 
-  const toTicket = (p: AllocPick, isForced: boolean): SyncTicket => {
+  const toTicket = (s: Seat): SyncTicket => {
+    const p = s.pick;
     const pl = p.w.pl;
-    const stake = cappedStake(p);
+    const stake = Number(p.stake);
     return {
       id: p.id,
       stake,
@@ -399,13 +573,14 @@ export function buildLockEntry(args: {
       bsDec: pl.bsDec ?? null,
       bsEv: pl.bsEv ?? null,
       bsEvRaw: pl.bsEvRaw ?? null,
-      ...(stake !== Number(p.stake) ? { capTrim: Number(p.stake) - stake } : {}),
       name: pl.name ?? null,
       type: pl.type ?? null,
       tier: pl.tier ?? null,
       legs: (pl.legs ?? []).map((l) => ({ lkey: l.lkey ?? null, label: l.label ?? null, prop: l.prop ?? null, cz: l.cz ?? null, ...(l.gkey ? { gkey: l.gkey } : {}) })),
       paper: true,
-      ...(isForced ? { forced: true } : {}),
+      /* INSTRUCTION 46: the slot this ticket seats — persisted so later fires fill around it */
+      shapeSlot: s.slot,
+      ...(s.forced ? { forced: true } : {}),
       /* Josh's standing word, 2026-08-15: "I will not be taking ANY of the bets." Paper
          tickets are born placed:false/actualStake:0 — a decision on record, not the
          epoch-1 null-means-unanswered state. */
@@ -414,30 +589,36 @@ export function buildLockEntry(args: {
     };
   };
 
-  const withTopUp = (t: SyncTicket, tu: TopUp): SyncTicket =>
-    t.id && tu[t.id] > 0 ? { ...t, stake: Number(t.stake) + tu[t.id], topUp: tu[t.id] } : t;
-  const newCore: SyncTicket[] = [
-    ...alloc.picks.map((p, i) => {
-      const stake = args.__plantStakeSkew && i === 0 ? p.stake + 1 : p.stake;
-      if (stake !== p.stake) {
+  /* the slot top-up (INSTRUCTION 46): a pick the allocator sized under its slot rides up
+     to the slot's stake on the same ticket — `topUp` stamped, allocator sizing recoverable
+     as stake − topUp, never past the slot (the top-up IS the slot remainder).
+
+     THIS IS A DECISION, NOT A BUG (documented fix round 2026-09-08). One ticket rides to
+     the FULL slot stake: a Kelly-$12 pick in a $90 slot is staked $90 with topUp 78, and a
+     $60 slot on a $12 pick is $60 with topUp 48. That is Josh's INSTRUCTION 46 shape
+     decision — the day is SHAPED (six $150 menus, each slot a fixed stake) and the shape is
+     what the record calibrates, so the slot's money goes on the slot's ticket whatever the
+     allocator's own ceiling said. The allocator's sizing is never lost (gatedSum accrues
+     stake − topUp), so gated performance at Kelly size and the shaped deployment can always
+     be split. Do not "fix" this by splitting the slot across tickets or capping at Kelly. */
+  const withTopUp = (t: SyncTicket, tu: number): SyncTicket => (tu > 0 ? { ...t, stake: Number(t.stake) + tu, topUp: tu } : t);
+  const newCore: SyncTicket[] = primaryCard.seated
+    .map((s, i) => {
+      const stake = args.__plantStakeSkew && i === 0 ? s.pick.stake + 1 : s.pick.stake;
+      if (stake !== s.pick.stake) {
         throw new Error(
-          `TWO ALLOCATORS: locked stake ${stake} != allocator stake ${p.stake} on ${String(p.w.pl.name)} — ` +
+          `TWO ALLOCATORS: locked stake ${stake} != allocator stake ${s.pick.stake} on ${String(s.pick.w.pl.name)} — ` +
             `the card being locked is not the card the allocator sized. STOP.`,
         );
       }
-      return toTicket(p, false);
-    }),
-    ...forced.picks.map((p) => toTicket(p, true)),
-  ].map((t) => withTopUp(t, primaryCard.topUp));
+      return withTopUp(toTicket(s), s.topUp);
+    });
   /* block fires APPEND: the date's entry accumulates each block's card; dedupe by id */
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
   const core: SyncTicket[] = [...carried, ...newCore];
 
   /* the alt world accumulates the same way, in its own lane */
-  const altNew: SyncTicket[] = [
-    ...altCard.alloc.picks.map((p) => toTicket(p, false)),
-    ...altCard.forced.picks.map((p) => toTicket(p, true)),
-  ].map((t) => withTopUp(t, altCard.topUp));
+  const altNew: SyncTicket[] = altCard.seated.map((s) => withTopUp(toTicket(s), s.topUp));
   const altCore: SyncTicket[] = [
     ...(altPrev?.core ?? []).filter((t) => !altNew.some((n) => n.id === t.id)),
     ...altNew,
@@ -452,9 +633,6 @@ export function buildLockEntry(args: {
   let funT: SyncTicket[] = carry?.funT ?? [];
   let funNote: string | undefined;
   if (funT.length === 0) {
-    for (const p of forced.picks) {
-      for (const l of p.w.pl.legs) usedLegs.add(legKey(l));
-    }
     const hrRows = ((data.categories as Record<string, unknown[]> | undefined)?.batter_home_runs ?? []) as Array<Record<string, unknown>>;
     const funPool: FunLegSrc[] = hrRows
       .filter((r) => !r.susp && String(r.sub ?? "").includes(" O "))
@@ -530,8 +708,13 @@ export function buildLockEntry(args: {
   /* INSTRUCTION 18: the rule counters are ALWAYS numbers on the record (0 included) */
   blockedReasons.hrr_over_suspended = Number(blockedReasons.hrr_over_suspended ?? 0) + hrrOverDropped;
   blockedReasons.core_shape_rules = Number(blockedReasons.core_shape_rules ?? 0) + shapeDropped;
-  for (const b of alloc.blocked ?? []) {
+  /* a ticket the gate refused is counted ONCE per fire, whichever slots it was tried in */
+  const seenBlocked = new Set<string>();
+  for (const b of primaryCard.blocked) {
     const r = b?.reason ?? "unknown";
+    const k = `${b?.name ?? ""}|${r}`;
+    if (seenBlocked.has(k)) continue;
+    seenBlocked.add(k);
     blockedReasons[r] = (blockedReasons[r] ?? 0) + 1;
   }
 
@@ -542,15 +725,27 @@ export function buildLockEntry(args: {
   const blocks = blockKey
     ? {
         ...(carry?.blocks ?? {}),
-        [blockKey]: { budget: daily, tickets: newCore.length, gkeys: [...(blockGkeys ?? [])], firedAt: now },
+        [blockKey]: { budget: daily, tickets: newCore.length, gkeys: [...(blockGkeys ?? [])], firedAt: now, slots: primaryCard.owned },
       }
     : carry?.blocks;
 
-  const topUpAmt = Object.values(primaryCard.topUp).reduce((a, b) => a + b, 0);
+  const topUpAmt = primaryCard.seated.reduce((a, s) => a + s.topUp, 0);
   const deployed = newCore.reduce((a, t) => a + Number(t.stake), 0);
   if (deployed !== primaryCard.deployed) {
-    throw new Error(`TWO ALLOCATORS: locked card deploys $${deployed} but the cap-respecting pass computed $${primaryCard.deployed}. STOP.`);
+    throw new Error(`TWO ALLOCATORS: locked card deploys $${deployed} but the slot-filling pass computed $${primaryCard.deployed}. STOP.`);
   }
+  /* IMPOSSIBLE BRANCH (INSTRUCTION 46, pre-committed): the day past $150. Σ(owned slot
+     stakes) ≤ daily and the route prices daily as what the day still owes, so this cannot
+     fire on a sound day — when it does, a second writer or a broken carry exists. */
+  const carriedSum = carried.reduce((a, t) => a + (Number(t.stake) || 0), 0);
+  if (carriedSum + deployed > dayCeiling + 1e-9) {
+    throw new Error(`OVER THE DAY: carried $${carriedSum} + this fire's $${deployed} exceeds the $${dayCeiling} day — a second writer or a broken carry exists. STOP.`);
+  }
+  const dayAt = Number(carry?.allocSum ?? 0) + deployed;
+  /* the day's slot map after this fire: which slots hold a ticket, which are still open */
+  const filledAfter = seatCarried(core).filled;
+  const openSlots = shape.slots.map((_, i) => i).filter((i) => !filledAfter.has(i));
+  const unfilledNames = primaryCard.unfilled.map((u) => u.reason);
   const entry: SyncEntry = {
     date,
     locked: true,
@@ -568,11 +763,17 @@ export function buildLockEntry(args: {
     paperCfg: { daily: PAPER.daily, fun: PAPER.fun, since: PAPER.since },
     allocSum: Number(carry?.allocSum ?? 0) + deployed,
     gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + gatedDeployed,
-    unallocated: alloc.unallocated ?? 0,
-    /* INSTRUCTION 18 rule 3: what the $25 per-ticket ceiling could not seat this fire */
+    unallocated: primaryCard.unallocated,
+    /* INSTRUCTION 46: what this fire could not seat into its slots (carries forward) */
     capResidue: primaryCard.capResidue,
     coreRules: CORE_RULES,
-    /* residue top-ups across the day's fires (0 = every fire seated its budget outright) */
+    /* INSTRUCTION 46 (2026-09-08): the day's shape, how it was picked, and the slot map —
+       the ledger/card prints shapeLine(); the unfilled list names each open slot */
+    coreShape: shapeRecord,
+    shapeLine: shapeLine(shape),
+    slotsOpen: openSlots,
+    slotsUnfilled: primaryCard.unfilled.map((u) => ({ slot: u.slot, name: u.name, reason: u.reason })),
+    /* residue top-ups across the day's fires (0 = every pick was sized to its slot outright) */
     topUpSum: Number((carry as { topUpSum?: number } | null | undefined)?.topUpSum ?? 0) + topUpAmt,
     core,
     funT,
@@ -589,25 +790,30 @@ export function buildLockEntry(args: {
       selMode: ALT_MODE,
       core: altCore,
       allocSum: Number(altPrev?.allocSum ?? 0) + altNew.reduce((a, t) => a + Number(t.stake), 0),
-      gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.alloc.picks.reduce((a, p) => a + cappedStake(p), 0),
+      gatedSum: Number(altPrev?.gatedSum ?? 0) + altCard.gatedSizing,
       underShare: Math.round(altCard.underShare * 1000) / 1000,
     },
     ...(funNote ? { funNote } : {}),
     ...(blocks ? { blocks } : {}),
     ...(core.length === 0
-      ? { note: `paper day — $0 of $${daily} deployed: nothing cleared the CORE_RULES shape filter (≤2 legs, dec ≤2.6, no H+R+RBI overs) and the EV gate; blockedReasons is the histogram` }
+      ? {
+          note: `paper day — $0 of $${daily} deployed under ${shapeLine(shape)}: ${unfilledNames.length ? unfilledNames.join("; ") : "no slot fit this fire's budget"} (H+R+RBI overs out, per-slot leg range and price ceiling, then the EV gate); blockedReasons is the histogram`,
+        }
       : deployed < daily
         ? {
             /* the note is DAY-AWARE (2026-08-19): a fire's shortfall names its cause AND
                where the day stands, because the deficit now carries forward — the next
                fire's budget picks it up, and the scheduler's top-up sweep retries while
-               unstarted games remain. */
+               unstarted games remain. INSTRUCTION 46: the cause is the SLOT — each open
+               slot is named with why nothing seated in it. */
             note:
-              primaryCard.capResidue > 0 && newCore.length > 0
-                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): $${primaryCard.capResidue} left unallocated because the $${CORE_RULES.maxStake} per-ticket ceiling (core rules ${CORE_RULES.since}) could not absorb it across the fire's new tickets; the deficit carries to the next fire or top-up sweep`
-                : shortfall > 0 && forcedMax === 0
-                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the ${PAPER_TICKETS.max}-ticket day ceiling left this fire no seat and no new ticket to carry the residue`
-                : `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${Number(carry?.allocSum ?? 0) + deployed} of $${dayCeiling}): the CZ-playable leg-disjoint pool exhausted before the budget; the deficit carries to the next fire or top-up sweep`,
+              unfilledNames.length > 0
+                ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${dayAt} of $${dayCeiling}) under ${shapeLine(shape)}: ${unfilledNames.join("; ")}; the deficit carries to the next fire or top-up sweep`
+                : primaryCard.owned.length === 0 && openSlots.length > 0
+                  ? `paper day — this fire deployed $0 of its $${daily} budget (day at $${dayAt} of $${dayCeiling}) under ${shapeLine(shape)}: no open slot fits inside this fire's budget (open: ${openSlots.map((i) => slotName(shape.slots[i])).join(", ")}); the deficit carries to the next fire or top-up sweep`
+                  : openSlots.length === 0
+                    ? `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${dayAt} of $${dayCeiling}) under ${shapeLine(shape)}: every slot of the day's shape is seated — nothing more to fill`
+                    : `paper day — this fire deployed $${deployed} of its $${daily} budget (day at $${dayAt} of $${dayCeiling}) under ${shapeLine(shape)}: the open slots (${openSlots.map((i) => slotName(shape.slots[i])).join(", ")}) did not fit inside this fire's remaining budget; the deficit carries to the next fire or top-up sweep`,
           }
         : {}),
   };

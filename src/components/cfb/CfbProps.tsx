@@ -1,10 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useCfbDesk } from "@/components/cfb/CfbBuilder";
 import { addCfbLeg, CfbSlip, type CfbSlipLeg } from "@/components/cfb/CfbSlip";
-import { TeamMark, teamHex } from "@/components/cfb/TeamMark";
+import { PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { useShellInsets } from "@/components/props/useShellInsets";
@@ -15,6 +16,7 @@ import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, loadCfbProps } from "@/lib/cfb/client";
 import { kickoffLabel } from "@/lib/cfb/dates";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
+import { playerSlug } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_MODEL, CFB_PROPS, CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
@@ -49,6 +51,17 @@ import { railLabel } from "@/lib/games";
  * team, season context — with Over / Under two-button cells (anytime TD is one YES pill); a
  * game with no priced line in the market prints one muted line instead of vanishing. No blur
  * filter on any per-item surface (the iOS freeze rule); nothing here scrolls sideways at 375 px.
+ *
+ * INSTRUCTION 46 (2026-09-08, Josh's word, verbatim: "Board & Builder should have player headshot
+ * as well as team logo"): a prop row's disc is now the player's ESPN headshot with HIS team's
+ * logo as the corner badge (PlayerMark; initials in the team colour when no headshot loaded),
+ * and the slip legs carry the same marks. The team beside the name and the matchup line are
+ * unchanged. The Builder also answers a ledger deep link (INSTRUCTION 46, point 9 — tapping a
+ * player's name on a ledger ticket): `?game=<id>&mkt=<market>&player=<slug>[&date=<day>]`
+ * picks the day, opens the market tab (sides for ml / spread / total), clears the search and
+ * scrolls the player's row (matched by slug + market, never by the line — "even if the line has
+ * changed") or the game card into view with a short amber ring. The query is read inside a
+ * Suspense boundary (Next's `useSearchParams` rule, same as the Games page).
  */
 
 type PriceMode = "cz" | "best";
@@ -120,6 +133,9 @@ function legOf(game: CfbGame, row: CfbRow, q: CfbQuote): CfbSlipLeg {
     cz: q.price,
     book: bookTag(q),
     prob: p.win * 100,
+    // INSTRUCTION 46: the side's own team for the slip mark; a total carries the pair instead
+    team: row.market === "total" ? null : row.side === "home" ? game.home : game.away,
+    pair: row.market === "total" ? { away: game.away, home: game.home } : null,
   };
 }
 
@@ -328,11 +344,27 @@ function propLegOf(row: CfbPropRow, q: CfbPropQuote): CfbSlipLeg | null {
     cz: q.price,
     book: bookTag(q),
     prob: row.fair * 100,
+    // INSTRUCTION 46: the row knows the headshot / position; PropRow attaches the team object
+    headshot: row.headshot,
+    pos: row.pos,
   };
 }
 
 /** one row per player + line: both sides of an O/U prop, or the single "yes" side */
-type PlayerLine = { id: string; player: string; team: string | null; teamId: string | null; line: number | null; sides: CfbPropRow[] };
+type PlayerLine = {
+  id: string;
+  player: string;
+  team: string | null;
+  teamId: string | null;
+  /** INSTRUCTION 46: ESPN headshot href / position from the row (null → initials disc) */
+  headshot: string | null;
+  pos: string | null;
+  line: number | null;
+  sides: CfbPropRow[];
+};
+
+/** INSTRUCTION 46 (point 9): what a ledger deep link asked the Builder to show */
+type PropFocus = { gameId: string; market: NavKey; player: string | null };
 
 type PropGroup = { gameId: string; kickoff: string; status: CfbPropRow["status"]; sub: string; lines: PlayerLine[] };
 
@@ -364,7 +396,7 @@ function groupProps(rows: CfbPropRow[], market: CfbPropMarket, mode: PriceMode, 
     const id = `${normName(r.player)}|${r.line ?? ""}`;
     let pl = g.lines.find((x) => x.id === id);
     if (!pl) {
-      pl = { id, player: r.player, team: r.teamAbbr ?? r.team, teamId: r.teamId, line: r.line, sides: [] };
+      pl = { id, player: r.player, team: r.teamAbbr ?? r.team, teamId: r.teamId, headshot: r.headshot, pos: r.pos, line: r.line, sides: [] };
       g.lines.push(pl);
     }
     pl.sides.push(r);
@@ -391,13 +423,7 @@ function ctxLine(row: CfbPropRow): string | null {
   return `${per} / game · ${c.g} G`;
 }
 
-/** "TS" for "Ty Simpson" — the avatar disc's initials (no headshot feed exists for CFB props) */
-function initials(name: string): string {
-  const parts = name.replace(/[^A-Za-z\s'-]/g, "").split(/[\s-]+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return `${first}${last}`.toUpperCase() || "?";
-}
+/* the initials disc moved to TeamMark.tsx (`initials`, INSTRUCTION 46) — PlayerMark draws it when no headshot loads */
 
 /* prop-rows:start — plain surfaces only on per-item rows (the iOS freeze rule: no blur filters here) */
 
@@ -422,33 +448,30 @@ function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (
   };
 }
 
-function Avatar({ name, color }: { name: string; color: string | null }) {
-  const hex = teamHex(color);
-  return (
-    <span
-      aria-hidden
-      className="num flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-bold uppercase leading-none tracking-tight text-text ring-1 ring-white/[0.08]"
-      style={hex ? { background: `color-mix(in srgb, ${hex} 55%, var(--color-surface-2))` } : undefined}
-    >
-      {initials(name)}
-    </span>
-  );
-}
+/** the amber ring a deep-linked row / card wears while the Builder scrolls to it (INSTRUCTION 46, point 9) */
+const FOCUS_RING = "rounded-[12px] ring-2 ring-cfb/70 ring-offset-2 ring-offset-bg";
 
 function PropRow({
   pl,
   mode,
-  teamColor,
+  team,
+  gameId,
+  focused,
   pickedKeys,
-  onPick,
+  onPick: pickLeg,
 }: {
   pl: PlayerLine;
   mode: PriceMode;
-  /** ESPN's team color for the avatar disc, or null */
-  teamColor: string | null;
+  /** the slate team the player is on (logo + colour for the PlayerMark), or null when unresolved */
+  team: CfbTeam | null;
+  gameId: string;
+  /** INSTRUCTION 46 (point 9): this row is the one a ledger deep link pointed at */
+  focused: boolean;
   pickedKeys: Set<string>;
   onPick: (leg: CfbSlipLeg) => void;
 }) {
+  /* INSTRUCTION 46: the leg leaves with the team object so the slip draws the same mark */
+  const onPick = (leg: CfbSlipLeg) => pickLeg({ ...leg, team });
   /* the row's headline number is its best-EV side at the chosen price */
   const lead = pl.sides.reduce((a, b) => (evRank(b, mode) > evRank(a, mode) ? b : a), pl.sides[0]);
   const ev = propEv(lead, mode);
@@ -456,8 +479,12 @@ function PropRow({
   const ctx = ctxLine(lead);
   const yes = lead.side === "yes";
   return (
-    <div className="flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0">
-      <Avatar name={pl.player} color={teamColor} />
+    <div
+      data-prop-game={gameId}
+      data-prop-player={playerSlug(pl.player)}
+      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? FOCUS_RING : ""}`}
+    >
+      <PlayerMark player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
       <div className="min-w-0 flex-1 leading-tight">
         <div className="truncate text-[12px] font-semibold text-text">
           {pl.player}
@@ -486,6 +513,7 @@ function PropGameGroup({
   game,
   market,
   mode,
+  focus,
   pickedKeys,
   onPick,
 }: {
@@ -493,15 +521,21 @@ function PropGameGroup({
   game: CfbGame | null;
   market: CfbPropMarket;
   mode: PriceMode;
+  /** INSTRUCTION 46 (point 9): the deep-linked row, if any */
+  focus: PropFocus | null;
   pickedKeys: Set<string>;
   onPick: (leg: CfbSlipLeg) => void;
 }) {
   const live = (game?.status ?? group.status) === "live";
   const score = game && game.homeScore != null && game.awayScore != null ? `${game.awayScore}–${game.homeScore}` : null;
-  const colorOf = (pl: PlayerLine): string | null => {
+  /* the slate team the player is on — by the row's teamId (odds feed or ESPN, props.ts), never guessed */
+  const teamOf = (pl: PlayerLine): CfbTeam | null => {
     if (!game || !pl.teamId) return null;
-    return pl.teamId === game.home.id ? game.home.color : pl.teamId === game.away.id ? game.away.color : null;
+    return pl.teamId === game.home.id ? game.home : pl.teamId === game.away.id ? game.away : null;
   };
+  /* matched by slug + market only — the line may have moved since the ticket locked */
+  const focusedSlug = focus && focus.gameId === group.gameId && focus.market === market ? focus.player : null;
+  const firstFocus = focusedSlug ? group.lines.find((pl) => playerSlug(pl.player) === focusedSlug) : undefined;
   return (
     <section className="rounded-[14px] border border-white/[0.07] bg-white/[0.03]">
       <header className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2">
@@ -527,7 +561,7 @@ function PropGameGroup({
           <div className="num py-2.5 text-[10.5px] text-faint">No {marketMeta(market).label} lines priced for this game.</div>
         ) : (
           group.lines.map((pl) => (
-            <PropRow key={pl.id} pl={pl} mode={mode} teamColor={colorOf(pl)} pickedKeys={pickedKeys} onPick={onPick} />
+            <PropRow key={pl.id} pl={pl} mode={mode} team={teamOf(pl)} gameId={group.gameId} focused={pl === firstFocus} pickedKeys={pickedKeys} onPick={onPick} />
           ))
         )}
       </div>
@@ -567,6 +601,36 @@ function PropSkeleton() {
   );
 }
 
+/** the shape of a ledger deep link (INSTRUCTION 46, point 9) — every field the URL's own value or null */
+export type CfbPropsLink = { date: string | null; game: string | null; mkt: string | null; player: string | null };
+
+/** `?date&game&mkt&player` → CfbPropsLink; a link with no `game` is null (nothing to show) */
+export function cfbPropsLinkOf(params: { get(name: string): string | null }): CfbPropsLink | null {
+  const game = params.get("game");
+  if (!game) return null;
+  return { date: params.get("date"), game, mkt: params.get("mkt"), player: params.get("player") };
+}
+
+/** the nav tab a link's `mkt` opens: a prop market by id, anything else (ml / spread / total / missing) the sides */
+export function cfbPropsLinkNav(mkt: string | null): NavKey {
+  return CFB_PROP_MARKETS.some((m) => m.id === mkt) ? (mkt as CfbPropMarket) : "sides";
+}
+
+/**
+ * Reads the deep link once per distinct query. Lives in its own component so the Suspense
+ * boundary around `useSearchParams` (Next's rule) never wraps the whole Builder.
+ */
+function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
+  const params = useSearchParams();
+  const key = params.toString();
+  useEffect(() => {
+    const link = cfbPropsLinkOf(params);
+    if (link) onLink(link);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the query's identity
+  }, [key]);
+  return null;
+}
+
 export function CfbProps() {
   const { today, date, dates, pick, slate, bankroll, loading, error, refetch } = useCfbDesk();
   const { top, bottom } = useShellInsets();
@@ -578,6 +642,17 @@ export function CfbProps() {
   const [note, setNote] = useState<string | null>(null);
   const noteTimer = useRef<number | null>(null);
   useEffect(() => () => { if (noteTimer.current) window.clearTimeout(noteTimer.current); }, []);
+
+  /* INSTRUCTION 46 (point 9): a ledger deep link → day, market tab, then scroll + ring the target */
+  const [focus, setFocus] = useState<PropFocus | null>(null);
+  const focusTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (focusTimer.current) window.clearTimeout(focusTimer.current); }, []);
+  const onLink = (link: CfbPropsLink) => {
+    if (link.date) pick(link.date);
+    setNav(cfbPropsLinkNav(link.mkt));
+    setSearch("");
+    setFocus({ gameId: link.game as string, market: cfbPropsLinkNav(link.mkt), player: link.player });
+  };
 
   const propsQ = useQuery({
     queryKey: cfbPropsQueryKey(date, bankroll),
@@ -625,6 +700,22 @@ export function CfbProps() {
   );
   const lineCount = groups.reduce((n, g) => n + g.lines.length, 0);
 
+  /* scroll the deep-linked row / card into view once it exists; the ring clears itself after a beat */
+  useEffect(() => {
+    if (!focus || focusTimer.current) return;
+    const sel =
+      focus.market === "sides"
+        ? `[data-cfb-game="${focus.gameId}"]`
+        : `[data-prop-game="${focus.gameId}"][data-prop-player="${focus.player ?? ""}"]`;
+    const el = document.querySelector(sel);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    focusTimer.current = window.setTimeout(() => {
+      focusTimer.current = null;
+      setFocus(null);
+    }, 5000);
+  }, [focus, groups, games]);
+
   const copyText = useMemo(() => {
     if (!calc) return "";
     const lines = [
@@ -641,6 +732,9 @@ export function CfbProps() {
 
   return (
     <div className={legs.length ? "pb-20" : ""}>
+      <Suspense fallback={null}>
+        <PropsLinkReader onLink={onLink} />
+      </Suspense>
       <p className="mb-3 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the CFB ledger.</p>
       <DateRail dates={dates} date={date} today={today} onPick={pick} />
 
@@ -700,7 +794,9 @@ export function CfbProps() {
             )}
             {games.map((g, i) => (
               <Reveal key={g.id} delay={Math.min(i, 8) * 0.03} y={10}>
-                <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} />
+                <div data-cfb-game={g.id} className={focus?.market === "sides" && focus.gameId === g.id ? FOCUS_RING : undefined}>
+                  <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} />
+                </div>
               </Reveal>
             ))}
           </div>
@@ -731,7 +827,7 @@ export function CfbProps() {
         <div className="space-y-2">
           {groups.map((g, i) => (
             <Reveal key={g.gameId} delay={Math.min(i, 8) * 0.03} y={10}>
-              <PropGameGroup group={g} game={gameById.get(g.gameId) ?? null} market={nav} mode={mode} pickedKeys={pickedKeys} onPick={toggle} />
+              <PropGameGroup group={g} game={gameById.get(g.gameId) ?? null} market={nav} mode={mode} focus={focus} pickedKeys={pickedKeys} onPick={toggle} />
             </Reveal>
           ))}
           <p className="px-1 text-[9.5px] leading-snug text-faint">

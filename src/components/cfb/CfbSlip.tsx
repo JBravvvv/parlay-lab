@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PairMark, PlayerMark, TeamMark, type TeamMarkTeam } from "@/components/cfb/TeamMark";
 import type { CfbPropMarket } from "@/lib/cfb/props-types";
 import type { CfbMarketKey } from "@/lib/cfb/types";
 import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
@@ -12,6 +13,10 @@ import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
  * true % / EV from `combineTicket`, a stake → pays line and a "Copy slip" button that hands
  * the ticket to the clipboard as text. Nothing here writes the ledger: the sandbox's
  * whole contract is that it is untracked.
+ *
+ * INSTRUCTION 46 (2026-09-08): every leg row carries its mark — a prop leg the player's headshot
+ * with HIS team's logo (PlayerMark), a side leg that team's logo (TeamMark), a total the pair.
+ * The marks come with the leg (`team` / `pair` / `headshot`), so the slip needs no slate lookup.
  */
 
 export type CfbSlipLeg = {
@@ -36,6 +41,13 @@ export type CfbSlipLeg = {
   player?: string | null;
   /** prop legs only: "Pass Yds" / "Anytime TD" — the market's display label */
   marketLabel?: string;
+  /** INSTRUCTION 46: the team the leg is ON (a prop's player's team, a side's team); null for a total */
+  team?: TeamMarkTeam | null;
+  /** INSTRUCTION 46: a total's two teams (the only leg that draws both logos) */
+  pair?: { away: TeamMarkTeam; home: TeamMarkTeam } | null;
+  /** INSTRUCTION 46, prop legs: ESPN headshot href / position, or null */
+  headshot?: string | null;
+  pos?: string | null;
 };
 
 export type CfbSlipAdd = {
@@ -64,6 +76,14 @@ export function addCfbLeg(prev: CfbSlipLeg[], leg: CfbSlipLeg): CfbSlipAdd {
   }
   /* one side per game — a new side on a game replaces the old side, props on that game stay */
   return { legs: [...prev.filter((l) => l.kind === "prop" || l.gameId !== leg.gameId), leg], note: null };
+}
+
+/** INSTRUCTION 46: player → PlayerMark; side → TeamMark; total → PairMark; nothing known → no mark */
+function SlipLegMark({ leg }: { leg: CfbSlipLeg }) {
+  if (leg.kind === "prop" && leg.player) return <PlayerMark player={leg.player} headshot={leg.headshot ?? null} team={leg.team ?? null} pos={leg.pos ?? null} size="sm" />;
+  if (leg.pair) return <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" />;
+  if (leg.team) return <TeamMark team={leg.team} size="sm" showAbbr={false} />;
+  return null;
 }
 
 export function CfbSlip({
@@ -150,6 +170,7 @@ export function CfbSlip({
                 <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/[0.06] px-3 py-1">
                   {legs.map((l) => (
                     <div key={l.key} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
+                      <SlipLegMark leg={l} />
                       <span className="min-w-0 flex-1 leading-tight">
                         <span className="block truncate text-text">
                           {l.label}{" "}

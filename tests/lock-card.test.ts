@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { FROZEN_NOW, armedFixtureEngine } from "./helpers/fixture-env";
 import { validateLedger, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { buildLockEntry, needsLockAction, LEDGER_STORE_KEY } from "@/lib/server/lock-card";
-import { CORE_RULES, PAPER } from "@/lib/paper-mode";
+import { CORE_RULES, PAPER, slotMaxDec } from "@/lib/paper-mode";
+import { SHAPE_TICKETS, shapeById, type ShapeCalibration } from "@/lib/core-shapes";
 import { readFileSync } from "node:fs";
 import { stripComments } from "./helpers/source";
 
@@ -110,8 +111,11 @@ describe("buildLockEntry — the card the system locks for itself", () => {
     expect(deployed + Number((entry as { capResidue?: number }).capResidue ?? 0), "deployed + the cap-stranded residue must account for the whole budget").toBe(entry.daily);
     expect(String((entry as { note?: string }).note), "a $0 day must say so").toMatch(/paper day/);
     /* 2026-08-22, Josh's word: "a max of 7 tickets for the daily core card" — the
-       08-22 card reached 14 because only the forced pass honored the ceiling */
-    expect(core.length, "the core card exceeded the 7-ticket day ceiling").toBeLessThanOrEqual(7);
+       08-22 card reached 14 because only the forced pass honored the ceiling.
+       PIN UPDATED 2026-09-08 (INSTRUCTION 46): the ceiling is the day's shape — at most
+       SHAPE_TICKETS.max (5) slots on the menu, one ticket per slot. */
+    expect(core.length, "the core card exceeded the shape's slot count").toBeLessThanOrEqual(SHAPE_TICKETS.max);
+    expect(String((entry as { shapeLine?: string }).shapeLine)).toMatch(/^shape: /);
     const hist = (entry as { blockedReasons?: Record<string, number> }).blockedReasons;
     expect(hist, "the gated no-bet verdict lost its reasons — the decision record must survive the top-up").toBeTruthy();
     expect(typeof hist).toBe("object");
@@ -149,68 +153,283 @@ describe("buildLockEntry — the card the system locks for itself", () => {
   }, T9);
 });
 
-describe("THE RESIDUE TOP-UP (2026-08-22 — the 08-22 card: 14 tickets, $132 of $150, 'the 10-ticket day ceiling was reached before the budget')", () => {
-  /* A mock engine shaped like the failing fire: the disciplined allocator sizes ONE pick
-     at $12 of a $46 budget (Kelly leaves the rest unallocated by design) and the forced
-     pass finds no seat — six tickets are already carried, the window is 1. Before this
-     ship the fire deployed $12 and stranded $34; now the residue rides that pick. */
-  function mockEng(gatedStake: number) {
-    const pl = { name: "Mock single", czEv: 3.1, czDec: 2.2, legs: [{ label: "A (NYY)", prop: "Hits O 0.5", lkey: "a|batter_hits|0.5", gkey: "g1" }] };
+/**
+ * INSTRUCTION 46 — SLOT FILLING (2026-09-08, "Parlay Lab Baseball 1", Josh's word,
+ * verbatim: "Should consider doing some higher $ 2 team parlays. Hypothetically could be 2
+ * $60 2 leg parlays one day w/ 3 $10 3-4 leg parlays one day, 5 $30 2 leg parlays the
+ * next, …"). The 2026-08-22 RESIDUE TOP-UP suite that lived here (a $12 pick carrying a
+ * $34 residue under the 7-ticket window, then the 09-03 $25 cap) is RETIRED by this ship,
+ * not deleted from the record: its two mechanisms — the count window and the per-ticket
+ * cap — are replaced by the slot. The mock engine below is shaped like the allocator's
+ * contract: one pick per call from the pool it is handed, sized to `amount` (or the
+ * Kelly-style `kelly` ceiling when set), refusing tickets flagged gated:false unless the
+ * call is the probability (forced) pass.
+ */
+describe("INSTRUCTION 46 — slot filling on a mock pool (2026-09-08)", () => {
+  const leg = (label: string, prop = "Hits O 0.5") => ({ label, prop, lkey: `${label}|batter_hits|0.5`, cz: -110, gkey: `g-${label[0]}` });
+  const tk = (name: string, labels: string[], dec = 2.2, extra: Record<string, unknown> = {}) => ({
+    pl: { name, type: "parlay", prob: 45, probRaw: 50, czEv: 3, czEvRaw: 4, czDec: dec, bsDec: dec, legs: labels.map((l) => leg(l)), ...extra },
+    src: "p",
+    idx: 0,
+  });
+  /* the pool: three 2-leg (one sharing a leg with the first), two 4-leg (one gate-refused),
+     and three tickets that fit NO slot of shape A — a single, an over-priced 2-leg, an
+     over-priced 3-leg */
+  const POOL = [
+    tk("T2a", ["A1", "A2"]),
+    tk("T2b", ["B1", "B2"]),
+    tk("T2c", ["C1", "A1"]), // shares A1 with T2a — never seatable beside it
+    tk("T4a", ["D1", "D2", "D3", "D4"], 6.0),
+    tk("T4b", ["E1", "E2", "E3", "E4"], 6.5, { gated: false }), // only the forced pass may seat it
+    tk("T1", ["F1"]),
+    tk("T2x", ["G1", "G2"], 3.0), // above the 2.6 two-leg ceiling
+    tk("T3x", ["H1", "H2", "H3"], 12.0), // above the 9.38 3-4-leg ceiling
+  ];
+  type W = { pl: { name: string; gated?: boolean } };
+  function mockEng(opts: { kelly?: number; over?: boolean; pool?: typeof POOL } = {}) {
     return {
       get<T>(k: string): T {
-        if (k === "SH_CFG") return { maxCoreTickets: 6, minCoreTickets: 4, selMode: "dk_fd" } as T;
+        if (k === "SH_CFG") return { maxCoreTickets: 6, minCoreTickets: 4, selMode: "dk_fd", perParlayCap: 0.25 } as T;
         if (k === "SH") return { bankroll: 750 } as T;
-        if (k === "shCardPool") return ((_b: unknown) => [{ pl, src: "p", idx: 0 }]) as T;
+        if (k === "shCardPool") return ((_b: unknown) => opts.pool ?? POOL) as T;
         if (k === "shTicketId") return ((x: { name?: string }) => `id-${x.name ?? "fun"}`) as T;
         if (k === "shAllocate") {
-          return ((_p: unknown, amount: number, cfg: { selMode?: string; maxCoreTickets?: number }) => {
-            if (cfg.selMode === "caesars_ev") return { picks: [], sum: 0, blocked: [] }; // no seat / nothing disjoint
-            if ((cfg.maxCoreTickets ?? 0) < 1) return { picks: [], sum: 0, blocked: [] };
-            const stake = Math.min(gatedStake, amount);
-            return { picks: [{ id: "id-Mock single", stake, w: { pl } }], sum: stake, blocked: [], unallocated: amount - stake };
+          return ((p: W[], amount: number, cfg: { selMode?: string; maxCoreTickets?: number; coreMaxLegs?: number }) => {
+            const forced = cfg.selMode === CORE_RULES.forcedSelMode;
+            const c = p.find((x) => forced || x.pl.gated !== false);
+            if (!c || amount <= 0) return { picks: [], sum: 0, blocked: p.filter((x) => x.pl.gated === false).map((x) => ({ name: x.pl.name, reason: "ev_gate" })) };
+            const stake = opts.over ? amount + 5 : forced ? amount : Math.min(opts.kelly ?? amount, amount);
+            return { picks: [{ id: `id-${c.pl.name}`, stake, w: { pl: c.pl } }], sum: stake, blocked: [], unallocated: amount - stake };
           }) as T;
         }
         return null as T;
       },
     };
   }
-  const carry6 = {
-    date: "2026-08-22", locked: true, lockedAt: 1, allocSum: 86, gatedSum: 86,
-    core: Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, stake: 10, legs: [{ label: `P${i} (BOS)`, prop: "Hits O 0.5" }], paper: true, placed: false, actualStake: 0 })),
-    funT: [], games: {},
+  const DATA = { gameInfo: { "g-A": { pk: 1, start: "2026-09-10T23:05:00Z" } }, categories: {} } as never;
+  const DATE = "2026-09-10"; // day index 20706 → 20706 % 6 == 0 → shape A: 2x$60 2-leg + 3x$10 3-4 leg
+  type Tix = { id: string; stake: number; shapeSlot?: number; topUp?: number; forced?: boolean; legs: { label: string }[] };
+  const lock = (args: Partial<Parameters<typeof buildLockEntry>[0]> & { eng?: unknown } = {}) =>
+    buildLockEntry({ eng: (args.eng ?? mockEng()) as never, data: DATA, date: DATE, now: Date.parse("2026-09-10T20:00:00Z"), trigger: "test", ...args } as never);
+  const disjoint = (core: Tix[]) => {
+    const seen = new Set<string>();
+    for (const t of core) for (const l of t.legs) {
+      if (seen.has(l.label)) return false;
+      seen.add(l.label);
+    }
+    return true;
   };
-  it("the fire deploys its WHOLE budget: the allocator's $12 pick carries the $34 residue as a stamped topUp", () => {
-    const entry = buildLockEntry({
-      eng: mockEng(12) as never,
-      data: { gameInfo: { g1: { pk: 1, start: "2026-08-23T00:05:00Z" } }, categories: {} } as never,
-      date: "2026-08-22", now: Date.parse("2026-08-22T23:40:00Z"), trigger: "test",
-      dailyOverride: 46, carry: carry6 as never,
-    });
-    const fresh = (entry.core as { id: string; stake: number; topUp?: number; forced?: boolean }[]).filter((t) => t.id === "id-Mock single");
-    expect(fresh.length, "the fire's new ticket is missing").toBe(1);
-    /* INSTRUCTION 18 (2026-09-03, CORE_RULES.maxStake 25 — stakes ≥ $20 ran −33..−36%
-       ROI over the 19 paper days): the residue rides the ticket only UP TO the $25
-       ceiling ($12 + $13), and the $21 no ticket can absorb is stamped capResidue with
-       a note — never a $46 ticket. Pin updated, not deleted. */
-    expect(fresh[0].stake, "the residue breached the $25 ceiling").toBe(25);
-    expect(fresh[0].topUp, "the allocator's own sizing must stay recoverable (stake − topUp)").toBe(13);
-    expect((entry as { allocSum?: number }).allocSum).toBe(86 + 25);
-    expect((entry as { gatedSum?: number }).gatedSum, "gatedSum records the allocator's sizing, not the top-up").toBe(86 + 12);
-    expect((entry as { topUpSum?: number }).topUpSum).toBe(13);
-    expect((entry as { capResidue?: number }).capResidue).toBe(21);
-    expect(String((entry as { note?: string }).note)).toMatch(/\$21 left unallocated because the \$25 per-ticket ceiling/);
-    expect((entry.core as unknown[]).length).toBeLessThanOrEqual(7);
+
+  it("fills the right slots: 2-leg tickets take the $60 slots, 4-leg tickets the $10 3-4 leg slots, every stake == its slot, day ≤ $150, legs disjoint, the unfillable slot NAMED", () => {
+    const entry = lock();
+    const sh = shapeById("A")!;
+    expect((entry as { coreShape?: { id: string; label: string; pick: string } }).coreShape?.id).toBe("A");
+    expect((entry as { coreShape?: { label: string } }).coreShape?.label).toBe("2x$60 2-leg + 3x$10 3-4 leg");
+    expect((entry as { coreShape?: { pick: string } }).coreShape?.pick).toBe("rotation");
+    expect((entry as { shapeLine?: string }).shapeLine).toBe("shape: 2x$60 2-leg + 3x$10 3-4 leg");
+    const core = entry.core as Tix[];
+    expect(core.map((t) => [t.id, t.shapeSlot, t.stake, t.forced === true])).toEqual([
+      ["id-T2a", 0, 60, false],
+      ["id-T2b", 1, 60, false],
+      ["id-T4a", 2, 10, false],
+      ["id-T4b", 3, 10, true], // the gate refused it; the forced (probability) pass seated it in the same leg range
+    ]);
+    for (const t of core) {
+      const slot = sh.slots[t.shapeSlot!];
+      expect(t.stake, `${t.id} does not carry exactly its slot's stake`).toBe(slot.stake);
+      expect(t.legs.length).toBeGreaterThanOrEqual(slot.legs.min);
+      expect(t.legs.length).toBeLessThanOrEqual(slot.legs.max);
+    }
+    expect(disjoint(core), "two seated tickets share a leg").toBe(true);
+    expect(entry.allocSum).toBe(140);
+    expect(entry.allocSum).toBeLessThanOrEqual(PAPER.daily);
+    expect((entry as { capResidue?: number }).capResidue).toBe(10);
+    expect((entry as { slotsUnfilled?: { slot: number; name: string; reason: string }[] }).slotsUnfilled).toEqual([
+      { slot: 4, name: "$10 3-4 leg slot", reason: "$10 3-4 leg slot unfilled — no leg-disjoint 3-4 leg ticket priced under 9.38 in the pool" },
+    ]);
+    expect((entry as { slotsOpen?: number[] }).slotsOpen).toEqual([4]);
+    expect(String(entry.note)).toMatch(/\$10 3-4 leg slot unfilled/);
+    expect(String(entry.note)).toMatch(/day at \$140 of \$150/);
+    /* the three tickets that fit no slot left the pool up front, counted */
+    expect((entry as { blockedReasons?: Record<string, number> }).blockedReasons?.core_shape_rules).toBe(3);
+    expect((entry as { blockedReasons?: Record<string, number> }).blockedReasons?.ev_gate, "the gate's refusal is counted once per fire, not once per slot").toBe(1);
+    expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
   });
-  it("a fire with NO seat and NO new ticket still cannot invent money — the shortfall note names it", () => {
-    const carry7 = { ...carry6, core: [...carry6.core, { id: "c6", stake: 10, legs: [{ label: "P6 (BOS)", prop: "Hits O 0.5" }], paper: true, placed: false, actualStake: 0 }] };
-    const entry = buildLockEntry({
-      eng: mockEng(12) as never,
-      data: { gameInfo: { g1: { pk: 1, start: "2026-08-23T00:05:00Z" } }, categories: {} } as never,
-      date: "2026-08-22", now: Date.parse("2026-08-22T23:40:00Z"), trigger: "test",
-      dailyOverride: 46, carry: carry7 as never,
-    });
-    expect((entry.core as unknown[]).length).toBe(7);
-    expect(String((entry as { note?: string }).note)).toMatch(/7-ticket day ceiling left this fire no seat/);
+
+  it("a Kelly-sized pick rides up to its slot on the same ticket: stake == slot, topUp stamped, gatedSum keeps the allocator's own sizing", () => {
+    const entry = lock({ eng: mockEng({ kelly: 12 }) });
+    const core = entry.core as Tix[];
+    expect(core.map((t) => [t.id, t.stake, t.topUp ?? 0])).toEqual([
+      ["id-T2a", 60, 48],
+      ["id-T2b", 60, 48],
+      ["id-T4a", 10, 0], // min(12, 10) — the slot is smaller than the Kelly ceiling
+      ["id-T4b", 10, 0], // forced: exact-sum, no top-up
+    ]);
+    expect(entry.allocSum).toBe(140);
+    expect((entry as { gatedSum?: number }).gatedSum).toBe(12 + 12 + 10);
+    expect((entry as { topUpSum?: number }).topUpSum).toBe(96);
+  });
+
+  it("IMPOSSIBLE BRANCH: an allocator handing back more than the slot is a THROW naming two allocators — never a clamp", () => {
+    expect(() => lock({ eng: mockEng({ over: true }) })).toThrow(/TWO ALLOCATORS.*never carry more than its slot/);
+  });
+
+  it("BLOCK FIRES own the unfilled slots that fit their budget share, in shape order; the day's shape is chosen once and reused; Σ never passes $150", () => {
+    /* fire 1: a $70 block → walks A's slots: $60 fits (rem 10), the second $60 does not,
+       the $10 3-4 leg slot fits (rem 0), the rest do not → owns [0, 2] */
+    const e1 = lock({ dailyOverride: 70, blockKey: "blk-1", blockGkeys: new Set(["g-A", "g-D"]) });
+    const c1 = e1.core as Tix[];
+    expect(c1.map((t) => [t.id, t.shapeSlot, t.stake])).toEqual([["id-T2a", 0, 60], ["id-T4a", 2, 10]]);
+    expect(e1.blocks?.["blk-1"]).toMatchObject({ budget: 70, tickets: 2, slots: [0, 2] });
+    expect(e1.allocSum).toBe(70);
+    expect((e1 as { capResidue?: number }).capResidue).toBe(0);
+    expect(e1.note, "a fire that seated every slot it owns carries no shortfall note").toBeUndefined();
+    /* fire 2: the rest of the day ($80), a different block, and a calibration that would
+       have tilted a FRESH day to shape B — the day keeps A (carry.coreShape wins) */
+    const tilt: ShapeCalibration = { bucketRoi: { two: 0.2, long: -0.5 }, n: { two: 40, long: 40 } };
+    const e2 = lock({ dailyOverride: 80, blockKey: "blk-2", blockGkeys: new Set(["g-B", "g-E"]), carry: e1, shapeCal: tilt });
+    expect((e2 as { coreShape?: { id: string; pick: string } }).coreShape).toMatchObject({ id: "A", pick: "rotation" });
+    const c2 = e2.core as Tix[];
+    expect(c2.map((t) => [t.id, t.shapeSlot, t.stake, t.forced === true])).toEqual([
+      ["id-T2a", 0, 60, false], // carried, slot kept
+      ["id-T4a", 2, 10, false], // carried, slot kept
+      ["id-T2b", 1, 60, false],
+      ["id-T4b", 3, 10, true],
+    ]);
+    expect(e2.blocks?.["blk-2"]).toMatchObject({ budget: 80, tickets: 2, slots: [1, 3, 4] });
+    expect(e2.allocSum).toBe(140);
+    expect(e2.allocSum).toBeLessThanOrEqual(PAPER.daily);
+    expect(disjoint(c2)).toBe(true);
+    expect((e2 as { slotsOpen?: number[] }).slotsOpen).toEqual([4]);
+    expect(String(e2.note)).toMatch(/\$10 3-4 leg slot unfilled/);
+    expect(validateLedger([e2 as SyncEntry]).ok).toBe(true);
+  });
+
+  it("a $10 block on a day whose open slots are all bigger deploys nothing and says which slots are open — money is never invented", () => {
+    const e1 = lock({ dailyOverride: 70, blockKey: "blk-1", blockGkeys: new Set(["g-A"]) });
+    const e2 = lock({ dailyOverride: 5, blockKey: "blk-2", blockGkeys: new Set(["g-B"]), carry: e1 });
+    expect(e2.allocSum).toBe(70);
+    expect(e2.blocks?.["blk-2"]).toMatchObject({ tickets: 0, slots: [] });
+    expect(String(e2.note)).toMatch(/no open slot fits inside this fire's budget \(open: \$60 2-leg slot, \$10 3-4 leg slot, \$10 3-4 leg slot\)/);
+  });
+
+  it("carried tickets WITHOUT a shapeSlot (a day locked before 2026-09-08) seat BY MONEY — best fit, the smallest slot that holds the stake — so the fire can still fill the big slots", () => {
+    /* FIX ROUND 2026-09-08. OBSERVED RED against in-order seating: the two $10 legacy
+       tickets sat in the $60 slots 0 and 1, the fire could only seat the $10 3-4 leg slots,
+       the day stranded $100 of its $150, and decideTopUp kept buying top-ups (~120 credits
+       each) that rebuilt the same seating. Best fit: $10 → the $10 slots (2, 3); the fire
+       owns 0, 1, 4 and the day reaches $150. */
+    const carry = {
+      date: DATE, locked: true, lockedAt: 1, allocSum: 20, gatedSum: 20,
+      core: [
+        { id: "old-1", stake: 10, legs: [leg("Z1"), leg("Z2")], paper: true, placed: false, actualStake: 0 },
+        { id: "old-2", stake: 10, legs: [leg("Y1"), leg("Y2")], paper: true, placed: false, actualStake: 0 },
+      ],
+      funT: [], games: {},
+    };
+    const entry = lock({ carry: carry as never });
+    const fresh = (entry.core as Tix[]).filter((t) => !t.id.startsWith("old"));
+    expect(fresh.map((t) => [t.id, t.shapeSlot, t.stake])).toEqual([["id-T2a", 0, 60], ["id-T2b", 1, 60], ["id-T4a", 4, 10]]);
+    expect(entry.allocSum).toBe(150);
+    expect((entry as { slotsOpen?: number[] }).slotsOpen).toEqual([]);
+    expect((entry as { slotsUnfilled?: unknown[] }).slotsUnfilled).toEqual([]);
+  });
+
+  it("a legacy ticket no slot can hold is STRANDED: its money still counts, the fire owns only what fits after it, and the displaced slots are named `cannot fill further`", () => {
+    /* a $100 pre-shape ticket on shape A (biggest slot $60): no seat. rem = 150 − 100 = 50 →
+       the $60 slots do not fit, the three $10 slots do. With T4c in the pool all three seat,
+       so the ONLY open slots are the two the stranded money displaced — the terminal case
+       the scheduler's top-up sweep reads. */
+    const carry = {
+      date: DATE, locked: true, lockedAt: 1, allocSum: 100, gatedSum: 100,
+      core: [{ id: "old-big", stake: 100, legs: [leg("Z1"), leg("Z2")], paper: true, placed: false, actualStake: 0 }],
+      funT: [], games: {},
+    };
+    const entry = lock({ eng: mockEng({ pool: [...POOL, tk("T4c", ["K1", "K2", "K3", "K4"], 5)] }), carry: carry as never });
+    const core = entry.core as Tix[];
+    expect(core.find((t) => t.id === "old-big")!.shapeSlot).toBeUndefined();
+    // T4b is gate-refused, so the gated T4c takes slot 3 and the forced pass seats T4b in slot 4
+    expect(core.filter((t) => t.id !== "old-big").map((t) => [t.id, t.shapeSlot, t.stake])).toEqual([["id-T4a", 2, 10], ["id-T4c", 3, 10], ["id-T4b", 4, 10]]);
+    expect(entry.allocSum).toBe(130);
+    expect(entry.allocSum).toBeLessThanOrEqual(PAPER.daily);
+    const unfilled = (entry as { slotsUnfilled: { slot: number; name: string; reason: string }[] }).slotsUnfilled;
+    expect(unfilled.map((u) => u.slot)).toEqual([0, 1]);
+    for (const u of unfilled) {
+      expect(u.name).toBe("$60 2-leg slot");
+      expect(u.reason).toBe("$60 2-leg slot unfilled — cannot fill further: $100 of carried money sits outside the shape's slots (1 legacy ticket no slot could seat), so the day has no room left for it");
+    }
+    expect((entry as { slotsOpen?: number[] }).slotsOpen).toEqual([0, 1]);
+    expect(String(entry.note)).toMatch(/cannot fill further/);
+    expect(validateLedger([entry as SyncEntry]).ok).toBe(true);
+    /* and a top-up fire against that day rebuilds the same answer: $0 more, same two names */
+    const again = lock({ dailyOverride: 20, blockKey: "topup-1", carry: entry });
+    expect(again.allocSum).toBe(130);
+    expect((again as { slotsUnfilled: { reason: string }[] }).slotsUnfilled.every((u) => u.reason.includes("cannot fill further"))).toBe(true);
+  });
+
+  it("PRODUCTION SHAPE: a block fire whose dailyOverride already nets the stranded money (daily − allocSoFar) is not charged for it twice — it still seats the three $10 slots", () => {
+    const carry = {
+      date: DATE, locked: true, lockedAt: 1, allocSum: 100, gatedSum: 100,
+      core: [{ id: "old-big", stake: 100, legs: [leg("Z1"), leg("Z2")], paper: true, placed: false, actualStake: 0 }],
+      funT: [], games: {},
+    };
+    // generate/scheduler pass dailyOverride = 150 − 0 reserved − 100 allocSoFar = 50
+    const entry = lock({ eng: mockEng({ pool: [...POOL, tk("T4c", ["K1", "K2", "K3", "K4"], 5)] }), dailyOverride: 50, blockKey: "topup-1", carry: carry as never });
+    expect(entry.allocSum).toBe(130);
+    const unfilled = (entry as { slotsUnfilled: { slot: number; reason: string }[] }).slotsUnfilled;
+    expect(unfilled.map((u) => u.slot)).toEqual([0, 1]);
+    expect(unfilled.every((u) => u.reason.includes("cannot fill further"))).toBe(true);
+    expect((entry as { slotsOpen?: number[] }).slotsOpen).toEqual([0, 1]);
+  });
+
+  it("a stranded day whose OTHER open slots are ordinary shortfalls is NOT terminal — those slots keep their pool reason beside the terminal ones", () => {
+    const carry = {
+      date: DATE, locked: true, lockedAt: 1, allocSum: 100, gatedSum: 100,
+      core: [{ id: "old-big", stake: 100, legs: [leg("Z1"), leg("Z2")], paper: true, placed: false, actualStake: 0 }],
+      funT: [], games: {},
+    };
+    const entry = lock({ carry: carry as never }); // the base POOL has only two 4-leg tickets → slot 4 stays open for want of a ticket
+    const unfilled = (entry as { slotsUnfilled: { slot: number; reason: string }[] }).slotsUnfilled;
+    expect(unfilled.map((u) => [u.slot, u.reason.includes("cannot fill further")])).toEqual([[4, false], [0, true], [1, true]]);
+    expect(entry.allocSum).toBe(120);
+  });
+
+  it("a FULL day (every slot carried) gives a fire nothing to fill: nothing deploys, and the note says so honestly", () => {
+    const e1 = lock({ eng: mockEng({ pool: [...POOL, tk("T4c", ["K1", "K2", "K3", "K4"], 5)] }) });
+    expect((e1.core as Tix[]).length).toBe(5);
+    expect(e1.allocSum).toBe(150);
+    const e2 = lock({ dailyOverride: 10, blockKey: "late", carry: e1 });
+    expect((e2.core as Tix[]).length).toBe(5);
+    expect(e2.allocSum).toBe(150);
+    expect(String(e2.note)).toMatch(/every slot of the day's shape is seated/);
+  });
+
+  it("IMPOSSIBLE BRANCH: a carry that already holds more than the $150 day is a THROW, never a quietly over-deployed day", () => {
+    const carry = {
+      date: DATE, locked: true, lockedAt: 1, allocSum: 200, gatedSum: 200,
+      core: [
+        { id: "big-1", stake: 100, shapeSlot: 0, legs: [leg("Z1"), leg("Z2")], paper: true, placed: false, actualStake: 0 },
+        { id: "big-2", stake: 100, shapeSlot: 1, legs: [leg("Y1"), leg("Y2")], paper: true, placed: false, actualStake: 0 },
+      ],
+      funT: [], games: {},
+    };
+    expect(() => lock({ carry: carry as never })).toThrow(/OVER THE DAY/);
+  });
+
+  it("a fresh day with a thick record TILTS: 2-leg running better walks B/E/F, and the entry records the pick and its reason", () => {
+    const tilt: ShapeCalibration = { bucketRoi: { two: -0.18, long: -0.53 }, n: { two: 50, long: 26 }, window: "2026-08-09..2026-09-09" };
+    const entry = lock({ shapeCal: tilt }); // 20706 % 3 == 0 → B: 5x$30 2-leg
+    const cs = (entry as { coreShape?: { id: string; pick: string; reason: string; menu: string[]; calibration?: ShapeCalibration | null } }).coreShape!;
+    expect(cs.id).toBe("B");
+    expect(cs.pick).toBe("tilt:two");
+    expect(cs.menu).toEqual(["B", "E", "F"]);
+    expect(cs.reason).toMatch(/2-leg is running better/);
+    expect(cs.calibration).toEqual(tilt);
+    const core = entry.core as Tix[];
+    /* only two leg-disjoint 2-leg tickets exist under 2.6 → two $30 seats, three named */
+    expect(core.map((t) => [t.id, t.shapeSlot, t.stake])).toEqual([["id-T2a", 0, 30], ["id-T2b", 1, 30]]);
+    expect((entry as { slotsUnfilled?: unknown[] }).slotsUnfilled).toHaveLength(3);
+    expect(entry.allocSum).toBe(60);
   });
 });
 
@@ -284,25 +503,37 @@ describe("the store key mirror", () => {
  * OBSERVED RED 2026-09-03 before the rules landed (3-leg tickets, dec 11.97, $150 singles).
  */
 describe("INSTRUCTION 18 — the 2026-09-03 core rules on the locked card", () => {
-  it("2 legs max · dec ≤ 2.6 · no HRR over · every stake ≤ $25 · forced ≤ 1.75 · shrunk numbers with raw beside them · fun == $25", async () => {
+  it("every core ticket sits inside its slot (legs in range, stake == slot, dec ≤ the slot ceiling) · no HRR over · forced ≤ the forced ceiling · shrunk numbers with raw beside them · fun == $25", async () => {
+    /* PIN UPDATED 2026-09-08 (INSTRUCTION 46): the 09-03 "2 legs max · every stake ≤ $25"
+       pins are RETIRED — Josh's shapes carry $60/$75/$90 2-leg slots and 3-5-leg slots.
+       The binding limits are now the slot's: leg range, stake, and slotMaxDec. OBSERVED
+       RED against the old pin before this update ("a core stake above $25: expected 90"). */
     const { entry } = await fixtureLock();
-    const core = entry.core as { stake: number; forced?: boolean; czDec?: number | null; bsDec?: number | null; prob?: number | null; probRaw?: number | null; czEvRaw?: number | null; topUp?: number; legs: { lkey?: string | null; prop?: string | null }[] }[];
+    const shape = shapeById(String((entry as { coreShape?: { id: string } }).coreShape?.id))!;
+    expect(shape, "the entry carries no menu shape").toBeTruthy();
+    const core = entry.core as { stake: number; shapeSlot?: number; forced?: boolean; czDec?: number | null; bsDec?: number | null; prob?: number | null; probRaw?: number | null; czEvRaw?: number | null; topUp?: number; legs: { lkey?: string | null; prop?: string | null }[] }[];
     expect(core.length, "ZERO picks — vacuous; the probability mode must fill the card").toBeGreaterThan(0);
+    const seen = new Set<number>();
     for (const t of core) {
-      expect(t.legs.length, `${t.legs.length}-leg core ticket`).toBeLessThanOrEqual(CORE_RULES.maxLegs);
-      const settling = t.bsDec ?? t.czDec;
-      expect(Number(settling), "a core ticket priced above the 2.6 ceiling").toBeLessThanOrEqual(CORE_RULES.maxDec);
-      expect(Number(t.czDec)).toBeLessThanOrEqual(CORE_RULES.maxDec);
+      expect(typeof t.shapeSlot, "a core ticket without its slot").toBe("number");
+      expect(seen.has(t.shapeSlot!), "two tickets in one slot").toBe(false);
+      seen.add(t.shapeSlot!);
+      const slot = shape.slots[t.shapeSlot!];
+      expect(t.legs.length, `${t.legs.length}-leg ticket in a ${slot.legs.min}-${slot.legs.max} leg slot`).toBeGreaterThanOrEqual(slot.legs.min);
+      expect(t.legs.length).toBeLessThanOrEqual(slot.legs.max);
+      expect(t.stake, "a ticket carrying other than its slot's stake").toBe(slot.stake);
+      const ceil = slotMaxDec(slot.legs, t.forced ? "forced" : "gated");
+      expect(Number(t.czDec), "a core ticket priced above its slot ceiling").toBeLessThanOrEqual(ceil);
+      expect(Number(t.bsDec), "a core ticket priced above its slot ceiling").toBeLessThanOrEqual(ceil);
       for (const l of t.legs) {
         const mkt = String(l.lkey ?? "").split("|")[1];
         expect(mkt === "batter_hits_runs_rbis" && String(l.prop ?? "").includes(" O "), `HRR over on core: ${l.prop}`).toBe(false);
       }
-      expect(t.stake, "a core stake above $25").toBeLessThanOrEqual(CORE_RULES.maxStake);
-      if (t.forced) expect(Math.max(Number(t.czDec ?? 0), Number(t.bsDec ?? 0))).toBeLessThanOrEqual(CORE_RULES.forcedMaxDec);
       expect(typeof t.probRaw, "probRaw missing — the pre-shrink number must stay recoverable").toBe("number");
       expect(typeof t.prob).toBe("number");
       expect("czEvRaw" in t).toBe(true);
     }
+    expect(core.reduce((a, t) => a + t.stake, 0)).toBeLessThanOrEqual(PAPER.daily);
     /* the shrink moved the numbers: on this fixture at least one ticket's model prob sat
        above its market read, so its shrunk prob is strictly below probRaw */
     const moved = core.filter((t) => Number(t.prob) < Number(t.probRaw));
@@ -324,10 +555,14 @@ describe("INSTRUCTION 18 — the 2026-09-03 core rules on the locked card", () =
   it("the alt world reads the same shrunk pool: every alt ticket carries probRaw too and obeys the same shape", async () => {
     const { entry } = await fixtureLock();
     const alt = (entry as SyncEntry).alt!;
-    for (const t of alt.core as { stake: number; probRaw?: unknown; legs: unknown[] }[]) {
+    const shape = shapeById(String((entry as { coreShape?: { id: string } }).coreShape?.id))!;
+    /* PIN UPDATED 2026-09-08 (INSTRUCTION 46): slot limits, not maxLegs/maxStake */
+    for (const t of alt.core as { stake: number; shapeSlot?: number; probRaw?: unknown; legs: unknown[] }[]) {
       expect(typeof t.probRaw).toBe("number");
-      expect(t.legs.length).toBeLessThanOrEqual(CORE_RULES.maxLegs);
-      expect(t.stake).toBeLessThanOrEqual(CORE_RULES.maxStake);
+      const slot = shape.slots[Number(t.shapeSlot)];
+      expect(slot, "an alt ticket outside the day's shape").toBeTruthy();
+      expect(t.legs.length).toBeLessThanOrEqual(slot.legs.max);
+      expect(t.stake).toBe(slot.stake);
     }
   }, T9);
 
@@ -335,4 +570,27 @@ describe("INSTRUCTION 18 — the 2026-09-03 core rules on the locked card", () =
     const { entry } = await fixtureLock();
     expect((entry as { blockedReasons?: Record<string, number> }).blockedReasons?.hrr_over_suspended).toBe(3);
   }, T9);
+});
+
+describe("INSTRUCTION 46 — self-calibration is WIRED: both lock-writing routes read the record and hand it to buildLockEntry (fix round 2026-09-08)", () => {
+  /* OBSERVED RED before the fix: readShapeCalibration was exported and never called — every
+     day ran the plain rotation and the "calibrating itself" half of INSTRUCTION 46 was dead. */
+  const read = (f: string) => stripComments(readFileSync(f, "utf8"));
+  it("app/api/generate/route.ts computes shapeCal via readShapeCalibration and passes it into buildLockEntry", () => {
+    const src = read("app/api/generate/route.ts");
+    expect(src).toMatch(/readShapeCalibration\(date\)/);
+    const call = src.slice(src.indexOf("const entry = buildLockEntry({"));
+    expect(call.slice(0, call.indexOf("});"))).toMatch(/\bshapeCal\b/);
+  });
+  it("app/api/scheduler/route.ts (the backfill lock) does the same", () => {
+    const src = read("app/api/scheduler/route.ts");
+    expect(src).toMatch(/readShapeCalibration\(date\)/);
+    const call = src.slice(src.indexOf("buildLockEntry({"));
+    expect(call.slice(0, call.indexOf("})"))).toMatch(/\bshapeCal\b/);
+  });
+  it("the read is fail-safe: readShapeCalibration catches its own errors (an unreadable store is null → rotation)", () => {
+    const src = read("src/lib/server/lock-card.ts");
+    const fn = src.slice(src.indexOf("export async function readShapeCalibration"));
+    expect(fn.slice(0, fn.indexOf("export function buildLockEntry"))).toMatch(/catch\s*\{\s*return null;/);
+  });
 });

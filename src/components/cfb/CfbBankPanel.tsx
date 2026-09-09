@@ -11,11 +11,18 @@ import { syncCfbNow } from "@/lib/cfb/sync";
  * the Settings page's MLB bank rows on the CFB store. The bankroll is managed, never
  * hand-edited: $2,500 base + the logged deposits / withdrawals + graded CFB P/L. Logging a
  * move appends to the CFB bank's own log and kicks the CFB sync loop.
+ *
+ * PHONE PASS (INSTRUCTION 46, 2026-09-08, the Builder relayout's sibling — Settings is where the
+ * CFB bank lives): each row stacks its label OVER its controls on a phone instead of a
+ * flex-wrap that broke the amount box, the note box and "Log it" across three ragged lines;
+ * the amount and note inputs are 44px tall (the tap target the props sandbox uses); the
+ * Deposit / Withdrawal pair and "Log it" fill their own lines. md+ keeps the label-left,
+ * controls-right rows the MLB bank has. Nothing here is set below 11px.
  */
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.04] py-3 last:border-0">
+    <div className="flex flex-col gap-2 border-b border-white/[0.04] py-3 last:border-0 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-3">
       <span className="text-[12px] text-muted">{label}</span>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
@@ -58,49 +65,54 @@ export function CfbBankPanel() {
   return (
     <div>
       <Row label="CFB bankroll (managed — never hand-edited)">
-        <span className="num text-[14px] font-bold text-cfb">{money(bankroll)}</span>
-        <span className="num text-[10.5px] text-faint">
+        <span className="num text-[16px] font-bold text-cfb md:text-[14px]">{money(bankroll)}</span>
+        <span className="num text-[11px] text-faint">
           = ${CFB_BANK_BASE.toLocaleString("en-US")} base ({bankStore.asOf}) {moves >= 0 ? "+" : "−"} ${Math.abs(moves).toFixed(2)} logged moves + graded CFB P/L
         </span>
       </Row>
       <Row label="Log a deposit / withdrawal">
-        <Pill
-          variant={kind === "deposit" ? "gold" : "ghost"}
-          className="!px-2.5 !py-0.5 text-[10.5px]"
-          onClick={() => setKind("deposit")}
-          aria-pressed={kind === "deposit"}
-        >
-          Deposit
-        </Pill>
-        <Pill
-          variant={kind === "withdrawal" ? "gold" : "ghost"}
-          className="!px-2.5 !py-0.5 text-[10.5px]"
-          onClick={() => setKind("withdrawal")}
-          aria-pressed={kind === "withdrawal"}
-        >
-          Withdrawal
-        </Pill>
-        <span className="num text-[12px] text-muted">$</span>
-        <input
-          type="number"
-          inputMode="decimal"
-          min={0}
-          step="1"
-          value={amt}
-          onChange={(e) => setAmt(e.target.value)}
-          aria-label="Amount"
-          className="num w-20 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[12px] text-text"
-        />
-        <input
-          type="text"
-          value={note}
-          maxLength={120}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="note (why)"
-          aria-label="Note"
-          className="w-36 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[12px] text-text"
-        />
-        <Pill variant="gold" className="!px-3 !py-1 text-[11px]" onClick={logIt}>
+        {/* phones: kind pair / $ + amount + note / Log it, one line each; md+: one flowing row */}
+        <div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center" data-testid="cfb-bank-kind">
+          <Pill
+            variant={kind === "deposit" ? "gold" : "ghost"}
+            className="min-h-[40px] justify-center !px-3 !py-1 text-[12px] md:min-h-0 md:!py-0.5 md:text-[11px]"
+            onClick={() => setKind("deposit")}
+            aria-pressed={kind === "deposit"}
+          >
+            Deposit
+          </Pill>
+          <Pill
+            variant={kind === "withdrawal" ? "gold" : "ghost"}
+            className="min-h-[40px] justify-center !px-3 !py-1 text-[12px] md:min-h-0 md:!py-0.5 md:text-[11px]"
+            onClick={() => setKind("withdrawal")}
+            aria-pressed={kind === "withdrawal"}
+          >
+            Withdrawal
+          </Pill>
+        </div>
+        <div className="flex w-full items-center gap-2 md:w-auto">
+          <span className="num text-[13px] text-muted">$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="1"
+            value={amt}
+            onChange={(e) => setAmt(e.target.value)}
+            aria-label="Amount"
+            className="num min-h-[44px] w-24 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[14px] text-text md:min-h-0 md:w-20 md:text-[12px]"
+          />
+          <input
+            type="text"
+            value={note}
+            maxLength={120}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="note (why)"
+            aria-label="Note"
+            className="min-h-[44px] min-w-0 flex-1 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 text-[14px] text-text md:min-h-0 md:w-36 md:flex-none md:text-[12px]"
+          />
+        </div>
+        <Pill variant="gold" className="min-h-[44px] w-full justify-center !px-3 !py-1 text-[13px] md:min-h-0 md:w-auto md:text-[11px]" onClick={logIt}>
           Log it
         </Pill>
         {saved && <span className="text-[11px] text-muted">{saved}</span>}
@@ -109,9 +121,9 @@ export function CfbBankPanel() {
         {log.length === 0 ? (
           <span className="text-[11px] text-faint">No moves logged — the CFB bank sits at its ${CFB_BANK_BASE.toLocaleString("en-US")} base.</span>
         ) : (
-          <ul className="w-full space-y-1">
+          <ul className="w-full space-y-1.5">
             {log.map((a) => (
-              <li key={`${a.ts}-${a.kind}-${a.amt}`} className="num flex items-baseline justify-between gap-2 text-[11px]">
+              <li key={`${a.ts}-${a.kind}-${a.amt}`} className="num flex items-baseline justify-between gap-2 text-[12px]">
                 <span className="text-faint">{new Date(a.ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                 <span className="min-w-0 flex-1 truncate text-muted">{a.note || (a.kind === "deposit" ? "deposit" : "withdrawal")}</span>
                 <span className={a.kind === "deposit" ? "text-pos" : "text-neg"}>
