@@ -1,0 +1,5014 @@
+{
+ "note": "REAL ENGINE OUTPUT, NOT A HAND-BUILT POOL. `propBoard` is the board the repo's own fixture engine produces from the captured 2026-07-09 odds/stats fixtures (tests/helpers/fixture-env.ts) -- the same 6 games / 289 rows tests/fixtures/baseline-armed-v1.json pins (armed-baseline.test.ts:91-96, plus that run's per-row shadow prices, which the generator does not read). Every price and every win % here is the engine's, so no test in tests/parlay-gen.test.ts quotes a number anybody made up.",
+ "source": "createEngine({ fetchJson: fixtureFetchJson, today: '2026-07-10' }).analyze(await collectSlate()).propBoard",
+ "games": 6,
+ "rows": 289,
+ "propBoard": [
+  {
+   "game": "Philadelphia Phillies @ Detroit Tigers \u00b7 3:40 PM",
+   "gkey": "philadelphiaphillies@detroittigers",
+   "start": "2026-07-10T22:40:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Jack Flaherty",
+      "tm": "DET",
+      "ln": 5.5,
+      "lkey": "jackflaherty|pitcher_strikeouts|5.5",
+      "o": -128,
+      "oBook": "FanDuel",
+      "u": 103,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.7,
+      "fO": 53.1,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Aaron Nola",
+      "tm": "PHI",
+      "ln": 5.5,
+      "lkey": "aaronnola|pitcher_strikeouts|5.5",
+      "o": 100,
+      "oBook": "FanDuel",
+      "u": -113,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 52.4,
+      "fO": 47.5,
+      "books": 4,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "Gabriel Rincones Jr.",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "gabrielrinconesjr|batter_hits|0.5",
+      "o": -140,
+      "oBook": "Fanatics",
+      "u": 105,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 55.2,
+      "fO": 54.5,
+      "books": 2,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kevin McGonigle",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "kevinmcgonigle|batter_hits|0.5",
+      "o": -271,
+      "oBook": "DraftKings",
+      "u": 199,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 69.1,
+      "fO": 68.6,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Trea Turner",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "treaturner|batter_hits|0.5",
+      "o": -254,
+      "oBook": "DraftKings",
+      "u": 187,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 66.1,
+      "fO": 67.3,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Riley Greene",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "rileygreene|batter_hits|0.5",
+      "o": -226,
+      "oBook": "DraftKings",
+      "u": 168,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 66.9,
+      "fO": 65,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Colt Keith",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "coltkeith|batter_hits|0.5",
+      "o": -223,
+      "oBook": "DraftKings",
+      "u": 165,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 63,
+      "fO": 64.7,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Alec Bohm",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "alecbohm|batter_hits|0.5",
+      "o": -221,
+      "oBook": "DraftKings",
+      "u": 164,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 59.6,
+      "fO": 64.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryce Harper",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "bryceharper|batter_hits|0.5",
+      "o": -214,
+      "oBook": "DraftKings",
+      "u": 159,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 58.4,
+      "fO": 63.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Marsh",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "brandonmarsh|batter_hits|0.5",
+      "o": -196,
+      "oBook": "DraftKings",
+      "u": 146,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60,
+      "fO": 62,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Zach McKinstry",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "zachmckinstry|batter_hits|0.5",
+      "o": -192,
+      "oBook": "DraftKings",
+      "u": 143,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 62.1,
+      "fO": 61.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Torkelson",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "spencertorkelson|batter_hits|0.5",
+      "o": -191,
+      "oBook": "DraftKings",
+      "u": 143,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 61.7,
+      "fO": 61.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryson Stott",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "brysonstott|batter_hits|0.5",
+      "o": -181,
+      "oBook": "DraftKings",
+      "u": 135,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 59.1,
+      "fO": 60.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kyle Schwarber",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "kyleschwarber|batter_hits|0.5",
+      "o": -180,
+      "oBook": "DraftKings",
+      "u": 135,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 58.6,
+      "fO": 60.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kerry Carpenter",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "kerrycarpenter|batter_hits|0.5",
+      "o": -176,
+      "oBook": "DraftKings",
+      "u": 132,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60.7,
+      "fO": 59.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Justin Crawford",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "justincrawford|batter_hits|0.5",
+      "o": -166,
+      "oBook": "DraftKings",
+      "u": 124,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60,
+      "fO": 58.3,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "J.T. Realmuto",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "jtrealmuto|batter_hits|0.5",
+      "o": -161,
+      "oBook": "DraftKings",
+      "u": 121,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.5,
+      "fO": 57.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Hao-Yu Lee",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "haoyulee|batter_hits|0.5",
+      "o": -150,
+      "oBook": "DraftKings",
+      "u": 113,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60.7,
+      "fO": 56.1,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Rogers",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "jakerogers|batter_hits|0.5",
+      "o": -126,
+      "oBook": "DraftKings",
+      "u": -105,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.3,
+      "fO": 52.1,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "James Outman",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "jamesoutman|batter_hits|0.5",
+      "o": -116,
+      "oBook": "DraftKings",
+      "u": -114,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 51.3,
+      "fO": 50.2,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Bryce Harper",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "bryceharper|batter_hits_runs_rbis|1.5",
+      "o": -115,
+      "oBook": "Fanatics",
+      "u": -110,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -121,
+       "u": -110
+      },
+      "pO": 47.3,
+      "fO": 50.1,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Justin Crawford",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "justincrawford|batter_hits_runs_rbis|1.5",
+      "o": 116,
+      "oBook": "DraftKings",
+      "u": -150,
+      "uBook": "Bovada",
+      "cz": {
+       "o": 115,
+       "u": -152
+      },
+      "pO": 45.5,
+      "fO": 43.5,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryson Stott",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "brysonstott|batter_hits_runs_rbis|1.5",
+      "o": 105,
+      "oBook": "Bovada",
+      "u": -132,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -102,
+       "u": -132
+      },
+      "pO": 46,
+      "fO": 45.9,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Marsh",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "brandonmarsh|batter_hits_runs_rbis|1.5",
+      "o": -105,
+      "oBook": "Bovada",
+      "u": -117,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -114,
+       "u": -117
+      },
+      "pO": 47.8,
+      "fO": 48.3,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Alec Bohm",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "alecbohm|batter_hits_runs_rbis|1.5",
+      "o": -110,
+      "oBook": "DraftKings",
+      "u": -114,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -117,
+       "u": -114
+      },
+      "pO": 46.5,
+      "fO": 49,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kyle Schwarber",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "kyleschwarber|batter_hits_runs_rbis|1.5",
+      "o": -120,
+      "oBook": "DraftKings",
+      "u": -105,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -127,
+       "u": -105
+      },
+      "pO": 51.3,
+      "fO": 51,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "J.T. Realmuto",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "jtrealmuto|batter_hits_runs_rbis|1.5",
+      "o": 120,
+      "oBook": "Bovada",
+      "u": -150,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 112,
+       "u": -150
+      },
+      "pO": 42,
+      "fO": 42.7,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Trea Turner",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "treaturner|batter_hits_runs_rbis|1.5",
+      "o": -125,
+      "oBook": "Bovada",
+      "u": 104,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -137,
+       "u": 104
+      },
+      "pO": 52.5,
+      "fO": 52.5,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Gabriel Rincones Jr.",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "gabrielrinconesjr|batter_hits_runs_rbis|0.5",
+      "o": -170,
+      "oBook": "DraftKings",
+      "u": 130,
+      "uBook": "Bovada",
+      "cz": null,
+      "pO": 62,
+      "fO": 59,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Bryce Harper",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "bryceharper|batter_total_bases|1.5",
+      "o": 126,
+      "oBook": "DraftKings",
+      "u": -162,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 120,
+       "u": -162
+      },
+      "pO": 37.6,
+      "fO": 41.7,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kerry Carpenter",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "kerrycarpenter|batter_total_bases|1.5",
+      "o": 124,
+      "oBook": "Caesars",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 124,
+       "u": -170
+      },
+      "pO": 41.2,
+      "fO": 41.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Alec Bohm",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "alecbohm|batter_total_bases|1.5",
+      "o": 145,
+      "oBook": "Bovada",
+      "u": -176,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 132,
+       "u": -176
+      },
+      "pO": 35.5,
+      "fO": 38.4,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Colt Keith",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "coltkeith|batter_total_bases|1.5",
+      "o": 135,
+      "oBook": "Bovada",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 127,
+       "u": -170
+      },
+      "pO": 41.9,
+      "fO": 40.7,
+      "books": 3,
+      "lu": "projected"
+     },
+     {
+      "p": "Trea Turner",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "treaturner|batter_total_bases|1.5",
+      "o": 116,
+      "oBook": "DraftKings",
+      "u": -148,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 110,
+       "u": -148
+      },
+      "pO": 41.2,
+      "fO": 43.7,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kevin McGonigle",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "kevinmcgonigle|batter_total_bases|1.5",
+      "o": 115,
+      "oBook": "Bovada",
+      "u": -141,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 106,
+       "u": -141
+      },
+      "pO": 44.2,
+      "fO": 44.1,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Marsh",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "brandonmarsh|batter_total_bases|1.5",
+      "o": 135,
+      "oBook": "Bovada",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 127,
+       "u": -170
+      },
+      "pO": 37.3,
+      "fO": 40,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Dillon Dingler",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "dillondingler|batter_total_bases|1.5",
+      "o": 107,
+      "oBook": "Caesars",
+      "u": -143,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 107,
+       "u": -143
+      },
+      "pO": 43.5,
+      "fO": 45.1,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Kyle Schwarber",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "kyleschwarber|batter_total_bases|1.5",
+      "o": 110,
+      "oBook": "Bovada",
+      "u": -141,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 106,
+       "u": -141
+      },
+      "pO": 39.9,
+      "fO": 45.2,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Riley Greene",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "rileygreene|batter_total_bases|1.5",
+      "o": 117,
+      "oBook": "DraftKings",
+      "u": -148,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 111,
+       "u": -148
+      },
+      "pO": 45.8,
+      "fO": 43.7,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Torkelson",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "spencertorkelson|batter_total_bases|1.5",
+      "o": 130,
+      "oBook": "Bovada",
+      "u": -170,
+      "uBook": "Bovada",
+      "cz": null,
+      "pO": 42.7,
+      "fO": 40.9,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "pitcher_outs": [
+     {
+      "p": "Aaron Nola",
+      "tm": "PHI",
+      "ln": 16.5,
+      "lkey": "aaronnola|pitcher_outs|16.5",
+      "o": -118,
+      "oBook": "DraftKings",
+      "u": -112,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -120,
+       "u": -112
+      },
+      "pO": 41.5,
+      "fO": 50.7,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jack Flaherty",
+      "tm": "DET",
+      "ln": 15.5,
+      "lkey": "jackflaherty|pitcher_outs|15.5",
+      "o": -104,
+      "oBook": "Caesars",
+      "u": -127,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -104,
+       "u": -130
+      },
+      "pO": 40.7,
+      "fO": 47.8,
+      "books": 3,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Kyle Schwarber",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "kyleschwarber|batter_home_runs|0.5",
+      "o": 205,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 205,
+       "u": null
+      },
+      "pO": 25.5,
+      "fO": 30.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Riley Greene",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "rileygreene|batter_home_runs|0.5",
+      "o": 370,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 370,
+       "u": null
+      },
+      "pO": 20.6,
+      "fO": 20.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kerry Carpenter",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "kerrycarpenter|batter_home_runs|0.5",
+      "o": 400,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 400,
+       "u": null
+      },
+      "pO": 19,
+      "fO": 18.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryce Harper",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "bryceharper|batter_home_runs|0.5",
+      "o": 425,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 425,
+       "u": null
+      },
+      "pO": 16.4,
+      "fO": 18,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Dillon Dingler",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "dillondingler|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 14.8,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Kevin McGonigle",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "kevinmcgonigle|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 15.1,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Torkelson",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "spencertorkelson|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 17,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Marsh",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "brandonmarsh|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 15.5,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Gabriel Rincones Jr.",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "gabrielrinconesjr|batter_home_runs|0.5",
+      "o": 575,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 575,
+       "u": null
+      },
+      "pO": 13.2,
+      "fO": 14,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "James Outman",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "jamesoutman|batter_home_runs|0.5",
+      "o": 575,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 575,
+       "u": null
+      },
+      "pO": 14.9,
+      "fO": 14,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Colt Keith",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "coltkeith|batter_home_runs|0.5",
+      "o": 575,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 575,
+       "u": null
+      },
+      "pO": 16.2,
+      "fO": 14,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Trea Turner",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "treaturner|batter_home_runs|0.5",
+      "o": 625,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 625,
+       "u": null
+      },
+      "pO": 13.4,
+      "fO": 13,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryson Stott",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "brysonstott|batter_home_runs|0.5",
+      "o": 700,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 700,
+       "u": null
+      },
+      "pO": 10.4,
+      "fO": 11.8,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Alec Bohm",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "alecbohm|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 11.5,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "J.T. Realmuto",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "jtrealmuto|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 11.7,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Zach McKinstry",
+      "tm": "DET",
+      "ln": 0.5,
+      "lkey": "zachmckinstry|batter_home_runs|0.5",
+      "o": 950,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 950,
+       "u": null
+      },
+      "pO": 11.1,
+      "fO": 9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Justin Crawford",
+      "tm": "PHI",
+      "ln": 0.5,
+      "lkey": "justincrawford|batter_home_runs|0.5",
+      "o": 1100,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1100,
+       "u": null
+      },
+      "pO": 7.8,
+      "fO": 7.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Marsh",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "brandonmarsh|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Kerry Carpenter",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "kerrycarpenter|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Riley Greene",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "rileygreene|batter_home_runs|1.5",
+      "o": 3500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.6,
+      "books": 0
+     },
+     {
+      "p": "Kevin McGonigle",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "kevinmcgonigle|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     },
+     {
+      "p": "Bryce Harper",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "bryceharper|batter_home_runs|1.5",
+      "o": 4500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.1,
+      "books": 0
+     },
+     {
+      "p": "Colt Keith",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "coltkeith|batter_home_runs|1.5",
+      "o": 8000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 8000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.2,
+      "books": 0
+     },
+     {
+      "p": "James Outman",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "jamesoutman|batter_home_runs|1.5",
+      "o": 8000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 8000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.2,
+      "books": 0
+     },
+     {
+      "p": "Gabriel Rincones Jr.",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "gabrielrinconesjr|batter_home_runs|1.5",
+      "o": 8000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 8000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.2,
+      "books": 0
+     },
+     {
+      "p": "Spencer Torkelson",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "spencertorkelson|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Kyle Schwarber",
+      "tm": "PHI",
+      "ln": 1.5,
+      "lkey": "kyleschwarber|batter_home_runs|1.5",
+      "o": 1300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 6.7,
+      "books": 0
+     },
+     {
+      "p": "Dillon Dingler",
+      "tm": "DET",
+      "ln": 1.5,
+      "lkey": "dillondingler|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     }
+    ]
+   }
+  },
+  {
+   "game": "Milwaukee Brewers @ Pittsburgh Pirates \u00b7 3:40 PM",
+   "gkey": "milwaukeebrewers@pittsburghpirates",
+   "start": "2026-07-10T22:40:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Braxton Ashcraft",
+      "tm": "PIT",
+      "ln": 6.5,
+      "lkey": "braxtonashcraft|pitcher_strikeouts|6.5",
+      "o": 116,
+      "oBook": "DraftKings",
+      "u": -142,
+      "uBook": "FanDuel",
+      "cz": null,
+      "pO": 41.6,
+      "fO": 44.1,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Sproat",
+      "tm": "MIL",
+      "ln": 4.5,
+      "lkey": "brandonsproat|pitcher_strikeouts|4.5",
+      "o": -162,
+      "oBook": "FanDuel",
+      "u": 126,
+      "uBook": "FanDuel",
+      "cz": null,
+      "pO": 65.4,
+      "fO": 58.3,
+      "books": 2,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brandon Sproat",
+      "tm": "MIL",
+      "ln": 5.5,
+      "lkey": "brandonsproat|pitcher_strikeouts|5.5",
+      "o": 126,
+      "oBook": "DraftKings",
+      "u": -162,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 49.6,
+      "fO": 41.7,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "Ryan O'Hearn",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "ryanohearn|batter_hits|0.5",
+      "o": -205,
+      "oBook": "Fanatics",
+      "u": 155,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 62.8,
+      "fO": 63.1,
+      "books": 2,
+      "lu": "confirmed"
+     },
+     {
+      "p": "William Contreras",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "williamcontreras|batter_hits|1.5",
+      "o": 193,
+      "oBook": "DraftKings",
+      "u": -262,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 27.3,
+      "fO": 32,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Mangum",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "jakemangum|batter_hits|0.5",
+      "o": -275,
+      "oBook": "DraftKings",
+      "u": 202,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 69,
+      "fO": 68.9,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jackson Chourio",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "jacksonchourio|batter_hits|0.5",
+      "o": -264,
+      "oBook": "DraftKings",
+      "u": 194,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 65.3,
+      "fO": 68.1,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Nick Gonzales",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "nickgonzales|batter_hits|0.5",
+      "o": -247,
+      "oBook": "DraftKings",
+      "u": 182,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 64.5,
+      "fO": 66.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Christian Yelich",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "christianyelich|batter_hits|0.5",
+      "o": -220,
+      "oBook": "DraftKings",
+      "u": 164,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60.4,
+      "fO": 64.5,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Brandon Lowe",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "brandonlowe|batter_hits|0.5",
+      "o": -215,
+      "oBook": "DraftKings",
+      "u": 160,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 62.3,
+      "fO": 64,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryan Reynolds",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "bryanreynolds|batter_hits|0.5",
+      "o": -208,
+      "oBook": "DraftKings",
+      "u": 155,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 61.7,
+      "fO": 63.3,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brice Turang",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "briceturang|batter_hits|0.5",
+      "o": -202,
+      "oBook": "DraftKings",
+      "u": 151,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 63.7,
+      "fO": 62.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sal Frelick",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "salfrelick|batter_hits|0.5",
+      "o": -189,
+      "oBook": "DraftKings",
+      "u": 141,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 59.6,
+      "fO": 61.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Esmerlyn Valdez",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "esmerlynvaldez|batter_hits|0.5",
+      "o": -174,
+      "oBook": "DraftKings",
+      "u": 131,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 60.3,
+      "fO": 59.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Bauers",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "jakebauers|batter_hits|0.5",
+      "o": -167,
+      "oBook": "DraftKings",
+      "u": 126,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 57.8,
+      "fO": 58.6,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Garrett Mitchell",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "garrettmitchell|batter_hits|0.5",
+      "o": -155,
+      "oBook": "DraftKings",
+      "u": 116,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 61.1,
+      "fO": 56.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jared Triolo",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "jaredtriolo|batter_hits|0.5",
+      "o": -150,
+      "oBook": "DraftKings",
+      "u": 113,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 55,
+      "fO": 56.1,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Joey Ortiz",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "joeyortiz|batter_hits|0.5",
+      "o": -143,
+      "oBook": "DraftKings",
+      "u": 108,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 56.7,
+      "fO": 55,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Cooper Pratt",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "cooperpratt|batter_hits|0.5",
+      "o": -137,
+      "oBook": "DraftKings",
+      "u": 103,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 53.4,
+      "fO": 54,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Tyler Callihan",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "tylercallihan|batter_hits|0.5",
+      "o": -131,
+      "oBook": "DraftKings",
+      "u": -101,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.6,
+      "fO": 53,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Henry Davis",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "henrydavis|batter_hits|0.5",
+      "o": -107,
+      "oBook": "DraftKings",
+      "u": -124,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 52.2,
+      "fO": 48.3,
+      "books": 1,
+      "lu": "projected"
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Jake Mangum",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "jakemangum|batter_hits_runs_rbis|1.5",
+      "o": -155,
+      "oBook": "Fanatics",
+      "u": 110,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 56.8,
+      "fO": 56.1,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Ryan O'Hearn",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "ryanohearn|batter_total_bases|1.5",
+      "o": 145,
+      "oBook": "Fanatics",
+      "u": -179,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 133,
+       "u": -179
+      },
+      "pO": 38.7,
+      "fO": 39,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Christian Yelich",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "christianyelich|batter_total_bases|1.5",
+      "o": 136,
+      "oBook": "DraftKings",
+      "u": -179,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 133,
+       "u": -179
+      },
+      "pO": 37.8,
+      "fO": 39.8,
+      "books": 3,
+      "lu": "projected"
+     },
+     {
+      "p": "Brandon Lowe",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "brandonlowe|batter_total_bases|1.5",
+      "o": 115,
+      "oBook": "Caesars",
+      "u": -150,
+      "uBook": "Bovada",
+      "cz": {
+       "o": 115,
+       "u": -154
+      },
+      "pO": 41.4,
+      "fO": 43.7,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Nick Gonzales",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "nickgonzales|batter_total_bases|1.5",
+      "o": 150,
+      "oBook": "DraftKings",
+      "u": -193,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 144,
+       "u": -193
+      },
+      "pO": 34.4,
+      "fO": 37.5,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryan Reynolds",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "bryanreynolds|batter_total_bases|1.5",
+      "o": 130,
+      "oBook": "DraftKings",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 125,
+       "u": -170
+      },
+      "pO": 39.5,
+      "fO": 40.8,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jackson Chourio",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "jacksonchourio|batter_total_bases|1.5",
+      "o": 116,
+      "oBook": "DraftKings",
+      "u": -148,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 110,
+       "u": -148
+      },
+      "pO": 41.7,
+      "fO": 43.7,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "William Contreras",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "williamcontreras|batter_total_bases|1.5",
+      "o": 130,
+      "oBook": "Bovada",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 125,
+       "u": -170
+      },
+      "pO": 35.5,
+      "fO": 41.2,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Mangum",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "jakemangum|batter_total_bases|1.5",
+      "o": 135,
+      "oBook": "Bovada",
+      "u": -157,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 118,
+       "u": -157
+      },
+      "pO": 40.2,
+      "fO": 40.2,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brice Turang",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "briceturang|batter_total_bases|1.5",
+      "o": 145,
+      "oBook": "Bovada",
+      "u": -190,
+      "uBook": "Bovada",
+      "cz": null,
+      "pO": 40.3,
+      "fO": 38.4,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Brandon Lowe",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "brandonlowe|batter_home_runs|0.5",
+      "o": 330,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 330,
+       "u": null
+      },
+      "pO": 19.6,
+      "fO": 21.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Esmerlyn Valdez",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "esmerlynvaldez|batter_home_runs|0.5",
+      "o": 475,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 475,
+       "u": null
+      },
+      "pO": 16.2,
+      "fO": 16.4,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bryan Reynolds",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "bryanreynolds|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 15.4,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jackson Chourio",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "jacksonchourio|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 15.5,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Ryan O'Hearn",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "ryanohearn|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 15.6,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Garrett Mitchell",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "garrettmitchell|batter_home_runs|0.5",
+      "o": 575,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 575,
+       "u": null
+      },
+      "pO": 14.4,
+      "fO": 14,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Bauers",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "jakebauers|batter_home_runs|0.5",
+      "o": 625,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 625,
+       "u": null
+      },
+      "pO": 13.3,
+      "fO": 13,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Henry Davis",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "henrydavis|batter_home_runs|0.5",
+      "o": 625,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 625,
+       "u": null
+      },
+      "pO": 13.9,
+      "fO": 13,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Tyler Callihan",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "tylercallihan|batter_home_runs|0.5",
+      "o": 700,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 700,
+       "u": null
+      },
+      "pO": 12,
+      "fO": 11.8,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "William Contreras",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "williamcontreras|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 10.9,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Christian Yelich",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "christianyelich|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 10.5,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Brice Turang",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "briceturang|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 10.7,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Nick Gonzales",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "nickgonzales|batter_home_runs|0.5",
+      "o": 950,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 950,
+       "u": null
+      },
+      "pO": 9,
+      "fO": 9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jared Triolo",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "jaredtriolo|batter_home_runs|0.5",
+      "o": 1100,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1100,
+       "u": null
+      },
+      "pO": 8.4,
+      "fO": 7.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Joey Ortiz",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "joeyortiz|batter_home_runs|0.5",
+      "o": 1300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1300,
+       "u": null
+      },
+      "pO": 8.4,
+      "fO": 6.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jake Mangum",
+      "tm": "PIT",
+      "ln": 0.5,
+      "lkey": "jakemangum|batter_home_runs|0.5",
+      "o": 1300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1300,
+       "u": null
+      },
+      "pO": 8.5,
+      "fO": 6.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Cooper Pratt",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "cooperpratt|batter_home_runs|0.5",
+      "o": 1500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1500,
+       "u": null
+      },
+      "pO": 6.3,
+      "fO": 5.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sal Frelick",
+      "tm": "MIL",
+      "ln": 0.5,
+      "lkey": "salfrelick|batter_home_runs|0.5",
+      "o": 2000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2000,
+       "u": null
+      },
+      "pO": 5.9,
+      "fO": 4.5,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Esmerlyn Valdez",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "esmerlynvaldez|batter_home_runs|1.5",
+      "o": 5500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 5500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.7,
+      "books": 0
+     },
+     {
+      "p": "Bryan Reynolds",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "bryanreynolds|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     },
+     {
+      "p": "Jackson Chourio",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "jacksonchourio|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     },
+     {
+      "p": "Brandon Lowe",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "brandonlowe|batter_home_runs|1.5",
+      "o": 3000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3,
+      "books": 0
+     },
+     {
+      "p": "Ryan O'Hearn",
+      "tm": "PIT",
+      "ln": 1.5,
+      "lkey": "ryanohearn|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Garrett Mitchell",
+      "tm": "MIL",
+      "ln": 1.5,
+      "lkey": "garrettmitchell|batter_home_runs|1.5",
+      "o": 8000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 8000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.2,
+      "books": 0
+     }
+    ]
+   }
+  },
+  {
+   "game": "New York Yankees @ Washington Nationals \u00b7 3:45 PM",
+   "gkey": "newyorkyankees@washingtonnationals",
+   "start": "2026-07-10T22:45:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Ryan Weathers",
+      "tm": "NYY",
+      "ln": 5.5,
+      "lkey": "ryanweathers|pitcher_strikeouts|5.5",
+      "o": 125,
+      "oBook": "Fanatics",
+      "u": -149,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": 107,
+       "u": null
+      },
+      "pO": 42.3,
+      "fO": 42.5,
+      "books": 4,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "Nasim Nunez",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "nasimnunez|batter_hits|0.5",
+      "o": -150,
+      "oBook": "DraftKings",
+      "u": 125,
+      "uBook": "Fanatics",
+      "cz": {
+       "o": -180,
+       "u": null
+      },
+      "pO": 61.5,
+      "fO": 57.2,
+      "books": 2,
+      "lu": "projected"
+     },
+     {
+      "p": "Ben Rice",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "benrice|batter_hits|1.5",
+      "o": 174,
+      "oBook": "DraftKings",
+      "u": -235,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": 159,
+       "u": null
+      },
+      "pO": 30.9,
+      "fO": 34.2,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Paul Goldschmidt",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "paulgoldschmidt|batter_hits|1.5",
+      "o": 185,
+      "oBook": "DraftKings",
+      "u": -250,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": 170,
+       "u": null
+      },
+      "pO": 26.4,
+      "fO": 32.9,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Cody Bellinger",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "codybellinger|batter_hits|1.5",
+      "o": 186,
+      "oBook": "DraftKings",
+      "u": -252,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": 171,
+       "u": null
+      },
+      "pO": 27.5,
+      "fO": 32.8,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Jasson Dom\u00ednguez",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "jassondominguez|batter_hits|1.5",
+      "o": 188,
+      "oBook": "DraftKings",
+      "u": -256,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": 173,
+       "u": null
+      },
+      "pO": 30.4,
+      "fO": 32.6,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Daylen Lile",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "daylenlile|batter_hits|0.5",
+      "o": -242,
+      "oBook": "DraftKings",
+      "u": 179,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -257,
+       "u": null
+      },
+      "pO": 66.2,
+      "fO": 66.4,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Curtis Mead",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "curtismead|batter_hits|0.5",
+      "o": -234,
+      "oBook": "DraftKings",
+      "u": 173,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -249,
+       "u": null
+      },
+      "pO": 65.6,
+      "fO": 65.7,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Jazz Chisholm Jr.",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "jazzchisholmjr|batter_hits|0.5",
+      "o": -231,
+      "oBook": "DraftKings",
+      "u": 171,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -246,
+       "u": null
+      },
+      "pO": 61.3,
+      "fO": 65.4,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "James Wood",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "jameswood|batter_hits|0.5",
+      "o": -226,
+      "oBook": "DraftKings",
+      "u": 167,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -241,
+       "u": null
+      },
+      "pO": 62.9,
+      "fO": 64.9,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Dylan Crews",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "dylancrews|batter_hits|0.5",
+      "o": -222,
+      "oBook": "DraftKings",
+      "u": 165,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -237,
+       "u": null
+      },
+      "pO": 62.7,
+      "fO": 64.6,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Trent Grisham",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "trentgrisham|batter_hits|0.5",
+      "o": -217,
+      "oBook": "DraftKings",
+      "u": 161,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -232,
+       "u": null
+      },
+      "pO": 64,
+      "fO": 64.1,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Jose Caballero",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "josecaballero|batter_hits|0.5",
+      "o": -194,
+      "oBook": "DraftKings",
+      "u": 145,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -209,
+       "u": null
+      },
+      "pO": 61.8,
+      "fO": 61.8,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "CJ Abrams",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "cjabrams|batter_hits|0.5",
+      "o": -182,
+      "oBook": "DraftKings",
+      "u": 136,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -197,
+       "u": null
+      },
+      "pO": 60.8,
+      "fO": 60.4,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Jacob Young",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "jacobyoung|batter_hits|0.5",
+      "o": -178,
+      "oBook": "DraftKings",
+      "u": 133,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -193,
+       "u": null
+      },
+      "pO": 58.9,
+      "fO": 59.9,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Keibert Ruiz",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "keibertruiz|batter_hits|0.5",
+      "o": -178,
+      "oBook": "DraftKings",
+      "u": 134,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -193,
+       "u": null
+      },
+      "pO": 61.5,
+      "fO": 60,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Ryan McMahon",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "ryanmcmahon|batter_hits|0.5",
+      "o": -157,
+      "oBook": "DraftKings",
+      "u": 118,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -172,
+       "u": null
+      },
+      "pO": 58.2,
+      "fO": 57.1,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Austin Wells",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "austinwells|batter_hits|0.5",
+      "o": -145,
+      "oBook": "DraftKings",
+      "u": 109,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -160,
+       "u": null
+      },
+      "pO": 54.8,
+      "fO": 55.3,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Andr\u00e9s Chaparro",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "andreschaparro|batter_hits|0.5",
+      "o": -142,
+      "oBook": "DraftKings",
+      "u": 107,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -157,
+       "u": null
+      },
+      "pO": 55.6,
+      "fO": 54.8,
+      "books": 1,
+      "lu": "projected"
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Jacob Young",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "jacobyoung|batter_hits_runs_rbis|1.5",
+      "o": 120,
+      "oBook": "Fanatics",
+      "u": -170,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 40.3,
+      "fO": 41.9,
+      "books": 1,
+      "lu": "projected"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Jazz Chisholm Jr.",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "jazzchisholmjr|batter_total_bases|1.5",
+      "o": 120,
+      "oBook": "Fanatics",
+      "u": -150,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 113,
+       "u": -150
+      },
+      "pO": 38.5,
+      "fO": 43.2,
+      "books": 2,
+      "lu": "projected"
+     },
+     {
+      "p": "Curtis Mead",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "curtismead|batter_total_bases|1.5",
+      "o": 112,
+      "oBook": "Caesars",
+      "u": -150,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 112,
+       "u": -150
+      },
+      "pO": 44.5,
+      "fO": 44,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Cody Bellinger",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "codybellinger|batter_total_bases|1.5",
+      "o": -102,
+      "oBook": "Caesars",
+      "u": -132,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -102,
+       "u": -132
+      },
+      "pO": 40.7,
+      "fO": 47,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Trent Grisham",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "trentgrisham|batter_total_bases|1.5",
+      "o": 121,
+      "oBook": "Caesars",
+      "u": -162,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 121,
+       "u": -162
+      },
+      "pO": 44.1,
+      "fO": 42.3,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Jasson Dom\u00ednguez",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "jassondominguez|batter_total_bases|1.5",
+      "o": 101,
+      "oBook": "Caesars",
+      "u": -134,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 101,
+       "u": -134
+      },
+      "pO": 44.8,
+      "fO": 46.5,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Ben Rice",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "benrice|batter_total_bases|1.5",
+      "o": -117,
+      "oBook": "Caesars",
+      "u": -114,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -117,
+       "u": -114
+      },
+      "pO": 46.8,
+      "fO": 50.3,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Daylen Lile",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "daylenlile|batter_total_bases|1.5",
+      "o": 126,
+      "oBook": "Caesars",
+      "u": -170,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 126,
+       "u": -170
+      },
+      "pO": 42.1,
+      "fO": 41.3,
+      "books": 1,
+      "lu": "projected"
+     }
+    ],
+    "pitcher_outs": [
+     {
+      "p": "Ryan Weathers",
+      "tm": "NYY",
+      "ln": 16.5,
+      "lkey": "ryanweathers|pitcher_outs|16.5",
+      "o": -106,
+      "oBook": "DraftKings",
+      "u": -115,
+      "uBook": "Fanatics",
+      "cz": {
+       "o": -113,
+       "u": -118
+      },
+      "pO": 43.6,
+      "fO": 48.8,
+      "books": 4,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Ben Rice",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "benrice|batter_home_runs|0.5",
+      "o": 290,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 290,
+       "u": null
+      },
+      "pO": 24.5,
+      "fO": 24.2,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Jazz Chisholm Jr.",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "jazzchisholmjr|batter_home_runs|0.5",
+      "o": 330,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 330,
+       "u": null
+      },
+      "pO": 18.2,
+      "fO": 21.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "James Wood",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "jameswood|batter_home_runs|0.5",
+      "o": 350,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 350,
+       "u": null
+      },
+      "pO": 19.9,
+      "fO": 21,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Cody Bellinger",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "codybellinger|batter_home_runs|0.5",
+      "o": 390,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 390,
+       "u": null
+      },
+      "pO": 16,
+      "fO": 19.3,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Paul Goldschmidt",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "paulgoldschmidt|batter_home_runs|0.5",
+      "o": 390,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 390,
+       "u": null
+      },
+      "pO": 17.5,
+      "fO": 19.3,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Curtis Mead",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "curtismead|batter_home_runs|0.5",
+      "o": 400,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 400,
+       "u": null
+      },
+      "pO": 17.8,
+      "fO": 18.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Austin Wells",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "austinwells|batter_home_runs|0.5",
+      "o": 400,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 400,
+       "u": null
+      },
+      "pO": 17.1,
+      "fO": 18.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Dylan Crews",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "dylancrews|batter_home_runs|0.5",
+      "o": 425,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 425,
+       "u": null
+      },
+      "pO": 16.1,
+      "fO": 18,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Jasson Dom\u00ednguez",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "jassondominguez|batter_home_runs|0.5",
+      "o": 475,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 475,
+       "u": null
+      },
+      "pO": 15.3,
+      "fO": 16.4,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Trent Grisham",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "trentgrisham|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 15.2,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Andr\u00e9s Chaparro",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "andreschaparro|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 14.8,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "CJ Abrams",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "cjabrams|batter_home_runs|0.5",
+      "o": 575,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 575,
+       "u": null
+      },
+      "pO": 15.2,
+      "fO": 14,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Jose Caballero",
+      "tm": "NYY",
+      "ln": 0.5,
+      "lkey": "josecaballero|batter_home_runs|0.5",
+      "o": 625,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 625,
+       "u": null
+      },
+      "pO": 14.7,
+      "fO": 13,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Daylen Lile",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "daylenlile|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 11.9,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Jacob Young",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "jacobyoung|batter_home_runs|0.5",
+      "o": 1100,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1100,
+       "u": null
+      },
+      "pO": 8.7,
+      "fO": 7.9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Nasim Nunez",
+      "tm": "WSH",
+      "ln": 0.5,
+      "lkey": "nasimnunez|batter_home_runs|0.5",
+      "o": 1300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1300,
+       "u": null
+      },
+      "pO": 8.5,
+      "fO": 6.7,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Cody Bellinger",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "codybellinger|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Jasson Dom\u00ednguez",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "jassondominguez|batter_home_runs|1.5",
+      "o": 5500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 5500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.7,
+      "books": 0
+     },
+     {
+      "p": "CJ Abrams",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "cjabrams|batter_home_runs|1.5",
+      "o": 8000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 8000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.2,
+      "books": 0
+     },
+     {
+      "p": "Trent Grisham",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "trentgrisham|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     },
+     {
+      "p": "Paul Goldschmidt",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "paulgoldschmidt|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Jazz Chisholm Jr.",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "jazzchisholmjr|batter_home_runs|1.5",
+      "o": 3000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3,
+      "books": 0
+     },
+     {
+      "p": "Ben Rice",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "benrice|batter_home_runs|1.5",
+      "o": 2300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3.9,
+      "books": 0
+     },
+     {
+      "p": "James Wood",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "jameswood|batter_home_runs|1.5",
+      "o": 3300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.8,
+      "books": 0
+     },
+     {
+      "p": "Dylan Crews",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "dylancrews|batter_home_runs|1.5",
+      "o": 4500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.1,
+      "books": 0
+     },
+     {
+      "p": "Austin Wells",
+      "tm": "NYY",
+      "ln": 1.5,
+      "lkey": "austinwells|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Curtis Mead",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "curtismead|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Andr\u00e9s Chaparro",
+      "tm": "WSH",
+      "ln": 1.5,
+      "lkey": "andreschaparro|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     }
+    ]
+   }
+  },
+  {
+   "game": "Kansas City Royals @ Baltimore Orioles \u00b7 4:05 PM",
+   "gkey": "kansascityroyals@baltimoreorioles",
+   "start": "2026-07-10T23:05:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Brandon Young",
+      "tm": "BAL",
+      "ln": 4.5,
+      "lkey": "brandonyoung|pitcher_strikeouts|4.5",
+      "o": 105,
+      "oBook": "Bovada",
+      "u": -130,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 47.7,
+      "fO": 46.3,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Luinder Avila",
+      "tm": "KC",
+      "ln": 4.5,
+      "lkey": "luinderavila|pitcher_strikeouts|4.5",
+      "o": 112,
+      "oBook": "FanDuel",
+      "u": -142,
+      "uBook": "FanDuel",
+      "cz": null,
+      "pO": 51.1,
+      "fO": 44.6,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "Dylan Beavers",
+      "tm": "BAL",
+      "ln": 0.5,
+      "lkey": "dylanbeavers|batter_hits|0.5",
+      "o": -170,
+      "oBook": "Fanatics",
+      "u": 130,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": null,
+      "fO": 59.2,
+      "books": 1
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Bobby Witt Jr.",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "bobbywittjr|batter_hits_runs_rbis|1.5",
+      "o": -165,
+      "oBook": "Fanatics",
+      "u": 115,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 58.3,
+      "fO": 57.2,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Blaze Alexander",
+      "tm": "BAL",
+      "ln": 1.5,
+      "lkey": "blazealexander|batter_total_bases|1.5",
+      "o": 150,
+      "oBook": "Fanatics",
+      "u": -200,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 39.5,
+      "fO": 37.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Gunnar Henderson",
+      "tm": "BAL",
+      "ln": 1.5,
+      "lkey": "gunnarhenderson|batter_total_bases|1.5",
+      "o": -110,
+      "oBook": "Caesars",
+      "u": -121,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -110,
+       "u": -121
+      },
+      "pO": 44.4,
+      "fO": 48.9,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Pete Alonso",
+      "tm": "BAL",
+      "ln": 1.5,
+      "lkey": "petealonso|batter_total_bases|1.5",
+      "o": 109,
+      "oBook": "Caesars",
+      "u": -145,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 109,
+       "u": -145
+      },
+      "pO": 44.8,
+      "fO": 44.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Samuel Basallo",
+      "tm": "BAL",
+      "ln": 1.5,
+      "lkey": "samuelbasallo|batter_total_bases|1.5",
+      "o": 118,
+      "oBook": "Caesars",
+      "u": -157,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 118,
+       "u": -157
+      },
+      "pO": 39.9,
+      "fO": 42.9,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Vinnie Pasquantino",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "vinniepasquantino|batter_total_bases|1.5",
+      "o": 118,
+      "oBook": "Caesars",
+      "u": -157,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 118,
+       "u": -157
+      },
+      "pO": null,
+      "fO": 42.9,
+      "books": 1
+     },
+     {
+      "p": "Carter Jensen",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "carterjensen|batter_total_bases|1.5",
+      "o": 106,
+      "oBook": "Caesars",
+      "u": -141,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 106,
+       "u": -141
+      },
+      "pO": 43.9,
+      "fO": 45.3,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Adley Rutschman",
+      "tm": "BAL",
+      "ln": 1.5,
+      "lkey": "adleyrutschman|batter_total_bases|1.5",
+      "o": 115,
+      "oBook": "Caesars",
+      "u": -152,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 115,
+       "u": -152
+      },
+      "pO": 44.9,
+      "fO": 43.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Bobby Witt Jr.",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "bobbywittjr|batter_total_bases|1.5",
+      "o": -124,
+      "oBook": "Caesars",
+      "u": -107,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -124,
+       "u": -107
+      },
+      "pO": 48.5,
+      "fO": 51.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jac Caglianone",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "jaccaglianone|batter_total_bases|1.5",
+      "o": 103,
+      "oBook": "Caesars",
+      "u": -137,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 103,
+       "u": -137
+      },
+      "pO": 44,
+      "fO": 46,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "pitcher_outs": [
+     {
+      "p": "Luinder Avila",
+      "tm": "KC",
+      "ln": 14.5,
+      "lkey": "luinderavila|pitcher_outs|14.5",
+      "o": -130,
+      "oBook": "Fanatics",
+      "u": -110,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 42.9,
+      "fO": 51.9,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Jac Caglianone",
+      "tm": "KC",
+      "ln": 0.5,
+      "lkey": "jaccaglianone|batter_home_runs|0.5",
+      "o": 265,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 265,
+       "u": null
+      },
+      "pO": 20.7,
+      "fO": 25.8,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jac Caglianone",
+      "tm": "KC",
+      "ln": 1.5,
+      "lkey": "jaccaglianone|batter_home_runs|1.5",
+      "o": 2000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 4.5,
+      "books": 0
+     }
+    ]
+   }
+  },
+  {
+   "game": "Chicago Cubs @ Cincinnati Reds \u00b7 4:10 PM",
+   "gkey": "chicagocubs@cincinnatireds",
+   "start": "2026-07-10T23:10:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Hunter Greene",
+      "tm": "CIN",
+      "ln": 6.5,
+      "lkey": "huntergreene|pitcher_strikeouts|6.5",
+      "o": 100,
+      "oBook": "FanDuel",
+      "u": -125,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": null,
+      "fO": 47.1,
+      "books": 3
+     },
+     {
+      "p": "Shota Imanaga",
+      "tm": "CHC",
+      "ln": 5.5,
+      "lkey": "shotaimanaga|pitcher_strikeouts|5.5",
+      "o": -115,
+      "oBook": "FanDuel",
+      "u": -111,
+      "uBook": "FanDuel",
+      "cz": null,
+      "pO": 54.1,
+      "fO": 50.2,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "JJ Bleday",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "jjbleday|batter_hits|0.5",
+      "o": -170,
+      "oBook": "Fanatics",
+      "u": 130,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 57,
+      "fO": 59.2,
+      "books": 2,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Elly De La Cruz",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "ellydelacruz|batter_hits|0.5",
+      "o": -260,
+      "oBook": "DraftKings",
+      "u": 191,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 63.5,
+      "fO": 67.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sal Stewart",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "salstewart|batter_hits|0.5",
+      "o": -240,
+      "oBook": "DraftKings",
+      "u": 177,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 64.2,
+      "fO": 66.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Steer",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "spencersteer|batter_hits|0.5",
+      "o": -228,
+      "oBook": "DraftKings",
+      "u": 169,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 62,
+      "fO": 65.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Noelvi Marte",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "noelvimarte|batter_hits|0.5",
+      "o": -211,
+      "oBook": "DraftKings",
+      "u": 157,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 59.6,
+      "fO": 63.6,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Tyler Stephenson",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "tylerstephenson|batter_hits|0.5",
+      "o": -171,
+      "oBook": "DraftKings",
+      "u": 128,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 59.9,
+      "fO": 59,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Eugenio Suarez",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "eugeniosuarez|batter_hits|0.5",
+      "o": -168,
+      "oBook": "DraftKings",
+      "u": 126,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.9,
+      "fO": 58.6,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Matt McLain",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "mattmclain|batter_hits|0.5",
+      "o": -142,
+      "oBook": "DraftKings",
+      "u": 107,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 52.4,
+      "fO": 54.8,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Edwin Arroyo",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "edwinarroyo|batter_hits|0.5",
+      "o": -133,
+      "oBook": "DraftKings",
+      "u": 100,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 53.7,
+      "fO": 53.3,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Carson Kelly",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "carsonkelly|batter_hits_runs_rbis|1.5",
+      "o": 105,
+      "oBook": "Fanatics",
+      "u": -150,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 49.2,
+      "fO": 44.8,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Seiya Suzuki",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "seiyasuzuki|batter_total_bases|1.5",
+      "o": 120,
+      "oBook": "Fanatics",
+      "u": -160,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 47.1,
+      "fO": 42.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Elly De La Cruz",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "ellydelacruz|batter_total_bases|1.5",
+      "o": 110,
+      "oBook": "Bovada",
+      "u": -136,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 102,
+       "u": -136
+      },
+      "pO": 39.7,
+      "fO": 45,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sal Stewart",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "salstewart|batter_total_bases|1.5",
+      "o": 111,
+      "oBook": "DraftKings",
+      "u": -139,
+      "uBook": "Caesars",
+      "cz": {
+       "o": 105,
+       "u": -139
+      },
+      "pO": 44,
+      "fO": 44.6,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Steer",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "spencersteer|batter_total_bases|1.5",
+      "o": 116,
+      "oBook": "Caesars",
+      "u": -150,
+      "uBook": "Bovada",
+      "cz": {
+       "o": 116,
+       "u": -154
+      },
+      "pO": 40.1,
+      "fO": 43.5,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Noelvi Marte",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "noelvimarte|batter_total_bases|1.5",
+      "o": 145,
+      "oBook": "Bovada",
+      "u": -189,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 38.8,
+      "fO": 38.6,
+      "books": 2,
+      "lu": "confirmed"
+     }
+    ],
+    "pitcher_outs": [
+     {
+      "p": "Shota Imanaga",
+      "tm": "CHC",
+      "ln": 17.5,
+      "lkey": "shotaimanaga|pitcher_outs|17.5",
+      "o": -125,
+      "oBook": "Caesars",
+      "u": -106,
+      "uBook": "DraftKings",
+      "cz": {
+       "o": -125,
+       "u": -106
+      },
+      "pO": 40.5,
+      "fO": 51.9,
+      "books": 3,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Ian Happ",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "ianhapp|batter_home_runs|0.5",
+      "o": 280,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 280,
+       "u": null
+      },
+      "pO": 21.3,
+      "fO": 24.8,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Pete Crow-Armstrong",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "petecrowarmstrong|batter_home_runs|0.5",
+      "o": 290,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 290,
+       "u": null
+      },
+      "pO": 24.1,
+      "fO": 24.2,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sal Stewart",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "salstewart|batter_home_runs|0.5",
+      "o": 305,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 305,
+       "u": null
+      },
+      "pO": 21.3,
+      "fO": 23.3,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Michael Busch",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "michaelbusch|batter_home_runs|0.5",
+      "o": 330,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 330,
+       "u": null
+      },
+      "pO": 19.7,
+      "fO": 21.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Eugenio Suarez",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "eugeniosuarez|batter_home_runs|0.5",
+      "o": 330,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 330,
+       "u": null
+      },
+      "pO": 18.8,
+      "fO": 21.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Seiya Suzuki",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "seiyasuzuki|batter_home_runs|0.5",
+      "o": 330,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 330,
+       "u": null
+      },
+      "pO": 23,
+      "fO": 21.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Michael Conforto",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "michaelconforto|batter_home_runs|0.5",
+      "o": 350,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 350,
+       "u": null
+      },
+      "pO": 20.3,
+      "fO": 21,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Dansby Swanson",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "dansbyswanson|batter_home_runs|0.5",
+      "o": 370,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 370,
+       "u": null
+      },
+      "pO": 21.2,
+      "fO": 20.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Spencer Steer",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "spencersteer|batter_home_runs|0.5",
+      "o": 390,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 390,
+       "u": null
+      },
+      "pO": 17,
+      "fO": 19.3,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Alex Bregman",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "alexbregman|batter_home_runs|0.5",
+      "o": 400,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 400,
+       "u": null
+      },
+      "pO": 17.1,
+      "fO": 18.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "JJ Bleday",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "jjbleday|batter_home_runs|0.5",
+      "o": 425,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 425,
+       "u": null
+      },
+      "pO": 15.7,
+      "fO": 18,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Tyler Stephenson",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "tylerstephenson|batter_home_runs|0.5",
+      "o": 475,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 475,
+       "u": null
+      },
+      "pO": 14.1,
+      "fO": 16.4,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Carson Kelly",
+      "tm": "CHC",
+      "ln": 0.5,
+      "lkey": "carsonkelly|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 15.3,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Noelvi Marte",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "noelvimarte|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 15.2,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Edwin Arroyo",
+      "tm": "CIN",
+      "ln": 0.5,
+      "lkey": "edwinarroyo|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 10.2,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Alex Bregman",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "alexbregman|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Carson Kelly",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "carsonkelly|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Dansby Swanson",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "dansbyswanson|batter_home_runs|1.5",
+      "o": 3500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.6,
+      "books": 0
+     },
+     {
+      "p": "JJ Bleday",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "jjbleday|batter_home_runs|1.5",
+      "o": 4500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.1,
+      "books": 0
+     },
+     {
+      "p": "Pete Crow-Armstrong",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "petecrowarmstrong|batter_home_runs|1.5",
+      "o": 2300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3.9,
+      "books": 0
+     },
+     {
+      "p": "Spencer Steer",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "spencersteer|batter_home_runs|1.5",
+      "o": 4000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 4000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.3,
+      "books": 0
+     },
+     {
+      "p": "Tyler Stephenson",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "tylerstephenson|batter_home_runs|1.5",
+      "o": 5500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 5500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.7,
+      "books": 0
+     },
+     {
+      "p": "Ian Happ",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "ianhapp|batter_home_runs|1.5",
+      "o": 2200,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2200,
+       "u": null
+      },
+      "pO": null,
+      "fO": 4.1,
+      "books": 0
+     },
+     {
+      "p": "Noelvi Marte",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "noelvimarte|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Michael Conforto",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "michaelconforto|batter_home_runs|1.5",
+      "o": 3300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.8,
+      "books": 0
+     },
+     {
+      "p": "Sal Stewart",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "salstewart|batter_home_runs|1.5",
+      "o": 2500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 2500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3.6,
+      "books": 0
+     },
+     {
+      "p": "Michael Busch",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "michaelbusch|batter_home_runs|1.5",
+      "o": 3000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3,
+      "books": 0
+     },
+     {
+      "p": "Eugenio Suarez",
+      "tm": "CIN",
+      "ln": 1.5,
+      "lkey": "eugeniosuarez|batter_home_runs|1.5",
+      "o": 3000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3,
+      "books": 0
+     },
+     {
+      "p": "Seiya Suzuki",
+      "tm": "CHC",
+      "ln": 1.5,
+      "lkey": "seiyasuzuki|batter_home_runs|1.5",
+      "o": 3000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 3,
+      "books": 0
+     }
+    ]
+   }
+  },
+  {
+   "game": "Cleveland Guardians @ Miami Marlins \u00b7 4:10 PM",
+   "gkey": "clevelandguardians@miamimarlins",
+   "start": "2026-07-10T23:10:00Z",
+   "live": false,
+   "markets": {
+    "pitcher_strikeouts": [
+     {
+      "p": "Parker Messick",
+      "tm": "CLE",
+      "ln": 5.5,
+      "lkey": "parkermessick|pitcher_strikeouts|5.5",
+      "o": -113,
+      "oBook": "FanDuel",
+      "u": -108,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 49.2,
+      "fO": 50,
+      "books": 3,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sandy Alcantara",
+      "tm": "MIA",
+      "ln": 5.5,
+      "lkey": "sandyalcantara|pitcher_strikeouts|5.5",
+      "o": 105,
+      "oBook": "Fanatics",
+      "u": -117,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54,
+      "fO": 48,
+      "books": 4,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits": [
+     {
+      "p": "Brayan Rocchio",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "brayanrocchio|batter_hits|0.5",
+      "o": -235,
+      "oBook": "Fanatics",
+      "u": 178,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 66.3,
+      "fO": 66.1,
+      "books": 2,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Otto Lopez",
+      "tm": "MIA",
+      "ln": 1.5,
+      "lkey": "ottolopez|batter_hits|1.5",
+      "o": 169,
+      "oBook": "DraftKings",
+      "u": -228,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 34.8,
+      "fO": 34.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Xavier Edwards",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "xavieredwards|batter_hits|0.5",
+      "o": -243,
+      "oBook": "DraftKings",
+      "u": 180,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 63.9,
+      "fO": 66.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Chase DeLauter",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "chasedelauter|batter_hits|0.5",
+      "o": -212,
+      "oBook": "DraftKings",
+      "u": 158,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 66,
+      "fO": 63.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Liam Hicks",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "liamhicks|batter_hits|0.5",
+      "o": -212,
+      "oBook": "DraftKings",
+      "u": 158,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 65.3,
+      "fO": 63.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Javier Sanoja",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "javiersanoja|batter_hits|0.5",
+      "o": -203,
+      "oBook": "DraftKings",
+      "u": 151,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 64.7,
+      "fO": 62.7,
+      "books": 1,
+      "lu": "projected"
+     },
+     {
+      "p": "Travis Bazzana",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "travisbazzana|batter_hits|0.5",
+      "o": -203,
+      "oBook": "DraftKings",
+      "u": 152,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 61.4,
+      "fO": 62.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kyle Stowers",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "kylestowers|batter_hits|0.5",
+      "o": -196,
+      "oBook": "DraftKings",
+      "u": 146,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 62.6,
+      "fO": 62,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Steven Kwan",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "stevenkwan|batter_hits|0.5",
+      "o": -179,
+      "oBook": "DraftKings",
+      "u": 134,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 57.6,
+      "fO": 60,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kyle Manzardo",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "kylemanzardo|batter_hits|0.5",
+      "o": -173,
+      "oBook": "DraftKings",
+      "u": 130,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 55.3,
+      "fO": 59.3,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kahlil Watson",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "kahlilwatson|batter_hits|0.5",
+      "o": -169,
+      "oBook": "DraftKings",
+      "u": 127,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 57.9,
+      "fO": 58.8,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Heriberto Hernandez",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "heribertohernandez|batter_hits|0.5",
+      "o": -167,
+      "oBook": "DraftKings",
+      "u": 125,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 57.7,
+      "fO": 58.5,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Daniel Schneemann",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "danielschneemann|batter_hits|0.5",
+      "o": -154,
+      "oBook": "DraftKings",
+      "u": 116,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 56.1,
+      "fO": 56.7,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Gabriel Arias",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "gabrielarias|batter_hits|0.5",
+      "o": -148,
+      "oBook": "DraftKings",
+      "u": 112,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 56.6,
+      "fO": 55.9,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Patrick Bailey",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "patrickbailey|batter_hits|0.5",
+      "o": -133,
+      "oBook": "DraftKings",
+      "u": 100,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 54.4,
+      "fO": 53.3,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jakob Marsee",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "jakobmarsee|batter_hits|0.5",
+      "o": -132,
+      "oBook": "DraftKings",
+      "u": 100,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 52.7,
+      "fO": 53.2,
+      "books": 1,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Esteury Ruiz",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "esteuryruiz|batter_hits|0.5",
+      "o": -123,
+      "oBook": "DraftKings",
+      "u": -107,
+      "uBook": "DraftKings",
+      "cz": null,
+      "pO": 51.7,
+      "fO": 51.6,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_hits_runs_rbis": [
+     {
+      "p": "Xavier Edwards",
+      "tm": "MIA",
+      "ln": 1.5,
+      "lkey": "xavieredwards|batter_hits_runs_rbis|1.5",
+      "o": -115,
+      "oBook": "Fanatics",
+      "u": -125,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 50.2,
+      "fO": 49.1,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_total_bases": [
+     {
+      "p": "Brayan Rocchio",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "brayanrocchio|batter_total_bases|1.5",
+      "o": 130,
+      "oBook": "Fanatics",
+      "u": -170,
+      "uBook": "Fanatics",
+      "cz": null,
+      "pO": 41.3,
+      "fO": 40.8,
+      "books": 1,
+      "lu": "confirmed"
+     }
+    ],
+    "pitcher_outs": [
+     {
+      "p": "Parker Messick",
+      "tm": "CLE",
+      "ln": 17.5,
+      "lkey": "parkermessick|pitcher_outs|17.5",
+      "o": -132,
+      "oBook": "Caesars",
+      "u": 105,
+      "uBook": "Bovada",
+      "cz": {
+       "o": -132,
+       "u": 100
+      },
+      "pO": 45.2,
+      "fO": 54.1,
+      "books": 4,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Sandy Alcantara",
+      "tm": "MIA",
+      "ln": 18.5,
+      "lkey": "sandyalcantara|pitcher_outs|18.5",
+      "o": 105,
+      "oBook": "DraftKings",
+      "u": -129,
+      "uBook": "Caesars",
+      "cz": {
+       "o": -105,
+       "u": -129
+      },
+      "pO": 39.7,
+      "fO": 45.5,
+      "books": 3,
+      "lu": "confirmed"
+     }
+    ],
+    "batter_home_runs": [
+     {
+      "p": "Kyle Manzardo",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "kylemanzardo|batter_home_runs|0.5",
+      "o": 350,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 350,
+       "u": null
+      },
+      "pO": 17.9,
+      "fO": 21,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Travis Bazzana",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "travisbazzana|batter_home_runs|0.5",
+      "o": 475,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 475,
+       "u": null
+      },
+      "pO": 14.3,
+      "fO": 16.4,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Gabriel Arias",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "gabrielarias|batter_home_runs|0.5",
+      "o": 475,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 475,
+       "u": null
+      },
+      "pO": 15.9,
+      "fO": 16.4,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Heriberto Hernandez",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "heribertohernandez|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 16.1,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kahlil Watson",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "kahlilwatson|batter_home_runs|0.5",
+      "o": 500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 500,
+       "u": null
+      },
+      "pO": 13.8,
+      "fO": 15.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Chase DeLauter",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "chasedelauter|batter_home_runs|0.5",
+      "o": 525,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 525,
+       "u": null
+      },
+      "pO": 14.7,
+      "fO": 15.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Daniel Schneemann",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "danielschneemann|batter_home_runs|0.5",
+      "o": 625,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 625,
+       "u": null
+      },
+      "pO": 12.2,
+      "fO": 13,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Liam Hicks",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "liamhicks|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 10.6,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Brayan Rocchio",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "brayanrocchio|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 11.8,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Patrick Bailey",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "patrickbailey|batter_home_runs|0.5",
+      "o": 750,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 750,
+       "u": null
+      },
+      "pO": 11.1,
+      "fO": 11.1,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Jakob Marsee",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "jakobmarsee|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 9.7,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Otto Lopez",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "ottolopez|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 11.7,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Esteury Ruiz",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "esteuryruiz|batter_home_runs|0.5",
+      "o": 850,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 850,
+       "u": null
+      },
+      "pO": 10,
+      "fO": 9.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Javier Sanoja",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "javiersanoja|batter_home_runs|0.5",
+      "o": 950,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 950,
+       "u": null
+      },
+      "pO": 10.1,
+      "fO": 9,
+      "books": 0,
+      "lu": "projected"
+     },
+     {
+      "p": "Xavier Edwards",
+      "tm": "MIA",
+      "ln": 0.5,
+      "lkey": "xavieredwards|batter_home_runs|0.5",
+      "o": 1100,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1100,
+       "u": null
+      },
+      "pO": 7.6,
+      "fO": 7.9,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Steven Kwan",
+      "tm": "CLE",
+      "ln": 0.5,
+      "lkey": "stevenkwan|batter_home_runs|0.5",
+      "o": 1300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 1300,
+       "u": null
+      },
+      "pO": 6.9,
+      "fO": 6.7,
+      "books": 0,
+      "lu": "confirmed"
+     },
+     {
+      "p": "Kyle Manzardo",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "kylemanzardo|batter_home_runs|1.5",
+      "o": 3300,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 3300,
+       "u": null
+      },
+      "pO": null,
+      "fO": 2.8,
+      "books": 0
+     },
+     {
+      "p": "Chase DeLauter",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "chasedelauter|batter_home_runs|1.5",
+      "o": 7000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 7000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.3,
+      "books": 0
+     },
+     {
+      "p": "Heriberto Hernandez",
+      "tm": "MIA",
+      "ln": 1.5,
+      "lkey": "heribertohernandez|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     },
+     {
+      "p": "Gabriel Arias",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "gabrielarias|batter_home_runs|1.5",
+      "o": 5500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 5500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.7,
+      "books": 0
+     },
+     {
+      "p": "Travis Bazzana",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "travisbazzana|batter_home_runs|1.5",
+      "o": 5500,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 5500,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.7,
+      "books": 0
+     },
+     {
+      "p": "Kahlil Watson",
+      "tm": "CLE",
+      "ln": 1.5,
+      "lkey": "kahlilwatson|batter_home_runs|1.5",
+      "o": 6000,
+      "oBook": "Caesars",
+      "u": null,
+      "uBook": null,
+      "cz": {
+       "o": 6000,
+       "u": null
+      },
+      "pO": null,
+      "fO": 1.5,
+      "books": 0
+     }
+    ]
+   }
+  }
+ ]
+}

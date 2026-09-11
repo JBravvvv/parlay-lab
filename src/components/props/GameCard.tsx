@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
 import { parseMatchup, teamAbbr, teamCode, teamLogo, teamLogoFromLabel } from "@/lib/mlb-visuals";
 import { legId, playerMatches, type GameGroup, type TeamSide } from "./props-model";
+import { collapseKey, panelIdFor, setCollapsed, useGameCollapse } from "./collapse-store";
 
 /* ----------------------------------------------------------- the game header */
 
@@ -17,24 +18,35 @@ function Logo({ name, size = "h-5 w-5" }: { name: string; size?: string }) {
 /**
  * Compact card header: 20px logos, "AWAY @ HOME · time" at 11px, the row count
  * and a chevron. Tapping anywhere on it collapses the card.
+ *
+ * INSTRUCTION 50 (2026-09-11, item 5): the strip was h-9 = 36px, under this repo's own 44px
+ * thumb-target bar (the Board's Engine-notes toggle, app/board/page.tsx). It is now
+ * min-h-[44px] with `press` tap feedback, and it names the panel it opens through
+ * aria-controls — emitted ONLY while open, so a collapsed card leaves no dangling reference
+ * to an element that is not in the tree.
  */
 export function GameHeader({
   game,
   open,
   onToggle,
   count,
+  panelId,
 }: {
   game: string;
   open: boolean;
   onToggle: () => void;
   count?: string;
+  /** id of the body this header opens; referenced only while `open` */
+  panelId?: string;
 }) {
   const m = parseMatchup(game);
   return (
     <button
-      className="flex h-9 w-full items-center gap-2 px-3 text-left"
+      type="button"
+      className="press flex min-h-[44px] w-full items-center gap-2 px-3 text-left"
       onClick={onToggle}
       aria-expanded={open}
+      aria-controls={open && panelId ? panelId : undefined}
     >
       <Logo name={m.away} />
       <Logo name={m.home} />
@@ -135,16 +147,39 @@ export function GameMarketCard({
   /** INSTRUCTION 46 deep link: the ledger bet's team name — that side's row gets ringed and scrolled to */
   hitPlayer?: string | null;
 }) {
-  const [open, setOpen] = useState(true);
   const hitRef = useRef<HTMLDivElement>(null);
+  /* INSTRUCTION 50 item 5: the choice lives in the shared collapse store, so it survives the
+     remounts the props page does on every market change / deep-link narrowing, and a reload.
+     An unseen game key is OPEN — the default is unchanged. */
+  const ckey = collapseKey(g.gkey, g.game);
+  const { open: stored, toggle } = useGameCollapse(ckey);
+  const panel = panelIdFor(ckey);
+  const hasHit = !!hitPlayer && g.rows.some((r) => playerMatches(String(r.label ?? ""), hitPlayer));
+  /* A deep link OPENS its card once, on arrival — it does not hold it open forever.
+     `open = stored || hasHit` did the latter, and that made the header a dead button on exactly
+     the card a ledger link lands on: the tap wrote collapsed=true to the store, `hasHit` forced
+     `open` back to true, nothing moved, aria-expanded stayed "true", and the store quietly
+     desynchronised from the screen. That is Josh's item-1 complaint ("button not working")
+     reintroduced by item 5's own fix. Clearing the stored bit once instead leaves the header
+     live: the link still always reveals its row. */
+  useEffect(() => {
+    if (hasHit) setCollapsed(ckey, false);
+  }, [hasHit, ckey]);
+  const open = stored;
   useEffect(() => {
     if (hitPlayer) hitRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [hitPlayer]);
   return (
     <section className="glass overflow-hidden">
-      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} />
+      <GameHeader
+        game={g.game}
+        open={open}
+        onToggle={toggle}
+        panelId={panel}
+        count={`${g.rows.length} line${g.rows.length === 1 ? "" : "s"}`}
+      />
       {open && (
-        <div className="px-2 pb-1">
+        <div id={panel} className="px-2 pb-1">
           {g.rows.map((r) => {
             const cz = typeof r.cz === "number" ? r.cz : null;
             const prob = typeof r.prob === "number" ? r.prob : null;

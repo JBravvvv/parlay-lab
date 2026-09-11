@@ -18,6 +18,7 @@ import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { getEngine, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { useCalibration } from "@/lib/useCalibration";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
+import { settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import type { PickRow } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
 
@@ -144,6 +145,21 @@ export default function SharpPage() {
       r.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[r.gkey]?.pk ?? null, r.lkey) : null,
     [d, liveNow],
   );
+  /* INSTRUCTION 50 item 2, on THE SHARP (fix pass). This is the tab Josh says the refresh works
+     on, so it is the one he sits on — and it reproduced the bug verbatim: the live tally
+     "● now 3 H+R+RBI · Top 4" printed on the same line as the pregame EV badge and the green
+     EDGE tag, with no check that the boxscore had already decided the leg. The read is the same
+     pure function the Board uses, and it costs nothing here: playNow already carries `.val`. */
+  const playSettled = useCallback(
+    (r: PickRow): LegSettledRead | null => settledRead(r.lkey, r.sub, playNow(r)?.val),
+    [playNow],
+  );
+  /* A decided leg is not a "play". It is NOT hidden — nothing is deleted from the desk's read —
+     but it sinks below everything still open, so it can never head today's list. */
+  const shownPlays = useMemo(
+    () => plays.map((r, i) => ({ r, i, s: playSettled(r) })).sort((a, b) => Number(!!a.s) - Number(!!b.s) || a.i - b.i),
+    [plays, playSettled],
+  );
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      read. Every hook above has already run, so this early return is hooks-safe. */
@@ -247,8 +263,8 @@ export default function SharpPage() {
                 : "Today's plays — best playable EV at Caesars"}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
-              {plays.map((r, i) => (
-                <Panel key={`${r.label}|${r.sub}`} className={i === 0 ? "glow-pos" : ""}>
+              {shownPlays.map(({ r, s: settled }, i) => (
+                <Panel key={`${r.label}|${r.sub}`} className={i === 0 && !settled ? "glow-pos" : ""}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="display text-[16px] text-text"><BoardLabel label={r.label} /></div>
@@ -280,17 +296,33 @@ export default function SharpPage() {
                         </span>
                       ) : null;
                     })()}
-                    <EvBadge ev={Number(selMode === "dk_fd" ? r.bsEv : r.czEv)} />
-                    {selMode === "dk_fd" && r.czEv != null && (
-                      <span className="text-muted" title="Informational: EV at the Caesars settlement price">
-                        @CZ {Number(r.czEv) > 0 ? "+" : ""}{Number(r.czEv).toFixed(1)}%
+                    {settled ? (
+                      <span
+                        className="inline-flex items-center gap-1.5"
+                        title={`${settled.why} — the price shown is the pregame lock, not a live market`}
+                      >
+                        <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-gold">
+                          SETTLED
+                        </span>
+                        <span className={`text-[10px] ${settled.side === "U" ? "text-neg" : "text-pos"}`}>
+                          {settled.why} — the price shown is the pregame lock, not a live market
+                        </span>
                       </span>
+                    ) : (
+                      <>
+                        <EvBadge ev={Number(selMode === "dk_fd" ? r.bsEv : r.czEv)} />
+                        {selMode === "dk_fd" && r.czEv != null && (
+                          <span className="text-muted" title="Informational: EV at the Caesars settlement price">
+                            @CZ {Number(r.czEv) > 0 ? "+" : ""}{Number(r.czEv).toFixed(1)}%
+                          </span>
+                        )}
+                        {(selMode === "dk_fd" ? r.bsBadge : r.czBadge) ? (
+                          <span className="rounded-full border border-pos/50 bg-pos/10 px-2 py-0.5 text-[9.5px] font-bold text-pos">
+                            EDGE
+                          </span>
+                        ) : null}
+                      </>
                     )}
-                    {(selMode === "dk_fd" ? r.bsBadge : r.czBadge) ? (
-                      <span className="rounded-full border border-pos/50 bg-pos/10 px-2 py-0.5 text-[9.5px] font-bold text-pos">
-                        EDGE
-                      </span>
-                    ) : null}
                     {r.lu === "projected" && (
                       <span
                         className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"

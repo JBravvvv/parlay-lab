@@ -10,6 +10,9 @@ import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import type { Ticket } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
+import { PlayerMark } from "@/components/player/PlayerMark";
+import { parseBoardLabel } from "@/lib/player-card";
+import { useHeadshots } from "@/lib/mlb-visuals";
 
 /* The engine's generated parlay sets, straight from BoardData — the old app's
    PARLAYS / MIXED PARLAYS / LIVE PARLAYS tabs. Display only: every number here
@@ -80,6 +83,24 @@ export function ParlaysSection({
   const modeEv = (t: Ticket) => (basisMode ? (t.bsEv == null ? null : Number(t.bsEv)) : t.czEv == null ? null : Number(t.czEv));
 
   const lists: Record<View, Ticket[]> = { parlays, mixed, live };
+
+  /* INSTRUCTION 50 (2026-09-11, Josh's word, verbatim: "Need player headshots for Parlay Builder
+     etc or need team logo next to name"): every leg that names a player gets his headshot with HIS
+     team's logo badged on it. The name list is computed ONCE over all three sets — not per view and
+     not per filter — because useHeadshots re-keys on the joined list, and a key that changed when
+     Josh tapped MIXED would re-run the statsapi resolve on every tab press. A club leg (ML/RL) has
+     no "(TEAM)" suffix, so parseBoardLabel returns null and no mark is drawn: a club is not a person. */
+  const markNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const t of [...parlays, ...mixed, ...live]) {
+      for (const l of t.legs ?? []) {
+        const parsed = parseBoardLabel(String(l.label ?? ""));
+        if (parsed) names.add(parsed.name);
+      }
+    }
+    return [...names].sort();
+  }, [parlays, mixed, live]);
+  const headshots = useHeadshots(markNames);
   const all = useMemo(() => orderByMode(lists[view] ?? [], selMode), [parlays, mixed, live, view, selMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filters = useMemo(() => {
@@ -207,8 +228,18 @@ export function ParlaysSection({
                       {t.legs.map((l, i) => {
                         const n = legNow ? legNow(l as { gkey?: string | null; lkey?: string | null }) : null;
                         const lo = legOut ? legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null }) : false;
+                        const who = parseBoardLabel(String(l.label ?? ""));
                         return (
                           <li key={i} className={lo ? "truncate line-through decoration-red-400/60" : "truncate"}>
+                            {who && (
+                              <PlayerMark
+                                player={who.name}
+                                team={who.team}
+                                headshot={headshots[who.name] ?? null}
+                                size="xs"
+                                className="mr-1 align-text-bottom"
+                              />
+                            )}
                             <span className="text-text"><BoardLabel label={l.label} /></span> · {l.prop}
                             {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}

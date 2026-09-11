@@ -58,6 +58,12 @@ export function refillReason(b: Record<string, unknown>): string | null {
 /**
  * The mutation the Board page's Refresh pill runs. Whatever the server answers (seated, capped,
  * refused free) the board and the ledger are re-read so the card shows what the server now holds.
+ *
+ * INSTRUCTION 50 (2026-09-11, Josh: "Refresh button not working on 'Board' tab; works if I refresh
+ * on 'The Sharp' tab"). The day's stamped picks — the rows every prop tab renders — were NOT part
+ * of that re-read: the Board fetched /api/picks once on mount and never again, so leaving for The
+ * Sharp and coming back (a remount) was the only thing that ever refreshed them. The picks query
+ * is invalidated here alongside the board, so a tap re-reads both.
  */
 export function useRefillDesk() {
   const qc = useQueryClient();
@@ -65,6 +71,7 @@ export function useRefillDesk() {
     mutationFn: (desk: RefillDesk) => refillDesk(desk),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["board"] });
+      void qc.invalidateQueries({ queryKey: ["picks"] });
       void syncNow();
     },
   });

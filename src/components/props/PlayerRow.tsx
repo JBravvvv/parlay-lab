@@ -5,6 +5,7 @@ import type { PropBoardGame, PropBoardRow } from "@/engine";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
 import { parseMatchup } from "@/lib/mlb-visuals";
 import { GameHeader, TeamSidePills } from "./GameCard";
+import { collapseKey, panelIdFor, useGameCollapse, setCollapsed } from "./collapse-store";
 import { PlayerName } from "@/components/player/PlayerName";
 import { MKT_LABEL, filterSide, playerLeg, playerMatches, sidePrice, sideProb, sideShort, type Side, type TeamSide } from "./props-model";
 
@@ -198,7 +199,15 @@ export function PropGameCard({
   /** INSTRUCTION 46 deep link: the ledger bet's player name — his row(s) get ringed, the list opens far enough to show him */
   hitPlayer?: string | null;
 }) {
-  const [open, setOpen] = useState(true);
+  /* INSTRUCTION 50 item 5 (2026-09-11, Josh: "Need to be able to collapse list of picks for
+     each individual game/prop by clicking/pressing in the top box that shows the team
+     matchup"). The collapse was already here; what it lacked was memory — a bare useState
+     was thrown away on every remount. It now reads/writes the shared collapse store, so a
+     closed card stays closed across a market change, a deep link and a reload. Unseen keys
+     stay OPEN. */
+  const ckey = collapseKey(g.gkey, g.game);
+  const { open: stored, toggle } = useGameCollapse(ckey);
+  const panel = panelIdFor(ckey);
   const [shown, setShown] = useState(FIRST);
   /* INSTRUCTION 46 (2026-09-08): All / <away> / <home> — per game, and back to All whenever the
      market changes (a Giants filter on H+R+RBI must not silently carry into Hits). */
@@ -208,11 +217,26 @@ export function PropGameCard({
   const visible = useMemo(() => filterSide(rows, side, m.away, m.home), [rows, side, m]);
   const hitAt = hitPlayer ? visible.findIndex((r) => playerMatches(r.p, hitPlayer)) : -1;
   const limit = hitAt >= shown ? hitAt + 1 : shown;
+  /* Same as GameMarketCard: the deep link CLEARS the remembered collapse once, rather than
+     overriding `open` on every render. Overriding left the matchup header inert on the one
+     card a ledger link takes Josh straight to — the tap wrote to the store and nothing on
+     screen moved (INSTRUCTION 50 fix pass). */
+  const hasHit = hitAt >= 0;
+  useEffect(() => {
+    if (hasHit) setCollapsed(ckey, false);
+  }, [hasHit, ckey]);
+  const open = stored;
   return (
     <section className="glass overflow-hidden">
-      <GameHeader game={g.game} open={open} onToggle={() => setOpen((o) => !o)} count={`${visible.length} line${visible.length === 1 ? "" : "s"}`} />
+      <GameHeader
+        game={g.game}
+        open={open}
+        onToggle={toggle}
+        panelId={panel}
+        count={`${visible.length} line${visible.length === 1 ? "" : "s"}`}
+      />
       {open && (
-        <div className="px-1.5 pb-1">
+        <div id={panel} className="px-1.5 pb-1">
           <TeamSidePills away={m.away} home={m.home} side={side} onSide={setSide} />
           {visible.slice(0, limit).map((r) => (
             <PlayerRow

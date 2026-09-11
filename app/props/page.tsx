@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -17,13 +17,17 @@ import { NflProps } from "@/components/nfl/NflProps";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
 import { useHeadshots } from "@/lib/mlb-visuals";
+import { parseBoardLabel } from "@/lib/player-card";
 import { MarketNav } from "@/components/props/MarketNav";
 import { PropGameCard } from "@/components/props/PlayerRow";
 import { GameMarketCard } from "@/components/props/GameCard";
 import { Slip } from "@/components/props/Slip";
+import { GEN_MARKETS, GenSheet } from "@/components/props/GenSheet";
+import { buildPool, generate, specSeed, type GenPool, type GenResult, type GenSpec } from "@/lib/parlay-gen";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import {
   MARKETS,
+  MKT_LABEL,
   bothSides,
   gameMatches,
   groupByGame,
@@ -66,6 +70,39 @@ import {
  * parseDeepLink / legDeepLink in props-model.ts.
  */
 
+/* INSTRUCTION 50 — the generator's remembered open/closed state, and the spec it opens with.
+   The default band and category are Josh's own worked example ("4 leg, H+R+RBI, -152 -> +110"),
+   read as a PER-LEG band: his four legs (-145 / -124 / -137 / -130) each sit inside it, while
+   their product is +834. Neither is a price — they are filters over prices the book posted. */
+const GEN_OPEN_KEY = "pl:props:gen-open";
+const blankPins = (n: number): (string | null)[] => Array.from({ length: n }, () => null);
+const GEN_SPEC_DEFAULT: GenSpec = {
+  market: "batter_hits_runs_rbis",
+  legs: 4,
+  legMinAm: -152,
+  legMaxAm: 110,
+  payout: null,
+  sides: "o",
+  onePerGame: true,
+  czOnly: false,
+  includeStarted: false,
+  modelOnly: false,
+  pinned: blankPins(4),
+};
+
+/* What the generator sees while its panel is CLOSED: nothing, at no cost. buildPool and
+   generate are pure but not free, and a reader who never opens the sheet should not pay for a
+   full pool build plus a seeded fill on every board or spec change (INSTRUCTION 50 fix pass). */
+const EMPTY_POOL: GenPool = {
+  legs: [],
+  byId: new Map(),
+  rows: 0,
+  games: 0,
+  startedDropped: 0,
+  noParlayDropped: 0,
+};
+const GEN_CLOSED: GenResult = { ok: false, fail: { code: "no-rows" } };
+
 export default function PropsPage() {
   // useSearchParams needs a Suspense boundary; it is read on both server and client so the deep link hydrates cleanly
   return (
@@ -101,6 +138,31 @@ function PropsDesk() {
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [search, setSearch] = useState("");
+  /* ---- INSTRUCTION 50, the parlay generator -------------------------------------------
+     `genOpen` is read from localStorage only AFTER mount — the hydration rule (the same one
+     app/board/page.tsx:123-135 states): an initializer read would render one tree on the
+     server and another on the client. `nowMs` starts at 0 for the same reason, so a server
+     render marks NO game as started; it is set once on mount, never on a timer — a ticket
+     Josh is looking at must not reshuffle itself under him. */
+  const [genOpen, setGenOpen] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(GEN_OPEN_KEY) === "1") setGenOpen(true);
+    } catch { /* fresh device / storage blocked */ }
+  }, []);
+  const toggleGen = (next: boolean) => {
+    setGenOpen(next);
+    try { localStorage.setItem(GEN_OPEN_KEY, next ? "1" : "0"); } catch {}
+  };
+  const [spec, setSpec] = useState<GenSpec>(GEN_SPEC_DEFAULT);
+  const [roll, setRoll] = useState(0);
+  const [added, setAdded] = useState(false);
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => setNowMs(Date.now()), []);
+  /* the last 10 ticket keys, so Regenerate does not hand back the spin just seen */
+  const history = useRef<string[]>([]);
+  /* the slip exactly as it was before "Add to slip" — the Undo */
+  const prevLegs = useRef<SandboxLeg[] | null>(null);
   const linkOn = !!link && link.tab === tab && link.mkt === mktKey;
 
   const d = q.data?.data;
@@ -178,11 +240,110 @@ function PropsDesk() {
   const linkMissing = linkOn && !!d && !q.isPending && !deep.found && !(ownEmpty && !gameTab && serverProps.isPending);
 
   const totalRows = propGames.reduce((n, x) => n + x.rows.length, 0);
+
+  /* ---- INSTRUCTION 50: the generator's pool and its ticket -----------------------------
+     Both are pure: buildPool/generate never fetch, never touch the engine sandbox and never
+     spend an Odds credit — they read the board that is already on the device.
+
+     Both are also gated on `genOpen` (fix pass): a reader who never opens the sheet should not
+     pay for pool construction over the whole prop board plus the seeded fill and the bounded
+     repair loop on every dependency change. A closed sheet gets the empty pool, which the
+     generator answers with `no-rows` at no cost. */
+  const pool = useMemo(
+    () => (genOpen ? buildPool(propBoard, spec, nowMs) : EMPTY_POOL),
+    [genOpen, propBoard, spec, nowMs],
+  );
+  const gen = useMemo(
+    () =>
+      genOpen
+        ? generate(pool, spec, specSeed(spec, q.data?.date ?? "", roll), new Set(history.current))
+        : GEN_CLOSED,
+    [genOpen, pool, spec, roll, q.data?.date],
+  );
+
+  /* ONE headshot map for the page, and it must cover the GENERATOR's legs too (fix pass).
+     `propGames` is search-filtered while the generator's pool is built over the whole prop
+     board, so with any text in the search box every generated slot fell back to initials.
+     Still exactly one useHeadshots call — a second would thrash the module-level inflight lane
+     in src/lib/mlb-visuals.ts. */
   const playerNames = useMemo(
-    () => [...new Set(propGames.flatMap((x) => x.rows.map((r) => r.p)))],
-    [propGames],
+    () => [
+      ...new Set([
+        ...propGames.flatMap((x) => x.rows.map((r) => r.p)),
+        ...pool.legs.map((l) => parseBoardLabel(l.leg.label)?.name ?? l.leg.label),
+      ]),
+    ],
+    [propGames, pool],
   );
   const headshots = useHeadshots(playerNames);
+  /* ONE market state: the RAIL owns it. A category tap inside the generator moves the rail,
+     and this effect copies the rail's market back into the spec, so the two cannot disagree.
+     Pins are leg ids and a leg id is market-specific — changing market clears them rather
+     than leaving pins that could only ever come back as "pin-missing". */
+  useEffect(() => {
+    if (!cat || !GEN_MARKETS.includes(cat)) return;
+    setSpec((sp) => (sp.market === cat ? sp : { ...sp, market: cat, pinned: blankPins(sp.legs) }));
+  }, [cat]);
+  const moveRailTo = (m: string) => {
+    for (const t of ["batter", "pitcher"] as TabKey[]) {
+      const hit = MARKETS[t].find((x) => x.cat === m);
+      if (!hit) continue;
+      setTab(t);
+      setMktKey(hit.key);
+      return;
+    }
+  };
+  const patchSpec = (patch: Partial<GenSpec>) => {
+    if (patch.market && patch.market !== spec.market) {
+      moveRailTo(patch.market);
+      return;
+    }
+    setSpec((sp) => {
+      const next: GenSpec = { ...sp, ...patch };
+      if (patch.legs != null && patch.legs !== sp.legs) next.pinned = blankPins(patch.legs);
+      return next;
+    });
+  };
+  /* UNPINNING ALWAYS WORKS (fix pass). This used to open with `if (!gen.ok) return;` and read
+     the id off the ticket — so on any failure the control was a no-op, while the failure copy
+     ("unpin the gold slot and spin again") told Josh to use exactly it. Clearing a pin reads
+     the id from the SPEC, which is always available; only SETTING a new pin needs a ticket. */
+  const togglePin = (slot: number) => {
+    setSpec((sp) => {
+      const pinned = Array.from({ length: sp.legs }, (_, k) => sp.pinned[k] ?? null);
+      if (pinned[slot]) {
+        pinned[slot] = null;
+        return { ...sp, pinned };
+      }
+      if (!gen.ok) return sp;
+      const id = gen.ticket.legs[slot]?.leg.id;
+      if (!id) return sp;
+      pinned[slot] = id;
+      return { ...sp, pinned };
+    });
+  };
+  const spin = () => {
+    if (gen.ok) {
+      const k = gen.ticket.key;
+      history.current = [k, ...history.current.filter((x) => x !== k)].slice(0, 10);
+    }
+    setRoll((r) => r + 1);
+  };
+  const addGenerated = () => {
+    if (!gen.ok) return;
+    prevLegs.current = legs;
+    setLegs(gen.ticket.legs.map((l) => l.leg));
+    setAdded(true);
+  };
+  const undoAdd = () => {
+    setLegs(prevLegs.current ?? []);
+    prevLegs.current = null;
+    setAdded(false);
+  };
+  /* the board's own generation time, formatted only after mount (nowMs is 0 on the server, so
+     SSR prints no time and hydration cannot mismatch on a locale-rendered clock) */
+  const boardAtLabel =
+    nowMs > 0 && q.data?.at ? new Date(q.data.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
 
   /* a board generated before the full prop board shipped has no `propBoard` */
   const legacyBoard = !!d && !d.propBoard && !gameTab && !fromServer && !serverProps.isPending;
@@ -245,6 +406,26 @@ function PropsDesk() {
         search={!gameTab && cat != null ? search : null}
         onSearch={setSearch}
         count={{ lines: totalRows, games: propGames.length }}
+      />
+
+      <GenSheet
+        market={spec.market}
+        marketLabel={MKT_LABEL[spec.market] ?? spec.market}
+        pool={pool}
+        headshots={headshots}
+        spec={spec}
+        onSpec={patchSpec}
+        result={gen}
+        onGenerate={spin}
+        onTogglePin={togglePin}
+        onAdd={addGenerated}
+        canUndo={added && prevLegs.current != null}
+        onUndo={undoAdd}
+        open={genOpen}
+        onOpen={toggleGen}
+        boardAt={boardAtLabel}
+        loading={q.isPending || (ownEmpty && serverProps.isPending)}
+        gameMarket={gameTab}
       />
 
       {fromServer && !gameTab && (

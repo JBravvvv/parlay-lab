@@ -138,17 +138,31 @@ export function gradePrediction(
 /* ---------- live "current" read (2026-07-21) ----------
    The same stat extraction as the grader, but for a game IN PROGRESS: what is
    this leg's number right now? No void/lineup rules (nothing is being settled),
-   no fabrication — a player not yet in the boxscore returns null, not 0. */
+   no fabrication — a player not yet in the boxscore returns null, not 0.
+
+   INSTRUCTION 50 (2026-09-11, Josh's word, verbatim: "it will show the player is top 4th
+   w/ 3 H+R+RBI, but show them as an 'S' grade for over .5 H+R+RBI"). The tally was
+   computed here and then THROWN AWAY — only `txt` was returned, so no caller could ever
+   compare "3 H+R+RBI" to the leg's 0.5 line. The number now rides out alongside the text
+   as `val`, one extraction with one source of truth (a second exported extractor would
+   drift). The honesty rule is unchanged and now explicit in the type:
+     - ml_/rl_ legs have no counting stat → val: null (the score lives in txt).
+     - a player not in the boxscore, or with no batting/pitching block yet → the whole
+       read is null. Never `val: 0`: "no appearance" and "0 so far" are different facts.
+   A real 0 (player IS in the box, no HR yet) is a real `val: 0`. */
 export function currentValue(
   lkey: string,
   status: GameStatus | null,
   box: Boxscore | null,
-): { txt: string } | null {
+): { txt: string; val: number | null } | null {
   if (lkey === "ml_home" || lkey === "ml_away" || lkey === "rl_home" || lkey === "rl_away") {
     if (status?.away == null || status?.home == null) return null;
     // [bet team]-[opponent], matching the grader's settled details
     const betHome = lkey === "ml_home" || lkey === "rl_home";
-    return { txt: betHome ? `${status.home}-${status.away}` : `${status.away}-${status.home}` };
+    return {
+      txt: betHome ? `${status.home}-${status.away}` : `${status.away}-${status.home}`,
+      val: null, // a score is not this leg's counting stat — nothing to compare to a line
+    };
   }
   const parts = lkey.split("|");
   if (parts.length !== 3 || !box) return null;
@@ -158,9 +172,8 @@ export function currentValue(
   if (mkt === "pitcher_strikeouts" || mkt === "pitcher_outs") {
     const pit = pl.stats?.pitching ?? {};
     if (!Object.keys(pit).length) return null;
-    return mkt === "pitcher_strikeouts"
-      ? { txt: `${num(pit.strikeOuts)} K` }
-      : { txt: `${num(pit.outs)} outs` };
+    const pv = mkt === "pitcher_strikeouts" ? num(pit.strikeOuts) : num(pit.outs);
+    return { txt: `${pv}${mkt === "pitcher_strikeouts" ? " K" : " outs"}`, val: pv };
   }
   const bat = pl.stats?.batting ?? {};
   if (!Object.keys(bat).length) return null;
@@ -170,9 +183,15 @@ export function currentValue(
   const HR = num(bat.homeRuns);
   const D2 = num(bat.doubles);
   const T3 = num(bat.triples);
-  if (mkt === "batter_hits") return { txt: `${H} H` };
-  if (mkt === "batter_total_bases") return { txt: `${H + D2 + 2 * T3 + 3 * HR} TB` };
-  if (mkt === "batter_home_runs") return { txt: `${HR} HR` };
-  if (mkt === "batter_hits_runs_rbis") return { txt: `${H + R + BI} H+R+RBI` };
+  if (mkt === "batter_hits") return { txt: `${H} H`, val: H };
+  if (mkt === "batter_total_bases") {
+    const tb = H + D2 + 2 * T3 + 3 * HR;
+    return { txt: `${tb} TB`, val: tb };
+  }
+  if (mkt === "batter_home_runs") return { txt: `${HR} HR`, val: HR };
+  if (mkt === "batter_hits_runs_rbis") {
+    const hrr = H + R + BI;
+    return { txt: `${hrr} H+R+RBI`, val: hrr };
+  }
   return null;
 }

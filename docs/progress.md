@@ -1,3 +1,66 @@
+# Progress — 2026-09-11 (INSTRUCTION 50: the Board's Refresh acts, a settled leg stops being graded, the Builder gets a generator)
+
+## Board — the Refresh button always does something (item 1)
+- Josh: "Refresh button not working on 'Board' tab; works if I refresh on 'The Sharp' tab"
+- Four causes, all four fixed. The pill only fell back to a browser re-price on two of the nine
+  refusal reasons the server can give; a 401/502/503 from the refill route came back as SUCCESS and
+  the tap died in silence; the "Scanning slate…" label watched only the browser regenerate, so a
+  refill in flight looked like a dead button; and the Board's pick rows came from a MOUNT-ONLY
+  fetch — which is the real reason refreshing on The Sharp "worked". Leaving the tab and coming
+  back remounts the page and refetches. Navigation was doing it, never the button.
+- Now a tap always re-prices something: the server refill when the sync phrase is stored, otherwise
+  the browser generate, and the browser generate as a fallback on ANY refusal, any non-2xx and any
+  error. The picks list became a query that both paths refresh. Every tap prints its one-line reason
+  plus what it spent (~114–150 Odds credits, estimate 140) — counted to keep the spend visible,
+  never to block it. No budget, cap or slot lowered, and no cooldown added: nothing should stop a bet.
+
+## Board — an 'S' grade on a leg that has already won (item 2)
+- Josh: "It's not updating with live odds; it will show the player is top 4th w/ 3 H+R+RBI, but show
+  them as an 'S' grade for over .5 H+R+RBI when their live over/under is 3.5 H+R+RBI"
+- Both halves were already on the same row and nothing compared them: the live-tally reader computed
+  the number and returned only the text to print, and the grade is a pure threshold on one EV number
+  with no line, no clock and no game state. The tally reader now returns the number as well, and a leg
+  whose live tally has passed its line shows a dash and a SETTLED tag instead of a grade, saying in
+  plain words that the price on that row is the PREGAME lock, not a live market. The row stays on
+  screen and sinks to the bottom — nothing is hidden or deleted.
+- Deliberately NOT claimed: a leg still under its line is never called settled (proving that needs a
+  live re-pull), and no live line and no live price is invented anywhere. A real in-play price would
+  cost a paid per-event pull that Josh has not authorised.
+- Sequencing: this suppression ships WITH the refresh fix, never after it. A working refresh with no
+  suppression would mint a real 'S' on every settled leg priced softer than about −1640.
+
+## Parlay Builder — a generator you can pin and respin (items 3 and 4)
+- Josh: "Parlay builder should have a generator that I can select # of legs, prop category, min & max
+  odds then it will generate a parlay for me within those parameters; if I hit regenerate then it
+  regenerates a new parlay; each slot is clickable to keep that player(s) in any round and spin the
+  other slots"
+- Josh's own example settles what the odds range means: his four legs (−145, −124, −137, −130)
+  multiply out to +834, while the range he wrote is −152 → +110 and every one of the four sits inside
+  it individually. So the range is PER LEG by default, with a combined-payout target as an optional
+  extra. One question goes back to Josh to confirm that reading.
+- Pin any slot and spin the rest; the same settings and the same spin give the same ticket on any
+  phone; one leg per player always, one per game unless you turn it off; when it cannot fill the
+  request it says so in one honest line instead of quietly loosening the rules. No price is ever
+  invented — only sides the book actually posted. Sandbox only: nothing is tracked, nothing enters
+  the ledger, no credits are spent.
+- Josh: "Need player headshots for Parlay Builder etc or need team logo next to name" — every
+  generated leg and every parlay leg now carries the player's headshot with his own team's logo
+  badged on the corner, and his initials when there is no photo.
+
+## Picks list — collapse a game by pressing its matchup box (item 5)
+- Josh: "Need to be able to collapse list of picks for each individual game/prop by clicking/pressing
+  in the top box that shows the team matchup"
+- It already worked — the matchup bar was already the toggle. What was actually wrong: the bar was
+  36px tall against this project's own 44px minimum, it gave no press feedback so a tap that DID work
+  felt like nothing happened, and it forgot what you had collapsed the moment the list re-rendered.
+  Now 44px, it presses, a collapsed market card still shows how many lines are inside it, and a
+  collapse survives a reload.
+- Not built, flagged for Josh: the Board tab has no per-game grouping to collapse at all, and games
+  still default to open the first time you see them.
+- Status: built on the shared tree, NOT committed, NOT deployed. The handoff's origin-sha claim was
+  refreshed in the same work — it sat exactly at the currency guard's limit, so the next commit on
+  this branch would have turned it red.
+
 # Progress — 2026-09-09 (INSTRUCTION 49: refill on the five slots, or on Josh's own click)
 
 ## Every desk — the card refills five times a day, or when Josh presses Refresh

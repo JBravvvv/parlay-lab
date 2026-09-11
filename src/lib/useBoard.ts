@@ -17,11 +17,20 @@ export function useBoard() {
   });
 }
 
+/**
+ * INSTRUCTION 50 (2026-09-11): a browser re-price also invalidates ["picks"] — the day's stamped
+ * picks feed every prop tab on the Board, and before this they only ever refreshed on a remount
+ * (which is why Josh saw the refresh "work" on The Sharp and not on Board: navigating away and
+ * back remounted the page). setQueryData on ["board"] stays exactly as it was.
+ */
 export function useRegenerateBoard() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: generateBoard,
-    onSuccess: (b) => qc.setQueryData(["board"], b),
+    onSuccess: (b) => {
+      qc.setQueryData(["board"], b);
+      void qc.invalidateQueries({ queryKey: ["picks"] });
+    },
   });
 }
 

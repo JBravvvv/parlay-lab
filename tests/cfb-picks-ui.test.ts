@@ -32,8 +32,14 @@ describe("CFB Board — the one green Refresh Board control", () => {
     expect(pill).toMatch(/"Pulling…" : "Refresh Board"/);
     expect(pill).toMatch(/disabled=\{fetching\}/);
   });
+  /* INSTRUCTION 50 (2026-09-11, Josh item 1: "Refresh button not working on 'Board' tab"): the
+     MLB pill's label now watches BOTH mutations — the refill (the server pass) and the browser
+     re-price it falls back to — so the pill reads "Scanning slate…" for the whole of a tap
+     instead of looking inert while the refill is in flight. Placement and variant unchanged. */
   it("the MLB header action is untouched (Refresh MLB stays a primary Pill)", () => {
-    expect(page).toMatch(/\{regen\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/);
+    expect(page).toMatch(
+      /\{regen\.isPending \|\| refill\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/,
+    );
   });
   it("the small ↻ Refresh pill is gone — one refresh control on the desk", () => {
     expect(board).not.toMatch(/↻ Refresh/);

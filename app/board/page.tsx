@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill, FilterPill } from "@/components/ui/Pill";
@@ -25,7 +26,7 @@ import { NflPicksBoard, NflRefreshPill } from "@/components/nfl/NflPicksBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
-import { getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
+import { GEN_CREDITS_EST, generatesToday, getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
 import { MODE_LABEL, orderByMode } from "@/lib/board-order";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { pickStatus, STATUS_LABEL } from "@/lib/picks-status";
@@ -39,6 +40,8 @@ import { normalizeName, parseBoardLabel } from "@/lib/player-card";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
 import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
+import { settledRead, type LegSettledRead } from "@/lib/leg-settled";
+import { lineOf } from "@/lib/pred-serialize";
 
 /* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
    'ALL'; If I click on 'Top 50' then click on one of the categories (ie: hits) then all top
@@ -195,6 +198,11 @@ export default function BoardPage() {
     gkey: string | null; start: string | null; res: string | null; susp?: boolean;
     /** ALL-scope rows only: the row's market (the "every market" view mixes them) */
     market?: string;
+    /* INSTRUCTION 50 (2026-09-11, Josh: "it will show the player is top 4th w/ 3 H+R+RBI, but
+       show them as an 'S' grade for over .5 H+R+RBI"). The leg key carries the LINE, which is
+       what turns a live tally into "already cleared". /api/picks now emits it (W1) and the
+       ALL-scope builder below copies it off the prop-board row. */
+    lkey?: string | null;
   };
   type PicksPayload = {
     date?: string; servedDate?: string | null; staleNote?: string | null;
@@ -206,19 +214,27 @@ export default function BoardPage() {
     bySource: { stamped: number; reconstructed: number };
     perDay?: { date: string; n: number; w: number; l: number }[];
   };
-  const [picksData, setPicksData] = useState<PicksPayload | null>(null);
-  useEffect(() => {
-    let dead = false;
-    fetch("/api/picks")
-      .then((r) => r.json())
-      .then((j) => {
-        if (!dead && j) setPicksData(j as PicksPayload);
-      })
-      .catch(() => {});
-    return () => {
-      void (dead = true);
-    };
-  }, []);
+  /* INSTRUCTION 50 (2026-09-11), Josh's item 1, verbatim: "Refresh button not working on 'Board'
+     tab; works if I refresh on 'The Sharp' tab". THIS was the mechanism. The day's stamped picks —
+     the rows every prop tab renders — were fetched ONCE on mount with an empty dependency list, so
+     no refresh could ever replace them; navigating to The Sharp unmounted the page and coming back
+     remounted it, which refetched. The refresh never did it, the navigation did.
+
+     It is a TanStack query now, keyed ["picks"] and always stale, and both refresh mutations
+     invalidate that key (src/lib/refill-client.ts, src/lib/useBoard.ts) — so a tap re-reads the
+     picks exactly like leaving and coming back does. No auth, no credits: /api/picks is a free
+     read of what the server already stored. */
+  const picksQuery = useQuery<PicksPayload>({
+    queryKey: ["picks"],
+    queryFn: async () => {
+      const r = await fetch("/api/picks", { cache: "no-store" });
+      if (!r.ok) throw new Error(`picks ${r.status}`);
+      return (await r.json()) as PicksPayload;
+    },
+    staleTime: 0,
+    retry: false,
+  });
+  const picksData = picksQuery.data ?? null;
   const cohorts = picksData?.record?.markets ?? null;
   const catRecord = cohorts?.[cat] ?? null;
   const catDay = catRecord?.perDay?.length
@@ -251,7 +267,7 @@ export default function BoardPage() {
           out.push({
             rank: 0, player: `${r.p} (${r.tm})`, side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
             cz: r.cz?.o ?? null, odds, book: r.o != null ? r.oBook : odds != null ? "Caesars" : null,
-            gkey: g.gkey, start: g.start, res: null, market: m,
+            gkey: g.gkey, start: g.start, res: null, market: m, lkey: r.lkey ?? null,
           });
         }
       }
@@ -278,6 +294,19 @@ export default function BoardPage() {
     (l: { gkey?: string | null; lkey?: string | null }) =>
       l.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[l.gkey]?.pk ?? null, l.lkey) : null,
     [d, liveNow],
+  );
+
+  /* INSTRUCTION 50 item 2 — ONE GUARD PER ROW, not one per cell (fix pass).
+     Suppressing only the Grade chip left the same row printing the pregame number four more
+     ways: EV @ CZR / EV @ basis with its green EDGE badge, the ¼-Kelly stake chip, the True %
+     bar and the row's own ev-glow. On Josh's exact case — 3 H+R+RBI in the top of the 4th
+     against a 0.5 line — that reads as one honest cell surrounded by four dishonest ones, and
+     the Kelly chip is the worst of them because it is an instruction to stake money on a bet
+     that is already decided. Every one of those cells now asks this single question. */
+  const rowSettled = useCallback(
+    (r: { gkey?: string | null; lkey?: string | null; sub?: string | null }): LegSettledRead | null =>
+      settledRead(r.lkey, r.sub, legLive({ gkey: r.gkey, lkey: r.lkey })?.val),
+    [legLive],
   );
 
   const columns: Column<PickRow>[] = useMemo(
@@ -315,6 +344,12 @@ export default function BoardPage() {
                   title="Live from the official boxscore — updates every minute while the game is in progress"
                 >
                   ● {nowLabel(n)}
+                  {(() => {
+                    const s0 = settledRead(r.lkey, r.sub, n.val);
+                    /* the relation in plain language, and the SIDE it decided — "already over
+                       0.5" reads as good news next to an Under bet that has in fact just lost */
+                    return s0 ? <span className="text-gold"> · {s0.why} — priced pregame</span> : null;
+                  })()}
                 </div>
               )}
             </div>
@@ -324,21 +359,42 @@ export default function BoardPage() {
       {
         key: "grade",
         header: "Grade",
-        // grades the SAME EV the mode displays — czEv at Caesars, bsEv under dk_fd
-        sortValue: (r) => gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv))),
-        cell: (r) =>
-          basisMode ? (
+        /* grades the SAME EV the mode displays — czEv at Caesars, bsEv under dk_fd — EXCEPT on a
+           leg the live boxscore has already decided (INSTRUCTION 50 item 2). A tally past the
+           line means the Over is won and the Under lost, at any point in any game: the stored EV
+           is then a PREGAME lock, not a live market, and dressing it as an S grade is the exact
+           bug Josh reported. No grade is shown; gradeRank(null) = 0, so the row sinks. The row
+           itself stays visible — nothing is hidden, nothing is deleted, no price is invented. */
+        sortValue: (r) =>
+          rowSettled(r)
+            ? gradeRank(null)
+            : gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv))),
+        cell: (r) => {
+          const s0 = rowSettled(r);
+          return s0 ? (
+            <SettledGrade read={s0} />
+          ) : basisMode ? (
             <GradeChip grade={gradeFromEv(r.bsEv == null ? null : Number(r.bsEv))} basis="EV @ basis (DK/FD)" />
           ) : (
             <GradeChip grade={gradeFromEv(r.czEv == null ? null : Number(r.czEv))} basis="EV @ Caesars" />
-          ),
+          );
+        },
       },
       {
         key: "prob",
         header: "True %",
         numeric: true,
         sortValue: (r) => Number(r.prob) || 0,
-        cell: (r) => <ProbBar p={(Number(r.prob) || 0) / 100} className="w-28 justify-end md:w-36" />,
+        /* on a decided leg this is no longer a "true %" of anything open — it is the model's
+           PREGAME number, said so in words rather than drawn as a live probability bar */
+        cell: (r) =>
+          rowSettled(r) ? (
+            <span className="num text-[11px] text-faint" title="The model's pregame probability — the leg is already decided, so this is history, not a live read">
+              {(Number(r.prob) || 0).toFixed(1)}% pregame model
+            </span>
+          ) : (
+            <ProbBar p={(Number(r.prob) || 0) / 100} className="w-28 justify-end md:w-36" />
+          ),
       },
       ...(basisMode
         ? [
@@ -375,9 +431,11 @@ export default function BoardPage() {
               key: "bsEv",
               header: "EV @ basis",
               numeric: true,
-              sortValue: (r) => (r.bsEv == null ? -99 : Number(r.bsEv)),
+              sortValue: (r) => (rowSettled(r) || r.bsEv == null ? -99 : Number(r.bsEv)),
               cell: (r) =>
-                r.bsEv != null ? (
+                rowSettled(r) ? (
+                  <SettledDash />
+                ) : r.bsEv != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <EvBadge ev={Number(r.bsEv)} />
                     {r.bsBadge ? (
@@ -392,9 +450,12 @@ export default function BoardPage() {
               key: "stake",
               header: "¼-Kelly",
               numeric: true,
-              sortValue: (r) => Number(r.bsKellyF) || 0,
+              sortValue: (r) => (rowSettled(r) ? -99 : Number(r.bsKellyF) || 0),
+              /* a stake chip on a decided leg is an INSTRUCTION TO BET on a settled market */
               cell: (r) =>
-                r.bsKellyF != null && Number(r.bsKellyF) > 0 ? (
+                rowSettled(r) ? (
+                  <SettledDash />
+                ) : r.bsKellyF != null && Number(r.bsKellyF) > 0 ? (
                   <KellyChip stake={Number(r.bsKellyF) * bankroll} />
                 ) : (
                   <span className="text-faint">—</span>
@@ -420,16 +481,20 @@ export default function BoardPage() {
               key: "czEv",
               header: "EV @ CZR",
               numeric: true,
-              sortValue: (r) => Number(r.czEv) || 0,
-              cell: (r) => (r.czEv != null ? <EvBadge ev={Number(r.czEv)} /> : <span className="text-faint">—</span>),
+              sortValue: (r) => (rowSettled(r) ? -99 : Number(r.czEv) || 0),
+              cell: (r) =>
+                rowSettled(r) ? <SettledDash /> : r.czEv != null ? <EvBadge ev={Number(r.czEv)} /> : <span className="text-faint">—</span>,
             } satisfies Column<PickRow>,
             {
               key: "stake",
               header: "¼-Kelly",
               numeric: true,
-              sortValue: (r) => Number(r.czKellyF) || 0,
+              sortValue: (r) => (rowSettled(r) ? -99 : Number(r.czKellyF) || 0),
+              /* a stake chip on a decided leg is an INSTRUCTION TO BET on a settled market */
               cell: (r) =>
-                r.czKellyF != null && Number(r.czKellyF) > 0 ? (
+                rowSettled(r) ? (
+                  <SettledDash />
+                ) : r.czKellyF != null && Number(r.czKellyF) > 0 ? (
                   <KellyChip stake={Number(r.czKellyF) * bankroll} />
                 ) : (
                   <span className="text-faint">—</span>
@@ -438,7 +503,7 @@ export default function BoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bankroll, basisMode, legLive, cz.hidden, rowOut],
+    [bankroll, basisMode, legLive, rowSettled, cz.hidden, rowOut],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
@@ -446,6 +511,13 @@ export default function BoardPage() {
      Status'"): the stamped-picks table is now the same sortable DataTable the ML/RL tabs
      use — every column carries a sortValue, so every header is clickable (▲/▼). */
   const pickOut = useCallback((p: ApiPick) => isOut(p.player, p.market ?? cat, p.gkey), [isOut, cat]);
+  /* INSTRUCTION 50 item 2, the stamped-picks and ALL-scope tables. `side` is the row's sub string
+     on a stamped pick ("H+R+RBI O 0.5") and "o" on an ALL-scope row — legSettled reads the side the
+     byte-identical way the grader does (/ U /), so both shapes are read correctly. */
+  const pickSettled = useCallback(
+    (p: ApiPick) => settledRead(p.lkey, p.side, legLive({ gkey: p.gkey, lkey: p.lkey })?.val),
+    [legLive],
+  );
   const pickKey = useCallback((p: ApiPick) => `${p.market ?? cat}|${p.player}|${p.line}|${p.side}`, [cat]);
   const pickColumns: Column<ApiPick>[] = useMemo(() => {
     const now = Date.now();
@@ -455,8 +527,15 @@ export default function BoardPage() {
       {
         key: "grade",
         header: "Grade",
-        sortValue: (p) => gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge))),
-        cell: (p) => <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />,
+        sortValue: (p) => (pickSettled(p) ? gradeRank(null) : gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge)))),
+        cell: (p) => {
+          const s0 = pickSettled(p);
+          return s0 ? (
+            <SettledGrade read={s0} />
+          ) : (
+            <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />
+          );
+        },
       },
       {
         key: "pick",
@@ -515,7 +594,7 @@ export default function BoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut, pickKey]);
+  }, [cat, cz.hidden, pickOut, pickKey, pickSettled]);
   const visiblePicksAll = useMemo(
     () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
     [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
@@ -528,6 +607,56 @@ export default function BoardPage() {
   const gameCount = d?.gameInfo ? Object.keys(d.gameInfo).length : 0;
   const pickCount = d ? Object.entries(d.categories).filter(([k]) => k !== "all").reduce((s, [, v]) => s + v.length, 0) : 0;
   const quota = quotaRemaining();
+
+  /* INSTRUCTION 50 item 2 (the header half): how many games are already under way on a board that
+     was priced BEFORE first pitch. Those rows carry the pregame lock, not a live market — the
+     header says so out loud instead of letting a live tally sit beside a stale price unexplained. */
+  const pregameLive = useMemo(() => {
+    if (!d?.gameInfo || !board) return 0;
+    /* IN PROGRESS, not "the clock has passed first pitch" (INSTRUCTION 50 fix pass). gameInfo
+       carries no state at all, so a pure clock test counted every FINISHED game too — after
+       the slate ended the header read "15 games under way", which is false. useLiveNow already
+       tracks live/final per game on its 60s poll, so the honest answer was in scope; reading it
+       here also makes the badge tick up as games actually start, which the old `Date.now()`
+       inside a [d, board] memo never did (it froze at page load). */
+    return Object.values(d.gameInfo).filter((g) => {
+      const st = g.start ? Date.parse(g.start) : NaN;
+      return g.pk != null && liveNow.games[g.pk]?.live && Number.isFinite(st) && board.at <= st;
+    }).length;
+  }, [d, board, liveNow]);
+
+  /* INSTRUCTION 50 item 1: EVERY tap prints a line. A plain success used to print nothing at all —
+     which is precisely what "the refresh button doesn't work" looks like from the outside. The
+     spend is shown too: generatesToday() × GEN_CREDITS_EST. That counter exists to make the spend
+     VISIBLE, never to block it (src/lib/engine-client.ts) — there is deliberately no cooldown here,
+     because nothing in this app may stop a bet. */
+  const spendNote = (() => {
+    const n = generatesToday();
+    return n > 0 ? ` · ${n} browser re-price${n === 1 ? "" : "s"} today ≈ ${n * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
+  })();
+  const refreshNote =
+    refill.isPending || regen.isPending
+      ? "refreshing — asking the server for a refill, then re-pricing the board on this device…"
+      : refill.error
+        ? /* THE FALLBACK'S ACTUAL OUTCOME, NOT AN ASSERTION (INSTRUCTION 50 fix pass). This
+             branch used to say "re-priced in the browser instead" unconditionally — but the
+             offline case trips exactly here: the refill fetch throws, onError fires
+             regen.mutate(), that fails too, and Josh was told the board had been re-priced on
+             his device when nothing was. A refresh may never report an action it did not take. */
+          regen.isError
+          ? `refill failed: ${refill.error.message}, and the browser re-price also failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was re-priced and nothing was fabricated${spendNote}`
+          : regen.isSuccess
+            ? `refill failed: ${refill.error.message} — re-priced in the browser instead${spendNote}`
+            : `refill failed: ${refill.error.message} — re-pricing in the browser…`
+        : regen.isError
+          ? `re-price failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was fabricated${spendNote}`
+          : refill.data
+            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own pass" : "the server had nothing to add")}${
+                regen.isSuccess ? " · board re-priced on this device" : ""
+              }${spendNote}`
+            : regen.isSuccess
+              ? `board re-priced on this device${spendNote}`
+              : null;
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      board. Every hook above has already run, so this early return is hooks-safe. */
@@ -572,7 +701,7 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${pregameLive > 0 ? ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way — priced pregame` : ""}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
                 : "Consensus de-vigged probability vs the Caesars line"
@@ -583,30 +712,38 @@ export default function BoardPage() {
                refill pass (the same one the five slots run); otherwise the pre-49 browser generate */
             <Pill
               variant="primary"
-              onClick={() =>
-                d && getSyncKey()
-                  ? refill.mutate("mlb", {
-                      /* refused free for a reason a browser re-price CAN act on (no server lock yet
-                         this morning, or every game started) → fall back to the pre-49 generate so
-                         the pill still re-prices the visible board (fix round, 2026-09-09) */
-                      onSuccess: (r) => {
-                        const reason = String((r.body.topup as { reason?: unknown } | undefined)?.reason ?? "");
-                        if (r.body.fired === false && /no paper lock|every game started/.test(reason)) regen.mutate();
-                      },
-                    })
-                  : regen.mutate()
-              }
+              onClick={() => {
+                if (!(d && getSyncKey())) {
+                  regen.mutate();
+                  return;
+                }
+                refill.mutate("mlb", {
+                  /* INSTRUCTION 50 item 1 (2026-09-11). The 49 fix only fell back to a browser
+                     re-price when the server refused with ONE of two reasons — and the refill
+                     pass is slot-gated and attempt-capped, so most taps were refused free under
+                     one of the other seven reasons and NOTHING re-priced. Worse, refillDesk
+                     resolves 401 / 502 / 503 as a mutation SUCCESS carrying no `fired` field at
+                     all, so a failing server also did nothing. A tap must never resolve with
+                     nothing re-priced: fall back on ANY refusal, ANY non-2xx, and on a throw. */
+                  onSuccess: (r) => {
+                    const refused = r.body.fired === false;
+                    const httpFail = r.status < 200 || r.status > 299;
+                    if (refused || httpFail) regen.mutate();
+                  },
+                  onError: () => regen.mutate(),
+                });
+              }}
               disabled={regen.isPending || refill.isPending || isPending}
             >
-              {regen.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
+              {regen.isPending || refill.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
             </Pill>
           ) : undefined
         }
       />
 
-      {sport === "mlb" && ((refill.data && refillReason(refill.data.body)) || refill.error) && (
+      {sport === "mlb" && refreshNote && (
         <p className="mb-3 text-xs text-muted" data-testid="mlb-refill-note">
-          {refill.error ? `refill failed: ${refill.error.message}` : refillReason(refill.data!.body)}
+          {refreshNote}
         </p>
       )}
 
@@ -813,7 +950,8 @@ export default function BoardPage() {
             rows={visibleRows}
             rowKey={(r) => `${r.label}|${r.sub}`}
             stagger
-            rowClassName={(r) => (r.susp ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
+            /* a settled row never glows green: the glow is "this is a live edge" (INSTRUCTION 50) */
+            rowClassName={(r) => (r.susp || rowSettled(r) ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
           {scratchedHere > 0 && <ScratchedNote n={scratchedHere} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {czHiddenHere > 0 && (
@@ -853,6 +991,50 @@ export default function BoardPage() {
         </>
       )}
     </>
+  );
+}
+
+/**
+ * INSTRUCTION 50 (2026-09-11), Josh's item 2, verbatim: "It's not updating with live odds; it will
+ * show the player is top 4th w/ 3 H+R+RBI, but show them as an 'S' grade for over .5 H+R+RBI when
+ * their live over/under is 3.5 H+R+RBI".
+ *
+ * The grade cell for a leg the official boxscore has ALREADY decided. All six MLB prop markets are
+ * monotone counting stats, so a tally past the line settles the Over won / the Under lost with
+ * certainty. What it does NOT tell us is the live price — that needs an in-play re-pull Josh has
+ * not authorised — so this cell shows no number it did not read: an em dash, the SETTLED tag, and
+ * the plain-language reason. The row stays on the board; only the manufactured grade is gone.
+ */
+function SettledGrade({ read }: { read: LegSettledRead }) {
+  /* `why` is the module's own sentence, and it names the SIDE — "this Under is decided lost"
+     next to an under bet, "this Over is decided won" next to an over. The first cut of this
+     cell said "already over 0.5" from the line alone, which reads as good news beside a leg
+     that has in fact just lost (INSTRUCTION 50 fix pass). */
+  const txt = `${read.why} — the price shown is the pregame lock, not a live market`;
+  const tone = read.side === "U" ? "text-neg" : "text-pos";
+  return (
+    <span className="inline-flex flex-col items-start gap-0.5" title={txt}>
+      <span className="inline-flex items-center gap-1.5">
+        <span className="num text-faint">—</span>
+        <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold">
+          SETTLED
+        </span>
+      </span>
+      <span className={`text-[9.5px] leading-tight ${tone}`}>{txt}</span>
+    </span>
+  );
+}
+
+/**
+ * The placeholder every OTHER number on a settled row collapses to — EV, the EDGE badge and
+ * the ¼-Kelly stake. Each of those was computed pregame against a market that is now closed;
+ * printing them beside a SETTLED grade would restate the exact claim the grade just withdrew.
+ */
+function SettledDash() {
+  return (
+    <span className="text-faint" title="This leg is already decided by the live boxscore — the stored EV and stake were computed pregame and no longer describe anything you can bet">
+      —
+    </span>
   );
 }
 

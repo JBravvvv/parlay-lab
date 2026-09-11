@@ -129,6 +129,14 @@ export async function GET(req: NextRequest) {
         rank: i + 1,
         player: r.label ?? null,
         side: r.sub ?? null,
+        /* INSTRUCTION 50 (2026-09-11, Josh's word, verbatim: "it will show the player is
+           top 4th w/ 3 H+R+RBI, but show them as an 'S' grade for over .5 H+R+RBI"): the
+           leg key rides out with the pick so a surface can compare the live tally to THIS
+           leg's line (src/lib/leg-settled.ts) and stop showing a pregame grade on a leg
+           that is already decided. One additional output field, derived from the row this
+           route already reads — same population, same filters, no gate touched, no extra
+           read, zero Odds credits. */
+        lkey: r.lkey ?? null,
         line: lineOf(r.lkey ?? null),
         prob: r.prob ?? null,
         implied: r.implied ?? null,

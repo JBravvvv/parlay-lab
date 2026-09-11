@@ -12,6 +12,8 @@ import { currentValue, type Boxscore, type GameStatus } from "@/engine2/grade";
  * boxscore call per LIVE game only. Polls every 60s while anything is live,
  * every 5 minutes otherwise; stops entirely when every game is final.
  * Honest by construction: no boxscore appearance → no number, never a 0.
+ * Each read carries both the display text and the raw tally (`val`), so callers can
+ * compare the live number to a leg's line without re-deriving it (INSTRUCTION 50).
  */
 
 export type GameNow = {
@@ -24,7 +26,28 @@ export type GameNow = {
   inning: string | null; // "Bot 5"
 };
 
-export type LegNow = { txt: string; inning: string | null };
+/**
+ * INSTRUCTION 50 (2026-09-11, Josh's word, verbatim: "it will show the player is top 4th
+ * w/ 3 H+R+RBI, but show them as an 'S' grade for over .5 H+R+RBI") — `val` is the same
+ * live tally `txt` renders, kept as a NUMBER so a surface can compare it to the leg's
+ * line (see `legSettled` in src/lib/leg-settled.ts) instead of printing the two side by
+ * side and never relating them. Additive: every existing reader of `txt`/`inning` is
+ * unchanged, and no extra network call — this rides the boxscore already polled below.
+ * `val` is null for ml_/rl_ legs (a score is not a counting stat) and the whole read
+ * stays null for a player with no boxscore appearance, so `val: 0` only ever means a
+ * real, observed zero.
+ */
+export type LegNow = {
+  txt: string;
+  inning: string | null;
+  val: number | null;
+  /**
+   * The game is OVER and this is its closing number, not a live one (INSTRUCTION 50 fix
+   * pass). Optional so every existing constructor of a LegNow still type-checks; absent
+   * means "in progress", which is what every pre-existing caller assumed.
+   */
+  final?: boolean;
+};
 
 type SchedGame = {
   gamePk: number;
@@ -86,6 +109,9 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
     [JSON.stringify(reqs.map((r) => r.date ?? null))],
   );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* the latest snapshot, readable inside the tick without re-arming the effect */
+  const snapRef = useRef(snap);
+  snapRef.current = snap;
 
   useEffect(() => {
     if (!pks.length) return;
@@ -115,9 +141,22 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
           }
         }
       }
-      const boxes: Record<number, Boxscore> = {};
+      /* LIVE FIRST, THEN FINALS (INSTRUCTION 50 fix pass). The settled read used to evaporate
+         the moment a game ended: `legNow` served only live games, so at 10pm a leg that was
+         correctly marked SETTLED at 7pm got its manufactured pregame grade back. A final
+         boxscore is a REAL read — the tally is simply frozen — so it keeps being served, with
+         no inning. Live games are fetched first so the MAX_BOXES cap can never cost a live
+         read to pay for a finished one, and the previous snapshot's boxes are carried over so
+         a game that went final between two ticks keeps the number it ended on. */
+      const boxes: Record<number, Boxscore> = { ...snapRef.current.boxes };
+      const order = [
+        ...Object.values(games).filter((g) => g.live).map((g) => g.pk),
+        ...Object.values(games).filter((g) => !g.live && g.final).map((g) => g.pk),
+      ].slice(0, MAX_BOXES);
       const livePks = Object.values(games).filter((g) => g.live).map((g) => g.pk).slice(0, MAX_BOXES);
-      for (const pk of livePks) {
+      for (const pk of order) {
+        /* a final game already in hand does not need re-reading — its number cannot change */
+        if (!games[pk]?.live && boxes[pk]) continue;
         const bx = await getJson<Boxscore>(`${API}/game/${pk}/boxscore`);
         if (bx) boxes[pk] = bx;
       }
@@ -141,10 +180,14 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
     const legNow = (pk: number | null | undefined, lkey: string | null | undefined): LegNow | null => {
       if (pk == null || !lkey) return null;
       const g = snap.games[pk];
-      if (!g || !g.live) return null;
+      if (!g || (!g.live && !g.final)) return null;
       const status: GameStatus = { state: g.state, away: g.away, home: g.home };
       const cur = currentValue(lkey, status, snap.boxes[pk] ?? null);
-      return cur ? { txt: cur.txt, inning: g.inning } : null;
+      if (!cur) return null;
+      /* a finished game reports no inning — `nowLabel` already tolerates a null one */
+      return g.live
+        ? { txt: cur.txt, inning: g.inning, val: cur.val }
+        : { txt: cur.txt, inning: null, val: cur.val, final: true };
     };
     return {
       at: snap.at,
@@ -157,7 +200,7 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
 
 /** Shared inline chip so every surface renders the live number identically. */
 export function nowLabel(n: LegNow): string {
-  return `now ${n.txt}${n.inning ? ` · ${n.inning}` : ""}`;
+  return `${n.final ? "final" : "now"} ${n.txt}${n.inning ? ` · ${n.inning}` : ""}`;
 }
 
 /* ------------------------------------------------ leg phase (INSTRUCTION 46) */
