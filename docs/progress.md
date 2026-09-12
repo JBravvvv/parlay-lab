@@ -32,10 +32,14 @@ chat handed that folder would have rebuilt July and believed it was current.
 
 ## What makes it fire
 
-1. **Five git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
-   `post-index-change`, which fires on `git add` so staged work publishes too. Each hook backgrounds
-   the call and ends `exit 0`: a sync must never slow or fail a git operation. Verified live — the
-   INSTRUCTION 53 commit republished `01-STATE.md` to its own sha with no further action.
+1. **Four git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Each hook
+   backgrounds the call and ends `exit 0`: a sync must never slow or fail a git operation. Verified
+   live — the INSTRUCTION 53 commit republished `01-STATE.md` to its own sha with no further action.
+   A fifth hook on `post-index-change` was tried and **removed**: git refreshes the index on a plain
+   `git status`, so it spawned a sync per status check and raced the run in flight. That race is also
+   why the script now serialises on a `mkdir` lock in `$TMPDIR` (600 s stale-breaker) — verified by
+   running two `--force` syncs at once: one published, one skipped, tarball valid at 695 entries, no
+   `.tmp` left behind.
 2. **A standing rule in `CLAUDE.md`** that any session changing the project runs the script. This is
    what covers unstaged edits.
 3. `tools/sync-handoff.sh --force` on demand, which also rebuilds the bundle.
@@ -73,6 +77,29 @@ it — cheap enough to run on every hook and at the end of every session.
 
 The nine July files and the 7 MB July repo zip moved to `archive/superseded-2026-09-12/`, keyed on a
 sentinel so it happens exactly once. Nothing was deleted.
+
+## PASTE-THIS.md — the answer to "can I paste this folder into any chat?"
+
+No, not the folder: `code/` alone is 108 MB and the repo copies are **216,000 tokens**
+(`session-handoff.md` 159k, `CLAUDE.md` 36k). The eight briefs, though, are 55 KB / **~13,000 tokens**,
+so the sync now emits `PASTE-THIS.md` — one self-contained file concatenated from those briefs, with
+the sentinel and duplicate footers stripped. 763 lines.
+
+Its first section tells the receiving chat what it can actually do, because the answer depends on where
+it lands: **(A)** Claude Code on Josh's Mac does not need it — the repo and the full package are on
+disk; **(B)** Claude Code elsewhere should clone `github.com/JBravvvv/parlay-lab` and check out
+`frontend-rebuild`, which is authoritative and current; **(C)** a plain chat can explain, price, design
+and review, but cannot edit, gate or deploy, and **must never say something is done, fixed, or live** —
+and is told its own 13k-of-216k ceiling so it asks for the deep doc instead of guessing.
+
+## A guard fired, and the fix was structural rather than a re-date
+
+`sha-currency` went red on `docs/session-handoff.md:16` at exactly **11 behind (K=10)**. The stale sha
+was not the claim — it was `46f68df9`, the INSTRUCTION 50 tip, riding along as a parenthetical on the
+same marked line. The guard scans every sha on a marked line, so inline history turned each superseded
+sha into its own ticking clock, and refreshing the claim alone would not have cleared it. Line 16 now
+carries exactly one sha, the current one; the superseded three moved to an adjacent unmarked line that
+`sha-references` still forces to resolve and `sha-currency` ignores by design.
 
 ## The limit, stated
 

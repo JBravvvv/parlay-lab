@@ -819,11 +819,15 @@ dated deploy/gate facts), `02-ENVIRONMENT.md` (the prelude, the gate, every trap
 `MANIFEST.md`, verbatim copies of `CLAUDE.md` + `ENGINE2.md` + all of `docs/` under `repo/`, and a
 restorable `code/` pair — a `git archive HEAD` tarball and a full-history `git bundle`.
 
-**It fires on its own** from five git hooks — `post-commit`, `post-merge`, `post-checkout`,
-`post-rewrite`, `post-index-change` (that last one fires on `git add`, so staged work publishes too).
-It is change-gated on a fingerprint of HEAD + the dirty-tree listing + every doc/config mtime, so a
-no-op sync costs nothing. It never runs a mutating git command, and it refuses to publish if an
+**It fires on its own** from four git hooks — `post-commit`, `post-merge`, `post-checkout`,
+`post-rewrite`. It is change-gated on a fingerprint of HEAD + the dirty-tree listing + every
+doc/config mtime, so a no-op sync costs nothing, and it serialises on a `mkdir` lock in `$TMPDIR`
+because hooks can overlap. It never runs a mutating git command, and it refuses to publish if an
 env-shaped file is ever tracked.
+
+A fifth hook on `post-index-change` was tried and **removed**: git refreshes the index on a plain
+`git status`, so it spawned a sync on every status check and raced the run already in flight — which is
+how the missing lock was found. Do not re-add it.
 
 **There is no timer, and that is measured.** A 15-minute LaunchAgent was installed and fired, and
 macOS TCC denied it: a launchd-spawned shell cannot read anything under `~/Documents`. A probe from

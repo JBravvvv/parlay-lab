@@ -13,9 +13,21 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `f6e996beca1485ee1853551754ff2416b8f885d6` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 52 shipped and its review round shipped on top; the earlier 2026-09-12 claim — `f2e9bf77…`, the INSTRUCTION 51 tip — and the 2026-09-11 one — `46f68df9…`, INSTRUCTION 50 — are history.)
+> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `8dc38de6bfcb4774baf1bd6215c3b45d194357a8` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 53 shipped and its timer correction shipped on top.)
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
+>
+> *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `f6e996be…` the INSTRUCTION 52 review-round tip (2026-09-12), `f2e9bf77…` INSTRUCTION 51
+>   (2026-09-12), `46f68df9…` INSTRUCTION 50 (2026-09-11). **`sha-currency` fired on the last of
+>   these at exactly 11 behind (K=10) during INSTRUCTION 53's gate** — the guard scans EVERY sha on
+>   a STATE-CLAIM-marked line, so carrying the history INLINE made each superseded sha its own
+>   ticking clock: refreshing the claim would not have cleared it, because the stale token was a
+>   parenthetical, not the claim. Structural fix rather than a re-date — the marked line now carries
+>   exactly ONE sha, the one asserted as current, and every superseded sha lives on this unmarked
+>   line. `sha-references` still requires all of them to resolve; `sha-currency` correctly ignores
+>   them, which is what its own 'an UNMARKED line carrying a stale sha is invisible, by design'
+>   case already guarantees.)*
 >
 > *(The 08-18 draft of this claim FABRICATED the 40-char tail of a real short sha —
 > `sha-currency` refused it as "ancestor of NO ref" before it could be committed. The
@@ -873,12 +885,24 @@ deriving the prose from the docs by extraction; the docs are 28,647 lines of app
 struck-through sections, and an extractor over that would publish retracted claims as current.
 
 **WHAT MAKES IT FIRE, AND THE TIMER THAT TURNED OUT TO BE IMPOSSIBLE.**
-1. **Five git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
-   `post-index-change`, which fires on `git add` so staged-but-uncommitted work publishes too.
-   Doctrine here is commit-and-push every shipped change, so the hooks make every shipped change land
-   in the folder. Each hook backgrounds the call and ends `exit 0`: **a sync must never slow or fail a
-   git operation.** Verified live — the INSTRUCTION 53 commit itself republished `01-STATE.md` to the
-   new sha with no further action.
+1. **Four git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Doctrine here is
+   commit-and-push every shipped change, so the hooks make every shipped change land in the folder.
+   Each hook backgrounds the call and ends `exit 0`: **a sync must never slow or fail a git
+   operation.** Verified live — the INSTRUCTION 53 commit itself republished `01-STATE.md` to the new
+   sha with no further action.
+
+   **A FIFTH HOOK WAS TRIED AND REMOVED, AND ITS FAILURE BOUGHT THE LOCK.** `post-index-change` was
+   added to cover `git add`, on the reasoning that staged-but-uncommitted work should publish too. Git
+   refreshes the index on a **plain `git status`**, so the hook fired a background sync on every status
+   check — and one of those raced a sync already in flight, `mv`-ing a `.tmp` out from under it. The
+   visible symptom was one line: `mv: rename .../parlay-lab-worktree-UNCOMMITTED.tar.gz.tmp: No such
+   file or directory`. Standalone reproduction of the `tar` call **succeeded**, twice, which is what
+   ruled out a tar/BSD problem and pointed at concurrency. Two fixes, not one: the hook is gone (its
+   value — a narrow staged-but-uncommitted window — did not justify a sync per `git status`), **and the
+   script now serialises on a `mkdir` lock in `$TMPDIR`** with a 600 s stale-breaker, because the four
+   remaining hooks can still overlap a manual run. Verified by launching two `--force` runs at once:
+   one published, the other printed *another sync is already running — skipping*, the worktree tarball
+   came out valid at 695 entries, no `.tmp` survived, and the lock released.
 2. **Every session that touches the project**, as a standing rule now written into `CLAUDE.md`. This
    is what covers unstaged edits, and it is the honest mechanism: a rule a session follows, not a
    daemon.
@@ -939,6 +963,34 @@ every tuned constant with its reasoning — including the two that are easiest t
 outside: that the football reserve is **372 CFB / 248 NFL** and lowers nothing (`dailyBudget` stays
 2,500 and every credit is still spendable), and that the MLB live calendar is **six** slots because
 7 × 94 = 658 > 600 while 6 × 94 = 564 fits.
+
+**INSTRUCTION 53a, SAME DAY — "So I can now paste the parlay lab handoff folder in any chat anywhere
+with the parlay lab website and continue?"** No, and the measurement says why: `code/` alone is 108 MB
+(a 99 MB full-history bundle plus a 9.5 MB source tarball), and the repo copies are **216,000 tokens**
+— `docs/session-handoff.md` 159k, `CLAUDE.md` 36k, `docs/credit-budget.md` 13k. Nothing uploads 99 MB
+to a chat. But the **eight briefs together are 55 KB, about 13,000 tokens**, which fits anywhere, so
+the sync now also emits `PASTE-THIS.md`: one self-contained file, concatenated from the briefs already
+written (so there is exactly one source for every sentence in it), with the sentinel and the repeated
+`_Synced_` footers stripped.
+
+**ITS FIRST SECTION IS THE PART THAT MATTERS,** because the honest answer depends on where it is
+pasted, and Josh is non-technical enough to be told "done" by a chat that cannot do anything:
+**(A)** Claude Code on Josh's Mac does not need the file at all — the repo and the full package are on
+disk and complete. **(B)** Claude Code anywhere else should clone `github.com/JBravvvv/parlay-lab` and
+check out `frontend-rebuild`, which is authoritative and current — the file is an extract, not a
+source. **(C)** A plain chat with no disk access can explain, price a decision, design, and review
+pasted code, but **cannot edit, gate, or deploy, and must never say something is done, fixed, or
+live.** It is also told its own context ceiling — 13k of a 216k package — and told to ask for the
+specific deep doc or to hand the question to a Claude Code session rather than guess.
+
+**A GUARD FIRED DURING THIS SHIP AND THE FIX WAS STRUCTURAL, NOT A RE-DATE.** `sha-currency` went red
+on `docs/session-handoff.md:16` at exactly **11 behind (K=10)** — and the stale token was NOT the
+claim. It was `46f68df9`, the INSTRUCTION 50 tip, carried as a PARENTHETICAL on the same marked line.
+The guard scans every sha on a marked line, so inline history made each superseded sha its own ticking
+clock, and refreshing the claim alone would not have cleared it. Line 16 now carries exactly one sha —
+the one asserted as current — and every superseded sha moved to an adjacent UNMARKED line, which
+`sha-references` still forces to resolve and `sha-currency` correctly ignores. Four commits in one day
+is what surfaced it; the same shape would have surfaced it on someone else's turn otherwise.
 
 **WHAT IS STILL TRUE AFTER THIS SHIP.** The folder is a mirror of the repo, not a second source of
 truth. Nothing in it is authoritative over `docs/`; `01-STATE.md` is authoritative for git facts only

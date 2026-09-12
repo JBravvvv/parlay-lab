@@ -26,8 +26,13 @@
 #     tools/sync-handoff.sh --quiet      # no output unless something fails
 #
 #  WIRED TO FIRE AUTOMATICALLY FROM
-#     .git/hooks/post-commit, post-merge, post-checkout, post-rewrite,
-#     post-index-change  (so `git add` publishes too, not only `git commit`)
+#     .git/hooks/post-commit, post-merge, post-checkout, post-rewrite
+#
+#  A post-index-change hook was tried and REMOVED: git refreshes the index on a
+#  plain `git status`, so it fired a background sync on every status check and
+#  raced the run already in flight. The four hooks above cover every change that
+#  lands a commit, which under this project's commit-and-push doctrine is every
+#  shipped change. The lock below exists anyway, because hooks can still overlap.
 #
 #  WHY THERE IS NO TIMER — MEASURED 2026-09-12, NOT ASSUMED. A LaunchAgent was
 #  installed, fired, and DENIED: under macOS TCC a launchd-spawned shell cannot
@@ -68,6 +73,25 @@ die() { printf 'sync-handoff: %s\n' "$*" >&2; exit 1; }
 cd "$REPO" 2>/dev/null || die "repo not found at $REPO"
 [ -d "$REPO/.git" ] || die "$REPO is not a git repo"
 mkdir -p "$OUT/repo/docs" "$OUT/code" "$OUT/archive" 2>/dev/null || die "cannot write to $OUT"
+
+# ------------------------------------------------------------------- mutex
+# Hooks can overlap (a commit landing while a sync is mid-flight), and two
+# concurrent runs DO collide: one mv's a .tmp out from under the other, which is
+# exactly how this was found — a `git status` fired a hook during a manual run
+# and the worktree tarball failed. mkdir is atomic, so it is the lock.
+LOCK="${TMPDIR:-/tmp}/pl-sync-handoff.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  LOCK_AGE=$(( $(date +%s) - $(stat -f '%m' "$LOCK" 2>/dev/null || echo 0) ))
+  if [ "$LOCK_AGE" -gt 600 ]; then
+    rmdir "$LOCK" 2>/dev/null
+    mkdir "$LOCK" 2>/dev/null || { say "sync-handoff: cannot take the lock — skipping."; exit 0; }
+    say "sync-handoff: broke a stale lock (${LOCK_AGE}s old)."
+  else
+    say "sync-handoff: another sync is already running — skipping."
+    exit 0
+  fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM HUP
 
 NOW_ISO="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 NOW_DAY="$(date '+%Y-%m-%d')"
@@ -212,6 +236,8 @@ allocation, but it can never remove one.
 
 ```
 00-START-HERE.md          this file — the orientation brief
+PASTE-THIS.md             ALL the briefs in ONE file (~14k tokens) — the thing to
+                          drag into a chat that has no access to this disk
 01-STATE.md               live: branch, commit, dirty/clean, deploy, gate result
 02-ENVIRONMENT.md         how to run anything here, and every trap that has bitten
 03-SECURITY.md            the credential and money rules. NON-NEGOTIABLE.
@@ -273,10 +299,11 @@ travels) regenerates this whole folder. It is change-gated, so running it when
 nothing has changed costs nothing. It fires automatically from:
 
 - **Git hooks** in `/Users/josh/Documents/Parlay-Lab/.git/hooks/` —
-  `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
-  `post-index-change` (which fires on `git add`, so staged-but-uncommitted work
-  publishes too). Doctrine here is commit-and-push every shipped change, so
-  every shipped change lands in this folder without anyone asking.
+  `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Doctrine here is
+  commit-and-push every shipped change, so every shipped change lands in this
+  folder without anyone asking. (A fifth hook on index changes was tried and
+  removed: git refreshes the index on a plain `git status`, so it fired a sync on
+  every status check and raced the run already in flight.)
 - **Every session that touches the project**, as a standing rule in
   `repo/CLAUDE.md`: after any change, run the script. That is what covers edits
   that are never staged.
@@ -880,7 +907,7 @@ cat <<'EOF'
 
 | Trigger | Where |
 |---|---|
-| every commit / merge / checkout / rewrite / `git add` | `/Users/josh/Documents/Parlay-Lab/.git/hooks/` — 5 hooks |
+| every commit / merge / checkout / rewrite | `/Users/josh/Documents/Parlay-Lab/.git/hooks/` — 4 hooks |
 | every session that changes the project | standing rule in `repo/CLAUDE.md` |
 | on demand | `/Users/josh/Documents/Parlay-Lab/tools/sync-handoff.sh --force` |
 
@@ -891,6 +918,68 @@ A sync with nothing changed exits immediately; it compares a fingerprint of HEAD
 the dirty-tree listing, and the mtimes of every doc and config.
 EOF
 } > "$OUT/MANIFEST.md"
+
+# ==========================================================================
+#  PASTE-THIS.md — ONE file, ~14k tokens, for a chat with no disk access.
+#  The folder itself cannot be handed to a chat: code/ alone is 108 MB. This is
+#  the part that fits, concatenated from the briefs already written above so
+#  there is exactly one source for every sentence.
+# ==========================================================================
+{
+cat <<'EOF'
+# PARLAY LAB — THE WHOLE PROJECT IN ONE FILE
+
+You have been handed this by Josh (GitHub `JBravvvv`) to continue work on Parlay
+Lab. It is a generated snapshot, not a hand-written summary. Read it all before
+you answer anything.
+
+## FIRST: work out what you can actually do, and say so plainly
+
+**A. You are Claude Code on Josh's own Mac.** You do not need this file. The repo
+is at `/Users/josh/Documents/Parlay-Lab` and the full package — all 23 docs, the
+1,500-line `CLAUDE.md`, the code — is at `/Users/josh/Documents/Parlay Lab Handoff`.
+Read those instead; they are complete and this file is only an extract.
+
+**B. You are Claude Code somewhere else** (claude.ai/code, another machine, a
+container). Get the code from GitHub, not from this file:
+
+```bash
+git clone https://github.com/JBravvvv/parlay-lab
+cd parlay-lab && git checkout frontend-rebuild && npm install
+```
+
+That is the authoritative source and it is current — `frontend-rebuild` is both
+the working branch and the Vercel production branch. Then read `CLAUDE.md` and
+`docs/session-handoff.md` in the clone. You will still need Josh to supply
+environment variables; he types those himself, always.
+
+**C. You are a plain chat with no file access and no terminal.** Then be honest
+about the ceiling, because Josh is non-technical and will take you at your word:
+
+- You **can** explain the system, reason about the betting model, price a
+  decision, review logic he pastes in, design a feature, write code for him to
+  carry over, and help him answer the open decisions at the end of this file.
+- You **cannot** edit the repo, run the 3,193-test suite, check types, or deploy.
+  **Never say something is done, fixed, or live.** Nothing you write here reaches
+  the app until a session with disk access ships it.
+- You do **not** have the deep docs. This file is roughly 14,000 tokens; the full
+  package is over 216,000. If a question needs `CLAUDE.md` (36k tokens) or
+  `docs/session-handoff.md` (159k), ask Josh to paste the specific file, or tell
+  him this is a question for a Claude Code session on his Mac.
+
+In every case: the rules in the SECURITY section below are binding on you from
+the first message, and nothing in this file authorizes a purchase, a deploy, or
+entering any secret.
+
+EOF
+for f in 00-START-HERE 01-STATE 03-SECURITY 02-ENVIRONMENT 06-ARCHITECTURE 04-OPEN-DECISIONS 05-INSTRUCTION-LOG; do
+  [ -f "$OUT/$f.md" ] || continue
+  printf '\n\n<!-- ============ %s ============ -->\n\n' "$f"
+  # drop the sentinel comment and each file's trailing "_Synced ..._" footer
+  sed -e '/^<!-- pl-handoff:generated -->$/d' -e '/^_Synced .*_$/d' "$OUT/$f.md"
+done
+printf '\n\n---\n\n_One-file snapshot generated %s from `%s` @ `%s` (%s). The complete package, including the codebase, is `/Users/josh/Documents/Parlay Lab Handoff`._\n' "$NOW_ISO" "$BRANCH" "$HEAD_SHORT" "$DIRTY"
+} > "$OUT/PASTE-THIS.md"
 
 # --------------------------------------------------------------- fingerprint
 printf '%s\n' "$FP_NEW" > "$FP_FILE"
