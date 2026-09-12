@@ -7,6 +7,7 @@
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSyncKey, syncNow } from "@/lib/ledgerSync";
+import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
 
 export type RefillDesk = "mlb" | "cfb" | "nfl";
 
@@ -72,6 +73,12 @@ export function useRefillDesk() {
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["board"] });
       void qc.invalidateQueries({ queryKey: ["picks"] });
+      /* INSTRUCTION 51 fix pass (2026-09-11). Josh's tap now makes the server re-price the games in
+         play (/api/refill?desk=mlb forwards to the live pull with manual=1), so the overlay the
+         Board joins has to be re-read too — otherwise the tap bought a fresh line and the phone
+         kept rendering the one it already had for up to 30 minutes. Prefix match: every slate
+         date's overlay, not just today's. */
+      void qc.invalidateQueries({ queryKey: MLB_LIVE_QUERY_PREFIX });
       void syncNow();
     },
   });

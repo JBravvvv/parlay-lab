@@ -24,6 +24,16 @@ export type GameNow = {
   away: number | null;
   home: number | null;
   inning: string | null; // "Bot 5"
+  /**
+   * IN PLAY RIGHT NOW, which is NOT the same question as `live` (INSTRUCTION 51 fix pass,
+   * 2026-09-11). `live` deliberately reads a "Delayed Start: Rain" / "Rain Delay" game as live,
+   * because the boxscore tally is still a real, frozen number and the phone should keep showing it.
+   * But a book pulls its in-play markets the instant play stops, so a LIVE PRICE may not be shown
+   * against a delay: the last quote would keep pulsing "LIVE" against a market nobody is posting.
+   * Every live-PRICE surface gates on this; every tally surface still gates on `live`.
+   * The server's own twin is `isPriceable` (src/lib/server/mlb-live-state.ts).
+   */
+  priceable: boolean;
 };
 
 /**
@@ -134,6 +144,11 @@ export function useLiveNow(reqs: LiveNowReq[]): LiveNowRead {
               state: st,
               live: abs === "Live" || /in progress|delayed/i.test(st),
               final: /final|game over|completed/i.test(st),
+              /* live AND actually being played — see the field's own note on GameNow */
+              priceable:
+                (abs === "Live" || /in progress|delayed/i.test(st)) &&
+                !/final|game over|completed/i.test(st) &&
+                !/delay|postponed|cancell?ed|suspended/i.test(st),
               away: g.teams?.away?.score ?? null,
               home: g.teams?.home?.score ?? null,
               inning: inningTxt(g.linescore),

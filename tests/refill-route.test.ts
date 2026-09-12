@@ -17,10 +17,14 @@ vi.mock("@/lib/server/refill", () => ({
   readMlbDay: vi.fn(),
   decideMlbRefill: vi.fn(),
   forwardMlbRefill: vi.fn(),
+  /* INSTRUCTION 51 fix pass (2026-09-11): the Refresh pill now also pokes the live in-play pull.
+     It has to be in the mock factory — the route imports it at module load, and an undefined
+     import made every ?desk=mlb answer a 502 (which is how this amendment was found). */
+  forwardMlbLivePull: vi.fn(),
 }));
 
 import { storeEnv } from "@/lib/server/store";
-import { decideMlbRefill, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
+import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
 import { POST } from "../app/api/refill/route";
 
 const SECRET = "cron-secret-for-this-test-only";
@@ -43,6 +47,7 @@ describe("POST /api/refill — the gate, in order: 503 (env) → 401 (phrase) �
     vi.mocked(readMlbDay).mockReset();
     vi.mocked(decideMlbRefill).mockReset();
     vi.mocked(forwardMlbRefill).mockReset();
+    vi.mocked(forwardMlbLivePull).mockReset().mockResolvedValue({ status: 200, note: "2 live games re-priced" } as never);
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -134,6 +139,12 @@ describe("POST /api/refill — the gate, in order: 503 (env) → 401 (phrase) �
     expect((body.topup as { reason: string }).reason).toMatch(/no paper lock/);
     expect(forwardMlbRefill).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+    /* INSTRUCTION 51 fix pass — THE LIVE PULL IS NOT GATED ON THE TOP-UP DECISION. Josh's
+       complaint is a price, not a ticket: "it will show the player is top 4th w/ 3 H+R+RBI, but
+       show them as an 'S' grade for over .5 H+R+RBI". The top-up refuses for free most of the day,
+       so behind it a tap could never re-price a line. It rides beside, reported under `live`. */
+    expect(forwardMlbLivePull).toHaveBeenCalledWith({ origin: "https://parlay.test", secret: SECRET, slot: "manual", manual: true });
+    expect(body.live).toMatchObject({ status: 200, note: "2 live games re-priced" });
   });
 
   it("?desk=mlb: a fire forwards through forwardMlbRefill with slot manual and the secret, and reports the generate answer", async () => {
@@ -144,7 +155,32 @@ describe("POST /api/refill — the gate, in order: 503 (env) → 401 (phrase) �
     expect(status).toBe(200);
     expect(forwardMlbRefill).toHaveBeenCalledWith({ origin: "https://parlay.test", secret: SECRET, slot: "manual" });
     expect(body).toMatchObject({ ok: true, desk: "mlb", trigger: "manual", slot: "manual", fired: true, generateStatus: 200, generate: { ok: true, topup: true } });
+    expect(forwardMlbLivePull).toHaveBeenCalledWith({ origin: "https://parlay.test", secret: SECRET, slot: "manual", manual: true });
+    expect(body.live).toMatchObject({ status: 200 });
     expect(JSON.stringify(body)).not.toContain(SECRET);
+  });
+
+  it("?desk=mlb: manual:true is what makes the live pull skip its own slot de-duplication", async () => {
+    /* The route stamps `slot` under NX so a double cron poke cannot buy the same prices twice
+       (src/lib/server/mlb-live-quote.ts RAIL 1b). A hand tap must NOT be swallowed by that stamp —
+       manual=1 is the one flag that bypasses it — so this is pinned separately from the call above. */
+    vi.mocked(readMlbDay).mockResolvedValue({ lockEntry: null, blocksArr: [], reg: {}, starts: [] } as never);
+    vi.mocked(decideMlbRefill).mockReturnValue({ fire: false, reason: "fully deployed", owed: 0, used: 0 } as never);
+    await post("?desk=mlb");
+    expect(vi.mocked(forwardMlbLivePull).mock.calls[0]![0]).toMatchObject({ slot: "manual", manual: true });
+  });
+
+  it("?desk=mlb: a live pull that fails does NOT speak for the refill — the top-up answer still lands", async () => {
+    /* forwardMlbLivePull is total by construction (src/lib/server/refill.ts) — it resolves a
+       {status,error} shape instead of throwing — so a dead live pull can never turn a successful
+       top-up into the 502 that the catch below produces. */
+    vi.mocked(forwardMlbLivePull).mockResolvedValue({ status: 0, error: "aborted" } as never);
+    vi.mocked(readMlbDay).mockResolvedValue({ lockEntry: { paper: true }, blocksArr: [], reg: {}, starts: [] } as never);
+    vi.mocked(decideMlbRefill).mockReturnValue({ fire: true, reason: "day short $90", owed: 90, used: 1 } as never);
+    vi.mocked(forwardMlbRefill).mockResolvedValue({ generateStatus: 200, generate: { ok: true, topup: true } });
+    const { status, body } = await post("?desk=mlb");
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true, fired: true, generateStatus: 200, live: { status: 0, error: "aborted" } });
   });
 });
 

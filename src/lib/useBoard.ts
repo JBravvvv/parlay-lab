@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bestBoard, generateBoard, type Board } from "./engine-client";
+import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
 
 /**
  * Today's board, from the cheapest acceptable source: this device's cache, or the
@@ -30,6 +31,11 @@ export function useRegenerateBoard() {
     onSuccess: (b) => {
       qc.setQueryData(["board"], b);
       void qc.invalidateQueries({ queryKey: ["picks"] });
+      /* INSTRUCTION 51 fix pass (2026-09-11): and the live overlay. A browser re-price replaces the
+         pregame population the overlay re-anchors, so serving the old overlay against the new rows
+         is how a row ends up graded against a line nobody is offering. Re-reading it is FREE — the
+         route answers from Redis unless its own gate says a credit is warranted. */
+      void qc.invalidateQueries({ queryKey: MLB_LIVE_QUERY_PREFIX });
     },
   });
 }

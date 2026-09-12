@@ -40,8 +40,10 @@ import { normalizeName, parseBoardLabel } from "@/lib/player-card";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
 import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
-import { settledRead, type LegSettledRead } from "@/lib/leg-settled";
+import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import { lineOf } from "@/lib/pred-serialize";
+import { fmtAmerican } from "@/lib/format";
+import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote, type MlbLiveView } from "@/lib/mlb/live-client";
 
 /* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
    'ALL'; If I click on 'Top 50' then click on one of the categories (ie: hits) then all top
@@ -235,6 +237,24 @@ export default function BoardPage() {
     retry: false,
   });
   const picksData = picksQuery.data ?? null;
+  /* INSTRUCTION 51 (2026-09-11), Josh's order verbatim: "Authorize the live in-play odds pull for
+     MLB". THE SECOND HALF of INSTRUCTION 50 item 2. Item 2 could only suppress a dead row, because
+     the in-play re-pull costs money Josh had not authorised. He has now authorised it, for MLB.
+
+     The board still reaches NO paid feed itself: this is one free GET to the budgeted server route
+     (src/lib/mlb/live-client.ts), which owns the key, the daily budget, the divergence gate that
+     decides which games are worth paying for, and the 429 cooldown. There is no refetchInterval
+     anywhere in that module — a timer on a paid feed spends money while nobody is watching. It
+     re-reads on mount, on focus, and on Josh's own Refresh tap. */
+  const liveQuotes = useMlbLiveQuotes(board?.date ?? null);
+  const liveOverlay = liveQuotes.data ?? null;
+  /* WHY THERE IS NO LIVE LINE, WHEN THERE IS NO LIVE LINE (fix pass, 2026-09-11). The route is
+     behind the sync phrase, so without one stored the query is disabled and the Board shows pregame
+     numbers with no explanation — which is the symptom Josh reported, wearing no symptom at all.
+     Both reasons are now printed in the footnote: no phrase, or a route that answered with an
+     error. */
+  const liveSyncReady = useMlbLiveSyncReady();
+  const liveError = liveQuotes.error ? String((liveQuotes.error as Error).message ?? liveQuotes.error) : null;
   const cohorts = picksData?.record?.markets ?? null;
   const catRecord = cohorts?.[cat] ?? null;
   const catDay = catRecord?.perDay?.length
@@ -303,10 +323,91 @@ export default function BoardPage() {
      against a 0.5 line — that reads as one honest cell surrounded by four dishonest ones, and
      the Kelly chip is the worst of them because it is an instruction to stake money on a bet
      that is already decided. Every one of those cells now asks this single question. */
+  /* INSTRUCTION 51 — THE OVERLAY'S QUOTE FOR THIS ROW, OR NOTHING.
+     Three separate reasons for null, and each is a deliberate refusal rather than an omission:
+       • no quote — the book posts no in-play market on this leg, or the budget refused the pull;
+       • the game is not live — a quote may never outlive its game, so a final never prints a
+         live price, it drops back to the final/SETTLED read on the next render;
+       • the quote is older than MLB_LIVE_CLIENT.quoteMaxAgeSec — THE HARD RENDER-TIME DROP. Redis
+         may still hold it; the screen may not show it. No label older than the cap can ever
+         appear, which is the only thing that lets the word "live" be taken at face value.
+     Every one of those falls through to INSTRUCTION 50's SETTLED suppression, byte-identical. */
+  const rowLive = useCallback(
+    (r: { gkey?: string | null; lkey?: string | null }): MlbLiveQuote | null => {
+      const rows = liveOverlay?.rows;
+      if (!rows || !r.gkey || !r.lkey) return null;
+      const q = rows[`${r.gkey}|${r.lkey}`];
+      if (!q) return null;
+      const pk = d?.gameInfo?.[r.gkey]?.pk ?? null;
+      if (pk == null || !liveNow.games[pk]?.live) return null;
+      if (Date.now() - Date.parse(q.at) > MLB_LIVE_CLIENT.quoteMaxAgeSec * 1000) return null;
+      return q;
+    },
+    [liveOverlay, d, liveNow],
+  );
+  /** when THIS GAME's live line was pulled — per game, never board-level; that is the whole answer to "how fresh" */
+  const livePricedAt = useCallback(
+    (gkey: string | null | undefined) => (gkey ? liveOverlay?.pricedAt?.[gkey] ?? null : null),
+    [liveOverlay],
+  );
+
+  /* INSTRUCTION 50 item 2 — ONE GUARD PER ROW, now asked AT THE LIVE LINE (INSTRUCTION 51).
+     The join is the elegant part, and it must not be "improved": settledRead is handed the
+     stored lkey with its THIRD segment swapped for the line the book is posting now. Then
+       • case A, re-anchored — 3 against a live 3.5 returns null all by itself, because
+         !(3 > 3.5) (src/lib/leg-settled.ts:87). The suppression falls away the moment a real
+         line exists, and every money cell on the row comes back graded at that live price.
+       • case B, provably settled — 3 against a live 0.5 still reads over-cleared, and now the
+         sentence cites the LIVE line rather than a pregame one.
+       • case C, no quote — identical to INSTRUCTION 50, byte for byte. That is the default on
+         every failure path: no budget, a 429, a game with no in-play market, an unmatched event.
+     `lineOf` reads the third segment with no edit to that module (src/lib/pred-serialize.ts:205),
+     and tab purity is untouched because segment 1, the player, never changes. */
   const rowSettled = useCallback(
-    (r: { gkey?: string | null; lkey?: string | null; sub?: string | null }): LegSettledRead | null =>
-      settledRead(r.lkey, r.sub, legLive({ gkey: r.gkey, lkey: r.lkey })?.val),
-    [legLive],
+    (r: { gkey?: string | null; lkey?: string | null; sub?: string | null }): LegSettledRead | null => {
+      const q = rowLive(r);
+      const tally = legLive({ gkey: r.gkey, lkey: r.lkey })?.val;
+      /* THE SWAP IS AN OVER-ONLY MOVE (fix pass, 2026-09-11). Re-anchoring says "the bet on this row
+         is now the one the book is posting" — which is true for an Over, whose stored leg has WON
+         and whose live leg at the new line is a fresh, open, actionable bet. It is false for an
+         Under: a tally past the stored line means that Under has LOST, permanently, and swapping
+         in a higher live line un-decides a decided loss and prints the row as open. Josh's own
+         case, mirrored: 3 H+R+RBI against a stored UNDER 0.5 is gone, and a live 3.5 does not
+         bring it back. An Under is therefore always read at the line Josh actually holds; when
+         that read is null the row is still open and falls through to the live Under price below. */
+      if (!q || legSideOf(r.sub) === "U") return settledRead(r.lkey, r.sub, tally);
+      const [player, market] = String(r.lkey ?? "").split("|");
+      return settledRead(`${player}|${market}|${q.ln}`, r.sub, tally);
+    },
+    [legLive, rowLive],
+  );
+  /**
+   * THE QUOTE A ROW MAY PRESENT — which is not always the quote that exists (fix pass, 2026-09-11).
+   *
+   * `rowSettled` refuses to re-anchor an Under, so on a SETTLED Under the verdict, the line it cites
+   * and the numbers behind it are all taken at the line Josh holds. Presenting the live Under price,
+   * the live line and the "at the live line" clause beside that verdict would claim the live line
+   * decided a bet it did not decide, and would hang a live price on a ticket that is already lost.
+   *
+   * Every PRESENTATION site asks this. `rowSettled` itself still asks `rowLive`, which is exactly
+   * what lets case B — an Over decided AT the live line — keep citing that live line.
+   */
+  const rowQuote = useCallback(
+    (r: { gkey?: string | null; lkey?: string | null; sub?: string | null }): MlbLiveQuote | null => {
+      const q = rowLive(r);
+      if (!q) return null;
+      return legSideOf(r.sub) === "U" && rowSettled(r) ? null : q;
+    },
+    [rowLive, rowSettled],
+  );
+  /** the live American price for the side THIS ROW is on, or null — the price-column half of the
+      side fix; `null` means "there is no live price here", never "use the pregame one silently". */
+  const liveAmOf = useCallback(
+    (r: { gkey?: string | null; lkey?: string | null; sub?: string | null }) => {
+      const q = rowQuote(r);
+      return q ? mlbLiveView(q, legSideOf(r.sub)).am : null;
+    },
+    [rowQuote],
   );
 
   const columns: Column<PickRow>[] = useMemo(
@@ -317,6 +418,7 @@ export default function BoardPage() {
         sortValue: (r) => r.label,
         cell: (r) => {
           const n = legLive({ gkey: r.gkey, lkey: r.lkey });
+          const q = rowQuote(r);
           return (
             <div className={r.susp || rowOut(r) ? "opacity-50" : undefined}>
               <div className="font-medium text-text">
@@ -324,7 +426,18 @@ export default function BoardPage() {
                 {rowOut(r) && <OutTag />}
                 <CzInfo pickKey={`${r.label}|${r.sub}`} offered={!cz.isHidden(`${r.label}|${r.sub}`)} onToggle={cz.toggle} />
               </div>
-              <div className="text-[11px] text-muted">{r.sub}</div>
+              {/* THE ROW'S STATED BET, RE-ANCHORED (fix pass, 2026-09-11). `r.sub` is the pregame
+                  sentence — "H+R+RBI O 0.5" — and on a re-anchored row it is the ONE cell still
+                  describing the dead bet while the grade, the price, the EV and the True % have all
+                  moved to the live line. Reading "O 0.5" beside "Tier B at the live line" is how a
+                  person concludes the S grade was about 0.5 after all. The live line is appended,
+                  never substituted, so the bet Josh locked is still legible. */}
+              <div className="text-[11px] text-muted">
+                {r.sub}
+                {q && q.ln !== lineOf(r.lkey ?? "") ? (
+                  <span className="text-live"> → {legSideOf(r.sub)} {q.ln} live</span>
+                ) : null}
+              </div>
               {r.susp && (
                 <div
                   className="mt-0.5 inline-block rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted"
@@ -345,13 +458,23 @@ export default function BoardPage() {
                 >
                   ● {nowLabel(n)}
                   {(() => {
-                    const s0 = settledRead(r.lkey, r.sub, n.val);
+                    const s0 = rowSettled(r);
                     /* the relation in plain language, and the SIDE it decided — "already over
-                       0.5" reads as good news next to an Under bet that has in fact just lost */
-                    return s0 ? <span className="text-gold"> · {s0.why} — priced pregame</span> : null;
+                       0.5" reads as good news next to an Under bet that has in fact just lost.
+                       INSTRUCTION 51: this asks rowSettled, so on a re-anchored row the sentence
+                       cites the LIVE line — and a row whose live line the tally has NOT cleared
+                       says nothing here at all, which is exactly the case Josh reported. */
+                    return s0 ? (
+                      <span className="text-gold">
+                        {" · "}
+                        {s0.why}
+                        {q ? " — at the live line" : " — priced pregame"}
+                      </span>
+                    ) : null;
                   })()}
                 </div>
               )}
+              {q && <LivePriceLine view={mlbLiveView(q, legSideOf(r.sub))} pricedAt={livePricedAt(r.gkey)} />}
             </div>
           );
         },
@@ -365,14 +488,25 @@ export default function BoardPage() {
            is then a PREGAME lock, not a live market, and dressing it as an S grade is the exact
            bug Josh reported. No grade is shown; gradeRank(null) = 0, so the row sinks. The row
            itself stays visible — nothing is hidden, nothing is deleted, no price is invented. */
-        sortValue: (r) =>
-          rowSettled(r)
+        sortValue: (r) => {
+          /* INSTRUCTION 51: a RE-ANCHORED row sorts on its LIVE grade — it is open, actionable and
+             priced, so it belongs wherever that grade puts it. Case-B and case-C rows still sink
+             at gradeRank(null), unchanged. */
+          const q = rowQuote(r);
+          const v = q ? mlbLiveView(q, legSideOf(r.sub)) : null;
+          return rowSettled(r)
             ? gradeRank(null)
-            : gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv))),
+            : v
+              ? gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null)
+              : gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv)));
+        },
         cell: (r) => {
           const s0 = rowSettled(r);
+          const q = rowQuote(r);
           return s0 ? (
             <SettledGrade read={s0} />
+          ) : q ? (
+            <LiveGrade view={mlbLiveView(q, legSideOf(r.sub))} pricedAt={livePricedAt(r.gkey)} />
           ) : basisMode ? (
             <GradeChip grade={gradeFromEv(r.bsEv == null ? null : Number(r.bsEv))} basis="EV @ basis (DK/FD)" />
           ) : (
@@ -387,14 +521,23 @@ export default function BoardPage() {
         sortValue: (r) => Number(r.prob) || 0,
         /* on a decided leg this is no longer a "true %" of anything open — it is the model's
            PREGAME number, said so in words rather than drawn as a live probability bar */
-        cell: (r) =>
-          rowSettled(r) ? (
+        cell: (r) => {
+          /* INSTRUCTION 51: on a re-anchored row the pregame % is not the true % of anything —
+             3 H+R+RBI already banked against a live 3.5 is a different bet. The live number is
+             the engine's own remaining-game sim where it has one, and the market's de-vigged fair
+             where it does not — and a market fair is NEVER drawn as a ProbBar, because a bar
+             reads as model edge over the market and a market fair has none by construction. */
+          const q = rowQuote(r);
+          return rowSettled(r) ? (
             <span className="num text-[11px] text-faint" title="The model's pregame probability — the leg is already decided, so this is history, not a live read">
               {(Number(r.prob) || 0).toFixed(1)}% pregame model
             </span>
+          ) : q && q.pLive != null ? (
+            <LiveProb pregamePct={Number(r.prob) || 0} view={mlbLiveView(q, legSideOf(r.sub))} />
           ) : (
             <ProbBar p={(Number(r.prob) || 0) / 100} className="w-28 justify-end md:w-36" />
-          ),
+          );
+        },
       },
       ...(basisMode
         ? [
@@ -404,9 +547,16 @@ export default function BoardPage() {
               key: "basis",
               header: "Basis",
               numeric: true,
-              sortValue: (r) => Number(String(r.bsOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
+              sortValue: (r) => (rowQuote(r) ? -Infinity : Number(String(r.bsOdds ?? "").replace(/[^\d.-]/g, "")) || 0),
+              /* A PREGAME PRICE MAY NOT SIT UNLABELLED BESIDE A LIVE ONE (fix pass, 2026-09-11).
+                 The in-play pull asks Caesars only, so on a re-anchored row there IS no live DK/FD
+                 basis — and the stored one prices a different line. It is withdrawn and said so. */
               cell: (r) =>
-                r.bsOdds != null ? (
+                rowQuote(r) ? (
+                  <span className="text-[10px] text-faint" title="The in-play pull prices Caesars only — there is no live DK/FD basis, and the pregame one prices a different line">
+                    no live DK/FD basis
+                  </span>
+                ) : r.bsOdds != null ? (
                   <span className="num inline-flex items-baseline gap-1.5">
                     <OddsCell odds={r.bsOdds as never} />
                     <span className="text-[9.5px] uppercase text-muted">{String(r.bsBook ?? "").replace("draftkings", "DK").replace("fanduel", "FD")}</span>
@@ -424,17 +574,23 @@ export default function BoardPage() {
               key: "cz",
               header: "CZ (settles)",
               numeric: true,
-              sortValue: (r) => Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
-              cell: (r) => <OddsCell odds={r.czOdds as never} book="caesars" />,
+              sortValue: (r) => liveAmOf(r) ?? (Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0),
+              cell: (r) => <CzPrice row={r} live={rowQuote(r)} />,
             } satisfies Column<PickRow>,
             {
               key: "bsEv",
               header: "EV @ basis",
               numeric: true,
               sortValue: (r) => (rowSettled(r) || r.bsEv == null ? -99 : Number(r.bsEv)),
-              cell: (r) =>
-                rowSettled(r) ? (
+              cell: (r) => {
+                const q = rowQuote(r);
+                return rowSettled(r) ? (
                   <SettledDash />
+                ) : q ? (
+                  /* the in-play pull asks for the six core markets at us regions only, so there is
+                     no live DK/FD basis to price against — the honest substitute is the EV at the
+                     live Caesars line, said in as many words rather than a pregame basis number */
+                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live Caesars line" note="the in-play pull prices Caesars, so there is no live DK/FD basis — this is the EV at the live Caesars line" />
                 ) : r.bsEv != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <EvBadge ev={Number(r.bsEv)} />
@@ -444,7 +600,8 @@ export default function BoardPage() {
                   </span>
                 ) : (
                   <span className="text-faint">—</span>
-                ),
+                );
+              },
             } satisfies Column<PickRow>,
             {
               key: "stake",
@@ -452,14 +609,18 @@ export default function BoardPage() {
               numeric: true,
               sortValue: (r) => (rowSettled(r) ? -99 : Number(r.bsKellyF) || 0),
               /* a stake chip on a decided leg is an INSTRUCTION TO BET on a settled market */
-              cell: (r) =>
-                rowSettled(r) ? (
+              cell: (r) => {
+                const q = rowQuote(r);
+                return rowSettled(r) ? (
                   <SettledDash />
+                ) : q ? (
+                  <LiveTag />
                 ) : r.bsKellyF != null && Number(r.bsKellyF) > 0 ? (
                   <KellyChip stake={Number(r.bsKellyF) * bankroll} />
                 ) : (
                   <span className="text-faint">—</span>
-                ),
+                );
+              },
             } satisfies Column<PickRow>,
           ]
         : [
@@ -467,23 +628,44 @@ export default function BoardPage() {
               key: "best",
               header: "Best",
               numeric: true,
-              sortValue: (r) => Number(String(r.odds).replace(/[^\d.-]/g, "")) || 0,
-              cell: (r) => (r.odds != null ? <OddsCell odds={r.odds as never} /> : <span className="text-faint">—</span>),
+              sortValue: (r) => (rowQuote(r) ? -Infinity : Number(String(r.odds).replace(/[^\d.-]/g, "")) || 0),
+              /* the all-books best is a PREGAME survey of a line the game has moved past; the
+                 in-play pull buys Caesars only, so there is no live best to put here (fix pass) */
+              cell: (r) =>
+                rowQuote(r) ? (
+                  <span className="text-[10px] text-faint" title="The in-play pull prices Caesars only — no all-books survey exists at the live line">
+                    no live best
+                  </span>
+                ) : r.odds != null ? (
+                  <OddsCell odds={r.odds as never} />
+                ) : (
+                  <span className="text-faint">—</span>
+                ),
             } satisfies Column<PickRow>,
             {
               key: "cz",
               header: "Caesars",
               numeric: true,
-              sortValue: (r) => Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0,
-              cell: (r) => <OddsCell odds={r.czOdds as never} book="caesars" />,
+              sortValue: (r) => liveAmOf(r) ?? (Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0),
+              cell: (r) => <CzPrice row={r} live={rowQuote(r)} />,
             } satisfies Column<PickRow>,
             {
               key: "czEv",
               header: "EV @ CZR",
               numeric: true,
               sortValue: (r) => (rowSettled(r) ? -99 : Number(r.czEv) || 0),
-              cell: (r) =>
-                rowSettled(r) ? <SettledDash /> : r.czEv != null ? <EvBadge ev={Number(r.czEv)} /> : <span className="text-faint">—</span>,
+              cell: (r) => {
+                const q = rowQuote(r);
+                return rowSettled(r) ? (
+                  <SettledDash />
+                ) : q ? (
+                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live Caesars line" />
+                ) : r.czEv != null ? (
+                  <EvBadge ev={Number(r.czEv)} />
+                ) : (
+                  <span className="text-faint">—</span>
+                );
+              },
             } satisfies Column<PickRow>,
             {
               key: "stake",
@@ -491,19 +673,27 @@ export default function BoardPage() {
               numeric: true,
               sortValue: (r) => (rowSettled(r) ? -99 : Number(r.czKellyF) || 0),
               /* a stake chip on a decided leg is an INSTRUCTION TO BET on a settled market */
-              cell: (r) =>
-                rowSettled(r) ? (
+              cell: (r) => {
+                const q = rowQuote(r);
+                /* NO ¼-KELLY ON A LIVE LINE, following the football desks exactly (CfbPicksBoard
+                   :417 / src/lib/cfb/props.ts:287). A market-derived fair has zero edge over the
+                   market by construction, and the pregame Kelly prices a DIFFERENT bet at a
+                   DIFFERENT line — a stake chip there is an instruction to bet a phantom. */
+                return rowSettled(r) ? (
                   <SettledDash />
+                ) : q ? (
+                  <LiveTag />
                 ) : r.czKellyF != null && Number(r.czKellyF) > 0 ? (
                   <KellyChip stake={Number(r.czKellyF) * bankroll} />
                 ) : (
                   <span className="text-faint">—</span>
-                ),
+                );
+              },
             } satisfies Column<PickRow>,
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bankroll, basisMode, legLive, rowSettled, cz.hidden, rowOut],
+    [bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
@@ -514,9 +704,38 @@ export default function BoardPage() {
   /* INSTRUCTION 50 item 2, the stamped-picks and ALL-scope tables. `side` is the row's sub string
      on a stamped pick ("H+R+RBI O 0.5") and "o" on an ALL-scope row — legSettled reads the side the
      byte-identical way the grader does (/ U /), so both shapes are read correctly. */
+  /* INSTRUCTION 51 WAS NEVER WIRED INTO THIS TABLE (fix pass, 2026-09-11) — the defect Josh would
+     have hit first. `pickRows` is non-null on EVERY prop tab with LIVE off (propRows) and on every
+     ALL-scope view (allRows), and the render branches to the stamped-picks DataTable whenever it is
+     non-empty. So on the H+R+RBI tab — the exact tab his complaint came from — not one of the live
+     components below was reachable: the table asked `settledRead` at the STORED line only, and a
+     row whose live line had moved past the tally printed the pregame grade with no live price
+     anywhere on it. Every live read the main table performs is performed here now, side-aware, off
+     the same `rowLive`, so the two tables cannot disagree about what the book is posting. */
+  const pickLive = useCallback(
+    (p: ApiPick) => rowLive({ gkey: p.gkey, lkey: p.lkey }),
+    [rowLive],
+  );
   const pickSettled = useCallback(
-    (p: ApiPick) => settledRead(p.lkey, p.side, legLive({ gkey: p.gkey, lkey: p.lkey })?.val),
-    [legLive],
+    (p: ApiPick): LegSettledRead | null => {
+      const q = pickLive(p);
+      const tally = legLive({ gkey: p.gkey, lkey: p.lkey })?.val;
+      /* the Over-only swap, for the same reason as `rowSettled`: an Under past its stored line has
+         LOST and a higher live line does not un-decide it */
+      if (!q || legSideOf(p.side) === "U") return settledRead(p.lkey, p.side, tally);
+      const [player, market] = String(p.lkey ?? "").split("|");
+      return settledRead(`${player}|${market}|${q.ln}`, p.side, tally);
+    },
+    [legLive, pickLive],
+  );
+  /** the stamped table's half of the rule above — the same gate, asked of the same two functions */
+  const pickQuote = useCallback(
+    (p: ApiPick): MlbLiveQuote | null => {
+      const q = pickLive(p);
+      if (!q) return null;
+      return legSideOf(p.side) === "U" && pickSettled(p) ? null : q;
+    },
+    [pickLive, pickSettled],
   );
   const pickKey = useCallback((p: ApiPick) => `${p.market ?? cat}|${p.player}|${p.line}|${p.side}`, [cat]);
   const pickColumns: Column<ApiPick>[] = useMemo(() => {
@@ -527,11 +746,22 @@ export default function BoardPage() {
       {
         key: "grade",
         header: "Grade",
-        sortValue: (p) => (pickSettled(p) ? gradeRank(null) : gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge)))),
+        sortValue: (p) => {
+          const q = pickQuote(p);
+          const v = q ? mlbLiveView(q, legSideOf(p.side)) : null;
+          return pickSettled(p)
+            ? gradeRank(null)
+            : v
+              ? gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null)
+              : gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge)));
+        },
         cell: (p) => {
           const s0 = pickSettled(p);
+          const q = pickQuote(p);
           return s0 ? (
             <SettledGrade read={s0} />
+          ) : q ? (
+            <LiveGrade view={mlbLiveView(q, legSideOf(p.side))} pricedAt={livePricedAt(p.gkey)} />
           ) : (
             <GradeChip grade={gradeFromEv(p.edge == null ? null : Number(p.edge))} basis="model − implied edge (pts)" />
           );
@@ -544,6 +774,8 @@ export default function BoardPage() {
         cell: (p) => {
           const pk = pickKey(p);
           const mk = p.market && cat === "all" ? `${MARKET_SHORT[p.market] ?? p.market} ` : "";
+          const q = pickQuote(p);
+          const side = legSideOf(p.side);
           return (
             <div className={pickOut(p) ? "opacity-50" : undefined}>
               {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
@@ -553,6 +785,8 @@ export default function BoardPage() {
               <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
               {pickOut(p) && <OutTag />}
               {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — shown always, never on a ticket</span>}
+              {q && q.ln !== p.line ? <span className="ml-1 text-[10px] font-bold text-live">→ {side} {q.ln} live</span> : null}
+              {q && <LivePriceLine view={mlbLiveView(q, side)} pricedAt={livePricedAt(p.gkey)} />}
             </div>
           );
         },
@@ -580,8 +814,20 @@ export default function BoardPage() {
         key: "edge",
         header: "Edge",
         numeric: true,
-        sortValue: (p) => Number(p.edge ?? -Infinity),
-        cell: (p) => (p.edge == null ? "—" : `${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)}`),
+        sortValue: (p) => (pickQuote(p) ? -Infinity : Number(p.edge ?? -Infinity)),
+        /* model − implied, both measured at the PREGAME line. On a re-anchored row that is a number
+           about a bet nobody can place any more, so it is labelled rather than left to be read as
+           the live edge (fix pass, 2026-09-11). */
+        cell: (p) =>
+          p.edge == null ? (
+            "—"
+          ) : pickQuote(p) ? (
+            <span className="num text-[11px] text-faint" title="The pregame model − implied edge; the book has since moved the line, so this is history">
+              {`${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)} pregame`}
+            </span>
+          ) : (
+            `${Number(p.edge) > 0 ? "+" : ""}${Number(p.edge).toFixed(1)}`
+          ),
       },
       {
         key: "status",
@@ -594,7 +840,7 @@ export default function BoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut, pickKey, pickSettled]);
+  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt]);
   const visiblePicksAll = useMemo(
     () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
     [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
@@ -624,6 +870,65 @@ export default function BoardPage() {
       return g.pk != null && liveNow.games[g.pk]?.live && Number.isFinite(st) && board.at <= st;
     }).length;
   }, [d, board, liveNow]);
+
+  /* INSTRUCTION 51 — the header half. `pregameLive` counts the games under way; this counts how
+     many of THOSE carry a live line on this very render, using the same three tests rowLive
+     applies (a quote exists, the game is live, the quote is inside quoteMaxAgeSec). A board that
+     is part live and part pregame must never read as uniformly one or the other. */
+  const liveQuoteGames = useMemo(() => {
+    const rows = liveOverlay?.rows;
+    if (!rows || !d?.gameInfo) return 0;
+    const now = Date.now();
+    const seen = new Set<string>();
+    for (const [key, q] of Object.entries(rows)) {
+      const gkey = key.split("|")[0];
+      const pk = d.gameInfo[gkey]?.pk ?? null;
+      if (pk == null || !liveNow.games[pk]?.live) continue;
+      if (now - Date.parse(q.at) > MLB_LIVE_CLIENT.quoteMaxAgeSec * 1000) continue;
+      seen.add(gkey);
+    }
+    return seen.size;
+  }, [liveOverlay, d, liveNow]);
+  /**
+   * "priced live 4:52p" — THE OLDEST stamp among the games actually carrying a rendered live line.
+   *
+   * It was `Math.max` over every key in `pricedAt` (fix pass, 2026-09-11), which is the most
+   * flattering number available twice over: the newest stamp speaks for games priced long before
+   * it, and the set included games that are finished or whose quotes the render-time cap has
+   * already dropped. One headline number covering several games has to be the WORST of them, or it
+   * is an advertisement rather than a measurement.
+   */
+  const livePricedLabel = useMemo(() => {
+    const rows = liveOverlay?.rows;
+    if (!rows || !d?.gameInfo) return null;
+    const now = Date.now();
+    const stamps: number[] = [];
+    for (const [key, q] of Object.entries(rows)) {
+      const gkey = key.split("|")[0];
+      const pk = d.gameInfo[gkey]?.pk ?? null;
+      if (pk == null || !liveNow.games[pk]?.live) continue;
+      if (now - Date.parse(q.at) > MLB_LIVE_CLIENT.quoteMaxAgeSec * 1000) continue;
+      const t = Date.parse(liveOverlay?.pricedAt?.[gkey] ?? q.at);
+      if (Number.isFinite(t)) stamps.push(t);
+    }
+    return stamps.length ? mlbLiveClockLabel(new Date(Math.min(...stamps)).toISOString()) : null;
+  }, [liveOverlay, d, liveNow]);
+  /* THE SPEND IS SHOWN, NEVER HIDDEN — the same discipline as the browser re-price counter below.
+     Josh authorised this spend; he gets to watch it. `spentToday` is null only when no store is
+     configured, and in that case the route refuses to fetch at all, so there is nothing to report. */
+  const liveSpendNote =
+    liveOverlay && liveOverlay.spentToday != null
+      ? ` · ${liveOverlay.spentToday}/${MLB_LIVE_CLIENT.dailyBudget} live-odds credits`
+      : "";
+  /* With no overlay this is byte-identical to INSTRUCTION 50's clause. With one it names how many
+     of the games under way carry a live line, when those lines were taken, and what today's live
+     pull has cost so far. */
+  const underWayNote =
+    pregameLive === 0
+      ? ""
+      : liveQuoteGames > 0
+        ? ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way · ${liveQuoteGames} priced live${livePricedLabel ? ` ${livePricedLabel}` : ""} · ${pregameLive - liveQuoteGames} priced pregame${liveSpendNote}`
+        : ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way — priced pregame`;
 
   /* INSTRUCTION 50 item 1: EVERY tap prints a line. A plain success used to print nothing at all —
      which is precisely what "the refresh button doesn't work" looks like from the outside. The
@@ -701,7 +1006,7 @@ export default function BoardPage() {
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${pregameLive > 0 ? ` · ${pregameLive} game${pregameLive === 1 ? "" : "s"} under way — priced pregame` : ""}`
+              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${underWayNote}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
                 : "Consensus de-vigged probability vs the Caesars line"
@@ -951,7 +1256,9 @@ export default function BoardPage() {
             rowKey={(r) => `${r.label}|${r.sub}`}
             stagger
             /* a settled row never glows green: the glow is "this is a live edge" (INSTRUCTION 50) */
-            rowClassName={(r) => (r.susp || rowSettled(r) ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
+            /* ...and neither does a re-anchored one: ev-glow signals a MODEL edge, and a live
+               row is graded against the market's own posted price (INSTRUCTION 51) */
+            rowClassName={(r) => (r.susp || rowSettled(r) ? "" : rowQuote(r) ? "" : Number(basisMode ? r.bsEv : r.czEv) > 0 ? "ev-glow" : "")}
           />
           {scratchedHere > 0 && <ScratchedNote n={scratchedHere} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {czHiddenHere > 0 && (
@@ -988,6 +1295,36 @@ export default function BoardPage() {
           : "Prices are Caesars' US feed via The Odds API; the NV app can differ — confirm at lock."}
         Informational only, not betting advice.
       </div>
+
+      {/* INSTRUCTION 51 — the MLB twin of CfbProps' props footnote. Every clause is a count off the
+          overlay the server returned; none of it is estimated, and the budget is stated out loud. */}
+      {!liveOverlay && pregameLive > 0 && (
+        <p className="mt-2 text-[10px] leading-snug text-faint" data-testid="mlb-live-unavailable">
+          {!liveSyncReady
+            ? "live in-play prices need your sync phrase — enter it in Settings and the Board will re-price the games under way (the pull is budgeted server-side; nothing is fabricated without it)"
+            : liveError
+              ? `live in-play prices are unavailable — the server route answered "${liveError}". The rows below carry their pregame lock, graded as such.`
+              : "live in-play prices have not loaded yet — the rows below carry their pregame lock"}
+        </p>
+      )}
+
+      {liveOverlay && (
+        <p className="mt-2 text-[10px] leading-snug text-faint" data-testid="mlb-live-footnote">
+          live lines priced {livePricedLabel ?? "—"} · {liveQuoteGames} of {liveOverlay.live} in-play game
+          {liveOverlay.live === 1 ? "" : "s"}
+          {liveOverlay.noLive ? ` · ${liveOverlay.noLive} game${liveOverlay.noLive === 1 ? "" : "s"} post no in-play market` : ""}
+          {liveOverlay.unmatched ? ` · ${liveOverlay.unmatched} game${liveOverlay.unmatched === 1 ? "" : "s"} could not be matched to an odds event` : ""}
+          {/* THE CAP IS A STANDING RULE, NOT THIS PASS'S COUNT (fix pass, 2026-09-11): `fetched` is
+              how many games this pull happened to buy, which on the probe reads "capped at 3". */}
+          {liveOverlay.capped ? ` · capped at ${MLB_LIVE_CLIENT.liveMaxEvents} games per pull` : ""}
+          {liveOverlay.stale ? " · showing stored quotes — the current window was not re-pulled" : ""}
+          {liveOverlay.oddsMissing ? " · the odds feed did not answer — nothing was fabricated" : ""}
+          {` · today's live-odds budget is ${MLB_LIVE_CLIENT.dailyBudget} credits`}
+          {liveOverlay.spentToday != null ? ` · ${liveOverlay.spentToday} spent today` : ""}
+          {liveOverlay.note ? ` · ${liveOverlay.note}` : ""}
+          {" · prices are posted quotes, never invented"}
+        </p>
+      )}
         </>
       )}
     </>
@@ -1046,6 +1383,195 @@ function OutTag() {
       title={SCRATCHED_LABEL}
     >
       out
+    </span>
+  );
+}
+
+/**
+ * INSTRUCTION 51 (2026-09-11), Josh's order verbatim: "Authorize the live in-play odds pull for MLB".
+ *
+ * THE BINDING PLACEMENT RULE: every live component below is defined AFTER `OutTag`, never between
+ * `SettledGrade` and it. tests/board-settled.test.ts slices the source from `function SettledGrade`
+ * to `function OutTag` and asserts that slice carries no hand-typed American price — the guard that
+ * the SETTLED cell invents nothing. A live cell dropped into that gap would be swept into the slice
+ * and red-line a pin that is doing its job. New live components go here.
+ *
+ * These cells DO print prices, and every digit of every one of them comes off the quote object the
+ * server bought from the book. There is not one hand-typed number anywhere below.
+ */
+
+/** the pulsing in-play marker, one shape for every live cell on the row */
+function LiveDot() {
+  return <span className="pulse-dot inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-live" aria-hidden />;
+}
+
+/**
+ * The line the book is posting RIGHT NOW, under the gold live-tally chip in the Pick cell. This is
+ * the sentence Josh asked for: not "an S grade for over 0.5" beside a player who already has 3, but
+ * "over 3.5 at -145, pulled at 4:52p". Freshness is per GAME (the overlay's own `pricedAt[gkey]`),
+ * never board-level — one game turning due may not make another game's price look older than it is.
+ */
+function LivePriceLine({ view, pricedAt }: { view: MlbLiveView; pricedAt: string | null }) {
+  /* AGE IS THIS QUOTE'S OWN AGE (fix pass, 2026-09-11). It read `pricedAt ?? quote.at` — the
+     GAME's last-asked stamp — while the hard render-time drop tests `quote.at`. A quote carried
+     across a pull that failed for this event therefore printed "just now" under a fresh game stamp
+     while being up to 30 minutes old, which is the one thing the cap exists to prevent. The game
+     stamp is still shown, in the tooltip, as what it actually is. */
+  const age = mlbLiveAgeLabel(view.at);
+  const asked = pricedAt ? mlbLiveAgeLabel(pricedAt) : null;
+  return (
+    <div
+      className="num mt-0.5 flex items-center gap-1 text-[10px] font-bold tabular-nums text-live"
+      data-testid="mlb-live-price"
+      title={`Priced in play at Caesars, this quote taken ${age} — ${view.books} book${view.books === 1 ? "" : "s"} quoting this line${asked ? `; the game was last asked ${asked}` : ""}. A posted quote, never invented.`}
+    >
+      <LiveDot />
+      <span>
+        ↻ live {view.side} {view.ln}
+        {view.am != null ? ` · ${fmtAmerican(view.am)} CZR` : " · no Caesars price at this line"}
+        {` · ${age}`}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The grade on a RE-ANCHORED row — a real letter, off a real EV, against the price the book is
+ * posting now. The pulsing LIVE pill sits where SETTLED sits, so no column widens and the two
+ * states are never mistakable for each other. No ¼-Kelly stake rides along with it: see LiveTag.
+ */
+function LiveGrade({ view, pricedAt }: { view: MlbLiveView; pricedAt: string | null }) {
+  const age = mlbLiveAgeLabel(view.at);
+  const asked = pricedAt ? mlbLiveAgeLabel(pricedAt) : null;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {/* A LETTER GRADE IS MODEL VOCABULARY (fix pass, 2026-09-11). `GradeChip` is the same S–F
+          ladder the model's own edge is graded on, and on a `pSrc: "market"` row the number behind
+          it is the de-vigged price ITSELF — an edge of zero by construction, rounded into whatever
+          letter the vig noise lands on. Until the sim socket is wired (`legPOf` is never supplied,
+          so this is 100% of production rows) a market-derived fair gets the figure and the words,
+          and no letter: a grade nobody computed is worse than no grade. */}
+      {view.pSrc === "sim" ? (
+        <GradeChip grade={gradeFromEv(view.ev)} basis={`EV at the live Caesars line (${view.side} ${view.ln}), this quote taken ${age}`} />
+      ) : (
+        <span
+          className="num text-[11px] text-muted"
+          data-testid="mlb-live-market-grade"
+          title={`The de-vigged consensus at the live ${view.side} ${view.ln} — the market's own price, not a model read. No letter grade is shown because none was computed: a market fair has no edge over the market it came from.`}
+        >
+          {view.ev == null ? "—" : `${view.ev > 0 ? "+" : ""}${view.ev.toFixed(1)}% vs market`}
+        </span>
+      )}
+      <span
+        className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
+        data-testid="mlb-live-pill"
+        title={`Priced in play at Caesars, this quote taken ${age}${asked ? `; the game was last asked ${asked}` : ""} — no ¼-Kelly stake on a live line.`}
+      >
+        <LiveDot /> LIVE
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The True % cell on a re-anchored row. Two sources, two very different readings, and the
+ * difference is never blurred (INSTRUCTION 51 §5's probability ladder):
+ *   • "sim"    — the engine's own remaining-game probability, resumed from the real live state.
+ *                Shown as pregame → live, because watching that number move IS the information.
+ *   • "market" — the de-vigged live pair. A market fair is NOT a model number and is never dressed
+ *                as one: muted text, the words "market fair", and never a ProbBar, because a bar
+ *                reads as edge over the market and a market fair has none by construction.
+ * The pregame number is never re-used against the live price — that is how you print a confidently
+ * wrong EV, which is strictly worse than the dash it would replace.
+ */
+function LiveProb({ pregamePct, view }: { pregamePct: number; view: MlbLiveView }) {
+  if (view.p == null) return <span className="text-faint">—</span>;
+  /* the probability of THIS ROW'S SIDE: `1 - pLive` on an Under, because the overlay's `pLive` is
+     always P(over) — the lkey it is keyed by carries no side at all (fix pass, 2026-09-11) */
+  const livePct = view.p * 100;
+  return view.pSrc === "sim" ? (
+    <span
+      className="num text-[11px] text-text"
+      data-testid="mlb-live-prob"
+      title="The engine's own sim, resumed from the real live game state — what is left of this bet, not what it was worth before first pitch"
+    >
+      {pregamePct.toFixed(1)}% <span className="text-faint">→</span>{" "}
+      <span className="font-semibold text-live">{livePct.toFixed(1)}% live</span>
+    </span>
+  ) : (
+    <span
+      className="num text-[11px] text-muted"
+      data-testid="mlb-live-prob"
+      title="The de-vigged consensus at the live line — the market's own number, not the model's. No edge is claimed over a price it was derived from."
+    >
+      {livePct.toFixed(1)}% market fair
+    </span>
+  );
+}
+
+/** EV against the price the book is posting now — a real number, computed by the route off a real quote. */
+function LiveEv({ view, basis, note }: { view: MlbLiveView; basis: string; note?: string }) {
+  if (view.ev == null) return <span className="text-faint">—</span>;
+  /* SAME RULE AS THE GRADE CHIP: `EvBadge` is the green/red model-edge badge the pregame board
+     uses, and a `pSrc: "market"` EV is the de-vigged price against itself — zero edge, dressed as
+     an edge. The number is still shown, because it IS the EV at the live price and Josh asked for
+     the live price; it is shown as a figure with its source named, not as a badge (fix pass). */
+  return view.pSrc === "sim" ? (
+    <span className="inline-flex items-center gap-1.5" data-testid="mlb-live-ev" title={`${basis}${note ? ` — ${note}` : ""}`}>
+      <EvBadge ev={view.ev} />
+      <span className="text-[9px] font-bold uppercase tracking-wide text-live">live</span>
+    </span>
+  ) : (
+    <span
+      className="num inline-flex items-center gap-1.5 text-[11px] text-muted"
+      data-testid="mlb-live-ev"
+      title={`${basis}${note ? ` — ${note}` : ""} — derived from the market's own de-vigged price, so it claims no edge over that price`}
+    >
+      {`${view.ev > 0 ? "+" : ""}${view.ev.toFixed(1)}% vs market`}
+      <span className="text-[9px] font-bold uppercase tracking-wide text-live">live</span>
+    </span>
+  );
+}
+
+/**
+ * The Caesars price column on a row that may or may not be re-anchored (fix pass, 2026-09-11).
+ *
+ * It was `<OddsCell odds={r.czOdds} book="caesars" />` unconditionally, so the pregame price sat
+ * unlabelled in the settlement column of a row whose grade, EV, True % and stated line had all
+ * moved to the live number. A price column is the last place an unlabelled stale figure belongs.
+ * With a live quote it prints the live American for THIS ROW'S SIDE; with a live quote the book
+ * posts no price for, it says so rather than falling back.
+ */
+function CzPrice({ row, live }: { row: { czOdds?: unknown; sub?: string | null }; live: MlbLiveQuote | null }) {
+  if (!live) return <OddsCell odds={row.czOdds as never} book="caesars" />;
+  const v = mlbLiveView(live, legSideOf(row.sub));
+  return v.am == null ? (
+    <span className="text-[10px] text-faint" title="Caesars posts no in-play price on this side at the live line — the pregame price is a different bet and is not shown here">
+      no live price
+    </span>
+  ) : (
+    <span className="num inline-flex items-baseline gap-1" data-testid="mlb-live-cz">
+      <OddsCell odds={fmtAmerican(v.am) as never} book="caesars" />
+      <span className="text-[9px] font-bold uppercase tracking-wide text-live">live</span>
+    </span>
+  );
+}
+
+/**
+ * What stands in BOTH ¼-Kelly columns on a live row — the football desks' tag, verbatim
+ * (src/components/cfb/CfbPicksBoard.tsx:228). A stake is never shown on an in-play line: a
+ * market-derived fair has zero edge over the market by construction, and the pregame Kelly
+ * fraction prices a different bet at a different number. Either way the chip would be an
+ * instruction to stake money on a phantom.
+ */
+function LiveTag() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
+      title="In play — graded on EV at Caesars, no ¼-Kelly stake on a live line"
+      data-testid="mlb-live-tag"
+    >
+      <LiveDot /> live
     </span>
   );
 }

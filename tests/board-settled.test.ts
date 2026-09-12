@@ -183,11 +183,28 @@ describe("INSTRUCTION 50 item 2 — a decided leg shows no manufactured grade", 
 describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (source pins)", () => {
   const src = stripComments(read(PAGE));
 
-  /* ONE guard, hoisted to the row, so a later edit cannot restore the bug in a single cell */
-  it("rowSettled is the single per-row guard, read straight off the live boxscore", () => {
+  /* ONE guard, hoisted to the row, so a later edit cannot restore the bug in a single cell.
+     INSTRUCTION 51 (2026-09-11) made it THREE-WAY without making it a second rule: the same
+     settledRead is asked the same question, at the line the book is posting NOW when the paid
+     in-play pull returned one, and at the stored pregame line when it did not. Case A falls out
+     for free — 3 is not past a live 3.5, so settledRead returns null on its own and every money
+     cell comes back graded at the live price. This stays an EXACT-SIGNATURE pin, not a loose one:
+     the join is the whole mechanism and a paraphrase of it is a different mechanism. */
+  it("rowSettled is the single per-row guard, asked at the LIVE line when one was bought", () => {
+    /* AMENDED in the fix pass (2026-09-11) for the Under gate, and for that reason only. The swap
+       is an OVER-ONLY move: a tally past the stored line settles the Over WON and the Under LOST at
+       the same instant, so re-anchoring an Under to a higher live line un-decides a decided loss and
+       prints a dead ticket as open, graded and priced. Josh's own row, mirrored: 3 H+R+RBI against a
+       stored UNDER 0.5 is gone, and a live 3.5 does not bring it back. */
     expect(src).toMatch(
-      /const rowSettled = useCallback\(\s*\(r: \{ gkey\?: string \| null; lkey\?: string \| null; sub\?: string \| null \}\): LegSettledRead \| null =>\s*settledRead\(r\.lkey, r\.sub, legLive\(\{ gkey: r\.gkey, lkey: r\.lkey \}\)\?\.val\),/,
+      /const rowSettled = useCallback\(\s*\(r: \{ gkey\?: string \| null; lkey\?: string \| null; sub\?: string \| null \}\): LegSettledRead \| null => \{\s*const q = rowLive\(r\);\s*const tally = legLive\(\{ gkey: r\.gkey, lkey: r\.lkey \}\)\?\.val;\s*if \(!q \|\| legSideOf\(r\.sub\) === "U"\) return settledRead\(r\.lkey, r\.sub, tally\);\s*const \[player, market\] = String\(r\.lkey \?\? ""\)\.split\("\|"\);\s*return settledRead\(`\$\{player\}\|\$\{market\}\|\$\{q\.ln\}`, r\.sub, tally\);\s*\},\s*\[legLive, rowLive\],/,
     );
+    // the side is read from leg-settled's single authority — never a fourth copy of the regex
+    expect(src).toMatch(/import \{ legSideOf, settledRead, type LegSettledRead \} from "@\/lib\/leg-settled";/);
+    expect(src).not.toMatch(/\(\^\|\\s\)U\(nder\)\?/);
+    // the join key is the ORIGINAL lkey's player and market — only the LINE segment moves, which
+    // is why lineOf needs no edit and tab purity (segment 1) still holds
+    expect(src).not.toMatch(/settledRead\(`\$\{q\.gkey\}/);
   });
 
   it("the live-board Grade column suppresses through rowSettled, in the cell AND the sort key", () => {
@@ -212,10 +229,24 @@ describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (
   });
 
   it("the stamped-picks / ALL-scope Grade column suppresses through the same predicate", () => {
-    expect(src).toMatch(/const pickSettled = useCallback\(\s*\(p: ApiPick\) => settledRead\(p\.lkey, p\.side, legLive\(\{ gkey: p\.gkey, lkey: p\.lkey \}\)\?\.val\),/);
+    /* AMENDED in the fix pass (2026-09-11). This column had NO INSTRUCTION 51 wiring at all: on a
+       prop tab `pickRows` is non-null, so the stamped-picks table rendered while every live cell was
+       unreachable — the pregame grade against a live line, which is Josh's complaint verbatim. It now
+       performs the SAME three-way join as `rowSettled`, Under gate included. `p.side` is the sub
+       string here (app/api/picks/route.ts sets `side: r.sub ?? null`). */
+    expect(src).toMatch(
+      /const pickSettled = useCallback\(\s*\(p: ApiPick\): LegSettledRead \| null => \{\s*const q = pickLive\(p\);\s*const tally = legLive\(\{ gkey: p\.gkey, lkey: p\.lkey \}\)\?\.val;\s*if \(!q \|\| legSideOf\(p\.side\) === "U"\) return settledRead\(p\.lkey, p\.side, tally\);\s*const \[player, market\] = String\(p\.lkey \?\? ""\)\.split\("\|"\);\s*return settledRead\(`\$\{player\}\|\$\{market\}\|\$\{q\.ln\}`, p\.side, tally\);\s*\},\s*\[legLive, pickLive\],/,
+    );
+    // and the stamped table reads the live overlay through the same single hook the board does
+    expect(src).toMatch(/const pickLive = useCallback\(/);
     const col = src.slice(src.indexOf("const pickColumns"), src.indexOf('key: "pick",', src.indexOf("const pickColumns")));
-    expect(col).toMatch(/sortValue: \(p\) => \(pickSettled\(p\) \? gradeRank\(null\) :/);
+    /* the sort key is now three-way, exactly like the cell: settled sinks to gradeRank(null), a
+       re-anchored row ranks on the LIVE EV (and only when a sim fair computed it — a market fair
+       gets no letter, so it ranks as ungraded), and an unpriced row keeps its pregame edge. */
+    expect(col).toMatch(/return pickSettled\(p\)\s*\? gradeRank\(null\)/);
+    expect(col).toMatch(/gradeRank\(v\.pSrc === "sim" \? gradeFromEv\(v\.ev\) : null\)/);
     expect(col).toMatch(/<SettledGrade read=\{s0\} \/>/);
+    expect(col).toMatch(/<LiveGrade view=\{mlbLiveView\(q, legSideOf\(p\.side\)\)\} pricedAt=\{livePricedAt\(p\.gkey\)\} \/>/);
   });
 
   it("ApiPick carries lkey, and the ALL-scope builder copies it off the prop-board row", () => {
@@ -239,6 +270,87 @@ describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (
     expect(cell).not.toMatch(/[+-]\d{3}/);
   });
 
+  /* INSTRUCTION 51's sibling to the pin above. The SETTLED cell may print no price because it has
+     none; the LIVE cells print one because the route BOUGHT one — and the distinction that matters
+     is that theirs comes out of the quote object, digit for digit, and is never typed by hand. */
+  it("the live cells quote the price from the quote object, and hand-type no number either", () => {
+    const cells = src.slice(src.indexOf("function LivePriceLine"), src.indexOf("function LiveTag"));
+    /* AMENDED in the fix pass (2026-09-11): every cell now takes a SIDED view of the quote rather
+       than the quote itself. The overlay is keyed `gkey|player|market|line` — the lkey carries no
+       side — so one quote object serves an Over row and an Under row, and every field on it is the
+       OVER's. Reading `quote.czAm` on an Under printed the Over's price, the Over's EV and the
+       Over's probability with the Under's sign kept. `mlbLiveView(q, side)` is the one place that
+       flip happens, so these pins now require the view, not the raw quote. */
+    expect(cells).toMatch(/fmtAmerican\(view\.am\)/); //  the price, for THIS row's side
+    expect(cells).toMatch(/live \{view\.side\} \{view\.ln\}/); // the line, labelled O or U
+    expect(cells).toMatch(/gradeFromEv\(view\.ev\)/); //  the grade
+    expect(cells).toMatch(/view\.p \* 100/); //            the probability
+    expect(cells).not.toMatch(/quote\.czAm|quote\.evCz|quote\.pLive/); // no raw, unsided read left
+    // and not one hand-typed american price anywhere in any of them
+    expect(cells).not.toMatch(/[+-]\d{3}/);
+  });
+
+  /* THE MODEL-VOCABULARY GATE (fix pass, 2026-09-11). `legPOf` is never supplied, so `pSrc` is
+     "market" on 100% of production rows today: the "fair" is the de-vigged live pair itself, an edge
+     of zero by construction. A GradeChip or an EvBadge on that number is the model asserting an edge
+     over the price it was derived from — a confidently wrong S. The figure is still shown, with its
+     source named, as muted text. Both money cells gate on the same single field. */
+  it("GradeChip and EvBadge are unreachable on a market-derived fair", () => {
+    const grade = src.slice(src.indexOf("function LiveGrade"), src.indexOf("function LiveProb"));
+    expect(grade).toMatch(/view\.pSrc === "sim" \? \(\s*<GradeChip/);
+    expect(grade).toMatch(/data-testid="mlb-live-market-grade"/);
+    expect(grade).toMatch(/% vs market/);
+    const ev = src.slice(src.indexOf("function LiveEv"), src.indexOf("function CzPrice"));
+    expect(ev).toMatch(/view\.pSrc === "sim" \? \(/);
+    expect(ev.slice(ev.indexOf("<EvBadge")), "EvBadge must sit inside the sim branch").toBeTruthy();
+    expect(ev.indexOf('view.pSrc === "sim"')).toBeLessThan(ev.indexOf("<EvBadge"));
+    // the True % cell draws no ProbBar on a market fair either — a bar reads as edge
+    const prob = src.slice(src.indexOf("function LiveProb"), src.indexOf("function LiveEv"));
+    expect(prob).not.toMatch(/<ProbBar/);
+    expect(prob).toMatch(/market fair/);
+  });
+
+  /* And the price columns. A re-anchored row whose grade, EV, True % and stated line have all moved
+     to the live number may not keep an UNLABELLED pregame american in the settlement column. */
+  it("the Caesars column never prints an unlabelled pregame price on a re-anchored row", () => {
+    const cz = src.slice(src.indexOf("function CzPrice"), src.indexOf("function LiveTag"));
+    expect(cz).toMatch(/if \(!live\) return <OddsCell odds=\{row\.czOdds as never\} book="caesars" \/>;/);
+    expect(cz).toMatch(/mlbLiveView\(live, legSideOf\(row\.sub\)\)/);
+    expect(cz).toMatch(/no live price/);
+    expect(cz).toMatch(/data-testid="mlb-live-cz"/);
+    // and the board uses it in BOTH Caesars price columns rather than calling OddsCell directly
+    expect((src.match(/<CzPrice row=\{r\} live=\{rowQuote\(r\)\} \/>/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  /* THE PRESENTATION GATE (fix pass, 2026-09-11). `rowSettled` refuses to re-anchor an Under, so on
+     a settled Under every number is read at the line Josh holds — and the cells must then not print
+     the live line, the live price or "at the live line" beside that verdict, or they claim the live
+     line decided a bet it did not decide. `rowQuote` is that single gate; `rowSettled` keeps asking
+     the RAW `rowLive`, which is what lets case B (an Over decided at the live line) cite it. */
+  it("the quote a row PRESENTS is gated, and the quote it is READ at is not", () => {
+    expect(src).toMatch(
+      /const rowQuote = useCallback\(\s*\(r: \{ gkey\?: string \| null; lkey\?: string \| null; sub\?: string \| null \}\): MlbLiveQuote \| null => \{\s*const q = rowLive\(r\);\s*if \(!q\) return null;\s*return legSideOf\(r\.sub\) === "U" && rowSettled\(r\) \? null : q;\s*\},\s*\[rowLive, rowSettled\],/,
+    );
+    expect(src).toMatch(
+      /const pickQuote = useCallback\(\s*\(p: ApiPick\): MlbLiveQuote \| null => \{\s*const q = pickLive\(p\);\s*if \(!q\) return null;\s*return legSideOf\(p\.side\) === "U" && pickSettled\(p\) \? null : q;\s*\},\s*\[pickLive, pickSettled\],/,
+    );
+    // the raw read is asked in exactly two places — the two settled reads and the two gates
+    const body = src.slice(src.indexOf("const rowLive = useCallback"));
+    expect((body.match(/[^k]rowLive\(r\)/g) ?? []).length, "rowLive is for the READ; every render asks rowQuote").toBe(2);
+    expect((body.match(/[^k]pickLive\(p\)/g) ?? []).length).toBe(2);
+  });
+
+  /* THE BINDING PLACEMENT RULE. The pin above slices SettledGrade → OutTag and forbids a price in
+     that range; a live cell dropped into the gap would be swept in and red-line a guard that is
+     doing its job. The rule is asserted, not just written down. */
+  it("every live component is defined BELOW OutTag, outside the SETTLED slice", () => {
+    const out = src.indexOf("function OutTag");
+    expect(out).toBeGreaterThan(0);
+    for (const fn of ["function LiveGrade", "function LivePriceLine", "function LiveProb", "function LiveEv", "function LiveTag"]) {
+      expect(src.indexOf(fn), `${fn} must be defined below OutTag`).toBeGreaterThan(out);
+    }
+  });
+
   it("the header counts games that are LIVE, not games whose clock has passed", () => {
     expect(src).toMatch(/const pregameLive = useMemo\(/);
     // a finished game is not "under way": the count reads useLiveNow, which knows live vs final
@@ -247,9 +359,40 @@ describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (
     expect(src).toMatch(/under way — priced pregame/);
   });
 
-  it("nothing here re-pulls a live price — that spend is not authorised", () => {
+  /* KEPT AND EXTENDED, NOT REPLACED (INSTRUCTION 51). Josh authorised the in-play spend, so the
+     board now reads a live price — but it still may not reach the paid feed itself. This regex
+     forbids exactly that, and `/api/mlb/live-props` matches none of its tokens, so it goes on
+     saying the true thing about a page that does more than it used to. */
+  it("the board never reaches the Odds API directly — the live pull is budgeted and server-side", () => {
     const q = src.slice(src.indexOf("const picksQuery"), src.indexOf("const cohorts ="));
     expect(q).not.toMatch(/odds-api|the-odds-api|\/api\/generate|\/api\/refill/);
+  });
+
+  /* ...and the positive half: there IS exactly one live-price read on the page, it is the hook,
+     and the hook's route is the budgeted server one. NOTE ON SHAPE: the URL literal lives in
+     src/lib/mlb/live-client.ts, not in the page — the page holds the call site. Asserting both
+     halves proves the whole path rather than one string's presence. */
+  it("the ONE live-price read on the page is the budgeted server route", () => {
+    const q = src.slice(src.indexOf("const picksQuery"), src.indexOf("const cohorts ="));
+    expect(q).toMatch(/const liveQuotes = useMlbLiveQuotes\(board\?\.date \?\? null\);/);
+    const client = stripComments(read("src/lib/mlb/live-client.ts"));
+    expect(client).toContain('MLB_LIVE_ROUTE = "/api/mlb/live-props"');
+    expect(client).toMatch(/fetch\(`\$\{MLB_LIVE_ROUTE\}/);
+    // the client module reaches no other host and no other route
+    expect(client).not.toMatch(/odds-api|the-odds-api|statsapi|\/api\/generate|\/api\/refill/);
+    // NO POLLING on a paid feed — the standing rule (src/lib/cfb/client.ts:101)
+    expect(client).toMatch(/refetchInterval: false/);
+    expect(client).not.toMatch(/refetchInterval: [1-9]|setInterval/);
+    // and the page itself still fetches exactly one thing directly: the free /api/picks read
+    // (\b keeps the board's own refetch() out of the count — it is a query invalidation, not a URL)
+    expect(src.match(/\bfetch\(/g)?.length ?? 0).toBe(1);
+    expect(src).toMatch(/fetch\("\/api\/picks", \{ cache: "no-store" \}\)/);
+  });
+
+  it("PLANT: a refetchInterval smuggled onto the paid live feed is detected", () => {
+    const client = stripComments(read("src/lib/mlb/live-client.ts"));
+    const planted = client.replace("refetchInterval: false", "refetchInterval: 30_000");
+    expect(planted, "the checker cannot see a poll added to a paid feed").toMatch(/refetchInterval: [1-9]/);
   });
 });
 
@@ -261,8 +404,9 @@ describe("INSTRUCTION 50 item 2 — the Sharp tab suppresses the same numbers", 
   const SHARP = stripComments(read("app/sharp/page.tsx"));
 
   it("the page reads the same single comparison, not a second copy of the rule", () => {
-    expect(SHARP).toMatch(/import \{ settledRead, type LegSettledRead \} from "@\/lib\/leg-settled";/);
-    expect(SHARP).toMatch(/settledRead\(r\.lkey, r\.sub, playNow\(r\)\?\.val\)/);
+    // legSideOf joined the import in the fix pass — the Under gate, read off the same authority
+    expect(SHARP).toMatch(/import \{ legSideOf, settledRead, type LegSettledRead \} from "@\/lib\/leg-settled";/);
+    expect(SHARP).toMatch(/if \(!q \|\| legSideOf\(r\.sub\) === "U"\) return settledRead\(r\.lkey, r\.sub, playNow\(r\)\?\.val\);/);
     // no re-implementation of the monotone comparison on this page
     expect(SHARP).not.toMatch(/val > line|cur > ln/);
   });

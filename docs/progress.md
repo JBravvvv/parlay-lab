@@ -1,3 +1,55 @@
+# Progress — 2026-09-11 (INSTRUCTION 51: the live in-play line and price are really pulled, for MLB)
+
+## Board — "over 3.5 at −145" instead of a dash
+- Josh: "Authorize the live in-play odds pull for MLB"
+- This is the second half of the last fix. His complaint was: "It's not updating with live odds; it
+  will show the player is top 4th w/ 3 H+R+RBI, but show them as an 'S' grade for over .5 H+R+RBI
+  when their live over/under is 3.5 H+R+RBI". The last ship fixed the half that was free — a leg the
+  live tally has already carried past its line stops being graded and says so. It could not do the
+  other half, because the other half costs money: knowing what the book is charging RIGHT NOW needs a
+  paid per-event pull, and that had not been authorised. Now it has.
+- What changed: the live line and the live price come from a real, budgeted, per-event in-play pull
+  of the six MLB prop markets — the same six the app already prices — asked one game at a time, only
+  for games that are actually under way, and only for the games worth paying for. Which games those
+  are is decided FREE before a single credit is spent: the app already knows every player's live
+  tally from the free MLB feed and can already run the rest of the game through its own simulator, so
+  it buys the games where the line has provably been cleared first, the games the sim says have
+  genuinely moved second, and the quiet ones last or not at all.
+- What a re-priced row looks like: the line the book is posting now, the price beside it with the
+  book's name and the minute it was pulled, a pulsing LIVE pill so it can never be mistaken for the
+  pregame lock, a real grade computed on THAT price at THAT line, and the live probability. The
+  probability is the engine's own live-resume sim where the sim can price the rest of the game; where
+  it cannot, it is derived from the book's own two-sided price and is labelled "market fair" rather
+  than shown as a model number; where neither exists, the row shows the price and no grade at all.
+  The pregame number is never run against the new price — that would produce a confident, wrong edge,
+  which is worse than the dash it replaces.
+- No ¼-Kelly stake on a live row, deliberately, and this is the one that matters for the bankroll: a
+  fair price worked out FROM the market has, by construction, zero edge over that market, so a stake
+  sized off it is sizing a bet with no edge in it. And the pregame Kelly on the row was sizing a
+  different bet at a different line. A stake chip on an in-play line would be an instruction to bet a
+  phantom, so there is no stake chip. The football desks already work this way; MLB now matches them.
+- When no live line comes back — the book has taken the market down, the game just ended, the budget
+  is spent, the pull errored, or the quote on file is too old to trust — the row falls back to
+  EXACTLY what it showed yesterday: the dash, the SETTLED tag, and a plain sentence saying the price
+  on that row is the pregame lock. The only thing added on those rows is one clause saying WHY no
+  live line was obtained. The protection did not get weaker in any failure case; it is the default in
+  all of them.
+- Nothing is invented anywhere. Every number on screen came from the book, the free live game feed,
+  or the engine's own simulator, and the one that came from the market is labelled as such. Every new
+  test fixture is synthesized from the real response shape with invented numbers and marked as
+  synthetic in the file — the paid feed is never called to build one.
+- What is NOT claimed: that this refreshes itself all evening. It fires automatically on the same
+  five Pacific slots as everything else, and four of those five see zero live baseball — the 16:45
+  one catches about nine games, and the busiest stretch of the night is after it. The rest is Josh's
+  own Refresh, which runs the identical pass, exactly as he asked for on 09-09. An opt-in that would
+  cover the evening peak is built and shipped switched OFF, one constant away, and turning it on is
+  his call, not ours. No budget, cap or slot was lowered to pay for any of this, and the new spend has
+  its own counter so it can never eat the football desks' allowance.
+- Also NOT claimed, and it is the gate on the whole thing: nobody has yet proved the feed even posts
+  MLB prop markets on a game in progress. One small three-game probe against a live game settles it.
+  If it comes back empty, the honest answer is that the authorisation bought a measurement rather
+  than a board, and what stays on screen is the protection that already shipped.
+
 # Progress — 2026-09-11 (INSTRUCTION 50: the Board's Refresh acts, a settled leg stops being graded, the Builder gets a generator)
 
 ## Board — the Refresh button always does something (item 1)
@@ -26,6 +78,17 @@
 - Deliberately NOT claimed: a leg still under its line is never called settled (proving that needs a
   live re-pull), and no live line and no live price is invented anywhere. A real in-play price would
   cost a paid per-event pull that Josh has not authorised.
+- AMENDED 2026-09-11 (INSTRUCTION 51, and the sentence above is kept as the dated record): Josh
+  authorised that spend the same day — "Authorize the live in-play odds pull for MLB". What it bought
+  is a budgeted per-event in-play re-pull for MLB only, so a row whose line has moved now shows the
+  line the book is posting NOW and the price beside it, instead of a dash. The first half of the
+  sentence above did not change and was not weakened: a leg still under its line is still never
+  called settled, and when the paid pull brings nothing back the dash and the SETTLED tag are exactly
+  what they were. One thing is claimed at model tier and only under one condition — the live
+  probability is the engine's own live-resume sim when that sim can price the rest of the game, and
+  in that case only. When it cannot, the number shown is derived from the book's own two-sided price
+  and is labelled "market fair" on screen, never dressed up as a model edge, and if neither is
+  available the row shows the price with no grade at all.
 - Sequencing: this suppression ships WITH the refresh fix, never after it. A working refresh with no
   suppression would mint a real 'S' on every settled leg priced softer than about −1640.
 

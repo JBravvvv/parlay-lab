@@ -1,0 +1,678 @@
+{
+  "_note": "SYNTHETIC (2026-09-11): shape of The Odds API per-event MLB odds for an IN-PLAY game, six core prop markets. Lines and prices are invented, plausible retail shapes for tests - NOT captured quotes, never to be shown as real prices. The Odds API was NOT called to build this.",
+  "eventsList": [
+    {
+      "id": "250b0373676b10f51ed1c59c93714245",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T22:46:00Z",
+      "home_team": "Washington Nationals",
+      "away_team": "New York Yankees"
+    },
+    {
+      "id": "f308816130f3007f771929f15d62862c",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T22:41:00Z",
+      "home_team": "Pittsburgh Pirates",
+      "away_team": "Milwaukee Brewers"
+    },
+    {
+      "id": "6f2c4b9ad1e34a7c8b5d0e91f7a23c45",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T23:10:00Z",
+      "home_team": "Atlanta Braves",
+      "away_team": "Miami Marlins"
+    },
+    {
+      "id": "a91b7c3d5e2f48a0b6c1d8e4f70a29b3",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-11T00:15:00Z",
+      "home_team": "St. Louis Cardinals",
+      "away_team": "Chicago Cubs"
+    },
+    {
+      "id": "b02c8d4e6f3a59b1c7d2e9f5a81b30c4",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-11T00:35:00Z",
+      "home_team": "St. Louis Cardinals",
+      "away_team": "Chicago Cubs"
+    }
+  ],
+  "byEvent": {
+    "250b0373676b10f51ed1c59c93714245": {
+      "id": "250b0373676b10f51ed1c59c93714245",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T22:46:00Z",
+      "home_team": "Washington Nationals",
+      "away_team": "New York Yankees",
+      "bookmakers": [
+        {
+          "key": "williamhill_us",
+          "title": "Caesars",
+          "markets": [
+            {
+              "key": "batter_hits_runs_rbis",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -145,
+                  "point": 3.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": 115,
+                  "point": 3.5
+                },
+                {
+                  "name": "Over",
+                  "description": "Juan Soto",
+                  "price": 128,
+                  "point": 2.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Juan Soto",
+                  "price": -158,
+                  "point": 2.5
+                }
+              ]
+            },
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 134,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -164,
+                  "point": 1.5
+                },
+                {
+                  "name": "Over",
+                  "description": "CJ Abrams",
+                  "price": -118,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "CJ Abrams",
+                  "price": -104,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "batter_total_bases",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -106,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -116,
+                  "point": 1.5
+                }
+              ]
+            },
+            {
+              "key": "batter_home_runs",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 240,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -310,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "pitcher_strikeouts",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Ryan Weathers",
+                  "price": 122,
+                  "point": 4.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Ryan Weathers",
+                  "price": -156,
+                  "point": 4.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "draftkings",
+          "title": "DraftKings",
+          "markets": [
+            {
+              "key": "batter_hits_runs_rbis",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -150,
+                  "point": 3.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": 120,
+                  "point": 3.5
+                },
+                {
+                  "name": "Over",
+                  "description": "Juan Soto",
+                  "price": -138,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Juan Soto",
+                  "price": 112,
+                  "point": 1.5
+                }
+              ]
+            },
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 130,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -160,
+                  "point": 1.5
+                },
+                {
+                  "name": "Over",
+                  "description": "CJ Abrams",
+                  "price": -122,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "CJ Abrams",
+                  "price": 100,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "batter_total_bases",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -110,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -112,
+                  "point": 1.5
+                }
+              ]
+            },
+            {
+              "key": "batter_home_runs",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 235,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -300,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "pitcher_strikeouts",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Ryan Weathers",
+                  "price": 118,
+                  "point": 4.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Ryan Weathers",
+                  "price": -150,
+                  "point": 4.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "fanduel",
+          "title": "FanDuel",
+          "markets": [
+            {
+              "key": "batter_hits_runs_rbis",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -140,
+                  "point": 3.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": 110,
+                  "point": 3.5
+                },
+                {
+                  "name": "Over",
+                  "description": "Juan Soto",
+                  "price": -134,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Juan Soto",
+                  "price": 108,
+                  "point": 1.5
+                }
+              ]
+            },
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 138,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -168,
+                  "point": 1.5
+                },
+                {
+                  "name": "Over",
+                  "description": "CJ Abrams",
+                  "price": -114,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "CJ Abrams",
+                  "price": -108,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "batter_total_bases",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": -102,
+                  "point": 1.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -120,
+                  "point": 1.5
+                }
+              ]
+            },
+            {
+              "key": "batter_home_runs",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Aaron Judge",
+                  "price": 250,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Aaron Judge",
+                  "price": -320,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "pitcher_strikeouts",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Ryan Weathers",
+                  "price": 126,
+                  "point": 4.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Ryan Weathers",
+                  "price": -162,
+                  "point": 4.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "fanatics",
+          "title": "Fanatics",
+          "markets": [
+            {
+              "key": "batter_hits_runs_rbis",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Juan Soto",
+                  "price": 124,
+                  "point": 2.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Juan Soto",
+                  "price": -152,
+                  "point": 2.5
+                }
+              ]
+            },
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Luis Garcia Jr.",
+                  "price": -130,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Luis Garcia Jr.",
+                  "price": 106,
+                  "point": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "f308816130f3007f771929f15d62862c": {
+      "id": "f308816130f3007f771929f15d62862c",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T22:41:00Z",
+      "home_team": "Pittsburgh Pirates",
+      "away_team": "Milwaukee Brewers",
+      "bookmakers": [
+        {
+          "key": "draftkings",
+          "title": "DraftKings",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Christian Yelich",
+                  "price": -136,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Christian Yelich",
+                  "price": 108,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "pitcher_strikeouts",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Paul Skenes",
+                  "price": 104,
+                  "point": 6.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Paul Skenes",
+                  "price": -128,
+                  "point": 6.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "fanduel",
+          "title": "FanDuel",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Christian Yelich",
+                  "price": -132,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Christian Yelich",
+                  "price": 104,
+                  "point": 0.5
+                }
+              ]
+            },
+            {
+              "key": "pitcher_strikeouts",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Paul Skenes",
+                  "price": 110,
+                  "point": 6.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Paul Skenes",
+                  "price": -134,
+                  "point": 6.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "6f2c4b9ad1e34a7c8b5d0e91f7a23c45": {
+      "id": "6f2c4b9ad1e34a7c8b5d0e91f7a23c45",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-10T23:10:00Z",
+      "home_team": "Atlanta Braves",
+      "away_team": "Miami Marlins",
+      "bookmakers": []
+    },
+    "a91b7c3d5e2f48a0b6c1d8e4f70a29b3": {
+      "id": "a91b7c3d5e2f48a0b6c1d8e4f70a29b3",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-11T00:15:00Z",
+      "home_team": "St. Louis Cardinals",
+      "away_team": "Chicago Cubs",
+      "bookmakers": [
+        {
+          "key": "williamhill_us",
+          "title": "Caesars",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Nico Hoerner",
+                  "price": -140,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Nico Hoerner",
+                  "price": 112,
+                  "point": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "draftkings",
+          "title": "DraftKings",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Nico Hoerner",
+                  "price": -144,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Nico Hoerner",
+                  "price": 116,
+                  "point": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "b02c8d4e6f3a59b1c7d2e9f5a81b30c4": {
+      "id": "b02c8d4e6f3a59b1c7d2e9f5a81b30c4",
+      "sport_key": "baseball_mlb",
+      "sport_title": "MLB",
+      "commence_time": "2026-07-11T00:35:00Z",
+      "home_team": "St. Louis Cardinals",
+      "away_team": "Chicago Cubs",
+      "bookmakers": [
+        {
+          "key": "williamhill_us",
+          "title": "Caesars",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Nico Hoerner",
+                  "price": -140,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Nico Hoerner",
+                  "price": 112,
+                  "point": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "draftkings",
+          "title": "DraftKings",
+          "markets": [
+            {
+              "key": "batter_hits",
+              "last_update": "2026-07-11T01:29:41Z",
+              "outcomes": [
+                {
+                  "name": "Over",
+                  "description": "Nico Hoerner",
+                  "price": -144,
+                  "point": 0.5
+                },
+                {
+                  "name": "Under",
+                  "description": "Nico Hoerner",
+                  "price": 116,
+                  "point": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

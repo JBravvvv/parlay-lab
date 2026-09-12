@@ -336,3 +336,159 @@ the `CFB_PROPS` docblock) — stale, no new reading was taken in this build; re-
 `/api/cfb`'s `quota.remaining` on prod and date it. With the levers countermanded, the month's
 shortfall on the INSTRUCTION 48 arithmetic (≈ 29,300 realistic against a 20,000 plan) is met by
 purchasing credits, per Josh — the next tier above is documented earlier in this file.
+## 2026-09-11 INSTRUCTION 51 — the MLB live in-play props rail
+Josh, verbatim: **"Authorize the live in-play odds pull for MLB"** — the second half of
+INSTRUCTION 50 item 2, which shipped the free half (a prop whose line the live tally has already
+cleared loses its grade and carries a SETTLED tag) and deliberately left the half that costs money.
+This section is that half. **It is ADDITIVE: it lowers nothing.**
+
+### The new line item — its own key, its own counter
+| | |
+|---|---|
+| spend key | `pl:mlb:liveprops:spend:v1:<ptDate>` (Pacific day, `INCRBY` + `EXPIRE` 36 h) |
+| `dailyBudget` | **600** — new, MLB-live only; it cannot touch `pl:cfb:props:spend:v1:` or `pl:nfl:props:spend:v1:` |
+| `measuredCreditsPerEvent` | **6** (the budgeting figure — see the caveat below; **NOT** CFB's 31) |
+| `liveMaxEvents` | 12 — measured peak concurrency on a real 15-game slate |
+| `liveRevalidateSec` / `quoteMaxAgeSec` | 1800 / 1800 — a game re-prices on its OWN `pricedAt`; a stored quote past the cap is DISCARDED AT RENDER, so no label older than 30 min can ever appear |
+| `emptyHoldSec` | 7200 — a live game whose last pull returned zero usable quotes is not re-asked for 2 h |
+| `probeEvents` | 3 — the day's FIRST pull is capped this small until a real header delta lands |
+| `cooldownDay` | a 429 suspends the fast cadence for the rest of the Pacific day |
+
+### Per call
+| call | what it is for | credits |
+|---|---|---|
+| `/v4/sports/baseball_mlb/events` (no `markets` param) | the `gkey → oddsEventId` bridge | the endpoint's no-market-product class (`src/lib/server/odds-shape.ts:49`); `/v4/sports` itself is measured FREE (`tools/quota.mjs:15-16`), and the probe must record this call's own delta |
+| `/v4/sports/baseball_mlb/events/<id>/odds`, six core markets × `regions=us`, `oddsFormat=american` | one live game's in-play re-price | **~6 budgeted** per event |
+| a full pull at `liveMaxEvents` 12 | one pass over the peak | 12 × 6 = **72** |
+| `dailyBudget` 600 | what the day buys | **100 event-pulls** |
+
+Six markets, no `_alternate` ladders: the three ladders are pre-kick Caesars milestone products this
+feature never reads, and nine markets instead of six is +50% spend for nothing. The six-market × `us`
+product is already inside the allow-list (`src/lib/server/odds-shape.ts:20-53`), so
+**`odds-shape.ts` and `app/api/odds/route.ts` were not edited** and no route's auth changed.
+
+**THE CAVEAT ON 6, stated rather than buried.** This file's own history refutes a per-event constant
+of 6.0 as a MEASUREMENT: `docs/branch-firing-audit.md:550-561` bounds it at `c ≤ 5.114` from the
+binding window (641 spent / 123 event-fetches) and `docs/board-open-experiment.md:124` records the
+band `c ∈ [5.114, 5.845]` with the cost NOT constant across windows. 6 is therefore used here as a
+BUDGETING figure only — deliberately above the band, so the rail over-counts rather than under-counts,
+which is the same direction `pullCredits`'s own docblock takes (`src/lib/cfb/props-store.ts:253-256`).
+
+### Per day — event-pull counts computed 2026-09-11 from `tests/fixtures/fix39/events.json` (15 real first pitches, 165-minute games)
+| scope | event-pulls/day | @6 (budgeted) | @31 (pessimistic — if MLB ever bills like CFB) |
+|---|---|---|---|
+| **16:45 PT slot alone — THE SHIPPED DEFAULT** | 9 | **54** | 279 |
+| + four manual Refreshes ≥ 30 min apart across the peak | 44 | **264** | — |
+| 30-min passes, every live game, whole span (ungated) | 86 | **516** | 2,666 |
+| the same on a 16-game September slate (× 16/15) | ~92 | **550** | — |
+| 30-min passes, divergence-gated (~⅓ of live games) | 29 | **~174** | 899 |
+| the `liveSlotsPT` opt-in, SHIPPED EMPTY (17:00 / 17:30 / 18:00 / 18:30 PT) | 43 | **258** (312 with the 16:45 default) | — |
+| 10-min passes, every live game — the cadence his complaint implies | 249 | **1,494/day ≈ 29,900 a month** | 7,719 |
+
+**Why 600.** The worst realistic day is the ungated whole-span pass: 550 on a 16-game slate. 600 is
+~9% over it and buys 100 event-pulls. **It is a CEILING, not a forecast** — the shipped default spends
+54 automatic plus Josh's taps, and the expected gated day is ~174. The 10-minute cadence is not
+fundable on a 20,000/month plan and is not what shipped.
+
+### THE PROBE — OUTSTANDING as of 2026-09-11, and the build does not deploy without it
+`app/api/propsnap/route.ts:83-84` asserts in a comment on live code that "a started game is gone from
+the upstream anyway". If that holds for `baseball_mlb`, this rig returns empty overlays and the honest
+product is the INSTRUCTION 50 suppression Josh already has. It cannot be checked in development (this
+branch forbids calling the Odds API; every odds fixture here is synthesized). One manual per-event call
+against a real in-progress MLB game, `probeEvents` **3** maximum, ~18 credits at the budgeted rate,
+reading `x-requests-used` off the response:
+
+| field | value |
+|---|---|
+| date run | **NOT YET RUN — unrecorded as this section was written (2026-09-11)** |
+| in-play prop markets returned? | **unrecorded** |
+| which of the six | **unrecorded** |
+| real per-event `x-requests-used` delta | **unrecorded — the 6 above is a budgeting estimate, not a measurement** |
+| events-list call delta | **unrecorded** |
+
+**Empty ⇒ STOP.** Do not build the rig, do not spend the 600; tell Josh his authorisation bought a
+measurement, not a board. **Non-empty ⇒ proceed**, and replace the 6 with the measurement in the same
+pass, here and in the constant. Re-read the quota first — it is free.
+
+### NO BUDGET IS LOWERED
+Josh's standing word, 2026-09-09, verbatim: "I can purchase more credits. Don't lower any budgets."
+`CFB_PROPS.dailyBudget` stays **2500** (`src/lib/cfb/rules.ts:475`), `NFL_PROPS.dailyBudget` stays
+**1000** (`src/lib/nfl/rules.ts:194`), `MAX_RUNS_PER_DATE` **4** (`app/api/generate/route.ts:58`),
+`TOPUP_MAX` **6** (`src/lib/paper-mode.ts:73`), `GEN_CREDITS_EST` **140**
+(`src/lib/engine-client.ts:172`), the five PT slots and `/api/clv`'s limiter all stand.
+
+**THE TRAP THAT WOULD BILL MLB AGAINST CFB'S RAIL, SILENTLY.** Both rail helpers carry CFB defaults
+baked into their signatures — `affordableEvents(wanted, spent, budget = CFB_PROPS.dailyBudget,
+perEvent = CFB_PROPS.measuredCreditsPerEvent)` (`src/lib/cfb/props-store.ts:245`) and
+`pullCredits(usedReadings, fetched, perEvent = CFB_PROPS.measuredCreditsPerEvent)` (`:258`). A
+forgotten argument does not error; it prices MLB at 31/event against a 2500 rail that is not MLB's.
+**Every MLB call site passes `MLB_LIVE_PROPS.dailyBudget` and `MLB_LIVE_PROPS.measuredCreditsPerEvent`
+explicitly, and a test asserts no site omits them.** One deliberate deviation from CFB, recorded
+rather than inherited: when the store is unavailable CFB sets `allowed = need.length` and fetches
+anyway (`props-store.ts:213-214`) because it has a legitimate pre-kick job that must survive an
+outage; this route exists ONLY to spend, so **no spend tally means no pull.**
+
+### The honest month statement
+The plan is **20,000 credits/month at $30**. The last quota reading in the tree is **16,480 remaining
+on 2026-09-05** (`src/lib/cfb/rules.ts:412-413`) — **six days stale**, taken BEFORE that Saturday's
+props spend and four further days — and the dated series that should have replaced it,
+`data/quota-log.jsonl`, **stopped on 2026-08-06** (last line: 18,030 remaining / 1,970 used). So every
+figure below sits on a stale base, and the first action is to re-read `/api/cfb`'s `quota.remaining`
+(free, a normal board read) and date it.
+
+Before this feature, the INSTRUCTION 48 section above already put the rest of September at **≈ 29,300
+realistic against a 20,000 plan**, and **roughly 13,000 short** against the 09-05 reading. Against that:
+
+| this feature's September cost, 20 slate days | credits | share of a 20,000 plan |
+|---|---|---|
+| at the 600/day **ceiling** | 12,000 | **60%** |
+| at the realistic **gated** ~174/day | ~3,480 | **~17%** |
+
+The ceiling case is not affordable on the current tier on top of a month already over-subscribed; the
+realistic case is, and the shipped default (54/day automatic plus taps) is well under even that. The
+honest pairing for this feature is the tier already priced in this file at **100,000 credits/month for
+$59** (see the section above) rather than engineering the feature down — which is also Josh's own
+stated preference. **And the standing warning applies with full force: exhausting the key takes
+`/api/clv` — the scoreboard — down with it**, which is why a 429 suspends the fast cadence for the rest
+of the Pacific day instead of retrying.
+
+### 2026-09-11, the SAME day, fix pass — four corrections to the arithmetic above
+Nothing in this subsection lowers a budget either. All four make the rail bill MORE than the section
+above says it would, which is the only safe direction for a number nobody has measured yet.
+
+**1. Call A is billed now, as a flat 1.** `/v4/sports/baseball_mlb/events` carries no `markets`
+param, so it is the 1-credit no-market-product class, not a per-event cost. It is added to the pull's
+total as `MLB_LIST_CALL_CREDITS = 1` (`src/lib/mlb/live-props-store.ts:186`) and is NOT handed to
+`pullCredits`, whose header delta already covers it and which would otherwise price it at the
+6-credit per-event rate. Before this, a pull that made the bridge call and then bought nothing wrote
+no spend row at all; now it writes 1.
+
+**2. The header delta is trusted only when it is believable.** `mlbPullCredits`
+(`src/lib/mlb/live-props-store.ts:203-208`) takes `pullCredits`'s delta when the readings show at
+least as many DISTINCT values as events fetched, and otherwise floors the bill at
+`fetched x measuredCreditsPerEvent`. Reason: every per-event request is `cache:"no-store"` and four
+run concurrently, so identical `x-requests-used` snapshots are likely — most of all on the 3-event
+probe, where three equal readings would otherwise bill one event's worth for three. A genuine delta
+is never overridden: readings `[1005, 1009, 1013]` over 3 events bill **14**, not 18.
+
+**3. `rateMeasured: false` caps EVERY pass at `probeEvents`, not just the day's first.** The original
+gate was `spent === 0`, which held the cap for the first pass of the day only; the second pass could
+take twelve events at an unmeasured rate. So until the probe below is run and this flag is flipped,
+**the real per-pass ceiling is 3 x 6 + 1 = 19 credits** (and 3 x 31 + 1 = 94 if MLB ever bills like
+CFB), against the 72 the table above quotes for a full 12-event pass. The 600/day ceiling is
+unchanged and is now unreachable in practice — by design, until a measurement exists.
+
+**4. The drift rung is inert, and so is the letter grade on a live row.**
+`app/api/mlb/live-props/route.ts:55` supplies only `storeKeys`, never `legPOf`, so the engine's
+per-game sim never reaches the pull. Two consequences, both already assumed by every figure above but
+worth stating where the money is counted:
+* `legP` is `{}`, `drift` is always 0, and the shipped divergence gate is really THREE rungs —
+  cleared / unpriced / expired. No spend figure here was ever derived from the drift rung.
+* `pSrc` is `"market"` on 100% of production rows: the "fair" is the de-vigged live pair itself, an
+  edge of zero by construction. The Board and The Sharp therefore show the live line, the live price
+  and the EV figure with its source named, and **no letter grade, no EV badge and no Kelly stake** on
+  an in-play row. Wiring `legPOf` is what turns those back on; it costs no extra credits, because the
+  sim is free and already paid for by `/api/generate`.
+
+The probe table above stays **unrecorded**. It is still the gate on flipping `rateMeasured`, on
+replacing the 6, and on scheduling this route at all.

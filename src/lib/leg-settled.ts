@@ -28,10 +28,24 @@ import { lineOf } from "@/lib/pred-serialize";
  * push either (one more hit clears it); it is simply undecided. A leg the app has not
  * observed a number for (`val == null`) is likewise undecided, never treated as a zero.
  *
- * It also does NOT know the current market price. Saying "the live line is 3.5 at -145"
- * would need a paid per-event in-play re-pull; until Josh authorises that spend, the
- * honest statement is the one this enables: the number has cleared the line, and the
- * price on screen is the pregame lock, not a live market.
+ * IT STILL DOES NOT KNOW A PRICE (amended 2026-09-11, INSTRUCTION 51 — DOCBLOCK ONLY).
+ * The paragraph above used to end "until Josh authorises that spend". He authorised it,
+ * verbatim: "Authorize the live in-play odds pull for MLB". The live line and the live
+ * price now arrive from `/api/mlb/live-props`, a budgeted per-event in-play pull with its
+ * own daily rail, and the board can print "over 3.5 at -145" where it used to print a dash.
+ *
+ * None of that reaches this module, and that is the point. This function is handed a LINE
+ * inside an lkey and a tally, and nothing else — no price, no book, no fetch, no clock. The
+ * caller re-keys the lkey's third segment to the line the book is posting NOW before calling
+ * in, so a re-anchored leg arrives as `player|market|3.5` and `settledRead(..., 3)` returns
+ * null on its own arithmetic: `3 > 3.5` is false. The suppression therefore FALLS AWAY the
+ * moment a real live line exists and STAYS IN FORCE the moment one does not — no flag, no
+ * branch, and not one line of code in this file changed to make that true.
+ *
+ * So the honest statement this still enables is unchanged, and it is the default on every
+ * path where the paid pull returns nothing, is refused by the budget, errors, or is older
+ * than its freshness cap: the number has cleared the line, and the price on screen is the
+ * pregame lock, not a live market.
  */
 
 /** The only verdict this module will ever return: the live tally is past the line. */
@@ -71,6 +85,20 @@ export type LegSettledRead = {
 };
 
 /**
+ * WHICH SIDE OF THE LINE A STORED ROW IS ON — the ONE authority (extracted, fix pass 2026-09-11).
+ *
+ * The regex is unchanged, character for character: a bare `U` or the word `Under` as its own token,
+ * matched against the row's `sub` ("H+R+RBI O 0.5" on a stamped pick, the same string /api/picks
+ * serves as `side`). Anything else is an Over. It was inlined in `settledRead` and INSTRUCTION 51
+ * needed the same question answered in three more places — the divergence gate, the Board and The
+ * Sharp — so it is exported rather than re-typed, because four copies of a regex are four chances
+ * to read an Under as an Over, and reading an Under as an Over is how a LOST bet prints as won.
+ */
+export function legSideOf(sub: string | null | undefined): LegSide {
+  return /(^|\s)U(nder)?(\s|$)/.test(String(sub ?? "")) ? "U" : "O";
+}
+
+/**
  * The full read: the verdict plus the numbers behind it, for copy that quotes real values.
  * Returns null whenever the leg is undecided — see the module note.
  */
@@ -95,7 +123,7 @@ export function settledRead(
      The side is used for WORDING ONLY — the verdict above does not depend on it, because a
      cleared line settles the Over won and the Under lost at the same instant. A misread side
      can therefore never turn an undecided leg into a settled one. */
-  const side: LegSide = /(^|\s)U(nder)?(\s|$)/.test(String(sub ?? "")) ? "U" : "O";
+  const side: LegSide = legSideOf(sub);
   return {
     code: "over-cleared",
     side,

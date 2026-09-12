@@ -86,3 +86,68 @@ export async function forwardMlbRefill(a: {
   }
   return { generateStatus: gen.status, generate };
 }
+
+/**
+ * MLB LIVE IN-PLAY PULL — the second forward (INSTRUCTION 51, 2026-09-11, Josh's word,
+ * verbatim: "Authorize the live in-play odds pull for MLB").
+ *
+ * A SEPARATE exported forward, deliberately NOT a widening of forwardMlbRefill above. The
+ * refill is a signed-off spending path: decideMlbRefill owns its fire/no-fire decision,
+ * /api/generate owns its slot stamp and its registry cap, and INSTRUCTION 49 paced the whole
+ * thing to five Pacific slots. The live pull spends from its OWN budget under its OWN Redis
+ * prefix (MLB_LIVE_PROPS.dailyBudget; pl:mlb:liveprops:spend:v1:<ptDate>), so folding it into
+ * forwardMlbRefill would put two different budgets behind one return value and let a live-pull
+ * failure speak for the refill. It rides alongside instead, and reports itself.
+ *
+ * FIRE AND REPORT, TOTAL BY CONSTRUCTION. A thrown fetch, an abort, a non-2xx and a non-JSON
+ * body all become a plain record the caller prints; this function never throws and never
+ * returns anything the caller has to branch on to stay alive. That guarantee lives HERE, in
+ * the file that makes the claim — the same lesson the CFB forward learned on 2026-09-06, when
+ * a bare `await` on a "total" helper still took the whole poke down with an ECONNRESET.
+ *
+ * SAME HEADER CONTRACT AS THE REFILL FORWARD: the secret rides in `x-cron-key`, never in the
+ * query string, so it cannot land in a log line or a referrer. The only query parameters are the
+ * slot, which the route stamps on the overlay and de-duplicates against (one automatic pass per
+ * slot per Pacific day), and `manual=1`.
+ *
+ * WHY `manual` IS A SEPARATE FLAG, NOT `slot === "manual"` (fix pass, 2026-09-11): the route's 429
+ * circuit breaker lets Josh's own tap through exactly once a day, and that branch was unreachable
+ * because nothing in the tree had ever sent `manual=1`. A tap is his explicit act; it is also the
+ * one pass that must NOT be refused as a duplicate slot. Both behaviours hang off this flag.
+ */
+export type MlbLivePullResult =
+  | { forwarded: true; status: number; result: unknown }
+  | { forwarded: false; error: string };
+
+/** the live pull's own abort budget. The scheduler's maxDuration is 90 s and a refill generate
+    can take ~60 s of it; this runs BESIDE that, never after it, so 20 s cannot extend the poke's
+    worst case (max(60 s generate, 20 s live pull) = 60 s) and a hung Odds upstream can never
+    cost the tick its answer. */
+export const MLB_LIVE_PULL_TIMEOUT_MS = 20_000;
+
+export async function forwardMlbLivePull(a: {
+  origin: string;
+  secret: string;
+  slot: string;
+  manual?: boolean;
+  fetchImpl?: typeof fetch;
+}): Promise<MlbLivePullResult> {
+  const f = a.fetchImpl ?? fetch;
+  const qs = `slot=${encodeURIComponent(a.slot)}${a.manual ? "&manual=1" : ""}`;
+  try {
+    const res = await f(new URL(`/api/mlb/live-props?${qs}`, a.origin), {
+      headers: { "x-cron-key": a.secret },
+      cache: "no-store",
+      signal: AbortSignal.timeout(MLB_LIVE_PULL_TIMEOUT_MS),
+    });
+    let result: unknown = null;
+    try {
+      result = await res.json();
+    } catch {
+      result = { error: "live pull returned non-JSON" };
+    }
+    return { forwarded: true, status: res.status, result };
+  } catch (e) {
+    return { forwarded: false, error: (e as Error).message };
+  }
+}

@@ -432,6 +432,173 @@ Leg 4: Ronald Acuna Jr over 1.5 H+R+RBI -130
 - WHAT SHIPS AND WHERE: W1 widens `currentValue` to `{ txt, val }` (ONE stat extraction, not a duplicate reader) and adds the pure `src/lib/leg-settled.ts`; `legSettled` returns `"over-cleared"` ONLY when the live tally STRICTLY exceeds the line — `val <= ln` returns `null`, always, because the converse is not provable for free and must never be claimed — and `app/api/picks/route.ts` gains exactly ONE output field (`lkey`) with no auth, filter, gate or budget change. W2 fixes the Board refresh and suppresses the grade at all three grade cells: the row STAYS VISIBLE, showing an em dash plus a SETTLED tag and the relation in plain language ("already over 0.5 — the price shown is the pregame lock, not a live market"), and sinks on the existing sort. W3 is the generator core, W4 the generator sheet and `PlayerMark`, W5 the collapse, W6 this memory. **Never invented anywhere in this instruction: no current line, no live price, no fabricated tally.** Showing a real in-play number ("over 3.5 at −145") needs a paid per-event in-play re-pull — the MLB analogue of the football live-revalidate rails — and is OUT OF SCOPE until Josh authorises that spend.
 - STATUS: built on the shared tree 2026-09-11, **NOT committed, NOT deployed**. The `origin/frontend-rebuild` STATE-CLAIM at the top of this file was refreshed by this instruction and the note there records why it could not wait. No new `.md` file was added (a new doc would need its own row in the handoff's read-first index, carrying a real description — the literal marker string is deliberately NOT retyped here, because `tests/read-first-index.test.ts` slices the doc from its FIRST occurrence and an earlier mention moves the whole index out from under the guard; observed red on this very line, 2026-09-11), and no desk doc changed — cron cadence, the five slots, every budget and `docs/cron-jobs.md` are untouched by INSTRUCTION 50.
 
+**INSTRUCTION 51 — THE MLB LIVE IN-PLAY ODDS PULL (2026-09-11, branch `frontend-rebuild`, HEAD
+`521d2bf`). Josh's order, verbatim: "Authorize the live in-play odds pull for MLB".** Second half
+of INSTRUCTION 50 item 2, which shipped incomplete on purpose. His original complaint, verbatim:
+"It's not updating with live odds; it will show the player is top 4th w/ 3 H+R+RBI, but show them
+as an 'S' grade for over .5 H+R+RBI when their live over/under is 3.5 H+R+RBI". INSTRUCTION 50
+shipped the free half — a prop whose line the live tally has already cleared loses its grade, EV
+and Kelly chip and carries a SETTLED tag. This ships the half that costs money: pulling the in-play
+line and price so the board can print "over 3.5 at −145" instead of suppressing a dead row.
+
+- **WHAT SHIPPED.** A separate route (`/api/mlb/live-props`) and a separate Redis overlay
+  (`pl:mlb:liveprops:v1:<slateDate>`), joined to the board at render — never written into
+  `pl:board:<date>`, which is the stamped, graded population and would re-grade a bet Josh never
+  placed. Two upstream calls: the `baseball_mlb` events list (no `markets` param, the 1-credit
+  class, measured at zero) to bridge `gkey → oddsEventId`, and one per-event in-play re-price
+  asking the SIX core prop markets at `regions=us`. No `_alternate` ladders: the three ladders are
+  pre-kick Caesars milestone products that this feature never reads, and nine markets instead of
+  six is +50% spend for nothing. The six-market × `us` product is already inside the existing
+  allow-list (`src/lib/server/odds-shape.ts:20-53` — `PROP_MARKETS` is a superset and `regions` is
+  byte-equal), so **`src/lib/server/odds-shape.ts` and `app/api/odds/route.ts` were not edited and
+  no route's auth was touched.** The pull is direct server-side with `cache: "no-store"`, NOT
+  through `/api/odds`, because that proxy's `TTL_SECONDS = 240` (`app/api/odds/route.ts:21`) and an
+  unauthenticated `fresh=1` degrades to cache (`:47-50`) — a live price served from a four-minute
+  cache looks live and is not, which is the exact dishonesty INSTRUCTION 50 existed to remove.
+- **THE FREE DIVERGENCE GATE — the one genuinely MLB-native idea, and the reason this is fundable.**
+  MLB live game state is free from statsapi, `currentValue` (`src/engine2/grade.ts`) already extracts
+  the live tally, and the engine already computes a remaining-game probability free
+  (`shLiveState` → `shSimGames(init).legP`). So the route decides WHICH games are worth paying for
+  before it spends a credit, ranked `cleared` (a stored row whose tally already passed its line —
+  proof, not an estimate, and literally Josh's complaint) → `drifted` (the free sim moved ≥ 0.15 off
+  the pregame number) → `unpriced` → `expired`. CFB cannot do this; it has no free per-play feed,
+  which is why the football desks re-price every live game on a timer. The gate turns an ungated
+  ~516-credit day into an expected ~174-credit day using only free inputs.
+- **WHAT DELIBERATELY DID NOT SHIP.** No ¼-Kelly stake on a live row, following CFB exactly
+  (`playable = !!cz && upcoming`, `src/lib/cfb/props.ts`): a market-derived fair has zero edge over
+  the market by construction, and the pregame Kelly prices a different bet at a different line, so a
+  stake chip on an in-play line is an instruction to bet a phantom. No pregame probability against a
+  live price — that produces a confidently wrong EV, worse than the dash it replaces; the ladder is
+  the engine's own sim (`pSrc: "sim"`) → else the de-vigged live pair, labelled "market fair" and
+  never presented as a model number (`pSrc: "market"`) → else the price with NO grade at all. No
+  polling: `staleTime` is what is left of the overlay's own `ttlSec`, never a `refetchInterval`. No
+  change to `legacy/index.html`, no regeneration of `src/engine/legacy-src.gen.ts`. And
+  `src/lib/leg-settled.ts` got **no code change at all** — a re-anchored leg arrives re-keyed to the
+  live line and `settledRead` returns null on its own arithmetic, so the suppression falls away when
+  a real line exists and stays in force when one does not. Only that module's docblock was amended,
+  because "until Josh authorises that spend" is now history.
+- **THE GATE ON THE WHOLE BUILD, AND IT IS NOT CLOSED AS THIS IS TYPED.** `app/api/propsnap/route.ts`
+  states as fact, in a comment on live code, that "a started game is gone from the upstream anyway".
+  If that holds for `baseball_mlb`, this rig returns empty overlays and the honest product is exactly
+  the INSTRUCTION 50 suppression Josh already has. It cannot be checked in development — this branch
+  forbids calling the Odds API and every odds fixture here is synthesized — so ONE manual 3-event
+  probe against a real in-progress game (~18 credits at the estimated rate), reading `x-requests-used`
+  off the response, decides it. **Empty ⇒ STOP: do not build the rig, do not spend the 600, and tell
+  Josh his authorisation bought a measurement, not a board.** The probe result was NOT yet recorded
+  when this addendum was written; `docs/credit-budget.md` carries the row it lands in, still marked
+  outstanding. Re-read the quota first — it is free (`/v4/sports` measured at zero credits,
+  `tools/quota.mjs:15-16`).
+- **CREDIT ARITHMETIC** (event-pull counts computed this turn from `tests/fixtures/fix39/events.json`,
+  15 real first pitches, 165-minute games; costs at the estimated 6/event, MLB's measured band being
+  5.114–5.845 rounded up — **NOT** CFB's 31): the events list is 0; a full pull is `liveMaxEvents` 12
+  × 6 = **72**; `dailyBudget` **600** = **100 event-pulls**. The shipped default (the 16:45 PT slot
+  alone, 9 games live) is **54 credits automatic**, plus Josh's taps — four taps spaced ≥ 30 min
+  across the peak measured 44 pulls = **264**. Ungated 30-minute passes across the whole in-play span
+  are 86 pulls = **516** on this 15-game slate, **550** on a 16-game September one — which is where
+  the 600 comes from: a ~9% cushion over the worst realistic day, a CEILING and not a forecast. The
+  divergence gate takes that to ~29 pulls = **~174**. The 10-minute cadence his complaint implies is
+  249 pulls = **1,494/day ≈ 29,900/month on 20 slate days — not fundable on a 20,000 plan, and it is
+  not what shipped.** Pessimistically, if MLB ever bills like CFB at 31/event, those same pull counts
+  are 279 / 2,666 / 899 / 7,719 — which is why the day's FIRST pull is capped at 3 events until a real
+  header delta is recorded for that Pacific day.
+- **NO BUDGET, CAP, SLOT OR ALLOTMENT WAS LOWERED** — Josh's standing word, 2026-09-09, verbatim: "I
+  can purchase more credits. Don't lower any budgets." `CFB_PROPS.dailyBudget` stays **2500**
+  (`src/lib/cfb/rules.ts:475`), `NFL_PROPS.dailyBudget` stays **1000** (`src/lib/nfl/rules.ts:194`),
+  `MAX_RUNS_PER_DATE` **4** (`app/api/generate/route.ts:58`), `TOPUP_MAX` **6**
+  (`src/lib/paper-mode.ts:73`), `GEN_CREDITS_EST` **140** (`src/lib/engine-client.ts:172`), the five
+  PT slots and `/api/clv`'s limiter all stand. The new spend gets its OWN counter under its own
+  prefix (`pl:mlb:liveprops:spend:v1:<ptDate>`) and cannot touch the football tallies. **TRAP, and it
+  is the one that would bill MLB against CFB's rail silently:** `affordableEvents`
+  (`src/lib/cfb/props-store.ts:245`) and `pullCredits` (`:258`) both carry CFB defaults baked into
+  their signatures — `budget = CFB_PROPS.dailyBudget`, `perEvent = CFB_PROPS.measuredCreditsPerEvent`
+  — so every MLB call site MUST pass its own two arguments explicitly, and a test asserts no site
+  omits them. Deliberate deviation from CFB, also recorded: when the store is unavailable CFB sets
+  `allowed = need.length` and fetches anyway (`props-store.ts:213-214`) because it has a legitimate
+  pre-kick job that must survive an outage; this route exists ONLY to spend, so **no spend tally
+  means no pull.**
+- **THE CADENCE FINDING, AND IT IS THE PART ONLY JOSH CAN CLOSE.** Computed from the same fixture:
+  the in-play span is **15:41 → 22:01 PT** and the peak is **12 of 15 concurrent at ~17:16 PT**. Four
+  of the five INSTRUCTION 49 slots — 08:00 / 09:30 / 12:00 / 15:00 PT — see **ZERO** live baseball;
+  the fifth, 16:45, catches ~9 and sits 31 minutes before the peak, after which there are five hours
+  of in-play baseball with no automatic pass at all. So what ships is INSTRUCTION 49 compliant byte
+  for byte (`tickMode: "slots"`, reusing `decideSlotTick` with the SAME `REFILL_SLOTS_PT` array
+  object, `src/lib/server/grading-progress.ts:116-123`) and the PRIMARY VEHICLE IS HIS TAP — which is
+  his own contract, 2026-09-09 verbatim: "I can manually do it and it can function the same way
+  whether I manually refresh it or it refreshes itself automatically". The opt-in `liveSlotsPT`
+  **ships EMPTY**, one constant away: populating it rides the EXISTING scheduler ticker (every 15 min,
+  UTC hours 15-23 and 0-2 = 08:00-19:00 PT in PDT, stated in-tree at
+  `src/lib/server/grading-progress.ts:50-52`), so it costs **zero new cron-job.org executions** —
+  17:00/17:30/18:00/18:30 PT measured 43 pulls = 258 credits, 312 with the 16:45 default. **Flipping
+  it is Josh's word, not ours.**
+- **OPEN — THREE ITEMS, AND ONLY JOSH CAN CLOSE THEM.** (a) **Cron cadence past 19:00 PT.** The
+  current design banner (`docs/cron-jobs.md:15-19`) is scheduler every 15 min over UTC hours 15-23
+  and 0-2 = 12 h × 4 = 48/day, plus Parlay CLV every 30 min = 48/day, plus calibrate weekly —
+  **≈ 96-97 against a 100/day free tier**, so the tier is effectively full and widening or adding a
+  row breaks it. Do NOT present this as settled: `docs/cron-jobs.md:779-781` bills CLV at 96/day (i.e.
+  every 15 min) while `:19` says every 30 min, and that line belongs to the SUPERSEDED 2026-07-31
+  propsnap-entry design. **Josh must read his own cron-job.org execution history before we ask him
+  for anything.** (b) **The tier.** The last quota reading in the tree is 16,480 remaining on
+  2026-09-05 (`src/lib/cfb/rules.ts:412-413`), six days stale, and `data/quota-log.jsonl` stopped
+  2026-08-06 at 18,030 — the honest pairing for this feature is the 100,000/$59 tier already priced
+  at `docs/credit-budget.md:284`. (c) **Re-read the quota**, free, and date it. Exhausting the key
+  takes `/api/clv` — the scoreboard — down with it.
+- **STATUS:** built on the shared tree 2026-09-11, **NOT committed, NOT deployed**, and no new `.md`
+  file was added — everything landed in `docs/progress.md`, `docs/credit-budget.md` and
+  `docs/cron-jobs.md`, which already have their described rows in this file's doc index. (The literal
+  marker string for that index is deliberately not retyped here: the guard slices this file from its
+  FIRST occurrence, so an earlier mention moves the whole index out from under it. Observed red on
+  2026-09-11.)
+
+**INSTRUCTION 51 — FIX PASS, same day (2026-09-11), same branch, still NOT committed.** A review of
+the build above found 25 defects; every high and medium is fixed and the cheap lows with them. The
+ones that change what Josh sees, in the order they would have bitten him:
+
+- **THE lkey CARRIES NO SIDE — the worst of them.** The overlay is keyed `gkey|player|market|line`,
+  so an Over row and an Under row on the same line share ONE quote object whose every field is the
+  OVER's. An Under was being shown the Over's price, the Over's EV and the Over's probability with
+  its own sign kept: every number plausible, all of them the opposite bet's. The route now emits
+  `evOpp` beside `evCz`, and `mlbLiveView(q, side)` (`src/lib/mlb/live-client.ts`) is the ONE place
+  the flip happens — both pages ask it and nothing reads a raw quote field any more.
+- **THE UNDER GATE.** Re-anchoring says "the bet on this row is now the line the book is posting",
+  which is true of an Over whose stored leg has WON and false of an Under whose stored leg has LOST.
+  Swapping a higher live line onto a cleared Under un-decided a decided loss and put a dead ticket
+  back at the top of the board, graded and priced. An Under is now always READ at the line Josh
+  holds (`rowSettled` / `pickSettled` / `playSettled`), and a settled Under also PRESENTS nothing
+  live — `rowQuote` / `pickQuote` are the presentation gate, while the settled read still asks the
+  raw `rowLive`, which is what lets an Over decided AT the live line keep citing it.
+- **A LETTER GRADE NOBODY COMPUTED.** `legPOf` is never supplied, so `pSrc` is `"market"` on 100% of
+  production rows: the "fair" is the de-vigged live pair itself, an edge of zero by construction. The
+  S–F chip and the green EV badge are model vocabulary and are now unreachable on such a row — the
+  figure is still shown, muted, as "+X.X% vs market", with no badge and no stake.
+- **THE BOARD'S STAMPED-PICKS TABLE HAD NO LIVE WIRING AT ALL.** On any prop tab with LIVE off,
+  `pickRows` is non-null and that table renders — with every live cell unreachable, i.e. the pregame
+  grade against a live line, Josh's complaint verbatim. It is now wired cell for cell like the main
+  board.
+- **THE BROWSER COULD NEVER HAVE REACHED THE ROUTE.** `useMlbLiveQuotes` sent no `x-pl-sync`, so
+  every call 401'd and `retry: false` swallowed it silently. The header is sent, the query is
+  disabled without a phrase, and the footnote now names which of the three reasons applies instead
+  of showing pregame numbers with no explanation.
+- **THE REFRESH TAP DID NOT REFRESH PRICES.** `/api/refill?desk=mlb` now also pokes the live pull
+  with `slot: "manual", manual: true`, beside the top-up rather than behind its decision (the top-up
+  refuses for free most of the day), reported under `live`; and both invalidators now invalidate the
+  live query key.
+- **MONEY RAILS.** The events-list call is billed as a flat `MLB_LIST_CALL_CREDITS = 1`; the header
+  delta is trusted only when the readings show as many distinct values as events fetched (four
+  concurrent `no-store` calls make equal snapshots likely, most of all on the 3-event probe);
+  `rateMeasured: false` now caps EVERY pass at `probeEvents`, not just the day's first, so the real
+  per-pass ceiling today is 19 credits; an NX lease plus a re-read of the spend inside it closes the
+  non-atomic budget gate; an NX slot stamp makes a duplicate cron poke free (a manual tap is never
+  de-duplicated); an unmatched game is held on `emptyHoldSec` instead of being re-bought every poll.
+- **THE FREE GATE'S OWN FLOOR.** `clearedCount` comes off the STORED board, so it stays true for the
+  rest of the game and re-fired on every poll, bypassing `liveRevalidateSec`. The freshness floor now
+  sits above `cleared` / `unpriced` / `expired`; `drifted` stays above the floor, because drift is
+  recomputed each pass from live state a stored quote cannot contain and is self-limiting (and inert
+  until `legPOf` is wired).
+
+All four corrections to the credit arithmetic are written into `docs/credit-budget.md`. **Still
+outstanding and unchanged: the 3-event probe.** It remains the gate on flipping `rateMeasured`, on
+replacing the estimated 6, and on scheduling this route at all.
+
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
 unders — same-day vindication of instruction 6, which deployed ~1h after that card

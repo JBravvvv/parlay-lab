@@ -30,6 +30,7 @@ const game = (over: Partial<GameNow> = {}): GameNow => ({
   away: null,
   home: null,
   inning: null,
+  priceable: false,
   ...over,
 });
 

@@ -25,6 +25,58 @@
 > updated in the same visit. Josh types the secret; nobody else does. Everything below this
 > banner is the 07-26 design text, kept as the dated record.
 
+> ## 🟡 THE MLB LIVE IN-PLAY CADENCE — RECORDED, NOT RESOLVED — 2026-09-11 (INSTRUCTION 51)
+>
+> Josh, verbatim: **"Authorize the live in-play odds pull for MLB"**. The pull shipped; the CADENCE
+> it wants is an external-scheduler question, and this section records it **without resolving it by
+> guessing**, because the answer lives in an account only Josh can read.
+>
+> **THE FINDING.** Computed 2026-09-11 from `tests/fixtures/fix39/events.json` (15 real first
+> pitches, 165-minute games): the in-play span is **15:41 → 22:01 PT** and the peak is **12 of 15
+> games concurrent at ~17:16 PT**. Against the five Pacific refill/grading slots
+> (`REFILL_SLOTS_PT` = `GRADE_SLOTS_PT` = 08:00 / 09:30 / 12:00 / 15:00 / 16:45):
+>
+> | PT slot | live MLB games |
+> |---|---|
+> | 08:00 / 09:30 / 12:00 / 15:00 | **0 — all four** |
+> | **16:45** | **9**, and it sits 31 minutes BEFORE the peak |
+>
+> **Four of the five slots see zero live baseball, and after the fifth there are five hours of
+> in-play baseball — the games Josh actually watches — with no automatic pass at all.** So the
+> primary vehicle shipped as his own Refresh tap, which runs the identical pass; that is his stated
+> contract (2026-09-09, verbatim: "I can manually do it and it can function the same way whether I
+> manually refresh it or it refreshes itself automatically"). Nothing here was changed on his
+> account, and no cron row was added, widened or countermanded.
+>
+> **THE OPT-IN COSTS ZERO CRON EXECUTIONS.** `MLB_LIVE_PROPS.liveSlotsPT` ships EMPTY. Populating it
+> rides the **existing** scheduler ticker — stated in-tree at `src/lib/server/grading-progress.ts:50-52`
+> as every 15 min over UTC hours 15-23 and 0-2, i.e. **08:00-19:00 PT in PDT** — and reuses the same
+> `decideSlotTick(nowMs, slots, windowMin)` with `slots` passed as a parameter (`:118-123`), so there
+> is no second implementation and **no new cron-job.org row**. It dies at 19:00 PT and does not alter
+> `REFILL_SLOTS_PT`. Flipping it is Josh's word, not ours.
+>
+> **PAST 19:00 PT IS HIS ACCOUNT, AND THE TIER LOOKS FULL.** Recomputed from the CURRENT design
+> banner immediately above (its table, this file's lines 15-19): **scheduler** every 15 min over UTC
+> hours 15-23 and 0-2 = 12 h × 4 = **48/day**; **Parlay CLV** every 30 min = **48/day**; **calibrate**
+> weekly. That is **≈ 96-97/day against cron-job.org's 100/day free tier** — effectively full, so
+> widening the scheduler window or adding a row breaks it.
+>
+> **DO NOT PRESENT THAT AS SETTLED — THIS DOCUMENT CONTRADICTS ITSELF.** The "free tier binds at
+> exactly two" arithmetic further down this file (the heading "And the free tier binds at exactly
+> two", its lines 779-781: "cron-job.org free tier is 100 executions/day and `/api/clv` already
+> uses **96**") bills CLV at 96/day, which is a 15-minute
+> cadence, while the design banner's own row says **every 30 min**. That 96 belongs to the
+> **SUPERSEDED 2026-07-31 propsnap-entry analysis** and is kept as the dated record; it is not a
+> current reading. Both routes reach "the tier is effectively full", which is why the conclusion is
+> safe to state and the ARITHMETIC is not.
+>
+> **THE ONE ACTION, AND IT IS JOSH'S:** read the cron-job.org execution history and report what is
+> actually scheduled and how many executions a day it really uses — **before** anyone asks him to add
+> a row, widen a window or upgrade a tier. Everything above is inference from two disagreeing
+> paragraphs in this file; his dashboard is ground truth, and the last time this document asserted
+> operator actions instead of reading them, it carried four phantom entries as live for ten days (the
+> banner directly above).
+
 > ## ⚠️ THE THIRD SCHEDULER, AND THE FIRING-BRANCH SPLIT — 2026-07-31 (owner's item 5)
 >
 > This document is about **cron-job.org**, and its entries are unaffected by what follows — they

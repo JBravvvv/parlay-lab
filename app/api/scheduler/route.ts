@@ -11,8 +11,9 @@ import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-re
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { applySuspensionLift } from "@/lib/paper-mode";
 import { applyEnvClosedForm } from "@/lib/env-adjust";
-import { decideGradePass, decideRefillTick } from "@/lib/server/grading-progress";
-import { decideMlbRefill, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
+import { decideGradePass, decideRefillTick, decideSlotTick, GRADE_SLOT_WINDOW_MIN } from "@/lib/server/grading-progress";
+import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay, type MlbLivePullResult } from "@/lib/server/refill";
+import { MLB_LIVE_PROPS } from "@/lib/mlb/live-props-rules";
 import { attachCfb, forwardCfbLock } from "@/lib/server/cfb-lock-forward";
 import type { CfbForwardResult } from "@/lib/server/cfb-lock-forward";
 import { attachNfl, forwardNflLock, type NflForwardResult } from "@/lib/server/nfl-lock-forward";
@@ -295,17 +296,42 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        INSTRUCTION 49: the refill and the grading share the same slots, so the two forwards
        run TOGETHER (allSettled) — a refill no longer starves the grading pass. */
     const gp = decideGradePass(now);
-    const [gen, cal] = await Promise.allSettled([
+    /* THE LIVE IN-PLAY POKE (INSTRUCTION 51, 2026-09-11, Josh's word, verbatim: "Authorize the
+       live in-play odds pull for MLB"). It is gated on MLB_LIVE_PROPS.tickMode and on nothing
+       else, and it reuses the decision this tick has ALREADY made:
+
+         "slots"  — THE SHIPPED DEFAULT. `rt` is reused verbatim: the same decideSlotTick result
+                    the refill gate above just read, off the same REFILL_SLOTS_PT array object.
+                    One calendar, so an automatic live pull can only ever happen on the five
+                    INSTRUCTION 49 Pacific slots, and the two can never drift apart. No new cron
+                    entry, no change to the ticker, nothing of Josh's countermanded.
+         "ticker" — OPT-IN, SHIPPED OFF (MLB_LIVE_PROPS.liveSlotsPT is []). The SAME
+                    decideSlotTick function, called with that array — which is why there is no
+                    second slot-matching implementation anywhere in this file. With the array
+                    empty `fire` is false at every instant, so turning it on is one constant and
+                    Josh's word, never ours.
+
+       It rides in the SAME Promise.allSettled as the refill and the grading pass, so it cannot
+       delay either and a rejection cannot escape. Its answer is REPORTED and nothing more:
+       `livePull` is added to the body only when a poke was actually made, so an off-slot poke's
+       body is byte-identical to what it was before this instruction. The refill's fire/no-fire
+       decision, its reason string and its spend accounting are untouched — the live pull spends
+       from its own daily budget under its own Redis prefix, never from the top-up's. */
+    const lt = MLB_LIVE_PROPS.tickMode === "ticker" ? decideSlotTick(now, MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN) : rt;
+    const liveSlot = lt.fire ? lt.slot : null;
+    const [gen, cal, lp] = await Promise.allSettled([
       refillFires ? forwardMlbRefill({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: rt.slot! }) : Promise.resolve(null),
       gp.fire ? gradeForward(req.nextUrl.origin, process.env.CRON_SECRET) : Promise.resolve(null),
+      liveSlot ? forwardMlbLivePull({ origin: req.nextUrl.origin, secret: process.env.CRON_SECRET, slot: liveSlot }) : Promise.resolve(null),
     ]);
     const grading = await gradingReport(gp, cal);
+    const livePull = liveSlot ? livePullReport(liveSlot, lp) : null;
     if (refillFires) {
       const g = gen.status === "fulfilled" && gen.value ? gen.value : { generateStatus: 0, generate: { error: gen.status === "rejected" ? (gen.reason as Error).message : "no forward" } };
       console.log(`[scheduler] REFILL ${rt.slot} fired for ${date}: owed $${tu0.owed}, generate ${g.generateStatus}`);
-      return NextResponse.json({ fired: true, topup, grading, generateStatus: g.generateStatus, generate: g.generate, lock, ...body });
+      return NextResponse.json({ fired: true, topup, grading, ...(livePull ? { livePull } : {}), generateStatus: g.generateStatus, generate: g.generate, lock, ...body });
     }
-    return NextResponse.json({ fired: false, topup, grading, lock, ...body });
+    return NextResponse.json({ fired: false, topup, grading, ...(livePull ? { livePull } : {}), lock, ...body });
   }
 
   /* Forward to the one spending route with the TARGET BLOCK, same header contract.
@@ -345,6 +371,26 @@ function gradeForward(origin: string, secret: string): Promise<Response> {
     headers: { authorization: `Bearer ${secret}` },
     cache: "no-store",
   });
+}
+
+/** The `livePull` field, printed ONLY on a tick that actually poked the live in-play route
+    (INSTRUCTION 51). It is a report, never a decision: every outcome — a rejected promise, a
+    total forward that caught its own error, a non-2xx from the route — lands here as a field
+    and changes nothing about the refill's status, its reason string or its spend. A live pull
+    that fails costs Josh the live line for that slot and nothing else. */
+function livePullReport(slot: string, lp: PromiseSettledResult<MlbLivePullResult | null>): Record<string, unknown> {
+  if (lp.status === "rejected") {
+    console.warn(`[scheduler] mlb live pull threw: ${(lp.reason as Error).message}`);
+    return { slot, forwarded: false, error: (lp.reason as Error).message };
+  }
+  const v = lp.value;
+  if (!v) return { slot, forwarded: false, error: "no forward" };
+  if (!v.forwarded) {
+    console.warn(`[scheduler] mlb live pull failed: ${v.error}`);
+    return { slot, forwarded: false, error: v.error };
+  }
+  console.log(`[scheduler] mlb live pull ${slot}: ${v.status}`);
+  return { slot, forwarded: true, status: v.status, result: v.result };
 }
 
 /** the `grading` field both mlbTick branches print, from the pass decision and the settled forward */

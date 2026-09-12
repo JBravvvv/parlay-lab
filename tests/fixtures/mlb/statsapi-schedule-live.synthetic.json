@@ -1,0 +1,405 @@
+{
+  "_note": "SYNTHETIC (2026-09-11): shape of the free MLB statsapi /api/v1/schedule?sportId=1&date=<d>&hydrate=linescore answer, trimmed to the fields src/lib/liveNow.ts and src/lib/server/mlb-live-state.ts read. Carries a LIVE game, a FINAL game, a PRE-GAME game, a POSTPONED game and a DOUBLEHEADER PAIR (one matchup, two gamePks, gameNumber 1/2) whose Odds-side commence_times sit 20 min apart so the ambiguity refusal is exercised. Scores, innings and gamePks are invented - NOT a captured feed. statsapi is keyless and free; no paid feed was called to build this.",
+  "copyright": "Synthetic fixture - no MLB Advanced Media data was copied.",
+  "totalGames": 8,
+  "totalGamesInProgress": 4,
+  "dates": [
+    {
+      "date": "2026-07-10",
+      "totalGames": 8,
+      "games": [
+        {
+          "gamePk": 823901,
+          "link": "/api/v1.1/game/823901/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-10T22:46:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Live",
+            "codedGameState": "I",
+            "detailedState": "In Progress",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 147,
+                "name": "New York Yankees",
+                "link": "/api/v1/teams/147"
+              },
+              "score": 4
+            },
+            "home": {
+              "team": {
+                "id": 120,
+                "name": "Washington Nationals",
+                "link": "/api/v1/teams/120"
+              },
+              "score": 2
+            }
+          },
+          "linescore": {
+            "currentInning": 4,
+            "currentInningOrdinal": "4th",
+            "inningState": "Top",
+            "inningHalf": "Top",
+            "isTopInning": true,
+            "scheduledInnings": 9,
+            "balls": 1,
+            "strikes": 2,
+            "outs": 1,
+            "teams": {
+              "away": {
+                "runs": 4,
+                "hits": 6,
+                "errors": 0,
+                "leftOnBase": 3
+              },
+              "home": {
+                "runs": 2,
+                "hits": 3,
+                "errors": 1,
+                "leftOnBase": 4
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        },
+        {
+          "gamePk": 823902,
+          "link": "/api/v1.1/game/823902/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-10T22:41:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Live",
+            "codedGameState": "I",
+            "detailedState": "In Progress",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 158,
+                "name": "Milwaukee Brewers",
+                "link": "/api/v1/teams/158"
+              },
+              "score": 1
+            },
+            "home": {
+              "team": {
+                "id": 134,
+                "name": "Pittsburgh Pirates",
+                "link": "/api/v1/teams/134"
+              },
+              "score": 3
+            }
+          },
+          "linescore": {
+            "currentInning": 5,
+            "currentInningOrdinal": "5th",
+            "inningState": "Bottom",
+            "inningHalf": "Bottom",
+            "isTopInning": false,
+            "scheduledInnings": 9,
+            "balls": 1,
+            "strikes": 2,
+            "outs": 2,
+            "teams": {
+              "away": {
+                "runs": 1,
+                "hits": 3,
+                "errors": 0,
+                "leftOnBase": 3
+              },
+              "home": {
+                "runs": 3,
+                "hits": 4,
+                "errors": 1,
+                "leftOnBase": 4
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        },
+        {
+          "gamePk": 823903,
+          "link": "/api/v1.1/game/823903/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-10T23:10:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Live",
+            "codedGameState": "I",
+            "detailedState": "In Progress",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 146,
+                "name": "Miami Marlins",
+                "link": "/api/v1/teams/146"
+              },
+              "score": 0
+            },
+            "home": {
+              "team": {
+                "id": 144,
+                "name": "Atlanta Braves",
+                "link": "/api/v1/teams/144"
+              },
+              "score": 5
+            }
+          },
+          "linescore": {
+            "currentInning": 6,
+            "currentInningOrdinal": "6th",
+            "inningState": "Top",
+            "inningHalf": "Top",
+            "isTopInning": true,
+            "scheduledInnings": 9,
+            "balls": 1,
+            "strikes": 2,
+            "outs": 0,
+            "teams": {
+              "away": {
+                "runs": 0,
+                "hits": 2,
+                "errors": 0,
+                "leftOnBase": 3
+              },
+              "home": {
+                "runs": 5,
+                "hits": 6,
+                "errors": 1,
+                "leftOnBase": 4
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        },
+        {
+          "gamePk": 823904,
+          "link": "/api/v1.1/game/823904/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-10T17:07:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Final",
+            "codedGameState": "F",
+            "detailedState": "Final",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 111,
+                "name": "Boston Red Sox",
+                "link": "/api/v1/teams/111"
+              },
+              "score": 6
+            },
+            "home": {
+              "team": {
+                "id": 141,
+                "name": "Toronto Blue Jays",
+                "link": "/api/v1/teams/141"
+              },
+              "score": 2
+            }
+          },
+          "linescore": {
+            "currentInning": 9,
+            "currentInningOrdinal": "9th",
+            "inningState": "End",
+            "inningHalf": "Bottom",
+            "isTopInning": false,
+            "scheduledInnings": 9,
+            "balls": 1,
+            "strikes": 2,
+            "outs": 3,
+            "teams": {
+              "away": {
+                "runs": 6,
+                "hits": 8,
+                "errors": 0,
+                "leftOnBase": 3
+              },
+              "home": {
+                "runs": 2,
+                "hits": 3,
+                "errors": 1,
+                "leftOnBase": 4
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        },
+        {
+          "gamePk": 823905,
+          "link": "/api/v1.1/game/823905/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-11T02:10:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Preview",
+            "codedGameState": "S",
+            "detailedState": "Scheduled",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 119,
+                "name": "Los Angeles Dodgers",
+                "link": "/api/v1/teams/119"
+              }
+            },
+            "home": {
+              "team": {
+                "id": 135,
+                "name": "San Diego Padres",
+                "link": "/api/v1/teams/135"
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        },
+        {
+          "gamePk": 823906,
+          "link": "/api/v1.1/game/823906/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-11T00:15:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Live",
+            "codedGameState": "I",
+            "detailedState": "In Progress",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 112,
+                "name": "Chicago Cubs",
+                "link": "/api/v1/teams/112"
+              },
+              "score": 2
+            },
+            "home": {
+              "team": {
+                "id": 138,
+                "name": "St. Louis Cardinals",
+                "link": "/api/v1/teams/138"
+              },
+              "score": 2
+            }
+          },
+          "linescore": {
+            "currentInning": 3,
+            "currentInningOrdinal": "3rd",
+            "inningState": "Bottom",
+            "inningHalf": "Bottom",
+            "isTopInning": false,
+            "scheduledInnings": 9,
+            "balls": 1,
+            "strikes": 2,
+            "outs": 0,
+            "teams": {
+              "away": {
+                "runs": 2,
+                "hits": 4,
+                "errors": 0,
+                "leftOnBase": 3
+              },
+              "home": {
+                "runs": 2,
+                "hits": 3,
+                "errors": 1,
+                "leftOnBase": 4
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "S"
+        },
+        {
+          "gamePk": 823907,
+          "link": "/api/v1.1/game/823907/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-11T00:35:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Preview",
+            "codedGameState": "S",
+            "detailedState": "Scheduled",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 112,
+                "name": "Chicago Cubs",
+                "link": "/api/v1/teams/112"
+              }
+            },
+            "home": {
+              "team": {
+                "id": 138,
+                "name": "St. Louis Cardinals",
+                "link": "/api/v1/teams/138"
+              }
+            }
+          },
+          "gameNumber": 2,
+          "doubleHeader": "S"
+        },
+        {
+          "gamePk": 823908,
+          "link": "/api/v1.1/game/823908/feed/live",
+          "gameType": "R",
+          "season": "2026",
+          "gameDate": "2026-07-11T01:10:00Z",
+          "officialDate": "2026-07-10",
+          "status": {
+            "abstractGameState": "Other",
+            "codedGameState": "D",
+            "detailedState": "Postponed",
+            "startTimeTBD": false
+          },
+          "teams": {
+            "away": {
+              "team": {
+                "id": 113,
+                "name": "Cincinnati Reds",
+                "link": "/api/v1/teams/113"
+              }
+            },
+            "home": {
+              "team": {
+                "id": 115,
+                "name": "Colorado Rockies",
+                "link": "/api/v1/teams/115"
+              }
+            }
+          },
+          "gameNumber": 1,
+          "doubleHeader": "N"
+        }
+      ]
+    }
+  ]
+}

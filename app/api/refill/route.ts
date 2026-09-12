@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { storeEnv, syncAuthed } from "@/lib/server/store";
 import { ptToday } from "@/lib/server/pt-date";
-import { decideMlbRefill, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
+import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay } from "@/lib/server/refill";
 
 /**
  * THE MANUAL REFILL (INSTRUCTION 49, 2026-09-09), Josh verbatim: "It shouldn't be refreshing every
@@ -14,7 +14,16 @@ import { decideMlbRefill, forwardMlbRefill, readMlbDay } from "@/lib/server/refi
  * Josh's Refresh pill calls this with his sync phrase; it runs the IDENTICAL server pass the
  * scheduler runs on a slot tick, with slot "manual":
  *   - mlb: the free decision (readMlbDay + decideMlbRefill) first, then — only when it fires — the
- *     forward to /api/generate?topup=1&slot=manual with the cron key.
+ *     forward to /api/generate?topup=1&slot=manual with the cron key; and ALONGSIDE that, always,
+ *     the INSTRUCTION 51 live in-play pull (fix pass, 2026-09-11).
+ *
+ *     WHY THE LIVE PULL RUNS EVEN WHEN THE TOP-UP DOES NOT: Josh's complaint is about a price, not
+ *     about a ticket — "it will show the player is top 4th w/ 3 H+R+RBI, but show them as an 'S'
+ *     grade for over .5". The top-up decision is about whether the card needs more tickets, and it
+ *     refuses for free most of the day; gating the live re-price behind it meant a tap could never
+ *     refresh a line. It rides beside, on its OWN 600-credit budget under its OWN Redis prefix,
+ *     with its own free divergence gate deciding whether a credit is warranted at all, and it
+ *     reports itself under `live` rather than letting a live failure speak for the refill.
  *   - cfb/nfl: the league's own lock route with ?date=<today>&manual=1 (the already-locked branch
  *     runs topUpDate with slot "manual"; ?date suppresses sweep/settle, as on any hand poke).
  *
@@ -52,11 +61,16 @@ export async function POST(req: NextRequest) {
      could not read. Every failure is a 502 JSON with the message; the secret is never in it. */
   try {
     if (desk === "mlb") {
+      const origin = req.nextUrl.origin;
+      /* TOTAL BY CONSTRUCTION (src/lib/server/refill.ts:102-107): `forwardMlbLivePull` never throws
+         and never returns anything this route has to branch on, so it can be started first and
+         awaited beside the top-up without the catch below ever seeing it. */
+      const live = forwardMlbLivePull({ origin, secret, slot: "manual", manual: true });
       const day = await readMlbDay(ptToday());
       const d = decideMlbRefill({ ...day, now, slot: "manual" });
-      if (!d.fire) return NextResponse.json({ ...base, fired: false, topup: d });
-      const g = await forwardMlbRefill({ origin: req.nextUrl.origin, secret, slot: "manual" });
-      return NextResponse.json({ ...base, fired: true, topup: d, ...g });
+      if (!d.fire) return NextResponse.json({ ...base, fired: false, topup: d, live: await live });
+      const g = await forwardMlbRefill({ origin, secret, slot: "manual" });
+      return NextResponse.json({ ...base, fired: true, topup: d, ...g, live: await live });
     }
 
     const r = await fetch(new URL(`/api/${desk}/lock?date=${ptToday()}&manual=1`, req.nextUrl.origin), {
