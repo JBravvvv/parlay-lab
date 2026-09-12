@@ -15,7 +15,7 @@ chat handed that folder would have rebuilt July and believed it was current.
 
 ## What shipped
 
-`tools/sync-handoff.sh` — 868 lines, generates the entire package from the repo:
+`tools/sync-handoff.sh` — 898 lines, generates the entire package from the repo:
 
 | file | what it is |
 |---|---|
@@ -30,17 +30,31 @@ chat handed that folder would have rebuilt July and believed it was current.
 | `repo/` | verbatim `CLAUDE.md`, `ENGINE2.md`, `PARLAY_LAB_QUANT_ENGINE.md`, all 23 `docs/`, every config, the workflows |
 | `code/` | `git archive HEAD` tarball (788 entries, 9.5 MB) + full-history `git bundle` (99 MB) |
 
-## Why it is automatic in three places
+## What makes it fire
 
-1. `.git/hooks/post-commit`, `post-merge`, `post-checkout`, `post-rewrite` — every commit publishes.
-   Each hook backgrounds the call and ends `exit 0`: a sync must never slow or fail a git operation.
-2. `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist`, every 15 minutes, `Nice 10` and
-   `LowPriorityIO` — covers uncommitted work in progress, which the hooks structurally cannot.
-   Uninstall: `launchctl bootout gui/$(id -u)/com.josh.parlaylab.handoff`.
+1. **Five git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
+   `post-index-change`, which fires on `git add` so staged work publishes too. Each hook backgrounds
+   the call and ends `exit 0`: a sync must never slow or fail a git operation. Verified live — the
+   INSTRUCTION 53 commit republished `01-STATE.md` to its own sha with no further action.
+2. **A standing rule in `CLAUDE.md`** that any session changing the project runs the script. This is
+   what covers unstaged edits.
 3. `tools/sync-handoff.sh --force` on demand, which also rebuilds the bundle.
 
+## The timer was built, tested, and removed — and the removal is a finding
+
+A LaunchAgent on a 15-minute interval was installed and fired. It logged
+`Operation not permitted`. Rather than assume the cause was the script's location, a probe agent
+placed outside `~/Documents` was run: `ls ~/Documents` **DENIED**, `ls ~/Documents/Parlay-Lab`
+**DENIED**, `cat .../package.json` **DENIED**, `ls "~/Documents/Parlay Lab Handoff"` **DENIED**. macOS
+TCC denies a launchd-spawned shell the whole Documents tree, wherever the script lives. (An earlier,
+looser probe line read `write handoff dir: OK` — a **false positive**; the sharper probe is the one to
+believe.) The only cure is Full Disk Access for `/bin/bash` — a security setting, not worth a file
+copy, and Josh's to grant if he ever wants it. **The agent was deleted rather than left failing every
+15 minutes: a broken automation is worse than a missing one.**
+
 Change-gated on a fingerprint of HEAD + the dirty-tree listing + every doc and config mtime, so the
-no-change path is one `shasum`. A full run measured **3.6 s**, bundle included.
+no-change path is one `shasum`. A full run measured **3.6 s** with the 99 MB bundle, **1.4 s** without
+it — cheap enough to run on every hook and at the end of every session.
 
 ## The security posture, because this is a copy machine
 

@@ -852,7 +852,7 @@ the app as it stood in July and called it current. **This is the failure the ins
 missing file, a mirror that stopped being a mirror.**
 
 **THE SHAPE OF THE FIX — GENERATED, NOT CURATED.** A curated folder decays the moment someone forgets
-to curate it, which is exactly what happened. `tools/sync-handoff.sh` (868 lines) generates the whole
+to curate it, which is exactly what happened. `tools/sync-handoff.sh` (898 lines) generates the whole
 package from the repo on every run:
 
 | published | source | decays? |
@@ -872,18 +872,35 @@ reviewed in a diff, instead of in a folder nobody diffs. The alternative conside
 deriving the prose from the docs by extraction; the docs are 28,647 lines of append-only narrative with
 struck-through sections, and an extractor over that would publish retracted claims as current.
 
-**WHY IT IS AUTOMATIC IN THREE PLACES, NOT ONE.**
-1. **Git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Doctrine here is
-   commit-and-push every shipped change, so the hook makes every shipped change land in the folder.
-   Each hook backgrounds the call and ends `exit 0`: **a sync must never slow or fail a git operation.**
-2. **A LaunchAgent** — `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist`, `StartInterval 900`,
-   `Nice 10`, `LowPriorityIO`. This is the half the hooks cannot cover: work in progress that has not
-   been committed yet. Josh's words were "AT ANY POINT IN TIME", and a commit-only trigger leaves the
-   whole gap between commits uncovered. Uninstall is one line:
-   `launchctl bootout gui/$(id -u)/com.josh.parlaylab.handoff`.
+**WHAT MAKES IT FIRE, AND THE TIMER THAT TURNED OUT TO BE IMPOSSIBLE.**
+1. **Five git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
+   `post-index-change`, which fires on `git add` so staged-but-uncommitted work publishes too.
+   Doctrine here is commit-and-push every shipped change, so the hooks make every shipped change land
+   in the folder. Each hook backgrounds the call and ends `exit 0`: **a sync must never slow or fail a
+   git operation.** Verified live — the INSTRUCTION 53 commit itself republished `01-STATE.md` to the
+   new sha with no further action.
+2. **Every session that touches the project**, as a standing rule now written into `CLAUDE.md`. This
+   is what covers unstaged edits, and it is the honest mechanism: a rule a session follows, not a
+   daemon.
 3. **On demand** — `tools/sync-handoff.sh --force`, which also rebuilds the bundle.
 
-**WHY A TIMER EVERY 15 MINUTES IS NOT A COST.** The script computes a fingerprint — HEAD, the
+**THE TIMER WAS BUILT, TESTED, AND REMOVED — and the removal is the finding.** A LaunchAgent
+(`StartInterval 900`, `Nice 10`, `LowPriorityIO`) was installed and fired at load. Its log read
+`/bin/bash: tools/sync-handoff.sh: Operation not permitted`. The first reading would have been "move
+the script out of `~/Documents`", so that was tested instead of assumed: a probe agent placed under
+`~/Library/Application Support` reported `ls ~/Documents` **DENIED**, `ls ~/Documents/Parlay-Lab`
+**DENIED**, `cat .../package.json` **DENIED**, `ls "~/Documents/Parlay Lab Handoff"` **DENIED** — the
+script's location is irrelevant, macOS TCC denies a launchd-spawned shell the whole Documents tree.
+(One earlier probe line read `write handoff dir: OK` and was a **false positive**; the sharper probe
+contradicted it, and the sharper probe is the one to believe.) The only cure is granting Full Disk
+Access to `/bin/bash`, which is a security-settings change, is not worth a file copy, and is Josh's to
+make if he ever wants it. **The agent was deleted rather than left to fail every 15 minutes: a broken
+automation is worse than a missing one, because it buys false confidence in exactly the place this
+instruction exists to remove it.** Josh's words were "AT ANY POINT IN TIME", and the honest report is
+that the hooks deliver that for everything that reaches the index, and the session rule covers the
+rest.
+
+**WHY RUNNING IT CONSTANTLY IS NOT A COST.** The script computes a fingerprint — HEAD, the
 `git status --porcelain` listing, and `stat -f '%m %z %N'` over every `docs/*.md`, every root config,
 and the script itself — and exits before touching anything if it matches `.sync-fingerprint`. The
 no-change path is a single `shasum`. The full path measured **3.6 s**, and that included the 99 MB

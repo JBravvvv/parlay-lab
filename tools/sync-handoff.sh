@@ -26,8 +26,21 @@
 #     tools/sync-handoff.sh --quiet      # no output unless something fails
 #
 #  WIRED TO FIRE AUTOMATICALLY FROM
-#     .git/hooks/post-commit, post-merge, post-checkout, post-rewrite
-#     ~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist  (every 15 min)
+#     .git/hooks/post-commit, post-merge, post-checkout, post-rewrite,
+#     post-index-change  (so `git add` publishes too, not only `git commit`)
+#
+#  WHY THERE IS NO TIMER — MEASURED 2026-09-12, NOT ASSUMED. A LaunchAgent was
+#  installed, fired, and DENIED: under macOS TCC a launchd-spawned shell cannot
+#  read anything under ~/Documents. A probe run from outside Documents confirmed
+#  it is the whole tree, not this script's location: `ls ~/Documents`,
+#  `ls ~/Documents/Parlay-Lab`, `cat .../package.json` and
+#  `ls "~/Documents/Parlay Lab Handoff"` all returned Operation not permitted.
+#  The only cure is granting Full Disk Access to a shell binary, which is a
+#  security-settings change and is NOT worth a file copy. The agent was removed
+#  rather than left to log a failure every 15 minutes, because a broken
+#  automation is worse than a missing one — it buys false confidence.
+#  THE GAP THIS LEAVES: edits that are never staged and never committed. It is
+#  closed by the session, not by a timer — see the rule in CLAUDE.md.
 #
 #  MAINTENANCE RULE FOR ANY FUTURE SESSION: the live facts below (git state,
 #  doc copies, code snapshot, instruction log, manifest) regenerate themselves.
@@ -260,12 +273,26 @@ travels) regenerates this whole folder. It is change-gated, so running it when
 nothing has changed costs nothing. It fires automatically from:
 
 - **Git hooks** in `/Users/josh/Documents/Parlay-Lab/.git/hooks/` —
-  `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Every commit
-  refreshes this folder. Since doctrine is commit-and-push every shipped change,
-  every shipped change lands here.
-- **A LaunchAgent**, `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist`,
-  every 15 minutes — the safety net that catches uncommitted work in progress.
-  To stop it: `launchctl bootout gui/$(id -u)/com.josh.parlaylab.handoff`
+  `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`, and
+  `post-index-change` (which fires on `git add`, so staged-but-uncommitted work
+  publishes too). Doctrine here is commit-and-push every shipped change, so
+  every shipped change lands in this folder without anyone asking.
+- **Every session that touches the project**, as a standing rule in
+  `repo/CLAUDE.md`: after any change, run the script. That is what covers edits
+  that are never staged.
+
+**There is deliberately NO timer, and this is a measured finding, not an
+oversight.** A LaunchAgent on a 15-minute interval was installed and fired, and
+macOS TCC denied it: a launchd-spawned shell cannot read anything under
+`~/Documents`. A probe from outside Documents confirmed the whole tree is
+blocked — `ls ~/Documents`, `ls ~/Documents/Parlay-Lab`, `cat .../package.json`
+and `ls "~/Documents/Parlay Lab Handoff"` all returned *Operation not
+permitted*. The only cure is granting Full Disk Access to a shell binary, which
+is a security-settings change and not worth a file copy. The agent was removed
+rather than left logging a failure every 15 minutes — a broken automation is
+worse than a missing one, because it buys false confidence. **If Josh ever wants
+the timer, he grants `/bin/bash` Full Disk Access in System Settings himself and
+says so; no session does that for him.**
 
 **Rule for any session working on Parlay Lab:** when you change a fact that lives
 in the prose of `00`, `02`, `03`, `04` or `06`, edit the heredoc inside
@@ -853,9 +880,12 @@ cat <<'EOF'
 
 | Trigger | Where |
 |---|---|
-| every commit / merge / checkout / rewrite | `/Users/josh/Documents/Parlay-Lab/.git/hooks/` |
-| every 15 minutes | `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist` |
+| every commit / merge / checkout / rewrite / `git add` | `/Users/josh/Documents/Parlay-Lab/.git/hooks/` — 5 hooks |
+| every session that changes the project | standing rule in `repo/CLAUDE.md` |
 | on demand | `/Users/josh/Documents/Parlay-Lab/tools/sync-handoff.sh --force` |
+
+No timer: macOS TCC denies a launchd agent all access to `~/Documents`, measured
+2026-09-12. See "How this folder stays current" in `00-START-HERE.md`.
 
 A sync with nothing changed exits immediately; it compares a fingerprint of HEAD,
 the dirty-tree listing, and the mtimes of every doc and config.
