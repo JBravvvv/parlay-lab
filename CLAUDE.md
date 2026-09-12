@@ -803,6 +803,33 @@ armed board; Phase 2's exit comparison then runs both engines on the same rows, 
 `gen=best`+`latest` is BUILT and running · `pen_quality` same-day replace (bounded, recorded) ·
 `repository_dispatch` PAT route (**not needed** — `/api/propsnap` solved it).
 
+## The handoff folder is MIRRORED AUTOMATICALLY — never hand-edit it (INSTRUCTION 53, 2026-09-12)
+
+Josh, verbatim: *"Make sure every single thing for parlay lab to be edited/analyzed/optimized/carried
+over into another chat is added to the folder 'Parlay Lab Handoff' so at any point I need to move this
+project to a new chat, I can do so. Also make sure that every time something is added, it is immediately
+added to the disk/files in that folder so it can be accurately handed off AT ANY POINT IN TIME NO MATTER
+WHAT WITHOUT HAVING TO ASK FIRST BECAUSE ITS AUTOMATIC"*
+
+`/Users/josh/Documents/Parlay Lab Handoff` is a generated mirror. **`tools/sync-handoff.sh` is the
+only thing that writes it.** It publishes `00-START-HERE.md` (orientation), `01-STATE.md` (live git +
+dated deploy/gate facts), `02-ENVIRONMENT.md` (the prelude, the gate, every trap), `03-SECURITY.md`
+(the credential rules), `04-OPEN-DECISIONS.md` (what is still Josh's call), `05-INSTRUCTION-LOG.md`
+(extracted from the handoff doc), `06-ARCHITECTURE.md` (desks, routes, every tuned constant),
+`MANIFEST.md`, verbatim copies of `CLAUDE.md` + `ENGINE2.md` + all of `docs/` under `repo/`, and a
+restorable `code/` pair — a `git archive HEAD` tarball and a full-history `git bundle`.
+
+**It fires on its own** from `.git/hooks/{post-commit,post-merge,post-checkout,post-rewrite}` and from
+`~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist` every 15 minutes. It is change-gated on a
+fingerprint of HEAD + the dirty-tree listing + every doc/config mtime, so a no-op sync costs nothing.
+It never runs a mutating git command, and it refuses to publish if an env-shaped file is ever tracked.
+
+**The rule for every future session:** a fact that lives in the PROSE of 00/02/03/04/06 is edited in
+the heredocs inside `tools/sync-handoff.sh`, in this repo. Deploy and gate facts are edited in
+`tools/handoff-state.env`. Editing the published file directly is pointless — the next sync overwrites
+it. Stating a deploy in `handoff-state.env` that was not actually verified is worse than leaving the
+old one: the file's own header says an undated claim is worse than no claim.
+
 ## The docs, and what each is for
 | file | holds |
 |---|---|

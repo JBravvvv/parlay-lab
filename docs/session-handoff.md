@@ -835,6 +835,100 @@ about two different things.
 inside it buys nothing and says so" (it now re-prices on the device) · and the browser-only spend line.
 `docs/credit-budget.md` carries the whole corrected arithmetic in its own dated review-round section.
 
+**INSTRUCTION 53 — THE HANDOFF FOLDER BECOMES A GENERATED MIRROR (2026-09-12, Josh's word, verbatim:
+"Make sure every single thing for parlay lab to be edited/analyzed/optimized/carried over into another
+chat is added to the folder 'Parlay Lab Handoff' so at any point I need to move this project to a new
+chat, I can do so. Also make sure that every time something is added, it is immediately added to the
+disk/files in that folder so it can be accurately handed off AT ANY POINT IN TIME NO MATTER WHAT
+WITHOUT HAVING TO ASK FIRST BECAUSE ITS AUTOMATIC")**
+
+**WHAT WAS ACTUALLY WRONG, MEASURED BEFORE ANYTHING WAS WRITTEN.** `/Users/josh/Documents/Parlay Lab
+Handoff` held nine files, every one of them stamped **2026-07-24** — forty-nine days stale. Its
+`00-START-HERE.md` described Parlay Lab as an *MLB* betting terminal on a **$2,500** bankroll. By
+2026-09-12 the project is three desks (MLB $150 / CFB $250 / NFL $350 core) on a **$10,000** bankroll,
+and the folder mentioned neither football desk, neither football rules file, no credit rail, no live
+in-play pull, and none of instructions 17 through 52. A new chat handed that folder would have rebuilt
+the app as it stood in July and called it current. **This is the failure the instruction names: not a
+missing file, a mirror that stopped being a mirror.**
+
+**THE SHAPE OF THE FIX — GENERATED, NOT CURATED.** A curated folder decays the moment someone forgets
+to curate it, which is exactly what happened. `tools/sync-handoff.sh` (868 lines) generates the whole
+package from the repo on every run:
+
+| published | source | decays? |
+|---|---|---|
+| `01-STATE.md` | live `git rev-parse` / `status` / `log`, plus `tools/handoff-state.env` | no — read at sync time |
+| `05-INSTRUCTION-LOG.md` | `grep '^\*\*INSTRUCTION '` over this file, with line refs | no — extracted |
+| `MANIFEST.md` | `find` + `du` + `shasum` over what was just written | no |
+| `repo/` | `cp` of `CLAUDE.md`, `ENGINE2.md`, `PARLAY_LAB_QUANT_ENGINE.md`, all 23 `docs/`, every config | no — verbatim |
+| `code/parlay-lab-source-at-HEAD.tar.gz` | `git archive HEAD` (788 entries, 9.5 MB) | no |
+| `code/parlay-lab-full-history.bundle` | `git bundle create --all` (99 MB, rebuilt when >24h old) | no |
+| `00/02/03/04/06-*.md` | heredocs inside the script, in the repo | **yes — this is the one part a session must maintain** |
+
+That last row is the honest limit and it is stated in the published files themselves: the prose blocks
+(orientation, environment, security, open decisions, architecture) are written by hand, so they decay
+like any doc. What changed is WHERE they live — in `tools/sync-handoff.sh` under version control,
+reviewed in a diff, instead of in a folder nobody diffs. The alternative considered and rejected was
+deriving the prose from the docs by extraction; the docs are 28,647 lines of append-only narrative with
+struck-through sections, and an extractor over that would publish retracted claims as current.
+
+**WHY IT IS AUTOMATIC IN THREE PLACES, NOT ONE.**
+1. **Git hooks** — `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`. Doctrine here is
+   commit-and-push every shipped change, so the hook makes every shipped change land in the folder.
+   Each hook backgrounds the call and ends `exit 0`: **a sync must never slow or fail a git operation.**
+2. **A LaunchAgent** — `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist`, `StartInterval 900`,
+   `Nice 10`, `LowPriorityIO`. This is the half the hooks cannot cover: work in progress that has not
+   been committed yet. Josh's words were "AT ANY POINT IN TIME", and a commit-only trigger leaves the
+   whole gap between commits uncovered. Uninstall is one line:
+   `launchctl bootout gui/$(id -u)/com.josh.parlaylab.handoff`.
+3. **On demand** — `tools/sync-handoff.sh --force`, which also rebuilds the bundle.
+
+**WHY A TIMER EVERY 15 MINUTES IS NOT A COST.** The script computes a fingerprint — HEAD, the
+`git status --porcelain` listing, and `stat -f '%m %z %N'` over every `docs/*.md`, every root config,
+and the script itself — and exits before touching anything if it matches `.sync-fingerprint`. The
+no-change path is a single `shasum`. The full path measured **3.6 s**, and that included the 99 MB
+bundle.
+
+**THE SECURITY POSTURE, BECAUSE THIS FOLDER IS A COPY MACHINE.** A script that mirrors a repo into a
+second folder is exactly the thing that leaks a key, so the constraints are structural rather than
+careful:
+- The code snapshots come from `git archive` and `git ls-files`. `.env*.local` is gitignored, so no
+  env file is tracked and none can ride along. **Verified, not assumed:** `tar -tzf` over the published
+  tarball for `(^|/)\.env` and `.vercel/` returned nothing across all 788 entries.
+- Before publishing, the script greps the tracked set for an env-shaped path and **dies** if it finds
+  one, and deletes any env-shaped file it finds already sitting in the handoff folder.
+- A sweep of the published folder for the sync phrase and for key-shaped assignments returned one hit,
+  `docs/session-handoff.md:2019` — `process.env.CRON_SECRET = "s3cret"`, this file's own quotation of a
+  unit-test dummy. No real secret is in the mirror.
+- The script runs **no mutating git command**: `rev-parse`, `status`, `log`, `ls-files`, `archive`,
+  `bundle create` only. It cannot damage the repo it reads, which matters because a LaunchAgent fires
+  while nobody is watching.
+
+**THE SUPERSEDED PACKAGE WAS KEPT, NOT DELETED.** The nine July files, the 7 MB July repo zip included,
+moved to `archive/superseded-2026-09-12/`. The move is keyed on a sentinel — the script only archives a
+`00-START-HERE.md` that lacks its `pl-handoff:generated` marker — so it happens exactly once and a
+re-run never touches the archive again. Deleting Josh's files to make room for mine was not on the
+table; the instruction was to make the folder complete, and a superseded package is part of the record.
+
+**WHAT THE NEW PACKAGE FIXES THAT THE OLD ONE GOT WRONG.** `04-OPEN-DECISIONS.md` is the file that did
+not exist before and is the one Josh will actually use: twelve numbered items, each with the trade
+spelled out — the football credit choice ($30 → $59/month vs `liveRevalidateSec` 600 → 1800 vs
+`liveMaxEvents` 24 → 8-10), the evening board-only re-price (114-150 credits a pass, 230-450 a night,
+and that it shares the day's four server runs with the locked card), the cron-job.org window that stops
+at 19:45 PT PDT / 18:45 PT PST against baseball that ran to 22:01 PT, the seven expired workflow
+waivers with **DO NOT RE-DATE** on them, the unrun 3-event MLB probe that leaves one manual tap able to
+end near 658 against the 600 rail, and the sync phrase only Josh can type. `06-ARCHITECTURE.md` carries
+every tuned constant with its reasoning — including the two that are easiest to get wrong from the
+outside: that the football reserve is **372 CFB / 248 NFL** and lowers nothing (`dailyBudget` stays
+2,500 and every credit is still spendable), and that the MLB live calendar is **six** slots because
+7 × 94 = 658 > 600 while 6 × 94 = 564 fits.
+
+**WHAT IS STILL TRUE AFTER THIS SHIP.** The folder is a mirror of the repo, not a second source of
+truth. Nothing in it is authoritative over `docs/`; `01-STATE.md` is authoritative for git facts only
+because it is read at sync time. And the prose blocks are a session's responsibility — the automation
+guarantees the folder is never stale relative to the REPO, not that the repo's prose is never stale.
+
+
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
 unders — same-day vindication of instruction 6, which deployed ~1h after that card

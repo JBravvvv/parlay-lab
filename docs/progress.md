@@ -1,3 +1,74 @@
+# Progress — 2026-09-12 (INSTRUCTION 53: the handoff folder becomes a generated mirror)
+
+Josh, verbatim: *"Make sure every single thing for parlay lab to be edited/analyzed/optimized/carried
+over into another chat is added to the folder 'Parlay Lab Handoff' so at any point I need to move this
+project to a new chat, I can do so. Also make sure that every time something is added, it is immediately
+added to the disk/files in that folder so it can be accurately handed off AT ANY POINT IN TIME NO MATTER
+WHAT WITHOUT HAVING TO ASK FIRST BECAUSE ITS AUTOMATIC"*
+
+## What was wrong
+
+`/Users/josh/Documents/Parlay Lab Handoff` held nine files, all stamped **2026-07-24** — 49 days stale.
+Its orientation file called Parlay Lab an MLB terminal on a $2,500 bankroll. It is three desks on
+$10,000. No CFB, no NFL, no credit rail, no live in-play pull, nothing from instructions 17-52. A new
+chat handed that folder would have rebuilt July and believed it was current.
+
+## What shipped
+
+`tools/sync-handoff.sh` — 868 lines, generates the entire package from the repo:
+
+| file | what it is |
+|---|---|
+| `00-START-HERE.md` | the orientation brief: three desks, allocations, bankroll, where everything lives, who Josh is, read order |
+| `01-STATE.md` | **live** — branch, HEAD, subject, origin, dirty/clean, tracked + test counts, last 15 commits, and the dated deploy/gate block |
+| `02-ENVIRONMENT.md` | the shell prelude, the gate, the deploy path, and every trap: BSD `find` has no `-newermt`, never grep the 291 KB generated engine blob, `next-env.d.ts` drift, the `route.ts` export rule, no jsdom, subagents never run git |
+| `03-SECURITY.md` | the credential and money rules, verbatim, plus the prompt-injection posture |
+| `04-OPEN-DECISIONS.md` | twelve items, each with its trade priced — **new, never existed before** |
+| `05-INSTRUCTION-LOG.md` | every `**INSTRUCTION N**` header extracted with its line number in the handoff doc |
+| `06-ARCHITECTURE.md` | desks, routes, client traps, and every tuned constant with the arithmetic behind it |
+| `MANIFEST.md` | inventory, sizes, checksums, restore commands, automation status |
+| `repo/` | verbatim `CLAUDE.md`, `ENGINE2.md`, `PARLAY_LAB_QUANT_ENGINE.md`, all 23 `docs/`, every config, the workflows |
+| `code/` | `git archive HEAD` tarball (788 entries, 9.5 MB) + full-history `git bundle` (99 MB) |
+
+## Why it is automatic in three places
+
+1. `.git/hooks/post-commit`, `post-merge`, `post-checkout`, `post-rewrite` — every commit publishes.
+   Each hook backgrounds the call and ends `exit 0`: a sync must never slow or fail a git operation.
+2. `~/Library/LaunchAgents/com.josh.parlaylab.handoff.plist`, every 15 minutes, `Nice 10` and
+   `LowPriorityIO` — covers uncommitted work in progress, which the hooks structurally cannot.
+   Uninstall: `launchctl bootout gui/$(id -u)/com.josh.parlaylab.handoff`.
+3. `tools/sync-handoff.sh --force` on demand, which also rebuilds the bundle.
+
+Change-gated on a fingerprint of HEAD + the dirty-tree listing + every doc and config mtime, so the
+no-change path is one `shasum`. A full run measured **3.6 s**, bundle included.
+
+## The security posture, because this is a copy machine
+
+- Snapshots come from `git archive` / `git ls-files`; `.env*.local` is gitignored, so no env file is
+  tracked and none can ride along. **Verified:** `tar -tzf` for `(^|/)\.env` and `.vercel/` over all
+  788 entries returned nothing.
+- The script dies rather than publish if an env-shaped path is ever tracked, and deletes any
+  env-shaped file it finds already in the folder.
+- A sweep of the published folder for the sync phrase and key-shaped assignments returned one hit:
+  `docs/session-handoff.md:2019`, `process.env.CRON_SECRET = "s3cret"` — the handoff's own quotation of
+  a unit-test dummy. No real secret is in the mirror.
+- **No mutating git command.** `rev-parse`, `status`, `log`, `ls-files`, `archive`, `bundle create`
+  only — it runs unattended on a timer, so it must not be able to damage the repo it reads.
+
+## What was kept
+
+The nine July files and the 7 MB July repo zip moved to `archive/superseded-2026-09-12/`, keyed on a
+sentinel so it happens exactly once. Nothing was deleted.
+
+## The limit, stated
+
+The prose blocks (00, 02, 03, 04, 06) are hand-written and decay like any doc. What changed is where
+they live: in `tools/sync-handoff.sh` under version control, reviewed in a diff, instead of in a folder
+nobody diffs. Deploy and gate facts live in `tools/handoff-state.env`. **Editing a published file
+directly is pointless — the next sync overwrites it.** Deriving the prose from `docs/` by extraction was
+considered and rejected: 28,647 lines of append-only narrative with struck-through sections would
+publish retracted claims as current.
+
 # Progress — 2026-09-12 (INSTRUCTION 52, documentarian pass: the credit arithmetic, the generator's own fix pass, and what is still Josh's to decide)
 
 Markdown only — no code changed. Josh, verbatim: (1) "I've always had in game live lines. It has live
