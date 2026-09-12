@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 /**
  * READING 15, WHOLE (2026-07-31, owner's authorization).
  *
@@ -212,7 +213,7 @@ export function fieldCensus(entries) {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const path = process.argv[2];
   if (!path) { console.error("usage: node tools/ledger-report.mjs <saved-export.json>"); process.exit(64); }
   const blob = JSON.parse(fs.readFileSync(path, "utf8"));

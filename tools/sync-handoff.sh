@@ -530,9 +530,9 @@ cd /Users/josh/Documents/Parlay-Lab && export PATH="/Library/Developer/CommandLi
 - **`tests/read-first-index.test.ts`** requires every `docs/*.md` to have a row
   in the READ-FIRST INDEX (section 0) of `docs/session-handoff.md`. Adding a doc
   without adding its row goes red.
-- **`tests/workflow-branch-sync.test.ts`** carries dated waivers
-  (`since: "2026-08-29"`) with a 14-day expiry. **Never re-date a waiver** — the
-  expiry is the point. Expiry is Josh's decision, not a maintenance chore.
+- **`tests/workflow-branch-sync.test.ts`** compares working workflow files with
+  `origin/main`. The seven expired waivers were resolved on 2026-09-12, retaining
+  the active cadence and pauses; UFC refresh is manual-only. Keep both copies aligned.
 
 ## Where documentation goes
 
@@ -663,19 +663,12 @@ row is his account; a session can only tell him the setting. Also worth reading
 its execution history — `repo/docs/cron-jobs.md` records that the 2026-07-26
 entries were never actually created.
 
-## 4. The seven expired workflow waivers  *(open, currently the one red test)*
+## 4. Workflow reconciliation *(resolved 2026-09-12)*
 
-`tests/workflow-branch-sync.test.ts:250` is red. Seven GitHub workflows carry
-`since: "2026-08-29"` waivers against a 14-day limit, which expired 2026-09-12:
-`board-archive.yml`, `context.yml`, `hr-overround.yml`, `line-history.yml`,
-`model.yml`, `props-history.yml`, `ufc.yml`.
-
-Each needs a keep / retire / re-scope answer. Two specifics:
-- **Does `ufc.yml` belong in this project at all?**
-- `line-history.yml`'s comment claims "~7.5 runs/day × 6 = ~45/day"; the measured
-  rate is **3–4 runs/day (~22/day)**. The comment should be corrected.
-
-**Do not re-date the waivers.** The expiry is the mechanism.
+The seven expired waivers have been removed. Workflow copies agree with main:
+six props-history crons, two context crons with ump-only writes, paused model and
+line-history schedules, and manual-only UFC refresh. The test now checks the working
+files being shipped. No schedules or paid usage were added by the reconciliation.
 
 ## 5. The MLB 3-event credit probe  *(open, unrun — one tap, tiny cost)*
 

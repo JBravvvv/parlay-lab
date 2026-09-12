@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 /**
  * BOARD READINGS (2026-07-31, owner's authorization) — chain steps 6–8 and readings
  * 24, 25, 26, 29, from a saved board JSON. No credits: it reads a file.
@@ -152,7 +153,7 @@ export function reopenReport(data, echo) {
   return { byReason, byMarket, mktN, consMinN, crossed, blockedPresent };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const path = process.argv[2];
   if (!path) { console.error("usage: node tools/board-report.mjs <board.json> [--before N --after N]"); process.exit(64); }
   const blob = JSON.parse(fs.readFileSync(path, "utf8"));

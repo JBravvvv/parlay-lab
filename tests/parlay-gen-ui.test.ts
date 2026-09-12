@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { stripComments } from "./helpers/source";
 import { GEN_PANEL_ID, GenSheet, genFailLine } from "@/components/props/GenSheet";
 import { MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
-import { generate, poolCounts, specSeed, type GenSpec } from "@/lib/parlay-gen";
+import { availableLegBand, generate, poolCounts, specSeed, type GenSpec } from "@/lib/parlay-gen";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import type { PropBoardGame } from "@/engine";
 
@@ -343,5 +343,31 @@ describe("source pins — the honesty guard extended to the newest price surface
     expect(parlays).toMatch(/setSelMode\(getSelectionMode\(\)\)/);
     expect(parlays).toMatch(/orderByMode\(/);
     expect(parlays).toMatch(/MODE_LABEL\[selMode\]/);
+  });
+});
+
+
+describe("generator recovery from an empty odds band", () => {
+  it("keeps Generate enabled and offers real available prices without changing the spec", () => {
+    const spec = { ...SPEC, legMinAm: -5000, legMaxAm: -4000 };
+    const result = generate(POOL, spec, 7);
+    const out = sheet({ spec, result });
+    const button = out.match(/<button[^>]*>Generate parlay<\/button>/)?.[0];
+    expect(button).toBeDefined();
+    expect(button).not.toContain("disabled");
+    const band = availableLegBand(POOL, spec)!;
+    expect(out).toContain(`Use available odds ${amFmt(band.legMinAm)} to ${amFmt(band.legMaxAm)}`);
+    expect(generate(POOL, { ...spec, ...band }, 7).ok).toBe(true);
+    expect(spec.legMinAm).toBe(-5000);
+  });
+  it("available odds respect side, book and probability-source filters", () => {
+    const spec = { ...SPEC, sides: "u" as const, czOnly: true, modelOnly: true };
+    const eligible = POOL.legs.filter((l) => l.side === "u" && l.book === "CZ" && l.src === "model").sort((a, b) => a.dec - b.dec);
+    expect(eligible.length).toBeGreaterThan(0);
+    expect(availableLegBand(POOL, spec)).toEqual({ legMinAm: eligible[0].am, legMaxAm: eligible[eligible.length - 1].am });
+  });
+  it("allows another seed after a bounded payout search misses", () => {
+    const out = sheet({ result: { ok: false, fail: { code: "payout-not-found", reach: { minAm: 400, maxAm: 1200 } } } });
+    expect(out.match(/<button[^>]*>Generate parlay<\/button>/)?.[0]).not.toContain("disabled");
   });
 });

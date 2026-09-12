@@ -1032,6 +1032,43 @@ and every `git add`". They do not — `git add` coverage *was* the removed fifth
 true: commits, merges, checkouts, rewrites, and nothing else, so a staged-but-uncommitted tree is the
 session's job. `tools/handoff-state.env` still said "5 git hooks" in `LAST_SHIPPED`; corrected to four.
 
+**INSTRUCTION 54 — INITIAL OPTIMIZATION REVIEW (2026-09-12).** Josh requested analysis and optimization of Parlay Lab's engine, paper-profit evaluation and investor-quality user experience. No credential values are recorded here.
+
+Reviewed local source and live public calibration/board outputs. Daily grading is ACTIVE: 2026-09-12 15:00:16 Pacific, 16,322 graded board rows, zero reported contradictions. Weekly fit: 2026-09-06 03:45:48 Pacific, 13,816 rows / 43 dates through September 5; the older fit is NOT evidence of outage. Five of eight market-level model Brier point estimates are worse than consensus; no independent-sample significance claimed. Today's public card: one $15 core experiment, czEv -12.5, forced:true, gatedSum:0. Grading football tickets is not learned football weights; current reviewed game weights are configured constants.
+
+Initial UNCOMMITTED, UNDEPLOYED patch: app/page.tsx and src/components/stats/CalibrationPanel.tsx. Clear paper-first homepage / direct parlay-builder CTA / mobile video contrast / unconfirmed sync record instead of implied zero / local board absence wording / estimated-probability language. Calibration UI gets fit time + window, NO FLAG instead of OK, accurate weekly-vs-slope adjustment copy, no claims that slope 1 or one better Brier score proves calibration.
+
+Validation: typecheck passed. Full suite 3,191/3,193, failures nav-flat (new link missing replace; FIXED) and existing expired workflow waivers. Final focused nav/calibration/window run 52/52. No claim of a fresh 3,192-pass full run. Desktop + 375px homepage inspected; no horizontal overflow. Local populated calibration view unavailable; compiled/type-checked, not visually verified with live summary. No production build or deploy. No odds refresh, model change, real wager or account change. Local preview stopped.
+
+Durable review, public evidence, final patch and preview PNGs: `/Users/josh/Documents/Parlay Lab Handoff/review-2026-09-12/`. Main report `Parlay-Lab-Review.md`; detailed limits `validation.md`. Next: separate learning health clocks, football forecast datasets, profit-policy shadow portfolio and controlled MLB challengers; the larger redesign remains proposed.
+
+
+## Generator repair and workflow reconciliation — 2026-09-12
+
+Josh reported that Generate parlay was not working. Reproduced on the production MLB
+Batter Props / HR panel: default -152 to +110 excluded all 66 eligible HR legs and
+Generate was disabled. Shared MLB/football sheet now keeps Generate active after a
+failed search, reports attempts, and offers an explicit available-odds adjustment
+computed from eligible posted quotes. Existing side/book/model filters and kept slots
+remain binding. Short pools can offer fewer legs; bounded payout searches can retry.
+No odds requests or ledger writes are added by these controls.
+
+Under Josh's instruction to do the optimization work, workflow copies are reconciled:
+retain main's six props-history crons and current arguments, two context crons and
+ump-only writes, paused model and line-history jobs. UFC refresh is manual-only.
+Only timing comments and the manual UFC workflow are added to main. No app merge to
+main. Remove expired divergence waivers; compare working workflow files to origin/main
+so the pre-commit test now inspects the files actually being shipped. Timing inventory
+now correctly expects four scheduled workflows. Existing cadence and paid usage unchanged.
+
+The broader prospective paper-research portfolio and football calibration remain
+planned, not implemented; this repair takes priority over that work. Validation and
+production verification are recorded when complete. The first full run passed 3188/3196;
+seven failures exposed file-URL comparisons that skipped report execution in paths with
+spaces (fixed using pathToFileURL), and one historical-data check required network access.
+Final validation: TypeScript clean; 199 files / 3196 tests passed in 285 seconds with
+network access for the historical-data check. Production verification follows deployment.
+
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
 unders — same-day vindication of instruction 6, which deployed ~1h after that card

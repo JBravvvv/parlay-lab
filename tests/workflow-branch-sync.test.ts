@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
 
 /**
  * SCHEDULED BEHAVIOUR FIRES FROM `main`. WE SHIP TO `frontend-rebuild`. ENFORCED, NOT REMEMBERED.
@@ -51,84 +52,8 @@ export type Waiver = { since: string; divergence: string; awaiting: string };
  * INTENTIONAL-FOR-NOW divergence. Not a permission — a countdown. Empty is the healthy state.
  * Populated 2026-07-31 with the seven the audit found; each carries the decision that ends it.
  */
-export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {
-  "props-history.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence:
-      "TWO divergences now. (1) main runs the 2026-07-26 base file with no step arguments; " +
-      "frontend-rebuild carries the 07-27 redesign (--wait, --fold-only, timeout-minutes 330), " +
-      "which has NEVER executed anywhere: 0 of 66 props-history runs were workflow_dispatch. " +
-      "(2) main's schedule was CUT ten -> four on 2026-07-31 (7bfb6b3), keeping 0 17 / 0 20 / " +
-      "0 21 / 30 22 — the two close-producing bands plus one same-day pre and one queued opener " +
-      "— while frontend-rebuild still declares the redesign's own four (0 17 --wait, 0 13, " +
-      "0 23, 0 3 --fold-only). The two branches now disagree on the cron SET as well as on args. " +
-      "(3) ADDED 2026-08-01, owner signed off from the diff: main gains a TARGETED PAIR — " +
-      "`10 18` (-> ~21:1x) and `55 18` (-> ~21:5x), both passing `--window 120` — to populate the " +
-      "60-120-minutes-to-first-pitch bucket, which is STRUCTURALLY EMPTY in the archive because a " +
-      "price path needs TWO captures inside the window and the cadence delivers one " +
-      "(docs/auto-lock-memo.md §M1, §M12). frontend-rebuild carries the `--window` FLAG (default " +
-      "off, so the four existing crons are byte-identical) but NOT the two cron entries, because " +
-      "scheduled behaviour lives on the firing copy. main is now at SIX crons, frontend-rebuild " +
-      "at four.",
-    awaiting:
-      "owner's choice on the redesign — either a manual workflow_dispatch run on an affordable " +
-      "day and then ship it (superseding the cut), or fold the cut's chosen four back onto " +
-      "frontend-rebuild so the two agree. Priced in docs/branch-firing-audit.md PART THREE §8. " +
-      "AND SEPARATELY for divergence (3): the pre-committed landing test — first day the pair " +
-      "runs, `node tools/price-path.mjs <props-dir>` must print n > 0 in the 60-120 bucket. Zero " +
-      "means the SPACING is wrong, not that prices do not move; ONE cron delivering is a PARTIAL " +
-      "landing that produces no pair and therefore no observation, and reads as a failure. " +
-      "NOTE: `since` deliberately NOT bumped to 2026-08-01 — divergences (1) and (2) are still " +
-      "open and their countdown must not be extended by a new one.",
-  },
-  "line-history.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence:
-      "schedule now disabled on BOTH copies (3356c54 cherry-picked it to main); frontend-rebuild " +
-      "additionally carries the TIMING: INSENSITIVE classification block.",
-    awaiting:
-      "the comment reconciliation that also corrects '~7.5 runs/day x 6 = ~45/day' to the " +
-      "measured 3-4 runs/day (~22/day) on both copies in one pass — owner's item 5.",
-  },
-  "context.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence:
-      "main carries the 07-29 pause (git add data/ump_k.json only) and TWO crons; frontend-rebuild " +
-      "carries the unpaused git add (context.json + pen_quality.json) and a THIRD cron, `0 12`, " +
-      "aimed at weekend umpire resolution before first pitch. The weekend cron has never fired.",
-    awaiting:
-      "owner's decision on whether the `0 12` weekend cron ships to the firing copy (it costs 0 " +
-      "Odds credits) and how the pause is represented on the ship branch so the two can agree.",
-  },
-  "model.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence:
-      "the M18 data-vintage pause (schedule commented out) exists ONLY on main. frontend-rebuild's " +
-      "copy still reads `30 9 * * *` — inert, but it is what a reader sees, and it is what misled " +
-      "this doc's own §5/§6 on 2026-07-31.",
-    awaiting: "owner's word to mirror the pause onto frontend-rebuild so the file cannot mislead again.",
-  },
-  "board-archive.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence: "TIMING: SENSITIVE classification comment on frontend-rebuild only. No behavioural difference.",
-    awaiting: "the comment reconciliation sweep (same pass as line-history.yml).",
-  },
-  "hr-overround.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence: "TIMING: INSENSITIVE classification comment on frontend-rebuild only. No behavioural difference.",
-    awaiting: "the comment reconciliation sweep (same pass as line-history.yml).",
-  },
-  "ufc.yml": {
-    since: "2026-08-29", /* RENEWED at the 14-day expiry (was 2026-08-15; the guard fired 2026-08-29 on all seven at once). Nothing resolved and nothing new drifted — every waiver still awaits the OWNER decision its reason names, and that decision list now rides the handoff FIRST-ACTION block so it reaches Josh instead of expiring silently again. */
-    divergence:
-      "the whole workflow is absent from main, so its two declared crons (`0 15 * * 3`, `0 15 * * 6`) " +
-      "HAVE NEVER FIRED. It reaches no Odds API itself; the spend on that feature is client-side " +
-      "(src/lib/ufc.ts L84-86, with a fresh=1 path that bypasses the cache).",
-    awaiting:
-      "owner's decision on whether it should be scheduled at all, or deleted so the inventory stops " +
-      "listing a job that cannot run.",
-  },
-};
+// Reconciled with the firing branch on 2026-09-12: active cadence and pauses retained.
+export const ALLOWED_DIVERGENCE: Record<string, Waiver> = {};
 
 export type Divergence = {
   file: string;
@@ -238,7 +163,9 @@ describe("every workflow we ship is the workflow that fires", () => {
           `and must not pass by default. (${e})`,
       );
     }
-    const drift = diffWorkflows(workflowsOnRef("HEAD"), firing);
+    const dir = path.join(REPO, ".github/workflows");
+    const working = Object.fromEntries(readdirSync(dir).filter((n) => n.endsWith(".yml")).map((n) => [n, readFileSync(path.join(dir, n), "utf8")]));
+    const drift = diffWorkflows(working, firing);
     expect(
       drift,
       `\n\nWORKFLOW DRIFT AGAINST THE COPIES THAT FIRE (${FIRING_REF}).\n` +

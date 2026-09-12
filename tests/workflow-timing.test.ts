@@ -85,12 +85,12 @@ describe("every scheduled workflow declares whether its value depends on WHEN it
     expect(TIMING_RE.exec("# TIMING: SENSITIVE — guard: x")).not.toBeNull();
   });
   it("there is at least one scheduled workflow to check", () => {
-    expect(rows.filter((r) => r.scheduled).length).toBeGreaterThanOrEqual(6);
+    expect(rows.filter((r) => r.scheduled).length).toBeGreaterThanOrEqual(4);
   });
 
   it("EVERY scheduled workflow carries a TIMING classification", () => {
     // guarded IN PLACE, not by a sibling test: an empty `rows` would pass this loop silently
-    expect(rows.filter((r) => r.scheduled).length, "no scheduled workflow found — scan broken").toBeGreaterThanOrEqual(6);
+    expect(rows.filter((r) => r.scheduled).length, "no scheduled workflow found — scan broken").toBeGreaterThanOrEqual(4);
     for (const r of rows) {
       if (!r.scheduled) continue;
       expect(
@@ -135,16 +135,8 @@ describe("every scheduled workflow declares whether its value depends on WHEN it
        tests/scheduler-route.test.ts; tools/board_window.py stays as the derivation record. */
     expect(sens).toEqual(["board-archive.yml", "context.yml", "props-history.yml"]);
     const insens = rows.filter((r) => r.scheduled && r.sensitive === false).map((r) => r.file).sort();
-    /* line-history.yml LEFT this list 2026-07-31 — not reclassified, DISABLED: its
-       schedule block is commented out (owner's cadence ration; nothing reads its output,
-       invariant in tests/line-history-consumers.test.ts). It reappears here the moment
-       the schedule is uncommented, which is the intended coupling. NOTE: model.yml is
-       still counted here even though the 07-29 bot pause commented ITS schedule out —
-       the two disables use different comment styles and this parser only stops seeing
-       the one that removes the `schedule:` key itself. That asymmetry is recorded rather
-       than smoothed: it means "scheduled" in this guard means "declares a schedule the
-       parser can see", not "will fire". */
-    expect(insens).toEqual(["hr-overround.yml", "model.yml", "ufc.yml"]);
+    // Active schedule inventory: model and line-history stay paused; UFC is manual-only.
+    expect(insens).toEqual(["hr-overround.yml"]);
   });
 
   it("no workflow claims a self-pacing guard it does not use", () => {

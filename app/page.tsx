@@ -12,6 +12,7 @@ import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { CountUp } from "@/components/motion/CountUp";
+import { useSyncState } from "@/lib/ledgerSync";
 import { useLedger, roiPct } from "@/lib/useLedger";
 import { ledgerSegments } from "@/lib/ledger-segments";
 import type { SyncEntry } from "@/lib/ledger-merge";
@@ -175,6 +176,7 @@ function Chevron() {
 function Hero() {
   return (
     <div className="relative">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-black/60" />
       <div className="relative z-10 flex min-h-dvh flex-col">
         {/* navbar — the app draws under the iOS status bar (viewport-fit=cover),
             so reserve the safe-area inset or the wordmark sits behind the clock */}
@@ -215,21 +217,26 @@ function Hero() {
         <section className="relative flex flex-1 items-center justify-center overflow-visible px-4">
           <div className="pointer-events-none absolute left-1/2 top-1/2 h-[527px] w-[984px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-bg/45 blur-[82px]" />
           <div className="relative text-center">
+            <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.24em] text-pos">Real games. Paper stakes.</div>
             <h1
-              className="text-[clamp(64px,15vw,220px)] font-normal leading-[1.02] tracking-[-0.024em] text-text"
+              className="text-[clamp(64px,13vw,180px)] font-normal leading-[1.02] tracking-[-0.024em] text-text"
               style={{ fontFamily: "var(--font-display)" }}
             >
               Parlay <span className="text-gradient">Lab</span>
             </h1>
             <p className="mx-auto mt-[9px] max-w-md text-lg leading-8 text-hero-sub opacity-80">
-              A 10,000-simulation quant engine for MLB, College Football &amp; the NFL — sharp-anchored fair prices,
-              ¼-Kelly sizing, every bet graded against the close.
+              Build a ticket. Test your edge. Follow every result.
+              Your paper-money playground for MLB, College Football &amp; the NFL.
             </p>
-            <Link replace href="/board" className="mt-[25px] inline-block">
-              <Pill variant="hero" className="!px-[29px] !py-6 text-[14px]">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link replace href="/props" className="rounded-full bg-pos px-7 py-4 text-sm font-bold text-[#08090b] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pos">
+                Build a parlay →
+              </Link>
+              <Link replace href="/board" className="rounded-full border border-white/20 px-7 py-4 text-sm font-semibold text-text transition hover:bg-white/10">
                 Open Today&apos;s Board
-              </Pill>
-            </Link>
+              </Link>
+            </div>
+            <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-muted">Explore the possibilities. Keep the receipts. Profitability is still being tested.</p>
             <DeskChooser />
           </div>
         </section>
@@ -263,6 +270,7 @@ function Hero() {
 
 export default function DashboardPage() {
   const { api } = useLedger();
+  const sync = useSyncState();
   // localStorage-backed data only exists on the client; render the SSR
   // fallback until mounted so hydration sees identical markup.
   const [mounted, setMounted] = useState(false);
@@ -278,6 +286,7 @@ export default function DashboardPage() {
   // Phase 6: the managed bankroll ALREADY includes realized graded P/L (from its
   // init date forward) — equity IS the bankroll; adding stats.pl would double-count
   const equity = money.bankroll;
+  const hasRecord = mounted && (sync.kind === "synced" || (api?.entries.length ?? 0) > 0);
   const exposure = mounted ? getTodayExposure() : 0;
   const spark = (stats?.days ?? []).map((d) => ({ pl: d.cumPl }));
 
@@ -298,40 +307,47 @@ export default function DashboardPage() {
 
       <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 pt-10 md:px-8 md:pb-12">
       <PageHeader
-        title="Parlay Lab"
+        title="Your paper season"
         eyebrow="MLB desk · season to date"
         chip={
           <span className="rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pos">
             ⚾ MLB
           </span>
         }
-        sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No board yet today"}
+        sub={board ? `Board generated today at ${new Date(board.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "No current MLB board loaded on this device"}
         action={
           <Link replace href="/board">
-            <Pill variant="primary">{board ? "Open board" : "Generate today's board"}</Pill>
+            <Pill variant="primary">Open board</Pill>
           </Link>
         }
       />
 
+      {!hasRecord && (
+        <Panel className="mb-4 border-gold/30">
+          <div className="text-sm font-semibold text-text">{sync.kind === "syncing" ? "Loading your paper record…" : "Connect your paper record"}</div>
+          <p className="mt-1 text-sm leading-6 text-muted">Your saved bankroll and results have not been confirmed on this device. A missing record is not a $0 balance.</p>
+          <Link replace href="/settings" className="mt-2 inline-block text-sm font-semibold text-pos">Open sync settings →</Link>
+        </Panel>
+      )}
       <div className="grid gap-4 md:grid-cols-5">
         <Reveal className="md:col-span-3">
           <Panel className={`${(stats?.pl ?? 0) >= 0 ? "glow-pos" : ""} h-full`}>
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Equity</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Paper equity</div>
             <Glow tone="pos" className="inline-block">
               <div className="display num mt-2 text-[clamp(2.6rem,6vw,4.4rem)] leading-none text-text">
-                <CountUp value={equity} format={(n) => `$${Math.round(n).toLocaleString()}`} />
+                {hasRecord ? <CountUp value={equity} format={(n) => `$${Math.round(n).toLocaleString()}`} /> : "—"}
               </div>
             </Glow>
             <div className="num mt-2 text-[13px]">
               <span className={(stats?.pl ?? 0) >= 0 ? "text-pos" : "text-neg"}>
-                {stats ? fmtMoneyExact(stats.pl) : "$0.00"}
+                {hasRecord && stats ? fmtMoneyExact(stats.pl) : "—"}
               </span>{" "}
               <span className="text-muted">core season P/L · fun money tracked separately below</span>
             </div>
             <div className="num mt-1 text-[12px] text-muted">
               today&apos;s exposure{" "}
               <span className={exposure / Math.max(1, money.bankroll) > 0.1 ? "text-gold" : "text-text"}>
-                ${exposure} · {((exposure / Math.max(1, money.bankroll)) * 100).toFixed(1)}%
+                {hasRecord ? `$${exposure} · ${((exposure / Math.max(1, money.bankroll)) * 100).toFixed(1)}%` : "—"}
               </span>{" "}
               of bankroll (cap 10%)
             </div>
@@ -371,7 +387,7 @@ export default function DashboardPage() {
           <Reveal delay={0.16}>
             <Panel className="glow-gold h-full">
               <div className="flex items-center justify-between">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">Featured edge</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">Featured estimate</div>
                 <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold">
                   @ Caesars
                 </span>
@@ -383,11 +399,11 @@ export default function DashboardPage() {
                   <div className="mt-2 flex items-center gap-2">
                     <OddsCell odds={featured.czOdds as never} book="caesars" />
                     <EvBadge ev={Number(featured.czEv)} />
-                    <span className="num text-[11px] text-muted">{Number(featured.prob).toFixed(1)}% true</span>
+                    <span className="num text-[11px] text-muted">{Number(featured.prob).toFixed(1)}% estimated</span>
                   </div>
                 </div>
               ) : (
-                <div className="mt-2 text-[12px] text-muted">Generate today&apos;s board to surface the best playable edge.</div>
+                <div className="mt-2 text-[12px] text-muted">Open the board to load current estimates. Each ticket still needs to pass the card checks.</div>
               )}
             </Panel>
           </Reveal>
@@ -403,7 +419,7 @@ export default function DashboardPage() {
       )}
 
       <Reveal>
-        <Panel title="Today's top playable edges" className="mt-4">
+        <Panel title="Today's top estimated edges" className="mt-4">
           {topEdges.length ? (
             <div className="space-y-2">
               {topEdges.map((r) => (
@@ -427,11 +443,11 @@ export default function DashboardPage() {
             </div>
           ) : (
             <EmptyState
-              title="No board yet today"
-              body="Generate the board to see ranked edges here — everything is engine output, nothing is ever fabricated."
+              title="No current board loaded"
+              body="Open the board to load today’s estimates. Positive estimated EV is a model opinion, not a guarantee or approval to bet."
               action={
                 <Link replace href="/board">
-                  <Pill variant="primary">Generate board</Pill>
+                  <Pill variant="primary">Open board</Pill>
                 </Link>
               }
             />

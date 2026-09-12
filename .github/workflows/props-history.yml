@@ -17,27 +17,45 @@ name: engine-v2-props-history
 #
 # The reliable long-term trigger is cron-job.org (already running the CLV job 96x/day),
 # which does not queue. These crons are the delay-tolerant fallback.
-# TIMING: SENSITIVE — guard: _snapshot_kind (tools/snapshot_props.py) — the script decides `close`
-#   vs `pre` from the next unstarted first pitch, never from the clock. Ten crons so some firing
-#   lands inside the 95-minute window whatever the queue delay does.
+# TIMING: SENSITIVE — guard: _snapshot_kind (tools/snapshot_props.py) classifies actual
+#   capture time relative to first pitch. Six scheduled attempts retain the active cadence.
 on:
   schedule:
-    # 2026-07-27 — TEN CRONS REPLACED BY ONE THAT WAITS.
-    # Measured on this account, every scheduled workflow lands in one of two batches: ~20:00-21:00Z
-    # or ~06:00-08:30Z the NEXT morning. Of the ten configured firings only the early one ever
-    # arrived usefully; the rest queued into the next morning, after the games. Ten fires inside a
-    # 95-minute window was not redundancy, it was a lottery drawing on the same throttled queue
-    # that drops 19 of 24 line-history ticks.
-    # `--wait` makes the SCRIPT hold the runner until the window opens (tools/snapshot_props.py,
-    # _wait_for_window), so one tick is deterministic where ten were not.
-    - cron: "0 17 * * *"   # lands ~20:1x-20:5x, then waits ~70 min -> close at ~21:4x for a 23:15 FP
-    # two cheap unwaiting fallbacks: if the 17:00 tick is dropped outright (property 2), these
-    # still record a `pre` so the day is not blank. They do not wait and cannot take a close.
-    - cron: "0 13 * * *"
-    - cron: "0 23 * * *"
-    # ...and one fold-only tick so a Vercel-captured weekend close reaches git the same day
-    # even when every sweep tick is dropped. Costs no Odds credits: it only reads /api/propsnap.
-    - cron: "0 3 * * *"
+    # 2026-07-31 — CUT FROM TEN TO FOUR (owner's item 1), chosen from the ARCHIVE, not the
+    # schedule's shape. Measured over 17 archived days, deliveries land in four bands and the
+    # declared hour does not control when a run arrives — only how many arrive:
+    #   20-21Z  17 paid, 7.9 ev/snap, median lead 112 min ->  0 closes (17 min outside the window)
+    #   23Z      4 paid, 6.2 ev/snap, median lead  18 min ->  4 closes
+    #   00Z      3 paid, 4.0 ev/snap, median lead  85 min ->  3 closes
+    #   06-11Z  33 paid, 13.5 ev/snap, median lead 508 min -> 0 closes, and 72% OF ALL SPEND
+    # ALL SEVEN archived closes came from the 23Z and 00Z bands. The seven queued crons produced
+    # none of them and three quarters of the cost. MIN_GAP is untouched; snapshot_props.py is
+    # untouched. Reversible: uncomment. Ceiling falls ~339 -> ~185 credits/day (measured
+    # ev/snapshot x the measured 5.84 credits/event). docs/branch-firing-audit.md PART THREE.
+    - cron: "0 17 * * *"   # -> 20:0x-20:5x, 19/20 days. The same-day `pre`, median lead 112 min.
+    # TARGETED PAIR — ADDED 2026-08-01, owner signed off from docs/props-window-cron.diff.
+    # THE GAP IT EXISTS FOR: the 60-120-minutes-to-first-pitch bucket is STRUCTURALLY EMPTY in the
+    # archive (17,546 observations, ZERO in 60-90/30-60/10-30/<10) because a price path needs TWO
+    # captures inside the window and every existing cron delivers at most one. That bucket is the
+    # only place a lock-time criterion could ever be FITTED rather than chosen.
+    # SPACING: ~45 min apart, >= MIN_GAP_S (40), so neither suppresses the other. Neighbour gaps
+    # 20:0x -> 21:1x ~70 min and 21:5x -> 23:3x ~100 min. NOTHING COLLIDES; no existing cron moves.
+    # COST: --window 120 restricts each capture to ~3-8 events (~18-48 credits) instead of the
+    # full slate's 13-15, so the pair is ~36-96/day against a pool of 19,958.
+    - cron: "10 18 * * *"  # -> ~21:1x, ~115 min before a 23:05Z first pitch   [--window 120]
+    - cron: "55 18 * * *"  # -> ~21:5x, ~70 min before it                      [--window 120]
+    - cron: "0 20 * * *"   # -> ~23:3x. LOAD-BEARING: 4 of the 7 archived closes.
+    - cron: "0 21 * * *"   # -> ~00:1x. LOAD-BEARING: the other 3.
+    - cron: "30 22 * * *"  # -> queues to the next morning batch = the 8.5h-out opener, the wide
+                           #    end of the model-vs-close span. One queued tick delivered on
+                           #    15 of 15 days in the two-cron era, so one is enough.
+    # COMMENTED OUT 2026-07-31 — six queued crons that only ever added morning duplicates:
+    # - cron: "0 22 * * *"
+    # - cron: "0 23 * * *"
+    # - cron: "30 23 * * *"
+    # - cron: "0 0 * * *"
+    # - cron: "30 0 * * *"
+    # - cron: "0 1 * * *"
   workflow_dispatch:
 
 # MIN_GAP reads the last paid timestamp from the COMMITTED day-file, so overlapping
@@ -55,9 +73,6 @@ permissions:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    # explicit, and UNDER GitHub's 360-minute hosted-runner ceiling so a timeout is ours rather
-    # than a mid-sweep kill. MAX_WAIT_S (300 min) + the sweep (~5 min for a 15-game slate) fits.
-    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,8 +82,11 @@ jobs:
           git fetch --depth 1 origin frontend-rebuild
           git checkout origin/frontend-rebuild -- tools/snapshot_props.py
       - name: Snapshot props
-        # --wait only on the tick that can reach a window; the fallbacks record a `pre` and exit
-        run: python3 tools/snapshot_props.py ${{ github.event.schedule == '0 17 * * *' && '--wait' || github.event.schedule == '0 3 * * *' && '--fold-only' || '' }}
+        # Only the targeted pair passes --window; every other firing keeps the full-slate default,
+        # so the four pre-existing crons are byte-identical in behaviour.
+        env:
+          PL_WINDOW: ${{ (github.event.schedule == '10 18 * * *' || github.event.schedule == '55 18 * * *') && '--window 120' || '' }}
+        run: python3 tools/snapshot_props.py $PL_WINDOW
       - name: Commit
         run: |
           git config user.name "engine-v2-bot"

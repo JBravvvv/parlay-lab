@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { pathToFileURL } from "node:url";
 /**
  * BURN ATTRIBUTION (2026-07-31, owner's authorization) — the arithmetic that has been
  * reconstructed by hand every turn, versioned so the residual is a NAMED UNKNOWN rather
@@ -70,7 +71,7 @@ export function attribute({ spent, props, ticks }) {
   return { spent, props, ticks, known, residual: spent - known, residualPct: spent ? +(100 * (spent - known) / spent).toFixed(1) : 0 };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const argOf = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
   const predPath = argOf("--pred");

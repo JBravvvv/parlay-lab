@@ -32,7 +32,7 @@ function TierChip({ tier, significant, direction }: { tier: string; significant:
   if (!significant || tier === "MONITOR") {
     return (
       <span className="rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[9.5px] font-bold text-muted">
-        {tier === "MONITOR" ? "MONITOR" : "OK"}
+        {tier === "MONITOR" ? "MONITOR" : "NO FLAG"}
       </span>
     );
   }
@@ -97,8 +97,8 @@ export function CalibrationPanel() {
     return (
       <Panel>
         <EmptyState
-          title="No graded predictions yet"
-          body="Every board the engine generates is now logged in full — played or not, every line including suspended ones — and graded nightly against official box scores. These are board rows, not the legs you bet. The first reliability table appears after the first graded slate; adjustment decisions need 150+ graded rows per market, so early numbers are strictly informational."
+          title="No calibration report loaded"
+          body="A calibration summary is not available on this device yet. This does not mean the engine has no history. Logged board predictions are graded against official box scores; model fitting runs separately. The report will appear when its data is available."
         />
       </Panel>
     );
@@ -106,6 +106,11 @@ export function CalibrationPanel() {
 
   return (
     <div className="space-y-4">
+      <Panel title="MLB learning record">
+        <p className="text-sm leading-6 text-text">Last model fit: {new Date(s.at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", dateStyle: "medium", timeStyle: "short" })} Pacific.</p>
+        <p className="mt-1 text-xs leading-5 text-muted">{s.window ? `Training dates: ${s.window.from ?? "—"} through ${s.window.to ?? "—"} · ${s.window.days} logged dates. ` : "Training window unavailable. "}Grading runs separately from the scheduled weekly model fit. These statistics describe MLB board predictions; they do not establish profit or validate the football engines.</p>
+        <p className="mt-2 text-xs leading-5 text-muted">No flag means this test did not detect a gap. It does not prove calibration. Multiple lines for one player or game can share an outcome.</p>
+      </Panel>
       {s.globalShrink && (
         <Reveal>
           <div className="num rounded-(--radius-panel) border border-white/[0.06] bg-surface/60 px-4 py-3 text-[12px]">
@@ -114,7 +119,7 @@ export function CalibrationPanel() {
             </span>
             <div className="mt-1 text-text">
               {s.globalShrink.s >= 1 ? (
-                <>no global shrink applied — pooled reliability slope {s.globalShrink.slopeBefore != null ? s.globalShrink.slopeBefore.toFixed(2) : "—"} over {s.globalShrink.n} consensus-logged legs</>
+                <>no global shrink applied — pooled reliability slope {s.globalShrink.slopeBefore != null ? s.globalShrink.slopeBefore.toFixed(2) : "—"} over {s.globalShrink.n} consensus-logged rows</>
               ) : (
                 <>
                   every prop&apos;s model probability is blended {Math.round((1 - s.globalShrink.s) * 100)}% further
@@ -125,7 +130,7 @@ export function CalibrationPanel() {
               )}
             </div>
             <div className="mt-1 font-sans text-[10.5px] leading-relaxed text-faint">
-              Slope 1.00 = perfectly calibrated; below 1 = overconfident. The shrink is refit nightly from the graded
+              Slope near 1 is one diagnostic, not proof of calibration. The shrink is recomputed during the full model fit from the graded
               record and only ever pulls TOWARD the market — it lifts automatically as slopes return to 1.
             </div>
           </div>
@@ -147,13 +152,13 @@ export function CalibrationPanel() {
                   <th className="pb-2 text-right">Predicted</th>
                   <th className="pb-2 text-right">Actual</th>
                   <th className="pb-2 text-right">Brier</th>
-                  <th className="pb-2 text-right" title="Consensus-only baseline Brier over the same records — the model has earned a raise the day it beats this">
+                  <th className="pb-2 text-right" title="Consensus-only baseline Brier over the same records — Lower is better; a point-estimate improvement still needs validation on later data">
                     vs market
                   </th>
-                  <th className="pb-2 text-right" title="Reliability slope: OLS of outcome on stated probability. 1.00 = calibrated, below 1 = overconfident">
+                  <th className="pb-2 text-right" title="Reliability slope: OLS of outcome on stated probability. A slope near 1 alone does not establish calibration; inspect the probability buckets too">
                     Slope
                   </th>
-                  <th className="pb-2 text-right" title="The model-weight multiplier currently applied to this market (weekly 3D state machine and nightly slope fit — whichever is stricter)">
+                  <th className="pb-2 text-right" title="The model-weight multiplier currently applied to this market (weekly adjustment and the most recent full slope fit — whichever is stricter)">
                     Shrink
                   </th>
                   <th className="pb-2 text-right">Status</th>
@@ -235,11 +240,12 @@ export function CalibrationPanel() {
           </div>
           <div className="mt-3 text-[10.5px] leading-relaxed text-faint">
             Statistical significance = the predicted rate falls outside the 95% confidence interval of the actual
-            rate. Under 50 graded picks a bucket is pure variance and shows MONITOR no matter the gap; automatic
-            adjustment needs 150+ AND significance, is capped at ±10% per week, and can only pull the model TOWARD
-            the market consensus — never away from it. <b className="text-muted">vs market</b> is the consensus-only
-            Brier over the same records (lower is better): the day the model&apos;s Brier beats it in a market (▲) is
-            the day that market&apos;s blend weight has earned a raise — until then, shrink-only stands.
+            rate. Under 50 graded rows a bucket stays below the flagging threshold and shows MONITOR; automatic
+            weekly adjustment needs 150+ rows; flagged overconfidence reduces the current multiplier by 10%,
+            while unflagged markets can recover toward their default weight. The separate slope fit may apply
+            a stronger reduction. None of these mechanisms raises model weight above its shipped default. <b className="text-muted">vs market</b> is the consensus-only
+            Brier over the same records (lower is better). An improvement (▲) is a descriptive point estimate;
+            increasing trust requires validation on later data, with uncertainty measured across games and days.
           </div>
         </Panel>
       </Reveal>

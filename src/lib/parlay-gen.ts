@@ -407,6 +407,12 @@ type Ctx<P> = {
  * to mint its ids that way — a football row key ("g1|pass_yds|ty-simpson|over|245.5") would have
  * been silently read as an under, quietly breaking the one control Josh sets most.
  */
+export function availableLegBand<P>(pool: GenPool<P>, spec: GenSpec): Pick<GenSpec, "legMinAm" | "legMaxAm"> | null {
+  const legs = eligible(pool, spec).sort((a, b) => a.dec - b.dec);
+  if (!legs.length) return null;
+  return { legMinAm: legs[0].am, legMaxAm: legs[legs.length - 1].am };
+}
+
 function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
   const want = new Set<GenSide>(sidesOf(spec.sides));
   return pool.legs.filter((l) => {

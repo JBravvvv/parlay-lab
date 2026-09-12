@@ -11,6 +11,7 @@ import {
   LEG_MIN,
   REPAIR_TRIES,
   bandDec,
+  availableLegBand,
   poolCounts,
   type GenFail,
   type GenLeg,
@@ -151,7 +152,7 @@ export function genFailLine(
     case "payout-unreachable":
       return `A ${ctx.legs}-leg ${ctx.marketLabel} parlay from this pool pays about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)} — your target payout sits outside that, so nothing here can reach it.`;
     case "payout-not-found":
-      return `Could not land inside your target payout in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}, so the target is only just out of reach.`;
+      return `Could not land inside your target payout in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}, try Generate again or widen the target.`;
     case "pin-missing":
       return `${fail.ids.length} kept slot${fail.ids.length === 1 ? " is" : "s are"} no longer posted on this board — unpin the gold slot${fail.ids.length === 1 ? "" : "s"} and spin again.`;
     case "pin-conflict":
@@ -388,6 +389,7 @@ export function GenSheet<P>({
   marketNote?: ReactNode;
 }) {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
+  const [attempt, setAttempt] = useState(0);
   /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). These counts were hand-rolled
      over the RAW pool — both sides of every line, ignoring `sides`, `czOnly` and `modelOnly` —
      so with the default overs-only spec they printed roughly double, and the panel could read
@@ -405,10 +407,9 @@ export function GenSheet<P>({
   /* a yes-only market (anytime TD) has no under to pick, so the side control is not offered on it */
   const oneSided = !!mkt?.oneSided;
   const fail = result.ok ? null : result.fail;
-  /* every failure code is DETERMINISTIC in the pool and the spec, so "Generate" would be a
-     guaranteed no-op in that state — the same "the button does nothing" complaint as item 1.
-     When the generator names a relaxation the button becomes that one control; otherwise it is
-     disabled and says why. */
+  // A bounded payout search can succeed on another seed. Keep Generate usable and
+  // offer explicit filter repairs separately, without silently changing the request.
+  const availableBand = availableLegBand(pool, spec);
   /* A market that posts one side only (anytime TD) gets the same one-tap escape: the side it
      really does post. Without it the Unders button was a trap — the Generate button went dead,
      the banner called the board empty, and nothing on screen pointed at the control Josh had
@@ -418,7 +419,13 @@ export function GenSheet<P>({
       ? { label: RELAX_BUTTON[fail.relax], patch: RELAX_PATCH[fail.relax] }
       : fail?.code === "one-sided"
         ? { label: fail.has === "u" ? "Switch to unders" : "Switch to overs", patch: { sides: fail.has } }
-        : null;
+        : availableBand && (fail?.code === "band-empty" || (fail?.code === "short-pool" && counts.inBand < counts.eligible))
+          ? { label: `Use available odds ${amFmt(availableBand.legMinAm)} to ${amFmt(availableBand.legMaxAm)}`, patch: availableBand }
+          : fail?.code === "short-pool" && fail.have >= LEG_MIN && !spec.pinned.some(Boolean)
+            ? { label: `Build ${fail.have} legs instead`, patch: { legs: fail.have } }
+            : fail?.code === "payout-unreachable"
+              ? { label: "Remove combined payout target", patch: { payout: null } }
+              : null;
   /* the kept slots, resolved against the pool — rendered in EVERY state, success or failure,
      so the 44px unpin button the failure copy tells Josh to press is always on screen */
   const pinRows = spec.pinned
@@ -617,31 +624,14 @@ export function GenSheet<P>({
 
           {/* generate */}
           <div className="flex gap-2">
-            {ticket ? (
+            {(
               <button
                 type="button"
-                onClick={onGenerate}
+                onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
+                disabled={loading}
                 className="press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg"
               >
-                Regenerate
-              </button>
-            ) : relax ? (
-              <button
-                type="button"
-                onClick={() => onSpec(relax.patch)}
-                title="Spinning again cannot help — the pool and these filters decide this answer. This is the one control that would open it up."
-                className="press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-gold bg-gold/15 px-2 text-center text-[12.5px] font-bold leading-tight text-gold"
-              >
-                {relax.label}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled
-                title="Spinning again would return the same answer — this pool and these filters decide it. Change a control above instead."
-                className="flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-white/[0.06] bg-surface-2/50 text-[13px] font-bold text-faint"
-              >
-                Generate parlay
+                {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
               </button>
             )}
             <button
@@ -655,6 +645,16 @@ export function GenSheet<P>({
               Add to slip
             </button>
           </div>
+          {!loading && relax && (
+            <button type="button" onClick={() => onSpec(relax.patch)} className="press min-h-11 w-full rounded-[12px] border border-gold/40 bg-gold/10 px-3 py-2 text-[12px] font-semibold text-gold">
+              {relax.label}
+            </button>
+          )}
+          {!ticket && !loading && attempt > 0 && (
+            <div role="status" aria-live="polite" className="text-[11px] text-gold">
+              Attempt {attempt}: no matching parlay. {relax ? "Try the suggested adjustment above." : "Review the explanation below and change your filters."}
+            </div>
+          )}
           {canUndo && (
             <button type="button" onClick={onUndo} className="press min-h-11 w-full text-[11px] font-semibold text-gold">
               Added to the slip — undo

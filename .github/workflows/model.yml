@@ -4,8 +4,10 @@ name: engine-v2-priors
 # TIMING: INSENSITIVE — a daily priors rebuild whose only requirement is `after Savant's overnight
 #   refresh`. Observed starts 12:09-17:24Z clear that by hours and all land before the 22:00 board.
 on:
-  schedule:
-    - cron: "30 9 * * *" # 09:30 UTC = 2:30am PT, after Savant's overnight refresh
+  # schedule:                                # PAUSED 2026-07-29 (owner sign-off - the
+  #   - cron: "30 9 * * *"                   # data-vintage pause, M18/homogeneous window;
+  #                                          # docs/collection-period.md THE BOT PAUSE block.
+  #                                          # Reversible: uncomment this block, one commit.)
   workflow_dispatch:
 
 permissions:
