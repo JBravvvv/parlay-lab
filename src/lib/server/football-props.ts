@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
 import { ctxLookup, loadPropsContext } from "@/lib/cfb/props-context";
 import { czMissingGameIds, parseEventProps, propsCoverage, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
-import { affordableEvents, boardFresh, czMissingDue, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
+import { affordableEvents, boardFresh, czMissingDue, liveReserveCredits, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
 import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import { espnEventsOf, quotaOf, slateFromEspnOf, type CfbQuota } from "@/lib/cfb/slate-server";
 import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
@@ -91,6 +91,13 @@ import type { LeagueConfig } from "@/lib/football/league";
  *      (`budgeted: true`, `note`). The games it skips keep their LAST PRICED rows from the stored
  *      board, flagged `stale: true` (never fabricated, honestly dated by `generatedAt`); with
  *      nothing stored they are simply absent.
+ *      THE LIVE-ONLY RESERVE (2026-09-12): that budget is now handed out in TWO allowances, not one
+ *      — the in-play games against the whole rail, everything else against
+ *      `dailyBudget - liveReserveCredits`. Ranking live games first (WHY_RANK below) never helped,
+ *      because one allowance returns ZERO for every game alike once the day is spent, and the board
+ *      then served carried pre-kick rows re-stamped "live": a frozen in-game line. No budget is
+ *      lowered by this; see `liveReserveCredits` in src/lib/cfb/props-store.ts and the split at
+ *      Rail 2 below, which is byte-identical to the old single allowance when the reserve is 0.
  *   3. The Next data cache on each event call, as before (the pull's window).
  *
  * After a pull the merged board is written back (EX boardRetainSec) and the spend counter grows
@@ -288,10 +295,57 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
 
   // Rail 2: the daily budget. Without a store there is no tally, so the cap cannot apply.
   const spentBefore = store ? await quiet(store.readSpend(ptDate), 0) : 0;
-  const allowed = store ? affordableEvents(need.length, spentBefore, cfg.props.dailyBudget, cfg.props.measuredCreditsPerEvent) : need.length;
+  /* THE LIVE-ONLY RESERVE (2026-09-12) — WHY ONE ALLOWANCE WAS NOT ENOUGH.
+     `need` is already ordered live → unpriced → czMissing → expired (WHY_RANK above), and that
+     ordering was the whole of the live pass's protection. It protects nothing: a single
+     `affordableEvents` over the whole day's tally returns ZERO once the spend leaves less than one
+     event of room, and zero takes the live games down with everything else. A 60-game CFB pre-kick
+     pull books 1,860 of the 2,500 rail and the afternoon's carry expiries finish it, so from
+     mid-afternoon every in-play pull was refused — and the answer below then served carried rows
+     re-stamped `status: "live"` with `playable: false`, which on the phone is a frozen in-game line.
+
+     So the allowance is split in two, against two different rails:
+       · the LIVE partition is sized against the FULL `dailyBudget` — an in-play re-price may spend
+         the last credit of the day, because a moving line is the only thing worth buying late;
+       · the REST partition is sized against `dailyBudget - liveReserveCredits` AND against what the
+         live partition is about to spend this pass, so at least the reserve is still unspent when
+         this pass ends.
+     NO BUDGET IS LOWERED: `dailyBudget` is untouched and all of it remains spendable. What changes
+     is WHICH pass gets the last slice.
+
+     AT `liveReserveCredits` 0 THIS IS BYTE-IDENTICAL to the single allowance it replaced — same
+     count, same games, same order — because the rest partition is then sized against
+     `dailyBudget - 0 - spentBefore - liveSpend`, whose events-allowed sum is exactly the old
+     `affordableEvents(need.length, spentBefore, dailyBudget, perEvent)`. Proved both branches in
+     tests/live-reserve.test.ts, which is also why `spentBefore + liveSpend` is passed below rather
+     than `spentBefore` twice: sizing BOTH partitions off the same untouched tally would hand the
+     same room out twice and could spend up to one reserve MORE than the day's budget. */
+  const perEventCost = cfg.props.measuredCreditsPerEvent;
+  const reserve = liveReserveCredits(cfg.props);
+  /* THE PARTITION IS THE GAME'S STATUS, NOT ITS `why` RANK — and that distinction is the whole fix.
+     `why()` returns "unpriced" for ANY game the stored board does not carry, live or not (line 278),
+     so on the first pull of a day, or after the board's TTL lapsed, an IN-PLAY game is ranked
+     "unpriced" and a `why === "live"` partition would leave the most frozen case of all — an in-play
+     game with no rows at all — in the pre-kick half, sized against the reduced rail. Asking
+     `g.status === "live"` instead cannot miss it. `why === "live"` implies `status === "live"`, so
+     this is a strict widening of the live half, never a narrowing.
+     ORDER: each half keeps `need`'s own order (live → unpriced → czMissing → expired), so the only
+     ordering change is that an in-play game now outranks a pregame one that shares its `why`. On a
+     truncated pull that is the intended preference: an in-play line is the one that has moved. */
+  const liveNeed = need.filter((g) => g.status === "live");
+  const restNeed = need.filter((g) => g.status !== "live");
+  const allowedLive = store ? affordableEvents(liveNeed.length, spentBefore, cfg.props.dailyBudget, perEventCost) : liveNeed.length;
+  // what the live half of this pass commits, at the estimated rate — the rest half may not spend it twice
+  const liveSpend = allowedLive * perEventCost;
+  const allowedRest = store
+    ? affordableEvents(restNeed.length, spentBefore + liveSpend, cfg.props.dailyBudget - reserve, perEventCost)
+    : restNeed.length;
+  const toFetch = [...liveNeed.slice(0, allowedLive), ...restNeed.slice(0, allowedRest)];
+  const refused = [...liveNeed.slice(allowedLive), ...restNeed.slice(allowedRest)];
+  /* the count the honest note and the stale flag below already read — unchanged in meaning: how many
+     of the games that needed a price this pass actually get one */
+  const allowed = toFetch.length;
   const budgeted = allowed < need.length;
-  const toFetch = need.slice(0, allowed);
-  const refused = need.slice(allowed);
   // the games this answer carries from the stored board: everything selected that is not fetched now
   const fetchIds = new Set(toFetch.map((g) => g.id));
   const carriedNow = stored ? events.filter((g) => !fetchIds.has(g.id) && storedIds.has(g.id)) : [];
@@ -310,10 +364,21 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   const staleCarried = carriedNow.some(
     (g) => (g.status === "live" && !liveCarried.has(g.id)) || (refused.some((r) => r.id === g.id) && (storedRowCount.get(g.id) ?? 0) > 0),
   );
+  /* THE NOTE HAS TO NAME THE RESERVE, or it claims a budget is spent that is not (2026-09-12).
+     With `liveReserveCredits` set, a refused PRE-KICK game can now be refused while hundreds of
+     credits are still unspent — they are held for the games that will be under way tonight. Saying
+     "today's props budget (2500 credits) is used up" there would be false. `reserveBit` is
+     appended only when the reserve is what bound this pass: every live game this pass wanted was
+     affordable and a pre-kick game was not. With `liveReserveCredits` absent or 0 the note is
+     byte-identical to the one this replaced. */
+  const reserveBound = reserve > 0 && allowedLive === liveNeed.length && allowedRest < restNeed.length;
+  const reserveBit = reserveBound
+    ? ` (${reserve} of those credits are held back for games already under way, so in-play lines can still be bought tonight)`
+    : "";
   const budgetNote = budgeted
     ? allowed === 0
-      ? `today's props budget (${cfg.props.dailyBudget} credits) is used up — ${staleCarried ? "showing the last priced lines" : "more games price again tomorrow"}`
-      : `today's props budget (${cfg.props.dailyBudget} credits) covers ${allowed} of ${need.length} games — the rest ${staleCarried ? "show their last priced lines" : "price again tomorrow"}`
+      ? `today's props budget (${cfg.props.dailyBudget} credits) is used up${reserveBit} — ${staleCarried ? "showing the last priced lines" : "more games price again tomorrow"}`
+      : `today's props budget (${cfg.props.dailyBudget} credits) covers ${allowed} of ${need.length} games${reserveBit} — the rest ${staleCarried ? "show their last priced lines" : "price again tomorrow"}`
     : undefined;
   const priced = (rows: CfbPropRow[], fetchedIds: string[]) => Array.from(new Set([...fetchedIds, ...rows.map((r) => r.gameId)]));
   // when each game on the answer was last pulled: now for the games fetched this pull, the stored

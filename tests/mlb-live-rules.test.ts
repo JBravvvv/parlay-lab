@@ -6,6 +6,7 @@ import { MLB_LIVE_EVENTS_URL, MLB_LIVE_MARKETS, MLB_LIVE_PROPS, MLB_LIVE_REDIS, 
 import {
   decodeOverlay,
   encodeOverlay,
+  MLB_LIST_CALL_CREDITS,
   mlbAffordableEvents,
   mlbLiveBoardKey,
   mlbLiveCooldownKey,
@@ -96,8 +97,14 @@ describe("MLB_LIVE_PROPS — the whole constant, pinned", () => {
       dailyBudget: 600,
       measuredCreditsPerEvent: 6,
       slots: ["08:00", "09:30", "12:00", "15:00", "16:45"],
-      liveSlotsPT: [],
-      tickMode: "slots",
+      /* INSTRUCTION 52 (2026-09-12, Josh verbatim: "I've always had in game live lines. It has live
+         lines; they just went away this week"). INSTRUCTION 51 shipped `[]` + "slots", which made the
+         in-play pull ride the five STAKE slots — and 08:00 / 09:30 / 12:00 / 15:00 PT see zero live
+         baseball, so four of the five automatic passes bought in-play prices for games that had not
+         started. These seven are the live window. The deep-equal stays whole-object, so a field
+         still cannot slip in unpinned. */
+      liveSlotsPT: ["12:00", "15:00", "16:45", "17:15", "17:45", "18:15", "18:45"],
+      tickMode: "ticker",
     });
   });
 
@@ -113,9 +120,33 @@ describe("MLB_LIVE_PROPS — the whole constant, pinned", () => {
     expect(MLB_LIVE_PROPS.probeEvents).toBeLessThan(MLB_LIVE_PROPS.liveMaxEvents);
   });
 
-  it("ships on the slot calendar with the opt-in ticker window OFF", () => {
-    expect(MLB_LIVE_PROPS.tickMode).toBe("slots");
-    expect(MLB_LIVE_PROPS.liveSlotsPT).toHaveLength(0);
+  it("runs on its OWN live calendar, and the stake calendar is untouched by it", () => {
+    /* INSTRUCTION 52 (2026-09-12). The guard this replaces read "the opt-in ticker window is OFF",
+       which was true and is exactly what Josh reported as broken: off means the in-play pull fires on
+       the stake slots, four of which are hours before first pitch. What must stay true is the thing
+       that guard was really protecting — that turning the live pull on does not move INSTRUCTION 49's
+       money calendar — so that is asserted here directly, in both directions. */
+    expect(MLB_LIVE_PROPS.tickMode).toBe("ticker");
+    expect(MLB_LIVE_PROPS.liveSlotsPT.length).toBeGreaterThan(0);
+    // the stake calendar is a DIFFERENT array object, still the INSTRUCTION 49 five, still by reference
+    expect(MLB_LIVE_PROPS.liveSlotsPT).not.toBe(MLB_LIVE_PROPS.slots);
+    expect(MLB_LIVE_PROPS.slots).toBe(REFILL_SLOTS_PT);
+    expect(MLB_LIVE_PROPS.slots).toEqual(["08:00", "09:30", "12:00", "15:00", "16:45"]);
+    // and no live time lands before baseball does: 08:00 / 09:30 PT are not on the live calendar
+    expect(MLB_LIVE_PROPS.liveSlotsPT).not.toContain("08:00");
+    expect(MLB_LIVE_PROPS.liveSlotsPT).not.toContain("09:30");
+  });
+
+  it("the whole live calendar fits the rail with room, at the PROBE-CAPPED cost it really bills", () => {
+    /* `rateMeasured` is false, so src/lib/server/mlb-live-quote.ts caps EVERY pass at probeEvents —
+       one pass is the flat list call + probeEvents x the per-event rate, not liveMaxEvents x it. The
+       seven passes are priced here off the constant itself so the arithmetic cannot rot silently. */
+    const perPass = MLB_LIST_CALL_CREDITS + MLB_LIVE_PROPS.probeEvents * MLB_LIVE_PROPS.measuredCreditsPerEvent;
+    expect(perPass).toBe(19);
+    expect(MLB_LIVE_PROPS.liveSlotsPT.length * perPass).toBe(133);
+    expect(MLB_LIVE_PROPS.liveSlotsPT.length * perPass).toBeLessThan(MLB_LIVE_PROPS.dailyBudget);
+    // NO BUDGET WAS RAISED TO FIT THIS (Josh, 2026-09-09: "Don't lower any budgets")
+    expect(MLB_LIVE_PROPS.dailyBudget).toBe(600);
   });
 
   it("re-prices a live game less often than it re-reads it, and never serves a quote past the window", () => {

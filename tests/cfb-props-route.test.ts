@@ -73,6 +73,16 @@ const EVENT = readJson("odds-ncaaf-event-props.synthetic.json") as Record<string
 const NOW = Date.parse("2026-09-05T12:00:00Z"); // 05:00 PT — every fixture kickoff is still ahead
 const DATE = "2026-09-05";
 const PER = CFB_PROPS.measuredCreditsPerEvent;
+/* THE PRE-KICK RAIL (INSTRUCTION 52, 2026-09-12, Josh verbatim: "I've always had in game live lines.
+   It has live lines; they just went away this week"). There are two rails now, not one: a PRE-KICK
+   game is sized against `dailyBudget - liveReserveCredits`, an IN-PLAY game against the whole
+   `dailyBudget`. That is the fix for the defect Josh reported — 60 pre-kick events x 31 = 1,860 of
+   2,500 left 640, and a live pull of 24 wants 744, so on a full Saturday the in-game pull was refused
+   by the rail and the board served carried rows marked playable:false. NO TOTAL WAS LOWERED.
+   Every `spent` precondition below that governs PRE-KICK games is written against this rail, so each
+   test still proves exactly the property it was written to prove; the live-slate tests keep using
+   `dailyBudget`, which is itself the proof that a live pass may still draw the entire budget. */
+const RAIL = CFB_PROPS.dailyBudget - CFB_PROPS.liveReserveCredits;
 
 const root = path.join(__dirname, "..");
 const readSrc = (p: string) => stripComments(fs.readFileSync(path.join(root, p), "utf8"));
@@ -541,7 +551,9 @@ describe("a live slate (INSTRUCTION 40, 2026-09-05 — in-game props keep popula
   });
 
   it("the budget still buys only what it can: room for 2 events prices the live game plus one", async () => {
-    const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget - 2 * PER) });
+    /* room for 2 events ON THE PRE-KICK RAIL: the live game is sized against the whole budget and is
+       bought first regardless, then exactly one pre-kick game fits. */
+    const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(RAIL - 2 * PER) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
     expect(body.budgeted).toBe(true);
@@ -687,13 +699,25 @@ describe("INSTRUCTION 42 (2026-09-05) — per-game windows and the empty-event r
   });
 
   it("the budget rail still refuses beyond 2500: room for one event buys exactly one; at or past 2500 buys none", async () => {
-    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(2500 - PER) });
+    /* this fixture is all PRE-KICK, so the rail that governs it is dailyBudget - liveReserveCredits.
+       The hard 2500 ceiling is asserted below exactly as before — it did not move. */
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(RAIL - PER) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const one = await call();
     expect(one.body.budgeted).toBe(true);
     expect(one.body.fetched).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(one.body.spentToday).toBe(2500);
+    expect(one.body.spentToday).toBe(RAIL);
+
+    // AT the pre-kick rail, a pre-kick game buys nothing — and the note says the held credits are held
+    fetchMock.mockClear();
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(RAIL) });
+    const atRail = await call();
+    expect(atRail.body.budgeted).toBe(true);
+    expect(atRail.body.fetched).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(atRail.body.note).toMatch(/held back for games already under way/);
+    expect(atRail.body.note).toMatch(/744/);
 
     fetchMock.mockClear();
     fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: "2500" });
@@ -717,7 +741,7 @@ describe("the daily budget", () => {
   it("fetches only as many events as the budget still buys, and says so", async () => {
     const wanted = slate().games.length; // > the affordable count below
     expect(wanted).toBeGreaterThan(4);
-    const spent = CFB_PROPS.dailyBudget - 4 * PER; // room for exactly 4 events
+    const spent = RAIL - 4 * PER; // room for exactly 4 events on the pre-kick rail
     const r = fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(spent) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
@@ -744,14 +768,32 @@ describe("the daily budget", () => {
     expect(r.boardSets()).toHaveLength(0);
     expect(r.ops("INCRBY")).toHaveLength(0);
   });
-  it("exactly at the line is allowed: spent + n × 31 == budget fetches all n", async () => {
+  it("exactly at the line is allowed: spent + n × 31 == the PRE-KICK rail fetches all n", async () => {
     const s = slate();
     const n = Math.min(s.games.length, CFB_PROPS.maxEvents);
-    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget - n * PER) });
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(RAIL - n * PER) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
     expect(body.budgeted).toBe(false);
     expect(body.fetched).toBe(body.events);
+  });
+  it("exactly at the line is allowed ON THE LIVE RAIL TOO: an all-live slate draws the WHOLE budget", async () => {
+    /* INSTRUCTION 52 (2026-09-12): the other half of the two-rail contract, and the half that is the
+       actual fix. The reserve takes nothing away from an in-play pass — with every game under way,
+       spent + n x 31 == dailyBudget (NOT the reduced rail) still buys all n. */
+    const base = slate();
+    const games = base.games.map((g) => ({ ...g, status: "live" as const, detail: "3rd 4:01", homeScore: 21, awayScore: 17 }));
+    vi.mocked(slateFromEspn).mockResolvedValue({ ...base, games, finals: finalsOf(games) });
+    const n = Math.min(games.length, CFB_PROPS.liveMaxEvents);
+    fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget - n * PER) });
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.budgeted).toBe(false);
+    expect(body.fetched).toBe(n);
+    expect(body.live).toBe(n);
+    // and it really did spend past the pre-kick rail — that is the point
+    expect(body.spentToday).toBe(CFB_PROPS.dailyBudget);
+    expect(CFB_PROPS.dailyBudget - n * PER).toBeGreaterThan(RAIL - n * PER);
   });
 });
 
@@ -1153,7 +1195,7 @@ describe("THE CAESARS-MISSING RULE (2026-09-05) — a 30-min re-check inside 4 h
     const board: CfbPropsBoard = { ...strip(base, G), generatedAt: iso(IN - 1 * MIN), ttlSec: CFB_PROPS.liveRevalidateSec, live: 1, pricedAt: { ...base.pricedAt, [liveId]: iso(IN - 1 * MIN) } };
     vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
     expect(boardFresh(board, IN, CFB_PROPS.liveRevalidateSec)).toBe(true); // rail 1 is skipped ONLY because G is due
-    const r = seed(board, String(CFB_PROPS.dailyBudget - 1 * PER)); // room for exactly one event: before the fix the live game took it and G was refused
+    const r = seed(board, String(RAIL - 1 * PER)); // room for exactly one PRE-KICK event: before the fix the live game took it and G was refused
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -1205,7 +1247,10 @@ describe("THE CAESARS-MISSING RULE (2026-09-05) — a 30-min re-check inside 4 h
     };
     vi.mocked(slateFromEspn).mockResolvedValue(liveSlate());
     const expectOrder = async (room: number, ids: string[]) => {
-      seed(board, String(CFB_PROPS.dailyBudget - room * PER));
+      /* `room` is room on the PRE-KICK rail (INSTRUCTION 52, 2026-09-12). The live game is sized
+         against the whole budget and so is bought at every room value here — which is exactly the
+         ordering this test exists to prove, and it is unchanged. */
+      seed(board, String(RAIL - room * PER));
       fetchMock.mockClear();
       fetchMock.mockImplementation(async () => eventResponse(null));
       const { body } = await call();

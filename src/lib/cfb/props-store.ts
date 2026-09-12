@@ -241,6 +241,37 @@ export function propsStore(keys: PropsStoreKeys = CFB_PROPS_REDIS): CfbPropsStor
   };
 }
 
+/**
+ * THE LIVE-ONLY RESERVE — the credits a league holds back so an in-play re-price is never priced
+ * out by the morning's pre-kick pass (2026-09-12, "in-game lines are frozen").
+ *
+ * THE DEFECT IT FIXES: `footballPropsGet` ranked live games FIRST (WHY_RANK live: 0) and then asked
+ * for ONE allowance off the whole day's tally. Ranking is worthless once that allowance is zero: a
+ * 60-game CFB pre-kick pull books 60 x 31 = 1,860 of the 2,500 rail, four more pulls finish it, and
+ * from then on every in-play pull is refused. The board then served carried rows re-stamped
+ * `status: "live"` with `playable: false` — on screen, a frozen in-game line.
+ *
+ * WHAT IT IS NOT: it LOWERS NO BUDGET. `dailyBudget` is untouched and every credit in it is still
+ * spendable; this only decides WHICH pass may spend the last slice of it. The pre-kick pass may
+ * spend down to `dailyBudget - liveReserveCredits`; the live pass may spend the whole rail.
+ *
+ * OPTIONAL BY DESIGN: a `LeagueProps` that declares no `liveReserveCredits` reads 0 here, and at 0
+ * the two-way split in `footballPropsGet` is byte-identical to the single allowance it replaced
+ * (proved in tests/live-reserve.test.ts). Declared here rather than on `LeagueProps` itself so
+ * src/lib/football/league.ts needs no edit; a config that carries the field satisfies the wider
+ * type below and the reader is the only thing that has to know about it.
+ *
+ * Clamped into [0, dailyBudget]: a nonsense or negative value reads 0 (today's behaviour) and a
+ * reserve bigger than the day's budget reads as the whole budget (live-only, never negative room).
+ */
+export type LivePropsReserve = { readonly liveReserveCredits?: number };
+
+export function liveReserveCredits(props: LeagueProps): number {
+  const raw = (props as LeagueProps & LivePropsReserve).liveReserveCredits;
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return 0;
+  return Math.min(Math.floor(raw), Math.max(0, props.dailyBudget));
+}
+
 /** How many of `wanted` events the day's budget still buys at `perEvent` credits each (0..wanted). */
 export function affordableEvents(wanted: number, spent: number, budget: number = CFB_PROPS.dailyBudget, perEvent: number = CFB_PROPS.measuredCreditsPerEvent): number {
   if (wanted <= 0) return 0;

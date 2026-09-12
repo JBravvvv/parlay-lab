@@ -5,6 +5,14 @@
  * regenerate then it regenerates a new parlay; each slot is clickable to keep that
  * player(s) in any round and spin the other slots").
  *
+ * INSTRUCTION 52 (2026-09-12, Josh's word, verbatim: "Parlay Generator should be on CFB & NFL
+ * just like it is on MLB"). This file is now PAYLOAD-OPAQUE: it knows about prices, sides,
+ * players and games, and nothing at all about a board. Every field it reads is hoisted onto
+ * `GenLeg` by a per-sport ADAPTER (src/components/props/mlb-gen-pool.ts for the MLB prop board,
+ * src/lib/football/gen-pool.ts for the CFB/NFL prop rows), and the desk's own leg object rides
+ * along untouched in `leg` so the slip still gets exactly the object it would from a tap.
+ * Forking this logic per sport would have been the defect; there is one implementation.
+ *
  * THE BAND IS PER LEG. Josh's own example settles it — his four legs
  *   -145 · -124 · -137 · -130  →  1.689655 × 1.806452 × 1.729927 × 1.769231 = 9.341931 = +834,
  * nowhere near the "-152 -> +110" he wrote on the same line, while EVERY leg sits inside
@@ -13,13 +21,15 @@
  * predicate. Both are compared in DECIMAL: American odds are not ordered across the ±100
  * discontinuity (-150 and +150 are both "150" to a naive numeric compare).
  *
- * NOTHING IS INVENTED HERE. Every price is a posted quote carried on the board row and
- * minted through `playerLeg`, which returns null when that side is not posted; every
- * probability is the engine's own model number or the de-vigged market fair, tagged as
- * one or the other (`leg.src`). The generator picks among real legs — it never prices one.
- * When it cannot satisfy the request it says so with a typed failure carrying REAL pool
- * numbers, and it NEVER silently relaxes a rule to produce a ticket anyway (the legacy
- * engine does exactly that on its second pass, legacy/index.html:2687 — we do not).
+ * NOTHING IS INVENTED HERE. Every price is a posted quote the adapter read off a board row and
+ * minted through the desk's OWN leg minter, which returns null when that side is not posted (MLB:
+ * `playerLeg`; football: `propLegOf`, which also refuses a quote at a line the row has no fair
+ * for — exactly the cell the board itself renders as an untappable dash); every probability is
+ * the engine's own model number or the de-vigged market fair, tagged as one or the other
+ * (`leg.src`). The generator picks among real legs — it never prices one. When it cannot satisfy
+ * the request it says so with a typed failure carrying REAL pool numbers, and it NEVER silently
+ * relaxes a rule to produce a ticket anyway (the legacy engine does exactly that on its second
+ * pass, legacy/index.html:2687 — we do not).
  *
  * PURE: no React, no fetch, no Date.now, no Math.random, no engine sandbox. Same inputs →
  * byte-identical ticket, on any device, which is why the pool is sorted by leg id (board
@@ -30,18 +40,38 @@
  * Sandbox only: nothing here writes anywhere, spends an Odds credit, or enters the ledger.
  */
 
-import type { PropBoardGame, PropBoardRow } from "@/engine";
-import { amToDec, decToAm, type SandboxLeg } from "@/lib/ticket-math";
-import { nameKey, playerLeg, teamTag, type Side } from "@/components/props/props-model";
+import { amToDec, decToAm } from "@/lib/ticket-math";
 
 /* ------------------------------------------------------------------ shapes */
 
-export type GenSides = "o" | "u" | "both";
+/** which side of the posted line a leg is — an anytime-TD "yes" counts as an over */
+export type GenSide = "o" | "u";
+
+export type GenSides = GenSide | "both";
+
+/**
+ * One market the generator can be pointed at, in the desk's OWN vocabulary — the adapter
+ * supplies the list (MLB_GEN_MARKETS / FOOTBALL_GEN_MARKETS) so the sheet never has to know
+ * which sport it is looking at. `suspended` marks a market the engine keeps out of its own
+ * auto-built tickets; the sheet still offers it, with the reason written on the page.
+ */
+export type GenMarket = {
+  key: string;
+  label: string;
+  suspended?: boolean;
+  /**
+   * This market posts ONE side only — anytime TD is a price on the thing happening, and there is
+   * no under to take (the adapter counts its "yes" as an over). The sheet hides its Overs /
+   * Unders / Both control on such a market rather than offering a choice the board cannot honour
+   * (INSTRUCTION 52 fix pass).
+   */
+  oneSided?: boolean;
+};
 
 export type GenSpec = {
-  /** engine market key — "batter_hits_runs_rbis", "batter_hits", … (ML/RL are not generated) */
+  /** the desk's own market key — "batter_hits_runs_rbis" (MLB), "pass_yds" (football) */
   market: string;
-  /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI only offers 2..6) */
+  /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI only offers 2..8) */
   legs: number;
   /** PER-LEG band in American odds, either order (-152 … +110) */
   legMinAm: number;
@@ -61,19 +91,37 @@ export type GenSpec = {
   pinned: readonly (string | null)[];
 };
 
-export type GenLeg = {
-  /** the sandbox leg itself — the exact object the slip prices and renders */
-  leg: SandboxLeg;
-  /** amToDec(leg.cz) — the posted price in decimal */
+/**
+ * One mintable leg. Everything the core reads is HOISTED here by the adapter; `leg` is the
+ * desk's own object and this file never looks inside it.
+ */
+export type GenLeg<P = unknown> = {
+  /** the leg's identity — the canonical sort key, the pin id, and the dedupe key */
+  id: string;
+  /** the posted American price (the same number the slip prices) */
+  am: number;
+  /** win % (0..100) at that price */
+  prob: number;
+  /** where `prob` came from: the engine's model, or the de-vigged market fair */
+  src?: "model" | "market";
+  /** over or under ("yes" markets are overs) — the side filter reads THIS, never a string suffix */
+  side: GenSide;
+  /** the name line: "Bryce Harper (PHI)" / "Ty Simpson" */
+  label: string;
+  /** the bet line: "H+R+RBI Over 1.5" / "Pass Yds O 245.5" */
+  sub: string;
+  /** the desk's own leg object — the exact object the slip prices and renders */
+  leg: P;
+  /** amToDec(am) — the posted price in decimal */
   dec: number;
   gameKey: string;
   /** accent/punctuation-proof player identity (R1 is enforced on this) */
   playerKey: string;
-  /** the row's team tag, folded through teamTag so OAK/ATH and CHW/CWS have ONE spelling */
+  /** the row's team tag, folded to ONE spelling per club by the adapter */
   team: string | null;
   /** its game had started at the nowMs the pool was built with */
   started: boolean;
-  /** a Caesars milestone-ladder line ("2+ hits") rather than a standard O/U */
+  /** an alternate/milestone-ladder line ("2+ hits") rather than a standard O/U */
   alt: boolean;
   /** short book tag: "CZ" when Caesars posts it */
   book: string;
@@ -81,23 +129,30 @@ export type GenLeg = {
   ev: number;
 };
 
-export type GenPool = {
+export type GenPool<P = unknown> = {
   /** every mintable leg for this market, sorted by leg id (canonical, device-independent) */
-  legs: readonly GenLeg[];
-  byId: ReadonlyMap<string, GenLeg>;
+  legs: readonly GenLeg<P>[];
+  byId: ReadonlyMap<string, GenLeg<P>>;
   /** board rows scanned for this market in the games that were kept */
   rows: number;
   /** distinct games represented in `legs` */
   games: number;
   /** rows skipped because their game had started and includeStarted was off */
   startedDropped: number;
-  /** rows the engine itself refuses on tickets (legacy/index.html:2682) */
+  /** rows the book or the engine itself refuses on tickets (legacy/index.html:2682) */
   noParlayDropped: number;
+  /**
+   * Rows skipped because their game is OVER (final) or was called off (postponed). A separate
+   * counter from `noParlayDropped` on purpose (INSTRUCTION 52 fix pass): the sheet prints that
+   * one as "the book bars from parlays", which is a statement about Caesars, and filing a
+   * finished Saturday-morning game under it told Josh the book had barred legs nobody barred.
+   */
+  finishedDropped: number;
 };
 
-export type GenTicket = {
+export type GenTicket<P = unknown> = {
   /** slot order: index i is slot i, so a pinned slot keeps its position across spins */
-  legs: readonly GenLeg[];
+  legs: readonly GenLeg<P>[];
   /** product of the leg decimals, multiplied in slot order exactly as combineTicket does */
   dec: number;
   am: number;
@@ -119,6 +174,15 @@ export type GenTicket = {
 
 export type GenFail =
   | { code: "no-rows" }
+  /**
+   * The market HAS legs, and every one of them is on the other side from the one asked for —
+   * football's anytime TD posts a YES and no under at all, so "unders" there can never fill a
+   * slot (INSTRUCTION 52 fix pass). Told apart from `no-rows` because "no lines on this board"
+   * is a statement about the board, and saying it while the board shows dozens of prices is
+   * exactly the contradiction the diagnostic line exists to prevent. `has` is the side that IS
+   * posted, so the sheet can offer it as a one-tap fix.
+   */
+  | { code: "one-sided"; want: GenSide; has: GenSide; rows: number }
   | { code: "band-empty"; rows: number; nearest: { belowAm: number | null; aboveAm: number | null } }
   | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | null }
   | { code: "payout-unreachable"; reach: { minAm: number; maxAm: number } }
@@ -126,7 +190,7 @@ export type GenFail =
   | { code: "pin-missing"; ids: readonly string[] }
   | { code: "pin-conflict"; ids: readonly string[]; why: "same-player" | "same-game" };
 
-export type GenResult = { ok: true; ticket: GenTicket } | { ok: false; fail: GenFail };
+export type GenResult<P = unknown> = { ok: true; ticket: GenTicket<P> } | { ok: false; fail: GenFail };
 
 export const LEG_MIN = 2;
 export const LEG_MAX = 8;
@@ -208,84 +272,51 @@ export function bandDec(aAm: number, bAm: number): { lo: number; hi: number } {
 
 const inDec = (dec: number, b: { lo: number; hi: number }) => dec >= b.lo && dec <= b.hi;
 
-const sidesOf = (s: GenSides): Side[] => (s === "both" ? ["o", "u"] : [s]);
+const sidesOf = (s: GenSides): GenSide[] => (s === "both" ? ["o", "u"] : [s]);
 
 const clampLegs = (n: number) => Math.max(LEG_MIN, Math.min(LEG_MAX, Math.round(n)));
 
 /* ------------------------------------------------------------------------ pool */
 
 /**
- * Every leg this market can currently produce, from the real board rows.
+ * THE ONE POOL SHAPE, shared by every adapter (INSTRUCTION 52). An adapter's only job is to
+ * turn its own board rows into `GenLeg`s; the canonical ordering, the id map and the counters
+ * are this function's, so two sports cannot drift on the part that makes the answer
+ * reproducible.
  *
- * The started-game skip is the FIRST consumer of `PropBoardGame.live` / `.start` in the
- * builder (both carried by the engine since the prop board shipped, and read by nothing
- * here until now): a game in progress still shows its PREGAME prices, so those legs are
- * off by default and admitted only when Josh asks for them.
- *
- * `nowMs` is passed in rather than read from the clock so this stays pure — the caller
- * sets it in a post-mount effect and SSR passes 0, which marks nothing started.
+ * CANONICAL ORDER — load-bearing. Board row order differs between the server board and the
+ * locally cached one, and both desks re-sort rows for display (by rank on MLB, by EV on
+ * football); sorting by the leg id here is what makes "same seed → same ticket" true on two
+ * different devices. `legs` is sorted IN PLACE, so pass a fresh array.
  */
-export function buildPool(board: readonly PropBoardGame[], spec: GenSpec, nowMs: number): GenPool {
-  const legs: GenLeg[] = [];
-  let rows = 0;
-  let startedDropped = 0;
-  let noParlayDropped = 0;
-
-  for (const g of board) {
-    const rowsHere: PropBoardRow[] = g.markets?.[spec.market] ?? [];
-    if (!rowsHere.length) continue;
-    /* Date.parse of an unparseable start is NaN, and NaN <= nowMs is false — an unknown
-       start time is never guessed into "started". */
-    const started = !!g.live || (!!g.start && Date.parse(g.start) <= nowMs);
-    if (started && !spec.includeStarted) {
-      startedDropped += rowsHere.length;
-      continue;
-    }
-    rows += rowsHere.length;
-    const gameKey = g.gkey ?? g.game;
-    for (const r of rowsHere) {
-      if (r.noParlay) {
-        noParlayDropped++;
-        continue;
-      }
-      for (const side of ["o", "u"] as Side[]) {
-        /* playerLeg returns null when that side is not posted — the one and only reason a
-           side is missing, and the reason no price is ever invented for it. */
-        const leg = playerLeg(r, spec.market, side, g.game, g.gkey);
-        if (!leg) continue;
-        if (!(leg.prob > 0)) continue; // no model number and no market fair → nothing to weigh
-        const dec = amToDec(leg.cz);
-        legs.push({
-          leg,
-          dec,
-          gameKey,
-          playerKey: nameKey(r.p),
-          team: r.tm ? teamTag(r.tm) : null,
-          started,
-          alt: !!r.alt,
-          book: leg.book ?? "BOOK",
-          ev: (leg.prob / 100) * dec - 1,
-        });
-      }
-    }
-  }
-
-  /* CANONICAL ORDER — load-bearing. Board row order differs between the server board and
-     the locally cached one, and the page re-sorts by rank; sorting by the leg id here is
-     what makes "same seed → same ticket" true on two different devices. */
-  legs.sort((a, b) => (a.leg.id < b.leg.id ? -1 : a.leg.id > b.leg.id ? 1 : 0));
-
-  const byId = new Map<string, GenLeg>();
-  for (const l of legs) byId.set(l.leg.id, l);
-
+export function poolOf<P>(
+  legs: GenLeg<P>[],
+  counts: { rows: number; startedDropped: number; noParlayDropped: number; finishedDropped?: number },
+): GenPool<P> {
+  legs.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const byId = new Map<string, GenLeg<P>>();
+  for (const l of legs) byId.set(l.id, l);
   return {
     legs,
     byId,
-    rows,
+    rows: counts.rows,
     games: new Set(legs.map((l) => l.gameKey)).size,
-    startedDropped,
-    noParlayDropped,
+    startedDropped: counts.startedDropped,
+    noParlayDropped: counts.noParlayDropped,
+    /* a board with no notion of a finished game (MLB's prop board drops those upstream) passes
+       nothing and the count is 0 — it is never folded into another counter's meaning */
+    finishedDropped: counts.finishedDropped ?? 0,
   };
+}
+
+/**
+ * What the generator sees while its panel is CLOSED: nothing, at no cost. The adapters are pure
+ * but not free, and a reader who never opens the sheet should not pay for a full pool build plus
+ * a seeded fill on every board or spec change (INSTRUCTION 50 fix pass). `generate` answers this
+ * with `no-rows`.
+ */
+export function emptyPool<P>(): GenPool<P> {
+  return { legs: [], byId: new Map(), rows: 0, games: 0, startedDropped: 0, noParlayDropped: 0, finishedDropped: 0 };
 }
 
 /* ---------------------------------------------------------------------- ticket */
@@ -295,7 +326,7 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenSpec, nowMs:
  * clamping are combineTicket's (src/lib/ticket-math.ts:42-58) so the generator's headline
  * price can never disagree with the slip it hands the legs to — pinned by a test.
  */
-export function ticketOf(legs: readonly GenLeg[], spec: GenSpec, seed: number): GenTicket {
+export function ticketOf<P>(legs: readonly GenLeg<P>[], spec: GenSpec, seed: number): GenTicket<P> {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
   let dec = 1;
   let p = 1;
@@ -303,11 +334,11 @@ export function ticketOf(legs: readonly GenLeg[], spec: GenSpec, seed: number): 
   const outsideLegBand: string[] = [];
   let marketPriced = 0;
   for (const l of legs) {
-    dec *= amToDec(l.leg.cz);
-    p *= Math.min(1, Math.max(0, l.leg.prob / 100));
+    dec *= amToDec(l.am);
+    p *= Math.min(1, Math.max(0, l.prob / 100));
     seenGame.set(l.gameKey, (seenGame.get(l.gameKey) ?? 0) + 1);
-    if (!inDec(l.dec, band)) outsideLegBand.push(l.leg.id);
-    if (l.leg.src === "market") marketPriced++;
+    if (!inDec(l.dec, band)) outsideLegBand.push(l.id);
+    if (l.src === "market") marketPriced++;
   }
   return {
     legs,
@@ -315,7 +346,7 @@ export function ticketOf(legs: readonly GenLeg[], spec: GenSpec, seed: number): 
     am: decToAm(dec),
     trueProb: p,
     key: legs
-      .map((l) => l.leg.id)
+      .map((l) => l.id)
       .slice()
       .sort()
       .join("+"),
@@ -332,8 +363,8 @@ export function ticketOf(legs: readonly GenLeg[], spec: GenSpec, seed: number): 
  * games" — so Josh can see WHICH control is binding before he reads a failure. Computed
  * through the same filters `generate` uses, so the line can never disagree with the answer.
  */
-export function poolCounts(
-  pool: GenPool,
+export function poolCounts<P>(
+  pool: GenPool<P>,
   spec: GenSpec,
 ): { pool: number; eligible: number; inBand: number; games: number } {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
@@ -349,11 +380,11 @@ export function poolCounts(
 
 /* ---------------------------------------------------------------------- search */
 
-type Ctx = {
+type Ctx<P> = {
   spec: GenSpec;
   n: number;
   band: { lo: number; hi: number };
-  pins: (GenLeg | null)[];
+  pins: (GenLeg<P> | null)[];
   /**
    * The set the seeded order is drawn from: in-band and eligible, id-sorted, and DELIBERATELY
    * pin-independent — it still contains the pinned legs and the legs that clash with them
@@ -365,18 +396,23 @@ type Ctx = {
    * of a lock. With the set fixed, seating a pin consumes it from the same order the unpinned
    * run already followed, and the other slots stay exactly where they were.
    */
-  cands: GenLeg[];
+  cands: GenLeg<P>[];
 };
 
-/** Eligibility that is NOT the band: side, book and price-source filters. */
-function eligible(pool: GenPool, spec: GenSpec): GenLeg[] {
-  const want = new Set<Side>(sidesOf(spec.sides));
+/**
+ * Eligibility that is NOT the band: side, book and price-source filters.
+ *
+ * The side is read off the HOISTED field (INSTRUCTION 52). It used to be recovered from the leg
+ * id by string suffix (`id.endsWith("|o")`), which only worked because MLB's `playerLeg` happens
+ * to mint its ids that way — a football row key ("g1|pass_yds|ty-simpson|over|245.5") would have
+ * been silently read as an under, quietly breaking the one control Josh sets most.
+ */
+function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
+  const want = new Set<GenSide>(sidesOf(spec.sides));
   return pool.legs.filter((l) => {
-    /* playerLeg's id ends in the side it was minted for ("…|1.5|o") */
-    const side: Side = l.leg.id.endsWith("|o") ? "o" : "u";
-    if (!want.has(side)) return false;
+    if (!want.has(l.side)) return false;
     if (spec.czOnly && l.book !== "CZ") return false;
-    if (spec.modelOnly && l.leg.src !== "model") return false;
+    if (spec.modelOnly && l.src !== "model") return false;
     return true;
   });
 }
@@ -392,7 +428,7 @@ function eligible(pool: GenPool, spec: GenSpec): GenLeg[] {
  * selection can reach is a number Josh cannot act on, so the estimate takes the smaller of
  * the two. It stays exact on an ordinary slate, and never over-states on a doubleheader.
  */
-function capacity(cands: readonly GenLeg[], pins: readonly GenLeg[], onePerGame: boolean): number {
+function capacity<P>(cands: readonly GenLeg<P>[], pins: readonly GenLeg<P>[], onePerGame: boolean): number {
   const usedP = new Set(pins.map((p) => p.playerKey));
   const usedG = new Set(pins.map((p) => p.gameKey));
   const freeP = new Set<string>();
@@ -427,12 +463,12 @@ function shuffled<T>(xs: readonly T[], rng: () => number): T[] {
  * de-vigged fair) sit at EV ≈ 0 by construction and are weighted accordingly — not dressed
  * up, not hidden.
  */
-function sampleOrder(cands: readonly GenLeg[], rng: () => number, legs: number): GenLeg[] {
+function sampleOrder<P>(cands: readonly GenLeg<P>[], rng: () => number, legs: number): GenLeg<P>[] {
   const topN = Math.max(40, 8 * legs);
-  const byEv = cands.slice().sort((a, b) => b.ev - a.ev || (a.leg.id < b.leg.id ? -1 : 1));
+  const byEv = cands.slice().sort((a, b) => b.ev - a.ev || (a.id < b.id ? -1 : 1));
   const head = byEv.slice(0, topN);
   const tail = byEv.slice(topN);
-  const out: GenLeg[] = [];
+  const out: GenLeg<P>[] = [];
   const w = head.map((l) => Math.exp((l.ev * 100) / EV_TEMP));
   const live = head.slice();
   let total = w.reduce((a, b) => a + b, 0);
@@ -452,10 +488,10 @@ function sampleOrder(cands: readonly GenLeg[], rng: () => number, legs: number):
   return out;
 }
 
-type Slots = { legs: (GenLeg | null)[]; usedP: Set<string>; usedG: Set<string>; ids: Set<string> };
+type Slots<P> = { legs: (GenLeg<P> | null)[]; usedP: Set<string>; usedG: Set<string>; ids: Set<string> };
 
-function seatPins(ctx: Ctx): Slots {
-  const legs: (GenLeg | null)[] = new Array(ctx.n).fill(null);
+function seatPins<P>(ctx: Ctx<P>): Slots<P> {
+  const legs: (GenLeg<P> | null)[] = new Array(ctx.n).fill(null);
   const usedP = new Set<string>();
   const usedG = new Set<string>();
   const ids = new Set<string>();
@@ -464,19 +500,19 @@ function seatPins(ctx: Ctx): Slots {
     legs[i] = p;
     usedP.add(p.playerKey);
     usedG.add(p.gameKey);
-    ids.add(p.leg.id);
+    ids.add(p.id);
   });
   return { legs, usedP, usedG, ids };
 }
 
-const fits = (s: Slots, c: GenLeg, onePerGame: boolean) =>
-  !s.ids.has(c.leg.id) && !s.usedP.has(c.playerKey) && !(onePerGame && s.usedG.has(c.gameKey));
+const fits = <P,>(s: Slots<P>, c: GenLeg<P>, onePerGame: boolean) =>
+  !s.ids.has(c.id) && !s.usedP.has(c.playerKey) && !(onePerGame && s.usedG.has(c.gameKey));
 
-function seat(s: Slots, c: GenLeg, i: number) {
+function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
   s.legs[i] = c;
   s.usedP.add(c.playerKey);
   s.usedG.add(c.gameKey);
-  s.ids.add(c.leg.id);
+  s.ids.add(c.id);
 }
 
 /**
@@ -484,7 +520,7 @@ function seat(s: Slots, c: GenLeg, i: number) {
  * ticket past the combined band's ceiling (the same pruning the CFB builder does,
  * src/lib/cfb/picks.ts:301,317); null when the order runs out before the slots fill.
  */
-function fillSlots(ctx: Ctx, order: readonly GenLeg[], maxDec: number | null): GenLeg[] | null {
+function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number | null): GenLeg<P>[] | null {
   const s = seatPins(ctx);
   let dec = s.legs.reduce((d, l) => (l ? d * l.dec : d), 1);
   for (const c of order) {
@@ -495,13 +531,13 @@ function fillSlots(ctx: Ctx, order: readonly GenLeg[], maxDec: number | null): G
     seat(s, c, i);
     dec *= c.dec;
   }
-  return s.legs.every((l): l is GenLeg => !!l) ? (s.legs as GenLeg[]) : null;
+  return s.legs.every((l): l is GenLeg<P> => !!l) ? (s.legs as GenLeg<P>[]) : null;
 }
 
 /** The cheapest and dearest combined prices R1/R2 allow from this candidate set. */
-function reachOf(ctx: Ctx): { minDec: number; maxDec: number } | null {
+function reachOf<P>(ctx: Ctx<P>): { minDec: number; maxDec: number } | null {
   const pick = (dir: 1 | -1): number | null => {
-    const order = ctx.cands.slice().sort((a, b) => dir * (a.dec - b.dec) || (a.leg.id < b.leg.id ? -1 : 1));
+    const order = ctx.cands.slice().sort((a, b) => dir * (a.dec - b.dec) || (a.id < b.id ? -1 : 1));
     const legs = fillSlots(ctx, order, null);
     return legs ? legs.reduce((d, l) => d * l.dec, 1) : null;
   };
@@ -515,12 +551,12 @@ function reachOf(ctx: Ctx): { minDec: number; maxDec: number } | null {
  * that moves log(price) closest to the band's geometric centre. Deterministic, capped by
  * REPAIR_TRIES × REPAIR_SCAN, and it never touches a pinned slot.
  */
-function repairPayout(
-  ctx: Ctx,
-  start: readonly GenLeg[],
-  order: readonly GenLeg[],
+function repairPayout<P>(
+  ctx: Ctx<P>,
+  start: readonly GenLeg<P>[],
+  order: readonly GenLeg<P>[],
   band: { lo: number; hi: number },
-): { legs: GenLeg[]; dropped: string[] } | null {
+): { legs: GenLeg<P>[]; dropped: string[] } | null {
   const target = Math.sqrt(band.lo * band.hi);
   const cur = start.slice();
   const dropped: string[] = [];
@@ -537,15 +573,15 @@ function repairPayout(
     const slot = free[t % free.length];
     const base = dec / cur[slot].dec;
     const others = cur.filter((_, i) => i !== slot);
-    const ids = new Set(others.map((l) => l.leg.id));
+    const ids = new Set(others.map((l) => l.id));
     const players = new Set(others.map((l) => l.playerKey));
     const games = new Set(others.map((l) => l.gameKey));
-    let best: GenLeg | null = null;
+    let best: GenLeg<P> | null = null;
     let bestGap = Math.abs(Math.log(dec) - Math.log(target));
     let scanned = 0;
     for (const c of order) {
       if (scanned >= REPAIR_SCAN) break;
-      if (ids.has(c.leg.id) || players.has(c.playerKey)) continue;
+      if (ids.has(c.id) || players.has(c.playerKey)) continue;
       if (ctx.spec.onePerGame && games.has(c.gameKey)) continue;
       scanned++;
       const gap = Math.abs(Math.log(base * c.dec) - Math.log(target));
@@ -555,7 +591,7 @@ function repairPayout(
       }
     }
     if (!best) break;
-    dropped.push(cur[slot].leg.id);
+    dropped.push(cur[slot].id);
     cur[slot] = best;
     dec = base * best.dec;
   }
@@ -563,24 +599,24 @@ function repairPayout(
 }
 
 /** The two real posted prices nearest the band — one below it, one above it. */
-function nearestPosted(cands: readonly GenLeg[], band: { lo: number; hi: number }) {
-  let below: GenLeg | null = null;
-  let above: GenLeg | null = null;
+function nearestPosted<P>(cands: readonly GenLeg<P>[], band: { lo: number; hi: number }) {
+  let below: GenLeg<P> | null = null;
+  let above: GenLeg<P> | null = null;
   for (const c of cands) {
     if (c.dec < band.lo && (!below || c.dec > below.dec)) below = c;
     if (c.dec > band.hi && (!above || c.dec < above.dec)) above = c;
   }
-  return { belowAm: below ? below.leg.cz : null, aboveAm: above ? above.leg.cz : null };
+  return { belowAm: below ? below.am : null, aboveAm: above ? above.am : null };
 }
 
 /** Which single relaxation — and only one that is actually engaged — would open the pool up. */
 type Relax = "same-game" | "started" | "cz" | "model" | null;
 
-function relaxHint(pool: GenPool, spec: GenSpec, pins: GenLeg[], want: number): Relax {
+function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: number): Relax {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
-  const pinIds = new Set(pins.map((p) => p.leg.id));
+  const pinIds = new Set(pins.map((p) => p.id));
   const cands = (s: GenSpec) =>
-    eligible(pool, s).filter((l) => !pinIds.has(l.leg.id) && inDec(l.dec, band) && !clashes(l, pins, s.onePerGame));
+    eligible(pool, s).filter((l) => !pinIds.has(l.id) && inDec(l.dec, band) && !clashes(l, pins, s.onePerGame));
   if (spec.onePerGame && capacity(cands({ ...spec, onePerGame: false }), pins, false) >= want) return "same-game";
   if (spec.czOnly && capacity(cands({ ...spec, czOnly: false }), pins, spec.onePerGame) >= want) return "cz";
   if (spec.modelOnly && capacity(cands({ ...spec, modelOnly: false }), pins, spec.onePerGame) >= want) return "model";
@@ -590,7 +626,7 @@ function relaxHint(pool: GenPool, spec: GenSpec, pins: GenLeg[], want: number): 
   return null;
 }
 
-const clashes = (l: GenLeg, pins: readonly GenLeg[], onePerGame: boolean) =>
+const clashes = <P,>(l: GenLeg<P>, pins: readonly GenLeg<P>[], onePerGame: boolean) =>
   pins.some((p) => p.playerKey === l.playerKey || (onePerGame && p.gameKey === l.gameKey));
 
 /**
@@ -602,14 +638,19 @@ const clashes = (l: GenLeg, pins: readonly GenLeg[], onePerGame: boolean) =>
  * never failed merely because the pool is small: after ROLL_RETRIES re-seeds the ticket is
  * returned anyway.
  */
-export function generate(pool: GenPool, spec: GenSpec, seed: number, avoid?: ReadonlySet<string>): GenResult {
+export function generate<P>(
+  pool: GenPool<P>,
+  spec: GenSpec,
+  seed: number,
+  avoid?: ReadonlySet<string>,
+): GenResult<P> {
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
 
   /* ---- pins first: a pin the board no longer carries is a failure, never a silent drop */
   const slotPins = spec.pinned.slice(0, n);
   const missing: string[] = [];
-  const pins: (GenLeg | null)[] = new Array(n).fill(null);
+  const pins: (GenLeg<P> | null)[] = new Array(n).fill(null);
   slotPins.forEach((id, i) => {
     if (!id) return;
     const l = pool.byId.get(id);
@@ -618,21 +659,43 @@ export function generate(pool: GenPool, spec: GenSpec, seed: number, avoid?: Rea
   });
   if (missing.length) return { ok: false, fail: { code: "pin-missing", ids: missing } };
 
-  const seated = pins.filter((p): p is GenLeg => !!p);
+  const seated = pins.filter((p): p is GenLeg<P> => !!p);
   for (let i = 0; i < seated.length; i++) {
     for (let j = i + 1; j < seated.length; j++) {
       if (seated[i].playerKey === seated[j].playerKey)
-        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].leg.id, seated[j].leg.id], why: "same-player" } };
+        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-player" } };
       if (spec.onePerGame && seated[i].gameKey === seated[j].gameKey)
-        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].leg.id, seated[j].leg.id], why: "same-game" } };
+        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-game" } };
     }
   }
 
   /* ---- eligibility, then the band */
   const elig = eligible(pool, spec);
-  if (!elig.length && seated.length < n) return { ok: false, fail: { code: "no-rows" } };
-  const pinIds = new Set(seated.map((p) => p.leg.id));
-  const free = elig.filter((l) => !pinIds.has(l.leg.id) && !clashes(l, seated, spec.onePerGame));
+  if (!elig.length && seated.length < n) {
+    /* WHICH filter emptied it (INSTRUCTION 52 fix pass). `no-rows` reads on the page as "No
+       Anytime TD lines on this board", a statement ABOUT THE BOARD — and football made that
+       reachable on a board that is full of them: anytime TD posts a YES and no under, so asking
+       for unders there emptied `elig` while the rows sat plainly on screen underneath. The pool
+       itself says whether the board was empty; when it was not, the side filter is named when it
+       is the cause (with the posted side, so the sheet can offer it as one tap), and the book /
+       price-source filters fall through to short-pool, which names the relaxation that opens it
+       up. Nothing is relaxed here — only reported. */
+    if (pool.legs.length) {
+      const want = spec.sides;
+      if (want !== "both") {
+        const has: GenSide = want === "u" ? "o" : "u";
+        const other = eligible(pool, { ...spec, sides: has });
+        if (other.length) return { ok: false, fail: { code: "one-sided", want, has, rows: other.length } };
+      }
+      return {
+        ok: false,
+        fail: { code: "short-pool", have: seated.length, want: n, relax: relaxHint(pool, spec, seated, n) },
+      };
+    }
+    return { ok: false, fail: { code: "no-rows" } };
+  }
+  const pinIds = new Set(seated.map((p) => p.id));
+  const free = elig.filter((l) => !pinIds.has(l.id) && !clashes(l, seated, spec.onePerGame));
   /* the sampling set (pin-independent — see Ctx.cands) and the CAPACITY set (what is actually
      still seatable given the pins) are two different questions and are counted separately */
   const sampleSet = elig.filter((l) => inDec(l.dec, band));
@@ -645,7 +708,7 @@ export function generate(pool: GenPool, spec: GenSpec, seed: number, avoid?: Rea
      handed Josh a remedy that does nothing. band-empty is now raised only when the band really
      is empty of un-pinned eligible legs; otherwise this falls through to the capacity check
      below, which says short-pool and names the relaxation that would actually open it up. */
-  const inBandAll = elig.filter((l) => !pinIds.has(l.leg.id) && inDec(l.dec, band));
+  const inBandAll = elig.filter((l) => !pinIds.has(l.id) && inDec(l.dec, band));
   if (!inBandAll.length && seated.length < n) {
     return {
       ok: false,
@@ -659,7 +722,7 @@ export function generate(pool: GenPool, spec: GenSpec, seed: number, avoid?: Rea
     return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
   }
 
-  const ctx: Ctx = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet };
+  const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet };
   const payoutBand = spec.payout ? bandDec(spec.payout.minAm, spec.payout.maxAm) : null;
 
   if (payoutBand) {
@@ -677,14 +740,14 @@ export function generate(pool: GenPool, spec: GenSpec, seed: number, avoid?: Rea
       const fixed = repairPayout(ctx, first, order, payoutBand);
       if (!fixed) continue;
       const t = ticketOf(fixed.legs, ctx.spec, s);
-      const ticket: GenTicket = { ...t, dropped: fixed.dropped };
+      const ticket: GenTicket<P> = { ...t, dropped: fixed.dropped };
       if (avoid?.has(ticket.key) && roll < ROLL_RETRIES) continue;
       return { ok: true, ticket };
     }
     return { ok: false, fail: { code: "payout-not-found", reach: reachAm } };
   }
 
-  let last: GenTicket | null = null;
+  let last: GenTicket<P> | null = null;
   for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
     const s = (seed + roll) >>> 0;
     const legs = fillSlots(ctx, sampleOrder(ctx.cands, mulberry32(s), n), null);

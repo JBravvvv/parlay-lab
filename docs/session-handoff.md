@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-11:** `origin/frontend-rebuild` = `46f68df9abc8ca16977636c4ee845f0081e0a312` (read by `git rev-parse origin/frontend-rebuild` this write, for INSTRUCTION 50; the 2026-09-08 claim is history.)
+> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `f2e9bf777c8e78e7bc1db8834da5cd95ea70e0f0` (read by `git rev-parse origin/frontend-rebuild` this write, for INSTRUCTION 52; the 2026-09-11 claim — `46f68df9…`, INSTRUCTION 50 — is history.)
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
@@ -598,6 +598,95 @@ ones that change what Josh sees, in the order they would have bitten him:
 All four corrections to the credit arithmetic are written into `docs/credit-budget.md`. **Still
 outstanding and unchanged: the 3-event probe.** It remains the gate on flipping `rateMeasured`, on
 replacing the estimated 6, and on scheduling this route at all.
+
+**INSTRUCTION 52 — THE LIVE LINES THAT WENT AWAY, AND THE PARLAY GENERATOR ON FOOTBALL (2026-09-12,
+branch `frontend-rebuild`, off `f2e9bf7`).** Josh, verbatim, two items:
+
+> 1. "I've always had in game live lines. It has live lines; they just went away this week"
+> 2. "Parlay Generator should be on CFB & NFL just like it is on MLB"
+
+Then: "Deploy once finished", "just tell me when it's deployed", "WORK FASTER".
+
+**ITEM 1 WAS A REGRESSION TO FIND, NOT A FEATURE TO BUILD — and he was right.** Two separate causes
+were found, on two different desks. Both are fixed here. Correcting the record first, because
+INSTRUCTION 51's own report got this wrong: I told Josh "the Odds API may not sell in-play MLB props
+at all". **The surface that has always had genuine in-game market lines is the CFB desk.** On MLB,
+in-game market PRICES were never wired until `f2e9bf7` (2026-09-11, yesterday); what MLB "always
+had" is the LIVE pill and the LIVE parlay set, which read live game STATE over the last-pulled
+pregame prices. So "they went away this week" is one true statement about CFB prices and one true
+statement about an MLB pill that had gone empty, and the two have nothing to do with each other.
+
+**CAUSE A — CFB/NFL in-game prop lines froze because the pre-kick pass ate the whole day's rail.**
+`7c2912b` (INSTRUCTION 42, 2026-09-05) raised `CFB_PROPS` maxEvents 12 → 60, dailyBudget 1200 → 2500,
+liveMaxEvents 6 → 24. 60 events × 31 credits = **1,860 of 2,500**, leaving 640 — which is 20
+event-pulls, while a live pull of 24 games wants **744**. So from the moment a Saturday slate was
+fully priced pre-kick, every in-play re-price was refused by the single Pacific-day counter, and the
+board served carried rows stamped `{status:"live", playable:false}` with `stale:true`. That is
+exactly "it has live lines; they just went away".
+
+THE FIX IS A TWO-RAIL SPLIT IN `src/lib/server/football-props.ts`, NOT A BIGGER BUDGET. A game that
+is under way is sized against the **whole** `dailyBudget`; a pre-kick game is sized against
+`dailyBudget − liveReserveCredits`. `liveReserveCredits` = `liveMaxEvents × measuredCreditsPerEvent`
+= **744 (CFB)** / **496 (NFL)** — the exact cost of one full live pass, held back from the pre-kick
+half only. **NO BUDGET, CAP, SLOT OR ALLOTMENT IS LOWERED BY THIS BUILD** (Josh, 2026-09-09: "Don't
+lower any budgets"). Consequences, stated plainly: CFB now prices **56 of 60** games pre-kick
+(`floor(1756/31)`) instead of 60, and keeps the ability to re-price 24 in play; NFL prices 16
+pre-kick and 16 live, 992 of 1000. The partition asks `g.status === "live"`, **not** the `why` rank,
+because `why()` returns "unpriced" for any game the stored board does not carry — so on a day's first
+pull an in-play game is ranked "unpriced", and a `why`-based split would have left the most frozen
+case of all (in-play, no rows at all) on the reduced rail. The honest note names the held credits
+rather than claiming a budget is spent that is not. With `liveReserveCredits` absent or 0 the whole
+path is byte-identical to the single allowance it replaces — that is asserted, not asserted-ish, in
+`tests/live-reserve.test.ts`.
+
+**THIS DOES NOT MANUFACTURE CREDITS, AND THE FOOTBALL SHORTFALL IS STILL JOSH'S CALL.** A Saturday
+that wants every game priced pre-kick AND re-priced in play wants more than 2,500. The reserve makes
+the in-play half possible at all; it cannot make the day cheaper. His three options are unchanged and
+all three are improved by the reserve rather than replaced by it: (a) 20,000 → 100,000 credits/month,
+$30 → $59; (b) `liveRevalidateSec` 600 → 1800, ~8,900 → ~3,000 credits; (c) `liveMaxEvents` 24 → 8-10.
+
+**CAUSE B — MLB's live pull rode the STAKE calendar, four fifths of which sees no baseball.**
+INSTRUCTION 51 shipped `liveSlotsPT: []` with `tickMode: "slots"`, which made the in-play pull ride
+`REFILL_SLOTS_PT` = 08:00 / 09:30 / 12:00 / 15:00 / 16:45 PT. **Four of those five see zero live
+baseball**, and 16:45 is ~31 minutes before the concurrency peak. Fixed by populating
+`liveSlotsPT: ["12:00","15:00","16:45","17:15","17:45","18:15","18:45"]` **and** flipping `tickMode`
+to `"ticker"` — populating alone is a no-op, because "slots" never reads the new array. `slots` still
+points at the SAME ARRAY OBJECT as `REFILL_SLOTS_PT` (by reference, asserted), so INSTRUCTION 49's
+money calendar is untouched and the two cannot drift. **ZERO NEW CRON EXECUTIONS**: this rides the
+existing cron-job.org ticker row, and `vercel.json` is untouched. Cost: `rateMeasured` is false, so
+`src/lib/server/mlb-live-quote.ts` caps EVERY pass at `probeEvents` (3), making a pass
+`1 + 3×6 = 19` credits — **7 × 19 = 133 of the 600 rail, 22%**.
+
+**CAUSE C — the LIVE pill and LIVE parlays need a board BUILT while games are live, and every
+automatic route to one is refused in play.** `board-store.ts:133-185` calls an in-play slate
+dead-slate / low-ceiling, and the top-up ladder calls it "every game started". So `categoriesLive`
+was whatever the last PREGAME pass computed: nothing. Fixed with a board-only `?live=1` mode on
+`/api/generate` that skips the conditional-skip branch exactly as `topup=1` does, writes the board
+blob, and **never enters `src/lib/server/blocks.ts`** — no claim, no allocation, no append, no
+`buildLockEntry`, no `writeLock`. INSTRUCTION 48's append-only card cannot be broken by a pass that
+never appends, and `tests/live-board-only.test.ts` proves that structurally, by line range, off the
+real route source. **It is wired to Josh's own tap only and is on no timer**: a pass costs a full
+generate (114-150 credits), so authorising an automatic evening re-price is his decision, not mine.
+The 45-minute limiter stays in force — a tap inside it buys nothing and says so.
+
+The paid call lives in `src/lib/mlb/live-board-client.ts`, not on the page. It was briefly written as
+a second `fetch(` in `app/board/page.tsx` and `tests/board-settled.test.ts` caught it: that file
+requires the Board page to write **exactly one** `fetch(` (the free `/api/picks` read) so a priced
+read cannot reach a page's JSX without going through a named, reviewable client. **The spend moved;
+the guard did not.**
+
+**ITEM 2 — THE PARLAY GENERATOR IS NOW ON CFB AND NFL, FROM ONE MOUNT.** `src/lib/parlay-gen.ts` was
+generalised rather than forked: the generic `GenLeg<T>` hoists `id`/`am`/`prob`/`src` and adds
+`side`/`label`/`sub`, which removes the id-suffix side recovery (`l.leg.id.endsWith("|o")`) that made
+the engine MLB-shaped. MLB's pool builder moved to `src/components/props/mlb-gen-pool.ts`; football
+gets `src/lib/football/gen-pool.ts`, injecting CfbProps' own `propQuote`/`propLegOf` so a football leg
+is priced by the football desk's rules and not a copy of them. The ~95-line panel state machine is
+`src/components/props/useParlayGen.ts`, shared. `GenSheet` is sport-neutral via `markets` and
+`renderMark`. **The mount is ONE JSX block inside `src/components/cfb/CfbProps.tsx`** — and because
+`src/components/nfl/NflProps.tsx` is 18 lines rendering `<LeagueProvider desk={NFL_DESK}><CfbProps/>`,
+NFL gets the generator for free, with no second copy to drift. Editing `NflProps.tsx` would have been
+the fork. MLB mints two legs per row (over and under); a `CfbPropRow` is already one side, so football
+mints one. `app/props/page.tsx`'s documented hooks-safe early returns at `:361`/`:376` are unchanged.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs

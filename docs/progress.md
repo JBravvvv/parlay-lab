@@ -1,3 +1,64 @@
+# Progress — 2026-09-12 (INSTRUCTION 52: the in-game live lines come back, and the Parlay Generator lands on CFB & NFL)
+
+Josh, verbatim: (1) "I've always had in game live lines. It has live lines; they just went away this
+week"; (2) "Parlay Generator should be on CFB & NFL just like it is on MLB".
+
+## Item 1 was a regression, and he was right about it
+
+I had told him after INSTRUCTION 51 that "the Odds API may not sell in-play MLB props at all". That
+was wrong about his experience and it is corrected here. **The desk that has always had real in-game
+market lines is CFB.** On MLB, in-game market prices were first wired yesterday (`f2e9bf7`); what MLB
+always had is the LIVE pill and LIVE parlay set, which read live game *state* over the last pregame
+prices. Both had broken, for unrelated reasons, and both are fixed.
+
+### CFB/NFL: the pre-kick pass was eating the whole day's credit rail
+
+60 games × 31 credits = 1,860 of CFB's 2,500, leaving 640 — and a 24-game live pull wants 744. So the
+moment a Saturday slate finished pricing pre-kick, every in-play re-price was **refused by the budget**
+and the board served carried rows marked `playable:false`, `stale:true`. Lines that "went away".
+
+Fixed with a two-rail split, not a bigger budget: a game **under way** is sized against the whole
+`dailyBudget`; a **pre-kick** game against `dailyBudget − liveReserveCredits`, where the reserve is
+one full live pass (744 CFB, 496 NFL). **No budget, cap, slot or allotment was lowered.** CFB now
+prices 56 of 60 pre-kick rather than 60, and keeps its 24 in-play re-prices. NFL does 16 + 16 = 992 of
+1,000, and an unspent Sunday morning still buys all 13 games — that is pinned.
+
+This does **not** manufacture credits. A Saturday that wants all 60 priced pre-kick *and* re-priced in
+play still wants more than 2,500, so Josh's three options stand: upgrade to 100,000 credits ($30 →
+$59/mo), widen `liveRevalidateSec` 600 → 1800 (~8,900 → ~3,000), or trim `liveMaxEvents` 24 → 8-10.
+
+### MLB: the live pull was riding the stake calendar
+
+INSTRUCTION 51 shipped the in-play pull on `REFILL_SLOTS_PT` (08:00 / 09:30 / 12:00 / 15:00 / 16:45
+PT). **Four of those five see no live baseball.** It now has its own calendar — 12:00, 15:00, 16:45,
+17:15, 17:45, 18:15, 18:45 PT — and `tickMode` flipped to `"ticker"` so the new calendar is actually
+read. Seven passes × 19 credits = **133 of the 600 rail**. Zero new cron rows; `vercel.json` untouched;
+the stake calendar is the same array object it always was.
+
+### MLB: the LIVE pill needs a board built while games are live
+
+Every automatic route to an in-play engine run is refused (dead-slate, low-ceiling, "every game
+started"), so `categoriesLive` stayed frozen at its pregame state — empty. There is now a board-only
+`?live=1` pass that re-prices and stores the board **without ever entering the stake path**: no claim,
+no allocation, no append. The locked card cannot move. It runs on Josh's tap only, never on a timer,
+because a pass costs 114-150 credits — whether to authorise automatic evening re-prices is his call.
+
+## Item 2: one mount, two desks
+
+`parlay-gen.ts` was generalised instead of forked — a generic `GenLeg<T>` carrying its own `side`
+replaces the id-suffix trick that made the engine MLB-shaped. Football gets its own pool builder that
+injects the CFB desk's real `propQuote`/`propLegOf`, so football legs are priced by football rules. The
+panel's state machine and `GenSheet` are now shared and sport-neutral. The generator is mounted in
+**one** place, `CfbProps.tsx` — and since `NflProps.tsx` is 18 lines wrapping `CfbProps` in the NFL
+league context, **NFL gets it with no second copy to drift**.
+
+## Still Josh's to decide
+
+The football credit shortfall (the three options above); whether automatic evening board-only
+re-prices are authorised at 114-150 credits each; that his cron-job.org ticker covers 08:00-19:00 PT
+while baseball runs past 22:00, which is his account to extend; that the sync phrase must be saved on
+the phone or every MLB live price stays invisible; and the seven expired GitHub workflow waivers.
+
 # Progress — 2026-09-11 (INSTRUCTION 51: the live in-play line and price are really pulled, for MLB)
 
 ## Board — "over 3.5 at −145" instead of a dash

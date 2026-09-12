@@ -188,6 +188,116 @@ export function mlbLiveAgeLabel(pricedAtIso: string | null | undefined, now: num
 }
 
 /**
+ * WHY THERE IS NO LIVE PRICE ON THIS ROW — the three answers, counted, never guessed (2026-09-12).
+ *
+ * `rowLive` in the Board refuses a quote for three different reasons and then renders NOTHING for
+ * all three, which from the outside is one symptom — "it isn't updating with live odds" — with no
+ * way to tell a missing sync phrase from a book that posts no in-play market from a price that has
+ * simply gone stale. Each one has a different answer, and two of them are things Josh can act on:
+ *
+ *   • NO SYNC PHRASE ON THIS PHONE — `useMlbLiveQuotes` disables itself, so no pull is even asked
+ *     for. He fixes this in Settings in ten seconds, and until he is told, he cannot.
+ *   • NO LIVE QUOTE FOR THIS GAME — the pass never reached it (the per-pass cap is 3 games until
+ *     the probe is measured), or the book posts no in-play market on it. Nothing to do but wait for
+ *     the next pass; the row honestly keeps its pregame price.
+ *   • THE QUOTE IS OLDER THAN `quoteMaxAgeSec` — Redis still holds it, the screen drops it. This is
+ *     the one that looked most like a bug, because a price WAS pulled and still nothing appeared.
+ *
+ * This is a pure function over counts so both the Board and The Sharp print the same sentence from
+ * the same arithmetic, and so it can be tested without a browser. It spends nothing and fetches
+ * nothing. It deliberately does NOT start a poll: the standing rule on this paid feed is no
+ * `refetchInterval`, and naming a stale price is the honest alternative to quietly re-buying it.
+ */
+export type MlbLiveGap = {
+  /** games under way right now */
+  readonly live: number;
+  /** of those, carrying a live price the render will actually show */
+  readonly priced: number;
+  /** of those, with no in-play quote at all */
+  readonly noQuote: number;
+  /** of those, holding a quote the render-time age cap discards */
+  readonly tooOld: number;
+};
+
+export function mlbLiveGap(args: {
+  /** the gkeys of the games that are under way on THIS render (deduped internally) */
+  readonly liveGameKeys: readonly string[];
+  /** the overlay's `rows`, keyed `gkey|lkey` — null/undefined when no overlay loaded */
+  readonly rows?: Readonly<Record<string, { readonly at: string }>> | null;
+  readonly now?: number;
+}): MlbLiveGap {
+  const now = args.now ?? Date.now();
+  const maxAgeMs = MLB_LIVE_CLIENT.quoteMaxAgeSec * 1000;
+  const keys = Array.from(new Set(args.liveGameKeys.filter(Boolean)));
+  /* the FRESHEST stamp per game, because one game's quotes are bought in a single call and a row
+     that is inside the cap is enough to make the game "priced live" on screen. */
+  const freshest = new Map<string, number>();
+  for (const [k, q] of Object.entries(args.rows ?? {})) {
+    const gkey = k.split("|")[0];
+    const t = Date.parse(String(q?.at ?? ""));
+    if (!Number.isFinite(t)) continue;
+    const prev = freshest.get(gkey);
+    if (prev == null || t > prev) freshest.set(gkey, t);
+  }
+  let priced = 0;
+  let noQuote = 0;
+  let tooOld = 0;
+  for (const gkey of keys) {
+    const t = freshest.get(gkey);
+    if (t == null) noQuote += 1;
+    else if (now - t > maxAgeMs) tooOld += 1;
+    else priced += 1;
+  }
+  return { live: keys.length, priced, noQuote, tooOld };
+}
+
+/**
+ * The same three answers as one line of plain betting English, or null when there is nothing to
+ * explain (no game under way, or every game under way is priced live — the footnote already says
+ * when those were taken, and a second sentence saying "all good" is noise on a 375px screen).
+ *
+ * Every number in it is a count off the overlay the server returned. No estimate, no fabrication,
+ * and no jargon: Josh reads "no live price yet", not "unmatched event" or "cache miss".
+ */
+export function mlbLiveGapNote(
+  gap: MlbLiveGap,
+  opts: { readonly syncReady: boolean; readonly overlay: boolean; readonly error?: string | null },
+): string | null {
+  if (gap.live <= 0) return null;
+  const g = (n: number) => (n === 1 ? "game" : "games");
+  const under = `${gap.live} ${g(gap.live)} under way`;
+  /* AN OVERLAY IN HAND IS PROOF THE PHRASE WORKS, so the three no-overlay answers are asked first
+     and only then the per-game ones. `syncReady` is a mount-effect read and is false during the
+     first render pass (a render that disagreed with the server's would be a hydration mismatch), so
+     asking it ahead of `overlay` would print "no sync phrase" for one frame on a phone that has
+     one — a false reason is worse than no reason. */
+  if (!opts.overlay) {
+    if (!opts.syncReady) {
+      return `no live prices on this phone — your sync phrase isn't saved here, so the Board can't ask the server for in-play odds. Put it in Settings and the ${under} will re-price.`;
+    }
+    if (opts.error) {
+      return `no live prices right now — the server answered "${opts.error}". The ${under} are showing their pregame price.`;
+    }
+    return `live prices haven't loaded yet — the ${under} are showing their pregame price.`;
+  }
+  if (gap.noQuote === 0 && gap.tooOld === 0) return null;
+  const mins = Math.round(MLB_LIVE_CLIENT.quoteMaxAgeSec / 60);
+  const parts: string[] = [];
+  if (gap.priced > 0) parts.push(`${gap.priced} of ${under} ${gap.priced === 1 ? "is" : "are"} priced live`);
+  if (gap.noQuote > 0) {
+    parts.push(
+      `${gap.noQuote} ${g(gap.noQuote)} ${gap.noQuote === 1 ? "has" : "have"} no live price yet — the last pull did not reach ${gap.noQuote === 1 ? "it" : "them"}, so ${gap.noQuote === 1 ? "that game keeps" : "those games keep"} the pregame price`,
+    );
+  }
+  if (gap.tooOld > 0) {
+    parts.push(
+      `${gap.tooOld} ${g(gap.tooOld)} ${gap.tooOld === 1 ? "was" : "were"} last priced more than ${mins} minutes ago — too old to call live, so ${gap.tooOld === 1 ? "that game keeps" : "those games keep"} the pregame price`,
+    );
+  }
+  return parts.join(" · ");
+}
+
+/**
  * Is a sync phrase stored on this device? (fix pass, 2026-09-11.)
  *
  * `/api/mlb/live-props` answers 401 without one, so `useMlbLiveQuotes` disables itself rather than

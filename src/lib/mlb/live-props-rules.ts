@@ -38,35 +38,49 @@ import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
  * baseball with no automatic pass at all. That is stated here rather than papered over, because a
  * board that LOOKS live and is not is exactly the dishonesty INSTRUCTION 50 existed to remove.
  *
- * So `tickMode` ships "slots": automatic passes fire only on the first scheduler tick inside each
- * of the five PT slots, through `decideSlotTick` reusing `slots` below — which is the SAME ARRAY
- * OBJECT as `REFILL_SLOTS_PT` (`src/lib/server/grading-progress.ts:116`), never a literal copy, so
- * the two calendars can never drift apart. `tests/mlb-live-rules.test.ts` asserts that by reference.
- * The primary vehicle is Josh's own tap, which is his stated contract (2026-09-09, verbatim: "I can
- * manually do it and it can function the same way whether I manually refresh it or it refreshes
- * itself automatically") — and a tap while he is staring at a row is exactly when an in-play price
- * is worth money.
+ * INSTRUCTION 51 SHIPPED `tickMode: "slots"` — automatic passes on the five PT stake slots — and
+ * that is exactly the defect the paragraph above describes: four of those five see no baseball. IT
+ * WAS CHANGED ON 2026-09-12 to `"ticker"` with `liveSlotsPT` populated (see both fields below for
+ * the seven times, the reason for each, and the full credit arithmetic). `slots` still points at the
+ * SAME ARRAY OBJECT as `REFILL_SLOTS_PT` (`src/lib/server/grading-progress.ts:116`), never a literal
+ * copy, so INSTRUCTION 49's stake calendar is untouched and the two can never drift apart;
+ * `tests/mlb-live-rules.test.ts` asserts that by reference.
  *
- * `liveSlotsPT` is the opt-in, SHIPPED EMPTY. Populating it (e.g. ["17:00","17:30","18:00","18:30"])
- * rides the EXISTING cron-job.org scheduler ticker — stated in-tree at
- * `src/lib/server/grading-progress.ts:50-53` as every 15 min, UTC hours 15-23 and 0-2, which in PDT
- * is 08:00-19:00 PT — so it costs ZERO new cron-job.org executions and covers the concurrency peak.
- * It dies at 19:00 PT; past that is Josh's cron account and we do not touch it. It does not alter
- * `REFILL_SLOTS_PT`, so the generate/refill spend INSTRUCTION 49 was about is untouched. FLIPPING
- * IT IS JOSH'S WORD, NOT OURS.
+ * Josh's own tap remains the primary vehicle and his stated contract (2026-09-09, verbatim: "I can
+ * manually do it and it can function the same way whether I manually refresh it or it refreshes
+ * itself automatically") — a tap while he is staring at a row is exactly when an in-play price is
+ * worth money. The seven automatic passes exist so the board is not frozen when he opens it.
+ *
+ * ZERO NEW CRON EXECUTIONS: the ticker mode rides the EXISTING cron-job.org scheduler row — stated
+ * in-tree at `src/lib/server/grading-progress.ts:50-53` as every 15 min, UTC hours 15-23 and 0-2,
+ * which in PDT is 08:00-19:45 PT — and every one of the seven times lands inside it in both
+ * offsets. No cron row is added or edited and `vercel.json` is untouched. The ticker dies before
+ * 22:01 PT, when the in-play span actually ends; widening it is JOSH'S cron account, not ours.
  *
  * ── THE SPEND, AND WHAT IT DOES NOT TOUCH ───────────────────────────────────────────────────────
- * Event-pull counts computed from the real 15-game slate, costed at the measured 6:
+ * CORRECTED 2026-09-12. The table that stood here costed every pass at 9-12 event-pulls, and no
+ * pass can make more than THREE: `src/lib/server/mlb-live-quote.ts` reads
+ * `probing = !cfg.rateMeasured || spentNow === 0`, `rateMeasured` is false, so `allowed` is
+ * `min(affordable, probeEvents)` on EVERY pass, not just the day's first. Every figure below that
+ * line was therefore 3-4x too high — an over-count, which is the safe direction, but it is not the
+ * number. One pass costs, as the route actually bills it:
  *
- *     16:45 slot alone (THE SHIPPED DEFAULT)          9 pulls    54 credits
- *     + ~4 manual Refreshes at >= 30-min spacing    ~40 pulls   ~240 credits
- *     30-min, every live game, whole span (ungated)  86 pulls   516 credits
- *     30-min, divergence-gated (~1/3 of games)       29 pulls   174 credits
- *     opt-in ticker window (22:41Z-02:45Z), 30-min   66 pulls   396 credits
+ *     MLB_LIST_CALL_CREDITS (the flat events list, 1-credit class)        1
+ *     probeEvents (3) x measuredCreditsPerEvent (6)                     18
+ *                                                          ONE PASS  =  19 credits
  *
- * `dailyBudget: 600` is the worst realistic day (the ungated whole-span pass, 516 on 15 games,
- * x16/15 = 550 on a September slate) plus ~9% cushion. IT IS A CEILING, NOT A FORECAST: the
- * shipped default spends ~54 automatic plus taps, and the expected gated spend is ~174.
+ * and RAIL 1b NX-stamps each automatic slot for the Pacific day, so each slot buys at most one pass:
+ *
+ *     the seven liveSlotsPT times (2026-09-12)        7 passes   133 credits
+ *     + 5 manual Refresh taps                        5 passes    95 credits
+ *                                                              228 of 600
+ *
+ * `dailyBudget: 600` therefore holds with a 2.6x cushion over a heavy day. IT IS STILL A CEILING,
+ * NOT A FORECAST, and it is also the thing that makes the UNMEASURED rate safe: if MLB bills like
+ * CFB's 31 an event, a pass is 1 + 3 x 31 = 94 and twelve passes would be 1,128 — but the rail
+ * counts the REAL x-requests-used delta, so it refuses the tail of the pass that would cross 600
+ * instead of spending past it. Worst case the day stops around 600 + one pass of overshoot, which is
+ * the pre-existing property of a read-modify-write rail and not something this change introduced.
  *
  * NO EXISTING BUDGET, CAP, SLOT OR ALLOTMENT IS LOWERED BY THIS BUILD. `CFB_PROPS.dailyBudget`
  * stays 2500 (`src/lib/cfb/rules.ts:475`), `NFL_PROPS.dailyBudget` stays 1000
@@ -129,11 +143,60 @@ export const MLB_LIVE_PROPS = {
   dailyBudget: 600,
   /** the MLB band 5.114-5.845 rounded UP. NOT CFB's 31. */
   measuredCreditsPerEvent: 6,
-  /** THE INSTRUCTION 49 CALENDAR — the same array object, never a copy */
+  /**
+   * THE INSTRUCTION 49 CALENDAR — the same array object, never a copy.
+   *
+   * STILL POINTED AT `REFILL_SLOTS_PT` AFTER THE 2026-09-12 CHANGE BELOW, deliberately: this field
+   * is INSTRUCTION 49's stake calendar and nothing about the money ladder moves. `tickMode` is now
+   * "ticker", so the LIVE pull reads `liveSlotsPT` instead of this array — but the reference is kept
+   * so the two calendars still cannot silently drift, and flipping `tickMode` back restores the
+   * shipped-51 behaviour exactly.
+   */
   slots: REFILL_SLOTS_PT,
-  /** the opt-in extra calendar, SHIPPED EMPTY pending Josh's word */
-  liveSlotsPT: [] as readonly string[],
-  tickMode: "slots" as "slots" | "ticker",
+  /**
+   * THE LIVE CALENDAR (2026-09-12) — seven Pacific times, and the reason each one is there.
+   *
+   * THE DEFECT: INSTRUCTION 51 shipped `tickMode: "slots"`, which made the live in-play pull ride
+   * `REFILL_SLOTS_PT`. This file's own cadence finding (just above) already said what that means:
+   * 08:00 / 09:30 / 12:00 / 15:00 PT see ZERO live baseball, and 16:45 PT is ~31 minutes BEFORE the
+   * 12-of-15 concurrency peak. So four of the five automatic passes bought in-play prices for
+   * nothing at all, and the five hours of baseball after the fifth got no pass. The in-play span on
+   * a real slate is 15:41 PT -> 22:01 PT.
+   *
+   * WHY BOTH CONSTANTS HAD TO MOVE TOGETHER: populating this array alone does nothing — the
+   * scheduler only consults it when `tickMode` is "ticker" (app/api/scheduler/route.ts, the `lt`
+   * line). And flipping `tickMode` REPLACES the five slots for the live decision rather than adding
+   * to it, so this array has to carry the daytime times still worth pulling. 12:00 and 15:00 are
+   * kept for exactly that reason: a getaway day or a doubleheader can be in play then, and an early
+   * pass also lands the first real `x-requests-used` reading of the day, which is the measurement
+   * `rateMeasured` is waiting on. 08:00 and 09:30 are dropped — no MLB game has ever been in play
+   * at 08:00 Pacific.
+   *
+   * 16:45 -> 18:45 at 30 minutes covers the peak and the long middle of the span. It stops at 18:45
+   * because the existing cron-job.org ticker stops: every one of the seven lands inside its window
+   * (every 15 min, UTC hours 15-23 and 0-2) in BOTH offsets — 18:45 PT is 01:45 UTC in PDT and
+   * 02:45 UTC in PST, the ticker's last pulse. The 19:45 PT -> 22:01 PT tail of the in-play span
+   * therefore still gets no automatic pass, and widening the ticker is JOSH'S OWN cron account.
+   * No cron row is added by this change and vercel.json is untouched.
+   *
+   * WHAT THE SEVEN ACTUALLY COST, computed off this file's own numbers and the route's code:
+   * `rateMeasured` is false, and src/lib/server/mlb-live-quote.ts reads
+   * `probing = !cfg.rateMeasured || spentNow === 0` -> so EVERY pass is capped at `probeEvents` (3),
+   * never `liveMaxEvents` (12). One pass is therefore `MLB_LIST_CALL_CREDITS` (1, the flat events
+   * list) + 3 x `measuredCreditsPerEvent` (6) = 19 credits, not 72. And RAIL 1b stamps each slot
+   * with an NX key for the Pacific day, so each of the seven buys AT MOST ONE pass:
+   *
+   *     7 slots x 19 = 133 credits a day, against the route's own 600 rail — 22% of it.
+   *
+   * THE UNMEASURED CASE, stated rather than buried: if MLB in fact bills like CFB's 31 an event, a
+   * pass is 1 + 3 x 31 = 94 and seven would be 658 — past 600. That is what `probeEvents` and
+   * `rateMeasured: false` exist for, and the rail counts the REAL x-requests-used delta, so the
+   * route refuses the tail of the pass that would cross 600 rather than spending past it. It is
+   * also why 12:00 is kept: the sooner a real reading lands, the sooner this stops being a band.
+   */
+  liveSlotsPT: ["12:00", "15:00", "16:45", "17:15", "17:45", "18:15", "18:45"] as readonly string[],
+  /** "ticker" since 2026-09-12 — the live pull reads `liveSlotsPT`, not the five stake slots */
+  tickMode: "ticker" as "slots" | "ticker",
 } as const;
 
 /**

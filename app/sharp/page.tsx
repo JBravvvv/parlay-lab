@@ -19,7 +19,7 @@ import { getEngine, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client"
 import { useCalibration } from "@/lib/useCalibration";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
 import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
-import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveView, useMlbLiveQuotes, type MlbLiveQuote } from "@/lib/mlb/live-client";
+import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiveGapNote, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote } from "@/lib/mlb/live-client";
 import type { PickRow } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
 
@@ -199,6 +199,28 @@ export default function SharpPage() {
       return q;
     },
     [liveOverlay, d, liveNow],
+  );
+  /* FIX 4 ON THE SHARP (2026-09-12). This tab had no explanation of ANY kind: with no sync phrase
+     saved the live query is disabled, `liveOverlay` stays null, the footnote below never renders
+     and the card quietly shows pregame prices on a game in the 4th inning. Same three refusals as
+     `playLive` above, same words as the Board, one shared helper so the two tabs cannot tell Josh
+     different stories. Nothing here polls and nothing re-buys a stale price. */
+  const liveSyncReady = useMlbLiveSyncReady();
+  const liveError = liveQuotes.error ? String((liveQuotes.error as Error).message ?? liveQuotes.error) : null;
+  const liveGameKeys = useMemo(() => {
+    if (!d?.gameInfo) return [] as string[];
+    return Object.entries(d.gameInfo)
+      .filter(([, g]) => g.pk != null && liveNow.games[g.pk]?.live)
+      .map(([gkey]) => gkey);
+  }, [d, liveNow]);
+  const liveReasonNote = useMemo(
+    () =>
+      mlbLiveGapNote(mlbLiveGap({ liveGameKeys, rows: liveOverlay?.rows ?? null }), {
+        syncReady: liveSyncReady,
+        overlay: !!liveOverlay,
+        error: liveError,
+      }),
+    [liveGameKeys, liveOverlay, liveSyncReady, liveError],
   );
   /** when THIS GAME's live line was pulled — per game, never board-level; that is the whole
       answer to "how fresh", and a game turning due cannot age another game's price */
@@ -527,6 +549,11 @@ export default function SharpPage() {
                 count off the overlay the server returned; nothing here is estimated, and the budget is
                 stated out loud rather than hidden behind a spinner. Same sentence as the Board's
                 footnote (app/board/page.tsx), so the two tabs cannot tell Josh different stories. */}
+            {liveReasonNote && (
+              <p className="mt-3 text-[10px] leading-snug text-faint" data-testid="sharp-live-reason">
+                {liveReasonNote}
+              </p>
+            )}
             {liveOverlay && (
               <p className="mt-3 text-[10px] leading-snug text-faint" data-testid="sharp-live-footnote">
                 live lines priced {mlbLiveClockLabel(liveOverlay.generatedAt)} · {liveOverlay.fetched} of{" "}

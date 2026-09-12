@@ -6,7 +6,6 @@ import { parseAmerican } from "@/lib/parlay-calc";
 import { parseBoardLabel } from "@/lib/player-card";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { PlayerName } from "@/components/player/PlayerName";
-import { MKT_LABEL } from "./props-model";
 import {
   LEG_MAX,
   LEG_MIN,
@@ -15,6 +14,7 @@ import {
   poolCounts,
   type GenFail,
   type GenLeg,
+  type GenMarket,
   type GenPool,
   type GenResult,
   type GenSpec,
@@ -42,18 +42,36 @@ import {
 
 export const GEN_PANEL_ID = "props-gen-panel";
 
-/** the six markets the sandbox prices; ML/RL are game markets and have no player slots (v1) */
-export const GEN_MARKETS: readonly string[] = [
-  "batter_hits",
-  "batter_total_bases",
-  "batter_home_runs",
-  "batter_hits_runs_rbis",
-  "pitcher_strikeouts",
-  "pitcher_outs",
-];
+/**
+ * The market list and the player disc arrive as PROPS (INSTRUCTION 52, 2026-09-12, Josh's word,
+ * verbatim: "Parlay Generator should be on CFB & NFL just like it is on MLB"). They used to be
+ * hardcoded MLB: the six batter/pitcher keys, the MLB label table and the MLB headshot map. The
+ * MLB list now lives with the MLB pool builder (src/components/props/mlb-gen-pool.ts) and the
+ * football list with the football one (src/lib/football/gen-pool.ts), so this sheet is the same
+ * sheet on all three desks instead of a second copy per sport.
+ */
 
-/** the engine suspends these two from its OWN auto-built tickets (SH_CFG hrrAltMax:-1, outsSusp:true) */
-const SUSPENDED = new Set(["batter_hits_runs_rbis", "pitcher_outs"]);
+/**
+ * How a slot draws its player. `leg` is the DESK'S OWN leg object (an MLB SandboxLeg, a football
+ * CfbSlipLeg) so each desk can reach the fields only it has — the ESPN headshot and position on
+ * football, the page's resolved headshot map on MLB — and `gen` is the generator's wrapper for
+ * anything generic.
+ */
+type SlotPart<P> = (a: { leg: P; gen: GenLeg<P>; name: string; team: string | null }) => ReactNode;
+
+/** the default disc — today's MLB path. The page overrides it to pass its resolved headshot. */
+function mlbMark<P>({ name, team }: { leg: P; gen: GenLeg<P>; name: string; team: string | null }): ReactNode {
+  return <PlayerMark player={name} team={team} headshot={null} size="sm" />;
+}
+
+/** the default name — today's MLB path: tappable, opens the MLB profile sheet */
+function mlbName<P>({ name, team }: { leg: P; gen: GenLeg<P>; name: string; team: string | null }): ReactNode {
+  return (
+    <PlayerName name={name} team={team} className="block truncate text-[12.5px] font-medium tracking-tight text-text">
+      {name}
+    </PlayerName>
+  );
+}
 
 /* every count the generator will actually honour — the Faint line under this control quotes
    LEG_MIN..LEG_MAX, so offering 2-6 under a sentence that said "between 2 and 8" left two
@@ -100,6 +118,14 @@ export function genFailLine(
   switch (fail.code) {
     case "no-rows":
       return `No ${ctx.marketLabel} lines on this board — there is nothing here to build a parlay from.`;
+    case "one-sided": {
+      /* NEVER "no lines on this board" here: the board has plenty, they are all the other way
+         round (INSTRUCTION 52 fix pass). Anytime TD is the live case — a price on the touchdown
+         happening, with no under posted anywhere. */
+      const asked = fail.want === "u" ? "under" : "over";
+      const posted = fail.has === "u" ? "unders" : "overs";
+      return `No ${ctx.marketLabel} ${asked} is posted on this board — all ${fail.rows} ${ctx.marketLabel} leg${fail.rows === 1 ? "" : "s"} here ${fail.rows === 1 ? "is" : "are"} ${posted}. Switch to ${posted} and it can build.`;
+    }
     case "band-empty": {
       const b = fail.nearest.belowAm;
       const a = fail.nearest.aboveAm;
@@ -198,23 +224,29 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
 
 /* --------------------------------------------------------------------- one slot */
 
-function Slot({
+function Slot<P>({
   i,
   l,
   pinned,
   outOfBand,
-  headshot,
+  renderMark,
+  renderName,
   onTogglePin,
 }: {
   i: number;
-  l: GenLeg;
+  l: GenLeg<P>;
   pinned: boolean;
   outOfBand: boolean;
-  headshot: string | null;
+  renderMark: SlotPart<P>;
+  renderName: SlotPart<P>;
   onTogglePin: (slot: number) => void;
 }) {
-  const parsed = parseBoardLabel(l.leg.label);
-  const name = parsed?.name ?? l.leg.label;
+  /* An MLB board label prints "Name (TEAM)"; a football label is the name on its own and the
+     team rides in `l.team`. parseBoardLabel returns null for anything it does not recognise — it
+     resolves the abbreviation against the MLB club table — so one read serves both desks and
+     neither invents a team. */
+  const parsed = parseBoardLabel(l.label);
+  const name = parsed?.name ?? l.label;
   const team = parsed?.team ?? l.team;
   return (
     <div
@@ -237,22 +269,20 @@ function Slot({
         </span>
         <span className="mt-0.5 leading-none">{pinned ? "kept" : "spin"}</span>
       </button>
-      <PlayerMark player={name} team={team} headshot={headshot} size="sm" />
+      {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
-        <PlayerName name={name} team={team} className="block truncate text-[12.5px] font-medium tracking-tight text-text">
-          {name}
-        </PlayerName>
+        {renderName({ leg: l.leg, gen: l, name, team })}
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
-          <span className="truncate text-muted">{l.leg.sub}</span>
+          <span className="truncate text-muted">{l.sub}</span>
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
           {l.started && <span className="shrink-0 text-live">live</span>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end leading-none">
-        <span className="num text-[13px] font-semibold text-pos">{amFmt(l.leg.cz)}</span>
+        <span className="num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
         <span className="mt-[3px] flex items-center gap-1 text-[9px] text-faint">
-          {l.leg.src === "market" && <span className="italic">mkt</span>}
-          {l.leg.book && l.leg.book !== "CZ" && <span className="uppercase">{l.leg.book}</span>}
+          {l.src === "market" && <span className="italic">mkt</span>}
+          {l.book && l.book !== "CZ" && <span className="uppercase">{l.book}</span>}
         </span>
       </div>
     </div>
@@ -291,11 +321,13 @@ function LostSlot({ i, id, onTogglePin }: { i: number; id: string; onTogglePin: 
 
 /* ------------------------------------------------------------------- the sheet */
 
-export function GenSheet({
+export function GenSheet<P>({
   market,
   marketLabel,
+  markets,
   pool,
-  headshots,
+  renderMark = mlbMark,
+  renderName = mlbName,
   spec,
   onSpec,
   result,
@@ -309,15 +341,24 @@ export function GenSheet({
   boardAt,
   loading = false,
   gameMarket = false,
+  showModelOnly = true,
+  categoryNote = "Moneyline and run line are game markets, not player slots — the generator leaves them alone for now.",
+  stubNote = "The parlay generator builds PLAYER-prop parlays — pick a batter or pitcher market above and it appears here. Moneyline and run line are game markets and have no player slots yet.",
+  marketNote = "Italic legs use the market's own fair %, so their EV is ~0 by construction, not an edge.",
 }: {
   market: string;
   marketLabel: string;
-  pool: GenPool;
-  /** the page's ONE headshot map (app/props/page.tsx) — this sheet never calls useHeadshots itself */
-  headshots: Record<string, string>;
+  /** the desk's own prop markets, in its own rail order (MLB_GEN_MARKETS / FOOTBALL_GEN_MARKETS) */
+  markets: readonly GenMarket[];
+  pool: GenPool<P>;
+  /** the player disc for a slot — the page passes the headshot it already resolved; the football
+      desk passes its own mark. This sheet never calls useHeadshots itself. */
+  renderMark?: SlotPart<P>;
+  /** the player name for a slot — tappable on MLB (the profile sheet), plain text on football */
+  renderName?: SlotPart<P>;
   spec: GenSpec;
   onSpec: (patch: Partial<GenSpec>) => void;
-  result: GenResult;
+  result: GenResult<P>;
   onGenerate: () => void;
   onTogglePin: (slot: number) => void;
   onAdd: () => void;
@@ -329,8 +370,17 @@ export function GenSheet({
   boardAt: string | null;
   /** the board has not answered yet — say so instead of declaring the board empty */
   loading?: boolean;
-  /** the market rail is on a GAME market (ML/RL): the generator has no player slots there */
+  /** the market rail is on a GAME market (ML/RL, or football sides): no player slots there */
   gameMarket?: boolean;
+  /** offer the model-priced-only filter. Off on football, where every win % is the de-vigged
+      market consensus — the toggle would empty the pool and explain nothing. */
+  showModelOnly?: boolean;
+  /** the line under the category pills, in the desk's own words */
+  categoryNote?: ReactNode;
+  /** what stands in for the sheet on a game market */
+  stubNote?: ReactNode;
+  /** how this desk's market-sourced win % should be read */
+  marketNote?: ReactNode;
 }) {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
   /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). These counts were hand-rolled
@@ -340,10 +390,12 @@ export function GenSheet({
      4". poolCounts exists precisely so the diagnostic can never contradict the verdict. */
   const counts = poolCounts(pool, spec);
   const ticket = result.ok ? result.ticket : null;
-  const calc = ticket ? combineTicket(ticket.legs.map((l) => l.leg)) : null;
+  /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
+     the headline here still cannot disagree with the slip the legs are handed to */
+  const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob }))) : null;
   const outside = new Set(ticket?.outsideLegBand ?? []);
-  const anyMarketProb = !!ticket?.legs.some((l) => l.leg.src === "market");
-  const suspended = SUSPENDED.has(market);
+  const anyMarketProb = !!ticket?.legs.some((l) => l.src === "market");
+  const suspended = !!markets.find((m) => m.key === market)?.suspended;
   const fail = result.ok ? null : result.fail;
   /* every failure code is DETERMINISTIC in the pool and the spec, so "Generate" would be a
      guaranteed no-op in that state — the same "the button does nothing" complaint as item 1.
@@ -355,7 +407,7 @@ export function GenSheet({
   const pinRows = spec.pinned
     .slice(0, spec.legs)
     .map((id, i) => ({ i, id, leg: id ? pool.byId.get(id) ?? null : null }))
-    .filter((x): x is { i: number; id: string; leg: GenLeg | null } => !!x.id);
+    .filter((x): x is { i: number; id: string; leg: GenLeg<P> | null } => !!x.id);
 
   /* On the Games rail (moneyline / run line) the generator has nothing to build from — and the
      collapsed header used to read "Parlay generator · 4 legs · H+R+RBI" beside a Moneyline
@@ -363,8 +415,7 @@ export function GenSheet({
   if (gameMarket) {
     return (
       <section data-testid="props-gen-stub" className="glass mb-2 px-3 py-2 text-[10.5px] leading-snug text-faint">
-        The parlay generator builds PLAYER-prop parlays — pick a batter or pitcher market above and it appears here.
-        Moneyline and run line are game markets and have no player slots yet.
+        {stubNote}
       </section>
     );
   }
@@ -428,19 +479,19 @@ export function GenSheet({
           <div>
             <Label>Prop category</Label>
             <div className="flex flex-wrap gap-1.5">
-              {GEN_MARKETS.map((m) => (
+              {markets.map((m) => (
                 <button
-                  key={m}
+                  key={m.key}
                   type="button"
-                  aria-pressed={spec.market === m}
-                  onClick={() => onSpec({ market: m })}
-                  className={`${CTRL} px-3 ${spec.market === m ? ON : OFF}`}
+                  aria-pressed={spec.market === m.key}
+                  onClick={() => onSpec({ market: m.key })}
+                  className={`${CTRL} px-3 ${spec.market === m.key ? ON : OFF}`}
                 >
-                  {MKT_LABEL[m] ?? m}
+                  {m.label}
                 </button>
               ))}
             </div>
-            <Faint>Moneyline and run line are game markets, not player slots — the generator leaves them alone for now.</Faint>
+            <Faint>{categoryNote}</Faint>
           </div>
 
           {/* per-leg odds band */}
@@ -503,9 +554,11 @@ export function GenSheet({
               <Toggle on={spec.czOnly} onChange={(v) => onSpec({ czOnly: v })}>
                 Caesars-priced legs only
               </Toggle>
-              <Toggle on={spec.modelOnly} onChange={(v) => onSpec({ modelOnly: v })}>
-                Model-priced legs only (no market-fair legs)
-              </Toggle>
+              {showModelOnly && (
+                <Toggle on={spec.modelOnly} onChange={(v) => onSpec({ modelOnly: v })}>
+                  Model-priced legs only (no market-fair legs)
+                </Toggle>
+              )}
               <Toggle
                 on={spec.payout != null}
                 onChange={(v) => onSpec({ payout: v ? { minAm: 400, maxAm: 1200 } : null })}
@@ -594,12 +647,13 @@ export function GenSheet({
               <div className="-mx-1">
                 {ticket.legs.map((l, i) => (
                   <Slot
-                    key={l.leg.id}
+                    key={l.id}
                     i={i}
                     l={l}
-                    pinned={spec.pinned[i] === l.leg.id}
-                    outOfBand={outside.has(l.leg.id)}
-                    headshot={headshots[parseBoardLabel(l.leg.label)?.name ?? l.leg.label] ?? null}
+                    pinned={spec.pinned[i] === l.id}
+                    outOfBand={outside.has(l.id)}
+                    renderMark={renderMark}
+                    renderName={renderName}
                     onTogglePin={onTogglePin}
                   />
                 ))}
@@ -635,9 +689,7 @@ export function GenSheet({
               </div>
               <div className="mt-1.5 text-[9.5px] leading-snug text-faint">
                 True % is the naive product — same-game legs are correlated and this sandbox does not model that.
-                {anyMarketProb && (
-                  <> Italic legs use the market&apos;s own fair %, so their EV is ~0 by construction, not an edge.</>
-                )}{" "}
+                {anyMarketProb && <> {marketNote}</>}{" "}
                 {suspended && (
                   <>
                     {marketLabel} is suspended from the engine&apos;s own auto-built tickets; this sandbox spins it anyway.{" "}
@@ -662,7 +714,8 @@ export function GenSheet({
                         l={leg}
                         pinned
                         outOfBand={false}
-                        headshot={headshots[parseBoardLabel(leg.leg.label)?.name ?? leg.leg.label] ?? null}
+                        renderMark={renderMark}
+                        renderName={renderName}
                         onTogglePin={onTogglePin}
                       />
                     ) : (

@@ -147,6 +147,36 @@ export async function GET(req: NextRequest) {
        reaches it through POST /api/refill, which runs decideTopUp first and forwards with
        x-cron-key; a sync-phrase GET ?topup=1 is a plain generate and stays 45-min limited. */
     const topup = !blockKey && scheduled && req.nextUrl.searchParams.get("topup") === "1";
+    /* BOARD-ONLY MODE — `?live=1` (2026-09-12, "the LIVE pill and the LIVE parlays are empty").
+       WHAT WAS BROKEN: app/board/page.tsx shows the LIVE pill only when `d.categoriesLive` is
+       non-empty, and `categoriesLive` is whatever the run that built the board computed. Every
+       automatic route to a run taken WHILE games are in play is refused: a plain generate is refused
+       by liveCoverage as `dead-slate` / `low-ceiling` (src/lib/server/board-store.ts), and the top-up
+       ladder refuses with "day fully deployed" / "every game started" (src/lib/server/blocks.ts). So
+       the live pool was whatever the last PREGAME pass computed — i.e. nothing — INCLUDING when Josh
+       tapped Refresh himself.
+
+       WHAT THIS MODE IS: a board WITHOUT a card. It does three things and is defined by what it
+       does NOT do:
+         (a) it bypasses the conditional-skip branch below, exactly as `?topup=1` already does — the
+             in-play slate the skip refuses is the whole point of the pass;
+         (b) it builds and PERSISTS the board (the `categoriesLive` the LIVE pill and the LIVE
+             parlays read);
+         (c) it NEVER ENTERS src/lib/server/blocks.ts. No claim row, no allocation, no append, no
+             `buildLockEntry`, no `writeLock`, no reading. INSTRUCTION 48's append-only card is
+             therefore untouched BY CONSTRUCTION rather than by a guard that could be got round, and
+             INSTRUCTION 49's slot ladder never sees this pass at all. The owed-below-zero and "every
+             game started" refusals in blocks.ts are NOT relaxed — they are never reached.
+
+       WHAT STILL BINDS IT: the 45-minute K_LASTGEN limiter (this mode is deliberately NOT in the
+       bypass list above), the per-date run cap with NO top-up headroom, and the same auth as every
+       other caller. It costs a full generate (114-150 Odds credits measured), so it is JOSH'S TAP,
+       and INSTRUCTION 50 already prints that cost under the Board's Refresh button.
+
+       DELIBERATELY NOT SCHEDULED. No scheduler code sends `live=1` and none was added: a recurring
+       evening board-only pass is 114-150 NEW credits a day and that is Josh's decision to make, not
+       ours. See the task report's decisionsLeftToJosh. */
+    const boardOnly = !blockKey && !topup && req.nextUrl.searchParams.get("live") === "1";
     const slotRaw = req.nextUrl.searchParams.get("slot");
     const slot: string | undefined = slotRaw ?? undefined;
     if (topup && slot !== undefined && slot !== "manual" && !(REFILL_SLOTS_PT as readonly string[]).includes(slot)) {
@@ -204,7 +234,10 @@ export async function GET(req: NextRequest) {
       }
       reg[topupKey] = { at: now, tickets: 0, reason: "in flight", ...(slot ? { slot } : {}) };
       await redisSetJson(BLOCKS_KEY(dateNow), reg);
-    } else if (!force) {
+    } else if (!force && !boardOnly) {
+      /* `boardOnly` skips this branch for the same reason `topup` does: the refusals it prints
+         (dead-slate, low-ceiling, no-games-left) are all "the slate is already under way", which is
+         precisely the state this pass exists to price. */
       const existing = decodeBoard((await redis(["GET", BOARD_KEY(dateNow)])) as string | null);
       /* The schedule is consulted INDEPENDENTLY of any stored board, because an empty
          store would otherwise always mean "run" — and on a Sunday at 22:00, with the
@@ -456,7 +489,17 @@ export async function GET(req: NextRequest) {
        construction); the exposure cap IS the daily ceiling the allocator sized under. */
     let lock: Record<string, unknown> | null = null;
     let lockedEntry: ReturnType<typeof buildLockEntry> | null = null;
-    try {
+    /* THE ONE LINE THAT MAKES BOARD-ONLY MODE SAFE BY CONSTRUCTION (2026-09-12). Everything that
+       can touch the day's money — `getLockEntry`, `partitionBlocks`, `dayConsumed`,
+       `effectiveBlockBudget`, `buildLockEntry`, `writeLock`, and the BLOCKS_KEY registry write — is
+       inside this block and nowhere else in the route, so not entering it is not a guard that can be
+       got round: there is no code path from `?live=1` to src/lib/server/blocks.ts or to
+       src/lib/append-only.ts at all. A pass that cannot append cannot break INSTRUCTION 48. */
+    if (boardOnly) {
+      lock = {
+        skipped: "board-only pass — the board and its live pool were re-priced; the locked card was not touched",
+      };
+    } else try {
       /* BLOCK SCOPE (2026-08-08): on a ?block fire the card draws only from that block's
          games, sized to the block's pro-rata share of the day ceiling; the date's entry
          APPENDS across fires (carry). Partition recomputed here from the same feed the
@@ -557,7 +600,13 @@ export async function GET(req: NextRequest) {
        card. Best-effort, fully caught — a reading failure must never cost the board or
        the lock; the scheduler's self-check repairs a missing reading on its next poke. */
     let reading: Record<string, unknown> | null = null;
-    try {
+    /* THE READING IS THE CARD'S READING, so a board-only pass writes none (2026-09-12). Without this
+       guard `lockedEntry` is null here and the fallback below would persist a record saying "lock
+       failed before the reading could run" on a pass that never attempted a lock — a false red in the
+       one artifact whose job is to say what actually happened. */
+    if (boardOnly) {
+      reading = { skipped: "board-only pass — no card was locked, so there is no card reading to write" };
+    } else try {
       const r = lockedEntry
         ? buildReadingSafe({ entry: lockedEntry, gen: gen as never, date, now, kind: "fire" })
         : ({
@@ -598,7 +647,17 @@ export async function GET(req: NextRequest) {
       }
     }
     if (!records.length) {
-      return NextResponse.json({ ok: true, date, logged: 0, note: "no pregame picks (off day or slate underway)", lock, reading });
+      /* A BOARD-ONLY PASS REACHES HERE ON PURPOSE, and the board is already persisted above. On a
+         fully in-play slate there are no PREGAME rows to log, which is not a failure of this pass —
+         `categoriesLive` is what it was bought for and it is in the stored blob. Saying "no pregame
+         picks" without saying the board was written would read as "nothing happened". */
+      return NextResponse.json({
+        ok: true, date, logged: 0,
+        note: boardOnly
+          ? "board re-priced and stored (including its live pool); no pregame rows to log — every game has started"
+          : "no pregame picks (off day or slate underway)",
+        lock, reading, ...(boardOnly ? { boardOnly: true } : {}),
+      });
     }
 
     const cur = await redisGetJson<DayBlob>(dayKey(date));
@@ -630,6 +689,9 @@ export async function GET(req: NextRequest) {
       echo,
       /* lock-at-generation (2026-08-05): the locked card is part of the run's own artifact */
       lock,
+      /* board-only (2026-09-12): the caller — the Board's Refresh tap — needs to be able to say in
+         plain English that it re-priced the board and did not touch the card */
+      ...(boardOnly ? { boardOnly: true } : {}),
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

@@ -193,7 +193,25 @@ export const NFL_PROPS = {
   settleBook: "williamhill_us",
   dailyBudget: 1000,
   measuredCreditsPerEvent: 31,
-} as const satisfies LeagueProps;
+  /**
+   * THE LIVE-ONLY RESERVE (2026-09-12) — 496 = liveMaxEvents 16 x measuredCreditsPerEvent 31, ONE
+   * full live cycle, the largest pull an NFL live pass can make. The CFB twin (744) carries the
+   * full reasoning; the defect and the fix are the same on both desks.
+   *
+   * IT LOWERS NOTHING: `dailyBudget` stays 1000 and a LIVE pass may still spend all of it. The
+   * PRE-KICK pass now stops at 1000 - 496 = 504 credits, i.e. 16 events — which is the whole NFL
+   * slate (`maxEvents` is 16), so unlike CFB this costs the pre-kick board nothing at all: one full
+   * 16-game re-price is 496 and 504 pays for it outright. A second full pre-kick re-price in the
+   * same day is what gets refused, and the 2 h carry means a Sunday needs one.
+   *
+   * THE `satisfies` IS WIDENED BY ONE OPTIONAL FIELD, not loosened: the reserve is read through
+   * `liveReserveCredits(props)` (src/lib/cfb/props-store.ts), which declares it as OPTIONAL so
+   * src/lib/football/league.ts needs no edit and a config without the field behaves exactly as it
+   * does today. `satisfies LeagueProps` alone would reject the extra key on a fresh literal, so the
+   * shape is spelled out here rather than imported — nothing on the NFL desk depends on CFB code.
+   */
+  liveReserveCredits: 496,
+} as const satisfies LeagueProps & { liveReserveCredits: number };
 
 /** Suggested parlays by tier — the CFB shape; `perCategory` is 25 because a 16-game slate has fewer legs to draw on. */
 export const NFL_PARLAYS = {

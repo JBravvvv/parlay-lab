@@ -1,20 +1,25 @@
 import { describe, expect, it } from "vitest";
 import fx from "./fixtures/gen-pool.json";
 import type { PropBoardGame, PropBoardRow } from "@/engine";
-import { amToDec, combineTicket, decToAm } from "@/lib/ticket-math";
+import { amToDec, combineTicket, decToAm, type SandboxLeg } from "@/lib/ticket-math";
 import {
   LEG_MAX,
   LEG_MIN,
   bandDec,
-  buildPool,
   generate,
   mulberry32,
   poolCounts,
   specSeed,
   ticketOf,
   type GenLeg,
+  type GenResult,
   type GenSpec,
 } from "@/lib/parlay-gen";
+/* INSTRUCTION 52 (2026-09-12): `buildPool` is the MLB ADAPTER now — the core is payload-opaque
+   and the football desk has its own builder (src/lib/football/gen-pool.ts). The move must not
+   change one number in this file: every pinned count and every pinned price below is the same
+   assertion it was when buildPool lived inside parlay-gen.ts. */
+import { buildPool } from "@/components/props/mlb-gen-pool";
 
 /**
  * PARLAY GENERATOR CORE — INSTRUCTION 50 (2026-09-11), Josh's item 3, verbatim:
@@ -66,11 +71,11 @@ const spec = (o: Partial<GenSpec> = {}): GenSpec => {
 };
 
 const poolFor = (s: GenSpec, nowMs = 0, b: readonly PropBoardGame[] = board) => buildPool(b, s, nowMs);
-const ok = (r: ReturnType<typeof generate>) => {
+const ok = (r: GenResult<SandboxLeg>) => {
   if (!r.ok) throw new Error(`expected a ticket, got ${JSON.stringify(r.fail)}`);
   return r.ticket;
 };
-const fail = (r: ReturnType<typeof generate>) => {
+const fail = (r: GenResult<SandboxLeg>) => {
   if (r.ok) throw new Error(`expected a failure, got ${r.ticket.legs.map((l) => l.leg.id).join(", ")}`);
   return r.fail;
 };
@@ -502,7 +507,7 @@ describe("the pool — what it admits and what it refuses", () => {
 
   it("every leg's ev is the engine's own number against the posted price", () => {
     const pool = poolFor(spec({ market: HITS, sides: "both" }));
-    for (const l of pool.legs as GenLeg[]) {
+    for (const l of pool.legs as GenLeg<SandboxLeg>[]) {
       expect(l.dec).toBe(amToDec(l.leg.cz));
       expect(l.ev).toBeCloseTo((l.leg.prob / 100) * l.dec - 1, 12);
     }
@@ -608,7 +613,7 @@ describe("pins that consume the pool report short-pool, never band-empty", () =>
     const pool = poolFor(s);
     const band = bandDec(s.legMinAm, s.legMaxAm);
     const inBand = pool.legs.filter((l) => l.leg.id.endsWith("|o") && l.dec >= band.lo && l.dec <= band.hi);
-    const byGame = new Map<string, GenLeg>();
+    const byGame = new Map<string, GenLeg<SandboxLeg>>();
     for (const l of inBand) if (!byGame.has(l.gameKey)) byGame.set(l.gameKey, l);
     const pins = [...byGame.values()].map((l) => l.leg.id);
     /* the fixture must actually be in the shape this defect needs: fewer in-band GAMES than
@@ -651,5 +656,80 @@ describe("capacity never over-states what one-per-player can seat (doubleheaders
     expect(f.code).toBe("short-pool");
     if (f.code !== "short-pool") return;
     expect(f.have, "one player cannot fill two slots, in one game or two").toBe(1);
+  });
+});
+
+describe("the MLB adapter hoists, never invents (INSTRUCTION 52 — the move to CFB & NFL)", () => {
+  /* The core used to reach into the MLB leg object for the price, the win %, the source and
+     the two label lines. It is payload-opaque now, so the ADAPTER copies those up. These pins
+     exist because a silent typo in that copy would not fail a single other test in this file —
+     the generator would happily build tickets off a price that is not the slip's price. */
+  it("every hoisted field is the slip leg's own value, byte for byte", () => {
+    for (const market of [HITS, HRR, "pitcher_strikeouts"]) {
+      const pool = poolFor(spec({ market, sides: "both", legs: 2 }));
+      expect(pool.legs.length).toBeGreaterThan(0);
+      for (const l of pool.legs) {
+        expect(l.id).toBe(l.leg.id);
+        expect(l.am).toBe(l.leg.cz);
+        expect(l.prob).toBe(l.leg.prob);
+        expect(l.src).toBe(l.leg.src);
+        expect(l.label).toBe(l.leg.label);
+        expect(l.sub).toBe(l.leg.sub);
+        expect(l.book).toBe(l.leg.book ?? "BOOK");
+      }
+    }
+  });
+
+  it("the hoisted side agrees with the side in the leg id — an inverted copy cannot hide", () => {
+    /* Josh sets OVER/UNDER more often than any other control. The old core read the last
+       character of the leg id; the new one reads this field, so the two must agree on every
+       leg on the board or the filter silently hands back the opposite bet. */
+    const pool = poolFor(spec({ market: HITS, sides: "both" }));
+    expect(pool.legs.length).toBeGreaterThan(0);
+    for (const l of pool.legs) {
+      expect(l.side, l.id).toBe(l.id.endsWith("|u") ? "u" : "o");
+      expect(l.id.endsWith(`|${l.side}`), l.id).toBe(true);
+    }
+  });
+});
+
+describe("MLB's answer did not move when the generator went to CFB & NFL (INSTRUCTION 52)", () => {
+  /**
+   * A GOLDEN TICKET. The move made the core payload-opaque and pushed `buildPool` into the MLB
+   * adapter; a reshuffled field copy there would still satisfy every other test in this file
+   * while handing Josh a DIFFERENT parlay for the same board, spec and spin. So one ticket is
+   * frozen whole: its seed, its key, and each leg's id, price, win %, side and both label lines.
+   *
+   * Every frozen value is ALSO re-derived here against the band, the one-per-player and
+   * one-per-game rules and the slip leg itself — so this is a golden master with its own
+   * independent checks, not a bare snapshot of whatever the code happens to do.
+   */
+  it("the same board, spec and spin still produce this exact 4-leg H+R+RBI ticket", () => {
+    const s = spec({ sides: "both" });
+    const seed = specSeed(s, "2026-07-10", 0);
+    expect(seed).toBe(2137388135);
+    const t = ok(generate(poolFor(s), s, seed));
+    expect(t.legs.map((l) => [l.id, l.am, l.prob, l.side, l.label, l.sub, l.book, l.src])).toEqual([
+      ["philadelphiaphillies@detroittigers|bryceharper|batter_hits_runs_rbis|1.5|u", -110, 52.7, "u", "Bryce Harper (PHI)", "H+R+RBI Under 1.5", "CZ", "model"],
+      ["chicagocubs@cincinnatireds|carsonkelly|batter_hits_runs_rbis|1.5|o", 105, 49.2, "o", "Carson Kelly (CHC)", "H+R+RBI Over 1.5", "FAN", "model"],
+      ["clevelandguardians@miamimarlins|xavieredwards|batter_hits_runs_rbis|1.5|u", -125, 49.8, "u", "Xavier Edwards (MIA)", "H+R+RBI Under 1.5", "FAN", "model"],
+      ["milwaukeebrewers@pittsburghpirates|jakemangum|batter_hits_runs_rbis|1.5|u", 110, 43.2, "u", "Jake Mangum (PIT)", "H+R+RBI Under 1.5", "FAN", "model"],
+    ]);
+    expect(t.key).toBe(
+      "chicagocubs@cincinnatireds|carsonkelly|batter_hits_runs_rbis|1.5|o+clevelandguardians@miamimarlins|xavieredwards|batter_hits_runs_rbis|1.5|u+milwaukeebrewers@pittsburghpirates|jakemangum|batter_hits_runs_rbis|1.5|u+philadelphiaphillies@detroittigers|bryceharper|batter_hits_runs_rbis|1.5|u",
+    );
+    /* the independent checks: every frozen price is the slip's own, inside Josh's band, and the
+       four legs are four players in four games */
+    const b = bandDec(s.legMinAm, s.legMaxAm);
+    for (const l of t.legs) {
+      expect(l.am).toBe(l.leg.cz);
+      expect(l.prob).toBe(l.leg.prob);
+      expect(amToDec(l.am)).toBeGreaterThanOrEqual(b.lo);
+      expect(amToDec(l.am)).toBeLessThanOrEqual(b.hi);
+    }
+    expect(new Set(t.legs.map((l) => l.playerKey)).size).toBe(4);
+    expect(new Set(t.legs.map((l) => l.gameKey)).size).toBe(4);
+    expect(t.outsideLegBand).toEqual([]);
+    expect(t.sameGame).toEqual([]);
   });
 });

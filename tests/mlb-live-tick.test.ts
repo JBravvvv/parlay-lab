@@ -39,14 +39,28 @@ describe("INSTRUCTION 51 — the live pull rides the refill's calendar, it does 
     expect(REFILL_SLOTS_PT).toEqual(["08:00", "09:30", "12:00", "15:00", "16:45"]);
   });
 
-  it("THE SHIPPED DEFAULT is 'slots' with an EMPTY opt-in calendar — no new automatic fire exists without Josh's word", () => {
-    expect(MLB_LIVE_PROPS.tickMode).toBe("slots");
-    expect(MLB_LIVE_PROPS.liveSlotsPT).toEqual([]);
-    // the sentence that matters: with liveSlotsPT empty, the "ticker" mode fires NOTHING at all,
-    // so even a mistaken flip of tickMode cannot start spending on its own.
-    for (const t of ["08:00", "09:30", "12:00", "15:00", "16:45", "17:00", "19:00"]) {
+  it("SHIPS ON 'ticker' WITH JOSH'S WORD — the live pull has its own calendar, and it is the live window", () => {
+    /* INSTRUCTION 52 (2026-09-12, Josh verbatim: "I've always had in game live lines. It has live
+       lines; they just went away this week"), read against his 2026-09-09 contract ("I can manually do
+       it and it can function the same way whether I manually refresh it or it refreshes itself
+       automatically"). The guard this replaces said no automatic live fire exists without his word.
+       His word is now on the record, so what is asserted instead is WHEN it fires — and the half of
+       the old guard that still matters, that the fire cannot reach the stake calendar, is below. */
+    expect(MLB_LIVE_PROPS.tickMode).toBe("ticker");
+    expect(MLB_LIVE_PROPS.liveSlotsPT).toEqual(["12:00", "15:00", "16:45", "17:15", "17:45", "18:15", "18:45"]);
+    // every one of the seven fires, naming its own slot
+    for (const t of MLB_LIVE_PROPS.liveSlotsPT) {
+      expect(decideSlotTick(pdt(t), MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN), t).toEqual({ fire: true, slot: t });
+    }
+    /* and NOTHING fires before baseball does or after the cron ticker's own window closes: 08:00 and
+       09:30 PT are stake slots with zero live baseball, and the scheduler row that pokes this runs
+       UTC hours 15-23 and 0-2 = 08:00-19:00 PT, so 19:00 onward cannot fire regardless. */
+    for (const t of ["08:00", "09:30", "11:00", "19:00", "20:30"]) {
       expect(decideSlotTick(pdt(t), MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN).fire, t).toBe(false);
     }
+    // THE STAKE CALENDAR IS NOT TOUCHED BY ANY OF IT — still INSTRUCTION 49's five, still by reference
+    expect(MLB_LIVE_PROPS.slots).toBe(REFILL_SLOTS_PT);
+    expect(REFILL_SLOTS_PT).toEqual(["08:00", "09:30", "12:00", "15:00", "16:45"]);
   });
 });
 

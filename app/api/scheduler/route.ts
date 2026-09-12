@@ -300,16 +300,22 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
        live in-play odds pull for MLB"). It is gated on MLB_LIVE_PROPS.tickMode and on nothing
        else, and it reuses the decision this tick has ALREADY made:
 
-         "slots"  — THE SHIPPED DEFAULT. `rt` is reused verbatim: the same decideSlotTick result
-                    the refill gate above just read, off the same REFILL_SLOTS_PT array object.
-                    One calendar, so an automatic live pull can only ever happen on the five
-                    INSTRUCTION 49 Pacific slots, and the two can never drift apart. No new cron
-                    entry, no change to the ticker, nothing of Josh's countermanded.
-         "ticker" — OPT-IN, SHIPPED OFF (MLB_LIVE_PROPS.liveSlotsPT is []). The SAME
-                    decideSlotTick function, called with that array — which is why there is no
-                    second slot-matching implementation anywhere in this file. With the array
-                    empty `fire` is false at every instant, so turning it on is one constant and
-                    Josh's word, never ours.
+         "slots"  — `rt` is reused verbatim: the same decideSlotTick result the refill gate above
+                    just read, off the same REFILL_SLOTS_PT array object. One calendar, so an
+                    automatic live pull can only ever happen on the five INSTRUCTION 49 Pacific
+                    slots, and the two can never drift apart.
+         "ticker" — LIVE SINCE 2026-09-12, and the mode this build runs. The SAME decideSlotTick
+                    function, called with MLB_LIVE_PROPS.liveSlotsPT — which is why there is no
+                    second slot-matching implementation anywhere in this file.
+
+       WHY IT WAS FLIPPED. Under "slots" the live in-play pull rode the five stake slots — the
+       latest of which is 16:45 PT — and MLB's evening slate barely overlaps them: on a typical
+       night first pitch is 19:10 ET / 16:10 PT and the games are in the middle innings from 17:30
+       PT onwards, i.e. AFTER the last slot. So the automatic live pull could essentially only fire
+       when no baseball was in play, which is the in-game half of Josh's complaint. "ticker" runs
+       the same gate on the seven evening times in `liveSlotsPT`. It adds no cron entry (all seven
+       already sit inside his existing cron-job.org window), lowers nothing, and the per-slot NX
+       stamp in the live route still bounds it to ONE pass per slot per Pacific day.
 
        It rides in the SAME Promise.allSettled as the refill and the grading pass, so it cannot
        delay either and a rejection cannot escape. Its answer is REPORTED and nothing more:

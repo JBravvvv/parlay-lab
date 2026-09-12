@@ -385,8 +385,18 @@ describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (
     expect(client).not.toMatch(/refetchInterval: [1-9]|setInterval/);
     // and the page itself still fetches exactly one thing directly: the free /api/picks read
     // (\b keeps the board's own refetch() out of the count — it is a query invalidation, not a URL)
+    /* STILL EXACTLY ONE, AFTER INSTRUCTION 52 (2026-09-12). The board-only re-price
+       (/api/generate?live=1) is a PRICED call, and it was briefly written here as a second
+       page-level fetch. It moved into src/lib/mlb/live-board-client.ts instead of this number
+       moving: one free read on the page, every spend behind a named client. */
     expect(src.match(/\bfetch\(/g)?.length ?? 0).toBe(1);
     expect(src).toMatch(/fetch\("\/api\/picks", \{ cache: "no-store" \}\)/);
+    /* and the module that now owns the spend reaches the budgeted server route and nothing else */
+    const live = stripComments(read("src/lib/mlb/live-board-client.ts"));
+    expect(live.match(/\bfetch\(/g)?.length ?? 0).toBe(1);
+    expect(live).toMatch(/fetch\("\/api\/generate\?live=1"/);
+    expect(live).not.toMatch(/odds-api|the-odds-api|statsapi|\/api\/refill/);
+    expect(live).not.toMatch(/setInterval|refetchInterval/);
   });
 
   it("PLANT: a refetchInterval smuggled onto the paid live feed is detected", () => {

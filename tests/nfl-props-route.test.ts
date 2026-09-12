@@ -60,6 +60,13 @@ const NOW = Date.parse("2026-09-13T12:00:00Z"); // 05:00 PT — every week-1 Sun
 const DATE = "2026-09-13";
 const CIN = "401872925";
 const PER = NFL_PROPS.measuredCreditsPerEvent;
+/* THE PRE-KICK RAIL (INSTRUCTION 52, 2026-09-12) — the same two-rail split CFB got, with NFL's own
+   numbers: a pre-kick game is sized against `dailyBudget - liveReserveCredits` (1000 - 496 = 504), an
+   in-play game against the whole 1000. 496 = liveMaxEvents (16) x measuredCreditsPerEvent (31), so a
+   full Sunday of 16 in-play games is affordable at the moment they kick off instead of being refused
+   by a rail the morning pass had already consumed. NOTHING WAS LOWERED: 16 pre-kick + 16 live = 992
+   of 1000. A Sunday-morning pass is unaffected — 13 games at 403 credits still fits inside 504. */
+const RAIL = NFL_PROPS.dailyBudget - NFL_PROPS.liveReserveCredits;
 const KEYS = NFL_PROPS_REDIS;
 
 function slate(oddsMissing = false): CfbSlate {
@@ -342,14 +349,32 @@ describe("GET /api/nfl/props — the rails", () => {
     expect(r.boardSets()).toHaveLength(0);
   });
 
-  it("a partly spent budget buys only what is left: 1000 − 10 × 31 → 10 of 13 games", async () => {
-    fakeRedis({ [`pl:nfl:props:spend:v1:${DATE}`]: String(NFL_PROPS.dailyBudget - 10 * PER) });
+  it("a partly spent budget buys only what is left: the pre-kick rail − 10 × 31 → 10 of 13 games", async () => {
+    // a 13-game pre-kick fixture, so the governing rail is 504 — the note still names the full 1000
+    fakeRedis({ [`pl:nfl:props:spend:v1:${DATE}`]: String(RAIL - 10 * PER) });
     fetchMock.mockImplementation(async () => eventResponse(null));
     const { body } = await call();
     expect(fetchMock).toHaveBeenCalledTimes(10);
     expect(body.budgeted).toBe(true);
     expect(body.fetched).toBe(10);
     expect(body.note).toMatch(/covers 10 of 13 games/);
+    expect(body.note).toMatch(/1000 credits/);
+    expect(body.note).toMatch(/held back for games already under way/);
+  });
+
+  it("AN UNSPENT SUNDAY MORNING IS UNTOUCHED BY THE RESERVE: all 13 games price, as before", async () => {
+    /* INSTRUCTION 52 (2026-09-12) — the reserve must not cost Josh the morning board, and it does not:
+       13 x 31 = 403 fits inside the 504 rail with room, so the pass that matters most is byte-identical
+       to its pre-reserve behaviour. This is the test that would fail if the reserve were ever raised
+       past 1000 - 13 x 31 = 597. */
+    fakeRedis();
+    fetchMock.mockImplementation(async () => eventResponse(null));
+    const { body } = await call();
+    expect(body.fetched).toBe(13);
+    expect(body.budgeted).toBe(false);
+    expect(body.note).toBeUndefined();
+    expect(13 * PER).toBeLessThanOrEqual(RAIL);
+    expect(NFL_PROPS.liveReserveCredits).toBe(NFL_PROPS.liveMaxEvents * PER);
   });
 
   it("missing ODDS_API_KEY → oddsMissing, no fetch, nothing written", async () => {

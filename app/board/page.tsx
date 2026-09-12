@@ -43,7 +43,8 @@ import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check"
 import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import { lineOf } from "@/lib/pred-serialize";
 import { fmtAmerican } from "@/lib/format";
-import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote, type MlbLiveView } from "@/lib/mlb/live-client";
+import { useLiveBoardReprice } from "@/lib/mlb/live-board-client";
+import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiveGapNote, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote, type MlbLiveView } from "@/lib/mlb/live-client";
 
 /* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
    'ALL'; If I click on 'Top 50' then click on one of the categories (ie: hits) then all top
@@ -88,6 +89,14 @@ export default function BoardPage() {
   const desk = useSport();
   const regen = useRegenerateBoard();
   const refill = useRefillDesk();
+  /* THE LIVE POOL JOSH'S OWN TAP CAN NOW BUILD (2026-09-12) — /api/generate?live=1, a server
+     re-price that stores the board and its live pool and never enters the stake path, so
+     INSTRUCTION 48's locked card cannot move. The paid call itself lives in
+     src/lib/mlb/live-board-client.ts: tests/board-settled.test.ts requires this page to write
+     exactly one `fetch(` (the free /api/picks read) so that no priced read can be added to a page
+     without going through a named client. `onFallback` is the browser re-price, which runs on every
+     failure EXCEPT the 45-minute limiter refusing — see that module. */
+  const liveBoard = useLiveBoardReprice({ onFallback: () => regen.mutate() });
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
   const [scope, setScope] = useState<Scope>("top");
@@ -913,6 +922,37 @@ export default function BoardPage() {
     }
     return stamps.length ? mlbLiveClockLabel(new Date(Math.min(...stamps)).toISOString()) : null;
   }, [liveOverlay, d, liveNow]);
+  /* EVERY GAME UNDER WAY, not only the ones priced before first pitch (2026-09-12).
+     `pregameLive` asks `board.at <= start`, which is the right question for "is this row's price
+     older than the game". It is the WRONG question for "should the Board explain itself": a board
+     re-priced at 7pm has `board.at` after every start, so `pregameLive` collapses to 0 and the
+     explanation below used to vanish at exactly the moment Josh is staring at in-play rows. This
+     count is every game the live poll says is in progress, whatever the board's age. */
+  const liveGameKeys = useMemo(() => {
+    if (!d?.gameInfo) return [] as string[];
+    return Object.entries(d.gameInfo)
+      .filter(([, g]) => g.pk != null && liveNow.games[g.pk]?.live)
+      .map(([gkey]) => gkey);
+  }, [d, liveNow]);
+  const liveGap = useMemo(
+    () => mlbLiveGap({ liveGameKeys, rows: liveOverlay?.rows ?? null }),
+    [liveGameKeys, liveOverlay],
+  );
+  /* WHY A ROW SHOWS NO LIVE PRICE, IN WORDS (2026-09-12 — the fourth defect).
+     `rowLive` refuses a quote for three reasons and renders nothing for all three, so a missing
+     sync phrase, a game the pull never reached and a price that has gone stale past
+     `quoteMaxAgeSec` all look identical from the outside: "it isn't updating with live odds". Each
+     has a different answer and two are things Josh can act on, so the Board names which one it is.
+     Nothing here polls and nothing re-buys a stale price — naming it is the honest alternative.
+     The `!liveOverlay && pregameLive > 0` case is skipped because the paragraph below already
+     says it in its own words; this sentence covers everything that gate misses. */
+  const liveReasonNote = useMemo(
+    () =>
+      !liveOverlay && pregameLive > 0
+        ? null
+        : mlbLiveGapNote(liveGap, { syncReady: liveSyncReady, overlay: !!liveOverlay, error: liveError }),
+    [liveGap, liveSyncReady, liveOverlay, liveError, pregameLive],
+  );
   /* THE SPEND IS SHOWN, NEVER HIDDEN — the same discipline as the browser re-price counter below.
      Josh authorised this spend; he gets to watch it. `spentToday` is null only when no store is
      configured, and in that case the route refuses to fetch at all, so there is nothing to report. */
@@ -939,9 +979,25 @@ export default function BoardPage() {
     const n = generatesToday();
     return n > 0 ? ` · ${n} browser re-price${n === 1 ? "" : "s"} today ≈ ${n * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
   })();
+  /* WHAT THE SERVER'S BOARD-ONLY PASS DID, in plain English, appended to whatever the refill said
+     (2026-09-12). A refused refill resolves rather than throwing, so `refill.data` is set on exactly
+     the taps that go on to the board-only pass — reporting the refusal and saying nothing about what
+     was done instead is how a refresh ends up looking like it did nothing. "ran recently" is the
+     45-minute limiter, which is a real answer and not a failure: it is named as pacing. */
+  const liveBoardNote = liveBoard.isPending
+    ? " · the server is re-pricing the board and the games in play…"
+    : liveBoard.isSuccess
+      ? " · board and live odds re-priced on the server — your locked card was not touched"
+      : liveBoard.isError
+        ? /ran recently/.test(liveBoard.error.message)
+          ? " · the server re-priced this board less than 45 minutes ago, so there was nothing new to buy"
+          : ` · the server did not re-price the live board: ${liveBoard.error.message}`
+        : "";
   const refreshNote =
-    refill.isPending || regen.isPending
-      ? "refreshing — asking the server for a refill, then re-pricing the board on this device…"
+    refill.isPending || regen.isPending || liveBoard.isPending
+      ? liveBoard.isPending
+        ? "refreshing — the server is re-pricing the board and the games in play (your locked card is not touched)…"
+        : "refreshing — asking the server for a refill, then re-pricing the board on this device…"
       : refill.error
         ? /* THE FALLBACK'S ACTUAL OUTCOME, NOT AN ASSERTION (INSTRUCTION 50 fix pass). This
              branch used to say "re-priced in the browser instead" unconditionally — but the
@@ -956,12 +1012,16 @@ export default function BoardPage() {
         : regen.isError
           ? `re-price failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was fabricated${spendNote}`
           : refill.data
-            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own pass" : "the server had nothing to add")}${
+            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own pass" : "the server had nothing to add")}${liveBoardNote}${
                 regen.isSuccess ? " · board re-priced on this device" : ""
               }${spendNote}`
-            : regen.isSuccess
-              ? `board re-priced on this device${spendNote}`
-              : null;
+            : liveBoard.isSuccess
+              ? `board and live odds re-priced on the server — your locked card was not touched${spendNote}`
+              : liveBoard.isError
+                ? `the server did not re-price the live board: ${liveBoard.error.message}${regen.isSuccess ? " · board re-priced on this device instead" : ""}${spendNote}`
+                : regen.isSuccess
+                  ? `board re-priced on this device${spendNote}`
+                  : null;
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      board. Every hook above has already run, so this early return is hooks-safe. */
@@ -1033,6 +1093,16 @@ export default function BoardPage() {
                   onSuccess: (r) => {
                     const refused = r.body.fired === false;
                     const httpFail = r.status < 200 || r.status > 299;
+                    /* 2026-09-12: WITH A GAME UNDER WAY THE SERVER GOES FIRST. A browser re-price
+                       builds a board in this tab and stores nothing, so the stored board — and the
+                       live pool the LIVE pill and the LIVE parlays read — stayed frozen at its
+                       pre-kick state on exactly the slate Josh is watching. The board-only pass
+                       stores both and cannot touch the locked card. Pregame, the line below is
+                       reached unchanged. */
+                    if (pregameLive > 0 && (refused || httpFail)) {
+                      liveBoard.mutate();
+                      return;
+                    }
                     if (refused || httpFail) regen.mutate();
                   },
                   onError: () => regen.mutate(),
@@ -1305,6 +1375,13 @@ export default function BoardPage() {
             : liveError
               ? `live in-play prices are unavailable — the server route answered "${liveError}". The rows below carry their pregame lock, graded as such.`
               : "live in-play prices have not loaded yet — the rows below carry their pregame lock"}
+        </p>
+      )}
+
+      {/* FIX 4 — the Board says WHICH of the three refusals it is in, instead of rendering nothing. */}
+      {liveReasonNote && (
+        <p className="mt-2 text-[10px] leading-snug text-faint" data-testid="mlb-live-reason">
+          {liveReasonNote}
         </p>
       )}
 

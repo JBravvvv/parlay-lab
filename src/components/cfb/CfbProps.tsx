@@ -2,12 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCfbDesk } from "@/components/cfb/CfbBuilder";
 import { addCfbLeg, CfbSlip, type CfbSlipLeg } from "@/components/cfb/CfbSlip";
 import { PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
+import { GenSheet } from "@/components/props/GenSheet";
+import { useParlayGen, blankPins } from "@/components/props/useParlayGen";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { OddsCellButton, OddsGrid, type OddsGridCell } from "@/components/ui/OddsGrid";
@@ -19,6 +21,8 @@ import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, 
 import { kickoffLabel } from "@/lib/cfb/dates";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
+import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
+import type { GenSpec } from "@/lib/parlay-gen";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
@@ -316,7 +320,7 @@ function normName(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-function propQuote(row: CfbPropRow, mode: PriceMode): CfbPropQuote | null {
+export function propQuote(row: CfbPropRow, mode: PriceMode): CfbPropQuote | null {
   if (mode === "cz") return row.cz;
   return row.best ?? row.cz;
 }
@@ -344,7 +348,7 @@ const sameLine = (a: number | null, b: number | null) => (a == null && b == null
  * (Caesars alone at 249.5 against a 245.5 consensus) has no fair, so it gets no leg — the muted
  * cell, exactly as the Board prints EV "—" for it.
  */
-function propLegOf(row: CfbPropRow, q: CfbPropQuote): CfbSlipLeg | null {
+export function propLegOf(row: CfbPropRow, q: CfbPropQuote): CfbSlipLeg | null {
   if (row.fair == null || !sameLine(q.line, row.line)) return null;
   return {
     kind: "prop",
@@ -651,6 +655,45 @@ function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
   return null;
 }
 
+/* ---- INSTRUCTION 52 (2026-09-12, Josh's word, verbatim: "Parlay Generator should be on CFB &
+   NFL just like it is on MLB") — the generator's football defaults.
+
+   ONE set for BOTH football desks. CfbProps is the shared football surface and NflProps is an
+   18-line wrapper around it (INSTRUCTION 47), so the NFL gets the generator by being the same
+   component, not by carrying a second copy of any of this.
+
+   THE DEFAULT BAND IS WIDER THAN MLB'S. MLB opens on Josh's own worked example (-152 → +110), but
+   football's six markets are not priced in that range: anytime TD is plus money by nature and
+   would open every session on "no leg is priced in this band". -250 → +250 (1.40 → 3.50 in
+   decimal, which is how the band is actually compared) has real legs in all six. A band is a
+   filter over posted prices, never a price — widening the default invents nothing. */
+const GEN_MARKET_KEYS: readonly string[] = FOOTBALL_GEN_MARKETS.map((m) => m.key);
+const GEN_SPEC_DEFAULT: GenSpec = {
+  market: FOOTBALL_GEN_MARKETS[0].key,
+  legs: 4,
+  legMinAm: -250,
+  legMaxAm: 250,
+  payout: null,
+  sides: "o",
+  onePerGame: true,
+  czOnly: false,
+  includeStarted: false,
+  modelOnly: false,
+  pinned: blankPins(4),
+};
+
+/** the line under the category pills, and the sheet's stand-in on the Sides rail */
+const GEN_CATEGORY_NOTE =
+  "Sides, totals and moneylines are game markets, not player slots — the generator leaves them alone for now.";
+const GEN_STUB_NOTE =
+  "The parlay generator builds PLAYER-prop parlays — pick a player market above and it appears here. Sides, totals and moneylines are game markets and have no player slots yet.";
+/* EVERY football leg is market-priced: the win % is the de-vigged consensus of the books that
+   posted the line (src/lib/cfb/props.ts), so the MLB sentence — "their EV is ~0 by construction"
+   — would be plainly false here. The EV beside a football leg is measured against the ONE price
+   being taken, which is the whole point of the Caesars / best-price toggle. */
+const GEN_MARKET_NOTE =
+  "Every win % here is the de-vigged consensus of the books that posted the line; the EV beside it is measured against the one price you would take.";
+
 export function CfbProps() {
   const L = useLeague();
   /* the league's props table and client under the pinned CFB names (see the seam note above) */
@@ -723,6 +766,56 @@ export function CfbProps() {
     [board, nav],
   );
   const lineCount = groups.reduce((n, g) => n + g.lines.length, 0);
+
+  /* ---- INSTRUCTION 52: the parlay generator --------------------------------------------
+     The same pure core, the same state hook and the same sheet the MLB desk uses — the only
+     football-specific part is the pool builder, which reads THIS board's rows through the
+     desk's OWN quote picker and leg minter (`propQuote` / `propLegOf`), so a generated leg is
+     byte-for-byte the leg a tap on that cell would have produced, and a cell the board draws as
+     an untappable dash is never offered.
+
+     A PURE READER: no fetch, no extra market on any pull, not one Odds credit, no money seated
+     and no ledger row. The rows are the board that is already on the device. */
+  const buildGenPool = useCallback(
+    (sp: GenSpec, at: number) =>
+      footballGenPool<CfbSlipLeg>(board?.rows ?? [], sp, {
+        mode,
+        nowMs: at,
+        /* the row's own team tag, folded to one spelling per club — never guessed */
+        teamOf: (row) => row.teamAbbr ?? row.team,
+        quoteOf: propQuote,
+        legOf: (row, q) => {
+          const leg = propLegOf(row, q);
+          if (!leg) return null;
+          /* the SAME team resolution PropGameGroup uses — by the row's teamId against the slate
+             game, never by name — so a generated leg reaches the slip with the identical mark */
+          const g = gameById.get(row.gameId);
+          const team = g && row.teamId ? (row.teamId === g.home.id ? g.home : row.teamId === g.away.id ? g.away : null) : null;
+          return { ...leg, team };
+        },
+      }),
+    [board, mode, gameById],
+  );
+  const gen = useParlayGen<CfbSlipLeg>({
+    /* derived from the league, never a literal: one desk's remembered state must not be the
+       other's, and a hardcoded league key here is exactly what the separation tests forbid */
+    storageKey: `pl:${L.id}:props:gen-open`,
+    defaultSpec: GEN_SPEC_DEFAULT,
+    marketKeys: GEN_MARKET_KEYS,
+    railMarket: nav === "sides" ? null : nav,
+    boardKey: date,
+    build: buildGenPool,
+    onMarket: (m) => setNav(m as CfbPropMarket),
+    legs,
+    setLegs,
+  });
+  const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
+  /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
+     so SSR prints no clock and hydration cannot mismatch on a locale-rendered time) */
+  const genBoardAt =
+    gen.nowMs > 0 && board?.generatedAt
+      ? new Date(board.generatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : null;
 
   /* scroll the deep-linked row / card into view once it exists; the ring clears itself after a beat */
   useEffect(() => {
@@ -797,6 +890,44 @@ export function CfbProps() {
           </div>
         )}
       </div>
+
+      <GenSheet
+        market={gen.spec.market}
+        marketLabel={genMarketLabel}
+        markets={FOOTBALL_GEN_MARKETS}
+        pool={gen.pool}
+        renderMark={({ leg }) => (
+          <PlayerMark
+            player={leg.player ?? null}
+            headshot={leg.headshot ?? null}
+            team={leg.team ?? null}
+            pos={leg.pos ?? null}
+            size="md"
+          />
+        )}
+        renderName={({ name }) => (
+          /* plain text, exactly as the board prints it — the tappable MLB profile sheet would
+             resolve a football name against statsapi and come back "couldn't match" */
+          <span className="block truncate text-[12.5px] font-medium tracking-tight text-text">{name}</span>
+        )}
+        spec={gen.spec}
+        onSpec={gen.patchSpec}
+        result={gen.result}
+        onGenerate={gen.spin}
+        onTogglePin={gen.togglePin}
+        onAdd={gen.add}
+        canUndo={gen.canUndo}
+        onUndo={gen.undo}
+        open={gen.open}
+        onOpen={gen.setOpen}
+        boardAt={genBoardAt}
+        loading={propsQ.isPending}
+        gameMarket={nav === "sides"}
+        showModelOnly={false}
+        categoryNote={GEN_CATEGORY_NOTE}
+        stubNote={GEN_STUB_NOTE}
+        marketNote={GEN_MARKET_NOTE}
+      />
 
       {note && (
         <div role="status" className="mb-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">

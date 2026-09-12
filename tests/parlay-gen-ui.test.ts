@@ -6,7 +6,8 @@ import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { stripComments } from "./helpers/source";
 import { GEN_PANEL_ID, GenSheet, genFailLine } from "@/components/props/GenSheet";
-import { buildPool, generate, poolCounts, specSeed, type GenSpec } from "@/lib/parlay-gen";
+import { MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
+import { generate, poolCounts, specSeed, type GenSpec } from "@/lib/parlay-gen";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import type { PropBoardGame } from "@/engine";
 
@@ -83,8 +84,8 @@ const sheet = (over: Record<string, unknown> = {}) =>
     createElement(GenSheet, {
       market: SPEC.market,
       marketLabel: "H+R+RBI",
+      markets: MLB_GEN_MARKETS,
       pool: POOL,
-      headshots: {},
       spec: SPEC,
       onSpec: () => {},
       result: RESULT,
@@ -271,13 +272,14 @@ describe("source pins — the honesty guard extended to the newest price surface
   const gen = readSrc("src/components/props/GenSheet.tsx");
   const mark = readSrc("src/components/player/PlayerMark.tsx");
   const page = readSrc("app/props/page.tsx");
+  const hook = readSrc("src/components/props/useParlayGen.ts");
   const parlays = readSrc("src/components/mlb/ParlaysSection.tsx");
 
   it("no hand-typed american price in JSX text in either new file", () => {
     /* tests/props-ui.test.ts:28 joins only six files, so the two files added by INSTRUCTION 50
        would otherwise render prices with nothing guarding them. */
     expect([gen, mark].join("\n")).not.toMatch(/>\s*[+-]\d{3}\s*</);
-    expect(gen).toMatch(/amFmt\(l\.leg\.cz\)/);
+    expect(gen).toMatch(/amFmt\(l\.am\)/);
     expect(gen).toMatch(/amFmt\(calc\.am\)/);
   });
   it("the sheet is a dumb view — no fetch, no hook of its own, no ledger or credit path", () => {
@@ -288,35 +290,44 @@ describe("source pins — the honesty guard extended to the newest price surface
     expect(mark).not.toMatch(/backdrop-filter|backdrop-blur/);
   });
   it("the market-fair legs stay labelled: the italic mkt tag, never dressed as an edge", () => {
-    expect(gen).toMatch(/l\.leg\.src === "market"/);
+    expect(gen).toMatch(/l\.src === "market"/);
     expect(gen).toMatch(/italic/);
   });
-  it("the page reads the open flag AFTER mount, behind try/catch — never in a useState initializer", () => {
+  /* INSTRUCTION 52 (2026-09-12): the generator's STATE moved into one hook both desks call
+     (src/components/props/useParlayGen.ts). These pins moved with it — re-typing any of them
+     inside CfbProps would be the fork this instruction exists to avoid. */
+  it("the hook reads the open flag AFTER mount, behind try/catch — never in a useState initializer", () => {
     expect(page).toMatch(/const GEN_OPEN_KEY = "pl:props:gen-open";/);
-    expect(page).toMatch(/const \[genOpen, setGenOpen\] = useState\(false\);/);
-    expect(page).toMatch(
-      /useEffect\(\(\) => \{\s*try \{\s*if \(localStorage\.getItem\(GEN_OPEN_KEY\) === "1"\) setGenOpen\(true\);\s*\} catch \{[^}]*\}\s*\}, \[\]\);/,
-    );
-    expect(page).toMatch(/try \{ localStorage\.setItem\(GEN_OPEN_KEY, next \? "1" : "0"\); \} catch \{\}/);
-    expect(page).not.toMatch(/useState\([^)]*localStorage/);
+    expect(hook).toMatch(/const \[open, setOpenState\] = useState\(false\);/);
+    expect(hook).toMatch(/if \(localStorage\.getItem\(storageKey\) === "1"\) setOpenState\(true\);/);
+    expect(hook).toMatch(/localStorage\.setItem\(storageKey, next \? "1" : "0"\);/);
+    expect(hook).not.toMatch(/useState\([^)]*localStorage/);
     // nowMs defaults to 0 so a server render marks NO game started
-    expect(page).toMatch(/const \[nowMs, setNowMs\] = useState\(0\);/);
+    expect(hook).toMatch(/const \[nowMs, setNowMs\] = useState\(0\);/);
+    expect(hook).toMatch(/useEffect\(\(\) => setNowMs\(Date\.now\(\)\), \[\]\);/);
   });
-  it("ONE useHeadshots call on the page, and its map is what the sheet is handed", () => {
+  it("ONE useHeadshots call on the page, and its map is what the sheet draws with", () => {
     expect(count(page, /useHeadshots\(/g)).toBe(1);
-    expect(page).toMatch(/headshots=\{headshots\}/);
-    expect(page).toMatch(/buildPool\(propBoard, spec, nowMs\)/);
-    expect(page).toMatch(/generate\(pool, spec, specSeed\(/);
+    expect(page).toMatch(/headshot=\{headshots\[name\] \?\? null\}/);
+    expect(page).toMatch(/buildPool\(propBoard, sp, at\)/);
+    expect(hook).toMatch(/generate\(pool, spec, specSeed\(/);
   });
   it("Add to slip reuses the existing slip math and keeps an Undo; nothing is spent or written", () => {
-    expect(page).toMatch(/prevLegs\.current = legs;/);
-    expect(page).toMatch(/setLegs\(gen\.ticket\.legs\.map\(\(l\) => l\.leg\)\);/);
+    expect(hook).toMatch(/prevLegs\.current = legs\.slice\(\);/);
+    expect(hook).toMatch(/setLegs\(result\.ticket\.legs\.map\(\(l\) => l\.leg\)\);/);
     expect(page).toMatch(/combineTicket\(legs\)/);
     expect(page).not.toMatch(/\/api\/refill|\/api\/generate/);
   });
   it("the generator's category control IS the market rail's setter — one state, no divergence", () => {
     expect(page).toMatch(/setTab\(t\);\s*setMktKey\(hit\.key\);/);
-    expect(page).toMatch(/sp\.market === cat \? sp : \{ \.\.\.sp, market: cat, pinned: blankPins\(sp\.legs\) \}/);
+    expect(hook).toMatch(
+      /sp\.market === railMarket \? sp : \{ \.\.\.sp, market: railMarket, pinned: blankPins\(sp\.legs\) \}/,
+    );
+  });
+  it("the hook is a pure reader too — no fetch, no api path, no ledger, no credit", () => {
+    for (const bad of [/fetch\(/, /\/api\//, /Math\.random/, /ledger/, /the-odds-api/]) {
+      expect(hook, `useParlayGen must not contain ${bad}`).not.toMatch(bad);
+    }
   });
   it("ParlaysSection: one memoized name list over all three sets, and the pins it must not lose", () => {
     expect(parlays).toMatch(/<PlayerMark/);

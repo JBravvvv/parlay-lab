@@ -475,6 +475,31 @@ export const CFB_PROPS = {
   dailyBudget: 2500,
   /** measured 2026-09-05 (~753 credits / 24 events); the budget estimate's per-event cost */
   measuredCreditsPerEvent: 31,
+  /**
+   * THE LIVE-ONLY RESERVE (2026-09-12) — credits the pre-kick pass may NOT touch, so an in-game
+   * line can always be re-priced. 744 = liveMaxEvents 24 x measuredCreditsPerEvent 31: ONE full
+   * live cycle, the largest pull a live pass can make.
+   *
+   * WHY IT HAD TO EXIST: the Saturday arithmetic is already in this file's own docblock. A 60-game
+   * pre-kick pull books 1,860 of the 2,500 rail; the 2 h carry expiring across the afternoon
+   * finishes it; `affordableEvents` then returns 0 and the live games — ranked FIRST, which bought
+   * them nothing — were refused with everything else. The board kept serving the last pre-kick
+   * lines re-stamped "live", which is the frozen in-game line Josh reported.
+   *
+   * IT LOWERS NOTHING. `dailyBudget` stays 2500 and every credit of it is still spendable — a live
+   * pass may spend the whole rail. All this changes is that the PRE-KICK pass stops at
+   * 2500 - 744 = 1,756 credits, i.e. 56 events a day rather than 80.
+   *
+   * THE ONE PRICE, STATED: on a 60-game Saturday from a zero spend, the first pre-kick pull now
+   * prices 56 games and 4 wait for the next pull (they come back ranked `unpriced`, which the need
+   * order buys SECOND, right after the live games). That is the trade — four games' pre-kick props
+   * arriving a window later, against every in-game line on the board being frozen from
+   * mid-afternoon on. It is a trade, not a saving, and it is Josh's to reverse by setting
+   * `liveReserveCredits` to 0.
+   * `maxEvents`, `liveMaxEvents`, `liveRevalidateSec`, `revalidateSec`, `dailyBudget` and
+   * `measuredCreditsPerEvent` are all UNCHANGED — every one of those is Josh's call.
+   */
+  liveReserveCredits: 744,
 } as const;
 
 /** Suggested parlays by tier: leg counts, price bands, and the per-leg / per-game gates.

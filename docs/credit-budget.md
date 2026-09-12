@@ -492,3 +492,122 @@ worth stating where the money is counted:
 
 The probe table above stays **unrecorded**. It is still the gate on flipping `rateMeasured`, on
 replacing the 6, and on scheduling this route at all.
+
+## 2026-09-12 INSTRUCTION 52 — the two-rail football split, MLB's own live calendar, and the board-only pass
+
+Josh, verbatim: **"I've always had in game live lines. It has live lines; they just went away this
+week."** He was reporting a regression, not asking for a feature, and the arithmetic below is why the
+lines went away. **NOTHING IN THIS SECTION LOWERS A BUDGET, A CAP, A SLOT OR AN ALLOTMENT**
+(his rule, 2026-09-09: "Don't lower any budgets"), and it adds **zero** cron executions.
+
+### A — why CFB/NFL in-game lines froze: the single rail was spent before kickoff
+
+`7c2912b` (INSTRUCTION 42, 2026-09-05) raised `CFB_PROPS.maxEvents` 12 → 60 so that every eligible
+game is priced. Against one Pacific-day counter, that is:
+
+| | events | × credits/event | credits |
+|---|---|---|---|
+| pre-kick pass, full Saturday slate | 60 | 31 | **1,860** |
+| remaining on the 2,500 rail | | | **640** = 20 event-pulls |
+| one live pass wants (`liveMaxEvents`) | 24 | 31 | **744** |
+
+744 > 640, so **from the moment a Saturday slate finished pricing pre-kick, every in-play re-price was
+refused by the budget.** The route then served the stored board's carried rows, re-stamped
+`{status:"live", playable:false}` with `stale:true` — a line that is visibly there and visibly not
+being updated. That is the defect Josh reported, in one inequality.
+
+### The fix: two rails out of the same total
+
+`src/lib/server/football-props.ts` partitions `need` by `g.status === "live"` and sizes each half
+separately — the live half against the **whole** `dailyBudget`, the pre-kick half against
+`dailyBudget − liveReserveCredits`:
+
+| | CFB | NFL |
+|---|---|---|
+| `dailyBudget` (**unchanged**) | 2,500 | 1,000 |
+| `liveReserveCredits` = `liveMaxEvents × measuredCreditsPerEvent` | 24 × 31 = **744** | 16 × 31 = **496** |
+| pre-kick rail | 1,756 → `floor(1756/31)` = **56 games** | 504 → **16 games** |
+| live rail | the full **2,500** | the full **1,000** |
+| a full day both halves | 56 × 31 + 744 = 2,480 of 2,500 | 16 × 31 + 496 = **992 of 1,000** |
+
+What it costs, stated honestly: CFB prices **56 of 60** games pre-kick instead of 60. What it buys: the
+other 24 games can be re-priced while they are being played, which is the thing that was broken.
+An unspent NFL Sunday morning is **untouched** — 13 × 31 = 403 fits inside 504 with room, pinned in
+`tests/nfl-props-route.test.ts`.
+
+Three properties worth naming because they are easy to get wrong, and each is pinned:
+
+1. **The partition is `status`, not the `why` rank.** `why()` returns `"unpriced"` for any game the
+   stored board does not carry, so on a day's first pull an **in-play** game is ranked "unpriced"; a
+   `why`-based split would have left the worst case of all (in-play, no rows at all) on the reduced
+   rail. `why === "live"` implies `status === "live"`, so this is a strict widening.
+2. **The live half's spend is subtracted before the pre-kick half is sized** (`spentBefore + liveSpend`),
+   or the same room would be handed out twice and a pass could exceed the day's budget by one reserve.
+3. **At `liveReserveCredits` 0 or absent the path is byte-identical** to the single allowance it
+   replaced — `tests/live-reserve.test.ts`.
+
+The note the board shows names the held credits (`744 of those credits are held back for games already
+under way…`) **only when the reserve is what bound the pass**, because otherwise it would claim a
+budget is spent that is not.
+
+### This does not manufacture credits — the football shortfall is still Josh's call
+
+A Saturday that wants all 60 priced pre-kick **and** 24 re-priced in play wants more than 2,500. The
+reserve makes the in-play half possible at all; it cannot make the day cheaper. The three options are
+unchanged, and the reserve is worth having under **all** of them:
+
+| option | effect | cost |
+|---|---|---|
+| (a) upgrade the plan | 20,000 → 100,000 credits/month | **$30 → $59/month** — Josh's to buy, never mine |
+| (b) `liveRevalidateSec` 600 → 1800 | ~8,900 → ~3,000 credits | in-play lines refresh every 30 min, not 10 |
+| (c) `liveMaxEvents` 24 → 8-10 | a live pass costs 248-310, not 744 | only the biggest games re-price in play |
+
+### B — MLB's live pull was riding the stake calendar
+
+INSTRUCTION 51 shipped `liveSlotsPT: []` with `tickMode: "slots"`, which made the in-play pull ride
+`REFILL_SLOTS_PT`. **08:00 / 09:30 / 12:00 / 15:00 PT see zero live baseball**, and 16:45 PT is ~31
+minutes before the 12-of-15 concurrency peak — so four of five automatic passes bought in-play prices
+for games that had not started. Fixed by populating the live calendar **and** flipping `tickMode`;
+populating alone is a no-op, because `"slots"` never reads the new array.
+
+| | |
+|---|---|
+| `liveSlotsPT` | 12:00, 15:00, 16:45, 17:15, 17:45, 18:15, 18:45 PT (7) |
+| one pass, probe-capped | `MLB_LIST_CALL_CREDITS` 1 + `probeEvents` 3 × 6 = **19** |
+| seven passes | **133 of the 600 rail — 22%** |
+| heavy day (7 automatic + 5 manual taps) | 12 × 19 = **228 of 600** |
+| new cron executions | **0** — rides the existing cron-job.org ticker row; `vercel.json` untouched |
+
+`rateMeasured` is still **false**, which is what keeps this safe while the rate is an estimate: every
+pass is capped at `probeEvents` (3), never `liveMaxEvents` (12). **The unmeasured case, stated rather
+than buried:** if MLB in fact bills like CFB's 31/event, a pass is `1 + 3 × 31 = 94` and seven are 658
+— past 600. The rail counts the **real** `x-requests-used` delta, so the route refuses the tail of the
+pass that would cross 600 instead of spending past it. Worst case is ~600 plus one pass of overshoot,
+the pre-existing property of a read-modify-write rail.
+
+**The 3-event probe is STILL NOT RUN** (the table earlier in this file still reads "unrecorded"). It
+remains the gate on flipping `rateMeasured` and on replacing the estimated 6.
+
+**The ticker's window is narrower than the baseball day.** `src/lib/server/grading-progress.ts:50-53`
+records the cron-job.org row as every 15 min, UTC hours 15-23 and 0-2 = **08:00-19:00 PT**. Games on
+2026-09-11 ran to **22:01 PT**, so 19:00 onward has no poke at all and the 18:45 slot is the last one
+that can fire. Extending that row is **Josh's action on his own account** — cron-job.org is his, and
+this repo never edits it.
+
+### C — the board-only `?live=1` pass, and why it is on no timer
+
+The LIVE pill and LIVE parlays read `d.categoriesLive`, which only the run that **builds** the board
+can fill, and every automatic route to a run taken in play is refused (`board-store.ts:133-185`
+dead-slate / low-ceiling; the top-up ladder's "every game started"). `?live=1` is a full generate with
+the card half switched off: it writes the board blob and **never enters `src/lib/server/blocks.ts`**.
+
+| | |
+|---|---|
+| cost of one pass | **114-150 credits** (`GEN_CREDITS_EST = 140`) |
+| automatic passes | **none** — Josh's tap only |
+| if authorised for the evening | 2-3 passes/night = **230-450 credits/night** |
+| the 45-minute limiter | **still in force** — a tap inside it buys nothing and says so |
+
+Whether to authorise automatic evening re-prices is **his decision**, because it is the only item in
+this build that would add recurring spend.
+
