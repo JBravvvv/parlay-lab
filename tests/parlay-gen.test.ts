@@ -9,6 +9,7 @@ import {
   generate,
   mulberry32,
   poolCounts,
+  poolOf,
   specSeed,
   ticketOf,
   type GenLeg,
@@ -329,6 +330,43 @@ describe("failures carry real pool numbers, never invented ones", () => {
     const s = spec({ market: "batter_walks" });
     expect(poolFor(s).legs).toHaveLength(0);
     expect(fail(generate(poolFor(s), s, 1))).toEqual({ code: "no-rows" });
+  });
+
+  /* "No lines on this board" is a statement ABOUT THE BOARD, so it may only be said when the
+     board really is empty of this market (INSTRUCTION 52 fix pass). A FILTER that empties the
+     eligible set is a different failure and names itself — otherwise the sheet printed "there is
+     nothing here to build a parlay from" directly under a diagnostic reading "pool 40 rows", and
+     offered no way back. Football made it reachable: anytime TD posts a yes and no under at all.
+     The two pools below are this fixture's own legs, re-bagged — not one price is touched. */
+  const bagOf = (legs: readonly GenLeg<SandboxLeg>[], rows: number) =>
+    poolOf(
+      legs.map((l) => ({ ...l })),
+      { rows, startedDropped: 0, noParlayDropped: 0 },
+    );
+
+  it("a pool with rows and nothing on the side asked for names the SIDE, not the board", () => {
+    const full = poolFor(spec({ market: HITS, sides: "both" }));
+    const overs = bagOf(
+      full.legs.filter((l) => l.side === "o"),
+      full.rows,
+    );
+    expect(overs.legs.length).toBeGreaterThan(0);
+    const f = fail(generate(overs, spec({ market: HITS, sides: "u" }), 1));
+    expect(f).toEqual({ code: "one-sided", want: "u", has: "o", rows: overs.legs.length });
+    /* and the same pool asked for the side it HAS still builds — the filter was the whole problem */
+    expect(ok(generate(overs, spec({ market: HITS, sides: "o", onePerGame: false }), 1)).legs).toHaveLength(4);
+  });
+
+  it("…and when the Caesars-only filter is what emptied it, the failure names THAT instead", () => {
+    const full = poolFor(spec({ market: HITS, sides: "both" }));
+    const noCz = bagOf(
+      full.legs.filter((l) => l.book !== "CZ"),
+      full.rows,
+    );
+    expect(noCz.legs.length).toBeGreaterThan(3);
+    const s = spec({ market: HITS, sides: "both", legs: 3, czOnly: true, onePerGame: false });
+    /* both sides are present here, so the side filter is NOT the cause and must not be blamed */
+    expect(fail(generate(noCz, s, 1))).toMatchObject({ code: "short-pool", have: 0, want: 3, relax: "cz" });
   });
 
   it("a band with nothing in it quotes the two REAL posted prices either side of it", () => {

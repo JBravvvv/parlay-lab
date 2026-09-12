@@ -101,9 +101,11 @@ describe("MLB_LIVE_PROPS — the whole constant, pinned", () => {
          lines; they just went away this week"). INSTRUCTION 51 shipped `[]` + "slots", which made the
          in-play pull ride the five STAKE slots — and 08:00 / 09:30 / 12:00 / 15:00 PT see zero live
          baseball, so four of the five automatic passes bought in-play prices for games that had not
-         started. These seven are the live window. The deep-equal stays whole-object, so a field
-         still cannot slip in unpinned. */
-      liveSlotsPT: ["12:00", "15:00", "16:45", "17:15", "17:45", "18:15", "18:45"],
+         started. These SIX are the live window — six and not seven because at CFB's unmeasured 31 a
+         pass is 94 credits and seven automatic passes are 658, past Josh's own 600 rail, which the
+         rail cannot catch (it sizes a pass once, on the assumed rate, and never aborts one part-way).
+         The deep-equal stays whole-object, so a field still cannot slip in unpinned. */
+      liveSlotsPT: ["15:00", "16:45", "17:15", "17:45", "18:15", "18:45"],
       tickMode: "ticker",
     });
   });
@@ -140,12 +142,17 @@ describe("MLB_LIVE_PROPS — the whole constant, pinned", () => {
   it("the whole live calendar fits the rail with room, at the PROBE-CAPPED cost it really bills", () => {
     /* `rateMeasured` is false, so src/lib/server/mlb-live-quote.ts caps EVERY pass at probeEvents —
        one pass is the flat list call + probeEvents x the per-event rate, not liveMaxEvents x it. The
-       seven passes are priced here off the constant itself so the arithmetic cannot rot silently. */
+       six passes are priced here off the constant itself so the arithmetic cannot rot silently. */
     const perPass = MLB_LIST_CALL_CREDITS + MLB_LIVE_PROPS.probeEvents * MLB_LIVE_PROPS.measuredCreditsPerEvent;
     expect(perPass).toBe(19);
-    expect(MLB_LIVE_PROPS.liveSlotsPT.length * perPass).toBe(133);
+    expect(MLB_LIVE_PROPS.liveSlotsPT.length * perPass).toBe(114);
     expect(MLB_LIVE_PROPS.liveSlotsPT.length * perPass).toBeLessThan(MLB_LIVE_PROPS.dailyBudget);
-    // NO BUDGET WAS RAISED TO FIT THIS (Josh, 2026-09-09: "Don't lower any budgets")
+    /* AND IT FITS AT THE RATE NOBODY HAS MEASURED (review round, 2026-09-12) — the case that decided
+       the slot count: at CFB's 31 a pass is 94, so the automatic day is 564 and still inside the 600.
+       Seven slots were 658. No budget was raised to fit this and none was lowered
+       (Josh, 2026-09-09: "I can purchase more credits. Don't lower any budgets"). */
+    const worstPass = MLB_LIST_CALL_CREDITS + MLB_LIVE_PROPS.probeEvents * 31;
+    expect(MLB_LIVE_PROPS.liveSlotsPT.length * worstPass).toBeLessThanOrEqual(MLB_LIVE_PROPS.dailyBudget);
     expect(MLB_LIVE_PROPS.dailyBudget).toBe(600);
   });
 

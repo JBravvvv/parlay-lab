@@ -236,6 +236,10 @@ function PropsDesk() {
     onMarket: moveRailTo,
     legs,
     setLegs,
+    /* "Add to slip" ADDS (INSTRUCTION 52 fix pass): the legs already on the slip stay, and a leg
+       the spin produced that is already there is kept once, not doubled and not toggled off.
+       This slip's only rule is leg identity — `toggle` below dedupes on the same `l.id`. */
+    addLegs: (prev, add) => [...prev.filter((l) => !add.some((a) => a.id === l.id)), ...add],
   });
   const { pool, spec } = gen;
 

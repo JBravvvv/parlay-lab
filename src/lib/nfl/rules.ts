@@ -194,23 +194,36 @@ export const NFL_PROPS = {
   dailyBudget: 1000,
   measuredCreditsPerEvent: 31,
   /**
-   * THE LIVE-ONLY RESERVE (2026-09-12) — 496 = liveMaxEvents 16 x measuredCreditsPerEvent 31, ONE
-   * full live cycle, the largest pull an NFL live pass can make. The CFB twin (744) carries the
-   * full reasoning; the defect and the fix are the same on both desks.
+   * THE LIVE-ONLY RESERVE (2026-09-12) — 248 = half of liveMaxEvents 16 x measuredCreditsPerEvent
+   * 31: EIGHT in-play event-pulls held open at all times. The CFB twin (372) carries the full
+   * reasoning; the defect and the fix are the same on both desks.
    *
-   * IT LOWERS NOTHING: `dailyBudget` stays 1000 and a LIVE pass may still spend all of it. The
-   * PRE-KICK pass now stops at 1000 - 496 = 504 credits, i.e. 16 events — which is the whole NFL
-   * slate (`maxEvents` is 16), so unlike CFB this costs the pre-kick board nothing at all: one full
-   * 16-game re-price is 496 and 504 pays for it outright. A second full pre-kick re-price in the
-   * same day is what gets refused, and the 2 h carry means a Sunday needs one.
+   * WHY 248 AND NOT A FULL CYCLE (review round, 2026-09-12). The first cut reserved 496 and claimed
+   * it "costs the pre-kick board nothing at all" — which its own next sentence then contradicted, and
+   * so did the docblock above ("a `dailyBudget` of 1000 pays for two full boards plus change"). At
+   * 496 the pre-kick rail is 1000 - 496 = 504 = floor(504/31) = 16 event-pulls: EXACTLY one 16-game
+   * board and not one pull more, so the SECOND pre-kick pass a Sunday needs — the 2 h carry expires
+   * across a 10:00/13:25/17:20 ET slate, and late kickoffs are re-asked as `czMissing` — was refused
+   * outright. That is not "nothing at all"; that is a Sunday with the 17:20 game's props never
+   * re-priced. At 248 the rail is 752 = 24 event-pulls: the full 16-game board plus 8 pulls of
+   * re-pricing. The live floor it holds open is 8 in-play games, and a live pass is NOT capped at
+   * 248 — it is sized against the whole 1,000 rail, so all 16 can be bought live when the day's
+   * spend leaves room.
+   *
+   * IT LOWERS NOTHING: `dailyBudget` stays 1000 and a LIVE pass may still spend all of it. The only
+   * number that moved is this restriction on the PRE-KICK pass, and it moved DOWN — 504 credits of
+   * pre-kick allowance became 752.
    *
    * THE `satisfies` IS WIDENED BY ONE OPTIONAL FIELD, not loosened: the reserve is read through
    * `liveReserveCredits(props)` (src/lib/cfb/props-store.ts), which declares it as OPTIONAL so
    * src/lib/football/league.ts needs no edit and a config without the field behaves exactly as it
    * does today. `satisfies LeagueProps` alone would reject the extra key on a fresh literal, so the
    * shape is spelled out here rather than imported — nothing on the NFL desk depends on CFB code.
+   *
+   * ALSO NOT STATIC: src/lib/server/football-props.ts caps the reserve at what the games actually in
+   * play or about to start could spend, so a dead slate holds back NOTHING.
    */
-  liveReserveCredits: 496,
+  liveReserveCredits: 248,
 } as const satisfies LeagueProps & { liveReserveCredits: number };
 
 /** Suggested parlays by tier — the CFB shape; `perCategory` is 25 because a 16-game slate has fewer legs to draw on. */

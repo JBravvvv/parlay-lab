@@ -11,7 +11,8 @@ import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
 import { propLegOf, propQuote } from "@/components/cfb/CfbProps";
 import type { CfbSlipLeg } from "@/components/cfb/CfbSlip";
 import { FOOTBALL_GEN_MARKETS, footballGenPool, footballSide, type FootballPriceMode } from "@/lib/football/gen-pool";
-import { GenSheet } from "@/components/props/GenSheet";
+import { addCfbLegs } from "@/components/cfb/CfbProps";
+import { GenSheet, genFailLine } from "@/components/props/GenSheet";
 import { bandDec, generate, specSeed, type GenPool, type GenResult, type GenSpec } from "@/lib/parlay-gen";
 import { amFmt, amToDec } from "@/lib/ticket-math";
 
@@ -415,7 +416,13 @@ describe("a game under way, and a game that is over", () => {
       const done = clone().map((r) => ({ ...r, status }));
       const s = spec({ market: "anytime_td", sides: "both", legs: 2, onePerGame: false, includeStarted: true });
       const pool = poolFor(s, "cz", Date.parse("2026-09-06T00:00:00Z"), done);
-      expect(pool.noParlayDropped).toBe(5);
+      /* ITS OWN COUNTER (INSTRUCTION 52 fix pass). These five used to be filed under
+         `noParlayDropped`, which the sheet prints as "the book bars from parlays" — so a
+         Saturday-evening board, where the morning games are final and the night games are not,
+         told Josh Caesars had barred legs nobody barred. That counter is the BOOK's flag and
+         football never sets it. */
+      expect(pool.finishedDropped).toBe(5);
+      expect(pool.noParlayDropped).toBe(0);
       expect(pool.rows).toBe(0);
       expect(pool.legs).toHaveLength(0);
       expect(pool.startedDropped).toBe(0); // the game is not "started", it is finished
@@ -429,6 +436,44 @@ describe("a game under way, and a game that is over", () => {
     expect(pool.startedDropped).toBe(0);
     expect(pool.legs).toHaveLength(5);
     for (const l of pool.legs) expect(l.started).toBe(false);
+  });
+});
+
+describe("a yes-only market: the board is full of it, and there is no under to take", () => {
+  /**
+   * INSTRUCTION 52 fix pass. Anytime TD is the football board's FIRST prop market and a yes-only
+   * one: every row is a "yes", which this adapter counts as an over. Asking for unders there used
+   * to empty the eligible set and come back `no-rows`, which the sheet prints as "No Anytime TD
+   * lines on this board" — a false statement about a board that was showing dozens of them, and
+   * the diagnostic line directly above it said "eligible 0" while the pool line said otherwise.
+   * No relaxation was offered either, so the Generate button went dead with nothing on screen
+   * pointing at the control Josh had just pressed.
+   */
+  const UNDERS = spec({ market: "anytime_td", sides: "u", legs: 2, onePerGame: false });
+
+  it("names the side, quotes the legs that ARE posted, and never calls the board empty", () => {
+    const pool = poolFor(UNDERS, "cz");
+    expect(pool.legs).toHaveLength(5); // the board HAS five anytime-TD legs
+    const f = fail(generate(pool, UNDERS, 1));
+    expect(f).toEqual({ code: "one-sided", want: "u", has: "o", rows: 5 });
+    const line = genFailLine(f, { marketLabel: "Anytime TD", legs: 2, loAm: -250, hiAm: 250 });
+    expect(line).toContain("No Anytime TD under is posted on this board");
+    expect(line).toContain("all 5 Anytime TD legs here are overs");
+    expect(line).toContain("Switch to overs");
+    expect(line).not.toContain("nothing here to build a parlay from");
+  });
+
+  it("a market that really has no rows still says exactly what it said before", () => {
+    /* the Caesars pass_yds column is four dashes — an empty pool, and `no-rows` is the truth */
+    const s = spec({ market: "pass_yds", sides: "u" });
+    const empty = poolFor(s, "cz");
+    expect(empty.legs).toHaveLength(0);
+    expect(fail(generate(empty, s, 1))).toEqual({ code: "no-rows" });
+  });
+
+  it("the overs on that same market build a ticket — the side filter was the whole problem", () => {
+    const overs = { ...UNDERS, sides: "o" as const };
+    expect(ok(generate(poolFor(overs, "cz"), overs, 1)).legs).toHaveLength(2);
   });
 });
 
@@ -521,12 +566,93 @@ describe("the sheet renders for the FOOTBALL market list", () => {
     expect(out).not.toContain("Moneyline and run line"); // the MLB wording
   });
 
+  it("offers no Unders control on Anytime TD, and says in one line why", () => {
+    /* the control that was a guaranteed dead end on the football default market */
+    const atd = sheet();
+    expect(atd).not.toContain(">Unders<");
+    expect(atd).not.toContain(">Overs<");
+    expect(atd).toContain("Anytime TD has one side only");
+    /* …and it is still there on a real over/under market */
+    const pass = sheet({ market: "pass_yds", marketLabel: "Pass Yds" });
+    expect(pass).toContain(">Unders<");
+    expect(pass).toContain(">Overs<");
+    expect(pass).not.toContain("has one side only");
+  });
+
+  it("an unders request on a yes-only market gets the one-tap fix, not a dead Generate button", () => {
+    const u = spec({ market: "anytime_td", sides: "u", legs: 3, onePerGame: false, legMinAm: -400, legMaxAm: 400 });
+    const out = sheet({ spec: u, result: generate(poolFor(u, "cz"), u, 1) });
+    expect(out).toContain("Switch to overs");
+    expect(out).not.toContain("Spinning again would return the same answer");
+    expect(out).not.toContain("No Anytime TD lines on this board");
+  });
+
+  it("a finished game is reported as finished, never as a parlay the book barred", () => {
+    const done = clone().map((r) => ({ ...r, status: "final" as const }));
+    const pool = poolFor(SPEC, "cz", Date.parse("2026-09-06T00:00:00Z"), done);
+    const out = sheet({ pool, result: generate(pool, SPEC, 1) });
+    expect(out).toContain("5 in games that have finished");
+    expect(out).not.toContain("the book bars from parlays");
+    /* and the verdict says the same thing the counter does, in Josh's own words */
+    expect(out).toContain("Every Anytime TD game on this board has finished");
+    expect(out).not.toContain("No Anytime TD lines on this board");
+  });
+
   it("says it is waiting for the board rather than calling the board empty", () => {
     const empty = poolFor(spec({ market: "pass_yds", sides: "both" }), "cz");
     const out = sheet({ pool: empty, result: generate(empty, SPEC, 1), loading: true });
     expect(out).toContain("Waiting for today&#x27;s board…");
     const answered = sheet({ pool: empty, result: generate(empty, SPEC, 1), loading: false });
     expect(answered).toContain("No Anytime TD lines on this board");
+  });
+});
+
+describe('"Add to slip" ADDS — the Sides rail survives a spin (INSTRUCTION 52 fix pass)', () => {
+  /**
+   * On football ONE slip carries the Sides rail's spreads and the prop rails' legs, and the
+   * generator used to hand `setLegs` the generated legs alone — so three tapped spreads vanished
+   * the moment Josh pressed a button labelled "Add to slip". Every other route into this slip
+   * appends (`addCfbLeg`), and now this one does too.
+   */
+  const side = (gameId: string): CfbSlipLeg => ({
+    kind: "side",
+    key: `${gameId}|spread|home|-3.5`,
+    gameId,
+    label: "Alabama -3.5",
+    sub: "ECU @ ALA · Sat 9:00 AM",
+    market: "spread",
+    cz: -110,
+    book: "CZ",
+    prob: 52.1,
+  });
+  const S = spec({ market: "anytime_td", sides: "both", legs: 3, onePerGame: false, legMinAm: -400, legMaxAm: 400 });
+  const generated = ok(generate(poolFor(S, "cz"), S, specSeed(S, DATE, 0))).legs.map((l) => l.leg);
+
+  it("three sides plus a three-leg spin is six legs, and the three sides are untouched", () => {
+    const sides = [side("g1"), side("g2"), side("g3")];
+    const r = addCfbLegs(sides, generated);
+    expect(generated).toHaveLength(3);
+    expect(r.legs).toHaveLength(6);
+    expect(r.legs.slice(0, 3)).toEqual(sides); // in place, in order, same objects
+    expect(r.note).toBeNull();
+  });
+
+  it("a leg already on the slip is KEPT, never toggled back off by the add", () => {
+    const r = addCfbLegs([generated[0]], generated);
+    expect(r.legs).toHaveLength(3);
+    expect(r.legs.map((l) => l.key)).toContain(generated[0].key);
+  });
+
+  it("a player the slip already carries is refused BY NAME, never dropped in silence", () => {
+    const twin: CfbSlipLeg = { ...generated[0], key: `${generated[0].key}|twin` };
+    const r = addCfbLegs([twin], generated);
+    expect(r.legs).toHaveLength(3); // the twin plus the two that fit
+    expect(r.legs.map((l) => l.key)).not.toContain(generated[0].key);
+    expect(r.note).toContain("one leg per player");
+  });
+
+  it("an empty slip gets exactly the generated legs — the plain case still works", () => {
+    expect(addCfbLegs([], generated).legs).toEqual(generated);
   });
 });
 
@@ -556,6 +682,16 @@ describe("the football desk is wired to the shared generator, and the NFL inheri
     expect(nfl).not.toContain("useParlayGen");
     expect(nfl).toContain("<CfbProps />");
     expect(nfl.split("\n").filter((l) => l.trim()).length).toBeLessThan(25);
+  });
+
+  it("the generated legs go through the desk's adder, and the hook no longer overwrites the slip", () => {
+    const hook = readSrc("src/components/props/useParlayGen.ts");
+    expect(hook).toContain("setLegs(addLegs(legs, result.ticket.legs.map((l) => l.leg)));");
+    /* the shape that wiped the slip — it must not come back in either desk */
+    expect(hook).not.toMatch(/setLegs\(result\.ticket\.legs\.map/);
+    expect(cfb).toContain("addLegs: (prev, add) => {");
+    expect(cfb).toContain("const r = addCfbLegs(prev, add);");
+    expect(cfb).toContain("if (r.note) showNote(r.note);");
   });
 
   it("the adapter is a PURE READER — no fetch, no api path, no credit, no ledger", () => {

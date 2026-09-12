@@ -78,7 +78,11 @@ const PER = CFB_PROPS.measuredCreditsPerEvent;
    game is sized against `dailyBudget - liveReserveCredits`, an IN-PLAY game against the whole
    `dailyBudget`. That is the fix for the defect Josh reported — 60 pre-kick events x 31 = 1,860 of
    2,500 left 640, and a live pull of 24 wants 744, so on a full Saturday the in-game pull was refused
-   by the rail and the board served carried rows marked playable:false. NO TOTAL WAS LOWERED.
+   by the rail and the board served carried rows marked playable:false. NO TOTAL WAS LOWERED. The hold
+   is HALF a live cycle (372) since the review round, and capped at what today's live-or-upcoming games
+   could actually spend: a full 744 left floor(1756/31) = 56 event-pulls against a 60-game board, so
+   the live fix was costing four games' pre-kick props every Saturday. At 372 the rail is 68 pulls —
+   the whole board plus 8 — and a dead slate holds back nothing at all.
    Every `spent` precondition below that governs PRE-KICK games is written against this rail, so each
    test still proves exactly the property it was written to prove; the live-slate tests keep using
    `dailyBudget`, which is itself the proof that a live pass may still draw the entire budget. */
@@ -716,8 +720,10 @@ describe("INSTRUCTION 42 (2026-09-05) — per-game windows and the empty-event r
     expect(atRail.body.budgeted).toBe(true);
     expect(atRail.body.fetched).toBe(0);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(atRail.body.note).toMatch(/held back for games already under way/);
-    expect(atRail.body.note).toMatch(/744/);
+    expect(atRail.body.note).toMatch(/credits are being held for the games under way/);
+    /* the number in the note is the hold this slate actually has, not the configured ceiling: every
+       fixture game here is pre-kick, so liveSoon is the slate and the 372 ceiling binds */
+    expect(atRail.body.note).toMatch(/372/);
 
     fetchMock.mockClear();
     fakeRedis({ [`pl:cfb:props:spend:v1:${DATE}`]: "2500" });

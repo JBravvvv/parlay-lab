@@ -113,11 +113,16 @@ const RELAX_HINT: Record<string, string> = {
  */
 export function genFailLine(
   fail: GenFail,
-  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number },
+  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean },
 ): string {
   switch (fail.code) {
     case "no-rows":
-      return `No ${ctx.marketLabel} lines on this board — there is nothing here to build a parlay from.`;
+      /* EVERY GAME IS OVER is a different fact from "the board has no lines", and on a past date
+         the football board is full of grey final rows (INSTRUCTION 52 fix pass). The caller sets
+         the flag only when every row this market has is in a finished game. */
+      return ctx.allFinished
+        ? `Every ${ctx.marketLabel} game on this board has finished — there is nothing left to build a parlay from.`
+        : `No ${ctx.marketLabel} lines on this board — there is nothing here to build a parlay from.`;
     case "one-sided": {
       /* NEVER "no lines on this board" here: the board has plenty, they are all the other way
          round (INSTRUCTION 52 fix pass). Anytime TD is the live case — a price on the touchdown
@@ -395,13 +400,25 @@ export function GenSheet<P>({
   const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob }))) : null;
   const outside = new Set(ticket?.outsideLegBand ?? []);
   const anyMarketProb = !!ticket?.legs.some((l) => l.src === "market");
-  const suspended = !!markets.find((m) => m.key === market)?.suspended;
+  const mkt = markets.find((m) => m.key === market);
+  const suspended = !!mkt?.suspended;
+  /* a yes-only market (anytime TD) has no under to pick, so the side control is not offered on it */
+  const oneSided = !!mkt?.oneSided;
   const fail = result.ok ? null : result.fail;
   /* every failure code is DETERMINISTIC in the pool and the spec, so "Generate" would be a
      guaranteed no-op in that state — the same "the button does nothing" complaint as item 1.
      When the generator names a relaxation the button becomes that one control; otherwise it is
      disabled and says why. */
-  const relax = fail?.code === "short-pool" ? fail.relax : null;
+  /* A market that posts one side only (anytime TD) gets the same one-tap escape: the side it
+     really does post. Without it the Unders button was a trap — the Generate button went dead,
+     the banner called the board empty, and nothing on screen pointed at the control Josh had
+     just pressed (INSTRUCTION 52 fix pass). */
+  const relax: { label: string; patch: Partial<GenSpec> } | null =
+    fail?.code === "short-pool" && fail.relax
+      ? { label: RELAX_BUTTON[fail.relax], patch: RELAX_PATCH[fail.relax] }
+      : fail?.code === "one-sided"
+        ? { label: fail.has === "u" ? "Switch to unders" : "Switch to overs", patch: { sides: fail.has } }
+        : null;
   /* the kept slots, resolved against the pool — rendered in EVERY state, success or failure,
      so the 44px unpin button the failure copy tells Josh to press is always on screen */
   const pinRows = spec.pinned
@@ -532,19 +549,30 @@ export function GenSheet<P>({
               Advanced <span className="ml-1 inline-block transition-transform group-open:rotate-180">▾</span>
             </summary>
             <div className="mt-2 space-y-1.5">
-              <div className="flex gap-1.5">
-                {(["o", "u", "both"] as const).map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    aria-pressed={spec.sides === s}
-                    onClick={() => onSpec({ sides: s })}
-                    className={`${CTRL} flex-1 ${spec.sides === s ? ON : OFF}`}
-                  >
-                    {s === "o" ? "Overs" : s === "u" ? "Unders" : "Both"}
-                  </button>
-                ))}
-              </div>
+              {/* THE SIDE CONTROL IS NOT OFFERED ON A YES-ONLY MARKET (INSTRUCTION 52 fix pass).
+                  Every Anytime TD price is on the touchdown happening — there is no under to
+                  take — so "Unders" there could only ever empty the pool, and the sheet then
+                  told Josh the board had no lines while the board sat underneath, full of them. */}
+              {oneSided ? (
+                <div data-testid="gen-one-sided" className="text-[9.5px] leading-snug text-faint">
+                  {marketLabel} has one side only — the price is on it happening, so there is no over or under to pick
+                  here.
+                </div>
+              ) : (
+                <div className="flex gap-1.5">
+                  {(["o", "u", "both"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={spec.sides === s}
+                      onClick={() => onSpec({ sides: s })}
+                      className={`${CTRL} flex-1 ${spec.sides === s ? ON : OFF}`}
+                    >
+                      {s === "o" ? "Overs" : s === "u" ? "Unders" : "Both"}
+                    </button>
+                  ))}
+                </div>
+              )}
               <Toggle on={!spec.onePerGame} onChange={(v) => onSpec({ onePerGame: !v })}>
                 Two legs from one game
               </Toggle>
@@ -600,11 +628,11 @@ export function GenSheet<P>({
             ) : relax ? (
               <button
                 type="button"
-                onClick={() => onSpec(RELAX_PATCH[relax])}
+                onClick={() => onSpec(relax.patch)}
                 title="Spinning again cannot help — the pool and these filters decide this answer. This is the one control that would open it up."
                 className="press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-gold bg-gold/15 px-2 text-center text-[12.5px] font-bold leading-tight text-gold"
               >
-                {RELAX_BUTTON[relax]}
+                {relax.label}
               </button>
             ) : (
               <button
@@ -638,7 +666,10 @@ export function GenSheet<P>({
             pool {pool.rows} rows → eligible {counts.eligible} → after band {counts.inBand} → {counts.games} game
             {counts.games === 1 ? "" : "s"}
             {pool.startedDropped > 0 && <> · {pool.startedDropped} dropped as already started</>}
+            {/* two different sentences, because they are two different facts: the book refusing a
+                leg on a parlay, and a game that is simply over (INSTRUCTION 52 fix pass) */}
             {pool.noParlayDropped > 0 && <> · {pool.noParlayDropped} the book bars from parlays</>}
+            {pool.finishedDropped > 0 && <> · {pool.finishedDropped} in games that have finished</>}
           </div>
 
           {/* the ticket, or the one honest reason there isn't one */}
@@ -734,6 +765,10 @@ export function GenSheet<P>({
                       legs: spec.legs,
                       loAm: spec.legMinAm,
                       hiAm: spec.legMaxAm,
+                      /* `rows` counts only the rows that were still bettable, so rows 0 with
+                         nothing dropped for being under way and something dropped for being over
+                         means exactly one thing: every game in this market has finished */
+                      allFinished: pool.rows === 0 && pool.startedDropped === 0 && pool.finishedDropped > 0,
                     })}
               </div>
             </div>

@@ -30,6 +30,11 @@ import {
  *    from the ticket, so the control the failure copy tells Josh to press is never a no-op.
  *  - the pool and the ticket are gated on `open`: a reader who never opens the sheet pays for
  *    no pool build and no seeded fill.
+ *  - "ADD TO SLIP" ADDS. It used to overwrite the slip outright, which on football — where ONE
+ *    slip carries the Sides rail's spreads and the prop rails' legs — deleted every leg Josh had
+ *    tapped before he spun (INSTRUCTION 52 fix pass). The desk passes its OWN adder, so the fold
+ *    obeys that desk's clash rules and keeps what is already there; Undo still restores the slip
+ *    exactly as it stood.
  *
  * PURE READER. The `build` the caller passes in reads the board that is ALREADY on the device;
  * nothing here fetches, adds a market to a pull, spends an Odds credit, seats money or writes a
@@ -67,6 +72,7 @@ export function useParlayGen<P>({
   onMarket,
   legs,
   setLegs,
+  addLegs,
 }: {
   /** where the open/closed state is remembered — derive it from the league, never a literal */
   storageKey: string;
@@ -84,6 +90,16 @@ export function useParlayGen<P>({
   /** the slip as it stands, so Add can be undone */
   legs: readonly P[];
   setLegs: (legs: P[]) => void;
+  /**
+   * How THIS desk folds the generated legs into the slip it already has. Required, and required
+   * to ADD rather than replace: the button says "Add to slip", and on football one slip carries
+   * the Sides rail's legs and the prop rails' legs at once, so an overwrite silently deleted the
+   * spreads Josh had tapped (INSTRUCTION 52 fix pass). The desk supplies it because only the desk
+   * knows its own clash rules — one side per game and one leg per player on football
+   * (`addCfbLeg`), dedupe by leg id on MLB — and a leg the slip refuses must not be double-added
+   * or toggled back off.
+   */
+  addLegs: (prev: readonly P[], add: readonly P[]) => P[];
 }): UseParlayGen<P> {
   /* `open` is read from localStorage only AFTER mount — the hydration rule (the same one
      app/board/page.tsx:123-135 states): an initializer read would render one tree on the
@@ -183,10 +199,13 @@ export function useParlayGen<P>({
     setRoll((r) => r + 1);
   };
 
+  /* ADDS, never replaces — and the fold is the desk's own, so the legs Josh tapped before he
+     spun survive and the desk's clash rules still decide what may join them. `prevLegs` is the
+     slip exactly as it stood, which is what Undo puts back. */
   const add = () => {
     if (!result.ok) return;
     prevLegs.current = legs.slice();
-    setLegs(result.ticket.legs.map((l) => l.leg));
+    setLegs(addLegs(legs, result.ticket.legs.map((l) => l.leg)));
     setAdded(true);
   };
 

@@ -85,6 +85,21 @@ describe("FIX 4 — each of the three states gets its own plain-English sentence
     expect(note).toContain("1 game under way");
   });
 
+  it("NOT LOOKED AT YET IS NOT NO PHRASE — a null syncReady blames nothing", () => {
+    /* review round, 2026-09-12: `syncReady` is a mount-effect read, so the server render and the
+       first client pass have not looked at localStorage yet. Telling Josh his phrase isn't saved in
+       that window — on a phone where it IS saved — sends him to Settings to re-enter something that
+       is already there, which is worse than giving no reason at all. */
+    const note = mlbLiveGapNote(gap({ noQuote: 1 }), { syncReady: null, overlay: false });
+    expect(note).toContain("live prices haven't loaded yet");
+    expect(note).not.toContain("sync phrase");
+    // and the sentence agrees with the count: one game "is showing its", not "are showing their"
+    expect(note).toContain("the 1 game under way is showing its pregame price");
+    expect(mlbLiveGapNote(gap({ live: 2, noQuote: 2 }), { syncReady: null, overlay: false })).toContain(
+      "the 2 games under way are showing their pregame price",
+    );
+  });
+
   it("no live quote for this game — and it says the row keeps its pregame price", () => {
     const note = mlbLiveGapNote(gap({ live: 3, priced: 2, noQuote: 1 }), { syncReady: true, overlay: true });
     expect(note).toContain("1 game has no live price yet");
@@ -212,8 +227,15 @@ describe("FIX 4 — rendered: the Board names the reason instead of rendering no
     const html = await renderBoard({ boardAt: FIRST_PITCH + 60 * 60_000, rows: null });
     expect(html).not.toContain('data-testid="mlb-live-unavailable"');
     expect(html).toContain('data-testid="mlb-live-reason"');
-    expect(html).toContain("your sync phrase isn&#x27;t saved here");
+    /* THE NEUTRAL SENTENCE, NOT THE PHRASE ONE (review round, 2026-09-12). This render IS the
+       not-looked-at-yet window: `useMlbLiveSyncReady` reads localStorage in a mount effect, which
+       renderToString never runs, so `syncReady` is null. It used to assert the opposite — that the
+       Board tells Josh his sync phrase isn't saved — which is a guess dressed as a diagnosis, and
+       wrong on every phone that has one. */
+    expect(html).toContain("live prices haven&#x27;t loaded yet");
     expect(html).toContain("1 game under way");
+    expect(html).toContain("is showing its pregame price");
+    expect(html).not.toContain("your sync phrase isn&#x27;t saved here");
   });
 
   it("a live game the pull never reached is named, not left blank", async () => {

@@ -61,11 +61,14 @@ const DATE = "2026-09-13";
 const CIN = "401872925";
 const PER = NFL_PROPS.measuredCreditsPerEvent;
 /* THE PRE-KICK RAIL (INSTRUCTION 52, 2026-09-12) — the same two-rail split CFB got, with NFL's own
-   numbers: a pre-kick game is sized against `dailyBudget - liveReserveCredits` (1000 - 496 = 504), an
-   in-play game against the whole 1000. 496 = liveMaxEvents (16) x measuredCreditsPerEvent (31), so a
-   full Sunday of 16 in-play games is affordable at the moment they kick off instead of being refused
-   by a rail the morning pass had already consumed. NOTHING WAS LOWERED: 16 pre-kick + 16 live = 992
-   of 1000. A Sunday-morning pass is unaffected — 13 games at 403 credits still fits inside 504. */
+   numbers: a pre-kick game is sized against `dailyBudget - liveReserveCredits` (1000 - 248 = 752), an
+   in-play game against the whole 1000. 248 = HALF of liveMaxEvents (16) x measuredCreditsPerEvent
+   (31), so in-play games are affordable the moment they kick off instead of being refused by a rail
+   the morning pass had already consumed. HALF, after the review round: a full 496 cycle left exactly
+   floor(504/31) = 16 event-pulls, i.e. one board and not one pull more, so the re-price a Sunday needs
+   when the 2 h carry lapses across the 13:25/17:20 ET windows was refused outright. At 248 the rail
+   is 24 event-pulls — the 16-game board plus 8 — and the live half is still sized against the whole
+   1000. NOTHING WAS LOWERED: `dailyBudget` is 1000 either way, and the pre-kick allowance went UP. */
 const RAIL = NFL_PROPS.dailyBudget - NFL_PROPS.liveReserveCredits;
 const KEYS = NFL_PROPS_REDIS;
 
@@ -359,7 +362,7 @@ describe("GET /api/nfl/props — the rails", () => {
     expect(body.fetched).toBe(10);
     expect(body.note).toMatch(/covers 10 of 13 games/);
     expect(body.note).toMatch(/1000 credits/);
-    expect(body.note).toMatch(/held back for games already under way/);
+    expect(body.note).toMatch(/credits are being held for the games under way/);
   });
 
   it("AN UNSPENT SUNDAY MORNING IS UNTOUCHED BY THE RESERVE: all 13 games price, as before", async () => {
@@ -374,7 +377,10 @@ describe("GET /api/nfl/props — the rails", () => {
     expect(body.budgeted).toBe(false);
     expect(body.note).toBeUndefined();
     expect(13 * PER).toBeLessThanOrEqual(RAIL);
-    expect(NFL_PROPS.liveReserveCredits).toBe(NFL_PROPS.liveMaxEvents * PER);
+    expect(NFL_PROPS.liveReserveCredits).toBe((NFL_PROPS.liveMaxEvents / 2) * PER);
+    /* AND THE SECOND PASS FITS TOO (review round, 2026-09-12) — a full 16-game board plus 8 more
+       event-pulls, which is the re-price a 17:20 ET kickoff needs when the 2 h carry lapses. */
+    expect(Math.floor(RAIL / PER)).toBeGreaterThanOrEqual(NFL_PROPS.maxEvents + 8);
   });
 
   it("missing ODDS_API_KEY → oddsMissing, no fetch, nothing written", async () => {

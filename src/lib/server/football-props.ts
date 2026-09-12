@@ -98,6 +98,8 @@ import type { LeagueConfig } from "@/lib/football/league";
  *      then served carried pre-kick rows re-stamped "live": a frozen in-game line. No budget is
  *      lowered by this; see `liveReserveCredits` in src/lib/cfb/props-store.ts and the split at
  *      Rail 2 below, which is byte-identical to the old single allowance when the reserve is 0.
+ *      The hold is also capped at what the in-play-or-still-to-kick games could spend, so a dead or
+ *      2-game slate holds back nothing it could not use (review round, 2026-09-12).
  *   3. The Next data cache on each event call, as before (the pull's window).
  *
  * After a pull the merged board is written back (EX boardRetainSec) and the spend counter grows
@@ -307,9 +309,10 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
      So the allowance is split in two, against two different rails:
        · the LIVE partition is sized against the FULL `dailyBudget` — an in-play re-price may spend
          the last credit of the day, because a moving line is the only thing worth buying late;
-       · the REST partition is sized against `dailyBudget - liveReserveCredits` AND against what the
-         live partition is about to spend this pass, so at least the reserve is still unspent when
-         this pass ends.
+       · the REST partition is sized against `dailyBudget - reserve` AND against what the live
+         partition is about to spend this pass, so at least the reserve is still unspent when this
+         pass ends — `reserve` being `liveReserveCredits` capped at what today's live-or-upcoming
+         games could actually spend.
      NO BUDGET IS LOWERED: `dailyBudget` is untouched and all of it remains spendable. What changes
      is WHICH pass gets the last slice.
 
@@ -321,7 +324,20 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
      than `spentBefore` twice: sizing BOTH partitions off the same untouched tally would hand the
      same room out twice and could spend up to one reserve MORE than the day's budget. */
   const perEventCost = cfg.props.measuredCreditsPerEvent;
-  const reserve = liveReserveCredits(cfg.props);
+  /* THE RESERVE IS CAPPED AT WHAT A LIVE PASS COULD ACTUALLY SPEND TODAY (review round, 2026-09-12).
+     The configured figure is a CEILING, not a standing charge. Held flat it was charged to the
+     pre-kick pass on slates that can never use it: a 2-game Thursday night CFB card gave up 372
+     credits to protect at most 62 credits of in-play pulls, and a slate whose every game is final or
+     postponed gave up all 372 to protect nothing at all. That is a budget quietly reduced, which is
+     exactly what this reserve was promised not to do. So the hold is the SMALLER of the configured
+     ceiling and what the games that are in play or still to kick off could spend at the measured
+     rate, capped by `liveMaxEvents` (a live pass cannot pull more events than that in one window).
+     On a full Saturday the cap is far above the ceiling, so a game day is unchanged. */
+  const liveSoon = Math.min(
+    events.filter((g) => g.status === "live" || g.status === "upcoming").length,
+    cfg.props.liveMaxEvents,
+  );
+  const reserve = Math.min(liveReserveCredits(cfg.props), liveSoon * perEventCost);
   /* THE PARTITION IS THE GAME'S STATUS, NOT ITS `why` RANK — and that distinction is the whole fix.
      `why()` returns "unpriced" for ANY game the stored board does not carry, live or not (line 278),
      so on the first pull of a day, or after the board's TTL lapsed, an IN-PLAY game is ranked
@@ -371,9 +387,18 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
      appended only when the reserve is what bound this pass: every live game this pass wanted was
      affordable and a pre-kick game was not. With `liveReserveCredits` absent or 0 the note is
      byte-identical to the one this replaced. */
-  const reserveBound = reserve > 0 && allowedLive === liveNeed.length && allowedRest < restNeed.length;
+  /* BOUND BY THE RESERVE, MEASURED RATHER THAN ASSUMED (review round, 2026-09-12). The first cut
+     read "every live game was afforded AND a pre-kick game was refused", which is also true when the
+     DAY'S BUDGET is what refused it — the reserve then got the blame for games it did not cost, and
+     the note promised credits were waiting when in truth the rail was empty. The honest test is
+     counterfactual: re-size the pre-kick half against the FULL budget and see whether it would have
+     bought more. Only the difference is the reserve's doing. */
+  const allowedRestNoReserve = store
+    ? affordableEvents(restNeed.length, spentBefore + liveSpend, cfg.props.dailyBudget, perEventCost)
+    : restNeed.length;
+  const reserveBound = reserve > 0 && allowedRest < allowedRestNoReserve;
   const reserveBit = reserveBound
-    ? ` (${reserve} of those credits are held back for games already under way, so in-play lines can still be bought tonight)`
+    ? ` (${reserve} credits are being held for the games under way so their in-play lines can still be re-priced — that much of the budget is not spent)`
     : "";
   const budgetNote = budgeted
     ? allowed === 0

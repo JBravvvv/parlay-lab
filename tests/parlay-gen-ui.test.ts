@@ -314,7 +314,12 @@ describe("source pins — the honesty guard extended to the newest price surface
   });
   it("Add to slip reuses the existing slip math and keeps an Undo; nothing is spent or written", () => {
     expect(hook).toMatch(/prevLegs\.current = legs\.slice\(\);/);
-    expect(hook).toMatch(/setLegs\(result\.ticket\.legs\.map\(\(l\) => l\.leg\)\);/);
+    /* ADD, NOT REPLACE (INSTRUCTION 52 fix pass). `setLegs(result.ticket.legs.map(...))` threw the
+       slip away — harmless-looking on MLB, destructive on football, where one slip carries the
+       Sides rail's legs too. The fold is the desk's own and it must keep what is there. */
+    expect(hook).toMatch(/setLegs\(addLegs\(legs, result\.ticket\.legs\.map\(\(l\) => l\.leg\)\)\);/);
+    expect(hook).not.toMatch(/setLegs\(result\.ticket\.legs\.map/);
+    expect(page).toMatch(/addLegs: \(prev, add\) => \[\.\.\.prev\.filter/);
     expect(page).toMatch(/combineTicket\(legs\)/);
     expect(page).not.toMatch(/\/api\/refill|\/api\/generate/);
   });

@@ -694,6 +694,36 @@ const GEN_STUB_NOTE =
 const GEN_MARKET_NOTE =
   "Every win % here is the de-vigged consensus of the books that posted the line; the EV beside it is measured against the one price you would take.";
 
+/**
+ * "ADD TO SLIP" ADDS (INSTRUCTION 52 fix pass). The generator used to hand `setLegs` the four
+ * generated legs and nothing else, which REPLACED the slip — and on football one slip carries the
+ * Sides rail's spreads and the prop rails' legs at once, so spinning a prop parlay silently
+ * deleted every side Josh had already tapped. Nothing else on this desk behaves that way: every
+ * other route in is `addCfbLeg`, which appends.
+ *
+ * So the fold goes through that same adder, one leg at a time, and its rules decide the rest:
+ *  - a leg ALREADY on the slip is left alone — `addCfbLeg` treats a repeat tap as "remove", and
+ *    an Add that removed a leg would be the opposite of what the button says;
+ *  - a player the slip already carries in that game is REFUSED and named, exactly as a tap is,
+ *    never dropped in silence.
+ *
+ * Pure, so it is testable on its own: the caller shows `note` and sets `legs`.
+ */
+export function addCfbLegs(
+  prev: readonly CfbSlipLeg[],
+  add: readonly CfbSlipLeg[],
+): { legs: CfbSlipLeg[]; note: string | null } {
+  let legs = [...prev];
+  let note: string | null = null;
+  for (const leg of add) {
+    if (legs.some((l) => l.key === leg.key)) continue;
+    const r = addCfbLeg(legs, leg);
+    if (r.note) note = note ?? r.note;
+    else legs = r.legs;
+  }
+  return { legs, note };
+}
+
 export function CfbProps() {
   const L = useLeague();
   /* the league's props table and client under the pinned CFB names (see the seam note above) */
@@ -808,6 +838,13 @@ export function CfbProps() {
     onMarket: (m) => setNav(m as CfbPropMarket),
     legs,
     setLegs,
+    /* "Add to slip" ADDS, through the desk's OWN adder (INSTRUCTION 52 fix pass) — see addCfbLegs
+       above: the sides Josh already tapped stay, and a refused player is named, not dropped. */
+    addLegs: (prev, add) => {
+      const r = addCfbLegs(prev, add);
+      if (r.note) showNote(r.note);
+      return r.legs;
+    },
   });
   const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,

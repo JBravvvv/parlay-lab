@@ -27,6 +27,11 @@ import { NFL_PROPS } from "@/lib/nfl/rules";
 const read = (p: string) => stripComments(fs.readFileSync(path.join(process.cwd(), p), "utf8"));
 const FP = "src/lib/server/football-props.ts";
 
+/** what the route actually holds back: the configured ceiling capped by what live could spend today */
+function heldBack(ceiling: number, liveOrUpcoming: number, liveMaxEvents: number, perEvent: number) {
+  return Math.min(ceiling, Math.min(liveOrUpcoming, liveMaxEvents) * perEvent);
+}
+
 /** the exact formula the route runs (pinned against the source in the last describe below) */
 function split(liveLen: number, restLen: number, spentBefore: number, budget: number, reserve: number, perEvent: number) {
   const allowedLive = affordableEvents(liveLen, spentBefore, budget, perEvent);
@@ -54,7 +59,10 @@ describe("FIX 1 — the live reserve lets an in-play pull through a spent pre-ki
   it("the pre-kick half stops at dailyBudget - reserve, and the live half still reaches the last credit", () => {
     const per = CFB_PROPS.measuredCreditsPerEvent;
     const reserve = liveReserveCredits(CFB_PROPS);
-    const fromZero = split(0, 60, 0, CFB_PROPS.dailyBudget, reserve, per);
+    /* 200 is synthetic demand far past any real slate, on purpose: what this pins is that the
+       CEILING stops the pre-kick half, not that it runs out of games. A real 60-game Saturday no
+       longer reaches the ceiling at all — that is the fix, pinned by the 60-game test above. */
+    const fromZero = split(0, 200, 0, CFB_PROPS.dailyBudget, reserve, per);
     expect(fromZero.allowedRest).toBe(Math.floor((CFB_PROPS.dailyBudget - reserve) / per));
     // and with the pre-kick half already at its ceiling, the live half is sized on the FULL budget
     const spent = fromZero.allowedRest * per;
@@ -63,13 +71,40 @@ describe("FIX 1 — the live reserve lets an in-play pull through a spent pre-ki
     expect(live.allowedLive).toBeGreaterThan(0);
   });
 
-  it("NFL keeps its whole pre-kick slate — the reserve only refuses a SECOND full re-price", () => {
+  it("NFL keeps its whole pre-kick slate AND the Sunday re-price the 2 h carry needs", () => {
     const per = NFL_PROPS.measuredCreditsPerEvent;
     const reserve = liveReserveCredits(NFL_PROPS);
     const prekickRoom = Math.floor((NFL_PROPS.dailyBudget - reserve) / per);
-    expect(prekickRoom).toBeGreaterThanOrEqual(NFL_PROPS.liveMaxEvents); // a full Sunday slate still prices
+    expect(prekickRoom).toBeGreaterThanOrEqual(NFL_PROPS.maxEvents); // a full Sunday slate still prices
+    /* AND THE SECOND PASS (review round, 2026-09-12). At the first cut's 496 the pre-kick rail was
+       504 = exactly 16 event-pulls: the 16-game board and not one pull more, so the re-price a
+       10:00/13:25/17:20 ET Sunday needs when the 2 h carry lapses was refused outright. 8 spare
+       event-pulls is the fix, and this assertion is what stops the reserve growing back. */
+    expect(prekickRoom).toBeGreaterThanOrEqual(NFL_PROPS.maxEvents + 8);
     const s = split(0, NFL_PROPS.liveMaxEvents, 0, NFL_PROPS.dailyBudget, reserve, per);
     expect(s.allowedRest).toBe(NFL_PROPS.liveMaxEvents);
+  });
+
+  it("CFB prices the WHOLE 60-game board on the first pull, with re-pricing left over", () => {
+    const per = CFB_PROPS.measuredCreditsPerEvent;
+    const reserve = liveReserveCredits(CFB_PROPS);
+    const prekickRoom = Math.floor((CFB_PROPS.dailyBudget - reserve) / per);
+    /* THE PRICE THE FIRST CUT PAID AND SHOULD NOT HAVE (review round, 2026-09-12). A full live cycle
+       (744) left floor(1756/31) = 56 event-pulls against a 60-game Saturday: the fix for a frozen
+       in-game line was refusing FOUR GAMES' pre-kick props every Saturday, live games or none. */
+    expect(prekickRoom).toBeGreaterThanOrEqual(CFB_PROPS.maxEvents);
+    expect(prekickRoom).toBeGreaterThanOrEqual(CFB_PROPS.maxEvents + 8);
+    const s = split(0, CFB_PROPS.maxEvents, 0, CFB_PROPS.dailyBudget, reserve, per);
+    expect(s.allowedRest).toBe(CFB_PROPS.maxEvents); // every game on the board, first pull, from zero
+  });
+
+  it("a live pass is NOT capped at the reserve — it is sized against the whole rail", () => {
+    const per = CFB_PROPS.measuredCreditsPerEvent;
+    const reserve = liveReserveCredits(CFB_PROPS);
+    // reserve is 12 event-pulls; with the day barely touched all 24 in-play games are still bought
+    const s = split(CFB_PROPS.liveMaxEvents, 0, 0, CFB_PROPS.dailyBudget, reserve, per);
+    expect(s.allowedLive).toBe(CFB_PROPS.liveMaxEvents);
+    expect(CFB_PROPS.liveMaxEvents * per).toBeGreaterThan(reserve); // i.e. live can outspend the hold
   });
 
   it("live is sized against the FULL budget — an in-play re-price may spend the day's last credit", () => {
@@ -124,11 +159,29 @@ describe("FIX 1 — NO BUDGET, CAP OR ALLOTMENT WAS LOWERED", () => {
     expect(NFL_PROPS.measuredCreditsPerEvent).toBe(31);
   });
 
-  it("the reserve is a slice OF the budget, never an addition to it or a cut of it", () => {
-    expect(liveReserveCredits(CFB_PROPS)).toBe(CFB_PROPS.liveMaxEvents * CFB_PROPS.measuredCreditsPerEvent);
-    expect(liveReserveCredits(NFL_PROPS)).toBe(NFL_PROPS.liveMaxEvents * NFL_PROPS.measuredCreditsPerEvent);
+  it("the reserve is HALF a live cycle — a slice of the budget, never an addition or a cut", () => {
+    /* HALF, NOT WHOLE (review round, 2026-09-12): a full cycle cost the pre-kick board real games
+       (the two tests above), and half a cycle still holds 12 CFB / 8 NFL in-play pulls open — more
+       than either slate has running inside one live window. */
+    expect(liveReserveCredits(CFB_PROPS)).toBe((CFB_PROPS.liveMaxEvents / 2) * CFB_PROPS.measuredCreditsPerEvent);
+    expect(liveReserveCredits(NFL_PROPS)).toBe((NFL_PROPS.liveMaxEvents / 2) * NFL_PROPS.measuredCreditsPerEvent);
+    expect(liveReserveCredits(CFB_PROPS)).toBe(372);
+    expect(liveReserveCredits(NFL_PROPS)).toBe(248);
     expect(liveReserveCredits(CFB_PROPS)).toBeLessThan(CFB_PROPS.dailyBudget);
     expect(liveReserveCredits(NFL_PROPS)).toBeLessThan(NFL_PROPS.dailyBudget);
+  });
+
+  it("the hold is capped at what today's live-or-upcoming games could actually spend", () => {
+    const per = CFB_PROPS.measuredCreditsPerEvent;
+    const ceiling = liveReserveCredits(CFB_PROPS);
+    // every game final or postponed: nothing to protect, so nothing is held back
+    expect(heldBack(ceiling, 0, CFB_PROPS.liveMaxEvents, per)).toBe(0);
+    // a 2-game Thursday night card: at most 2 x 31 of in-play pulls are possible, so that is the hold
+    expect(heldBack(ceiling, 2, CFB_PROPS.liveMaxEvents, per)).toBe(62);
+    // a full Saturday: the configured ceiling binds, and a game day is therefore unchanged
+    expect(heldBack(ceiling, 60, CFB_PROPS.liveMaxEvents, per)).toBe(ceiling);
+    // and the cap can never RAISE the hold above the configured ceiling
+    expect(heldBack(ceiling, 9999, CFB_PROPS.liveMaxEvents, per)).toBe(ceiling);
   });
 
   it("liveReserveCredits is OPTIONAL — a league that never sets it behaves exactly as today", () => {
@@ -167,7 +220,20 @@ describe("FIX 1 — the route really runs that split", () => {
   it("sizes live against the FULL dailyBudget and rest against dailyBudget - reserve", () => {
     expect(src).toMatch(/affordableEvents\(liveNeed\.length, spentBefore, cfg\.props\.dailyBudget, perEventCost\)/);
     expect(src).toMatch(/affordableEvents\(restNeed\.length, spentBefore \+ liveSpend, cfg\.props\.dailyBudget - reserve, perEventCost\)/);
-    expect(src).toMatch(/const reserve = liveReserveCredits\(cfg\.props\);/);
+    /* the hold is the configured ceiling capped by what live could spend today, not the flat ceiling */
+    expect(src).toMatch(/const reserve = Math\.min\(liveReserveCredits\(cfg\.props\), liveSoon \* perEventCost\);/);
+    expect(src).toMatch(/g\.status === "live" \|\| g\.status === "upcoming"/);
+    expect(src).toMatch(/const liveSoon = Math\.min\(/);
+    expect(src).toMatch(/cfg\.props\.liveMaxEvents,/);
+  });
+
+  it("blames the reserve only when the reserve is what refused a pre-kick game", () => {
+    /* COUNTERFACTUAL, NOT A GUESS (review round, 2026-09-12). "live all afforded AND rest truncated"
+       is also true when the DAY'S BUDGET did the refusing, and the note then promised Josh credits
+       were being held when the rail was simply empty. */
+    expect(src).toMatch(/affordableEvents\(restNeed\.length, spentBefore \+ liveSpend, cfg\.props\.dailyBudget, perEventCost\)/);
+    expect(src).toMatch(/const reserveBound = reserve > 0 && allowedRest < allowedRestNoReserve;/);
+    expect(src).not.toMatch(/allowedLive === liveNeed\.length && allowedRest < restNeed\.length/);
   });
 
   it("keeps the budgeted flag and still reports it off the same counts", () => {
@@ -176,7 +242,8 @@ describe("FIX 1 — the route really runs that split", () => {
   });
 
   it("names the reserve in the note rather than claiming a budget is spent that is not", () => {
-    expect(src).toMatch(/credits are held back for games already under way/);
+    expect(src).toMatch(/credits are being held for the games under way/);
+    expect(src).toMatch(/that much of the budget is not spent/);
   });
 
   it("changes no budget field: the route never assigns dailyBudget, maxEvents or liveMaxEvents", () => {

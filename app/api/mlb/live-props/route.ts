@@ -30,11 +30,20 @@ import { mlbLivePropsGet } from "@/lib/server/mlb-live-quote";
  * case is three sequential rounds of upstream latency plus the free statsapi reads. 60s is headroom,
  * not an expectation.
  *
- * NOT WIRED TO A CRON BY THIS BUILD. `MLB_LIVE_PROPS.liveSlotsPT` ships EMPTY and `vercel.json` is
- * untouched, so nothing calls this on a timer until someone deliberately opts in. Until the
- * 3-event credit probe in `docs/credit-budget.md` is actually run against a live game, the real
- * per-event cost is UNMEASURED and `measuredCreditsPerEvent` is an assumption — see the report for
- * WI-5. Do not schedule this route before that number is real.
+ * NOW ON A TIMER — CORRECTED 2026-09-12. This paragraph used to read "NOT WIRED TO A CRON BY THIS
+ * BUILD ... `liveSlotsPT` ships EMPTY ... Do not schedule this route before that number is real",
+ * and all three clauses stopped being true in the same change: `MLB_LIVE_PROPS.tickMode` is "ticker"
+ * and `liveSlotsPT` carries six Pacific times (15:00, 16:45, 17:15, 17:45, 18:15, 18:45), which the
+ * existing scheduler row fires — no new cron row, `vercel.json` still untouched. Leaving the old
+ * sentence standing would have told the next reader this route costs nothing unattended, which is the
+ * one thing a docblock over a spending route must never say.
+ *
+ * THE PROBE IS STILL UNRUN, and that is the honest caveat: the 3-event credit probe in
+ * `docs/credit-budget.md` has not been fired at a live game, so `measuredCreditsPerEvent` (6) is an
+ * assumption and the real rate could be CFB's 31. The six times are sized for that worst case —
+ * 6 x (1 + 3 x 31) = 564 against the 600 rail — and `probeEvents` keeps every pass at three events
+ * until the flag flips. See `src/lib/mlb/live-props-rules.ts` for the whole arithmetic, including the
+ * one case that can still overshoot (Josh's own tap on top of a worst-case day).
  */
 
 export const runtime = "nodejs";

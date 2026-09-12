@@ -261,32 +261,48 @@ export function mlbLiveGap(args: {
  */
 export function mlbLiveGapNote(
   gap: MlbLiveGap,
-  opts: { readonly syncReady: boolean; readonly overlay: boolean; readonly error?: string | null },
+  opts: { readonly syncReady: boolean | null; readonly overlay: boolean; readonly error?: string | null },
 ): string | null {
   if (gap.live <= 0) return null;
   const g = (n: number) => (n === 1 ? "game" : "games");
   const under = `${gap.live} ${g(gap.live)} under way`;
+  /* AGREES WITH THE COUNT (review round, 2026-09-12): at one game the sentence below read "the 1
+     game under way are showing their pregame price", and one game is the commonest weekday evening. */
+  const isAre = gap.live === 1 ? "is" : "are";
+  const itsTheir = gap.live === 1 ? "its" : "their";
   /* AN OVERLAY IN HAND IS PROOF THE PHRASE WORKS, so the three no-overlay answers are asked first
-     and only then the per-game ones. `syncReady` is a mount-effect read and is false during the
-     first render pass (a render that disagreed with the server's would be a hydration mismatch), so
-     asking it ahead of `overlay` would print "no sync phrase" for one frame on a phone that has
-     one — a false reason is worse than no reason. */
+     and only then the per-game ones.
+     `syncReady` IS THREE-VALUED, AND THAT IS THE FIX (review round, 2026-09-12). It is a
+     mount-effect read, so on the server render and on the first client pass the phrase has not been
+     LOOKED AT yet — which is a different fact from "there is no phrase". The first version of this
+     helper asked `!opts.syncReady` and therefore told Josh his phrase wasn't saved for the whole
+     interval between hydration and the overlay landing, on a phone where it WAS saved; the comment
+     claiming `overlay` was asked first was no protection, because both are falsy in that window. So
+     `null` means not read yet and prints the neutral "haven't loaded" sentence; only an actual
+     `false` — the read happened and found nothing — blames the phrase. A false reason that sends him
+     to Settings to re-enter something already there is worse than no reason at all. */
   if (!opts.overlay) {
-    if (!opts.syncReady) {
+    if (opts.syncReady === false) {
       return `no live prices on this phone — your sync phrase isn't saved here, so the Board can't ask the server for in-play odds. Put it in Settings and the ${under} will re-price.`;
     }
     if (opts.error) {
-      return `no live prices right now — the server answered "${opts.error}". The ${under} are showing their pregame price.`;
+      return `no live prices right now — the server answered "${opts.error}". The ${under} ${isAre} showing ${itsTheir} pregame price.`;
     }
-    return `live prices haven't loaded yet — the ${under} are showing their pregame price.`;
+    return `live prices haven't loaded yet — the ${under} ${isAre} showing ${itsTheir} pregame price.`;
   }
   if (gap.noQuote === 0 && gap.tooOld === 0) return null;
   const mins = Math.round(MLB_LIVE_CLIENT.quoteMaxAgeSec / 60);
   const parts: string[] = [];
   if (gap.priced > 0) parts.push(`${gap.priced} of ${under} ${gap.priced === 1 ? "is" : "are"} priced live`);
   if (gap.noQuote > 0) {
+    /* TWO CAUSES, NOT ONE (review round, 2026-09-12). This clause used to assert "the last pull did
+       not reach them", which the overlay itself can contradict: it carries `noLive` (the book posts
+       no in-play market on that game) and `unmatched` (no odds event to match), and the Board prints
+       both one line below this sentence. Two explanations for the same games, one of them false, on
+       a 375px screen. The counts are not threaded in here — this helper is shared with The Sharp,
+       which does not render them — so the honest form is to name both causes and claim neither. */
     parts.push(
-      `${gap.noQuote} ${g(gap.noQuote)} ${gap.noQuote === 1 ? "has" : "have"} no live price yet — the last pull did not reach ${gap.noQuote === 1 ? "it" : "them"}, so ${gap.noQuote === 1 ? "that game keeps" : "those games keep"} the pregame price`,
+      `${gap.noQuote} ${g(gap.noQuote)} ${gap.noQuote === 1 ? "has" : "have"} no live price yet — either the book isn't posting an in-play line on ${gap.noQuote === 1 ? "it" : "them"} or the last pull didn't reach ${gap.noQuote === 1 ? "it" : "them"}, so ${gap.noQuote === 1 ? "that game keeps" : "those games keep"} the pregame price`,
     );
   }
   if (gap.tooOld > 0) {
@@ -303,12 +319,18 @@ export function mlbLiveGapNote(
  * `/api/mlb/live-props` answers 401 without one, so `useMlbLiveQuotes` disables itself rather than
  * asking a paid route a question it must refuse. A DISABLED query is indistinguishable from a quiet
  * one at the call site — the Board would simply show no live lines and no reason — so the surfaces
- * read this and say which it is. `false` on the server and on the first client pass, by design: the
+ * read this and say which it is.
+ *
+ * THREE-VALUED SINCE THE 2026-09-12 REVIEW ROUND: `null` until the mount effect has run, because the
  * value is a localStorage read and a render that disagreed with the server's would be a hydration
- * mismatch.
+ * mismatch — so "not looked at yet" is a real state and it is NOT the same fact as "no phrase
+ * stored". Saying "your sync phrase isn't saved here" in that window sends Josh to Settings to
+ * re-enter a phrase that is already there. `mlbLiveGapNote` distinguishes the two; INSTRUCTION 51's
+ * own `mlb-live-unavailable` paragraph asks `!liveSyncReady`, for which `null` and `false` read
+ * alike, so its shipped wording is unchanged by this.
  */
-export function useMlbLiveSyncReady(): boolean {
-  const [ready, setReady] = useState(false);
+export function useMlbLiveSyncReady(): boolean | null {
+  const [ready, setReady] = useState<boolean | null>(null);
   useEffect(() => setReady(!!getSyncKey()), []);
   return ready;
 }

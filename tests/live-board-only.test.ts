@@ -96,18 +96,51 @@ describe("FIX 3 — the mode exists, and only Josh's own tap can ask for it", ()
 
   it("only fires in place of a refused refill, and only while a game is under way", () => {
     const board = stripComments(fs.readFileSync(path.join(process.cwd(), "app/board/page.tsx"), "utf8"));
-    // the in-play branch comes first; the pregame line below it is the pre-2026-09-12 behaviour, kept
-    expect(board).toMatch(/if \(pregameLive > 0 && \(refused \|\| httpFail\)\) \{\s*liveBoard\.mutate\(\);\s*return;\s*\}/);
+    /* GATED ON `liveGap.live`, NOT `pregameLive` (review round, 2026-09-12). `pregameLive` also
+       requires `board.at <= start` — "is this row older than its game" — and this very pass destroys
+       that: the board it stores is newer than every first pitch, so the SECOND tap of the evening
+       found 0 and fell back to the browser-only path for the rest of the night, and on an all-early
+       slate the server pass never fired at all. `liveGap.live` is what the live poll reports as in
+       progress, whatever the board's age. */
+    expect(board).toMatch(/if \(liveGap\.live > 0 && \(refused \|\| httpFail\)\) \{\s*liveBoard\.mutate\(\);\s*return;\s*\}/);
+    expect(board).not.toMatch(/if \(pregameLive > 0 && \(refused/);
+    // the pregame line below it is the pre-2026-09-12 behaviour, kept
     expect(board).toMatch(/if \(refused \|\| httpFail\) regen\.mutate\(\);/);
   });
 
-  it("a tap inside the 45-minute limiter buys NOTHING — it does not route around our own pacing", () => {
-    /* the refusal branch moved with the mutation (INSTRUCTION 52, 2026-09-12); the note Josh reads
-       is still the page's, so this asserts on both halves rather than dropping either. */
+  it("a tap inside the 45-minute limiter buys no SERVER re-price, and still re-prices on the device", () => {
+    /* CORRECTED IN THE REVIEW ROUND (2026-09-12). This case used to assert the tap bought NOTHING —
+       an early `return` in onError for "ran recently" — which re-created the exact defect
+       INSTRUCTION 50 item 1 exists to kill: a Refresh that buys nothing, stores nothing and
+       re-prices nothing, on the one slate Josh is watching. The server's 45-minute pacing still
+       holds (no second stored generate is bought inside the window); what it may not do is cancel
+       the browser re-price every tap has always produced, the one engine-client deliberately never
+       gates. So: every failure falls through to onFallback, and the note says what the SERVER did. */
     const client = stripComments(fs.readFileSync(path.join(process.cwd(), "src/lib/mlb/live-board-client.ts"), "utf8"));
-    expect(client).toMatch(/if \(\/ran recently\/\.test\(e\.message\)\) return;/);
+    expect(client).not.toMatch(/ran recently/);
+    expect(client).toMatch(/onError: \(\) => \{\s*onFallback\(\);\s*\},/);
+    // the limiter itself is untouched in the route — this mode is still NOT in the bypass list
+    expect(SRC).toMatch(/if \(!force && !topup && now - lastRun < 45 \* 60_000\) \{/);
     const board = stripComments(fs.readFileSync(path.join(process.cwd(), "app/board/page.tsx"), "utf8"));
-    expect(board).toMatch(/the server re-priced this board less than 45 minutes ago/);
+    expect(board).toMatch(/the server buys a stored re-price at most once every 45 minutes and it ran recently, so it did not buy again/);
+    // and the page still has a branch that reads that refusal, so the wording cannot drift unnoticed
+    expect(board).toMatch(/\/ran recently\/\.test\(liveBoard\.error\.message\)/);
+  });
+
+  it("a REFUSED board-only tap costs the block ladder no run-cap headroom", () => {
+    /* review round, 2026-09-12: the INCR is pessimistic by design, so a refused run used to consume
+       a unit of the day's four — and this is the one caller a human can fire at will, so four taps
+       could leave INSTRUCTION 48's block lock refused "run cap reached" with no credit spent on it.
+       A read-only GET first, and no `if (boardOnly) {` block, which is how the card-region proof
+       below still finds the right line. */
+    expect(SRC).toMatch(/const runsUsed = boardOnly \? Number\(await redis\(\["GET", runsKey\]\)\) \|\| 0 : 0;/);
+    expect(SRC).toMatch(/if \(boardOnly && runsUsed >= MAX_RUNS_PER_DATE\) \{/);
+    // the free refusal is above the INCR, so the counter is never touched by it
+    expect(lineOf(/if \(boardOnly && runsUsed >= MAX_RUNS_PER_DATE\) \{/)).toBeLessThan(
+      lineOf(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/),
+    );
+    // and the cap itself is not raised to make room for this mode
+    expect(SRC).toMatch(/const MAX_RUNS_PER_DATE = 4;/);
   });
 
   it("a 200 carrying `skipped` is NOT reported as a re-price", () => {

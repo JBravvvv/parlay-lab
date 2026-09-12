@@ -171,7 +171,15 @@ export async function GET(req: NextRequest) {
        WHAT STILL BINDS IT: the 45-minute K_LASTGEN limiter (this mode is deliberately NOT in the
        bypass list above), the per-date run cap with NO top-up headroom, and the same auth as every
        other caller. It costs a full generate (114-150 Odds credits measured), so it is JOSH'S TAP,
-       and INSTRUCTION 50 already prints that cost under the Board's Refresh button.
+       and INSTRUCTION 50 already prints that cost under the Board's Refresh button — the count of
+       these passes included, not just the browser ones (src/lib/mlb/live-board-client.ts).
+
+       AND THE PART THAT IS NOT FLATTERING: this pass shares MAX_RUNS_PER_DATE with the block locks
+       instead of having headroom of its own, so on a day that has already used its four runs the tap
+       is refused outright — checked for free below, before the counter is touched, so the refusal
+       costs the block ladder nothing. On such a night Josh still gets a device re-price and the note
+       says the server did not buy one. Widening the ceiling for this mode would raise the day's
+       credit bill, which is Josh's call.
 
        DELIBERATELY NOT SCHEDULED. No scheduler code sends `live=1` and none was added: a recurring
        evening board-only pass is 114-150 NEW credits a day and that is Josh's decision to make, not
@@ -254,6 +262,35 @@ export async function GET(req: NextRequest) {
           pct: cov.pct,
         });
       }
+    }
+
+    /* THE BOARD-ONLY TAP TAKES A NUMBER ONLY IF THERE IS ONE LEFT (review round, 2026-09-12).
+       The INCR below is pessimistic on purpose — it counts a run at the point of commitment so a
+       timeout cannot leave the ceiling unbounded — but that also makes a REFUSED run cost a unit of
+       the day's headroom, and this mode is the one caller a human can fire at will. Four taps on a
+       busy day and the 429s themselves would have eaten the four runs INSTRUCTION 48's block locks
+       need, so the evening's locked card could be refused "run cap reached" without a credit having
+       been spent on it. So: a read-only GET first. At the cap this tap is refused for FREE — the
+       counter is not touched, K_LASTGEN is not re-stamped, and the browser falls back to its own
+       re-price, so the tap still puts fresh numbers in front of Josh.
+
+       SPELLED `boardOnly && ...` AND NOT AS ITS OWN `if (boardOnly) {` BLOCK, deliberately:
+       tests/live-board-only.test.ts locates the CARD region — the one its proof shows `?live=1` can
+       never enter — by that exact line, and a second one earlier in the file would silently widen the
+       region that proof trusts.
+
+       The cap itself is UNCHANGED and an ALLOWED board-only pass still counts against it, because it
+       really does spend a full generate. The honest consequence: on a day that has already used all
+       four runs this tap cannot buy a stored re-price at all. Giving the mode its own headroom would
+       raise the day's credit ceiling, which is Josh's money call and not ours — it is in the report. */
+    const runsUsed = boardOnly ? Number(await redis(["GET", runsKey])) || 0 : 0;
+    if (boardOnly && runsUsed >= MAX_RUNS_PER_DATE) {
+      return NextResponse.json({
+        ok: true,
+        skipped: `today's ${MAX_RUNS_PER_DATE} server board runs are already used`,
+        runs: runsUsed,
+        cap: MAX_RUNS_PER_DATE,
+      });
     }
 
     /* (b) PER-DATE RUN CAP — the real protection. The secret stops a stranger; this

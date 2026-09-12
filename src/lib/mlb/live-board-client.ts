@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { todayStr } from "@/lib/engine-client";
 import { getSyncKey } from "@/lib/ledgerSync";
 import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
 
@@ -29,6 +30,36 @@ import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
  * re-stamps, and the live-price overlay (serving the old overlay against new rows is how a row ends
  * up graded against a line nobody is offering).
  */
+/* WHAT THIS PASS COST, ON THE SAME FOOTING AS THE BROWSER ONE (review round, 2026-09-12). The
+   refresh note's spend line counted ONLY browser re-prices (engine-client's pl_gencount), so the
+   passes that cost the most — a full server generate, the same 114-150 credits — were the invisible
+   half of the day's bill, and a night of taps could read "1 browser re-price today" while six server
+   generates had been bought. Same shape as generatesToday(), same Pacific day, same rule: this
+   counts to be SEEN, it never blocks a tap.
+
+   localStorage is read before todayStr() on purpose — on the server render the read throws, the
+   catch returns 0, and the engine singleton is never built during SSR. */
+const SERVER_REPRICE_KEY = "pl_livegencount"; // {date, n} — board-only server passes today
+
+/** Board-only server re-prices billed to today (Pacific). 0 in private mode or before any tap. */
+export function serverRepricesToday(): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(SERVER_REPRICE_KEY) ?? "{}") as { date?: string; n?: number };
+    if (!v.date) return 0;
+    return v.date === todayStr() ? Number(v.n) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function noteServerReprice() {
+  try {
+    localStorage.setItem(SERVER_REPRICE_KEY, JSON.stringify({ date: todayStr(), n: serverRepricesToday() + 1 }));
+  } catch {
+    /* private mode — the counter just stays at 0 */
+  }
+}
+
 export function useLiveBoardReprice(opts: { onFallback: () => void }) {
   const qc = useQueryClient();
   const { onFallback } = opts;
@@ -45,17 +76,21 @@ export function useLiveBoardReprice(opts: { onFallback: () => void }) {
       return body;
     },
     onSuccess: () => {
+      noteServerReprice();
       void qc.invalidateQueries({ queryKey: ["board"] });
       void qc.invalidateQueries({ queryKey: ["picks"] });
       void qc.invalidateQueries({ queryKey: MLB_LIVE_QUERY_PREFIX });
     },
-    onError: (e: Error) => {
-      /* THE LIMITER REFUSING IS THE SYSTEM WORKING, NOT SOMETHING TO ROUTE AROUND. This mode keeps
-         the 45-minute K_LASTGEN limiter, so a second tap inside that window answers
-         `skipped: "ran recently"` for free. Spending ~140 browser credits to defeat our own pacing
-         would be the opposite of what the limiter is for, so that ONE case re-prices nothing and the
-         note says so. Every other failure still leaves the tap owing Josh a re-price. */
-      if (/ran recently/.test(e.message)) return;
+    onError: () => {
+      /* EVERY FAILURE FALLS BACK — INCLUDING "ran recently" (review round, 2026-09-12). The first
+         cut returned early on the 45-minute limiter, which re-created the exact defect INSTRUCTION
+         50 item 1 exists to kill: a Refresh tap that buys nothing, stores nothing and re-prices
+         nothing, on the one slate Josh is actually watching. The limiter is the SERVER's pacing on
+         the STORED board and it still holds — no second server generate is bought inside the window.
+         What it must not do is cancel the device re-price the tap has always produced: the browser
+         pass is the one engine-client deliberately never gates ("this counter exists to make the
+         spend VISIBLE, never to block it ... nothing should stop a bet"). So the server declines to
+         re-buy, the note says exactly that, and Josh still gets fresh numbers in front of him. */
       onFallback();
     },
   });

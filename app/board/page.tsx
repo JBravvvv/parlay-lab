@@ -43,7 +43,7 @@ import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check"
 import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import { lineOf } from "@/lib/pred-serialize";
 import { fmtAmerican } from "@/lib/format";
-import { useLiveBoardReprice } from "@/lib/mlb/live-board-client";
+import { serverRepricesToday, useLiveBoardReprice } from "@/lib/mlb/live-board-client";
 import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiveGapNote, mlbLiveView, useMlbLiveQuotes, useMlbLiveSyncReady, type MlbLiveQuote, type MlbLiveView } from "@/lib/mlb/live-client";
 
 /* INSTRUCTION 31 (2026-09-04, Josh: "there should be two tabs next to each other 'Top 50' &
@@ -977,7 +977,14 @@ export default function BoardPage() {
      because nothing in this app may stop a bet. */
   const spendNote = (() => {
     const n = generatesToday();
-    return n > 0 ? ` · ${n} browser re-price${n === 1 ? "" : "s"} today ≈ ${n * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
+    /* BOTH HALVES OF THE BILL (review round, 2026-09-12). The server's board-only pass costs the
+       same full generate as the browser one, and showing only the browser count made the more
+       expensive half invisible — a night could read "1 browser re-price today" with six server
+       generates bought behind it. Both are counted for visibility only; neither blocks a tap. */
+    const s = serverRepricesToday();
+    const browser = n > 0 ? ` · ${n} browser re-price${n === 1 ? "" : "s"} today ≈ ${n * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
+    const server = s > 0 ? ` · ${s} server board re-price${s === 1 ? "" : "s"} today ≈ ${s * GEN_CREDITS_EST} Odds credits (counted, never blocked)` : "";
+    return `${browser}${server}`;
   })();
   /* WHAT THE SERVER'S BOARD-ONLY PASS DID, in plain English, appended to whatever the refill said
      (2026-09-12). A refused refill resolves rather than throwing, so `refill.data` is set on exactly
@@ -990,7 +997,12 @@ export default function BoardPage() {
       ? " · board and live odds re-priced on the server — your locked card was not touched"
       : liveBoard.isError
         ? /ran recently/.test(liveBoard.error.message)
-          ? " · the server re-priced this board less than 45 minutes ago, so there was nothing new to buy"
+          ? /* PACING, AND NO LONGER A DEAD END (review round, 2026-09-12). This used to end "so
+               there was nothing new to buy", which became untrue the moment the limiter started
+               falling through to the device re-price: something WAS bought, just in this tab. It
+               now says only what the server did, and the "board re-priced on this device" clause
+               that follows says what the tap actually produced. */
+            " · the server buys a stored re-price at most once every 45 minutes and it ran recently, so it did not buy again"
           : ` · the server did not re-price the live board: ${liveBoard.error.message}`
         : "";
   const refreshNote =
@@ -1094,12 +1106,21 @@ export default function BoardPage() {
                     const refused = r.body.fired === false;
                     const httpFail = r.status < 200 || r.status > 299;
                     /* 2026-09-12: WITH A GAME UNDER WAY THE SERVER GOES FIRST. A browser re-price
-                       builds a board in this tab and stores nothing, so the stored board — and the
-                       live pool the LIVE pill and the LIVE parlays read — stayed frozen at its
-                       pre-kick state on exactly the slate Josh is watching. The board-only pass
-                       stores both and cannot touch the locked card. Pregame, the line below is
-                       reached unchanged. */
-                    if (pregameLive > 0 && (refused || httpFail)) {
+                       builds a board in this tab and never stores it, so the STORED board — the one
+                       every other device, the stamped picks and tomorrow's grading read — stayed
+                       frozen at its pre-kick state on exactly the slate Josh is watching. The
+                       board-only pass stores it and cannot touch the locked card. Pregame, the line
+                       below is reached unchanged.
+
+                       GATED ON `liveGap.live`, NOT `pregameLive` (review round, 2026-09-12).
+                       `pregameLive` additionally requires `board.at <= start` — "is this row's price
+                       older than its game" — which is a different question and one this very pass
+                       destroys: the board it stores is newer than every first pitch, so the second
+                       tap of the evening would have found `pregameLive === 0` and silently gone back
+                       to the browser-only path for the rest of the night. On an all-early slate it
+                       would never have fired at all. `liveGap.live` is the count the live poll
+                       actually reports as in progress, whatever the board's age. */
+                    if (liveGap.live > 0 && (refused || httpFail)) {
                       liveBoard.mutate();
                       return;
                     }

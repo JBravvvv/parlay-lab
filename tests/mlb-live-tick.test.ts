@@ -47,15 +47,17 @@ describe("INSTRUCTION 51 — the live pull rides the refill's calendar, it does 
        His word is now on the record, so what is asserted instead is WHEN it fires — and the half of
        the old guard that still matters, that the fire cannot reach the stake calendar, is below. */
     expect(MLB_LIVE_PROPS.tickMode).toBe("ticker");
-    expect(MLB_LIVE_PROPS.liveSlotsPT).toEqual(["12:00", "15:00", "16:45", "17:15", "17:45", "18:15", "18:45"]);
-    // every one of the seven fires, naming its own slot
+    expect(MLB_LIVE_PROPS.liveSlotsPT).toEqual(["15:00", "16:45", "17:15", "17:45", "18:15", "18:45"]);
+    // every one of the six fires, naming its own slot
     for (const t of MLB_LIVE_PROPS.liveSlotsPT) {
       expect(decideSlotTick(pdt(t), MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN), t).toEqual({ fire: true, slot: t });
     }
     /* and NOTHING fires before baseball does or after the cron ticker's own window closes: 08:00 and
        09:30 PT are stake slots with zero live baseball, and the scheduler row that pokes this runs
        UTC hours 15-23 and 0-2 = 08:00-19:00 PT, so 19:00 onward cannot fire regardless. */
-    for (const t of ["08:00", "09:30", "11:00", "19:00", "20:30"]) {
+    /* 12:00 is on this list since the review round: it was dropped from the live calendar because
+       seven automatic passes at CFB's unmeasured 31 a prop event are 658, past Josh's 600 rail. */
+    for (const t of ["08:00", "09:30", "11:00", "12:00", "19:00", "20:30"]) {
       expect(decideSlotTick(pdt(t), MLB_LIVE_PROPS.liveSlotsPT, GRADE_SLOT_WINDOW_MIN).fire, t).toBe(false);
     }
     // THE STAKE CALENDAR IS NOT TOUCHED BY ANY OF IT — still INSTRUCTION 49's five, still by reference

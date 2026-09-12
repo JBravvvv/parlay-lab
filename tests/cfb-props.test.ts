@@ -72,15 +72,20 @@ describe("the contract", () => {
       /* INSTRUCTION 52 (2026-09-12, Josh verbatim: "I've always had in game live lines. It has live
          lines; they just went away this week"). 60 pre-kick events x 31 = 1,860 of 2,500 left 640,
          and a live pull of 24 events wants 744 — so on a full Saturday the in-game pull was refused
-         by the rail and the board served carried rows. 744 = liveMaxEvents x measuredCreditsPerEvent:
-         the live pass's full cost, reserved from the NON-live rail only. NO TOTAL IS LOWERED — the
-         live pass may still draw the whole 2,500; see src/lib/server/football-props.ts. */
-      liveReserveCredits: 744,
+         by the rail and the board served carried rows. The hold is HALF a live cycle, 12 x 31 = 372,
+         reserved from the NON-live rail only (review round, 2026-09-12: a full 744 cycle left
+         floor(1756/31) = 56 event-pulls against a 60-game board, so unfreezing the live lines was
+         costing four games' pre-kick props every Saturday). NO TOTAL IS LOWERED — the live pass may
+         still draw the whole 2,500, and the hold is further capped at what today's live-or-upcoming
+         games could spend; see src/lib/server/football-props.ts. */
+      liveReserveCredits: 372,
     });
-    // the reserve IS the live pass, exactly — not a number someone picked
-    expect(CFB_PROPS.liveReserveCredits).toBe(CFB_PROPS.liveMaxEvents * CFB_PROPS.measuredCreditsPerEvent);
-    // and it leaves the pre-kick rail able to price 56 of the 60 (floor(1756 / 31)), not zero
-    expect(Math.floor((CFB_PROPS.dailyBudget - CFB_PROPS.liveReserveCredits) / CFB_PROPS.measuredCreditsPerEvent)).toBe(56);
+    // HALF the live pass, exactly — not a number someone picked
+    expect(CFB_PROPS.liveReserveCredits).toBe((CFB_PROPS.liveMaxEvents / 2) * CFB_PROPS.measuredCreditsPerEvent);
+    // and it leaves the pre-kick rail able to price ALL 60 on the first pull, with 8 pulls to spare
+    const prekickPulls = Math.floor((CFB_PROPS.dailyBudget - CFB_PROPS.liveReserveCredits) / CFB_PROPS.measuredCreditsPerEvent);
+    expect(prekickPulls).toBe(68);
+    expect(prekickPulls).toBeGreaterThanOrEqual(CFB_PROPS.maxEvents + 8);
     expect(CFB_PROPS.liveRevalidateSec).toBeLessThan(CFB_PROPS.revalidateSec);
   });
   it("the fixture says it is synthetic and matches the Alabama game", () => {
