@@ -101,6 +101,31 @@ sha into its own ticking clock, and refreshing the claim alone would not have cl
 carries exactly one sha, the current one; the superseded three moved to an adjacent unmarked line that
 `sha-references` still forces to resolve and `sha-currency` ignores by design.
 
+## The mirror fell one commit behind, and the lock was the reason
+
+The first thing done after pushing `8705291` was to read the published `01-STATE.md` rather than assume
+the hook had worked. It said `8dc38de`. Four minutes stale, on the day the whole point was "AUTOMATIC".
+
+Two plausible explanations were tested and both failed. `git checkout -- <path>` firing `post-checkout`:
+ruled out by recording `.sync-fingerprint`'s mtime, running the checkout, waiting 8s, and seeing no
+change. `post-index-change` having come back: ruled out by `ls -l .git/hooks`, which shows four. The
+answer was in the script's own ordering — HEAD is read in the first 100 lines, the 99M
+`git bundle create --all` runs ~80 lines later, and the briefs are not written for another 200. A run
+that starts before a commit and spends a minute on the bundle publishes the HEAD it read at the start,
+and the `post-commit` hook for the new commit hit the held lock and **exited**. The lock was protecting
+the files and losing the update.
+
+So the lock now coalesces. A run that cannot take it leaves a request marker (carrying whether `--force`
+was wanted); the holder routes every normal exit through a `finish()` that re-execs once a request is
+pending, so the last writer is always the one with the newest state. Ten triggers during one long run
+become one extra pass, `PL_SYNC_DEPTH` caps the chain at three, and a request that lands after the cap
+stays on disk for the next hook. Proven with two simultaneous `--force` runs: loser left a request,
+holder published, re-synced, published again 4s later, no lock or marker residue, tarball valid at 790
+entries.
+
+Two stale sentences went with it: `CLAUDE.md` claimed the hooks "cover every commit and every `git add`"
+(the `git add` half *was* the removed fifth hook) and `tools/handoff-state.env` still said five hooks.
+
 ## The limit, stated
 
 The prose blocks (00, 02, 03, 04, 06) are hand-written and decay like any doc. What changed is where

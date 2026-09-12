@@ -32,7 +32,10 @@
 #  plain `git status`, so it fired a background sync on every status check and
 #  raced the run already in flight. The four hooks above cover every change that
 #  lands a commit, which under this project's commit-and-push doctrine is every
-#  shipped change. The lock below exists anyway, because hooks can still overlap.
+#  shipped change. The lock below exists anyway, because hooks can still overlap —
+#  and it COALESCES: a run that cannot take the lock leaves a request marker and
+#  the holder re-execs itself, because a mirror that silently skips an update is
+#  worse than one that does redundant work.
 #
 #  WHY THERE IS NO TIMER — MEASURED 2026-09-12, NOT ASSUMED. A LaunchAgent was
 #  installed, fired, and DENIED: under macOS TCC a launchd-spawned shell cannot
@@ -79,19 +82,52 @@ mkdir -p "$OUT/repo/docs" "$OUT/code" "$OUT/archive" 2>/dev/null || die "cannot 
 # concurrent runs DO collide: one mv's a .tmp out from under the other, which is
 # exactly how this was found — a `git status` fired a hook during a manual run
 # and the worktree tarball failed. mkdir is atomic, so it is the lock.
+# A skipped run must NOT be a lost run. This was found the hard way: a 99M
+# `git bundle create --all` holds the lock for a minute, a commit landed during
+# one, its post-commit hook found the lock held and skipped, and the folder sat
+# one commit behind until a human re-ran the script. "AUTOMATIC" cannot mean
+# "unless the timing is unlucky", so a skipping run leaves a request marker and
+# the lock holder re-runs itself once it is done. That is coalescing, not
+# queueing: ten triggers during one long run collapse into one extra pass.
 LOCK="${TMPDIR:-/tmp}/pl-sync-handoff.lock"
+REQ="${TMPDIR:-/tmp}/pl-sync-handoff.requested"
 if ! mkdir "$LOCK" 2>/dev/null; then
   LOCK_AGE=$(( $(date +%s) - $(stat -f '%m' "$LOCK" 2>/dev/null || echo 0) ))
   if [ "$LOCK_AGE" -gt 600 ]; then
     rmdir "$LOCK" 2>/dev/null
-    mkdir "$LOCK" 2>/dev/null || { say "sync-handoff: cannot take the lock — skipping."; exit 0; }
+    mkdir "$LOCK" 2>/dev/null || {
+      printf '%s\n' "$FORCE" > "$REQ" 2>/dev/null
+      say "sync-handoff: cannot take the lock — left a re-sync request instead."; exit 0; }
     say "sync-handoff: broke a stale lock (${LOCK_AGE}s old)."
   else
-    say "sync-handoff: another sync is already running — skipping."
+    printf '%s\n' "$FORCE" > "$REQ" 2>/dev/null
+    say "sync-handoff: another sync is already running — left it a re-sync request."
     exit 0
   fi
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM HUP
+
+# Every normal exit goes through finish(), so no exit path can drop a request.
+# PL_SYNC_DEPTH bounds the chain: a trigger storm cannot recurse forever, and a
+# request that arrives after the last allowed pass is left on disk for the next
+# hook to pick up rather than deleted.
+finish() {
+  if [ -e "$REQ" ]; then
+    REQ_FORCE="$(cat "$REQ" 2>/dev/null || echo 0)"
+    DEPTH="${PL_SYNC_DEPTH:-0}"
+    if [ "$DEPTH" -lt 3 ]; then
+      rm -f "$REQ" 2>/dev/null
+      rmdir "$LOCK" 2>/dev/null
+      trap - EXIT INT TERM HUP
+      say "sync-handoff: a trigger fired mid-run — re-syncing for the newer state."
+      [ "$REQ_FORCE" = 1 ] && set -- --force || set --
+      [ "$QUIET" = 1 ] && set -- "$@" --quiet
+      PL_SYNC_DEPTH=$((DEPTH + 1)) exec "$0" "$@"
+    fi
+    say "sync-handoff: re-sync chain hit its depth limit — request left for the next trigger."
+  fi
+  exit 0
+}
 
 NOW_ISO="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 NOW_DAY="$(date '+%Y-%m-%d')"
@@ -119,7 +155,7 @@ FP_NEW="$( { printf '%s\n' "HEAD=$HEAD_FULL" "DIRTY=$DIRTY";
 FP_FILE="$OUT/.sync-fingerprint"
 if [ "$FORCE" = 0 ] && [ -f "$FP_FILE" ] && [ "$(cat "$FP_FILE" 2>/dev/null)" = "$FP_NEW" ]; then
   say "sync-handoff: no change since last sync ($HEAD_SHORT, $DIRTY) — nothing to do."
-  exit 0
+  finish
 fi
 
 # ------------------------------------------- one-time: archive stale package
@@ -303,7 +339,13 @@ nothing has changed costs nothing. It fires automatically from:
   commit-and-push every shipped change, so every shipped change lands in this
   folder without anyone asking. (A fifth hook on index changes was tried and
   removed: git refreshes the index on a plain `git status`, so it fired a sync on
-  every status check and raced the run already in flight.)
+  every status check and raced the run already in flight.) Two runs cannot collide
+  — there is a lock — and a run that arrives while another holds it is **not**
+  dropped: it leaves a request and the holder re-runs itself when it finishes.
+  That was a real bug once: the folder sat one commit behind for four minutes
+  because a long bundle rebuild held the lock while a commit landed. If you ever
+  doubt it, `01-STATE.md` names the HEAD it was generated from — compare it with
+  `git rev-parse --short HEAD`.
 - **Every session that touches the project**, as a standing rule in
   `repo/CLAUDE.md`: after any change, run the script. That is what covers edits
   that are never staged.
@@ -984,4 +1026,4 @@ printf '\n\n---\n\n_One-file snapshot generated %s from `%s` @ `%s` (%s). The co
 # --------------------------------------------------------------- fingerprint
 printf '%s\n' "$FP_NEW" > "$FP_FILE"
 say "sync-handoff: published $HEAD_SHORT ($BRANCH, $DIRTY) to \"$OUT\" at $NOW_ISO"
-exit 0
+finish

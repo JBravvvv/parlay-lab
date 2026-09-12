@@ -13,11 +13,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `8dc38de6bfcb4774baf1bd6215c3b45d194357a8` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 53 shipped and its timer correction shipped on top.)
+> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `87052915363d6ebc0cb10861ecb1936a5ee57925` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 53's `PASTE-THIS.md` / lock / STATE-CLAIM-restructure commit shipped and deployed as `parlay-jzuzbm5lv`.)
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `8dc38de…` the INSTRUCTION 53 ship (2026-09-12),
 >   `f6e996be…` the INSTRUCTION 52 review-round tip (2026-09-12), `f2e9bf77…` INSTRUCTION 51
 >   (2026-09-12), `46f68df9…` INSTRUCTION 50 (2026-09-11). **`sha-currency` fired on the last of
 >   these at exactly 11 behind (K=10) during INSTRUCTION 53's gate** — the guard scans EVERY sha on
@@ -997,6 +998,39 @@ truth. Nothing in it is authoritative over `docs/`; `01-STATE.md` is authoritati
 because it is read at sync time. And the prose blocks are a session's responsibility — the automation
 guarantees the folder is never stale relative to the REPO, not that the repo's prose is never stale.
 
+
+**FOLLOW-UP TO INSTRUCTION 53 (2026-09-12) — A SKIPPED SYNC WAS A LOST SYNC, AND THE FOLDER SAT ONE
+COMMIT BEHIND FOR FOUR MINUTES.** Found by checking rather than assuming. After pushing `8705291` I read
+the published `01-STATE.md` instead of trusting the hook, and it said `8dc38de` — the *previous* commit —
+with an mtime inside the same second as the new commit.
+
+Two wrong explanations were killed by experiment before the right one was accepted. (1) *"`git checkout
+-- <path>` fires `post-checkout`, so a sync started before the ref moved."* Tested directly: recorded
+`.sync-fingerprint`'s mtime, ran `git checkout -- next-env.d.ts`, waited 8s — mtime unchanged. A
+path-limited checkout does **not** fire the hook. (2) *"`post-index-change` came back."* `ls -l
+.git/hooks` shows exactly four hooks. Neither guess survived contact.
+
+The actual cause is in the script's own ordering: HEAD is read at line ~101, the 99M
+`git bundle create --all` runs at ~182, and `01-STATE.md` is not written until ~393. So a run that
+started before the commit, spent a minute on the bundle, and wrote the briefs afterwards stamps the HEAD
+it read at the start — and the `post-commit` hook that fired for the new commit found the `mkdir` lock
+held and, in the lock's first version, simply **exited**. Correct for a build. Wrong for a mirror:
+the one run that knew about the newest commit was the one that gave up.
+
+**THE FIX IS COALESCING, NOT QUEUEING.** A run that cannot take the lock now writes a request marker
+(`$TMPDIR/pl-sync-handoff.requested`, carrying whether `--force` was asked for) and exits; every normal
+exit in the holder goes through a `finish()` that re-execs the script once a request is present, so the
+*last* writer always reflects the newest state. Ten triggers during one long run collapse into one
+extra pass. `PL_SYNC_DEPTH` caps the chain at three and a request that arrives after the cap is left on
+disk for the next hook rather than deleted. Verified by launching two `--force` runs in the same
+instant: the loser printed *"left it a re-sync request"*, the holder published, then printed *"a trigger
+fired mid-run — re-syncing for the newer state"* and published again 4s later; no lock and no marker
+left behind, `parlay-lab-source-at-HEAD.tar.gz` valid at 790 entries.
+
+**A SECOND CLAIM WAS CORRECTED WHILE IN THERE.** `CLAUDE.md` still said the hooks "cover every commit
+and every `git add`". They do not — `git add` coverage *was* the removed fifth hook. It now says what is
+true: commits, merges, checkouts, rewrites, and nothing else, so a staged-but-uncommitted tree is the
+session's job. `tools/handoff-state.env` still said "5 git hooks" in `LAST_SHIPPED`; corrected to four.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs

@@ -825,6 +825,16 @@ doc/config mtime, so a no-op sync costs nothing, and it serialises on a `mkdir` 
 because hooks can overlap. It never runs a mutating git command, and it refuses to publish if an
 env-shaped file is ever tracked.
 
+**A skipped sync must never be a lost sync, and once it was.** The lock's first version just exited
+when it was held, which is wrong for a mirror: a 99M `git bundle create --all` holds the lock for up
+to a minute, and a commit that lands inside that window fired `post-commit`, found the lock held, and
+skipped — so the folder sat one commit behind (`8dc38de` while `origin` was `8705291`) until a human
+re-ran the script. Caught by reading `01-STATE.md` after a push instead of assuming the hook had done
+its job. The skipping run now leaves a request marker next to the lock and **the holder re-runs itself
+when it finishes**, so the last writer always reflects the newest state. It coalesces rather than
+queues — ten triggers during one long run collapse into one extra pass — and `PL_SYNC_DEPTH` caps the
+chain at three, leaving a late request on disk for the next hook instead of deleting it.
+
 A fifth hook on `post-index-change` was tried and **removed**: git refreshes the index on a plain
 `git status`, so it spawned a sync on every status check and raced the run already in flight — which is
 how the missing lock was found. Do not re-add it.
@@ -837,8 +847,10 @@ The only cure is Full Disk Access for a shell binary; that is a security setting
 it. The agent was removed rather than left logging a failure every 15 minutes.
 
 **SO THE RULE THAT CLOSES THE REMAINING GAP IS YOURS, NOT A DAEMON'S: after any change to this
-project — committed or not — run `tools/sync-handoff.sh`.** The hooks cover every commit and every
-`git add`; a session's unstaged edits are covered only by the session.
+project — committed or not — run `tools/sync-handoff.sh`.** The hooks cover commits, merges,
+checkouts and rewrites — nothing else. `git add` is deliberately NOT covered (that was the removed
+fifth hook), so a staged-but-uncommitted tree and a session's unstaged edits are covered only by the
+session running the script.
 
 **The rule for every future session:** a fact that lives in the PROSE of 00/02/03/04/06 is edited in
 the heredocs inside `tools/sync-handoff.sh`, in this repo. Deploy and gate facts are edited in
