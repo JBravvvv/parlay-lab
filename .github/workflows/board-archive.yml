@@ -23,6 +23,9 @@ name: board-archive
 # chances inside its TTL, so no individual firing has to be punctual — the same reasoning
 # as tools/snapshot_props.py's self-pacing, reached with a cheaper mechanism because a
 # board, unlike a close, is still sitting there hours later.
+# TIMING: SENSITIVE — guard: WINDOW_DAYS (tools/archive_boards.py) — targets PT yesterday and the
+#   two days before, so a fire anywhere inside the 3-day board TTL captures the date. Six chances
+#   per date across two crons; no individual firing has to be punctual.
 on:
   schedule:
     - cron: "0 12 * * *"

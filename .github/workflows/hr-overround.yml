@@ -11,6 +11,8 @@ name: hr-overround
 #
 # NOTE: like every other workflow here, this is only SCHEDULED if it exists on the
 # default branch (main). On frontend-rebuild it can still be run by hand.
+# TIMING: INSENSITIVE — weekly, and the reading is computed over `--min-days 14`. A +3h start
+#   shift cannot move a statistic pooled across a fortnight.
 on:
   schedule:
     - cron: "0 15 * * 0"  # Sundays, 8am PT

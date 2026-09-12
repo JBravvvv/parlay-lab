@@ -17,6 +17,8 @@ name: engine-v2-props-history
 #
 # The reliable long-term trigger is cron-job.org (already running the CLV job 96x/day),
 # which does not queue. These crons are the delay-tolerant fallback.
+# TIMING: SENSITIVE — guard: _snapshot_kind (tools/snapshot_props.py) classifies actual
+#   capture time relative to first pitch. Six scheduled attempts retain the active cadence.
 on:
   schedule:
     # 2026-07-31 — CUT FROM TEN TO FOUR (owner's item 1), chosen from the ARCHIVE, not the
