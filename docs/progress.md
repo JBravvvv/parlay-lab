@@ -1,3 +1,20 @@
+# Progress — 2026-09-12 (INSTRUCTION 52 review round: the reserve stops costing pre-kick games)
+
+Shipped `f6e996b` on top of INSTRUCTION 52 and live on prod. Seven edges of my own port, found by
+reviewing it: the football reserve was double what it needed (744 → 372 CFB, 496 → 248 NFL), so all
+60 Saturday games are priced pre-kick again instead of 56, with a live pass still able to draw the
+whole budget; the MLB live calendar went 7 slots → 6 because a pass is sized once against the ASSUMED
+rate and seven at the unmeasured 31-an-event rate is 658 against a 600 rail (12:00 PT dropped, the
+thinnest); the board-only tap now checks the day's run cap with a free read-only GET first, so a
+refused tap can no longer spend a run the evening's locked card needs; the 45-minute limiter no
+longer cancels the device re-price, because a Refresh that buys nothing and re-prices nothing is the
+exact defect INSTRUCTION 50 exists to kill; the server's half of the credit bill is now on the Board
+next to the browser half; the server-first gate reads `liveGap.live` rather than `pregameLive`, which
+this pass itself destroys; and "your sync phrase isn't saved here" is no longer shown to a phone that
+has one, because the read is three-valued now. "Add to slip" on the football generator adds instead
+of overwriting. tsc 0, 3,192 of 3,193 tests pass — the red is the expired-waiver guard awaiting
+Josh's decisions.
+
 # Progress — 2026-09-12 (INSTRUCTION 52: the in-game live lines come back, and the Parlay Generator lands on CFB & NFL)
 
 Josh, verbatim: (1) "I've always had in game live lines. It has live lines; they just went away this

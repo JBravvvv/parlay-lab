@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `f2e9bf777c8e78e7bc1db8834da5cd95ea70e0f0` (read by `git rev-parse origin/frontend-rebuild` this write, for INSTRUCTION 52; the 2026-09-11 claim — `46f68df9…`, INSTRUCTION 50 — is history.)
+> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `f6e996beca1485ee1853551754ff2416b8f885d6` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 52 shipped and its review round shipped on top; the earlier 2026-09-12 claim — `f2e9bf77…`, the INSTRUCTION 51 tip — and the 2026-09-11 one — `46f68df9…`, INSTRUCTION 50 — are history.)
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
@@ -687,6 +687,43 @@ is priced by the football desk's rules and not a copy of them. The ~95-line pane
 NFL gets the generator for free, with no second copy to drift. Editing `NflProps.tsx` would have been
 the fork. MLB mints two legs per row (over and under); a `CfbPropRow` is already one side, so football
 mints one. `app/props/page.tsx`'s documented hooks-safe early returns at `:361`/`:376` are unchanged.
+
+**INSTRUCTION 52 REVIEW ROUND — SEVEN EDGES OF MY OWN PORT (2026-09-12, shipped `f6e996b`, live on
+prod):** reviewing the INSTRUCTION 52 work found seven places where the fix was right and its edges
+were not. **(1) The football reserve was double what it needed to be.** 744 held back a whole
+24-event live pass, which capped the pre-kick rail at 1,756 and priced 56 of Josh's 60 Saturday games
+instead of 60. Halved to **372** (CFB) / **248** (NFL): the pre-kick rail is 2,128, above the 1,860 a
+full 60-game board costs, so every game is priced pre-kick again and the realistic leftover for
+in-play is 640 rather than the 372 floor. A live pass may still draw the whole `dailyBudget`. Nothing
+of Josh's is lowered; the guaranteed floor is now half a live pass instead of one, which is the trade
+and it is his to revisit. **(2) The MLB live calendar could cross its own rail.** A pass is sized
+ONCE, before it pulls, against the ASSUMED 6 credits an event — the real `x-requests-used` delta is
+recorded only afterwards and there is no mid-pass abort. At CFB's measured 31 an event, seven
+automatic passes are 7 × 94 = **658**, past the 600 rail with nobody touching the phone; six are 564,
+inside it at either rate. `liveSlotsPT` is therefore six times — **15:00, 16:45, 17:15, 17:45, 18:15,
+18:45 PT** — with 12:00 dropped as the thinnest (a 10:05 start is barely in play) and 15:00 kept
+because it still lands the early reading the measurement waits on. **(3) The board-only tap could eat
+the locked card's runs.** It shares `MAX_RUNS_PER_DATE` with the block locks and the counter INCRs at
+commitment, so four refused taps would have spent the four runs INSTRUCTION 48's locks need — the
+evening's card refused "run cap reached" with no credit bought. A read-only GET now checks the cap
+first: at the cap the tap is refused for FREE, counter untouched, `K_LASTGEN` un-stamped. **(4) The
+45-minute limiter cancelled the device re-price** — returning early on "ran recently" re-created the
+exact defect INSTRUCTION 50 item 1 exists to kill, a Refresh that buys nothing and re-prices nothing.
+The server still declines to re-buy; the browser pass (the one `engine-client` deliberately never
+gates) runs anyway, and the note says which happened. **(5) The server's half of the bill was
+invisible** — the spend line counted only browser re-prices, so a night could read "1 browser
+re-price today" with six server generates behind it. Both halves are counted now, for visibility
+only, neither blocking a tap. **(6) The server-first gate read the wrong count** — `pregameLive` also
+requires `board.at <= start`, which this very pass destroys (the board it stores is newer than every
+first pitch), so the second tap of the evening would have found 0 and gone quietly back to
+browser-only for the night. Gated on `liveGap.live` instead. **(7) "No sync phrase" was shown to
+phones that had one** — `useMlbLiveSyncReady` is a mount-effect read, false on the server and the
+first client pass, so between hydration and the overlay landing the Board told Josh to re-enter a
+phrase already saved. It is three-valued now: `null` = not read yet (neutral sentence), only a real
+`false` blames the phrase. The no-live-price clause also stops asserting "the last pull did not reach
+them" when the overlay one line below can say the book posts no line at all. Also: **"Add to slip" on
+the football generator now ADDS**, keeping the legs already there and de-duping on leg id. Gate: tsc
+0, **3,192 of 3,193** pass — the one red is the pre-existing expired-waiver guard, not re-dated here.
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
