@@ -1,3 +1,61 @@
+# Progress — 2026-09-12 (INSTRUCTION 52, documentarian pass: the credit arithmetic, the generator's own fix pass, and what is still Josh's to decide)
+
+Markdown only — no code changed. Josh, verbatim: (1) "I've always had in game live lines. It has live
+lines; they just went away this week"; (2) "Parlay Generator should be on CFB & NFL just like it is on
+MLB". The two blocks below this one are the first cut (`67a7d3c`) and the seven-edge review round
+(`f6e996b`). This block carries what was not yet written down, re-read from the committed diff.
+
+## The numbers, after the review round
+
+| | held back | pre-kick rail | pre-kick event-pulls | board |
+|---|---|---|---|---|
+| CFB | 372 of 2,500 | 2,128 | 68 | 60 games — the whole board, plus 8 re-price pulls |
+| NFL | 248 of 1,000 | 752 | 24 | 16 games — the whole board, plus 8 re-price pulls |
+
+`dailyBudget` is untouched (2,500 / 1,000) and a live pass is still sized against the whole rail; only
+the pre-kick pass is restricted, and that restriction got SMALLER. Two things the review round added
+that are easy to miss: the reserve is now capped at what today's live-or-upcoming games could actually
+spend, so a 2-game Thursday card or an all-final slate holds back nothing; and the "credits are being
+held" note is printed only when re-sizing the pre-kick half against the full budget would have bought
+more, so the reserve is never blamed for games an empty rail refused.
+
+MLB's evening ticker is six Pacific times (15:00, 16:45, 17:15, 17:45, 18:15, 18:45). Because the
+credit probe is still unrun, every pass is capped at 3 events: **19 credits a pass, 114 a day** at the
+assumed rate, 209 on a heavy day with five manual taps, and **564 at the unmeasured worst case of 31 an
+event** — inside the 600 rail either way. No cron row was added; the five stake slots are the same
+array object they always were.
+
+## Item 2's fix pass — two parts that were not recorded
+
+Beyond "Add to slip" now adding instead of overwriting the slip (which on football had been deleting
+the Sides legs Josh tapped before he spun): the Anytime TD market no longer offers an Unders button it
+cannot fill — it hides the over/under control, says why, and a one-sided failure gets a one-tap
+"Switch to overs" escape instead of a dead Generate button under a banner calling a full board empty.
+And a board whose games have all finished now says exactly that, rather than "no lines on this board".
+
+## Still Josh's to decide
+
+- **Football credits.** A Saturday that wants all 60 games priced pre-kick *and* re-priced in play
+  wants more than 2,500. Either upgrade (20,000 → 100,000 credits, $30 → $59/mo), or slow the live
+  cadence (`liveRevalidateSec` 600 → 1800, in-play lines every 30 min instead of 10), or shrink the
+  live pool (`liveMaxEvents` 24 → 8-10). The reserve helps under all three and invents credits under
+  none.
+- **Automatic evening board-only re-prices**, 114-150 credits each. Nothing schedules them today; it
+  is his Refresh tap. The pass also shares the day's four server runs with the locked card, so after
+  four runs the tap falls back to a device-only re-price — widening that is a spend decision.
+- **His cron-job.org ticker** stops at 18:45 PT (PST) / 19:45 PT (PDT) while baseball ran to 22:01 PT
+  on 09-11; extending the row is his own account.
+- **The sync phrase must be on the phone**, or every MLB live price stays invisible.
+- **The 3-event credit probe is still unrun**, so one manual tap on a worst-case day can still end
+  near 658 against the 600 rail. Running it is the cure; lowering a cap is not.
+- **Two fast Refresh taps** can still race the 45-minute limiter (flagged, not forced).
+- **Seven expired GitHub workflow waivers** — `since: "2026-08-29"` in
+  `tests/workflow-branch-sync.test.ts`, against a 14-day limit, so they expired 2026-09-12 — await his
+  decisions. NOT 2026-09-11, which an earlier draft of this line said: that is the day INSTRUCTION 51
+  shipped, not the day the waivers were dated, and the distinction matters because re-dating them is
+  exactly what must not happen. They are the one red in the
+  gate.
+
 # Progress — 2026-09-12 (INSTRUCTION 52 review round: the reserve stops costing pre-kick games)
 
 Shipped `f6e996b` on top of INSTRUCTION 52 and live on prod. Seven edges of my own port, found by

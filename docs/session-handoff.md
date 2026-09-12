@@ -725,6 +725,116 @@ them" when the overlay one line below can say the book posts no line at all. Als
 the football generator now ADDS**, keeping the legs already there and de-duping on leg id. Gate: tsc
 0, **3,192 of 3,193** pass — the one red is the pre-existing expired-waiver guard, not re-dated here.
 
+**INSTRUCTION 52 — THE CORRECTED ARITHMETIC, THE GENERATOR'S OWN FIX PASS, AND EVERY DECISION LEFT TO
+JOSH (2026-09-12, documentarian pass over `67a7d3c` + `f6e996b`, recorded after `6fadc68`).** Josh,
+verbatim, both items, because the second one is the half the blocks above under-report:
+
+> 1. "I've always had in game live lines. It has live lines; they just went away this week"
+> 2. "Parlay Generator should be on CFB & NFL just like it is on MLB"
+
+No code is changed by this pass. Every figure and line below was re-read from the committed diff this
+turn rather than copied from a report. The two blocks above are the first cut (`67a7d3c`) and the
+seven-edge review round (`f6e996b`); this one carries the arithmetic in full, the part of item 2's fix
+pass that was not written down, and the complete list of what is still Josh's to decide.
+
+**THE FOOTBALL RESERVE, AS IT NOW STANDS.** `liveReserveCredits` = **372** (`src/lib/cfb/rules.ts:510`)
+and **248** (`src/lib/nfl/rules.ts:226`):
+
+| | held back | pre-kick rail | pre-kick event-pulls | against a board of |
+|---|---|---|---|---|
+| CFB, first cut | 744 | 1,756 | `floor(1756/31)` = **56** | 60 games — **four refused every Saturday** |
+| CFB, now | 372 | 2,128 | `floor(2128/31)` = **68** | 60 games — whole board + 8 re-price pulls |
+| NFL, first cut | 496 | 504 | **16** | 16 games — one board, **the second pass refused outright** |
+| NFL, now | 248 | 752 | **24** | 16 games — whole board + 8 re-price pulls |
+
+`dailyBudget` is **still 2,500 (CFB) / 1,000 (NFL)** and all of both is still spendable: a live pass is
+sized against the WHOLE rail (`src/lib/server/football-props.ts:353`) and only the pre-kick half against
+`dailyBudget − reserve` (`:357`). The one number that moved is the restriction on the pre-kick pass, and
+it moved DOWN, which RAISES that pass's allowance. The guaranteed in-play floor is 12 pulls on CFB and
+8 on NFL. Two properties worth having in writing:
+
+- **the reserve is no longer a standing charge** — `football-props.ts:336-340` holds back
+  `min(liveReserveCredits, min(games live-or-upcoming, liveMaxEvents) × 31)`, so a 2-game Thursday CFB
+  card stops giving up 372 credits to protect at most 62, and a slate whose every game is final gives
+  up nothing. On a full Saturday the cap sits far above the ceiling, so a game day is unchanged;
+- **the "credits are being held" note is measured, not assumed** (`:396-399`) — the pre-kick half is
+  re-sized against the full budget and the note prints only if that would have bought more, so the
+  reserve is never blamed for games an empty rail refused.
+
+**THE MLB EVENING TICKER, AS IT NOW STANDS.** `liveSlotsPT` is six Pacific times —
+`["15:00","16:45","17:15","17:45","18:15","18:45"]` (`src/lib/mlb/live-props-rules.ts:218`) — with
+`tickMode: "ticker"` (`:220`). `rateMeasured` is false, so `src/lib/server/mlb-live-quote.ts` caps
+every pass at `probeEvents` (3), never `liveMaxEvents` (12): a pass is `1 + 3 × 6 = 19` credits at the
+assumed rate, **6 × 19 = 114 of the 600 rail (19%)**, and **209** on a heavy day with five manual taps
+on top. At CFB's measured 31 an event a pass is `1 + 3 × 31 = 94`, so the six are **564 — inside 600
+even then**, which is why there are six and not the seven first written (658). `slots` still points at
+the SAME ARRAY OBJECT as `REFILL_SLOTS_PT`, so INSTRUCTION 49's five stake slots are untouched, and no
+cron row was added or edited.
+
+**ITEM 2 HAD A FIX PASS OF ITS OWN, and only one of its three parts is written down above.** The mount
+is still ONE block in `src/components/cfb/CfbProps.tsx:931`, with `NflProps.tsx` inheriting it:
+
+- **"Add to slip" now ADDS.** It used to hand `setLegs` the generated legs and nothing else, which
+  REPLACED the slip — and on football ONE slip carries the Sides rail's spreads and the prop rails'
+  legs, so spinning a prop parlay silently deleted every side Josh had already tapped. `useParlayGen`
+  now requires an `addLegs` fold from the desk (`src/components/props/useParlayGen.ts:102`): football
+  folds through its own `addCfbLegs` (`CfbProps.tsx:712`), which keeps what is there, leaves a leg
+  already on the slip alone rather than toggling it back off, and NAMES a refused player; MLB dedupes
+  on leg id (`app/props/page.tsx:240`). Undo still restores the slip exactly as it stood.
+- **Anytime TD no longer has an Unders trap.** Every price in that market is on the touchdown
+  happening, so a yes-only market now hides the over/under control and says why, and a "one-sided"
+  failure offers a one-tap "Switch to overs/unders" instead of a dead Generate button under a banner
+  calling a full board empty.
+- **"Every game on this board has finished" is its own sentence now**, separate from "no lines on this
+  board", with the count of finished-game rows shown in the pool line — the state a past date's
+  football board is actually in.
+
+**THE CORRECTION THAT MUST NOT BE SOFTENED, because a previous session told Josh the opposite:** MLB
+in-game live MARKET PRICES were **never wired to the Board until INSTRUCTION 51** (`f2e9bf7`,
+2026-09-11). What Josh "always had" on the MLB desk is the LIVE pill and the LIVE parlay set — live
+game STATE priced off the last pregame pull. The surface that genuinely had live in-game market lines
+before this week is **the CFB desk** (sides about every 240 s, props on a 10-minute live window), and
+that is exactly the one the credit rail froze. Both halves of his sentence were true; they were true
+about two different things.
+
+**EVERY DECISION THIS BUILD LEAVES TO JOSH — none of them taken here:**
+
+- **The football credit shortfall.** A Saturday that wants all 60 games priced pre-kick AND re-priced
+  in play wants more than 2,500 credits. The three options are unchanged: (a) 20,000 → 100,000
+  credits/month, **$30 → $59**; (b) `liveRevalidateSec` 600 → 1800, so in-play lines refresh every 30
+  minutes instead of 10; (c) `liveMaxEvents` 24 → 8-10, so only the biggest games re-price in play.
+  **The reserve is worth doing under all three and cannot manufacture credits under any of them.**
+- **Automatic evening board-only re-prices.** `/api/generate?live=1` costs a full generate,
+  **114-150 credits a pass**, and nothing schedules it — it is his Refresh tap only. Authorising 2-3 a
+  night is 230-450 new credits a night. Related and unflattering: the pass SHARES
+  `MAX_RUNS_PER_DATE` (4, unchanged) with the block locks, so on a day that has already used its four
+  runs the tap is refused outright and falls back to a device-only re-price. Giving the mode headroom
+  of its own raises the day's ceiling, which is a spend decision.
+- **His cron-job.org ticker dies before the late evening.** The row is every 15 min, UTC hours 15-23
+  and 0-2, whose last pulse is 18:45 PT in PST and 19:45 PT in PDT; MLB games on 2026-09-11 ran to
+  **22:01 PT**. So the late tail gets no automatic live pass and 18:45 is the last slot that can fire.
+  **Extending that row is his action on his own account** — this repo never edits it.
+- **The sync phrase must be saved on the phone.** `/api/mlb/live-props` answers 401 without it, so
+  without it every MLB live price stays invisible; the Board and The Sharp now say so in plain English
+  instead of showing a silent dash.
+- **The 3-event credit probe is STILL UNRUN**, so MLB live sizing still assumes 6 credits an event. The
+  six automatic passes are safe at either rate, but HIS OWN TAP on top of a worst-case day is sized
+  against the assumption and can end the day near 658 against the 600 rail — the pre-existing
+  read-modify-write property of every rail here. The honest cure is the measurement, not a smaller cap,
+  and nothing in this app may block a bet.
+- **Two fast Refresh taps can still race the 45-minute limiter.** The pill is not disabled while the
+  live-board mutation is pending; a pinned `disabled=` string blocks the clean fix, so it is flagged
+  rather than forced.
+- **Seven GitHub workflow waivers expired on 2026-09-11** and await his decisions. That guard is the
+  one red in the gate both code commits report, and it is pre-existing — nothing in INSTRUCTION 52
+  touched it.
+
+**SUPERSEDED — sentences in the FIRST INSTRUCTION 52 block above that are no longer true:** "744 (CFB)
+/ 496 (NFL)" · "CFB now prices 56 of 60 games pre-kick" · "NFL prices 16 pre-kick and 16 live, 992 of
+1000" · the seven-time `liveSlotsPT` list including 12:00 · "7 × 19 = 133 of the 600 rail" · "a tap
+inside it buys nothing and says so" (it now re-prices on the device) · and the browser-only spend line.
+`docs/credit-budget.md` carries the whole corrected arithmetic in its own dated review-round section.
+
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs
 unders — same-day vindication of instruction 6, which deployed ~1h after that card

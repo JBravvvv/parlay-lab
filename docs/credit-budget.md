@@ -611,3 +611,99 @@ the card half switched off: it writes the board blob and **never enters `src/lib
 Whether to authorise automatic evening re-prices is **his decision**, because it is the only item in
 this build that would add recurring spend.
 
+
+## 2026-09-12 INSTRUCTION 52 REVIEW ROUND — the corrected arithmetic (`f6e996b`)
+
+**Every figure in the section above is the FIRST CUT's (`67a7d3c`) and four of its rows are now
+superseded.** The section above is left as written; this one is the current arithmetic, re-read from the
+committed diff. **No budget total changed in either round**: `CFB_PROPS.dailyBudget` is 2,500
+(`src/lib/cfb/rules.ts:475`), `NFL_PROPS.dailyBudget` is 1,000 (`src/lib/nfl/rules.ts:194`),
+`MLB_LIVE_PROPS.dailyBudget` is 600 (`src/lib/mlb/live-props-rules.ts:150`), and `MAX_RUNS_PER_DATE`
+is 4. The only numbers that moved DOWN are the reserve's own restriction on the pre-kick pass — which
+RAISES that pass's allowance — and the count of MLB live slots, which are new in this build.
+
+### A — the football live reserve: what it holds, what the pre-kick pass can still afford
+
+`liveReserveCredits` is **372** (CFB, `rules.ts:510`, was 744) and **248** (NFL, `rules.ts:226`, was
+496). The split itself is unchanged: the live half is sized against the WHOLE `dailyBudget`
+(`src/lib/server/football-props.ts:353`), the pre-kick half against `dailyBudget − reserve` (`:357`),
+and the live half is bought first.
+
+| | held back | pre-kick rail | `floor(rail/31)` | the board it faces | verdict |
+|---|---|---|---|---|---|
+| CFB, first cut | 744 | 1,756 | **56** | 60 games | **four games refused every Saturday** |
+| CFB, now | 372 | 2,128 | **68** | 60 games (1,860) | whole board + 8 re-price pulls |
+| NFL, first cut | 496 | 504 | **16** | 16 games | one board only — **the second pass refused** |
+| NFL, now | 248 | 752 | **24** | 16 games (496) | whole board + 8 re-price pulls |
+
+The guaranteed in-play floor the reserve still holds open is `372/31` = **12** event-pulls (CFB) and
+`248/31` = **8** (NFL) — and that is a FLOOR, not a ceiling: a live pass may draw the whole rail, so a
+window with 24 games in play buys all 24 whenever the day's spend leaves room. On an untouched CFB
+Saturday the realistic in-play leftover after the 60-game pre-kick board is `2500 − 1860` = **640**,
+not 372.
+
+**The hold is now dynamic** (`football-props.ts:336-340`):
+`reserve = min(liveReserveCredits, min(games live-or-upcoming, liveMaxEvents) × 31)`. Held flat it was
+charged on slates that can never use it — a 2-game Thursday CFB card gave up 372 credits to protect at
+most 62, and an all-final slate gave up 372 to protect nothing, which is a budget quietly reduced. On a
+full Saturday the cap sits far above the ceiling, so a game day is unchanged.
+
+**The note is counterfactual, not inferred** (`:396-399`): the pre-kick half is re-sized against the
+FULL budget and the held-credits sentence prints only if that would have bought more games. The first
+cut printed it whenever every live game was afforded and a pre-kick game was not — which is also true
+when the DAY'S BUDGET did the refusing, so the reserve got blamed for games it did not cost and the
+note promised credits that were not there.
+
+### B — the MLB evening live ticker: per-pass cost and the day's total
+
+`liveSlotsPT` = **15:00, 16:45, 17:15, 17:45, 18:15, 18:45 PT** (six,
+`src/lib/mlb/live-props-rules.ts:218`), `tickMode: "ticker"` (`:220`). 12:00 PT is dropped.
+
+`rateMeasured` is **false** (`:142`), so `src/lib/server/mlb-live-quote.ts` reads
+`probing = !cfg.rateMeasured || spentNow === 0` and caps **every** pass at `probeEvents` 3 (`:128`),
+never `liveMaxEvents` 12 (`:106`). One pass is therefore `MLB_LIST_CALL_CREDITS` 1 + 3 × the per-event
+figure, and rail 1b NX-stamps each slot for the Pacific day, so each slot buys at most one pass:
+
+| | at the assumed 6/event | at CFB's measured 31/event |
+|---|---|---|
+| one probe-capped pass | `1 + 3×6` = **19** | `1 + 3×31` = **94** |
+| the six automatic slots | **114 of 600 — 19%** | **564 of 600 — 94%** |
+| + five manual Refresh taps | **209 of 600** | 1,034 — past the rail, see below |
+| seven slots (the first cut) | 133 | **658 — past the 600 rail unattended** |
+
+658 is why there are six slots and not seven. **And the first cut's reason for believing seven were
+safe is corrected here:** it said "the rail counts the real `x-requests-used` delta, so the route
+refuses the tail of the pass that would cross 600". **The route does not do that.** A pass is sized
+ONCE, before it pulls — `mlbAffordableEvents(sel.events.length, spentNow)` divides the rail that is
+left by the ASSUMED per-event figure — and the real delta is recorded only after the pass returns.
+There is no mid-pass abort and no worst-case sizing. So on a worst-case day the rail can read "room" at
+564 and one more pass can bill 94, ending near **658**. That is the pre-existing read-modify-write
+property of every rail in this tree, the tap is Josh's and nothing here may block a bet, and the cure is
+the measurement rather than a smaller cap.
+
+**The 3-event probe is STILL NOT RUN.** The probe table earlier in this file still reads **unrecorded**
+on every row and is left that way deliberately — no estimate is written into it. Until it is run,
+`measuredCreditsPerEvent: 6` (`:152`) is a budgeting assumption and the 31 column above is the honest
+worst case.
+
+### C — the board-only `?live=1` pass, now visible in the bill
+
+| | |
+|---|---|
+| cost of one pass | **114-150 credits** (`GEN_CREDITS_EST = 140`) |
+| automatic passes | **none** — no scheduler sends `live=1` |
+| run ceiling | shares `MAX_RUNS_PER_DATE` **4** with the block locks; a capped tap is refused by a FREE read-only `GET` before the INCR (`app/api/generate/route.ts:286-293`), so a refusal costs the locked card nothing |
+| the 45-minute limiter | still in force on the SERVER's stored re-price — **but the tap is no longer a no-op**: the browser falls back to a device re-price and the note says the server did not buy again |
+| shown to Josh | both halves — the browser counter (`pl_gencount`) and the new server counter (`pl_livegencount`, `src/lib/mlb/live-board-client.ts:42`), each as "N re-prices today ≈ N × 140 Odds credits (counted, never blocked)" |
+
+Authorising automatic evening re-prices is still **his decision** — at 114-150 a pass it is the only
+item in this build that would add recurring spend, and on a four-run day the tap is refused outright
+unless he also raises that ceiling.
+
+### D — the ticker's window, corrected
+
+The cron-job.org row is every 15 min, UTC hours 15-23 and 0-2, so its last pulse is **02:45 UTC** =
+**19:45 PT in PDT** and **18:45 PT in PST** — the section above says "08:00-19:00 PT", which understates
+the PDT window by 45 minutes and is **corrected** here. Either way 18:45 is the last slot that can fire,
+MLB games on 2026-09-11 ran to **22:01 PT**, and the late tail gets no automatic live pass. Widening that
+row is **Josh's action on his own cron-job.org account**; this repo adds and edits no cron row.
