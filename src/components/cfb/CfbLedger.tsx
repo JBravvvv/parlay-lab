@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { CfbTicketCard, cfbGradingOf, cfbLegLink, cfbTicketsOf, type CfbGradingView, type CfbLegVerdict } from "@/components/cfb/CfbTicketCard";
+import { NflPaperExperiment } from "@/components/nfl/NflPaperExperiment";
 import { CfbSyncChip } from "@/components/cfb/CfbSyncChip";
 import { useLeague } from "@/components/football/LeagueContext";
 import { Reveal } from "@/components/motion/Reveal";
@@ -903,6 +904,7 @@ export function CfbLedger() {
   return (
     <div className="space-y-4">
       <CfbSyncChip />
+      {L.id === "nfl" && <NflPaperExperiment entries={entries} />}
 
       {(open || importMsg) && (
         <Panel title={`Import a ${L.short} ledger backup`} action={<span className="text-[10.5px] text-faint">merges — never erases a locked day</span>}>

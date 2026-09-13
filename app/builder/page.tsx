@@ -341,6 +341,38 @@ function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
 
 
 export default function BuilderPage() {
+  const desk = useSport();
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Builder"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="A CFB paper card with full core allocation from September 14, including forced selections — its own bank and its own ledger, never mixed with MLB."
+        />
+        <CfbBuilder />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football card builder on the NFL desk handles (its own paper banner, bank and ledger). */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Builder"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="An NFL paper card with full Sunday allocation from September 20, including forced selections — its own bank and its own ledger, never mixed with MLB or CFB."
+        />
+        <NflBuilder />
+      </>
+    );
+  }
+  return <MlbBuilderPage />;
+}
+function MlbBuilderPage() {
   const { data: board } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -620,34 +652,7 @@ export default function BuilderPage() {
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      card builder (it carries its own paper banner). Every hook above has already run. */
-  if (CFB_ENABLED && desk === "cfb") {
-    return (
-      <>
-        <PageHeader
-          title="Builder"
-          eyebrow="College Football"
-          chip={<CfbChip />}
-          sub="A sized CFB paper card from the slate's +EV Caesars sides — its own bank and its own ledger, never mixed with MLB."
-        />
-        <CfbBuilder />
-      </>
-    );
-  }
 
-  /* NFL desk (2026-09-08): the shared football card builder on the NFL desk handles (its own paper banner, bank and ledger). */
-  if (NFL_ENABLED && desk === "nfl") {
-    return (
-      <>
-        <PageHeader
-          title="Builder"
-          eyebrow="National Football League"
-          chip={<NflChip />}
-          sub="A sized NFL paper card from the slate's +EV Caesars sides — its own bank and its own ledger, never mixed with MLB or CFB."
-        />
-        <NflBuilder />
-      </>
-    );
-  }
 
   return (
     <>

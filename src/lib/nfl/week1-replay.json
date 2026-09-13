@@ -1,0 +1,365 @@
+{
+  "version": 1,
+  "policy": "sunday-full-v1",
+  "asOf": "2026-09-13T16:00:00Z",
+  "oddsTimestamp": "2026-09-13T15:55:36Z",
+  "oddsSha256": "40f503ff7372989a03abc50399b3b3538dbecc53ef5cdce73fdc9cc435d13575",
+  "ratingsCommit": "10b6a63",
+  "entry": {
+    "sport": "nfl",
+    "date": "2026-09-13",
+    "locked": true,
+    "daily": 350,
+    "fun": 25,
+    "core": [
+      {
+        "id": "nfl-2026-09-13-core-1",
+        "bucket": "core",
+        "name": "SINGLE · Falcons +6.5",
+        "stake": 35,
+        "czOdds": -109,
+        "czDec": 1.9174,
+        "prob": 52.4,
+        "czEv": 0.48,
+        "legs": [
+          {
+            "label": "Falcons +6.5",
+            "prop": "Spread",
+            "cz": -109,
+            "gkey": "401872658",
+            "lkey": "401872658|spread|away|6.5",
+            "market": "spread",
+            "side": "away",
+            "line": 6.5,
+            "teamId": "1",
+            "prob": 0.5240401741458443,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-2",
+        "bucket": "core",
+        "name": "SINGLE · Packers +2",
+        "stake": 35,
+        "czOdds": -110,
+        "czDec": 1.9091,
+        "prob": 52.45,
+        "czEv": 0.14,
+        "legs": [
+          {
+            "label": "Packers +2",
+            "prop": "Spread",
+            "cz": -110,
+            "gkey": "401872927",
+            "lkey": "401872927|spread|away|2",
+            "market": "spread",
+            "side": "away",
+            "line": 2,
+            "teamId": "9",
+            "prob": 0.5090761503013432,
+            "push": 0.029491788847333666
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-3",
+        "bucket": "core",
+        "name": "SINGLE · Giants +3",
+        "stake": 35,
+        "czOdds": -107,
+        "czDec": 1.9346,
+        "prob": 51.02,
+        "czEv": -1.29,
+        "legs": [
+          {
+            "label": "Giants +3",
+            "prop": "Spread",
+            "cz": -107,
+            "gkey": "401872930",
+            "lkey": "401872930|spread|home|3",
+            "market": "spread",
+            "side": "home",
+            "line": 3,
+            "teamId": "19",
+            "prob": 0.49514597465318344,
+            "push": 0.029535394358831013
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-4",
+        "bucket": "core",
+        "name": "SINGLE · Lions -7",
+        "stake": 35,
+        "czOdds": -105,
+        "czDec": 1.9524,
+        "prob": 50.34,
+        "czEv": -1.73,
+        "legs": [
+          {
+            "label": "Lions -7",
+            "prop": "Spread",
+            "cz": -105,
+            "gkey": "401872923",
+            "lkey": "401872923|spread|home|-7",
+            "market": "spread",
+            "side": "home",
+            "line": -7,
+            "teamId": "8",
+            "prob": 0.48848398839328366,
+            "push": 0.029543540536080326
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-5",
+        "bucket": "core",
+        "name": "SINGLE · Titans ML",
+        "stake": 35,
+        "czOdds": -118,
+        "czDec": 1.8475,
+        "prob": 53.06,
+        "czEv": -1.97,
+        "legs": [
+          {
+            "label": "Titans ML",
+            "prop": "ML",
+            "cz": -118,
+            "gkey": "401872924",
+            "lkey": "401872924|ml|home|",
+            "market": "ml",
+            "side": "home",
+            "line": null,
+            "teamId": "10",
+            "prob": 0.5306027511158012,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-6",
+        "bucket": "core",
+        "name": "SINGLE · Panthers ML",
+        "stake": 35,
+        "czOdds": 138,
+        "czDec": 2.38,
+        "prob": 41.19,
+        "czEv": -1.98,
+        "legs": [
+          {
+            "label": "Panthers ML",
+            "prop": "ML",
+            "cz": 138,
+            "gkey": "401872661",
+            "lkey": "401872661|ml|home|",
+            "market": "ml",
+            "side": "home",
+            "line": null,
+            "teamId": "29",
+            "prob": 0.4118595248827091,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-7",
+        "bucket": "core",
+        "name": "SINGLE · Colts ML",
+        "stake": 35,
+        "czOdds": 137,
+        "czDec": 2.37,
+        "prob": 41.35,
+        "czEv": -2.01,
+        "legs": [
+          {
+            "label": "Colts ML",
+            "prop": "ML",
+            "cz": 137,
+            "gkey": "401872659",
+            "lkey": "401872659|ml|home|",
+            "market": "ml",
+            "side": "home",
+            "line": null,
+            "teamId": "11",
+            "prob": 0.41346410488265967,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-8",
+        "bucket": "core",
+        "name": "SINGLE · Chargers -9.5",
+        "stake": 35,
+        "czOdds": -108,
+        "czDec": 1.9259,
+        "prob": 50.58,
+        "czEv": -2.59,
+        "legs": [
+          {
+            "label": "Chargers -9.5",
+            "prop": "Spread",
+            "cz": -108,
+            "gkey": "401872926",
+            "lkey": "401872926|spread|home|-9.5",
+            "market": "spread",
+            "side": "home",
+            "line": -9.5,
+            "teamId": "24",
+            "prob": 0.5057770733235836,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-9",
+        "bucket": "core",
+        "name": "SINGLE · Dolphins ML",
+        "stake": 35,
+        "czOdds": 140,
+        "czDec": 2.4,
+        "prob": 40.54,
+        "czEv": -2.71,
+        "legs": [
+          {
+            "label": "Dolphins ML",
+            "prop": "ML",
+            "cz": 140,
+            "gkey": "401872928",
+            "lkey": "401872928|ml|away|",
+            "market": "ml",
+            "side": "away",
+            "line": null,
+            "teamId": "15",
+            "prob": 0.4053889521014675,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      },
+      {
+        "id": "nfl-2026-09-13-core-10",
+        "bucket": "core",
+        "name": "SINGLE · Browns +9.5",
+        "stake": 35,
+        "czOdds": -117,
+        "czDec": 1.8547,
+        "prob": 52.08,
+        "czEv": -3.4,
+        "legs": [
+          {
+            "label": "Browns +9.5",
+            "prop": "Spread",
+            "cz": -117,
+            "gkey": "401872922",
+            "lkey": "401872922|spread|away|9",
+            "market": "spread",
+            "side": "away",
+            "line": 9.5,
+            "teamId": "5",
+            "prob": 0.5208164054988292,
+            "push": 0
+          }
+        ],
+        "paperPolicy": "sunday-full-v1",
+        "forced": true,
+        "clearsEdgeGate": false
+      }
+    ],
+    "funT": [],
+    "lockedAt": 1789325567133,
+    "games": {
+      "401872658": {
+        "pk": 401872658,
+        "start": "2026-09-13T17:00Z",
+        "home": "Pittsburgh Steelers",
+        "away": "Atlanta Falcons"
+      },
+      "401872659": {
+        "pk": 401872659,
+        "start": "2026-09-13T17:00Z",
+        "home": "Indianapolis Colts",
+        "away": "Baltimore Ravens"
+      },
+      "401872661": {
+        "pk": 401872661,
+        "start": "2026-09-13T17:00Z",
+        "home": "Carolina Panthers",
+        "away": "Chicago Bears"
+      },
+      "401872922": {
+        "pk": 401872922,
+        "start": "2026-09-13T17:00Z",
+        "home": "Jacksonville Jaguars",
+        "away": "Cleveland Browns"
+      },
+      "401872923": {
+        "pk": 401872923,
+        "start": "2026-09-13T17:00Z",
+        "home": "Detroit Lions",
+        "away": "New Orleans Saints"
+      },
+      "401872924": {
+        "pk": 401872924,
+        "start": "2026-09-13T17:00Z",
+        "home": "Tennessee Titans",
+        "away": "New York Jets"
+      },
+      "401872926": {
+        "pk": 401872926,
+        "start": "2026-09-13T20:25Z",
+        "home": "Los Angeles Chargers",
+        "away": "Arizona Cardinals"
+      },
+      "401872927": {
+        "pk": 401872927,
+        "start": "2026-09-13T20:25Z",
+        "home": "Minnesota Vikings",
+        "away": "Green Bay Packers"
+      },
+      "401872928": {
+        "pk": 401872928,
+        "start": "2026-09-13T20:25Z",
+        "home": "Las Vegas Raiders",
+        "away": "Miami Dolphins"
+      },
+      "401872930": {
+        "pk": 401872930,
+        "start": "2026-09-14T00:20Z",
+        "home": "New York Giants",
+        "away": "Dallas Cowboys"
+      }
+    },
+    "grading": null,
+    "source": "server-lock",
+    "trigger": "nfl-week1-retrospective",
+    "note": "Week 1 replay — reconstructed after kickoff from historical pregame prices and archived September 8 ratings. Excluded from the live ledger, bankroll and prospective performance. $350 core only; original fun card unchanged."
+  }
+}

@@ -63,6 +63,38 @@ function LivePill() {
 }
 
 export default function SharpPage() {
+  const desk = useSport();
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="The Sharp"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="The desk's College Football read — the market + FPI margin model that prices every slate, constants in the open."
+        />
+        <CfbSharp />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football read on the NFL desk handles (its own model constants). */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="The Sharp"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="The desk's NFL read — the market + FPI margin model that prices every slate, constants in the open."
+        />
+        <NflSharp />
+      </>
+    );
+  }
+  return <MlbSharpPage />;
+}
+function MlbSharpPage() {
   const { data: board, isPending } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -269,34 +301,7 @@ export default function SharpPage() {
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      read. Every hook above has already run, so this early return is hooks-safe. */
-  if (CFB_ENABLED && desk === "cfb") {
-    return (
-      <>
-        <PageHeader
-          title="The Sharp"
-          eyebrow="College Football"
-          chip={<CfbChip />}
-          sub="The desk's College Football read — the market + FPI margin model that prices every slate, constants in the open."
-        />
-        <CfbSharp />
-      </>
-    );
-  }
 
-  /* NFL desk (2026-09-08): the shared football read on the NFL desk handles (its own model constants). */
-  if (NFL_ENABLED && desk === "nfl") {
-    return (
-      <>
-        <PageHeader
-          title="The Sharp"
-          eyebrow="National Football League"
-          chip={<NflChip />}
-          sub="The desk's NFL read — the market + FPI margin model that prices every slate, constants in the open."
-        />
-        <NflSharp />
-      </>
-    );
-  }
 
   return (
     <>

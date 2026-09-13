@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSport, getSport } from "@/lib/sport";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bestBoard, generateBoard, type Board } from "./engine-client";
 import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
@@ -10,12 +12,17 @@ import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
  * strictly better — never a downgrade), or failing both, a fresh engine run.
  */
 export function useBoard() {
-  return useQuery<Board>({
+  const sport = useSport();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const query = useQuery<Board>({
     queryKey: ["board"],
-    queryFn: bestBoard,
+    queryFn: () => { if (getSport() !== "mlb") throw new Error("MLB board is inactive"); return bestBoard(); },
+    enabled: mounted && sport === "mlb",
     staleTime: Infinity,
     gcTime: Infinity,
   });
+  return { ...query, data: mounted && sport === "mlb" ? query.data : undefined };
 }
 
 /**
@@ -27,7 +34,7 @@ export function useBoard() {
 export function useRegenerateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: generateBoard,
+    mutationFn: () => { if (getSport() !== "mlb") throw new Error("Switch to MLB to run the baseball engine"); return generateBoard(); },
     onSuccess: (b) => {
       qc.setQueryData(["board"], b);
       void qc.invalidateQueries({ queryKey: ["picks"] });

@@ -39,6 +39,7 @@ export const CFB_PAPER = {
 } as const;
 
 export const CFB_RULES = {
+  fullPaperSince: "2026-09-14",
   /** a core leg needs this % EV at Caesars */
   minEvPct: 2,
   maxLegs: 2,

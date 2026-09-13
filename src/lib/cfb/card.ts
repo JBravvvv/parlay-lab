@@ -3,6 +3,7 @@ import { decToAm } from "@/lib/ticket-math";
 import { CFB_RULES } from "@/lib/cfb/rules";
 import { rowProbAt, sideLabel } from "@/lib/cfb/model";
 import type { CfbBoard, CfbCard, CfbCardOpts, CfbGame, CfbRow, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
+import { isFullPaper } from "@/lib/football/sunday-paper";
 import type { LeagueRules } from "@/lib/football/league";
 
 /**
@@ -226,7 +227,23 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
      2026-09-06). This `if` replaces the early `return` that used to stand here; everything inside
      it is the core body byte for byte. See the docblock above `buildCfbCard` for why the core's
      verdict may not be applied to the fun bucket's money. */
-  if (bestRows.length) {
+  const sundayPaper = isFullPaper(R, board.date);
+  const policy = R.fullPaperSince ? "full-core-v1" : "sunday-full-v1";
+  const policyLabel = R.fullPaperSince ? "Full core" : "Sunday";
+  if (sundayPaper) {
+    // A fixed-budget paper cohort: rank real, pregame single bets by estimated EV,
+    // diversify across games, then equal-weight. No outcome or current score is read.
+    const eligible = playable.filter(r => Number.isFinite(r.evCz) && r.cz!.dec > 1 && r.cz!.dec <= R.maxDec);
+    const singles = drafts([...bestPerGame(eligible, [], () => "").values()], games, R.maxDec, 1)
+      .sort((a, b) => byEv(a, b) || a.rows[0].key.localeCompare(b.rows[0].key));
+    const n = Math.min(singles.length, R.tickets.max, Math.floor(opts.daily / R.minStake));
+    if (n) {
+      const base = Math.floor(opts.daily / n);
+      for (let i = 0; i < n; i++) picked.push({ d: singles[i], stake: base + (i < opts.daily - base * n ? 1 : 0) });
+      notes.push(`${policyLabel} paper allocation: $${opts.daily} across ${n} distinct games. Ranked by estimated EV; full allocation can include negative-EV picks. This cohort is an experiment, not a positive-edge claim.`);
+      if (Math.ceil(opts.daily / n) > R.maxStake) notes.push(`Thin slate: equal-weight stakes exceed the usual $${R.maxStake} cap to meet the requested ${policyLabel.toLowerCase()} paper budget.`);
+    } else notes.push(`${policyLabel} paper allocation blocked: no verified pregame single under ${R.maxDec} decimal. Missing prices and started games are never invented or backdated.`);
+  } else if (bestRows.length) {
     const usedGames = new Set<string>();
     let sum = 0;
     const room = () => opts.daily - sum;
@@ -285,7 +302,10 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
     }
   }
 
-  const core = picked.map((p, i) => finish(`${idPrefix}-${board.date}-core-${i + 1}`, "core", ticketName(p.d), p.d, p.stake));
+  const core = picked.map((p, i) => ({
+    ...finish(`${idPrefix}-${board.date}-core-${i + 1}`, "core", ticketName(p.d), p.d, p.stake),
+    ...(sundayPaper ? { paperPolicy: policy, forced: true, clearsEdgeGate: p.d.ev >= R.minEvPct } : {}),
+  }));
 
   /* ---------- FUN ---------- */
   const funT: CfbTicket[] = [];
@@ -333,8 +353,8 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
      it can only ever fire on a day the old code also called no-play. The note is decided here,
      after the fun build, and `unshift`ed so the verdict stays `notes[0]` for the two callers that
      read it by index (`buildCfbLockEntry`, `buildCfbSweepEntry` in src/lib/cfb/lock-server.ts). */
-  const noPlay = !bestRows.length && !funT.length;
-  if (!bestRows.length) {
+  const noPlay = !core.length && !funT.length;
+  if (!bestRows.length && !sundayPaper) {
     const gate = `no playable side clears +${R.minEvPct}% EV at Caesars under ${R.maxDec.toFixed(2)} (${playable.length} priced sides on ${board.games.length} games)`;
     notes.unshift(
       noPlay

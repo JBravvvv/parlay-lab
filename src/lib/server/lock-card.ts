@@ -1,6 +1,6 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { CORE_RULES, PAPER, slotMaxDec } from "@/lib/paper-mode";
+import { CORE_RULES, PAPER, PAPER_ACTION_SINCE, slotMaxDec } from "@/lib/paper-mode";
 import {
   CORE_SHAPES_SINCE,
   bucketRecordFromLedger,
@@ -109,7 +109,7 @@ export type CoreShapeRecord = {
   id: string;
   label: string;
   slots: CoreShape["slots"];
-  pick: "rotation" | "tilt:two" | "tilt:long";
+  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability";
   reason: string;
   menu: string[];
   dayIndex: number;
@@ -167,6 +167,7 @@ export function buildLockEntry(args: {
 }): SyncEntry {
   const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
   const cfg = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
+  const paperAction = date >= PAPER_ACTION_SINCE;
   const sh = eng.get<{ bankroll?: number }>("SH") ?? {};
   const bankroll = Number(sh.bankroll) > 0 ? Number(sh.bankroll) : PAPER.bankroll;
   /* PAPER EPOCH (2026-08-15, Josh's word): the daily is a FIXED hypothetical $150 — it
@@ -221,7 +222,9 @@ export function buildLockEntry(args: {
      picker: rotation by date, tilted by the realized record when it is thick enough. */
   const storedShape = (carry as { coreShape?: CoreShapeRecord } | null | undefined)?.coreShape;
   const storedMenuShape = storedShape ? shapeById(storedShape.id) : null;
-  const shapePick = storedMenuShape ? null : shapeForDay(date, args.shapeCal);
+  const shapePick = storedMenuShape ? null : paperAction
+    ? { ...shapeForDay(date, args.shapeCal), shape: shapeById("P")!, pick: "paper-probability" as const, reason: "Paper action experiment: three $50 two-leg slots, filled by estimated hit probability", menu: ["P"] }
+    : shapeForDay(date, args.shapeCal);
   const shape: CoreShape = storedMenuShape ?? shapePick!.shape;
   const shapeRecord: CoreShapeRecord = storedMenuShape
     ? { ...(storedShape as CoreShapeRecord), slots: storedMenuShape.slots }
@@ -408,7 +411,7 @@ export function buildLockEntry(args: {
      and the budget-over-bias yield — against its OWN carried tickets, so the primary
      selection and the alt selection get identical rules and independent leg-disjoint
      worlds. */
-  const buildModeCard = (mode: string, carriedTix: SyncTicket[]): ModeCard => {
+  const buildModeCard = (mode: string, carriedTix: SyncTicket[], experiment = false): ModeCard => {
     const carriedB = biasViewOf(carriedTix);
     const seating = seatCarried(carriedTix);
     const owned = ownSlots(seating);
@@ -428,7 +431,7 @@ export function buildLockEntry(args: {
         const slot = shape.slots[si];
         const free = (x: PoolItem) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l)));
         const gCeil = slotMaxDec(slot.legs, "gated");
-        const fCeil = slotMaxDec(slot.legs, "forced");
+        const fCeil = experiment ? gCeil : slotMaxDec(slot.legs, "forced");
         const ranged = p.filter((x) => inRange(x, slot.legs) && free(x));
         const gPool = ranged.filter((x) => !overDec(x.pl, gCeil));
         /* one seat, the slot's stake as the amount, cap = 100% of the slot (perParlayCap 1
@@ -446,7 +449,7 @@ export function buildLockEntry(args: {
           coreMaxDec: maxDec,
           perParlayCap: 1,
         });
-        const a: AllocResult = gPool.length ? shAllocate(gPool, slot.stake, slotCfg(mode, gCeil), false) : { picks: [], sum: 0, blocked: [] };
+        const a: AllocResult = !experiment && gPool.length ? shAllocate(gPool, slot.stake, slotCfg(mode, gCeil), false) : { picks: [], sum: 0, blocked: [] };
         blocked.push(...(a.blocked ?? []));
         let pick: AllocPick | null = a.picks[0] ?? null;
         let forced = false;
@@ -550,7 +553,7 @@ export function buildLockEntry(args: {
   };
 
   const primaryMode = String(cfg.selMode ?? LOCK_SEL_MODE);
-  const primaryCard = buildModeCard(primaryMode, carry?.core ?? []);
+  const primaryCard = buildModeCard(primaryMode, carry?.core ?? [], paperAction);
   const underShare = primaryCard.underShare;
   const quotaEvicted = primaryCard.quotaEvicted;
   const biasYielded = primaryCard.biasYielded;
@@ -571,7 +574,7 @@ export function buildLockEntry(args: {
   }
   const gatedDeployed = primaryCard.gatedSizing;
 
-  const toTicket = (s: Seat): SyncTicket => {
+  const toTicket = (s: Seat, experiment = false): SyncTicket => {
     const p = s.pick;
     const pl = p.w.pl;
     const stake = Number(p.stake);
@@ -595,6 +598,7 @@ export function buildLockEntry(args: {
       /* INSTRUCTION 46: the slot this ticket seats — persisted so later fires fill around it */
       shapeSlot: s.slot,
       ...(s.forced ? { forced: true } : {}),
+      ...(experiment && s.forced ? { paperPolicy: "probability-action-v1" } : {}),
       /* Josh's standing word, 2026-08-15: "I will not be taking ANY of the bets." Paper
          tickets are born placed:false/actualStake:0 — a decision on record, not the
          epoch-1 null-means-unanswered state. */
@@ -619,7 +623,7 @@ export function buildLockEntry(args: {
             `the card being locked is not the card the allocator sized. STOP.`,
         );
       }
-      return withTopUp(toTicket(s), s.topUp);
+      return withTopUp(toTicket(s, paperAction), s.topUp);
     });
   /* block fires APPEND: the date's entry accumulates each block's card; dedupe by id */
   const carried = (carry?.core ?? []).filter((t) => !newCore.some((n) => n.id === t.id));
@@ -764,7 +768,8 @@ export function buildLockEntry(args: {
     lockedAt: carry?.lockedAt ?? now,
     trigger,
     source: "server-lock",
-    selMode: cfg.selMode ?? null,
+    selMode: paperAction ? "probability" : cfg.selMode ?? null,
+    ...(paperAction ? { paperPolicy: "probability-action-v1" } : {}),
     /* the DAY ceiling, always — a fire's own budget lives in blocks[key].budget.
        (Was `blockKey ? dayCeiling : daily`; since 2026-08-19 top-up fires append with a
        reduced dailyOverride and no blockGkeys, so the ceiling is unconditional.) */
@@ -831,6 +836,7 @@ export function buildLockEntry(args: {
           }
         : {}),
   };
+  if (paperAction) entry.note = `${String(entry.note ?? "").replace("then the EV gate", "then probability allocation")} Paper action: full-sized slots ranked by estimated hit probability; negative EV is allowed, forced picks are marked, and existing tickets are unchanged.`.trim();
   const v = validateLedger([entry]);
   if (!v.ok) throw new Error(`lock entry failed the ledger's own validator: ${v.error}`);
   return entry;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -66,6 +66,8 @@ export default function GamesPage() {
 function Games() {
   const today = useMemo(ptToday, []);
   const sport = useSport();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const cfbDesk = CFB_ENABLED && sport === "cfb";
   const nflDesk = NFL_ENABLED && sport === "nfl";
   const qDate = useSearchParams().get("date");
@@ -75,7 +77,7 @@ function Games() {
 
   const q = useQuery<GamesPayload>({
     queryKey: ["games", date],
-    enabled: !cfbDesk && !nflDesk, // the CFB and NFL desks never spend an MLB games fetch
+    enabled: mounted && !cfbDesk && !nflDesk, // the CFB and NFL desks never spend an MLB games fetch
     queryFn: async () => {
       const r = await fetch(`/api/games?date=${date}`);
       const j = (await r.json().catch(() => null)) as (GamesPayload & { error?: string }) | null;

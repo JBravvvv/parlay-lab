@@ -119,7 +119,7 @@ export const TILT_SHAPES = 3;
 export type ShapePick = {
   shape: CoreShape;
   /** which rule chose it — on the entry, so a day's shape always explains itself */
-  pick: "rotation" | "tilt:two" | "tilt:long";
+  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability";
   reason: string;
   /** the menu the rotation walked (ids) and the day index that indexed it */
   menu: string[];
@@ -182,10 +182,13 @@ export function shapeForDay(date: string, cal: ShapeCalibration | null | undefin
   };
 }
 
+/** Fixed paper-action shape; kept outside the historical rotating menu. */
+export const PAPER_ACTION_SHAPE: CoreShape = { id: "P", label: "3x$50 2-leg · paper action", slots: [S(50, L(2,2)), S(50, L(2,2)), S(50, L(2,2))] };
+
 /** a shape by id (a stored entry's shape is rehydrated by id so the slots are always the
     menu's own, never a hand-edited copy); null when the id is not on the menu */
 export function shapeById(id: string | null | undefined): CoreShape | null {
-  return CORE_SHAPES.find((s) => s.id === id) ?? null;
+  return id === PAPER_ACTION_SHAPE.id ? PAPER_ACTION_SHAPE : CORE_SHAPES.find((s) => s.id === id) ?? null;
 }
 
 /** the human line the ledger/card prints: "shape: 2x$60 2-leg + 3x$10 3-4 leg" */

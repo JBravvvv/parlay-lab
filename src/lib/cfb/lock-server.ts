@@ -1,3 +1,4 @@
+import { isFullPaper } from "@/lib/football/sunday-paper";
 import { assertAppendOnly } from "@/lib/append-only";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { lockCfbCard, validateCfbLedger } from "@/lib/cfb/ledger";
@@ -181,7 +182,9 @@ export function assertCardMoney(cfg: LeagueConfig, card: CfbCard): void {
     throw new Error(`${cfg.short} MONEY GUARD: the card carries ${card.core.length} core tickets but ${cfg.short}_RULES.tickets.max is ${rules.tickets.max}. Nothing written. STOP.`);
   }
   for (const t of card.core) {
-    if (t.stake < rules.minStake - MONEY_EPS || t.stake > rules.maxStake + MONEY_EPS) {
+    const maxStake = isFullPaper(rules, card.date) && (t.paperPolicy === "sunday-full-v1" || t.paperPolicy === "full-core-v1")
+      ? Math.max(rules.maxStake, Math.ceil(paper.daily / Math.max(1, card.core.length))) : rules.maxStake;
+    if (!Number.isFinite(t.stake) || t.stake < rules.minStake - MONEY_EPS || t.stake > maxStake + MONEY_EPS) {
       throw new Error(
         `${cfg.short} MONEY GUARD: core ticket ${t.id} carries $${t.stake}, outside the $${rules.minStake}–$${rules.maxStake} band ${cfg.short}_RULES sets. Nothing written. STOP.`,
       );
@@ -236,7 +239,7 @@ export function buildLockEntry(cfg: LeagueConfig, board: CfbBoard, opts: LockEnt
      "No core ticket — …". Reading only `card.noPlay` dropped that note from `locked.note`, which is
      the line Josh reads under the card — so the day that staked $0 of the $150 said nothing about
      it. Widened to "no core ticket seated", which subsumes the no-play case. */
-  const detail = !missed && (card.noPlay || !card.core.length) ? card.notes[0] : null;
+  const detail = !missed && (card.noPlay || !card.core.length || isFullPaper(cfg.rules, board.date)) ? card.notes[0] : null;
   const entry: CfbLedgerEntry = {
     ...lockCfbCard(card, board, now, cfg),
     source: cfg.lockSource,
@@ -973,7 +976,7 @@ export function planTopUp(cfg: LeagueConfig, board: CfbBoard, entry: CfbLedgerEn
   if (!pricedAhead) return { tickets: [], stake: 0, fun: [], funStake: 0, games: {}, pricedAhead };
 
   const rest: CfbBoard = { ...board, games };
-  const card = buildCfbCard(rest, { bankroll: opts.bankroll, daily: opts.room, fun: cfg.paper.fun, now: opts.now, rules: cfg.rules, idPrefix: cfg.idPrefix });
+  const card = buildCfbCard(rest, { bankroll: opts.bankroll, daily: opts.room, fun: cfg.paper.fun, now: opts.now, rules: isFullPaper(cfg.rules, board.date) ? { ...cfg.rules, tickets: { ...cfg.rules.tickets, max: Math.min(cfg.rules.tickets.max, opts.slots) } } : cfg.rules, idPrefix: cfg.idPrefix });
   const byId = new Map(games.map((g) => [g.id, g]));
   const tickets: CfbTicket[] = [];
   const gmap: CfbLedgerEntry["games"] = {};

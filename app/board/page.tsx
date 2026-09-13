@@ -84,6 +84,40 @@ const CAT_LABELS: Record<string, string> = {
 };
 
 export default function BoardPage() {
+  const desk = useSport();
+  if (CFB_ENABLED && desk === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Board"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="Every playable side and player prop on the slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          action={<CfbRefreshPill />}
+        />
+        <CfbPicksBoard />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the same shared football board on the NFL desk handles — its own slate, ledger and bank. */
+  if (NFL_ENABLED && desk === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Board"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="Every playable side and player prop on the NFL slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          action={<NflRefreshPill />}
+        />
+        <NflPicksBoard />
+      </>
+    );
+  }
+  return <MlbBoardPage />;
+}
+function MlbBoardPage() {
   const { data: board, isPending, isError, refetch } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -1037,36 +1071,7 @@ export default function BoardPage() {
 
   /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
      board. Every hook above has already run, so this early return is hooks-safe. */
-  if (CFB_ENABLED && desk === "cfb") {
-    return (
-      <>
-        <PageHeader
-          title="Board"
-          eyebrow="College Football"
-          chip={<CfbChip />}
-          sub="Every playable side and player prop on the slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
-          action={<CfbRefreshPill />}
-        />
-        <CfbPicksBoard />
-      </>
-    );
-  }
 
-  /* NFL desk (2026-09-08): the same shared football board on the NFL desk handles — its own slate, ledger and bank. */
-  if (NFL_ENABLED && desk === "nfl") {
-    return (
-      <>
-        <PageHeader
-          title="Board"
-          eyebrow="National Football League"
-          chip={<NflChip />}
-          sub="Every playable side and player prop on the NFL slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
-          action={<NflRefreshPill />}
-        />
-        <NflPicksBoard />
-      </>
-    );
-  }
 
   return (
     <>

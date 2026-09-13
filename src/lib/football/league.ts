@@ -42,6 +42,9 @@ export type League = "cfb" | "nfl";
 export type LeaguePaper = { since: string; daily: number; fun: number };
 
 export type LeagueRules = {
+  /** Full-allocation Sunday paper experiment, effective on this Pacific slate date. */
+  sundayPaperSince?: string;
+  fullPaperSince?: string;
   minEvPct: number;
   maxLegs: number;
   maxDec: number;

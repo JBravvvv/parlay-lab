@@ -1,5 +1,6 @@
 "use client";
 
+import { useSport, setSport } from "@/lib/sport";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { EmptyState } from "@/components/ui/states";
@@ -12,6 +13,8 @@ import { CfbSeason } from "@/components/cfb/CfbSeason";
  * not read here). Both flags off → a plain notice, never a blank page.
  */
 export default function SeasonPage() {
+  const sport = useSport();
+  if (sport !== "cfb") return <><PageHeader title="Season Lab" sub="Season Lab currently supports college football."/><Panel><p className="text-sm text-muted">Season projections for {sport.toUpperCase()} are not available here.</p><button className="mt-3 rounded-xl border border-line-2 px-4 py-3 text-sm" onClick={() => setSport("cfb")}>Explore college football</button></Panel></>;
   const on = CFB_ENABLED && CFB_SEASON_ENABLED;
   return (
     <>

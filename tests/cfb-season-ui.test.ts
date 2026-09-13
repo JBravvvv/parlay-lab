@@ -3,7 +3,7 @@ import path from "node:path";
 import React, { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { stripComments } from "./helpers/source";
 import { addSeasonLeg, makeSeasonLeg, priceSeasonLeg, projectPlayerStat, type SeasonPlayer } from "@/lib/cfb/season";
 
@@ -16,6 +16,8 @@ import { addSeasonLeg, makeSeasonLeg, priceSeasonLeg, projectPlayerStat, type Se
  * freeze); no history-pushing navigation; the nav carries Season Lab in the CFB amber family;
  * the feature flag gates the page; and the builder adds a leg.
  */
+
+vi.mock("@/lib/sport", async orig => ({ ...await orig<typeof import("@/lib/sport")>(), useSport: () => "cfb" }));
 
 const ROOT = process.cwd();
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");

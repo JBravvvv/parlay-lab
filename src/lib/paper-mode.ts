@@ -13,6 +13,8 @@
 
 import { SHAPE_TICKETS } from "@/lib/core-shapes";
 
+export const PAPER_ACTION_SINCE = "2026-09-13";
+
 export const PAPER = {
   since: "2026-08-15",
   /** hypothetical core deployed every day, no matter what */

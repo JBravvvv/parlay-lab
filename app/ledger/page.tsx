@@ -301,8 +301,45 @@ function DayCard({ e }: { e: LedgerEntry }) {
 }
 
 export default function LedgerPage() {
-  const { api, refresh } = useLedger();
   const sport = useSport();
+  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
+     ledger — its own storage keys, its own sync route, never the MLB ledger. Every hook
+     above has already run, so this early return is hooks-safe. */
+  if (CFB_ENABLED && sport === "cfb") {
+    return (
+      <>
+        <PageHeader
+          title="Ledger"
+          eyebrow="College Football"
+          chip={<CfbChip />}
+          sub="Locked CFB paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
+          action={<CfbLedgerActions />}
+        />
+        <CfbLedger />
+      </>
+    );
+  }
+
+  /* NFL desk (2026-09-08): the shared football ledger on the NFL desk handles — pl_nfl_* keys, /api/nfl/ledger, never the MLB or CFB record. */
+  if (NFL_ENABLED && sport === "nfl") {
+    return (
+      <>
+        <PageHeader
+          title="Ledger"
+          eyebrow="National Football League"
+          chip={<NflChip />}
+          sub="Locked NFL paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
+          action={<NflLedgerActions />}
+        />
+        <NflLedger />
+      </>
+    );
+  }
+
+  return <MlbLedgerPage />;
+}
+function MlbLedgerPage() {
+  const { api, refresh } = useLedger();
   /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): the blended "all" view is gone —
      a combined net is exactly the number he ruled out. Core is the default; FUN is its
      own view, never folded in. */
@@ -443,40 +480,6 @@ export default function LedgerPage() {
     );
     void syncNow();
   };
-
-  /* CFB desk (2026-09-05): the global SportSwitch routes the page to the College Football
-     ledger — its own storage keys, its own sync route, never the MLB ledger. Every hook
-     above has already run, so this early return is hooks-safe. */
-  if (CFB_ENABLED && sport === "cfb") {
-    return (
-      <>
-        <PageHeader
-          title="Ledger"
-          eyebrow="College Football"
-          chip={<CfbChip />}
-          sub="Locked CFB paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
-          action={<CfbLedgerActions />}
-        />
-        <CfbLedger />
-      </>
-    );
-  }
-
-  /* NFL desk (2026-09-08): the shared football ledger on the NFL desk handles — pl_nfl_* keys, /api/nfl/ledger, never the MLB or CFB record. */
-  if (NFL_ENABLED && sport === "nfl") {
-    return (
-      <>
-        <PageHeader
-          title="Ledger"
-          eyebrow="National Football League"
-          chip={<NflChip />}
-          sub="Locked NFL paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
-          action={<NflLedgerActions />}
-        />
-        <NflLedger />
-      </>
-    );
-  }
 
   if (!api) return null;
   const empty = api.entries.length === 0;

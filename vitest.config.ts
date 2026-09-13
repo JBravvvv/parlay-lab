@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
     environment: "node",
     /* TZ PIN (2026-08-27): the armed baseline's propBoard hash embeds locale-rendered
        game times (toLocaleTimeString in the header strings), so the stored md5s are

@@ -30,6 +30,7 @@ export const NFL_PAPER = {
 } as const;
 
 export const NFL_RULES = {
+  sundayPaperSince: "2026-09-20",
   /** a core leg needs this % EV at Caesars */
   minEvPct: 2,
   maxLegs: 2,

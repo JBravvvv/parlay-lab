@@ -730,3 +730,7 @@ body::after {
 .gen-ticket-reveal { animation:parlay-reveal .28s ease-out both; }
 @keyframes parlay-reveal { from { opacity:.3; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion:reduce) { .gen-ticket-reveal { animation:none; } .gen-roll { transition:none; } .gen-roll:hover:not(:disabled),.gen-roll:active:not(:disabled) { transform:none; } }
+
+/* NFL typography: bright neutral text; blue remains the border/selection accent. */
+.text-nfl, .hero-price.is-nfl, .odds-grid.is-nfl .odds-cell-price { color: #edf4ff; }
+[class~="text-nfl/70"], [class~="text-nfl/80"] { color: #edf4ff; }

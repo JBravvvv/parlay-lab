@@ -1,4 +1,8 @@
 "use client";
+import { LeagueProvider } from "@/components/football/LeagueContext";
+import { FootballDashboard } from "@/components/football/FootballModelExplorer";
+import { NFL_DESK } from "@/lib/nfl/desk";
+import { CFB_DESK } from "@/lib/cfb/desk";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -269,6 +273,11 @@ function Hero() {
 }
 
 export default function DashboardPage() {
+  const sport = useSport();
+  if (sport !== "mlb") return <LeagueProvider key={sport} desk={sport === "nfl" ? NFL_DESK : CFB_DESK}><FootballDashboard /></LeagueProvider>;
+  return <MlbDashboard />;
+}
+function MlbDashboard() {
   const { api } = useLedger();
   const sync = useSyncState();
   // localStorage-backed data only exists on the client; render the SSR

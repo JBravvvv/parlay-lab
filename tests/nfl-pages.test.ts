@@ -75,7 +75,7 @@ describe("every page is wired to the NFL desk, below the CFB branch", () => {
   it("games: the NFL desk never spends an MLB games fetch", () => {
     const src = read("app/games/page.tsx");
     expect(src).toMatch(/const nflDesk = NFL_ENABLED && sport === "nfl";/);
-    expect(src).toMatch(/enabled: !cfbDesk && !nflDesk/);
+    expect(src).toMatch(/enabled: mounted && !cfbDesk && !nflDesk/);
   });
   it("props: ?nfl=1 flips the switch to NFL, beside the byte-identical ?cfb=1 lines", () => {
     const src = read("app/props/page.tsx");

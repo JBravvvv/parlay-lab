@@ -220,7 +220,7 @@ export function CfbTicketCard({
         <header className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${bucketCls}`}>
-              {fun ? "Favorites parlay" : "Core"}
+              {fun ? "Favorites parlay" : t.paperPolicy === "sunday-full-v1" ? "Core · Sunday paper" : t.paperPolicy === "full-core-v1" ? "Core · Full paper" : "Core"}
             </span>
             {tag && (
               <span className="rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted">

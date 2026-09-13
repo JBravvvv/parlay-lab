@@ -1,5 +1,10 @@
 "use client";
 
+import { useSport } from "@/lib/sport";
+import { LeagueProvider } from "@/components/football/LeagueContext";
+import { FootballModelExplorer } from "@/components/football/FootballModelExplorer";
+import { NFL_DESK } from "@/lib/nfl/desk";
+import { CFB_DESK } from "@/lib/cfb/desk";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -27,6 +32,12 @@ function teamNames(gkey: string, info?: Record<string, { away: string; home: str
 }
 
 export default function SimulatorPage() {
+  const sport = useSport();
+  if (sport !== "mlb") return <LeagueProvider key={sport} desk={sport === "nfl" ? NFL_DESK : CFB_DESK}><FootballModelExplorer /></LeagueProvider>;
+  return <MlbSimulator />;
+}
+
+function MlbSimulator() {
   const { data: board } = useBoard();
   const regen = useRegenerateBoard();
   const sims = useMemo<Record<string, Sim>>(() => {
