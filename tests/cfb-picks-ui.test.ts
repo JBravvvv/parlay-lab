@@ -204,7 +204,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(board).toMatch(/const SHOW_CAP = 50;/);
     expect(section).toMatch(/\{shown\.slice\(0, Math\.min\(phoneShown, SHOW_CAP\)\)\.map\(\(t, i\) => \(\n\s*<CfbParlayFeature key=\{t\.id\} t=\{t\} rank=\{i \+ 1\} live=\{cat === "live"\} \/>/);
     expect(section).toMatch(/\{shown\.slice\(0, SHOW_CAP\)\.map\(\(t, i\) => \(\n\s*<CfbParlayCard key=\{t\.id\} t=\{t\} games=\{games\} rank=\{i \+ 1\} \/>/);
-    expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV\./);
+    expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV, with player exposure limits\./);
   });
   describe("INSTRUCTION 42 (2026-09-05, review fix): one layout mounted, chunked carousel, top-rank sheen, per-leg LIVE", () => {
     const feature = board.slice(board.indexOf("export function CfbParlayFeature"), board.indexOf("export function CfbParlayCard"));
@@ -340,7 +340,7 @@ describe("CFB Board — INSTRUCTION 43 (2026-09-05): tickets past the leg gate a
     );
     expect(section).toMatch(/the set extends to Caesars-priced legs down to EV ≥ \$\{CFB_PARLAYS\.setFloorEvPct\}% \(tagged EDGE −\)/);
     // the pinned blurb tail survives
-    expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV\./);
+    expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV, with player exposure limits\./);
   });
   it("every single-market blurb reads its leg count off setBandOf; anytime TD also prints its price band as American odds — no literal 2–6", () => {
     expect(board).toMatch(/import \{ buildCfbPicks, CFB_PICK_CATEGORIES, setBandOf \} from "@\/lib\/cfb\/picks"/);

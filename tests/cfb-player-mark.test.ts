@@ -47,11 +47,12 @@ describe("PlayerMark — headshot disc with the player's own team logo as the ba
     expect(out).toContain('role="img"');
     expect(out).toContain('title="Ty Simpson · QB · ALA"');
   });
-  it("no headshot → initials in the team colour, badge still the team logo", () => {
+  it("no headshot → full-size team logo, badge retained", () => {
     const out = html(createElement(PlayerMark, { player: "Ty Simpson", headshot: null, team: ALA, size: "sm" }));
-    expect(out).toContain(">TS<");
-    expect(count(out, /<img /g)).toBe(1); // only the badge
-    expect(out).toContain("#9e1b32");
+    expect(out).not.toContain(">TS<");
+    expect(count(out, /<img /g)).toBe(2); // full-size logo and badge
+    expect(out).toContain(ALA.logo as string);
+    expect(html(createElement(PlayerMark, { player: "Ty Simpson", headshot: null, team: null }))).toContain(">TS<");
   });
   it("no team → initials on the surface tone and no badge; no player → a plain TeamMark; neither → nothing", () => {
     const noTeam = html(createElement(PlayerMark, { player: "Ryan Williams", headshot: HEADSHOT, team: null }));

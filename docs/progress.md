@@ -1,3 +1,9 @@
+## 2026-09-13 — Generated ticket history, Board diversity and image recovery
+
+Instruction 57: Previous/Next preserves exact generated tickets and settings through the current mounted session without a fixed depth limit. Regenerate after going back starts a new branch. Slip undo remains separate; recalled tickets disclose saved quotes. Board football sets now penalize repeated player exposure and cap a player at one third of requested slots (rounded up); category longshot subsets are checked separately. Rotated fill orders supply alternatives and thin pools return fewer tickets. The Board displays the most repeated player in the current filter. Roster metadata loads when the football generator opens and supplies verified headshot/team identity; marks fall back from headshot to team logo, then initials if imagery is unavailable. Failed image state follows the URL so later players recover.
+
+Validation: browser fixture at 390×844 restored eight generations backward and forward exactly; new branch disabled Next; all four logo fallbacks loaded; document width equaled viewport. Pure regression covers 20-step snapshot recovery, repeated Zonovan Knight exposure, thin pools and scoped image identity. Final release gate: TypeScript clean; 3,227/3,227 tests in 203 files, 291.90s. The 68-game composer benchmark passed after incremental exposure updates replaced repeated scoring allocations. Deployment facts are recorded after verification in the dated review artifact.
+
 ## Mobile generator and position filters — 2026-09-12
 
 **INSTRUCTION 56 — Josh: "the parlay generator needs to be smaller on iOS mobile 'app'" and "if i want a 4 team parlay with WR & RB I can check those 2 and only have those two positions in the generated picks".**

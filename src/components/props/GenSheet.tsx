@@ -351,6 +351,7 @@ export function GenSheet<P>({
   onSpec,
   result,
   onGenerate,
+  onBack, onForward, canBack = false, canForward = false, historyNotice,
   onTogglePin,
   onAdd,
   canUndo,
@@ -385,6 +386,11 @@ export function GenSheet<P>({
   onSpec: (patch: Partial<GenSpec>) => void;
   result: GenResult<P>;
   onGenerate: () => void;
+  onBack?: () => void;
+  onForward?: () => void;
+  canBack?: boolean;
+  canForward?: boolean;
+  historyNotice?: string | null;
   onTogglePin: (slot: number) => void;
   onAdd: () => void;
   onSaveSetup?: () => void;
@@ -736,6 +742,11 @@ export function GenSheet<P>({
               Add to slip
             </button>
           </div>
+          {onBack && <div className="flex items-center gap-2">
+            <button type="button" onClick={onBack} disabled={!canBack || loading} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold disabled:opacity-35">← Previous parlay</button>
+            <button type="button" onClick={onForward} disabled={!canForward || loading} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold disabled:opacity-35">Next parlay →</button>
+          </div>}
+          {historyNotice && <p role="status" className="text-[10px] text-muted">{historyNotice}</p>}
           {!loading && relax && (
             <button type="button" onClick={() => onSpec(relax.patch)} className="press min-h-11 w-full rounded-[12px] border border-gold/40 bg-gold/10 px-3 py-2 text-[12px] font-semibold text-gold">
               {relax.label}
@@ -833,7 +844,7 @@ export function GenSheet<P>({
                     {marketLabel} is suspended from the engine&apos;s own auto-built tickets; this sandbox spins it anyway.{" "}
                   </>
                 )}
-                Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""} — tap Regenerate for another
+                {historyNotice ? "Prices are saved with this ticket" : <>Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""}</>} — tap Regenerate for another
                 spin, not for a fresher price. Sandbox · not tracked, never enters the ledger.
               </details>
             </div>

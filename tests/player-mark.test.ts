@@ -39,15 +39,16 @@ describe("PlayerMark — headshot disc with the player's own team logo as the ba
     expect(out).toContain('title="Yordan Alvarez · HOU"');
   });
 
-  it("no headshot → initials, badge still the team logo (the server-render path)", () => {
+  it("no headshot → full-size team logo, badge retained (the server-render path)", () => {
     const out = html(createElement(PlayerMark, { player: "Yordan Alvarez", headshot: null, team: "HOU", size: "sm" }));
-    expect(out).toContain(">YA<");
-    expect(count(out, /<img /g)).toBe(1); // only the badge
+    expect(out).not.toContain(">YA<");
+    expect(count(out, /<img /g)).toBe(2); // full-size logo and badge
     expect(out).toContain(teamLogo("hou"));
     // the headshot map a server render actually gets is {} — a missing key must read the same way
     const undef = html(createElement(PlayerMark, { player: "Yordan Alvarez", headshot: undefined, team: "HOU" }));
-    expect(undef).toContain(">YA<");
-    expect(count(undef, /<img /g)).toBe(1);
+    expect(undef).toContain(teamLogo("hou"));
+    expect(count(undef, /<img /g)).toBe(2);
+    expect(html(createElement(PlayerMark, { player: "Yordan Alvarez", headshot: null, team: null }))).toContain(">YA<");
   });
 
   it("no team → initials and NO badge; no player → the club mark alone; neither → nothing", () => {

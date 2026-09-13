@@ -77,8 +77,8 @@ export function PlayerMark({
   className?: string;
   style?: CSSProperties;
 }) {
-  const [broken, setBroken] = useState(false);
-  const [badgeBroken, setBadgeBroken] = useState(false);
+  const [broken, setBroken] = useState<string | null>(null);
+  const [badgeBroken, setBadgeBroken] = useState<string | null>(null);
   const px = PX[size];
   const badgePx = LOGO_BADGE_PX[size];
   const name = (player ?? "").trim();
@@ -100,7 +100,7 @@ export function PlayerMark({
         className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/[0.08] ${className}`}
         style={{ width: px, height: px, ...style }}
       >
-        {logo && !badgeBroken ? (
+        {logo && badgeBroken !== logo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={logo}
@@ -110,7 +110,7 @@ export function PlayerMark({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            onError={() => setBadgeBroken(true)}
+            onError={() => setBadgeBroken(logo)}
             className="h-[78%] w-[78%] object-contain"
           />
         ) : (
@@ -120,7 +120,7 @@ export function PlayerMark({
     );
   }
 
-  const usePhoto = !!headshot && !broken;
+  const usePhoto = !!headshot && broken !== headshot;
 
   return (
     <span className={`inline-flex shrink-0 items-center ${className}`} style={style}>
@@ -142,9 +142,12 @@ export function PlayerMark({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            onError={() => setBroken(true)}
+            onError={() => setBroken(headshot ?? null)}
             className="h-full w-full rounded-full object-cover object-top"
           />
+        ) : logo && badgeBroken !== logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} alt="" width={px} height={px} onError={() => setBadgeBroken(logo)} className="h-[82%] w-[82%] object-contain" />
         ) : (
           <span
             aria-hidden
@@ -160,7 +163,7 @@ export function PlayerMark({
             className="absolute -left-1 -top-1 flex items-center justify-center rounded-full bg-[#101215] ring-1 ring-white/[0.12] shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]"
             style={{ width: badgePx, height: badgePx }}
           >
-            {logo && !badgeBroken ? (
+            {logo && badgeBroken !== logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logo}
@@ -170,7 +173,7 @@ export function PlayerMark({
                 loading="lazy"
                 decoding="async"
                 referrerPolicy="no-referrer"
-                onError={() => setBadgeBroken(true)}
+                onError={() => setBadgeBroken(logo)}
                 className="h-[80%] w-[80%] object-contain"
               />
             ) : (

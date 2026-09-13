@@ -2,7 +2,7 @@ import { playerSlug } from "@/lib/cfb/props";
 
 export const FOOTBALL_POSITIONS = ["QB", "RB", "WR", "TE", "FB"] as const;
 export type FootballPosition = (typeof FOOTBALL_POSITIONS)[number];
-export type RosterPosition = { athleteId: string; player: string; teamId: string; position: FootballPosition };
+export type RosterPosition = { athleteId: string; player: string; teamId: string; position: FootballPosition; headshot?: string };
 export type PositionFeed = { players: RosterPosition[]; missingTeams: string[] };
 
 export function footballPosition(value: unknown): FootballPosition | null {
@@ -14,25 +14,30 @@ export function footballPosition(value: unknown): FootballPosition | null {
 
 /** ESPN's current roster, scoped to the requested team. No inferred positions. */
 export function rosterPositions(json: unknown, teamId: string): RosterPosition[] {
-  const data = json as { team?: { id?: unknown }; athletes?: { items?: { id?: unknown; displayName?: unknown; position?: { abbreviation?: unknown } }[] }[] } | null;
+  const data = json as { team?: { id?: unknown }; athletes?: { items?: { id?: unknown; displayName?: unknown; headshot?: { href?: unknown }; position?: { abbreviation?: unknown } }[] }[] } | null;
   if (!data || String(data.team?.id) !== teamId || !Array.isArray(data.athletes)) return [];
   return data.athletes.flatMap((group) => (Array.isArray(group.items) ? group.items : []).flatMap((p) => {
     const position = footballPosition(p.position?.abbreviation);
     return position && typeof p.displayName === "string" && p.id != null
-      ? [{ athleteId: String(p.id), player: p.displayName, teamId, position }] : [];
+      ? [{ athleteId: String(p.id), player: p.displayName, teamId, position, ...(typeof p.headshot?.href === "string" && /^https:\/\//.test(p.headshot.href) ? { headshot: p.headshot.href } : {}) }] : [];
   }));
 }
 
 /** Match only within the two teams in this game; ambiguous names stay unknown. */
-export function positionLookup(players: readonly RosterPosition[]) {
+export function rosterLookup(players: readonly RosterPosition[]) {
   const byName = new Map<string, RosterPosition[]>();
   for (const p of players) {
     const key = playerSlug(p.player);
     byName.set(key, [...(byName.get(key) ?? []), p]);
   }
-  return (name: string, teamIds: readonly string[]): FootballPosition | null => {
+  return (name: string, teamIds: readonly string[]): RosterPosition | null => {
     const matches = (byName.get(playerSlug(name)) ?? []).filter((p) => teamIds.includes(p.teamId));
     const ids = new Set(matches.map((p) => p.athleteId));
-    return ids.size === 1 && new Set(matches.map((p) => p.position)).size === 1 ? matches[0].position : null;
+    return ids.size === 1 && new Set(matches.map((p) => p.teamId)).size === 1 && new Set(matches.map((p) => p.position)).size === 1 ? matches[0] : null;
   };
+}
+
+export function positionLookup(players: readonly RosterPosition[]) {
+  const lookup = rosterLookup(players);
+  return (name: string, teamIds: readonly string[]) => lookup(name, teamIds)?.position ?? null;
 }

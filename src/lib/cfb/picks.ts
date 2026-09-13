@@ -340,30 +340,55 @@ function combos(pool: Leg[], maxLegs: number, maxDec: number, R: Knobs): Draft[]
     keeps the incoming EV order), take one from every bucket in turn until `cap`, then rank the
     chosen tickets by EV then probability. Without the round-robin a slate of +EV legs would
     fill all fifty slots with six-leggers, since every extra +EV leg raises the ticket's EV. */
+/** Exposure is shared across markets/lines for the same player. Never fill a Board set
+ * with copies of one player's outcome just to hit the requested ticket count. */
 function spread(drafts: Draft[], cap: number): Draft[] {
-  const seen = new Set<string>();
-  const buckets = new Map<number, Draft[]>();
-  for (const d of drafts) {
-    if (seen.has(d.key)) continue;
-    seen.add(d.key);
-    const b = buckets.get(d.legs.length);
-    if (b) b.push(d);
-    else buckets.set(d.legs.length, [d]);
+  return exposureSpread(drafts, cap).sort(draftByEv);
+}
+
+export function exposureSpread<T extends { key: string; legs: { player?: string | null; rowKey: string }[] }>(drafts: T[], cap: number): T[] {
+  const unique = [...new Map(drafts.map((d) => [d.key, d])).values()];
+  const candidates = unique.map((draft) => ({
+    draft,
+    players: [...new Set(draft.legs.filter((l) => l.player).map((l) => playerKey(l.player)))],
+    penalty: 0,
+    blocked: false,
+  }));
+  const byPlayer = new Map<string, typeof candidates>();
+  for (const candidate of candidates) for (const player of candidate.players) {
+    const entries = byPlayer.get(player);
+    if (entries) entries.push(candidate);
+    else byPlayer.set(player, [candidate]);
   }
-  const counts = [...buckets.keys()].sort((a, b) => a - b);
-  const out: Draft[] = [];
-  for (let i = 0; out.length < cap; i++) {
-    let any = false;
-    for (const c of counts) {
-      const b = buckets.get(c)!;
-      if (i >= b.length) continue;
-      out.push(b[i]);
-      any = true;
-      if (out.length >= cap) break;
+  const exposure = new Map<string, number>();
+  const sizes = new Map<number, number>();
+  const limit = Math.max(1, Math.ceil(cap / 3));
+  const out: T[] = [];
+  while (out.length < cap) {
+    let best: (typeof candidates)[number] | undefined;
+    let bestScore = Infinity;
+    for (const candidate of candidates) {
+      if (candidate.blocked) continue;
+      const score = (sizes.get(candidate.draft.legs.length) ?? 0) * 1000 + candidate.penalty;
+      if (score < bestScore) { best = candidate; bestScore = score; }
     }
-    if (!any) break;
+    if (!best) break;
+    best.blocked = true;
+    out.push(best.draft);
+    const n = best.draft.legs.length;
+    sizes.set(n, (sizes.get(n) ?? 0) + 1);
+    // Update only tickets containing the selected players. No repeated key parsing or
+    // per-candidate array allocation in the selection loop on large college slates.
+    for (const player of best.players) {
+      const previous = exposure.get(player) ?? 0;
+      exposure.set(player, previous + 1);
+      for (const candidate of byPlayer.get(player)!) {
+        candidate.penalty += 2 * previous + 1;
+        if (previous + 1 >= limit) candidate.blocked = true;
+      }
+    }
   }
-  return out.sort(draftByEv);
+  return out;
 }
 
 /** The tiered ranking (2026-09-05): every-leg-tier-1 (`gated`) tickets first — spread across leg
@@ -380,7 +405,8 @@ function tieredSpread(drafts: Draft[], cap: number): Draft[] {
     drafts.filter((d) => !d.gated).sort(draftByEv),
     cap - gated.length,
   );
-  return [...gated, ...rest];
+  const chosen = exposureSpread([...gated, ...rest], cap);
+  return [...chosen.filter((d) => d.gated).sort(draftByEv), ...chosen.filter((d) => !d.gated).sort(draftByEv)];
 }
 
 /** Bounded exhaustive walk over `pool` in its own order: every in-band combination that respects
@@ -462,7 +488,6 @@ function finish(d: Draft, view: CfbParlayView, tier: CfbParlayTier, category: Cf
 }
 
 const SAFER_POOL = 12;
-const SEED_POOL = 24;
 const MIX_SEEDS = 8;
 
 /* ---------- INSTRUCTION 42 category sets ---------- */
@@ -542,9 +567,12 @@ function pairedSet(a: Leg[], b: Leg[], pool: Leg[], band: Band, maxPerGame: numb
     for (const y of b.slice(0, PAIR_SEEDS)) {
       if (!legFits(y, [x], maxPerGame) || x.dec * y.dec > band.maxDec) continue;
       const seed = [x, y];
+      const offset = Math.max(pool.indexOf(x), pool.indexOf(y)) + 1;
+      const rotated = [...pool.slice(offset), ...pool.slice(0, offset)];
       for (let n = Math.max(2, band.legs.min); n <= band.legs.max; n++) {
         pushDraft(out, fillTo(seed, pool, n, band.maxDec, maxPerGame, 0), band, R);
         pushDraft(out, fillTo(seed, byE, n, band.maxDec, maxPerGame, 0), band, R);
+        pushDraft(out, fillTo(seed, rotated, n, band.maxDec, maxPerGame, 0), band, R);
       }
     }
   }
@@ -660,12 +688,12 @@ export function buildCfbPicks(
   push(safer, "SAFER", "parlays", parlays);
 
   // LONGSHOT — sides + props, each candidate starts on a different leg, filled likeliest-first, by EV
-  const longshotSeeds = upcoming.slice(0, SEED_POOL);
-  const longshot = distinct(
-    longshotSeeds.map((seed) => fill([seed], upcoming, R.longshot, R)).filter((d): d is Draft => d != null).sort(draftByEv),
+  const longshotSeeds = upcoming.slice(0, SET_SEEDS);
+  const longshot = exposureSpread(
+    longshotSeeds.flatMap((seed, i) => [fill([seed], upcoming, R.longshot, R), fill([seed], [...upcoming.slice(i + 1), ...upcoming.slice(0, i)], R.longshot, R)]).filter((d): d is Draft => d != null).sort(draftByEv),
     R.perView,
   );
-  push(longshot, "LONGSHOT", "parlays", parlays);
+  push(longshot.sort(draftByEv), "LONGSHOT", "parlays", parlays);
 
   // MIX — one side + one prop seeded, filled likeliest-first inside the mix band, by EV
   const mixDrafts: Draft[] = [];
@@ -691,7 +719,10 @@ export function buildCfbPicks(
     const view: CfbParlayView = category === "mixed" ? "mixed" : category === "live" ? "live" : "parlays";
     const list: CfbParlay[] = [];
     let i = 0;
-    for (const d of pick(drafts.filter((d) => !taken.has(d.key)), R.perCategory)) {
+    const selected = pick(drafts.filter((d) => !taken.has(d.key)), R.perCategory);
+    const longshots = selected.filter((d) => tierOf(d, R) === "LONGSHOT");
+    const diverseLongshots = new Set(exposureSpread(longshots, longshots.length).map((d) => d.key));
+    for (const d of selected.filter((d) => tierOf(d, R) !== "LONGSHOT" || diverseLongshots.has(d.key))) {
       i++;
       taken.add(d.key);
       list.push(finish(d, view, tierOf(d, R), category, `${SET_LABEL[category]} · ${d.legs.length} legs`, `${idPrefix}-${board.date}-${category}-${i}`));

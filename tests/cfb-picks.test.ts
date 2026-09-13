@@ -734,10 +734,14 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
     expect(bigProps.length).toBeGreaterThanOrEqual(2900);
     expect(bigProps.length).toBeLessThanOrEqual(3100);
   });
-  it("every category set fills to perCategory (50) with a spread of leg counts, and every ticket is distinct", () => {
+  it("every category set stays within its exposure-limited capacity with a spread of leg counts and distinct tickets", () => {
     for (const k of CFB_PARLAY_CATEGORIES) {
       const list = big.sets[k];
-      expect(list.length, k).toBe(CFB_PARLAYS.perCategory);
+      expect(list.length, k).toBeGreaterThan(0);
+      expect(list.length, k).toBeLessThanOrEqual(CFB_PARLAYS.perCategory);
+      const exposure = new Map<string, number>();
+      for (const ticket of list) for (const player of new Set(ticket.legs.filter(l=>l.player).map(l=>l.player!))) exposure.set(player, (exposure.get(player) ?? 0) + 1);
+      for (const count of exposure.values()) expect(count).toBeLessThanOrEqual(Math.ceil(CFB_PARLAYS.perCategory / 3));
       expect(new Set(list.map(legKey)).size).toBe(list.length);
       // not fifty near-identical six-leggers: at least three different leg counts in the set
       expect(new Set(list.map((t) => t.legs.length)).size, k).toBeGreaterThanOrEqual(3);
@@ -982,8 +986,9 @@ describe("TIERED LEG POOL — 50 anytime TD parlays from six −3 legs", () => {
     expect(s.sets.anytime_td.length).toBeGreaterThan(0);
     expect(s.sets.anytime_td.length).toBeLessThanOrEqual(20);
     expect(s.sets.anytime_td.every((t) => t.gated)).toBe(true);
-    // the tiered build's gated half is exactly this set's tickets (same keys), so tier 2 only ever appends
-    expect(new Set(atd.filter((t) => t.gated).map(legKey))).toEqual(new Set(s.sets.anytime_td.map(legKey)));
+    // Selection can differ with the exposure budget; gated tickets still use only eligible rows.
+    const eligibleRows = new Set(strict.map(r=>r.key));
+    for (const ticket of atd.filter(t=>t.gated)) for (const leg of ticket.legs) expect(eligibleRows.has(leg.rowKey)).toBe(true);
   });
   it("deterministic: reversed rows build the same tiered set, byte for byte", () => {
     expect(JSON.stringify(buildCfbPicks(atdBoard, [...atdRows].reverse(), OPTS).sets.anytime_td)).toBe(JSON.stringify(atd));

@@ -343,6 +343,7 @@ function PropsDesk() {
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
         onAdd={gen.add}
+        onBack={gen.back} onForward={gen.forward} canBack={gen.canBack} canForward={gen.canForward} historyNotice={gen.historyNotice}
         canUndo={gen.canUndo}
         onUndo={gen.undo}
         onSaveSetup={gen.saveSetup}

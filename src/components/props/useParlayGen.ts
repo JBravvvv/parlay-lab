@@ -1,5 +1,6 @@
 "use client";
 
+import { moveParlayHistory } from "@/lib/parlay-history";
 import { decodeSetup, encodeSetup } from "@/lib/parlay-gen-setup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -57,6 +58,11 @@ export type UseParlayGen<P> = {
   togglePin: (slot: number) => void;
   /** Regenerate — remembers this ticket so the next spin moves */
   spin: () => void;
+  back: () => void;
+  forward: () => void;
+  canBack: boolean;
+  canForward: boolean;
+  historyNotice: string | null;
   /** put the generated legs on the slip, remembering what was there */
   add: () => void;
   undo: () => void;
@@ -148,10 +154,17 @@ export function useParlayGen<P>({
   };
   const loadSetup = () => {
     if (!savedSetup) return;
+    leaveRecall();
     onMarket(savedSetup.market);
     setSpec(savedSetup);
     setSetupNotice("Saved setup loaded. Pins cleared; picks use the current board.");
   };
+  type Snapshot = { spec: GenSpec; result: GenResult<P> };
+  const past = useRef<Snapshot[]>([]);
+  const future = useRef<Snapshot[]>([]);
+  const [, refreshHistory] = useState(0);
+  const [recalled, setRecalled] = useState<Snapshot | null>(null);
+  const leaveRecall = () => { setRecalled(null); future.current = []; };
   const [roll, setRoll] = useState(0);
   const [added, setAdded] = useState(false);
   /* 0 on the server, so a server render marks NO game as started; set once on mount, never on
@@ -173,7 +186,7 @@ export function useParlayGen<P>({
      `no-rows` at no cost. */
   const poolSpec = useMemo(() => ({ market: spec.market, includeStarted: spec.includeStarted }), [spec.market, spec.includeStarted]);
   const pool = useMemo(() => (open ? build(poolSpec, nowMs) : emptyPool<P>()), [open, build, poolSpec, nowMs]);
-  const result = useMemo<GenResult<P>>(
+  const generated = useMemo<GenResult<P>>(
     () =>
       open
         ? generate(pool, spec, specSeed(spec, boardKey, roll), new Set(history.current), playerExposure(recentPlayers.current))
@@ -181,16 +194,36 @@ export function useParlayGen<P>({
     [open, pool, spec, roll, boardKey],
   );
 
+  const result = recalled?.result ?? generated;
+  const remember = () => { if (result.ok) past.current.push({ spec, result }); };
+  const navigate = (direction: "back" | "forward") => {
+    const from = direction === "back" ? past.current : future.current;
+    const to = direction === "back" ? future.current : past.current;
+    const snapshot = moveParlayHistory(from, to, { spec, result });
+    if (!snapshot) return;
+    setSpec(snapshot.spec);
+    onMarket(snapshot.spec.market);
+    setRecalled(snapshot);
+    setSetupNotice(null);
+  };
+  useEffect(() => {
+    past.current = []; future.current = []; setRecalled(null);
+    refreshHistory((revision) => revision + 1);
+  }, [boardKey, storageKey]);
+
   /* ONE market state: the RAIL owns it. A category tap inside the sheet moves the rail, and
      this effect copies the rail's market back into the spec, so the two cannot disagree.
      Pins are leg ids and a leg id is market-specific — changing market clears them rather
      than leaving pins that could only ever come back as "pin-missing". */
   useEffect(() => {
     if (!railMarket || !marketKeys.includes(railMarket)) return;
+    if (railMarket !== spec.market) leaveRecall();
     setSpec((sp) => (sp.market === railMarket ? sp : { ...sp, market: railMarket, pinned: blankPins(sp.legs) }));
   }, [railMarket, marketKeys]);
 
   const patchSpec = (patch: Partial<GenSpec>) => {
+    remember();
+    leaveRecall();
     setSetupNotice(null);
     if (patch.market && patch.market !== spec.market) {
       onMarket(patch.market);
@@ -209,6 +242,7 @@ export function useParlayGen<P>({
      Clearing a pin reads the id from the SPEC, which is always available; only SETTING a new
      pin needs a ticket. */
   const togglePin = (slot: number) => {
+    leaveRecall();
     setSetupNotice(null);
     setSpec((sp) => {
       const pinned = Array.from({ length: sp.legs }, (_, k) => sp.pinned[k] ?? null);
@@ -225,6 +259,8 @@ export function useParlayGen<P>({
   };
 
   const spin = () => {
+    remember();
+    leaveRecall();
     setSetupNotice(null);
     if (result.ok) {
       recentPlayers.current = [result.ticket.legs.map((l) => l.playerKey), ...recentPlayers.current].slice(0, 4);
@@ -260,6 +296,9 @@ export function useParlayGen<P>({
     result,
     togglePin,
     spin,
+    back: () => navigate("back"), forward: () => navigate("forward"),
+    canBack: past.current.length > 0, canForward: future.current.length > 0,
+    historyNotice: recalled ? "Previous ticket · saved quotes, not refreshed. Regenerate to use the current board." : null,
     add,
     undo,
     canUndo: added && prevLegs.current != null,

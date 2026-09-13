@@ -90,11 +90,11 @@ export function TeamMark({
   className?: string;
   style?: CSSProperties;
 }) {
-  const [broken, setBroken] = useState(false);
+  const [broken, setBroken] = useState<string | null>(null);
   const px = PX[size];
   const hex = teamHex(team.color);
   const name = team.name ?? team.short ?? team.abbr;
-  const useLogo = !!team.logo && !broken;
+  const useLogo = !!team.logo && broken !== team.logo;
   const rank = showRank && team.rank != null ? team.rank : null;
 
   return (
@@ -115,7 +115,7 @@ export function TeamMark({
             height={px}
             loading="lazy"
             decoding="async"
-            onError={() => setBroken(true)}
+            onError={() => setBroken(team.logo)}
             className="h-[82%] w-[82%] object-contain"
           />
         ) : (
@@ -164,8 +164,8 @@ export function PlayerMark({
   className?: string;
   style?: CSSProperties;
 }) {
-  const [broken, setBroken] = useState(false);
-  const [badgeBroken, setBadgeBroken] = useState(false);
+  const [broken, setBroken] = useState<string | null>(null);
+  const [badgeBroken, setBadgeBroken] = useState<string | null>(null);
   const px = PX[size];
   const name = (player ?? "").trim();
   if (!name) {
@@ -173,10 +173,10 @@ export function PlayerMark({
     return <TeamMark team={team} size={size} showAbbr={false} className={className} style={style} />;
   }
   const hex = teamHex(team?.color);
-  const usePhoto = !!headshot && !broken;
+  const usePhoto = !!headshot && broken !== headshot;
   const badgePx = LOGO_BADGE_PX[size];
   const title = [name, pos, team?.abbr].filter(Boolean).join(" · ");
-  const useBadgeLogo = !!team?.logo && !badgeBroken;
+  const useBadgeLogo = !!team?.logo && badgeBroken !== team.logo;
 
   return (
     <span className={`inline-flex shrink-0 items-center ${className}`} style={style}>
@@ -197,9 +197,12 @@ export function PlayerMark({
             height={px}
             loading="lazy"
             decoding="async"
-            onError={() => setBroken(true)}
+            onError={() => setBroken(headshot ?? null)}
             className="h-full w-full rounded-full object-cover object-top"
           />
+        ) : team?.logo && useBadgeLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={team.logo} alt="" width={px} height={px} onError={() => setBadgeBroken(team?.logo ?? null)} className="h-[82%] w-[82%] object-contain" />
         ) : (
           <span
             aria-hidden
@@ -225,7 +228,7 @@ export function PlayerMark({
                 height={badgePx}
                 loading="lazy"
                 decoding="async"
-                onError={() => setBadgeBroken(true)}
+                onError={() => setBadgeBroken(team?.logo ?? null)}
                 className="h-[80%] w-[80%] object-contain"
               />
             ) : (

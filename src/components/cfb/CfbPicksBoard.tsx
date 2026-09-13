@@ -811,6 +811,12 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const match = (t: CfbParlay, f: string) => (f === "all" ? true : f === "SAFER" || f === "LONGSHOT" || f === "MIX" ? t.tier === f : t.type === f);
   const active = filters.some(([k]) => k === filter) ? filter : "all";
   const shown = all.filter((t) => match(t, active));
+  const playerExposure = new Map<string, { name: string; count: number }>();
+  for (const ticket of shown) for (const name of new Set(ticket.legs.map((l) => l.player).filter((p): p is string => !!p))) {
+    const key = name.trim().toLowerCase();
+    playerExposure.set(key, { name, count: (playerExposure.get(key)?.count ?? 0) + 1 });
+  }
+  const mostRepeated = [...playerExposure.values()].sort((a, b) => b.count - a.count)[0];
   /** INSTRUCTION 43: tickets in this set built past the −3 leg gate (single-market sets only; the builder ranks them last) */
   const openN = all.filter((t) => !t.gated).length;
 
@@ -861,7 +867,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           })}
         </div>
         <div className="mb-3 text-[11px] text-muted">
-          {meta.blurb} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV.</span>
+          {meta.blurb} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
           {openN > 0 && (
             <span className="text-faint" data-testid="cfb-parlay-open-note">
               {" "}
@@ -870,6 +876,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           )}
         </div>
 
+        {mostRepeated && <p className="mb-3 text-[11px] text-muted" role="status">Most repeated: {mostRepeated.name} · {mostRepeated.count}/{shown.length} displayed tickets. Shared players can lose several tickets together.</p>}
         {all.length === 0 ? (
           <Panel>
             <EmptyState title={empty.title} body={empty.body} />

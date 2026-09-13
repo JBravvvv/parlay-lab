@@ -22,7 +22,7 @@ import { kickoffLabel } from "@/lib/cfb/dates";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
 import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
-import { FOOTBALL_POSITIONS, footballPosition, positionLookup } from "@/lib/football/positions";
+import { FOOTBALL_POSITIONS, footballPosition, positionLookup, rosterLookup } from "@/lib/football/positions";
 import { loadPositionFeed } from "@/lib/football/positions-client";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
@@ -789,7 +789,7 @@ export function CfbProps() {
 
   const board = propsQ.data;
   const rosterTeams = useMemo(() => {
-    const needsPosition = new Set((board?.rows ?? []).filter((r) => !footballPosition(r.pos)).map((r) => r.gameId));
+    const needsPosition = new Set((board?.rows ?? []).filter((r) => !footballPosition(r.pos) || !r.headshot || !r.teamId).map((r) => r.gameId));
     return [...new Set(games.filter((g) => needsPosition.has(g.id) && g.status !== "final" && g.status !== "postponed").flatMap((g) => [g.home.id, g.away.id]))].sort().join(",");
   }, [board, games]);
   const positionsQ = useQuery({
@@ -799,6 +799,7 @@ export function CfbProps() {
     staleTime: (q) => q.state.data?.missingTeams.length ? 60_000 : 3_600_000,
     retry: 1,
   });
+  const rosterPlayer = useMemo(() => rosterLookup(positionsQ.data?.players ?? []), [positionsQ.data]);
   const rosterPosition = useMemo(() => positionLookup(positionsQ.data?.players ?? []), [positionsQ.data]);
   const positionOf = useCallback((row: CfbPropRow) => {
     const game = gameById.get(row.gameId);
@@ -838,11 +839,13 @@ export function CfbProps() {
           /* the SAME team resolution PropGameGroup uses — by the row's teamId against the slate
              game, never by name — so a generated leg reaches the slip with the identical mark */
           const g = gameById.get(row.gameId);
-          const team = g && row.teamId ? (row.teamId === g.home.id ? g.home : row.teamId === g.away.id ? g.away : null) : null;
-          return { ...leg, team, pos: positionOf(row) };
+          const player = g ? rosterPlayer(row.player, row.teamId ? [row.teamId] : [g.home.id, g.away.id]) : null;
+          const teamId = row.teamId ?? player?.teamId;
+          const team = g && teamId ? (teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null) : null;
+          return { ...leg, team, headshot: row.headshot ?? player?.headshot ?? null, pos: positionOf(row) };
         },
       }),
-    [board, mode, gameById, positionOf],
+    [board, mode, gameById, positionOf, rosterPlayer],
   );
   const gen = useParlayGen<CfbSlipLeg>({
     /* derived from the league, never a literal: one desk's remembered state must not be the
@@ -866,7 +869,7 @@ export function CfbProps() {
     },
   });
   const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
-  useEffect(() => setLoadRosterPositions(!!gen.spec.positions?.length), [gen.spec.positions]);
+  useEffect(() => setLoadRosterPositions(gen.open), [gen.open]);
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
      so SSR prints no clock and hydration cannot mismatch on a locale-rendered time) */
   const genBoardAt =
@@ -975,6 +978,7 @@ export function CfbProps() {
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
         onAdd={gen.add}
+        onBack={gen.back} onForward={gen.forward} canBack={gen.canBack} canForward={gen.canForward} historyNotice={gen.historyNotice}
         canUndo={gen.canUndo}
         onUndo={gen.undo}
         onSaveSetup={gen.saveSetup}
