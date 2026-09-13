@@ -259,7 +259,7 @@ function Mark({
   const L = useLeague();
   const g = games.get(gameId);
   const team = teamOf(games, gameId, teamId);
-  if (kind === "prop" && player) return <PlayerMark player={player} headshot={headshot ?? null} team={team} pos={pos ?? null} size={size} />;
+  if (kind === "prop" && player) return <PlayerMark teamIds={g ? [g.home.id, g.away.id] : []} player={player} headshot={headshot ?? null} team={team} pos={pos ?? null} size={size} />;
   if (team) return <TeamMark team={team} size={size} showRank showAbbr={false} />;
   if (g && kind === "side" && teamId == null) return <PairMark away={g.away} home={g.home} size={size} />;
   const accent = L.id === "nfl" ? "border-nfl/40 bg-nfl/10 text-nfl" : "border-cfb/40 bg-cfb/10 text-cfb";

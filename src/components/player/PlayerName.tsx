@@ -1,5 +1,7 @@
 "use client";
 
+import { PlayerMark } from "./PlayerMark";
+
 import type { ReactNode } from "react";
 import { usePlayerSheet } from "@/components/player/PlayerSheet";
 import { parseBoardLabel } from "@/lib/player-card";
@@ -58,11 +60,12 @@ export function PlayerName({
  * name. The former gets the tappable name (suffix kept); the latter renders
  * as plain text — a club is not a player.
  */
-export function BoardLabel({ label, className = "" }: { label: string; className?: string }) {
+export function BoardLabel({ label, className = "", showMark = true }: { label: string; className?: string; showMark?: boolean }) {
   const parsed = parseBoardLabel(label);
   if (!parsed) return <>{label}</>;
   return (
     <>
+      {showMark && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={parsed.name} team={parsed.team} headshot={null} size="sm" /></span>}
       <PlayerName name={parsed.name} team={parsed.team} className={className} />
       {label.slice(label.indexOf(parsed.name) + parsed.name.length)}
     </>

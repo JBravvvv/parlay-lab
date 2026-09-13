@@ -111,7 +111,7 @@ function fallbackAbbr(leg: CfbTicketLeg): string {
 function LegMark({ leg, game, abbrCls }: { leg: CfbTicketLeg; game: LegGame | undefined; abbrCls: string }) {
   const team = game ? (leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null) : null;
   /* INSTRUCTION 46: a player leg is the player + HIS team — with or without the slate loaded, never the pair */
-  if (leg.player) return <PlayerMark player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
+  if (leg.player) return <PlayerMark teamIds={game ? [game.home.id, game.away.id].filter((id): id is string => !!id) : []} player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
   if (game) {
     if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
     if (team) return <TeamMark team={team} size="sm" showRank showAbbr={false} />;

@@ -240,7 +240,7 @@ export function ParlaysSection({
                                 className="mr-1 align-text-bottom"
                               />
                             )}
-                            <span className="text-text"><BoardLabel label={l.label} /></span> · {l.prop}
+                            <span className="text-text"><BoardLabel showMark={false} label={l.label} /></span> · {l.prop}
                             {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
                             {n && (

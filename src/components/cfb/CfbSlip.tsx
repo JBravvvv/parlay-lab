@@ -48,6 +48,8 @@ export type CfbSlipLeg = {
   pair?: { away: TeamMarkTeam; home: TeamMarkTeam } | null;
   /** INSTRUCTION 46, prop legs: ESPN headshot href / position, or null */
   headshot?: string | null;
+  /** Display-only roster scope when the odds feed has not identified the player's club. */
+  imageTeamIds?: string[];
   pos?: string | null;
 };
 
@@ -81,7 +83,7 @@ export function addCfbLeg(prev: CfbSlipLeg[], leg: CfbSlipLeg): CfbSlipAdd {
 
 /** INSTRUCTION 46: player → PlayerMark; side → TeamMark; total → PairMark; nothing known → no mark */
 function SlipLegMark({ leg }: { leg: CfbSlipLeg }) {
-  if (leg.kind === "prop" && leg.player) return <PlayerMark player={leg.player} headshot={leg.headshot ?? null} team={leg.team ?? null} pos={leg.pos ?? null} size="sm" />;
+  if (leg.kind === "prop" && leg.player) return <PlayerMark teamIds={leg.imageTeamIds} player={leg.player} headshot={leg.headshot ?? null} team={leg.team ?? null} pos={leg.pos ?? null} size="sm" />;
   if (leg.pair) return <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" />;
   if (leg.team) return <TeamMark team={leg.team} size="sm" showAbbr={false} />;
   return null;

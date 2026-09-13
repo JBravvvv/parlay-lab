@@ -286,7 +286,7 @@ function PropsDesk() {
           title="Parlay Builder"
           eyebrow="College Football"
           chip={<CfbChip />}
-          sub="A CFB sandbox slip — sides, totals and moneylines from the slate, priced at Caesars or the best posted book."
+          sub="Player props & parlays · your picks, your mix."
         />
         <CfbProps />
       </>
@@ -301,7 +301,7 @@ function PropsDesk() {
           title="Parlay Builder"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="An NFL sandbox slip — sides, totals and moneylines from the slate, priced at Caesars or the best posted book."
+          sub="Player props & parlays · your picks, your mix."
         />
         <NflProps />
       </>

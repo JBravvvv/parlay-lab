@@ -712,3 +712,21 @@ body::after {
   .sheet-60 { width: min(60vw, 720px); height: 60vh; min-width: 480px; }
   .sheet-full { width: min(92vw, 720px); height: 88vh; }
 }
+
+/* Parlay Studio: a compact control deck and a collectible ticket, with restrained motion. */
+.gen-studio { border-radius: 22px; background: #0b1514 !important; border-color: #8dff6740; box-shadow: 0 16px 60px -30px #75ed4c50, inset 0 1px #d1ffc022; }
+.gen-studio-toggle { background: #ffffff03; }
+.gen-studio-hero { background: radial-gradient(ellipse at 90% 0%, #98fb5530, transparent 62%), linear-gradient(120deg, #15362670, #071614); border-bottom: 1px solid #bbffc818; }
+.gen-studio-emblem { display:flex; align-items:center; justify-content:center; width:56px; height:56px; flex-shrink:0; color:#bdff73; border:1px solid #aeff6b55; border-radius:17px; background:linear-gradient(145deg,#b6ff6530,#8bfd6b05); transform:rotate(-10deg); box-shadow:0 6px 25px #90ff5520; }
+.gen-ticket { background:linear-gradient(160deg,#192721,#0b1412); border-color:#ccffbd2b; box-shadow:0 8px 24px #0003; }
+.gen-roll { gap:2px; background:linear-gradient(110deg,#c9ff72,#9bff52); border-color:#deffb0; box-shadow:0 3px 18px #a8ff4a2c,inset 0 1px #fff7; color:#15200b; transition:transform .15s,box-shadow .15s; }
+.gen-roll:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 23px #a8ff4a45; }
+.gen-roll:active:not(:disabled) { transform:translateY(1px); }
+.gen-player-card { border:1px solid #ffffff0d; border-radius:12px; padding:7px 8px; background:linear-gradient(100deg,#ffffff07,#ffffff02); min-height:65px; }
+.gen-player-card:has(button[aria-pressed="true"]) { border-color:#baff6660; background:linear-gradient(100deg,#9aff6415,#ffffff02); }
+.gen-player-card [data-player-mark] { width:38px!important; height:38px!important; background:#d2e2ce15; }
+.gen-ticket-total { border-top:1px dashed #d2ffb933; padding:12px 3px 4px; }
+.gen-combined-odds { font-size:25px; letter-spacing:-.04em; line-height:1.2; }
+.gen-ticket-reveal { animation:parlay-reveal .28s ease-out both; }
+@keyframes parlay-reveal { from { opacity:.3; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
+@media (prefers-reduced-motion:reduce) { .gen-ticket-reveal { animation:none; } .gen-roll { transition:none; } .gen-roll:hover:not(:disabled),.gen-roll:active:not(:disabled) { transform:none; } }

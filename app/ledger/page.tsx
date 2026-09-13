@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { PlayerMark } from "@/components/player/PlayerMark";
+import { parseBoardLabel } from "@/lib/player-card";
 import {
   Area,
   AreaChart,
@@ -126,9 +128,11 @@ function LegLine({
      game prints plain text. stopPropagation keeps the tap from also toggling the ticket. */
   const phase = legPhase(game, r?.result, dayDone);
   const deep = phase === "final" ? null : legDeepLink(l);
+  const player = parseBoardLabel(l.label);
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11.5px]">
       <span className="min-w-0 text-text">
+        {player && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={player.name} team={player.team} headshot={null} size="sm" /></span>}
         {deep ? (
           <Link
             replace

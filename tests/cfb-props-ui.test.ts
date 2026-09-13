@@ -114,7 +114,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     // player's own team logo; initials only when no headshot loads) — the row draws PlayerMark now
     expect(props).not.toMatch(/function Avatar\(/);
     expect(props).not.toMatch(/function initials\(/);
-    expect(props).toMatch(/<PlayerMark player=\{pl\.player\} headshot=\{pl\.headshot\} team=\{team\} pos=\{pl\.pos\} size="md" \/>/);
+    expect(props).toMatch(/<PlayerMark teamIds=\{teamIds\} player=\{pl\.player\} headshot=\{pl\.headshot\} team=\{team\} pos=\{pl\.pos\} size="md" \/>/);
     expect(read("src/components/cfb/TeamMark.tsx")).toMatch(/export function initials\(name: string\): string/);
     expect(props).toMatch(/function propCell\(/);
     expect(props).toMatch(/<OddsCellButton key=\{r\.key\} cell=\{propCell\(r, mode, pickedKeys\.has\(r\.key\), onPick, L\.rules\)\} \/>/);

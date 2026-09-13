@@ -266,7 +266,7 @@ function Slot<P>({
   return (
     <div
       data-gen-slot={i}
-      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 @3xl:min-h-[56px] @3xl:py-1.5 ${
+      className={`gen-player-card flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 @3xl:min-h-[56px] @3xl:py-1.5 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }`}
     >
@@ -479,13 +479,13 @@ export function GenSheet<P>({
   }
 
   return (
-    <section data-testid="props-gen" style={{ backgroundColor: "rgba(16,25,20,0.96)" }} className="glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(54,225,155,0.35)]">
+    <section data-testid="props-gen" style={{ backgroundColor: "rgba(16,25,20,0.96)" }} className="gen-studio glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(54,225,155,0.35)]">
       <button
         type="button"
         onClick={() => onOpen(!open)}
         aria-expanded={open}
         aria-controls={open ? GEN_PANEL_ID : undefined}
-        className="press flex min-h-[44px] w-full items-center gap-2 px-3 text-left"
+        className="gen-studio-toggle press flex min-h-[44px] w-full items-center gap-2 px-3 text-left"
       >
         <span aria-hidden className="text-[13px] leading-none">
           🎲
@@ -512,10 +512,13 @@ export function GenSheet<P>({
 
       {open && (
         <div id={GEN_PANEL_ID} className="space-y-2.5 border-t border-white/[0.06] px-3 pb-3 pt-2.5">
-          <div className="-mx-3 -mt-2.5 border-b border-white/10 bg-linear-to-br from-pos/15 via-transparent to-gold/10 px-3 py-2 @3xl:py-4">
-            <div className="mb-1 hidden text-[9px] font-bold uppercase tracking-[0.22em] text-pos @3xl:block">Mix your next ticket</div>
-            <div className="hidden text-[19px] font-semibold tracking-tight text-text @3xl:block">More variety. Your boundaries.</div>
-            <p className="mt-1 hidden max-w-lg text-[12px] leading-relaxed text-muted @3xl:block">Keep the players you like. Rotate the rest across this category’s estimated hit chances.</p>
+          <div className="gen-studio-hero -mx-3 -mt-2.5 flex items-center justify-between gap-3 px-4 py-3 @3xl:py-5">
+            <div><div className="text-[9px] font-bold uppercase tracking-[0.24em] text-pos">THE PARLAY LAB</div>
+            <div className="mt-0.5 text-[22px] font-black tracking-tight text-white @3xl:text-[30px]">Make it your mix<span className="text-pos">.</span></div>
+            <p className="mt-1 text-[11px] text-muted">Pick your style. Keep your favorites. Spin the rest.</p></div>
+            <div aria-hidden className="gen-studio-emblem"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/></svg></div>
+          </div>
+          <div className="pb-1">
             <div role="group" aria-label="Build style" className="grid grid-cols-2 gap-2 @3xl:mt-3">
               {([
                 { key: "safer", title: "Safer mix", note: "Anchor-led, with room for variety" },
@@ -717,7 +720,7 @@ export function GenSheet<P>({
           )}
 
           </div>
-          <div id="props-gen-ticket" className="space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:sticky @3xl:top-4 @3xl:space-y-2.5 @3xl:p-3">
+          <div id="props-gen-ticket" className="gen-ticket space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:sticky @3xl:top-4 @3xl:space-y-2.5 @3xl:p-3">
           <div className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-pos @3xl:block">Your ticket</div>
           {/* generate */}
           <div className="flex gap-2">
@@ -726,8 +729,9 @@ export function GenSheet<P>({
                 type="button"
                 onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
                 disabled={loading}
-                className="press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg"
+                className="gen-roll press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg"
               >
+                <svg aria-hidden className="mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
                 {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
               </button>
             )}
@@ -789,8 +793,8 @@ export function GenSheet<P>({
 
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
-            <div>
-              <div className="-mx-1">
+            <div key={ticket.key} className="gen-ticket-reveal">
+              <div className="space-y-1.5">
                 {ticket.legs.map((l, i) => (
                   <Slot
                     key={l.id}
@@ -818,8 +822,8 @@ export function GenSheet<P>({
                   combined % below does not model that.
                 </div>
               )}
-              <div className="num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
-                <span className="text-[14px] font-bold text-pos">{amFmt(calc.am)}</span>
+              <div className="gen-ticket-total num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
+                <span className="gen-combined-odds text-[14px] font-bold text-pos"><span className="block text-[8px] font-semibold uppercase tracking-[0.16em] text-muted">Combined odds</span>{amFmt(calc.am)}</span>
                 <span className="text-muted">
                   estimated <b className="text-text">{(calc.trueProb * 100).toFixed(1)}%</b>
                 </span>

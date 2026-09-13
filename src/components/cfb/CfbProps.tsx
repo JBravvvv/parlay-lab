@@ -477,6 +477,7 @@ function focusRing(league: "cfb" | "nfl"): string {
 }
 
 function PropRow({
+  teamIds,
   pl,
   mode,
   team,
@@ -486,6 +487,7 @@ function PropRow({
   onPick: pickLeg,
 }: {
   pl: PlayerLine;
+  teamIds: string[];
   mode: PriceMode;
   /** the slate team the player is on (logo + colour for the PlayerMark), or null when unresolved */
   team: CfbTeam | null;
@@ -497,7 +499,7 @@ function PropRow({
 }) {
   const L = useLeague();
   /* INSTRUCTION 46: the leg leaves with the team object so the slip draws the same mark */
-  const onPick = (leg: CfbSlipLeg) => pickLeg({ ...leg, team });
+  const onPick = (leg: CfbSlipLeg) => pickLeg({ ...leg, team, imageTeamIds: teamIds });
   /* the row's headline number is its best-EV side at the chosen price */
   const lead = pl.sides.reduce((a, b) => (evRank(b, mode) > evRank(a, mode) ? b : a), pl.sides[0]);
   const ev = propEv(lead, mode);
@@ -510,7 +512,7 @@ function PropRow({
       data-prop-player={playerSlug(pl.player)}
       className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? focusRing(L.id) : ""}`}
     >
-      <PlayerMark player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
+      <PlayerMark teamIds={teamIds} player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
       <div className="min-w-0 flex-1 leading-tight">
         <div className="truncate text-[12px] font-semibold text-text">
           {pl.player}
@@ -587,7 +589,7 @@ function PropGameGroup({
           <div className="num py-2.5 text-[10.5px] text-faint">No {marketMeta(market).label} lines priced for this game.</div>
         ) : (
           group.lines.map((pl) => (
-            <PropRow key={pl.id} pl={pl} mode={mode} team={teamOf(pl)} gameId={group.gameId} focused={pl === firstFocus} pickedKeys={pickedKeys} onPick={onPick} />
+            <PropRow teamIds={game ? [game.home.id, game.away.id] : []} key={pl.id} pl={pl} mode={mode} team={teamOf(pl)} gameId={group.gameId} focused={pl === firstFocus} pickedKeys={pickedKeys} onPick={onPick} />
           ))
         )}
       </div>
@@ -842,7 +844,7 @@ export function CfbProps() {
           const player = g ? rosterPlayer(row.player, row.teamId ? [row.teamId] : [g.home.id, g.away.id]) : null;
           const teamId = row.teamId ?? player?.teamId;
           const team = g && teamId ? (teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null) : null;
-          return { ...leg, team, headshot: row.headshot ?? player?.headshot ?? null, pos: positionOf(row) };
+          return { ...leg, team, imageTeamIds: g ? [g.home.id, g.away.id] : [], headshot: row.headshot ?? player?.headshot ?? null, pos: positionOf(row) };
         },
       }),
     [board, mode, gameById, positionOf, rosterPlayer],

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { usePlayerImage } from "@/lib/use-player-image";
+import { useLeagueTone } from "@/components/football/LeagueContext";
 import type { CfbTeam } from "@/lib/cfb/types";
 
 /**
@@ -148,8 +150,9 @@ export function TeamMark({
  */
 export function PlayerMark({
   player,
-  headshot,
-  team,
+  headshot: suppliedHeadshot,
+  team: suppliedTeam,
+  teamIds = [],
   pos,
   size = "sm",
   className = "",
@@ -158,13 +161,19 @@ export function PlayerMark({
   player: string | null | undefined;
   headshot: string | null | undefined;
   team: TeamMarkTeam | null | undefined;
+  teamIds?: readonly string[];
   /** ESPN position abbreviation for the title ("QB"), or null */
   pos?: string | null;
   size?: TeamMarkSize;
   className?: string;
   style?: CSSProperties;
 }) {
-  const [broken, setBroken] = useState<string | null>(null);
+  const league = useLeagueTone();
+  const identity = usePlayerImage(league, player, suppliedTeam?.id ?? suppliedTeam?.abbr, suppliedTeam?.id ? [suppliedTeam.id] : teamIds);
+  const team = suppliedTeam ?? identity?.team;
+  const sources = [...new Set([...(identity?.srcs ?? []), suppliedHeadshot].filter((s): s is string => !!s))];
+  const [failed, setFailed] = useState<string[]>([]);
+  const headshot = sources.find(src => !failed.includes(src));
   const [badgeBroken, setBadgeBroken] = useState<string | null>(null);
   const px = PX[size];
   const name = (player ?? "").trim();
@@ -173,7 +182,7 @@ export function PlayerMark({
     return <TeamMark team={team} size={size} showAbbr={false} className={className} style={style} />;
   }
   const hex = teamHex(team?.color);
-  const usePhoto = !!headshot && broken !== headshot;
+  const usePhoto = !!headshot;
   const badgePx = LOGO_BADGE_PX[size];
   const title = [name, pos, team?.abbr].filter(Boolean).join(" · ");
   const useBadgeLogo = !!team?.logo && badgeBroken !== team.logo;
@@ -197,7 +206,7 @@ export function PlayerMark({
             height={px}
             loading="lazy"
             decoding="async"
-            onError={() => setBroken(headshot ?? null)}
+            onError={() => setFailed(prev => [...prev, headshot!])}
             className="h-full w-full rounded-full object-cover object-top"
           />
         ) : team?.logo && useBadgeLogo ? (

@@ -6,6 +6,7 @@ import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
 import { parseMatchup } from "@/lib/mlb-visuals";
 import { GameHeader, TeamSidePills } from "./GameCard";
 import { collapseKey, panelIdFor, useGameCollapse, setCollapsed } from "./collapse-store";
+import { PlayerMark } from "@/components/player/PlayerMark";
 import { PlayerName } from "@/components/player/PlayerName";
 import { MKT_LABEL, filterSide, playerLeg, playerMatches, sidePrice, sideProb, sideShort, type Side, type TeamSide } from "./props-model";
 
@@ -144,7 +145,7 @@ export function PlayerRow({
       data-deeplink={hit ? "hit" : undefined}
       className={"flex items-center gap-1.5 border-t border-white/[0.04] py-1" + (hit ? " rounded-[8px] bg-gold/[0.08] ring-1 ring-gold/50" : "")}
     >
-      <Avatar src={headshot} label={r.p} />
+      <PlayerMark player={r.p} headshot={headshot} team={r.tm} size="md" />
       <div className="min-w-0 flex-1 leading-none">
         {/* propBoard rows carry no MLB id — the sheet resolves name + team itself */}
         <PlayerName name={r.p} team={r.tm} className="block truncate text-[12px] font-medium tracking-tight text-text">{r.p}</PlayerName>

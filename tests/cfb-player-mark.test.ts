@@ -220,7 +220,7 @@ describe("CfbProps deep link + Board marks", () => {
   });
   it("Board Mark: a prop with a player is PlayerMark; PairMark only for a side with no team (a total)", () => {
     const src = readSrc("src/components/cfb/CfbPicksBoard.tsx");
-    expect(src).toMatch(/if \(kind === "prop" && player\) return <PlayerMark player=\{player\} headshot=\{headshot \?\? null\} team=\{team\} pos=\{pos \?\? null\} size=\{size\} \/>/);
+    expect(src).toMatch(/if \(kind === "prop" && player\) return <PlayerMark teamIds=\{g \? \[g\.home\.id, g\.away\.id\] : \[\]\} player=\{player\} headshot=\{headshot \?\? null\} team=\{team\} pos=\{pos \?\? null\} size=\{size\} \/>/);
     expect(src).toMatch(/if \(g && kind === "side" && teamId == null\) return <PairMark/);
     expect(count(src, /<Mark\b[^>]*player=\{/g)).toBe(3); // table pick column, featured strip, parlay card legs
     const slip = readSrc("src/components/cfb/CfbSlip.tsx");

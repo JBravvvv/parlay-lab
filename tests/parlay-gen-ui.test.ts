@@ -132,6 +132,14 @@ describe("GenSheet — the open panel", () => {
     expect(shut).not.toContain("aria-controls"); // no dangling handle while collapsed
     expect(shut).not.toContain(`id="${GEN_PANEL_ID}"`);
   });
+  it("keeps both build styles and the main action visible in the new studio", () => {
+    expect(out).toContain('aria-label="Build style"');
+    expect(out).toContain("Safer mix");
+    expect(out).toContain("Balanced mix");
+    expect(out).toContain("Make it your mix");
+    expect(out).toContain("Combined odds");
+    expect(out).toContain("gen-roll");
+  });
   it("every control is a 44px target and the pin toggles carry aria-pressed", () => {
     expect(count(out, /min-h-11/g)).toBeGreaterThan(10);
     expect(count(out, /aria-pressed/g)).toBeGreaterThan(10);
@@ -352,7 +360,7 @@ describe("generator recovery from an empty odds band", () => {
     const spec = { ...SPEC, legMinAm: -5000, legMaxAm: -4000 };
     const result = generate(POOL, spec, 7);
     const out = sheet({ spec, result });
-    const button = out.match(/<button[^>]*>Generate parlay<\/button>/)?.[0];
+    const button = out.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*?Generate parlay<\/button>/)?.[0];
     expect(button).toBeDefined();
     expect(button).not.toContain("disabled");
     const band = availableLegBand(POOL, spec)!;
@@ -368,6 +376,6 @@ describe("generator recovery from an empty odds band", () => {
   });
   it("allows another seed after a bounded payout search misses", () => {
     const out = sheet({ result: { ok: false, fail: { code: "payout-not-found", reach: { minAm: 400, maxAm: 1200 } } } });
-    expect(out.match(/<button[^>]*>Generate parlay<\/button>/)?.[0]).not.toContain("disabled");
+    expect(out.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*?Generate parlay<\/button>/)?.[0]).not.toContain("disabled");
   });
 });

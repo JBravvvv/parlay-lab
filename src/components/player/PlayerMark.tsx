@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { usePlayerImage } from "@/lib/use-player-image";
 import { teamLogo } from "@/lib/mlb-visuals";
 import { espnLogoCode } from "@/lib/player-card";
 import { teamTag } from "@/components/props/props-model";
@@ -62,8 +63,8 @@ export function mlbTeamLogo(team: string | null | undefined): string | null {
 
 export function PlayerMark({
   player,
-  headshot,
-  team,
+  headshot: suppliedHeadshot,
+  team: suppliedTeam,
   size = "sm",
   className = "",
   style,
@@ -77,7 +78,11 @@ export function PlayerMark({
   className?: string;
   style?: CSSProperties;
 }) {
-  const [broken, setBroken] = useState<string | null>(null);
+  const identity = usePlayerImage("mlb", player, suppliedTeam);
+  const team = suppliedTeam ?? identity?.team.abbr;
+  const sources = [...new Set([...(identity?.srcs ?? []), suppliedHeadshot].filter((s): s is string => !!s))];
+  const [failed, setFailed] = useState<string[]>([]);
+  const headshot = sources.find(src => !failed.includes(src));
   const [badgeBroken, setBadgeBroken] = useState<string | null>(null);
   const px = PX[size];
   const badgePx = LOGO_BADGE_PX[size];
@@ -120,7 +125,7 @@ export function PlayerMark({
     );
   }
 
-  const usePhoto = !!headshot && broken !== headshot;
+  const usePhoto = !!headshot;
 
   return (
     <span className={`inline-flex shrink-0 items-center ${className}`} style={style}>
@@ -142,7 +147,7 @@ export function PlayerMark({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            onError={() => setBroken(headshot ?? null)}
+            onError={() => setFailed(prev => [...prev, headshot!])}
             className="h-full w-full rounded-full object-cover object-top"
           />
         ) : logo && badgeBroken !== logo ? (
