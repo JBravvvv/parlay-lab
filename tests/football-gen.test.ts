@@ -125,6 +125,11 @@ describe("the fixture board this file reasons about", () => {
 });
 
 describe("ONE leg per row, not two — and the side it actually is", () => {
+  it("carries a verified roster position into the generator's filterable leg", () => {
+    const p = footballGenPool(rows, spec(), { mode: "best", nowMs: 0, teamOf: (r) => r.team, positionOf: () => "HB", quoteOf: propQuote, legOf: propLegOf });
+    expect(p.legs.length).toBeGreaterThan(0);
+    expect(p.legs.every((l) => l.position === "RB")).toBe(true);
+  });
   it("pass_yds: 4 board rows → 4 legs, each carrying that row's own key", () => {
     const s = spec({ market: "pass_yds", sides: "both" });
     const pool = poolFor(s);
@@ -262,7 +267,7 @@ describe("a cell the board draws as an untappable dash is never offered", () => 
 describe("the per-leg band is measured in DECIMAL on the football price", () => {
   const ATD = { market: "anytime_td", sides: "both" as const };
 
-  it("the desk's default -250 → +250 is 1.40 → 3.50, and Ty Simpson's +320 is outside it", () => {
+  it("a -250 → +250 band is 1.40 → 3.50, and Ty Simpson's +320 is outside it", () => {
     const b = bandDec(-250, 250);
     expect(b.lo).toBeCloseTo(1.4, 10);
     expect(b.hi).toBeCloseTo(3.5, 10);

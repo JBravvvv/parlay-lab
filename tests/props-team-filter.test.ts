@@ -240,9 +240,9 @@ describe("the page — Suspense + useSearchParams, opens the right tab/market, m
     expect(page).toMatch(/<Suspense fallback=\{null\}>\s*<PropsDesk \/>\s*<\/Suspense>/);
     expect(page).toMatch(/parseDeepLink\(\(k\) => params\.get\(k\)\)/);
   });
-  it("the initial tab and market come from the link, defaulting to Games / ML", () => {
-    expect(page).toMatch(/useState<TabKey>\(link\?\.tab \?\? "games"\)/);
-    expect(page).toMatch(/useState<string>\(link\?\.mkt \?\? "ml"\)/);
+  it("the initial tab and market come from the link, defaulting to Batter / H+R+RBI", () => {
+    expect(page).toMatch(/useState<TabKey>\(link\?\.tab \?\? "batter"\)/);
+    expect(page).toMatch(/useState<string>\(link\?\.mkt \?\? "hrr"\)/);
   });
   it("filters to the linked game and passes the player to the cards as hitPlayer; the row is ringed and scrolled to", () => {
     expect(page).toMatch(/gameMatches\(x\.g, link\.game\)/);

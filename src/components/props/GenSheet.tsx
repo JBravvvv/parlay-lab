@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { mixBands, MIX_LABEL, type MixBand } from "@/lib/parlay-gen-mix";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
 import { parseBoardLabel } from "@/lib/player-card";
@@ -12,6 +13,7 @@ import {
   REPAIR_TRIES,
   bandDec,
   availableLegBand,
+  mixCandidates,
   poolCounts,
   type GenFail,
   type GenLeg,
@@ -91,6 +93,7 @@ const RELAX_PATCH: Record<string, Partial<GenSpec>> = {
   started: { includeStarted: true },
   cz: { czOnly: false },
   model: { modelOnly: false },
+  positions: { positions: [] },
 };
 
 const RELAX_BUTTON: Record<string, string> = {
@@ -98,6 +101,7 @@ const RELAX_BUTTON: Record<string, string> = {
   started: "Include games already under way",
   cz: "Drop the Caesars-only filter",
   model: "Drop the model-priced-only filter",
+  positions: "Include all positions",
 };
 
 const RELAX_HINT: Record<string, string> = {
@@ -105,6 +109,7 @@ const RELAX_HINT: Record<string, string> = {
   started: 'turn on "include games already under way" and it may fit',
   cz: "drop the Caesars-only filter and it may fit",
   model: "drop the model-priced-only filter and it may fit",
+  positions: "add another position or choose all positions",
 };
 
 /**
@@ -155,6 +160,8 @@ export function genFailLine(
       return `Could not land inside your target payout in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}, try Generate again or widen the target.`;
     case "pin-missing":
       return `${fail.ids.length} kept slot${fail.ids.length === 1 ? " is" : "s are"} no longer posted on this board — unpin the gold slot${fail.ids.length === 1 ? "" : "s"} and spin again.`;
+    case "pin-position":
+      return "A kept player is outside your selected positions or has no verified position. Unpin that player or change the position filter.";
     case "pin-conflict":
       return fail.why === "same-player"
         ? "Two kept slots are the same player — one parlay can only carry him once, so unpin one of them."
@@ -235,6 +242,7 @@ function Slot<P>({
   l,
   pinned,
   outOfBand,
+  mixBand,
   renderMark,
   renderName,
   onTogglePin,
@@ -243,6 +251,7 @@ function Slot<P>({
   l: GenLeg<P>;
   pinned: boolean;
   outOfBand: boolean;
+  mixBand?: MixBand;
   renderMark: SlotPart<P>;
   renderName: SlotPart<P>;
   onTogglePin: (slot: number) => void;
@@ -257,7 +266,7 @@ function Slot<P>({
   return (
     <div
       data-gen-slot={i}
-      className={`flex min-h-[56px] items-center gap-2 border-t border-white/[0.04] py-1.5 ${
+      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 @3xl:min-h-[56px] @3xl:py-1.5 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }`}
     >
@@ -280,11 +289,13 @@ function Slot<P>({
         {renderName({ leg: l.leg, gen: l, name, team })}
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
           <span className="truncate text-muted">{l.sub}</span>
+          {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
           {l.started && <span className="shrink-0 text-live">live</span>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end leading-none">
+        {mixBand && <span title="Relative to eligible picks in this category and odds range" className="mb-1 rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-muted">{MIX_LABEL[mixBand]}</span>}
         <span className="num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
         <span className="mt-[3px] flex items-center gap-1 text-[9px] text-faint">
           {l.src === "market" && <span className="italic">mkt</span>}
@@ -331,6 +342,8 @@ export function GenSheet<P>({
   market,
   marketLabel,
   markets,
+  positions,
+  positionsLoading = false,
   pool,
   renderMark = mlbMark,
   renderName = mlbName,
@@ -342,6 +355,10 @@ export function GenSheet<P>({
   onAdd,
   canUndo,
   onUndo,
+  onSaveSetup,
+  onLoadSetup,
+  hasSetup = false,
+  setupNotice,
   open,
   onOpen,
   boardAt,
@@ -350,12 +367,14 @@ export function GenSheet<P>({
   showModelOnly = true,
   categoryNote = "Moneyline and run line are game markets, not player slots — the generator leaves them alone for now.",
   stubNote = "The parlay generator builds PLAYER-prop parlays — pick a batter or pitcher market above and it appears here. Moneyline and run line are game markets and have no player slots yet.",
-  marketNote = "Italic legs use the market's own fair %, so their EV is ~0 by construction, not an edge.",
+  marketNote = "Italic legs use market estimates; differences from the selected book price are not independent evidence of a model edge.",
 }: {
   market: string;
   marketLabel: string;
   /** the desk's own prop markets, in its own rail order (MLB_GEN_MARKETS / FOOTBALL_GEN_MARKETS) */
   markets: readonly GenMarket[];
+  positions?: readonly string[];
+  positionsLoading?: boolean;
   pool: GenPool<P>;
   /** the player disc for a slot — the page passes the headshot it already resolved; the football
       desk passes its own mark. This sheet never calls useHeadshots itself. */
@@ -368,6 +387,10 @@ export function GenSheet<P>({
   onGenerate: () => void;
   onTogglePin: (slot: number) => void;
   onAdd: () => void;
+  onSaveSetup?: () => void;
+  onLoadSetup?: () => void;
+  hasSetup?: boolean;
+  setupNotice?: string | null;
   canUndo: boolean;
   onUndo: () => void;
   open: boolean;
@@ -390,12 +413,17 @@ export function GenSheet<P>({
 }) {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
   const [attempt, setAttempt] = useState(0);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
   /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). These counts were hand-rolled
      over the RAW pool — both sides of every line, ignoring `sides`, `czOnly` and `modelOnly` —
      so with the default overs-only spec they printed roughly double, and the panel could read
      "after band 19 → 4 games" directly above "Only 3 legs clear these filters and you asked for
      4". poolCounts exists precisely so the diagnostic can never contradict the verdict. */
   const counts = poolCounts(pool, spec);
+  const candidates = useMemo(() => mixCandidates(pool, spec), [pool, spec]);
+  const tiers = useMemo(() => mixBands(candidates), [candidates]);
+  const distinctPlayers = new Set(candidates.map((l) => l.playerKey)).size;
+  const unknownPositions = positions ? new Set(mixCandidates(pool, { ...spec, positions: [] }).filter((l) => !l.position).map((l) => l.playerKey)).size : 0;
   const ticket = result.ok ? result.ticket : null;
   /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
      the headline here still cannot disagree with the slip the legs are handed to */
@@ -445,7 +473,7 @@ export function GenSheet<P>({
   }
 
   return (
-    <section data-testid="props-gen" className="glass mb-2 overflow-hidden">
+    <section data-testid="props-gen" style={{ backgroundColor: "rgba(16,25,20,0.96)" }} className="glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(54,225,155,0.35)]">
       <button
         type="button"
         onClick={() => onOpen(!open)}
@@ -478,6 +506,53 @@ export function GenSheet<P>({
 
       {open && (
         <div id={GEN_PANEL_ID} className="space-y-2.5 border-t border-white/[0.06] px-3 pb-3 pt-2.5">
+          <div className="-mx-3 -mt-2.5 border-b border-white/10 bg-linear-to-br from-pos/15 via-transparent to-gold/10 px-3 py-2 @3xl:py-4">
+            <div className="mb-1 hidden text-[9px] font-bold uppercase tracking-[0.22em] text-pos @3xl:block">Mix your next ticket</div>
+            <div className="hidden text-[19px] font-semibold tracking-tight text-text @3xl:block">More variety. Your boundaries.</div>
+            <p className="mt-1 hidden max-w-lg text-[12px] leading-relaxed text-muted @3xl:block">Keep the players you like. Rotate the rest across this category’s estimated hit chances.</p>
+            <div role="group" aria-label="Build style" className="grid grid-cols-2 gap-2 @3xl:mt-3">
+              {([
+                { key: "safer", title: "Safer mix", note: "Anchor-led, with room for variety" },
+                { key: "balanced", title: "Balanced mix", note: "Explore all three relative bands" },
+              ] as const).map((style) => (
+                <button key={style.key} type="button" aria-pressed={spec.style === style.key} onClick={() => onSpec({ style: style.key })}
+                  className={`press min-h-11 rounded-xl border px-3 py-2 text-left transition-colors @3xl:min-h-16 ${spec.style === style.key ? "border-pos/70 bg-pos/10" : "border-white/10 bg-bg/40 hover:border-white/25"}`}>
+                  <span className={`block text-[13px] font-semibold ${spec.style === style.key ? "text-pos" : "text-text"}`}>{style.title}</span>
+                  <span className="mt-0.5 hidden text-[10px] leading-snug text-muted @3xl:block">{style.note}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 hidden flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted @3xl:flex">
+              <span>{distinctPlayers} eligible players</span><span>{counts.games} games</span><span className="hidden @3xl:inline">Recent players rotate less often</span>
+            </div>
+            <details className="mt-2 hidden text-[10px] leading-relaxed text-muted @3xl:block">
+              <summary className="cursor-pointer py-1 font-semibold text-text">How this mix works</summary>
+              <p>Anchor, Middle and Upside compare picks within {marketLabel} and your odds range. Equal hit estimates share a band. Safer mix favors anchors while making room for other options; pins, game limits and payout targets can narrow the mix.</p>
+              <p className="mt-1">{showModelOnly ? "Where a model estimate exists, ranking uses the lower of that estimate and the price-implied chance. Other picks use market estimates." : "These rankings use market consensus, not an independent player-performance model."} A stronger option within Anytime TD can still be less likely to hit than a passing prop. Safer is relative; every parlay can lose.</p>
+            </details>
+          </div>
+          {positions && (
+            <fieldset className="min-w-0" aria-label="Player positions">
+              <legend className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted">Positions <span className="font-normal normal-case tracking-normal">· {distinctPlayers} eligible players</span></legend>
+              <div className="flex gap-1">
+                <button type="button" aria-pressed={!spec.positions?.length} onClick={() => onSpec({ positions: [] })}
+                  className={`${CTRL} min-w-0 flex-1 px-1 ${!spec.positions?.length ? ON : OFF}`}>All</button>
+                {positions.map((position) => {
+                  const checked = !!spec.positions?.includes(position);
+                  return <button key={position} type="button" role="checkbox" aria-checked={checked} aria-label={position}
+                    onClick={() => onSpec({ positions: checked ? spec.positions!.filter((p) => p !== position) : [...(spec.positions ?? []), position] })}
+                    className={`${CTRL} min-w-0 flex-1 px-1 ${checked ? ON : OFF}`}>{position}</button>;
+                })}
+              </div>
+              {positionsLoading ? <Faint>Checking roster positions…</Faint> : !!spec.positions?.length && unknownPositions > 0 && <Faint>{unknownPositions} players with unverified positions excluded.</Faint>}
+            </fieldset>
+          )}
+          <button type="button" aria-expanded={customizeOpen} aria-controls="props-gen-settings" onClick={() => setCustomizeOpen((v) => !v)}
+            className="press flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-white/10 px-3 text-left text-[11px] text-text @3xl:hidden">
+            <span><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{spec.legs} legs · {amFmt(spec.legMinAm)} to {amFmt(spec.legMaxAm)}</span></span><span aria-hidden>{customizeOpen ? "−" : "+"}</span>
+          </button>
+          <div className="grid items-start gap-4 @3xl:grid-cols-2">
+          <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-3 @3xl:block`}>
           {/* legs */}
           <div>
             <Label>Legs</Label>
@@ -521,6 +596,12 @@ export function GenSheet<P>({
           {/* per-leg odds band */}
           <div>
             <Label>Odds per leg</Label>
+            {market === "anytime_td" && (
+              <button type="button" onClick={() => onSpec({ style: "safer", legMinAm: -230, legMaxAm: 200 })}
+                className="press mb-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-pos/30 bg-pos/10 px-3 text-left text-[12px] font-semibold text-pos">
+                <span>TD safer mix</span><span className="num">{amFmt(-230)} to {amFmt(200)}</span>
+              </button>
+            )}
             <div className="flex items-end gap-2">
               <AmInput label="Min" value={spec.legMinAm} onCommit={(v) => onSpec({ legMinAm: v })} hint="-152" />
               <span className="pb-3 text-[12px] text-faint" aria-hidden>
@@ -622,6 +703,16 @@ export function GenSheet<P>({
             </div>
           </details>
 
+          {onSaveSetup && (
+            <div className="flex items-center gap-2 border-t border-white/10 pt-2">
+              <button type="button" onClick={onSaveSetup} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold text-text">Save setup</button>
+              <button type="button" onClick={onLoadSetup} disabled={!hasSetup} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold text-text disabled:opacity-40">Load saved setup</button>
+            </div>
+          )}
+
+          </div>
+          <div id="props-gen-ticket" className="space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:sticky @3xl:top-4 @3xl:space-y-2.5 @3xl:p-3">
+          <div className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-pos @3xl:block">Your ticket</div>
           {/* generate */}
           <div className="flex gap-2">
             {(
@@ -661,8 +752,10 @@ export function GenSheet<P>({
             </button>
           )}
 
+          {setupNotice && <div role="status" className="text-[10.5px] text-muted">{setupNotice}</div>}
+
           {/* which control is binding */}
-          <div data-testid="gen-diagnostic" className="num text-[9.5px] text-faint">
+          <div data-testid="gen-diagnostic" className="num hidden text-[9.5px] text-faint @3xl:block">
             pool {pool.rows} rows → eligible {counts.eligible} → after band {counts.inBand} → {counts.games} game
             {counts.games === 1 ? "" : "s"}
             {pool.startedDropped > 0 && <> · {pool.startedDropped} dropped as already started</>}
@@ -671,6 +764,17 @@ export function GenSheet<P>({
             {pool.noParlayDropped > 0 && <> · {pool.noParlayDropped} the book bars from parlays</>}
             {pool.finishedDropped > 0 && <> · {pool.finishedDropped} in games that have finished</>}
           </div>
+
+          {ticket && spec.style && (
+            <div aria-label="Your mix" className="grid grid-cols-3 gap-1.5">
+              {(["anchor", "middle", "upside"] as const).map((tier) => (
+                <div key={tier} className={`rounded-lg border px-2 py-1 text-center @3xl:py-2 ${tier === "anchor" ? "border-pos/25 bg-pos/5" : tier === "middle" ? "border-white/10 bg-white/5" : "border-gold/25 bg-gold/5"}`}>
+                  <span className="num mr-1 text-[12px] font-semibold text-text @3xl:mr-0 @3xl:block @3xl:text-[16px]">{ticket.legs.filter((l) => tiers.get(l.id) === tier).length}</span>
+                  <span className="text-[9px] font-medium text-muted">{MIX_LABEL[tier]}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
@@ -683,6 +787,7 @@ export function GenSheet<P>({
                     l={l}
                     pinned={spec.pinned[i] === l.id}
                     outOfBand={outside.has(l.id)}
+                    mixBand={spec.style ? tiers.get(l.id) : undefined}
                     renderMark={renderMark}
                     renderName={renderName}
                     onTogglePin={onTogglePin}
@@ -705,21 +810,23 @@ export function GenSheet<P>({
               <div className="num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
                 <span className="text-[14px] font-bold text-pos">{amFmt(calc.am)}</span>
                 <span className="text-muted">
-                  true <b className="text-text">{(calc.trueProb * 100).toFixed(1)}%</b>
+                  estimated <b className="text-text">{(calc.trueProb * 100).toFixed(1)}%</b>
                 </span>
                 <span className="text-muted">
                   implied <b className="text-text">{(calc.impProb * 100).toFixed(1)}%</b>
                 </span>
                 <span className={calc.ev >= 0 ? "text-pos" : "text-neg"}>
-                  EV {calc.ev >= 0 ? "+" : ""}
+                  Est. EV {calc.ev >= 0 ? "+" : ""}
                   {(calc.ev * 100).toFixed(1)}%
                 </span>
                 {ticket.marketPriced > 0 && (
                   <span className="italic text-faint">{ticket.marketPriced} market-priced</span>
                 )}
               </div>
-              <div className="mt-1.5 text-[9.5px] leading-snug text-faint">
-                True % is the naive product — same-game legs are correlated and this sandbox does not model that.
+              <details className="mt-1.5 text-[9.5px] leading-snug text-faint">
+                <summary className="cursor-pointer py-2">Estimates & price details · paper only</summary>
+                <p className="mb-1 @3xl:hidden">Mix bands compare this category within your odds range. Safer mix favors anchors and rotates other bands; recent players get less weight. Selected positions allow any combination of those positions. Safer is relative, and every parlay can lose.</p>
+                Estimated hit chance multiplies the leg estimates. Same-game correlation is not modeled; this is not a sportsbook parlay quote.
                 {anyMarketProb && <> {marketNote}</>}{" "}
                 {suspended && (
                   <>
@@ -728,7 +835,7 @@ export function GenSheet<P>({
                 )}
                 Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""} — tap Regenerate for another
                 spin, not for a fresher price. Sandbox · not tracked, never enters the ledger.
-              </div>
+              </details>
             </div>
           ) : (
             <div>
@@ -773,6 +880,8 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
+          </div>
+          </div>
         </div>
       )}
     </section>

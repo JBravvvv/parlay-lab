@@ -40,6 +40,7 @@
  * Sandbox only: nothing here writes anywhere, spends an Odds credit, or enters the ledger.
  */
 
+import { mixOrder, type MixStyle } from "./parlay-gen-mix";
 import { amToDec, decToAm } from "@/lib/ticket-math";
 
 /* ------------------------------------------------------------------ shapes */
@@ -68,7 +69,11 @@ export type GenMarket = {
   oneSided?: boolean;
 };
 
+export type GenPoolSpec = { market: string; includeStarted: boolean };
+
 export type GenSpec = {
+  /** Category-relative player rotation; omitted retains the historical sampler. */
+  style?: MixStyle;
   /** the desk's own market key — "batter_hits_runs_rbis" (MLB), "pass_yds" (football) */
   market: string;
   /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI only offers 2..8) */
@@ -79,6 +84,8 @@ export type GenSpec = {
   /** optional COMBINED payout band — off by default */
   payout: { minAm: number; maxAm: number } | null;
   sides: GenSides;
+  /** Empty/omitted = all positions. An explicit filter also binds kept slots. */
+  positions?: readonly string[];
   /** R2: at most one leg per game. Default ON, user-relaxable, never silently relaxed. */
   onePerGame: boolean;
   /** only legs whose price is the Caesars quote (the book Josh settles at) */
@@ -117,6 +124,8 @@ export type GenLeg<P = unknown> = {
   gameKey: string;
   /** accent/punctuation-proof player identity (R1 is enforced on this) */
   playerKey: string;
+  /** Verified position from the sport's player data; unknown is never guessed. */
+  position?: string | null;
   /** the row's team tag, folded to ONE spelling per club by the adapter */
   team: string | null;
   /** its game had started at the nowMs the pool was built with */
@@ -166,7 +175,7 @@ export type GenTicket<P = unknown> = {
   dropped: readonly string[];
   /** PINNED leg ids sitting outside the per-leg band — the only legs allowed to, always flagged */
   outsideLegBand: readonly string[];
-  /** legs whose win % is the de-vigged market fair (EV ≈ 0 by construction — never an edge) */
+  /** legs whose win % is the market estimate (not independent evidence of model edge) */
   marketPriced: number;
   /** game keys carrying more than one leg (only possible with onePerGame off) */
   sameGame: readonly string[];
@@ -184,10 +193,11 @@ export type GenFail =
    */
   | { code: "one-sided"; want: GenSide; has: GenSide; rows: number }
   | { code: "band-empty"; rows: number; nearest: { belowAm: number | null; aboveAm: number | null } }
-  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | null }
+  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | "positions" | null }
   | { code: "payout-unreachable"; reach: { minAm: number; maxAm: number } }
   | { code: "payout-not-found"; reach: { minAm: number; maxAm: number } }
   | { code: "pin-missing"; ids: readonly string[] }
+  | { code: "pin-position"; ids: readonly string[] }
   | { code: "pin-conflict"; ids: readonly string[]; why: "same-player" | "same-game" };
 
 export type GenResult<P = unknown> = { ok: true; ticket: GenTicket<P> } | { ok: false; fail: GenFail };
@@ -256,6 +266,8 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
     spec.modelOnly ? "model" : "both",
     String(roll),
   ];
+  if (spec.style) parts.push(spec.style);
+  if (spec.positions?.length) parts.push(`positions:${[...new Set(spec.positions)].sort().join(",")}`);
   return fnv1a(parts.join("|"));
 }
 
@@ -378,6 +390,12 @@ export function poolCounts<P>(
   };
 }
 
+/** The UI's relative bands use the generator's exact eligibility and odds bounds. */
+export function mixCandidates<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
+  const band = bandDec(spec.legMinAm, spec.legMaxAm);
+  return eligible(pool, spec).filter((l) => inDec(l.dec, band));
+}
+
 /* ---------------------------------------------------------------------- search */
 
 type Ctx<P> = {
@@ -397,6 +415,7 @@ type Ctx<P> = {
    * run already followed, and the other slots stay exactly where they were.
    */
   cands: GenLeg<P>[];
+  crossGamePlayers: boolean;
 };
 
 /**
@@ -419,33 +438,44 @@ function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
     if (!want.has(l.side)) return false;
     if (spec.czOnly && l.book !== "CZ") return false;
     if (spec.modelOnly && l.src !== "model") return false;
+    if (spec.positions?.length && (!l.position || !spec.positions.includes(l.position))) return false;
     return true;
   });
 }
 
-/**
- * The most legs that can ever coexist under R1/R2 in this candidate set.
- *
- * R1 (one leg per player) and R2 (one leg per game) are two independent matroids, so the
- * seatable count is bounded by BOTH: distinct free players, and — when R2 is on — distinct
- * free games. Counting games alone was wrong on a DOUBLEHEADER: `shGkey` appends "gm2", so
- * the two halves are distinct game keys while `playerKey` is the same man in both, and the
- * game count then over-states what R1 can actually seat. Reporting a `have` larger than any
- * selection can reach is a number Josh cannot act on, so the estimate takes the smaller of
- * the two. It stays exact on an ordinary slate, and never over-states on a doubleheader.
- */
+/** Exact player-to-game matching. Separate player/game counts can overstate
+ * capacity on doubleheaders when several players share their only available game. */
 function capacity<P>(cands: readonly GenLeg<P>[], pins: readonly GenLeg<P>[], onePerGame: boolean): number {
   const usedP = new Set(pins.map((p) => p.playerKey));
   const usedG = new Set(pins.map((p) => p.gameKey));
-  const freeP = new Set<string>();
-  const freeG = new Set<string>();
+  const choices = new Map<string, Set<string>>();
   for (const c of cands) {
-    if (usedP.has(c.playerKey)) continue;
-    if (onePerGame && usedG.has(c.gameKey)) continue;
-    freeP.add(c.playerKey);
-    freeG.add(c.gameKey);
+    if (usedP.has(c.playerKey) || (onePerGame && usedG.has(c.gameKey))) continue;
+    if (!choices.has(c.playerKey)) choices.set(c.playerKey, new Set());
+    choices.get(c.playerKey)!.add(c.gameKey);
   }
-  return pins.length + (onePerGame ? Math.min(freeP.size, freeG.size) : freeP.size);
+  if (!onePerGame) return pins.length + choices.size;
+  const owner = new Map<string, string>();
+  const seat = (player: string, seen: Set<string>): boolean => {
+    for (const game of choices.get(player) ?? []) {
+      if (seen.has(game)) continue;
+      seen.add(game);
+      const prior = owner.get(game);
+      if (prior === undefined || seat(prior, seen)) { owner.set(game, player); return true; }
+    }
+    return false;
+  };
+  for (const player of choices.keys()) seat(player, new Set());
+  return pins.length + owner.size;
+}
+
+function crossesGames(legs: readonly GenLeg[]): boolean {
+  const games = new Map<string, string>();
+  for (const l of legs) {
+    if (games.has(l.playerKey) && games.get(l.playerKey) !== l.gameKey) return true;
+    games.set(l.playerKey, l.gameKey);
+  }
+  return false;
 }
 
 /** Fisher-Yates over a copy, drawing from the seeded stream. */
@@ -528,12 +558,31 @@ function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
  */
 function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number | null): GenLeg<P>[] | null {
   const s = seatPins(ctx);
+  const byPrice = maxDec == null ? [] : ctx.cands.slice().sort((a, b) => a.dec - b.dec);
   let dec = s.legs.reduce((d, l) => (l ? d * l.dec : d), 1);
   for (const c of order) {
     const i = s.legs.indexOf(null);
     if (i < 0) break;
     if (!fits(s, c, ctx.spec.onePerGame)) continue;
-    if (maxDec != null && dec * c.dec > maxDec) continue;
+    if (maxDec != null) {
+      let floor = dec * c.dec;
+      const remaining = ctx.n - s.ids.size - 1;
+      let found = 0;
+      for (const next of byPrice) {
+        if (found >= remaining) break;
+        if (s.usedP.has(next.playerKey) || next.playerKey === c.playerKey
+          || (ctx.spec.onePerGame && (s.usedG.has(next.gameKey) || next.gameKey === c.gameKey))) continue;
+        floor *= next.dec;
+        found++;
+      }
+      // Optimistic remaining price: it can understate the true minimum when
+      // alternate lines clash, but can never reject a feasible cheaper ticket.
+      if (floor > maxDec || found < remaining) continue;
+    }
+    // On a doubleheader, preserve a completion for the other slots. Ordinary
+    // slates take the fast path; no matching lookahead is needed there.
+    if (ctx.spec.onePerGame && ctx.crossGamePlayers && capacity(ctx.cands,
+      [...s.legs.filter((l): l is GenLeg<P> => l !== null), c], true) < ctx.n) continue;
     seat(s, c, i);
     dec *= c.dec;
   }
@@ -616,7 +665,7 @@ function nearestPosted<P>(cands: readonly GenLeg<P>[], band: { lo: number; hi: n
 }
 
 /** Which single relaxation — and only one that is actually engaged — would open the pool up. */
-type Relax = "same-game" | "started" | "cz" | "model" | null;
+type Relax = "same-game" | "started" | "cz" | "model" | "positions" | null;
 
 function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: number): Relax {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
@@ -626,6 +675,7 @@ function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: 
   if (spec.onePerGame && capacity(cands({ ...spec, onePerGame: false }), pins, false) >= want) return "same-game";
   if (spec.czOnly && capacity(cands({ ...spec, czOnly: false }), pins, spec.onePerGame) >= want) return "cz";
   if (spec.modelOnly && capacity(cands({ ...spec, modelOnly: false }), pins, spec.onePerGame) >= want) return "model";
+  if (spec.positions?.length && capacity(cands({ ...spec, positions: [] }), pins, spec.onePerGame) >= want) return "positions";
   /* started rows were dropped before the pool existed, so this one is a SUGGESTION — the
      caller has to rebuild the pool to find out, and may still land on an honest failure. */
   if (!spec.includeStarted && pool.startedDropped > 0) return "started";
@@ -649,6 +699,7 @@ export function generate<P>(
   spec: GenSpec,
   seed: number,
   avoid?: ReadonlySet<string>,
+  recentPlayers?: ReadonlyMap<string, number>,
 ): GenResult<P> {
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
@@ -666,6 +717,8 @@ export function generate<P>(
   if (missing.length) return { ok: false, fail: { code: "pin-missing", ids: missing } };
 
   const seated = pins.filter((p): p is GenLeg<P> => !!p);
+  const wrongPosition = seated.filter((p) => spec.positions?.length && (!p.position || !spec.positions.includes(p.position)));
+  if (wrongPosition.length) return { ok: false, fail: { code: "pin-position", ids: wrongPosition.map((p) => p.id) } };
   for (let i = 0; i < seated.length; i++) {
     for (let j = i + 1; j < seated.length; j++) {
       if (seated[i].playerKey === seated[j].playerKey)
@@ -728,19 +781,27 @@ export function generate<P>(
     return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
   }
 
-  const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet };
+  const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet, crossGamePlayers: crossesGames(sampleSet) };
+  const orderFor = (s: number) => spec.style ? mixOrder(ctx.cands, spec.style, mulberry32(s), recentPlayers) : sampleOrder(ctx.cands, mulberry32(s), n);
   const payoutBand = spec.payout ? bandDec(spec.payout.minAm, spec.payout.maxAm) : null;
 
   if (payoutBand) {
     const reach = reachOf(ctx);
     if (!reach) return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
     const reachAm = { minAm: decToAm(reach.minDec), maxAm: decToAm(reach.maxDec) };
-    if (reach.maxDec < payoutBand.lo || reach.minDec > payoutBand.hi) {
+    // Greedy feasible examples are not mathematical bounds. Ignore conflicts to
+    // obtain safe outer bounds before declaring a payout impossible.
+    const freeSlots = n - seated.length;
+    const loose = ctx.cands.filter((l) => !pinIds.has(l.id)).map((l) => l.dec).sort((a, b) => a - b);
+    const base = seated.reduce((d, l) => d * l.dec, 1);
+    const lower = base * loose.slice(0, freeSlots).reduce((d, price) => d * price, 1);
+    const upper = base * (freeSlots ? loose.slice(-freeSlots).reduce((d, price) => d * price, 1) : 1);
+    if (upper < payoutBand.lo || lower > payoutBand.hi) {
       return { ok: false, fail: { code: "payout-unreachable", reach: reachAm } };
     }
     for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
       const s = (seed + roll) >>> 0;
-      const order = sampleOrder(ctx.cands, mulberry32(s), n);
+      const order = orderFor(s);
       const first = fillSlots(ctx, order, payoutBand.hi) ?? fillSlots(ctx, order, null);
       if (!first) continue;
       const fixed = repairPayout(ctx, first, order, payoutBand);
@@ -756,7 +817,7 @@ export function generate<P>(
   let last: GenTicket<P> | null = null;
   for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
     const s = (seed + roll) >>> 0;
-    const legs = fillSlots(ctx, sampleOrder(ctx.cands, mulberry32(s), n), null);
+    const legs = fillSlots(ctx, orderFor(s), null);
     if (!legs) break; // capacity said this cannot happen; if it ever does, fail honestly below
     const ticket = ticketOf(legs, ctx.spec, s);
     last = ticket;

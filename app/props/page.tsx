@@ -25,7 +25,7 @@ import { Slip } from "@/components/props/Slip";
 import { GenSheet } from "@/components/props/GenSheet";
 import { GEN_MARKETS, MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
 import { blankPins, useParlayGen } from "@/components/props/useParlayGen";
-import type { GenSpec } from "@/lib/parlay-gen";
+import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import {
@@ -79,6 +79,7 @@ import {
    their product is +834. Neither is a price — they are filters over prices the book posted. */
 const GEN_OPEN_KEY = "pl:props:gen-open";
 const GEN_SPEC_DEFAULT: GenSpec = {
+  style: "safer",
   market: "batter_hits_runs_rbis",
   legs: 4,
   legMinAm: -152,
@@ -122,8 +123,8 @@ function PropsDesk() {
   useEffect(() => {
     if (NFL_ENABLED && wantNfl) setSport("nfl");
   }, [wantNfl]);
-  const [tab, setTab] = useState<TabKey>(link?.tab ?? "games");
-  const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "ml");
+  const [tab, setTab] = useState<TabKey>(link?.tab ?? "batter");
+  const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "hrr");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [search, setSearch] = useState("");
@@ -223,7 +224,7 @@ function PropsDesk() {
   };
   /* the pool's only dependency is the board, so the builder is memoized on it */
   const buildGenPool = useCallback(
-    (sp: GenSpec, at: number) => buildPool(propBoard, sp, at),
+    (sp: GenPoolSpec, at: number) => buildPool(propBoard, sp, at),
     [propBoard],
   );
   const gen = useParlayGen<SandboxLeg>({
@@ -344,6 +345,10 @@ function PropsDesk() {
         onAdd={gen.add}
         canUndo={gen.canUndo}
         onUndo={gen.undo}
+        onSaveSetup={gen.saveSetup}
+        onLoadSetup={gen.loadSetup}
+        hasSetup={gen.hasSetup}
+        setupNotice={gen.setupNotice}
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={boardAtLabel}

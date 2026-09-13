@@ -1,5 +1,6 @@
 "use client";
 
+import { decodeSetup, encodeSetup } from "@/lib/parlay-gen-setup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   emptyPool,
@@ -8,7 +9,9 @@ import {
   type GenPool,
   type GenResult,
   type GenSpec,
+  type GenPoolSpec,
 } from "@/lib/parlay-gen";
+const NO_POSITIONS: readonly string[] = [];
 
 /**
  * THE PARLAY GENERATOR'S STATE, once (INSTRUCTION 52, 2026-09-12, Josh's word, verbatim:
@@ -60,12 +63,17 @@ export type UseParlayGen<P> = {
   canUndo: boolean;
   /** Date.now() as of mount, 0 during SSR — the caller formats the board clock off it */
   nowMs: number;
+  saveSetup: () => void;
+  loadSetup: () => void;
+  hasSetup: boolean;
+  setupNotice: string | null;
 };
 
 export function useParlayGen<P>({
   storageKey,
   defaultSpec,
   marketKeys,
+  positions = NO_POSITIONS,
   railMarket,
   boardKey,
   build,
@@ -79,12 +87,13 @@ export function useParlayGen<P>({
   defaultSpec: GenSpec;
   /** the market keys this desk's generator understands — the rail sync ignores anything else */
   marketKeys: readonly string[];
+  positions?: readonly string[];
   /** the market the rail is currently on, or null on a tab with no generator market */
   railMarket: string | null;
   /** the board's identity (its date): a fresh board re-rolls */
   boardKey: string;
   /** the desk's own pool builder — memoize it on the board, it is the pool's only dependency */
-  build: (spec: GenSpec, nowMs: number) => GenPool<P>;
+  build: (spec: GenPoolSpec, nowMs: number) => GenPool<P>;
   /** move the market rail; the generator never owns the market, it follows the rail */
   onMarket: (market: string) => void;
   /** the slip as it stands, so Add can be undone */
@@ -107,7 +116,7 @@ export function useParlayGen<P>({
   const [open, setOpenState] = useState(false);
   useEffect(() => {
     try {
-      if (localStorage.getItem(storageKey) === "1") setOpenState(true);
+      if (localStorage.getItem(storageKey) !== "0") setOpenState(true);
     } catch {
       /* fresh device / storage blocked */
     }
@@ -123,6 +132,26 @@ export function useParlayGen<P>({
   );
 
   const [spec, setSpec] = useState<GenSpec>(defaultSpec);
+  const [savedSetup, setSavedSetup] = useState<GenSpec | null>(null);
+  const [setupNotice, setSetupNotice] = useState<string | null>(null);
+  useEffect(() => {
+    try { setSavedSetup(decodeSetup(localStorage.getItem(`${storageKey}:setup`), marketKeys, positions)); }
+    catch { setSavedSetup(null); }
+  }, [storageKey, marketKeys, positions]);
+  const saveSetup = () => {
+    try {
+      const raw = encodeSetup({ ...spec, style: spec.style ?? "safer" });
+      localStorage.setItem(`${storageKey}:setup`, raw);
+      setSavedSetup(decodeSetup(raw, marketKeys, positions));
+      setSetupNotice("Setup saved on this device. Players will rotate from the current board.");
+    } catch { setSetupNotice("This browser could not save the setup. You can keep building."); }
+  };
+  const loadSetup = () => {
+    if (!savedSetup) return;
+    onMarket(savedSetup.market);
+    setSpec(savedSetup);
+    setSetupNotice("Saved setup loaded. Pins cleared; picks use the current board.");
+  };
   const [roll, setRoll] = useState(0);
   const [added, setAdded] = useState(false);
   /* 0 on the server, so a server render marks NO game as started; set once on mount, never on
@@ -131,6 +160,7 @@ export function useParlayGen<P>({
   useEffect(() => setNowMs(Date.now()), []);
   /* the last 10 ticket keys, so Regenerate does not hand back the spin just seen */
   const history = useRef<string[]>([]);
+  const recentPlayers = useRef<string[][]>([]);
   /* the slip exactly as it was before "Add to slip" — the Undo */
   const prevLegs = useRef<P[] | null>(null);
 
@@ -141,11 +171,12 @@ export function useParlayGen<P>({
      construction over the whole board plus the seeded fill and the bounded repair loop on every
      dependency change. A closed sheet gets the empty pool, which the generator answers with
      `no-rows` at no cost. */
-  const pool = useMemo(() => (open ? build(spec, nowMs) : emptyPool<P>()), [open, build, spec, nowMs]);
+  const poolSpec = useMemo(() => ({ market: spec.market, includeStarted: spec.includeStarted }), [spec.market, spec.includeStarted]);
+  const pool = useMemo(() => (open ? build(poolSpec, nowMs) : emptyPool<P>()), [open, build, poolSpec, nowMs]);
   const result = useMemo<GenResult<P>>(
     () =>
       open
-        ? generate(pool, spec, specSeed(spec, boardKey, roll), new Set(history.current))
+        ? generate(pool, spec, specSeed(spec, boardKey, roll), new Set(history.current), playerExposure(recentPlayers.current))
         : { ok: false, fail: { code: "no-rows" } },
     [open, pool, spec, roll, boardKey],
   );
@@ -160,6 +191,7 @@ export function useParlayGen<P>({
   }, [railMarket, marketKeys]);
 
   const patchSpec = (patch: Partial<GenSpec>) => {
+    setSetupNotice(null);
     if (patch.market && patch.market !== spec.market) {
       onMarket(patch.market);
       return;
@@ -177,6 +209,7 @@ export function useParlayGen<P>({
      Clearing a pin reads the id from the SPEC, which is always available; only SETTING a new
      pin needs a ticket. */
   const togglePin = (slot: number) => {
+    setSetupNotice(null);
     setSpec((sp) => {
       const pinned = Array.from({ length: sp.legs }, (_, k) => sp.pinned[k] ?? null);
       if (pinned[slot]) {
@@ -192,7 +225,9 @@ export function useParlayGen<P>({
   };
 
   const spin = () => {
+    setSetupNotice(null);
     if (result.ok) {
+      recentPlayers.current = [result.ticket.legs.map((l) => l.playerKey), ...recentPlayers.current].slice(0, 4);
       const k = result.ticket.key;
       history.current = [k, ...history.current.filter((x) => x !== k)].slice(0, 10);
     }
@@ -203,6 +238,7 @@ export function useParlayGen<P>({
      spun survive and the desk's clash rules still decide what may join them. `prevLegs` is the
      slip exactly as it stood, which is what Undo puts back. */
   const add = () => {
+    setSetupNotice(null);
     if (!result.ok) return;
     prevLegs.current = legs.slice();
     setLegs(addLegs(legs, result.ticket.legs.map((l) => l.leg)));
@@ -228,7 +264,15 @@ export function useParlayGen<P>({
     undo,
     canUndo: added && prevLegs.current != null,
     nowMs,
+    saveSetup, loadSetup, hasSetup: savedSetup != null, setupNotice,
   };
 }
 
 export const blankPins = (n: number): (string | null)[] => Array.from({ length: n }, () => null);
+
+
+function playerExposure(tickets: readonly string[][]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const ticket of tickets) for (const player of new Set(ticket)) counts.set(player, (counts.get(player) ?? 0) + 1);
+  return counts;
+}

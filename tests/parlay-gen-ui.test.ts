@@ -183,7 +183,7 @@ describe("GenSheet — the open panel", () => {
   });
   it("the footer carries the slip's own naive-product disclaimer, the sandbox framing and the suspension note", () => {
     expect(out).toContain(
-      "True % is the naive product — same-game legs are correlated and this sandbox does not model that.",
+      "Estimated hit chance multiplies the leg estimates. Same-game correlation is not modeled; this is not a sportsbook parlay quote.",
     );
     expect(out).toContain("Sandbox · not tracked, never enters the ledger.");
     /* H+R+RBI and Outs are suspended from the engine's OWN auto-built tickets (SH_CFG hrrAltMax -1 /
@@ -299,7 +299,7 @@ describe("source pins — the honesty guard extended to the newest price surface
   it("the hook reads the open flag AFTER mount, behind try/catch — never in a useState initializer", () => {
     expect(page).toMatch(/const GEN_OPEN_KEY = "pl:props:gen-open";/);
     expect(hook).toMatch(/const \[open, setOpenState\] = useState\(false\);/);
-    expect(hook).toMatch(/if \(localStorage\.getItem\(storageKey\) === "1"\) setOpenState\(true\);/);
+    expect(hook).toMatch(/if \(localStorage\.getItem\(storageKey\) !== "0"\) setOpenState\(true\);/);
     expect(hook).toMatch(/localStorage\.setItem\(storageKey, next \? "1" : "0"\);/);
     expect(hook).not.toMatch(/useState\([^)]*localStorage/);
     // nowMs defaults to 0 so a server render marks NO game started

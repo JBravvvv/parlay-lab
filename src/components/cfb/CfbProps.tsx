@@ -22,7 +22,9 @@ import { kickoffLabel } from "@/lib/cfb/dates";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
 import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
-import type { GenSpec } from "@/lib/parlay-gen";
+import { FOOTBALL_POSITIONS, footballPosition, positionLookup } from "@/lib/football/positions";
+import { loadPositionFeed } from "@/lib/football/positions-client";
+import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
@@ -662,17 +664,15 @@ function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
    18-line wrapper around it (INSTRUCTION 47), so the NFL gets the generator by being the same
    component, not by carrying a second copy of any of this.
 
-   THE DEFAULT BAND IS WIDER THAN MLB'S. MLB opens on Josh's own worked example (-152 → +110), but
-   football's six markets are not priced in that range: anytime TD is plus money by nature and
-   would open every session on "no leg is priced in this band". -250 → +250 (1.40 → 3.50 in
-   decimal, which is how the band is actually compared) has real legs in all six. A band is a
-   filter over posted prices, never a price — widening the default invents nothing. */
+   Anytime TD opens in the owner's -230 to +200 range (2026-09-12), with a
+   category-relative safer mix. The range stays editable for every prop category. */
 const GEN_MARKET_KEYS: readonly string[] = FOOTBALL_GEN_MARKETS.map((m) => m.key);
 const GEN_SPEC_DEFAULT: GenSpec = {
+  style: "safer",
   market: FOOTBALL_GEN_MARKETS[0].key,
   legs: 4,
-  legMinAm: -250,
-  legMaxAm: 250,
+  legMinAm: -230,
+  legMaxAm: 200,
   payout: null,
   sides: "o",
   onePerGame: true,
@@ -732,8 +732,9 @@ export function CfbProps() {
   const { today, date, dates, pick, slate, bankroll, loading, error, refetch } = useCfbDesk();
   const { top, bottom } = useShellInsets();
   const [mode, setMode] = useState<PriceMode>("cz");
-  const [nav, setNav] = useState<NavKey>("sides");
+  const [nav, setNav] = useState<NavKey>("anytime_td");
   const [search, setSearch] = useState("");
+  const [loadRosterPositions, setLoadRosterPositions] = useState(false);
   const [legs, setLegs] = useState<CfbSlipLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [note, setNote] = useState<string | null>(null);
@@ -787,6 +788,22 @@ export function CfbProps() {
   const liveGames = games.filter((g) => g.status === "live").length;
 
   const board = propsQ.data;
+  const rosterTeams = useMemo(() => {
+    const needsPosition = new Set((board?.rows ?? []).filter((r) => !footballPosition(r.pos)).map((r) => r.gameId));
+    return [...new Set(games.filter((g) => needsPosition.has(g.id) && g.status !== "final" && g.status !== "postponed").flatMap((g) => [g.home.id, g.away.id]))].sort().join(",");
+  }, [board, games]);
+  const positionsQ = useQuery({
+    queryKey: [L.id, "roster-positions", rosterTeams],
+    queryFn: ({ signal }) => loadPositionFeed(L.id, rosterTeams.split(","), signal),
+    enabled: loadRosterPositions && nav !== "sides" && !!rosterTeams,
+    staleTime: (q) => q.state.data?.missingTeams.length ? 60_000 : 3_600_000,
+    retry: 1,
+  });
+  const rosterPosition = useMemo(() => positionLookup(positionsQ.data?.players ?? []), [positionsQ.data]);
+  const positionOf = useCallback((row: CfbPropRow) => {
+    const game = gameById.get(row.gameId);
+    return footballPosition(row.pos) ?? (game ? rosterPosition(row.player, [game.home.id, game.away.id]) : null);
+  }, [gameById, rosterPosition]);
   const groups = useMemo(
     () => (nav === "sides" || !board ? [] : groupProps(board.rows, nav, mode, normName(search.trim()))),
     [board, nav, mode, search],
@@ -807,12 +824,13 @@ export function CfbProps() {
      A PURE READER: no fetch, no extra market on any pull, not one Odds credit, no money seated
      and no ledger row. The rows are the board that is already on the device. */
   const buildGenPool = useCallback(
-    (sp: GenSpec, at: number) =>
+    (sp: GenPoolSpec, at: number) =>
       footballGenPool<CfbSlipLeg>(board?.rows ?? [], sp, {
         mode,
         nowMs: at,
         /* the row's own team tag, folded to one spelling per club — never guessed */
         teamOf: (row) => row.teamAbbr ?? row.team,
+        positionOf,
         quoteOf: propQuote,
         legOf: (row, q) => {
           const leg = propLegOf(row, q);
@@ -821,10 +839,10 @@ export function CfbProps() {
              game, never by name — so a generated leg reaches the slip with the identical mark */
           const g = gameById.get(row.gameId);
           const team = g && row.teamId ? (row.teamId === g.home.id ? g.home : row.teamId === g.away.id ? g.away : null) : null;
-          return { ...leg, team };
+          return { ...leg, team, pos: positionOf(row) };
         },
       }),
-    [board, mode, gameById],
+    [board, mode, gameById, positionOf],
   );
   const gen = useParlayGen<CfbSlipLeg>({
     /* derived from the league, never a literal: one desk's remembered state must not be the
@@ -832,6 +850,7 @@ export function CfbProps() {
     storageKey: `pl:${L.id}:props:gen-open`,
     defaultSpec: GEN_SPEC_DEFAULT,
     marketKeys: GEN_MARKET_KEYS,
+    positions: FOOTBALL_POSITIONS,
     railMarket: nav === "sides" ? null : nav,
     boardKey: date,
     build: buildGenPool,
@@ -847,6 +866,7 @@ export function CfbProps() {
     },
   });
   const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
+  useEffect(() => setLoadRosterPositions(!!gen.spec.positions?.length), [gen.spec.positions]);
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
      so SSR prints no clock and hydration cannot mismatch on a locale-rendered time) */
   const genBoardAt =
@@ -932,6 +952,8 @@ export function CfbProps() {
         market={gen.spec.market}
         marketLabel={genMarketLabel}
         markets={FOOTBALL_GEN_MARKETS}
+        positions={FOOTBALL_POSITIONS}
+        positionsLoading={loadRosterPositions && !!rosterTeams && positionsQ.isPending}
         pool={gen.pool}
         renderMark={({ leg }) => (
           <PlayerMark
@@ -955,10 +977,14 @@ export function CfbProps() {
         onAdd={gen.add}
         canUndo={gen.canUndo}
         onUndo={gen.undo}
+        onSaveSetup={gen.saveSetup}
+        onLoadSetup={gen.loadSetup}
+        hasSetup={gen.hasSetup}
+        setupNotice={gen.setupNotice}
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={genBoardAt}
-        loading={propsQ.isPending}
+        loading={propsQ.isPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
         gameMarket={nav === "sides"}
         showModelOnly={false}
         categoryNote={GEN_CATEGORY_NOTE}

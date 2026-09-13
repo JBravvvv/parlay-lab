@@ -1,3 +1,85 @@
+## Mobile generator and position filters — 2026-09-12
+
+**INSTRUCTION 56 — Josh: "the parlay generator needs to be smaller on iOS mobile 'app'" and "if i want a 4 team parlay with WR & RB I can check those 2 and only have those two positions in the generated picks".**
+
+The shared generator now starts compact on narrow cards: full controls and saved
+setups sit behind Customize, explanatory copy is collapsed, and style, positions,
+Regenerate and ticket slots remain visible. Wide cards keep the two-column layout.
+Phone-width browser check: 341px clientWidth and scrollWidth, 671px panel height
+with four fictional legs and no status notice. This is a width-constrained browser
+check, not a test on physical iOS hardware. Touch targets remain at least 44px high.
+
+NFL/CFB now offer QB, RB, WR, TE and FB checkboxes. WR + RB allows any combination
+of those positions; it does not require a quota of each. Filters bind the core,
+counts, tier population and payout repair. Unknown positions are excluded when a
+filter is active. Incompatible pins fail visibly until unpinned or the filter is
+changed. Save/Load validates and restores positions along with the other settings.
+
+The live NFL feed had 1,235 rows with null positions in the September 13 board
+captured for this check. A separate keyless ESPN roster endpoint supplies identity
+metadata without changing or re-fetching Odds API prices. It accepts only NFL/CFB,
+numeric team IDs (up to 32), a fixed ESPN host, four concurrent requests, five-second
+per-request timeouts and an hour cache. Missing teams remain explicit. Browser
+queries start only after a position filter is selected and are league/team scoped.
+Large CFB slates are split into 32-team batches (at most two batches in flight),
+without truncating the candidate teams. Finished/postponed games need no roster
+lookup. Partial failures retain successful batches and get a shorter retry window.
+Names are matched only against the game's two rosters, and ambiguous matches stay
+unknown. Verified local endpoint: 47 position records for two NFL teams, no missing
+teams. QB/RB/WR/TE/FB values came from ESPN, not prop-category guesses.
+
+Synthetic browser checks: WR/RB-only tickets, kept WR survived regeneration,
+Save/Load restored position selections, Add to slip added four legs. The test-only
+preview route was removed before the release gate. A counterfactual removes the
+position constraint and requires the behavioral tests to fail before restoring it.
+The earlier full-suite run was stopped when these new owner requirements arrived;
+only the fresh final run is release evidence. Prospective profit-policy research
+and learned football prediction weights remain separate unfinished work.
+
+# Progress — 2026-09-12: category-relative parlay mixes
+
+**INSTRUCTION 55 — Josh: "i dont want it to just select a bunch of -200, -170, -150 every time".**
+
+Added Safer mix and Balanced mix to the shared MLB/CFB/NFL sandbox generator.
+Candidates stay inside the selected category, side, book, per-leg odds band and
+player/game constraints. Relative Anchor/Middle/Upside bands use hit estimates;
+model estimates are capped at the quote-implied chance for ranking only. Equal
+probabilities share a tier. Players' alternate-line counts do not dominate the
+relative ranking. Safer mix favors anchors while cycling other bands; the result
+shows the actual mix because pins and payout/game constraints can change it.
+Football remains market-consensus guided, not an independent player forecast.
+No automatic paper-portfolio or production model weights changed in this release.
+
+New spins downweight players from the previous four tickets, without excluding
+any eligible player or overriding pins. Seeded weighted band queues cost O(n log n).
+Pool creation now depends only on market/start filters and board inputs; editing
+odds, style or pins no longer rebuilds every prop leg. Spins and saved setups make
+no network requests. Opening the football builder now activates its existing
+budgeted props query immediately because it starts on Anytime TD; daily caps stay
+unchanged. The historical sampler remains available to existing callers that omit
+a style; both real app desks explicitly default to Safer mix.
+
+Anytime TD opens at the owner's -230 to +200 range, with a one-tap reset. Builder
+opens on props and the generator opens for a first-time reader. Saved setups are
+per-device and per-sport; they carry preferences only, discard pins, validate
+stored inputs, and use the current board. The ticket sits beside controls on wide
+cards and shows the observed band counts and each player's band. A more opaque
+panel improves contrast against the mascot. Estimated probability/EV wording
+replaces the generator's misleading "true" wording and market-EV-is-zero claim.
+
+Local browser verification (synthetic, clearly labeled preview; removed before
+shipping): Save/Load restored Safer mix after changing style; pin survived spin;
+Add to slip added four legs. Narrow generator width 341px, scrollWidth 341px.
+A later review found and reproduced two pre-existing doubleheader defects: an
+impossible three-leg request was reported as having capacity three (actual two),
+and a greedy early pick could block a valid two-leg combination. Exact bipartite
+matching now computes capacity; matching lookahead protects completion when a
+player appears in multiple games. Ordinary slates keep the fast path. A third reproduced defect rejected a feasible
+payout because greedy price examples were treated as bounds; rejection now uses
+optimistic outer bounds, with a remaining-price check during filling. The first
+full run was stopped to fix these defects; a fresh run follows the focused tests.
+Final release gate (2026-09-12, 20:37 PDT; working tree based on `7d64984`): TypeScript clean, 202 files / 3,223 tests passed, full run 262.86s. Earlier stopped/red runs are not release evidence. The old Games/ML default assertion was updated to the intended Batter/H+R+RBI default; no assertion was weakened. A duplicate progress file was preserved outside the code tree.
+
 
 ## Generator repair and workflow reconciliation — 2026-09-12
 

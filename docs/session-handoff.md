@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `87052915363d6ebc0cb10861ecb1936a5ee57925` (read by `git rev-parse origin/frontend-rebuild` this write, after INSTRUCTION 53's `PASTE-THIS.md` / lock / STATE-CLAIM-restructure commit shipped and deployed as `parlay-jzuzbm5lv`.)
+> - **STATE-CLAIM 2026-09-12:** `origin/frontend-rebuild` = `7d649846d020682ac5f2a8f8b070699fd4bc56f1` (verified by remote read before the compact generator and position-filter release).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
@@ -42,7 +42,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > the guard to catch on someone else's turn. `origin/frontend-rebuild` and local HEAD were both
 > `46f68df` at this write, so the new claim starts at distance 0 and the commit carrying it makes
 > it the structural 1.)*
-> - **STATE-CLAIM 2026-08-10:** `origin/main` = `ed2e4a5c11052a0bbe2322fbac36e060bdd142bd`
+> - **STATE-CLAIM 2026-09-12:** `origin/main` = `150315039d4e01387bd04a45f541fdb4b7c2875c` (verified remote workflow-reconciliation tip; production remains on frontend-rebuild).
 >
 > *(Refreshed when `sha-currency` fired at 11 behind — its first live catch, one day after it
 > shipped. The guard is doing the maintenance its header promised.)*
@@ -1068,6 +1068,89 @@ seven failures exposed file-URL comparisons that skipped report execution in pat
 spaces (fixed using pathToFileURL), and one historical-data check required network access.
 Final validation: TypeScript clean; 199 files / 3196 tests passed in 285 seconds with
 network access for the historical-data check. Production verification follows deployment.
+
+# Progress — 2026-09-12: category-relative parlay mixes
+
+**INSTRUCTION 55 — Josh: "i dont want it to just select a bunch of -200, -170, -150 every time".**
+
+Added Safer mix and Balanced mix to the shared MLB/CFB/NFL sandbox generator.
+Candidates stay inside the selected category, side, book, per-leg odds band and
+player/game constraints. Relative Anchor/Middle/Upside bands use hit estimates;
+model estimates are capped at the quote-implied chance for ranking only. Equal
+probabilities share a tier. Players' alternate-line counts do not dominate the
+relative ranking. Safer mix favors anchors while cycling other bands; the result
+shows the actual mix because pins and payout/game constraints can change it.
+Football remains market-consensus guided, not an independent player forecast.
+No automatic paper-portfolio or production model weights changed in this release.
+
+New spins downweight players from the previous four tickets, without excluding
+any eligible player or overriding pins. Seeded weighted band queues cost O(n log n).
+Pool creation now depends only on market/start filters and board inputs; editing
+odds, style or pins no longer rebuilds every prop leg. Spins and saved setups make
+no network requests. Opening the football builder now activates its existing
+budgeted props query immediately because it starts on Anytime TD; daily caps stay
+unchanged. The historical sampler remains available to existing callers that omit
+a style; both real app desks explicitly default to Safer mix.
+
+Anytime TD opens at the owner's -230 to +200 range, with a one-tap reset. Builder
+opens on props and the generator opens for a first-time reader. Saved setups are
+per-device and per-sport; they carry preferences only, discard pins, validate
+stored inputs, and use the current board. The ticket sits beside controls on wide
+cards and shows the observed band counts and each player's band. A more opaque
+panel improves contrast against the mascot. Estimated probability/EV wording
+replaces the generator's misleading "true" wording and market-EV-is-zero claim.
+
+Local browser verification (synthetic, clearly labeled preview; removed before
+shipping): Save/Load restored Safer mix after changing style; pin survived spin;
+Add to slip added four legs. Narrow generator width 341px, scrollWidth 341px.
+A later review found and reproduced two pre-existing doubleheader defects: an
+impossible three-leg request was reported as having capacity three (actual two),
+and a greedy early pick could block a valid two-leg combination. Exact bipartite
+matching now computes capacity; matching lookahead protects completion when a
+player appears in multiple games. Ordinary slates keep the fast path. A third reproduced defect rejected a feasible
+payout because greedy price examples were treated as bounds; rejection now uses
+optimistic outer bounds, with a remaining-price check during filling. The first
+full run was stopped to fix these defects; a fresh run follows the focused tests.
+Final release gate (2026-09-12, 20:37 PDT; working tree based on `7d64984`): TypeScript clean, 202 files / 3,223 tests passed, full run 262.86s. Earlier stopped/red runs are not release evidence. The old Games/ML default assertion was updated to the intended Batter/H+R+RBI default; no assertion was weakened. A duplicate progress file was preserved outside the code tree.
+
+## Mobile generator and position filters — 2026-09-12
+
+**INSTRUCTION 56 — Josh: "the parlay generator needs to be smaller on iOS mobile 'app'" and "if i want a 4 team parlay with WR & RB I can check those 2 and only have those two positions in the generated picks".**
+
+The shared generator now starts compact on narrow cards: full controls and saved
+setups sit behind Customize, explanatory copy is collapsed, and style, positions,
+Regenerate and ticket slots remain visible. Wide cards keep the two-column layout.
+Phone-width browser check: 341px clientWidth and scrollWidth, 671px panel height
+with four fictional legs and no status notice. This is a width-constrained browser
+check, not a test on physical iOS hardware. Touch targets remain at least 44px high.
+
+NFL/CFB now offer QB, RB, WR, TE and FB checkboxes. WR + RB allows any combination
+of those positions; it does not require a quota of each. Filters bind the core,
+counts, tier population and payout repair. Unknown positions are excluded when a
+filter is active. Incompatible pins fail visibly until unpinned or the filter is
+changed. Save/Load validates and restores positions along with the other settings.
+
+The live NFL feed had 1,235 rows with null positions in the September 13 board
+captured for this check. A separate keyless ESPN roster endpoint supplies identity
+metadata without changing or re-fetching Odds API prices. It accepts only NFL/CFB,
+numeric team IDs (up to 32), a fixed ESPN host, four concurrent requests, five-second
+per-request timeouts and an hour cache. Missing teams remain explicit. Browser
+queries start only after a position filter is selected and are league/team scoped.
+Large CFB slates are split into 32-team batches (at most two batches in flight),
+without truncating the candidate teams. Finished/postponed games need no roster
+lookup. Partial failures retain successful batches and get a shorter retry window.
+Names are matched only against the game's two rosters, and ambiguous matches stay
+unknown. Verified local endpoint: 47 position records for two NFL teams, no missing
+teams. QB/RB/WR/TE/FB values came from ESPN, not prop-category guesses.
+
+Synthetic browser checks: WR/RB-only tickets, kept WR survived regeneration,
+Save/Load restored position selections, Add to slip added four legs. The test-only
+preview route was removed before the release gate. A counterfactual removes the
+position constraint and requires the behavioral tests to fail before restoring it.
+The earlier full-suite run was stopped when these new owner requirements arrived;
+only the fresh final run is release evidence. Prospective profit-policy research
+and learned football prediction weights remain separate unfinished work.
+
 
 **FIRST PAPER RESULTS (read 2026-08-16 from the live public card):** 08-16 core 4W–2L,
 $10 forced-hits pending; the $81 that lost ($56 core + $25 fun) was ALL pitcher-outs

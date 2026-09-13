@@ -28,9 +28,10 @@
  */
 
 import { amToDec } from "@/lib/ticket-math";
-import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenSpec } from "@/lib/parlay-gen";
+import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenPoolSpec } from "@/lib/parlay-gen";
 import { playerSlug } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropQuote, type CfbPropRow } from "@/lib/cfb/props-types";
+import { footballPosition } from "./positions";
 
 /** the price column Josh is reading the board at — the desk's own PriceMode */
 export type FootballPriceMode = "cz" | "best";
@@ -74,6 +75,7 @@ export type FootballGenOpts<P> = {
   nowMs: number;
   /** the row's team tag, folded to ONE spelling per club ("ALA") */
   teamOf: (row: CfbPropRow) => string | null;
+  positionOf?: (row: CfbPropRow) => string | null;
   /** the desk's own quote picker (`propQuote`) — null when that book posts nothing */
   quoteOf: (row: CfbPropRow, mode: FootballPriceMode) => CfbPropQuote | null;
   /** the desk's own leg minter (`propLegOf`) — null for the cell the board draws as a dash */
@@ -90,7 +92,7 @@ export type FootballGenOpts<P> = {
  */
 export function footballGenPool<P extends { prob: number; book: string }>(
   rows: readonly CfbPropRow[],
-  spec: GenSpec,
+  spec: GenPoolSpec,
   opts: FootballGenOpts<P>,
 ): GenPool<P> {
   const legs: GenLeg<P>[] = [];
@@ -143,6 +145,7 @@ export function footballGenPool<P extends { prob: number; book: string }>(
          two different men, and a global name key would refuse to put both on one ticket. */
       playerKey: `${row.gameId}|${playerSlug(row.player)}`,
       team: opts.teamOf(row),
+      position: footballPosition(opts.positionOf?.(row) ?? row.pos),
       started,
       /* the football board carries no alternate ladders — every row is the book's own line */
       alt: false,

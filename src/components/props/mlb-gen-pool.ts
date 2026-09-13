@@ -18,7 +18,7 @@
 
 import type { PropBoardGame, PropBoardRow } from "@/engine";
 import { amToDec } from "@/lib/ticket-math";
-import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenSpec } from "@/lib/parlay-gen";
+import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenPoolSpec } from "@/lib/parlay-gen";
 import { MKT_LABEL, nameKey, playerLeg, teamTag, type Side } from "./props-model";
 import type { SandboxLeg } from "@/lib/ticket-math";
 
@@ -56,7 +56,7 @@ export type MlbGenPool = GenPool<SandboxLeg>;
  * `nowMs` is passed in rather than read from the clock so this stays pure — the caller
  * sets it in a post-mount effect and SSR passes 0, which marks nothing started.
  */
-export function buildPool(board: readonly PropBoardGame[], spec: GenSpec, nowMs: number): MlbGenPool {
+export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, nowMs: number): MlbGenPool {
   const legs: GenLeg<SandboxLeg>[] = [];
   let rows = 0;
   let startedDropped = 0;
