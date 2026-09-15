@@ -390,7 +390,7 @@ export function CfbPicksBoard() {
             <span className="inline-flex items-baseline gap-1">
               <OddsCell odds={r.cz.price} book="caesars" />
               {r.market !== "ml" && r.cz.line != null && r.line != null && Math.abs(r.cz.line - r.line) > 1e-9 && (
-                <span className={`num text-[9.5px] ${accentText}`} title="Caesars' own line differs from the consensus line">
+                <span className={`num text-[9.5px] ${accentText}`} title="The selected sportsbook line differs from the consensus line">
                   @{r.market === "spread" ? fmtLine(r.cz.line) : r.cz.line}
                 </span>
               )}
@@ -576,8 +576,7 @@ export function CfbPicksBoard() {
               </>
             )}
             Sides cache up to 4 min per date, player props {propsQ.data ? cfbCacheLabel(propsQ.data) : `${PROPS_CACHE_H} h`}
-            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — a refresh inside the window spends no quota. Caesars is the settlement
-            price (The Odds API&apos;s US feed); the NV app can differ — confirm at lock. Parlays multiply each leg&apos;s own probability
+            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — a refresh inside the window spends no quota. Displayed prices follow your selected sportsbook. Locked paper cards retain their recorded prices. Parlays multiply each leg&apos;s own probability
             (legs on different games are treated as independent). Setups that match criteria, not predictions. Informational only, not
             betting advice.
           </div>
@@ -646,10 +645,10 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
 
       <div className="mt-3 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-faint">Caesars</div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-faint">{bookName(cz.book)}</div>
           <div className={nfl ? "hero-price is-nfl num mt-0.5" : "hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
           {r.market !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
-            <div className={`num mt-1 text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="Caesars' own line differs from the consensus line">
+            <div className={`num mt-1 text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="The selected sportsbook line differs from the consensus line">
               at {r.market === "spread" ? fmtLine(cz.line) : cz.line}
             </div>
           )}

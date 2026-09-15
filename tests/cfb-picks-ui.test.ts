@@ -86,6 +86,7 @@ describe("CFB Board — the Caesars grammar", () => {
     const card = board.slice(board.indexOf("function FeaturedPick("), board.indexOf("function sideTeamId("));
     expect(card).toMatch(/hero-price is-cfb/);
     expect(card).toMatch(/fmtAmerican\(cz\.price\)/);
+    expect(card).toMatch(/bookName\(cz\.book\)/);
     expect(card).toMatch(/<GradeChip grade=\{r\.grade\}/);
     expect(card).toMatch(/<EvBadge ev=\{r\.evCz\} \/>/);
     expect(card).toMatch(/\{usd\(winsOn\(cz\.dec\)\)\}/);
