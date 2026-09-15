@@ -2,7 +2,7 @@ import {describe,it,expect} from 'vitest';
 import {valueAt} from '@/lib/sportsbook/books';
 import {gradeFromEv} from '@/lib/grade';
 import {priceFootballProp,priceFootballRow} from '@/lib/sportsbook/football';
-import {priceMlbBoard,priceMlbRow,priceMlbProp,attachBookQuotes,quoteCapture} from '@/lib/sportsbook/mlb';
+import {priceMlbMoneylines,priceMlbBoard,priceMlbRow,priceMlbProp,attachBookQuotes,quoteCapture} from '@/lib/sportsbook/mlb';
 import {priceLiveBoard} from '@/lib/sportsbook/useLivePrices';
 import type {BoardData} from '@/engine';
 import type {CfbPropRow,CfbPropQuote} from '@/lib/cfb/props-types';
@@ -46,3 +46,12 @@ it('does not attach quotes from an unmatched game',()=>{
  const e={...event,home_team:'Other'};
  expect(attachBookQuotes(data,[e]).bookQuotes).toEqual({});
 });
+
+it("Games moneylines use the chosen book, including Caesars, without a best-book fallback",()=>{
+ const data={categories:{ml:[{label:"Team",gkey:"g",lkey:"ml_home",sub:"ML",cz:-150,czOdds:"-150",odds:"+110",book:"FanDuel",bs:105,bsBook:"DK"}]}} as unknown as BoardData;
+ expect(priceMlbMoneylines(data,"williamhill_us")[0]).toMatchObject({odds:-150,cz:-150,book:"Caesars"});
+ expect(priceMlbMoneylines(data,"draftkings")[0]).toMatchObject({odds:105,cz:105,book:"DraftKings"});
+ expect(priceMlbMoneylines(data,"pinnacle")[0].odds).toBeUndefined();
+});
+
+it("selected price retains the original all-books comparison quote",()=>{const row=priceMlbRow({label:"Player",sub:"Over 0.5",prob:50,odds:"+120",book:"FanDuel",bs:-110,bsBook:"DK"} as never,"draftkings");expect(row.czOdds).toBe(-110);expect(row.bestDisplayOdds).toBe("+120");expect(row.bestDisplayBook).toBe("FanDuel");});

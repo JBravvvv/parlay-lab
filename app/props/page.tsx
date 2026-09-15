@@ -387,7 +387,7 @@ function PropsDesk() {
         <Panel>
           <EmptyState
             title={`${mkt.label} — not in the feed mirror yet`}
-            body="This market is posted at Caesars Sportsbook — the app's odds feed simply mirrors a subset of the book and doesn't carry it yet, so there are no real prices to show here (prices are never invented). The priced categories are the ones the engine already collects."
+            body="The app's odds feed does not carry this market yet, so there are no real prices to show here (prices are never invented). The priced categories are the ones the engine already collects."
           />
         </Panel>
       ) : legacyBoard ? (
@@ -439,15 +439,13 @@ function PropsDesk() {
             </summary>
             <div className="mt-1.5">
               {gameTab ? (
-                <>Prices are the board&apos;s captured Caesars quotes; the % is the engine&apos;s blended win % for that side.</>
+                <>Prices are the board&apos;s captured quotes at the selected sportsbook; the % is the engine&apos;s blended win % for that side.</>
               ) : (
                 <>
                   Every player the odds feed posts for this market, both sides, uncapped. Prices are real posted quotes —
-                  Caesars when Caesars posts the line, otherwise the best price in the feed with the book named on the
-                  button. The % is the engine&apos;s model number for that line; where the engine didn&apos;t price the
+                  from your selected sportsbook, with missing quotes left unavailable. The % is the engine&apos;s model number for that line; where the engine didn&apos;t price the
                   player (bench bats, sub-25-AB samples, unposted lineups) it is the de-vigged market fair, tagged{" "}
-                  <span className="italic">mkt</span> — a price the market thinks is fair, not an edge. ALT = a Caesars
-                  milestone ladder line. Nothing here is tracked or enters the ledger.
+                  <span className="italic">mkt</span> — a price the market thinks is fair, not an edge. ALT = an equivalent milestone ladder line. Nothing here is tracked or enters the ledger.
                 </>
               )}
             </div>

@@ -57,7 +57,7 @@ export function priceMlbRow(r:PickRow,book:string,index:QuoteIndex={}):PickRow{
  if(book===DEFAULT_BOOK)return r;const am=knownPrice(r,book,index);const p=r.prob==null?null:r.prob/100;const v=valueAt(p,am);
  const opp=r.opp as {lkey?:string;sub?:string;prob?:number;cz?:unknown;label?:string}|undefined;
  const oppAm=opp?.lkey?index[`${r.gkey}|${opp.lkey}|o`]?.[book]?.am??null:null;
- return {...r,displayBook:book,...(opp?{opp:{...opp,cz:oppAm}}:{}),odds:am??undefined,book:bookName(book),ev:v.ev,edge:v.edge,czOdds:am,czEv:v.ev,czEdge:v.edge,cz:am as PickRow['cz'],czBadge:am!=null&&v.ev!=null&&v.ev>0,czKellyF:null,
+ return {...r,displayBook:book,bestDisplayOdds:r.odds,bestDisplayBook:r.book,...(opp?{opp:{...opp,cz:oppAm}}:{}),odds:am??undefined,book:bookName(book),ev:v.ev,edge:v.edge,czOdds:am,czEv:v.ev,czEdge:v.edge,cz:am as PickRow['cz'],czBadge:am!=null&&v.ev!=null&&v.ev>0,czKellyF:null,
  // The named sportsbook overrides the legacy DK/FD basis toggle on display surfaces.
  bs:am,bsOdds:am==null?null:String(am),bsBook:bookName(book),bsEv:v.ev,bsKellyF:null,bsBadge:am!=null&&v.ev!=null&&v.ev>0};
 }
@@ -77,4 +77,10 @@ export function priceMlbBoard(data:BoardData,book:string):BoardData{
  const ticket=(t:Ticket):Ticket=>{const legs=t.legs.map(l=>{const r=rows.find(r=>r.gkey===l.gkey&&r.lkey===l.lkey&&under(r.sub)===under(l.prop));const am=r?knownPrice(r,book,index):index[`${l.gkey}|${l.lkey}|${under(l.prop)?'u':'o'}`]?.[book]?.am??null;return {...l,cz:am,bs:am,bsBook:bookName(book),book:bookName(book)};});const d=legs.length&&legs.every(l=>validAm(l.cz))?legs.reduce((n,l)=>n*decimal(l.cz!),1):null;const ev=d!=null&&t.prob!=null?100*(t.prob/100*d-1):null;return {...t,displayBook:book,legs,czDec:d,czOdds:d==null?null:decToAm(d),czEv:ev,bsDec:d,bsEv:ev,bsOdds:d==null?null:String(decToAm(d))};};
  const simMarkets=(data.simMarkets as SimMarket[]|undefined)?.map(r=>{if(!r.total)return r;const q=r.bookTotals?.[book]??null;const same=q?.pt===r.total.pt;return {...r,total:{...r.total,cz:q,evOver:same&&q?percentFraction(valueAt(r.total.final,q.o).ev):null,evUnder:same&&q?percentFraction(valueAt(1-r.total.final,q.u).ev):null}};});
  return {...data,trap:undefined,passes:[],overview:undefined,...(simMarkets?{simMarkets}:{}),categories:cats(data.categories),categoriesLive:cats(data.categoriesLive),parlays:data.parlays.map(ticket),parlaysMixed:data.parlaysMixed.map(ticket),parlaysLive:data.parlaysLive?.map(ticket),propBoard:data.propBoard?.map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,book))]))}))};
+}
+
+/** Games shows one named sportsbook, including when Caesars is the default. */
+export function priceMlbMoneylines(data:BoardData,book:string){
+ const index=(data.bookQuotes??{}) as QuoteIndex;
+ return (data.categories.ml??[]).map(r=>{const am=knownPrice(r,book,index);return {...r,odds:am??undefined,cz:am as PickRow["cz"],book:bookName(book)};});
 }

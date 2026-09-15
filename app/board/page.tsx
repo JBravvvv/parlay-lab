@@ -681,7 +681,7 @@ function MlbBoardPage() {
               key: "best",
               header: "Best",
               numeric: true,
-              sortValue: (r) => (rowQuote(r) ? -Infinity : Number(String(r.odds).replace(/[^\d.-]/g, "")) || 0),
+              sortValue: (r) => (rowQuote(r) ? -Infinity : Number(String((r.displayBook ? r.bestDisplayOdds : r.odds)).replace(/[^\d.-]/g, "")) || 0),
               /* the all-books best is a PREGAME survey of a line the game has moved past; the
                  in-play pull buys Caesars only, so there is no live best to put here (fix pass) */
               cell: (r) =>
@@ -689,8 +689,8 @@ function MlbBoardPage() {
                   <span className="text-[10px] text-faint" title="The in-play pull prices Caesars only — no all-books survey exists at the live line">
                     no live best
                   </span>
-                ) : r.odds != null ? (
-                  <OddsCell odds={r.odds as never} />
+                ) : (r.displayBook ? r.bestDisplayOdds : r.odds) != null ? (
+                  <OddsCell odds={(r.displayBook ? r.bestDisplayOdds : r.odds) as never} />
                 ) : (
                   <span className="text-faint">—</span>
                 ),

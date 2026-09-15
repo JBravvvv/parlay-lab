@@ -115,7 +115,7 @@ function Games() {
           title="Games"
           eyebrow="College Football"
           chip={<CfbChip />}
-          sub="Every FBS game by slate day — kickoffs, Caesars lines and finals from the desk's CFB feed."
+          sub="Every FBS game by slate day — kickoffs, selected-book lines and finals from the desk's CFB feed."
         />
         <CfbGames />
       </div>
@@ -130,7 +130,7 @@ function Games() {
           title="Games"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="Every NFL game by slate day — kickoffs, Caesars lines and finals from the desk's NFL feed."
+          sub="Every NFL game by slate day — kickoffs, selected-book lines and finals from the desk's NFL feed."
         />
         <NflGames />
       </div>
@@ -316,7 +316,6 @@ function TeamRow({ t, score, upcoming, winner }: { t: GameTeam; score: boolean; 
           {t.ml && (
             <span className="text-[9px] text-faint">
               {t.ml.book ?? ""}
-              {t.ml.cz ? ` · CZ ${t.ml.cz}` : ""}
             </span>
           )}
           <span className="text-[13px] font-bold text-gold">{t.ml?.odds ?? "—"}</span>

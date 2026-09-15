@@ -186,7 +186,7 @@ export function CfbGames() {
 
           <div className="text-[10.5px] leading-relaxed text-faint">
             Schedule, scores, clocks and records are ESPN&apos;s {L.label} scoreboard; ESPN&apos;s embedded line on a card is context,
-            not a priced quote. Prices, fair odds and grades are the {L.short} desk&apos;s own board (Caesars settles). Informational only, not
+            not a priced quote. Prices, fair odds and grades are the {L.short} desk&apos;s board at the selected sportsbook. Informational only, not
             betting advice.
           </div>
         </div>

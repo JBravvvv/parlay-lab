@@ -205,7 +205,7 @@ describe("copy that must survive the rebuild", () => {
     expect(page).toMatch(/<details/);
     expect(page).toMatch(/How to read this/);
     expect(page).toMatch(/de-vigged market fair/);
-    expect(page).toMatch(/ALT = a Caesars/);
+    expect(page).toMatch(/ALT = an equivalent milestone/);
   });
   it("the sandbox framing stays on the page and the slip", () => {
     expect(page).toMatch(/nothing here is tracked or enters the ledger/i);

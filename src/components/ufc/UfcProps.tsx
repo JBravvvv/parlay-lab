@@ -112,7 +112,7 @@ export function UfcProps({ fights, onAdd }: { fights: UfcFight[]; onAdd: (leg: P
     <Panel title="UFC props — method · round · anything exclusive" className="mt-6">
       <p className="mb-3 text-[11.5px] leading-relaxed text-muted">
         The national odds feed carries <b className="text-text">no MMA props at any book</b> (checked live against the
-        API), so these prices come from you: open the Caesars app, type what it shows for one market, and the desk
+        API), so these prices come from you: open your selected sportsbook app, type what it shows for one market, and the desk
         de-vigs it{fights.length > 0 ? ", anchors it to the 7-book moneyline consensus," : ""} and prices every
         outcome honestly.
       </p>
@@ -203,7 +203,7 @@ export function UfcProps({ fights, onAdd }: { fights: UfcFight[]; onAdd: (leg: P
           <p className="mt-3 text-[10.5px] leading-relaxed text-faint">
             Fill at least two outcomes of ONE market (they must cover exclusive results). True % strips the juice;
             {" "}with a fight selected on Method, fighter totals are re-anchored to the multi-book moneyline consensus —
-            an EV badge there means Caesars&apos; method split disagrees with the wider market, which is a real,
+            an EV badge there means your selected book&apos;s method split disagrees with the wider market, which is a real,
             checkable gap. Round markets can&apos;t be anchored, so their EV isn&apos;t shown — the true % and fair
             price still tell you what you&apos;re paying. Outcomes from one market are exclusive: only one can join a
             slip, and never alongside a moneyline from the same fight.

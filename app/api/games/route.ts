@@ -1,5 +1,5 @@
 import {BOOKS,DEFAULT_BOOK} from "@/lib/sportsbook/books";
-import {priceMlbBoard} from "@/lib/sportsbook/mlb";
+import {priceMlbMoneylines} from "@/lib/sportsbook/mlb";
 import { NextRequest, NextResponse } from "next/server";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { redis, storeEnv } from "@/lib/server/store";
@@ -63,7 +63,7 @@ async function boardMl(date: string, book: string = DEFAULT_BOOK): Promise<MlRow
   try {
     const blob = (await redis(["GET", BOARD_KEY(date)])) as string | null;
     const board = decodeBoard(blob);
-    const ml = board?.data ? priceMlbBoard(board.data,book).categories.ml : undefined;
+    const ml = board?.data ? priceMlbMoneylines(board.data,book) : undefined;
     return Array.isArray(ml) ? (ml as MlRow[]) : undefined;
   } catch {
     return undefined;

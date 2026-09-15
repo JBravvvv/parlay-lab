@@ -371,7 +371,7 @@ function MlbSharpPage() {
               {selMode === "dk_fd"
                 ? `Today's plays — EV at the DK/FD basis, gate +${gatePct}% (the Builder's exact bar; Caesars settles, never picks)`
                 : selMode !== "caesars_ev"
-                ? "Today's plays — highest true probability (consensus-anchored; Caesars prices the ticket, never picks it)"
+                ? "Today's plays — best playable EV at your selected sportsbook"
                 : "Today's plays — best playable EV at selected book"}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">

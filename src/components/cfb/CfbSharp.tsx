@@ -275,7 +275,7 @@ export function CfbSharp() {
                 </span>
               </div>
               <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
-                Games each book prices on this slate. Caesars settles every ticket; Pinnacle counts ×{L.model.pinnacleWeight} in the consensus median; a
+                Games each book prices on this slate. Paper tickets retain their recorded settlement book; Pinnacle counts ×{L.model.pinnacleWeight} in the consensus median; a
                 market needs {L.model.minBooks} books at a line to exist at all.
                 {slate.unmatched > 0 ? ` ${slate.unmatched} game${slate.unmatched === 1 ? "" : "s"} had no odds-feed event and priced nothing.` : ""}
               </p>
@@ -288,7 +288,7 @@ export function CfbSharp() {
 
           <div className="text-[10.5px] leading-relaxed text-faint">
             {slate.fpiUpdated ? `FPI updated ${fpiStamp(slate.fpiUpdated)} (ESPN). ` : "FPI was unavailable for this load. "}
-            Prices are The Odds API&apos;s US feed; Caesars is the settlement price and the NV app can differ — confirm at lock. Informational only, not betting
+            Prices are The Odds API&apos;s US feed; displayed prices follow your selected sportsbook. Informational only, not betting
             advice.
           </div>
         </>
@@ -382,8 +382,8 @@ function HowItPrices({ L }: { L: DeskHandles }) {
           </Term>
         </div>
         <div className="space-y-2.5">
-          <Term k="Caesars" label="Settlement">
-            EV, grade and stake are all at the selected book&apos; own quote at its own line (re-priced when its line differs from the consensus). Other books only
+          <Term k="Selected sportsbook" label="Pricing">
+            EV, grade and stake are all at the selected book&apos;s own quote at its own line (re-priced when its line differs from the consensus). Other books only
             inform the consensus and the &quot;best&quot; column.
           </Term>
           <Term k={`¼-Kelly · cap ${Math.round(r.kellyCap * 100)}%`} label="Sizing">
