@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -14,7 +15,7 @@ import { loadUfcBoard, amToDec, decToAm, fmtAm } from "@/lib/ufc";
 import { UfcProps, type PropLeg } from "@/components/ufc/UfcProps";
 import { UfcLiveProps } from "@/components/ufc/UfcLiveProps";
 
-/* Build-your-own UFC parlay from the Caesars-priced sides of the next card.
+/* Build-your-own UFC parlay from the selected book-priced sides of the next card.
    Same market math as the Board's UFC desk (consensus = de-vigged median
    across books, no fight model) and the same sizing discipline (¼-Kelly,
    2% cap). Fights are independent, so the product math is clean — the one
@@ -35,9 +36,10 @@ const fmtMoney = (n: number) => `$${n.toFixed(2)}`;
 export function UfcBuilder() {
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
   const qc = useQueryClient();
+  const selectedBook=useSportsbook();
   const q = useQuery({
-    queryKey: ["ufc-board"],
-    queryFn: () => loadUfcBoard({ bankroll }),
+    queryKey: ["ufc-board",selectedBook],
+    queryFn: () => loadUfcBoard({ bankroll,book:selectedBook }),
     staleTime: 240_000,
     retry: 1,
   });
@@ -115,7 +117,7 @@ export function UfcBuilder() {
         <div>
           <div className="text-[13px] font-semibold text-text">{q.data?.eventName ?? "Next UFC card"}</div>
           <div className="text-[11px] text-muted">
-            Pick any Caesars-priced sides and see the real combined math. Ready-made tickets live on the{" "}
+            Pick any selected book-priced sides and see the real combined math. Ready-made tickets live on the{" "}
             <Link replace href="/board" className="text-pos underline underline-offset-2">Board&apos;s UFC tab</Link>.
           </div>
         </div>
@@ -137,7 +139,7 @@ export function UfcBuilder() {
         <Panel><ErrorState title="Couldn't load UFC odds" onRetry={() => q.refetch()} /></Panel>
       ) : playable.length === 0 ? (
         <Panel>
-          <EmptyState title="No Caesars-priced fights right now" body="Started fights drop off the slip automatically — refresh closer to the next card." />
+          <EmptyState title="No selected book-priced fights right now" body="Started fights drop off the slip automatically — refresh closer to the next card." />
         </Panel>
       ) : (
         <Reveal>
@@ -199,7 +201,7 @@ export function UfcBuilder() {
                 {calc && (
                   <div className="num mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3 text-[12px]">
                     <span className="text-text">{fmtPct(calc.p)} true</span>
-                    <span className="text-gold">{fmtAm(decToAm(calc.dec))} @ CZR</span>
+                    <span className="text-gold">{fmtAm(decToAm(calc.dec))} @ Book</span>
                     <span className="text-muted">fair {fmtAm(decToAm(calc.fairDec))}</span>
                     <EvBadge ev={calc.ev * 100} />
                     <span className="text-muted">

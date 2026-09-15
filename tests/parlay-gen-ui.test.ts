@@ -41,6 +41,7 @@ vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("
 vi.mock("@/lib/sport", () => ({ useSport: () => "mlb", setSport: () => {} }));
 vi.mock("@/lib/useBoard", () => ({
   useBoard: () => ({ data: BOARD, isPending: false, isError: false, refetch: () => {} }),
+  usePricedBoard: () => ({ data: BOARD, isPending: false, isError: false, refetch: () => {} }),
   useRegenerateBoard: () => ({ mutate: () => {}, isPending: false }),
 }));
 vi.mock("@/lib/mlb-visuals", async (orig) => ({
@@ -348,9 +349,9 @@ describe("source pins — the honesty guard extended to the newest price surface
     expect(count(parlays, /useHeadshots\(/g)).toBe(1);
     expect(parlays).toMatch(/SCRATCHED LEG/);
     expect(parlays).toMatch(/legOut\?:/);
-    expect(parlays).toMatch(/setSelMode\(getSelectionMode\(\)\)/);
+    expect(parlays).not.toMatch(/setSelMode\(getSelectionMode\(\)\)/);
     expect(parlays).toMatch(/orderByMode\(/);
-    expect(parlays).toMatch(/MODE_LABEL\[selMode\]/);
+    expect(parlays).toMatch(/selected sportsbook prices/);
   });
 });
 

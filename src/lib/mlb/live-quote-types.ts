@@ -25,6 +25,7 @@
  * stops being "cleared" once the surface hands it the live line.
  */
 export type MlbLiveQuote = {
+  quotes?: Record<string,{o:number|null;u:number|null}>;
   /** the game this row belongs to, the board's own gkey */
   gkey: string;
   /** the ORIGINAL stored lkey (`player|market|line`) — the join key, NEVER rewritten */

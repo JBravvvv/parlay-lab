@@ -6,7 +6,7 @@ import { Reveal } from "@/components/motion/Reveal";
 
 /* ENGINE V2 · sim pricing desk — the 10,000-run PA-level Monte Carlo priced as
    markets: game totals (model blended 30/70 with the de-vigged consensus, EV at
-   the Caesars quote when CZ hangs the same number), first-5-innings and team
+   the Caesars quote when Selected book hangs the same number), first-5-innings and team
    totals (model fair prices — no market feed for those yet, stated plainly).
    Display-only: nothing here feeds parlays, the allocator, or ledger grading. */
 
@@ -83,13 +83,13 @@ export function SimDesk({ rows }: { rows: SimMarketRow[] | null }) {
                     </span>
                     {t.cz && (
                       <span className="text-gold">
-                        CZ {t.cz.pt}: {fmtAm(t.cz.o)}/{fmtAm(t.cz.u)}
+                        Book {t.cz.pt}: {fmtAm(t.cz.o)}/{fmtAm(t.cz.u)}
                       </span>
                     )}
                     {t.evOver != null && <span>O <EvBadge ev={t.evOver * 100} /></span>}
                     {t.evUnder != null && <span>U <EvBadge ev={t.evUnder * 100} /></span>}
                     {t.cz && t.cz.pt !== t.pt && (
-                      <span className="text-faint">CZ hangs a different number — not comparable, shop it</span>
+                      <span className="text-faint">Selected book hangs a different number — not comparable, shop it</span>
                     )}
                   </div>
                 ) : (

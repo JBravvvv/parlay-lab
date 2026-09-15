@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Panel } from "@/components/ui/Panel";
@@ -14,9 +15,10 @@ import { loadUfcBoard, fmtAm } from "@/lib/ufc";
 export function UfcCard() {
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
   const qc = useQueryClient();
+  const selectedBook=useSportsbook();
   const q = useQuery({
-    queryKey: ["ufc-board"],
-    queryFn: () => loadUfcBoard({ bankroll }),
+    queryKey: ["ufc-board",selectedBook],
+    queryFn: () => loadUfcBoard({ bankroll,book:selectedBook }),
     staleTime: 240_000,
     retry: 1,
   });
@@ -27,7 +29,7 @@ export function UfcCard() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[13px] font-semibold text-text">{d?.eventName ?? "Next UFC card"}</div>
-          <div className="text-[11px] text-muted">Records live from ESPN · moneylines are Caesars</div>
+          <div className="text-[11px] text-muted">Records live from ESPN · moneylines are selected book</div>
         </div>
         <Pill variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["ufc-board"] })} disabled={q.isFetching}>
           {q.isFetching ? "Refreshing…" : "↻ Refresh UFC"}

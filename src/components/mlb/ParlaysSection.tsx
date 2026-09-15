@@ -16,7 +16,7 @@ import { useHeadshots } from "@/lib/mlb-visuals";
 
 /* The engine's generated parlay sets, straight from BoardData — the old app's
    PARLAYS / MIXED PARLAYS / LIVE PARLAYS tabs. Display only: every number here
-   is the engine's own output (tier, type, prob, EV @ CZ, stake → win). */
+   is the engine's own output (tier, type, prob, EV @ book, stake → win). */
 
 const CAT_LABELS: Record<string, string> = {
   ml: "MONEYLINE",
@@ -76,8 +76,8 @@ export function ParlaysSection({
   // (hydration rule); ticket GENERATION already follows it via SH_CFG.selMode —
   // this aligns the displayed order and the primary price.
   const [selMode, setSelMode] = useState<SelectionMode>("ev_gated");
-  useEffect(() => setSelMode(getSelectionMode()), []);
-  const basisMode = selMode === "dk_fd";
+  // Browse by selected-book EV; generation retains its paper selection policy.
+  const basisMode = false;
   // the mode's price for badges and the +EV glow (probability mode still
   // badges EV at the settling book — probability drives the ORDER)
   const modeEv = (t: Ticket) => (basisMode ? (t.bsEv == null ? null : Number(t.bsEv)) : t.czEv == null ? null : Number(t.czEv));
@@ -119,7 +119,7 @@ export function ParlaysSection({
     <Reveal>
       <div className="mt-8">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-          Generated parlays — the engine&apos;s ticket sets · {MODE_LABEL[selMode]}
+          Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
 
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -168,7 +168,7 @@ export function ParlaysSection({
                       <div className="display text-[14px] text-text">{t.name}</div>
                       <span className="num shrink-0 text-[13.5px] font-bold text-gold">
                         {basisMode && t.bsOdds != null && <span className="mr-2 text-text">{String(t.bsOdds)} basis</span>}
-                        {String(t.czOdds)} @ CZ
+                        {String(t.czOdds)} @ book
                       </span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -273,7 +273,7 @@ export function ParlaysSection({
             {offBook.length > 0 && (
               <details className="mt-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3">
                 <summary className="cursor-pointer select-none text-[12px] font-semibold text-muted">
-                  Not at Caesars ({offBook.length}) — tickets with a leg Caesars doesn&apos;t price
+                  Not at the selected book ({offBook.length}) — tickets with a leg Caesars doesn&apos;t price
                 </summary>
                 <div className="mt-3 space-y-1.5">
                   {offBook.map((t, ti) => (

@@ -136,14 +136,14 @@ export function StatusMark({ game, className = "" }: { game: CfbGame; className?
  * the side; without it the tap opens the model, the same as tapping the header. No navigation.
  */
 
-/** the Caesars price cell for one side, as the OddsGrid wants it */
+/** the selected-book price cell for one side, as the OddsGrid wants it */
 export function sideCell(
   row: CfbRow | null,
   opts: { picked?: boolean; onClick?: () => void; game: CfbGame },
 ): OddsGridCell {
   if (!row) return { aria: "no line" };
   const line = row.market === "ml" ? undefined : row.market === "total" ? `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}` : row.line == null ? "—" : fmtLine(row.line);
-  if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no Caesars price` };
+  if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no selected-book price` };
   const czDiffers = row.market !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
   const czLine = czDiffers ? (row.market === "spread" ? fmtLine(row.cz.line!) : `${row.side === "over" ? "O" : "U"} ${row.cz.line}`) : line;
   const closed = !row.playable && opts.game.status !== "upcoming";
@@ -154,7 +154,7 @@ export function sideCell(
     tone,
     selected: opts.picked,
     onClick: opts.onClick,
-    aria: `${row.label} at Caesars ${fmtAmerican(row.cz.price)}${row.evCz != null ? `, EV ${fmtEv(row.evCz)}` : ""}${closed ? ", closed" : ""}`,
+    aria: `${row.label} at ${row.cz.title} ${fmtAmerican(row.cz.price)}${row.evCz != null ? `, EV ${fmtEv(row.evCz)}` : ""}${closed ? ", closed" : ""}`,
   };
 }
 
@@ -212,7 +212,7 @@ export function CfbGameCard({
     },
   ];
 
-  /* the +EV sides at Caesars, best first — the everyday bettor's "what's the play here" */
+  /* the +EV sides at the selected book, best first — the everyday bettor's "what's the play here" */
   const edges = orderedRows(game)
     .filter((r) => (r.evCz ?? -1) > 0)
     .sort((a, b) => (b.evCz ?? 0) - (a.evCz ?? 0));
@@ -281,10 +281,10 @@ export function CfbGameCard({
         )}
 
         {!isFinal && edges.length > 0 && (
-          <ul className="mt-2 space-y-1" aria-label="Edges at Caesars">
+          <ul className="mt-2 space-y-1" aria-label="Edges at selected book">
             {edges.map((r) => (
               <li key={r.key} className={`flex items-center gap-2 rounded-[10px] border px-2 py-1 text-[11px] ${nfl ? "border-nfl/25 bg-nfl/[0.06]" : "border-cfb/25 bg-cfb/[0.06]"}`}>
-                <GradeChip grade={r.grade} basis="EV @ Caesars" />
+                <GradeChip grade={r.grade} basis="EV @ selected book" />
                 <span className="min-w-0 flex-1 truncate font-semibold text-text">{cellLabel(r, game)}</span>
                 <span className="num shrink-0 text-[10px] text-muted">fair {fmtAmerican(r.fairAm)}</span>
                 {r.evCz != null && <EvBadge ev={r.evCz} className="scale-90" />}
@@ -426,7 +426,7 @@ function RowDetail({ row, game }: { row: CfbRow; game: CfbGame }) {
     <div className={`rounded-[12px] border px-3 py-2.5 ${lit ? "border-pos/25 bg-pos/[0.05]" : "border-white/[0.06] bg-white/[0.03]"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5 truncate text-[12px] font-semibold text-text">
-          <GradeChip grade={row.grade} basis="EV @ Caesars" />
+          <GradeChip grade={row.grade} basis="EV @ selected book" />
           <span className="truncate">{cellLabel(row, game)}</span>
         </span>
         <span className="num shrink-0 text-[10.5px] text-muted">
@@ -437,7 +437,7 @@ function RowDetail({ row, game }: { row: CfbRow; game: CfbGame }) {
       <EdgeMeter fair={row.fair} mkt={row.mkt} tone={L.id} className="mt-2" />
       <div className="num mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-muted">
         <span>
-          CZ <span className={row.cz ? "text-gold" : "text-faint"}>{quoteText(row.cz, row)}</span>
+          Book <span className={row.cz ? "text-gold" : "text-faint"}>{quoteText(row.cz, row)}</span>
           {row.evCz != null && <EvBadge ev={row.evCz} className="ml-1 scale-90" />}
         </span>
         <span>

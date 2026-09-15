@@ -1,4 +1,7 @@
 "use client";
+import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {bookName} from "@/lib/sportsbook/books";
 
 import { useEffect, useMemo, useState } from "react";
 import { useIsFetching, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
@@ -59,7 +62,7 @@ import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
  * prop parlay options like MLB has with live, mixed, safe. Longshots, etc"). The games list
  * lives on Games; this surface is the MLB Board's shape for College Football: a day rail, four
  * stat tiles, TOP 50 / ALL scope, a category strip (sides, then one tab per player-prop
- * market), a search box, the ranked read-only table S → F on the EV at Caesars, and under it
+ * market), a search box, the ranked read-only table S → F on the EV at the selected book, and under it
  * the generated parlay sets in three views (PARLAYS / MIXED / LIVE) with tier and type filters.
  *
  * INSTRUCTION 42 (2026-09-05, Josh: "It should be grading every possible pick available on the
@@ -78,7 +81,7 @@ import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
  *
  * INSTRUCTION 43 (2026-09-05, Josh: "It should be showing 50+ Anytime TD parlays"): a
  * single-market set that tier 1 (every leg EV ≥ CFB_PARLAYS.minLegEvPct) cannot fill extends to
- * Caesars-priced legs down to CFB_PARLAYS.setFloorEvPct; those tickets carry `gated: false`,
+ * selected-book-priced legs down to CFB_PARLAYS.setFloorEvPct; those tickets carry `gated: false`,
  * rank after the gated ones, and wear an EDGE − tag (`OpenTag`) beside the tier chip with the
  * EV chip dimmed — the Board says which tickets loosened the gate instead of hiding it. The
  * PARLAYS tile and the blurb count them ("N below gate"); the set blurbs read their leg count
@@ -96,7 +99,7 @@ import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
  * Two feeds: the slate (sides — rows appear at once) and the props board (`/api/cfb/props`,
  * one query per date, stale for the board's own ttlSec (10 min live / 2 h pre-kick), never polled — a fresh pull costs
  * quota per event, and the route holds a daily credit budget it will not spend past). Every
- * figure is the feed's own or the model's own at Caesars' price; a missing value says "—".
+ * figure is the feed's own or the model's own at the selected book' price; a missing value says "—".
  * Read-only, like the MLB Board: the Builder writes tickets, this page never does.
  */
 
@@ -225,7 +228,7 @@ function teamOf(games: Map<string, CfbGame>, gameId: string, teamId: string | nu
 /** the small in-play tag the table prints in place of a stake on a live row (INSTRUCTION 42) */
 function LiveTag() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live" title="In play — graded on EV at Caesars, no ¼-Kelly stake on a live line" data-testid="cfb-live-tag">
+    <span className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live" title="In play — graded on EV at the selected book, no ¼-Kelly stake on a live line" data-testid="cfb-live-tag">
       <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" aria-hidden /> live
     </span>
   );
@@ -281,7 +284,9 @@ export function CfbPicksBoard() {
   const PROPS_CACHE_H = CFB_PROPS.revalidateSec / 3600;
   const LIVE_CACHE_MIN = CFB_PROPS.liveRevalidateSec / 60;
   const propsBoardStaleMs = (board: CfbPropsBoard | undefined) => boardStaleMs(board, L.client);
-  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
+  const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
+  const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
+  const selectedBook=bookName(useSportsbook());
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
@@ -300,7 +305,8 @@ export function CfbPicksBoard() {
     retry: 0,
     enabled: propsOn,
   });
-  const propRows = propsQ.data?.rows ?? null;
+  const pricedProps=useFootballPropsPrices(propsQ.data,bankroll??L.bankBase,L.rules);
+  const propRows = pricedProps?.rows ?? null;
   const propsPending = propsOn && propsQ.isPending;
 
   const games = useMemo(() => new Map((current?.games ?? []).map((g) => [g.id, g])), [current]);
@@ -321,7 +327,7 @@ export function CfbPicksBoard() {
   const propsN = all.length - sides;
   const plusEv = all.filter((r) => (r.evCz ?? -1) > 0);
   const top = plusEv[0] ?? null;
-  /** the featured strip: the ranked +EV picks that carry a Caesars price (S → F, EV, fair) */
+  /** the featured strip: the ranked +EV picks that carry a selected-book price (S → F, EV, fair) */
   const featured = useMemo(() => plusEv.filter((r) => r.cz != null).slice(0, FEATURED_N), [plusEv]);
   /** every ticket across the twelve category sets (INSTRUCTION 42) — the engine emits each leg set under one category only, so the sets are disjoint */
   const setTickets = useMemo(() => (picks ? CFB_PARLAY_CATEGORIES.flatMap((k) => picks.sets[k] ?? []) : []), [picks]);
@@ -359,7 +365,7 @@ export function CfbPicksBoard() {
           </div>
         ),
       },
-      { key: "grade", header: "Grade", sortValue: (r) => gradeRank(r.grade), cell: (r) => <GradeChip grade={r.grade} basis="EV @ Caesars" /> },
+      { key: "grade", header: "Grade", sortValue: (r) => gradeRank(r.grade), cell: (r) => <GradeChip grade={r.grade} basis="EV @ selected book" /> },
       {
         key: "fair",
         header: "Fair",
@@ -376,7 +382,7 @@ export function CfbPicksBoard() {
       },
       {
         key: "cz",
-        header: "Caesars",
+        header: "Selected book",
         numeric: true,
         sortValue: (r) => r.cz?.price ?? -100000,
         cell: (r) =>
@@ -407,7 +413,7 @@ export function CfbPicksBoard() {
             <span className="text-faint">—</span>
           ),
       },
-      { key: "ev", header: "EV @ CZR", numeric: true, sortValue: (r) => r.evCz ?? -999, cell: (r) => (r.evCz != null ? <EvBadge ev={r.evCz} /> : <span className="text-faint">—</span>) },
+      { key: "ev", header: "EV @ book", numeric: true, sortValue: (r) => r.evCz ?? -999, cell: (r) => (r.evCz != null ? <EvBadge ev={r.evCz} /> : <span className="text-faint">—</span>) },
       {
         key: "kelly",
         header: "¼-Kelly",
@@ -435,7 +441,7 @@ export function CfbPicksBoard() {
           tone={L.id}
           icon="🏈"
         />
-        <StatTile label="+EV at Caesars" value={picks ? String(plusEv.length) : "—"} sub={picks ? `of ${all.length} priced picks` : undefined} tone={plusEv.length > 0 ? "pos" : "muted"} />
+        <StatTile label="+EV at selected book" value={picks ? String(plusEv.length) : "—"} sub={picks ? `of ${all.length} priced picks` : undefined} tone={plusEv.length > 0 ? "pos" : "muted"} />
         <StatTile
           label="Best edge"
           value={top ? <span className="block truncate text-[16px]">{top.label}</span> : "—"}
@@ -505,7 +511,7 @@ export function CfbPicksBoard() {
               <Panel>
                 {catIsProp && propsPending ? (
                   <div className="space-y-3">
-                    <div className="text-[11px] text-muted">Pricing player props at Caesars…</div>
+                    <div className="text-[11px] text-muted">Pricing player props at the selected book…</div>
                     <SkeletonRows rows={5} />
                   </div>
                 ) : (
@@ -517,8 +523,8 @@ export function CfbPicksBoard() {
                         : catIsProp && propsQ.isError
                           ? "The player-props feed did not answer — sides are still priced."
                           : catIsProp
-                            ? `A prop needs ${CFB_PROPS.minBooks} books at a line and a Caesars price before it is a pick.`
-                            : "A pick needs a Caesars price on a game that is upcoming or in play."
+                            ? `A prop needs ${CFB_PROPS.minBooks} books at a line and a selected-book price before it is a pick.`
+                            : "A pick needs a selected-book price on a game that is upcoming or in play."
                     }
                   />
                 )}
@@ -547,7 +553,7 @@ export function CfbPicksBoard() {
                   : propsQ.data.budgeted
                     ? " · today's props budget is used up — more games price again tomorrow"
                     : ""}
-                {propsQ.data.czMissing
+                {selectedBook === "Caesars" && propsQ.data.czMissing
                   ? ` · ${propsQ.data.czMissing} game${propsQ.data.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff`
                   : ""}
                 {propsQ.data.noProps ? ` · ${propsQ.data.noProps} game${propsQ.data.noProps === 1 ? "" : "s"} on the slate ha${propsQ.data.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""}
@@ -582,7 +588,7 @@ export function CfbPicksBoard() {
 }
 
 /* ---------- TOP EDGES — the featured strip (INSTRUCTION 40, the Caesars "boost card" grammar) ----------
-   One card per ranked +EV pick with a Caesars price: the mark, the pick, the big price, the
+   One card per ranked +EV pick with a selected-book price: the mark, the pick, the big price, the
    grade + EV, and "$10 wins $X" off Caesars' own decimal. A horizontal snap carousel — the
    strip scrolls, the page never does. Every figure is the row's own; nothing is estimated. */
 
@@ -593,7 +599,7 @@ function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total:
       <section aria-label="Top edges" data-testid="cfb-top-edges">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="text-faint">+EV at Caesars</span>
+            Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="text-faint">+EV at the selected book</span>
           </h2>
           {total > rows.length && <span className="num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
         </div>
@@ -651,7 +657,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-1.5">
             {r.evCz != null && <EvBadge ev={r.evCz} />}
-            <GradeChip grade={r.grade} basis="EV @ Caesars" />
+            <GradeChip grade={r.grade} basis="EV @ selected book" />
           </div>
           {r.fair != null && (
             <span className="num text-[10.5px] text-muted" title={r.push > 0 ? `${fmtPct(r.fair)} win · ${fmtPct(r.push)} push` : "model probability the pick hits"}>
@@ -704,18 +710,18 @@ const priceRangeOf = (k: CfbParlayCategory) => {
   return `${fmtAmerican(decimalToAmerican(b.minDec))} to ${fmtAmerican(decimalToAmerican(b.maxDec))}`;
 };
 const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blurb: string; live: boolean }> = {
-  ml: { label: "ML", blurb: `Moneyline-only tickets, ${legsOf("ml")} legs on distinct games, at Caesars' pregame and in-game prices.`, live: false },
-  spread: { label: "SPREAD", blurb: `Spread-only tickets, ${legsOf("spread")} legs on distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  total: { label: "TOTAL", blurb: `Totals-only tickets, ${legsOf("total")} legs on distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  anytime_td: { label: "ANYTIME TD", blurb: `Anytime-touchdown scorer tickets, ${legsOf("anytime_td")} players from distinct games at Caesars' pregame and in-game lines, priced ${priceRangeOf("anytime_td")}.`, live: false },
-  pass_tds: { label: "PASS TDS", blurb: `Passing-touchdown tickets, ${legsOf("pass_tds")} quarterbacks from distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  pass_yds: { label: "PASS YDS", blurb: `Passing-yards tickets, ${legsOf("pass_yds")} quarterbacks from distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  receptions: { label: "RECEPTIONS", blurb: `Receptions tickets, ${legsOf("receptions")} pass-catchers from distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  rush_yds: { label: "RUSH YDS", blurb: `Rushing-yards tickets, ${legsOf("rush_yds")} rushers from distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  rec_yds: { label: "REC YDS", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct games, at Caesars' pregame and in-game lines.`, live: false },
-  combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, at Caesars' pregame and in-game lines.", live: false },
+  ml: { label: "ML", blurb: `Moneyline-only tickets, ${legsOf("ml")} legs on distinct games, at the selected book' pregame and in-game prices.`, live: false },
+  spread: { label: "SPREAD", blurb: `Spread-only tickets, ${legsOf("spread")} legs on distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  total: { label: "TOTAL", blurb: `Totals-only tickets, ${legsOf("total")} legs on distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  anytime_td: { label: "ANYTIME TD", blurb: `Anytime-touchdown scorer tickets, ${legsOf("anytime_td")} players from distinct games at the selected book' pregame and in-game lines, priced ${priceRangeOf("anytime_td")}.`, live: false },
+  pass_tds: { label: "PASS TDS", blurb: `Passing-touchdown tickets, ${legsOf("pass_tds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  pass_yds: { label: "PASS YDS", blurb: `Passing-yards tickets, ${legsOf("pass_yds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  receptions: { label: "RECEPTIONS", blurb: `Receptions tickets, ${legsOf("receptions")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  rush_yds: { label: "RUSH YDS", blurb: `Rushing-yards tickets, ${legsOf("rush_yds")} rushers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  rec_yds: { label: "REC YDS", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, at the selected book' pregame and in-game lines.", live: false },
   mixed: { label: "MIXED", hint: "live+pregame", blurb: "Cross-game tickets pairing a game in progress (in-play price) with games still to kick off.", live: true },
-  live: { label: "LIVE", blurb: "In-game tickets from games in progress only, at the feed's live Caesars prices.", live: true },
+  live: { label: "LIVE", blurb: "In-game tickets from games in progress only, at the feed's live selected-book prices.", live: true },
 };
 const PREGAME_CATS = CFB_PARLAY_CATEGORIES.filter((k) => !PARLAY_CATS[k].live);
 const TIERS: [string, string][] = [
@@ -761,7 +767,7 @@ function InGameTag({ n }: { n: number }) {
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
-      title={`${n} of this ticket's legs ${n === 1 ? "is" : "are"} priced in play — graded on EV at Caesars like any leg, no paper stake on a live line`}
+      title={`${n} of this ticket's legs ${n === 1 ? "is" : "are"} priced in play — graded on EV at the selected book like any leg, no paper stake on a live line`}
       data-testid="cfb-parlay-ingame"
     >
       <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-live" aria-hidden /> {n} in-game
@@ -823,21 +829,21 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const empty =
     cat === "live"
       ? liveGames === 0
-        ? { title: "No games in progress right now", body: "In-game tickets appear once a kickoff goes live and the feed carries in-play Caesars prices." }
-        : { title: "No live tickets yet", body: `Two in-play legs on different games each need a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
+        ? { title: "No games in progress right now", body: "In-game tickets appear once a kickoff goes live and the feed carries in-play selected-book prices." }
+        : { title: "No live tickets yet", body: `Two in-play legs on different games each need a selected-book price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
       : cat === "mixed"
         ? liveGames === 0
           ? { title: "No games in progress right now", body: "Mixed tickets need a live game beside the upcoming ones — they appear the moment a kickoff goes live." }
-          : { title: "No mixed tickets yet", body: `A live leg and an upcoming leg each need a Caesars price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
+          : { title: "No mixed tickets yet", body: `A live leg and an upcoming leg each need a selected-book price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
         : propsPending && cat !== "ml" && cat !== "spread" && cat !== "total"
-          ? { title: "Building parlays…", body: `${meta.label} tickets fill in as player props finish pricing at Caesars.` }
-          : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a Caesars price (pregame or in play) and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%), and no two legs may share a game.${cat === "combo" ? "" : ` When fewer than ${CFB_PARLAYS.perCategory} tickets clear that gate, the set extends to Caesars-priced legs down to EV ≥ ${CFB_PARLAYS.setFloorEvPct}% (tagged EDGE −); none reached even that here.`}` };
+          ? { title: "Building parlays…", body: `${meta.label} tickets fill in as player props finish pricing at the selected book.` }
+          : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a selected-book price (pregame or in play) and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%), and no two legs may share a game.${cat === "combo" ? "" : ` When fewer than ${CFB_PARLAYS.perCategory} tickets clear that gate, the set extends to selected-book-priced legs down to EV ≥ ${CFB_PARLAYS.setFloorEvPct}% (tagged EDGE −); none reached even that here.`}` };
 
   return (
     <Reveal>
       <div className="mt-8" data-testid="cfb-parlays">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-          Generated parlays — the desk&apos;s ticket sets at Caesars <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
+          Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
         {/* INSTRUCTION 42: one pill per category set, up to CFB_PARLAYS.perCategory tickets each; the row scrolls, the page never does */}
@@ -871,7 +877,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           {openN > 0 && (
             <span className="text-faint" data-testid="cfb-parlay-open-note">
               {" "}
-              Fewer than {CFB_PARLAYS.perCategory} tickets clear the {CFB_PARLAYS.minLegEvPct}% leg gate, so {openN} tagged EDGE − use Caesars-priced legs down to EV ≥ {CFB_PARLAYS.setFloorEvPct}% — ranked after the gated ones.
+              Fewer than {CFB_PARLAYS.perCategory} tickets clear the {CFB_PARLAYS.minLegEvPct}% leg gate, so {openN} tagged EDGE − use selected-book-priced legs down to EV ≥ {CFB_PARLAYS.setFloorEvPct}% — ranked after the gated ones.
             </span>
           )}
         </div>
@@ -993,14 +999,14 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
         <div className="min-w-0">
           <div className="truncate text-[13px] font-bold text-text">{t.name}</div>
           <div className="num mt-0.5 text-[10.5px] text-faint">
-            {t.legs.length} legs · {t.dec.toFixed(2)}× at Caesars
+            {t.legs.length} legs · {t.dec.toFixed(2)}× at the selected book
           </div>
           <div className="hero-price is-gold num mt-2">{fmtAmerican(t.am)}</div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <div className="flex items-center gap-1.5">
             <EvBadge ev={t.ev} />
-            <GradeChip grade={grade} basis="EV at Caesars" />
+            <GradeChip grade={grade} basis="EV at the selected book" />
           </div>
           <span className="num text-[10.5px] text-muted" title={oneIn ? `≈ 1 in ${oneIn}` : undefined}>
             {pct.toFixed(1)}% to hit
@@ -1030,7 +1036,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
 
 /**
  * The parlay slip — CfbTicketCard's layout (tier / type chips, name, one line per leg with the
- * mark · label · market · Caesars price, the tear line, then the money) on a SELF-TINTED
+ * mark · label · market · selected-book price, the tear line, then the money) on a SELF-TINTED
  * surface: no blur filter per card (the iOS freeze rule), the glow on a wrapper.
  */
 export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<string, CfbGame>; rank?: number }) {
@@ -1060,7 +1066,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
             </div>
             <div className="mt-1.5 truncate text-[13px] font-bold text-text">{t.name}</div>
             <div className="num mt-0.5 text-[10.5px] text-faint">
-              {t.dec.toFixed(2)}× · {t.legs.length} legs at Caesars
+              {t.dec.toFixed(2)}× · {t.legs.length} legs at the selected book
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1097,7 +1103,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
               {pct.toFixed(1)}% to hit
             </span>
             <EvBadge ev={t.ev} />
-            <GradeChip grade={grade} basis="EV at Caesars" />
+            <GradeChip grade={grade} basis="EV at the selected book" />
           </div>
         </footer>
         {t.note && <div className="mt-2 text-[10.5px] leading-relaxed text-faint">{t.note}</div>}

@@ -151,6 +151,7 @@ let boardData: unknown = null;
 
 vi.mock("@/lib/useBoard", () => ({
   useBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
+  usePricedBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
   useRegenerateBoard: () => ({ mutate: () => {}, isPending: false, isSuccess: false, isError: false, error: null }),
 }));
 vi.mock("@/lib/refill-client", () => ({

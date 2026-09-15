@@ -65,6 +65,9 @@ export type CfbPropRow = {
   fairAm: number | null;
   /** books behind the consensus */
   books: number;
+  quotes?: Record<string, CfbPropQuote>;
+  probabilities?: Record<string, number | null>;
+  displayBook?: string;
   cz: CfbPropQuote | null;
   best: CfbPropQuote | null;
   dk: CfbPropQuote | null;

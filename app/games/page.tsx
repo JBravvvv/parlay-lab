@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -75,11 +76,12 @@ function Games() {
   const [date, setDate] = useState<string>(() => clampToWindow(qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate) ? qDate : today));
   const rail = useMemo(() => seasonDates(), []);
 
+  const selectedBook=useSportsbook();
   const q = useQuery<GamesPayload>({
-    queryKey: ["games", date],
+    queryKey: ["games", date, selectedBook],
     enabled: mounted && !cfbDesk && !nflDesk, // the CFB and NFL desks never spend an MLB games fetch
     queryFn: async () => {
-      const r = await fetch(`/api/games?date=${date}`);
+      const r = await fetch(`/api/games?date=${date}&book=${selectedBook}`);
       const j = (await r.json().catch(() => null)) as (GamesPayload & { error?: string }) | null;
       if (!r.ok || !j || j.error) throw new Error(j?.error ?? `games ${r.status}`);
       return j;

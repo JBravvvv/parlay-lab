@@ -53,6 +53,7 @@ let boardData: unknown = null;
 
 vi.mock("@/lib/useBoard", () => ({
   useBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
+  usePricedBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
   useRegenerateBoard: () => ({ mutate: () => {}, isPending: false, isSuccess: false, isError: false, error: null }),
 }));
 vi.mock("@/lib/refill-client", () => ({
@@ -179,7 +180,7 @@ async function renderBoard(opts: {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const html = renderToString(createElement(QueryClientProvider, { client: qc }, createElement(mod.default)));
   /* React SSR emits `<!-- -->` between adjacent text nodes so it can re-find the boundaries on
-     hydration, which splits every interpolated sentence — "live O <!-- -->3.5<!-- --> · -145 CZR".
+     hydration, which splits every interpolated sentence — "live O <!-- -->3.5<!-- --> · -145 at selected book".
      Those markers are a serialization artifact, not content; stripping them lets the assertions
      below read the sentence a person actually sees. (tests/board-settled.test.ts:122-124 solved the
      same problem by asserting only on fragments — this keeps the fragments but makes them whole.) */
@@ -187,7 +188,7 @@ async function renderBoard(opts: {
 }
 
 /** the GradeChip's own title text — the only unambiguous marker that a letter grade rendered */
-const S_CHIP_PREGAME = /Tier S on EV @ Caesars/;
+const S_CHIP_PREGAME = /Tier S on EV @ selected book/;
 /** ProbBar's own bar element — a live row must never draw one off a market-derived number */
 const PROB_BAR = 'class="h-1 flex-1 overflow-hidden rounded-full bg-surface-3"';
 const KELLY_CHIP = "¼K";
@@ -201,12 +202,12 @@ describe("INSTRUCTION 51 — case A: a live line re-anchors the row", () => {
     expect(html).toContain("Yordan Alvarez");
     // the line the book is posting NOW, and its price — this is literally Josh's sentence
     expect(html).toContain("live O 3.5");
-    expect(html).toContain("-145 CZR");
+    expect(html).toContain("-145 at selected book");
     // the row is OPEN again: no SETTLED anywhere, and the suppression fell away on its own
     expect(html, "a row whose live line the tally has not cleared is not settled").not.toContain("SETTLED");
     // graded on the LIVE EV, not the pregame one
     // the grade is gradeFromEv(+2.7%) = B, computed off the LIVE EV and labelled with its basis
-    expect(html).toContain("Tier B on EV at the live Caesars line");
+    expect(html).toContain("Tier B on EV at the live selected-book line");
     expect(html, "the pregame S grade may never survive a re-anchor").not.toMatch(S_CHIP_PREGAME);
   });
 
@@ -223,7 +224,7 @@ describe("INSTRUCTION 51 — case A: a live line re-anchors the row", () => {
   it("NO ¼-Kelly stake on a live line — the stake column carries the tag instead", async () => {
     const html = await renderBoard({ val: 3, q: quote({ ln: 3.5 }) });
     expect(html).toContain('data-testid="mlb-live-tag"');
-    expect(html).toContain("In play — graded on EV at Caesars, no ¼-Kelly stake on a live line");
+    expect(html).toContain("In play — graded on EV at your selected sportsbook, no ¼-Kelly stake on a live line");
     expect(html, "a stake chip on an in-play line is an instruction to bet a phantom").not.toContain(KELLY_CHIP);
   });
 
@@ -269,8 +270,8 @@ describe("INSTRUCTION 51 — an UNDER row is priced as an UNDER", () => {
   it("the Under sees the UNDER's price and line, never the Over's", async () => {
     const html = await renderBoard({ val: 1, row: UNDER, q: quote({ ln: 3.5, lkey: UNDER.lkey, czAm: -145, oppAm: 115 }) });
     expect(html).toContain("live U 3.5");
-    expect(html).toContain("+115 CZR");
-    expect(html, "the Over's price on an Under row is a wrong number that reads as a right one").not.toContain("-145 CZR");
+    expect(html).toContain("+115 at selected book");
+    expect(html, "the Over's price on an Under row is a wrong number that reads as a right one").not.toContain("-145 at selected book");
   });
 
   it("the Under sees the UNDER's EV and the UNDER's probability", async () => {
@@ -311,7 +312,7 @@ describe("INSTRUCTION 51 — no letter grade and no EV badge on a market-derived
     const html = await renderBoard({ val: 3, q: quote({ ln: 3.5, pSrc: "market", evCz: 2.7 }) });
     expect(html).toContain('data-testid="mlb-live-market-grade"');
     expect(html).toContain("+2.7% vs market");
-    expect(html, "a letter grade nobody computed is worse than no grade").not.toContain("Tier B on EV at the live Caesars line");
+    expect(html, "a letter grade nobody computed is worse than no grade").not.toContain("Tier B on EV at the live selected-book line");
     expect(html).not.toMatch(S_CHIP_PREGAME);
     // the row is still unmistakably live, and still carries no stake
     expect(html).toContain('data-testid="mlb-live-pill"');
@@ -328,7 +329,7 @@ describe("INSTRUCTION 51 — no letter grade and no EV badge on a market-derived
 
   it("with a SIM fair the letter and the badge come back — the gate is the source, not the build", async () => {
     const html = await renderBoard({ val: 3, q: quote({ ln: 3.5, pSrc: "sim", evCz: 2.7 }) });
-    expect(html).toContain("Tier B on EV at the live Caesars line");
+    expect(html).toContain("Tier B on EV at the live selected-book line");
     expect(html).not.toContain('data-testid="mlb-live-market-grade"');
   });
 });

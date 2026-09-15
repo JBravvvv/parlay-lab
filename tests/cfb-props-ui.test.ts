@@ -54,7 +54,7 @@ describe("CfbProps — wiring", () => {
     expect(props).toMatch(/enabled: nav !== "sides" && !!date/);
   });
   it("shows the empty state with the fetched / events counts", () => {
-    expect(props).toMatch(/Caesars hasn(&apos;|')t posted player props for this slate yet/);
+    expect(props).toMatch(/The selected book hasn(&apos;|')t posted player props for this slate yet/);
     expect(props).toMatch(/board\.fetched\} of \$\{board\.events\}/);
   });
   it("has a loading skeleton and a player search box", () => {
@@ -139,7 +139,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
   });
   it("phone tap floors: the market strips are the 30px Segmented with the 44px hit-44 region, the search box is 44px / 16px text (no iOS focus zoom)", () => {
     expect(props).toMatch(/<Segmented options=\{NAV_OPTIONS\}[^>]*size="md"/);
-    expect(props).toMatch(/<Segmented options=\{PRICE_OPTIONS\}[^>]*size="md"/);
+    expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/min-h-11/);
     expect(props).not.toMatch(/<Segmented[^>]*size="sm"/);
     expect(props).toMatch(/aria-label="Search players"[\s\S]*?className="h-11 [^"]*text-\[16px\]/);
     expect(read("src/components/ui/Segmented.tsx")).toMatch(/press hit-44 relative/);
@@ -158,7 +158,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).not.toMatch(/props for \{board\.fetched\}/);
     // "N games post player props at other books but no Caesars line yet — re-checked every 30 min inside 4 h of kickoff" (rows come from any US book, never "DK/FD" alone)
     expect(props).toMatch(
-      /\{board\.czMissing \? ` · \$\{board\.czMissing\} game\$\{board\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff` : ""\}/,
+      /\{selectedBook === "Caesars" && board\.czMissing \? ` · \$\{board\.czMissing\} game\$\{board\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff` : ""\}/,
     );
     // "M games on the slate have no player props posted at the books we price" — a zero-row game proves no more than that
     expect(props).toMatch(/\{board\.noProps \? ` · \$\{board\.noProps\} game\$\{board\.noProps === 1 \? "" : "s"\} on the slate ha\$\{board\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);

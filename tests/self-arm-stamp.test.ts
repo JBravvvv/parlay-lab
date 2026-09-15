@@ -377,10 +377,12 @@ const CROSSINGS = [
       "reached no board: umpKFrozen:true present with zero umpKFrozen:false, and " +
       "context.json unmoved since 64c42ad on 2026-07-29. Record: " +
       "docs/collection-period.md CROSSING 81." },
+  { ump: "Roberto Ortiz", date: "2026-09-14", commit: "ff04212", kPerG: 20, braked: true,
+    note: "EIGHTY-SECOND. g 4->5, k 80->100 in the 00:17:29Z refresh (September 13 PT). Found during the sportsbook release re-gate. umpKFrozen remains true with its early return; context.json remains unchanged since July 29. Reached no board. See collection-period.md CROSSING 82." },
 ] as const;
 
 /** Monotone floor. RAISE it in the same commit that appends. NEVER lower it. */
-const FLOOR = 81;
+const FLOOR = 82;
 
 /** About the SERIES, not any one crossing — kept out of the per-entry notes. */
 const RATE =

@@ -39,6 +39,7 @@ let boardData: unknown = null;
 
 vi.mock("@/lib/useBoard", () => ({
   useBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
+  usePricedBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
   useRegenerateBoard: () => ({ mutate: () => {}, isPending: false, isSuccess: false, isError: false, error: null }),
 }));
 /* the page imports useRefillDesk from @/lib/refill-client, NOT from @/lib/useBoard — mocking
@@ -104,7 +105,7 @@ async function renderBoard(val: number | null, sub = "H+R+RBI O 0.5"): Promise<s
 }
 
 /** the GradeChip's own title text — the only unambiguous marker that a letter grade rendered */
-const S_CHIP = /Tier S on EV @ Caesars/;
+const S_CHIP = /Tier S on EV @ selected book/;
 const SETTLED_LINE = "already 3 vs a 0.5 line — this Over is decided won — the price shown is the pregame lock, not a live market";
 /** EvBadge prints the stored pregame EV through fmtEv; KellyChip prints the ¼K tag */
 const EV_BADGE = "+12.4%";

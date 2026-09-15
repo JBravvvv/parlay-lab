@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,8 +12,8 @@ import { loadSharpBoard, type SharpGame } from "@/engine2/sharpBoard";
 import { getSelectionMode } from "@/lib/engine-client";
 
 /* ENGINE V2 · sharp desk — Shin de-vig + Pinnacle/exchange-weighted consensus
-   on tonight's games, judged at the Caesars line. Market layer only, no model:
-   a green number means Caesars is beating the sharp consensus price. */
+   on tonight's games, judged at the selected book line. Market layer only, no model:
+   a green number means selected book is beating the sharp consensus price. */
 
 const fmtAm = (a: number | null) => (a == null ? "—" : a > 0 ? `+${a}` : `${a}`);
 const fmtPct = (p: number | null) => (p == null ? "—" : `${(p * 100).toFixed(1)}%`);
@@ -45,12 +46,13 @@ function SideRow({ s, basis }: { s: SharpGame["away"]; basis: boolean }) {
 export function SharpDesk() {
   const qc = useQueryClient();
   // dk_fd: mounted-gated read (hydration rule) — EV judged at the DK/FD basis,
-  // Caesars kept visible as the settlement price
-  const [basis, setBasis] = useState(false);
-  useEffect(() => setBasis(getSelectionMode() === "dk_fd"), []);
+  // selected book kept visible as the settlement price
+  const book=useSportsbook();
+  const basis=false;
+
   const q = useQuery({
-    queryKey: ["sharp-board"],
-    queryFn: loadSharpBoard,
+    queryKey: ["sharp-board",book],
+    queryFn: ()=>loadSharpBoard(book),
     staleTime: 240_000,
     retry: 1,
   });
@@ -65,8 +67,8 @@ export function SharpDesk() {
             </h2>
             <div className="text-[11px] text-muted">
               {basis
-                ? "Fair price = sharp-consensus with the longshot bias stripped; EV is at the DK/FD basis (bold), Caesars in gold settles. Pure market read — the quant board above is the model view."
-                : "Fair price = sharp-consensus with the longshot bias stripped; EV is at the Caesars line. Pure market read — the quant board above is the model view."}
+                ? "Fair price = sharp-consensus with the longshot bias stripped; EV is at the DK/FD basis (bold), selected book in gold settles. Pure market read — the quant board above is the model view."
+                : "Fair price = sharp-consensus with the longshot bias stripped; EV is at the selected book line. Pure market read — the quant board above is the model view."}
             </div>
           </div>
           <Pill variant="ghost" onClick={() => qc.invalidateQueries({ queryKey: ["sharp-board"] })} disabled={q.isFetching}>
@@ -112,7 +114,7 @@ export function SharpDesk() {
                       )}
                       {g.total.czPoint != null && (
                         <span className="text-gold">
-                          CZ {g.total.czPoint}: {fmtAm(g.total.czOver)}/{fmtAm(g.total.czUnder)}
+                          Book {g.total.czPoint}: {fmtAm(g.total.czOver)}/{fmtAm(g.total.czUnder)}
                         </span>
                       )}
                       {basis ? (
@@ -127,7 +129,7 @@ export function SharpDesk() {
                         </>
                       )}
                       {g.total.czPoint != null && g.total.point !== g.total.czPoint && (
-                        <span className="text-faint">CZ hangs a different number — not comparable, shop it</span>
+                        <span className="text-faint">Selected book hangs a different number — not comparable, shop it</span>
                       )}
                     </>
                   ) : (

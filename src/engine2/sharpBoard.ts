@@ -71,7 +71,7 @@ export function basisPick(dk: number | null, fd: number | null): { am: number; b
   return decFromAmerican(fd) > decFromAmerican(dk) ? { am: fd, bk: "FD" } : { am: dk, bk: "DK" };
 }
 
-function mlConsensus(ev_: OddsEvent) {
+function mlConsensus(ev_: OddsEvent, book = "williamhill_us") {
   const books: { key: string; a: number; b: number }[] = [];
   let czAway: number | null = null;
   let czHome: number | null = null;
@@ -83,7 +83,7 @@ function mlConsensus(ev_: OddsEvent) {
     const home = m?.outcomes.find((o) => o.name === ev_.home_team);
     if (!away || !home) continue;
     books.push({ key: bk.key, a: away.price, b: home.price });
-    if (bk.key === "williamhill_us") {
+    if (bk.key === book) {
       czAway = away.price;
       czHome = home.price;
     }
@@ -99,7 +99,7 @@ function mlConsensus(ev_: OddsEvent) {
   };
 }
 
-function totalConsensus(ev_: OddsEvent) {
+function totalConsensus(ev_: OddsEvent, book = "williamhill_us") {
   // consensus over the MOST COMMON total point among books (apples to apples)
   const byPoint = new Map<number, { key: string; a: number; b: number }[]>();
   let cz: { point: number; over: number; under: number } | null = null;
@@ -111,7 +111,7 @@ function totalConsensus(ev_: OddsEvent) {
     const arr = byPoint.get(over.point) ?? [];
     arr.push({ key: bk.key, a: over.price, b: under.price });
     byPoint.set(over.point, arr);
-    if (bk.key === "williamhill_us") cz = { point: over.point, over: over.price, under: under.price };
+    if (bk.key === book) cz = { point: over.point, over: over.price, under: under.price };
   }
   let best: { point: number; books: { key: string; a: number; b: number }[] } | null = null;
   for (const [point, books] of byPoint) {
@@ -131,7 +131,7 @@ function totalConsensus(ev_: OddsEvent) {
   };
 }
 
-export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number }> {
+export async function loadSharpBoard(book = "williamhill_us"): Promise<{ games: SharpGame[]; at: number }> {
   const r = await fetch(`/api/odds?u=${encodeURIComponent(UPSTREAM)}`);
   if (!r.ok) throw new Error(`odds ${r.status}`);
   const events: OddsEvent[] = await r.json();
@@ -140,8 +140,8 @@ export async function loadSharpBoard(): Promise<{ games: SharpGame[]; at: number
     .sort((a, b) => a.commence_time.localeCompare(b.commence_time));
 
   const games: SharpGame[] = upcoming.map((e) => {
-    const ml = mlConsensus(e);
-    const tot = totalConsensus(e);
+    const ml = mlConsensus(e,book);
+    const tot = totalConsensus(e,book);
     const pAway = ml.c?.p ?? null;
     const pHome = pAway != null ? 1 - pAway : null;
     const overP = tot.c?.p ?? null;

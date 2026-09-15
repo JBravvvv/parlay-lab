@@ -173,8 +173,7 @@ export function mlFor(rows: MlRow[] | undefined, g: ApiGame, sideKey: "away" | "
   const abbrN = norm(side.team.abbreviation ?? "");
   const hits = rows.filter((r) => {
     const label = norm(String(r.label ?? ""));
-    if (!label.endsWith("ml")) return false;
-    const team = label.slice(0, -2);
+    const team = label.endsWith("ml") ? label.slice(0, -2) : label;
     const teamOk = team === nameN || (abbrN !== "" && team === abbrN);
     if (!teamOk) return false;
     return r.gkey ? gkeyMatches(String(r.gkey), g) : true;

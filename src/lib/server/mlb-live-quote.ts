@@ -173,6 +173,7 @@ type BookPoint = { book: string; point: number; over: number; under: number };
 
 /** What the live market is posting for one (player, market) right now. */
 export type LiveSight = {
+  quotes?: Record<string,{o:number|null;u:number|null}>;
   /** the point the market is on NOW — modal across books, Caesars breaking a tie */
   ln: number;
   czAm: number | null;
@@ -272,6 +273,7 @@ export function sightLiveQuote(ev: OddsEvent, player: string, market: string, cf
 
   return {
     ln,
+    quotes: Object.fromEntries([...alt.filter(a=>a.point===ln),...atLn].map(q=>[q.book,{o:q.over,u:q.under}])),
     czAm: cz?.over ?? czAlt?.over ?? null,
     oppAm: cz?.under ?? czAlt?.under ?? null,
     bsAm: bs?.am ?? null,
@@ -706,6 +708,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
         gkey: c.gkey,
         lkey: r.lkey,
         ln: sight.ln,
+        quotes: sight.quotes,
         czAm: sight.czAm,
         oppAm: sight.oppAm,
         bsAm: sight.bsAm,

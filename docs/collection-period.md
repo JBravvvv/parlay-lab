@@ -8902,3 +8902,8 @@ calendared item that arrived is the only one we do not drive.**
 L3064 says `graded = 70` over the **two** complete dates 07-25 and 07-26 — **35/day**. At 35/day
 the 300-row floor lands **~2026-08-03**, not ~07-31. Resolving it needs the graded-row count, which
 is off-disk (phrase-gated). Carried as contradiction #9 in the handoff.
+
+
+### CROSSING 82 — Roberto Ortiz, 2026-09-14 UTC (September 13 PT)
+
+The automated refresh at 00:17:29Z (`ff04212`) moved Ortiz from g=4, k=80 to g=5, k=100: 20 strikeouts per game. Detected during the September 14 sportsbook release re-gate. This crossed the count threshold but did not reach model boards: `umpKFrozen:true` and the early return remain present, and `public/model/context.json` is unchanged since July 29 (`64c42ad`). Appended the dated crossing and raised the completeness floor to 82; no model parameter or freeze was changed.

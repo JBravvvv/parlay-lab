@@ -464,6 +464,7 @@ function priceGame(game: CfbGame, ev: OddsEvent | null, now: number, bankroll: n
       fairAm: americanFromProb(clamped),
       mkt: mktProb,
       books: nBooks,
+      quotes: Object.fromEntries(quotes.map(q => [q.book, q])),
       cz: sq.cz,
       best,
       dk: sq.dk,

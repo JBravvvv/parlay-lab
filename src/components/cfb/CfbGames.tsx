@@ -1,4 +1,7 @@
 "use client";
+import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {bookName} from "@/lib/sportsbook/books";
 
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -57,7 +60,9 @@ function groupByKickoff(games: CfbGame[]): Group[] {
 export function CfbGames() {
   /* the league seam (2026-09-08): desk hook, finals loader, query prefix and copy all come off useLeague() */
   const L = useLeague();
-  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
+  const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
+  const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
+  const selectedBook=bookName(useSportsbook());
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = useCallback((id: string) => {
     setOpen((prev) => {

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {priceMlbBoard} from "@/lib/sportsbook/mlb";
+import { useEffect, useState, useMemo } from "react";
 import { useSport, getSport } from "@/lib/sport";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { bestBoard, generateBoard, type Board } from "./engine-client";
@@ -54,3 +56,6 @@ export function useRegenerateBoard() {
  * page depends on). Re-exported here for callers that read the desk's hooks off one module.
  */
 export { useRefillDesk } from "@/lib/refill-client";
+
+/** Display projection only. Auto-allocation and ledger callers keep useBoard(). */
+export function usePricedBoard(){const q=useBoard();const book=useSportsbook();const data=useMemo(()=>q.data?{...q.data,data:priceMlbBoard(q.data.data,book)}:undefined,[q.data,book]);return {...q,data};}

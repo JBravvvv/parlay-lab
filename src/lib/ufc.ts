@@ -126,7 +126,7 @@ async function fetchEspnCard(): Promise<{ eventName: string | null; bouts: EspnB
 }
 
 /* ---------- assembly ---------- */
-function sideFromBooks(ev: OddsEvent, fighter: string): UfcSide {
+function sideFromBooks(ev: OddsEvent, fighter: string, book = "williamhill_us"): UfcSide {
   const probs: number[] = [];
   let czOdds: number | null = null;
   let bestOdds: number | null = null;
@@ -139,7 +139,7 @@ function sideFromBooks(ev: OddsEvent, fighter: string): UfcSide {
     if (!mine || !other) continue;
     const pRaw = implied(mine.price);
     probs.push(pRaw / (pRaw + implied(other.price))); // de-vig this book
-    if (bk.key === "williamhill_us") czOdds = mine.price;
+    if (bk.key === book) czOdds = mine.price;
     if (bestOdds == null || amToDec(mine.price) > amToDec(bestOdds)) {
       bestOdds = mine.price;
       bestBook = bk.title;
@@ -237,7 +237,7 @@ function buildTickets(fights: UfcFight[], bankroll: number): UfcTicket[] {
 }
 
 /* ---------- public entry ---------- */
-export async function loadUfcBoard(opts?: { fresh?: boolean; bankroll?: number }): Promise<UfcBoard> {
+export async function loadUfcBoard(opts?: { fresh?: boolean; bankroll?: number; book?: string }): Promise<UfcBoard> {
   const bankroll = opts?.bankroll ?? 750;
   const [events, card] = await Promise.all([fetchOddsEvents(opts?.fresh ?? false), fetchEspnCard()]);
 
@@ -252,8 +252,8 @@ export async function loadUfcBoard(opts?: { fresh?: boolean; bankroll?: number }
   const slate = upcoming.filter((e) => new Date(e.commence_time).getTime() - first < 30 * 3600_000);
 
   const fights: UfcFight[] = slate.map((ev) => {
-    const a = sideFromBooks(ev, ev.home_team);
-    const b = sideFromBooks(ev, ev.away_team);
+    const a = sideFromBooks(ev, ev.home_team, opts?.book);
+    const b = sideFromBooks(ev, ev.away_team, opts?.book);
     const bout = card.bouts.find(
       (bt) =>
         sameName(bt.a, ev.home_team) || sameName(bt.b, ev.home_team) ||

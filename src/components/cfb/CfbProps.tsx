@@ -1,4 +1,7 @@
 "use client";
+import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {bookName} from "@/lib/sportsbook/books";
 
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
@@ -34,7 +37,7 @@ import { railLabel } from "@/lib/games";
 
 /**
  * CFB PARLAY BUILDER (INSTRUCTION 38, 2026-09-05): the College Football sandbox. The day's
- * games as compact cards — ML / spread / total, both sides tappable — priced at Caesars or at
+ * games as compact cards — ML / spread / total, both sides tappable — priced at the selected book or at
  * the best posted book (a toggle), one side per game on the slip. The sticky bottom slip
  * (CfbSlip) combines the legs with `combineTicket` on the model's own win probabilities.
  * Purely a sandbox: nothing here is tracked and nothing writes the CFB ledger.
@@ -45,7 +48,7 @@ import { railLabel } from "@/lib/games";
  * player rows grouped by game in kickoff order. A tap adds a `kind: "prop"` leg; `addCfbLeg`
  * refuses a second leg on the same player and shows the note inline. A prop and a side on the
  * same game are allowed. Prices are posted quotes (Caesars, or the best book on the toggle);
- * a market Caesars has not posted renders the empty state with the route's own counts.
+ * a market The selected book has not posted renders the empty state with the route's own counts.
  *
  * THE CARDS (INSTRUCTION 40, 2026-09-05 — Josh: "the logo sizes on the parlay builder page are
  * so disproportionate to the boxes. The boxes should be smaller vertically and the logos should
@@ -174,7 +177,7 @@ function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: P
   const row = rowFor(game, market, side);
   if (!row) return {};
   const q = quoteFor(row, mode);
-  if (!q) return { line: lineText(market, side, row.line) ?? undefined, price: mode === "cz" ? "no CZ" : "—", tone: "muted" };
+  if (!q) return { line: lineText(market, side, row.line) ?? undefined, price: "—", tone: "muted" };
   const tag = bookTag(q);
   const line = [lineText(market, side, q.line), tag !== "CZ" ? tag : null].filter(Boolean).join(" · ") || undefined;
   const closed = game.status === "final" || game.status === "postponed";
@@ -526,7 +529,7 @@ function PropRow({
           </span>
         </div>
       </div>
-      <GradeChip grade={grade} basis={mode === "cz" ? "EV @ Caesars" : "EV @ best price"} />
+      <GradeChip grade={grade} basis="EV at quoted book" />
       <div className={`${L.id === "nfl" ? "odds-grid is-nfl" : "odds-grid is-cfb"} shrink-0 ${yes ? "w-[74px] grid-cols-1" : "w-[150px] grid-cols-2"}`}>
         {pl.sides.map((r) => (
           <OddsCellButton key={r.key} cell={propCell(r, mode, pickedKeys.has(r.key), onPick, L.rules)} />
@@ -731,9 +734,11 @@ export function CfbProps() {
   /* the league's props table and client under the pinned CFB names (see the seam note above) */
   const { props: CFB_PROPS } = L;
   const { propsQueryKey: cfbPropsQueryKey, loadProps: loadCfbProps, cacheLabel, pricedAtLabel: cfbPricedAtLabel } = L.client;
-  const { today, date, dates, pick, slate, bankroll, loading, error, refetch } = useCfbDesk();
+  const { today, date, dates, pick, slate: rawSlate, bankroll, loading, error, refetch } = useCfbDesk();
   const { top, bottom } = useShellInsets();
-  const [mode, setMode] = useState<PriceMode>("cz");
+  const mode: PriceMode = "cz";
+  const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
+  const selectedBook=bookName(useSportsbook());
   const [nav, setNav] = useState<NavKey>("anytime_td");
   const [search, setSearch] = useState("");
   const [loadRosterPositions, setLoadRosterPositions] = useState(false);
@@ -789,7 +794,7 @@ export function CfbProps() {
   const gameById = useMemo(() => new Map(games.map((g) => [g.id, g])), [games]);
   const liveGames = games.filter((g) => g.status === "live").length;
 
-  const board = propsQ.data;
+  const board = useFootballPropsPrices(propsQ.data,bankroll??L.bankBase,L.rules);
   const rosterTeams = useMemo(() => {
     const needsPosition = new Set((board?.rows ?? []).filter((r) => !footballPosition(r.pos) || !r.headshot || !r.teamId).map((r) => r.gameId));
     return [...new Set(games.filter((g) => needsPosition.has(g.id) && g.status !== "final" && g.status !== "postponed").flatMap((g) => [g.home.id, g.away.id]))].sort().join(",");
@@ -923,7 +928,7 @@ export function CfbProps() {
           <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
         </div>
         <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1">
-          <Segmented options={PRICE_OPTIONS} value={mode} onChange={setMode} size="md" tone={L.id} label="Price at" />
+          <span className="text-sm font-semibold">{selectedBook} lines</span>
           <span className="num flex items-center gap-2 text-[10.5px] text-faint">
             {liveGames > 0 && nav === "sides" && (
               <span className="inline-flex items-center gap-1 text-live">
@@ -931,7 +936,7 @@ export function CfbProps() {
                 {liveGames} live
               </span>
             )}
-            {mode === "cz" ? "Caesars settles" : `best of ${L.model.minBooks}+ books · Caesars settles`}
+
           </span>
         </div>
         {nav !== "sides" && (
@@ -1014,7 +1019,7 @@ export function CfbProps() {
         ) : (
           <div className="space-y-2">
             {slate?.oddsMissing && (
-              <p className="text-[11px] text-gold">Caesars prices are missing for this slate — sides without a price are greyed out.</p>
+              <p className="text-[11px] text-gold">selected-book prices are missing for this slate — sides without a price are greyed out.</p>
             )}
             {games.map((g, i) => (
               <Reveal key={g.id} delay={Math.min(i, 8) * 0.03} y={10}>
@@ -1035,7 +1040,7 @@ export function CfbProps() {
         />
       ) : !board || board.oddsMissing || marketRows === 0 ? (
         <EmptyState
-          title="Caesars hasn't posted player props for this slate yet"
+          title="The selected book hasn't posted player props for this slate yet"
           body={
             board
               ? `${navLabel} · ${board.fetched} of ${board.events} event${board.events === 1 ? "" : "s"} priced${board.capped ? " (capped)" : ""}${board.oddsMissing ? " · odds feed missing" : ""}${board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""} · ${label}`
@@ -1058,7 +1063,7 @@ export function CfbProps() {
             priced {board.fetched - board.noProps} of {board.events} game{board.events === 1 ? "" : "s"}
             {board.live ? ` · ${board.live} in play` : ""} · cached {cacheLabel(board)}{board.capped ? ` · capped at ${CFB_PROPS.maxEvents}` : ""}
             {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — today's props budget is used up" : ""}` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""}
-            {board.czMissing ? ` · ${board.czMissing} game${board.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff` : ""}
+            {selectedBook === "Caesars" && board.czMissing ? ` · ${board.czMissing} game${board.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff` : ""}
             {board.noProps ? ` · ${board.noProps} game${board.noProps === 1 ? "" : "s"} on the slate ha${board.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""} ·
             prices are posted quotes, never invented · the % on a leg is the model&apos;s number for that line.
           </p>

@@ -1,6 +1,10 @@
 "use client";
+import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {bookName,DEFAULT_BOOK,valueAt,decimal} from "@/lib/sportsbook/books";
+import {priceMlbRow,type QuoteIndex} from "@/lib/sportsbook/mlb";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -14,7 +18,7 @@ import { gradeFromEv, gradeRank } from "@/lib/grade";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { getSyncKey } from "@/lib/ledgerSync";
 import { refillReason, useRefillDesk } from "@/lib/refill-client";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
@@ -92,7 +96,7 @@ export default function BoardPage() {
           title="Board"
           eyebrow="College Football"
           chip={<CfbChip />}
-          sub="Every playable side and player prop on the slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          sub="Every playable side and player prop on the slate ranked on its EV at your selected sportsbook, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
           action={<CfbRefreshPill />}
         />
         <CfbPicksBoard />
@@ -108,7 +112,7 @@ export default function BoardPage() {
           title="Board"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="Every playable side and player prop on the NFL slate ranked on its EV at Caesars, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          sub="Every playable side and player prop on the NFL slate ranked on its EV at your selected sportsbook, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
           action={<NflRefreshPill />}
         />
         <NflPicksBoard />
@@ -148,8 +152,10 @@ function MlbBoardPage() {
   // localStorage read (hydration rule). dk_fd additionally reprices the columns
   // at the DK/FD basis; every mode drives the TOP 50 order via orderByMode.
   const [selMode, setSelMode] = useState<SelectionMode>("ev_gated");
-  useEffect(() => setSelMode(getSelectionMode()), []);
-  const basisMode = selMode === "dk_fd";
+  // Browse by selected-book EV; paper selection settings remain separate.
+  const selectedBook=useSportsbook();
+  const selectedBookName=bookName(selectedBook);
+  const basisMode = false; // named sportsbook owns display pricing; paper allocation keeps its saved mode
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
   const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
@@ -290,7 +296,7 @@ function MlbBoardPage() {
      anywhere in that module — a timer on a paid feed spends money while nobody is watching. It
      re-reads on mount, on focus, and on Josh's own Refresh tap. */
   const liveQuotes = useMlbLiveQuotes(board?.date ?? null);
-  const liveOverlay = liveQuotes.data ?? null;
+  const liveOverlay = useLivePrices(liveQuotes.data) ?? null;
   /* WHY THERE IS NO LIVE LINE, WHEN THERE IS NO LIVE LINE (fix pass, 2026-09-11). The route is
      behind the sync phrase, so without one stored the query is disabled and the Board shows pregame
      numbers with no explanation — which is the symptom Josh reported, wearing no symptom at all.
@@ -307,7 +313,11 @@ function MlbBoardPage() {
     () => new Set(["batter_hits", "batter_total_bases", "batter_home_runs", "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"]),
     [],
   );
-  const propRows = !live && PROP_TABS.has(cat) ? picksData?.picks?.[cat] ?? null : null;
+  const propRows = useMemo(()=> {
+    const rs=!live && PROP_TABS.has(cat) ? picksData?.picks?.[cat] ?? null : null;
+    if(!rs)return rs;
+    return rs.map(p=>{const row=priceMlbRow({label:p.player??'',sub:`${p.side==='u'?'Under':'Over'} ${p.line}`,gkey:p.gkey,lkey:p.lkey??undefined,prob:p.prob??undefined,odds:typeof p.odds==='number'?p.odds:undefined,book:p.book},selectedBook,(d?.bookQuotes??{}) as QuoteIndex);const am=selectedBook===DEFAULT_BOOK?p.cz:row.czOdds??null;return {...p,cz:am,odds:am,book:selectedBookName,edge:valueAt(p.prob==null?null:p.prob/100,am).edge,implied:am==null?null:100/decimal(am)};}).sort((a,b)=>(b.edge??-Infinity)-(a.edge??-Infinity));
+  },[live,cat,picksData,selectedBook,selectedBookName,d]);
   /* ALL scope: every priced OVER line on the prop board for this market (or every market),
      graded on pO − fO (the engine's model % minus the de-vigged fair — the same "edge" the
      stamped picks grade on), ordered S → F then by edge. Rows the engine did not price
@@ -325,7 +335,7 @@ function MlbBoardPage() {
             noCz++;
             continue;
           }
-          const edge = r.pO != null && r.fO != null ? Math.round((r.pO - r.fO) * 10) / 10 : null;
+          const edge = valueAt(r.pO==null?null:r.pO/100,r.cz?.o).edge;
           const odds = r.o ?? r.cz?.o ?? null;
           out.push({
             rank: 0, player: `${r.p} (${r.tm})`, side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
@@ -361,7 +371,7 @@ function MlbBoardPage() {
 
   /* INSTRUCTION 50 item 2 — ONE GUARD PER ROW, not one per cell (fix pass).
      Suppressing only the Grade chip left the same row printing the pregame number four more
-     ways: EV @ CZR / EV @ basis with its green EDGE badge, the ¼-Kelly stake chip, the True %
+     ways: EV @ book / EV @ basis with its green EDGE badge, the ¼-Kelly stake chip, the True %
      bar and the row's own ev-glow. On Josh's exact case — 3 H+R+RBI in the top of the 4th
      against a 0.5 line — that reads as one honest cell surrounded by four dishonest ones, and
      the Kelly chip is the worst of them because it is an instruction to stake money on a bet
@@ -553,7 +563,7 @@ function MlbBoardPage() {
           ) : basisMode ? (
             <GradeChip grade={gradeFromEv(r.bsEv == null ? null : Number(r.bsEv))} basis="EV @ basis (DK/FD)" />
           ) : (
-            <GradeChip grade={gradeFromEv(r.czEv == null ? null : Number(r.czEv))} basis="EV @ Caesars" />
+            <GradeChip grade={gradeFromEv(r.czEv == null ? null : Number(r.czEv))} basis="EV @ selected book" />
           );
         },
       },
@@ -615,7 +625,7 @@ function MlbBoardPage() {
             } satisfies Column<PickRow>,
             {
               key: "cz",
-              header: "CZ (settles)",
+              header: selectedBookName,
               numeric: true,
               sortValue: (r) => liveAmOf(r) ?? (Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0),
               cell: (r) => <CzPrice row={r} live={rowQuote(r)} />,
@@ -632,8 +642,8 @@ function MlbBoardPage() {
                 ) : q ? (
                   /* the in-play pull asks for the six core markets at us regions only, so there is
                      no live DK/FD basis to price against — the honest substitute is the EV at the
-                     live Caesars line, said in as many words rather than a pregame basis number */
-                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live Caesars line" note="the in-play pull prices Caesars, so there is no live DK/FD basis — this is the EV at the live Caesars line" />
+                     live selected-book line, said in as many words rather than a pregame basis number */
+                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live selected-book line" note="the in-play pull prices Caesars, so there is no live DK/FD basis — this is the EV at the live selected-book line" />
                 ) : r.bsEv != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <EvBadge ev={Number(r.bsEv)} />
@@ -687,14 +697,14 @@ function MlbBoardPage() {
             } satisfies Column<PickRow>,
             {
               key: "cz",
-              header: "Caesars",
+              header: selectedBookName,
               numeric: true,
               sortValue: (r) => liveAmOf(r) ?? (Number(String(r.czOdds ?? "").replace(/[^\d.-]/g, "")) || 0),
               cell: (r) => <CzPrice row={r} live={rowQuote(r)} />,
             } satisfies Column<PickRow>,
             {
               key: "czEv",
-              header: "EV @ CZR",
+              header: "EV @ book",
               numeric: true,
               sortValue: (r) => (rowSettled(r) ? -99 : Number(r.czEv) || 0),
               cell: (r) => {
@@ -702,7 +712,7 @@ function MlbBoardPage() {
                 return rowSettled(r) ? (
                   <SettledDash />
                 ) : q ? (
-                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live Caesars line" />
+                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live selected-book line" />
                 ) : r.czEv != null ? (
                   <EvBadge ev={Number(r.czEv)} />
                 ) : (
@@ -736,7 +746,7 @@ function MlbBoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut],
+    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
@@ -1079,14 +1089,14 @@ function MlbBoardPage() {
         title="Board"
         sub={
           sport === "ufc"
-            ? "UFC — de-vigged market consensus vs the Caesars moneyline, records live from ESPN"
+            ? "UFC — de-vigged market consensus vs your selected sportsbook, records live from ESPN"
             : sport === "asg"
             ? "All-Star Game — ML, F3, F5, HR props & correct score · straight bets only at Caesars"
             : d
-              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${MODE_LABEL[selMode]} · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices are Caesars"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${underWayNote}`
+              ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${selectedBookName} price comparison · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices follow your selected sportsbook"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${underWayNote}`
               : basisMode
                 ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
-                : "Consensus de-vigged probability vs the Caesars line"
+                : "Consensus de-vigged probability vs the selected sportsbook line"
         }
         action={
           sport === "mlb" ? (
@@ -1317,7 +1327,7 @@ function MlbBoardPage() {
         <Panel>
           {allRows && (
             <div className="mb-2 text-[11px] text-muted">
-              {cat === "all" ? "Every market" : CAT_LABELS[cat]} · {allRows.length} line{allRows.length === 1 ? "" : "s"} Caesars posts on today&apos;s board, graded S → F on model − fair
+              {cat === "all" ? "Every market" : CAT_LABELS[cat]} · {allRows.length} line{allRows.length === 1 ? "" : "s"} the selected book posts on today&apos;s board, graded S → F on model − implied
               {allNoCz > 0 ? ` · ${allNoCz} line${allNoCz === 1 ? "" : "s"} only other books post hidden` : ""}
               {capped ? ` · showing the top ${ALL_SCOPE_CAP} — search to narrow` : ""}
             </div>
@@ -1330,7 +1340,7 @@ function MlbBoardPage() {
           {scratchedPicks > 0 && <ScratchedNote n={scratchedPicks} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {cz.count > 0 && (
             <div className="mt-3 flex items-center justify-between text-[11.5px] text-muted">
-              <span>{cz.count} pick{cz.count === 1 ? "" : "s"} hidden by your Caesars toggle (all tabs)</span>
+              <span>{cz.count} pick{cz.count === 1 ? "" : "s"} hidden by your sportsbook toggle (all tabs)</span>
               <button type="button" onClick={cz.reset} className="font-semibold text-pos hover:underline">
                 show all again
               </button>
@@ -1360,7 +1370,7 @@ function MlbBoardPage() {
           {czHiddenHere > 0 && (
             <div className="mt-3 flex items-center justify-between rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-2 text-[11.5px] text-muted">
               <span>
-                {czHiddenHere} pick{czHiddenHere === 1 ? "" : "s"} hidden by your Caesars toggle
+                {czHiddenHere} pick{czHiddenHere === 1 ? "" : "s"} hidden by your sportsbook toggle
               </span>
               <button type="button" onClick={cz.reset} className="font-semibold text-pos hover:underline">
                 show all again
@@ -1388,7 +1398,7 @@ function MlbBoardPage() {
         {quota && <>Odds API quota remaining: <span className="num">{quota}</span> · </>}
         {basisMode
           ? "EV and Kelly are at the DK/FD basis (the better de-vigged price of the pair, tie → DK) — the exact price the Builder selects on. Caesars is the settlement price; the NV app can differ — confirm at lock."
-          : "Prices are Caesars' US feed via The Odds API; the NV app can differ — confirm at lock."}
+          : "Prices are from the selected sportsbook via The Odds API; local availability can differ."}
         Informational only, not betting advice.
       </div>
 
@@ -1526,12 +1536,12 @@ function LivePriceLine({ view, pricedAt }: { view: MlbLiveView; pricedAt: string
     <div
       className="num mt-0.5 flex items-center gap-1 text-[10px] font-bold tabular-nums text-live"
       data-testid="mlb-live-price"
-      title={`Priced in play at Caesars, this quote taken ${age} — ${view.books} book${view.books === 1 ? "" : "s"} quoting this line${asked ? `; the game was last asked ${asked}` : ""}. A posted quote, never invented.`}
+      title={`Priced in play at the selected book, this quote taken ${age} — ${view.books} book${view.books === 1 ? "" : "s"} quoting this line${asked ? `; the game was last asked ${asked}` : ""}. A posted quote, never invented.`}
     >
       <LiveDot />
       <span>
         ↻ live {view.side} {view.ln}
-        {view.am != null ? ` · ${fmtAmerican(view.am)} CZR` : " · no Caesars price at this line"}
+        {view.am != null ? ` · ${fmtAmerican(view.am)} at selected book` : " · no selected-book price at this line"}
         {` · ${age}`}
       </span>
     </div>
@@ -1555,7 +1565,7 @@ function LiveGrade({ view, pricedAt }: { view: MlbLiveView; pricedAt: string | n
           so this is 100% of production rows) a market-derived fair gets the figure and the words,
           and no letter: a grade nobody computed is worse than no grade. */}
       {view.pSrc === "sim" ? (
-        <GradeChip grade={gradeFromEv(view.ev)} basis={`EV at the live Caesars line (${view.side} ${view.ln}), this quote taken ${age}`} />
+        <GradeChip grade={gradeFromEv(view.ev)} basis={`EV at the live selected-book line (${view.side} ${view.ln}), this quote taken ${age}`} />
       ) : (
         <span
           className="num text-[11px] text-muted"
@@ -1568,7 +1578,7 @@ function LiveGrade({ view, pricedAt }: { view: MlbLiveView; pricedAt: string | n
       <span
         className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
         data-testid="mlb-live-pill"
-        title={`Priced in play at Caesars, this quote taken ${age}${asked ? `; the game was last asked ${asked}` : ""} — no ¼-Kelly stake on a live line.`}
+        title={`Priced in play at the selected book, this quote taken ${age}${asked ? `; the game was last asked ${asked}` : ""} — no ¼-Kelly stake on a live line.`}
       >
         <LiveDot /> LIVE
       </span>
@@ -1649,7 +1659,7 @@ function CzPrice({ row, live }: { row: { czOdds?: unknown; sub?: string | null }
   if (!live) return <OddsCell odds={row.czOdds as never} book="caesars" />;
   const v = mlbLiveView(live, legSideOf(row.sub));
   return v.am == null ? (
-    <span className="text-[10px] text-faint" title="Caesars posts no in-play price on this side at the live line — the pregame price is a different bet and is not shown here">
+    <span className="text-[10px] text-faint" title="The selected book posts no in-play price on this side at the live line — the pregame price is a different bet and is not shown here">
       no live price
     </span>
   ) : (
@@ -1671,7 +1681,7 @@ function LiveTag() {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
-      title="In play — graded on EV at Caesars, no ¼-Kelly stake on a live line"
+      title="In play — graded on EV at your selected sportsbook, no ¼-Kelly stake on a live line"
       data-testid="mlb-live-tag"
     >
       <LiveDot /> live

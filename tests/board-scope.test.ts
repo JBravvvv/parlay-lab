@@ -43,7 +43,7 @@ describe("INSTRUCTION 31/33 — Board page wiring (source scan)", () => {
   it("INSTRUCTION 41: the ALL view drops lines Caesars does not post and counts them in the footnote", () => {
     expect(src).toMatch(/if \(r\.cz\?\.o == null\) \{\s*noCz\+\+;\s*continue;\s*\}/);
     expect(src).toMatch(/return \[out, noCz\];/);
-    expect(src).toMatch(/Caesars posts on today&apos;s board/);
+    expect(src).toMatch(/the selected book posts on today&apos;s board/);
     expect(src).toMatch(/only other books post hidden/);
   });
   it("the search box filters by normalized player name in both scopes", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import {quoteCapture,attachBookQuotes} from "@/lib/sportsbook/mlb";
 import { createEngine, type BoardData, type Engine } from "@/engine";
 import { browserFetchJson } from "./fetcher";
 import { logBoardPredictions } from "./predictions";
@@ -16,6 +17,7 @@ import { applyEnvClosedForm } from "@/lib/env-adjust";
  * pl_daily, pl_fun, pl_ledger, ...) — data stays compatible.
  */
 let engine: Engine | null = null;
+const bookCapture=quoteCapture();
 
 /**
  * Per-game sim outputs. The engine keeps SIMS local to shAnalyzeLocal, so we
@@ -104,7 +106,7 @@ export function setDirPref(mkt: string, v: DirPref) {
 
 export function getEngine(): Engine {
   if (!engine) {
-    engine = createEngine({ fetchJson: browserFetchJson, storage: window.localStorage });
+    engine = createEngine({ fetchJson: async (url) => {const r=await browserFetchJson(url);if(r.ok)bookCapture.capture(r.body);return r;}, storage: window.localStorage });
     const orig = engine.get<(ctx: unknown, n: number, seed: number) => SimOut>("shSimGames");
     engine.set("shSimGames", (ctx: unknown, n: number, seed: number) => {
       const res = orig(ctx, n, seed);
@@ -371,9 +373,10 @@ export async function generateBoard(): Promise<Board> {
   const eng = getEngine();
   noteGenerate();
   await armV2(eng);
+  bookCapture.clear();
   const slate = await eng.collectSlate();
   simCapture = [];
-  const data = eng.analyze(slate);
+  const data = attachBookQuotes(eng.analyze(slate), bookCapture.events.values());
   const board: Board = { date: todayStr(), at: Date.now(), data };
   try {
     localStorage.setItem(BOARD_KEY, JSON.stringify(board));

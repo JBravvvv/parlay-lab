@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * The ⓘ next to every pick (2026-08-09, Josh's spec): hover shows the question, click
- * opens the toggle — "Is this pick offered at Caesars sportsbook right now?" Defaults
+ * opens the toggle — "Is this pick offered at the selected sportsbook right now?" Defaults
  * YES; NO hides the pick from the board (device-local, reversible via the reset line).
  */
 export function CzInfo({ pickKey, offered, onToggle }: { pickKey: string; offered: boolean; onToggle: (k: string) => void }) {
@@ -22,8 +22,8 @@ export function CzInfo({ pickKey, offered, onToggle }: { pickKey: string; offere
     <span ref={ref} className="relative inline-block">
       <button
         type="button"
-        aria-label="Is this pick offered at Caesars sportsbook right now?"
-        title="Is this pick offered at Caesars sportsbook right now?"
+        aria-label="Is this pick offered at the selected sportsbook right now?"
+        title="Is this pick offered at the selected sportsbook right now?"
         onClick={() => setOpen((o) => !o)}
         className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/20 text-[9px] font-bold text-muted transition-colors hover:border-pos hover:text-pos"
       >
@@ -31,7 +31,7 @@ export function CzInfo({ pickKey, offered, onToggle }: { pickKey: string; offere
       </button>
       {open && (
         <span className="liquid-glass absolute left-1/2 top-6 z-30 w-56 -translate-x-1/2 rounded-[14px] bg-surface-2/95 p-3 text-left shadow-xl">
-          <span className="block text-[11px] leading-snug text-text">Is this pick offered at Caesars sportsbook right now?</span>
+          <span className="block text-[11px] leading-snug text-text">Is this pick offered at the selected sportsbook right now?</span>
           <span className="mt-2 flex items-center gap-2">
             <button
               type="button"

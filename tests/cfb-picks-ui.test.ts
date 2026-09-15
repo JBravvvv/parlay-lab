@@ -71,7 +71,7 @@ describe("CFB Board — the one green Refresh Board control", () => {
 });
 
 describe("CFB Board — the Caesars grammar", () => {
-  it("TOP EDGES is a snap carousel of featured +EV picks with a Caesars price, above the table", () => {
+  it("TOP EDGES is a snap carousel of featured +EV picks with a selected-book price, above the table", () => {
     expect(board).toMatch(/function TopEdges\(/);
     expect(board).toMatch(/data-testid="cfb-top-edges"/);
     expect(board.indexOf("<TopEdges rows=")).toBeLessThan(board.indexOf("<DataTable"));
@@ -132,7 +132,7 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(board).toMatch(/priced <span className="num">\{propsQ\.data\.fetched - propsQ\.data\.noProps\}<\/span> of <span className="num">\{propsQ\.data\.events\}<\/span> games/);
     expect(board).not.toMatch(/props for <span/);
     expect(board).toMatch(
-      /\{propsQ\.data\.czMissing\s*\? ` · \$\{propsQ\.data\.czMissing\} game\$\{propsQ\.data\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff`\s*: ""\}/,
+      /\{selectedBook === "Caesars" && propsQ\.data\.czMissing\s*\? ` · \$\{propsQ\.data\.czMissing\} game\$\{propsQ\.data\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff`\s*: ""\}/,
     );
     expect(board).toMatch(/\{propsQ\.data\.noProps \? ` · \$\{propsQ\.data\.noProps\} game\$\{propsQ\.data\.noProps === 1 \? "" : "s"\} on the slate ha\$\{propsQ\.data\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);
     expect(board).not.toMatch(/only at DK\/FD|at any book/);
@@ -336,9 +336,9 @@ describe("CFB Board — INSTRUCTION 43 (2026-09-05): tickets past the leg gate a
     expect(section).toMatch(/\{openN > 0 && \(/);
     expect(section).toMatch(/data-testid="cfb-parlay-open-note"/);
     expect(section).toMatch(
-      /Fewer than \{CFB_PARLAYS\.perCategory\} tickets clear the \{CFB_PARLAYS\.minLegEvPct\}% leg gate, so \{openN\} tagged EDGE − use Caesars-priced legs down to EV ≥ \{CFB_PARLAYS\.setFloorEvPct\}% — ranked after the gated ones\./,
+      /Fewer than \{CFB_PARLAYS\.perCategory\} tickets clear the \{CFB_PARLAYS\.minLegEvPct\}% leg gate, so \{openN\} tagged EDGE − use selected-book-priced legs down to EV ≥ \{CFB_PARLAYS\.setFloorEvPct\}% — ranked after the gated ones\./,
     );
-    expect(section).toMatch(/the set extends to Caesars-priced legs down to EV ≥ \$\{CFB_PARLAYS\.setFloorEvPct\}% \(tagged EDGE −\)/);
+    expect(section).toMatch(/the set extends to selected-book-priced legs down to EV ≥ \$\{CFB_PARLAYS\.setFloorEvPct\}% \(tagged EDGE −\)/);
     // the pinned blurb tail survives
     expect(board).toMatch(/Up to \{CFB_PARLAYS\.perCategory\} ranked by EV, with player exposure limits\./);
   });
@@ -402,7 +402,7 @@ describe("CFB Board — INSTRUCTION 44 (2026-09-05): in-game legs in the categor
     expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
     expect(cats.match(/live: false/g)?.length).toBe(10);
     // the empty state no longer demands a game that hasn't kicked off
-    expect(section).toMatch(/a Caesars price \(pregame or in play\) and grade D or better/);
+    expect(section).toMatch(/a selected-book price \(pregame or in play\) and grade D or better/);
     expect(section).not.toMatch(/on a game that hasn't kicked off/);
   });
 });

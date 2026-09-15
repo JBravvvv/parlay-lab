@@ -102,6 +102,8 @@ export type CfbRow = {
   /** book count behind `mkt` */
   books: number;
   /** Caesars (williamhill_us), at ITS OWN line — the settling book */
+  quotes?: Record<string, CfbQuote>;
+  displayBook?: string;
   cz: CfbQuote | null;
   /** best price among books posting the consensus line (or the ML) */
   best: CfbQuote | null;

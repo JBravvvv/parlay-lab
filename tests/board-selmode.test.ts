@@ -56,24 +56,24 @@ describe("wired — source scans, comment-stripped", () => {
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   const read = (p: string) => strip(fs.readFileSync(path.join(process.cwd(), p), "utf8"));
 
-  it("the board page reads the FULL mode and orders TOP 50 with the shared ordering", () => {
+  it("the board uses selected-book pricing and shared EV ordering", () => {
     const src = read("app/board/page.tsx");
-    expect(src).toMatch(/setSelMode\(getSelectionMode\(\)\)/); // the whole mode, not just a dk_fd boolean
+    expect(src).not.toMatch(/setSelMode\(getSelectionMode\(\)\)/); // the whole mode, not just a dk_fd boolean
     expect(src).toMatch(/orderByMode\(/);
-    expect(src).toMatch(/MODE_LABEL\[selMode\]/); // the header names the order
+    expect(src).toMatch(/selected(?:BookName| sportsbook prices)/); // the header names the order
     expect(src).not.toMatch(/getSelectionMode\(\) === "dk_fd"/); // the boolean-only read is gone
   });
-  it("the parlay sets follow the mode too (2026-08-15, Josh: 'The parlays and tickets should follow the selection mode too')", () => {
+  it("parlay browsing follows selected-book EV while generation keeps its policy", () => {
     const src = read("src/components/mlb/ParlaysSection.tsx");
-    expect(src).toMatch(/setSelMode\(getSelectionMode\(\)\)/); // full mode, not the dk_fd boolean
+    expect(src).not.toMatch(/setSelMode\(getSelectionMode\(\)\)/); // full mode, not the dk_fd boolean
     expect(src).not.toMatch(/getSelectionMode\(\) === "dk_fd"/);
     expect(src).toMatch(/orderByMode\(/); // tickets ranked by the mode's price
-    expect(src).toMatch(/MODE_LABEL\[selMode\]/); // the section names its order
+    expect(src).toMatch(/selected(?:BookName| sportsbook prices)/); // the section names its order
   });
 
-  it("The Sharp keeps its own mode discipline — this ship aligned the Board TO it, not the reverse", () => {
+  it("The Sharp uses selected-book EV rather than paper allocation settings", () => {
     const src = read("app/sharp/page.tsx");
-    expect(src).toMatch(/getSelectionMode\(\)/);
+    expect(src).not.toMatch(/getSelectionMode\(\)/);
     expect(src).toMatch(/selMode === "ev_gated"/);
   });
 });

@@ -7,8 +7,10 @@ import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
 import { EmptyState, Skeleton } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {priceMlbProp} from "@/lib/sportsbook/mlb";
 import { useQuery } from "@tanstack/react-query";
-import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { setSport } from "@/lib/sport";
@@ -104,6 +106,7 @@ export default function PropsPage() {
 
 function PropsDesk() {
   const q = useBoard();
+  const selectedBook=useSportsbook();
   const sport = useSport();
   const regen = useRegenerateBoard();
   const ins = useShellInsets();
@@ -171,7 +174,7 @@ function PropsDesk() {
       return j?.board?.data?.propBoard ?? [];
     },
   });
-  const propBoard = ownEmpty ? serverProps.data ?? [] : ownProps;
+  const propBoard = useMemo(()=>ownEmpty ? (serverProps.data ?? []).map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,selectedBook))]))})) : ownProps,[ownEmpty,serverProps.data,selectedBook,ownProps]);
   const fromServer = ownEmpty && (serverProps.data?.length ?? 0) > 0;
   const allPropGames = useMemo(() => {
     if (!cat || gameTab) return [];

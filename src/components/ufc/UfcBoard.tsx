@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,9 +24,10 @@ type SideRow = { fightId: string; start: string; weightClass?: string; side: Ufc
 export function UfcBoard() {
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
   const qc = useQueryClient();
+  const selectedBook=useSportsbook();
   const q = useQuery({
-    queryKey: ["ufc-board"],
-    queryFn: () => loadUfcBoard({ bankroll }),
+    queryKey: ["ufc-board",selectedBook],
+    queryFn: () => loadUfcBoard({ bankroll,book:selectedBook }),
     staleTime: 240_000,
     retry: 1,
   });
@@ -71,7 +73,7 @@ export function UfcBoard() {
       },
       {
         key: "cz",
-        header: "Caesars",
+        header: "selected book",
         numeric: true,
         sortValue: (r) => r.side.czOdds ?? -100000,
         cell: (r) =>
@@ -83,7 +85,7 @@ export function UfcBoard() {
       },
       {
         key: "ev",
-        header: "EV @ CZR",
+        header: "EV @ Book",
         numeric: true,
         sortValue: (r) => r.side.czEv ?? -9,
         cell: (r) => (r.side.czEv != null ? <EvBadge ev={r.side.czEv * 100} /> : <span className="text-faint">—</span>),
@@ -128,7 +130,7 @@ export function UfcBoard() {
         <div>
           <div className="text-[13px] font-semibold text-text">{d?.eventName ?? "Next UFC card"}</div>
           <div className="text-[11px] text-muted">
-            Moneylines de-vigged across every US book in the feed; EV priced at Caesars. No fight model — edges are
+            Moneylines de-vigged across every US book in the feed; EV priced at selected book. No fight model — edges are
             price gaps, not predictions.
           </div>
         </div>
@@ -159,7 +161,7 @@ export function UfcBoard() {
 
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-              Suggested parlays — Caesars moneylines only
+              Suggested parlays — selected book moneylines only
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {d.tickets.map((t) => (
@@ -195,14 +197,14 @@ export function UfcBoard() {
             </div>
             {d.tickets.length === 0 && (
               <Panel>
-                <EmptyState title="No Caesars-priced fights yet" body="Caesars hasn't posted moneylines for this card in the feed." />
+                <EmptyState title="No selected book-priced fights yet" body="selected book hasn't posted moneylines for this card in the feed." />
               </Panel>
             )}
           </Reveal>
 
           <div className="text-[10.5px] leading-relaxed text-faint">
             Fight props (method of victory, round betting) aren&apos;t in this odds feed at any book — to price them,
-            type the Caesars app&apos;s prices into the <b className="text-muted">props desk on the Builder&apos;s UFC
+            type the selected book app&apos;s prices into the <b className="text-muted">props desk on the Builder&apos;s UFC
             tab</b> and it de-vigs the market for you. Rounds O/U shown is another book&apos;s line for reference.
             Fights are treated as independent. Informational only, not betting advice.
           </div>

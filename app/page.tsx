@@ -1,4 +1,7 @@
 "use client";
+import {bookName} from "@/lib/sportsbook/books";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {priceMlbBoard} from "@/lib/sportsbook/mlb";
 import { LeagueProvider } from "@/components/football/LeagueContext";
 import { FootballDashboard } from "@/components/football/FootballModelExplorer";
 import { NFL_DESK } from "@/lib/nfl/desk";
@@ -289,7 +292,9 @@ function MlbDashboard() {
      into the net. */
   const stats = useMemo(() => (mounted ? api?.stats("core") : undefined), [api, mounted]);
   const funStats = useMemo(() => (mounted ? api?.stats("fun") : undefined), [api, mounted]);
-  const board = mounted ? cachedBoard() : null;
+  const selectedBook=useSportsbook();
+  const rawBoard = mounted ? cachedBoard() : null;
+  const board=rawBoard?{...rawBoard,data:priceMlbBoard(rawBoard.data,selectedBook)}:null;
   const money = mounted ? getMoney() : { bankroll: 750, daily: 0, fun: 0 };
 
   // Phase 6: the managed bankroll ALREADY includes realized graded P/L (from its
@@ -398,7 +403,7 @@ function MlbDashboard() {
               <div className="flex items-center justify-between">
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">Featured estimate</div>
                 <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold">
-                  @ Caesars
+                  @ {bookName(selectedBook)}
                 </span>
               </div>
               {featured ? (

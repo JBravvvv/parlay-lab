@@ -76,7 +76,7 @@ describe("wired — source scans, comment-stripped", () => {
     expect(src).toMatch(/CzInfo/);
     expect(src).toMatch(/show all again/); // hidden picks are always recoverable
     const czInfo = fs.readFileSync(path.join(process.cwd(), "src/components/ui/CzInfo.tsx"), "utf8");
-    expect(czInfo).toMatch(/Is this pick offered at Caesars sportsbook right now\?/);
+    expect(czInfo).toMatch(/Is this pick offered at the selected sportsbook right now\?/);
   });
 
   it("the lime liquid glass spans (2026-08-09, Josh's aesthetic call): panels, tables, and no half-green rows", () => {

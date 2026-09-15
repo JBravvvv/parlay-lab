@@ -31,6 +31,7 @@ const OVERVIEW =
 let boardData: unknown = null;
 vi.mock("@/lib/useBoard", () => ({
   useBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
+  usePricedBoard: () => ({ data: boardData, isPending: false, isError: false, refetch: () => {} }),
   useRegenerateBoard: () => ({ mutate: () => {}, isPending: false }),
 }));
 vi.mock("@/lib/sport", () => ({ useSport: () => "mlb" }));

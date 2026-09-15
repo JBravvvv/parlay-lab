@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import {bookName,BOOKS,DEFAULT_BOOK} from "@/lib/sportsbook/books";
+import { NextResponse, NextRequest } from "next/server";
 
 /**
  * UFC prop odds, including the Caesars column, scraped from BestFightOdds'
@@ -28,7 +29,8 @@ async function get(url: string) {
   return r.text();
 }
 
-export async function GET() {
+export async function GET(req:NextRequest) {
+ const selected=bookName(BOOKS.find(b=>b.key===req.nextUrl.searchParams.get("book"))?.key??DEFAULT_BOOK);
   try {
     const home = await get("https://www.bestfightodds.com/");
     const ev = home.match(/href="(\/events\/ufc-[^"]+)"/)?.[1];
@@ -56,15 +58,15 @@ export async function GET() {
       if (row.includes("/fighters/")) {
         if (cur?.half) {
           cur.b = label;
-          cur.czMlB = cells["Caesars"] ?? null;
+          cur.czMlB = cells[selected] ?? null;
           cur.half = false;
         } else {
-          cur = { a: label, b: "", czMlA: cells["Caesars"] ?? null, czMlB: null, props: [], half: true };
+          cur = { a: label, b: "", czMlA: cells[selected] ?? null, czMlB: null, props: [], half: true };
           fights.push(cur);
         }
-      } else if (cur && cells["Caesars"] != null) {
-        const cz = cells["Caesars"];
-        const others = Object.entries(cells).filter(([b]) => REAL_BOOKS.has(b) && b !== "Caesars");
+      } else if (cur && cells[selected] != null) {
+        const cz = cells[selected];
+        const others = Object.entries(cells).filter(([b]) => REAL_BOOKS.has(b) && b !== selected);
         if (!others.length) continue;
         const imps = others.map(([, v]) => imp(v)).sort((x, y) => x - y);
         const mid = Math.floor(imps.length / 2);

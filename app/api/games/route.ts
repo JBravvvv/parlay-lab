@@ -1,3 +1,5 @@
+import {BOOKS,DEFAULT_BOOK} from "@/lib/sportsbook/books";
+import {priceMlbBoard} from "@/lib/sportsbook/mlb";
 import { NextRequest, NextResponse } from "next/server";
 import { BOARD_KEY, decodeBoard } from "@/lib/server/board-store";
 import { redis, storeEnv } from "@/lib/server/store";
@@ -56,12 +58,12 @@ async function pitcherLines(ids: number[], season: string): Promise<PitcherStats
 }
 
 /** the day's latest board ML rows, or undefined when there is no store / no board */
-async function boardMl(date: string): Promise<MlRow[] | undefined> {
+async function boardMl(date: string, book: string = DEFAULT_BOOK): Promise<MlRow[] | undefined> {
   if (!storeEnv()) return undefined;
   try {
     const blob = (await redis(["GET", BOARD_KEY(date)])) as string | null;
     const board = decodeBoard(blob);
-    const ml = board?.data?.categories?.ml;
+    const ml = board?.data ? priceMlbBoard(board.data,book).categories.ml : undefined;
     return Array.isArray(ml) ? (ml as MlRow[]) : undefined;
   } catch {
     return undefined;
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `date outside the Games window ${SEASON_WINDOW.start}..${SEASON_WINDOW.end}` }, { status: 400 });
   }
   try {
-    const [games, ml] = await Promise.all([scheduleFor(date), boardMl(date)]);
+    const [games, ml] = await Promise.all([scheduleFor(date), boardMl(date, BOOKS.find(b=>b.key===req.nextUrl.searchParams.get("book"))?.key??DEFAULT_BOOK)]);
     const stats = await pitcherLines(pitcherIds(games), SEASON_OF(date));
     return NextResponse.json(shapeGames(date, games, stats, ml), {
       headers: { "cache-control": "public, max-age=30, stale-while-revalidate=60" },

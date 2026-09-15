@@ -1,4 +1,7 @@
 "use client";
+import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {bookName} from "@/lib/sportsbook/books";
 
 import { useMemo, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,7 +29,7 @@ import { TeamMark } from "./TeamMark";
 /**
  * THE SHARP — CFB (INSTRUCTION 38, 2026-09-05): the explanation desk. Nothing here is a new
  * number: it prints the constants the model runs on (from CFB_MODEL / CFB_RULES, the one copy),
- * reads the day's slate back as a paragraph, lists the best and worst Caesars prices against
+ * reads the day's slate back as a paragraph, lists the best and worst selected-book prices against
  * the model with an edge meter each, tabulates every game's model parts (the three P(home)
  * inputs, the blend, the expected margin and total, σ), shows which books priced the slate,
  * and ends with ESPN's FPI for the day's teams. Setups, not predictions.
@@ -59,7 +62,9 @@ function coverage(games: CfbGame[]): Coverage[] {
 
 export function CfbSharp() {
   const L = useLeague();
-  const { today, date, pick, rail, bankroll, q, slate } = L.useDesk();
+  const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
+  const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
+  const selectedBook=bookName(useSportsbook());
   const qc = useQueryClient();
 
   const ranked = useMemo(() => (slate ? rankRows(slate.games) : []), [slate]);
@@ -68,7 +73,7 @@ export function CfbSharp() {
   const value = playable.slice(0, 4);
   const trap = priced.length > 0 ? priced[priced.length - 1] : null;
   const plusEv = playable.filter((r) => (r.row.evCz ?? -1) > 0);
-  const books = useMemo(() => coverage(slate?.games ?? []), [slate]);
+  const books = useMemo(() => coverage(rawSlate?.games ?? []), [rawSlate]);
   const teams = useMemo(() => (slate ? slate.games.flatMap((g) => [g.home, g.away]) : []), [slate]);
   const matched = slate ? slate.games.filter((g) => g.oddsEventId != null).length : 0;
   const withMl = slate ? slate.games.filter((g) => g.model.parts.mkt != null).length : 0;
@@ -86,8 +91,8 @@ export function CfbSharp() {
   const overview = slate
     ? `${slate.games.length} ${L.noun} game${slate.games.length === 1 ? "" : "s"} on ${railLabel(date)}: ${matched} matched to the odds feed, ${withMl} with a two-book moneyline consensus, ${withFpi} with FPI on both sides. ` +
       (priced.length === 0
-        ? "Caesars has not posted a price the desk can grade yet."
-        : `Of ${priced.length} Caesars-priced sides, ${plusEv.length} clear${plusEv.length === 1 ? "s" : ""} the model's fair price and ${
+        ? "The selected book has not posted a price the desk can grade yet."
+        : `Of ${priced.length} selected-book-priced sides, ${plusEv.length} clear${plusEv.length === 1 ? "s" : ""} the model's fair price and ${
             plusEv.filter((r) => (r.row.evCz ?? 0) >= L.rules.minEvPct).length
           } clear${plusEv.filter((r) => (r.row.evCz ?? 0) >= L.rules.minEvPct).length === 1 ? "s" : ""} the card's +${L.rules.minEvPct}% bar. `) +
       "Every edge below is a gap between a posted price and the blend of the de-vigged market and ESPN FPI — a setup that matches criteria, not a prediction."
@@ -149,7 +154,7 @@ export function CfbSharp() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-text">The {L.short} read · {railLabel(date)}</div>
-          <div className="text-[11px] text-muted">Market + FPI margin model, priced at Caesars. Every constant below is the one the board runs on.</div>
+          <div className="text-[11px] text-muted">Market + FPI margin model, priced at the selected book. Every constant below is the one the board runs on.</div>
         </div>
         <Pill variant="ghost" className="press" onClick={() => qc.invalidateQueries({ queryKey: [L.queryPrefix, "slate"] })} disabled={q.isFetching}>
           {q.isFetching ? "Reading…" : "↻ Refresh read"}
@@ -185,7 +190,7 @@ export function CfbSharp() {
 
           {value.length > 0 && (
             <Reveal>
-              <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Best Caesars prices vs the model</h2>
+              <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Best selected-book prices vs the model</h2>
               <div className="grid gap-3 md:grid-cols-2">
                 {value.map((r, i) => (
                   <Spot key={r.row.key} r={r} lit={i === 0 && (r.row.evCz ?? -1) > 0} league={L.id} />
@@ -200,13 +205,13 @@ export function CfbSharp() {
                 <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-neg">
                   {trap.team && <TeamMark team={trap.team} size="sm" showAbbr={false} />}
                   <span>
-                    {trap.row.label} {trap.row.cz ? fmtAmerican(trap.row.cz.price) : "—"} at Caesars
+                    {trap.row.label} {trap.row.cz ? fmtAmerican(trap.row.cz.price) : "—"} at the selected book
                   </span>
                   <EvBadge ev={trap.row.evCz ?? 0} />
                 </div>
                 <div className="mt-1 text-[12px] leading-relaxed text-muted">
                   The model makes this side {fmtPct(trap.row.fair)} ({fmtAmerican(trap.row.fairAm)} fair)
-                  {trap.row.mkt != null ? `; the de-vigged market says ${fmtPct(trap.row.mkt)}` : ""}. Caesars&apos; price gives up{" "}
+                  {trap.row.mkt != null ? `; the de-vigged market says ${fmtPct(trap.row.mkt)}` : ""}. The selected price gives up{" "}
                   {Math.abs(trap.row.evCz ?? 0).toFixed(1)}% per dollar
                   {trap.row.best && trap.row.best.book !== trap.row.cz?.book ? ` (${fmtAmerican(trap.row.best.price)} is posted at ${bookShort(trap.row.best)})` : ""}. If you
                   like this side anyway, this is the leg a parlay bleeds on.
@@ -316,7 +321,7 @@ function Spot({ r, lit, league }: { r: BoardRow; lit: boolean; league: League })
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <GradeChip grade={row.grade} basis="EV @ Caesars" />
+          <GradeChip grade={row.grade} basis="EV @ selected book" />
           {row.cz && <OddsCell odds={row.cz.price} book="caesars" />}
         </div>
       </div>
@@ -378,18 +383,18 @@ function HowItPrices({ L }: { L: DeskHandles }) {
         </div>
         <div className="space-y-2.5">
           <Term k="Caesars" label="Settlement">
-            EV, grade and stake are all at Caesars&apos; own quote at its own line (re-priced when its line differs from the consensus). Other books only
+            EV, grade and stake are all at the selected book&apos; own quote at its own line (re-priced when its line differs from the consensus). Other books only
             inform the consensus and the &quot;best&quot; column.
           </Term>
           <Term k={`¼-Kelly · cap ${Math.round(r.kellyCap * 100)}%`} label="Sizing">
-            Stake = {r.kellyFrac}× the Kelly fraction at Caesars, capped at {Math.round(r.kellyCap * 100)}% of the {L.short} bankroll, whole dollars, $0 when the edge is ≤ 0.
+            Stake = {r.kellyFrac}× the Kelly fraction at the selected book, capped at {Math.round(r.kellyCap * 100)}% of the {L.short} bankroll, whole dollars, $0 when the edge is ≤ 0.
             Passing is a position.
           </Term>
           <Term k={`S ≥ +${GRADE_CUTS.S} · A ≥ +${GRADE_CUTS.A} · B ≥ +${GRADE_CUTS.B} · C ≥ ${GRADE_CUTS.C} · D ≥ ${GRADE_CUTS.D} · F`} label="Grades">
-            A label on the EV% at Caesars, fixed cutoffs, never curved — most of a retail board is −EV and the grade says so.
+            A label on the EV% at the selected book, fixed cutoffs, never curved — most of a retail board is −EV and the grade says so.
           </Term>
           <Term k={`$${L.paper.daily} core + $${L.paper.fun} fun`} label="The card">
-            Core legs need ≥ +{r.minEvPct}% EV at Caesars and a price ≤ {r.maxDec} decimal; singles and 2-leg cross-game parlays, one leg per game, no two core
+            Core legs need ≥ +{r.minEvPct}% EV at the selected book and a price ≤ {r.maxDec} decimal; singles and 2-leg cross-game parlays, one leg per game, no two core
             tickets on the same game, {r.tickets.min}–{r.tickets.max} tickets at ${r.minStake}–${r.maxStake} each. The fun ticket is a {r.fun.legs.min}–{r.fun.legs.max}-leg
             favorites parlay at ≥ {r.fun.minDec}× — its own ledger and bank, separate from MLB, since {L.paper.since}.
           </Term>

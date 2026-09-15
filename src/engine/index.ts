@@ -112,6 +112,8 @@ export interface Ticket {
  * Parlay Builder tab. Display-only: never feeds selection, grading or the ledger.
  */
 export interface PropBoardRow {
+  bookQuotes?: {o: Record<string, import("@/lib/sportsbook/mlb").BookQuote>;u: Record<string, import("@/lib/sportsbook/mlb").BookQuote>};
+  displayBook?: string;
   p: string; // player, exactly as the feed names him
   tm: string | null; // team abbreviation when known
   ln: number; // the line (0.5 = "anytime"/"1+")

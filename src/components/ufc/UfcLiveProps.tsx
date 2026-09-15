@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -8,8 +9,8 @@ import { Reveal } from "@/components/motion/Reveal";
 import { fmtAm, amToDec, type UfcFight } from "@/lib/ufc";
 import type { PropLeg } from "@/components/ufc/UfcProps";
 
-/* Live Caesars fight props via the BestFightOdds scrape (/api/ufcprops).
-   For each prop Caesars prices we show the best price elsewhere and the
+/* Live selected book fight props via the BestFightOdds scrape (/api/ufcprops).
+   For each prop selected book prices we show the best price elsewhere and the
    cross-book median — an honest line-shop read. The median implied % is used
    as the slip probability and slightly overstates true chances on longshots
    (per-outcome vig can't be fully stripped on partial markets) — disclosed. */
@@ -26,10 +27,11 @@ const lastName = (s: string) => s.trim().split(/\s+/).slice(-1)[0];
 const fmtPct = (p: number) => `${(p * 100).toFixed(1)}%`;
 
 export function UfcLiveProps({ fights, onAdd }: { fights: UfcFight[]; onAdd: (leg: PropLeg) => void }) {
+  const selectedBook=useSportsbook();
   const q = useQuery({
-    queryKey: ["ufc-props"],
+    queryKey: ["ufc-props",selectedBook],
     queryFn: async (): Promise<{ fights: ApiFight[]; source?: string }> => {
-      const r = await fetch("/api/ufcprops");
+      const r = await fetch(`/api/ufcprops?book=${selectedBook}`);
       if (!r.ok) throw new Error(`props feed ${r.status}`);
       return r.json();
     },
@@ -54,29 +56,29 @@ export function UfcLiveProps({ fights, onAdd }: { fights: UfcFight[]; onAdd: (le
 
   if (q.isPending)
     return (
-      <Panel title="Caesars fight props — live" className="mt-6">
+      <Panel title="selected book fight props — live" className="mt-6">
         <SkeletonRows rows={5} />
       </Panel>
     );
   if (q.isError)
     return (
-      <Panel title="Caesars fight props — live" className="mt-6">
+      <Panel title="selected book fight props — live" className="mt-6">
         <EmptyState
           title="Prop feed unreachable right now"
-          body="The BestFightOdds scrape didn't answer — the typed-price props desk below still prices anything you see in the Caesars app."
+          body="The BestFightOdds scrape didn't answer — the typed-price props desk below still prices anything you see in the selected book app."
         />
       </Panel>
     );
   if (matched.length === 0)
     return (
-      <Panel title="Caesars fight props — live" className="mt-6">
-        <EmptyState title="No Caesars props for the remaining fights" body="Props drop off as fights start." />
+      <Panel title="selected book fight props — live" className="mt-6">
+        <EmptyState title="No selected book props for the remaining fights" body="Props drop off as fights start." />
       </Panel>
     );
 
   return (
     <Reveal>
-      <Panel title="Caesars fight props — live (rounds · draw, via BestFightOdds)" className="mt-6">
+      <Panel title="selected book fight props — live (rounds · draw, via BestFightOdds)" className="mt-6">
         <div className="space-y-4">
           {matched.map(({ bf, f }) => (
             <div key={f.id}>
@@ -131,10 +133,10 @@ export function UfcLiveProps({ fights, onAdd }: { fights: UfcFight[]; onAdd: (le
           ))}
         </div>
         <p className="mt-4 text-[10.5px] leading-relaxed text-faint">
-          &quot;vs mkt&quot; compares Caesars to the cross-book median for the same outcome — a line-shop read, not a
+          &quot;vs mkt&quot; compares selected book to the cross-book median for the same outcome — a line-shop read, not a
           model. On big longshots the median overstates true chances (vig can&apos;t be fully stripped from partial
           markets), so treat green there with suspicion; CZ BEST just means no book on the board beats this price.
-          Slip probability uses the market median, same caveat. Method-of-victory prices from the Caesars NV app
+          Slip probability uses the market median, same caveat. Method-of-victory prices from the selected book NV app
           aren&apos;t tracked here — type those into the desk below. Informational only, not betting advice.
         </p>
       </Panel>

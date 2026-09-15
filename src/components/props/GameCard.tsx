@@ -1,4 +1,5 @@
 "use client";
+import {bookName} from "@/lib/sportsbook/books";
 
 import { useEffect, useRef } from "react";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
@@ -215,7 +216,7 @@ export function GameMarketCard({
                         cz,
                         prob: prob ?? 0,
                         market,
-                        book: "CZ",
+                        book: r.displayBook ? bookName(String(r.displayBook)) : "CZ",
                         src: "model",
                       })
                     }

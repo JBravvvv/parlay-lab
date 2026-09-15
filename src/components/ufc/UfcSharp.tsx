@@ -1,4 +1,5 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,9 +24,10 @@ type Spot = { side: UfcSide; fight: string; start: string };
 export function UfcSharp() {
   const bankroll = typeof window !== "undefined" ? getMoney().bankroll : 750;
   const qc = useQueryClient();
+  const selectedBook=useSportsbook();
   const q = useQuery({
-    queryKey: ["ufc-board"],
-    queryFn: () => loadUfcBoard({ bankroll }),
+    queryKey: ["ufc-board",selectedBook],
+    queryFn: () => loadUfcBoard({ bankroll,book:selectedBook }),
     staleTime: 240_000,
     retry: 1,
   });
@@ -48,7 +50,7 @@ export function UfcSharp() {
 
   const overview = d
     ? `${d.fights.length} fights left on ${d.eventName ?? "the card"}. Consensus across every US book prices this ` +
-      `card ${posCount === 0 ? "tight — no Caesars line beats the market right now" : `with ${posCount} Caesars line${posCount === 1 ? "" : "s"} above consensus`}. ` +
+      `card ${posCount === 0 ? "tight — no selected book line beats the market right now" : `with ${posCount} selected book line${posCount === 1 ? "" : "s"} above consensus`}. ` +
       `Everything below is price-gap analysis, not fight prediction — the desk has no MMA model and says so.`
     : "";
 
@@ -57,7 +59,7 @@ export function UfcSharp() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[13px] font-semibold text-text">{d?.eventName ?? "Next UFC card"}</div>
-          <div className="text-[11px] text-muted">Market read only — de-vigged 7-book consensus vs the Caesars line</div>
+          <div className="text-[11px] text-muted">Market read only — de-vigged 7-book consensus vs the selected book line</div>
         </div>
         <Pill variant="primary" onClick={() => qc.invalidateQueries({ queryKey: ["ufc-board"] })} disabled={q.isFetching}>
           {q.isFetching ? "Reading the card…" : "↻ Refresh UFC read"}
@@ -80,7 +82,7 @@ export function UfcSharp() {
 
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-              Best Caesars prices vs the market
+              Best selected book prices vs the market
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {value.map((s, i) => (
@@ -115,10 +117,10 @@ export function UfcSharp() {
             <Reveal>
               <Panel title="Worst price on the card" className="border-neg/20">
                 <div className="text-[13px] font-semibold text-neg">
-                  {trap.side.name} {fmtAm(trap.side.czOdds!)} at Caesars
+                  {trap.side.name} {fmtAm(trap.side.czOdds!)} at selected book
                 </div>
                 <div className="mt-1 text-[12px] leading-relaxed text-muted">
-                  Consensus says {fmtPct(trap.side.prob!)} — Caesars&apos; price gives up{" "}
+                  Consensus says {fmtPct(trap.side.prob!)} — selected book&apos; price gives up{" "}
                   {(Math.abs(trap.side.czEv!) * 100).toFixed(1)}% to the market
                   {trap.side.bestOdds != null ? ` (${fmtAm(trap.side.bestOdds)} available at ${trap.side.bestBook})` : ""}.
                   If you like this fighter anyway, this is the leg your parlay bleeds on.
@@ -170,7 +172,7 @@ export function UfcSharp() {
               <div className="mt-3 space-y-2 text-[12.5px] leading-relaxed text-muted">
                 <p>
                   <b className="text-text">The market is the whole model.</b> Every book&apos;s moneyline is de-vigged;
-                  the median is the consensus &quot;true&quot; probability. Caesars&apos; price is then judged against it —
+                  the median is the consensus &quot;true&quot; probability. selected book&apos; price is then judged against it —
                   a positive gap is a real, checkable edge; there is no fight model and none is faked.
                 </p>
                 <p>

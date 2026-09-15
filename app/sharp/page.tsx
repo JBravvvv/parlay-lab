@@ -1,4 +1,5 @@
 "use client";
+import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -14,7 +15,7 @@ import { EvBadge } from "@/components/ui/EvBadge";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import { useBoard, useRegenerateBoard } from "@/lib/useBoard";
+import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { getEngine, getSelectionMode, SIM_PATHS_TXT } from "@/lib/engine-client";
 import { useCalibration } from "@/lib/useCalibration";
 import { nowLabel, useLiveNow } from "@/lib/liveNow";
@@ -46,14 +47,14 @@ function ConvChip({ c }: { c?: string }) {
  * THE LIVE PILL (INSTRUCTION 51). The same pulsing mark the CFB rail uses
  * (src/components/cfb/CfbPicksBoard.tsx:228) — same tokens, same dot, same promise — so "in play"
  * looks identical on every desk and Josh never has to learn a second vocabulary. The title carries
- * the rule that the badge itself cannot: EV is at the live Caesars price, and a live line is never
+ * the rule that the badge itself cannot: EV is at the live selected-book price, and a live line is never
  * given a stake.
  */
 function LivePill() {
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full border border-live/50 bg-live/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-live"
-      title="In play — graded on EV at the live Caesars price, and no ¼-Kelly stake is ever sized on a live line"
+      title="In play — graded on EV at the live selected-book price, and no ¼-Kelly stake is ever sized on a live line"
       data-testid="sharp-live-tag"
     >
       <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
@@ -119,12 +120,12 @@ function MlbSharpPage() {
   // today's plays by the engine's true % — Caesars' price never changes WHICH
   // picks are chosen, it only prices them (the EV gate lives in the Builder's
   // allocator, where stakes are). caesars_ev is the legacy ranking.
-  const [selMode, setSelModeState] = useState<"dk_fd" | "ev_gated" | "probability" | "caesars_ev">("dk_fd");
+  const [selMode, setSelModeState] = useState<"dk_fd" | "ev_gated" | "probability" | "caesars_ev">("ev_gated");
   // dk_fd: the active core EV gate, straight from the engine (mounted only) —
   // The Sharp's plays clear the same bar the Builder's allocator enforces
   const [gatePct, setGatePct] = useState(0);
   useEffect(() => {
-    setSelModeState(getSelectionMode());
+    // Displayed value follows the named sportsbook; the paper allocator retains its own mode.
     const cfg = getEngine().get<{ coreEvMin?: number }>("SH_CFG");
     setGatePct(cfg?.coreEvMin ?? 0);
   }, []);
@@ -207,7 +208,7 @@ function MlbSharpPage() {
      that module — a timer on a paid feed spends money while nobody is looking — so it re-reads on
      mount, on focus, and on Josh's own Refresh. */
   const liveQuotes = useMlbLiveQuotes(board?.date ?? null);
-  const liveOverlay = liveQuotes.data ?? null;
+  const liveOverlay = useLivePrices(liveQuotes.data) ?? null;
   /* THE OVERLAY'S QUOTE FOR THIS PLAY, OR NOTHING. Three separate reasons for null, each a
      deliberate refusal rather than an omission — and every one of them falls through to
      INSTRUCTION 50's SETTLED suppression, byte-identical:
@@ -309,7 +310,7 @@ function MlbSharpPage() {
         title="The Sharp"
         sub={
           sport === "ufc"
-            ? "The desk's UFC read — market consensus vs the Caesars line, no fight model, no key needed"
+            ? "The desk's UFC read — market consensus vs the selected sportsbook line, no fight model, no key needed"
             : sport === "asg"
             ? "The desk's All-Star read — consensus-anchored ML/F3/F5, sim-priced correct scores, straight bets only"
             : "The quant engine's daily read — the exact engine from the original app (parity-proven), free, no key needed"
@@ -371,7 +372,7 @@ function MlbSharpPage() {
                 ? `Today's plays — EV at the DK/FD basis, gate +${gatePct}% (the Builder's exact bar; Caesars settles, never picks)`
                 : selMode !== "caesars_ev"
                 ? "Today's plays — highest true probability (consensus-anchored; Caesars prices the ticket, never picks it)"
-                : "Today's plays — best playable EV at Caesars"}
+                : "Today's plays — best playable EV at selected book"}
             </h2>
             <div className="grid gap-3 md:grid-cols-2">
               {shownPlays.map(({ r, s: settled, q: live }, i) => (
@@ -488,22 +489,22 @@ function MlbSharpPage() {
                               live line {v.side} {v.ln}
                             </span>
                             {v.am != null ? (
-                              <span title="The live Caesars price on THIS side — a posted quote, never derived">
+                              <span title="The live selected-book price on THIS side — a posted quote, never derived">
                                 <OddsCell odds={v.am} book="caesars" />
                               </span>
                             ) : (
-                              <span className="text-faint" title="Caesars posts no in-play price on this side right now — nothing is substituted in its place">
-                                no live Caesars price
+                              <span className="text-faint" title="The selected book posts no in-play price on this side right now — nothing is substituted in its place">
+                                no live selected-book price
                               </span>
                             )}
                             {v.ev == null ? null : v.pSrc === "sim" ? (
-                              <span title="EV at the LIVE Caesars price against the live line, off the engine's own remaining-game sim — this replaces the pregame EV, it does not sit beside it">
+                              <span title="EV at the LIVE selected-book price against the live line, off the engine's own remaining-game sim — this replaces the pregame EV, it does not sit beside it">
                                 <EvBadge ev={v.ev} />
                               </span>
                             ) : (
                               <span
                                 className="num text-[10px] text-muted"
-                                title="EV at the live Caesars price, measured against the market's own de-vigged fair — so it claims no edge over the price it came from. No badge, because nothing computed an edge."
+                                title="EV at the live selected-book price, measured against the market's own de-vigged fair — so it claims no edge over the price it came from. No badge, because nothing computed an edge."
                               >
                                 {`${v.ev > 0 ? "+" : ""}${v.ev.toFixed(1)}% vs market`}
                               </span>
@@ -518,8 +519,8 @@ function MlbSharpPage() {
                       <>
                         <EvBadge ev={Number(selMode === "dk_fd" ? r.bsEv : r.czEv)} />
                         {selMode === "dk_fd" && r.czEv != null && (
-                          <span className="text-muted" title="Informational: EV at the Caesars settlement price">
-                            @CZ {Number(r.czEv) > 0 ? "+" : ""}{Number(r.czEv).toFixed(1)}%
+                          <span className="text-muted" title="Informational: EV at the selected sportsbook price">
+                            @book {Number(r.czEv) > 0 ? "+" : ""}{Number(r.czEv).toFixed(1)}%
                           </span>
                         )}
                         {(selMode === "dk_fd" ? r.bsBadge : r.czBadge) ? (
@@ -578,8 +579,8 @@ function MlbSharpPage() {
               <div className="mt-4">
                 <h3 className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
                   {selMode === "dk_fd"
-                    ? "Clears the gate at the basis, not offered at Caesars — never substituted with a weaker pick"
-                    : "In the top picks, not offered at Caesars — never substituted with a lower-probability pick"}
+                    ? "Clears the gate at the basis, not offered at the selected book — never substituted with a weaker pick"
+                    : "In the top picks, not offered at the selected book — never substituted with a lower-probability pick"}
                 </h3>
                 <div className="space-y-1.5">
                   {notOffered.map((r) => (
@@ -606,7 +607,7 @@ function MlbSharpPage() {
                       ? `Nothing clears +${gatePct}% EV at the DK/FD basis right now`
                       : selMode !== "caesars_ev"
                       ? "No playable picks right now"
-                      : "No positive-EV plays at Caesars right now"
+                      : "No positive-EV plays at the selected book right now"
                   }
                   body="The engine found nothing playable on this slate — that's a real answer, not a failure. Passing is a position."
                 />
@@ -676,8 +677,7 @@ function MlbSharpPage() {
                 </p>
                 <p>
                   <b className="text-text">4 · Model meets market.</b> Final probability = 35% model / 65%
-                  consensus for props (15/85 for ML-RL). EV is computed at the DK/FD selection basis (Caesars
-                  settles the ticket). EDGE badges need both the EV threshold and enough sample behind it.
+                  consensus for props (15/85 for ML-RL). Displayed EV is computed at your selected sportsbook. Paper tickets retain their recorded prices. EDGE badges need both the EV threshold and enough sample behind it.
                 </p>
                 <p>
                   <b className="text-text">5 · Discipline is hard-coded.</b> ¼-Kelly capped at 2% per bet,

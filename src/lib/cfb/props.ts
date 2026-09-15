@@ -309,6 +309,8 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
         fair,
         fairAm: clamped == null ? null : americanFromProb(clamped),
         books: consensus?.n ?? 0,
+        quotes: Object.fromEntries(quotes.map(q => [q.book, q])),
+        probabilities: Object.fromEntries(quotes.map(q => [q.book, evAt(q)?.p ?? null])),
         cz,
         best,
         dk: find("draftkings"),

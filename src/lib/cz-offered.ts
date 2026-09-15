@@ -1,4 +1,6 @@
 "use client";
+import {useSportsbook} from "@/lib/sportsbook/store";
+import {DEFAULT_BOOK} from "@/lib/sportsbook/books";
 
 import { useCallback, useEffect, useState } from "react";
 import { getSyncKey } from "./ledgerSync";
@@ -136,5 +138,7 @@ export function useCzHidden(): {
     });
   }, []);
   const count = Object.values(hidden).filter((e) => e.hidden).length;
-  return { hidden, isHidden: (k) => !!hidden[k]?.hidden, toggle, reset, count };
+  const book=useSportsbook();
+  const scoped=(k:string)=>book===DEFAULT_BOOK?k:`book:${book}:${k}`;
+  return { hidden, isHidden: (k) => !!hidden[scoped(k)]?.hidden, toggle:(k)=>toggle(scoped(k)), reset, count };
 }
