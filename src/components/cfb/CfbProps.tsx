@@ -984,6 +984,10 @@ export function CfbProps() {
         result={gen.result}
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
+        onExcludePlayer={gen.excludePlayer}
+        excludedPlayers={gen.excludedPlayers}
+        onRestorePlayer={gen.restorePlayer}
+        onClearExclusions={gen.clearExclusions}
         onAdd={gen.add}
         onBack={gen.back} onForward={gen.forward} canBack={gen.canBack} canForward={gen.canForward} historyNotice={gen.historyNotice}
         canUndo={gen.canUndo}

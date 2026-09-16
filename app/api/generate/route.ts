@@ -1,3 +1,4 @@
+import {browseOddsUrl} from "@/lib/mlb/browse-markets";
 import { NextRequest, NextResponse } from "next/server";
 import {quoteCapture,attachBookQuotes} from "@/lib/sportsbook/mlb";
 import { createEngine, type BoardData } from "@/engine";
@@ -358,7 +359,7 @@ export async function GET(req: NextRequest) {
        default sized every server ticket. Seed the paper bankroll so the lock prices off it. */
     const bookCapture=quoteCapture();
     const eng = createEngine({
-      fetchJson: async (url) => {const r=await serverFetchJson(url);if(r.ok)bookCapture.capture(r.body);return r;},
+      fetchJson: async (url) => {const r=await serverFetchJson(browseOddsUrl(url));if(r.ok)bookCapture.capture(r.body);return r;},
       storage: memoryStorage({ pl_bankroll: JSON.stringify(PAPER.bankroll) }),
       today: dateNow,
     });

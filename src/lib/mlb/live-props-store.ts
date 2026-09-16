@@ -154,8 +154,8 @@ export function mlbLiveStore(keys: MlbLiveStoreKeys = MLB_LIVE_REDIS): MlbLiveSt
  * The arithmetic is CFB's, reviewed and pinned; the budget and the per-event rate are MLB's, passed
  * explicitly so the CFB defaults in that signature can never apply here.
  */
-export function mlbAffordableEvents(wanted: number, spent: number): number {
-  return affordableEvents(wanted, spent, MLB_LIVE_PROPS.dailyBudget, MLB_LIVE_PROPS.measuredCreditsPerEvent);
+export function mlbAffordableEvents(wanted: number, spent: number, extraMarkets = 0): number {
+  return affordableEvents(wanted, spent, MLB_LIVE_PROPS.dailyBudget, MLB_LIVE_PROPS.measuredCreditsPerEvent + extraMarkets);
 }
 
 /**
@@ -200,11 +200,11 @@ export const MLB_LIST_CALL_CREDITS = 1;
  * i.e. every call moved the counter — and otherwise the measured per-event rate is the floor. A real
  * delta is never overridden: three events, readings 4 apart, bills the measured 14 and not 18.
  */
-export function mlbPullCredits(usedReadings: number[], fetched: number): number {
-  const byDelta = pullCredits(usedReadings, fetched, MLB_LIVE_PROPS.measuredCreditsPerEvent);
+export function mlbPullCredits(usedReadings: number[], fetched: number, extraMarkets = 0): number {
+  const byDelta = pullCredits(usedReadings, fetched, MLB_LIVE_PROPS.measuredCreditsPerEvent + extraMarkets);
   const distinct = new Set(usedReadings.filter((n) => Number.isFinite(n))).size;
   if (fetched > 0 && distinct >= fetched) return byDelta;
-  return Math.max(byDelta, Math.max(0, fetched) * MLB_LIVE_PROPS.measuredCreditsPerEvent);
+  return Math.max(byDelta, Math.max(0, fetched) * (MLB_LIVE_PROPS.measuredCreditsPerEvent + extraMarkets));
 }
 
 /**

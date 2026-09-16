@@ -18,6 +18,8 @@
  */
 
 const PROP_MARKETS = new Set([
+  "batter_rbis",
+  "batter_runs_scored",
   "batter_hits",
   "batter_total_bases",
   "batter_home_runs",

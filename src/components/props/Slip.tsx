@@ -88,6 +88,7 @@ export function Slip({
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-text">
                         <BoardLabel label={l.label} /> <span className="text-muted">{l.sub}</span>
+                        {l.phase==="live" && <span className="ml-1 text-[10px] text-live" title={l.quoteAt}>Live quote</span>}
                       </span>
                       <span className="block truncate text-[9.5px] text-faint">{l.game.split(" · ")[0]}</span>
                     </span>

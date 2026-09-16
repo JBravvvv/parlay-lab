@@ -24,6 +24,8 @@ import type { SandboxLeg } from "@/lib/ticket-math";
 
 /** the six markets the sandbox prices; ML/RL are game markets and have no player slots (v1) */
 export const GEN_MARKETS: readonly string[] = [
+  "batter_rbis",
+  "batter_runs_scored",
   "batter_hits",
   "batter_total_bases",
   "batter_home_runs",
@@ -68,13 +70,15 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
     /* Date.parse of an unparseable start is NaN, and NaN <= nowMs is false — an unknown
        start time is never guessed into "started". */
     const started = !!g.live || (!!g.start && Date.parse(g.start) <= nowMs);
-    if (started && !spec.includeStarted) {
+    if (spec.phase === "live" && !g.live) continue;
+    if (started && (!spec.includeStarted && !spec.phase || spec.phase === "pregame")) {
       startedDropped += rowsHere.length;
       continue;
     }
     rows += rowsHere.length;
     const gameKey = g.gkey ?? g.game;
     for (const r of rowsHere) {
+      if (spec.phase && started && (!r.quoteAt || !Number.isFinite(Date.parse(r.quoteAt)) || nowMs-Date.parse(r.quoteAt)>1_800_000 || Date.parse(r.quoteAt)>nowMs)) continue;
       if (r.noParlay) {
         noParlayDropped++;
         continue;
@@ -102,6 +106,7 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
           playerKey: nameKey(r.p),
           team: r.tm ? teamTag(r.tm) : null,
           started,
+          ...(r.quoteAt ? {quoteAt:r.quoteAt} : {}),
           alt: !!r.alt,
           book: leg.book ?? "BOOK",
           ev: (leg.prob / 100) * dec - 1,

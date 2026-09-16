@@ -19,7 +19,8 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
         || s.positions.some((p: unknown) => typeof p !== "string" || !positions.includes(p))))
       || [s.onePerGame, s.czOnly, s.includeStarted, s.modelOnly].some((v) => typeof v !== "boolean")
       || (s.payout !== null && (!price(s.payout?.minAm) || !price(s.payout?.maxAm)))) return null;
-    return { market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
+    if (s.phase !== undefined && !["pregame", "live", "mixed"].includes(s.phase)) return null;
+    return { ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
       sides: s.sides, style: s.style, onePerGame: s.onePerGame, czOnly: s.czOnly,
       includeStarted: s.includeStarted, modelOnly: s.modelOnly,
       ...(s.positions !== undefined ? { positions: [...new Set(s.positions as string[])].sort() } : {}),

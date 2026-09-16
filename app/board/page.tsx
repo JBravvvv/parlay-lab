@@ -1,4 +1,8 @@
 "use client";
+import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
+import {liveMarketBoard} from "@/lib/mlb/market-board";
+import {LiveOpportunities} from "@/components/mlb/LiveOpportunities";
+import {MLB_BROWSE_MARKETS} from "@/lib/mlb/browse-markets";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -64,6 +68,8 @@ import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiv
    stays Caesars until Josh says he is in another state on DK / FD. */
 type Scope = "top" | "all";
 const MARKET_SHORT: Record<string, string> = {
+  batter_rbis: "RBI",
+  batter_runs_scored: "Runs",
   batter_hits: "Hits",
   batter_total_bases: "TB",
   batter_home_runs: "HR",
@@ -79,6 +85,8 @@ const CAT_LABELS: Record<string, string> = {
   all: "OVERALL",
   ml: "MONEYLINE",
   rl: "RUN LINE",
+  batter_rbis: "RBI",
+  batter_runs_scored: "RUNS",
   batter_hits: "HITS",
   batter_total_bases: "TOTAL BASES",
   batter_home_runs: "HOME RUNS",
@@ -189,6 +197,7 @@ function MlbBoardPage() {
   };
 
   const d = board?.data;
+  const browseProps = useBrowseProps(board);
   const cats = (live ? d?.categoriesLive : d?.categories) ?? {};
   /* TAB PURITY (2026-08-05, operator report: RL under Hits, ML under RL). The engine's arrays
      measured pure on the fixture and this page is key-addressed — but the defensive layer now
@@ -310,7 +319,7 @@ function MlbBoardPage() {
     ? catRecord.perDay.find((d0) => d0.date === picksData?.servedDate) ?? null
     : null;
   const PROP_TABS = useMemo(
-    () => new Set(["batter_hits", "batter_total_bases", "batter_home_runs", "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"]),
+    () => new Set(["batter_rbis", "batter_runs_scored", "batter_hits", "batter_total_bases", "batter_home_runs", "batter_hits_runs_rbis", "pitcher_strikeouts", "pitcher_outs"]),
     [],
   );
   const propRows = useMemo(()=> {
@@ -323,8 +332,8 @@ function MlbBoardPage() {
      stamped picks grade on), ordered S → F then by edge. Rows the engine did not price
      (pO null: bench bats, tiny samples) carry no grade and sink to the bottom. */
   const [allRows, allNoCz] = useMemo<[ApiPick[] | null, number]>(() => {
-    if (scope !== "all" || live || !(PROP_TABS.has(cat) || cat === "all")) return [null, 0];
-    const pb = (d?.propBoard ?? []) as PropBoardGame[];
+    if ((scope !== "all" && !(PROP_TABS.has(cat) && !propRows?.length)) || live || !(PROP_TABS.has(cat) || cat === "all")) return [null, 0];
+    const pb = browseProps.rows.length ? browseProps.rows : (d?.propBoard ?? []) as PropBoardGame[];
     const mkts = cat === "all" ? Object.keys(MARKET_SHORT) : [cat];
     const out: ApiPick[] = [];
     let noCz = 0; // INSTRUCTION 41: lines only other books post are hidden from ALL, counted here
@@ -352,8 +361,9 @@ function MlbBoardPage() {
         (b.prob ?? -1) - (a.prob ?? -1),
     );
     out.forEach((r, i) => void (r.rank = i + 1));
+    if (scope === "top") out.splice(50);
     return [out, noCz];
-  }, [scope, live, cat, d, PROP_TABS]);
+  }, [scope, live, cat, d, PROP_TABS, propRows, browseProps.rows]);
   const pickRows = allRows ?? propRows;
 
   // live "now" stats for in-progress games — one shared poll for the whole page
@@ -363,6 +373,7 @@ function MlbBoardPage() {
     [d],
   );
   const liveNow = useLiveNow(liveReqs);
+  const liveMarkets = liveMarketBoard(browseProps.rows, liveOverlay, d?.gameInfo, liveNow, Date.now(), MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
   const legLive = useCallback(
     (l: { gkey?: string | null; lkey?: string | null }) =>
       l.gkey && d?.gameInfo ? liveNow.legNow(d.gameInfo[l.gkey]?.pk ?? null, l.lkey) : null,
@@ -1224,17 +1235,17 @@ function MlbBoardPage() {
             </button>
           ))}
         </div>
-        {Object.keys(cats)
+        {[...new Set(live ? ["all", ...Object.keys(MLB_BROWSE_MARKETS)] : ["all", "ml", "rl", ...Object.keys(MLB_BROWSE_MARKETS), ...Object.keys(cats)])]
           .sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : 0))
           .map((k) => (
             <FilterPill key={k} selected={cat === k} onClick={() => setCat(k)}>
               {scope === "all" && k === "all" ? "EVERY MARKET" : CAT_LABELS[k] ?? k.toUpperCase()}
-              {scope === "top" && <span className="num ml-1 text-[10px] opacity-70">{(cats[k] ?? []).length}</span>}
+              {scope === "top" && <span className="num ml-1 text-[10px] opacity-70">{live ? liveMarkets.reduce((n,g)=>n+(k==="all"?Object.values(g.markets).flat().length:(g.markets[k]?.length??0)),0) : PROP_TABS.has(k) ? (picksData?.picks?.[k]?.length || Math.min(50,browseProps.rows.reduce((n,g)=>n+(g.markets[k]?.length??0),0))) : (cats[k] ?? []).length}</span>}
             </FilterPill>
           ))}
       </div>
       <div className="mb-4 flex items-center gap-2">
-        {d?.categoriesLive && Object.values(d.categoriesLive).some((v) => v.length) && (
+        {(
           <FilterPill
             selected={live}
             onClick={() => {
@@ -1321,6 +1332,8 @@ function MlbBoardPage() {
           body="The odds feed or MLB stats API didn't answer. Nothing is fabricated on failure."
           onRetry={() => refetch()}
         />
+      ) : live ? (
+        <LiveOpportunities games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError} />
       ) : pickRows && pickRows.length > 0 ? (
         /* THE DAY'S PICKS (2026-08-08): stamped top-N from the stored board — the same
            cohort /api/picks serves and the grading records. Never empty by clock. */
@@ -1351,7 +1364,7 @@ function MlbBoardPage() {
         <Panel>
           <EmptyState
             title="No picks in this category"
-            body="Either the slate is empty right now or every candidate failed the engine's thresholds (see another tab)."
+            body="No matching prices are stored for this market at the selected sportsbook. Try another book or Refresh MLB for current quotes. A missing feed quote does not mean the sportsbook never offers this bet."
           />
         </Panel>
       ) : (
@@ -1380,7 +1393,7 @@ function MlbBoardPage() {
         </>
       )}
 
-      {d && (
+      {d && !live && (
         <ParlaysSection
           parlays={d.parlays ?? []}
           mixed={d.parlaysMixed ?? []}

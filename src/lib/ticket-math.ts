@@ -8,6 +8,8 @@
  */
 
 export type SandboxLeg = {
+  quoteAt?: string;
+  phase?: "pregame" | "live";
   id: string; // gkey|lkey|side — dedupe key
   label: string;
   sub: string;

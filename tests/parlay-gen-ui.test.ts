@@ -318,7 +318,8 @@ describe("source pins — the honesty guard extended to the newest price surface
   it("ONE useHeadshots call on the page, and its map is what the sheet draws with", () => {
     expect(count(page, /useHeadshots\(/g)).toBe(1);
     expect(page).toMatch(/headshot=\{headshots\[name\] \?\? null\}/);
-    expect(page).toMatch(/buildPool\(propBoard, sp, at\)/);
+    expect(page).toMatch(/liveMarketBoard\(propBoard,liveOverlay/);
+    expect(page).toMatch(/buildPool\(marketPhaseBoard\(propBoard,currentLive/);
     expect(hook).toMatch(/generate\(pool, spec, specSeed\(/);
   });
   it("Add to slip reuses the existing slip math and keeps an Undo; nothing is spent or written", () => {

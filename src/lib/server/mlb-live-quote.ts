@@ -321,6 +321,17 @@ export function storedPropRows(board: StoredBoard | null): Map<string, BoardRow[
       }
     }
   }
+  for (const game of board?.data?.propBoard ?? []) {
+    if (!game.gkey) continue;
+    for (const rows of Object.values(game.markets)) for (const row of rows) {
+      const key = liveQuoteKey(game.gkey, row.lkey);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const list = out.get(game.gkey) ?? [];
+      list.push({gkey:game.gkey,lkey:row.lkey,prob:row.pO,sub:null});
+      out.set(game.gkey,list);
+    }
+  }
   return out;
 }
 
@@ -540,7 +551,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
   }
 
   /* RAIL 3 — the daily budget, checked BEFORE the events call so an exhausted day costs nothing. */
-  if (mlbAffordableEvents(1, spent) === 0) {
+  if (mlbAffordableEvents(1, spent, 2) === 0) {
     return NextResponse.json(
       base({
         budgeted: true,
@@ -640,7 +651,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
   /* RE-READ THE TALLY INSIDE THE LEASE. The `spent` above gated RAIL 3 before Call A; this is the
      number the per-event buy is actually sized against. */
   const spentNow = await quiet(store.readSpend(ptDate), spent);
-  const affordable = mlbAffordableEvents(sel.events.length, spentNow);
+  const affordable = mlbAffordableEvents(sel.events.length, spentNow, 2);
   /* THE PROBE CAP. Until a real `x-requests-used` delta for MLB is written into
      docs/credit-budget.md and `rateMeasured` is flipped, EVERY pass is capped at `probeEvents`, not
      just the day's first: CFB measures 31 on the same nominal shape and nothing in this tree
@@ -685,9 +696,12 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
     if (p.remaining != null || p.used != null) quota = { remaining: p.remaining, used: p.used };
     const legP = deps.legPOf?.(c.gkey, state) ?? {};
     let got = 0;
+    const sightings = new Map<string, ReturnType<typeof sightLiveQuote>>();
     for (const r of c.rows) {
       const [player, market] = r.lkey.split("|");
-      const sight = sightLiveQuote(p.json, player, market, cfg);
+      const identity = `${player}|${market}`;
+      if (!sightings.has(identity)) sightings.set(identity, sightLiveQuote(p.json, player, market, cfg));
+      const sight = sightings.get(identity);
       if (!sight) continue;
       got++;
       /* THE LADDER: sim, else the de-vigged live pair labelled as a market number, else no grade.
@@ -749,7 +763,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
      the upstream and fetched NOTHING now records 1 rather than 0, which is what actually happened:
      roughly 100 credits a day at the 15-minute cadence, and previously invisible. The probe in
      docs/credit-budget.md still replaces the per-event assumption with a measurement. */
-  const credits = mlbPullCredits(used, fetched) + MLB_LIST_CALL_CREDITS;
+  const credits = mlbPullCredits(used, fetched, 2) + MLB_LIST_CALL_CREDITS;
   const spentToday = await quiet(store.addSpend(ptDate, credits), spentNow + credits);
 
   /* THE STAMPS ARE PART OF THE GATE, SO THEY ARE PRUNED WITH IT (fix pass, 2026-09-11). A gkey that

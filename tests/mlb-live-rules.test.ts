@@ -172,6 +172,9 @@ describe("the credit rail — MLB's own budget, MLB's own rate", () => {
   it("mlbAffordableEvents clips against the 600 and refuses at it", () => {
     // 560 spent: floor((600-560)/6) = 6 of the 12 wanted
     expect(mlbAffordableEvents(12, 560)).toBe(6);
+    expect(mlbAffordableEvents(12, 560, 2)).toBe(5);
+    expect(mlbAffordableEvents(12, 588, 2)).toBe(1);
+    expect(mlbPullCredits([], 3, 2)).toBe(24);
     expect(mlbAffordableEvents(12, 600)).toBe(0);
     expect(mlbAffordableEvents(12, 0)).toBe(12);
     expect(mlbAffordableEvents(0, 0)).toBe(0);
@@ -237,13 +240,13 @@ describe("SOURCE PIN — the store never calls CFB's credit arithmetic bare", ()
   });
 
   it("PLANT: swap in CFB's rate and BOTH calls fire", () => {
-    const planted = STORE_SRC.replaceAll("MLB_LIVE_PROPS.measuredCreditsPerEvent)", "CFB_PROPS.measuredCreditsPerEvent)");
+    const planted = STORE_SRC.replaceAll("MLB_LIVE_PROPS.measuredCreditsPerEvent + extraMarkets)", "CFB_PROPS.measuredCreditsPerEvent + extraMarkets)");
     expect(planted).not.toBe(STORE_SRC);
     expect(unguardedCreditCalls(planted)).toHaveLength(2);
   });
 });
 
-describe("the live-pull URL — six core markets, and the allow-list needs no change", () => {
+describe("the live-pull URL — eight core markets, including RBI and Runs", () => {
   const url = mlbLiveEventUrl("abc", "K");
 
   it("is the baseball_mlb per-event in-play shape", () => {
@@ -252,7 +255,7 @@ describe("the live-pull URL — six core markets, and the allow-list needs no ch
     expect(url).toContain("regions=us");
     expect(url).toContain("oddsFormat=american");
     for (const m of MLB_LIVE_MARKETS.split(",")) expect(url).toContain(m);
-    expect(MLB_LIVE_MARKETS.split(",")).toHaveLength(6);
+    expect(MLB_LIVE_MARKETS.split(",")).toHaveLength(8);
   });
 
   it("carries NO _alternate ladder — +50% spend for nothing this feature reads", () => {

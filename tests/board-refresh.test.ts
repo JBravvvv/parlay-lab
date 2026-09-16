@@ -83,7 +83,7 @@ describe("INSTRUCTION 50 item 1 — a tap always re-prices something", () => {
     // the only thing that disables the pill is work already in flight
     expect(page).toMatch(/disabled=\{regen\.isPending \|\| refill\.isPending \|\| isPending\}/);
     const engine = read("src/lib/engine-client.ts");
-    expect(engine).toMatch(/export const GEN_CREDITS_EST = 140;/);
+    expect(engine).toMatch(/export const GEN_CREDITS_EST = 172;/);
   });
 });
 

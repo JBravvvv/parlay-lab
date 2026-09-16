@@ -1,3 +1,4 @@
+import {EXTRA_BATTER_MARKETS} from "@/lib/mlb/browse-markets";
 import type {BoardData,PickRow,PropBoardRow,Ticket,TicketLeg} from '@/engine';
 import {american,DEFAULT_BOOK,bookKey,bookName,decimal,validAm,valueAt} from './books';
 import {decToAm} from '@/lib/ticket-math';
@@ -33,7 +34,30 @@ export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>):Boar
    (index[key]??={})[b.key]={am:o.price,line:o.point??null,book:b.key,at:m.last_update??b.last_update};
   }
  }
- const propBoard=data.propBoard?.map(g=>({
+ const browse = [...(data.propBoard ?? [])];
+ for (const [gkey, info] of Object.entries(data.gameInfo ?? {})) {
+  const e = rawEvents.filter(e => norm(e.home_team) === norm(info.home) && norm(e.away_team) === norm(info.away))
+   .sort((a,b)=>Math.abs(Date.parse(a.commence_time)-Date.parse(info.start))-Math.abs(Date.parse(b.commence_time)-Date.parse(info.start)))[0];
+  if (!e) continue;
+  const existing = browse.find(g=>g.gkey===gkey);
+  const markets = {...existing?.markets};
+  for (const market of EXTRA_BATTER_MARKETS) {
+   const players = new Map<string,{name:string;line:number}>();
+   for(const b of e.bookmakers) for(const m of b.markets) if(m.key===market) for(const o of m.outcomes)
+    if(o.description && o.point!=null) players.set(`${norm(o.description)}|${market}|${o.point}`,{name:o.description,line:o.point});
+   markets[market]=[...players].map(([lkey,p])=>{
+    const o=index[`${gkey}|${lkey}|o`]??{},u=index[`${gkey}|${lkey}|u`]??{};
+    const fair=Object.keys(o).flatMap(b=>u[b]?[100*(1/decimal(o[b].am))/(1/decimal(o[b].am)+1/decimal(u[b].am))]:[]).sort((a,b)=>a-b);
+    const best=(q:Record<string,BookQuote>)=>Object.values(q).sort((a,b)=>decimal(b.am)-decimal(a.am))[0];
+    const bo=best(o),bu=best(u);
+    const tm=Object.values(existing?.markets??{}).flat().find(r=>norm(r.p)===norm(p.name))?.tm??null;
+    return {p:p.name,tm,ln:p.line,lkey,o:bo?.am??null,u:bu?.am??null,oBook:bo?bookName(bo.book):null,uBook:bu?bookName(bu.book):null,cz:{o:o[DEFAULT_BOOK]?.am??null,u:u[DEFAULT_BOOK]?.am??null},pO:null,fO:fair.length?(fair[Math.floor((fair.length-1)/2)]+fair[Math.floor(fair.length/2)])/2:null,books:fair.length};
+   });
+  }
+  if(existing) browse[browse.indexOf(existing)]={...existing,markets};
+  else if(Object.values(markets).some(rs=>rs.length)) browse.push({gkey,game:`${info.away} @ ${info.home}`,start:info.start,live:false,markets});
+ }
+ const propBoard=browse.map(g=>({
   ...g, markets:Object.fromEntries(Object.entries(g.markets).map(([m,rs])=>[m,
    rs.map(r=>({...r,bookQuotes:{o:index[`${g.gkey}|${r.lkey}|o`]??{},u:index[`${g.gkey}|${r.lkey}|u`]??{}}}))
   ]))

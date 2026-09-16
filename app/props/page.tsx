@@ -24,6 +24,11 @@ import { MarketNav } from "@/components/props/MarketNav";
 import { PropGameCard } from "@/components/props/PlayerRow";
 import { GameMarketCard } from "@/components/props/GameCard";
 import { Slip } from "@/components/props/Slip";
+import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
+import {liveMarketBoard,marketPhaseBoard} from "@/lib/mlb/market-board";
+import {useMlbLiveQuotes,MLB_LIVE_CLIENT} from "@/lib/mlb/live-client";
+import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
+import {useLiveNow} from "@/lib/liveNow";
 import { GenSheet } from "@/components/props/GenSheet";
 import { GEN_MARKETS, MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
 import { blankPins, useParlayGen } from "@/components/props/useParlayGen";
@@ -81,6 +86,7 @@ import {
    their product is +834. Neither is a price — they are filters over prices the book posted. */
 const GEN_OPEN_KEY = "pl:props:gen-open";
 const GEN_SPEC_DEFAULT: GenSpec = {
+  phase: "pregame",
   style: "safer",
   market: "batter_hits_runs_rbis",
   legs: 4,
@@ -161,54 +167,13 @@ function PropsDesk() {
      call until the same-day fix in odds-shape.ts) and still win bestBoard on freshness. When
      the chosen board has no prop board, fall back to the server-built one for today — its
      props generate with the board — and say so. */
-  const ownProps = (d?.propBoard ?? []) as PropBoardGame[];
-  const ownEmpty = !!d && ownProps.length === 0;
-  const serverProps = useQuery<PropBoardGame[]>({
-    queryKey: ["server-props", q.data?.date ?? null],
-    enabled: ownEmpty,
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const r = await fetch(`/api/board?date=${encodeURIComponent(q.data!.date)}`, { cache: "no-store" });
-      if (!r.ok) return [];
-      const j = (await r.json()) as { board?: { data?: { propBoard?: PropBoardGame[] } } | null };
-      return j?.board?.data?.propBoard ?? [];
-    },
-  });
-  const propBoard = useMemo(()=>ownEmpty ? (serverProps.data ?? []).map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,selectedBook))]))})) : ownProps,[ownEmpty,serverProps.data,selectedBook,ownProps]);
-  const fromServer = ownEmpty && (serverProps.data?.length ?? 0) > 0;
-  const allPropGames = useMemo(() => {
-    if (!cat || gameTab) return [];
-    const needle = norm(search.trim());
-    return propBoard
-      .map((g) => {
-        let rows = (g.markets?.[cat] ?? []).slice();
-        if (needle) rows = rows.filter((r) => norm(r.p).includes(needle));
-        rows.sort((a, b) => rankOf(b) - rankOf(a));
-        return { g, rows };
-      })
-      .filter((x) => x.rows.length > 0);
-  }, [propBoard, cat, gameTab, search]);
-
-  /* INSTRUCTION 46 deep link: narrow the board to the linked game and find the player's row.
-     found = the bet is on today's board (game AND player, name-matched — the line may have
-     moved); otherwise the whole board stays up under a "not on today's board" notice. */
-  const deep = useMemo(() => {
-    if (!linkOn || !link || !d) return { games: null as null | typeof allGameGroups, props: null as null | typeof allPropGames, found: false, hit: null as string | null };
-    if (gameTab) {
-      const games = allGameGroups.filter((g) => gameMatches(g, link.game));
-      const found = link.player ? games.some((g) => g.rows.some((r) => playerMatches(String(r.label ?? ""), link.player))) : games.length > 0;
-      return { games: found ? games : null, props: null, found, hit: found && link.player ? link.player : null };
-    }
-    const props = allPropGames.filter((x) => gameMatches(x.g, link.game));
-    const found = link.player ? props.some((x) => x.rows.some((r) => playerMatches(r.p, link.player))) : props.length > 0;
-    return { games: null, props: found ? props : null, found, hit: found && link.player ? link.player : null };
-  }, [linkOn, link, d, gameTab, allGameGroups, allPropGames]);
-  const gameGroups = deep.games ?? allGameGroups;
-  const propGames = deep.props ?? allPropGames;
-  const linkMissing = linkOn && !!d && !q.isPending && !deep.found && !(ownEmpty && !gameTab && serverProps.isPending);
-
-  const totalRows = propGames.reduce((n, x) => n + x.rows.length, 0);
-
+  const browseProps = useBrowseProps(q.data);
+  const propBoard = browseProps.rows;
+  const fromServer = browseProps.fromServer;
+  const liveQuotes = useMlbLiveQuotes(sport==="mlb" ? q.data?.date ?? null : null);
+  const liveOverlay = useLivePrices(liveQuotes.data);
+  const liveReqs = useMemo(()=>Object.values(d?.gameInfo??{}).map(g=>({pk:g.pk,date:g.start})),[d]);
+  const liveNow = useLiveNow(liveReqs);
   /* ---- INSTRUCTION 50: the generator ----------------------------------------------------
      The state, the pins, the seeded spin and the Add/Undo pair all live in ONE hook that both
      this desk and the football desk call (src/components/props/useParlayGen.ts, INSTRUCTION 52)
@@ -227,12 +192,16 @@ function PropsDesk() {
   };
   /* the pool's only dependency is the board, so the builder is memoized on it */
   const buildGenPool = useCallback(
-    (sp: GenPoolSpec, at: number) => buildPool(propBoard, sp, at),
-    [propBoard],
+    (sp: GenPoolSpec, at: number) => {
+      at = at ? Date.now() : 0;
+      const currentLive=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
+      return buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at);
+    },
+    [propBoard,liveOverlay,d,liveNow],
   );
   const gen = useParlayGen<SandboxLeg>({
     storageKey: GEN_OPEN_KEY,
-    defaultSpec: GEN_SPEC_DEFAULT,
+    defaultSpec: {...GEN_SPEC_DEFAULT,phase:params.get("phase")==="live"?"live":params.get("phase")==="mixed"?"mixed":"pregame"},
     marketKeys: GEN_MARKETS,
     railMarket: cat,
     boardKey: q.data?.date ?? "",
@@ -246,6 +215,45 @@ function PropsDesk() {
     addLegs: (prev, add) => [...prev.filter((l) => !add.some((a) => a.id === l.id)), ...add],
   });
   const { pool, spec } = gen;
+  useEffect(()=>{if(params.has("phase"))gen.setOpen(true);},[]);
+
+  const shownPropBoard = useMemo(() => {
+    const at=gen.nowMs ? Date.now() : 0;
+    const live=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
+    return marketPhaseBoard(propBoard,live,spec.phase??"pregame",at);
+  },[propBoard,liveOverlay,d,liveNow,spec.phase,gen.nowMs]);
+  const allPropGames = useMemo(() => {
+    if (!cat || gameTab) return [];
+    const needle = norm(search.trim());
+    return shownPropBoard
+      .map((g) => {
+        let rows = (g.markets?.[cat] ?? []).slice();
+        if (needle) rows = rows.filter((r) => norm(r.p).includes(needle));
+        rows.sort((a, b) => rankOf(b) - rankOf(a));
+        return { g, rows };
+      })
+      .filter((x) => x.rows.length > 0);
+  }, [shownPropBoard, cat, gameTab, search]);
+
+  /* INSTRUCTION 46 deep link: narrow the board to the linked game and find the player's row.
+     found = the bet is on today's board (game AND player, name-matched — the line may have
+     moved); otherwise the whole board stays up under a "not on today's board" notice. */
+  const deep = useMemo(() => {
+    if (!linkOn || !link || !d) return { games: null as null | typeof allGameGroups, props: null as null | typeof allPropGames, found: false, hit: null as string | null };
+    if (gameTab) {
+      const games = allGameGroups.filter((g) => gameMatches(g, link.game));
+      const found = link.player ? games.some((g) => g.rows.some((r) => playerMatches(String(r.label ?? ""), link.player))) : games.length > 0;
+      return { games: found ? games : null, props: null, found, hit: found && link.player ? link.player : null };
+    }
+    const props = allPropGames.filter((x) => gameMatches(x.g, link.game));
+    const found = link.player ? props.some((x) => x.rows.some((r) => playerMatches(r.p, link.player))) : props.length > 0;
+    return { games: null, props: found ? props : null, found, hit: found && link.player ? link.player : null };
+  }, [linkOn, link, d, gameTab, allGameGroups, allPropGames]);
+  const gameGroups = deep.games ?? allGameGroups;
+  const propGames = deep.props ?? allPropGames;
+  const linkMissing = linkOn && !!d && !q.isPending && !deep.found && !(!gameTab && browseProps.loading);
+
+  const totalRows = propGames.reduce((n, x) => n + x.rows.length, 0);
 
   /* ONE headshot map for the page, and it must cover the GENERATOR's legs too (fix pass).
      `propGames` is search-filtered while the generator's pool is built over the whole prop
@@ -270,7 +278,7 @@ function PropsDesk() {
       : null;
 
   /* a board generated before the full prop board shipped has no `propBoard` */
-  const legacyBoard = !!d && !d.propBoard && !gameTab && !fromServer && !serverProps.isPending;
+  const legacyBoard = !!d && !d.propBoard && !gameTab && !fromServer && !browseProps.loading;
 
   const isSel = (id: string) => legs.some((l) => l.id === id);
   const toggle = (leg: SandboxLeg) =>
@@ -345,6 +353,10 @@ function PropsDesk() {
         result={gen.result}
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
+        onExcludePlayer={gen.excludePlayer}
+        excludedPlayers={gen.excludedPlayers}
+        onRestorePlayer={gen.restorePlayer}
+        onClearExclusions={gen.clearExclusions}
         onAdd={gen.add}
         onBack={gen.back} onForward={gen.forward} canBack={gen.canBack} canForward={gen.canForward} historyNotice={gen.historyNotice}
         canUndo={gen.canUndo}
@@ -356,7 +368,7 @@ function PropsDesk() {
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={boardAtLabel}
-        loading={q.isPending || (ownEmpty && serverProps.isPending)}
+        loading={q.isPending || browseProps.loading}
         gameMarket={gameTab}
       />
 
@@ -381,7 +393,7 @@ function PropsDesk() {
           </button>
         </div>
       )}
-      {q.isPending || (ownEmpty && !gameTab && serverProps.isPending) ? (
+      {q.isPending || (!gameTab && browseProps.loading) ? (
         <BoardSkeleton />
       ) : cat == null ? (
         <Panel>

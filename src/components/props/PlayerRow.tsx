@@ -153,6 +153,7 @@ export function PlayerRow({
           {r.tm && <span className="shrink-0 text-[9.5px] font-semibold text-muted">{r.tm}</span>}
           {r.tm && <span className="shrink-0 text-faint/60">·</span>}
           <span className="truncate">{MKT_LABEL[cat] ?? cat}</span>
+          {r.quoteAt && <span className="shrink-0 text-live" title={r.quoteAt}>live quote</span>}
           {r.alt && <span className={CHIP}>alt</span>}
           {r.lu === "projected" && <span className={CHIP}>proj</span>}
           {r.pO == null && <span className="min-w-0 truncate italic">mkt price only</span>}

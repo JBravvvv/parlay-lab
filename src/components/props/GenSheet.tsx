@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { exclusionKey } from "@/lib/parlay-exclusions";
 import { mixBands, MIX_LABEL, type MixBand } from "@/lib/parlay-gen-mix";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -119,10 +120,12 @@ const RELAX_HINT: Record<string, string> = {
  */
 export function genFailLine(
   fail: GenFail,
-  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean },
+  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean; phase?: GenSpec["phase"] },
 ): string {
   switch (fail.code) {
+    case "phase-empty": return "Mixed needs at least one pregame leg and one live leg. No qualifying quotes are available for both — try Pregame or Live.";
     case "no-rows":
+      if(ctx.phase==="live") return `No current live ${ctx.marketLabel} quotes qualify. Check the selected sportsbook, Refresh MLB, or switch to Pregame.`;
       /* EVERY GAME IS OVER is a different fact from "the board has no lines", and on a past date
          the football board is full of grey final rows (INSTRUCTION 52 fix pass). The caller sets
          the flag only when every row this market has is in a finished game. */
@@ -246,6 +249,8 @@ function Slot<P>({
   renderMark,
   renderName,
   onTogglePin,
+  onExclude,
+  excluded = false,
 }: {
   i: number;
   l: GenLeg<P>;
@@ -255,6 +260,8 @@ function Slot<P>({
   renderMark: SlotPart<P>;
   renderName: SlotPart<P>;
   onTogglePin: (slot: number) => void;
+  onExclude?: (slot: number) => void;
+  excluded?: boolean;
 }) {
   /* An MLB board label prints "Name (TEAM)"; a football label is the name on its own and the
      team rides in `l.team`. parseBoardLabel returns null for anything it does not recognise — it
@@ -287,11 +294,15 @@ function Slot<P>({
       {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
         {renderName({ leg: l.leg, gen: l, name, team })}
+        {onExclude && <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-[11px] text-muted">
+          <input type="checkbox" checked={excluded} onChange={() => onExclude(i)} aria-label={`Exclude ${name} from generated parlays`} className="h-4 w-4 accent-amber-400" />
+          Exclude player
+        </label>}
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
           <span className="truncate text-muted">{l.sub}</span>
           {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
-          {l.started && <span className="shrink-0 text-live">live</span>}
+          {l.started && <span className="shrink-0 text-live">{l.quoteAt ? "live quote" : "started"}</span>}
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end leading-none">
@@ -353,6 +364,7 @@ export function GenSheet<P>({
   onGenerate,
   onBack, onForward, canBack = false, canForward = false, historyNotice,
   onTogglePin,
+  onExcludePlayer, excludedPlayers = [], onRestorePlayer, onClearExclusions,
   onAdd,
   canUndo,
   onUndo,
@@ -392,6 +404,10 @@ export function GenSheet<P>({
   canForward?: boolean;
   historyNotice?: string | null;
   onTogglePin: (slot: number) => void;
+  onExcludePlayer?: (slot: number) => void;
+  excludedPlayers?: readonly { key: string; label: string }[];
+  onRestorePlayer?: (key: string) => void;
+  onClearExclusions?: () => void;
   onAdd: () => void;
   onSaveSetup?: () => void;
   onLoadSetup?: () => void;
@@ -540,6 +556,12 @@ export function GenSheet<P>({
               <p className="mt-1">{showModelOnly ? "Where a model estimate exists, ranking uses the lower of that estimate and the price-implied chance. Other picks use market estimates." : "These rankings use market consensus, not an independent player-performance model."} A stronger option within Anytime TD can still be less likely to hit than a passing prop. Safer is relative; every parlay can lose.</p>
             </details>
           </div>
+              {spec.phase && <div className="space-y-2">
+                <div className="flex gap-1" role="group" aria-label="Parlay timing">
+                  {(["pregame","live","mixed"] as const).map(phase=><button key={phase} type="button" aria-pressed={spec.phase===phase} onClick={()=>onSpec({phase,includeStarted:phase!=="pregame"})} className={`${CTRL} flex-1 ${spec.phase===phase?ON:OFF}`}>{phase==="pregame"?"Pregame":phase==="live"?"Live":"Mixed"}</button>)}
+                </div>
+                <p className="text-[10px] text-muted">{spec.phase==="pregame"?"Upcoming games only.":spec.phase==="live"?"Active games with recent in-play prices only.":"Upcoming games and active games with recent in-play prices."} Suspended, finished and expired live markets are excluded.</p>
+              </div>}
           {positions && (
             <fieldset className="min-w-0" aria-label="Player positions">
               <legend className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted">Positions <span className="font-normal normal-case tracking-normal">· {distinctPlayers} eligible players</span></legend>
@@ -673,9 +695,9 @@ export function GenSheet<P>({
               <Toggle on={!spec.onePerGame} onChange={(v) => onSpec({ onePerGame: !v })}>
                 Two legs from one game
               </Toggle>
-              <Toggle on={spec.includeStarted} onChange={(v) => onSpec({ includeStarted: v })}>
+              {!spec.phase && <Toggle on={spec.includeStarted} onChange={(v) => onSpec({ includeStarted: v })}>
                 Include games already under way
-              </Toggle>
+              </Toggle>}
               <Toggle on={spec.czOnly} onChange={(v) => onSpec({ czOnly: v })}>
                 Caesars-priced legs only
               </Toggle>
@@ -791,6 +813,17 @@ export function GenSheet<P>({
             </div>
           )}
 
+          {excludedPlayers.length > 0 && <div className="rounded-xl border border-gold/25 bg-gold/5 px-3 py-2" aria-label="Excluded players">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
+              <span>{excludedPlayers.length} excluded · resets when filters change</span>
+              <button type="button" onClick={onClearExclusions} className="min-h-11 px-2 font-semibold text-gold">Clear all</button>
+            </div>
+            <div className="flex flex-wrap gap-x-3">
+              {excludedPlayers.map(p => <label key={p.key} className="flex min-h-11 cursor-pointer items-center gap-2 text-[11px] text-text">
+                <input type="checkbox" checked onChange={() => onRestorePlayer?.(p.key)} aria-label={`Restore ${p.label}`} className="h-4 w-4 accent-amber-400" />{p.label}
+              </label>)}
+            </div>
+          </div>}
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
             <div key={ticket.key} className="gen-ticket-reveal">
@@ -806,6 +839,8 @@ export function GenSheet<P>({
                     renderMark={renderMark}
                     renderName={renderName}
                     onTogglePin={onTogglePin}
+                    excluded={excludedPlayers.some(p => p.key === exclusionKey(l))}
+                    onExclude={excludedPlayers.some(p => p.key === exclusionKey(l)) ? () => onRestorePlayer?.(exclusionKey(l)) : onExcludePlayer}
                   />
                 ))}
               </div>
@@ -848,7 +883,7 @@ export function GenSheet<P>({
                     {marketLabel} is suspended from the engine&apos;s own auto-built tickets; this sandbox spins it anyway.{" "}
                   </>
                 )}
-                {historyNotice ? "Prices are saved with this ticket" : <>Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""}</>} — tap Regenerate for another
+                {historyNotice ? "Prices are saved with this ticket" : spec.phase && spec.phase!=="pregame" ? "Live legs use their individual in-play quote times; pregame legs use the stored board" : <>Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""}</>} — tap Regenerate for another
                 spin, not for a fresher price. Sandbox · not tracked, never enters the ledger.
               </details>
             </div>
@@ -884,6 +919,7 @@ export function GenSheet<P>({
                     "Waiting for today's board…"
                   : genFailLine(result.ok ? { code: "no-rows" } : result.fail, {
                       marketLabel,
+                      phase: spec.phase,
                       legs: spec.legs,
                       loAm: spec.legMinAm,
                       hiAm: spec.legMaxAm,

@@ -64,7 +64,8 @@ describe("INSTRUCTION 34 — the Parlay Builder never goes empty because a devic
   });
   it("the props page falls back to the server-built prop board when the chosen board has none", () => {
     const props = read("app/props/page.tsx");
-    expect(props).toMatch(/queryKey: \["server-props"/);
+    expect(props).toContain("useBrowseProps");
+    expect(read("src/lib/mlb/useBrowseProps.ts")).toMatch(/queryKey:\s*\["server-props"/);
     expect(props).toMatch(/fromServer/);
     expect(props).toMatch(/showing the server-built prop board/);
   });

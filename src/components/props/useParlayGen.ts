@@ -12,6 +12,7 @@ import {
   type GenSpec,
   type GenPoolSpec,
 } from "@/lib/parlay-gen";
+import { excludePlayers, exclusionKey, exclusionFilterKey } from "@/lib/parlay-exclusions";
 const NO_POSITIONS: readonly string[] = [];
 
 /**
@@ -56,6 +57,10 @@ export type UseParlayGen<P> = {
   result: GenResult<P>;
   /** keep / release slot `i` */
   togglePin: (slot: number) => void;
+  excludedPlayers: readonly { key: string; label: string }[];
+  excludePlayer: (slot: number) => void;
+  restorePlayer: (key: string) => void;
+  clearExclusions: () => void;
   /** Regenerate — remembers this ticket so the next spin moves */
   spin: () => void;
   back: () => void;
@@ -138,6 +143,12 @@ export function useParlayGen<P>({
   );
 
   const [spec, setSpec] = useState<GenSpec>(defaultSpec);
+  const filterKey = `${storageKey}:${boardKey}:${exclusionFilterKey(spec)}`;
+  const [exclusions, setExclusions] = useState<{ filter: string; players: {key: string; label: string}[] }>({ filter: "", players: [] });
+  const excludedPlayers = useMemo(() => exclusions.filter === filterKey ? exclusions.players : [], [exclusions, filterKey]);
+  const excludedKeys = useMemo(() => new Set(excludedPlayers.map(p => p.key)), [excludedPlayers]);
+  // Clear stored exclusions when filters change, so returning to an old filter cannot revive them.
+  useEffect(() => { setExclusions({ filter: filterKey, players: [] }); }, [filterKey]);
   const [savedSetup, setSavedSetup] = useState<GenSpec | null>(null);
   const [setupNotice, setSetupNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -156,7 +167,7 @@ export function useParlayGen<P>({
     if (!savedSetup) return;
     leaveRecall();
     onMarket(savedSetup.market);
-    setSpec(savedSetup);
+    setSpec({...savedSetup,...(defaultSpec.phase?{phase:savedSetup.phase??"pregame"}:{})});
     setSetupNotice("Saved setup loaded. Pins cleared; picks use the current board.");
   };
   type Snapshot = { spec: GenSpec; result: GenResult<P> };
@@ -184,8 +195,8 @@ export function useParlayGen<P>({
      construction over the whole board plus the seeded fill and the bounded repair loop on every
      dependency change. A closed sheet gets the empty pool, which the generator answers with
      `no-rows` at no cost. */
-  const poolSpec = useMemo(() => ({ market: spec.market, includeStarted: spec.includeStarted }), [spec.market, spec.includeStarted]);
-  const pool = useMemo(() => (open ? build(poolSpec, nowMs) : emptyPool<P>()), [open, build, poolSpec, nowMs]);
+  const poolSpec = useMemo(() => ({ market: spec.market, includeStarted: spec.includeStarted, phase: spec.phase }), [spec.market, spec.includeStarted, spec.phase]);
+  const pool = useMemo(() => (open ? excludePlayers(build(poolSpec, nowMs), excludedKeys) : emptyPool<P>()), [open, build, poolSpec, nowMs, excludedKeys]);
   const generated = useMemo<GenResult<P>>(
     () =>
       open
@@ -231,6 +242,7 @@ export function useParlayGen<P>({
     }
     setSpec((sp) => {
       const next: GenSpec = { ...sp, ...patch };
+      if (patch.phase != null && patch.phase !== sp.phase) next.pinned = blankPins(next.legs);
       if (patch.legs != null && patch.legs !== sp.legs) next.pinned = blankPins(patch.legs);
       return next;
     });
@@ -258,7 +270,35 @@ export function useParlayGen<P>({
     });
   };
 
+  const excludePlayer = (slot: number) => {
+    if (!result.ok) return;
+    const leg = result.ticket.legs[slot];
+    if (!leg) return;
+    remember(); leaveRecall();
+    const key = exclusionKey(leg);
+    setExclusions({ filter: filterKey, players: [...excludedPlayers.filter(p => p.key !== key), { key, label: leg.label }] });
+    setSpec(sp => ({ ...sp, pinned: sp.pinned.map(id => {
+      const kept = id ? pool.byId.get(id) : null;
+      return kept && exclusionKey(kept) === key ? null : id;
+    }) }));
+    setSetupNotice(`${leg.label} excluded. Picks updated; exclusions last until filters change.`);
+  };
+  const restorePlayer = (key: string) => {
+    leaveRecall();
+    setExclusions({ filter: filterKey, players: excludedPlayers.filter(p => p.key !== key) });
+    setSetupNotice(null);
+  };
+  const clearExclusions = () => {
+    leaveRecall(); setExclusions({ filter: filterKey, players: [] }); setSetupNotice(null);
+  };
+
   const spin = () => {
+    // A recalled ticket may restore a pin for a player excluded after it was saved.
+    if (result.ok && excludedKeys.size) {
+      const excludedIds = new Set(result.ticket.legs.filter(l => excludedKeys.has(exclusionKey(l))).map(l => l.id));
+      setSpec(sp => ({ ...sp, pinned: sp.pinned.map(id => id && excludedIds.has(id) ? null : id) }));
+    }
+    setNowMs(Date.now());
     remember();
     leaveRecall();
     setSetupNotice(null);
@@ -276,6 +316,15 @@ export function useParlayGen<P>({
   const add = () => {
     setSetupNotice(null);
     if (!result.ok) return;
+    if (result.ticket.legs.some(l => excludedKeys.has(exclusionKey(l)))) {
+      setSetupNotice("This saved ticket includes an excluded player. Regenerate or restore that player before adding."); return;
+    }
+    if(spec.phase){
+      const current=build(poolSpec,Date.now());
+      if(result.ticket.legs.some(l=>{const fresh=current.byId.get(l.id);return !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||fresh.quoteAt!==l.quoteAt;})){
+        setSetupNotice("These quotes changed or are no longer available. Regenerate before adding to the slip.");return;
+      }
+    }
     prevLegs.current = legs.slice();
     setLegs(addLegs(legs, result.ticket.legs.map((l) => l.leg)));
     setAdded(true);
@@ -295,6 +344,7 @@ export function useParlayGen<P>({
     pool,
     result,
     togglePin,
+    excludedPlayers, excludePlayer, restorePlayer, clearExclusions,
     spin,
     back: () => navigate("back"), forward: () => navigate("forward"),
     canBack: past.current.length > 0, canForward: future.current.length > 0,

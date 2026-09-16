@@ -35,8 +35,8 @@ export const MARKETS: Record<TabKey, { key: string; label: string; cat: string |
     { key: "hits", label: "Hits", cat: "batter_hits" },
     { key: "tb", label: "Total Bases O/U", cat: "batter_total_bases" },
     { key: "hrr", label: "Hits + Runs + RBI O/U", cat: "batter_hits_runs_rbis" },
-    { key: "rbi", label: "RBI", cat: null },
-    { key: "runs", label: "Batter Runs", cat: null },
+    { key: "rbi", label: "RBI", cat: "batter_rbis" },
+    { key: "runs", label: "Batter Runs", cat: "batter_runs_scored" },
     { key: "xbh", label: "Extra-Base Hit", cat: null },
     { key: "singles", label: "Singles", cat: null },
   ],
@@ -51,6 +51,8 @@ export const MARKETS: Record<TabKey, { key: string; label: string; cat: string |
 };
 
 export const MKT_LABEL: Record<string, string> = {
+  batter_rbis: "RBI",
+  batter_runs_scored: "Runs",
   batter_hits: "Hits",
   batter_total_bases: "Total Bases",
   batter_home_runs: "HR",
@@ -316,6 +318,7 @@ export function playerLeg(
   if (!price) return null;
   return {
     id: `${gkey ?? game}|${r.lkey}|${side}`,
+    ...(r.quoteAt ? {quoteAt:r.quoteAt,phase:"live" as const} : {}),
     label: r.p + (r.tm ? ` (${r.tm})` : ""),
     sub: `${MKT_LABEL[cat] ?? cat} ${sideLabel(cat, r, side)}`,
     game,

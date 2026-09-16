@@ -152,8 +152,8 @@ describe("FIX 2 — what six passes actually cost, inside the live pull's OWN 60
     expect(mlbAffordableEvents(MLB_LIVE_PROPS.probeEvents, worstDay)).toBe(MLB_LIVE_PROPS.probeEvents);
     const q = read("src/lib/server/mlb-live-quote.ts");
     // sized once, before the pass; the real delta is added after it returns
-    expect(q).toMatch(/const affordable = mlbAffordableEvents\(sel\.events\.length, spentNow\);/);
-    expect(q).toMatch(/mlbPullCredits\(used, fetched\)/);
+    expect(q).toMatch(/const affordable = mlbAffordableEvents\(sel\.events\.length, spentNow, 2\);/);
+    expect(q).toMatch(/mlbPullCredits\(used, fetched, 2\)/);
   });
 
   it("NO BUDGET OR CAP WAS LOWERED — every MLB live number Josh set is unchanged", () => {

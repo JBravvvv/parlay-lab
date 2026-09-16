@@ -61,6 +61,8 @@ export type LegSide = "O" | "U";
  * re-reads that file and fails if the two ever drift apart, so the list cannot rot.
  */
 export const MONOTONE_MARKETS: ReadonlySet<string> = new Set([
+  "batter_rbis",
+  "batter_runs_scored",
   "batter_hits",
   "batter_total_bases",
   "batter_home_runs",

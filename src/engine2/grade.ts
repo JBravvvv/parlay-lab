@@ -183,6 +183,8 @@ export function currentValue(
   const HR = num(bat.homeRuns);
   const D2 = num(bat.doubles);
   const T3 = num(bat.triples);
+  if (mkt === "batter_rbis") return {txt:`${BI} RBI`,val:BI};
+  if (mkt === "batter_runs_scored") return {txt:`${R} R`,val:R};
   if (mkt === "batter_hits") return { txt: `${H} H`, val: H };
   if (mkt === "batter_total_bases") {
     const tb = H + D2 + 2 * T3 + 3 * HR;

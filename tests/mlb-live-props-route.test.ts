@@ -426,7 +426,7 @@ describe("the rails that cost nothing", () => {
 /* ================================================================== the pull */
 
 describe("the pull", () => {
-  it("asks for the six core markets at regions=us, with no alternate ladder and the key threaded", async () => {
+  it("asks for the eight core markets at regions=us, with no alternate ladder and the key threaded", async () => {
     fakeRedis({ [BOARD_KEY(DATE)]: storedBoard(ALL_GAMES) });
     await call();
     const first = eventPulls()[0];
@@ -435,7 +435,7 @@ describe("the pull", () => {
     expect(first).toContain("regions=us");
     expect(first).toContain("oddsFormat=american");
     expect(first).not.toContain("_alternate");
-    expect(MLB_LIVE_MARKETS.split(",")).toHaveLength(6);
+    expect(MLB_LIVE_MARKETS.split(",")).toHaveLength(8);
     for (const u of upstream()) expect(u.startsWith("https://api.the-odds-api.com/")).toBe(true);
   });
 
@@ -576,10 +576,10 @@ describe("the credit rails", () => {
     plan.events = widenedEventsList();
     fakeRedis({ [BOARD_KEY(DATE)]: storedBoard(ALL_GAMES), [mlbLiveSpendKey(PT)]: "588" });
     const b = await callWith(yelichDrift);
-    expect(eventPulls()).toHaveLength(2); // (600 − 588) / 6
+    expect(eventPulls()).toHaveLength(1); // floor((600 − 588) / 8)
     expect(b.budgeted).toBe(true);
     expect(b.stale).toBe(true);
-    expect(b.note).toMatch(/600 credits bought 2 of 4/);
+    expect(b.note).toMatch(/600 credits bought 1 of 4/);
   });
 
   it("records the spend from the real header deltas, and only when something was fetched", async () => {
@@ -593,8 +593,8 @@ describe("the credit rails", () => {
        rail. It is added separately rather than handed to `pullCredits`, which would price it at the
        6-credit per-event rate on top of a delta that already covered it. */
     expect(MLB_LIST_CALL_CREDITS).toBe(1);
-    expect(r.kv.get(mlbLiveSpendKey(PT))).toBe(String(14 + MLB_LIST_CALL_CREDITS));
-    expect(b.spentToday).toBe(14 + MLB_LIST_CALL_CREDITS);
+    expect(r.kv.get(mlbLiveSpendKey(PT))).toBe(String(16 + MLB_LIST_CALL_CREDITS));
+    expect(b.spentToday).toBe(16 + MLB_LIST_CALL_CREDITS);
     expect(r.ops("EXPIRE").some((c) => c[1] === mlbLiveSpendKey(PT))).toBe(true);
   });
 
@@ -629,7 +629,7 @@ describe("the credit rails", () => {
     expect(b.note).toMatch(/1 in-play call failed/);
     // two readings, still 4 apart per call, so the spend is the delta plus one event's rate — and
     // Call A, which happened whether or not any per-event call landed
-    expect(Number(r.kv.get(mlbLiveSpendKey(PT)))).toBe(mlbPullCredits([1009, 1013], 2) + MLB_LIST_CALL_CREDITS);
+    expect(Number(r.kv.get(mlbLiveSpendKey(PT)))).toBe(mlbPullCredits([1009, 1013], 2, 2) + MLB_LIST_CALL_CREDITS);
   });
 
   it("a pull where every per-event call failed still bills Call A, and nothing more", async () => {
@@ -824,13 +824,13 @@ describe("the source", () => {
        inside the Redis lease, immediately before the per-event buy is sized against it, because the
        first read happened before two network round trips and two overlapping passes could both
        size a full budget against the same stale number. */
-    const hasBudgetRail = (src: string) => /mlbAffordableEvents\(1, spent\) === 0/.test(src) && /mlbAffordableEvents\(sel\.events\.length, spentNow\)/.test(src);
+    const hasBudgetRail = (src: string) => /mlbAffordableEvents\(1, spent, 2\) === 0/.test(src) && /mlbAffordableEvents\(sel\.events\.length, spentNow, 2\)/.test(src);
     const src = quote();
     expect(hasBudgetRail(src)).toBe(true);
     expect(src).toMatch(/const spentNow = await quiet\(store\.readSpend\(ptDate\), spent\)/);
-    const cut = src.replace(/mlbAffordableEvents\(1, spent\) === 0/, "false");
+    const cut = src.replace(/mlbAffordableEvents\(1, spent, 2\) === 0/, "false");
     expect(hasBudgetRail(cut)).toBe(false);
-    const bothCut = cut.replace(/mlbAffordableEvents\(sel\.events\.length, spentNow\)/, "sel.events.length");
+    const bothCut = cut.replace(/mlbAffordableEvents\(sel\.events\.length, spentNow, 2\)/, "sel.events.length");
     expect(hasBudgetRail(bothCut)).toBe(false);
   });
 });

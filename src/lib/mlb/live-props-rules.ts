@@ -232,7 +232,7 @@ export const MLB_LIVE_PROPS = {
  * same billed product or smaller, allowed.
  */
 export const MLB_LIVE_MARKETS =
-  "batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs";
+  "batter_hits,batter_total_bases,batter_home_runs,batter_hits_runs_rbis,pitcher_strikeouts,pitcher_outs,batter_rbis,batter_runs_scored";
 
 /** The events list — no `markets` param, so the 1-credit class (`src/lib/server/odds-shape.ts:49`). */
 export const MLB_LIVE_EVENTS_URL = "https://api.the-odds-api.com/v4/sports/baseball_mlb/events";

@@ -1,4 +1,5 @@
 "use client";
+import {browseOddsUrl} from "@/lib/mlb/browse-markets";
 
 import {quoteCapture,attachBookQuotes} from "@/lib/sportsbook/mlb";
 import { createEngine, type BoardData, type Engine } from "@/engine";
@@ -106,7 +107,7 @@ export function setDirPref(mkt: string, v: DirPref) {
 
 export function getEngine(): Engine {
   if (!engine) {
-    engine = createEngine({ fetchJson: async (url) => {const r=await browserFetchJson(url);if(r.ok)bookCapture.capture(r.body);return r;}, storage: window.localStorage });
+    engine = createEngine({ fetchJson: async (url) => {const r=await browserFetchJson(browseOddsUrl(url));if(r.ok)bookCapture.capture(r.body);return r;}, storage: window.localStorage });
     const orig = engine.get<(ctx: unknown, n: number, seed: number) => SimOut>("shSimGames");
     engine.set("shSimGames", (ctx: unknown, n: number, seed: number) => {
       const res = orig(ctx, n, seed);
@@ -170,8 +171,8 @@ export function generatesToday(): number {
   }
 }
 
-/** ~114-150 Odds credits each (measured). Counted for visibility, not enforcement. */
-export const GEN_CREDITS_EST = 140;
+/** Prior shape measured 114–150; RBI/Runs add up to 32 credits at 16 events. Estimate only. */
+export const GEN_CREDITS_EST = 172;
 
 function noteGenerate() {
   try {
