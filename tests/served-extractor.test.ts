@@ -100,4 +100,13 @@ describe("served-engine extractor", () => {
     const facadeOnly = `${FACADE}not the engine');`;
     expect(() => extractServed(facadeOnly)).toThrow(/ANCHOR-2 MISSING/);
   });
+
+  it("2026-09-17: the bundler may rename the shim parameter — `)(s,'` extracts exactly like `)(r,'`", () => {
+    const esc = (t: string) => t.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, "\\n");
+    const engine = "\n/* ===== config ===== */\nvar X = \"Pitcher K's\";";
+    const chunk = `var s={};(function(){ /* shim */ }\n};')(s,'${esc(engine)}');\n`;
+    expect(extractServed(chunk)).toBe(engine);
+    const twice = chunk + `\n;(function(){})(t,'x');`;
+    expect(() => extractServed(twice)).toThrow(/ANCHOR-1 AMBIGUOUS/);
+  });
 });

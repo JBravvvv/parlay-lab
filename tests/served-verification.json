@@ -1,6 +1,6 @@
 {
   "_": "SERVED-ARTIFACT VERIFICATION STATE (2026-07-30, owner's item 3). Test-owned: no runtime code reads this file. `pending` is set TRUE by an engine ship (the served artifact cannot carry the new string until that ship deploys), and set FALSE by the post-deploy re-grep, which also updates SERVED_ENGINE_SHA_VERIFIED in src/lib/engine-echo.ts. The resolution guard in tests/engine-echo.test.ts FAILS THE BUILD once a pending marker is older than MAX_PENDING_H hours \u2014 so the exception cannot become permanent by default.",
-  "pending": true,
+  "pending": false,
   "since": "2026-09-17T23:02:46Z",
-  "note": "PENDING 2026-09-17: INSTRUCTION 68 (daily ballpark factor) + INSTRUCTION 71 (parlay variety) moved the engine string bb6be52d -> 52510d67 (287,361 chars): windNote consults the shParkDaily hook when SH_CFG.parkDaily is armed; sim/closed-form hits and TB read the hook's h/tb; buildParlaySet honours SH_CFG.parlayGameCap / parlayMore / parlayCap. Cleared by the post-deploy re-grep (tools/verify-served-engine.mjs) within 24h."
+  "note": "CLEARED 2026-09-17: post-deploy re-grep of the a3de0d5 production chunk (9637-3a99aa05f5738304.js on parlay-nt4n61yfa) MATCHED the repo engine byte-for-byte \u2014 287,367 chars, sha 52510d67. INSTRUCTION 68 (shParkDaily hook) + INSTRUCTION 71 (parlayGameCap / parlayMore / parlayCap) are the served engine. The verifier's facade anchor was generalised the same day: the bundler renamed the shim parameter (`)(r,'` -> `)(s,'`)."
 }

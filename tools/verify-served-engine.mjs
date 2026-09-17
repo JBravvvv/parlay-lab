@@ -34,7 +34,12 @@
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 
-const FACADE = ")(r,'";
+/* ANCHOR-1 (2026-09-17 revision): the facade passes the engine as a single-quoted argument —
+   `)(r,'` in every build up to 2026-09-17 — but the parameter NAME is the bundler's to choose,
+   and the a3de0d5 build emitted `)(s,'`. The anchor is therefore the CALL SHAPE `)(<identifier>,'`
+   found by a regex, still required to be unique and still required to agree with ANCHOR-2. */
+const FACADE = ")(r,'"; // the historical literal, kept for the message and the synthetic tests
+const FACADE_RE = /\)\([A-Za-z_$][\w$]*,'/g;
 const HEAD_ESCAPED = "\\n/* ===== config ===== */";
 
 const args = process.argv.slice(2);
@@ -51,13 +56,13 @@ export function repoEngine(path = "src/engine/legacy-src.gen.ts") {
 
 /** Extract the engine literal from a served chunk. Throws with a named reason. */
 export function extractServed(chunk) {
-  const viaFacade = chunk.indexOf(FACADE);
+  const facades = [...chunk.matchAll(FACADE_RE)];
   const viaHead = chunk.indexOf(HEAD_ESCAPED);
-  if (viaFacade < 0) throw new Error(`ANCHOR-1 MISSING: the facade call ${FACADE} is absent — the bundler changed the call shape`);
+  if (facades.length === 0) throw new Error(`ANCHOR-1 MISSING: the facade call ${FACADE} (any parameter name) is absent — the bundler changed the call shape`);
   if (viaHead < 0) throw new Error("ANCHOR-2 MISSING: the engine's opening bytes are absent — this chunk does not carry the engine");
-  if (chunk.indexOf(FACADE, viaFacade + 1) >= 0) throw new Error("ANCHOR-1 AMBIGUOUS: the facade call appears more than once");
+  if (facades.length > 1) throw new Error("ANCHOR-1 AMBIGUOUS: the facade call appears more than once");
   if (chunk.indexOf(HEAD_ESCAPED, viaHead + 1) >= 0) throw new Error("ANCHOR-2 AMBIGUOUS: the engine head appears more than once");
-  const start = viaFacade + FACADE.length;
+  const start = facades[0].index + facades[0][0].length;
   if (start !== viaHead) {
     throw new Error(`ANCHORS DISAGREE: facade says ${start}, engine head says ${viaHead} — do not trust either`);
   }

@@ -41,7 +41,8 @@ const ALLOW = new Set(["e67eaad0", "942ab102", "935704d7", "c06b3afe", "135f586f
      (39fc8681… → cb2cdebc…) — same class as f6cf1513 above: hashes of the engine
      source, not commits. */
   "39fc8681", "cb2cdebc",
-  /* 2026-08-27: env->closed-form engine ship string sha */ "bb6be52d"]);
+  /* 2026-08-27: env->closed-form engine ship string sha */ "bb6be52d",
+  /* 2026-09-17: INSTRUCTION 68 + 71 engine ship string sha (cited in the handoff, the review and served-verification.json) */ "52510d67"]);
 const SHA = /\b[0-9a-f]{7,10}\b/g;
 
 /**
