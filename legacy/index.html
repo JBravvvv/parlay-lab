@@ -1614,7 +1614,7 @@ function shPenQFShadow(team){if(!(SH_CTX&&SH_CTX.pen_quality&&team))return null;
   if(!row||!lg||!(lg.era>0)||row.era==null)return null;
   return {f:shClamp(1+(row.era-lg.era)/lg.era*0.12,0.95,1.06,"1615"),era:row.era,ip:(row.ip!=null)?row.ip:null};}
 function shTempF(g){if(!(SH_V2&&SH_V2.ctx))return 1;var t=g&&g.weather&&parseFloat(g.weather.temp);
-  if(!isFinite(t))return 1;return shClamp(1+0.008*(t-70),0.90,1.12,"1617");}
+  if(!isFinite(t))return 1;return shClamp(1+0.008*(t-70),0.90,1.12,"1617");} var shParkDaily=null; /* INSTRUCTION 68 (2026-09-17, Josh: "take into account temperature, elevation, wind mph, wind in/out/left/right"): the daily ballpark hook, bound by every generator to src/lib/mlb/ballpark.ts parkDailyForGame and armed by SH_CFG.parkDaily; null/unarmed = windNote runs its legacy rule byte-identically */
 /* Savant percentile ranks — orientation verified 2026-07-12: ALWAYS 100 = elite
    for the player's role (Savant inverts negative stats on both sides). */
 function shPct(kind,id){var P=SH_V2&&SH_V2.priors&&SH_PRIORS&&SH_PRIORS[kind];var r=P&&id!=null&&P[id];return (r&&r.pct)||null;}
@@ -2021,8 +2021,8 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
     if((g.lineup_away||[]).some(function(x){return pnorm(x)===n;}))return g.probable_home;
     if((g.lineup_home||[]).some(function(x){return pnorm(x)===n;}))return g.probable_away;
     return null;}
-  function windNote(g){var w=(g&&g.weather&&g.weather.wind)||"";var mph=parseFloat(w)||0;var tf=shTempF(g);
-    if(/out/i.test(w)&&mph>=10)return {f:1.10*tf,txt:w+" (out)"};
+  function windNote(g){var w=(g&&g.weather&&g.weather.wind)||"";var mph=parseFloat(w)||0;var tf=shTempF(g);var dp=(SH_CFG&&SH_CFG.parkDaily&&typeof shParkDaily==="function")?shParkDaily(g):null;
+    if(dp&&isFinite(dp.f))return {f:dp.f,h:dp.h,tb:dp.tb,txt:dp.txt||null}; /* INSTRUCTION 68: temp x wind mph x direction x elevation, one continuous read */ if(/out/i.test(w)&&mph>=10)return {f:1.10*tf,txt:w+" (out)"};
     if(/in\b/i.test(w)&&mph>=10)return {f:0.90*tf,txt:w+" (in)"};
     return {f:tf,txt:(tf!==1?"temp-adjusted":null)};}
   function tLoc(iso){return iso?new Date(iso).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):"";}
@@ -2059,7 +2059,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
       var pk=shParkF(g&&g.venue,stand);
       var parkH=pk?pk.h:(coors?1.07:1),parkHR=pk?pk.hr:(coors?1.08:1);
       var pq=useStarter?shPitPctF(pst):1;
-      var hF=contact*pq*parkH*pl.h*(bpF||1),hrF=power*pq*wind.f*parkHR*pl.hr*(bpF||1);
+      var hF=contact*pq*parkH*pl.h*(bpF||1)*(wind.h||1),hrF=power*pq*wind.f*parkHR*pl.hr*(bpF||1);
       var hitR=null,hrR=null,bbAB=null,s2=0.20,s3=0.015;
       if(st){
         var hb=shBlendN(st,function(s){return Number(s.h);},"ab",10);if(hb)hitR=shShrink(hb.r,hb.n,60,shPriorH(st,Lh));
@@ -2323,7 +2323,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         /* v2: ERA-vs-xERA luck read — a flattered starter gets faded, an unlucky one credited */
         luck=shEraLuck(pst);var luckF=luck?luck.f:1;
         if(luck){tags.push(luck.tag);bits.push(luck.txt);}
-        var pq=shPitPctF(pst);var _pk=shParkCf(g&&g.venue,shStands(st));var hrF=power*pq*wind.f*(_pk?_pk.hr:(coors?1.08:1))*luckF,tbF=power*pq*(wind.f>1?1.05:wind.f<1?0.96:1)*(_pk?1+(_pk.h-1)*0.7+(_pk.hr-1)*0.3:(coors?1.10:1))*luckF,hF=contact*pq*(_pk?_pk.h:(coors?1.07:1))*luckF;
+        var pq=shPitPctF(pst);var _pk=shParkCf(g&&g.venue,shStands(st));var hrF=power*pq*wind.f*(_pk?_pk.hr:(coors?1.08:1))*luckF,tbF=power*pq*(wind.tb||(wind.f>1?1.05:wind.f<1?0.96:1))*(_pk?1+(_pk.h-1)*0.7+(_pk.hr-1)*0.3:(coors?1.10:1))*luckF,hF=contact*pq*(_pk?_pk.h:(coors?1.07:1))*luckF*(wind.h||1);
         /* batter-vs-pitcher career history — doc discipline, hard-coded caps:
            under 15 PA = ignored in the math (context only on the card);
            15–30 PA = tiny nudge; 30+ = modest weight; total effect capped ±10%. */
@@ -2434,7 +2434,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         if(sBnb&&LH&&LH.ab>0){var sB2=shShrink(sBnb.r,sBnb.n,75,LH.bb/LH.ab);
           sEx2=pa*(1-Math.max(0,Math.min(0.25,sB2))*0.9);}
         var sPk=shParkF(g&&g.venue,shStands(st)),sF1=null;
-        if(sPk)sF1=(sIsHR?(power*pq*wind.f*sPk.hr*luckF):(contact*pq*sPk.h*luckF))*sTbAdj;
+        if(sPk)sF1=(sIsHR?(power*pq*wind.f*sPk.hr*luckF):(contact*pq*sPk.h*luckF*(wind.h||1)))*sTbAdj;
         shdw={
           m8:(sIsTB&&row.ln<1&&lam.lamH!=null)?sRnd(1-shPoisPmf(0,lam.lamH)):null,
           m11:(sRx!=null)?sPx(sRx*expAB*sLiveF,false):null,
@@ -2677,13 +2677,13 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
         var pa=use.uPlayer[a.r.label]||0,pb=use.uPlayer[b.r.label]||0;if(pa!==pb)return pa-pb;
         var ka=use.uKey[a.r.label+"|"+a.r.sub]||0,kb=use.uKey[b.r.label+"|"+b.r.sub]||0;if(ka!==kb)return ka-kb;
         return b.r.prob-a.r.prob;});
-      var out=[],seenP={},seenG={};
+      var out=[],seenP={},seenG={},cntG={},gcap=(SH_CFG&&SH_CFG.parlayGameCap)|0; /* INSTRUCTION 71 (2026-09-17): at most gcap legs from one game on any auto-built ticket, HR included — "3 should be avoided"; 0 = legacy (unbounded) */
       function pass(enforceGame){for(var i=0;i<ranked.length&&out.length<n;i++){var x=ranked[i];
         if(x.r.noParlay)continue; /* projected-lineup rule: fringe players without a posted lineup stay off tickets */
         var gm=(x.r.game||"").split(" · ")[0];
         if((use.uPlayer[x.r.label]||0)>=cap)continue;
-        if(seenP[x.r.label])continue;if(enforceGame&&seenG[gm])continue;
-        seenP[x.r.label]=1;seenG[gm]=1;out.push(x);}}
+        if(seenP[x.r.label])continue;if(enforceGame&&seenG[gm])continue;if(gcap&&(cntG[gm]||0)>=gcap)continue;
+        seenP[x.r.label]=1;seenG[gm]=1;cntG[gm]=(cntG[gm]||0)+1;out.push(x);}}
       pass(!!preferDistinctGame);if(out.length<n&&preferDistinctGame)pass(false);
       if(out.length<n)return null;
       out.forEach(function(x){use.uPlayer[x.r.label]=(use.uPlayer[x.r.label]||0)+1;use.uKey[x.r.label+"|"+x.r.sub]=(use.uKey[x.r.label+"|"+x.r.sub]||0)+1;});
@@ -2790,7 +2790,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
               pitcher_outs:[2,2,3,3,4,2,3],
               ml:[2,2,3,3,4,2],
               rl:[2,2,3,3,4,2]};
-    SH_NAMED_CATS.forEach(function(k){
+    var more=(SH_CFG&&SH_CFG.parlayMore)|0;if(more)Object.keys(plan).forEach(function(k){var b0=plan[k].slice();for(var q=0;q<more;q++)plan[k]=plan[k].concat(b0);}); /* INSTRUCTION 71: "as many parlays as possible for variety" — the pattern lists repeat `more` extra times; 0 = legacy */ SH_NAMED_CATS.forEach(function(k){
       var pool=(C[k]||[]).map(function(r){return {cat:k,r:r};});
       if(pool.length<2)return;
       var pdg=(k!=="batter_home_runs"); /* HR can double up in one game; others prefer distinct games */
@@ -2804,7 +2804,7 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
        from them (card, FUN). */
     var mixPool=[];SH_NAMED_CATS.forEach(function(k){if(k==="batter_home_runs")return;(C[k]||[]).forEach(function(r){mixPool.push({cat:k,r:r});});});
     mixPool.sort(function(a,b){return b.r.prob-a.r.prob;});
-    var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});
+    var mixPat=[];[[2,8],[3,10],[4,8],[5,6],[6,4],[7,3],[8,2],[9,1],[10,1]].forEach(function(pr){for(var i=0;i<pr[1];i++)mixPat.push(pr[0]);});if(more){var mb=mixPat.slice();for(var q2=0;q2<more;q2++)mixPat=mixPat.concat(mb);}
     mixPat.forEach(function(want){var n=Math.min(want,mixPool.length);if(n<2)return;
       var p=build("Mixed · "+n+" legs","MIX",pick(mixPool,n,true));if(p)out.push(p);});
     /* 2026-08-02 singles (owner's word, flagged): built after the ENTIRE set — per-type AND
@@ -2823,9 +2823,9 @@ function shAnalyzeLocal(slate){SH_CLAMP_LOG=(SH_V2&&SH_V2.clampLog)?{}:null;
   /* MIXED PARLAYS excludes HR (too volatile) and ML/RL (game-outcome bets) — those live
      only in the dedicated PARLAYS / LIVE PARLAYS tabs. Blank those pools before building. */
   function omitCats(C,drop){var o={};SH_NAMED_CATS.forEach(function(k){o[k]=drop[k]?[]:(C[k]||[]);});o.all=C.all;return o;}
-  var parlays=buildParlaySet(pregameF.cats,3);   /* PARLAYS tab: not-started games only */
-  var parlaysMixed=buildParlaySet(omitCats(preF.cats,{ml:1,rl:1,batter_home_runs:1}),3);  /* MIXED: no HR/ML/RL */
-  var parlaysLive=buildParlaySet(liveF.cats,3);  /* LIVE PARLAYS tab: every live game */
+  var pcap=(SH_CFG&&SH_CFG.parlayCap)||3; /* INSTRUCTION 71: per-player ticket cap, 3 = legacy */ var parlays=buildParlaySet(pregameF.cats,pcap);   /* PARLAYS tab: not-started games only */
+  var parlaysMixed=buildParlaySet(omitCats(preF.cats,{ml:1,rl:1,batter_home_runs:1}),pcap);  /* MIXED: no HR/ML/RL */
+  var parlaysLive=buildParlaySet(liveF.cats,pcap);  /* LIVE PARLAYS tab: every live game */
 
   /* pass list (doc: "passes are logged too") — worst mispricings with the reason we're off them */
   traps.sort(function(a,b){return a.edge-b.edge;});

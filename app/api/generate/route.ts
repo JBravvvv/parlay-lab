@@ -15,7 +15,7 @@ import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
 import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
-import { applyEnvClosedForm } from "@/lib/env-adjust";
+import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
 
@@ -407,7 +407,10 @@ export async function GET(req: NextRequest) {
          ticket pool — hrrAltMax/outsSusp are runtime config, not an engine-hash move */
       applySuspensionLift(cfg);
       applyEnvClosedForm(cfg); // park/weather -> closed form (2026-08-27, Josh's word)
+      applyParkDaily(cfg); // INSTRUCTION 68 (2026-09-17): daily ballpark factor (temp x wind mph x direction x elevation)
+    applyParlayVariety(cfg); // INSTRUCTION 71 (2026-09-17): max 2 legs per game on a ticket, 3x the ticket plan, player cap 5
     }
+    bindParkDaily(eng); // INSTRUCTION 68: the blob's shParkDaily var -> src/lib/mlb/ballpark.ts
 
     const slate = await eng.collectSlate();
     const data = attachBookQuotes(eng.analyze(slate) as BoardData, bookCapture.events.values(), SETTLE_BOOK);

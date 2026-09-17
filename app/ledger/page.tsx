@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { PlayerMark } from "@/components/player/PlayerMark";
+import { clubFromLabel } from "@/lib/mlb-visuals";
 import { parseBoardLabel } from "@/lib/player-card";
 import {
   Area,
@@ -129,10 +130,12 @@ function LegLine({
   const phase = legPhase(game, r?.result, dayDone);
   const deep = phase === "final" ? null : legDeepLink(l);
   const player = parseBoardLabel(l.label);
+  const club = player ? null : clubFromLabel(l.label); // INSTRUCTION 70: a club leg draws the club's logo
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[11.5px]">
       <span className="min-w-0 text-text">
         {player && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={player.name} team={player.team} headshot={null} size="sm" /></span>}
+        {club && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={null} team={club} headshot={null} size="sm" /></span>}
         {deep ? (
           <Link
             replace

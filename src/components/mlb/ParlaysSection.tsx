@@ -8,11 +8,13 @@ import { FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
-import type { Ticket } from "@/engine";
+import type { Ticket, TicketLeg } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { parseBoardLabel } from "@/lib/player-card";
-import { useHeadshots } from "@/lib/mlb-visuals";
+import { clubFromLabel, useHeadshots } from "@/lib/mlb-visuals";
+import { MyToggle } from "@/components/mlb/MyParlayBar";
+import { parseAm, type MyLeg } from "@/lib/my-parlay";
 
 /* The engine's generated parlay sets, straight from BoardData — the old app's
    PARLAYS / MIXED PARLAYS / LIVE PARLAYS tabs. Display only: every number here
@@ -41,7 +43,13 @@ const VIEWS: [View, string, string][] = [
 const x = (t: Ticket) =>
   t as Ticket & { tier?: string; typeLabel?: string; stake?: number; toWin?: number; note?: string };
 
+/* INSTRUCTION 71 (2026-09-17, Josh): "There needs to be as many parlays generated on the bottom of the
+   board page as possible for variety … i need more ability just to see more parlays". The section used
+   to stop dead at 24 with a "narrow with the filters" note; now it pages — 24 first, "Show 48 more"
+   per tap, or "Show all". The engine side of the same instruction (env-adjust PARLAY_VARIETY) triples
+   the ticket plan, so there is a lot more to page through. */
 const SHOW_CAP = 24;
+const SHOW_STEP = 48;
 
 function TierTag({ tier }: { tier?: string }) {
   const cls =
@@ -59,6 +67,7 @@ export function ParlaysSection({
   live,
   legNow,
   legOut,
+  mine,
 }: {
   parlays: Ticket[];
   mixed: Ticket[];
@@ -68,6 +77,8 @@ export function ParlaysSection({
   /** INSTRUCTION 28 (2026-09-04): true when the leg's batter is absent from the POSTED
       lineup — the ticket is flagged SCRATCHED LEG and dimmed (a book voids or pulls it) */
   legOut?: (l: { label?: string | null; gkey?: string | null; lkey?: string | null }) => boolean;
+  /** INSTRUCTION 71: the Board's "My parlay" — tap a leg or take a whole ticket into it */
+  mine?: { has: (key: string) => boolean; toggle: (leg: MyLeg) => void; addAll: (legs: MyLeg[]) => void };
 }) {
   const [view, setView] = useState<View>("parlays");
   const [pfilter, setPfilter] = useState("all");
@@ -89,7 +100,8 @@ export function ParlaysSection({
      team's logo badged on it. The name list is computed ONCE over all three sets — not per view and
      not per filter — because useHeadshots re-keys on the joined list, and a key that changed when
      Josh tapped MIXED would re-run the statsapi resolve on every tab press. A club leg (ML/RL) has
-     no "(TEAM)" suffix, so parseBoardLabel returns null and no mark is drawn: a club is not a person. */
+     no "(TEAM)" suffix, so parseBoardLabel returns null and it needs no headshot: it draws the club's
+     own logo instead (INSTRUCTION 70, 2026-09-17: "If its a team ml.rl then it only needs a team logo"). */
   const markNames = useMemo(() => {
     const names = new Set<string>();
     for (const t of [...parlays, ...mixed, ...live]) {
@@ -113,6 +125,21 @@ export function ParlaysSection({
     f === "all" ? true : f === "SAFER" || f === "LONGSHOT" ? x(t).tier === f : t.type === f;
   const shown = all.filter((t) => match(t, filters.some(([k]) => k === pfilter) ? pfilter : "all"));
   const playable = shown.filter((t) => t.czOdds != null);
+  const [cap, setCap] = useState(SHOW_CAP);
+  const capKey = `${view}|${pfilter}`;
+  const [seenCap, setSeenCap] = useState(capKey);
+  if (seenCap !== capKey) {
+    setSeenCap(capKey);
+    setCap(SHOW_CAP);
+  }
+  const legOfTicket = (l: TicketLeg): MyLeg => ({
+    key: `${l.label}|${l.prop}`,
+    label: String(l.label ?? ""),
+    sub: String(l.prop ?? ""),
+    gkey: l.gkey ?? null,
+    odds: parseAm(l.cz),
+    prob: typeof l.prob === "number" && Number.isFinite(l.prob) ? l.prob : null,
+  });
   const offBook = shown.filter((t) => t.czOdds == null);
 
   return (
@@ -158,7 +185,7 @@ export function ParlaysSection({
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              {playable.slice(0, SHOW_CAP).map((t, ti) => {
+              {playable.slice(0, cap).map((t, ti) => {
                 const e = x(t);
                 const toWin = e.czDec && e.stake != null ? Math.round(e.stake * (e.czDec - 1)) : e.toWin;
                 const outLeg = legOut ? t.legs.some((l) => legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null })) : false;
@@ -166,9 +193,20 @@ export function ParlaysSection({
                   <Panel key={`${view}|${ti}`} className={outLeg ? "opacity-60" : (modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="display text-[14px] text-text">{t.name}</div>
-                      <span className="num shrink-0 text-[13.5px] font-bold text-gold">
-                        {basisMode && t.bsOdds != null && <span className="mr-2 text-text">{String(t.bsOdds)} basis</span>}
+                      <span className="num flex shrink-0 items-center gap-2 text-[13.5px] font-bold text-gold">
+                        {basisMode && t.bsOdds != null && <span className="text-text">{String(t.bsOdds)} basis</span>}
                         {String(t.czOdds)} @ book
+                        {mine && (
+                          <button
+                            type="button"
+                            className="rounded-full border border-line-2 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-muted hover:border-gold hover:text-gold"
+                            title="Copy every leg of this ticket into My parlay, then add or drop legs to see how the edge moves"
+                            data-testid="ticket-to-mine"
+                            onClick={() => mine.addAll(t.legs.map(legOfTicket))}
+                          >
+                            → mine
+                          </button>
+                        )}
                       </span>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -229,9 +267,14 @@ export function ParlaysSection({
                         const n = legNow ? legNow(l as { gkey?: string | null; lkey?: string | null }) : null;
                         const lo = legOut ? legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null }) : false;
                         const who = parseBoardLabel(String(l.label ?? ""));
+                        const club = who ? null : clubFromLabel(String(l.label ?? ""));
                         return (
                           <li key={i} className={lo ? "truncate line-through decoration-red-400/60" : "truncate"}>
-                            {who && (
+                            {mine && (() => {
+                              const ml = legOfTicket(l);
+                              return <span className="mr-1.5 inline-flex align-text-bottom"><MyToggle on={mine.has(ml.key)} onClick={() => mine.toggle(ml)} label={`${ml.label} ${ml.sub}`} /></span>;
+                            })()}
+                            {who ? (
                               <PlayerMark
                                 player={who.name}
                                 team={who.team}
@@ -239,7 +282,9 @@ export function ParlaysSection({
                                 size="xs"
                                 className="mr-1 align-text-bottom"
                               />
-                            )}
+                            ) : club ? (
+                              <PlayerMark player={null} team={club} headshot={null} size="xs" className="mr-1 align-text-bottom" />
+                            ) : null}
                             <span className="text-text"><BoardLabel showMark={false} label={l.label} /></span> · {l.prop}
                             {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
@@ -261,9 +306,17 @@ export function ParlaysSection({
                 );
               })}
             </div>
-            {playable.length > SHOW_CAP && (
-              <div className="mt-2 text-[11px] text-faint">
-                +{playable.length - SHOW_CAP} more in this view — narrow with the filters above.
+            {playable.length > cap && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted" data-testid="parlays-more">
+                <span>
+                  showing {cap} of {playable.length} in this view
+                </span>
+                <button type="button" className="rounded-full border border-line-2 px-3 py-1 font-semibold text-text hover:border-gold" onClick={() => setCap((c) => c + SHOW_STEP)}>
+                  Show {Math.min(SHOW_STEP, playable.length - cap)} more
+                </button>
+                <button type="button" className="rounded-full border border-line-2 px-3 py-1 font-semibold text-text hover:border-gold" onClick={() => setCap(playable.length)}>
+                  Show all {playable.length}
+                </button>
               </div>
             )}
             {playable.length === 0 && (

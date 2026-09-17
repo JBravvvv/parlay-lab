@@ -11,7 +11,7 @@ import { buildLockEntry, buildReasonRecord, getLockEntry, lockExists, needsLockA
 import { buildReadingSafe, getReading, writeReading } from "@/lib/server/self-reading";
 import { ensureLedgerEpoch } from "@/lib/server/ledger-epoch-server";
 import { applySuspensionLift } from "@/lib/paper-mode";
-import { applyEnvClosedForm } from "@/lib/env-adjust";
+import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { decideGradePass, decideRefillTick, decideSlotTick, GRADE_SLOT_WINDOW_MIN } from "@/lib/server/grading-progress";
 import { decideMlbRefill, forwardMlbLivePull, forwardMlbRefill, readMlbDay, type MlbLivePullResult } from "@/lib/server/refill";
 import { MLB_LIVE_PROPS } from "@/lib/mlb/live-props-rules";
@@ -225,7 +225,10 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
         cfg.selMode = LOCK_SEL_MODE;
         applySuspensionLift(cfg); // backfill locks re-run the allocator — same lift as generation
         applyEnvClosedForm(cfg);
+        applyParkDaily(cfg); // INSTRUCTION 68 (2026-09-17): daily ballpark factor (temp x wind mph x direction x elevation)
+    applyParlayVariety(cfg); // INSTRUCTION 71 (2026-09-17): max 2 legs per game on a ticket, 3x the ticket plan, player cap 5
       }
+      bindParkDaily(eng); // INSTRUCTION 68: the blob's shParkDaily var -> src/lib/mlb/ballpark.ts
       /* INSTRUCTION 46 self-calibration (wired fix round 2026-09-08): same read as generate —
          fail-safe null → rotation only */
       const shapeCal = await readShapeCalibration(date).catch(() => null);

@@ -25,6 +25,8 @@ export type Column<T> = {
 /** rows past this index share one delay: 12 × 45 ms = 0.54 s, then everything is on screen */
 export const STAGGER_CAP = 12;
 
+export type SortState = { key: string; dir: 1 | -1 };
+
 export function DataTable<T>({
   columns,
   rows,
@@ -32,6 +34,8 @@ export function DataTable<T>({
   maxHeight = "62vh",
   stagger = false,
   rowClassName,
+  defaultSort = null,
+  resetKey,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -39,8 +43,18 @@ export function DataTable<T>({
   maxHeight?: string;
   stagger?: boolean;
   rowClassName?: (row: T) => string;
+  /** the column the table opens sorted on, arrow shown — so the FIRST tap visibly flips it (INSTRUCTION 69) */
+  defaultSort?: SortState | null;
+  /** when this changes (a different view: scope, tab, book) the sort goes back to `defaultSort` —
+      one view's ▲ never silently rides into the next (INSTRUCTION 69) */
+  resetKey?: string;
 }) {
-  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+  const [sort, setSort] = useState<SortState | null>(defaultSort);
+  const [seenReset, setSeenReset] = useState(resetKey);
+  if (seenReset !== resetKey) {
+    setSeenReset(resetKey);
+    setSort(defaultSort);
+  }
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -51,6 +65,9 @@ export function DataTable<T>({
       const va = sv(a);
       const vb = sv(b);
       if (va === vb) return 0;
+      // NaN compares false both ways and would freeze the order — an unreadable value sinks
+      if (typeof va === "number" && Number.isNaN(va)) return 1;
+      if (typeof vb === "number" && Number.isNaN(vb)) return -1;
       return (va < vb ? -1 : 1) * sort.dir;
     });
   }, [rows, sort, columns]);

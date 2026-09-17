@@ -12,6 +12,7 @@ import {
   IconGames,
   IconLedger,
   IconParlay,
+  IconPark,
   IconSeason,
   IconSettings,
   IconSharp,
@@ -42,6 +43,8 @@ type NavItem = {
   /** INSTRUCTION 46 fix round: a CFB-only page — the entry is hidden (rail + phone top bar) while the
    *  SportSwitch sits on MLB, so the MLB desk never shows a tab whose page ignores it. */
   cfbOnly?: boolean;
+  /** INSTRUCTION 68 (2026-09-17): an MLB-only page — hidden while the SportSwitch sits on CFB or NFL. */
+  mlbOnly?: boolean;
 };
 
 /** `#RRGGBB` → `rgba(r, g, b, a)` — the tone at a given opacity (idle text, pill fill, glow) */
@@ -69,6 +72,9 @@ const NAV: readonly NavItem[] = [
   // INSTRUCTION 46 (2026-09-08): Season Lab — season-long CFB props / win totals / parlays on typed lines. Desktop rail + the
   // phone's top-bar icon row (a 7th bottom tab does not fit at 375px); the tone is the CFB amber (--color-cfb) since the page is CFB-only.
   { href: "/season", label: "Season Lab", icon: IconSeason, group: "top", mobile: false, tone: "#F5A524", cfbOnly: true },
+  // INSTRUCTION 68 (2026-09-17, Josh: "a tab titled 'Ballpark Factor' that shows daily ballpark factor for every stadium") — MLB-only,
+  // desktop rail + the phone's top-bar icon row (its fifth icon on the MLB desk, the width Season Lab already proved on CFB).
+  { href: "/ballpark", label: "Ballpark Factor", icon: IconPark, group: "top", mobile: false, tone: "#86EFAC", mlbOnly: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true, tone: "#FDE68A" },
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
 ];
@@ -165,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const nfl = sport === "nfl";
   /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB or NFL
    *  (NFL Season Lab is cut for the 2026-09-08 ship; the NFL desk adds no nav entry of its own) */
-  const shown = (n: Pick<NavItem, "cfbOnly">) => !n.cfbOnly || cfb;
+  const shown = (n: Pick<NavItem, "cfbOnly" | "mlbOnly">) => (!n.cfbOnly || cfb) && (!n.mlbOnly || sport === "mlb");
 
   return (
     <div className="min-h-dvh">
@@ -221,8 +227,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Brand />
         <SportSwitch size="sm" className="shrink-0" />
         <div className="flex shrink-0 items-center gap-0.5">
-          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone, cfbOnly }) =>
-            shown({ cfbOnly }) ? (
+          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone, cfbOnly, mlbOnly }) =>
+            shown({ cfbOnly, mlbOnly }) ? (
               <Link
                 key={href}
                 href={href}

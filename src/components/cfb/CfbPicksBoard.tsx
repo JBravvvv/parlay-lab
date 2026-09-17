@@ -52,7 +52,7 @@ import type { CfbGame } from "@/lib/cfb/types";
 import { quotaRemaining } from "@/lib/fetcher";
 import { fmtAmerican, fmtMoney, fmtPct } from "@/lib/format";
 import { railLabel } from "@/lib/games";
-import { gradeFromEv, gradeRank } from "@/lib/grade";
+import { gradeFromEv, gradeRank, gradeSortKey } from "@/lib/grade";
 import { bookShort } from "./CfbGameCard";
 import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
 
@@ -365,7 +365,8 @@ export function CfbPicksBoard() {
           </div>
         ),
       },
-      { key: "grade", header: "Grade", sortValue: (r) => gradeRank(r.grade), cell: (r) => <GradeChip grade={r.grade} basis="EV @ selected book" /> },
+      /* INSTRUCTION 69: by letter, then by EV inside the letter — the same key the MLB board sorts on */
+      { key: "grade", header: "Grade", sortValue: (r) => gradeSortKey(gradeRank(r.grade), r.evCz), cell: (r) => <GradeChip grade={r.grade} basis="EV @ selected book" /> },
       {
         key: "fair",
         header: "Fair",
@@ -530,7 +531,7 @@ export function CfbPicksBoard() {
                 )}
               </Panel>
             ) : (
-              <DataTable columns={columns} rows={rows} rowKey={(r) => r.key} maxHeight="62vh" stagger={scope === "top"} rowClassName={(r) => ((r.evCz ?? -1) > 0 ? "ev-glow" : "")} />
+              <DataTable columns={columns} rows={rows} rowKey={(r) => r.key} maxHeight="62vh" stagger={scope === "top"} rowClassName={(r) => ((r.evCz ?? -1) > 0 ? "ev-glow" : "")} defaultSort={{ key: "grade", dir: -1 }} resetKey={`${scope}|${cat}`} />
             )}
           </Reveal>
 

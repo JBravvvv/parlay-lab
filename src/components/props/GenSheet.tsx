@@ -9,6 +9,7 @@ import { amFmt, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
 import { parseBoardLabel } from "@/lib/player-card";
 import { PlayerMark } from "@/components/player/PlayerMark";
+import { clubFromLabel } from "@/lib/mlb-visuals";
 import { PlayerName } from "@/components/player/PlayerName";
 import {
   LEG_MAX,
@@ -65,8 +66,11 @@ export const GEN_PANEL_ID = "props-gen-panel";
  */
 type SlotPart<P> = (a: { leg: P; gen: GenLeg<P>; name: string; team: string | null }) => ReactNode;
 
-/** the default disc — today's MLB path. The page overrides it to pass its resolved headshot. */
+/** the default disc — today's MLB path. The page overrides it to pass its resolved headshot.
+    A club leg (no "(TEAM)" suffix, no team of its own) draws the club's logo alone — INSTRUCTION 70. */
 function mlbMark<P>({ name, team }: { leg: P; gen: GenLeg<P>; name: string; team: string | null }): ReactNode {
+  const club = team ? null : clubFromLabel(name);
+  if (club) return <PlayerMark player={null} team={club} headshot={null} size="sm" />;
   return <PlayerMark player={name} team={team} headshot={null} size="sm" />;
 }
 

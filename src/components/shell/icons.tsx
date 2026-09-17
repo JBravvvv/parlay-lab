@@ -123,3 +123,14 @@ export function IconSeason({ className = "" }: P) {
     </svg>
   );
 }
+
+/** Ballpark Factor — a diamond under a wind arc (INSTRUCTION 68, 2026-09-17). */
+export function IconPark({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`${base} ${className}`}>
+      <path d="M12 21l-7-7 7-7 7 7-7 7z" />
+      <path d="M12 14v.01" />
+      <path d="M4 5c2.5-2 5.5-2 8 0s5.5 2 8 0" />
+    </svg>
+  );
+}

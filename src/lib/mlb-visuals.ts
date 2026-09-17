@@ -48,6 +48,40 @@ export const teamCode = (name: string): string | null => TEAM_AB[name.trim()] ??
 export const teamLogo = (code: string) => `https://a.espncdn.com/i/teamlogos/mlb/500/${code}.png`;
 export const teamAbbr = (name: string): string => (teamCode(name) ?? name.slice(0, 3)).toUpperCase();
 
+/**
+ * THE CLUB AN ML/RL LABEL NAMES (INSTRUCTION 70, 2026-09-17, Josh's word, verbatim: "It also
+ * ALWAYS needs to show player headshot and/or team logo next to every single pick. If its a team
+ * ml.rl then it only needs a team logo ie: Tigers ML"). The engine prints a club leg as the full
+ * club name ("Detroit Tigers"); a ticket or a ledger line may print the nickname ("Tigers ML") or
+ * the tag ("DET ML"). All three resolve to the club's full name — the key `teamTag` / `mlbTeamLogo`
+ * already read — or to null when the label names no MLB club (a player, a football side), so no
+ * surface ever draws a logo the label did not name. Two-word nicknames (Red Sox, White Sox, Blue
+ * Jays) are matched whole; a bare "Sox" is nobody.
+ */
+const CLUB_NICK: Record<string, string> = Object.fromEntries(
+  Object.keys(TEAM_AB).map((name) => {
+    const w = name.split(" ");
+    const nick = /^(Sox|Jays)$/.test(w[w.length - 1]) ? w.slice(-2).join(" ") : w[w.length - 1];
+    return [name, nick];
+  }),
+);
+const CLUB_TAGS: Record<string, string[]> = { oak: ["OAK", "ATH"], chw: ["CHW", "CWS"], ari: ["ARI", "AZ"] };
+export function clubFromLabel(label: string | null | undefined): string | null {
+  const s = (label ?? "").trim();
+  if (!s) return null;
+  for (const name of Object.keys(TEAM_AB)) if (s.includes(name)) return name;
+  for (const [name, nick] of Object.entries(CLUB_NICK)) {
+    if (new RegExp(`(^|[^A-Za-z])${nick}(?![A-Za-z])`).test(s)) return name;
+  }
+  const tag = s.match(/^([A-Z]{2,3})(?![A-Za-z])/)?.[1];
+  if (tag) {
+    for (const [name, code] of Object.entries(TEAM_AB)) {
+      if ((CLUB_TAGS[code] ?? [code.toUpperCase()]).includes(tag)) return name;
+    }
+  }
+  return null;
+}
+
 /** Logo for an ML/RL row whose label contains the team name somewhere. */
 export function teamLogoFromLabel(label: string): string | null {
   for (const [name, code] of Object.entries(TEAM_AB)) {

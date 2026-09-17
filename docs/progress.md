@@ -1,3 +1,15 @@
+# Progress — 2026-09-17 (Ballpark Factor, sort fix, marks on every pick, parlay variety)
+
+INSTRUCTIONS 68–71, shipped together.
+
+- **Ballpark Factor (68)**: `src/lib/mlb/ballpark.ts` (30 parks; temperature × wind mph × direction × elevation, roof-aware, clamped 0.8–1.25, split HR/H/TB). The legacy engine's `windNote` reads the `shParkDaily` hook when `SH_CFG.parkDaily` is armed (hits/TB paths read `wind.h`/`wind.tb`); all three generators arm it; unarmed = byte-identical blob. New MLB-only tab `/ballpark` (`app/api/mlb/ballpark/route.ts`) lists every park on the slate with the day's read. Engine string changed: `SERVED_ENGINE_SHA_VERIFIED` refreshed, `tests/served-verification.json` pending until the post-deploy re-grep.
+- **Column sorting (69)**: `gradeSortKey` (letter band × 1000 + clamped EV, settled rows sink) on the Board's two Grade columns and the CFB board; `DataTable` `defaultSort` + `resetKey` (Board opens on Grade ▼ and resets on every scope/prop/live/book change); NaN sorts last.
+- **Marks on every pick (70)**: `clubFromLabel` + `BoardLabel` draw a headshot + team badge for a player label and the club logo for a team label — Board stamped/ALL table, generated parlays, parlay generator sheet, ledger.
+- **Parlay variety (71)**: `SH_CFG.parlayGameCap / parlayMore / parlayCap` in `buildParlaySet`, armed as 2 / 2 / 5 by `applyParlayVariety` (max two legs per game on a ticket, three times the ticket plan, five tickets per player); generated-parlays paging (24, +48, all); the Board's **My parlay** bar prices tapped legs with the engine's ticket arithmetic (odds × , true % ×, EV = true × dec − 1, fair) and names what it cannot model (same-game correlation) and what it left out (no price / no model %).
+- Tests: `tests/ballpark.test.ts`, `tests/ballpark-engine.test.ts`, `tests/board-sort.test.ts`, `tests/pick-marks.test.ts`, `tests/parlay-variety.test.ts`, `tests/my-parlay.test.ts`; `tests/nav.test.ts` updated for the new tab.
+
+Validation: TypeScript passes; full serial vitest gate recorded in `tools/handoff-state.env` (GATE_TESTS).
+
 # Progress — 2026-09-17 (DraftKings settlement book)
 
 INSTRUCTION 67: Josh asked for every grade, edge %, EV and Kelly stake to be computed at DraftKings instead of Caesars, with nothing else on the site changed.

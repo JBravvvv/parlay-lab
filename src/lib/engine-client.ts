@@ -11,7 +11,7 @@ import { boardStale, mayAutoRun, type StaleVerdict } from "./board-stale";
 import { liveCoverageOf, pricedGames, type GameInfoLike } from "./board-coverage";
 import { NOPLAY_KEY, validateNoPlayLog, type NoPlayLog } from "./noplay";
 import { applySuspensionLift } from "./paper-mode";
-import { applyEnvClosedForm } from "@/lib/env-adjust";
+import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 
 /**
  * Browser-side engine singleton. Real localStorage is passed through, so the
@@ -124,7 +124,10 @@ export function getEngine(): Engine {
       /* PAPER EPOCH (2026-08-15, Josh's word): H+R+RBI and pitcher_outs back on tickets */
       applySuspensionLift(cfg);
       applyEnvClosedForm(cfg); // park/weather -> closed form (2026-08-27, Josh's word)
+      applyParkDaily(cfg); // INSTRUCTION 68 (2026-09-17): daily ballpark factor (temp x wind mph x direction x elevation)
+    applyParlayVariety(cfg); // INSTRUCTION 71 (2026-09-17): max 2 legs per game on a ticket, 3x the ticket plan, player cap 5
     }
+    bindParkDaily(engine); // INSTRUCTION 68: the blob's shParkDaily var -> src/lib/mlb/ballpark.ts
   }
   return engine;
 }

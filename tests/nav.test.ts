@@ -44,6 +44,7 @@ function navEntries() {
       tone: /tone: "(#[0-9A-Fa-f]{6})"/.exec(l)?.[1],
       icon: /icon: (Icon\w+)/.exec(l)![1],
       cfbOnly: /cfbOnly: true/.test(l),
+      mlbOnly: /mlbOnly: true/.test(l),
     }));
 }
 
@@ -53,7 +54,8 @@ describe("nav — desktop side rail", () => {
   // (this rewrites the 2026-09-04 pin "Ledger right below Parlay Calc" — Ledger now lives in
   // the bottom group, see the next pin)
   // 2026-09-08 (INSTRUCTION 46): Season Lab appended after Parlay Calc — the eight-entry order above is unchanged ahead of it
-  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc, Season Lab — in that order", () => {
+  // 2026-09-17 (INSTRUCTION 68): Ballpark Factor appended after Season Lab — MLB-only, so on the MLB desk it follows Parlay Calc
+  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc, Season Lab, Ballpark Factor — in that order", () => {
     expect(nav.filter((n) => n.group === "top").map((n) => n.label)).toEqual([
       "Games",
       "Stats",
@@ -64,6 +66,7 @@ describe("nav — desktop side rail", () => {
       "Parlay Builder",
       "Parlay Calc",
       "Season Lab",
+      "Ballpark Factor",
     ]);
     expect(nav.filter((n) => n.group === "top").map((n) => n.href)).toEqual([
       "/games",
@@ -75,6 +78,7 @@ describe("nav — desktop side rail", () => {
       "/props",
       "/calc",
       "/season",
+      "/ballpark",
     ]);
   });
   it("The Sharp and Simulator sit immediately above Parlay Builder", () => {
@@ -140,8 +144,9 @@ describe("nav — mobile (375px)", () => {
     expect(shell).toMatch(/gridTemplateColumns: `repeat\(\$\{NAV\.filter\(\(n\) => n\.mobile\)\.length\}/);
   });
   // 2026-09-08 (INSTRUCTION 46): /season rides the top-bar icon row — 11 pages now
-  it("every route not in the bottom bar is an icon in the mobile top bar (all 11 pages reachable on a phone)", () => {
-    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/season", "/settings"]);
+  // 2026-09-17 (INSTRUCTION 68): /ballpark rides the top-bar icon row too — 12 pages
+  it("every route not in the bottom bar is an icon in the mobile top bar (all 12 pages reachable on a phone)", () => {
+    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/season", "/ballpark", "/settings"]);
     // the header row derives from the same table, so nothing can fall off
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
     expect(header).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
@@ -149,6 +154,21 @@ describe("nav — mobile (375px)", () => {
   });
   it("isActive semantics are unchanged", () => {
     expect(shell).toMatch(/return href === "\/" \? pathname === "\/" : pathname\.startsWith\(href\);/);
+  });
+});
+
+describe("nav — Ballpark Factor (INSTRUCTION 68, 2026-09-17)", () => {
+  const nav = navEntries();
+  it("is an MLB-only rail entry with its own glyph, not a bottom tab, after Season Lab", () => {
+    const bp = nav.find((n) => n.href === "/ballpark")!;
+    expect(bp.label).toBe("Ballpark Factor");
+    expect(bp.icon).toBe("IconPark");
+    expect(bp.mobile).toBe(false);
+    expect(bp.mlbOnly).toBe(true);
+    expect(bp.cfbOnly).toBe(false);
+    expect(nav.indexOf(bp)).toBe(nav.findIndex((n) => n.href === "/season") + 1);
+    expect(fs.readFileSync(path.join(process.cwd(), "src/components/shell/icons.tsx"), "utf8")).toMatch(/export function IconPark\(/);
+    expect(fs.existsSync(path.join(process.cwd(), "app/ballpark/page.tsx"))).toBe(true);
   });
 });
 
@@ -161,11 +181,13 @@ describe("nav — Season Lab (INSTRUCTION 46 fix round, 2026-09-08)", () => {
   });
   it("Season Lab is the only CFB-only entry, and both nav surfaces drop CFB-only entries while the switch is on MLB", () => {
     expect(nav.filter((n) => n.cfbOnly).map((n) => n.href)).toEqual(["/season"]);
-    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly">\) => !n\.cfbOnly \|\| cfb;/);
+    // 2026-09-17 (INSTRUCTION 68): Ballpark Factor is the only MLB-only entry; `shown` gates both
+    expect(nav.filter((n) => n.mlbOnly).map((n) => n.href)).toEqual(["/ballpark"]);
+    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly" \| "mlbOnly">\) => \(!n\.cfbOnly \|\| cfb\) && \(!n\.mlbOnly \|\| sport === "mlb"\);/);
     const rail = shell.slice(shell.indexOf('NAV.filter((n) => n.group === "top")'), shell.indexOf('<div className="flex-1" aria-hidden />'));
     expect(rail).toMatch(/shown\(item\) \? <RailLink/);
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
-    expect(header).toMatch(/shown\(\{ cfbOnly \}\) \? \(/);
+    expect(header).toMatch(/shown\(\{ cfbOnly, mlbOnly \}\) \? \(/);
   });
 });
 
@@ -174,8 +196,8 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
   it("every tab carries a tone hex, and every tone is distinct", () => {
     for (const n of nav) expect(n.tone, n.label).toMatch(/^#[0-9A-F]{6}$/);
     expect(new Set(nav.map((n) => n.tone)).size).toBe(nav.length);
-    // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab)
-    expect(nav.length).toBe(11);
+    // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab); 11 → 12 on 2026-09-17 (INSTRUCTION 68, Ballpark Factor)
+    expect(nav.length).toBe(12);
   });
   it("tones are the agreed palette (Board keeps the lime brand green)", () => {
     expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
@@ -189,6 +211,8 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
       "Parlay Calc": "#5EEAD4",
       // 2026-09-08 (INSTRUCTION 46): the CFB amber, --color-cfb — Season Lab is a CFB-only page
       "Season Lab": "#F5A524",
+      // 2026-09-17 (INSTRUCTION 68): a mint, distinct from the Board's lime — an MLB-only page
+      "Ballpark Factor": "#86EFAC",
       Ledger: "#FDE68A",
       Settings: "#D4D4D8",
     });
@@ -275,9 +299,9 @@ describe("nav — the NFL desk joins the shell (2026-09-08: three desks, one swi
   });
   it("the NFL desk adds no nav entry, and CFB-only entries stay CFB-only (Season Lab is cut for NFL this ship)", () => {
     const nav = navEntries();
-    expect(nav.length).toBe(11);
+    expect(nav.length).toBe(12);
     expect(nav.some((n) => /nfl/i.test(n.href) || /nfl/i.test(n.label))).toBe(false);
     expect(shell).not.toMatch(/nflOnly/);
-    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly">\) => !n\.cfbOnly \|\| cfb;/);
+    expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly" \| "mlbOnly">\) => \(!n\.cfbOnly \|\| cfb\) && \(!n\.mlbOnly \|\| sport === "mlb"\);/);
   });
 });

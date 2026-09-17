@@ -1,6 +1,7 @@
 "use client";
 
 import { PlayerMark } from "./PlayerMark";
+import { clubFromLabel } from "@/lib/mlb-visuals";
 
 import type { ReactNode } from "react";
 import { usePlayerSheet } from "@/components/player/PlayerSheet";
@@ -62,7 +63,19 @@ export function PlayerName({
  */
 export function BoardLabel({ label, className = "", showMark = true }: { label: string; className?: string; showMark?: boolean }) {
   const parsed = parseBoardLabel(label);
-  if (!parsed) return <>{label}</>;
+  if (!parsed) {
+    /* INSTRUCTION 70 (2026-09-17): a club leg ("Detroit Tigers", "Tigers ML") carries the club's own
+       logo — a team pick "only needs a team logo". No club named, no mark: the label stands alone. */
+    const club = showMark ? clubFromLabel(label) : null;
+    return club ? (
+      <>
+        <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={null} team={club} headshot={null} size="sm" /></span>
+        {label}
+      </>
+    ) : (
+      <>{label}</>
+    );
+  }
   return (
     <>
       {showMark && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={parsed.name} team={parsed.team} headshot={null} size="sm" /></span>}

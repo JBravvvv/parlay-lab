@@ -32,8 +32,14 @@ export const ENGINE_SHA = createHash("sha256").update(LEGACY_SRC, "utf8").digest
  * Coors flags, HRR blend λ, venue-K + weather trim on pitchers) is DORMANT behind
  * SH_CFG.envCf — armed at runtime by both generators; fixtures never set it, so every
  * baseline held without a re-cut. Same pending-marker protocol as the side-aware ship. */
+/* SHIP 2026-09-17 (INSTRUCTION 68, Josh: "take into account temperature, elevation, wind mph, wind
+ * in/out/left/right"): bb6be52d… -> 3e9a14e4…, 286,016 -> 286,633 chars. `windNote` consults the daily
+ * ballpark hook `shParkDaily` (src/lib/mlb/ballpark.ts) when SH_CFG.parkDaily is armed — temp x wind mph
+ * x direction x elevation, continuous — and the sim / closed-form hits and TB terms read the hook's h / tb.
+ * DORMANT unless armed (fixtures never arm it; every baseline held without a re-cut). Same pending-marker
+ * protocol as the two ships above. */
 export const SERVED_ENGINE_SHA_VERIFIED =
-  "bb6be52dc0f203d2efe3ae5afeda01f9431687afb58e538e7f6f3cbb5adb8dc5";
+  "52510d67d6c782256a420db334c9606f4e8d57cff79559134cb7027b57ce6a54";
 
 export const sha256Text = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 

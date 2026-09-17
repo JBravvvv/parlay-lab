@@ -18,7 +18,7 @@ import { EvBadge } from "@/components/ui/EvBadge";
 import { ProbBar } from "@/components/ui/ProbBar";
 import { KellyChip } from "@/components/ui/KellyChip";
 import { GradeChip } from "@/components/ui/GradeChip";
-import { gradeFromEv, gradeRank } from "@/lib/grade";
+import { gradeFromEv, gradeRank, gradeSortKey, SETTLED_SINK } from "@/lib/grade";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
@@ -32,6 +32,9 @@ import { useSport } from "@/lib/sport";
 import { CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
 import { NflPicksBoard, NflRefreshPill } from "@/components/nfl/NflPicksBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
+import { MyParlayBar, MyToggle } from "@/components/mlb/MyParlayBar";
+import { useMyParlay } from "@/lib/use-my-parlay";
+import { parseAm, type MyLeg } from "@/lib/my-parlay";
 import { SharpDesk } from "@/components/mlb/SharpDesk";
 import { SimDesk, type SimMarketRow } from "@/components/mlb/SimDesk";
 import { GEN_CREDITS_EST, generatesToday, getMoney, getSelectionMode, SIM_PATHS_TXT, type SelectionMode } from "@/lib/engine-client";
@@ -43,7 +46,7 @@ import { CzInfo } from "@/components/ui/CzInfo";
 import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
-import { BoardLabel, PlayerName } from "@/components/player/PlayerName";
+import { BoardLabel } from "@/components/player/PlayerName";
 import { normalizeName, parseBoardLabel } from "@/lib/player-card";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
@@ -165,6 +168,10 @@ function MlbBoardPage() {
   const selectedBook=useSportsbook();
   const selectedBookName=bookName(selectedBook);
   const basisMode = false; // named sportsbook owns display pricing; paper allocation keeps its saved mode
+  /* INSTRUCTION 71 (2026-09-17): "see the edge % on any parlay that i personally generate/create
+     using the metrics used by the engine" — tapped legs, priced by MyParlayBar with the engine's
+     own ticket arithmetic. Page state only. */
+  const mine = useMyParlay();
   // localStorage only after mount — an initializer read would diverge from the
   // server's "mlb" and trip a hydration mismatch
   const [sport, setSport] = useState<"mlb" | "ufc" | "asg">("mlb");
@@ -478,6 +485,22 @@ function MlbBoardPage() {
   const columns: Column<PickRow>[] = useMemo(
     () => [
       {
+        key: "mine",
+        header: "+",
+        sortValue: (r) => (mine.has(`${r.label}|${r.sub}`) ? 1 : 0),
+        cell: (r) => {
+          const leg: MyLeg = {
+            key: `${r.label}|${r.sub}`,
+            label: r.label,
+            sub: r.sub,
+            gkey: r.gkey ?? null,
+            odds: liveAmOf(r) ?? parseAm(r.czOdds),
+            prob: Number.isFinite(Number(r.prob)) && r.prob != null ? Number(r.prob) : null,
+          };
+          return <MyToggle on={mine.has(leg.key)} onClick={() => mine.toggle(leg)} label={`${r.label} ${r.sub}`} />;
+        },
+      },
+      {
         key: "pick",
         header: "Pick",
         sortValue: (r) => r.label,
@@ -559,11 +582,14 @@ function MlbBoardPage() {
              at gradeRank(null), unchanged. */
           const q = rowQuote(r);
           const v = q ? mlbLiveView(q, legSideOf(r.sub)) : null;
+          /* INSTRUCTION 69: band × 1000 + the row's own EV — see gradeSortKey. A settled leg sinks
+             below every unlettered live row; a market-fair live row orders by its live figure. */
+          const ev0 = basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv);
           return rowSettled(r)
-            ? gradeRank(null)
+            ? gradeRank(null) - SETTLED_SINK
             : v
-              ? gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null)
-              : gradeRank(gradeFromEv(basisMode ? (r.bsEv == null ? null : Number(r.bsEv)) : r.czEv == null ? null : Number(r.czEv)));
+              ? gradeSortKey(gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null), v.ev)
+              : gradeSortKey(gradeRank(gradeFromEv(ev0)), ev0);
         },
         cell: (r) => {
           const s0 = rowSettled(r);
@@ -758,7 +784,7 @@ function MlbBoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut],
+    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut, mine],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
@@ -809,16 +835,35 @@ function MlbBoardPage() {
     return [
       { key: "rank", header: "#", numeric: true, sortValue: (p) => p.rank, cell: (p) => <span className="text-faint">{p.rank}</span> },
       {
+        key: "mine",
+        header: "+",
+        sortValue: (p) => (mine.has(pickKey(p)) ? 1 : 0),
+        cell: (p) => {
+          const mk = p.market && cat === "all" ? `${MARKET_SHORT[p.market] ?? p.market} ` : "";
+          const leg: MyLeg = {
+            key: pickKey(p),
+            label: p.player ?? "",
+            sub: `${mk}${p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}`,
+            gkey: p.gkey,
+            odds: parseAm(p.odds),
+            prob: p.prob == null || !Number.isFinite(Number(p.prob)) ? null : Number(p.prob),
+          };
+          return <MyToggle on={mine.has(leg.key)} onClick={() => mine.toggle(leg)} label={`${leg.label} ${leg.sub}`} />;
+        },
+      },
+      {
         key: "grade",
         header: "Grade",
         sortValue: (p) => {
           const q = pickQuote(p);
           const v = q ? mlbLiveView(q, legSideOf(p.side)) : null;
+          /* INSTRUCTION 69: the same composite key as the live board's Grade column */
+          const edge0 = p.edge == null ? null : Number(p.edge);
           return pickSettled(p)
-            ? gradeRank(null)
+            ? gradeRank(null) - SETTLED_SINK
             : v
-              ? gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null)
-              : gradeRank(gradeFromEv(p.edge == null ? null : Number(p.edge)));
+              ? gradeSortKey(gradeRank(v.pSrc === "sim" ? gradeFromEv(v.ev) : null), v.ev)
+              : gradeSortKey(gradeRank(gradeFromEv(edge0)), edge0);
         },
         cell: (p) => {
           const s0 = pickSettled(p);
@@ -843,7 +888,9 @@ function MlbBoardPage() {
           const side = legSideOf(p.side);
           return (
             <div className={pickOut(p) ? "opacity-50" : undefined}>
-              {p.player ? <PlayerName name={parseBoardLabel(p.player)?.name ?? p.player} team={parseBoardLabel(p.player)?.team ?? null} /> : null}{" "}
+              {/* INSTRUCTION 70 (2026-09-17): headshot + his team's logo on every player pick, the club's
+                  logo on a team pick — BoardLabel draws whichever the label names, never a guess */}
+              {p.player ? <BoardLabel label={p.player} /> : null}{" "}
               <span className="text-muted">
                 {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>
@@ -905,7 +952,7 @@ function MlbBoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt]);
+  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine]);
   const visiblePicksAll = useMemo(
     () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
     [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
@@ -1349,7 +1396,14 @@ function MlbBoardPage() {
           {visiblePicks.length === 0 && needle ? (
             <EmptyState title="No player matches that search" body="Clear the search to see every line in this view." />
           ) : (
-            <DataTable columns={pickColumns} rows={visiblePicks} rowKey={(p) => `${p.market ?? cat}|${p.rank}|${p.player}|${p.line}`} />
+            <DataTable
+              columns={pickColumns}
+              rows={visiblePicks}
+              rowKey={(p) => `${p.market ?? cat}|${p.rank}|${p.player}|${p.line}`}
+              /* INSTRUCTION 69: opens on Grade ▼ (highest → lowest) and returns there on every view change */
+              defaultSort={{ key: "grade", dir: -1 }}
+              resetKey={`${scope}|${cat}|${live}|${selectedBook}`}
+            />
           )}
           {scratchedPicks > 0 && <ScratchedNote n={scratchedPicks} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
           {cz.count > 0 && (
@@ -1374,6 +1428,8 @@ function MlbBoardPage() {
             columns={columns}
             rows={visibleRows}
             rowKey={(r) => `${r.label}|${r.sub}`}
+            defaultSort={{ key: "grade", dir: -1 }}
+            resetKey={`${scope}|${cat}|${live}|${selectedBook}`}
             stagger
             /* a settled row never glows green: the glow is "this is a live edge" (INSTRUCTION 50) */
             /* ...and neither does a re-anchored one: ev-glow signals a MODEL edge, and a live
@@ -1401,8 +1457,11 @@ function MlbBoardPage() {
           live={d.parlaysLive ?? []}
           legNow={legLive}
           legOut={(l) => isOut(l.label, marketOfLkey(l.lkey), l.gkey)}
+          mine={mine}
         />
       )}
+
+      <MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear} />
 
       <SimDesk rows={(d?.simMarkets as SimMarketRow[] | null | undefined) ?? null} />
 
