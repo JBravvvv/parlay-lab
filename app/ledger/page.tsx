@@ -312,7 +312,7 @@ export default function LedgerPage() {
           title="Ledger"
           eyebrow="College Football"
           chip={<CfbChip />}
-          sub="Locked CFB paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
+          sub="Locked CFB paper cards only — append-only, its own bank and its own ledger, graded from final scores at the DraftKings line."
           action={<CfbLedgerActions />}
         />
         <CfbLedger />
@@ -328,7 +328,7 @@ export default function LedgerPage() {
           title="Ledger"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="Locked NFL paper cards only — append-only, its own bank and its own ledger, graded from final scores at the Caesars line."
+          sub="Locked NFL paper cards only — append-only, its own bank and its own ledger, graded from final scores at the DraftKings line."
           action={<NflLedgerActions />}
         />
         <NflLedger />
@@ -488,7 +488,7 @@ function MlbLedgerPage() {
     <>
       <PageHeader
         title="Ledger"
-        sub={`Locked cards only, since ${api.seed} — append-only, auto-graded from official MLB box scores under Caesars void rules.`}
+        sub={`Locked cards only, since ${api.seed} — append-only, auto-graded from official MLB box scores under DraftKings void rules.`}
         action={
           <div className="flex gap-2">
             <Pill variant="primary" onClick={doGrade} disabled={grading || empty}>
@@ -719,7 +719,7 @@ function MlbLedgerPage() {
       )}
 
       <div className="mt-6 text-[10.5px] text-faint">
-        CLV compares your locked price to the last Caesars price seen before first pitch — the true closing
+        CLV compares your locked price to the last DraftKings price seen before first pitch (Caesars for cards locked before 2026-09-17) — the true closing
         line isn&apos;t visible without paid odds history, so coverage is disclosed. Informational only.
       </div>
     </>

@@ -45,9 +45,10 @@ vi.mock("@/lib/server/store", () => ({
 import { cronHeaderAuthed, redis, storeEnv, syncAuthed } from "@/lib/server/store";
 import { GET } from "../app/api/mlb/live-props/route";
 import { DH_AMBIGUITY_MS, bridgeEvent, mlbLivePropsGet, sightLiveQuote } from "@/lib/server/mlb-live-quote";
+import { swapSettleBook } from "./helpers/settle-book";
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "mlb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ODDS = readJson("odds-event-live-props.synthetic.json") as {
   _note: string;
   eventsList: { id: string; commence_time: string; away_team: string; home_team: string }[];
@@ -744,13 +745,13 @@ describe("sightLiveQuote", () => {
   });
 
   it("settles on Caesars: the settle book decides the tie and owns czAm", () => {
-    expect(MLB_LIVE_PROPS.settleBook).toBe("williamhill_us");
+    expect(MLB_LIVE_PROPS.settleBook).toBe("draftkings");
     const s = sightLiveQuote(ev(), "juansoto", "batter_hits_runs_rbis", cfg);
     expect(s?.ln).toBe(2.5);
     expect(s?.czAm).toBe(128);
     expect(s?.oppAm).toBe(-158);
     // with a different settle book the tie breaks elsewhere — the rule is the book, not the number
-    const dkSettles = sightLiveQuote(ev(), "juansoto", "batter_hits_runs_rbis", { ...cfg, settleBook: "draftkings" });
+    const dkSettles = sightLiveQuote(ev(), "juansoto", "batter_hits_runs_rbis", { ...cfg, settleBook: "williamhill_us" });
     expect(dkSettles?.ln).toBe(1.5);
     expect(dkSettles?.czAm).toBe(-138);
   });

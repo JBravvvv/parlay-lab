@@ -176,7 +176,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
           {kellyGap && (
             <span
               className="num rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
-              title="¼-Kelly stake at this ticket's probability and Caesars price (2%-of-bankroll cap) — the bankroll-growth-consistent size"
+              title="¼-Kelly stake at this ticket's probability and DraftKings price (2%-of-bankroll cap) — the bankroll-growth-consistent size"
             >
               Kelly {fmtMoney(kelly)}
             </span>
@@ -194,7 +194,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
           {czTax != null && (
             <span
               className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[10.5px] text-muted"
-              title="Informational: EV at the Caesars price, and the tax vs the DK/FD basis — you settle at CZ/NV, selection never sees it"
+              title="Informational: EV at the DraftKings price, and the tax vs the DK/FD basis — you settle at DK, selection never sees it"
             >
               @CZ {Number(t.czEv) >= 0 ? "+" : ""}{Number(t.czEv).toFixed(1)}% · tax {czTax >= 0 ? "+" : ""}{czTax.toFixed(1)}%
             </span>
@@ -228,7 +228,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
               {(l as { lu?: string }).lu === "projected" && (
                 <span
                   className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold text-gold"
-                  title="Lineup not posted yet — projected everyday starter; Caesars auto-voids the leg if he sits"
+                  title="Lineup not posted yet — projected everyday starter; DraftKings auto-voids the leg if he sits"
                 >
                   PROJ
                 </span>
@@ -308,7 +308,7 @@ function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
       <div className="num mt-1 text-[12px] text-text">
         <b>{rows.length}</b> {rows.length === 1 ? "ticket" : "tickets"} had your edge and were stopped
         {order.map((r) => ` · ${counts[r]} ${BLOCK_LABEL[r] || r}`).join("")}
-        {best !== null ? <span className="text-muted"> (best refused: +{best}% EV at Caesars)</span> : null}
+        {best !== null ? <span className="text-muted"> (best refused: +{best}% EV at DraftKings)</span> : null}
       </div>
       {counts.consensus ? (
         <div className="mt-1 text-[10.5px] leading-relaxed text-faint">
@@ -660,10 +660,10 @@ function MlbBuilderPage() {
         title="Builder"
         sub={
           sport === "ufc"
-            ? "UFC — build any parlay from the card's Caesars moneylines, priced against market consensus"
+            ? "UFC — build any parlay from the card's DraftKings moneylines, priced against market consensus"
             : sport === "asg"
             ? "All-Star Game — a sized card of STRAIGHT bets (Caesars NV takes no ASG parlays)"
-            : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at Caesars"
+            : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at DraftKings"
         }
       />
       <PaperBanner />
@@ -710,7 +710,7 @@ function MlbBuilderPage() {
       )}
       {!locked && czCover && (
         <div className={`num mb-4 text-[11.5px] ${czCover.have < czCover.total ? "text-gold" : "text-muted"}`}>
-          Caesars props live for {czCover.have} of {czCover.total} games right now
+          DraftKings props live for {czCover.have} of {czCover.total} games right now
           {czCover.have < czCover.total &&
             " — the rest usually post closer to first pitch. If you're generating early, regenerate right before locking so the card can cover the whole day."}
         </div>
@@ -890,7 +890,7 @@ function MlbBuilderPage() {
           {card.alloc.noPlay && money.daily > 0 && (
             <Panel>
               <div className="space-y-3 py-2 text-center">
-                <div className="text-[15px] font-semibold text-text">No positive-EV core card at Caesars today</div>
+                <div className="text-[15px] font-semibold text-text">No positive-EV core card at DraftKings today</div>
                 <div className="text-[12px] text-muted">
                   Recommended stake <span className="num font-bold text-text">$0</span>. Zero edge means zero stake — passing is a
                   position, and it costs nothing. Fun bucket unaffected.
@@ -971,7 +971,7 @@ function MlbBuilderPage() {
                   </span>
                   {gatePct != null && (
                     <span
-                      title={`Core tickets must clear +${gatePct}% EV at the selection price (${basisMode ? "DK/FD basis" : "Caesars"}) — below the gate is a NO-PLAY, not a smaller bet`}
+                      title={`Core tickets must clear +${gatePct}% EV at the selection price (${basisMode ? "DK/FD basis" : "DraftKings"}) — below the gate is a NO-PLAY, not a smaller bet`}
                     >
                       gate: <b className="text-text">+{gatePct}% EV min</b>
                     </span>

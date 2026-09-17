@@ -411,6 +411,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 function emptyBoard(date: string, now: number, over: Partial<MlbLiveQuoteBoard>): MlbLiveQuoteBoard {
   return {
     date,
+    settleBook: MLB_LIVE_PROPS.settleBook,
     generatedAt: iso(now),
     events: 0,
     fetched: 0,
@@ -785,6 +786,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
 
   const board: MlbLiveQuoteBoard = {
     date,
+    settleBook: MLB_LIVE_PROPS.settleBook,
     generatedAt: iso(now),
     /* WHICH PASS BOUGHT THESE PRICES — the slot `forwardMlbLivePull` has always sent and nothing
        read until the fix pass. "manual" is Josh's tap; null is a direct browser read. */

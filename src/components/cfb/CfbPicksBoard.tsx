@@ -553,8 +553,8 @@ export function CfbPicksBoard() {
                   : propsQ.data.budgeted
                     ? " · today's props budget is used up — more games price again tomorrow"
                     : ""}
-                {selectedBook === "Caesars" && propsQ.data.czMissing
-                  ? ` · ${propsQ.data.czMissing} game${propsQ.data.czMissing === 1 ? "" : "s"} post player props at other books but no Caesars line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff`
+                {selectedBook === "DraftKings" && propsQ.data.czMissing
+                  ? ` · ${propsQ.data.czMissing} game${propsQ.data.czMissing === 1 ? "" : "s"} post player props at other books but no DraftKings line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff`
                   : ""}
                 {propsQ.data.noProps ? ` · ${propsQ.data.noProps} game${propsQ.data.noProps === 1 ? "" : "s"} on the slate ha${propsQ.data.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""}
               </span>

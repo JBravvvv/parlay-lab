@@ -126,7 +126,7 @@ async function fetchEspnCard(): Promise<{ eventName: string | null; bouts: EspnB
 }
 
 /* ---------- assembly ---------- */
-function sideFromBooks(ev: OddsEvent, fighter: string, book = "williamhill_us"): UfcSide {
+function sideFromBooks(ev: OddsEvent, fighter: string, book = "draftkings"): UfcSide {
   const probs: number[] = [];
   let czOdds: number | null = null;
   let bestOdds: number | null = null;
@@ -199,7 +199,7 @@ function buildTickets(fights: UfcFight[], bankroll: number): UfcTicket[] {
 
   const t1 = ticket(
     "VALUE DOUBLE",
-    "The two best Caesars prices vs the market consensus — the closest thing to +EV on this card.",
+    "The two best DraftKings prices vs the market consensus — the closest thing to +EV on this card.",
     byEv.slice(0, 2).map((s) => s.leg),
     bankroll,
   );

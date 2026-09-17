@@ -9,6 +9,7 @@ import { CFB_PROPS_ODDS_MARKETS, CFB_PROP_MARKETS, type CfbPropRow } from "@/lib
 import { CFB_PROPS } from "@/lib/cfb/rules";
 import { CFB_PROPS_STALE_MS, cfbPropsQueryKey } from "@/lib/cfb/client";
 import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * CFB PLAYER PROPS (INSTRUCTION 39, 2026-09-05) on a SYNTHETIC per-event payload
@@ -19,7 +20,7 @@ import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
  */
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-05.json") as { events: unknown[] };
 const ODDS = readJson("odds-ncaaf-2026-09-05.json") as unknown[];
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -66,7 +67,7 @@ describe("the contract", () => {
       czMissingWindowSec: 4 * 3600,
       regions: "us",
       minBooks: 2,
-      settleBook: "williamhill_us",
+      settleBook: "draftkings",
       dailyBudget: 2500,
       measuredCreditsPerEvent: 31,
       /* INSTRUCTION 52 (2026-09-12, Josh verbatim: "I've always had in game live lines. It has live
@@ -146,12 +147,12 @@ describe("parseEventProps — pricing", () => {
   });
   it("quotes Caesars at ITS OWN line; a line no second book posts has a price but no EV, grade or Kelly", () => {
     const r = find("pass_yds", "Ty Simpson", "over");
-    expect(r.cz).toEqual({ book: "williamhill_us", title: "Caesars", price: -110, line: 249.5, dec: expect.closeTo(1.909091, 5) });
+    expect(r.cz).toEqual({ book: "draftkings", title: "DraftKings", price: -110, line: 249.5, dec: expect.closeTo(1.909091, 5) });
     expect(r.evCz).toBeNull();
     expect(r.grade).toBeNull();
     expect(r.playable).toBe(true);
     expect(r.kelly).toBe(0);
-    expect(r.dk?.line).toBe(245.5);
+    expect(r.quotes?.williamhill_us?.line).toBe(245.5); // the swapped fixture: the old DK quote sits under williamhill_us
     expect(r.fd?.line).toBe(245.5);
   });
   it("best = highest decimal among the books at the consensus line, with EV there", () => {
@@ -160,7 +161,7 @@ describe("parseEventProps — pricing", () => {
     expect(r.best?.book).toBe("betmgm");
     expect(r.evBest).toBeCloseTo(-2.89, 2);
     const u = find("pass_yds", "Ty Simpson", "under");
-    expect(u.best?.book).toBe("draftkings"); // DK -105 is the best under at 245.5
+    expect(u.best?.book).toBe("williamhill_us"); // the old DK -105 (under williamhill_us in the swapped fixture) is the best under at 245.5
     expect(u.evBest).toBeCloseTo(-4.07, 2);
   });
   it("EV at Caesars uses the fair at Caesars' line, then grades it", () => {
@@ -222,7 +223,7 @@ describe("parseEventProps — pricing", () => {
         { name: "Over", description: "A B", price: over, point: 245.5 },
         { name: "Under", description: "A B", price: under, point: 245.5 } ] }],
     });
-    const payload = { id: "x", bookmakers: [ou("williamhill_us", "Caesars", -130, 100), ou("draftkings", "DraftKings", -105, -115)] };
+    const payload = { id: "x", bookmakers: [ou("draftkings", "DraftKings", -130, 100), ou("williamhill_us", "Caesars", -105, -115)] };
     const two = parseEventProps(payload, ala, { now: NOW, bankroll: 2500 });
     const o = two.find((r) => r.side === "over") as CfbPropRow;
     const u = two.find((r) => r.side === "under") as CfbPropRow;
@@ -233,7 +234,7 @@ describe("parseEventProps — pricing", () => {
     expect(o.evCz).toBeCloseTo(-9.79, 2);
     expect(u.evCz).toBeCloseTo(-1.98, 2);
     // mirror the quotes (swap Over/Under prices) → the grades mirror exactly; the estimator has no side
-    const mirrored = { id: "x", bookmakers: [ou("williamhill_us", "Caesars", 100, -130), ou("draftkings", "DraftKings", -115, -105)] };
+    const mirrored = { id: "x", bookmakers: [ou("draftkings", "DraftKings", 100, -130), ou("williamhill_us", "Caesars", -115, -105)] };
     const m = parseEventProps(mirrored, ala, { now: NOW, bankroll: 2500 });
     const mo = m.find((r) => r.side === "over") as CfbPropRow;
     const mu = m.find((r) => r.side === "under") as CfbPropRow;
@@ -262,9 +263,9 @@ describe("parseEventProps — pricing", () => {
     const mk = (cz: number) => ({
       id: "x",
       bookmakers: [
-        { key: "williamhill_us", title: "Caesars", markets: [{ key: "player_receptions", outcomes: [
-          { name: "Over", description: "A B", price: cz, point: 4.5 }, { name: "Under", description: "A B", price: -110, point: 4.5 } ] }] },
         { key: "draftkings", title: "DraftKings", markets: [{ key: "player_receptions", outcomes: [
+          { name: "Over", description: "A B", price: cz, point: 4.5 }, { name: "Under", description: "A B", price: -110, point: 4.5 } ] }] },
+        { key: "williamhill_us", title: "Caesars", markets: [{ key: "player_receptions", outcomes: [
           { name: "Over", description: "A B", price: -110, point: 4.5 }, { name: "Under", description: "A B", price: -110, point: 4.5 } ] }] },
         { key: "fanduel", title: "FanDuel", markets: [{ key: "player_receptions", outcomes: [
           { name: "Over", description: "A B", price: -110, point: 4.5 }, { name: "Under", description: "A B", price: -110, point: 4.5 } ] }] },

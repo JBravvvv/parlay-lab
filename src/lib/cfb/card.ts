@@ -344,7 +344,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
       if (d.dec < R.fun.minDec) notes.push(`Fun: the ${name.toLowerCase()} pays ${d.dec.toFixed(2)} — under the ${R.fun.minDec}× target with the slate's ${legs.length} likeliest grade-D-or-better sides.`);
     }
   } else {
-    notes.push(`Fun: no fun parlay — only ${legs.length} playable side${legs.length === 1 ? "" : "s"} grade D or better at Caesars (need ${R.fun.legs.min}).`);
+    notes.push(`Fun: no fun parlay — only ${legs.length} playable side${legs.length === 1 ? "" : "s"} grade D or better at DraftKings (need ${R.fun.legs.min}).`);
   }
 
   /* ---------- THE VERDICT ---------- */
@@ -355,7 +355,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
      read it by index (`buildCfbLockEntry`, `buildCfbSweepEntry` in src/lib/cfb/lock-server.ts). */
   const noPlay = !core.length && !funT.length;
   if (!bestRows.length && !sundayPaper) {
-    const gate = `no playable side clears +${R.minEvPct}% EV at Caesars under ${R.maxDec.toFixed(2)} (${playable.length} priced sides on ${board.games.length} games)`;
+    const gate = `no playable side clears +${R.minEvPct}% EV at DraftKings under ${R.maxDec.toFixed(2)} (${playable.length} priced sides on ${board.games.length} games)`;
     notes.unshift(
       noPlay
         ? `NO-PLAY — ${gate}. Nothing staked.`

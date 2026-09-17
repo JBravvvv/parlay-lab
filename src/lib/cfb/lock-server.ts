@@ -211,7 +211,7 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 function missedWindowCard(board: CfbBoard, total: number, cause: CfbMissCause = "no-lock"): CfbCard {
   const note =
     cause === "odds-gap"
-      ? `NO-PLAY — the day went unpriced: all ${plural(total, "game")} on ${board.date} kicked off with no Caesars price ever available on the games still ahead, so the server refused rather than stake a card it could not price. Nothing staked.`
+      ? `NO-PLAY — the day went unpriced: all ${plural(total, "game")} on ${board.date} kicked off with no DraftKings price ever available on the games still ahead, so the server refused rather than stake a card it could not price. Nothing staked.`
       : `NO-PLAY — lock window missed: every one of the ${plural(total, "game")} on ${board.date} had kicked off before the server could lock. Nothing staked; no line that was already gone was priced.`;
   return { date: board.date, core: [], funT: [], coreSum: 0, funSum: 0, noPlay: true, notes: [note], benched: [] };
 }
@@ -282,7 +282,7 @@ export function buildSweepEntry(cfg: LeagueConfig, board: CfbBoard, opts: SweepE
      instead of naming a cause nothing verified. */
   const tail =
     cause === "odds-gap"
-      ? `Recorded by the sweep — swept on the following day's poke: ${board.date} was poked inside its lock window and every poke refused, because no Caesars price was ever available on the games still ahead. The day was lost to the odds feed, not to a gap in the ticker.`
+      ? `Recorded by the sweep — swept on the following day's poke: ${board.date} was poked inside its lock window and every poke refused, because no DraftKings price was ever available on the games still ahead. The day was lost to the odds feed, not to a gap in the ticker.`
       : `Recorded by the sweep — swept on the following day's poke: no lock ever landed for ${board.date} and no odds-outage refusal was recorded for it, so the day is recorded as missed rather than left silent.`;
   const entry: CfbLedgerEntry = {
     ...lockCfbCard(card, board, opts.now, cfg),

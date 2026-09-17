@@ -9,6 +9,7 @@ import type { CfbBoard, CfbGame } from "@/lib/cfb/types";
 import type { CfbParlay, CfbPropRow } from "@/lib/cfb/props-types";
 import { gradeFromEv, gradeRank } from "@/lib/grade";
 import { amToDec, decToAm } from "@/lib/ticket-math";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * THE CFB PICKS + PARLAYS ENGINE (2026-09-05): categories and the three parlay views under
@@ -22,7 +23,7 @@ import { amToDec, decToAm } from "@/lib/ticket-math";
  */
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const NOW = Date.parse("2026-09-05T12:00:00Z");
 const DATE = "2026-09-05";
 const OPTS = { now: NOW, bankroll: 2500 };
@@ -56,7 +57,7 @@ function syntheticProps(board: CfbBoard): CfbPropRow[] {
   return SPECS.map((s) => {
     const g = games[s.g % games.length];
     const dec = s.cz === 0 ? null : amToDec(s.cz);
-    const cz = dec == null ? null : { book: "williamhill_us", title: "Caesars", price: s.cz, line: s.line, dec };
+    const cz = dec == null ? null : { book: "draftkings", title: "DraftKings", price: s.cz, line: s.line, dec };
     const ev = dec == null ? null : evPct(s.fair, 0, dec);
     return {
       key: `${g.id}|${s.market}|${s.player.toLowerCase().replace(/\s+/g, "-")}|${s.side}|${s.line ?? ""}`,
@@ -158,8 +159,8 @@ function oddsEvent(i: number, books: Book[], commence = "2026-09-05T16:00:00Z") 
     grade about −4.5 % (pure vig) and never qualify, so the SPREAD / TOTAL sets had nothing to build from. */
 const favEdge: Book[] = [
   { key: "pinnacle", title: "Pinnacle", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-  { key: "draftkings", title: "DraftKings", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-  { key: "williamhill_us", title: "Caesars", h2h: [-180, 150], spread: [-6.5, 100, 100], total: [50.5, 100, 100] },
+  { key: "williamhill_us", title: "Caesars", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+  { key: "draftkings", title: "DraftKings", h2h: [-180, 150], spread: [-6.5, 100, 100], total: [50.5, 100, 100] },
 ];
 function synthBoard(n: number): CfbBoard {
   const idx = Array.from({ length: n }, (_, i) => i + 1);
@@ -681,7 +682,7 @@ function scaledProps(board: CfbBoard, liveIds: Set<string>): CfbPropRow[] {
           const fair = side === "under" ? 1 - fairOver : fairOver;
           // Caesars' price: the fair price nudged ±6 % so the EV spreads across the grades
           const dec = Math.max(1.05, (1 / fair) * (0.94 + rnd() * 0.12));
-          const cz = { book: "williamhill_us", title: "Caesars", price: decToAm(Math.round(dec * 1000) / 1000), line, dec };
+          const cz = { book: "draftkings", title: "DraftKings", price: decToAm(Math.round(dec * 1000) / 1000), line, dec };
           const ev = evPct(fair, 0, dec);
           const live = liveIds.has(g.id);
           rows.push({
@@ -851,7 +852,7 @@ function atdSlate(): { board: CfbBoard; rows: CfbPropRow[] } {
       const fair = 0.13 + ((gi * 7 + pi * 5) % 10) * 0.05; // 0.13 … 0.58
       const dec = (1 + ev / 100) / fair;
       const player = `P${pi} ${g.home.abbr}`;
-      const cz = { book: "williamhill_us", title: "Caesars", price: decToAm(dec), line: null, dec };
+      const cz = { book: "draftkings", title: "DraftKings", price: decToAm(dec), line: null, dec };
       const evCz = evPct(fair, 0, dec);
       rows.push({
         key: `${g.id}|anytime_td|${player.toLowerCase().replace(/\s+/g, "-")}|yes|`,

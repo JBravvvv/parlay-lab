@@ -1,6 +1,6 @@
 import {EXTRA_BATTER_MARKETS} from "@/lib/mlb/browse-markets";
 import type {BoardData,PickRow,PropBoardRow,Ticket,TicketLeg} from '@/engine';
-import {american,DEFAULT_BOOK,bookKey,bookName,decimal,validAm,valueAt} from './books';
+import {american,DEFAULT_BOOK,SETTLE_BOOK,bookKey,bookName,decimal,validAm,valueAt} from './books';
 import {decToAm} from '@/lib/ticket-math';
 export type BookQuote={am:number;line:number|null;book:string;at?:string};
 export type QuoteIndex=Record<string,Record<string,BookQuote>>;
@@ -13,7 +13,7 @@ export function quoteCapture(){
  return {events, capture(body:unknown){for(const e of Array.isArray(body)?body:[body]){if(!e||typeof e!=='object'||!Array.isArray(e.bookmakers)||!e.id)continue;const prior=events.get(e.id);events.set(e.id,prior?{...e,bookmakers:[...prior.bookmakers,...e.bookmakers]}:e);}},clear(){events.clear();}};
 }
 /** Add quote provenance outside the parity-locked engine. No selection fields change. */
-export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>):BoardData {
+export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>,settlementBook:string=SETTLE_BOOK):BoardData {
  const index:QuoteIndex={};
  const rawEvents=[...events];
  const rows=[...Object.values(data.categories??{}).flat(),...Object.values(data.categoriesLive??{}).flat()];
@@ -51,7 +51,7 @@ export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>):Boar
     const best=(q:Record<string,BookQuote>)=>Object.values(q).sort((a,b)=>decimal(b.am)-decimal(a.am))[0];
     const bo=best(o),bu=best(u);
     const tm=Object.values(existing?.markets??{}).flat().find(r=>norm(r.p)===norm(p.name))?.tm??null;
-    return {p:p.name,tm,ln:p.line,lkey,o:bo?.am??null,u:bu?.am??null,oBook:bo?bookName(bo.book):null,uBook:bu?bookName(bu.book):null,cz:{o:o[DEFAULT_BOOK]?.am??null,u:u[DEFAULT_BOOK]?.am??null},pO:null,fO:fair.length?(fair[Math.floor((fair.length-1)/2)]+fair[Math.floor(fair.length/2)])/2:null,books:fair.length};
+    return {p:p.name,tm,ln:p.line,lkey,o:bo?.am??null,u:bu?.am??null,oBook:bo?bookName(bo.book):null,uBook:bu?bookName(bu.book):null,cz:{o:o[settlementBook]?.am??null,u:u[settlementBook]?.am??null},pO:null,fO:fair.length?(fair[Math.floor((fair.length-1)/2)]+fair[Math.floor(fair.length/2)])/2:null,books:fair.length};
    });
   }
   if(existing) browse[browse.indexOf(existing)]={...existing,markets};
@@ -59,7 +59,7 @@ export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>):Boar
  }
  const propBoard=browse.map(g=>({
   ...g, markets:Object.fromEntries(Object.entries(g.markets).map(([m,rs])=>[m,
-   rs.map(r=>({...r,bookQuotes:{o:index[`${g.gkey}|${r.lkey}|o`]??{},u:index[`${g.gkey}|${r.lkey}|u`]??{}}}))
+   rs.map(r=>({...r,settlementBook,bookQuotes:{o:index[`${g.gkey}|${r.lkey}|o`]??{},u:index[`${g.gkey}|${r.lkey}|u`]??{}}}))
   ]))
  }));
  const simMarkets=(data.simMarkets as SimMarket[]|undefined)?.map(r=>{
@@ -68,17 +68,19 @@ export function attachBookQuotes(data:BoardData,events:Iterable<EventOdds>):Boar
   for(const b of e?.bookmakers??[])for(const m of b.markets){if(m.key!=='totals')continue;const o=m.outcomes.find(o=>o.name==='Over'),u=m.outcomes.find(o=>o.name==='Under');if(o&&u&&o.point!=null&&u.point===o.point)quotes[b.key]={pt:o.point,o:o.price,u:u.price};}
   return {...r,bookTotals:quotes};
  });
- return {...data,bookQuotes:index,propBoard,...(simMarkets?{simMarkets}:{})};
+ const stamp=(cs:Record<string,PickRow[]>|undefined)=>Object.fromEntries(Object.entries(cs??{}).map(([k,rs])=>[k,rs.map(r=>({...r,settlementBook}))]));
+ return {...data,settlementBook,categories:stamp(data.categories),...(data.categoriesLive?{categoriesLive:stamp(data.categoriesLive)}:{}),bookQuotes:index,propBoard,...(simMarkets?{simMarkets}:{})};
 }
 function knownPrice(r:PickRow,book:string,index:QuoteIndex):number|null{
  const side=under(r.sub)?'u':'o';const q=index[`${r.gkey}|${r.lkey}|${side}`]?.[book];if(q)return q.am;
- if(book===DEFAULT_BOOK)return american(r.czOdds)??american(r.cz);
+ // `cz` is the quote at the board's settlement book; a board stamped before INSTRUCTION 67 (2026-09-17) was priced at Caesars
+ if(book===(r.settlementBook??'williamhill_us'))return american(r.czOdds)??american(r.cz);
  if(bookKey(r.bsBook)===book&&validAm(r.bs))return r.bs;
  if(bookKey(r.book)===book)return american(r.odds);
  return null;
 }
 export function priceMlbRow(r:PickRow,book:string,index:QuoteIndex={}):PickRow{
- if(book===DEFAULT_BOOK)return r;const am=knownPrice(r,book,index);const p=r.prob==null?null:r.prob/100;const v=valueAt(p,am);
+ if(book===(r.settlementBook??'williamhill_us'))return r;const am=knownPrice(r,book,index);const p=r.prob==null?null:r.prob/100;const v=valueAt(p,am);
  const opp=r.opp as {lkey?:string;sub?:string;prob?:number;cz?:unknown;label?:string}|undefined;
  const oppAm=opp?.lkey?index[`${r.gkey}|${opp.lkey}|o`]?.[book]?.am??null:null;
  return {...r,displayBook:book,bestDisplayOdds:r.odds,bestDisplayBook:r.book,...(opp?{opp:{...opp,cz:oppAm}}:{}),odds:am??undefined,book:bookName(book),ev:v.ev,edge:v.edge,czOdds:am,czEv:v.ev,czEdge:v.edge,cz:am as PickRow['cz'],czBadge:am!=null&&v.ev!=null&&v.ev>0,czKellyF:null,
@@ -86,7 +88,7 @@ export function priceMlbRow(r:PickRow,book:string,index:QuoteIndex={}):PickRow{
  bs:am,bsOdds:am==null?null:String(am),bsBook:bookName(book),bsEv:v.ev,bsKellyF:null,bsBadge:am!=null&&v.ev!=null&&v.ev>0};
 }
 export function priceMlbProp(r:PropBoardRow,book:string):PropBoardRow{
- if(book===DEFAULT_BOOK)return {...r,displayBook:book,o:r.cz?.o??null,u:r.cz?.u??null,oBook:r.cz?.o!=null?'Caesars':null,uBook:r.cz?.u!=null?'Caesars':null};
+ if(book===(r.settlementBook??'williamhill_us'))return {...r,displayBook:book,o:r.cz?.o??null,u:r.cz?.u??null,oBook:r.cz?.o!=null?bookName(book):null,uBook:r.cz?.u!=null?bookName(book):null};
  const qs=r.bookQuotes;
  const pick=(side:'o'|'u')=>qs?.[side]?.[book]?.am??(bookKey(side==='o'?r.oBook:r.uBook)===book?(side==='o'?r.o:r.u):null);
  const o=pick('o'),u=pick('u');
@@ -95,7 +97,8 @@ export function priceMlbProp(r:PropBoardRow,book:string):PropBoardRow{
 type SimMarket=import("@/components/mlb/SimDesk").SimMarketRow & {bookTotals?:Record<string,{pt:number;o:number;u:number}>};
 const percentFraction=(v:number|null)=>v==null?null:v/100;
 export function priceMlbBoard(data:BoardData,book:string):BoardData{
- if(book===DEFAULT_BOOK)return {...data,propBoard:data.propBoard?.map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,book))]))}))};const index=(data.bookQuotes??{}) as QuoteIndex;
+ // a board is served as-is only at the book it was priced at; a Caesars-stamped (pre-2026-09-17) cache is repriced at DraftKings from the quote index
+ if(book===(data.settlementBook??'williamhill_us'))return {...data,propBoard:data.propBoard?.map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,book))]))}))};const index=(data.bookQuotes??{}) as QuoteIndex;
  const cats=(cs:Record<string,PickRow[]>|undefined)=>Object.fromEntries(Object.entries(cs??{}).map(([k,rs])=>[k,rs.map(r=>priceMlbRow(r,book,index)).sort((a,b)=>(b.czEv??-Infinity)-(a.czEv??-Infinity))]));
  const rows=Object.values(data.categories).flat();
  const ticket=(t:Ticket):Ticket=>{const legs=t.legs.map(l=>{const r=rows.find(r=>r.gkey===l.gkey&&r.lkey===l.lkey&&under(r.sub)===under(l.prop));const am=r?knownPrice(r,book,index):index[`${l.gkey}|${l.lkey}|${under(l.prop)?'u':'o'}`]?.[book]?.am??null;return {...l,cz:am,bs:am,bsBook:bookName(book),book:bookName(book)};});const d=legs.length&&legs.every(l=>validAm(l.cz))?legs.reduce((n,l)=>n*decimal(l.cz!),1):null;const ev=d!=null&&t.prob!=null?100*(t.prob/100*d-1):null;return {...t,displayBook:book,legs,czDec:d,czOdds:d==null?null:decToAm(d),czEv:ev,bsDec:d,bsEv:ev,bsOdds:d==null?null:String(decToAm(d))};};
@@ -103,7 +106,7 @@ export function priceMlbBoard(data:BoardData,book:string):BoardData{
  return {...data,trap:undefined,passes:[],overview:undefined,...(simMarkets?{simMarkets}:{}),categories:cats(data.categories),categoriesLive:cats(data.categoriesLive),parlays:data.parlays.map(ticket),parlaysMixed:data.parlaysMixed.map(ticket),parlaysLive:data.parlaysLive?.map(ticket),propBoard:data.propBoard?.map(g=>({...g,markets:Object.fromEntries(Object.entries(g.markets).map(([k,rs])=>[k,rs.map(r=>priceMlbProp(r,book))]))}))};
 }
 
-/** Games shows one named sportsbook, including when Caesars is the default. */
+/** Games shows one named sportsbook, including when it is the settlement book. */
 export function priceMlbMoneylines(data:BoardData,book:string){
  const index=(data.bookQuotes??{}) as QuoteIndex;
  return (data.categories.ml??[]).map(r=>{const am=knownPrice(r,book,index);return {...r,odds:am??undefined,cz:am as PickRow["cz"],book:bookName(book)};});

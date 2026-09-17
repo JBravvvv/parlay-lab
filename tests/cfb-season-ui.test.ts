@@ -134,6 +134,6 @@ describe("Season Lab — renders", () => {
     expect(legs).toHaveLength(1);
     expect(legs[0].label).toBe("Ty Simpson Pass Yds O 3,250.5");
     expect(legs[0].inputs).toBe("5 G / 271.4 per G / 12 games / proj 3,257");
-    expect(legs[0].book).toBe("Caesars");
+    expect(legs[0].book).toBe("DraftKings");
   });
 });

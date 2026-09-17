@@ -192,7 +192,7 @@ export function ProScoreboard({ entries }: { entries: LedgerEntry[] }) {
         )}
 
         <p className="mt-3 text-[10.5px] leading-relaxed text-faint">
-          CLV = de-vigged cross-book closing probability minus the probability implied by your locked Caesars price
+          CLV = de-vigged cross-book closing probability minus the probability implied by your locked DraftKings price
           (positive = you consistently beat the close — the strongest known predictor of long-term betting profit).
           Coverage grows as the prop-snapshot archive accumulates (it started 2026-07-12; earlier days can&apos;t be
           scored). Calibration within ±10 points of predicted is healthy. Under ~500 graded tickets, win rate and ROI

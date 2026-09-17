@@ -145,7 +145,7 @@ export const MLB_LIVE_PROPS = {
   regions: "us",
   /** a lone book's in-play line is not a market */
   minBooks: 2,
-  settleBook: "williamhill_us",
+  settleBook: "draftkings",
   /** credits this route may spend per Pacific day — NEW, its own counter, lowers nothing */
   dailyBudget: 600,
   /** the MLB band 5.114-5.845 rounded UP. NOT CFB's 31. */

@@ -53,7 +53,7 @@ function coverage(games: CfbGame[]): Coverage[] {
   const has = (g: CfbGame, k: Coverage["key"]) => g.rows.some((r) => r[k] != null);
   const count = (k: Coverage["key"]) => games.filter((g) => has(g, k)).length;
   return [
-    { key: "cz", label: "Caesars", games: count("cz") },
+    { key: "cz", label: "DraftKings", games: count("cz") },
     { key: "dk", label: "DraftKings", games: count("dk") },
     { key: "fd", label: "FanDuel", games: count("fd") },
     { key: "pin", label: "Pinnacle", games: count("pin") },

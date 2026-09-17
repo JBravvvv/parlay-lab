@@ -69,7 +69,7 @@ function SelectionCalibrationPanel() {
             True probability
           </Pill>
           <Pill variant={mode === "caesars_ev" ? "primary" : "ghost"} onClick={() => flipMode("caesars_ev")} className="!px-3 !py-1 text-[11px]">
-            Caesars EV
+            DraftKings EV
           </Pill>
         </div>
       </Row>
@@ -105,15 +105,15 @@ function SelectionCalibrationPanel() {
       {note && <div className="pt-1 text-[11.5px] text-pos">{note}</div>}
       <div className="pt-2 text-[11px] leading-relaxed text-faint">
         <b className="text-muted">EV-gated @ CZ</b> (default): every selection number — the EV gate, edge badges,
-        Kelly, FUN tiers — computes at the Caesars price, the book the ticket actually settles at. A day with no
+        Kelly, FUN tiers — computes at the DraftKings price, the book the ticket actually settles at. A day with no
         qualifying ticket is a NO-PLAY day with $0 recommended, and staking anyway takes an explicit override that
         the ledger tracks separately. Zero edge, zero stake. <b className="text-muted">DK/FD basis</b>: the same
         discipline priced at the better de-vigged price between DraftKings and FanDuel (tie goes to DK); no other
         book&apos;s price influences selection, and CZ becomes display + settlement only — a card ticket still needs
-        both a DK/FD basis and a Caesars quote, and one that goes negative-EV at Caesars is refused at lock.{" "}
+        both a DK/FD basis and a DraftKings quote, and one that goes negative-EV at DraftKings is refused at lock.{" "}
         <b className="text-muted">True probability</b>: picks are chosen by the engine&apos;s blended true %
-        anchored to the full multi-book consensus — Caesars only prices and sizes what was already chosen, and picks
-        it doesn&apos;t offer are listed separately, never substituted. <b className="text-muted">Caesars EV</b> is the
+        anchored to the full multi-book consensus — DraftKings only prices and sizes what was already chosen, and picks
+        it doesn&apos;t offer are listed separately, never substituted. <b className="text-muted">DraftKings EV</b> is the
         legacy ranking by playable edge at CZ. Auto-calibration lets the nightly grader shrink a market&apos;s model
         weight toward the consensus when 150+ graded picks show statistically significant overconfidence (capped ±10%
         per week, shrink-only, every change logged under Stats → Calibration). Off = reporting continues, weights stay
@@ -488,7 +488,7 @@ export default function SettingsPage() {
             <span className="text-[12px] text-muted">Ledger tab → Export / Import (locked days are never overwritten)</span>
           </Row>
           <Row label="Book">
-            <span className="text-[12px] text-gold">Caesars (Nevada) — the only book the card prices</span>
+            <span className="text-[12px] text-gold">DraftKings — the only book the card prices</span>
           </Row>
         </Panel>
       </div>

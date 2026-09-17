@@ -158,7 +158,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).not.toMatch(/props for \{board\.fetched\}/);
     // "N games post player props at other books but no Caesars line yet — re-checked every 30 min inside 4 h of kickoff" (rows come from any US book, never "DK/FD" alone)
     expect(props).toMatch(
-      /\{selectedBook === "Caesars" && board\.czMissing \? ` · \$\{board\.czMissing\} game\$\{board\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff` : ""\}/,
+      /\{selectedBook === "DraftKings" && board\.czMissing \? ` · \$\{board\.czMissing\} game\$\{board\.czMissing === 1 \? "" : "s"\} post player props at other books but no DraftKings line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff` : ""\}/,
     );
     // "M games on the slate have no player props posted at the books we price" — a zero-row game proves no more than that
     expect(props).toMatch(/\{board\.noProps \? ` · \$\{board\.noProps\} game\$\{board\.noProps === 1 \? "" : "s"\} on the slate ha\$\{board\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);

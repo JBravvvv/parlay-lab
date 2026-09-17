@@ -43,8 +43,8 @@ export function orderByMode<T extends OrderableRow>(rows: readonly T[], mode: Se
 
 /** Header copy — names the active mode so the order is never a mystery. */
 export const MODE_LABEL: Record<SelectionMode, string> = {
-  dk_fd: "ranked by EV @ DK/FD basis (Caesars settles)",
-  ev_gated: "ranked by EV @ Caesars (EV gate lives at the card)",
-  caesars_ev: "ranked by EV @ Caesars",
+  dk_fd: "ranked by EV @ DK/FD basis (DraftKings settles)",
+  ev_gated: "ranked by EV @ DraftKings (EV gate lives at the card)",
+  caesars_ev: "ranked by EV @ DraftKings",
   probability: "ranked by win probability",
 };

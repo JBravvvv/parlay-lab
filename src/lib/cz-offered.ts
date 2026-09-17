@@ -139,6 +139,6 @@ export function useCzHidden(): {
   }, []);
   const count = Object.values(hidden).filter((e) => e.hidden).length;
   const book=useSportsbook();
-  const scoped=(k:string)=>book===DEFAULT_BOOK?k:`book:${book}:${k}`;
+  const scoped=(k:string)=>book==='williamhill_us'?k:`book:${book}:${k}`;
   return { hidden, isHidden: (k) => !!hidden[scoped(k)]?.hidden, toggle:(k)=>toggle(scoped(k)), reset, count };
 }

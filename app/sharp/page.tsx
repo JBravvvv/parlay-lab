@@ -369,7 +369,7 @@ function MlbSharpPage() {
           <Reveal>
             <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
               {selMode === "dk_fd"
-                ? `Today's plays — EV at the DK/FD basis, gate +${gatePct}% (the Builder's exact bar; Caesars settles, never picks)`
+                ? `Today's plays — EV at the DK/FD basis, gate +${gatePct}% (the Builder's exact bar; DraftKings settles, never picks)`
                 : selMode !== "caesars_ev"
                 ? "Today's plays — best playable EV at your selected sportsbook"
                 : "Today's plays — best playable EV at selected book"}
@@ -533,7 +533,7 @@ function MlbSharpPage() {
                     {r.lu === "projected" && (
                       <span
                         className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9.5px] font-bold text-gold"
-                        title="Lineup not posted yet — projected everyday starter; Caesars auto-voids the leg if he sits"
+                        title="Lineup not posted yet — projected everyday starter; DraftKings auto-voids the leg if he sits"
                       >
                         PROJ
                       </span>

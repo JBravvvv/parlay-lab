@@ -320,7 +320,7 @@ describe("source pins — the honesty guard extended to the newest price surface
     expect(page).toMatch(/headshot=\{headshots\[name\] \?\? null\}/);
     expect(page).toMatch(/liveMarketBoard\(propBoard,liveOverlay/);
     expect(page).toMatch(/buildPool\(marketPhaseBoard\(propBoard,currentLive/);
-    expect(hook).toMatch(/generate\(pool, spec, specSeed\(/);
+    expect(hook).toMatch(/generate\(pool, \{ \.\.\.spec, pricingBook \}, specSeed\(/);
   });
   it("Add to slip reuses the existing slip math and keeps an Undo; nothing is spent or written", () => {
     expect(hook).toMatch(/prevLegs\.current = legs\.slice\(\);/);
@@ -371,7 +371,7 @@ describe("generator recovery from an empty odds band", () => {
     expect(spec.legMinAm).toBe(-5000);
   });
   it("available odds respect side, book and probability-source filters", () => {
-    const spec = { ...SPEC, sides: "u" as const, czOnly: true, modelOnly: true };
+    const spec = { ...SPEC, sides: "u" as const, czOnly: true, pricingBook: "CZ", modelOnly: true }; // the fixture pool predates INSTRUCTION 67 (Caesars-priced)
     const eligible = POOL.legs.filter((l) => l.side === "u" && l.book === "CZ" && l.src === "model").sort((a, b) => a.dec - b.dec);
     expect(eligible.length).toBeGreaterThan(0);
     expect(availableLegBand(POOL, spec)).toEqual({ legMinAm: eligible[0].am, legMaxAm: eligible[eligible.length - 1].am });

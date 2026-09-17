@@ -133,7 +133,7 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(board).toMatch(/priced <span className="num">\{propsQ\.data\.fetched - propsQ\.data\.noProps\}<\/span> of <span className="num">\{propsQ\.data\.events\}<\/span> games/);
     expect(board).not.toMatch(/props for <span/);
     expect(board).toMatch(
-      /\{selectedBook === "Caesars" && propsQ\.data\.czMissing\s*\? ` · \$\{propsQ\.data\.czMissing\} game\$\{propsQ\.data\.czMissing === 1 \? "" : "s"\} post player props at other books but no Caesars line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff`\s*: ""\}/,
+      /\{selectedBook === "DraftKings" && propsQ\.data\.czMissing\s*\? ` · \$\{propsQ\.data\.czMissing\} game\$\{propsQ\.data\.czMissing === 1 \? "" : "s"\} post player props at other books but no DraftKings line yet — re-checked every \$\{CFB_PROPS\.czMissingRevalidateSec \/ 60\} min inside \$\{CFB_PROPS\.czMissingWindowSec \/ 3600\} h of kickoff`\s*: ""\}/,
     );
     expect(board).toMatch(/\{propsQ\.data\.noProps \? ` · \$\{propsQ\.data\.noProps\} game\$\{propsQ\.data\.noProps === 1 \? "" : "s"\} on the slate ha\$\{propsQ\.data\.noProps === 1 \? "s" : "ve"\} no player props posted at the books we price` : ""\}/);
     expect(board).not.toMatch(/only at DK\/FD|at any book/);

@@ -8,7 +8,7 @@ import { mulberry32 } from "@/lib/parlay-gen";
 const odds = [-230, -210, -190, -170, -150, -130, -115, -100, 110, 125, 140, 155, 170, 185, 200];
 const legs: GenLeg[] = odds.map((am, i) => ({ id: `p${i}`, playerKey: `p${i}`, gameKey: `g${i}`,
   am, dec: amToDec(am), prob: 96 / amToDec(am), src: "market", side: "o", label: `Player ${i}`,
-  sub: "Anytime TD", leg: {}, team: null, started: false, alt: false, book: "CZ", ev: -0.04 }));
+  sub: "Anytime TD", leg: {}, team: null, started: false, alt: false, book: "DK", ev: -0.04 }));
 const pool = poolOf(legs, { rows: legs.length, startedDropped: 0, noParlayDropped: 0 });
 const spec: GenSpec = { style: "safer", market: "anytime_td", legs: 4, legMinAm: -230, legMaxAm: 200,
   payout: null, sides: "o", onePerGame: true, czOnly: true, includeStarted: false, modelOnly: false,

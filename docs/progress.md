@@ -1,3 +1,16 @@
+# Progress — 2026-09-17 (DraftKings settlement book)
+
+INSTRUCTION 67: Josh asked for every grade, edge %, EV and Kelly stake to be computed at DraftKings instead of Caesars, with nothing else on the site changed.
+
+- `SETTLE_BOOK = "draftkings"` (`src/lib/sportsbook/books.ts`) is now the one settlement constant. The legacy MLB engine's `CAESARS_KEY` variable is rebound to it by the facade on every `createEngine` call (engine-client, /api/generate, the scheduler), so the engine's `cz*` numbers, the Builder, the Board, the lock card and the paper ledger are DraftKings-priced. `shBasisPick` (selection) is untouched.
+- Boards, rows, lock-card tickets and CLV pending legs carry a `settlementBook` stamp; anything without the stamp (pre-2026-09-17 caches and ledger entries) is treated as Caesars-priced. The client repricers (`priceMlbBoard`, `priceFootballRow/Prop`, `priceLiveBoard`) short-circuit on that stamp rather than on the default book, so a stale Caesars board is repriced at DraftKings from its quote index until the next refresh slot rebuilds it.
+- CFB and NFL `settleBook` constants (model, props, live props), MLB live props, the sharp board, the UFC helper, the season lab default book and the offered-book scoping all flipped to DraftKings. The parlay generator's book-only toggle now reads "DraftKings-priced legs only" and follows the selected sportsbook. The selector's storage key changed (`pl_display_sportsbook_dk_v1`), so every device opens on DraftKings.
+- Labels, notes and refusal strings that named Caesars as the settle book now name DraftKings (Board, Builder, Settings, Ledger, CLV panel, CFB/NFL lock notes, football props). Verbatim quotes of earlier instructions and the Caesars-app paste feature (All-Star) are unchanged.
+- Tests: `tests/helpers/settle-book.ts` loads the hand-checked fixtures with the Caesars and DraftKings keys exchanged; the parlay-generator fixtures pass `pricingBook: "CZ"` because the captured pool predates this change; `docs/harness-substitutions.md` documents the `CAESARS_KEY` binding.
+- Astra's uncommitted DraftKings pass was archived (never committed) in the handoff's `review-2026-09-17-draftkings/`.
+
+Validation: TypeScript passes; full serial vitest gate recorded in `tools/handoff-state.env` (GATE_TESTS).
+
 # Progress — 2026-09-16 (MLB live browsing and player exclusions)
 
 Josh approved updating the superseded regression expectations, running validation and deploying, then requested a per-player exclusion checkbox for the generator.

@@ -40,9 +40,10 @@ export type OddsEvent = {
   bookmakers?: Bookmaker[];
 };
 
+/** the settlement book of every leg locked BEFORE INSTRUCTION 67 (2026-09-17); later legs carry `settlementBook` */
 export const CAESARS_KEY = "williamhill_us";
 
-export type PendingLeg = { lid: string; lkey: string; prop: string; gkey: string; start: number };
+export type PendingLeg = { lid: string; lkey: string; prop: string; gkey: string; start: number; settlementBook?: string };
 
 export const impliedProb = (am: number): number => (am > 0 ? 100 / (am + 100) : -am / (-am + 100)) as number;
 const devigPair = (a: number | null, b: number | null): number | null =>
@@ -54,8 +55,8 @@ const median = (xs: number[]): number | null => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-type LedgerLeg = { label?: string; prop?: string; gkey?: string | null; lkey?: string | null };
-type LedgerTicket = { legs?: LedgerLeg[] };
+type LedgerLeg = { label?: string; prop?: string; gkey?: string | null; lkey?: string | null; settlementBook?: string };
+type LedgerTicket = { legs?: LedgerLeg[]; settlementBook?: string };
 
 /** Every still-pregame leg of a locked entry whose game starts within horizonMs,
     deduped by leg id and grouped by game. */
@@ -68,6 +69,9 @@ export function pendingLegs(
   const out = new Map<string, { start: number; legs: PendingLeg[] }>();
   const seen = new Set<string>();
   const tickets = [...((entry.core as LedgerTicket[]) ?? []), ...((entry.funT as LedgerTicket[]) ?? [])];
+  /* INSTRUCTION 67: a ticket locked since 2026-09-17 carries `settlementBook: "draftkings"`; older
+     tickets carry nothing and are sighted at the Caesars close they were priced at. */
+  const entryBook = typeof entry.settlementBook === "string" ? entry.settlementBook : undefined;
   for (const t of tickets) {
     for (const l of t.legs ?? []) {
       if (!l.lkey || !l.gkey || !l.label || !l.prop) continue;
@@ -79,7 +83,7 @@ export function pendingLegs(
       if (!(start > now) || start - now > horizonMs) continue; // started, or not in the window yet
       seen.add(lid);
       const g = out.get(l.gkey) ?? { start, legs: [] };
-      g.legs.push({ lid, lkey: l.lkey, prop: l.prop, gkey: l.gkey, start });
+      g.legs.push({ lid, lkey: l.lkey, prop: l.prop, gkey: l.gkey, start, settlementBook: l.settlementBook ?? t.settlementBook ?? entryBook });
       out.set(l.gkey, g);
     }
   }
@@ -149,7 +153,7 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
       if (mk.key !== market && !alt) continue;
       // ladders fill the Caesars price and (mirroring the engine's basis capture)
       // the DK/FD basis for markets those books quote only as milestones ("1+ HR")
-      if (alt && bk.key !== CAESARS_KEY && bk.key !== DK && bk.key !== FD) continue;
+      if (alt && bk.key !== (leg.settlementBook ?? CAESARS_KEY) && bk.key !== DK && bk.key !== FD) continue;
       let o: number | null = null;
       let u: number | null = null;
       for (const x of mk.outcomes ?? []) {
@@ -162,7 +166,7 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
         else u = x.price ?? null;
       }
       if (alt) {
-        if (bk.key === CAESARS_KEY) {
+        if (bk.key === (leg.settlementBook ?? CAESARS_KEY)) {
           if (o != null) czAltOver = o;
           if (u != null) czAltUnder = u;
         } else if (bk.key === DK) {
@@ -176,7 +180,7 @@ export function sightProp(ev: OddsEvent, leg: PendingLeg, at: number): ClvSight 
       }
       const f = devigPair(o != null ? impliedProb(o) : null, u != null ? impliedProb(u) : null);
       if (f != null) fairs.push(f);
-      if (bk.key === CAESARS_KEY) {
+      if (bk.key === (leg.settlementBook ?? CAESARS_KEY)) {
         if (o != null) czOver = o;
         if (u != null) czUnder = u;
       }
@@ -229,7 +233,7 @@ export function sightGameLeg(ev: OddsEvent, leg: PendingLeg, at: number): ClvSig
       if (!ml && (mine.point ?? null) !== pt) continue; // only books quoting the leg's exact point
       const f = devigPair(impliedProb(mine.price), impliedProb(other.price));
       if (f != null) fairs.push(f);
-      if (bk.key === CAESARS_KEY) cz = mine.price;
+      if (bk.key === (leg.settlementBook ?? CAESARS_KEY)) cz = mine.price;
       if (bk.key === DK) dk = mine.price;
       if (bk.key === FD) fd = mine.price;
     }

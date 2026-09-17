@@ -76,6 +76,8 @@ export type MlbLiveQuote = {
 export type MlbLiveQuoteBoard = {
   /** the slate's Pacific date */
   date: string;
+  /** the book every czAm / evCz on this overlay is priced at (INSTRUCTION 67, 2026-09-17: DraftKings); overlays from before that date carry no stamp and are Caesars-priced */
+  settleBook?: string;
   /** when this overlay was assembled (ISO) */
   generatedAt: string;
   /**

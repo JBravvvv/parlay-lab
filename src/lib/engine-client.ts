@@ -1,4 +1,5 @@
 "use client";
+import {SETTLE_BOOK} from "@/lib/sportsbook/books";
 import {browseOddsUrl} from "@/lib/mlb/browse-markets";
 
 import {quoteCapture,attachBookQuotes} from "@/lib/sportsbook/mlb";
@@ -107,7 +108,7 @@ export function setDirPref(mkt: string, v: DirPref) {
 
 export function getEngine(): Engine {
   if (!engine) {
-    engine = createEngine({ fetchJson: async (url) => {const r=await browserFetchJson(browseOddsUrl(url));if(r.ok)bookCapture.capture(r.body);return r;}, storage: window.localStorage });
+    engine = createEngine({ settlementBook: SETTLE_BOOK, fetchJson: async (url) => {const r=await browserFetchJson(browseOddsUrl(url));if(r.ok)bookCapture.capture(r.body);return r;}, storage: window.localStorage });
     const orig = engine.get<(ctx: unknown, n: number, seed: number) => SimOut>("shSimGames");
     engine.set("shSimGames", (ctx: unknown, n: number, seed: number) => {
       const res = orig(ctx, n, seed);
@@ -377,7 +378,7 @@ export async function generateBoard(): Promise<Board> {
   bookCapture.clear();
   const slate = await eng.collectSlate();
   simCapture = [];
-  const data = attachBookQuotes(eng.analyze(slate), bookCapture.events.values());
+  const data = attachBookQuotes(eng.analyze(slate), bookCapture.events.values(), SETTLE_BOOK);
   const board: Board = { date: todayStr(), at: Date.now(), data };
   try {
     localStorage.setItem(BOARD_KEY, JSON.stringify(board));

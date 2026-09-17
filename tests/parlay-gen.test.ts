@@ -64,6 +64,7 @@ const spec = (o: Partial<GenSpec> = {}): GenSpec => {
     sides: "o",
     onePerGame: true,
     czOnly: false,
+    pricingBook: "CZ", // tests/fixtures/gen-pool.json predates INSTRUCTION 67: its rows are Caesars-priced
     includeStarted: false,
     modelOnly: false,
     pinned: new Array(legs).fill(null),

@@ -93,7 +93,7 @@ describe("MLB_LIVE_PROPS — the whole constant, pinned", () => {
       cooldownDay: true,
       regions: "us",
       minBooks: 2,
-      settleBook: "williamhill_us",
+      settleBook: "draftkings",
       dailyBudget: 600,
       measuredCreditsPerEvent: 6,
       slots: ["08:00", "09:30", "12:00", "15:00", "16:45"],

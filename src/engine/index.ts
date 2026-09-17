@@ -20,6 +20,8 @@ export type StorageLike = {
 };
 
 export interface EngineDeps {
+  /** odds-API bookmaker key the engine settles at (`CAESARS_KEY` inside the blob); omitted = legacy Caesars */
+  settlementBook?: string;
   /** All engine network I/O goes through this (odds proxy / statsapi). */
   fetchJson: FetchJson;
   /** Real localStorage in the browser; memory store in tests. */
@@ -30,6 +32,8 @@ export interface EngineDeps {
 
 /** A pick row as the engine emits it (fields used by the UI; loosely typed on purpose). */
 export interface PickRow {
+  /** the odds-API book `cz` / `czOdds` / `czEv` were priced at (stamped by attachBookQuotes; missing = Caesars, pre-2026-09-17) */
+  settlementBook?: string;
   label: string;
   sub: string;
   odds?: number;
@@ -69,6 +73,8 @@ export interface PickRow {
 }
 
 export interface TicketLeg {
+  /** book the leg's `cz` price is at (missing = Caesars, pre-2026-09-17) */
+  settlementBook?: string;
   label: string;
   prop: string;
   odds?: number;
@@ -112,6 +118,8 @@ export interface Ticket {
  * Parlay Builder tab. Display-only: never feeds selection, grading or the ledger.
  */
 export interface PropBoardRow {
+  /** book the `cz` pair is at (missing = Caesars, pre-2026-09-17) */
+  settlementBook?: string;
   /** Timestamp of an actual in-play quote; absent on pregame rows. */
   quoteAt?: string;
   bookQuotes?: {o: Record<string, import("@/lib/sportsbook/mlb").BookQuote>;u: Record<string, import("@/lib/sportsbook/mlb").BookQuote>};
@@ -142,6 +150,8 @@ export interface PropBoardGame {
 }
 
 export interface BoardData {
+  /** book every `cz` field on this board is priced at (missing = Caesars, pre-2026-09-17) */
+  settlementBook?: string;
   overview?: unknown;
   categories: Record<string, PickRow[]>;
   /** every priced player row the feed carries (browse-only; see PropBoardRow) */
@@ -283,6 +293,11 @@ return {
   };
 
   const scope = boot(shims, LEGACY_SRC);
+  /* INSTRUCTION 67 (2026-09-17): the settlement book is DraftKings. The parity-locked blob
+     declares `var CAESARS_KEY="williamhill_us"`; rebinding it here (a `var`, so the assignment
+     is legal) makes every `*_cz` capture, grade, EV, edge and Kelly stake read the DraftKings
+     quote. Callers that omit `settlementBook` keep the legacy Caesars behaviour (parity tests). */
+  if (deps.settlementBook) scope.set("CAESARS_KEY", deps.settlementBook);
 
   // Route all engine I/O through the caller's fetcher.
   scope.set("obFetchJson", deps.fetchJson);

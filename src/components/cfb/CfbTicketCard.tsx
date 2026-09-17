@@ -241,9 +241,9 @@ export function CfbTicketCard({
         <div className="mt-2 flex items-end justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-[13.5px] font-bold text-text">{t.name}</div>
-            <div className="num mt-0.5 text-[10px] text-faint">{t.czDec.toFixed(2)}× at Caesars</div>
+            <div className="num mt-0.5 text-[10px] text-faint">{t.czDec.toFixed(2)}× at DraftKings</div>
           </div>
-          <span className={`hero-price ${heroTone} shrink-0`} aria-label={`Caesars price ${fmtAmerican(t.czOdds)}`}>
+          <span className={`hero-price ${heroTone} shrink-0`} aria-label={`DraftKings price ${fmtAmerican(t.czOdds)}`}>
             {fmtAmerican(t.czOdds)}
           </span>
         </div>
@@ -319,7 +319,7 @@ export function CfbTicketCard({
             )}
             <div className="flex shrink-0 items-center gap-1.5">
               <EvBadge ev={t.czEv} />
-              <GradeChip grade={evGrade} basis="EV at Caesars" />
+              <GradeChip grade={evGrade} basis="EV at DraftKings" />
             </div>
           </div>
         </footer>

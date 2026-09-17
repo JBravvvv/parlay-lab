@@ -139,6 +139,7 @@ function overlayWith(q: MlbLiveQuote, ageMin = 0): MlbLiveQuoteBoard {
   return {
     _note: "SYNTHETIC — shaped from the real /api/mlb/live-props body; every price, line and count invented for this test",
     date: "2026-09-11",
+    settleBook: "draftkings", // the route stamps its settle book (INSTRUCTION 67); an unstamped overlay would be repriced as a Caesars one
     generatedAt: at,
     events: 9,
     fetched: 7,

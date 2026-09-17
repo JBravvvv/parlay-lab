@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
+import { bookName } from "@/lib/sportsbook/books";
+import { useSportsbook } from "@/lib/sportsbook/store";
 import { mixBands, MIX_LABEL, type MixBand } from "@/lib/parlay-gen-mix";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -100,7 +102,7 @@ const RELAX_PATCH: Record<string, Partial<GenSpec>> = {
 const RELAX_BUTTON: Record<string, string> = {
   "same-game": "Allow two legs from one game",
   started: "Include games already under way",
-  cz: "Drop the Caesars-only filter",
+  cz: "Drop the selected-book-only filter",
   model: "Drop the model-priced-only filter",
   positions: "Include all positions",
 };
@@ -108,7 +110,7 @@ const RELAX_BUTTON: Record<string, string> = {
 const RELAX_HINT: Record<string, string> = {
   "same-game": 'turn on "two legs from one game" and it may fit',
   started: 'turn on "include games already under way" and it may fit',
-  cz: "drop the Caesars-only filter and it may fit",
+  cz: "drop the selected-book-only filter and it may fit",
   model: "drop the model-priced-only filter and it may fit",
   positions: "add another position or choose all positions",
 };
@@ -699,7 +701,7 @@ export function GenSheet<P>({
                 Include games already under way
               </Toggle>}
               <Toggle on={spec.czOnly} onChange={(v) => onSpec({ czOnly: v })}>
-                Caesars-priced legs only
+                <BookOnlyLabel />
               </Toggle>
               {showModelOnly && (
                 <Toggle on={spec.modelOnly} onChange={(v) => onSpec({ modelOnly: v })}>
@@ -945,4 +947,10 @@ function Label({ children }: { children: ReactNode }) {
 
 function Faint({ children }: { children: ReactNode }) {
   return <div className="mt-1 text-[9.5px] leading-snug text-faint">{children}</div>;
+}
+
+/** "DraftKings-priced legs only" — the book `czOnly` keeps is the selected sportsbook (DraftKings by default). */
+function BookOnlyLabel() {
+  const book = useSportsbook();
+  return <>{bookName(book)}-priced legs only</>;
 }

@@ -35,8 +35,8 @@ describe("cfb rules — the constants the desk runs on", () => {
     expect(rules).toMatch(/ledger:\s*"pl:cfb:ledger:v1"/);
     expect(rules).toMatch(/bank:\s*"pl:cfb:bank:v1"/);
   });
-  it("Caesars settles", () => {
-    expect(rules).toMatch(/settleBook:\s*"williamhill_us"/);
+  it("DraftKings settles (INSTRUCTION 67, 2026-09-17)", () => {
+    expect(rules).toMatch(/settleBook:\s*"draftkings"/);
   });
   it("the server lock window (INSTRUCTION 45): one hour before the first kickoff, a 25 s forward budget", () => {
     expect(rules).toMatch(/export const CFB_LOCK = \{\s*leadMs:\s*60 \* 60_000,\s*forwardTimeoutMs:\s*25_000,\s*\} as const;/);

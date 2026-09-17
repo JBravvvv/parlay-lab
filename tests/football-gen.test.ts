@@ -15,6 +15,7 @@ import { addCfbLegs } from "@/components/cfb/CfbProps";
 import { GenSheet, genFailLine } from "@/components/props/GenSheet";
 import { bandDec, generate, specSeed, type GenPool, type GenResult, type GenSpec } from "@/lib/parlay-gen";
 import { amFmt, amToDec } from "@/lib/ticket-math";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * THE PARLAY GENERATOR ON FOOTBALL — INSTRUCTION 52 (2026-09-12), Josh's word, verbatim:
@@ -39,7 +40,7 @@ import { amFmt, amToDec } from "@/lib/ticket-math";
 vi.stubGlobal("React", React);
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-05.json") as { events: unknown[] };
 const ODDS = readJson("odds-ncaaf-2026-09-05.json") as unknown[];
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -559,7 +560,7 @@ describe("the sheet renders for the FOOTBALL market list", () => {
     expect(sheet()).not.toContain("Model-priced legs only");
     expect(sheet({ showModelOnly: true })).toContain("Model-priced legs only");
     /* the controls that DO apply are still there */
-    expect(sheet()).toContain("Caesars-priced legs only");
+    expect(sheet()).toContain("DraftKings-priced legs only");
     expect(sheet()).toContain("Two legs from one game");
   });
 

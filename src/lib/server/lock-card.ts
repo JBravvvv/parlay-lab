@@ -574,6 +574,9 @@ export function buildLockEntry(args: {
   }
   const gatedDeployed = primaryCard.gatedSizing;
 
+  /* INSTRUCTION 67 (2026-09-17): the book this fire priced at — DraftKings — rides every ticket it
+     writes, so CLV sights it at that book; carried tickets keep whatever they were locked with. */
+  const settlementBook = String(eng.get<string>("CAESARS_KEY"));
   const toTicket = (s: Seat, experiment = false): SyncTicket => {
     const p = s.pick;
     const pl = p.w.pl;
@@ -595,6 +598,7 @@ export function buildLockEntry(args: {
       tier: pl.tier ?? null,
       legs: (pl.legs ?? []).map((l) => ({ lkey: l.lkey ?? null, label: l.label ?? null, prop: l.prop ?? null, cz: l.cz ?? null, ...(l.gkey ? { gkey: l.gkey } : {}) })),
       paper: true,
+      settlementBook,
       /* INSTRUCTION 46: the slot this ticket seats — persisted so later fires fill around it */
       shapeSlot: s.slot,
       ...(s.forced ? { forced: true } : {}),
@@ -698,6 +702,7 @@ export function buildLockEntry(args: {
     funNote = fun.note;
     funT = [...(ladder ? [ladder] : []), ...fun.tickets].map((t) => ({
       id: tid({ type: t.type, legs: t.legs.map((l) => ({ label: l.label, prop: l.prop })) }),
+      settlementBook,
       stake: t.stake,
       prob: Math.round(t.prob * 100) / 100,
       czDec: Math.round(t.czDec * 100) / 100,

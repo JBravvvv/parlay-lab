@@ -1,3 +1,4 @@
+import {SETTLE_BOOK} from "@/lib/sportsbook/books";
 import {browseOddsUrl} from "@/lib/mlb/browse-markets";
 import { NextRequest, NextResponse } from "next/server";
 import {quoteCapture,attachBookQuotes} from "@/lib/sportsbook/mlb";
@@ -358,7 +359,7 @@ export async function GET(req: NextRequest) {
        kellyStakeMult x 1/4-Kelly x SH.bankroll — an empty storage meant the legacy $750
        default sized every server ticket. Seed the paper bankroll so the lock prices off it. */
     const bookCapture=quoteCapture();
-    const eng = createEngine({
+    const eng = createEngine({ settlementBook: SETTLE_BOOK,
       fetchJson: async (url) => {const r=await serverFetchJson(browseOddsUrl(url));if(r.ok)bookCapture.capture(r.body);return r;},
       storage: memoryStorage({ pl_bankroll: JSON.stringify(PAPER.bankroll) }),
       today: dateNow,
@@ -409,7 +410,7 @@ export async function GET(req: NextRequest) {
     }
 
     const slate = await eng.collectSlate();
-    const data = attachBookQuotes(eng.analyze(slate) as BoardData, bookCapture.events.values());
+    const data = attachBookQuotes(eng.analyze(slate) as BoardData, bookCapture.events.values(), SETTLE_BOOK);
     const date = dateNow;
 
     /* Persist the BOARD, not just the prediction records. Until this, the cron's work

@@ -91,7 +91,7 @@ export const CFB_SEASON = {
   ticketDefault: 5,
   ticketMax: 25,
   /** the book a typed line is assumed to come from unless Josh says otherwise */
-  defaultBook: "Caesars",
+  defaultBook: "DraftKings",
 } as const;
 
 export type SeasonStat = keyof typeof CFB_SEASON.cv;

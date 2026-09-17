@@ -40,6 +40,7 @@
  * Sandbox only: nothing here writes anywhere, spends an Odds credit, or enters the ledger.
  */
 
+import { SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { mixOrder, type MixStyle } from "./parlay-gen-mix";
 import { amToDec, decToAm } from "@/lib/ticket-math";
 
@@ -90,8 +91,10 @@ export type GenSpec = {
   positions?: readonly string[];
   /** R2: at most one leg per game. Default ON, user-relaxable, never silently relaxed. */
   onePerGame: boolean;
-  /** only legs whose price is the Caesars quote (the book Josh settles at) */
+  /** only legs whose price is the settlement book's quote (DraftKings since INSTRUCTION 67; the selected book on display surfaces) */
   czOnly: boolean;
+  /** short tag of the book `czOnly` keeps ("DK" by default; the display selector overrides it) */
+  pricingBook?: string;
   /** admit games that have already started (their prices are pregame quotes) */
   includeStarted: boolean;
   /** only legs whose win % is the engine's model number, not the de-vigged market fair */
@@ -135,7 +138,7 @@ export type GenLeg<P = unknown> = {
   quoteAt?: string;
   /** an alternate/milestone-ladder line ("2+ hits") rather than a standard O/U */
   alt: boolean;
-  /** short book tag: "CZ" when Caesars posts it */
+  /** short book tag: "DK" when the settlement book posts it */
   book: string;
   /** prob/100 × dec − 1, as a FRACTION (same convention as TicketCalc.ev) */
   ev: number;
@@ -443,7 +446,7 @@ function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
     if (spec.phase === "live" && !l.started) return false;
     if (spec.phase === "pregame" && l.started) return false;
     if (!want.has(l.side)) return false;
-    if (spec.czOnly && l.book !== "CZ") return false;
+    if (spec.czOnly && l.book !== (spec.pricingBook ?? SETTLE_BOOK_SHORT)) return false;
     if (spec.modelOnly && l.src !== "model") return false;
     if (spec.positions?.length && (!l.position || !spec.positions.includes(l.position))) return false;
     return true;

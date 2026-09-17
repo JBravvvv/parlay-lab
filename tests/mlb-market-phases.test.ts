@@ -54,7 +54,7 @@ describe("RBI and Runs browse quotes",()=>{
   const data={categories:{},parlays:[],parlaysMixed:[],gameInfo:{g:{home:"Boston Red Sox",away:"New York Yankees",start:game.start,pk:1}},propBoard:[game]} as unknown as BoardData;
   const books=[{key:"williamhill_us",title:"Caesars",price:-120},{key:"draftkings",title:"DraftKings",price:130}];
   const event={id:"e",home_team:"Boston Red Sox",away_team:"New York Yankees",commence_time:game.start!,bookmakers:books.map(b=>({...b,markets:["batter_rbis","batter_runs_scored"].map(key=>({key,outcomes:[{name:"Over",description:"Test Hitter",point:.5,price:b.price},{name:"Under",description:"Test Hitter",point:.5,price:-110}]}))}))};
-  const captured=attachBookQuotes(data,[event]);expect(captured.categories).toBe(data.categories);
+  const captured=attachBookQuotes(data,[event],'williamhill_us');/* the row's cz is Caesars-priced */expect(captured.categories).toStrictEqual(data.categories); // the settle-book stamp (INSTRUCTION 67) rebuilds the object; nothing in it changes
   for(const market of ["batter_rbis","batter_runs_scored"]){
    const r=captured.propBoard![0].markets[market][0];expect(r.pO).toBeNull();expect(r.fO).toBeGreaterThan(0);expect(r.tm).toBe("NYY");expect(r.cz?.o).toBe(-120);
    expect(priceMlbBoard(captured,"draftkings").propBoard![0].markets[market][0].cz?.o).toBe(130);

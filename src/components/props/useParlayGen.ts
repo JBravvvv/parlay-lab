@@ -13,6 +13,8 @@ import {
   type GenPoolSpec,
 } from "@/lib/parlay-gen";
 import { excludePlayers, exclusionKey, exclusionFilterKey } from "@/lib/parlay-exclusions";
+import { BOOKS, SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
+import { useSportsbook } from "@/lib/sportsbook/store";
 const NO_POSITIONS: readonly string[] = [];
 
 /**
@@ -143,6 +145,9 @@ export function useParlayGen<P>({
   );
 
   const [spec, setSpec] = useState<GenSpec>(defaultSpec);
+  /* INSTRUCTION 67 (2026-09-17): "settle-book only" keeps legs priced at the selected sportsbook — DraftKings by default */
+  const selectedBook = useSportsbook();
+  const pricingBook = BOOKS.find((b) => b.key === selectedBook)?.short ?? SETTLE_BOOK_SHORT;
   const filterKey = `${storageKey}:${boardKey}:${exclusionFilterKey(spec)}`;
   const [exclusions, setExclusions] = useState<{ filter: string; players: {key: string; label: string}[] }>({ filter: "", players: [] });
   const excludedPlayers = useMemo(() => exclusions.filter === filterKey ? exclusions.players : [], [exclusions, filterKey]);
@@ -200,9 +205,9 @@ export function useParlayGen<P>({
   const generated = useMemo<GenResult<P>>(
     () =>
       open
-        ? generate(pool, spec, specSeed(spec, boardKey, roll), new Set(history.current), playerExposure(recentPlayers.current))
+        ? generate(pool, { ...spec, pricingBook }, specSeed(spec, boardKey, roll), new Set(history.current), playerExposure(recentPlayers.current))
         : { ok: false, fail: { code: "no-rows" } },
-    [open, pool, spec, roll, boardKey],
+    [open, pool, spec, pricingBook, roll, boardKey],
   );
 
   const result = recalled?.result ?? generated;

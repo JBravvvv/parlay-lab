@@ -134,7 +134,7 @@ export function ReceiptsPanel({ entries }: { entries: SyncEntry[] }) {
                 {s.nvTax.byMarket.map((m) => `${m.market} ${money(-m.tax)}`).join(" · ")}
               </span>
             )}
-            <span className="ml-1 text-faint">— what settling at Caesars cost vs the price that picked the card</span>
+            <span className="ml-1 text-faint">— what settling at DraftKings cost vs the price that picked the card</span>
           </div>
         )}
 

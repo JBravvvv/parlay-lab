@@ -535,7 +535,7 @@ export async function topUpDate(cfg: LeagueConfig, keys: LockKeys, entry: CfbLed
         action: "skipped",
         reason:
           probe.pricedAhead === 0
-            ? `no Caesars price on any game still ahead that the core is not already on — $${d.room} of core and $${paper.fun - cfbStakeOf(entry.funT)} of fun stay undeployed and the next poke retries.`
+            ? `no DraftKings price on any game still ahead that the core is not already on — $${d.room} of core and $${paper.fun - cfbStakeOf(entry.funT)} of fun stay undeployed and the next poke retries.`
             : `nothing on the ${probe.pricedAhead} priced sides still ahead clears the card's gate — $${d.room} of core and $${paper.fun - cfbStakeOf(entry.funT)} of fun stay undeployed rather than stake a ticket the rules refuse.`,
         pricedAhead: probe.pricedAhead,
         room: d.room,

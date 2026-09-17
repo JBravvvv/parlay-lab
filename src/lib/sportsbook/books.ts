@@ -8,11 +8,14 @@ export const BOOKS = [
  {key:'pinnacle',label:'Pinnacle',short:'PIN'},
 ] as const;
 export type BookKey = typeof BOOKS[number]['key'];
-export const DEFAULT_BOOK: BookKey = 'williamhill_us';
+/** The book every grade, edge %, EV and Kelly stake is computed at (INSTRUCTION 67, 2026-09-17: DraftKings replaces Caesars). */
+export const SETTLE_BOOK: BookKey = 'draftkings';
+export const SETTLE_BOOK_SHORT = 'DK';
+export const DEFAULT_BOOK: BookKey = SETTLE_BOOK;
 export const bookName = (key: string) => BOOKS.find(b=>b.key===key)?.label ?? key;
 export function bookKey(value: string | null | undefined): string | null {
  if(!value)return null; const v=value.toLowerCase().replace(/[^a-z0-9]/g,'');
- if(['cz','czr','caesars','williamhillus'].includes(v))return DEFAULT_BOOK;
+ if(['cz','czr','caesars','williamhillus'].includes(v))return 'williamhill_us';
  return BOOKS.find(b=>[b.key,b.label,b.short].some(s=>s.toLowerCase().replace(/[^a-z0-9]/g,'')===v))?.key??value;
 }
 export function validAm(n: unknown): n is number {return typeof n==='number'&&Number.isFinite(n)&&Math.abs(n)>=100;}

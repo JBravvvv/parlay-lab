@@ -47,9 +47,10 @@ import { redis, storeEnv } from "@/lib/server/store";
 import { espnEventsOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import { GET } from "../app/api/nfl/lock/route";
 import * as lockRouteMod from "../app/api/nfl/lock/route";
+import { swapSettleBook } from "./helpers/settle-book";
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "nfl");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-13.json") as { events: unknown[] };
 const ODDS = readJson("odds-2026-09-13.json") as unknown[];
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -374,7 +375,7 @@ describe("the exported GET, CALLED on the week-1 Sunday fixture", () => {
     expect(body.source).toBe("server-lock");
     expect(body.trigger).toBe("nfl-lock");
     // the headline AND the no-core detail, the line Josh reads under the card
-    expect(String(body.note)).toMatch(/^locked by the server before the first kickoff — 13 games on the slate · No core ticket — no playable side clears \+2% EV at Caesars under 2\.60/);
+    expect(String(body.note)).toMatch(/^locked by the server before the first kickoff — 13 games on the slate · No core ticket — no playable side clears \+2% EV at DraftKings under 2\.60/);
     expect(String(body.note)).toMatch(/None of the \$350 core is staked; the \$25 fun parlay is the day's only money/);
     // the odds pull was paid exactly once, on the league's own config
     expect(vi.mocked(slateFromEspnOf).mock.calls.length).toBe(1);

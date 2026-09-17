@@ -274,10 +274,10 @@ export function bothSides(rows: PickRow[]): PickRow[] {
 
 export type Side = "o" | "u";
 
-/** The price for one side: Caesars when Caesars posts it, else the feed's best. */
+/** The price for one side: the settlement book (DraftKings) when it posts it, else the feed's best. */
 export function sidePrice(r: PropBoardRow, side: Side): { am: number; book: string } | null {
   const cz = r.cz ? (side === "o" ? r.cz.o : r.cz.u) : null;
-  if (cz != null) return { am: cz, book: r.displayBook ? bookAb(bookName(r.displayBook)) : "CZ" };
+  if (cz != null) return { am: cz, book: r.displayBook ? bookAb(bookName(r.displayBook)) : r.settlementBook ? bookAb(bookName(String(r.settlementBook))) : "CZ" };
   const am = side === "o" ? r.o : r.u;
   if (am == null) return null;
   const b = side === "o" ? r.oBook : r.uBook;

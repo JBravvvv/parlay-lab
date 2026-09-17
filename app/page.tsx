@@ -71,7 +71,7 @@ function WeekReceipt({ entries }: { entries: SyncEntry[] }) {
       </div>
       <MonthOverrideLine entries={entries} />
       <div className="mt-2 text-[10.5px] text-faint">
-        CLV in probability points vs the last pre-pitch Caesars price — under parlay variance it converges long before
+        CLV in probability points vs the last pre-pitch DraftKings price — under parlay variance it converges long before
         P/L does. Full segment tables live on the Ledger tab.
       </div>
     </Panel>
@@ -111,7 +111,7 @@ function MonthOverrideLine({ entries }: { entries: SyncEntry[] }) {
    2026-09-08: the NFL desk is the third card — 2 + 1 at 375px (the NFL card spans the row),
    three across from `sm`. */
 const DESKS: { sport: Sport; blurb: string }[] = [
-  { sport: "mlb", blurb: "10,000-path sims · props & game lines · Caesars settles" },
+  { sport: "mlb", blurb: "10,000-path sims · props & game lines · DraftKings settles" },
   { sport: "cfb", blurb: "Consensus lines + ESPN FPI · ML, spread, total · own ledger & bank" },
   { sport: "nfl", blurb: "Consensus lines + ESPN FPI · ML, spread, total · own ledger & bank · Sundays, TNF, MNF" },
 ];

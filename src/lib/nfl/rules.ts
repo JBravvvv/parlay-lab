@@ -62,7 +62,7 @@ export const NFL_MODEL = {
   spreadBlend: { mkt: 0.75, fpi: 0.25 },
   pinnacleWeight: 2,
   minBooks: 2,
-  settleBook: "williamhill_us",
+  settleBook: "draftkings",
   /** how far apart (ms) an ESPN kickoff and an odds-feed commence_time may sit and still match */
   matchWindowMs: 3 * 3600_000,
 } as const satisfies LeagueModel;
@@ -191,7 +191,7 @@ export const NFL_PROPS = {
   czMissingWindowSec: 4 * 3600,
   regions: "us",
   minBooks: 2,
-  settleBook: "williamhill_us",
+  settleBook: "draftkings",
   dailyBudget: 1000,
   measuredCreditsPerEvent: 31,
   /**

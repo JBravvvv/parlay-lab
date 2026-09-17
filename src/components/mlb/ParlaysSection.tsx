@@ -273,7 +273,7 @@ export function ParlaysSection({
             {offBook.length > 0 && (
               <details className="mt-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-3">
                 <summary className="cursor-pointer select-none text-[12px] font-semibold text-muted">
-                  Not at the selected book ({offBook.length}) — tickets with a leg Caesars doesn&apos;t price
+                  Not at the selected book ({offBook.length}) — tickets with a leg the selected book doesn&apos;t price
                 </summary>
                 <div className="mt-3 space-y-1.5">
                   {offBook.map((t, ti) => (

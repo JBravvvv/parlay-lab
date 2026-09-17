@@ -11,6 +11,7 @@ import { CFB_LEAGUE, CFB_MODEL } from "@/lib/cfb/rules";
 import { NFL_LEAGUE, NFL_MODEL, NFL_PAPER, NFL_PARLAYS, NFL_RULES } from "@/lib/nfl/rules";
 import { CFB_PARLAY_CATEGORIES } from "@/lib/cfb/props-types";
 import type { CfbBoard, CfbCardOpts } from "@/lib/cfb/types";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * THE SHARED FOOTBALL ENGINE ON THE NFL FIXTURES (2026-09-08, the NFL build — Josh: "NFL needs
@@ -26,7 +27,7 @@ import type { CfbBoard, CfbCardOpts } from "@/lib/cfb/types";
 
 type Rec = Record<string, unknown>;
 const FIX = path.join(process.cwd(), "tests", "fixtures", "nfl");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-13.json") as { events: unknown[] };
 const ODDS = readJson("odds-2026-09-13.json") as Array<Record<string, unknown>>;
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -129,7 +130,7 @@ function sharpenCaesars(events: Array<Record<string, unknown>>, pct: number): Ar
   return events.map((raw) => {
     const ev = JSON.parse(JSON.stringify(raw)) as Rec;
     for (const bk of ev.bookmakers as Rec[]) {
-      if (bk.key !== "williamhill_us") continue;
+      if (bk.key !== NFL_MODEL.settleBook) continue;
       for (const m of bk.markets as Rec[]) for (const o of m.outcomes as Rec[]) o.price = betterPrice(o.price as number, pct);
     }
     return ev;

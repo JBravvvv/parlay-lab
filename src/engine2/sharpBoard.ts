@@ -71,7 +71,7 @@ export function basisPick(dk: number | null, fd: number | null): { am: number; b
   return decFromAmerican(fd) > decFromAmerican(dk) ? { am: fd, bk: "FD" } : { am: dk, bk: "DK" };
 }
 
-function mlConsensus(ev_: OddsEvent, book = "williamhill_us") {
+function mlConsensus(ev_: OddsEvent, book = "draftkings") {
   const books: { key: string; a: number; b: number }[] = [];
   let czAway: number | null = null;
   let czHome: number | null = null;
@@ -99,7 +99,7 @@ function mlConsensus(ev_: OddsEvent, book = "williamhill_us") {
   };
 }
 
-function totalConsensus(ev_: OddsEvent, book = "williamhill_us") {
+function totalConsensus(ev_: OddsEvent, book = "draftkings") {
   // consensus over the MOST COMMON total point among books (apples to apples)
   const byPoint = new Map<number, { key: string; a: number; b: number }[]>();
   let cz: { point: number; over: number; under: number } | null = null;
@@ -131,7 +131,7 @@ function totalConsensus(ev_: OddsEvent, book = "williamhill_us") {
   };
 }
 
-export async function loadSharpBoard(book = "williamhill_us"): Promise<{ games: SharpGame[]; at: number }> {
+export async function loadSharpBoard(book = "draftkings"): Promise<{ games: SharpGame[]; at: number }> {
   const r = await fetch(`/api/odds?u=${encodeURIComponent(UPSTREAM)}`);
   if (!r.ok) throw new Error(`odds ${r.status}`);
   const events: OddsEvent[] = await r.json();

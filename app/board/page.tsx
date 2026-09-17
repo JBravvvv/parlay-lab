@@ -7,7 +7,7 @@ import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {useSportsbook} from "@/lib/sportsbook/store";
-import {bookName,DEFAULT_BOOK,valueAt,decimal} from "@/lib/sportsbook/books";
+import {bookName,DEFAULT_BOOK,SETTLE_BOOK,valueAt,decimal} from "@/lib/sportsbook/books";
 import {priceMlbRow,type QuoteIndex} from "@/lib/sportsbook/mlb";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -65,7 +65,8 @@ import { MLB_LIVE_CLIENT, mlbLiveAgeLabel, mlbLiveClockLabel, mlbLiveGap, mlbLiv
    the non-Caesars lines from ALL"): ALL keeps only the lines Caesars posts (`cz` priced) —
    a line another book posts at a different number (the "O 0.5 H+R+RBI" rows Josh saw when
    Caesars had 1.5) is hidden and counted in the footnote, never graded. The settle book
-   stays Caesars until Josh says he is in another state on DK / FD. */
+   stays Caesars until Josh says he is in another state on DK / FD. INSTRUCTION 67 (2026-09-17):
+   the settle book is DraftKings now — same rule, the `cz` quote is the DraftKings one. */
 type Scope = "top" | "all";
 const MARKET_SHORT: Record<string, string> = {
   batter_rbis: "RBI",
@@ -348,7 +349,7 @@ function MlbBoardPage() {
           const odds = r.o ?? r.cz?.o ?? null;
           out.push({
             rank: 0, player: `${r.p} (${r.tm})`, side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
-            cz: r.cz?.o ?? null, odds, book: r.o != null ? r.oBook : odds != null ? "Caesars" : null,
+            cz: r.cz?.o ?? null, odds, book: r.o != null ? r.oBook : odds != null ? bookName(SETTLE_BOOK) : null,
             gkey: g.gkey, start: g.start, res: null, market: m, lkey: r.lkey ?? null,
           });
         }
@@ -617,7 +618,7 @@ function MlbBoardPage() {
                  basis — and the stored one prices a different line. It is withdrawn and said so. */
               cell: (r) =>
                 rowQuote(r) ? (
-                  <span className="text-[10px] text-faint" title="The in-play pull prices Caesars only — there is no live DK/FD basis, and the pregame one prices a different line">
+                  <span className="text-[10px] text-faint" title="The in-play pull prices DraftKings only — there is no live DK/FD basis, and the pregame one prices a different line">
                     no live DK/FD basis
                   </span>
                 ) : r.bsOdds != null ? (
@@ -654,7 +655,7 @@ function MlbBoardPage() {
                   /* the in-play pull asks for the six core markets at us regions only, so there is
                      no live DK/FD basis to price against — the honest substitute is the EV at the
                      live selected-book line, said in as many words rather than a pregame basis number */
-                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live selected-book line" note="the in-play pull prices Caesars, so there is no live DK/FD basis — this is the EV at the live selected-book line" />
+                  <LiveEv view={mlbLiveView(q, legSideOf(r.sub))} basis="EV at the live selected-book line" note="the in-play pull prices DraftKings, so there is no live DK/FD basis — this is the EV at the live selected-book line" />
                 ) : r.bsEv != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <EvBadge ev={Number(r.bsEv)} />
@@ -697,7 +698,7 @@ function MlbBoardPage() {
                  in-play pull buys Caesars only, so there is no live best to put here (fix pass) */
               cell: (r) =>
                 rowQuote(r) ? (
-                  <span className="text-[10px] text-faint" title="The in-play pull prices Caesars only — no all-books survey exists at the live line">
+                  <span className="text-[10px] text-faint" title="The in-play pull prices DraftKings only — no all-books survey exists at the live line">
                     no live best
                   </span>
                 ) : (r.displayBook ? r.bestDisplayOdds : r.odds) != null ? (
@@ -1106,7 +1107,7 @@ function MlbBoardPage() {
             : d
               ? `${gameCount} games · ${pickCount} live board rows · prop tabs show the day's stamped picks · TOP 50 ${selectedBookName} price comparison · ${basisMode ? "priced at the DK/FD basis (Builder's selection price) · Caesars settles" : "consensus is multi-book, prices follow your selected sportsbook"} · ${SIM_PATHS_TXT}-path sims · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${underWayNote}`
               : basisMode
-                ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at Caesars"
+                ? "Consensus de-vigged probability · EV at the DK/FD basis, settled at DraftKings"
                 : "Consensus de-vigged probability vs the selected sportsbook line"
         }
         action={
@@ -1410,7 +1411,7 @@ function MlbBoardPage() {
       <div className="mt-4 text-[10.5px] text-faint">
         {quota && <>Odds API quota remaining: <span className="num">{quota}</span> · </>}
         {basisMode
-          ? "EV and Kelly are at the DK/FD basis (the better de-vigged price of the pair, tie → DK) — the exact price the Builder selects on. Caesars is the settlement price; the NV app can differ — confirm at lock."
+          ? "EV and Kelly are at the DK/FD basis (the better de-vigged price of the pair, tie → DK) — the exact price the Builder selects on. DraftKings is the settlement price; the DK app can differ — confirm at lock."
           : "Prices are from the selected sportsbook via The Odds API; local availability can differ."}
         Informational only, not betting advice.
       </div>

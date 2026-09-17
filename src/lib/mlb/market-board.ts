@@ -1,4 +1,5 @@
 import type {PropBoardGame} from "@/engine";
+import {SETTLE_BOOK,bookName} from "@/lib/sportsbook/books";
 import type {MlbLiveQuoteBoard} from "./live-quote-types";
 import type {LiveNowRead} from "@/lib/liveNow";
 
@@ -23,7 +24,7 @@ export function liveMarketBoard(board: readonly PropBoardGame[], overlay: MlbLiv
    if(seen.has(lkey))continue;
    seen.add(lkey);
    (markets[market]??=[]).push({...row,lkey,ln:q.ln,alt:false,quoteAt:q.at,
-    o:q.czAm,u:q.oppAm,oBook:row.displayBook??"Caesars",uBook:row.displayBook??"Caesars",
+    o:q.czAm,u:q.oppAm,settlementBook:SETTLE_BOOK,oBook:row.displayBook??bookName(SETTLE_BOOK),uBook:row.displayBook??bookName(SETTLE_BOOK),
     bookQuotes:{
       o:Object.fromEntries(Object.entries(q.quotes??{}).flatMap(([book,v])=>v.o==null?[]:[[book,{am:v.o,line:q.ln,book,at:q.at}]])),
       u:Object.fromEntries(Object.entries(q.quotes??{}).flatMap(([book,v])=>v.u==null?[]:[[book,{am:v.u,line:q.ln,book,at:q.at}]]))},

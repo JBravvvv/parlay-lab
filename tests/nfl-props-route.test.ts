@@ -165,7 +165,7 @@ describe("the NFL props rules", () => {
     expect(NFL_PROPS.dailyBudget).toBe(1000);
     expect(NFL_PROPS.measuredCreditsPerEvent).toBe(31);
     expect(NFL_PROPS.regions).toBe("us");
-    expect(NFL_PROPS.settleBook).toBe("williamhill_us");
+    expect(NFL_PROPS.settleBook).toBe("draftkings");
     expect(NFL_LEAGUE.props).toBe(NFL_PROPS);
     expect(KEYS).toEqual({ board: "pl:nfl:props:v1:", spend: "pl:nfl:props:spend:v1:" });
     expect(NFL_LEAGUE.redis.propsBoard).toBe(KEYS.board);

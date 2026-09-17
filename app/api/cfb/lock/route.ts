@@ -415,7 +415,7 @@ export async function GET(req: NextRequest) {
         pricedAhead,
         ahead: d.ahead,
         games: d.total,
-        note: `no Caesars price on any of the ${d.ahead} games still ahead (${why}) — nothing written, the next poke retries. A day is never locked NO-PLAY for want of lines.`,
+        note: `no DraftKings price on any of the ${d.ahead} games still ahead (${why}) — nothing written, the next poke retries. A day is never locked NO-PLAY for want of lines.`,
       },
       { status: 502 },
     );

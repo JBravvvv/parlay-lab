@@ -53,7 +53,7 @@ const COLUMNS: Column<SampleRow>[] = [
     cell: (r) => <ProbBar p={r.prob} className="w-32 justify-end" />,
   },
   { key: "fair", header: "Fair", numeric: true, sortValue: (r) => r.fair, cell: (r) => <OddsCell odds={r.fair} /> },
-  { key: "cz", header: "Caesars", numeric: true, sortValue: (r) => r.cz, cell: (r) => <OddsCell odds={r.cz} book="caesars" /> },
+  { key: "cz", header: "DraftKings", numeric: true, sortValue: (r) => r.cz, cell: (r) => <OddsCell odds={r.cz} book="caesars" /> },
   { key: "ev", header: "EV", numeric: true, sortValue: (r) => r.ev, cell: (r) => <EvBadge ev={r.ev} /> },
 ];
 
@@ -237,7 +237,7 @@ export default function DesignPage() {
                     The Sharp · featured
                   </div>
                   <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-gold">
-                    @ Caesars
+                    @ DraftKings
                   </span>
                 </div>
                 <div className="mt-2 text-[14px] font-semibold text-text">
@@ -426,7 +426,7 @@ export default function DesignPage() {
               <OddsCell odds={movedOdds} />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-muted">Caesars (gold, always)</span>
+              <span className="text-[11px] text-muted">DraftKings (gold, always)</span>
               <OddsCell odds={movedOdds - 12} book="caesars" />
             </div>
             <EvBadge ev={4.2} />

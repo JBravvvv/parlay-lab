@@ -484,7 +484,7 @@ export function CfbBuilder() {
             )}
             {locked.noPlay && (
               <p className="mt-3 text-[12px] leading-relaxed text-muted">
-                No side cleared +{L.rules.minEvPct}% EV at Caesars under {L.rules.maxDec.toFixed(2)} that day — recommended stake $0.
+                No side cleared +{L.rules.minEvPct}% EV at DraftKings under {L.rules.maxDec.toFixed(2)} that day — recommended stake $0.
               </p>
             )}
           </Panel>
@@ -505,7 +505,7 @@ export function CfbBuilder() {
             title={`${label}'s card`}
             action={
               <span className="num text-[11px] text-faint">
-                {slate.games.length} games{slate.oddsMissing ? " · Caesars prices missing" : ""}
+                {slate.games.length} games{slate.oddsMissing ? " · DraftKings prices missing" : ""}
                 {fetching ? " · refreshing" : ""}
               </span>
             }
@@ -518,7 +518,7 @@ export function CfbBuilder() {
               <div className="mt-3 rounded-[14px] border border-line-2 bg-white/[0.03] px-4 py-4">
                 <div className="display text-[18px] leading-none tracking-tight text-text">NO-PLAY</div>
                 <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                  No playable side clears +{L.rules.minEvPct}% EV at Caesars under {L.rules.maxDec.toFixed(2)} on this slate.
+                  No playable side clears +{L.rules.minEvPct}% EV at DraftKings under {L.rules.maxDec.toFixed(2)} on this slate.
                   Recommended core stake <b className="num text-text">$0</b> — record the day so the ledger shows the desk sat out.
                 </p>
               </div>

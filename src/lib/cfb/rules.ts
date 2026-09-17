@@ -72,7 +72,7 @@ export const CFB_MODEL = {
   spreadBlend: { mkt: 0.75, fpi: 0.25 },
   pinnacleWeight: 2,
   minBooks: 2,
-  settleBook: "williamhill_us",
+  settleBook: "draftkings",
   /** how far apart (ms) an ESPN kickoff and an odds-feed commence_time may sit and still match */
   matchWindowMs: 3 * 3600_000,
 } as const;
@@ -367,7 +367,7 @@ export const CFB_ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sport
 export const CFB_ESPN_FPI = "https://site.web.api.espn.com/apis/fitt/v3/sports/football/college-football/powerindex?region=us&lang=en&limit=400";
 
 /** Player props (INSTRUCTION 39): the Odds API event-odds endpoint is one call per event,
-    so a slate is capped at `maxEvents` priced events; `settleBook` is Caesars, as everywhere.
+    so a slate is capped at `maxEvents` priced events; `settleBook` is DraftKings, as everywhere (INSTRUCTION 67, 2026-09-17; was Caesars).
 
     QUOTA RAILS (2026-09-05, measured on prod): one fresh 24-event pull cost ~753 credits —
     about 31 credits per event (x-requests-used 2428 → 3187 across the pull plus one 6-credit
@@ -471,7 +471,7 @@ export const CFB_PROPS = {
   czMissingWindowSec: 4 * 3600,
   regions: "us",
   minBooks: 2,
-  settleBook: "williamhill_us",
+  settleBook: "draftkings",
   /** credits the props route may spend per Pacific day (INSTRUCTION 42, 2026-09-05: was 1200) */
   dailyBudget: 2500,
   /** measured 2026-09-05 (~753 credits / 24 events); the budget estimate's per-event cost */

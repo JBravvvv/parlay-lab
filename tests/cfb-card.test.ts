@@ -5,6 +5,7 @@ import { buildCfbBoard } from "@/lib/cfb/model";
 import { buildCfbCard, legOf } from "@/lib/cfb/card";
 import { CFB_PAPER, CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbBoard, CfbCard, CfbTicket } from "@/lib/cfb/types";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * THE CFB PAPER CARD (INSTRUCTION 38, 2026-09-05): $150 core + $25 fun per slate day, under
@@ -15,7 +16,7 @@ import type { CfbBoard, CfbCard, CfbTicket } from "@/lib/cfb/types";
  */
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const NOW = Date.parse("2026-09-05T12:00:00Z");
 const DATE = "2026-09-05";
 const OPTS = { bankroll: 2500, daily: CFB_PAPER.daily, fun: CFB_PAPER.fun, now: NOW };
@@ -78,21 +79,21 @@ function oddsEvent(i: number, books: Book[], commence = "2026-09-05T16:00:00Z") 
 /** market at −250 / +210 on the home ML, Caesars off-market at −180 → the home ML is a short-priced +EV side */
 const favEdge = (czHome = -180): Book[] => [
   { key: "pinnacle", title: "Pinnacle", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-  { key: "draftkings", title: "DraftKings", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-  { key: "williamhill_us", title: "Caesars", h2h: [czHome, 150], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+  { key: "williamhill_us", title: "Caesars", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+  { key: "draftkings", title: "DraftKings", h2h: [czHome, 150], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
 ];
 /** fair-priced everywhere: no side clears +2% at Caesars */
 const flat: Book[] = [
   { key: "pinnacle", title: "Pinnacle", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
-  { key: "draftkings", title: "DraftKings", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
   { key: "williamhill_us", title: "Caesars", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
+  { key: "draftkings", title: "DraftKings", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
 ];
 /** the market is fair, Caesars quotes -200 on BOTH sides of everything: every side is graded F
     (EV far under CFB_RULES.fun.minEvPct = -3), so neither bucket has anything to buy */
 const heavyVig: Book[] = [
   { key: "pinnacle", title: "Pinnacle", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
-  { key: "draftkings", title: "DraftKings", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
-  { key: "williamhill_us", title: "Caesars", h2h: [-300, -200], spread: [-3, -200, -200], total: [48.5, -200, -200] },
+  { key: "williamhill_us", title: "Caesars", h2h: [-150, 130], spread: [-3, -110, -110], total: [48.5, -110, -110] },
+  { key: "draftkings", title: "DraftKings", h2h: [-300, -200], spread: [-3, -200, -200], total: [48.5, -200, -200] },
 ];
 function synthBoard(n: number, books: (i: number) => Book[]): CfbBoard {
   const idx = Array.from({ length: n }, (_, i) => i + 1);
@@ -276,7 +277,7 @@ describe("the fun allotment is gated independently of the core (INSTRUCTION 45)"
   it("the note tells the truth: no NO-PLAY claim on a day that staked the fun money", () => {
     const card = buildCfbCard(rest, OPTS);
     expect(card.notes.some((n) => /^NO-PLAY/.test(n))).toBe(false);
-    expect(card.notes.some((n) => /no playable side clears \+2% EV at Caesars/.test(n))).toBe(true);
+    expect(card.notes.some((n) => /no playable side clears \+2% EV at DraftKings/.test(n))).toBe(true);
   });
 
   it("the fun bucket does not depend on the core's room: daily $0 and daily $150 both seat the parlay", () => {
@@ -413,8 +414,8 @@ describe("synthetic slates through the real model", () => {
     // −205 (dec 1.4878) → EV ≈ +0.9%: above 0, under the +2% gate, under 1.75 — exactly the forced pool.
     const nearFair: Book[] = [
       { key: "pinnacle", title: "Pinnacle", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-      { key: "draftkings", title: "DraftKings", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
-      { key: "williamhill_us", title: "Caesars", h2h: [-205, 175], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+      { key: "williamhill_us", title: "Caesars", h2h: [-250, 210], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
+      { key: "draftkings", title: "DraftKings", h2h: [-205, 175], spread: [-6.5, -110, -110], total: [50.5, -110, -110] },
     ];
     const board = synthBoard(8, (i) => (i <= 2 ? favEdge() : i === 3 ? nearFair : flat));
     const g3 = board.games[2].rows.find((r) => r.market === "ml" && r.side === "home")!;

@@ -30,7 +30,7 @@ const MODE_LABEL: Record<string, string> = {
   ev_gated: "EV-gated @ CZ",
   dk_fd: "DK/FD basis",
   probability: "True probability",
-  caesars_ev: "Caesars EV",
+  caesars_ev: "DraftKings EV",
 };
 
 const signed = (v: number | null, digits = 2, unit = "") =>
@@ -162,7 +162,7 @@ export function ClvPanel() {
                 </th>
                 <th className="pb-2 text-right">±SE</th>
                 <th className="pb-2 text-right">n (CZ)</th>
-                <th className="pb-2 text-right" title="Locked Caesars price vs the last pre-pitch Caesars price, in cents; positive = we beat the close">
+                <th className="pb-2 text-right" title="Locked settlement-book price vs the last pre-pitch price at that book (DraftKings since 2026-09-17), in cents; positive = we beat the close">
                   CZ cents
                 </th>
               </tr>

@@ -7,6 +7,7 @@ import { NFL_LEAGUE } from "@/lib/nfl/rules";
 import { ptDateOf, kickoffLabel, espnDateParam, nextDate } from "@/lib/cfb/dates";
 import { normCdf } from "@/lib/cfb/normal";
 import type { CfbBoard, CfbBuildInput, CfbGame } from "@/lib/cfb/types";
+import { swapSettleBook } from "./helpers/settle-book";
 
 /**
  * THE CFB MODEL ON THE 2026-09-05 FIXTURES (INSTRUCTION 38). Every number asserted here is
@@ -18,7 +19,7 @@ import type { CfbBoard, CfbBuildInput, CfbGame } from "@/lib/cfb/types";
  */
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-05.json") as { events: unknown[] };
 const ODDS = readJson("odds-ncaaf-2026-09-05.json") as Array<Record<string, unknown>>;
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -126,7 +127,7 @@ describe("the full fixture board — 12 games, 0 unmatched, every market priced"
         expect(r.fair + r.push).toBeLessThanOrEqual(1 + 1e-12);
         expect(Number.isFinite(r.fairAm)).toBe(true);
         expect(r.key).toBe(`${g.id}|${r.market}|${r.side}|${r.line ?? ""}`);
-        if (r.cz) expect(r.cz.book).toBe("williamhill_us");
+        if (r.cz) expect(r.cz.book).toBe("draftkings");
         if (r.pin) expect(r.pin.book).toBe("pinnacle");
         if (r.dk) expect(r.dk.book).toBe("draftkings");
         if (r.fd) expect(r.fd.book).toBe("fanduel");
@@ -189,11 +190,12 @@ describe("the full fixture board — 12 games, 0 unmatched, every market priced"
     const iu = game(b, "IU");
     const nt = row(iu, "North Texas +40.5"); // consensus line +40.5 (fixture: DK/FD 40.5, Caesars 39.5, Pinnacle 41)
     expect(nt.line).toBe(40.5);
-    expect(nt.cz).toMatchObject({ book: "williamhill_us", price: -104, line: 39.5 });
+    expect(nt.cz).toMatchObject({ book: "draftkings", price: -104, line: 39.5 });
     expect(nt.pin).toMatchObject({ book: "pinnacle", price: -116, line: 41 });
-    expect(nt.dk).toMatchObject({ book: "draftkings", price: -110, line: 40.5 });
+    // the swapped capture (tests/helpers/settle-book.ts): the old DK quote now sits under `williamhill_us`
+    expect(nt.quotes?.williamhill_us).toMatchObject({ book: "williamhill_us", price: -110, line: 40.5 });
     expect(nt.best!.line).toBe(40.5);
-    expect(nt.best!.dec).toBeGreaterThanOrEqual(nt.dk!.dec);
+    expect(nt.best!.dec).toBeGreaterThanOrEqual(nt.quotes!.williamhill_us!.dec);
     const sub = nt.sub;
     expect(sub).toBe("@ Indiana · Sat 9:00 AM");
     expect(row(iu, "Indiana -40.5").sub).toBe("vs North Texas · Sat 9:00 AM");
@@ -237,7 +239,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
    *   ECU +28 at −106 (dec 1.943396): win = 0.4924271 → EV = −1.8846 %
    */
   it("CHECK 1 · Alabama −28 / East Carolina +28 at Caesars (fixture prices, Pinnacle-weighted median)", () => {
-    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["williamhill_us", "pinnacle"])], fpi: null });
+    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["draftkings", "pinnacle"])], fpi: null });
     const ala = game(b, "ALA");
     expect(ala.model.books).toEqual({ ml: 0, spread: 2, total: 2 });
     expect(ala.model.parts.mkt).toBeNull();
@@ -259,7 +261,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
     expect(a.evCz!).toBeCloseTo(-1.88, 2);
     expect(a.grade).toBe("D");
     // evBest: the best price at the consensus line among the two books — ECU +28: Caesars −106 beats Pinnacle −109
-    expect(a.best).toMatchObject({ book: "williamhill_us", price: -106 });
+    expect(a.best).toMatchObject({ book: "draftkings", price: -106 });
     expect(a.evBest).toBe(a.evCz);
   });
 
@@ -274,7 +276,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
    *   Under 52.5 at Caesars −109 (dec 1.917431): win = 0.5044524 → EV = −3.2747 %
    */
   it("CHECK 2 · Over / Under 52.5 at Caesars (fixture prices)", () => {
-    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["williamhill_us", "pinnacle"])], fpi: null });
+    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["draftkings", "pinnacle"])], fpi: null });
     const ala = game(b, "ALA");
     expect(ala.model.muTotal!).toBeCloseTo(52.299108434453615, 9);
     const o = row(ala, "Over 52.5");
@@ -285,7 +287,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
     expect(o.evCz!).toBeCloseTo(-6.2, 2);
     expect(u.fair).toBeCloseTo(0.5044523597506678, 9);
     expect(u.evCz!).toBeCloseTo(-3.27, 2);
-    expect(u.best).toMatchObject({ book: "williamhill_us", price: -109, line: 52.5 });
+    expect(u.best).toMatchObject({ book: "draftkings", price: -109, line: 52.5 });
   });
 
   /*
@@ -301,7 +303,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
    *   EV = 100·(0.0461216·20 − 0.9538784) = −3.1447 %.
    */
   it("CHECK 3 · Alabama / East Carolina ML at the best posted price (fixture prices, no Caesars ML)", () => {
-    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["draftkings", "fanduel"], ["h2h"])], fpi: null });
+    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["williamhill_us", "fanduel"], ["h2h"]) /* the swapped capture: the old DK ML sits under williamhill_us */], fpi: null });
     const ala = game(b, "ALA");
     expect(ala.model.books).toEqual({ ml: 2, spread: 0, total: 0 });
     expect(ala.model.parts.mkt!).toBeCloseTo(0.9538784067085954, 9);
@@ -313,7 +315,7 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
     expect(h.cz).toBeNull();
     expect(h.evCz).toBeNull();
     expect(h.playable).toBe(false);
-    expect(h.best).toMatchObject({ book: "draftkings", price: -6500 });
+    expect(h.best).toMatchObject({ book: "williamhill_us", price: -6500 });
     expect(h.evBest!).toBeCloseTo(-3.14, 2);
     expect(a.best).toMatchObject({ price: 2000 });
     expect(a.evBest!).toBeCloseTo(-3.14, 2);
@@ -331,12 +333,12 @@ describe("hand-computed EV checks from fixture prices (reduced books so the medi
    *   Liberty ML at Caesars +188 (dec 2.88): EV = 100·(0.3300596·1.88 − 0.6699404) = −4.9428 %
    */
   it("CHECK 4 · James Madison / Liberty ML at Caesars (fixture prices)", () => {
-    const b = build({ oddsEvents: [reduced("James Madison Dukes", ["williamhill_us", "pinnacle"], ["h2h"])], fpi: null });
+    const b = build({ oddsEvents: [reduced("James Madison Dukes", ["draftkings", "pinnacle"], ["h2h"])], fpi: null });
     const jmu = game(b, "JMU");
     expect(jmu.model.parts.mkt!).toBeCloseTo(0.6699404282724198, 9);
     const h = row(jmu, "James Madison ML");
     const a = row(jmu, "Liberty ML");
-    expect(h.cz).toMatchObject({ book: "williamhill_us", price: -230, line: null });
+    expect(h.cz).toMatchObject({ book: "draftkings", price: -230, line: null });
     expect(h.evCz!).toBeCloseTo(-3.88, 2);
     expect(h.grade).toBe("F");
     expect(h.playable).toBe(true);
@@ -432,7 +434,7 @@ describe("skeleton rules", () => {
     expect(b.slateDates).toEqual(["2026-09-05"]);
   });
   it("one book at a line is below minBooks → that market has no consensus", () => {
-    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["williamhill_us"])], fpi: null });
+    const b = build({ oddsEvents: [reduced("Alabama Crimson Tide", ["draftkings"])], fpi: null });
     const ala = game(b, "ALA");
     expect(ala.model.books).toEqual({ ml: 0, spread: 1, total: 1 });
     expect(ala.model.parts.mktMargin).toBeNull();

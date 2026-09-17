@@ -79,9 +79,10 @@ import { espnEvents, slateFromEspn } from "@/lib/cfb/slate-server";
 import { buildCfbCard } from "@/lib/cfb/card";
 import { GET } from "../app/api/cfb/lock/route";
 import * as lockRouteMod from "../app/api/cfb/lock/route";
+import { swapSettleBook } from "./helpers/settle-book";
 
 const FIX = path.join(process.cwd(), "tests", "fixtures", "cfb");
-const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8"));
+const readJson = (f: string) => swapSettleBook(JSON.parse(fs.readFileSync(path.join(FIX, f), "utf8")));
 const ESPN = readJson("espn-scoreboard-2026-09-05.json") as { events: unknown[] };
 const ODDS = readJson("odds-ncaaf-2026-09-05.json") as unknown[];
 const FPI = readJson("espn-fpi.json") as unknown;
@@ -572,7 +573,7 @@ describe("DEFECT 1 — an odds outage inside the window must never lock the day 
     expect(body.oddsMissing).toBe(true);
     expect(Number(body.pricedAhead)).toBeGreaterThan(0);
     expect(body.ahead).toBe(12);
-    expect(String(body.note)).toMatch(/no Caesars price/i);
+    expect(String(body.note)).toMatch(/no DraftKings price/i);
     /* and it is the FEED's failure that is named, not the match count */
     expect(String(body.note)).toMatch(/the Odds API call failed or had no key/);
     expect(fr.sets().length).toBe(0);
@@ -590,7 +591,7 @@ describe("DEFECT 1 — an odds outage inside the window must never lock the day 
     expect(body.pricedAhead).toBe(0);
     expect(body.ahead).toBe(12);
     expect(body.games).toBe(12);
-    expect(String(body.note)).toMatch(/no Caesars price/i);
+    expect(String(body.note)).toMatch(/no DraftKings price/i);
     expect(fr.sets().length).toBe(0);
     expect(fr.ledger()).toEqual([]);
   });
@@ -661,7 +662,7 @@ describe("DEFECT 1 — an odds outage inside the window must never lock the day 
     expect(body.noPlay).toBe(true);
     expect(body.core).toBe(0);
     expect(body.coreStake).toBe(0);
-    expect(String(body.note)).toMatch(/no playable side clears \+2% EV at Caesars/);
+    expect(String(body.note)).toMatch(/no playable side clears \+2% EV at DraftKings/);
     expect(fr.sets().length).toBe(1);
     const e = fr.ledger()[0];
     expect(e.noPlay).toBe(true);
@@ -1138,7 +1139,7 @@ describe("DEFECT 4 (2026-09-06) — a swept day states the cause it can actually
     expect(y.source).toBe("server-lock");
     expect(y.trigger).toBe("cfb-lock-sweep-odds"); // its own trigger, distinct forever
     expect(String(y.note)).toMatch(/poked inside its lock window/i);
-    expect(String(y.note)).toMatch(/no Caesars price/i);
+    expect(String(y.note)).toMatch(/no DraftKings price/i);
     expect(String(y.note)).not.toMatch(/no scheduler poke ever landed/i);
     expect(sweepDays(body)[0]).toMatchObject({ date: A, action: "recorded", cause: "odds-gap" });
     // day B priced normally, so it stamped no marker of its own — A's is still the only one
@@ -1156,7 +1157,7 @@ describe("DEFECT 4 (2026-09-06) — a swept day states the cause it can actually
     const y = fr.ledger().find((e) => e.date === A)!;
     expect(y.trigger).toBe(CFB_SWEEP_TRIGGER);
     expect(String(y.note)).toMatch(/swept on the following day's poke/);
-    expect(String(y.note)).not.toMatch(/no Caesars price/i);
+    expect(String(y.note)).not.toMatch(/no DraftKings price/i);
     expect(sweepDays(body)[0]).toMatchObject({ date: A, action: "recorded", cause: "no-lock" });
     // and the note never asserts a cause it cannot prove: it states what IS known
     expect(String(y.note)).not.toMatch(/because no scheduler poke ever landed/);

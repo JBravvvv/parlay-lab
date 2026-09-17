@@ -85,7 +85,7 @@ export function buildFunHrTickets(
     // most-likely-first; name breaks ties so the order is total and deterministic
     .sort((a, b) => Number(b.prob) - Number(a.prob) || a.player.localeCompare(b.player));
   if (!pool.length || amt <= 0) {
-    return { tickets: [], sum: 0, note: "fun: no Caesars-priced HR-over pool today" };
+    return { tickets: [], sum: 0, note: "fun: no DraftKings-priced HR-over pool today" };
   }
 
   const appearances = new Map<string, number>();

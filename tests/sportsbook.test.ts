@@ -22,7 +22,7 @@ const data:BoardData={categories:{ml:[{label:'Away ML',sub:'ML vs Home',prob:50,
 const event={id:'one',home_team:'Home',away_team:'Away',commence_time:'2099-01-01',bookmakers:[{key:'draftkings',title:'DraftKings',last_update:'2098-12-31',markets:[{key:'h2h',outcomes:[{name:'Away',price:120},{name:'Home',price:-140}]},{key:'batter_hits',outcomes:[{name:'Over',description:'Player',point:.5,price:120},{name:'Under',description:'Player',point:.5,price:-140}]}]}]};
 describe('MLB sportsbook projections',()=>{
  it('captures existing responses without changing their contents',()=>{const capture=quoteCapture();capture.capture(event);expect(capture.events.size).toBe(1);expect(event.bookmakers[0].key).toBe('draftkings');capture.clear();expect(capture.events.size).toBe(0);});
- it('joins exact games and lines, reprices tickets, leaves historical input untouched',()=>{const enriched=attachBookQuotes(data,[event]);const out=priceMlbBoard(enriched,'draftkings');expect(out.categories.ml[0].czOdds).toBe(120);expect(out.categories.ml[0].czEv).toBeCloseTo(10);expect(out.parlays[0].czDec).toBeCloseTo(4.84);expect(out.parlays[0].czEv).toBeCloseTo(21);expect(data.categories.ml[0].czOdds).toBe(-130);expect(data.parlays[0].czDec).toBe(3);expect(out.propBoard?.[0].markets.batter_hits[0].cz?.u).toBe(-140);});
+ it('joins exact games and lines, reprices tickets, leaves historical input untouched',()=>{const enriched=attachBookQuotes(data,[event],'williamhill_us');/* the fixture's cz prices are Caesars' */const out=priceMlbBoard(enriched,'draftkings');expect(out.categories.ml[0].czOdds).toBe(120);expect(out.categories.ml[0].czEv).toBeCloseTo(10);expect(out.parlays[0].czDec).toBeCloseTo(4.84);expect(out.parlays[0].czEv).toBeCloseTo(21);expect(data.categories.ml[0].czOdds).toBe(-130);expect(data.parlays[0].czDec).toBe(3);expect(out.propBoard?.[0].markets.batter_hits[0].cz?.u).toBe(-140);});
  it('unoffered tickets have no combined selected-book odds',()=>{const out=priceMlbBoard(data,'betmgm');expect(out.parlays[0].czDec).toBeNull();expect(out.parlays[0].czEv).toBeNull();});
  it('never claims a best-price fallback belongs to the selected book',()=>{const row=data.propBoard![0].markets.batter_hits[0];expect(priceMlbProp(row,'draftkings').cz).toEqual({o:120,u:null});expect(priceMlbProp(row,'betmgm').o).toBeNull();});
  it('keeps live probability anchored to the live line for each side',()=>{const b={rows:{x:{ln:2.5,pLive:.3,czAm:-120,oppAm:100,quotes:{draftkings:{o:200,u:-220}}}}} as never;const out=priceLiveBoard(b,'draftkings')!;expect(out.rows.x.evCz).toBeCloseTo(-10);expect(out.rows.x.evOpp).toBeCloseTo(1.81818);expect(out.rows.x.ln).toBe(2.5);});
@@ -40,7 +40,7 @@ it('Caesars-only display never falls back to a different book on an unavailable 
 });
 it('normalizes an integer milestone into the identical half-line bet',()=>{
  const e={...event,bookmakers:[{...event.bookmakers[0],markets:[{key:'batter_hits_alternate',outcomes:[{name:'Over',description:'Player',point:1,price:120}]}]}]};
- expect(priceMlbBoard(attachBookQuotes(data,[e]),'draftkings').propBoard![0].markets.batter_hits[0].cz?.o).toBe(120);
+ expect(priceMlbBoard(attachBookQuotes(data,[e],'williamhill_us'),'draftkings').propBoard![0].markets.batter_hits[0].cz?.o).toBe(120);
 });
 it('does not attach quotes from an unmatched game',()=>{
  const e={...event,home_team:'Other'};

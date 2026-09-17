@@ -1,3 +1,4 @@
+import {SETTLE_BOOK} from "@/lib/sportsbook/books";
 import { NextRequest, NextResponse } from "next/server";
 import { createEngine } from "@/engine";
 import { decide, MIN_READY, SCHED_T } from "@/lib/server/scheduler-decide";
@@ -215,7 +216,7 @@ async function mlbTick(req: NextRequest): Promise<NextResponse> {
   try {
     const action = needsLockAction({ boardExists: board != null, lockExists: lock.present as boolean, deadSlate: d.reason === "dead-slate" });
     if (action === "backfill" && board) {
-      const eng = createEngine({
+      const eng = createEngine({ settlementBook: SETTLE_BOOK,
         fetchJson: () => Promise.reject(new Error("backfill lock never fetches")),
         storage: (() => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; })(),
       });
