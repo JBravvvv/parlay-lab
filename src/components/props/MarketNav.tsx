@@ -57,7 +57,7 @@ function Segmented({ tab, onTab }: { tab: TabKey; onTab: (t: TabKey) => void }) 
             aria-selected={on}
             onClick={() => onTab(t.key)}
             className={`rounded-[8px] text-[11.5px] font-semibold transition-colors duration-(--dur-fast) ${
-              on ? "bg-pos/15 text-pos shadow-[inset_0_0_0_1px_rgba(182,255,61,0.35)]" : "text-muted hover:text-text"
+              on ? "bg-pos/15 text-pos shadow-[inset_0_0_0_1px_rgba(255,95,184,0.35)]" : "text-muted hover:text-text"
             }`}
           >
             {t.label}

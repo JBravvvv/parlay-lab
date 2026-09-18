@@ -118,7 +118,7 @@ const DESKS: { sport: Sport; blurb: string }[] = [
 
 /** each desk's ring (when it is the current desk) and text accent — lime / amber / blue */
 const DESK_TONE: Record<Sport, { ring: string; text: string }> = {
-  mlb: { ring: "shadow-[inset_0_0_0_1px_rgba(182,255,61,0.55)]", text: "text-pos" },
+  mlb: { ring: "shadow-[inset_0_0_0_1px_rgba(255,95,184,0.55)]", text: "text-pos" },
   cfb: { ring: "shadow-[inset_0_0_0_1px_rgba(245,165,36,0.55)]", text: "text-cfb" },
   nfl: { ring: "shadow-[inset_0_0_0_1px_rgba(79,140,255,0.55)]", text: "text-nfl" },
 };

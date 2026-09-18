@@ -63,7 +63,7 @@ function tint(hex: string, alpha: number) {
 const NAV: readonly NavItem[] = [
   { href: "/games", label: "Games", icon: IconGames, group: "top", mobile: true, tone: "#7DD3FC" },
   { href: "/stats", label: "Stats", icon: IconStats, group: "top", mobile: true, tone: "#C4B5FD" },
-  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#B6FF3D" },
+  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#FF5FB8" },
   { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true, tone: "#FCD34D" },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "top", mobile: false, tone: "#FDA4AF" },
   { href: "/simulator", label: "Simulator", icon: IconSim, group: "top", mobile: false, tone: "#67E8F9" },
@@ -74,7 +74,7 @@ const NAV: readonly NavItem[] = [
   { href: "/season", label: "Season Lab", icon: IconSeason, group: "top", mobile: false, tone: "#F5A524", cfbOnly: true },
   // INSTRUCTION 68 (2026-09-17, Josh: "a tab titled 'Ballpark Factor' that shows daily ballpark factor for every stadium") — MLB-only,
   // desktop rail + the phone's top-bar icon row (its fifth icon on the MLB desk, the width Season Lab already proved on CFB).
-  { href: "/ballpark", label: "Ballpark Factor", icon: IconPark, group: "top", mobile: false, tone: "#86EFAC", mlbOnly: true },
+  { href: "/ballpark", label: "Ballpark Factor", icon: IconPark, group: "top", mobile: false, tone: "#F9A8D4", mlbOnly: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true, tone: "#FDE68A" },
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
 ];
@@ -104,7 +104,7 @@ function Brand() {
 
 /* Tone opacities: idle label/icon sit at 70% / 55% of the tab's tone; the active
    state is the full tone, and the pill fill, its inset ring and the glow are the
-   same hue at low alpha — so each tab lights up in its own colour, never always lime. */
+   same hue at low alpha — so each tab lights up in its own colour, never always pink. */
 const IDLE_LABEL = 0.7;
 const IDLE_ICON = 0.55;
 

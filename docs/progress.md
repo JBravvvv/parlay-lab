@@ -1,3 +1,7 @@
+# Progress — 2026-09-18 (brand goes pink to match the llama)
+
+- Josh: "I was saying the whole website should match the new color of the background. it was green with the green llama." The whole theme is retinted from electric green to hot pink: surfaces hue 160 → 330 (`--color-bg` … `--color-line-2`), `--color-pos` #b6ff3d → #ff5fb8, the brand gradient teal→green→lime → violet→magenta→hot pink (`--color-acc-*` token NAMES kept — classes and tests key on them), every lime rgba glow/glint/ev-glow/stat-tile shadow in globals.css, `Glow` pos halo, MarketNav ring, landing MLB ring, the Board tab tone (#FF5FB8) and Ballpark Factor tone (#F9A8D4), PWA theme/background colour #040b09 → #0b0408 (manifest + layout), and the three app icons recoloured (hue-shifted in place via ffmpeg; green originals kept in the session scratchpad). Red-orange −EV, gold, ice-blue live, CFB amber and NFL blue are untouched.
+
 # Progress — 2026-09-18 (backdrop back to the footage's original pink)
 
 - Josh: "Bring parlay lab background back to the original colors in this mp4. Pink instead of green for the most part." The `hue-rotate(120deg)` that recoloured `backdrop-llama.mp4` lime is removed from `VideoBackdrop` (no filter at all now); the CSS `.aurora` fallback under the video is retinted from green/teal to pink/rose so the loop gap and the no-autoplay still match the footage. No data or engine change.

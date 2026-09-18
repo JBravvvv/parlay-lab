@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 const HALOS = {
-  pos: "rgba(182,255,61,0.32)",
+  pos: "rgba(255,95,184,0.32)",
   gold: "rgba(199,154,59,0.34)",
   live: "rgba(92,200,255,0.30)",
 } as const;

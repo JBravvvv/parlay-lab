@@ -203,7 +203,7 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
     expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
       Games: "#7DD3FC",
       Stats: "#C4B5FD",
-      Board: "#B6FF3D",
+      Board: "#FF5FB8",
       Builder: "#FCD34D",
       "The Sharp": "#FDA4AF",
       Simulator: "#67E8F9",
@@ -212,7 +212,7 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
       // 2026-09-08 (INSTRUCTION 46): the CFB amber, --color-cfb — Season Lab is a CFB-only page
       "Season Lab": "#F5A524",
       // 2026-09-17 (INSTRUCTION 68): a mint, distinct from the Board's lime — an MLB-only page
-      "Ballpark Factor": "#86EFAC",
+      "Ballpark Factor": "#F9A8D4",
       Ledger: "#FDE68A",
       Settings: "#D4D4D8",
     });
