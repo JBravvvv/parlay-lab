@@ -13,7 +13,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-18:** `origin/frontend-rebuild` = `afa68ad` (verified by `git rev-parse refs/remotes/origin/frontend-rebuild` before the pink-brand release).
+> - **STATE-CLAIM 2026-09-18:** `origin/frontend-rebuild` = `0819dcd` (verified by `git rev-parse refs/remotes/origin/frontend-rebuild` after the pink-brand release, deployed as parlay-luqnxhok8).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
