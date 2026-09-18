@@ -3,6 +3,9 @@ import {bookName} from "@/lib/sportsbook/books";
 
 import { useEffect, useRef } from "react";
 import { amFmt, type SandboxLeg } from "@/lib/ticket-math";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { mlbLegSplit } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import { parseMatchup, teamAbbr, teamCode, teamLogo, teamLogoFromLabel } from "@/lib/mlb-visuals";
 import { legId, playerMatches, type GameGroup, type TeamSide } from "./props-model";
 import { collapseKey, panelIdFor, setCollapsed, useGameCollapse } from "./collapse-store";
@@ -121,7 +124,7 @@ export function TeamSidePills({
 
 /* ------------------------------------------------------------ ML / RL rows */
 
-function TeamAvatar({ label }: { label: string }) {
+export function TeamAvatar({ label }: { label: string }) {
   const src = teamLogoFromLabel(label);
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -149,6 +152,8 @@ export function GameMarketCard({
   hitPlayer?: string | null;
 }) {
   const hitRef = useRef<HTMLDivElement>(null);
+  /* bet % / money % on ML / RL rows (2026-09-18) */
+  const splitsFeed = useSplits("mlb");
   /* INSTRUCTION 50 item 5: the choice lives in the shared collapse store, so it survives the
      remounts the props page does on every market change / deep-link narrowing, and a reload.
      An unseen game key is OPEN — the default is unchanged. */
@@ -197,7 +202,10 @@ export function GameMarketCard({
                 <TeamAvatar label={r.label} />
                 <div className="min-w-0 flex-1 leading-none">
                   <div className="truncate text-[12px] font-medium text-text">{r.label}</div>
-                  <div className="mt-[3px] truncate text-[9.5px] text-faint">{r.sub}</div>
+                  <div className="mt-[3px] flex items-center gap-1.5 truncate text-[9.5px] text-faint">
+                    <span className="truncate">{r.sub}</span>
+                    <SplitsChip split={mlbLegSplit(splitsFeed, { label: String(r.label ?? ""), sub: String(r.sub ?? ""), gkey: (r.gkey as string | undefined) ?? g.gkey })} compact />
+                  </div>
                 </div>
                 {prob != null && (
                   <span className="num shrink-0 text-[10px] text-muted" title="Engine blended true win % for this side">

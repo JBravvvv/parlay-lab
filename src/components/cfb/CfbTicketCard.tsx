@@ -7,6 +7,9 @@ import { useLeagueTone } from "@/components/football/LeagueContext";
 import type { League } from "@/lib/football/league";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { findGameSplits, sideSplit } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import { WonPaid } from "@/components/ui/WonPaid";
 import type { CfbBoard, CfbGame, CfbGrade, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import { playerSlug } from "@/lib/cfb/props";
@@ -200,6 +203,8 @@ export function CfbTicketCard({
     for (const g of board?.games ?? []) m.set(g.id, g);
     return m;
   }, [board]);
+  /* bet % / money % on side legs (2026-09-18); prop legs have no public split */
+  const splitsFeed = useSplits(league);
   const evGrade = gradeFromEv(t.czEv);
   const glow = t.czEv > 0 ? "ev-glow" : "";
   const shine = evGrade === "S" ? "shine" : "";
@@ -216,7 +221,8 @@ export function CfbTicketCard({
 
   return (
     <div className={`rounded-[16px] ${glow} ${dimmed ? "opacity-55" : ""} ${className}`} data-testid="cfb-ticket">
-      <article className={`ticket ${shine} ${rim} px-4 pt-3`}>
+      {/* COMPACT since 2026-09-18 (Josh, verbatim: "The boxes for the picks on 'Board' and 'Builder' screens are way too big. They could easily be shrunk by 50% vertically") — tighter paddings, one-line legs, pays/EV/grade on one footer row */}
+      <article className={`ticket ${shine} ${rim} px-3 pt-2`}>
         <header className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${bucketCls}`}>
@@ -238,17 +244,17 @@ export function CfbTicketCard({
           </span>
         </header>
 
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-[13.5px] font-bold text-text">{t.name}</div>
-            <div className="num mt-0.5 text-[10px] text-faint">{t.czDec.toFixed(2)}× at DraftKings</div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <div className="truncate text-[12.5px] font-bold text-text">{t.name}</div>
+            <div className="num shrink-0 text-[9.5px] text-faint">{t.czDec.toFixed(2)}× DK</div>
           </div>
           <span className={`hero-price ${heroTone} shrink-0`} aria-label={`DraftKings price ${fmtAmerican(t.czOdds)}`}>
             {fmtAmerican(t.czOdds)}
           </span>
         </div>
 
-        <ul className="mt-3 space-y-1.5">
+        <ul className="mt-1.5 space-y-0.5">
           {t.legs.map((leg) => {
             const v = legResults?.[leg.lkey];
             const link = legLink?.(leg) ?? null;
@@ -256,10 +262,11 @@ export function CfbTicketCard({
             // INSTRUCTION 46 fix round (2026-09-08): a player leg prints the matchup under the name
             // (his own team's logo is the mark; the other team is still named here)
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
+            const split = !leg.player && game ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
             return (
-              <li key={leg.lkey} className="flex items-center gap-2 text-[11.5px]" title={v?.detail}>
+              <li key={leg.lkey} className="flex items-center gap-1.5 text-[11px] leading-tight" title={v?.detail}>
                 <LegMark leg={leg} game={game} abbrCls={accent.abbr} />
-                <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
                 {link?.href ? (
                   // the name is the one tap inside a ledger box that does NOT collapse it (INSTRUCTION 46, point 9)
                   <Link
@@ -275,9 +282,10 @@ export function CfbTicketCard({
                 ) : (
                   <span className="min-w-0 flex-1 truncate text-text" title={link?.title}>{leg.label}</span>
                 )}
-                {matchup && <span className="truncate text-[9.5px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
+                {matchup && <span className="shrink-0 text-[9px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
                 </span>
                 <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{leg.prop}</span>
+                <SplitsChip split={split} compact />
                 <span className={`num shrink-0 font-semibold ${leg.cz > 0 ? "text-pos" : "text-text"}`}>{fmtAmerican(leg.cz)}</span>
                 {v && (
                   <span
@@ -291,13 +299,13 @@ export function CfbTicketCard({
           })}
         </ul>
 
-        <div className="ticket-tear my-3" aria-hidden />
+        <div className="ticket-tear my-1.5" aria-hidden />
 
-        <footer className="pb-1.5">
-          <div className="flex items-baseline justify-between gap-3">
+        <footer className="pb-1">
+          <div className="flex items-center justify-between gap-2">
             {payout && !settled ? (
-              <span className="num text-[13px] font-bold text-text">
-                ${t.stake} <span className="text-[10px] font-semibold uppercase tracking-wide text-faint">pays</span>{" "}
+              <span className="num text-[12px] font-bold text-text" title={`wins ${usd(payout.wins)} · stake $${t.stake}`}>
+                ${t.stake} <span className="text-[9.5px] font-semibold uppercase tracking-wide text-faint">pays</span>{" "}
                 <span className={fun ? accent.text : "text-pos"}>{usd(payout.pays)}</span>
               </span>
             ) : payout ? (
@@ -307,17 +315,10 @@ export function CfbTicketCard({
                 ${t.stake} <span className="uppercase tracking-wide text-faint">to win</span> {usd(toWin)}
               </span>
             )}
-            <span className="num shrink-0 text-[11px] font-semibold text-muted" title={oneIn ? `≈ 1 in ${oneIn} slates` : undefined}>
-              {t.prob.toFixed(1)}% <span className="text-[9.5px] font-medium uppercase tracking-wide text-faint">to hit</span>
-            </span>
-          </div>
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            {payout && !settled ? (
-              <span className="num text-[10px] text-faint">wins {usd(payout.wins)} · stake ${t.stake}</span>
-            ) : (
-              <span className="num text-[10px] text-faint">stake ${t.stake}</span>
-            )}
             <div className="flex shrink-0 items-center gap-1.5">
+              <span className="num text-[10.5px] font-semibold text-muted" title={oneIn ? `≈ 1 in ${oneIn} slates` : undefined}>
+                {t.prob.toFixed(1)}% <span className="text-[9px] font-medium uppercase tracking-wide text-faint">to hit</span>
+              </span>
               <EvBadge ev={t.czEv} />
               <GradeChip grade={evGrade} basis="EV at DraftKings" />
             </div>

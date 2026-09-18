@@ -14,6 +14,7 @@ import { ClvPanel } from "@/components/stats/ClvPanel";
 import { DisciplinePanel } from "@/components/stats/DisciplinePanel";
 import { PitcherVsTeam } from "@/components/stats/PitcherVsTeam";
 import { PlayerName } from "@/components/player/PlayerName";
+import { headshotUrl } from "@/lib/mlb-visuals";
 import { WINDOW_GAMES, isWindowGroup, parseWindowValue, siblingWindow, windowNote, windowValue } from "@/lib/stats-window";
 import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
@@ -217,6 +218,29 @@ function logoUrl(sport: TableSportId, ab: string) {
   const code = sport === "nfl" ? ab.toLowerCase() : ESPN_LOGO[ab.toUpperCase()] || ab.toLowerCase();
   return `https://a.espncdn.com/i/teamlogos/${sport === "nfl" ? "nfl" : "mlb"}/500/${code}.png`;
 }
+/** the player's headshot (2026-09-18, Josh: "no headshots on stats page only logos showing"): MLB
+    off statsapi's photo CDN by person id, NFL / CFB off ESPN's combiner by athlete id — the ids the
+    stat rows already carry, never a name match. A miss falls back to initials, never a stock face. */
+function headshotFor(sport: TableSportId, id: number | string): string | null {
+  const n = String(id ?? "").trim();
+  if (!/^\d+$/.test(n)) return null;
+  if (sport === "mlb") return headshotUrl(Number(n));
+  return `https://a.espncdn.com/combiner/i?img=/i/headshots/${sport === "nfl" ? "nfl" : "college-football"}/players/full/${n}.png&w=96&h=96&scale=crop`;
+}
+function StatHeadshot({ src, name }: { src: string | null; name: string }) {
+  const [broken, setBroken] = useState(false);
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  if (!src || broken)
+    return (
+      <span data-stat-headshot="initials" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-surface-2 text-[8.5px] font-bold text-muted">
+        {initials || "?"}
+      </span>
+    );
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img data-stat-headshot="img" src={src} alt="" loading="lazy" onError={() => setBroken(true)} className="h-6 w-6 shrink-0 rounded-full bg-[#1a1c22] object-cover object-top ring-1 ring-white/[0.08]" />
+  );
+}
 function matchPos(sport: TableSportId, group: string, sel: string, p: StatRow) {
   if (sel === "ALL") return true;
   if (sport !== "mlb") return p.pos === sel;
@@ -410,8 +434,10 @@ export default function StatsPage() {
         sortValue: (r) => r.name,
         cell: (r) => {
           const lg = logoUrl(tableSport, r.team);
+          const hs = scope === "ind" ? headshotFor(tableSport, r.id) : null;
           return (
             <span className="flex max-w-[168px] items-center gap-1.5 truncate font-medium text-text md:max-w-[240px]">
+              {scope === "ind" && <StatHeadshot src={hs} name={r.name} />}
               {lg && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={lg} alt="" className="h-[16px] w-[16px] shrink-0 object-contain" loading="lazy" />

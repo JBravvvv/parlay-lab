@@ -95,7 +95,7 @@ export function DataTable<T>({
                           )
                       : undefined
                   }
-                  className={`whitespace-nowrap border-b border-white/[0.06] px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                  className={`whitespace-nowrap border-b border-white/[0.06] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${
                     c.numeric ? "text-right" : "text-left"
                   } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""} ${
                     c.stickyLeft != null ? "sticky z-20 bg-surface-2" : ""
@@ -121,7 +121,7 @@ export function DataTable<T>({
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`whitespace-nowrap px-3 py-2.5 ${c.numeric ? "num text-right" : ""} ${
+                  className={`whitespace-nowrap px-2.5 py-1.5 ${c.numeric ? "num text-right" : ""} ${
                     c.stickyLeft != null ? "sticky z-10 bg-bg" : ""
                   } ${c.className ?? ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}

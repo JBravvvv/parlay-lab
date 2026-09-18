@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { Grade } from "@/lib/grade";
+import type { SideSplit } from "@/lib/splits";
 
 /**
  * ODDS GRID (INSTRUCTION 40, 2026-09-05): the Caesars-style market grid a game card carries —
@@ -25,6 +27,10 @@ export type OddsGridCell = {
   disabled?: boolean;
   /** accessible name — defaults to "<line> <price>" */
   aria?: string;
+  /** GRADE ON EVERY PICK (Josh, 2026-09-18: "It should show grades next to every pick on the games page ie: spreads, MLs, overs"): a small letter badge in the pill's corner */
+  grade?: Grade | null;
+  /** bet % · money % for this side (scoresandodds consensus), drawn as a third line under the price */
+  split?: SideSplit | null;
 };
 
 export type OddsGridRow = {
@@ -59,7 +65,7 @@ function toneClass(c: OddsGridCell): string {
 
 export function OddsCellButton({ cell }: { cell: OddsGridCell }) {
   const empty = cell.price == null && cell.line == null;
-  const label = cell.aria ?? [cell.line, cell.price].filter(Boolean).join(" ");
+  const label = (cell.aria ?? [cell.line, cell.price].filter(Boolean).join(" ")) + (cell.grade && !empty ? `, grade ${cell.grade}` : "");
   const inert = empty || cell.disabled || !cell.onClick;
   return (
     <button
@@ -76,7 +82,17 @@ export function OddsCellButton({ cell }: { cell: OddsGridCell }) {
         <>
           {cell.line != null && <span className="odds-cell-line num">{cell.line}</span>}
           {cell.price != null && <span className="odds-cell-price num">{cell.price}</span>}
+          {cell.split && (
+            <span className="odds-cell-split num" data-splits-chip title={`${cell.split.bets}% of bets · ${cell.split.money}% of the money on this side (consensus via scoresandodds.com / Action Network)`}>
+              {cell.split.bets}%<span className="opacity-60"> · </span>{cell.split.money}%$
+            </span>
+          )}
         </>
+      )}
+      {!empty && cell.grade && (
+        <span className={`odds-cell-grade num is-${cell.grade}`} aria-label={`grade ${cell.grade}`} title={`Grade ${cell.grade} (EV at the selected book)`}>
+          {cell.grade}
+        </span>
       )}
     </button>
   );

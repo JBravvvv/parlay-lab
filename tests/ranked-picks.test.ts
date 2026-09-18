@@ -1,0 +1,175 @@
+import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import React, { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { stripComments } from "./helpers/source";
+import { RANKED_PAGE, RankedPicks, RankedViewTabs, type RankedPick } from "@/components/props/RankedPicks";
+import { GRADE_CUTS } from "@/lib/grade";
+
+/**
+ * 2026-09-18, Josh's word, verbatim: "Below the Parlay Generator, the default view should be every
+ * pick available for the day ranked from S down. So every S pick no matter if its a ML, prop, etc
+ * is listed first, then all of the As, Bs & so on. There should be filters above it to sort by each
+ * option (ex: ML, RL, HR, Hits, H+R+RBI, etc); when you select a filter (ie: H+R+RBI) it should
+ * list every pick under that category for the entire day (every single prop under that category
+ * for every single player in every single game) from S to A to B etc."
+ *
+ * The component is fed synthetic rows here (prices and EVs are inputs to a sorter, not claims about
+ * any board) — the point is the ORDER, the chips, the counts, and the default view on both desks.
+ */
+vi.stubGlobal("React", React);
+(globalThis as { React?: typeof React }).React = React;
+
+const root = path.join(__dirname, "..");
+const readSrc = (p: string) => stripComments(fs.readFileSync(path.join(root, p), "utf8"));
+const count = (s: string, re: RegExp) => (s.match(re) ?? []).length;
+
+type L = { id: string };
+const row = (id: string, market: string, ev: number, over: Partial<RankedPick<L>> = {}): RankedPick<L> => ({
+  id,
+  market,
+  label: id,
+  sub: `${market} line`,
+  am: -110,
+  prob: 52.4,
+  ev,
+  leg: { id },
+  mark: createElement("i", { "data-mark": id }),
+  ...over,
+});
+
+/* one of each tier across three categories, deliberately fed in the WRONG order */
+const PICKS: RankedPick<L>[] = [
+  row("f-ml", "ml", GRADE_CUTS.D - 1),
+  row("b-hrr", "batter_hits_runs_rbis", GRADE_CUTS.B + 0.5),
+  row("s-hits", "batter_hits", GRADE_CUTS.S + 2),
+  row("a-ml", "ml", GRADE_CUTS.A + 0.2),
+  row("s-ml", "ml", GRADE_CUTS.S + 0.1),
+  row("c-hrr", "batter_hits_runs_rbis", GRADE_CUTS.C + 0.5),
+  row("d-hits", "batter_hits", GRADE_CUTS.D + 0.5),
+];
+const FILTERS = [
+  { key: "ml", label: "ML" },
+  { key: "rl", label: "RL" },
+  { key: "batter_hits", label: "Hits" },
+  { key: "batter_hits_runs_rbis", label: "H+R+RBI" },
+];
+
+const render = (over: Record<string, unknown> = {}) =>
+  renderToStaticMarkup(
+    createElement(RankedPicks<L>, {
+      picks: PICKS,
+      filters: FILTERS,
+      isSel: (id: string) => id === "a-ml",
+      onToggle: () => {},
+      ...over,
+    } as Parameters<typeof RankedPicks<L>>[0]),
+  );
+
+const order = (out: string) => [...out.matchAll(/data-ranked-pick="([^"]+)"/g)].map((m) => m[1]);
+
+describe("RankedPicks — every pick today, S down", () => {
+  it("renders the section and every row, sorted S → A → B → C → D → F regardless of category or input order", () => {
+    const out = render();
+    expect(out).toContain('data-testid="ranked-picks"');
+    expect(order(out)).toEqual(["s-hits", "s-ml", "a-ml", "b-hrr", "c-hrr", "d-hits", "f-ml"]);
+    expect([...out.matchAll(/data-grade="([A-FS])"/g)].map((m) => m[1])).toEqual(["S", "S", "A", "B", "C", "D", "F"]);
+  });
+
+  it("within a tier the higher EV sits first (s-hits at +2 over the cut beats s-ml at +0.1)", () => {
+    expect(order(render()).slice(0, 2)).toEqual(["s-hits", "s-ml"]);
+  });
+
+  it("rows are numbered from 1 and carry the desk's own mark, the category tag, and a GradeChip", () => {
+    const out = render();
+    expect(out).toMatch(/text-\[9\.5px\] text-faint">1<\/span><i data-mark="s-hits">/);
+    expect(count(out, /data-mark="/g)).toBe(7);
+    expect(count(out, /title="Tier S on EV at the posted price/g)).toBe(2);
+    expect(count(out, /title="Tier [A-FS] on EV at the posted price/g)).toBe(7);
+    expect(out).toContain(">H+R+RBI</span>");
+    expect(out).toContain(">ML</span>");
+  });
+
+  it('the category chips: "All" first (selected by default) then each filter with its count — empty ones dimmed', () => {
+    const out = render();
+    expect(out).toMatch(/role="tablist" aria-label="Pick category"/);
+    expect(out).toMatch(/role="tab" aria-selected="true"[^>]*>All <span class="num opacity-70">7<\/span>/);
+    expect(out).toMatch(/>ML <span class="num opacity-70">3<\/span>/);
+    expect(out).toMatch(/>RL <span class="num opacity-70">0<\/span>/);
+    expect(out).toMatch(/>Hits <span class="num opacity-70">2<\/span>/);
+    expect(out).toMatch(/>H\+R\+RBI <span class="num opacity-70">2<\/span>/);
+    expect(out).toMatch(/opacity-40"[^>]*>RL <span/);
+    expect(count(out, /aria-selected="true"/g)).toBe(1);
+  });
+
+  it("the header counts picks per tier", () => {
+    const out = render();
+    expect(out).toMatch(/aria-label="Picks per tier"/);
+    expect(out).toMatch(/<b class="text-text">S<\/b> 2/);
+    expect(out).toMatch(/<b class="text-text">A<\/b> 1/);
+    expect(out).toMatch(/<b class="text-text">F<\/b> 1/);
+  });
+
+  it("the selected leg's price button is pressed; the others are not", () => {
+    const out = render();
+    expect(count(out, /aria-pressed="true"/g)).toBe(1);
+    expect(out).toMatch(/data-ranked-pick="a-ml"[\s\S]*?aria-pressed="true"/);
+  });
+
+  it("pages at RANKED_PAGE rows with a 'Show N more · M left' button", () => {
+    const many = Array.from({ length: RANKED_PAGE + 25 }, (_, i) => row(`p${i}`, "ml", 1 + (i % 9)));
+    const out = render({ picks: many });
+    expect(count(out, /data-ranked-pick="/g)).toBe(RANKED_PAGE);
+    expect(out).toContain(`Show 25 more · 25 left`);
+    expect(render()).not.toContain("more ·");
+  });
+
+  it("empty and loading states", () => {
+    expect(render({ picks: [], loading: true })).toContain("Loading the board…");
+    expect(render({ picks: [], emptyBody: "nothing priced" })).toContain("nothing priced");
+    expect(render({ picks: [] })).toContain("No priced picks on this board yet.");
+  });
+
+  it("the accent follows the desk (cfb amber / nfl blue) on the selected chip and the price", () => {
+    expect(render({ accent: "nfl" })).toMatch(/aria-selected="true" class="[^"]*text-nfl/);
+    expect(render({ accent: "cfb" })).toMatch(/aria-selected="true" class="[^"]*text-cfb/);
+    expect(render()).toMatch(/aria-selected="true" class="[^"]*text-pos/);
+  });
+});
+
+describe("RankedViewTabs — Ranked is a real tab pair", () => {
+  it("renders Ranked · S → F and By game with the active one selected", () => {
+    const out = renderToStaticMarkup(createElement(RankedViewTabs, { view: "ranked", onView: () => {} }));
+    expect(out).toMatch(/role="tablist" aria-label="Board view"/);
+    expect(out).toMatch(/aria-selected="true"[^>]*>Ranked · S → F</);
+    expect(out).toMatch(/aria-selected="false"[^>]*>By game</);
+  });
+});
+
+describe("wiring — the ranked list is the default view under the generator on every desk", () => {
+  const props = readSrc("app/props/page.tsx");
+  const cfb = readSrc("src/components/cfb/CfbProps.tsx");
+  it("MLB /props defaults to ranked (a deep link still opens the game view it targets) and feeds ML + RL + every generator market", () => {
+    expect(props).toMatch(/useState<"ranked" \| "games">\(link \? "games" : "ranked"\)/);
+    expect(props).toMatch(/RANKED_FILTERS[\s\S]*?\{ key: "ml", label: "ML" \},\s*\{ key: "rl", label: "RL" \}/);
+    expect(props).toMatch(/MLB_GEN_MARKETS\.map\(/);
+    expect(props).toMatch(/markets: GEN_MARKETS, includeStarted: false/);
+    expect(props).toMatch(/view === "ranked" \?/);
+    expect(props).toMatch(/<RankedPicks/);
+    expect(props).toMatch(/<RankedViewTabs view=\{view\} onView=\{setView\}/);
+  });
+  it("football (CFB + NFL) defaults to ranked, keeps the props query alive for it, and feeds ML + spread + total + every football market", () => {
+    expect(cfb).toMatch(/useState<"ranked" \| "games">\("ranked"\)/);
+    expect(cfb).toMatch(/enabled: \(nav !== "sides" \|\| view === "ranked"\) && !!date/);
+    expect(cfb).toMatch(/RANKED_FILTERS[\s\S]*?"ml"[\s\S]*?"spread"[\s\S]*?"total"/);
+    expect(cfb).toMatch(/FOOTBALL_GEN_MARKETS/);
+    expect(cfb).toMatch(/<RankedPicks/);
+    expect(cfb).toMatch(/accent=\{L\.id === "nfl" \? "nfl" : "cfb"\}/);
+  });
+  it("the ranked EV is graded with the site's one grade scale (gradeFromEv) — no second ladder", () => {
+    const src = readSrc("src/components/props/RankedPicks.tsx");
+    expect(src).toMatch(/gradeFromEv\(p\.ev\)/);
+    expect(src).not.toMatch(/ev >= \d+ \? "S"/);
+  });
+});

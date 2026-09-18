@@ -520,6 +520,7 @@ body::after {
 .odds-grid.is-nfl { --odds-accent: var(--color-nfl); }
 .odds-cell {
   --odds-accent: var(--color-pos);
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -548,6 +549,21 @@ body::after {
   font-size: 13.5px;
   font-weight: 700;
 }
+/* 2026-09-18: the grade letter in the pill's corner and the bet%/money% third line */
+.odds-cell-split { font-size: 8.5px; font-weight: 600; color: var(--color-faint); letter-spacing: -0.01em; }
+.odds-cell-grade {
+  position: absolute; top: -5px; right: -4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 999px;
+  font-size: 9px; font-weight: 800; line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-surface-2); color: var(--color-muted);
+  box-shadow: 0 0 0 1.5px rgba(8, 9, 11, 0.9);
+}
+.odds-cell-grade.is-S { background: color-mix(in srgb, var(--color-gold) 30%, var(--color-surface-2)); border-color: color-mix(in srgb, var(--color-gold) 70%, transparent); color: var(--color-gold); box-shadow: 0 0 0 1.5px rgba(8, 9, 11, 0.9), 0 0 8px -1px color-mix(in srgb, var(--color-gold) 60%, transparent); }
+.odds-cell-grade.is-A { background: color-mix(in srgb, var(--color-pos) 22%, var(--color-surface-2)); border-color: color-mix(in srgb, var(--color-pos) 60%, transparent); color: var(--color-pos); }
+.odds-cell-grade.is-B { background: color-mix(in srgb, var(--color-pos) 12%, var(--color-surface-2)); border-color: color-mix(in srgb, var(--color-pos) 35%, transparent); color: var(--color-text); }
+.odds-cell-grade.is-D, .odds-cell-grade.is-F { color: var(--color-neg); border-color: color-mix(in srgb, var(--color-neg) 40%, transparent); }
 .odds-cell.is-plus .odds-cell-price { color: var(--odds-accent); }
 .odds-cell.is-minus .odds-cell-price { color: var(--color-text); }
 .odds-cell.is-ev {
@@ -726,6 +742,8 @@ body::after {
 .gen-roll:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 23px #ff5fb845; }
 .gen-roll:active:not(:disabled) { transform:translateY(1px); }
 .gen-player-card { border:1px solid #ffffff0d; border-radius:12px; padding:5px 7px; background:linear-gradient(100deg,#ffffff07,#ffffff02); min-height:52px; }
+/* the slot number on a generated pick (2026-09-18) */
+.gen-slot-no { display:flex; width:20px; height:20px; flex-shrink:0; align-items:center; justify-content:center; border-radius:999px; background:#ffffff12; font-size:10px; font-weight:700; color:var(--color-muted); }
 .gen-player-card:has(button[aria-pressed="true"]) { border-color:#ff5fb860; background:linear-gradient(100deg,#ff5fb815,#ffffff02); }
 .gen-player-card [data-player-mark] { width:32px!important; height:32px!important; background:#e2ced815; }
 .gen-ticket-total { border-top:1px dashed #ffbddf33; padding:12px 3px 4px; }

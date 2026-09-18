@@ -168,7 +168,7 @@ describe("GenSheet — the open panel", () => {
     expect(excl).toMatch(/aria-label="Exclude [^"]+ from generated parlays"[^>]*class="[^"]*h-6 w-6/);
     expect(count(out, /data-gen-slot="\d"/g)).toBe(4);
     expect(out).toMatch(/data-gen-slot="0"[\s\S]{0,400}?aria-pressed="false"/);
-    expect(out).toMatch(/aria-label="Keep slot 1: /);
+    expect(out).toMatch(/aria-label="Lock in slot 1: /); // "hit the 'lock it in' button" (2026-09-18)
   });
   it("each slot draws a PlayerMark — initials here, because useHeadshots is {} on the server", () => {
     expect(count(out, /data-player-mark/g)).toBe(4);

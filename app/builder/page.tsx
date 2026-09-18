@@ -27,6 +27,9 @@ import { marketOf } from "@/lib/ledger-segments";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { mlbLegSplit } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 
 /* ---------- engine card types ---------- */
 type CardPick = { id: string; stake: number; kelly?: number | null; tier?: number; w: { pl: Ticket & { tier?: string; fair?: string } } };
@@ -149,10 +152,12 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
      either way — "allocator $49 · Kelly $11" is the tell that the entered daily, not the
      edge, is driving the size */
   const kellyGap = kelly != null && (stake > 2 * kelly || kelly > 2 * stake);
+  /* bet % / money % on a club leg (2026-09-18); a prop leg has no public split */
+  const splitsFeed = useSplits("mlb");
   return (
-    <div className={`glass px-4 py-3 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[13px] font-semibold text-text">
+    <div className={`glass px-3 py-2 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <div className="text-[12.5px] font-semibold text-text">
           {t.name}
           {tag && (
             <span className="ml-2 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold">
@@ -220,9 +225,9 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
           ⚠ 3 legs — the graded record's ceiling: 2-leg tickets ran −0.7% ROI; 3+ legs went 1-25.
         </div>
       )}
-      <div className="mt-2 space-y-1">
+      <div className="mt-1.5 space-y-0.5">
         {t.legs.map((l, i) => (
-          <div key={i} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+          <div key={i} className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
             <span className="text-muted">
               <span className="text-text"><BoardLabel label={l.label} /></span> {l.prop}
               {(l as { lu?: string }).lu === "projected" && (
@@ -246,7 +251,8 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
                   ) : null;
                 })()}
             </span>
-            <span className="num shrink-0">
+            <span className="num flex shrink-0 items-center gap-1.5">
+              <SplitsChip split={mlbLegSplit(splitsFeed, { label: l.label, sub: l.prop, gkey: (l as { gkey?: string | null }).gkey ?? null })} compact />
               {basisMode && (l as { bs?: number | null }).bs != null && (
                 <span className="mr-1.5 text-text" title="DK/FD basis price for this leg">
                   {fmtAmerican(Number((l as { bs?: number }).bs))} ({(l as { bsBook?: string }).bsBook ?? "DK"})
@@ -258,7 +264,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
         ))}
       </div>
       {t.prob != null && (
-        <div className="num mt-2 text-[10.5px] text-faint">
+        <div className="num mt-1 text-[10px] text-faint">
           {Number(t.prob).toFixed(1)}% to hit ≈ 1 in {Math.max(1, Math.round(100 / Math.max(Number(t.prob), 0.01)))} slates
         </div>
       )}

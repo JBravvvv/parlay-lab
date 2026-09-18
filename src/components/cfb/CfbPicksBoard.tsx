@@ -10,6 +10,9 @@ import { Reveal } from "@/components/motion/Reveal";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { findGameSplits, sideSplit, type SideSplit, type SplitsFeed } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import { KellyChip } from "@/components/ui/KellyChip";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { Panel } from "@/components/ui/Panel";
@@ -290,6 +293,8 @@ export function CfbPicksBoard() {
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
+  /* bet % / money % on side rows (2026-09-18) — props have no public split */
+  const splitsFeed = useSplits(L.id);
 
   /** the slate for the picked date only — a rail mid-switch reads as loading */
   const current = slate && slate.date === date ? slate : null;
@@ -360,6 +365,7 @@ export function CfbPicksBoard() {
               <div className="truncate text-[10.5px] text-faint">
                 {r.kind === "prop" && <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${marketChip}`}>{MARKET_WORD[r.market] ?? r.market}</span>}
                 {r.sub}
+                {r.kind === "side" && <SplitsChip split={sideSplitOf(r, games, splitsFeed)} className="ml-1.5" />}
               </div>
             </div>
           </div>
@@ -424,7 +430,7 @@ export function CfbPicksBoard() {
         cell: (r) => (r.status === "live" ? <LiveTag /> : r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="text-faint">—</span>),
       },
     ],
-    [games, propRows, marketChip, accentText],
+    [games, propRows, marketChip, accentText, splitsFeed],
   );
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);
@@ -619,9 +625,11 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
   const cz = r.cz!;
   const teamId = r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows);
   const s = r.grade === "S";
+  const splitsFeed = useSplits(L.id);
+  const split = sideSplitOf(r, games, splitsFeed);
   return (
     <article
-      className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[18px] border px-4 pb-3.5 pt-3.5 md:w-[300px] ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
+      className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[14px] border px-3 pb-2 pt-2 md:w-[280px] ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
       style={{
         borderColor: nfl ? "color-mix(in srgb, var(--color-nfl) 26%, rgba(255,255,255,0.08))" : "color-mix(in srgb, var(--color-cfb) 26%, rgba(255,255,255,0.08))",
         background: nfl
@@ -630,13 +638,15 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
       }}
       data-testid="cfb-featured-pick"
     >
-      <header className="flex items-center gap-2.5">
+      {/* COMPACT since 2026-09-18 (Josh: "The boxes for the picks on 'Board' and 'Builder' screens are way too big … shrunk by 50% vertically"): the mark + pick on one row, price/EV/grade/$10-wins on the next, no tear */}
+      <header className="flex items-center gap-2">
         <Mark games={games} gameId={r.gameId} teamId={teamId} kind={r.kind} size="md" player={r.player} headshot={r.headshot} pos={r.pos} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13.5px] font-bold text-text">{r.label}</div>
-          <div className="truncate text-[10.5px] text-faint">
+          <div className="truncate text-[12.5px] font-bold leading-tight text-text">{r.label}</div>
+          <div className="truncate text-[10px] leading-tight text-faint">
             <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
             {r.sub}
+            <SplitsChip split={split} className="ml-1.5" compact />
           </div>
         </div>
         <span className="num shrink-0 rounded-full border border-line-2 bg-white/[0.04] px-1.5 py-0.5 text-[9px] font-bold text-muted" aria-label={`rank ${rank}`}>
@@ -644,39 +654,45 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         </span>
       </header>
 
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-faint">{bookName(cz.book)}</div>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-baseline gap-1.5">
           <div className={nfl ? "hero-price is-nfl num mt-0.5" : "hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
+          <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-faint">{bookName(cz.book)}</div>
           {r.market !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
-            <div className={`num mt-1 text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="The selected sportsbook line differs from the consensus line">
+            <div className={`num text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="The selected sportsbook line differs from the consensus line">
               at {r.market === "spread" ? fmtLine(cz.line) : cz.line}
             </div>
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <div className="flex items-center gap-1.5">
-            {r.evCz != null && <EvBadge ev={r.evCz} />}
-            <GradeChip grade={r.grade} basis="EV @ selected book" />
-          </div>
-          {r.fair != null && (
-            <span className="num text-[10.5px] text-muted" title={r.push > 0 ? `${fmtPct(r.fair)} win · ${fmtPct(r.push)} push` : "model probability the pick hits"}>
-              {fmtPct(r.fair, 0)} to hit
-            </span>
-          )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {r.evCz != null && <EvBadge ev={r.evCz} />}
+          <GradeChip grade={r.grade} basis="EV @ selected book" />
         </div>
       </div>
 
-      <div className="ticket-tear my-3" aria-hidden />
-
-      <footer className="flex items-center justify-between gap-2">
-        <span className="num text-[11px] text-text">
-          <span className="text-[9.5px] uppercase tracking-wide text-faint">${WIN_STAKE} wins</span> <b className="text-pos">{usd(winsOn(cz.dec))}</b>
+      <footer className="mt-1 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-1">
+        <span className="num text-[10.5px] text-text">
+          <span className="text-[9px] uppercase tracking-wide text-faint">${WIN_STAKE} wins</span> <b className="text-pos">{usd(winsOn(cz.dec))}</b>
+          {r.fair != null && (
+            <span className="num ml-1.5 text-[9.5px] text-muted" title={r.push > 0 ? `${fmtPct(r.fair)} win · ${fmtPct(r.push)} push` : "model probability the pick hits"}>
+              {fmtPct(r.fair, 0)} to hit
+            </span>
+          )}
         </span>
         {r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="num text-[10px] text-faint">no ¼-Kelly stake</span>}
       </footer>
     </article>
   );
+}
+
+/** the consensus bet%/money% for a SIDE pick — the row's own side off the game's card, or null (2026-09-18) */
+function sideSplitOf(r: CfbPickRow, games: Map<string, CfbGame>, feed: SplitsFeed | null): SideSplit | null {
+  if (r.kind !== "side" || !feed) return null;
+  const g = games.get(r.gameId);
+  if (!g) return null;
+  const row = g.rows.find((x) => x.key === r.key);
+  if (!row) return null;
+  return sideSplit(findGameSplits(feed, g.away, g.home, g.date), row.market, row.side);
 }
 
 function sideTeamId(r: CfbPickRow, games: Map<string, CfbGame>): string | null {

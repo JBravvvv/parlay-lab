@@ -8,10 +8,12 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCfbDesk } from "@/components/cfb/CfbBuilder";
 import { addCfbLeg, CfbSlip, type CfbSlipLeg } from "@/components/cfb/CfbSlip";
-import { PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
+import { PairMark, PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
 import { GenSheet } from "@/components/props/GenSheet";
+import { RankedPicks, RankedViewTabs, type RankedFilter, type RankedPick } from "@/components/props/RankedPicks";
+import { SplitsChip } from "@/components/ui/SplitsChip";
 import { useParlayGen, blankPins } from "@/components/props/useParlayGen";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import { GradeChip } from "@/components/ui/GradeChip";
@@ -32,6 +34,8 @@ import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRo
 import { CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
 import { gradeFromEv } from "@/lib/grade";
+import { findGameSplits, sideSplit, type GameSplits } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import { amFmt, combineTicket } from "@/lib/ticket-math";
 import { railLabel } from "@/lib/games";
 
@@ -173,11 +177,12 @@ function priceTone(price: number, ev: number | null, rules: Pick<LeagueRules, "m
 }
 
 /** one grid cell for (market, side) of a game — a real leg when priced, a muted "—" otherwise */
-function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: PriceMode, picked: string | null, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES): OddsGridCell {
+function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: PriceMode, picked: string | null, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES, splits: GameSplits | null = null): OddsGridCell {
   const row = rowFor(game, market, side);
   if (!row) return {};
+  const split = sideSplit(splits, market, side);
   const q = quoteFor(row, mode);
-  if (!q) return { line: lineText(market, side, row.line) ?? undefined, price: "—", tone: "muted" };
+  if (!q) return { line: lineText(market, side, row.line) ?? undefined, price: "—", tone: "muted", split };
   const tag = bookTag(q);
   const line = [lineText(market, side, q.line), tag !== "CZ" ? tag : null].filter(Boolean).join(" · ") || undefined;
   const closed = game.status === "final" || game.status === "postponed";
@@ -189,6 +194,9 @@ function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: P
     disabled: closed,
     aria: `${row.label} ${amFmt(q.price)}${tag !== "CZ" ? ` at ${tag}` : ""}`,
     onClick: () => onPick(legOf(game, row, q)),
+    // 2026-09-18: the grade off the EV at the price shown, and the consensus split for this side
+    grade: closed ? null : gradeFromEv(sideEv(row, mode)),
+    split,
   };
 }
 
@@ -247,12 +255,14 @@ function SlipGameCard({
   mode,
   picked,
   onPick,
+  splits = null,
 }: {
   game: CfbGame;
   mode: PriceMode;
   /** the row key on the slip for this game, if any */
   picked: string | null;
   onPick: (leg: CfbSlipLeg) => void;
+  splits?: GameSplits | null;
 }) {
   const L = useLeague();
   if (game.status === "final") return <FinalRow game={game} />;
@@ -260,7 +270,7 @@ function SlipGameCard({
   const postponed = game.status === "postponed";
   const score = game.homeScore != null && game.awayScore != null ? `${game.awayScore}–${game.homeScore}` : null;
   const cells = (side: "away" | "home"): OddsGridCell[] =>
-    GRID_COLUMNS.map((c) => sideCell(game, c.key, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick, L.rules));
+    GRID_COLUMNS.map((c) => sideCell(game, c.key, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick, L.rules, splits));
   const pickedRing = L.id === "nfl" ? "ring-1 ring-nfl/40" : "ring-1 ring-cfb/40";
   return (
     <article className={`glass card-lift px-3 pb-2.5 pt-2 ${picked ? pickedRing : ""}`}>
@@ -672,6 +682,13 @@ function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
    Anytime TD opens in the owner's -230 to +200 range (2026-09-12). The range stays
    editable for every prop category; the build-style mixes are gone (2026-09-18). */
 const GEN_MARKET_KEYS: readonly string[] = FOOTBALL_GEN_MARKETS.map((m) => m.key);
+/* the ranked list's category chips (2026-09-18 item 8): the three game markets, then every prop market */
+const RANKED_FILTERS: RankedFilter[] = [
+  { key: "ml", label: "ML" },
+  { key: "spread", label: "Spread" },
+  { key: "total", label: "Total" },
+  ...FOOTBALL_GEN_MARKETS.map((m) => ({ key: m.key, label: m.label })),
+];
 const GEN_SPEC_DEFAULT: GenSpec = {
   market: FOOTBALL_GEN_MARKETS[0].key,
   legs: 4,
@@ -738,7 +755,11 @@ export function CfbProps() {
   const mode: PriceMode = "cz";
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
+  /* bet % / money % per side on the SIDES cards (2026-09-18) */
+  const splitsFeed = useSplits(L.id);
   const [nav, setNav] = useState<NavKey>("anytime_td");
+  /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
+  const [view, setView] = useState<"ranked" | "games">("ranked");
   const [search, setSearch] = useState("");
   const [loadRosterPositions, setLoadRosterPositions] = useState(false);
   const [legs, setLegs] = useState<CfbSlipLeg[]>([]);
@@ -753,6 +774,7 @@ export function CfbProps() {
   useEffect(() => () => { if (focusTimer.current) window.clearTimeout(focusTimer.current); }, []);
   const onLink = (link: CfbPropsLink) => {
     if (link.date) pick(link.date);
+    setView("games");
     setNav(cfbPropsLinkNav(link.mkt));
     setSearch("");
     setFocus({ gameId: link.game as string, market: cfbPropsLinkNav(link.mkt), player: link.player });
@@ -761,7 +783,8 @@ export function CfbProps() {
   const propsQ = useQuery({
     queryKey: cfbPropsQueryKey(date, bankroll),
     queryFn: () => loadCfbProps(date, { bankroll }),
-    enabled: nav !== "sides" && !!date,
+    /* the ranked view lists every prop too, so it needs the props board on any rail */
+    enabled: (nav !== "sides" || view === "ranked") && !!date,
     staleTime: (q) => propsStaleMs(q.state.data, L.client),
     retry: 1,
   });
@@ -883,6 +906,58 @@ export function CfbProps() {
       ? new Date(board.generatedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
       : null;
 
+  /* EVERY PICK TODAY, S DOWN (2026-09-18 item 8) — sides off the slate's own rows at the priced
+     quote (the very leg a tap on the card mints), props off the generator's pool over every
+     category. Same rows, same prices, same win %; nothing new is priced here. */
+  const rankedPool = useMemo(
+    () => buildGenPool({ market: GEN_MARKET_KEYS[0], markets: GEN_MARKET_KEYS, includeStarted: false }, gen.nowMs),
+    [buildGenPool, gen.nowMs],
+  );
+  const rankedPicks = useMemo<RankedPick<CfbSlipLeg>[]>(() => {
+    const out: RankedPick<CfbSlipLeg>[] = [];
+    for (const g of games) {
+      if (g.status === "final") continue;
+      const gs = findGameSplits(splitsFeed, g.away, g.home, g.date);
+      for (const row of g.rows) {
+        const q = quoteFor(row, mode);
+        const ev = sideEv(row, mode);
+        if (!q || ev == null || !Number.isFinite(ev)) continue;
+        const leg = legOf(g, row, q);
+        out.push({
+          id: row.key,
+          market: row.market,
+          label: leg.label,
+          sub: leg.sub,
+          am: q.price,
+          prob: leg.prob,
+          ev,
+          book: leg.book,
+          started: g.status === "live",
+          leg,
+          mark: leg.pair ? <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" /> : leg.team ? <TeamMark team={leg.team} size="sm" showAbbr={false} /> : null,
+          splits: <SplitsChip split={sideSplit(gs, row.market, row.side)} compact />,
+        });
+      }
+    }
+    for (const l of rankedPool.legs) {
+      out.push({
+        id: l.id,
+        market: l.market ?? gen.spec.market,
+        label: l.leg.player ?? l.label,
+        sub: `${l.sub} · ${l.leg.sub}`,
+        am: l.am,
+        prob: l.prob,
+        ev: l.ev * 100,
+        book: l.book,
+        src: l.src,
+        started: l.started,
+        leg: l.leg,
+        mark: <PlayerMark player={l.leg.player ?? null} headshot={l.leg.headshot ?? null} team={l.leg.team ?? null} pos={l.leg.pos ?? null} size="sm" />,
+      });
+    }
+    return out;
+  }, [games, mode, splitsFeed, rankedPool, gen.spec.market]);
+
   /* scroll the deep-linked row / card into view once it exists; the ring clears itself after a beat */
   useEffect(() => {
     if (!focus || focusTimer.current) return;
@@ -983,6 +1058,7 @@ export function CfbProps() {
         result={gen.result}
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
+        onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
         excludedPlayers={gen.excludedPlayers}
         onRestorePlayer={gen.restorePlayer}
@@ -1012,7 +1088,21 @@ export function CfbProps() {
         </div>
       )}
 
-      {nav === "sides" ? (
+      {/* 2026-09-18 item 8: the ranked list is the default; the per-game book is one tap away */}
+      <RankedViewTabs view={view} onView={setView} accent={L.id === "nfl" ? "nfl" : "cfb"} />
+      {view === "ranked" ? (
+        <div className={legs.length ? "pb-20" : "pb-6"}>
+          <RankedPicks
+            picks={rankedPicks}
+            filters={RANKED_FILTERS}
+            isSel={(id) => pickedKeys.has(id)}
+            onToggle={toggle}
+            loading={loading || propsQ.isPending}
+            accent={L.id === "nfl" ? "nfl" : "cfb"}
+            emptyBody={`No priced ${L.short} picks on ${label} yet — sides and props appear here, S down, as the book posts them.`}
+          />
+        </div>
+      ) : nav === "sides" ? (
         loading ? (
           <SkeletonRows rows={6} />
         ) : error ? (
@@ -1027,7 +1117,7 @@ export function CfbProps() {
             {games.map((g, i) => (
               <Reveal key={g.id} delay={Math.min(i, 8) * 0.03} y={10}>
                 <div data-cfb-game={g.id} className={focus?.market === "sides" && focus.gameId === g.id ? focusRing(L.id) : undefined}>
-                  <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} />
+                  <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
                 </div>
               </Reveal>
             ))}

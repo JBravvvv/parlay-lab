@@ -10,6 +10,7 @@ import { fmtLine } from "@/lib/cfb/model";
 import { useLeague } from "@/components/football/LeagueContext";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow } from "@/lib/cfb/types";
 import { fmtAmerican, fmtEv, fmtPct } from "@/lib/format";
+import { sideSplit, type GameSplits } from "@/lib/splits";
 import { TeamMark } from "./TeamMark";
 
 /**
@@ -139,11 +140,13 @@ export function StatusMark({ game, className = "" }: { game: CfbGame; className?
 /** the selected-book price cell for one side, as the OddsGrid wants it */
 export function sideCell(
   row: CfbRow | null,
-  opts: { picked?: boolean; onClick?: () => void; game: CfbGame },
+  opts: { picked?: boolean; onClick?: () => void; game: CfbGame; splits?: GameSplits | null },
 ): OddsGridCell {
   if (!row) return { aria: "no line" };
+  // 2026-09-18: the row's own grade rides every cell, and the consensus bet%/money% for this side when the page carries the game
+  const split = sideSplit(opts.splits, row.market, row.side);
   const line = row.market === "ml" ? undefined : row.market === "total" ? `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}` : row.line == null ? "—" : fmtLine(row.line);
-  if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no selected-book price` };
+  if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no selected-book price`, split };
   const czDiffers = row.market !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
   const czLine = czDiffers ? (row.market === "spread" ? fmtLine(row.cz.line!) : `${row.side === "over" ? "O" : "U"} ${row.cz.line}`) : line;
   const closed = !row.playable && opts.game.status !== "upcoming";
@@ -155,6 +158,8 @@ export function sideCell(
     selected: opts.picked,
     onClick: opts.onClick,
     aria: `${row.label} at ${row.cz.title} ${fmtAmerican(row.cz.price)}${row.evCz != null ? `, EV ${fmtEv(row.evCz)}` : ""}${closed ? ", closed" : ""}`,
+    grade: closed ? null : row.grade,
+    split,
   };
 }
 
@@ -165,6 +170,7 @@ export function CfbGameCard({
   onPick,
   isPicked,
   className = "",
+  splits = null,
 }: {
   game: CfbGame;
   expanded: boolean;
@@ -174,6 +180,8 @@ export function CfbGameCard({
   /** lights a picked side */
   isPicked?: (row: CfbRow) => boolean;
   className?: string;
+  /** the consensus bet%/money% card for this game, when the page carries it (2026-09-18) */
+  splits?: GameSplits | null;
 }) {
   /* the league seam (2026-09-08): the accent classes come off useLeague() — both class strings literal */
   const L = useLeague();
@@ -197,7 +205,7 @@ export function CfbGameCard({
   /* a price tap: pick the side in the sandbox, else open the model (what the card did before) */
   const tap = (row: CfbRow | null) => (row && onPick ? () => onPick(row) : onToggle);
   const picked = (row: CfbRow | null) => (row != null && !!isPicked?.(row));
-  const cell = (row: CfbRow | null) => sideCell(row, { picked: picked(row), onClick: tap(row), game });
+  const cell = (row: CfbRow | null) => sideCell(row, { picked: picked(row), onClick: tap(row), game, splits });
 
   const rows: OddsGridRow[] = [
     {

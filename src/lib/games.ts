@@ -15,7 +15,8 @@ export type GameStatus = "upcoming" | "live" | "final" | "postponed";
 export type PitcherLine = { wins: number; losses: number; era: string | null; saves?: number };
 export type PitcherStatsMap = Record<number, PitcherLine | undefined>;
 
-export type MlPrice = { odds: string; book: string | null; cz: string | null };
+/** `grade` (2026-09-18, additive): the engine's letter for this ML when the row carried a model probability — EV = P(win) × decimal − 1 at the best posted price, graded on the shared cuts */
+export type MlPrice = { odds: string; book: string | null; cz: string | null; grade?: Grade | null };
 
 export type GameTeam = {
   id: number;
@@ -183,7 +184,10 @@ export function mlFor(rows: MlRow[] | undefined, g: ApiGame, sideKey: "away" | "
   const odds = fmtAm(best.odds);
   if (!odds) return null;
   const czRow = hits.find((r) => fmtAm(r.cz) != null);
-  return { odds, book: best.book ?? null, cz: czRow ? fmtAm(czRow.cz) : null };
+  const out: MlPrice = { odds, book: best.book ?? null, cz: czRow ? fmtAm(czRow.cz) : null };
+  const prob = Number((best as { prob?: unknown }).prob);
+  if (Number.isFinite(prob) && prob > 0 && prob < 100) out.grade = gradeFromEv(((prob / 100) * amDec(best.odds) - 1) * 100);
+  return out;
 }
 
 function wlOf(p: PitcherLine | undefined): string | null {
@@ -379,4 +383,5 @@ export function xBottomOf(ls: Linescore | null, status: GameStatus): number | nu
   if (status !== "final" || !ls) return null;
   const last = ls.innings[ls.innings.length - 1];
   return last && last.away != null && last.home == null ? last.n : null;
-}
+}import { gradeFromEv, type Grade } from "@/lib/grade";
+

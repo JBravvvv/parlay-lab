@@ -1,3 +1,17 @@
+# Progress — 2026-09-18 (eight-item UI pass: NFL first, splits, ranked S→F, generator reorder)
+
+- Josh's eight items with 15 desktop/Caesars screenshots: sport order NFL/CFB/MLB; the logo must never open the landing; bet % / money % on every pick; logos visible (no black disc), headshots on Stats; grades on every Games pick; Board/Builder pick boxes half the height; generator stacked (filters above, ticket below) with numbered, drag-reorderable, lock-in slots; a ranked S→F list of every pick for the day under the generator with category filters.
+- **Order + logo**: `SPORTS = ["nfl","cfb","mlb"]`; `Brand` links `/games` (replace).
+- **Splits** (`src/lib/splits.ts`, `/api/splits`, `useSplits`, `SplitsChip`): public scoresandodds consensus page per league (nfl / mlb / ncaaf), 10-min server cache, always 200; chip on football Games/Board/Builder/ledger tickets and MLB Games/Board/Props/Builder ML-RL rows. No public source carries player-prop splits, so prop rows have none; a side with no match shows nothing.
+- **Marks**: `TeamMark`/`PlayerMark` draw the logo raw (no dark disc/ring); Stats rows carry 24px headshots (MLB statsapi image host, ESPN combiner for NFL/CFB, initials fallback).
+- **Grades**: every `OddsGrid` cell (football Games) shows its tier badge; MLB Games ML rows show a GradeChip (RL/total absent from the games payload).
+- **Compaction**: `DataTable` px-2.5 py-1.5; `TicketCard`, `CfbTicketCard`, `FeaturedPick` legs single-line.
+- **Generator**: `GenSheet` settings stacked over the ticket; numbered slots, "Lock in" buttons, HTML5 drag + ▲▼ reorder via `useParlayGen.reorder` (`applyOrder` keyed to the ticket; pins move with their leg; nothing re-rolls on a drag).
+- **Ranked list**: `RankedPicks` + `RankedViewTabs` — the default view on `/props` on all three desks; S→F then EV; "All" + category chips with counts; 60 rows a page.
+- Tests: `tests/splits.test.ts`, `tests/parlay-gen-reorder.test.ts`, `tests/ranked-picks.test.ts` (new); `nav`, `parlay-gen-ui`, `cfb-props-ui` re-pinned. Headless-Chrome DevTools smoke over every page × desk: no console errors.
+
+Validation: TypeScript passes; full serial vitest gate recorded in `tools/handoff-state.env` (GATE_TESTS).
+
 # Progress — 2026-09-18 (UI overhaul: generator customization, hit-rate analytics, Caesars-tight chips)
 
 - Josh's five items: more generator customization without the mix presets, a smaller exclude control, DK always (no option), stats/hit-rate analytics on the generator and picks over the last 7/15/30/60/120 games, and a tighter, game-like layout after the Caesars/William Hill app (no screenshots came through; the known chip layout was followed).

@@ -94,7 +94,8 @@ const INSTANT: Transition = { duration: 0 };
 
 function Brand() {
   return (
-    <Link replace href="/" className="flex items-baseline gap-0.5 select-none">
+    // the wordmark goes to the Games desk, never the landing (Josh, 2026-09-18: "Clicking Parlay Lab logo in top left brings up this page for some reason … It should never bring this up")
+    <Link replace href="/games" className="flex items-baseline gap-0.5 select-none">
       <span className="text-[14px] font-bold tracking-tight text-text md:text-[15px]">PARLAY</span>
       <span className="text-gradient text-[14px] font-bold md:text-[15px]">//</span>
       <span className="text-[14px] font-bold tracking-tight text-text md:text-[15px]">LAB</span>

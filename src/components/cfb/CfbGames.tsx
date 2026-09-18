@@ -15,6 +15,8 @@ import { addDays } from "@/lib/cfb/dates";
 import type { CfbFinals, CfbGame } from "@/lib/cfb/types";
 import { railLabel } from "@/lib/games";
 import { CfbGameCard, timeLabelPT } from "./CfbGameCard";
+import { findGameSplits } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 
 /**
  * CFB GAMES (INSTRUCTION 38, 2026-09-05): the schedule-and-scores view for a Pacific date —
@@ -63,6 +65,8 @@ export function CfbGames() {
   const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
+  /* bet % / money % per side (2026-09-18) — one feed per league, matched per game below */
+  const splitsFeed = useSplits(L.id);
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
   const toggle = useCallback((id: string) => {
     setOpen((prev) => {
@@ -176,7 +180,7 @@ export function CfbGames() {
                   </h2>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {grp.games.map((g) => (
-                      <CfbGameCard key={g.id} game={g} expanded={open.has(g.id)} onToggle={() => toggle(g.id)} />
+                      <CfbGameCard key={g.id} game={g} expanded={open.has(g.id)} onToggle={() => toggle(g.id)} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
                     ))}
                   </div>
                 </section>

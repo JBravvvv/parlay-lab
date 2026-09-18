@@ -1,5 +1,8 @@
 "use client";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { mlbLegSplit } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import {liveMarketBoard} from "@/lib/mlb/market-board";
 import {LiveOpportunities} from "@/components/mlb/LiveOpportunities";
 import {MLB_BROWSE_MARKETS} from "@/lib/mlb/browse-markets";
@@ -228,6 +231,9 @@ function MlbBoardPage() {
      Caesars price — off-book rows render with their best price and Josh's own ⓘ toggle
      ("offered at Caesars right now?") is the only thing that hides a pick. */
   const cz = useCzHidden();
+  /* bet % / money % on ML / RL rows (2026-09-18) — the consensus page carries no player props; the
+     football desks render their own board below and never read this feed, so they do not fetch it */
+  const splitsFeed = useSplits(useSport() === "mlb" ? "mlb" : null);
   /* INSTRUCTION 28 (2026-09-04, Josh: "It keeps showing Jose Caballero on the board even
      with a refresh yet he's not in the yankees starting lineup so there's no bets available
      for him at any book"). The stored board — and the stamped picks, which ARE that board —
@@ -540,6 +546,7 @@ function MlbBoardPage() {
                 {q && q.ln !== lineOf(r.lkey ?? "") ? (
                   <span className="text-live"> → {legSideOf(r.sub)} {q.ln} live</span>
                 ) : null}
+                <SplitsChip split={mlbLegSplit(splitsFeed, r)} className="ml-1.5" />
               </div>
               {r.susp && (
                 <div
@@ -799,7 +806,7 @@ function MlbBoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut, mine],
+    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut, mine, splitsFeed],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'

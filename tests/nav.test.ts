@@ -110,7 +110,9 @@ describe("nav — desktop side rail", () => {
     expect(shell).not.toMatch(/IconDash/);
     // the brand still links home — `replace` since 2026-09-05 (iOS freeze fix: every
     // internal Link is replace-only so the back-swipe recognizer never arms; see nav-flat.test.ts)
-    expect(shell).toMatch(/<Link replace href="\/" className="flex items-baseline/);
+    // 2026-09-18, Josh: "Clicking Parlay Lab logo in top left brings up this page for some reason … It should never bring this up" — the wordmark goes to /games now
+    expect(shell).toMatch(/<Link replace href="\/games" className="flex items-baseline/);
+    expect(shell).not.toMatch(/<Link replace href="\/" className="flex items-baseline/);
   });
   it("Calc was renamed Parlay Calc (2026-09-04; briefly 'Parlay Calculator' on 09-03)", () => {
     expect(nav.find((n) => n.href === "/calc")!.label).toBe("Parlay Calc");
@@ -255,8 +257,8 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
 describe("nav — the NFL desk joins the shell (2026-09-08: three desks, one switch)", () => {
   const sportSrc = fs.readFileSync(path.join(process.cwd(), "src/lib/sport.ts"), "utf8");
   const sw = fs.readFileSync(path.join(process.cwd(), "src/components/shell/SportSwitch.tsx"), "utf8");
-  it("SportSwitch renders three options in order mlb / cfb / nfl (it maps SPORTS verbatim)", () => {
-    expect(sportSrc).toMatch(/export const SPORTS: readonly Sport\[\] = \["mlb", "cfb", "nfl"\] as const;/);
+  it("SportSwitch renders three options in order nfl / cfb / mlb (it maps SPORTS verbatim; NFL first since 2026-09-18)", () => {
+    expect(sportSrc).toMatch(/export const SPORTS: readonly Sport\[\] = \["nfl", "cfb", "mlb"\] as const;/);
     expect(sw).toMatch(/SPORTS\.map\(\(s\) => \(\{/);
     // the thumb tone follows the desk: amber on CFB, blue on NFL, lime otherwise
     expect(sw).toMatch(/tone=\{sport === "cfb" \? "cfb" : sport === "nfl" \? "nfl" : "pos"\}/);

@@ -17,12 +17,15 @@ import { setSport } from "@/lib/sport";
 import { CfbProps } from "@/components/cfb/CfbProps";
 import { NflProps } from "@/components/nfl/NflProps";
 import type { PickRow, PropBoardGame } from "@/engine";
-import { combineTicket, type SandboxLeg } from "@/lib/ticket-math";
+import { amToDec, combineTicket, type SandboxLeg } from "@/lib/ticket-math";
 import { useHeadshots } from "@/lib/mlb-visuals";
 import { parseBoardLabel } from "@/lib/player-card";
 import { MarketNav } from "@/components/props/MarketNav";
 import { PropGameCard } from "@/components/props/PlayerRow";
-import { GameMarketCard } from "@/components/props/GameCard";
+import { GameMarketCard, TeamAvatar } from "@/components/props/GameCard";
+import { RankedPicks, RankedViewTabs, type RankedFilter, type RankedPick } from "@/components/props/RankedPicks";
+import { HitChip } from "@/components/props/HitChip";
+import { bookName } from "@/lib/sportsbook/books";
 import { Slip } from "@/components/props/Slip";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
 import {liveMarketBoard,marketPhaseBoard} from "@/lib/mlb/market-board";
@@ -102,6 +105,14 @@ const GEN_SPEC_DEFAULT: GenSpec = {
   pinned: blankPins(4),
 };
 
+/* the ranked list's category chips (2026-09-18 item 8): the two game markets, then every prop
+   market the generator prices, in its own rail order */
+const RANKED_FILTERS: RankedFilter[] = [
+  { key: "ml", label: "ML" },
+  { key: "rl", label: "RL" },
+  ...MLB_GEN_MARKETS.map((m) => ({ key: m.key, label: m.label })),
+];
+
 export default function PropsPage() {
   // useSearchParams needs a Suspense boundary; it is read on both server and client so the deep link hydrates cleanly
   return (
@@ -133,6 +144,8 @@ function PropsDesk() {
   useEffect(() => {
     if (NFL_ENABLED && wantNfl) setSport("nfl");
   }, [wantNfl]);
+  /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
+  const [view, setView] = useState<"ranked" | "games">(link ? "games" : "ranked");
   const [tab, setTab] = useState<TabKey>(link?.tab ?? "batter");
   const [mktKey, setMktKey] = useState<string>(link?.mkt ?? "hrr");
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
@@ -237,6 +250,30 @@ function PropsDesk() {
     const live=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
     return marketPhaseBoard(propBoard,live,spec.phase??"pregame",at);
   },[propBoard,liveOverlay,d,liveNow,spec.phase,gen.nowMs]);
+  /* EVERY PICK TODAY (2026-09-18 item 8): the prop legs are the generator's own pool over EVERY
+     category — same rows, same prices, same win % — and ML/RL are the engine's categories, both
+     sides, exactly as the game cards list them. Nothing here is a new price. */
+  const rankedPool = useMemo(
+    () => buildGenPool({ market: GEN_MARKETS[0], markets: GEN_MARKETS, includeStarted: false, phase: spec.phase ?? "pregame" }, gen.nowMs),
+    [buildGenPool, spec.phase, gen.nowMs],
+  );
+  const rankedGameRows = useMemo(() => {
+    if (!d) return [] as { market: string; row: PickRow }[];
+    const cats = (d.categories ?? {}) as Record<string, PickRow[]>;
+    const live = (d.categoriesLive ?? {}) as Record<string, PickRow[]>;
+    const out: { market: string; row: PickRow }[] = [];
+    for (const m of ["ml", "rl"]) {
+      const seen = new Set<string>();
+      const base = [...(cats[m] ?? []), ...(live[m] ?? [])].filter((r) => {
+        const id = legId(r);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      for (const row of bothSides(base)) out.push({ market: m, row });
+    }
+    return out;
+  }, [d]);
   const allPropGames = useMemo(() => {
     if (!cat || gameTab) return [];
     const needle = norm(search.trim());
@@ -280,11 +317,60 @@ function PropsDesk() {
       ...new Set([
         ...propGames.flatMap((x) => x.rows.map((r) => r.p)),
         ...pool.legs.map((l) => parseBoardLabel(l.label)?.name ?? l.label),
+        ...rankedPool.legs.map((l) => parseBoardLabel(l.label)?.name ?? l.label),
       ]),
     ],
-    [propGames, pool],
+    [propGames, pool, rankedPool],
   );
   const headshots = useHeadshots(playerNames);
+  const rankedPicks = useMemo<RankedPick<SandboxLeg>[]>(() => {
+    const out: RankedPick<SandboxLeg>[] = [];
+    for (const { market, row: r } of rankedGameRows) {
+      const cz = typeof r.cz === "number" ? r.cz : null;
+      const prob = typeof r.prob === "number" ? r.prob : null;
+      if (cz == null || prob == null || !(prob > 0)) continue;
+      const label = String(r.label ?? "");
+      const sub = String(r.sub ?? "");
+      const game = String(r.game ?? "");
+      const book = r.displayBook ? bookName(String(r.displayBook)) : "CZ";
+      const id = legId(r);
+      out.push({
+        id,
+        market,
+        label,
+        sub: game ? `${sub} · ${game}` : sub,
+        am: cz,
+        prob,
+        ev: ((prob / 100) * amToDec(cz) - 1) * 100,
+        book,
+        src: "model",
+        leg: { id, label, sub, game, cz, prob, market, book, src: "model" },
+        mark: <TeamAvatar label={label} />,
+      });
+    }
+    for (const l of rankedPool.legs) {
+      const parsed = parseBoardLabel(l.label);
+      const name = parsed?.name ?? l.label;
+      const team = parsed?.team ?? l.team;
+      out.push({
+        id: l.id,
+        market: l.market ?? spec.market,
+        label: name,
+        sub: l.gameLabel ? `${l.sub} · ${l.gameLabel}` : l.sub,
+        am: l.am,
+        prob: l.prob,
+        ev: l.ev * 100,
+        book: l.book,
+        src: l.src,
+        started: l.started,
+        alt: l.alt,
+        leg: l.leg,
+        mark: <PlayerMark player={name} team={team} headshot={headshots[name] ?? null} size="sm" />,
+        hit: l.hit ? <HitChip stat={l.hit} window={hitWindow} /> : null,
+      });
+    }
+    return out;
+  }, [rankedGameRows, rankedPool, headshots, hitWindow, spec.market]);
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
      so SSR prints no time and hydration cannot mismatch on a locale-rendered clock) */
   const boardAtLabel =
@@ -370,6 +456,7 @@ function PropsDesk() {
         result={gen.result}
         onGenerate={gen.spin}
         onTogglePin={gen.togglePin}
+        onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
         excludedPlayers={gen.excludedPlayers}
         onRestorePlayer={gen.restorePlayer}
@@ -414,7 +501,20 @@ function PropsDesk() {
           </button>
         </div>
       )}
-      {q.isPending || (!gameTab && browseProps.loading) ? (
+      {/* 2026-09-18 item 8: the ranked list is the default; the per-game book is one tap away */}
+      <RankedViewTabs view={view} onView={setView} />
+      {view === "ranked" ? (
+        <div className={legs.length ? "pb-20" : "pb-6"}>
+          <RankedPicks
+            picks={rankedPicks}
+            filters={RANKED_FILTERS}
+            isSel={isSel}
+            onToggle={toggle}
+            loading={q.isPending || browseProps.loading}
+            emptyBody="No priced picks on today's board yet — generate a board (Board tab) and every ML, RL and prop appears here, S down."
+          />
+        </div>
+      ) : q.isPending || (!gameTab && browseProps.loading) ? (
         <BoardSkeleton />
       ) : cat == null ? (
         <Panel>

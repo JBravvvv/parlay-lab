@@ -11,6 +11,10 @@ import { DateRail } from "@/components/games/DateRail";
 import { LinescoreTable } from "@/components/games/LinescoreTable";
 import { logoFor, ptToday, startLabel } from "@/components/games/logo";
 import { PlayerName } from "@/components/player/PlayerName";
+import { GradeChip } from "@/components/ui/GradeChip";
+import { SplitsChip } from "@/components/ui/SplitsChip";
+import { findGameSplits, sideSplit, type GameSplits } from "@/lib/splits";
+import { useSplits } from "@/lib/use-splits";
 import {
   SEASON_WINDOW,
   cardExpansion,
@@ -193,6 +197,9 @@ function Section({ title, games, tone = "text-muted", date }: { title: string; g
 }
 
 function GameCard({ g, date }: { g: ShapedGame; date: string }) {
+  /* bet % / money % per side (2026-09-18): one feed per league (react-query dedupes), matched to this game by club */
+  const splitsFeed = useSplits("mlb");
+  const gameSplits: GameSplits | null = findGameSplits(splitsFeed, { abbr: g.away.abbr, name: g.away.name }, { abbr: g.home.abbr, name: g.home.name });
   // INSTRUCTION 46: collapsed by default; the body toggles, the top-right button navigates
   const [open, setOpen] = useState(false);
   const upcoming = g.status === "upcoming";
@@ -265,8 +272,8 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
         className="flex w-full items-center gap-2 px-3 pb-2.5 pt-1.5 text-left transition-[background] duration-(--dur-fast) hover:bg-white/[0.03] active:bg-white/[0.05]"
       >
         <div className="min-w-0 flex-1 space-y-1">
-          <TeamRow t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} />
-          <TeamRow t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} />
+          <TeamRow t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} split={sideSplit(gameSplits, "ml", "away")} />
+          <TeamRow t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} split={sideSplit(gameSplits, "ml", "home")} />
         </div>
         <span aria-hidden className={`shrink-0 text-[12px] leading-none text-faint transition-transform duration-(--dur-fast) ${open ? "rotate-180" : ""}`}>
           ⌄
@@ -297,7 +304,8 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
 }
 
 /** one compact line per club: logo, abbr (full name from md up), record, then the score or the ML */
-function TeamRow({ t, score, upcoming, winner }: { t: GameTeam; score: boolean; upcoming: boolean; winner: boolean }) {
+/** `split` (2026-09-18): the consensus bet%/money% on this club's moneyline; the ML grade rides beside the price (Josh: "grades next to every pick on the games page") */
+function TeamRow({ t, score, upcoming, winner, split = null }: { t: GameTeam; score: boolean; upcoming: boolean; winner: boolean; split?: import("@/lib/splits").SideSplit | null }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -312,13 +320,15 @@ function TeamRow({ t, score, upcoming, winner }: { t: GameTeam; score: boolean; 
       {score ? (
         <span className={`num shrink-0 text-[17px] font-bold leading-none ${winner ? "text-text" : "text-muted"}`}>{t.score ?? "—"}</span>
       ) : upcoming ? (
-        <span className="num flex shrink-0 items-baseline gap-1.5 leading-none">
+        <span className="num flex shrink-0 items-center gap-1.5 leading-none">
+          <SplitsChip split={split} compact />
           {t.ml && (
             <span className="text-[9px] text-faint">
               {t.ml.book ?? ""}
             </span>
           )}
           <span className="text-[13px] font-bold text-gold">{t.ml?.odds ?? "—"}</span>
+          {t.ml?.grade && <GradeChip grade={t.ml.grade} basis="EV at the best posted price" />}
         </span>
       ) : null}
     </div>

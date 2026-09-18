@@ -27,7 +27,8 @@ export const SPORT_META: Record<Sport, { label: string; short: string; emoji: st
   nfl: { label: "NFL", short: "NFL", emoji: "🏈", eyebrow: "National Football League", feed: "ESPN final scores" },
 };
 
-export const SPORTS: readonly Sport[] = ["mlb", "cfb", "nfl"] as const;
+/** desk order on the switch — NFL first (Josh, 2026-09-18: "Re-order the sports from MLB/CFB/NFL to NFL/CFB/MLB") */
+export const SPORTS: readonly Sport[] = ["nfl", "cfb", "mlb"] as const;
 
 export function isSport(x: unknown): x is Sport {
   return x === "mlb" || x === "cfb" || x === "nfl";

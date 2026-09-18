@@ -50,8 +50,8 @@ describe("CfbProps — wiring", () => {
     expect(client).toMatch(/CFB_PROPS_STALE_MS = CFB_PROPS\.revalidateSec \* 1000/);
     expect(client).toMatch(/Math\.max\(0, winMs - age\)/);
   });
-  it("the props query is only enabled on a prop tab", () => {
-    expect(props).toMatch(/enabled: nav !== "sides" && !!date/);
+  it("the props query is enabled on a prop tab — or whenever the ranked list (the default view since 2026-09-18) needs every prop", () => {
+    expect(props).toMatch(/enabled: \(nav !== "sides" \|\| view === "ranked"\) && !!date/);
   });
   it("shows the empty state with the fetched / events counts", () => {
     expect(props).toMatch(/The selected book hasn(&apos;|')t posted player props for this slate yet/);

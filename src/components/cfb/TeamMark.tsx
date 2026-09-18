@@ -36,8 +36,17 @@ const BADGE: Record<TeamMarkSize, string> = {
   lg: "-left-1.5 -top-1.5 h-[18px] min-w-[18px] px-1 text-[10px]",
 };
 
-/** the corner logo badge of a PlayerMark, px per size (about half the disc) */
-const LOGO_BADGE_PX: Record<TeamMarkSize, number> = { xs: 10, sm: 13, md: 17, lg: 22 };
+/**
+ * the corner logo badge of a PlayerMark, px per size (a little over half the disc). LIGHT since
+ * 2026-09-18 — Josh, verbatim: "the team logo is not visible with the black circle background
+ * encompassing the logos". A dark #101215 disc swallowed dark-primary logos (Ravens, Steelers,
+ * Saints, Jaguars); the badge is now a near-white disc with a dark rim, the way Caesars' own
+ * dark mode keeps every logo legible, and the plain team mark draws ESPN's logo raw at the full
+ * box with no disc behind it at all.
+ */
+const LOGO_BADGE_PX: Record<TeamMarkSize, number> = { xs: 11, sm: 14, md: 18, lg: 24 };
+/** the badge disc: near-white fill, dark rim, so a dark-primary logo reads on a dark surface */
+export const LOGO_BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]";
 
 /**
  * ESPN's image combiner URL for a headshot at a small size — the full-size PNG is ~220 KB, the
@@ -105,7 +114,7 @@ export function TeamMark({
         role="img"
         aria-label={rank != null ? `#${rank} ${name}` : name}
         title={name}
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full bg-white/[0.06] ring-1 ring-white/[0.08]"
+        className={`relative inline-flex shrink-0 items-center justify-center rounded-full ${useLogo ? "" : "bg-white/[0.06] ring-1 ring-white/[0.08]"}`}
         style={{ width: px, height: px }}
       >
         {useLogo ? (
@@ -118,7 +127,7 @@ export function TeamMark({
             loading="lazy"
             decoding="async"
             onError={() => setBroken(team.logo)}
-            className="h-[82%] w-[82%] object-contain"
+            className="h-full w-full object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
           />
         ) : (
           <span
@@ -211,7 +220,7 @@ export function PlayerMark({
           />
         ) : team?.logo && useBadgeLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={team.logo} alt="" width={px} height={px} onError={() => setBadgeBroken(team?.logo ?? null)} className="h-[82%] w-[82%] object-contain" />
+          <img src={team.logo} alt="" width={px} height={px} onError={() => setBadgeBroken(team?.logo ?? null)} className="h-[92%] w-[92%] object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
         ) : (
           <span
             aria-hidden
@@ -225,7 +234,7 @@ export function PlayerMark({
           <span
             aria-hidden
             data-team-badge
-            className="absolute -left-1 -top-1 flex items-center justify-center rounded-full bg-[#101215] ring-1 ring-white/[0.12] shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]"
+            className={`absolute -left-1 -top-1 flex items-center justify-center rounded-full ${LOGO_BADGE_CLASS}`}
             style={{ width: badgePx, height: badgePx }}
           >
             {useBadgeLogo ? (
@@ -238,10 +247,10 @@ export function PlayerMark({
                 loading="lazy"
                 decoding="async"
                 onError={() => setBadgeBroken(team?.logo ?? null)}
-                className="h-[80%] w-[80%] object-contain"
+                className="h-[84%] w-[84%] object-contain"
               />
             ) : (
-              <span className="h-[60%] w-[60%] rounded-full" style={{ background: hex ?? "rgba(255,255,255,0.35)" }} />
+              <span className="h-[60%] w-[60%] rounded-full" style={{ background: hex ?? "rgba(0,0,0,0.35)" }} />
             )}
           </span>
         )}

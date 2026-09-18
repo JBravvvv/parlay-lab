@@ -7,6 +7,7 @@ import {
   emptyPool,
   generate,
   specSeed,
+  type GenLeg,
   type GenPool,
   type GenResult,
   type GenSpec,
@@ -59,6 +60,8 @@ export type UseParlayGen<P> = {
   result: GenResult<P>;
   /** keep / release slot `i` */
   togglePin: (slot: number) => void;
+  /** move the leg in slot `from` to slot `to` — display order; a pin travels with its leg (2026-09-18) */
+  reorder: (from: number, to: number) => void;
   excludedPlayers: readonly { key: string; label: string }[];
   excludePlayer: (slot: number) => void;
   restorePlayer: (key: string) => void;
@@ -210,7 +213,33 @@ export function useParlayGen<P>({
     [open, pool, spec, pricingBook, roll, boardKey],
   );
 
-  const result = recalled?.result ?? generated;
+  /* DISPLAY ORDER (2026-09-18, Josh: "ability to reorder/drag the picks so if im keeping the bottom
+     pick i can drag it to top, hit the 'lock it in' button on the pick then regenerate the ones
+     below it"). A ticket is a SET — its key is order-independent — so the order Josh drags into
+     is an overlay keyed by that ticket: it applies while the same legs are on screen and falls
+     away the moment a spin produces a different set. A pin travels with its leg: the spec's slot
+     pins are permuted by the same move, so "drag to the top, lock it, regenerate" seats the kept
+     leg in slot 1 of the next ticket. Pins alone do not change which legs the walk seats
+     (tests/parlay-gen-reorder.test.ts), so the permuted spec re-rolls to the same set. */
+  const [order, setOrder] = useState<{ key: string; ids: readonly string[] } | null>(null);
+  const baseResult = recalled?.result ?? generated;
+  const result = useMemo(() => applyOrder(baseResult, order), [baseResult, order]);
+  const reorder = (from: number, to: number) => {
+    if (!result.ok) return;
+    const legs = result.ticket.legs;
+    if (from === to || from < 0 || to < 0 || from >= legs.length || to >= legs.length) return;
+    const ids = legs.map((l) => l.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    setOrder({ key: result.ticket.key, ids });
+    setSpec((sp) => {
+      const pinned = Array.from({ length: sp.legs }, (_, k) => sp.pinned[k] ?? null);
+      if (!pinned.some(Boolean)) return sp; // nothing locked: the spec is untouched, nothing re-rolls
+      const [pin] = pinned.splice(from, 1);
+      pinned.splice(to, 0, pin ?? null);
+      return { ...sp, pinned };
+    });
+  };
   const remember = () => { if (result.ok) past.current.push({ spec, result }); };
   const navigate = (direction: "back" | "forward") => {
     const from = direction === "back" ? past.current : future.current;
@@ -367,6 +396,7 @@ export function useParlayGen<P>({
     pool,
     result,
     togglePin,
+    reorder,
     excludedPlayers, excludePlayer, restorePlayer, clearExclusions,
     spin,
     back: () => navigate("back"), forward: () => navigate("forward"),
@@ -388,4 +418,13 @@ function playerExposure(tickets: readonly string[][]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const ticket of tickets) for (const player of new Set(ticket)) counts.set(player, (counts.get(player) ?? 0) + 1);
   return counts;
+}
+
+/** the ticket in the order Josh dragged it into — only while those exact legs are the ticket */
+function applyOrder<P>(r: GenResult<P>, order: { key: string; ids: readonly string[] } | null): GenResult<P> {
+  if (!r.ok || !order || order.key !== r.ticket.key) return r;
+  const byId = new Map(r.ticket.legs.map((l) => [l.id, l]));
+  const legs = order.ids.map((id) => byId.get(id)).filter((l): l is GenLeg<P> => !!l);
+  if (legs.length !== r.ticket.legs.length) return r;
+  return { ok: true, ticket: { ...r.ticket, legs } };
 }

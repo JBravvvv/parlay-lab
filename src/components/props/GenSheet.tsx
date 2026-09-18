@@ -325,6 +325,7 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
 
 function Slot<P>({
   i,
+  count,
   l,
   pinned,
   outOfBand,
@@ -334,8 +335,13 @@ function Slot<P>({
   onTogglePin,
   onExclude,
   excluded = false,
+  onMove,
+  dragFrom = null,
+  onDragFrom,
 }: {
   i: number;
+  /** how many slots the ticket has — the ▲/▼ bounds read it */
+  count: number;
   l: GenLeg<P>;
   pinned: boolean;
   outOfBand: boolean;
@@ -345,6 +351,10 @@ function Slot<P>({
   onTogglePin: (slot: number) => void;
   onExclude?: (slot: number) => void;
   excluded?: boolean;
+  /** move this slot to another position (2026-09-18) — drag on a pointer, ▲/▼ on a thumb */
+  onMove?: (from: number, to: number) => void;
+  dragFrom?: number | null;
+  onDragFrom?: (slot: number | null) => void;
 }) {
   /* An MLB board label prints "Name (TEAM)"; a football label is the name on its own and the
      team rides in `l.team`. parseBoardLabel returns null for anything it does not recognise — it
@@ -353,26 +363,37 @@ function Slot<P>({
   const parsed = parseBoardLabel(l.label);
   const name = parsed?.name ?? l.label;
   const team = parsed?.team ?? l.team;
+  const dragging = dragFrom === i;
+  const dropTarget = dragFrom != null && dragFrom !== i;
   return (
     <div
       data-gen-slot={i}
+      draggable={!!onMove}
+      onDragStart={onMove ? (e) => { e.dataTransfer.effectAllowed = "move"; onDragFrom?.(i); } : undefined}
+      onDragOver={onMove ? (e) => { if (dragFrom != null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } } : undefined}
+      onDrop={onMove ? (e) => { e.preventDefault(); if (dragFrom != null && dragFrom !== i) onMove(dragFrom, i); onDragFrom?.(null); } : undefined}
+      onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
       className={`gen-player-card flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
-      }`}
+      }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}`}
     >
+      {/* the slot number (2026-09-18, Josh: "numbers next to the picks generated so its easy to see
+          how many picks if someone is looking over your shoulder") */}
+      <span aria-hidden className="gen-slot-no num">{i + 1}</span>
+      {/* "hit the 'lock it in' button on the pick then regenerate the ones below it" */}
       <button
         type="button"
         aria-pressed={pinned}
-        aria-label={`${pinned ? "Spin" : "Keep"} slot ${i + 1}: ${name}`}
+        aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}
         onClick={() => onTogglePin(i)}
         className={`press flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-[10px] border text-[7.5px] font-bold uppercase tracking-wide ${
           pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
         }`}
       >
         <span aria-hidden className="text-[12px] leading-none">
-          {pinned ? "📌" : "🎲"}
+          {pinned ? "🔒" : "🔓"}
         </span>
-        <span className="mt-[2px] leading-none">{pinned ? "kept" : "spin"}</span>
+        <span className="mt-[2px] leading-none">{pinned ? "locked" : "lock in"}</span>
       </button>
       {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
@@ -397,6 +418,15 @@ function Slot<P>({
           {l.book && l.book !== "CZ" && <span className="uppercase">{l.book}</span>}
         </span>
       </div>
+      {/* ▲/▼ for thumbs and keyboards; the whole card drags with a pointer (2026-09-18) */}
+      {onMove && (
+        <span className="flex shrink-0 flex-col gap-px">
+          <button type="button" aria-label={`Move slot ${i + 1} up`} disabled={i === 0} onClick={() => onMove(i, i - 1)}
+            className="press flex h-4 w-6 items-center justify-center rounded-[5px] border border-white/[0.08] bg-white/[0.03] text-[8px] leading-none text-faint hover:text-text disabled:opacity-25">▲</button>
+          <button type="button" aria-label={`Move slot ${i + 1} down`} disabled={i >= count - 1} onClick={() => onMove(i, i + 1)}
+            className="press flex h-4 w-6 items-center justify-center rounded-[5px] border border-white/[0.08] bg-white/[0.03] text-[8px] leading-none text-faint hover:text-text disabled:opacity-25">▼</button>
+        </span>
+      )}
       {/* THE EXCLUDE CONTROL IS A 24px GHOST "✕" (2026-09-18: "The exclude player button is way too
           big and visible it looks atrocious"). Excluded → a small "↺" that restores him. */}
       {onExclude && (
@@ -426,6 +456,7 @@ function Slot<P>({
 function LostSlot({ i, id, onTogglePin }: { i: number; id: string; onTogglePin: (slot: number) => void }) {
   return (
     <div data-gen-slot={i} className="flex min-h-[52px] items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5">
+      <span aria-hidden className="gen-slot-no num">{i + 1}</span>
       <button
         type="button"
         aria-pressed
@@ -463,6 +494,7 @@ export function GenSheet<P>({
   onGenerate,
   onBack, onForward, canBack = false, canForward = false, historyNotice,
   onTogglePin,
+  onMove,
   onExcludePlayer, excludedPlayers = [], onRestorePlayer, onClearExclusions,
   onAdd,
   canUndo,
@@ -507,6 +539,8 @@ export function GenSheet<P>({
   canForward?: boolean;
   historyNotice?: string | null;
   onTogglePin: (slot: number) => void;
+  /** drag / ▲▼ reorder of the generated slots (2026-09-18); absent = fixed order */
+  onMove?: (from: number, to: number) => void;
   onExcludePlayer?: (slot: number) => void;
   excludedPlayers?: readonly { key: string; label: string }[];
   onRestorePlayer?: (key: string) => void;
@@ -547,6 +581,8 @@ export function GenSheet<P>({
   void band;
   const [attempt, setAttempt] = useState(0);
   const [customizeOpen, setCustomizeOpen] = useState(false);
+  /* the slot being dragged, for the drop highlight (2026-09-18) */
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
   /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). poolCounts exists precisely so
      the diagnostic can never contradict the verdict. */
   const counts = poolCounts(pool, spec);
@@ -683,8 +719,11 @@ export function GenSheet<P>({
             <span className="min-w-0"><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{summary}</span></span><span aria-hidden className="shrink-0 text-pos">{customizeOpen ? "−" : "+"}</span>
           </button>
 
-          <div className="grid items-start gap-4 @3xl:grid-cols-2">
-          <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-3 @3xl:block`}>
+          {/* STACKED (2026-09-18, Josh: "header/filters on top & the picks/generate button below so
+              they are stacked top/bottom instead of … filters/picks stacked left/right"). On a wide
+              panel the filters run two-up so the ticket stays close under them. */}
+          <div className="space-y-3">
+          <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-3 @3xl:grid @3xl:grid-cols-2 @3xl:gap-x-6 @3xl:gap-y-3 @3xl:space-y-0`}>
           {/* legs */}
           <ChipRow label="Legs" hint={`${LEG_MIN} to ${LEG_MAX}`}>
             {LEG_CHOICES.map((n) => (
@@ -852,8 +891,11 @@ export function GenSheet<P>({
           )}
 
           </div>
-          <div id="props-gen-ticket" className="gen-ticket space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:sticky @3xl:top-4 @3xl:space-y-2.5 @3xl:p-3">
-          <div className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-pos @3xl:block">Your ticket</div>
+          <div id="props-gen-ticket" className="gen-ticket space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:space-y-2.5 @3xl:p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-pos">Your ticket</span>
+            {ticket && <span className="num min-w-0 truncate text-[9.5px] text-faint">{ticket.legs.length} picks{onMove ? " · drag or ▲▼ to reorder · lock what you like, then regenerate" : ""}</span>}
+          </div>
           {/* generate */}
           <div className="flex gap-2">
             {(
@@ -930,6 +972,10 @@ export function GenSheet<P>({
                   <Slot
                     key={l.id}
                     i={i}
+                    count={ticket.legs.length}
+                    onMove={onMove}
+                    dragFrom={dragFrom}
+                    onDragFrom={setDragFrom}
                     l={l}
                     pinned={spec.pinned[i] === l.id}
                     outOfBand={outside.has(l.id)}
@@ -997,6 +1043,7 @@ export function GenSheet<P>({
                       <Slot
                         key={id}
                         i={i}
+                        count={spec.legs}
                         l={leg}
                         pinned
                         outOfBand={false}

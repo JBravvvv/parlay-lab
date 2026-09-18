@@ -31,7 +31,13 @@ export type PlayerMarkSize = "xs" | "sm" | "md" | "lg";
 
 /* px per size — mirrors the CFB mark's PX (TeamMark.tsx:27) and LOGO_BADGE_PX (:38) */
 const PX: Record<PlayerMarkSize, number> = { xs: 18, sm: 24, md: 32, lg: 44 };
-const LOGO_BADGE_PX: Record<PlayerMarkSize, number> = { xs: 10, sm: 13, md: 17, lg: 22 };
+const LOGO_BADGE_PX: Record<PlayerMarkSize, number> = { xs: 11, sm: 14, md: 18, lg: 24 };
+/**
+ * the badge disc — LIGHT since 2026-09-18 (Josh, verbatim: "the team logo is not visible with the
+ * black circle background encompassing the logos"): near-white fill with a dark rim so a
+ * dark-primary logo reads on the dark surface, mirroring the CFB mark's LOGO_BADGE_CLASS.
+ */
+const BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]";
 const DISC_TEXT: Record<PlayerMarkSize, string> = {
   xs: "text-[7px]",
   sm: "text-[8.5px]",
@@ -102,7 +108,7 @@ export function PlayerMark({
         aria-label={tag ?? ""}
         title={tag ?? ""}
         data-team-mark
-        className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/[0.08] ${className}`}
+        className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ${logo && badgeBroken !== logo ? "" : "bg-white/[0.06] ring-1 ring-white/[0.08]"} ${className}`}
         style={{ width: px, height: px, ...style }}
       >
         {logo && badgeBroken !== logo ? (
@@ -116,7 +122,7 @@ export function PlayerMark({
             decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setBadgeBroken(logo)}
-            className="h-[78%] w-[78%] object-contain"
+            className="h-full w-full object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
           />
         ) : (
           <span className={`num font-bold uppercase leading-none tracking-tight text-muted ${DISC_TEXT[size]}`}>{tag}</span>
@@ -152,7 +158,7 @@ export function PlayerMark({
           />
         ) : logo && badgeBroken !== logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logo} alt="" width={px} height={px} onError={() => setBadgeBroken(logo)} className="h-[82%] w-[82%] object-contain" />
+          <img src={logo} alt="" width={px} height={px} onError={() => setBadgeBroken(logo)} className="h-[92%] w-[92%] object-contain drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
         ) : (
           <span
             aria-hidden
@@ -165,7 +171,7 @@ export function PlayerMark({
           <span
             aria-hidden
             data-team-badge
-            className="absolute -left-1 -top-1 flex items-center justify-center rounded-full bg-[#101215] ring-1 ring-white/[0.12] shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]"
+            className={`absolute -left-1 -top-1 flex items-center justify-center rounded-full ${BADGE_CLASS}`}
             style={{ width: badgePx, height: badgePx }}
           >
             {logo && badgeBroken !== logo ? (
@@ -179,10 +185,10 @@ export function PlayerMark({
                 decoding="async"
                 referrerPolicy="no-referrer"
                 onError={() => setBadgeBroken(logo)}
-                className="h-[80%] w-[80%] object-contain"
+                className="h-[84%] w-[84%] object-contain"
               />
             ) : (
-              <span className="h-[60%] w-[60%] rounded-full bg-white/35" />
+              <span className="h-[60%] w-[60%] rounded-full bg-black/35" />
             )}
           </span>
         )}
