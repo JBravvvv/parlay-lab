@@ -71,14 +71,36 @@ export type GenMarket = {
 };
 
 export type GenPhase = "pregame" | "live" | "mixed";
-export type GenPoolSpec = { market: string; includeStarted: boolean; phase?: GenPhase };
+/**
+ * What the adapter needs to build the pool. `markets`, when present and non-empty, is the FULL
+ * set of categories on the ticket (2026-09-18: "The parlay generator needs significantly more
+ * customization") and the pool is their union; `market` alone is the single-category case and
+ * every pre-existing caller.
+ */
+export type GenPoolSpec = { market: string; markets?: readonly string[]; includeStarted: boolean; phase?: GenPhase };
+
+/** the categories a spec actually builds from: `markets` when set, else the one `market` */
+export const specMarkets = (spec: Pick<GenSpec, "market" | "markets">): readonly string[] =>
+  spec.markets?.length ? spec.markets : [spec.market];
 
 export type GenSpec = {
   phase?: GenPhase;
   /** Category-relative player rotation; omitted retains the historical sampler. */
   style?: MixStyle;
-  /** the desk's own market key — "batter_hits_runs_rbis" (MLB), "pass_yds" (football) */
+  /** the desk's own market key — "batter_hits_runs_rbis" (MLB), "pass_yds" (football). With
+      `markets` set this is the one the rail is showing; the ticket draws from all of `markets`. */
   market: string;
+  /** every category on the ticket (2026-09-18). Empty/omitted = just `market`. */
+  markets?: readonly string[];
+  /** with several categories: every selected category must appear at least once when the leg
+      count allows it (default ON). Off = any mix the sampler lands on. */
+  spread?: boolean;
+  /** hit-rate floor, 0..1: only legs whose player cleared THIS line on THIS side in at least this
+      share of his recent games (the window is the page's; the adapter stamps `hit` on the leg).
+      A leg with no game-log data cannot clear a floor. null/omitted = no floor. */
+  minHit?: number | null;
+  /** restrict to these game keys; empty/omitted = every game on the board */
+  games?: readonly string[];
   /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI only offers 2..8) */
   legs: number;
   /** PER-LEG band in American odds, either order (-152 … +110) */
@@ -142,6 +164,15 @@ export type GenLeg<P = unknown> = {
   book: string;
   /** prob/100 × dec − 1, as a FRACTION (same convention as TicketCalc.ev) */
   ev: number;
+  /** the market this leg is in — hoisted so a multi-category ticket can spread across them */
+  market?: string;
+  /** the posted line (0.5 for anytime HR); null on a yes-only market */
+  line?: number | null;
+  /** the matchup as the board prints it ("NYY @ BOS · 7:05p"), for the games filter chips */
+  gameLabel?: string;
+  /** cleared-the-line rate over the page's window, stamped by the adapter from the game log;
+      undefined = no data for this player (a floor then excludes him, honestly) */
+  hit?: { n: number; hits: number; rate: number; dots?: readonly boolean[] } | null;
 };
 
 export type GenPool<P = unknown> = {
@@ -200,7 +231,7 @@ export type GenFail =
    */
   | { code: "one-sided"; want: GenSide; has: GenSide; rows: number }
   | { code: "band-empty"; rows: number; nearest: { belowAm: number | null; aboveAm: number | null } }
-  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | "positions" | null }
+  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null }
   | { code: "payout-unreachable"; reach: { minAm: number; maxAm: number } }
   | { code: "payout-not-found"; reach: { minAm: number; maxAm: number } }
   | { code: "pin-missing"; ids: readonly string[] }
@@ -275,6 +306,10 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
   ];
   if (spec.style) parts.push(spec.style);
   if (spec.phase) parts.push(`phase:${spec.phase}`);
+  if (spec.markets?.length) parts.push(`markets:${[...new Set(spec.markets)].sort().join(",")}`);
+  if (spec.spread === false) parts.push("spread:off");
+  if (spec.minHit != null) parts.push(`hit:${spec.minHit}`);
+  if (spec.games?.length) parts.push(`games:${[...new Set(spec.games)].sort().join(",")}`);
   if (spec.positions?.length) parts.push(`positions:${[...new Set(spec.positions)].sort().join(",")}`);
   return fnv1a(parts.join("|"));
 }
@@ -449,8 +484,24 @@ function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
     if (spec.czOnly && l.book !== (spec.pricingBook ?? SETTLE_BOOK_SHORT)) return false;
     if (spec.modelOnly && l.src !== "model") return false;
     if (spec.positions?.length && (!l.position || !spec.positions.includes(l.position))) return false;
+    /* the hit-rate floor (2026-09-18): a leg whose player has no game-log data cannot clear it —
+       excluded rather than waved through, and the relax hint names the floor as the cause */
+    if (spec.minHit != null && !(l.hit && l.hit.rate >= spec.minHit)) return false;
+    if (spec.games?.length && !spec.games.includes(l.gameKey)) return false;
     return true;
   });
+}
+
+/** the categories the spread rule must cover: every selected market that has a candidate at all */
+function spreadTargets<P>(ctx: Ctx<P>): readonly string[] {
+  const wanted = specMarkets(ctx.spec);
+  if (wanted.length < 2 || ctx.spec.spread === false) return [];
+  const present = new Set(ctx.cands.map((l) => l.market).filter((m): m is string => !!m));
+  for (const p of ctx.pins) if (p?.market) present.add(p.market);
+  const targets = wanted.filter((m) => present.has(m));
+  /* fewer legs than categories: cover as many as the legs allow — never fail a 2-leg ticket for
+     not carrying three categories */
+  return targets.slice(0, Math.min(targets.length, ctx.n));
 }
 
 /** Exact player-to-game matching. Separate player/game counts can overstate
@@ -568,6 +619,7 @@ function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
  */
 function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number | null): GenLeg<P>[] | null {
   const s = seatPins(ctx);
+  const spread = spreadTargets(ctx);
   const byPrice = maxDec == null ? [] : ctx.cands.slice().sort((a, b) => a.dec - b.dec);
   let dec = s.legs.reduce((d, l) => (l ? d * l.dec : d), 1);
   for (const c of order) {
@@ -598,10 +650,23 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
       const missing=[false,true].filter(phase=>!selected.some(l=>l.started===phase));
       if(missing.length && (selected.length===ctx.n || !ctx.cands.some(l=>l.started===missing[0] && !selected.some(p=>p.playerKey===l.playerKey || (ctx.spec.onePerGame && p.gameKey===l.gameKey)))))continue;
     }
+    /* SPREAD ACROSS CATEGORIES (2026-09-18): with several markets selected, every one of them
+       lands on the ticket at least once. The same shape as the mixed-phase rule above — a
+       candidate is skipped when seating it would leave more uncovered categories than free
+       slots, or would strand a category with no seatable leg left. */
+    if (spread.length) {
+      const selected = [...s.legs.filter((l): l is GenLeg<P> => !!l), c];
+      const covered = new Set(selected.map((l) => l.market));
+      const missing = spread.filter((m) => !covered.has(m));
+      const free = ctx.n - selected.length;
+      if (missing.length > free) continue;
+      if (missing.some((m) => !ctx.cands.some((l) => l.market === m && !selected.some((p) => p.playerKey === l.playerKey || (ctx.spec.onePerGame && p.gameKey === l.gameKey))))) continue;
+    }
     seat(s, c, i);
     dec *= c.dec;
   }
   if(ctx.spec.phase==="mixed" && ![false,true].every(phase=>s.legs.some(l=>l?.started===phase)))return null;
+  if (spread.length && !spread.every((m) => s.legs.some((l) => l?.market === m))) return null;
   return s.legs.every((l): l is GenLeg<P> => !!l) ? (s.legs as GenLeg<P>[]) : null;
 }
 
@@ -681,7 +746,7 @@ function nearestPosted<P>(cands: readonly GenLeg<P>[], band: { lo: number; hi: n
 }
 
 /** Which single relaxation — and only one that is actually engaged — would open the pool up. */
-type Relax = "same-game" | "started" | "cz" | "model" | "positions" | null;
+type Relax = "same-game" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null;
 
 function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: number): Relax {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
@@ -692,6 +757,8 @@ function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: 
   if (spec.czOnly && capacity(cands({ ...spec, czOnly: false }), pins, spec.onePerGame) >= want) return "cz";
   if (spec.modelOnly && capacity(cands({ ...spec, modelOnly: false }), pins, spec.onePerGame) >= want) return "model";
   if (spec.positions?.length && capacity(cands({ ...spec, positions: [] }), pins, spec.onePerGame) >= want) return "positions";
+  if (spec.minHit != null && capacity(cands({ ...spec, minHit: null }), pins, spec.onePerGame) >= want) return "hit";
+  if (spec.games?.length && capacity(cands({ ...spec, games: [] }), pins, spec.onePerGame) >= want) return "games";
   /* started rows were dropped before the pool existed, so this one is a SUGGESTION — the
      caller has to rebuild the pool to find out, and may still land on an honest failure. */
   if (!spec.phase && !spec.includeStarted && pool.startedDropped > 0) return "started";

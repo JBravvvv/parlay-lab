@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildIndex, resolvePlayer, type IndexEntry } from "@/lib/player-card";
+import { resolvePlayer } from "@/lib/player-card";
+import { loadPlayerIndex } from "@/lib/mlb/player-index";
 
 /**
  * Name → MLB id (2026-09-03). Most click sites only print a name (and maybe a
@@ -8,23 +9,9 @@ import { buildIndex, resolvePlayer, type IndexEntry } from "@/lib/player-card";
  * 404 when nothing matches unambiguously — a miss beats a wrong player.
  * The index (~1.4k active players) is fetched once a day and kept in memory.
  */
-const API = "https://statsapi.mlb.com/api/v1";
-const SEASON = 2026;
-const INDEX_TTL = 86400;
-
-let indexCache: { at: number; entries: IndexEntry[] } | null = null;
-
-async function loadIndex(): Promise<IndexEntry[]> {
-  if (indexCache && Date.now() - indexCache.at < INDEX_TTL * 1000) return indexCache.entries;
-  const r = await fetch(
-    `${API}/sports/1/players?season=${SEASON}&fields=people,id,fullName,currentTeam,id,primaryPosition,abbreviation`,
-    { next: { revalidate: INDEX_TTL }, headers: { accept: "application/json" } },
-  );
-  if (!r.ok) throw new Error(`MLB ${r.status} on players index`);
-  const entries = buildIndex((await r.json()) as never);
-  if (entries.length) indexCache = { at: Date.now(), entries };
-  return entries;
-}
+/* the index itself moved to src/lib/mlb/player-index.ts (2026-09-18) so the hit-rate route can
+   share it — same fetch, same TTL, same in-memory cache */
+const loadIndex = loadPlayerIndex;
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MARKETS, TABS, type TabKey } from "./props-model";
+import { HIT_WINDOWS, windowLabel, type HitWindow } from "@/lib/prop-hit-rate";
 
 /**
  * Two-row market navigation, sticky under the app's top bar on mobile:
@@ -19,6 +20,8 @@ export function MarketNav({
   search,
   onSearch,
   count,
+  hitWindow,
+  onHitWindow,
 }: {
   tab: TabKey;
   mktKey: string;
@@ -30,6 +33,9 @@ export function MarketNav({
   search: string | null;
   onSearch: (s: string) => void;
   count: { lines: number; games: number };
+  /** the hit-rate window the rows print (L7…L120); one tap cycles to the next — the sheet has the full row */
+  hitWindow?: HitWindow;
+  onHitWindow?: (w: HitWindow) => void;
 }) {
   return (
     <div
@@ -39,7 +45,7 @@ export function MarketNav({
       <Segmented tab={tab} onTab={onTab} />
       <MarketRail tab={tab} mktKey={mktKey} onMarket={onMarket} />
       {search != null && (
-        <SearchBox value={search} onChange={onSearch} lines={count.lines} games={count.games} />
+        <SearchBox value={search} onChange={onSearch} lines={count.lines} games={count.games} hitWindow={hitWindow} onHitWindow={onHitWindow} />
       )}
     </div>
   );
@@ -93,13 +99,15 @@ function MarketRail({ tab, mktKey, onMarket }: { tab: TabKey; mktKey: string; on
   }, [mktKey, tab]);
 
   return (
-    <div className="relative mt-2">
+    <div className="relative mt-1.5">
       <div
         ref={ref}
         onScroll={measure}
-        className="flex snap-x snap-mandatory gap-1.5 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-1 overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden"
       >
-        {MARKETS[tab].map((m) => {
+        {/* 2026-09-18: the sportsbook-app rail — 28px chips, 4px apart, and a market the feed does
+            not price (cat null) is not drawn at all: a dead chip is a tap that goes nowhere */}
+        {MARKETS[tab].filter((m) => m.cat != null || mktKey === m.key).map((m) => {
           const on = mktKey === m.key;
           return (
             <button
@@ -107,11 +115,11 @@ function MarketRail({ tab, mktKey, onMarket }: { tab: TabKey; mktKey: string; on
               data-mkt={m.key}
               aria-pressed={on}
               onClick={() => onMarket(m.key)}
-              className={`h-[30px] shrink-0 snap-start whitespace-nowrap rounded-full border px-3 text-[11.5px] font-semibold transition-[transform,background,color,border-color] duration-(--dur-fast) active:scale-[0.96] ${
+              className={`h-[28px] shrink-0 snap-start whitespace-nowrap rounded-full border px-2.5 text-[11px] font-semibold transition-[transform,background,color,border-color] duration-(--dur-fast) active:scale-[0.96] ${
                 on
                   ? "border-pos bg-pos text-bg"
                   : m.cat
-                    ? "border-line-2 bg-white/[0.03] text-muted hover:text-text"
+                    ? "border-white/[0.1] bg-white/[0.04] text-muted hover:text-text"
                     : "border-line bg-transparent text-faint"
               }`}
             >
@@ -137,14 +145,19 @@ function SearchBox({
   onChange,
   lines,
   games,
+  hitWindow,
+  onHitWindow,
 }: {
   value: string;
   onChange: (s: string) => void;
   lines: number;
   games: number;
+  hitWindow?: HitWindow;
+  onHitWindow?: (w: HitWindow) => void;
 }) {
+  const nextWindow = hitWindow != null ? HIT_WINDOWS[(HIT_WINDOWS.indexOf(hitWindow) + 1) % HIT_WINDOWS.length] : null;
   return (
-    <div className="mt-2 flex items-center gap-2">
+    <div className="mt-1.5 flex items-center gap-2">
       <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-[10px] border border-white/[0.08] bg-surface-2 px-2.5 focus-within:border-pos/50">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="shrink-0 text-faint" aria-hidden>
           <circle cx="11" cy="11" r="7" />
@@ -169,6 +182,20 @@ function SearchBox({
           </button>
         )}
       </label>
+      {hitWindow != null && nextWindow != null && (
+        /* the hit-rate window, one tap to cycle (L7 → L15 → L30 → L60 → L120) — the same window
+           every row's chip and the generator's floor read (2026-09-18) */
+        <button
+          type="button"
+          onClick={() => onHitWindow?.(nextWindow)}
+          aria-label={`Hit-rate window: last ${hitWindow} games. Tap for last ${nextWindow}.`}
+          title="How many recent games the hit-rate chips count"
+          className="press num flex h-9 shrink-0 flex-col items-center justify-center rounded-[10px] border border-pos/30 bg-pos/[0.08] px-2 leading-none text-pos"
+        >
+          <span className="text-[11px] font-bold">{windowLabel(hitWindow)}</span>
+          <span className="mt-[2px] text-[7px] font-semibold uppercase tracking-wide opacity-80">hit rate</span>
+        </button>
+      )}
       <span className="num shrink-0 text-right text-[10px] leading-tight text-faint">
         {lines} line{lines === 1 ? "" : "s"}
         <br />

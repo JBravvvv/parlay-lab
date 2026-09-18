@@ -290,12 +290,25 @@ describe("player-card: wiring", () => {
     expect(src).toContain("PlayerSheetProvider");
     expect(src.match(/<PlayerSheetProvider>/g)).toHaveLength(1);
   });
-  it("both routes only talk to statsapi.mlb.com", () => {
-    for (const f of ["app/api/player/route.ts", "app/api/player/resolve/route.ts"]) {
-      const src = read(f);
+  it("every MLB player route only talks to statsapi.mlb.com (the shared index module included)", () => {
+    /* 2026-09-18: the resolve route and the hit-rates route share `src/lib/mlb/player-index.ts`
+       (one index fetch, one TTL), so the host guard reads the route TOGETHER with that module —
+       an import cannot smuggle a second host past it. Any other http(s) host in these files fails. */
+    const INDEX = "src/lib/mlb/player-index.ts";
+    const groups: string[][] = [
+      ["app/api/player/route.ts"],
+      ["app/api/player/resolve/route.ts", INDEX],
+      ["app/api/mlb/hit-rates/route.ts", INDEX],
+    ];
+    for (const files of groups) {
+      const src = files.map(read).join("\n");
       const hosts = [...src.matchAll(/https?:\/\/([a-z0-9.-]+)/g)].map((m) => m[1]);
-      expect(hosts.length).toBeGreaterThan(0);
-      expect(new Set(hosts)).toEqual(new Set(["statsapi.mlb.com"]));
+      expect(hosts.length, files.join("+")).toBeGreaterThan(0);
+      expect(new Set(hosts), files.join("+")).toEqual(new Set(["statsapi.mlb.com"]));
+    }
+    for (const f of ["app/api/player/resolve/route.ts", "app/api/mlb/hit-rates/route.ts"]) {
+      expect(read(f)).toMatch(/from "@\/lib\/mlb\/player-index"/);
+      expect(read(f)).not.toMatch(/api\.the-odds-api|ODDS_API|process\.env\./);
     }
   });
   it("INSTRUCTION 37: the card route no longer asks for calendar windows — season + game log only", () => {

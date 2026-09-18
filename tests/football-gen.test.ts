@@ -560,7 +560,8 @@ describe("the sheet renders for the FOOTBALL market list", () => {
     expect(sheet()).not.toContain("Model-priced legs only");
     expect(sheet({ showModelOnly: true })).toContain("Model-priced legs only");
     /* the controls that DO apply are still there */
-    expect(sheet()).toContain("DraftKings-priced legs only");
+    /* 2026-09-18: the board is priced at the settlement book already, so the book-only toggle is gone */
+    expect(sheet()).not.toContain("priced legs only");
     expect(sheet()).toContain("Two legs from one game");
   });
 

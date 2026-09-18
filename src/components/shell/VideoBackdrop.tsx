@@ -138,7 +138,7 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
           (blocked, saving power, still loading) the backdrop still moves */}
       <div className="aurora absolute inset-0" />
       {video}
-      {scrim && <div className="absolute inset-0 bg-bg/40" />}
+      {scrim && <div className="absolute inset-0 bg-bg/55" />}
     </div>
   );
 }

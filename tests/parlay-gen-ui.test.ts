@@ -133,17 +133,39 @@ describe("GenSheet — the open panel", () => {
     expect(shut).not.toContain("aria-controls"); // no dangling handle while collapsed
     expect(shut).not.toContain(`id="${GEN_PANEL_ID}"`);
   });
-  it("keeps both build styles and the main action visible in the new studio", () => {
-    expect(out).toContain('aria-label="Build style"');
-    expect(out).toContain("Safer mix");
-    expect(out).toContain("Balanced mix");
-    expect(out).toContain("Make it your mix");
+  it("2026-09-18: the build-style mixes and the odds presets are gone; the chip rows and the main action are there", () => {
+    /* Josh, verbatim: "It doesn't need 'Safer Mix'/'Balanced Mix' or 'Favorites/Even/Longshots'
+       because majority of the time those lines aren't consistent across props" */
+    for (const gone of ['aria-label="Build style"', "Safer mix", "Balanced mix", "Make it your mix", "Favorites", "Longshots", "How this mix works", "Your mix"]) {
+      expect(out, `${gone} must be gone`).not.toContain(gone);
+    }
+    expect(out).toContain("Build your parlay");
     expect(out).toContain("Combined odds");
     expect(out).toContain("gen-roll");
+    /* the sportsbook-app chip rows: Legs · Categories · Odds per leg · Sides · Games */
+    for (const row of ["Legs", "Categories", "Odds per leg", "Sides", "Games"]) expect(out).toContain(row);
+    expect(count(out, /h-\[30px\]/g)).toBeGreaterThan(15);
+    /* every MLB category is a chip, and the one on the rail is pressed */
+    for (const m of MLB_GEN_MARKETS) expect(out).toContain(m.label.replace(/'/g, "&#x27;")); // React escapes the apostrophe in K's
+    expect(out).toMatch(/aria-pressed="true"[^>]*>H\+R\+RBI</);
+    /* the two-thumb odds slider stops on prices the board really posts */
+    expect(out).toContain('data-testid="gen-odds-slider"');
+    expect(out).toContain('aria-label="Lowest odds per leg"');
+    /* "Everything should always be graded and priced based on DK so that shouldn't need to be an option" */
+    expect(out).not.toContain("DraftKings-priced legs only");
+    expect(out).not.toMatch(/(Caesars|FanDuel|Book|Sportsbook)-priced legs only/);
+    expect(out).toContain("Model-priced legs only"); // the honesty filter stays; only the book choice is gone
   });
-  it("every control is a 44px target and the pin toggles carry aria-pressed", () => {
-    expect(count(out, /min-h-11/g)).toBeGreaterThan(10);
+  it("the primary actions are 44px targets, the chips carry aria-pressed, and the exclude control is a 24px ghost", () => {
+    expect(out).toMatch(/gen-roll[^>]*min-h-12/);
+    expect(out).toMatch(/<button[^>]*class="[^"]*min-h-\[44px\]/);
     expect(count(out, /aria-pressed/g)).toBeGreaterThan(10);
+    /* "The exclude player button is way too big and visible it looks atrocious" */
+    expect(out).not.toContain("Exclude player");
+    expect(out).not.toMatch(/type="checkbox"[^>]*aria-label="Exclude/);
+    const excl = sheet({ onExcludePlayer: () => {} });
+    expect(count(excl, /aria-label="Exclude [^"]+ from generated parlays"/g)).toBe(4);
+    expect(excl).toMatch(/aria-label="Exclude [^"]+ from generated parlays"[^>]*class="[^"]*h-6 w-6/);
     expect(count(out, /data-gen-slot="\d"/g)).toBe(4);
     expect(out).toMatch(/data-gen-slot="0"[\s\S]{0,400}?aria-pressed="false"/);
     expect(out).toMatch(/aria-label="Keep slot 1: /);
@@ -335,9 +357,11 @@ describe("source pins — the honesty guard extended to the newest price surface
   });
   it("the generator's category control IS the market rail's setter — one state, no divergence", () => {
     expect(page).toMatch(/setTab\(t\);\s*setMktKey\(hit\.key\);/);
-    expect(hook).toMatch(
-      /sp\.market === railMarket \? sp : \{ \.\.\.sp, market: railMarket, pinned: blankPins\(sp\.legs\) \}/,
-    );
+    /* a rail move inside the selected category set keeps the pool (and the pins); a move outside
+       it collapses the set to the rail's category and clears the pins (2026-09-18) */
+    expect(hook).toMatch(/if \(sp\.market === railMarket\) return sp;/);
+    expect(hook).toMatch(/if \(sp\.markets\?\.includes\(railMarket\)\) return \{ \.\.\.sp, market: railMarket \};/);
+    expect(hook).toMatch(/return \{ \.\.\.sp, market: railMarket, markets: undefined, pinned: blankPins\(sp\.legs\) \};/);
   });
   it("the hook is a pure reader too — no fetch, no api path, no ledger, no credit", () => {
     for (const bad of [/fetch\(/, /\/api\//, /Math\.random/, /ledger/, /the-odds-api/]) {

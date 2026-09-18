@@ -28,7 +28,7 @@
  */
 
 import { amToDec } from "@/lib/ticket-math";
-import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenPoolSpec } from "@/lib/parlay-gen";
+import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenPoolSpec } from "@/lib/parlay-gen";
 import { playerSlug } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropQuote, type CfbPropRow } from "@/lib/cfb/props-types";
 import { footballPosition } from "./positions";
@@ -99,9 +99,11 @@ export function footballGenPool<P extends { prob: number; book: string }>(
   let scanned = 0;
   let startedDropped = 0;
   let finishedDropped = 0;
+  /* several categories at once (2026-09-18): the pool is their union, each leg stamped with its own */
+  const wanted = new Set(specMarkets(spec));
 
   for (const row of rows) {
-    if (row.market !== spec.market) continue;
+    if (!wanted.has(row.market)) continue;
 
     /* A finished or called-off game is not bettable at any price — and it is counted on ITS OWN
        line (INSTRUCTION 52 fix pass). These used to go into `noParlayDropped`, which the sheet
@@ -151,6 +153,10 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       alt: false,
       book: leg.book,
       ev: (leg.prob / 100) * dec - 1,
+      market: row.market,
+      line: q.line ?? row.line ?? null,
+      /* the matchup as the board's own sub prints it ("ALA vs ECU"), for the games filter chips */
+      gameLabel: row.sub?.split(" · ")[0] || row.gameId,
     });
   }
 

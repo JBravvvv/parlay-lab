@@ -20,8 +20,8 @@
   /* text — warm off-white (hsl 40 6% 95%) */
   --color-text: hsl(40 6% 95%);
   --color-hero-sub: hsl(40 6% 82%);
-  --color-muted: hsl(40 5% 65%);
-  --color-faint: hsl(40 4% 45%);
+  --color-muted: hsl(40 5% 72%);
+  --color-faint: hsl(40 4% 55%);
 
   /* gradient accent (brand): violet → magenta → hot pink. The token NAMES are kept
      (acc-teal / acc-green / acc-lime) because classes and tests key on them —
@@ -145,7 +145,7 @@ body::after {
       color-mix(in srgb, var(--color-acc-green) 8%, transparent) 55%,
       color-mix(in srgb, var(--color-acc-lime) 11%, transparent)
     ),
-    color-mix(in srgb, var(--color-surface) 78%, transparent);
+    color-mix(in srgb, var(--color-surface) 88%, transparent);
   background-blend-mode: normal, luminosity;
   border: 1px solid color-mix(in srgb, var(--color-acc-lime) 24%, rgba(255, 255, 255, 0.07));
   border-radius: var(--radius-panel);
@@ -717,18 +717,18 @@ body::after {
 }
 
 /* Parlay Studio: a compact control deck and a collectible ticket, with restrained motion. */
-.gen-studio { border-radius: 22px; background: #0b1514 !important; border-color: #8dff6740; box-shadow: 0 16px 60px -30px #75ed4c50, inset 0 1px #d1ffc022; }
+.gen-studio { border-radius: 22px; background: #160a12 !important; border-color: #ff5fb840; box-shadow: 0 16px 60px -30px #ff5fb850, inset 0 1px #ffd1ea22; }
 .gen-studio-toggle { background: #ffffff03; }
-.gen-studio-hero { background: radial-gradient(ellipse at 90% 0%, #98fb5530, transparent 62%), linear-gradient(120deg, #15362670, #071614); border-bottom: 1px solid #bbffc818; }
-.gen-studio-emblem { display:flex; align-items:center; justify-content:center; width:56px; height:56px; flex-shrink:0; color:#bdff73; border:1px solid #aeff6b55; border-radius:17px; background:linear-gradient(145deg,#b6ff6530,#8bfd6b05); transform:rotate(-10deg); box-shadow:0 6px 25px #90ff5520; }
-.gen-ticket { background:linear-gradient(160deg,#192721,#0b1412); border-color:#ccffbd2b; box-shadow:0 8px 24px #0003; }
-.gen-roll { gap:2px; background:linear-gradient(110deg,#c9ff72,#9bff52); border-color:#deffb0; box-shadow:0 3px 18px #a8ff4a2c,inset 0 1px #fff7; color:#15200b; transition:transform .15s,box-shadow .15s; }
-.gen-roll:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 23px #a8ff4a45; }
+.gen-studio-hero { background: radial-gradient(ellipse at 90% 0%, #ff5fb830, transparent 62%), linear-gradient(120deg, #3a153070, #14070f); border-bottom: 1px solid #ffbbdf18; }
+.gen-studio-emblem { display:flex; align-items:center; justify-content:center; width:56px; height:56px; flex-shrink:0; color:#ff8fd0; border:1px solid #ff6fbf55; border-radius:17px; background:linear-gradient(145deg,#ff5fb830,#ff5fb805); transform:rotate(-10deg); box-shadow:0 6px 25px #ff5fb820; }
+.gen-ticket { background:linear-gradient(160deg,#27121f,#140810); border-color:#ffbddf2b; box-shadow:0 8px 24px #0003; }
+.gen-roll { gap:2px; background:linear-gradient(110deg,#ff8fd0,#ff5fb8); border-color:#ffb3dc; box-shadow:0 3px 18px #ff5fb82c,inset 0 1px #fff7; color:#20060f; transition:transform .15s,box-shadow .15s; }
+.gen-roll:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 23px #ff5fb845; }
 .gen-roll:active:not(:disabled) { transform:translateY(1px); }
-.gen-player-card { border:1px solid #ffffff0d; border-radius:12px; padding:7px 8px; background:linear-gradient(100deg,#ffffff07,#ffffff02); min-height:65px; }
-.gen-player-card:has(button[aria-pressed="true"]) { border-color:#baff6660; background:linear-gradient(100deg,#9aff6415,#ffffff02); }
-.gen-player-card [data-player-mark] { width:38px!important; height:38px!important; background:#d2e2ce15; }
-.gen-ticket-total { border-top:1px dashed #d2ffb933; padding:12px 3px 4px; }
+.gen-player-card { border:1px solid #ffffff0d; border-radius:12px; padding:5px 7px; background:linear-gradient(100deg,#ffffff07,#ffffff02); min-height:52px; }
+.gen-player-card:has(button[aria-pressed="true"]) { border-color:#ff5fb860; background:linear-gradient(100deg,#ff5fb815,#ffffff02); }
+.gen-player-card [data-player-mark] { width:32px!important; height:32px!important; background:#e2ced815; }
+.gen-ticket-total { border-top:1px dashed #ffbddf33; padding:12px 3px 4px; }
 .gen-combined-odds { font-size:25px; letter-spacing:-.04em; line-height:1.2; }
 .gen-ticket-reveal { animation:parlay-reveal .28s ease-out both; }
 @keyframes parlay-reveal { from { opacity:.3; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }

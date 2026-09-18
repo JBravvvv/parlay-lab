@@ -18,9 +18,18 @@
 
 import type { PropBoardGame, PropBoardRow } from "@/engine";
 import { amToDec } from "@/lib/ticket-math";
-import { poolOf, type GenLeg, type GenMarket, type GenPool, type GenPoolSpec } from "@/lib/parlay-gen";
+import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type GenPoolSpec } from "@/lib/parlay-gen";
 import { MKT_LABEL, nameKey, playerLeg, teamTag, type Side } from "./props-model";
 import type { SandboxLeg } from "@/lib/ticket-math";
+import { hitDots, hitRate, type HitWindow, type PlayerLog } from "@/lib/prop-hit-rate";
+
+/**
+ * Hit-rate stamping (2026-09-18): the page hands the pool builder the board's game logs and the
+ * window it is showing, and every leg carries "cleared this line on this side in N of his last M
+ * games" — the same number the row under it prints, so the generator's floor and the board's
+ * chip can never disagree. Both optional: tests and SSR build without them and legs carry no hit.
+ */
+export type MlbHitSource = { logs: ReadonlyMap<string, PlayerLog>; window: HitWindow; keyOf: (name: string) => string };
 
 /** the six markets the sandbox prices; ML/RL are game markets and have no player slots (v1) */
 export const GEN_MARKETS: readonly string[] = [
@@ -58,14 +67,16 @@ export type MlbGenPool = GenPool<SandboxLeg>;
  * `nowMs` is passed in rather than read from the clock so this stays pure — the caller
  * sets it in a post-mount effect and SSR passes 0, which marks nothing started.
  */
-export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, nowMs: number): MlbGenPool {
+export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, nowMs: number, hits?: MlbHitSource): MlbGenPool {
   const legs: GenLeg<SandboxLeg>[] = [];
   let rows = 0;
   let startedDropped = 0;
   let noParlayDropped = 0;
 
-  for (const g of board) {
-    const rowsHere: PropBoardRow[] = g.markets?.[spec.market] ?? [];
+  /* one pass per selected category (2026-09-18) — the single-category case walks exactly the
+     path it always did, so a given board + spec + seed still mints the byte-identical ticket */
+  for (const market of specMarkets(spec)) for (const g of board) {
+    const rowsHere: PropBoardRow[] = g.markets?.[market] ?? [];
     if (!rowsHere.length) continue;
     /* Date.parse of an unparseable start is NaN, and NaN <= nowMs is false — an unknown
        start time is never guessed into "started". */
@@ -86,10 +97,12 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
       for (const side of ["o", "u"] as Side[]) {
         /* playerLeg returns null when that side is not posted — the one and only reason a
            side is missing, and the reason no price is ever invented for it. */
-        const leg = playerLeg(r, spec.market, side, g.game, g.gkey);
+        const leg = playerLeg(r, market, side, g.game, g.gkey);
         if (!leg) continue;
         if (!(leg.prob > 0)) continue; // no model number and no market fair → nothing to weigh
         const dec = amToDec(leg.cz);
+        const log = hits ? hits.logs.get(hits.keyOf(r.p)) : undefined;
+        const hit = hits ? hitRate(log, market, r.ln, side, hits.window) : undefined;
         legs.push({
           /* the hoisted fields the core reads. `side` is the SAME value playerLeg just minted
              into the leg id, so the side filter cannot disagree with the leg it filtered. */
@@ -110,6 +123,10 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
           alt: !!r.alt,
           book: leg.book ?? "BOOK",
           ev: (leg.prob / 100) * dec - 1,
+          market,
+          line: r.ln,
+          gameLabel: g.game,
+          ...(hits ? { hit: hit ? { n: hit.n, hits: hit.hits, rate: hit.rate, dots: hitDots(log, market, r.ln, side) } : null } : {}),
         });
       }
     }

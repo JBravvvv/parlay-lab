@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
-import { bookName } from "@/lib/sportsbook/books";
-import { useSportsbook } from "@/lib/sportsbook/store";
-import { mixBands, MIX_LABEL, type MixBand } from "@/lib/parlay-gen-mix";
-import { amFmt, combineTicket } from "@/lib/ticket-math";
+import { amFmt, amToDec, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
 import { parseBoardLabel } from "@/lib/player-card";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { clubFromLabel } from "@/lib/mlb-visuals";
 import { PlayerName } from "@/components/player/PlayerName";
+import { HIT_WINDOWS, windowLabel, type HitWindow } from "@/lib/prop-hit-rate";
+import { HitChip, HitDots } from "./HitChip";
 import {
   LEG_MAX,
   LEG_MIN,
@@ -19,6 +18,7 @@ import {
   availableLegBand,
   mixCandidates,
   poolCounts,
+  specMarkets,
   type GenFail,
   type GenLeg,
   type GenMarket,
@@ -41,6 +41,20 @@ import {
  * mode under Advanced (and it says "about" when it reports what this pool can reach, because the
  * reach is a greedy estimate under the one-per-player / one-per-game rules, not a proof).
  *
+ * THE 2026-09-18 REBUILD (Josh, verbatim: "The parlay generator needs significantly more
+ * customization. It doesn't need 'Safer Mix'/'Balanced Mix' or 'Favorites/Even/Longshots'
+ * because majority of the time those lines aren't consistent across props" … "Everything should
+ * always be graded and priced based on DK so that shouldn't need to be an option" … "The exclude
+ * player button is way too big" … "Make this easy to maneuver and fun to play with"). So:
+ *   - the build-style cards, the three odds presets and the "Your mix" tiers are gone;
+ *   - the book-only toggle is gone — the board is already priced at the settlement book;
+ *   - every control is a tight chip row in the sportsbook-app shape (30px chips, 4px gaps):
+ *     Legs · Categories (tap SEVERAL to mix them on one ticket) · Odds per leg (typed, plus a
+ *     two-thumb slider over the prices the board actually posts) · Hit rate (a floor on how
+ *     often the player has cleared this line lately, over a window Josh picks) · Sides · Games
+ *     · Positions · Timing;
+ *   - the exclude control is a 24px "✕" on the slot, not a checkbox with a sentence.
+ *
  * This file is a DUMB VIEW: every number it prints comes from the pure generator
  * (src/lib/parlay-gen.ts) or from combineTicket, and every price renders through `amFmt`. There
  * is no fetch, no Odds credit, no ledger write and no engine run behind any control here — the
@@ -51,11 +65,10 @@ export const GEN_PANEL_ID = "props-gen-panel";
 
 /**
  * The market list and the player disc arrive as PROPS (INSTRUCTION 52, 2026-09-12, Josh's word,
- * verbatim: "Parlay Generator should be on CFB & NFL just like it is on MLB"). They used to be
- * hardcoded MLB: the six batter/pitcher keys, the MLB label table and the MLB headshot map. The
- * MLB list now lives with the MLB pool builder (src/components/props/mlb-gen-pool.ts) and the
- * football list with the football one (src/lib/football/gen-pool.ts), so this sheet is the same
- * sheet on all three desks instead of a second copy per sport.
+ * verbatim: "Parlay Generator should be on CFB & NFL just like it is on MLB"). The MLB list lives
+ * with the MLB pool builder (src/components/props/mlb-gen-pool.ts) and the football list with
+ * the football one (src/lib/football/gen-pool.ts), so this sheet is the same sheet on all three
+ * desks instead of a second copy per sport.
  */
 
 /**
@@ -83,15 +96,17 @@ function mlbName<P>({ name, team }: { leg: P; gen: GenLeg<P>; name: string; team
   );
 }
 
-/* every count the generator will actually honour — the Faint line under this control quotes
-   LEG_MIN..LEG_MAX, so offering 2-6 under a sentence that said "between 2 and 8" left two
-   unreachable numbers on the page (INSTRUCTION 50 fix pass). Seven pills still wrap at 375px. */
+/* every count the generator will actually honour — the hint under this row quotes
+   LEG_MIN..LEG_MAX, so offering fewer would leave unreachable numbers on the page */
 const LEG_CHOICES = [2, 3, 4, 5, 6, 7, 8] as const;
 
-const PRESETS: readonly { key: string; label: string; min: number; max: number }[] = [
-  { key: "fav", label: "Favorites", min: -300, max: -120 },
-  { key: "even", label: "Even", min: -140, max: 140 },
-  { key: "long", label: "Longshots", min: 120, max: 400 },
+/** the hit-rate floors on offer: "he cleared this line in at least this share of his recent games" */
+const HIT_FLOORS: readonly { value: number | null; label: string }[] = [
+  { value: null, label: "Any" },
+  { value: 0.5, label: "50%+" },
+  { value: 0.6, label: "60%+" },
+  { value: 0.7, label: "70%+" },
+  { value: 0.8, label: "80%+" },
 ];
 
 /** The single control each relax hint names — the button in the failure state sets exactly this. */
@@ -101,6 +116,8 @@ const RELAX_PATCH: Record<string, Partial<GenSpec>> = {
   cz: { czOnly: false },
   model: { modelOnly: false },
   positions: { positions: [] },
+  hit: { minHit: null },
+  games: { games: [] },
 };
 
 const RELAX_BUTTON: Record<string, string> = {
@@ -109,6 +126,8 @@ const RELAX_BUTTON: Record<string, string> = {
   cz: "Drop the selected-book-only filter",
   model: "Drop the model-priced-only filter",
   positions: "Include all positions",
+  hit: "Drop the hit-rate floor",
+  games: "Include all games",
 };
 
 const RELAX_HINT: Record<string, string> = {
@@ -117,6 +136,8 @@ const RELAX_HINT: Record<string, string> = {
   cz: "drop the selected-book-only filter and it may fit",
   model: "drop the model-priced-only filter and it may fit",
   positions: "add another position or choose all positions",
+  hit: "lower the hit-rate floor and it may fit",
+  games: "add another game or choose all games",
 };
 
 /**
@@ -180,9 +201,35 @@ export function genFailLine(
 
 /* ------------------------------------------------------------------ small controls */
 
+/* THE CHIP: the sportsbook-app control (2026-09-18). 30px tall, 4px apart, filled when on —
+   the same shape as the market rail above the sheet, so the whole desk reads as one surface. */
+const CHIP = "press inline-flex h-[30px] shrink-0 items-center justify-center whitespace-nowrap rounded-full border px-2.5 text-[11.5px] font-semibold transition-[background,color,border-color] duration-(--dur-fast)";
+const CHIP_ON = "border-pos bg-pos text-bg";
+const CHIP_OFF = "border-white/[0.1] bg-white/[0.04] text-muted hover:text-text";
 const CTRL = "press min-h-11 rounded-[10px] border text-[12px] font-semibold transition-colors duration-(--dur-fast)";
 const ON = "border-pos bg-pos/15 text-pos";
 const OFF = "border-white/[0.08] bg-surface-2 text-muted hover:text-text";
+
+function Chip({ on, onClick, children, label, disabled = false }: { on: boolean; onClick: () => void; children: ReactNode; label?: string; disabled?: boolean }) {
+  return (
+    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick} disabled={disabled} className={`${CHIP} ${on ? CHIP_ON : CHIP_OFF} disabled:opacity-40`}>
+      {children}
+    </button>
+  );
+}
+
+/** one labelled row of chips; the chips scroll sideways on a phone instead of wrapping into a wall */
+function ChipRow({ label, hint, children, wrap = false }: { label: ReactNode; hint?: ReactNode; children: ReactNode; wrap?: boolean }) {
+  return (
+    <div className="gen-row">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">{label}</span>
+        {hint && <span className="min-w-0 truncate text-[9.5px] text-faint">{hint}</span>}
+      </div>
+      <div className={`flex gap-1 ${wrap ? "flex-wrap" : "-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}`}>{children}</div>
+    </div>
+  );
+}
 
 /** An american-odds field: typed freely, committed only when it parses (|v| >= 100). */
 function AmInput({
@@ -200,8 +247,8 @@ function AmInput({
   useEffect(() => setTxt(amFmt(value)), [value]);
   const parsed = parseAmerican(txt);
   return (
-    <label className="flex min-w-0 flex-1 flex-col gap-1">
-      <span className="text-[9.5px] font-semibold uppercase tracking-[0.12em] text-faint">{label}</span>
+    <label className="flex min-w-0 flex-1 items-center gap-1.5">
+      <span className="text-[9.5px] font-bold uppercase tracking-[0.12em] text-faint">{label}</span>
       <input
         value={txt}
         onChange={(e) => {
@@ -217,11 +264,41 @@ function AmInput({
         placeholder={hint}
         aria-label={label}
         aria-invalid={parsed == null}
-        className={`num h-11 w-full rounded-[10px] border bg-surface-2 px-2.5 text-[13px] text-text outline-none placeholder:text-faint ${
+        className={`num h-9 w-full min-w-0 rounded-[10px] border bg-surface-2 px-2.5 text-[13px] font-semibold text-text outline-none placeholder:text-faint ${
           parsed == null ? "border-gold/60" : "border-white/[0.08] focus:border-pos/50"
         }`}
       />
     </label>
+  );
+}
+
+/**
+ * THE ODDS SLIDER: two thumbs over the prices this pool actually posts, so every stop is a real
+ * quote. The typed fields stay the exact control; the slider is the fast, playful one.
+ */
+function OddsSlider({ prices, lo, hi, onChange }: { prices: readonly number[]; lo: number; hi: number; onChange: (lo: number, hi: number) => void }) {
+  if (prices.length < 2) return null;
+  const decs = prices.map(amToDec);
+  const loDec = amToDec(lo);
+  const hiDec = amToDec(hi);
+  let iLo = decs.findIndex((d) => d >= loDec - 1e-9);
+  if (iLo < 0) iLo = prices.length - 1;
+  let iHi = -1;
+  for (let i = decs.length - 1; i >= 0; i--) if (decs[i] <= hiDec + 1e-9) { iHi = i; break; }
+  if (iHi < 0) iHi = 0;
+  if (iHi < iLo) [iLo, iHi] = [Math.min(iLo, iHi), Math.max(iLo, iHi)];
+  const max = prices.length - 1;
+  const pct = (i: number) => (max ? (i / max) * 100 : 0);
+  const thumb = "pointer-events-none absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg [&::-webkit-slider-thumb]:bg-pos [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(255,95,184,0.6)] [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-bg [&::-moz-range-thumb]:bg-pos";
+  return (
+    <div className="relative mt-2 h-6 px-2.5" data-testid="gen-odds-slider">
+      <div aria-hidden className="absolute inset-x-2.5 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
+      <div aria-hidden className="absolute top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-pos" style={{ left: `calc(10px + (100% - 20px) * ${pct(iLo) / 100})`, right: `calc(10px + (100% - 20px) * ${(100 - pct(iHi)) / 100})` }} />
+      <input type="range" min={0} max={max} step={1} value={iLo} aria-label="Lowest odds per leg" aria-valuetext={amFmt(prices[iLo])}
+        onChange={(e) => { const i = Math.min(Number(e.target.value), iHi); onChange(prices[i], prices[iHi]); }} className={thumb} />
+      <input type="range" min={0} max={max} step={1} value={iHi} aria-label="Highest odds per leg" aria-valuetext={amFmt(prices[iHi])}
+        onChange={(e) => { const i = Math.max(Number(e.target.value), iLo); onChange(prices[iLo], prices[i]); }} className={thumb} />
+    </div>
   );
 }
 
@@ -251,7 +328,7 @@ function Slot<P>({
   l,
   pinned,
   outOfBand,
-  mixBand,
+  hitWindow,
   renderMark,
   renderName,
   onTogglePin,
@@ -262,7 +339,7 @@ function Slot<P>({
   l: GenLeg<P>;
   pinned: boolean;
   outOfBand: boolean;
-  mixBand?: MixBand;
+  hitWindow?: number;
   renderMark: SlotPart<P>;
   renderName: SlotPart<P>;
   onTogglePin: (slot: number) => void;
@@ -279,7 +356,7 @@ function Slot<P>({
   return (
     <div
       data-gen-slot={i}
-      className={`gen-player-card flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 @3xl:min-h-[56px] @3xl:py-1.5 ${
+      className={`gen-player-card flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }`}
     >
@@ -288,37 +365,53 @@ function Slot<P>({
         aria-pressed={pinned}
         aria-label={`${pinned ? "Spin" : "Keep"} slot ${i + 1}: ${name}`}
         onClick={() => onTogglePin(i)}
-        className={`press flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[10px] border text-[9px] font-bold uppercase tracking-wide ${
+        className={`press flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-[10px] border text-[7.5px] font-bold uppercase tracking-wide ${
           pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
         }`}
       >
-        <span aria-hidden className="text-[13px] leading-none">
+        <span aria-hidden className="text-[12px] leading-none">
           {pinned ? "📌" : "🎲"}
         </span>
-        <span className="mt-0.5 leading-none">{pinned ? "kept" : "spin"}</span>
+        <span className="mt-[2px] leading-none">{pinned ? "kept" : "spin"}</span>
       </button>
       {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
         {renderName({ leg: l.leg, gen: l, name, team })}
-        {onExclude && <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2 text-[11px] text-muted">
-          <input type="checkbox" checked={excluded} onChange={() => onExclude(i)} aria-label={`Exclude ${name} from generated parlays`} className="h-4 w-4 accent-amber-400" />
-          Exclude player
-        </label>}
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
           <span className="truncate text-muted">{l.sub}</span>
           {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
           {l.started && <span className="shrink-0 text-live">{l.quoteAt ? "live quote" : "started"}</span>}
         </div>
+        {l.hit && hitWindow != null && (
+          <div className="mt-[3px] flex items-center gap-1.5">
+            <HitChip stat={l.hit} window={hitWindow} />
+            <HitDots dots={l.hit.dots} />
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 flex-col items-end leading-none">
-        {mixBand && <span title="Relative to eligible picks in this category and odds range" className="mb-1 rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] font-semibold text-muted">{MIX_LABEL[mixBand]}</span>}
         <span className="num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
         <span className="mt-[3px] flex items-center gap-1 text-[9px] text-faint">
           {l.src === "market" && <span className="italic">mkt</span>}
           {l.book && l.book !== "CZ" && <span className="uppercase">{l.book}</span>}
         </span>
       </div>
+      {/* THE EXCLUDE CONTROL IS A 24px GHOST "✕" (2026-09-18: "The exclude player button is way too
+          big and visible it looks atrocious"). Excluded → a small "↺" that restores him. */}
+      {onExclude && (
+        <button
+          type="button"
+          onClick={() => onExclude(i)}
+          aria-label={excluded ? `Restore ${name}` : `Exclude ${name} from generated parlays`}
+          title={excluded ? "Restore this player" : "Exclude this player from spins"}
+          className={`press flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none ${
+            excluded ? "border-gold/50 bg-gold/10 text-gold" : "border-white/[0.08] bg-white/[0.03] text-faint hover:border-neg/50 hover:text-neg"
+          }`}
+        >
+          <span aria-hidden>{excluded ? "↺" : "✕"}</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -332,18 +425,18 @@ function Slot<P>({
  */
 function LostSlot({ i, id, onTogglePin }: { i: number; id: string; onTogglePin: (slot: number) => void }) {
   return (
-    <div data-gen-slot={i} className="flex min-h-[56px] items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1.5 pl-1.5">
+    <div data-gen-slot={i} className="flex min-h-[52px] items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5">
       <button
         type="button"
         aria-pressed
         aria-label={`Unpin slot ${i + 1}`}
         onClick={() => onTogglePin(i)}
-        className="press flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[10px] border border-gold/60 bg-gold/10 text-[9px] font-bold uppercase tracking-wide text-gold"
+        className="press flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-[10px] border border-gold/60 bg-gold/10 text-[7.5px] font-bold uppercase tracking-wide text-gold"
       >
-        <span aria-hidden className="text-[13px] leading-none">
+        <span aria-hidden className="text-[12px] leading-none">
           📌
         </span>
-        <span className="mt-0.5 leading-none">unpin</span>
+        <span className="mt-[2px] leading-none">unpin</span>
       </button>
       <div className="min-w-0 flex-1 leading-snug">
         <div className="truncate text-[12.5px] font-medium text-gold">Kept slot {i + 1}</div>
@@ -384,7 +477,11 @@ export function GenSheet<P>({
   loading = false,
   gameMarket = false,
   showModelOnly = true,
-  categoryNote = "Moneyline and run line are game markets, not player slots — the generator leaves them alone for now.",
+  showHitRate = false,
+  hitWindow,
+  onHitWindow,
+  hitLoading = false,
+  categoryNote = "Tap several categories to mix them on one ticket — the rail above shows the one you tapped last.",
   stubNote = "The parlay generator builds PLAYER-prop parlays — pick a batter or pitcher market above and it appears here. Moneyline and run line are game markets and have no player slots yet.",
   marketNote = "Italic legs use market estimates; differences from the selected book price are not independent evidence of a model edge.",
 }: {
@@ -432,7 +529,14 @@ export function GenSheet<P>({
   /** offer the model-priced-only filter. Off on football, where every win % is the de-vigged
       market consensus — the toggle would empty the pool and explain nothing. */
   showModelOnly?: boolean;
-  /** the line under the category pills, in the desk's own words */
+  /** offer the hit-rate floor and window — MLB only, where the free game log exists */
+  showHitRate?: boolean;
+  /** the page's hit-rate window (L7…L120) and its setter — the rows below the sheet share them */
+  hitWindow?: HitWindow;
+  onHitWindow?: (w: HitWindow) => void;
+  /** the game logs are still on their way — a floor cannot be judged yet */
+  hitLoading?: boolean;
+  /** the line under the category chips, in the desk's own words */
   categoryNote?: ReactNode;
   /** what stands in for the sheet on a game market */
   stubNote?: ReactNode;
@@ -440,18 +544,27 @@ export function GenSheet<P>({
   marketNote?: ReactNode;
 }) {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
+  void band;
   const [attempt, setAttempt] = useState(0);
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). These counts were hand-rolled
-     over the RAW pool — both sides of every line, ignoring `sides`, `czOnly` and `modelOnly` —
-     so with the default overs-only spec they printed roughly double, and the panel could read
-     "after band 19 → 4 games" directly above "Only 3 legs clear these filters and you asked for
-     4". poolCounts exists precisely so the diagnostic can never contradict the verdict. */
+  /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). poolCounts exists precisely so
+     the diagnostic can never contradict the verdict. */
   const counts = poolCounts(pool, spec);
   const candidates = useMemo(() => mixCandidates(pool, spec), [pool, spec]);
-  const tiers = useMemo(() => mixBands(candidates), [candidates]);
   const distinctPlayers = new Set(candidates.map((l) => l.playerKey)).size;
   const unknownPositions = positions ? new Set(mixCandidates(pool, { ...spec, positions: [] }).filter((l) => !l.position).map((l) => l.playerKey)).size : 0;
+  /* how many legs carry a game log at all, before the floor — so the floor row can say "N of M have data" */
+  const withLog = useMemo(() => (showHitRate ? mixCandidates(pool, { ...spec, minHit: null }) : []), [pool, spec, showHitRate]);
+  const withLogCount = withLog.filter((l) => l.hit).length;
+  /* every distinct price this pool posts, cheapest decimal first — the slider's stops */
+  const prices = useMemo(() => [...new Set(pool.legs.map((l) => l.am))].sort((a, b) => amToDec(a) - amToDec(b)), [pool]);
+  /* the games on this board, for the games chips (label = the first leg's matchup string) */
+  const games = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const l of pool.legs) if (!m.has(l.gameKey)) m.set(l.gameKey, l.gameLabel ?? l.gameKey);
+    return [...m.entries()].map(([key, label]) => ({ key, label: label.split(" · ")[0] })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [pool]);
+  const selectedMarkets = specMarkets(spec);
   const ticket = result.ok ? result.ticket : null;
   /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
      the headline here still cannot disagree with the slip the legs are handed to */
@@ -483,11 +596,28 @@ export function GenSheet<P>({
               ? { label: "Remove combined payout target", patch: { payout: null } }
               : null;
   /* the kept slots, resolved against the pool — rendered in EVERY state, success or failure,
-     so the 44px unpin button the failure copy tells Josh to press is always on screen */
+     so the unpin button the failure copy tells Josh to press is always on screen */
   const pinRows = spec.pinned
     .slice(0, spec.legs)
     .map((id, i) => ({ i, id, leg: id ? pool.byId.get(id) ?? null : null }))
     .filter((x): x is { i: number; id: string; leg: GenLeg<P> | null } => !!x.id);
+
+  const toggleMarket = (key: string) => {
+    const on = selectedMarkets.includes(key);
+    if (on && selectedMarkets.length === 1) return; // the ticket always has at least one category
+    onSpec({ markets: on ? selectedMarkets.filter((m) => m !== key) : [...selectedMarkets, key] });
+  };
+  const toggleGame = (key: string) => {
+    const cur = spec.games ?? [];
+    onSpec({ games: cur.includes(key) ? cur.filter((g) => g !== key) : [...cur, key] });
+  };
+  const summary = [
+    `${spec.legs} legs`,
+    selectedMarkets.length > 1 ? `${selectedMarkets.length} categories` : marketLabel,
+    `${amFmt(spec.legMinAm)} to ${amFmt(spec.legMaxAm)}`,
+    ...(spec.minHit != null ? [`${Math.round(spec.minHit * 100)}%+ hit rate`] : []),
+    ...(spec.games?.length ? [`${spec.games.length} game${spec.games.length === 1 ? "" : "s"}`] : []),
+  ].join(" · ");
 
   /* On the Games rail (moneyline / run line) the generator has nothing to build from — and the
      collapsed header used to read "Parlay generator · 4 legs · H+R+RBI" beside a Moneyline
@@ -501,7 +631,7 @@ export function GenSheet<P>({
   }
 
   return (
-    <section data-testid="props-gen" style={{ backgroundColor: "rgba(16,25,20,0.96)" }} className="gen-studio glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(54,225,155,0.35)]">
+    <section data-testid="props-gen" style={{ backgroundColor: "rgba(24,9,18,0.96)" }} className="gen-studio glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(255,95,184,0.35)]">
       <button
         type="button"
         onClick={() => onOpen(!open)}
@@ -515,7 +645,7 @@ export function GenSheet<P>({
         <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold tracking-wide text-text">
           Parlay generator
           <span className="ml-1.5 font-normal text-muted">
-            {spec.legs} legs · {marketLabel}
+            {spec.legs} legs · {selectedMarkets.length > 1 ? `${selectedMarkets.length} categories` : marketLabel}
           </span>
         </span>
         <svg
@@ -534,179 +664,156 @@ export function GenSheet<P>({
 
       {open && (
         <div id={GEN_PANEL_ID} className="space-y-2.5 border-t border-white/[0.06] px-3 pb-3 pt-2.5">
-          <div className="gen-studio-hero -mx-3 -mt-2.5 flex items-center justify-between gap-3 px-4 py-3 @3xl:py-5">
-            <div><div className="text-[9px] font-bold uppercase tracking-[0.24em] text-pos">THE PARLAY LAB</div>
-            <div className="mt-0.5 text-[22px] font-black tracking-tight text-white @3xl:text-[30px]">Make it your mix<span className="text-pos">.</span></div>
-            <p className="mt-1 text-[11px] text-muted">Pick your style. Keep your favorites. Spin the rest.</p></div>
+          <div className="gen-studio-hero -mx-3 -mt-2.5 flex items-center justify-between gap-3 px-4 py-3 @3xl:py-4">
+            <div className="min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-pos">THE PARLAY LAB</div>
+              <div className="mt-0.5 text-[22px] font-black tracking-tight text-white @3xl:text-[28px]">Build your parlay<span className="text-pos">.</span></div>
+              <p className="mt-1 text-[11px] text-muted">Pick your categories, set the odds, spin. Keep the ones you like.</p>
+              <div className="num mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted">
+                <span><b className="text-text">{distinctPlayers}</b> players in play</span>
+                <span><b className="text-text">{counts.games}</b> game{counts.games === 1 ? "" : "s"}</span>
+                <span><b className="text-text">{counts.inBand}</b> legs in your band</span>
+              </div>
+            </div>
             <div aria-hidden className="gen-studio-emblem"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/></svg></div>
           </div>
-          <div className="pb-1">
-            <div role="group" aria-label="Build style" className="grid grid-cols-2 gap-2 @3xl:mt-3">
-              {([
-                { key: "safer", title: "Safer mix", note: "Anchor-led, with room for variety" },
-                { key: "balanced", title: "Balanced mix", note: "Explore all three relative bands" },
-              ] as const).map((style) => (
-                <button key={style.key} type="button" aria-pressed={spec.style === style.key} onClick={() => onSpec({ style: style.key })}
-                  className={`press min-h-11 rounded-xl border px-3 py-2 text-left transition-colors @3xl:min-h-16 ${spec.style === style.key ? "border-pos/70 bg-pos/10" : "border-white/10 bg-bg/40 hover:border-white/25"}`}>
-                  <span className={`block text-[13px] font-semibold ${spec.style === style.key ? "text-pos" : "text-text"}`}>{style.title}</span>
-                  <span className="mt-0.5 hidden text-[10px] leading-snug text-muted @3xl:block">{style.note}</span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 hidden flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted @3xl:flex">
-              <span>{distinctPlayers} eligible players</span><span>{counts.games} games</span><span className="hidden @3xl:inline">Recent players rotate less often</span>
-            </div>
-            <details className="mt-2 hidden text-[10px] leading-relaxed text-muted @3xl:block">
-              <summary className="cursor-pointer py-1 font-semibold text-text">How this mix works</summary>
-              <p>Anchor, Middle and Upside compare picks within {marketLabel} and your odds range. Equal hit estimates share a band. Safer mix favors anchors while making room for other options; pins, game limits and payout targets can narrow the mix.</p>
-              <p className="mt-1">{showModelOnly ? "Where a model estimate exists, ranking uses the lower of that estimate and the price-implied chance. Other picks use market estimates." : "These rankings use market consensus, not an independent player-performance model."} A stronger option within Anytime TD can still be less likely to hit than a passing prop. Safer is relative; every parlay can lose.</p>
-            </details>
-          </div>
-              {spec.phase && <div className="space-y-2">
-                <div className="flex gap-1" role="group" aria-label="Parlay timing">
-                  {(["pregame","live","mixed"] as const).map(phase=><button key={phase} type="button" aria-pressed={spec.phase===phase} onClick={()=>onSpec({phase,includeStarted:phase!=="pregame"})} className={`${CTRL} flex-1 ${spec.phase===phase?ON:OFF}`}>{phase==="pregame"?"Pregame":phase==="live"?"Live":"Mixed"}</button>)}
-                </div>
-                <p className="text-[10px] text-muted">{spec.phase==="pregame"?"Upcoming games only.":spec.phase==="live"?"Active games with recent in-play prices only.":"Upcoming games and active games with recent in-play prices."} Suspended, finished and expired live markets are excluded.</p>
-              </div>}
-          {positions && (
-            <fieldset className="min-w-0" aria-label="Player positions">
-              <legend className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-muted">Positions <span className="font-normal normal-case tracking-normal">· {distinctPlayers} eligible players</span></legend>
-              <div className="flex gap-1">
-                <button type="button" aria-pressed={!spec.positions?.length} onClick={() => onSpec({ positions: [] })}
-                  className={`${CTRL} min-w-0 flex-1 px-1 ${!spec.positions?.length ? ON : OFF}`}>All</button>
-                {positions.map((position) => {
-                  const checked = !!spec.positions?.includes(position);
-                  return <button key={position} type="button" role="checkbox" aria-checked={checked} aria-label={position}
-                    onClick={() => onSpec({ positions: checked ? spec.positions!.filter((p) => p !== position) : [...(spec.positions ?? []), position] })}
-                    className={`${CTRL} min-w-0 flex-1 px-1 ${checked ? ON : OFF}`}>{position}</button>;
-                })}
-              </div>
-              {positionsLoading ? <Faint>Checking roster positions…</Faint> : !!spec.positions?.length && unknownPositions > 0 && <Faint>{unknownPositions} players with unverified positions excluded.</Faint>}
-            </fieldset>
-          )}
+
           <button type="button" aria-expanded={customizeOpen} aria-controls="props-gen-settings" onClick={() => setCustomizeOpen((v) => !v)}
-            className="press flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-white/10 px-3 text-left text-[11px] text-text @3xl:hidden">
-            <span><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{spec.legs} legs · {amFmt(spec.legMinAm)} to {amFmt(spec.legMaxAm)}</span></span><span aria-hidden>{customizeOpen ? "−" : "+"}</span>
+            className="press flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-pos/25 bg-pos/[0.06] px-3 text-left text-[11px] text-text @3xl:hidden">
+            <span className="min-w-0"><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{summary}</span></span><span aria-hidden className="shrink-0 text-pos">{customizeOpen ? "−" : "+"}</span>
           </button>
+
           <div className="grid items-start gap-4 @3xl:grid-cols-2">
           <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-3 @3xl:block`}>
           {/* legs */}
-          <div>
-            <Label>Legs</Label>
-            <div className="flex gap-1.5">
-              {LEG_CHOICES.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  aria-pressed={spec.legs === n}
-                  onClick={() => onSpec({ legs: n })}
-                  className={`${CTRL} num flex-1 ${spec.legs === n ? ON : OFF}`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <Faint>
-              Between {LEG_MIN} and {LEG_MAX} legs; the generator returns exactly what you ask for or says why it cannot.
-            </Faint>
-          </div>
+          <ChipRow label="Legs" hint={`${LEG_MIN} to ${LEG_MAX}`}>
+            {LEG_CHOICES.map((n) => (
+              <Chip key={n} on={spec.legs === n} onClick={() => onSpec({ legs: n })}>
+                <span className="num">{n}</span>
+              </Chip>
+            ))}
+          </ChipRow>
 
-          {/* category — the same state as the market rail above */}
-          <div>
-            <Label>Prop category</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {markets.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  aria-pressed={spec.market === m.key}
-                  onClick={() => onSpec({ market: m.key })}
-                  className={`${CTRL} px-3 ${spec.market === m.key ? ON : OFF}`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-            <Faint>{categoryNote}</Faint>
-          </div>
+          {/* categories — MULTI-select; the rail above follows the one tapped last */}
+          <ChipRow label="Categories" hint={selectedMarkets.length > 1 ? `${selectedMarkets.length} on the ticket` : "tap more to mix"} wrap>
+            {markets.map((m) => (
+              <Chip key={m.key} on={selectedMarkets.includes(m.key)} onClick={() => toggleMarket(m.key)}>
+                {m.label}
+              </Chip>
+            ))}
+          </ChipRow>
+          <Faint className="-mt-2">{categoryNote}</Faint>
 
           {/* per-leg odds band */}
           <div>
-            <Label>Odds per leg</Label>
-            {market === "anytime_td" && (
-              <button type="button" onClick={() => onSpec({ style: "safer", legMinAm: -230, legMaxAm: 200 })}
-                className="press mb-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-pos/30 bg-pos/10 px-3 text-left text-[12px] font-semibold text-pos">
-                <span>TD safer mix</span><span className="num">{amFmt(-230)} to {amFmt(200)}</span>
-              </button>
-            )}
-            <div className="flex items-end gap-2">
+            <div className="mb-1 flex items-baseline justify-between gap-2">
+              <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">Odds per leg</span>
+              <span className="num text-[9.5px] text-faint">{counts.inBand} of {counts.eligible} legs in band</span>
+            </div>
+            <div className="flex items-center gap-2">
               <AmInput label="Min" value={spec.legMinAm} onCommit={(v) => onSpec({ legMinAm: v })} hint="-152" />
-              <span className="pb-3 text-[12px] text-faint" aria-hidden>
-                →
-              </span>
               <AmInput label="Max" value={spec.legMaxAm} onCommit={(v) => onSpec({ legMaxAm: v })} hint="+110" />
             </div>
-            <div className="mt-1.5 flex gap-1.5">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  aria-pressed={spec.legMinAm === p.min && spec.legMaxAm === p.max}
-                  onClick={() => onSpec({ legMinAm: p.min, legMaxAm: p.max })}
-                  className={`${CTRL} flex-1 px-1 text-[11px] ${spec.legMinAm === p.min && spec.legMaxAm === p.max ? ON : OFF}`}
-                >
-                  {p.label}
-                  <span className="num ml-1 block text-[9px] font-normal opacity-70">
-                    {amFmt(p.min)} to {amFmt(p.max)}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <Faint>
-              <span className="num">{counts.inBand}</span> of <span className="num">{counts.eligible}</span>{" "}
-              {marketLabel} legs clear your filters and are posted inside that band right now.
-            </Faint>
+            <OddsSlider prices={prices} lo={spec.legMinAm} hi={spec.legMaxAm} onChange={(lo, hi) => onSpec({ legMinAm: lo, legMaxAm: hi })} />
           </div>
 
+          {/* hit-rate floor — MLB only */}
+          {showHitRate && hitWindow != null && (
+            <div className="space-y-1.5">
+              <ChipRow label="Hit rate" hint={hitLoading ? "loading game logs…" : `${withLogCount} of ${withLog.length} legs have game logs`}>
+                {HIT_FLOORS.map((f) => (
+                  <Chip key={f.label} on={(spec.minHit ?? null) === f.value} onClick={() => onSpec({ minHit: f.value })} disabled={hitLoading && f.value != null}>
+                    {f.label}
+                  </Chip>
+                ))}
+              </ChipRow>
+              <ChipRow label="Over the last">
+                {HIT_WINDOWS.map((w) => (
+                  <Chip key={w} on={hitWindow === w} onClick={() => onHitWindow?.(w)} label={`Last ${w} games`}>
+                    <span className="num">{windowLabel(w)}</span>
+                  </Chip>
+                ))}
+              </ChipRow>
+              <Faint>How often the player has cleared the line on this ticket in his recent games — a count, not a prediction. The floor keeps only legs at or above it; the window also drives the chips on every row below.</Faint>
+            </div>
+          )}
+
+          {/* sides — not offered on a yes-only market (INSTRUCTION 52 fix pass) */}
+          {oneSided ? (
+            <div data-testid="gen-one-sided" className="text-[9.5px] leading-snug text-faint">
+              {marketLabel} has one side only — the price is on it happening, so there is no over or under to pick
+              here.
+            </div>
+          ) : (
+            <ChipRow label="Sides">
+              {(["o", "u", "both"] as const).map((s) => (
+                <Chip key={s} on={spec.sides === s} onClick={() => onSpec({ sides: s })}>
+                  {s === "o" ? "Overs" : s === "u" ? "Unders" : "Both"}
+                </Chip>
+              ))}
+            </ChipRow>
+          )}
+
+          {/* games */}
+          {games.length > 1 && (
+            <ChipRow label="Games" hint={spec.games?.length ? `${spec.games.length} of ${games.length}` : `all ${games.length}`}>
+              <Chip on={!spec.games?.length} onClick={() => onSpec({ games: [] })}>All</Chip>
+              {games.map((g) => (
+                <Chip key={g.key} on={!!spec.games?.includes(g.key)} onClick={() => toggleGame(g.key)}>
+                  {g.label}
+                </Chip>
+              ))}
+            </ChipRow>
+          )}
+
+          {/* positions — football */}
+          {positions && (
+            <fieldset className="min-w-0" aria-label="Player positions">
+              <ChipRow label="Positions" hint={`${distinctPlayers} eligible players`}>
+                <Chip on={!spec.positions?.length} onClick={() => onSpec({ positions: [] })}>All</Chip>
+                {positions.map((position) => {
+                  const checked = !!spec.positions?.includes(position);
+                  return (
+                    <button key={position} type="button" role="checkbox" aria-checked={checked} aria-label={position}
+                      onClick={() => onSpec({ positions: checked ? spec.positions!.filter((p) => p !== position) : [...(spec.positions ?? []), position] })}
+                      className={`${CHIP} ${checked ? CHIP_ON : CHIP_OFF}`}>{position}</button>
+                  );
+                })}
+              </ChipRow>
+              {positionsLoading ? <Faint>Checking roster positions…</Faint> : !!spec.positions?.length && unknownPositions > 0 && <Faint>{unknownPositions} players with unverified positions excluded.</Faint>}
+            </fieldset>
+          )}
+
+          {/* timing */}
+          {spec.phase && (
+            <div role="group" aria-label="Parlay timing">
+              <ChipRow label="Timing" hint={spec.phase === "pregame" ? "upcoming games only" : spec.phase === "live" ? "in-play prices only" : "upcoming + in-play"}>
+                {(["pregame", "live", "mixed"] as const).map((phase) => (
+                  <Chip key={phase} on={spec.phase === phase} onClick={() => onSpec({ phase, includeStarted: phase !== "pregame" })}>
+                    {phase === "pregame" ? "Pregame" : phase === "live" ? "Live" : "Mixed"}
+                  </Chip>
+                ))}
+              </ChipRow>
+            </div>
+          )}
+
           {/* advanced */}
-          <details className="group rounded-[10px] border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center text-[11.5px] font-semibold text-muted [&::-webkit-details-marker]:hidden">
+          <details className="group rounded-[10px] border border-white/[0.06] bg-white/[0.02] px-2.5 py-1">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center text-[11px] font-semibold text-muted [&::-webkit-details-marker]:hidden">
               Advanced <span className="ml-1 inline-block transition-transform group-open:rotate-180">▾</span>
             </summary>
-            <div className="mt-2 space-y-1.5">
-              {/* THE SIDE CONTROL IS NOT OFFERED ON A YES-ONLY MARKET (INSTRUCTION 52 fix pass).
-                  Every Anytime TD price is on the touchdown happening — there is no under to
-                  take — so "Unders" there could only ever empty the pool, and the sheet then
-                  told Josh the board had no lines while the board sat underneath, full of them. */}
-              {oneSided ? (
-                <div data-testid="gen-one-sided" className="text-[9.5px] leading-snug text-faint">
-                  {marketLabel} has one side only — the price is on it happening, so there is no over or under to pick
-                  here.
-                </div>
-              ) : (
-                <div className="flex gap-1.5">
-                  {(["o", "u", "both"] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      aria-pressed={spec.sides === s}
-                      onClick={() => onSpec({ sides: s })}
-                      className={`${CTRL} flex-1 ${spec.sides === s ? ON : OFF}`}
-                    >
-                      {s === "o" ? "Overs" : s === "u" ? "Unders" : "Both"}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="mt-1 space-y-1.5 pb-1.5">
               <Toggle on={!spec.onePerGame} onChange={(v) => onSpec({ onePerGame: !v })}>
                 Two legs from one game
               </Toggle>
               {!spec.phase && <Toggle on={spec.includeStarted} onChange={(v) => onSpec({ includeStarted: v })}>
                 Include games already under way
               </Toggle>}
-              <Toggle on={spec.czOnly} onChange={(v) => onSpec({ czOnly: v })}>
-                <BookOnlyLabel />
-              </Toggle>
+              {selectedMarkets.length > 1 && (
+                <Toggle on={spec.spread !== false} onChange={(v) => onSpec({ spread: v })}>
+                  Every category on the ticket at least once
+                </Toggle>
+              )}
               {showModelOnly && (
                 <Toggle on={spec.modelOnly} onChange={(v) => onSpec({ modelOnly: v })}>
                   Model-priced legs only (no market-fair legs)
@@ -719,16 +826,13 @@ export function GenSheet<P>({
                 Target a combined payout too
               </Toggle>
               {spec.payout && (
-                <div className="flex items-end gap-2 pl-1">
+                <div className="flex items-center gap-2 pl-1">
                   <AmInput
                     label="Ticket min"
                     value={spec.payout.minAm}
                     onCommit={(v) => onSpec({ payout: { minAm: v, maxAm: spec.payout!.maxAm } })}
                     hint="+400"
                   />
-                  <span className="pb-3 text-[12px] text-faint" aria-hidden>
-                    →
-                  </span>
                   <AmInput
                     label="Ticket max"
                     value={spec.payout.maxAm}
@@ -741,9 +845,9 @@ export function GenSheet<P>({
           </details>
 
           {onSaveSetup && (
-            <div className="flex items-center gap-2 border-t border-white/10 pt-2">
-              <button type="button" onClick={onSaveSetup} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold text-text">Save setup</button>
-              <button type="button" onClick={onLoadSetup} disabled={!hasSetup} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold text-text disabled:opacity-40">Load saved setup</button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onSaveSetup} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold text-text">Save setup</button>
+              <button type="button" onClick={onLoadSetup} disabled={!hasSetup} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold text-text disabled:opacity-40">Load saved setup</button>
             </div>
           )}
 
@@ -775,8 +879,8 @@ export function GenSheet<P>({
             </button>
           </div>
           {onBack && <div className="flex items-center gap-2">
-            <button type="button" onClick={onBack} disabled={!canBack || loading} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold disabled:opacity-35">← Previous parlay</button>
-            <button type="button" onClick={onForward} disabled={!canForward || loading} className="press min-h-11 flex-1 rounded-lg border border-white/10 text-[11px] font-semibold disabled:opacity-35">Next parlay →</button>
+            <button type="button" onClick={onBack} disabled={!canBack || loading} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35">← Previous parlay</button>
+            <button type="button" onClick={onForward} disabled={!canForward || loading} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35">Next parlay →</button>
           </div>}
           {historyNotice && <p role="status" className="text-[10px] text-muted">{historyNotice}</p>}
           {!loading && relax && (
@@ -808,27 +912,15 @@ export function GenSheet<P>({
             {pool.finishedDropped > 0 && <> · {pool.finishedDropped} in games that have finished</>}
           </div>
 
-          {ticket && spec.style && (
-            <div aria-label="Your mix" className="grid grid-cols-3 gap-1.5">
-              {(["anchor", "middle", "upside"] as const).map((tier) => (
-                <div key={tier} className={`rounded-lg border px-2 py-1 text-center @3xl:py-2 ${tier === "anchor" ? "border-pos/25 bg-pos/5" : tier === "middle" ? "border-white/10 bg-white/5" : "border-gold/25 bg-gold/5"}`}>
-                  <span className="num mr-1 text-[12px] font-semibold text-text @3xl:mr-0 @3xl:block @3xl:text-[16px]">{ticket.legs.filter((l) => tiers.get(l.id) === tier).length}</span>
-                  <span className="text-[9px] font-medium text-muted">{MIX_LABEL[tier]}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {excludedPlayers.length > 0 && <div className="rounded-xl border border-gold/25 bg-gold/5 px-3 py-2" aria-label="Excluded players">
-            <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
-              <span>{excludedPlayers.length} excluded · resets when filters change</span>
-              <button type="button" onClick={onClearExclusions} className="min-h-11 px-2 font-semibold text-gold">Clear all</button>
-            </div>
-            <div className="flex flex-wrap gap-x-3">
-              {excludedPlayers.map(p => <label key={p.key} className="flex min-h-11 cursor-pointer items-center gap-2 text-[11px] text-text">
-                <input type="checkbox" checked onChange={() => onRestorePlayer?.(p.key)} aria-label={`Restore ${p.label}`} className="h-4 w-4 accent-amber-400" />{p.label}
-              </label>)}
-            </div>
+          {excludedPlayers.length > 0 && <div className="flex flex-wrap items-center gap-1 rounded-xl border border-gold/25 bg-gold/5 px-2 py-1.5" aria-label="Excluded players">
+            <span className="mr-1 text-[9.5px] font-bold uppercase tracking-[0.12em] text-gold">Sitting out</span>
+            {excludedPlayers.map(p => (
+              <button key={p.key} type="button" onClick={() => onRestorePlayer?.(p.key)} aria-label={`Restore ${p.label}`} title="Tap to bring him back"
+                className="press inline-flex h-6 items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 text-[10px] font-semibold text-text">
+                {p.label}<span aria-hidden className="text-gold">↺</span>
+              </button>
+            ))}
+            <button type="button" onClick={onClearExclusions} className="press ml-auto h-6 px-1.5 text-[10px] font-semibold text-gold">Clear all</button>
           </div>}
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
@@ -841,7 +933,7 @@ export function GenSheet<P>({
                     l={l}
                     pinned={spec.pinned[i] === l.id}
                     outOfBand={outside.has(l.id)}
-                    mixBand={spec.style ? tiers.get(l.id) : undefined}
+                    hitWindow={showHitRate ? hitWindow : undefined}
                     renderMark={renderMark}
                     renderName={renderName}
                     onTogglePin={onTogglePin}
@@ -881,9 +973,9 @@ export function GenSheet<P>({
               </div>
               <details className="mt-1.5 text-[9.5px] leading-snug text-faint">
                 <summary className="cursor-pointer py-2">Estimates & price details · paper only</summary>
-                <p className="mb-1 @3xl:hidden">Mix bands compare this category within your odds range. Safer mix favors anchors and rotates other bands; recent players get less weight. Selected positions allow any combination of those positions. Safer is relative, and every parlay can lose.</p>
                 Estimated hit chance multiplies the leg estimates. Same-game correlation is not modeled; this is not a sportsbook parlay quote.
                 {anyMarketProb && <> {marketNote}</>}{" "}
+                {showHitRate && <>Hit rates count games already played and are not a forecast. </>}
                 {suspended && (
                   <>
                     {marketLabel} is suspended from the engine&apos;s own auto-built tickets; this sandbox spins it anyway.{" "}
@@ -908,6 +1000,7 @@ export function GenSheet<P>({
                         l={leg}
                         pinned
                         outOfBand={false}
+                        hitWindow={showHitRate ? hitWindow : undefined}
                         renderMark={renderMark}
                         renderName={renderName}
                         onTogglePin={onTogglePin}
@@ -924,7 +1017,7 @@ export function GenSheet<P>({
                        statement about the board, not a report on it */
                     "Waiting for today's board…"
                   : genFailLine(result.ok ? { code: "no-rows" } : result.fail, {
-                      marketLabel,
+                      marketLabel: selectedMarkets.length > 1 ? `${selectedMarkets.length}-category` : marketLabel,
                       phase: spec.phase,
                       legs: spec.legs,
                       loAm: spec.legMinAm,
@@ -945,16 +1038,6 @@ export function GenSheet<P>({
   );
 }
 
-function Label({ children }: { children: ReactNode }) {
-  return <div className="mb-1 text-[9.5px] font-semibold uppercase tracking-[0.12em] text-faint">{children}</div>;
-}
-
-function Faint({ children }: { children: ReactNode }) {
-  return <div className="mt-1 text-[9.5px] leading-snug text-faint">{children}</div>;
-}
-
-/** "DraftKings-priced legs only" — the book `czOnly` keeps is the selected sportsbook (DraftKings by default). */
-function BookOnlyLabel() {
-  const book = useSportsbook();
-  return <>{bookName(book)}-priced legs only</>;
+function Faint({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`mt-1 text-[9.5px] leading-snug text-faint ${className}`}>{children}</div>;
 }

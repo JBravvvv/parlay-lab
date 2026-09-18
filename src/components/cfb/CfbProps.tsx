@@ -669,11 +669,10 @@ function PropsLinkReader({ onLink }: { onLink: (link: CfbPropsLink) => void }) {
    18-line wrapper around it (INSTRUCTION 47), so the NFL gets the generator by being the same
    component, not by carrying a second copy of any of this.
 
-   Anytime TD opens in the owner's -230 to +200 range (2026-09-12), with a
-   category-relative safer mix. The range stays editable for every prop category. */
+   Anytime TD opens in the owner's -230 to +200 range (2026-09-12). The range stays
+   editable for every prop category; the build-style mixes are gone (2026-09-18). */
 const GEN_MARKET_KEYS: readonly string[] = FOOTBALL_GEN_MARKETS.map((m) => m.key);
 const GEN_SPEC_DEFAULT: GenSpec = {
-  style: "safer",
   market: FOOTBALL_GEN_MARKETS[0].key,
   legs: 4,
   legMinAm: -230,
@@ -689,7 +688,7 @@ const GEN_SPEC_DEFAULT: GenSpec = {
 
 /** the line under the category pills, and the sheet's stand-in on the Sides rail */
 const GEN_CATEGORY_NOTE =
-  "Sides, totals and moneylines are game markets, not player slots — the generator leaves them alone for now.";
+  "Tap several categories to mix them on one ticket. Sides, totals and moneylines are game markets, not player slots — the generator leaves them alone for now.";
 const GEN_STUB_NOTE =
   "The parlay generator builds PLAYER-prop parlays — pick a player market above and it appears here. Sides, totals and moneylines are game markets and have no player slots yet.";
 /* EVERY football leg is market-priced: the win % is the de-vigged consensus of the books that

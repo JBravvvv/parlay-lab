@@ -48,6 +48,9 @@ import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
 import { BoardLabel } from "@/components/player/PlayerName";
 import { normalizeName, parseBoardLabel } from "@/lib/player-card";
+import { useHitRates, useHitWindow } from "@/lib/mlb/useHitRates";
+import { hitKey, hitRate } from "@/lib/prop-hit-rate";
+import { HitChip } from "@/components/props/HitChip";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
 import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
@@ -303,6 +306,18 @@ function MlbBoardPage() {
     retry: false,
   });
   const picksData = picksQuery.data ?? null;
+  /* HIT RATES on the Picks tabs (2026-09-18): the same free game-log read the Builder shows, so a
+     pick's row says how often he has cleared THIS line lately. Same window as the Builder. */
+  const [hitWindow] = useHitWindow();
+  const pickPlayers = useMemo(() => {
+    const seen = new Map<string, { name: string; team: string | null }>();
+    for (const list of Object.values(picksData?.picks ?? {})) for (const p of list ?? []) {
+      const parsed = p.player ? parseBoardLabel(p.player) : null;
+      if (parsed && !seen.has(parsed.name)) seen.set(parsed.name, { name: parsed.name, team: parsed.team });
+    }
+    return [...seen.values()];
+  }, [picksData]);
+  const pickHits = useHitRates(pickPlayers, pickPlayers.length > 0);
   /* INSTRUCTION 51 (2026-09-11), Josh's order verbatim: "Authorize the live in-play odds pull for
      MLB". THE SECOND HALF of INSTRUCTION 50 item 2. Item 2 could only suppress a dead row, because
      the in-play re-pull costs money Josh had not authorised. He has now authorised it, for MLB.
@@ -894,6 +909,13 @@ function MlbBoardPage() {
               <span className="text-muted">
                 {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>
+              {p.player && p.line != null && (p.side === "o" || p.side === "u") && (
+                <HitChip
+                  className="ml-1.5 align-middle"
+                  window={hitWindow}
+                  stat={hitRate(pickHits.logs.get(hitKey(parseBoardLabel(p.player)?.name ?? p.player)), p.market ?? cat, p.line, p.side, hitWindow)}
+                />
+              )}
               <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
               {pickOut(p) && <OutTag />}
               {p.susp && <span className="ml-1 text-[10px] text-gold">SUSPENDED — shown always, never on a ticket</span>}
@@ -952,7 +974,7 @@ function MlbBoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine]);
+  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine, pickHits.logs, hitWindow]);
   const visiblePicksAll = useMemo(
     () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
     [pickRows, cz, pickKey, showScratched, pickOut, nameHit],

@@ -30,7 +30,9 @@ import {useMlbLiveQuotes,MLB_LIVE_CLIENT} from "@/lib/mlb/live-client";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 import {useLiveNow} from "@/lib/liveNow";
 import { GenSheet } from "@/components/props/GenSheet";
-import { GEN_MARKETS, MLB_GEN_MARKETS, buildPool } from "@/components/props/mlb-gen-pool";
+import { GEN_MARKETS, MLB_GEN_MARKETS, buildPool, type MlbHitSource } from "@/components/props/mlb-gen-pool";
+import { useHitRates, useHitWindow } from "@/lib/mlb/useHitRates";
+import { hitKey } from "@/lib/prop-hit-rate";
 import { blankPins, useParlayGen } from "@/components/props/useParlayGen";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { PlayerMark } from "@/components/player/PlayerMark";
@@ -87,7 +89,6 @@ import {
 const GEN_OPEN_KEY = "pl:props:gen-open";
 const GEN_SPEC_DEFAULT: GenSpec = {
   phase: "pregame",
-  style: "safer",
   market: "batter_hits_runs_rbis",
   legs: 4,
   legMinAm: -152,
@@ -190,14 +191,28 @@ function PropsDesk() {
       return;
     }
   };
-  /* the pool's only dependency is the board, so the builder is memoized on it */
+  /* HIT RATES (2026-09-18): one free statsapi game-log pull for every player on the whole prop
+     board (all markets, all games — the generator's pool is built over all of it), read over the
+     window Josh picks. The window is page state, not spec state: every row's chip, the generator's
+     floor and the Picks page read the same one. Never the Odds API, never a credit. */
+  const [hitWindow, setHitWindow] = useHitWindow();
+  const boardPlayers = useMemo(() => {
+    const seen = new Map<string, { name: string; team: string | null }>();
+    for (const g of propBoard) for (const m of GEN_MARKETS) for (const r of g.markets?.[m] ?? []) {
+      if (!seen.has(r.p)) seen.set(r.p, { name: r.p, team: r.tm ?? null });
+    }
+    return [...seen.values()];
+  }, [propBoard]);
+  const hitRates = useHitRates(boardPlayers, boardPlayers.length > 0);
+  const hitSource = useMemo<MlbHitSource>(() => ({ logs: hitRates.logs, window: hitWindow, keyOf: hitKey }), [hitRates.logs, hitWindow]);
+  /* the pool's dependencies are the board and the game logs, so the builder is memoized on them */
   const buildGenPool = useCallback(
     (sp: GenPoolSpec, at: number) => {
       at = at ? Date.now() : 0;
       const currentLive=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
-      return buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at);
+      return buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at,hitSource);
     },
-    [propBoard,liveOverlay,d,liveNow],
+    [propBoard,liveOverlay,d,liveNow,hitSource],
   );
   const gen = useParlayGen<SandboxLeg>({
     storageKey: GEN_OPEN_KEY,
@@ -338,6 +353,8 @@ function PropsDesk() {
         search={!gameTab && cat != null ? search : null}
         onSearch={setSearch}
         count={{ lines: totalRows, games: propGames.length }}
+        hitWindow={hitWindow}
+        onHitWindow={setHitWindow}
       />
 
       <GenSheet
@@ -370,6 +387,10 @@ function PropsDesk() {
         boardAt={boardAtLabel}
         loading={q.isPending || browseProps.loading}
         gameMarket={gameTab}
+        showHitRate
+        hitWindow={hitWindow}
+        onHitWindow={setHitWindow}
+        hitLoading={hitRates.loading}
       />
 
       {fromServer && !gameTab && (
@@ -442,7 +463,7 @@ function PropsDesk() {
               ))
             : propGames.map(({ g, rows }) => (
                 <Reveal key={g.game} y={10}>
-                  <PropGameCard g={g} cat={cat} rows={rows} headshots={headshots} isSel={isSel} onToggle={toggle} hitPlayer={deep.hit} />
+                  <PropGameCard g={g} cat={cat} rows={rows} headshots={headshots} isSel={isSel} onToggle={toggle} hitPlayer={deep.hit} logs={hitRates.logs} hitWindow={hitWindow} logKey={hitKey} />
                 </Reveal>
               ))}
           <details className="group rounded-[12px] border border-white/[0.05] bg-white/[0.02] px-3 py-2 text-[10px] leading-relaxed text-faint">

@@ -9,6 +9,9 @@ import { collapseKey, panelIdFor, useGameCollapse, setCollapsed } from "./collap
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { PlayerName } from "@/components/player/PlayerName";
 import { MKT_LABEL, filterSide, playerLeg, playerMatches, sidePrice, sideProb, sideShort, type Side, type TeamSide } from "./props-model";
+import { hitDots, hitRate, type HitWindow, type PlayerLog } from "@/lib/prop-hit-rate";
+import type { HitLogMap } from "@/lib/mlb/useHitRates";
+import { HitChip, HitDots } from "./HitChip";
 
 /* ------------------------------------------------------------------- visuals */
 
@@ -123,6 +126,8 @@ export function PlayerRow({
   isSel,
   onToggle,
   hit = false,
+  log = null,
+  hitWindow,
 }: {
   r: PropBoardRow;
   cat: string;
@@ -133,8 +138,14 @@ export function PlayerRow({
   onToggle: (leg: SandboxLeg) => void;
   /** INSTRUCTION 46 deep link: this is the ledger bet's player — ring the row and scroll it into view once */
   hit?: boolean;
+  /** his game log, when the board has it — the sub line then prints how often he has cleared THIS
+      line (over) lately, plus a ten-game hit/miss strip (2026-09-18) */
+  log?: PlayerLog | null;
+  hitWindow?: HitWindow;
 }) {
   const sides: Side[] = ["o", "u"];
+  const stat = log && hitWindow != null ? hitRate(log, cat, r.ln, "o", hitWindow) : null;
+  const dots = stat ? hitDots(log, cat, r.ln, "o") : null;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (hit) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -152,7 +163,14 @@ export function PlayerRow({
         <div className="mt-[3px] flex items-center gap-1 text-[9.5px] text-faint">
           {r.tm && <span className="shrink-0 text-[9.5px] font-semibold text-muted">{r.tm}</span>}
           {r.tm && <span className="shrink-0 text-faint/60">·</span>}
-          <span className="truncate">{MKT_LABEL[cat] ?? cat}</span>
+          {stat && hitWindow != null ? (
+            <>
+              <HitChip stat={stat} window={hitWindow} />
+              <HitDots dots={dots} />
+            </>
+          ) : (
+            <span className="truncate">{MKT_LABEL[cat] ?? cat}</span>
+          )}
           {r.quoteAt && <span className="shrink-0 text-live" title={r.quoteAt}>live quote</span>}
           {r.alt && <span className={CHIP}>alt</span>}
           {r.lu === "projected" && <span className={CHIP}>proj</span>}
@@ -191,6 +209,9 @@ export function PropGameCard({
   isSel,
   onToggle,
   hitPlayer = null,
+  logs,
+  hitWindow,
+  logKey,
 }: {
   g: PropBoardGame;
   cat: string;
@@ -200,6 +221,10 @@ export function PropGameCard({
   onToggle: (leg: SandboxLeg) => void;
   /** INSTRUCTION 46 deep link: the ledger bet's player name — his row(s) get ringed, the list opens far enough to show him */
   hitPlayer?: string | null;
+  /** the board's game logs and the window to read them over (2026-09-18) */
+  logs?: HitLogMap;
+  hitWindow?: HitWindow;
+  logKey?: (name: string) => string;
 }) {
   /* INSTRUCTION 50 item 5 (2026-09-11, Josh: "Need to be able to collapse list of picks for
      each individual game/prop by clicking/pressing in the top box that shows the team
@@ -251,6 +276,8 @@ export function PropGameCard({
               isSel={isSel}
               onToggle={onToggle}
               hit={!!hitPlayer && playerMatches(r.p, hitPlayer)}
+              log={logs && logKey ? logs.get(logKey(r.p)) ?? null : null}
+              hitWindow={hitWindow}
             />
           ))}
           {visible.length === 0 && (

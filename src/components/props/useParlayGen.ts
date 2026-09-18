@@ -162,7 +162,7 @@ export function useParlayGen<P>({
   }, [storageKey, marketKeys, positions]);
   const saveSetup = () => {
     try {
-      const raw = encodeSetup({ ...spec, style: spec.style ?? "safer" });
+      const raw = encodeSetup(spec);
       localStorage.setItem(`${storageKey}:setup`, raw);
       setSavedSetup(decodeSetup(raw, marketKeys, positions));
       setSetupNotice("Setup saved on this device. Players will rotate from the current board.");
@@ -200,7 +200,7 @@ export function useParlayGen<P>({
      construction over the whole board plus the seeded fill and the bounded repair loop on every
      dependency change. A closed sheet gets the empty pool, which the generator answers with
      `no-rows` at no cost. */
-  const poolSpec = useMemo(() => ({ market: spec.market, includeStarted: spec.includeStarted, phase: spec.phase }), [spec.market, spec.includeStarted, spec.phase]);
+  const poolSpec = useMemo(() => ({ market: spec.market, markets: spec.markets, includeStarted: spec.includeStarted, phase: spec.phase }), [spec.market, spec.markets, spec.includeStarted, spec.phase]);
   const pool = useMemo(() => (open ? excludePlayers(build(poolSpec, nowMs), excludedKeys) : emptyPool<P>()), [open, build, poolSpec, nowMs, excludedKeys]);
   const generated = useMemo<GenResult<P>>(
     () =>
@@ -234,7 +234,14 @@ export function useParlayGen<P>({
   useEffect(() => {
     if (!railMarket || !marketKeys.includes(railMarket)) return;
     if (railMarket !== spec.market) leaveRecall();
-    setSpec((sp) => (sp.market === railMarket ? sp : { ...sp, market: railMarket, pinned: blankPins(sp.legs) }));
+    /* several categories (2026-09-18): a rail move INSIDE the selected set just changes which one
+       the rail shows — the pool is the same union, so the pins stay. A rail move OUTSIDE it
+       collapses the set to the rail's category, the way a single-category sheet always behaved. */
+    setSpec((sp) => {
+      if (sp.market === railMarket) return sp;
+      if (sp.markets?.includes(railMarket)) return { ...sp, market: railMarket };
+      return { ...sp, market: railMarket, markets: undefined, pinned: blankPins(sp.legs) };
+    });
   }, [railMarket, marketKeys]);
 
   const patchSpec = (patch: Partial<GenSpec>) => {
@@ -245,12 +252,23 @@ export function useParlayGen<P>({
       onMarket(patch.market);
       return;
     }
+    /* a category-set edit (2026-09-18): the rail must keep showing a category that is ON the
+       ticket, so dropping the rail's own category moves the rail to the first one left */
+    const nextMarkets = patch.markets === undefined ? undefined : [...new Set(patch.markets)].filter((m) => marketKeys.includes(m));
+    const railMove = nextMarkets?.length && !nextMarkets.includes(spec.market) ? nextMarkets[0] : null;
     setSpec((sp) => {
       const next: GenSpec = { ...sp, ...patch };
+      if (nextMarkets !== undefined) {
+        next.markets = nextMarkets.length > 1 ? nextMarkets : undefined;
+        if (railMove) next.market = railMove;
+        else if (!nextMarkets.length) next.markets = undefined;
+        if (setKey(next.markets ?? [next.market]) !== setKey(sp.markets ?? [sp.market])) next.pinned = blankPins(next.legs);
+      }
       if (patch.phase != null && patch.phase !== sp.phase) next.pinned = blankPins(next.legs);
       if (patch.legs != null && patch.legs !== sp.legs) next.pinned = blankPins(patch.legs);
       return next;
     });
+    if (railMove) onMarket(railMove);
   };
 
   /* UNPINNING ALWAYS WORKS (INSTRUCTION 50 fix pass). This used to open with `if (!gen.ok)
@@ -363,6 +381,7 @@ export function useParlayGen<P>({
 }
 
 export const blankPins = (n: number): (string | null)[] => Array.from({ length: n }, () => null);
+const setKey = (ms: readonly string[]) => [...new Set(ms)].sort().join(",");
 
 
 function playerExposure(tickets: readonly string[][]): Map<string, number> {
