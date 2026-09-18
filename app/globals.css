@@ -243,14 +243,14 @@ body::after {
   inset: -22%;
   filter: blur(46px);
   background:
-    radial-gradient(42% 36% at 30% 35%, rgba(34, 197, 94, 0.17), transparent 70%),
-    radial-gradient(34% 30% at 76% 62%, rgba(20, 184, 166, 0.13), transparent 70%);
+    radial-gradient(42% 36% at 30% 35%, rgba(236, 72, 153, 0.17), transparent 70%),
+    radial-gradient(34% 30% at 76% 62%, rgba(190, 24, 93, 0.13), transparent 70%);
   animation: aurora-a 26s ease-in-out infinite;
 }
 .aurora::after {
   background:
-    radial-gradient(38% 32% at 66% 24%, rgba(182, 255, 61, 0.1), transparent 70%),
-    radial-gradient(30% 28% at 24% 76%, rgba(34, 197, 94, 0.12), transparent 70%);
+    radial-gradient(38% 32% at 66% 24%, rgba(251, 113, 133, 0.1), transparent 70%),
+    radial-gradient(30% 28% at 24% 76%, rgba(236, 72, 153, 0.12), transparent 70%);
   animation: aurora-b 34s ease-in-out infinite;
 }
 

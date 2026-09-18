@@ -1,3 +1,7 @@
+# Progress — 2026-09-18 (backdrop back to the footage's original pink)
+
+- Josh: "Bring parlay lab background back to the original colors in this mp4. Pink instead of green for the most part." The `hue-rotate(120deg)` that recoloured `backdrop-llama.mp4` lime is removed from `VideoBackdrop` (no filter at all now); the CSS `.aurora` fallback under the video is retinted from green/teal to pink/rose so the loop gap and the no-autoplay still match the footage. No data or engine change.
+
 # Progress — 2026-09-17 (MLB variety card + $350/day, INSTRUCTION 72)
 
 - **Why**: since 2026-09-13 the MLB card was shape P (3×$50 two-leg, probability fill, ceiling 2.6) → hits parlays every day; rule 5 dropped every H+R+RBI-over leg; ML/RL only existed as 2-leg SAFER tickets; one single per pool.

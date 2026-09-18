@@ -9,9 +9,10 @@ import { useEffect, useRef } from "react";
    cached immutable, so replacing bytes under it would never reach clients. */
 const SRC = "/media/backdrop-llama.mp4";
 
-/* The footage's neon goggles are red; the brand is green. A hue rotation
-   recolors them to electric lime in the compositor — no re-encode needed. */
-const GREEN_SHIFT = "hue-rotate(120deg) saturate(0.95)";
+/* The footage plays in its ORIGINAL colours — pink/magenta glow, red neon
+   goggles. Josh (2026-09-18): "Bring parlay lab background back to the original
+   colors in this mp4. Pink instead of green for the most part." The earlier
+   hue-rotate(120deg) that recoloured it lime is gone; no filter is applied. */
 
 /**
  * Looping background video with a JS-controlled fade loop:
@@ -126,7 +127,7 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
       preload="auto"
       aria-hidden
       className="absolute inset-0 h-full w-full object-cover"
-      style={{ opacity: 0, filter: GREEN_SHIFT, WebkitFilter: GREEN_SHIFT }}
+      style={{ opacity: 0 }}
     />
   );
 
