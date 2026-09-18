@@ -43,8 +43,16 @@
  */
 
 export type LegRange = { min: number; max: number };
-export type CoreSlot = { stake: number; legs: LegRange };
-export type CoreShape = { id: string; label: string; slots: CoreSlot[] };
+/**
+ * INSTRUCTION 72 (2026-09-17): a slot may be MARKET-TYPED. `hrr` seats only a ticket carrying
+ * at least one H+R+RBI leg; `team` seats only a ticket whose every leg is a moneyline or run
+ * line; a slot without a kind seats anything its leg range and price ceiling admit. The
+ * 1-leg range IS the straight bet — no kind needed.
+ */
+export type SlotKind = "hrr" | "team";
+export type CoreSlot = { stake: number; legs: LegRange; kind?: SlotKind };
+/** `total` is the day the shape sums to; absent = SHAPE_TOTAL (the historic $150 menu) */
+export type CoreShape = { id: string; label: string; slots: CoreSlot[]; total?: number };
 
 /** the day the shaped core replaced the flat $25-cap / 2-leg core */
 export const CORE_SHAPES_SINCE = "2026-09-08";
@@ -53,7 +61,7 @@ export const CORE_SHAPES_SINCE = "2026-09-08";
 export const SHAPE_TOTAL = 150;
 
 const L = (min: number, max: number): LegRange => ({ min, max });
-const S = (stake: number, legs: LegRange): CoreSlot => ({ stake, legs });
+const S = (stake: number, legs: LegRange, kind?: SlotKind): CoreSlot => (kind ? { stake, legs, kind } : { stake, legs });
 
 /** Josh's six examples, verbatim, in his order. Big slots first inside each shape, as he
     wrote them — lock-card fills slots in this order, so the fire with the deepest pool
@@ -75,18 +83,67 @@ export const CORE_SHAPES: readonly CoreShape[] = [
 
 /* the sums are checked ONCE, at load — a menu edit that breaks $150 is a crash, never a
    quietly over- or under-deployed day (the same posture as lock-card's TWO ALLOCATORS) */
-for (const sh of CORE_SHAPES) {
+/** Fixed paper-action shape (INSTRUCTIONS 61–63, 2026-09-13); kept outside the historical rotating menu. */
+export const PAPER_ACTION_SHAPE: CoreShape = { id: "P", label: "3x$50 2-leg · paper action", slots: [S(50, L(2,2)), S(50, L(2,2)), S(50, L(2,2))] };
+
+/**
+ * THE VARIETY DAY — INSTRUCTION 72 (2026-09-17, Josh's word, verbatim: "MLB needs to have more
+ * variety. Almost every day its just 2 team hits prop parlays. There needs to be more H+R+RBI,
+ * ML/RL, straight bets etc. You can also increase daily money to be spent every single day no
+ * matter what by builder/ledger for MLB to $350"). One $350 shape, every day from
+ * VARIETY_SINCE (paper-mode.ts), whose slots are typed by MARKET so the day cannot collapse
+ * into hits parlays again:
+ *   $40 2-leg H+R+RBI                 — at least one H+R+RBI leg (this slot alone may carry
+ *                                        an H+R+RBI OVER; rule 5 of INSTRUCTION 18 holds elsewhere)
+ *   $40 2-leg ML/RL                   — every leg a moneyline or run line
+ *   2 x $50 2-leg (any market)        — the paper-action pair, kept
+ *   2 x $40 straight bet (1 leg)      — the singles Josh asked for
+ *   $40 3-leg, $30 4-5 leg, $20 5-6 leg — the longer builds; the 5-6 leg slot is the
+ *                                        CFB-style big ticket Josh liked on 2026-09-17
+ * Sum $350, asserted at load. The two untyped 2-leg slots and the straights are filled
+ * with a DISTINCT-TYPE preference in lock-card.ts (a second ticket of an already-seated
+ * market type is taken only when nothing else fits), so even the untyped money spreads.
+ */
+export const VARIETY_TOTAL = 350;
+export const VARIETY_SHAPE: CoreShape = {
+  id: "V",
+  label: "$40 H+R+RBI 2-leg + $40 ML/RL 2-leg + 2x$50 2-leg + 2x$40 straight + $40 3-leg + $30 4-5 leg + $20 5-6 leg",
+  total: VARIETY_TOTAL,
+  /* typed slots FIRST: lock-card fills slots in shape order, and an untyped 2-leg slot
+     filled first could seat the day's only ML/RL ticket and starve the ML/RL slot */
+  slots: [
+    S(40, L(2, 2), "hrr"),
+    S(40, L(2, 2), "team"),
+    S(50, L(2, 2)),
+    S(50, L(2, 2)),
+    S(40, L(1, 1)),
+    S(40, L(1, 1)),
+    S(40, L(3, 3)),
+    S(30, L(4, 5)),
+    S(20, L(5, 6)),
+  ],
+};
+
+/** every shape a day can run: the six rotating $150 shapes, the $150 paper-action shape, the
+    $350 variety shape — the derived ticket window reads all of them */
+export const ALL_SHAPES: readonly CoreShape[] = [...CORE_SHAPES, PAPER_ACTION_SHAPE, VARIETY_SHAPE];
+
+for (const sh of ALL_SHAPES) {
   const sum = sh.slots.reduce((a, s) => a + s.stake, 0);
-  if (sum !== SHAPE_TOTAL) throw new Error(`CORE_SHAPES ${sh.id} sums to $${sum}, not $${SHAPE_TOTAL}`);
+  const want = sh.total ?? SHAPE_TOTAL;
+  if (sum !== want) throw new Error(`CORE_SHAPES ${sh.id} sums to $${sum}, not $${want}`);
   for (const s of sh.slots) if (!(s.legs.min >= 1 && s.legs.max >= s.legs.min)) throw new Error(`CORE_SHAPES ${sh.id} has a bad leg range`);
 }
 
 /** the number of tickets a day runs, derived from the menu (paper-mode's PAPER_TICKETS
     reads this — the count is no longer a rule of its own) */
 export const SHAPE_TICKETS = {
-  min: Math.min(...CORE_SHAPES.map((s) => s.slots.length)),
-  max: Math.max(...CORE_SHAPES.map((s) => s.slots.length)),
+  min: Math.min(...ALL_SHAPES.map((s) => s.slots.length)),
+  max: Math.max(...ALL_SHAPES.map((s) => s.slots.length)),
 } as const;
+
+/** the money a shape sums to ($150 for the historic menu, $350 for the variety day) */
+export const shapeTotal = (sh: CoreShape): number => sh.total ?? SHAPE_TOTAL;
 
 /** a slot's leg bucket for the calibration read: exactly 2 legs is `two`, 3+ is `long`.
     A 1-leg ticket (or a malformed 0-leg one) is NULL — Josh's shapes have no 1-leg slot, so
@@ -119,7 +176,7 @@ export const TILT_SHAPES = 3;
 export type ShapePick = {
   shape: CoreShape;
   /** which rule chose it — on the entry, so a day's shape always explains itself */
-  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability";
+  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability" | "variety";
   reason: string;
   /** the menu the rotation walked (ids) and the day index that indexed it */
   menu: string[];
@@ -182,13 +239,10 @@ export function shapeForDay(date: string, cal: ShapeCalibration | null | undefin
   };
 }
 
-/** Fixed paper-action shape; kept outside the historical rotating menu. */
-export const PAPER_ACTION_SHAPE: CoreShape = { id: "P", label: "3x$50 2-leg · paper action", slots: [S(50, L(2,2)), S(50, L(2,2)), S(50, L(2,2))] };
-
 /** a shape by id (a stored entry's shape is rehydrated by id so the slots are always the
     menu's own, never a hand-edited copy); null when the id is not on the menu */
 export function shapeById(id: string | null | undefined): CoreShape | null {
-  return id === PAPER_ACTION_SHAPE.id ? PAPER_ACTION_SHAPE : CORE_SHAPES.find((s) => s.id === id) ?? null;
+  return ALL_SHAPES.find((s) => s.id === id) ?? null;
 }
 
 /** the human line the ledger/card prints: "shape: 2x$60 2-leg + 3x$10 3-4 leg" */
@@ -199,7 +253,26 @@ export function shapeLine(sh: CoreShape): string {
 /** one slot, named the way the note names it: "$20 3-leg slot", "$10 3-4 leg slot" */
 export function slotName(s: CoreSlot): string {
   const legs = s.legs.min === s.legs.max ? `${s.legs.min}-leg` : `${s.legs.min}-${s.legs.max} leg`;
-  return `$${s.stake} ${legs} slot`;
+  if (s.legs.max === 1) return `$${s.stake} straight slot`;
+  const kind = s.kind === "hrr" ? "H+R+RBI " : s.kind === "team" ? "ML/RL " : "";
+  return `$${s.stake} ${kind}${legs} slot`;
+}
+
+/** the market a leg settles on, read off its lkey: "ml_home" → "ml", "rl_away" → "rl",
+    "player|batter_hits|0.5" → "batter_hits"; "" when unreadable */
+export function legMarket(l: { lkey?: string | null }): string {
+  const k = String(l.lkey ?? "");
+  if (/^(ml|rl)_(home|away)$/.test(k)) return k.slice(0, 2);
+  const parts = k.split("|");
+  return parts.length >= 2 ? parts[1] : "";
+}
+
+/** does a ticket satisfy a slot's market kind? (INSTRUCTION 72) — untyped slots admit anything */
+export function slotKindAdmits(kind: SlotKind | undefined, legs: ReadonlyArray<{ lkey?: string | null }>): boolean {
+  if (!kind) return true;
+  if (legs.length === 0) return false;
+  if (kind === "hrr") return legs.some((l) => legMarket(l) === "batter_hits_runs_rbis");
+  return legs.every((l) => legMarket(l) === "ml" || legMarket(l) === "rl");
 }
 
 /**

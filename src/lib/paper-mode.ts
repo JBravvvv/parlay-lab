@@ -15,10 +15,23 @@ import { SHAPE_TICKETS } from "@/lib/core-shapes";
 
 export const PAPER_ACTION_SINCE = "2026-09-13";
 
+/**
+ * INSTRUCTION 72 (2026-09-17, Josh's word, verbatim: "MLB needs to have more variety. Almost
+ * every day its just 2 team hits prop parlays. There needs to be more H+R+RBI, ML/RL, straight
+ * bets etc. You can also increase daily money to be spent every single day no matter what by
+ * builder/ledger for MLB to $350"). The MLB core day is $350 from VARIETY_SINCE; every day
+ * before it stays a $150 day on the record (paperDaily reads the date). The variety itself is
+ * the VARIETY_SHAPE in core-shapes.ts — market-typed slots — filled by lock-card.ts.
+ */
+export const VARIETY_SINCE = "2026-09-18";
+
 export const PAPER = {
   since: "2026-08-15",
-  /** hypothetical core deployed every day, no matter what */
-  daily: 150,
+  /** hypothetical core deployed every day, no matter what — $350 since VARIETY_SINCE
+      (INSTRUCTION 72); `dailyBefore` is the $150 the 2026-08-15..09-17 record was locked under */
+  daily: 350,
+  dailyBefore: 150,
+  dailySince: VARIETY_SINCE,
   /** hypothetical fun-money longshot(s), every day */
   fun: 25,
   /** INSTRUCTION 46b (2026-09-08, Josh's word, verbatim: "How do we increase the size of
@@ -44,6 +57,13 @@ export const PAPER = {
     and the ticket count IS the shape's slot count. min/max here are the fewest/most slots
     on the menu (3 and 5 at this writing), read off the menu so they cannot drift from it. */
 export const PAPER_TICKETS = { min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max } as const;
+
+/** the MLB core allotment a DATE runs under: $350 from VARIETY_SINCE (INSTRUCTION 72), $150
+    before — so a re-run of an older day, a top-up on it, and its ledger ceiling all keep the
+    number the day was locked under. Pure; pinned in tests/variety-core.test.ts. */
+export function paperDaily(date: string | null | undefined): number {
+  return typeof date === "string" && date >= PAPER.dailySince ? PAPER.daily : PAPER.dailyBefore;
+}
 
 /**
  * TOP-UP SWEEPS (2026-08-19, Josh's word after the 08-19 card deployed $49 of $150:

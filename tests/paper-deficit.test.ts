@@ -69,13 +69,13 @@ describe("decideTopUp — the sweep that makes 'no matter what' true while games
   const allFired: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 } };
   const starts = BLOCKS.flatMap((b) => b.starts);
   it("fires on the exact 08-19 shape: short $101, no pending block, pregame games remain", () => {
-    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX });
+    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX });
     expect(d.fire).toBe(true);
     expect(d.owed).toBe(101);
   });
   it("holds while a block can still fire — that block's own fire carries the deficit", () => {
     const reg: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } }; // C unfired, 10 unstarted >= floor 4
-    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: T("2026-08-19T19:00:00Z"), daily: PAPER.daily, max: TOPUP_MAX });
+    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: T("2026-08-19T19:00:00Z"), daily: PAPER.dailyBefore, max: TOPUP_MAX });
     expect(d.fire).toBe(false);
     expect(d.reason).toMatch(/can still fire/);
   });
@@ -85,29 +85,29 @@ describe("decideTopUp — the sweep that makes 'no matter what' true while games
     // aliveness-only check held the top-up until nothing was pregame (watched happen).
     const reg: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } };
     const late = T("2026-08-19T23:47:00Z");
-    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: late, daily: PAPER.daily, max: TOPUP_MAX });
+    const d = decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: reg, starts, now: late, daily: PAPER.dailyBefore, max: TOPUP_MAX });
     expect(d.fire, "the sweep must not wait on a block that can never fire").toBe(true);
     expect(d.owed).toBe(101);
     const r = effectiveBlockBudget({ daily: 150, blocks: BLOCKS, currentKey: "", registry: reg, now: late, allocSoFar: 49 });
     expect(r, "a never-fireable block must not reserve its share away from the sweep").toEqual({ budget: 101, reserved: 0 });
   });
   it("holds on a fully-deployed day, a day with no paper lock, and a day with nothing pregame", () => {
-    expect(decideTopUp({ entry: { paper: true, allocSum: 150 }, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
-    expect(decideTopUp({ entry: null, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
-    expect(decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: allFired, starts, now: T("2026-08-20T02:00:00Z"), daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(false);
+    expect(decideTopUp({ entry: { paper: true, allocSum: 150 }, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(false);
+    expect(decideTopUp({ entry: null, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(false);
+    expect(decideTopUp({ entry: { paper: true, allocSum: 49 }, blocks: BLOCKS, registry: allFired, starts, now: T("2026-08-20T02:00:00Z"), daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(false);
   });
   it("the cap is the registry's topup count — spent means spent (TOPUP_MAX rows, whatever TOPUP_MAX is)", () => {
     /* RE-PINNED 2026-09-09 (INSTRUCTION 48): was a literal two rows against a literal 2. */
     const reg: BlockRegistry = { ...allFired };
     for (let i = 1; i <= TOPUP_MAX; i++) reg[`topup-${i}`] = { firedAt: 3 + i, at: 3 + i };
-    const d = decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX });
+    const d = decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX });
     expect(d.fire).toBe(false);
     expect(d.reason).toMatch(/cap/);
     expect(d.used).toBe(TOPUP_MAX);
     /* one row short of the cap still fires (no coreShape on this entry → slot-fit skipped; rows carry no `tickets` → no cooldown) */
     const one: BlockRegistry = { ...allFired };
     for (let i = 1; i < TOPUP_MAX; i++) one[`topup-${i}`] = { firedAt: 3 + i, at: 3 + i };
-    expect(decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: one, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+    expect(decideTopUp({ entry: { paper: true, allocSum: 120 }, blocks: BLOCKS, registry: one, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(true);
   });
 });
 
@@ -148,18 +148,18 @@ describe("INSTRUCTION 49 — SAME-SLOT refusal (free, from the registry row's ow
     "topup-1": { firedAt: now - 5 * 60_000, at: now - 5 * 60_000, tickets: 1, slot: "12:00" } as BlockRegistry[string],
   };
   it("slot 12:00 with a topup-1 row already stamped 12:00 → refused, /already ran today/", () => {
-    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "12:00" });
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "12:00" });
     expect(d.fire).toBe(false);
     expect(d.reason).toMatch(/already ran today/);
     expect(d.reason).toBe("refill slot 12:00 PT already ran today — the next automatic refill is the next slot; Josh's own Refresh still runs any time");
   });
   it("slot 15:00 against the same row → not refused for that reason (fires)", () => {
-    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "15:00" });
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "15:00" });
     expect(d.reason).not.toMatch(/already ran today/);
     expect(d.fire).toBe(true);
   });
   it("slot manual against the same row → never the same-slot refusal (Josh's click is honoured)", () => {
-    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" });
     expect(d.reason).not.toMatch(/already ran today/);
     expect(d.fire).toBe(true);
   });
@@ -182,28 +182,28 @@ describe("INSTRUCTION 49 fix round — MANUAL HEADROOM (free): a click never spe
   const morning = T("2026-08-19T16:00:00Z"); // 09:00 PT — four slots still ahead (09:30/12:00/15:00/16:45)
   const late = T("2026-08-19T23:11:00Z"); // 16:11 PT — one slot ahead (16:45)
   it("09:00 PT, one attempt used: 1 + 4 < 6 → the click fires", () => {
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(1), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(1), starts, now: morning, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
   });
   it("09:00 PT, two used: 2 + 4 >= 6 → refused with the exact headroom string, free", () => {
-    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2), starts, now: morning, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" });
     expect(d.fire).toBe(false);
     expect(d.reason).toBe("manual refill would spend a slot's attempt — 4 attempts left, 4 automatic slots still ahead today");
     expect(d.used).toBe(2);
   });
   it("a slot ahead that a row already stamps needs no reserve (a replayed day): rows 08:00 + 09:30 at 09:00 PT → 2 + 3 < 6 fires", () => {
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2, ["08:00", "09:30"]), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(2, ["08:00", "09:30"]), starts, now: morning, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
   });
   it("16:11 PT: five used + the 16:45 slot ahead → refused; four used → fires; a NAMED slot is never held for headroom", () => {
-    const held = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    const held = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" });
     expect(held.fire).toBe(false);
     expect(held.reason).toBe("manual refill would spend a slot's attempt — 1 attempt left, 1 automatic slot still ahead today");
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(4), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.daily, max: TOPUP_MAX, slot: "16:45" }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(4), starts, now: late, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: late, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "16:45" }).fire).toBe(true);
     // no slot at all (an off-slot ticker poke printing the day's reason) is never held either
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(5), starts, now: morning, daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(true);
   });
   it("the cap still answers first: six used → /cap/, not the headroom string", () => {
-    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(6), starts, now: morning, daily: PAPER.daily, max: TOPUP_MAX, slot: "manual" });
+    const d = decideTopUp({ entry, blocks: BLOCKS, registry: withTopups(6), starts, now: morning, daily: PAPER.dailyBefore, max: TOPUP_MAX, slot: "manual" });
     expect(d.reason).toBe("top-up cap spent (6/6)");
   });
 });
@@ -213,7 +213,7 @@ describe("INSTRUCTION 48 — the EMPTY-SWEEP COOLDOWN (free, from the registry's
   const allFired: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 }, C: { firedAt: 3, at: 3 } };
   const starts = BLOCKS.flatMap((b) => b.starts);
   const entry = { paper: true, allocSum: 49 };
-  const run = (reg: BlockRegistry) => decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
+  const run = (reg: BlockRegistry) => decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
 
   it("a sweep that priced a board 30 min ago and seated nothing holds the next one off", () => {
     const d = run({ ...allFired, "topup-1": { firedAt: now - 30 * 60_000, tickets: 0, at: now - 30 * 60_000 } });
@@ -248,7 +248,7 @@ describe("INSTRUCTION 48 — the EMPTY-SWEEP COOLDOWN (free, from the registry's
   it("rows without a numeric `tickets` (the legacy fixtures) never arm it, and omitting emptyRetryMs is the pre-09-09 behaviour", () => {
     expect(run({ ...allFired, "topup-1": { firedAt: now - 5 * 60_000, at: now - 5 * 60_000 } }).fire).toBe(true);
     const reg: BlockRegistry = { ...allFired, "topup-1": { firedAt: now - 5 * 60_000, tickets: 0, at: now - 5 * 60_000 } };
-    expect(decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.daily, max: TOPUP_MAX }).fire).toBe(true);
+    expect(decideTopUp({ entry, blocks: BLOCKS, registry: reg, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX }).fire).toBe(true);
   });
 });
 
@@ -260,7 +260,7 @@ describe("INSTRUCTION 48 — SLOT-FIT (free): a sweep must be able to OWN an ope
   const A = { id: "A", slots: CORE_SHAPES[0].slots };
   expect(CORE_SHAPES[0].id).toBe("A");
   const seat = (stake: number, shapeSlot: number) => ({ id: `t${shapeSlot}`, stake, shapeSlot });
-  const run = (entry: Record<string, unknown>) => decideTopUp({ entry, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
+  const run = (entry: Record<string, unknown>) => decideTopUp({ entry, blocks: BLOCKS, registry: allFired, starts, now, daily: PAPER.dailyBefore, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS });
 
   it("$60 in slot 0, allocSum 60 → owed 90, the other $60 slot fits → fires", () => {
     const d = run({ paper: true, allocSum: 60, slotUnderSum: 0, coreShape: A, core: [seat(60, 0)] });
@@ -325,7 +325,7 @@ describe("INSTRUCTION 48 — SLOT-FIT (free): a sweep must be able to OWN an ope
   });
   it("the refusal ORDER still holds: no lock → fully deployed → pending block → every game started → cap → slot-fit → cooldown", () => {
     const tight = { paper: true, allocSum: 100, slotUnderSum: 45, coreShape: A, core: [seat(50, 0), seat(40, 1), seat(10, 2)] }; // slot-fit would refuse
-    const base = { blocks: BLOCKS, starts, daily: PAPER.daily, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS };
+    const base = { blocks: BLOCKS, starts, daily: PAPER.dailyBefore, max: TOPUP_MAX, emptyRetryMs: TOPUP_EMPTY_RETRY_MS };
     expect(decideTopUp({ ...base, entry: null, registry: allFired, now }).reason).toMatch(/no paper lock/);
     expect(decideTopUp({ ...base, entry: { ...tight, allocSum: 150 }, registry: allFired, now }).reason).toBe("day fully deployed");
     const pendingC: BlockRegistry = { A: { firedAt: 1, at: 1 }, B: { firedAt: 2, at: 2 } };

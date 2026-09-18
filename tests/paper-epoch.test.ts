@@ -48,33 +48,36 @@ describe("the paper constants are Josh's numbers, verbatim", () => {
        OBSERVED RED against the three-key PAPER before this update. Set to BANK_BASE $2,500
        first; Josh the same day, verbatim: "Bump the bankroll to $10,000" — OBSERVED RED
        against 2500. The paper bankroll is deliberately NOT tied to BANK_BASE any more. */
-    expect(PAPER).toEqual({ since: "2026-08-15", daily: 150, fun: 25, bankroll: 10000 });
+    /* INSTRUCTION 72 (2026-09-17): $350/day from 2026-09-18; the $150 stays on the record as dailyBefore */
+    expect(PAPER).toEqual({ since: "2026-08-15", daily: 350, dailyBefore: 150, dailySince: "2026-09-18", fun: 25, bankroll: 10000 });
     expect(PAPER.bankroll).toBeGreaterThan(BANK_BASE);
   });
-  it("3-5 tickets for the $150 per day — DERIVED from Josh's shape menu since 2026-09-08 (was the pinned 3-7 of 2026-08-22)", () => {
+  it("3-9 tickets per day — DERIVED from Josh's shape menu since 2026-09-08 (was the pinned 3-7 of 2026-08-22)", () => {
     /* PIN UPDATED 2026-09-08 (INSTRUCTION 46, "Parlay Lab Baseball 1"): the ticket count
        is no longer a rule of its own — the day runs one of the six CORE_SHAPES and the
        count IS the slot count. min/max are read off the menu (SHAPE_TICKETS); the pin
        below is the menu's fewest (E: 3 slots) and most (A/B/C/D: 5 slots) so a menu edit
        moving the count is visible here. OBSERVED RED against the 2026-08-22 {3,7} pin. */
-    expect(PAPER_TICKETS).toEqual({ min: 3, max: 5 });
+    // INSTRUCTION 72 (2026-09-17): the nine-slot $350 variety shape "V" joins the menu → 3..9
+    expect(PAPER_TICKETS).toEqual({ min: 3, max: 9 });
     expect(PAPER_TICKETS).toEqual({ min: SHAPE_TICKETS.min, max: SHAPE_TICKETS.max });
-    expect(SHAPE_TOTAL, "the shape total and the paper daily must be the same $150").toBe(PAPER.daily);
+    expect(SHAPE_TOTAL, "the historic shape total is the $150 the record before 2026-09-18 ran under").toBe(PAPER.dailyBefore);
   });
   it("the day-share count window pro-rates the derived 3..5 (values re-pinned 2026-09-08; lock-card now fills by slot, the window stays for its other readers)", () => {
     // single block, empty day so far
-    expect(ticketWindow(150, 0)).toEqual({ maxNew: 5, minNew: 3 });
-    // Sunday-shaped budgets $110/$25/$15 pro-rate to 4/1/0 under the 5-ceiling
+    expect(ticketWindow(350, 0)).toEqual({ maxNew: 9, minNew: 3 }); // the variety shape has nine slots (INSTRUCTION 72)
+    // RE-PINNED 2026-09-17 (INSTRUCTION 72): the share is of the $350 day and the ceiling is 9 —
+    // $110/$25/$15 pro-rate to 3/1/1; a day at the 9 ceiling admits nothing more
     const a = ticketWindow(110, 0);
-    expect(a).toEqual({ maxNew: 4, minNew: 3 });
+    expect(a).toEqual({ maxNew: 3, minNew: 1 });
     const b = ticketWindow(25, 4); // block A locked 4 tickets
     expect(b.maxNew).toBe(1);
     expect(b.minNew).toBe(1);
-    const c = ticketWindow(15, 6); // over-full day: nothing more
+    const c = ticketWindow(15, 9); // over-full day: nothing more
     expect(c.maxNew).toBe(0);
     expect(c.minNew).toBe(0);
     // the ceiling is HARD: a full day admits nothing more
-    expect(ticketWindow(50, 5)).toEqual({ maxNew: 0, minNew: 0 });
+    expect(ticketWindow(50, 9)).toEqual({ maxNew: 0, minNew: 0 });
     expect(ticketWindow(50, 12)).toEqual({ maxNew: 0, minNew: 0 }); // over-full never goes negative
   });
   it("the lift opens every HRR line and pitcher_outs", () => {
@@ -139,7 +142,7 @@ describe("wired — source scans, comment-stripped", () => {
 
   it("lock-card deploys PAPER.daily with a caesars_ev top-up, forced-flagged, and stakes PAPER.fun via shFunPick", () => {
     const src = read("src/lib/server/lock-card.ts");
-    expect(src).toMatch(/PAPER\.daily/);
+    expect(src).toMatch(/paperDaily\(date\)/); // INSTRUCTION 72: the day's own allotment, by date
     /* INSTRUCTION 18 (2026-09-03): the forced top-up now selects by TRUE PROBABILITY
        (CORE_RULES.forcedSelMode = "probability") — the $915 caesars_ev forced pass ran
        −27% over the 19 paper days. Pin updated, not deleted. */
@@ -189,7 +192,7 @@ describe("wired — source scans, comment-stripped", () => {
   });
   it("the generate route prices every fire off PAPER.daily via the deficit-carrying budget (2026-08-19), not a re-derived bankroll cap", () => {
     const src = read("app/api/generate/route.ts");
-    expect(src).toMatch(/effectiveBlockBudget\(\{ daily: PAPER\.daily/);
+    expect(src).toMatch(/effectiveBlockBudget\(\{ daily: paperDaily\(date\)/); // INSTRUCTION 72: date-aware
     // the static splitBudget share is gone from the route — an under-deploying fire's
     // money must flow forward, never strand (the 08-19 $49-of-$150 day)
     expect(src).not.toMatch(/splitBudget\(PAPER\.daily/);

@@ -14,7 +14,7 @@ import { ptToday } from "@/lib/server/pt-date";
 import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 import { slateScope, slateStarts } from "@/lib/server/slate";
 import { buildLockEntry, getLockEntry, readShapeCalibration, writeLock } from "@/lib/server/lock-card";
-import { PAPER, TOPUP_MAX, applySuspensionLift } from "@/lib/paper-mode";
+import { PAPER, TOPUP_MAX, applySuspensionLift, paperDaily } from "@/lib/paper-mode";
 import { applyEnvClosedForm, applyParkDaily, applyParlayVariety, bindParkDaily } from "@/lib/env-adjust";
 import { BLOCKS_KEY, dayConsumed, effectiveBlockBudget, partitionBlocks, type BlockRegistry } from "@/lib/server/blocks";
 import { buildReadingSafe, writeReading, CHECKLIST } from "@/lib/server/self-reading";
@@ -572,7 +572,7 @@ export async function GET(req: NextRequest) {
              the fire's budget is everything the day still owes minus the shares reserved
              for blocks that can still fire on their own — an earlier fire's shortfall
              flows here instead of stranding (the 08-19 $49-of-$150 day). */
-          blockBudget = effectiveBlockBudget({ daily: PAPER.daily, blocks: bs, currentKey: blockKey, registry: reg0, now, allocSoFar }).budget;
+          blockBudget = effectiveBlockBudget({ daily: paperDaily(date), blocks: bs, currentKey: blockKey, registry: reg0, now, allocSoFar }).budget;
         } else {
           console.warn(`[generate] block ${blockKey} not found in today's partition — locking whole-slate instead`);
         }
@@ -580,7 +580,7 @@ export async function GET(req: NextRequest) {
       if (!blockGkeys && carry) {
         /* top-up, plain re-fire, or partition-mismatch fallback on a locked day: the
            day's remainder, still reserving any block that can fire for itself */
-        blockBudget = effectiveBlockBudget({ daily: PAPER.daily, blocks: bs, currentKey: "", registry: reg0, now, allocSoFar }).budget;
+        blockBudget = effectiveBlockBudget({ daily: paperDaily(date), blocks: bs, currentKey: "", registry: reg0, now, allocSoFar }).budget;
       }
       /* INSTRUCTION 46 self-calibration (wired fix round 2026-09-08 — readShapeCalibration
          existed but nothing called it): the realized 2-leg vs 3+-leg record the shape picker

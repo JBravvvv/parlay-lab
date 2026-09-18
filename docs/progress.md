@@ -1,3 +1,14 @@
+# Progress — 2026-09-17 (MLB variety card + $350/day, INSTRUCTION 72)
+
+- **Why**: since 2026-09-13 the MLB card was shape P (3×$50 two-leg, probability fill, ceiling 2.6) → hits parlays every day; rule 5 dropped every H+R+RBI-over leg; ML/RL only existed as 2-leg SAFER tickets; one single per pool.
+- **$350/day from 2026-09-18**: `PAPER.daily` 350, `dailyBefore` 150, `paperDaily(date)` read by the lock card, refill, `/api/generate`, the ledger merge kernel (`deskPaperOf`, MLB by date) and the banner. 08-15..09-17 remain $150 records.
+- **Shape V** (`VARIETY_SHAPE`, nine slots): $40 H+R+RBI 2-leg (only slot that admits an H+R+RBI-over ticket), $40 ML/RL 2-leg, 2×$50 2-leg, 2×$40 straight, $40 3-leg, $30 4–5 leg, $20 5–6 leg. Typed slots fill first; untyped slots prefer an unseated market type.
+- **Straight bets**: `buildStraightPool` composes a 1-leg ticket from every priced pregame board row (ML/RL/Hits/TB/H+R+RBI/K's/Outs) so the allocator can seat them.
+- `paperPolicy` `variety-action-v1`; pre-variety days re-fire unchanged (P / $150). No engine change.
+- Tests: `tests/variety-core.test.ts` (new); `core-shapes`, `paper-epoch`, `paper-deficit`, `ledger-merge` re-pinned to `PAPER.dailyBefore` for historic days.
+
+Validation: TypeScript passes; full serial vitest gate recorded in `tools/handoff-state.env` (GATE_TESTS).
+
 # Progress — 2026-09-17 (Ballpark Factor, sort fix, marks on every pick, parlay variety)
 
 INSTRUCTIONS 68–71, shipped together.

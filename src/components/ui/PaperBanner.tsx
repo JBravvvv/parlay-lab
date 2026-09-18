@@ -10,8 +10,8 @@ export function PaperBanner() {
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-(--radius-panel) border border-gold/40 bg-gold/10 px-4 py-2.5 text-[12px] text-gold">
       <span className="font-bold uppercase tracking-[0.12em]">Paper mode</span>
       <span className="text-text/80">
-        hypothetical ${PAPER.daily}/day on the card + ${PAPER.fun}/day fun since {PAPER.since} — locked and graded daily,
-        nothing is placed with real money
+        hypothetical ${PAPER.daily}/day on the card (${PAPER.dailyBefore}/day before {PAPER.dailySince}) + ${PAPER.fun}/day fun since{" "}
+        {PAPER.since} — locked and graded daily, nothing is placed with real money
       </span>
     </div>
   );

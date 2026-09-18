@@ -1,4 +1,4 @@
-import { PAPER } from "@/lib/paper-mode";
+import { PAPER, paperDaily } from "@/lib/paper-mode";
 import { CFB_PAPER } from "@/lib/cfb/rules";
 import { NFL_PAPER } from "@/lib/nfl/rules";
 
@@ -7,7 +7,7 @@ import { NFL_PAPER } from "@/lib/nfl/rules";
  * "is either side CFB?" and pick between two constants; with a third desk the question is "which
  * desk is this entry?", answered off the entry's own `sport` (absent on MLB entries, "cfb" or
  * "nfl" on the football ones). The fallback for an unknown or missing sport is the MLB PAPER set,
- * exactly as before. Today's numbers: MLB 150 / 25, CFB 250 / 25, NFL 350 / 25.
+ * exactly as before. Today's numbers: MLB 350 / 25 (INSTRUCTION 72, $150 before 2026-09-18), CFB 250 / 25, NFL 350 / 25.
  */
 const DESK_PAPER: Record<string, { daily: number; fun: number }> = { mlb: PAPER, cfb: CFB_PAPER, nfl: NFL_PAPER };
 
@@ -19,7 +19,10 @@ function sportOf(e: SyncEntry): string | null {
 /** the desk's own paper set for a pair of copies of one date — the first readable `sport` decides */
 function deskPaperOf(base: SyncEntry, other: SyncEntry): { daily: number; fun: number } {
   const s = sportOf(base) ?? sportOf(other);
-  return DESK_PAPER[s ?? "mlb"] ?? PAPER;
+  if (s && s !== "mlb") return DESK_PAPER[s] ?? PAPER;
+  /* INSTRUCTION 72 (2026-09-17): the MLB allotment is DATE-AWARE — $350 from 2026-09-18, $150
+     before — so a day locked under the old number is bounded by its own number, never raised */
+  return { daily: paperDaily(base.date ?? other.date), fun: PAPER.fun };
 }
 
 /**

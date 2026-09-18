@@ -1,18 +1,21 @@
 import { mergeLedgers, validateLedger, type SyncEntry, type SyncTicket } from "@/lib/ledger-merge";
 import { redis } from "@/lib/server/store";
-import { CORE_RULES, PAPER, PAPER_ACTION_SINCE, slotMaxDec } from "@/lib/paper-mode";
+import { CORE_RULES, PAPER, PAPER_ACTION_SINCE, VARIETY_SINCE, paperDaily, slotMaxDec } from "@/lib/paper-mode";
 import {
   CORE_SHAPES_SINCE,
+  VARIETY_SHAPE,
   bucketRecordFromLedger,
   shapeById,
   shapeForDay,
   shapeLine,
+  shapeTotal,
+  slotKindAdmits,
   slotName,
   type CoreShape,
   type ShapeCalibration,
 } from "@/lib/core-shapes";
 import { FUN_LADDER, FUN_SHAPE, buildFunHrTickets, buildFunLadderTicket, type FunLegSrc } from "@/lib/fun-hr";
-import { shrinkTicket } from "@/lib/shrink";
+import { evAt, shrinkTicket } from "@/lib/shrink";
 import { assertAppendOnly, type AoDay } from "@/lib/append-only";
 import { UNDER_BIAS, pruneOutsUnder, underStats, worstUnderTicket } from "@/lib/under-bias";
 
@@ -109,13 +112,97 @@ export type CoreShapeRecord = {
   id: string;
   label: string;
   slots: CoreShape["slots"];
-  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability";
+  pick: "rotation" | "tilt:two" | "tilt:long" | "paper-probability" | "variety";
   reason: string;
   menu: string[];
   dayIndex: number;
   since: string;
   calibration?: ShapeCalibration | null;
 };
+
+/**
+ * STRAIGHT BETS — INSTRUCTION 72 (2026-09-17, Josh: "There needs to be more H+R+RBI, ML/RL,
+ * straight bets etc"). The engine's own ticket pool carries a single only by accident (one
+ * "HR single" and one "Hits single" on the 2026-09-17 board, out of 161 tickets), so the
+ * variety day's two straight slots could never fill from it. This composes a 1-leg ticket
+ * from every pregame board row that has BOTH a DraftKings (cz) and a DK/FD basis (bs) price
+ * and a model probability — the same fields the engine's own singles carry, so the
+ * allocator, the shrink step, the grader and the ledger read them exactly like an engine
+ * ticket. HR rows are left out (the core never rides an HR prop — shCoreEligible's coreNoHR);
+ * live rows are left out (a lockable card is pregame by definition). Pure.
+ */
+export const STRAIGHT_MARKETS: Readonly<Record<string, string>> = {
+  ml: "ML",
+  rl: "RL",
+  batter_hits: "Hits",
+  batter_total_bases: "TB",
+  batter_hits_runs_rbis: "H+R+RBI",
+  pitcher_strikeouts: "K's",
+  pitcher_outs: "Outs",
+};
+const amDec = (am: number | null): number | null => (am == null || !Number.isFinite(am) || am === 0 ? null : am > 0 ? 1 + am / 100 : 1 + 100 / Math.abs(am));
+const r2 = (x: number) => Math.round(x * 100) / 100;
+export type StraightItem = { pl: Record<string, unknown> & { legs: Record<string, unknown>[] }; src: "s"; idx: number };
+export function buildStraightPool(data: Record<string, unknown>): StraightItem[] {
+  const cats = (data.categories as Record<string, unknown[]> | undefined) ?? {};
+  const out: StraightItem[] = [];
+  for (const [cat, typeLabel] of Object.entries(STRAIGHT_MARKETS)) {
+    for (const r of (cats[cat] ?? []) as Array<Record<string, unknown>>) {
+      if (!r || r.live || r.susp) continue;
+      const cz = r.cz == null ? null : Number(r.cz);
+      const bs = r.bs == null ? null : Number(r.bs);
+      const czDec = amDec(cz);
+      const bsDec = amDec(bs);
+      const prob = r.prob == null ? null : Number(r.prob);
+      if (czDec == null || bsDec == null || prob == null || !Number.isFinite(prob)) continue;
+      if (!r.lkey || !r.gkey) continue;
+      const label = String(r.label ?? "");
+      const prop = String(r.sub ?? "");
+      const czOdds = r.czOdds == null ? null : String(r.czOdds);
+      const leg = {
+        label,
+        prop,
+        odds: czOdds ?? "",
+        est: String(prob),
+        txt: `${label} · ${prop} (${czOdds ?? ""})`,
+        game: String(r.game ?? "").replace(/\s*·.*$/, ""),
+        prob,
+        lkey: String(r.lkey),
+        gkey: String(r.gkey),
+        cz,
+        bs,
+        bsBook: r.bsBook ?? null,
+        imp: r.implied == null ? null : Number(r.implied),
+        booksInd: 0,
+        live: false,
+        lu: r.lu ?? null,
+      };
+      const czEv = evAt(prob, czDec);
+      const bsEv = evAt(prob, bsDec);
+      const pl = {
+        name: `${typeLabel} single`,
+        type: cat,
+        typeLabel,
+        tier: "SAFER",
+        straight: true,
+        legs: [leg],
+        odds: czOdds ?? "",
+        prob,
+        stake: 0,
+        czOdds,
+        czDec: r2(czDec),
+        czEv,
+        bsOdds: r.bsOdds == null ? null : String(r.bsOdds),
+        bsDec: r2(bsDec),
+        bsEv,
+        ev: bsEv,
+        note: `straight bet — ${typeLabel} at ${czOdds ?? "?"} (INSTRUCTION 72)`,
+      };
+      out.push({ pl, src: "s", idx: out.length });
+    }
+  }
+  return out;
+}
 
 export function needsLockAction(s: { boardExists: boolean; lockExists: boolean; deadSlate: boolean }): "backfill" | "reason-record" | null {
   if (s.lockExists) return null;
@@ -168,13 +255,16 @@ export function buildLockEntry(args: {
   const { eng, data, date, now, trigger, blockKey, blockGkeys, carry } = args;
   const cfg = eng.get<Record<string, unknown>>("SH_CFG") ?? {};
   const paperAction = date >= PAPER_ACTION_SINCE;
+  /* INSTRUCTION 72 (2026-09-17): the $350 variety day, market-typed slots, from 2026-09-18 */
+  const variety = date >= VARIETY_SINCE;
+  const POLICY = variety ? "variety-action-v1" : "probability-action-v1";
   const sh = eng.get<{ bankroll?: number }>("SH") ?? {};
   const bankroll = Number(sh.bankroll) > 0 ? Number(sh.bankroll) : PAPER.bankroll;
   /* PAPER EPOCH (2026-08-15, Josh's word): the daily is a FIXED hypothetical $150 — it
      was round(dailyBankrollCap × bankroll) = $75 through epoch 1. On a block fire,
      dailyOverride carries the block's pro-rata share (splitBudget of PAPER.daily) and
      `daily` on the ENTRY stays the day ceiling. */
-  const dayCeiling = PAPER.daily;
+  const dayCeiling = paperDaily(date); // $350 from 2026-09-18 (INSTRUCTION 72), $150 before
   const daily = args.dailyOverride ?? dayCeiling;
 
   /* IMPOSSIBLE BRANCH (2026-08-08, pre-committed): two cards containing the same game.
@@ -200,7 +290,13 @@ export function buildLockEntry(args: {
      and blocks remain what they have really been all along — fire-timing and budget
      bookkeeping, not card scope. blockGkeys still guards the partition (TWO CARDS ONE
      GAME above) and stamps the entry's blocks map. */
-  const rawPool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data);
+  const enginePool = eng.get<(b: unknown) => unknown[]>("shCardPool")(data) as { pl: { legs: unknown[] } }[];
+  const tid = eng.get<(pl: unknown) => string>("shTicketId");
+  /* INSTRUCTION 72: the straight bets join the pool on a variety day — every priced pregame
+     row as a 1-leg ticket — minus any single the engine already built for the same leg */
+  const engineIds = new Set(enginePool.map((w) => tid(w.pl)));
+  const straights = variety ? buildStraightPool(data).filter((w) => !engineIds.has(tid(w.pl))) : [];
+  const rawPool: unknown[] = [...enginePool, ...straights];
   /* INSTRUCTION 18 (2026-09-03) — the pool is SHRUNK ONCE, here, before the under-bias
      prune, so the primary world, the alt world, the forced pass and the ticket record
      all read the same market-blended numbers (shrink.ts carries the diagnosis: model
@@ -210,7 +306,6 @@ export function buildLockEntry(args: {
     pl: shrinkTicket(w.pl as never, CORE_RULES.shrinkW) as unknown as Record<string, unknown> & { legs: Record<string, unknown>[] },
   }));
   const shAllocate = eng.get<(p: unknown, a: number, c: unknown, f: boolean) => AllocResult>("shAllocate");
-  const tid = eng.get<(pl: unknown) => string>("shTicketId");
   type PoolItem = { pl: Record<string, unknown> & { legs: { lkey?: string; label?: string; prop?: string; cz?: unknown; gkey?: string }[] } };
   const legKey = (l: { label?: string | null; prop?: string | null }) => `${l.label}|${l.prop}`;
 
@@ -222,9 +317,11 @@ export function buildLockEntry(args: {
      picker: rotation by date, tilted by the realized record when it is thick enough. */
   const storedShape = (carry as { coreShape?: CoreShapeRecord } | null | undefined)?.coreShape;
   const storedMenuShape = storedShape ? shapeById(storedShape.id) : null;
-  const shapePick = storedMenuShape ? null : paperAction
-    ? { ...shapeForDay(date, args.shapeCal), shape: shapeById("P")!, pick: "paper-probability" as const, reason: "Paper action experiment: three $50 two-leg slots, filled by estimated hit probability", menu: ["P"] }
-    : shapeForDay(date, args.shapeCal);
+  const shapePick = storedMenuShape ? null : variety
+    ? { ...shapeForDay(date, args.shapeCal), shape: VARIETY_SHAPE, pick: "variety" as const, reason: "INSTRUCTION 72 variety day: $350 across market-typed slots (two 2-leg, an H+R+RBI 2-leg, an ML/RL 2-leg, two straight bets, a 3-leg, a 4-5 leg, a 5-6 leg), filled by estimated hit probability with a distinct-market preference", menu: ["V"] }
+    : paperAction
+      ? { ...shapeForDay(date, args.shapeCal), shape: shapeById("P")!, pick: "paper-probability" as const, reason: "Paper action experiment: three $50 two-leg slots, filled by estimated hit probability", menu: ["P"] }
+      : shapeForDay(date, args.shapeCal);
   const shape: CoreShape = storedMenuShape ?? shapePick!.shape;
   const shapeRecord: CoreShapeRecord = storedMenuShape
     ? { ...(storedShape as CoreShapeRecord), slots: storedMenuShape.slots }
@@ -266,13 +363,24 @@ export function buildLockEntry(args: {
     return (cz != null && cz > cap) || (bs != null && bs > cap);
   };
   const inRange = (w: PoolItem, legs: { min: number; max: number }) => w.pl.legs.length >= legs.min && w.pl.legs.length <= legs.max;
-  const fitsSomeSlot = (w: PoolItem) => shape.slots.some((s) => inRange(w, s.legs) && !overDec(w.pl, slotMaxDec(s.legs, "gated")));
+  const fitsSlot = (w: PoolItem, s: CoreShape["slots"][number]) => inRange(w, s.legs) && !overDec(w.pl, slotMaxDec(s.legs, "gated")) && slotKindAdmits(s.kind, w.pl.legs);
+  const fitsSomeSlot = (w: PoolItem) => shape.slots.some((s) => fitsSlot(w, s));
+  /* INSTRUCTION 72: the H+R+RBI slot is Josh's ("There needs to be more H+R+RBI"), so on a
+     variety day a ticket carrying an H+R+RBI OVER leg is admitted to THAT slot only — rule 5
+     (INSTRUCTION 18: overs hit 54% vs 61% implied) keeps it out of every other slot. Such a
+     ticket is remembered here and refused by the untyped slots below. */
+  const hrrOnly = new Set<string>();
   let hrrOverDropped = 0;
   let shapeDropped = 0;
   const rulePool = (pool as PoolItem[]).filter((w) => {
     if (CORE_RULES.noHrrOver && w.pl.legs.some(isHrrOver)) {
-      hrrOverDropped++;
-      return false;
+      const hrrSeat = variety && shape.slots.some((s) => s.kind === "hrr" && fitsSlot(w, s));
+      if (!hrrSeat) {
+        hrrOverDropped++;
+        return false;
+      }
+      hrrOnly.add(tid(w.pl));
+      return true;
     }
     if (!fitsSomeSlot(w)) {
       shapeDropped++;
@@ -432,7 +540,23 @@ export function buildLockEntry(args: {
         const free = (x: PoolItem) => !ids.has(tid(x.pl)) && !x.pl.legs.some((l) => legs.has(legKey(l)));
         const gCeil = slotMaxDec(slot.legs, "gated");
         const fCeil = experiment ? gCeil : slotMaxDec(slot.legs, "forced");
-        const ranged = p.filter((x) => inRange(x, slot.legs) && free(x));
+        /* INSTRUCTION 72: a typed slot admits only its market (H+R+RBI / ML-RL); an untyped
+           slot never takes a ticket that was admitted for the H+R+RBI slot alone */
+        const kindOk = (x: PoolItem) => slotKindAdmits(slot.kind, x.pl.legs) && (slot.kind === "hrr" || !hrrOnly.has(tid(x.pl)));
+        const rangedAll = p.filter((x) => inRange(x, slot.legs) && free(x) && kindOk(x));
+        /* INSTRUCTION 72 DISTINCT-MARKET PREFERENCE on the untyped slots: a ticket whose engine
+           type (hits / TB / H+R+RBI / K's / MIX / ml / rl …) is already seated on the day is
+           taken only when no other type has a priced candidate — this is what stops the two
+           $50 slots and the two straights from all landing on hits. */
+        let ranged = rangedAll;
+        if (variety && !slot.kind) {
+          const seatedTypes = new Set<string>([
+            ...carriedTix.map((t) => String(t.type ?? "")),
+            ...seated.map((s) => String(s.pick.w.pl.type ?? "")),
+          ]);
+          const fresh = rangedAll.filter((x) => !seatedTypes.has(String(x.pl.type ?? "")));
+          if (fresh.some((x) => !overDec(x.pl, fCeil))) ranged = fresh;
+        }
         const gPool = ranged.filter((x) => !overDec(x.pl, gCeil));
         /* one seat, the slot's stake as the amount, cap = 100% of the slot (perParlayCap 1
            → capG = amount). The allocator's own leg cap is the slot's max; the slot's min
@@ -602,7 +726,7 @@ export function buildLockEntry(args: {
       /* INSTRUCTION 46: the slot this ticket seats — persisted so later fires fill around it */
       shapeSlot: s.slot,
       ...(s.forced ? { forced: true } : {}),
-      ...(experiment && s.forced ? { paperPolicy: "probability-action-v1" } : {}),
+      ...(experiment && s.forced ? { paperPolicy: POLICY } : {}),
       /* Josh's standing word, 2026-08-15: "I will not be taking ANY of the bets." Paper
          tickets are born placed:false/actualStake:0 — a decision on record, not the
          epoch-1 null-means-unanswered state. */
@@ -774,7 +898,7 @@ export function buildLockEntry(args: {
     trigger,
     source: "server-lock",
     selMode: paperAction ? "probability" : cfg.selMode ?? null,
-    ...(paperAction ? { paperPolicy: "probability-action-v1" } : {}),
+    ...(paperAction ? { paperPolicy: POLICY } : {}),
     /* the DAY ceiling, always — a fire's own budget lives in blocks[key].budget.
        (Was `blockKey ? dayCeiling : daily`; since 2026-08-19 top-up fires append with a
        reduced dailyOverride and no blockGkeys, so the ceiling is unconditional.) */
@@ -782,7 +906,7 @@ export function buildLockEntry(args: {
     bankroll,
     /* PAPER: hypothetical throughout; gated vs forced split is per-ticket (forced:true) */
     paper: true,
-    paperCfg: { daily: PAPER.daily, fun: PAPER.fun, since: PAPER.since },
+    paperCfg: { daily: dayCeiling, fun: PAPER.fun, since: PAPER.since },
     allocSum: Number(carry?.allocSum ?? 0) + deployed,
     gatedSum: Number((carry as { gatedSum?: number } | null | undefined)?.gatedSum ?? 0) + gatedDeployed,
     unallocated: primaryCard.unallocated,
@@ -842,6 +966,7 @@ export function buildLockEntry(args: {
         : {}),
   };
   if (paperAction) entry.note = `${String(entry.note ?? "").replace("then the EV gate", "then probability allocation")} Paper action: full-sized slots ranked by estimated hit probability; negative EV is allowed, forced picks are marked, and existing tickets are unchanged.`.trim();
+  if (variety) entry.note = `${String(entry.note ?? "")} Variety day (INSTRUCTION 72): $${shapeTotal(shape)} across market-typed slots — H+R+RBI, ML/RL, straight bets and a 5-6 leg build beside the 2-leg pair; untyped slots prefer a market not yet seated; ${straights.length} straight bets composed from the board's priced rows joined the pool.`.trim();
   const v = validateLedger([entry]);
   if (!v.ok) throw new Error(`lock entry failed the ledger's own validator: ${v.error}`);
   return entry;

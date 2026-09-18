@@ -40,7 +40,10 @@ describe("CORE_SHAPES — Josh's six examples, verbatim, each exactly $150", () 
   it("the menu is A..F in his order and every shape sums to SHAPE_TOTAL == PAPER.daily", () => {
     expect(CORE_SHAPES.map((s) => s.id)).toEqual(["A", "B", "C", "D", "E", "F"]);
     expect(SHAPE_TOTAL).toBe(150);
-    expect(SHAPE_TOTAL).toBe(PAPER.daily);
+    /* INSTRUCTION 72 (2026-09-17): the desk's daily is $350 from 2026-09-18; the six shapes are the
+       $150 record — SHAPE_TOTAL now mirrors PAPER.dailyBefore, the variety day has its own total */
+    expect(SHAPE_TOTAL).toBe(PAPER.dailyBefore);
+    expect(PAPER.daily).toBe(350);
     for (const sh of CORE_SHAPES) expect(sh.slots.reduce((a, s) => a + s.stake, 0), `${sh.id} does not sum to $150`).toBe(150);
     expect(CORE_SHAPES_SINCE).toBe("2026-09-08");
   });
@@ -56,8 +59,9 @@ describe("CORE_SHAPES — Josh's six examples, verbatim, each exactly $150", () 
     expect(shapeById("Z")).toBeNull();
   });
   it("SHAPE_TICKETS is derived from the menu (3..5) and PAPER_TICKETS reads it", () => {
-    expect(SHAPE_TICKETS).toEqual({ min: 3, max: 5 });
-    expect(PAPER_TICKETS).toEqual({ min: 3, max: 5 });
+    /* 3..9 since INSTRUCTION 72: the nine-slot variety shape is on the menu the window reads */
+    expect(SHAPE_TICKETS).toEqual({ min: 3, max: 9 });
+    expect(PAPER_TICKETS).toEqual({ min: 3, max: 9 });
   });
   it("longMoney ranks the shapes by 3+-leg money: A 30, B 0, C 30, D 30, E 20, F 25", () => {
     expect(CORE_SHAPES.map((s) => longMoney(s))).toEqual([30, 0, 30, 30, 20, 25]);

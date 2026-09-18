@@ -322,7 +322,7 @@ describe("core union — the CFB top-up survives a stale graded push (INSTRUCTIO
    * is $150 — and no guard runs on a merge result, so nothing downstream would ever catch it.
    *
    * AFTER, the case pins the new bound: with neither side carrying `daily`, the union falls back
-   * to the DESK'S OWN allotment (CFB_PAPER.daily for a `sport:"cfb"` entry, PAPER.daily
+   * to the DESK'S OWN allotment (CFB_PAPER.daily for a `sport:"cfb"` entry, PAPER.dailyBefore
    * otherwise) instead of to no bound at all. That is a REWRITE, not a weakening: the old
    * assertions (6 tickets, $150) are re-asserted below in the case that still fits under the
    * fallback, and the new case adds a bound where there was none. Nothing that passed for a real
@@ -425,7 +425,7 @@ describe("core union — the MLB desk (block fires append the same way)", () => 
         registry: {},
         starts: [Date.UTC(2026, 8, 6, 23, 0)],
         now: Date.UTC(2026, 8, 6, 20, 0),
-        daily: PAPER.daily,
+        daily: PAPER.dailyBefore,
         max: 2,
       });
       expect(d.owed, "a day already carrying the whole $150 was priced as still owing money").toBe(0);
@@ -598,11 +598,11 @@ describe("core union — the MLB desk (block fires append the same way)", () => 
     }
   });
 
-  it("with no `daily` a raise is bounded by PAPER.daily — the MLB desk's own allotment (defect E)", () => {
+  it("with no `daily` a raise is bounded by PAPER.dailyBefore — the MLB desk's own allotment (defect E)", () => {
     const a = mlbDay({ daily: undefined, core: [...B1(), ...B2()], grading: { done: true, tickets: {}, legs: {} } }); // $150
     const b = mlbDay({ daily: undefined, core: [mlbTix("MIXED_a1", "l1", 140), mlbTix("MIXED_b2", "l2", 35), ...B2()] });
     for (const m of [mergeLedgers([a], [b]), mergeLedgers([b], [a])]) {
-      expect(stakeOf(m[0].core), "a `daily`-less merge raised the day past the MLB desk's own allotment").toBeLessThanOrEqual(PAPER.daily);
+      expect(stakeOf(m[0].core), "a `daily`-less merge raised the day past the MLB desk's own allotment").toBeLessThanOrEqual(PAPER.dailyBefore);
       expect(stakeOf(m[0].core)).toBe(150);
     }
   });
@@ -1331,7 +1331,7 @@ describe("the blocks union deep-copies the loser's records (INSTRUCTION 45, A2)"
  * `capBreach` stamping (K3) and `funDropped` reporting (K4) were pinned EXCLUSIVELY on `cfbDay`
  * fixtures. `mergeDay` applies both to MLB days as well, and on an MLB day the bounds come from a
  * DIFFERENT branch of `allotmentCap` / `funCap`: those helpers pick the desk with
- * `sport === "cfb"` and fall back to PAPER.daily / PAPER.fun for everything else. Only the CFB
+ * `sport === "cfb"` and fall back to PAPER.dailyBefore / PAPER.fun for everything else. Only the CFB
  * branch was exercised anywhere in this file — `mlbDay` appears solely in the core-union describe
  * above, which predates both behaviours.
  *
@@ -1343,7 +1343,7 @@ describe("the blocks union deep-copies the loser's records (INSTRUCTION 45, A2)"
  * the CFB side this round, when `planCfbTopUp` started minting `cfb-<date>-topup<n>-fun-1` — MLB
  * fun tickets begin being dropped with nothing pinning the report.
  *
- * ON WHAT THESE CASES CAN AND CANNOT PROVE: PAPER.daily and CFB_PAPER.daily are both 150 today,
+ * ON WHAT THESE CASES CAN AND CANNOT PROVE: PAPER.dailyBefore and CFB_PAPER.daily are both 150 today,
  * and PAPER.fun and CFB_PAPER.fun are both 25, so no assertion can distinguish the two constants
  * ARITHMETICALLY. These cases therefore pin which constant the bound FOLLOWS by naming it —
  * `allotmentCap`'s own docblock makes the same point ("this is about which constant the bound
@@ -1359,7 +1359,7 @@ describe("capBreach and funDropped are pinned on the MLB desk too (INSTRUCTION 4
   const bareMlbDay = (over: Partial<SyncEntry> = {}): SyncEntry =>
     ({ date: "2026-09-12", locked: true, core: [], funT: [], ...over }) as SyncEntry;
 
-  it("an over-cap MLB day is kept whole and stamped capBreach against PAPER.daily, both orders", () => {
+  it("an over-cap MLB day is kept whole and stamped capBreach against PAPER.dailyBefore, both orders", () => {
     const over = (n: number, extra: Partial<SyncEntry> = {}): SyncEntry =>
       bareMlbDay({
         core: Array.from({ length: n }, (_, i) => aTix(`MIXED_x${i + 1}`, `l${i + 1}`, 25)),
@@ -1373,7 +1373,7 @@ describe("capBreach and funDropped are pinned on the MLB desk too (INSTRUCTION 4
       const b = (m[0] as { capBreach?: { core?: { sum: number; cap: number } } }).capBreach;
       expect(b?.core, "an MLB day over its allotment came out of the merge with no error and no note").toEqual({
         sum: 175,
-        cap: PAPER.daily,
+        cap: PAPER.dailyBefore,
       });
     }
     // and an in-cap MLB day carries no marker, so the stamp is not just always-on
@@ -2121,7 +2121,7 @@ describe("noPlay and the allotments on the MLB desk (INSTRUCTION 45, C4)", () =>
     const funMoney = nDay({ funT: [nTix("HR_a", "h1", 25, "fun"), nTix("HR_b", "h2", 25, "fun")] });
     for (const m of [mergeLedgers([flagged()], [coreMoney]), mergeLedgers([coreMoney], [flagged()])]) {
       expect(m[0].noPlay, "a no-play pill over real MLB core money").toBeUndefined();
-      expect(stakeOf(m[0].core), "the seventh $25 ticket must not fit — PAPER.daily is the only bound on this day").toBe(PAPER.daily);
+      expect(stakeOf(m[0].core), "the seventh $25 ticket must not fit — PAPER.dailyBefore is the only bound on this day").toBe(PAPER.dailyBefore);
       expect((m[0] as { coreDropped?: string[] }).coreDropped, "the refused MLB core wager must be named").toEqual(["MIXED_7"]);
     }
     for (const m of [mergeLedgers([flagged()], [funMoney]), mergeLedgers([funMoney], [flagged()])]) {
@@ -2214,7 +2214,7 @@ describe("a stored copy's own `daily` cannot raise the merged CORE ceiling (INST
     }
   });
 
-  it("the MLB desk is bounded by PAPER.daily the same way", () => {
+  it("the MLB desk is bounded by PAPER.dailyBefore the same way", () => {
     const mLeg = (lkey: string) => ({ lkey, label: `${lkey} over`, prop: "batter_hits", cz: -130 });
     const mTix = (n: number) => ({ id: `MIXED_${n}`, stake: 25, name: `MIXED · l${n}`, type: "MIXED", confirmed: null, placed: false, actualStake: 0, legs: [mLeg(`l${n}`)] });
     const bare = (daily: number | undefined, ns: number[], over: Partial<SyncEntry> = {}): SyncEntry =>
@@ -2222,9 +2222,9 @@ describe("a stored copy's own `daily` cannot raise the merged CORE ceiling (INST
     const rich = () => bare(500, [1, 2, 3, 4, 5, 6, 7], GRADED);
     const honest = () => bare(undefined, [8]);
     for (const m of [mergeLedgers([rich()], [honest()]), mergeLedgers([honest()], [rich()])]) {
-      expect(stakeOf(m[0].core), "an inflated MLB `daily` bought an eighth $25 ticket past PAPER.daily").toBe(175);
+      expect(stakeOf(m[0].core), "an inflated MLB `daily` bought an eighth $25 ticket past PAPER.dailyBefore").toBe(175);
       expect((m[0] as { coreDropped?: string[] }).coreDropped).toEqual(["MIXED_8"]);
-      expect((m[0] as { capBreach?: { core?: { cap: number } } }).capBreach?.core?.cap).toBe(PAPER.daily);
+      expect((m[0] as { capBreach?: { core?: { cap: number } } }).capBreach?.core?.cap).toBe(PAPER.dailyBefore);
     }
   });
 });
@@ -2490,7 +2490,7 @@ describe("a refused stake is reconciled on the TICKET, and `allocSum` follows th
       registry: {},
       starts: [Date.UTC(2026, 8, 1, 23, 0)],
       now: Date.UTC(2026, 8, 1, 20, 0),
-      daily: PAPER.daily,
+      daily: PAPER.dailyBefore,
       max: 2,
     }).owed;
 
@@ -2582,11 +2582,11 @@ describe("the clone reconciliation on the MLB desk, and its order freedom (INSTR
     }
   });
 
-  it("(b) an MLB core wager PAPER.daily refuses is NAMED and carries its money, both orders", () => {
+  it("(b) an MLB core wager PAPER.dailyBefore refuses is NAMED and carries its money, both orders", () => {
     const phone = () => rDay([rTix("MIXED_z9", "l9", 25, { placed: true, actualStake: 25 })]);
     const server = () => rDay(Array.from({ length: 6 }, (_, i) => rTix(`MIXED_${i + 1}`, `l${i + 1}`, 25)));
     for (const m of [mergeLedgers([phone()], [server()]), mergeLedgers([server()], [phone()])]) {
-      expect(stakeOf(m[0].core), "PAPER.daily is the only bound on this day").toBe(PAPER.daily);
+      expect(stakeOf(m[0].core), "PAPER.dailyBefore is the only bound on this day").toBe(PAPER.dailyBefore);
       expect((m[0] as { coreDropped?: string[] }).coreDropped, "a placed MLB wager vanished with no trace").toEqual(["MIXED_z9"]);
       expect((m[0] as { coreDroppedPL?: Record<string, unknown> }).coreDroppedPL).toEqual({
         MIXED_z9: { result: "pending", payout: 0, stake: 25, placed: true, actualStake: 25 },
@@ -2603,7 +2603,7 @@ describe("the clone reconciliation on the MLB desk, and its order freedom (INSTR
     const forward = mergeLedgers([base()], [rDay(tix())]);
     const reversed = mergeLedgers([base()], [rDay(tix().reverse())]);
     const shuffled = mergeLedgers([base()], [rDay([tix()[3], tix()[0], tix()[5], tix()[1], tix()[4], tix()[2]])]);
-    expect(stakeOf(forward[0].core), "seven $25 ids against a $150 ceiling seat exactly six").toBe(PAPER.daily);
+    expect(stakeOf(forward[0].core), "seven $25 ids against a $150 ceiling seat exactly six").toBe(PAPER.dailyBefore);
     expect(JSON.stringify(reversed), "the loser's storage order changed which ticket the allotment refused").toBe(JSON.stringify(forward));
     expect(JSON.stringify(shuffled), "the loser's storage order changed which ticket the allotment refused").toBe(JSON.stringify(forward));
     expect((forward[0] as { coreDropped?: string[] }).coreDropped, "the refusal must fall on the last id in TICKET-ID order").toEqual(["MIXED_7"]);
@@ -2838,7 +2838,7 @@ describe("a rival card's receipted raise is refused, not seated (INSTRUCTION 45,
     }
   });
 
-  it("the MLB desk is bounded by PAPER.daily the same way", () => {
+  it("the MLB desk is bounded by PAPER.dailyBefore the same way", () => {
     const mLeg = (lkey: string) => ({ lkey, label: `${lkey} over`, prop: "batter_hits", cz: -130 });
     const mTix = (id: string, lkey: string, stake: number, over: Record<string, unknown> = {}) => ({
       id, stake, name: `MIXED · ${lkey}`, type: "MIXED", confirmed: null, placed: false, actualStake: 0, legs: [mLeg(lkey)], ...over,
@@ -2855,8 +2855,8 @@ describe("a rival card's receipted raise is refused, not seated (INSTRUCTION 45,
         mTix("MIXED_5", "l5", 25),
       ]);
     for (const m of [mergeLedgers([phone()], [server()]), mergeLedgers([server()], [phone()])]) {
-      expect((m[0] as { daily?: unknown }).daily, "a day carrying its own `daily` would not exercise the PAPER.daily fallback").toBeUndefined();
-      expect(stakeOf(m[0].core)).toBeLessThanOrEqual(PAPER.daily);
+      expect((m[0] as { daily?: unknown }).daily, "a day carrying its own `daily` would not exercise the PAPER.dailyBefore fallback").toBeUndefined();
+      expect(stakeOf(m[0].core)).toBeLessThanOrEqual(PAPER.dailyBefore);
       expect((m[0] as { capBreach?: unknown }).capBreach).toBeUndefined();
       expect((m[0] as { betConflict?: string[] }).betConflict).toEqual(["MIXED_1"]);
       expect(m[0].core.find((t) => t.id === "MIXED_2")?.stake).toBe(25);
@@ -3076,7 +3076,7 @@ describe("`allocSum` is derived from the seated core (INSTRUCTION 45, F3)", () =
     for (const m of [mergeLedgers([pDay(10)], [pDay(25)]), mergeLedgers([pDay(25)], [pDay(10)])]) {
       expect(m[0].core[0].stake, "the receipt rule still decides the STAKE — that half is unchanged").toBe(10);
       expect((m[0] as { allocSum?: number }).allocSum, "allocSum stood above the card it describes").toBe(10);
-      expect(stakeOf(m[0].core) + 140, "a $10 day was priced as owing anything but $140").toBe(PAPER.daily);
+      expect(stakeOf(m[0].core) + 140, "a $10 day was priced as owing anything but $140").toBe(PAPER.dailyBefore);
     }
   });
 });
@@ -3129,7 +3129,7 @@ describe("the merged day's `daily` is the cap the merge used (INSTRUCTION 45, F4
       mergeLedgers([bare(500, [1, 2, 3, 4, 5, 6, 7], GRADED)], [bare(undefined, [8])]),
       mergeLedgers([bare(undefined, [8])], [bare(500, [1, 2, 3, 4, 5, 6, 7], GRADED)]),
     ]) {
-      expect((m[0] as { daily?: number }).daily).toBe(PAPER.daily);
+      expect((m[0] as { daily?: number }).daily).toBe(PAPER.dailyBefore);
       expect((m[0] as { daily?: number }).daily).toBe((m[0] as { capBreach?: { core?: { cap: number } } }).capBreach?.core?.cap);
     }
   });
@@ -3757,7 +3757,7 @@ describe("a receipted raise is bounded by the allotment on the ORDINARY path too
     expect(JSON.stringify(mergeLedgers(ab, [copyB()])), "a second sync moved the stake again").toBe(JSON.stringify(ab));
   });
 
-  /* THE MLB RAIL, the same shape on content-addressed ids and PAPER.daily (INSTRUCTION 45, FINAL
+  /* THE MLB RAIL, the same shape on content-addressed ids and PAPER.dailyBefore (INSTRUCTION 45, FINAL
      K5 — the rival machinery's pins were all CFB-shaped). */
   it("the MLB desk is bounded the same way — both orders", () => {
     const MD = "2026-09-01";
@@ -3770,13 +3770,13 @@ describe("a receipted raise is bounded by the allotment on the ORDINARY path too
       ({ date: MD, locked: true, daily: 150, allocSum: stakeOf(core), core, funT: [], games: {}, grading: null }) as SyncEntry;
     const a = (): SyncEntry => mDay([mTix("p:abc", "l1", 25, 0), mTix("p:def", "l2", 25, 20), ...mRest()]);
     const b = (): SyncEntry => mDay([mTix("p:abc", "l1", 45, 20), mTix("p:def", "l2", 5, 0), ...mRest()]);
-    expect(stakeOf(a().core)).toBe(PAPER.daily);
-    expect(stakeOf(b().core)).toBe(PAPER.daily);
+    expect(stakeOf(a().core)).toBe(PAPER.dailyBefore);
+    expect(stakeOf(b().core)).toBe(PAPER.dailyBefore);
     for (const [m, order] of [
       [mergeLedgers([a()], [b()])[0], "a,b"],
       [mergeLedgers([b()], [a()])[0], "b,a"],
     ] as const) {
-      expect(stakeOf(m.core), `${order}: the MLB day was staked past PAPER.daily by an unbounded receipted raise`).toBe(PAPER.daily);
+      expect(stakeOf(m.core), `${order}: the MLB day was staked past PAPER.dailyBefore by an unbounded receipted raise`).toBe(PAPER.dailyBefore);
       expect((m as { capBreach?: unknown }).capBreach, order).toBeUndefined();
       expect(Object.keys(((m as { stakeConflict?: Record<string, unknown> }).stakeConflict ?? {})).length, order).toBe(1);
     }
@@ -4357,8 +4357,8 @@ describe("the grading LEG map is base-over-other, and the loser's extra legs sti
 
 describe("INSTRUCTION 46 — the day's shape is DURABLE across mergeDay (fix round 2026-09-08)", () => {
   it("slotUnderSum (cap at Kelly, 2026-09-08) survives the merge as the LARGER copy in both orders — a merged day never reads seated slots as money still owed", () => {
-    const e1 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.daily, allocSum: 24, slotUnderSum: 96, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
-    const e2 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.daily, allocSum: 24, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
+    const e1 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.dailyBefore, allocSum: 24, slotUnderSum: 96, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
+    const e2 = { date: "2026-09-11", locked: true, paper: true, daily: PAPER.dailyBefore, allocSum: 24, core: [T2("k1", 12, { shapeSlot: 0 }), T2("k2", 12, { shapeSlot: 1 })] } as unknown as SyncEntry;
     for (const [x, y] of [[e1, e2], [e2, e1]] as const) {
       const m = mergeLedgers([JSON.parse(JSON.stringify(x))], [JSON.parse(JSON.stringify(y))])[0] as unknown as { slotUnderSum?: number };
       expect(m.slotUnderSum).toBe(96);
@@ -4374,10 +4374,10 @@ describe("INSTRUCTION 46 — the day's shape is DURABLE across mergeDay (fix rou
   const shapeB = { id: "B", label: "5x$30 2-leg", slots: [{ stake: 30, legs: { min: 2, max: 2 } }], pick: "rotation", reason: "rotation", menu: ["A", "B", "C", "D", "E", "F"], dayIndex: 20706, since: "2026-09-08" };
   const shapeE = { ...shapeB, id: "E", label: "3x$30 2-leg + 2x$20 3-leg", pick: "tilt:two", reason: "2-leg is running better" };
   const T = (id: string, stake: number, extra: Record<string, unknown> = {}) => ({ id, stake, name: id, paper: true, placed: false, actualStake: 0, legs: [{ label: `${id}-L1`, prop: "Hits O 0.5" }, { label: `${id}-L2`, prop: "Hits O 0.5" }], ...extra });
-  const entry1 = (): SyncEntry => ({ date: "2026-09-10", locked: true, paper: true, daily: PAPER.daily, allocSum: 60, core: [T("t1", 30, { shapeSlot: 0 }), T("t2", 30, { shapeSlot: 1 })], coreShape: shapeB, shapeLine: "shape: 5x$30 2-leg" } as SyncEntry);
+  const entry1 = (): SyncEntry => ({ date: "2026-09-10", locked: true, paper: true, daily: PAPER.dailyBefore, allocSum: 60, core: [T("t1", 30, { shapeSlot: 0 }), T("t2", 30, { shapeSlot: 1 })], coreShape: shapeB, shapeLine: "shape: 5x$30 2-leg" } as SyncEntry);
   /** the later copy: richer (graded), so it WINS pickBase — and it claims shape E */
   const entry2 = (): SyncEntry => ({
-    date: "2026-09-10", locked: true, paper: true, daily: PAPER.daily, allocSum: 90,
+    date: "2026-09-10", locked: true, paper: true, daily: PAPER.dailyBefore, allocSum: 90,
     core: [T("t1", 30), T("t2", 30), T("t3", 30, { shapeSlot: 2 })],
     coreShape: shapeE, shapeLine: "shape: 3x$30 2-leg + 2x$20 3-leg",
     grading: { done: true, tickets: { t1: { result: "won", payout: 66 } } },
@@ -4552,26 +4552,26 @@ describe("the NFL desk — the merge kernel bounds an `nfl` day by NFL_PAPER.dai
     const mLeg = (lkey: string) => ({ lkey, label: `${lkey} over`, prop: "batter_hits", cz: -130 });
     const mTix = (n: number) => ({ id: `MIXED_${n}`, stake: 25, name: `MIXED · l${n}`, type: "MIXED", confirmed: null, placed: false, actualStake: 0, legs: [mLeg(`l${n}`)] });
     const mlb = (ns: number[], over: Partial<SyncEntry> = {}): SyncEntry =>
-      ({ date: MD, locked: true, daily: PAPER.daily, core: ns.map(mTix), funT: [], ...over }) as SyncEntry;
+      ({ date: MD, locked: true, daily: PAPER.dailyBefore, core: ns.map(mTix), funT: [], ...over }) as SyncEntry;
     const GRADED = { grading: { done: true, tickets: {}, legs: {} } } as Partial<SyncEntry>;
     const A = () => [mlb([1, 2, 3, 4, 5, 6], GRADED), staleGraded()];
     const B = () => [mlb([1, 2, 3, 4, 5, 6, 7]), toppedUp()];
     for (const m of [mergeLedgers(A(), B()), mergeLedgers(B(), A())]) {
       const mlbDay = m.find((e) => !("sport" in e) || (e as { sport?: string }).sport !== "nfl");
       const nflDayM = m.find((e) => (e as { sport?: string }).sport === "nfl");
-      expect(mlbDay && stakeOf(mlbDay.core), "the MLB day borrowed the NFL desk's $350").toBe(PAPER.daily);
+      expect(mlbDay && stakeOf(mlbDay.core), "the MLB day borrowed the NFL desk's $350").toBe(PAPER.dailyBefore);
       expect(mlbDay?.core).toHaveLength(6);
       expect((mlbDay as { coreDropped?: string[] } | undefined)?.coreDropped).toEqual(["MIXED_7"]);
       expect(nflDayM && stakeOf(nflDayM.core), "the NFL day was bounded by the MLB desk's $150").toBe(NFL_PAPER.daily);
       expect(nflDayM?.core).toHaveLength(7);
     }
-    expect(PAPER.daily).toBe(150);
+    expect(PAPER.dailyBefore).toBe(150);
   });
 
   it("the CFB desk beside it is still $250 — three desks, three ceilings", () => {
     expect(CFB_PAPER.daily).toBe(250);
     expect(NFL_PAPER.daily - CFB_PAPER.daily).toBe(100);
-    expect(CFB_PAPER.daily - PAPER.daily).toBe(100);
+    expect(CFB_PAPER.daily - PAPER.dailyBefore).toBe(100);
   });
 });
 
