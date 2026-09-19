@@ -1,6 +1,6 @@
-## 2026-09-19 — phased generator update, Phase 1 (validated; deployment pending)
+## 2026-09-19 — phased generator update, Phase 1 (deployed)
 
-Probability visibility and sort, player matchup/time, compact leg/lock/game controls, actions below picks, mixed timing as an allowed union, 0–80% MLB historical hit floor, signed-keyboard odds entry, multi-select markets and hourly Pacific start windows on generator/Every Pick Today. No auto-card pricing, paper-budget or fetch-budget changes. Remaining phase map and validation boundaries: `docs/september-19-phases.md`. TypeScript passed; full serial suite 3598/3598 across 234 files passed; production build passed. Production release pending.
+Probability visibility and sort, player matchup/time, compact leg/lock/game controls, actions below picks, mixed timing as an allowed union, 0–80% MLB historical hit floor, signed-keyboard odds entry, multi-select markets and hourly Pacific start windows on generator/Every Pick Today. No auto-card pricing, paper-budget or fetch-budget changes. Remaining phase map and validation boundaries: `docs/september-19-phases.md`. TypeScript passed; full serial suite 3598/3598 across 234 files passed; production build passed. Deployed: 7ee44f2 → parlay-yzb99bcwj, Ready/production; public /api/version confirmed the exact commit. Populated NFL mobile ticket, lock/regenerate, probability sort and no horizontal overflow verified on production.
 
 # Progress — 2026-09-19 (1H bets on NFL & CFB: first-half ML / spread / total on both football desks)
 

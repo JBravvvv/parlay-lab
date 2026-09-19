@@ -2,7 +2,7 @@
 
 Baseline reviewed: Claude's 33807d1 handoff and 9c048d8 app release. Preserve DraftKings pricing, daily ballpark modeling, first-half football markets, paper budgets and quote freshness safeguards.
 
-## Phase 1 — generator clarity and controls (in progress)
+## Phase 1 — generator clarity and controls (deployed)
 - Requests 1, 4–8, 12, 14, 16: show source-labeled probability, probability sort, compact controls, player-first ticket, flexible mixed timing, signed odds entry, 0–80% historical hit-rate floors and matchup details.
 - Begin requests 3 and 10 with reusable hourly Pacific game-start sliders and multi-select market dropdown.
 - Verify minimum one-hour window, midnight/end-of-day, pins, history, same-game constraints and unchanged DraftKings math.
@@ -23,7 +23,7 @@ Baseline reviewed: Claude's 33807d1 handoff and 9c048d8 app release. Preserve Dr
 - Request 11: measure representative page height before/after, target 50% vertical footprint without changing width. Review rendering/readability; no second 33% reduction unless requested.
 
 ## Release evidence
-Phase 1: TypeScript passed; 3598/3598 tests across 234 files passed; production build passed. Logs: /private/tmp/parlay-phase1-release.log and /private/tmp/parlay-phase1-build.log. Production deployment pending.
+Phase 1: TypeScript passed; 3598/3598 tests across 234 files passed; production build passed. Logs: /private/tmp/parlay-phase1-release.log and /private/tmp/parlay-phase1-build.log. Deployed as commit 7ee44f2, Vercel parlay-yzb99bcwj (Ready, production). The public /api/version returned 7ee44f244b31ab55761ad92118691610720a652d.
 
 ### Phase 1 validation record
 - Shared generator and ranked list now expose model/market probability; ranked list adds probability sorting.
@@ -34,3 +34,6 @@ Phase 1: TypeScript passed; 3598/3598 tests across 234 files passed; production 
 - Odds input mode changed from numeric to text in generator and ranked bounds so iOS can access minus/plus. Other odds-entry components require the Phase 2 surface audit.
 - Browser checked 375×812 mobile layout, no horizontal overflow, 10am–11am slider, negative -230 entry, market Clear/Select all, and shared NFL rendering. Local feeds returned no picks: populated ticket behavior is tested with fixtures, not claimed as verified live-data coverage.
 - No 50% page-height reduction is claimed in Phase 1. Site-wide density, live meters, Stats splits, cross-sport slips and ballpark expansion remain open.
+
+### Production verification
+On the production alias, NFL Sunday 9/20 returned 461 ATD lines across 14 games and 1171 ranked picks. At 375×812, a four-leg generated ticket showed matchup/start, source-labeled probability, odds, right-side lock/exclude and actions below players, with no horizontal overflow. Locking slot 1 and regenerating retained that player. Probability sorting put the 86.2% model estimate first, ahead of lower-probability S-grade picks; grade and probability remain distinct. No ticket was placed or written to the ledger. Browser viewport restored and test tab closed.
