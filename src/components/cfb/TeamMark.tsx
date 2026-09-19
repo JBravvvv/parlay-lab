@@ -46,7 +46,7 @@ const BADGE: Record<TeamMarkSize, string> = {
  */
 const LOGO_BADGE_PX: Record<TeamMarkSize, number> = { xs: 11, sm: 14, md: 18, lg: 24 };
 /** the badge disc: near-white fill, dark rim, so a dark-primary logo reads on a dark surface */
-export const LOGO_BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]";
+export const LOGO_BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_var(--color-bg)]";
 
 /**
  * ESPN's image combiner URL for a headshot at a small size — the full-size PNG is ~220 KB, the
@@ -141,7 +141,7 @@ export function TeamMark({
         {rank != null && (
           <span
             aria-hidden
-            className={`num absolute flex items-center justify-center rounded-full bg-cfb font-bold leading-none text-[#131a26] shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)] ${BADGE[size]}`}
+            className={`num absolute flex items-center justify-center rounded-full bg-cfb font-bold leading-none text-[#131a26] shadow-[0_0_0_1.5px_var(--color-bg)] ${BADGE[size]}`}
           >
             {rank}
           </span>

@@ -289,7 +289,7 @@ function OddsSlider({ prices, lo, hi, onChange }: { prices: readonly number[]; l
   if (iHi < iLo) [iLo, iHi] = [Math.min(iLo, iHi), Math.max(iLo, iHi)];
   const max = prices.length - 1;
   const pct = (i: number) => (max ? (i / max) * 100 : 0);
-  const thumb = "pointer-events-none absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg [&::-webkit-slider-thumb]:bg-pos [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(255,95,184,0.6)] [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-bg [&::-moz-range-thumb]:bg-pos";
+  const thumb = "pointer-events-none absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-bg [&::-webkit-slider-thumb]:bg-pos [&::-webkit-slider-thumb]:shadow-[0_0_0_1px_rgba(58,176,232,0.6)] [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-bg [&::-moz-range-thumb]:bg-pos";
   return (
     <div className="relative mt-2 h-6 px-2.5" data-testid="gen-odds-slider">
       <div aria-hidden className="absolute inset-x-2.5 top-1/2 h-[4px] -translate-y-1/2 rounded-full bg-white/[0.08]" />
@@ -667,7 +667,7 @@ export function GenSheet<P>({
   }
 
   return (
-    <section data-testid="props-gen" style={{ backgroundColor: "rgba(24,9,18,0.96)" }} className="gen-studio glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(255,95,184,0.35)]">
+    <section data-testid="props-gen" style={{ backgroundColor: "rgba(24,29,36,0.96)" }} className="gen-studio glass @container mb-3 overflow-hidden border border-pos/25 shadow-[0_12px_50px_-25px_rgba(58,176,232,0.35)]">
       <button
         type="button"
         onClick={() => onOpen(!open)}

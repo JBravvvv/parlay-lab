@@ -6,7 +6,7 @@ type Variant = "primary" | "ghost" | "gold" | "danger" | "hero";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-pos text-[#08090b] font-bold hover:brightness-110 glow-pos",
+    "bg-pos text-bg font-bold hover:brightness-110 glow-pos",
   ghost:
     "border border-line-2 bg-white/[0.04] text-text hover:bg-white/[0.08] hover:border-white/20",
   gold:

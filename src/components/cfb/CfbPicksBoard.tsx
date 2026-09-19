@@ -11,6 +11,8 @@ import { DataTable, type Column } from "@/components/ui/DataTable";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { SplitsChip } from "@/components/ui/SplitsChip";
+import { LeanChip } from "@/components/ui/LeanChip";
+import { footballLeanIndex } from "@/lib/prop-lean";
 import { findGameSplits, sideSplit, type SideSplit, type SplitsFeed } from "@/lib/splits";
 import { useSplits } from "@/lib/use-splits";
 import { KellyChip } from "@/components/ui/KellyChip";
@@ -350,6 +352,10 @@ export function CfbPicksBoard() {
   const marketChip = L.id === "nfl" ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb";
   const accentText = L.id === "nfl" ? "text-nfl" : "text-cfb";
 
+  /* PROP MARKET LEAN (2026-09-18): the vig-free share of the settlement book's over/under pair on
+     every prop row — price-implied, never a bet count (see src/lib/prop-lean.ts) */
+  const leanIndex = useMemo(() => footballLeanIndex(propRows, "cz"), [propRows]);
+
   const columns: Column<CfbPickRow>[] = useMemo(
     () => [
       {
@@ -358,7 +364,7 @@ export function CfbPicksBoard() {
         stickyLeft: 0,
         sortValue: (r) => r.label,
         cell: (r) => (
-          <div className="flex max-w-[176px] items-center gap-2 md:max-w-none">
+          <div className="flex max-w-[176px] items-center gap-2 md:max-w-[280px]">
             <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} player={r.player} headshot={r.headshot} pos={r.pos} />
             <div className="min-w-0">
               <div className="truncate font-medium text-text">{r.label}</div>
@@ -366,17 +372,19 @@ export function CfbPicksBoard() {
                 {r.kind === "prop" && <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${marketChip}`}>{MARKET_WORD[r.market] ?? r.market}</span>}
                 {r.sub}
                 {r.kind === "side" && <SplitsChip split={sideSplitOf(r, games, splitsFeed)} className="ml-1.5" />}
+                {r.kind === "prop" && leanIndex.get(r.key) && <LeanChip lean={leanIndex.get(r.key)!.lean} side={leanIndex.get(r.key)!.side} compact className="ml-1.5" />}
               </div>
             </div>
           </div>
         ),
       },
       /* INSTRUCTION 69: by letter, then by EV inside the letter — the same key the MLB board sorts on */
-      { key: "grade", header: "Grade", sortValue: (r) => gradeSortKey(gradeRank(r.grade), r.evCz), cell: (r) => <GradeChip grade={r.grade} basis="EV @ selected book" /> },
+      { key: "grade", header: "Grade", fit: true, sortValue: (r) => gradeSortKey(gradeRank(r.grade), r.evCz), cell: (r) => <GradeChip grade={r.grade} basis="EV @ selected book" /> },
       {
         key: "fair",
         header: "Fair",
         numeric: true,
+        fit: true,
         sortValue: (r) => r.fair ?? -1,
         cell: (r) =>
           r.fair != null && r.fairAm != null ? (
@@ -389,8 +397,10 @@ export function CfbPicksBoard() {
       },
       {
         key: "cz",
-        header: "Selected book",
+        header: "Book",
+        headerTitle: "Price at the selected sportsbook (DraftKings settles every desk)",
         numeric: true,
+        fit: true,
         sortValue: (r) => r.cz?.price ?? -100000,
         cell: (r) =>
           r.cz ? (
@@ -410,6 +420,7 @@ export function CfbPicksBoard() {
         key: "best",
         header: "Best",
         numeric: true,
+        fit: true,
         sortValue: (r) => r.best?.price ?? -100000,
         cell: (r) =>
           r.best ? (
@@ -420,17 +431,18 @@ export function CfbPicksBoard() {
             <span className="text-faint">—</span>
           ),
       },
-      { key: "ev", header: "EV @ book", numeric: true, sortValue: (r) => r.evCz ?? -999, cell: (r) => (r.evCz != null ? <EvBadge ev={r.evCz} /> : <span className="text-faint">—</span>) },
+      { key: "ev", header: "EV", headerTitle: "EV at the selected book's price", numeric: true, fit: true, sortValue: (r) => r.evCz ?? -999, cell: (r) => (r.evCz != null ? <EvBadge ev={r.evCz} /> : <span className="text-faint">—</span>) },
       {
         key: "kelly",
         header: "¼-Kelly",
         numeric: true,
+        fit: true,
         sortValue: (r) => r.kelly ?? -1,
         // INSTRUCTION 42 (2026-09-05): live rows carry no stake — a LIVE tag sits where the ¼-Kelly chip would
         cell: (r) => (r.status === "live" ? <LiveTag /> : r.kelly != null ? <KellyChip stake={r.kelly} /> : <span className="text-faint">—</span>),
       },
     ],
-    [games, propRows, marketChip, accentText, splitsFeed],
+    [games, propRows, marketChip, accentText, splitsFeed, leanIndex],
   );
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);

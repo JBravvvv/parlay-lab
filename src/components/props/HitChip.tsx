@@ -5,7 +5,7 @@ import { hitTone, windowLabel } from "@/lib/prop-hit-rate";
  * the selected prop we are viewing over the last 7, 15, 30 60 & 120 games"). One small badge —
  * "L15 · 11/15 · 73%" — drawn wherever a prop line is shown: the board row, a generated slot, a
  * Picks-page pick. The numbers are a count over games already played (src/lib/prop-hit-rate.ts),
- * never a projection, and the colour is only a reading aid: pink from 60%, gold from 45%, red
+ * never a projection, and the colour is only a reading aid: cerulean from 60%, gold from 45%, red
  * below. Pure render: no fetch, no state.
  */
 const TONE = {

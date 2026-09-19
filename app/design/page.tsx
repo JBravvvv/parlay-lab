@@ -352,7 +352,7 @@ export default function DesignPage() {
 
             <div>
               <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
-                Segmented <span className="text-faint">· local state · lime thumb, amber (CFB) thumb, two sizes</span>
+                Segmented <span className="text-faint">· local state · cerulean thumb, amber (CFB) thumb, two sizes</span>
               </div>
               <div className="flex flex-wrap items-center gap-4">
                 <Segmented label="Market (sample)" options={SEG_OPTIONS} value={seg} onChange={setSeg} />

@@ -28,6 +28,7 @@
  */
 
 import { amToDec } from "@/lib/ticket-math";
+import { footballLeanIndex } from "@/lib/prop-lean";
 import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenPoolSpec } from "@/lib/parlay-gen";
 import { playerSlug } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropQuote, type CfbPropRow } from "@/lib/cfb/props-types";
@@ -101,6 +102,8 @@ export function footballGenPool<P extends { prob: number; book: string }>(
   let finishedDropped = 0;
   /* several categories at once (2026-09-18): the pool is their union, each leg stamped with its own */
   const wanted = new Set(specMarkets(spec));
+  /* PROP MARKET LEAN (2026-09-18): the over/under pair's vig-free share at the chosen price, by row key */
+  const leanIndex = footballLeanIndex(rows, opts.mode);
 
   for (const row of rows) {
     if (!wanted.has(row.market)) continue;
@@ -157,6 +160,7 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       line: q.line ?? row.line ?? null,
       /* the matchup as the board's own sub prints it ("ALA vs ECU"), for the games filter chips */
       gameLabel: row.sub?.split(" · ")[0] || row.gameId,
+      lean: leanIndex.get(row.key)?.lean ?? null,
     });
   }
 

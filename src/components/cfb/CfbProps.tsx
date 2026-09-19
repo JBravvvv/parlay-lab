@@ -14,6 +14,8 @@ import { Reveal } from "@/components/motion/Reveal";
 import { GenSheet } from "@/components/props/GenSheet";
 import { RankedPicks, RankedViewTabs, type RankedFilter, type RankedPick } from "@/components/props/RankedPicks";
 import { SplitsChip } from "@/components/ui/SplitsChip";
+import { LeanChip } from "@/components/ui/LeanChip";
+import { footballPropLean } from "@/lib/prop-lean";
 import { useParlayGen, blankPins } from "@/components/props/useParlayGen";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import { GradeChip } from "@/components/ui/GradeChip";
@@ -519,6 +521,9 @@ function PropRow({
   const grade = gradeFromEv(ev);
   const ctx = ctxLine(lead);
   const yes = lead.side === "yes";
+  /* PROP MARKET LEAN (2026-09-18): the vig-free share of this player's over/under pair at the
+     chosen price — price-implied, never a bet count (src/lib/prop-lean.ts) */
+  const lean = footballPropLean(pl.sides, mode);
   return (
     <div
       data-prop-game={gameId}
@@ -537,6 +542,7 @@ function PropRow({
           <span className={ev == null ? "" : ev >= 0 ? "text-pos" : "text-neg/80"}>
             EV {ev == null ? "—" : `${ev >= 0 ? "+" : ""}${ev.toFixed(1)}%`}
           </span>
+          <LeanChip lean={lean} compact className="ml-1 align-middle" />
         </div>
       </div>
       <GradeChip grade={grade} basis="EV at quoted book" />
@@ -953,6 +959,8 @@ export function CfbProps() {
         started: l.started,
         leg: l.leg,
         mark: <PlayerMark player={l.leg.player ?? null} headshot={l.leg.headshot ?? null} team={l.leg.team ?? null} pos={l.leg.pos ?? null} size="sm" />,
+        /* the pool stamps the row's price-implied lean (never a bet count) — the pick's own side */
+        splits: l.lean ? <LeanChip lean={l.lean} side={l.side} compact /> : undefined,
       });
     }
     return out;

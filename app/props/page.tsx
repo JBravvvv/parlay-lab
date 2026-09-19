@@ -25,6 +25,7 @@ import { PropGameCard } from "@/components/props/PlayerRow";
 import { GameMarketCard, TeamAvatar } from "@/components/props/GameCard";
 import { RankedPicks, RankedViewTabs, type RankedFilter, type RankedPick } from "@/components/props/RankedPicks";
 import { HitChip } from "@/components/props/HitChip";
+import { LeanChip } from "@/components/ui/LeanChip";
 import { bookName } from "@/lib/sportsbook/books";
 import { Slip } from "@/components/props/Slip";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
@@ -367,6 +368,8 @@ function PropsDesk() {
         leg: l.leg,
         mark: <PlayerMark player={name} team={team} headshot={headshots[name] ?? null} size="sm" />,
         hit: l.hit ? <HitChip stat={l.hit} window={hitWindow} /> : null,
+        /* the pool stamps the row's price-implied lean (never a bet count) — the pick's own side */
+        splits: l.lean ? <LeanChip lean={l.lean} side={l.side} compact /> : undefined,
       });
     }
     return out;

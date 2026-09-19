@@ -43,6 +43,7 @@
 import { SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { mixOrder, type MixStyle } from "./parlay-gen-mix";
 import { amToDec, decToAm } from "@/lib/ticket-math";
+import type { PropLean } from "@/lib/prop-lean";
 
 /* ------------------------------------------------------------------ shapes */
 
@@ -173,6 +174,9 @@ export type GenLeg<P = unknown> = {
   /** cleared-the-line rate over the page's window, stamped by the adapter from the game log;
       undefined = no data for this player (a floor then excludes him, honestly) */
   hit?: { n: number; hits: number; rate: number; dots?: readonly boolean[] } | null;
+  /** PROP MARKET LEAN (2026-09-18): the vig-free share of the row's two-way price at the settlement
+      book, stamped by the adapter — price-implied, never a bet count; null/undefined = one-sided market */
+  lean?: PropLean | null;
 };
 
 export type GenPool<P = unknown> = {

@@ -9,10 +9,12 @@ import { useEffect, useRef } from "react";
    cached immutable, so replacing bytes under it would never reach clients. */
 const SRC = "/media/backdrop-llama.mp4";
 
-/* The footage plays in its ORIGINAL colours — pink/magenta glow, red neon
-   goggles. Josh (2026-09-18): "Bring parlay lab background back to the original
-   colors in this mp4. Pink instead of green for the most part." The earlier
-   hue-rotate(120deg) that recoloured it lime is gone; no filter is applied. */
+/* The footage is natively pink/magenta with red neon goggles. Josh (2026-09-18, later the
+   same day): "change the theme to Cerulean Blue … the neon type of color with the green & pink
+   is what makes it too much to look at". A hue-rotate(230deg) swings the pink (~330°) to
+   cerulean (~200°) and the red goggles to blue, and saturate(0.8) takes the neon edge off; the
+   scrim below is a touch heavier so the graphite ground reads as gray, not black. */
+const VIDEO_FILTER = "hue-rotate(230deg) saturate(0.8)";
 
 /**
  * Looping background video with a JS-controlled fade loop:
@@ -127,7 +129,7 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
       preload="auto"
       aria-hidden
       className="absolute inset-0 h-full w-full object-cover"
-      style={{ opacity: 0 }}
+      style={{ opacity: 0, filter: VIDEO_FILTER }}
     />
   );
 
@@ -138,7 +140,7 @@ export function VideoBackdrop({ fixed = false, scrim = false }: { fixed?: boolea
           (blocked, saving power, still loading) the backdrop still moves */}
       <div className="aurora absolute inset-0" />
       {video}
-      {scrim && <div className="absolute inset-0 bg-bg/55" />}
+      {scrim && <div className="absolute inset-0 bg-bg/62" />}
     </div>
   );
 }

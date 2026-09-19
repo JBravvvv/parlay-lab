@@ -1,3 +1,11 @@
+# Progress — 2026-09-18 (cerulean on graphite, compact Board grade column, prop market lean)
+
+- Josh's three items: bet % / money % on player props "somehow"; the Board grade column must not force a horizontal scroll, explanations individually expandable; theme to Cerulean Blue on a greyer-than-black background ("less like a cosmic bowling screen").
+- **Prop lean** (`src/lib/prop-lean.ts`, `LeanChip`): no book publishes ticket/handle splits on props, so every priced prop shows the price-implied market lean (de-vigged two-way price at DK) — "56% O · 44% U lean" on browse rows, "56% lean" on a sided pick — labelled as price-implied, never as a bet count. On MLB Props/Board, football Props/Board, and the ranked prop picks on every desk (`RankedPick.splits`); `GenLeg.lean` stamped by both pools.
+- **Board width**: `DataTable` `Column.fit` + `headerTitle`, px-2 cells, fit grade/fair/book/best/EV/Kelly columns, capped Pick cell; `SettledGrade` explanation behind a per-row "why ▾" toggle (the nowrap sentence was the >400px column); `LiveGrade` market branch compact with the explanation in `title`.
+- **Theme**: `globals.css` retinted end to end (token names kept): graphite `hsl(216 9% 13%)` base, cerulean `#3ab0e8` pos/brand, blues `#1565a8/#1f8fd4/#5cc4f2`, lavender live, gold + NFL/CFB accents unchanged, all pink rgba/glass/aurora/glow/gen-studio retinted; manifest + theme-color `#1e2126`; llama footage hue-rotated to blue under a 62% scrim; Board tab periwinkle.
+- Tests: `tests/prop-lean.test.ts`, `tests/board-compact.test.ts`, `tests/theme-cerulean.test.ts` (new); `nav`, `prop-hit-rate` re-pinned. Full serial gate before push (see `tools/handoff-state.env`).
+
 # Progress — 2026-09-18 (eight-item UI pass: NFL first, splits, ranked S→F, generator reorder)
 
 - Josh's eight items with 15 desktop/Caesars screenshots: sport order NFL/CFB/MLB; the logo must never open the landing; bet % / money % on every pick; logos visible (no black disc), headshots on Stats; grades on every Games pick; Board/Builder pick boxes half the height; generator stacked (filters above, ticket below) with numbered, drag-reorderable, lock-in slots; a ranked S→F list of every pick for the day under the generator with category filters.

@@ -37,7 +37,7 @@ const LOGO_BADGE_PX: Record<PlayerMarkSize, number> = { xs: 11, sm: 14, md: 18, 
  * black circle background encompassing the logos"): near-white fill with a dark rim so a
  * dark-primary logo reads on the dark surface, mirroring the CFB mark's LOGO_BADGE_CLASS.
  */
-const BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_rgba(8,9,11,0.9)]";
+const BADGE_CLASS = "bg-[#f4f5f7] ring-1 ring-black/60 shadow-[0_0_0_1.5px_var(--color-bg)]";
 const DISC_TEXT: Record<PlayerMarkSize, string> = {
   xs: "text-[7px]",
   sm: "text-[8.5px]",

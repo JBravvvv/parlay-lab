@@ -117,7 +117,7 @@ export function hitDots(log: PlayerLog | null | undefined, market: string, line:
 }
 
 export type HitTone = "pos" | "gold" | "neg";
-/** the colour the UI gives a rate: pink from 60%, gold from 45%, red below */
+/** the colour the UI gives a rate: cerulean from 60%, gold from 45%, red below */
 export const hitTone = (rate: number): HitTone => (rate >= 0.6 ? "pos" : rate >= 0.45 ? "gold" : "neg");
 
 /** "L15" */

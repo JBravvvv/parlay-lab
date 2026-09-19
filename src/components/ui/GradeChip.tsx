@@ -4,7 +4,7 @@ import type { Grade } from "@/lib/grade";
 
 /**
  * The S/A–F grade chip (2026-08-10, Josh's ask; S added 2026-09-04, INSTRUCTION 32). Color follows the design system's
- * one-accent-per-meaning rule: electric green family for +EV tiers, muted for
+ * one-accent-per-meaning rule: the cerulean (pos) family for +EV tiers, muted for
  * about-fair, red-orange family for −EV tiers. The title states the basis and
  * the fixed cutoffs so the grade is self-explanatory on hover.
  */

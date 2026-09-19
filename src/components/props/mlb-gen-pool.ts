@@ -18,6 +18,7 @@
 
 import type { PropBoardGame, PropBoardRow } from "@/engine";
 import { amToDec } from "@/lib/ticket-math";
+import { mlbPropLean } from "@/lib/prop-lean";
 import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type GenPoolSpec } from "@/lib/parlay-gen";
 import { MKT_LABEL, nameKey, playerLeg, teamTag, type Side } from "./props-model";
 import type { SandboxLeg } from "@/lib/ticket-math";
@@ -127,6 +128,7 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
           line: r.ln,
           gameLabel: g.game,
           ...(hits ? { hit: hit ? { n: hit.n, hits: hit.hits, rate: hit.rate, dots: hitDots(log, market, r.ln, side) } : null } : {}),
+          lean: mlbPropLean(r),
         });
       }
     }

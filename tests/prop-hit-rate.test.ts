@@ -106,7 +106,7 @@ describe("clearing a line", () => {
     expect(hitDots(HITTER, "batter_hits", 0.5, "o")).toEqual([true, false, true, true, true, false, true]);
     expect(hitDots(HITTER, "batter_hits", 0.5, "o", 3)).toEqual([true, false, true]);
   });
-  it("the tone is only a reading aid: pink from 60%, gold from 45%, red below", () => {
+  it("the tone is only a reading aid: cerulean from 60%, gold from 45%, red below", () => {
     expect(hitTone(0.6)).toBe("pos");
     expect(hitTone(0.59)).toBe("gold");
     expect(hitTone(0.45)).toBe("gold");

@@ -12,6 +12,12 @@ export type Column<T> = {
   className?: string;
   /** pin the column at this px offset while the table scrolls sideways */
   stickyLeft?: number;
+  /** shrink the column to its content (a grade chip, a price) instead of taking a share of the
+      table's spare width — Josh (2026-09-18): "shrink the grade column horizontally so everything
+      in the box fits on one screen. There is no reason for it to be that long." */
+  fit?: boolean;
+  /** hover text on the header — lets a short header ("Book") keep its long meaning */
+  headerTitle?: string;
 };
 
 /**
@@ -95,12 +101,13 @@ export function DataTable<T>({
                           )
                       : undefined
                   }
-                  className={`whitespace-nowrap border-b border-white/[0.06] px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                  className={`whitespace-nowrap border-b border-white/[0.06] px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${
                     c.numeric ? "text-right" : "text-left"
                   } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""} ${
                     c.stickyLeft != null ? "sticky z-20 bg-surface-2" : ""
-                  }`}
+                  } ${c.fit ? "w-px" : ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
+                  title={c.headerTitle}
                 >
                   {c.header}
                   {active && <span className="ml-1">{sort!.dir === 1 ? "▲" : "▼"}</span>}
@@ -121,9 +128,9 @@ export function DataTable<T>({
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`whitespace-nowrap px-2.5 py-1.5 ${c.numeric ? "num text-right" : ""} ${
+                  className={`whitespace-nowrap px-2 py-1.5 ${c.numeric ? "num text-right" : ""} ${
                     c.stickyLeft != null ? "sticky z-10 bg-bg" : ""
-                  } ${c.className ?? ""}`}
+                  } ${c.fit ? "w-px" : ""} ${c.className ?? ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
                 >
                   {c.cell(r)}

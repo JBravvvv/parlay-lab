@@ -63,7 +63,7 @@ function tint(hex: string, alpha: number) {
 const NAV: readonly NavItem[] = [
   { href: "/games", label: "Games", icon: IconGames, group: "top", mobile: true, tone: "#7DD3FC" },
   { href: "/stats", label: "Stats", icon: IconStats, group: "top", mobile: true, tone: "#C4B5FD" },
-  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#FF5FB8" },
+  { href: "/board", label: "Board", icon: IconBoard, group: "top", mobile: true, tone: "#A5B4FC" },
   { href: "/builder", label: "Builder", icon: IconBuilder, group: "top", mobile: true, tone: "#FCD34D" },
   { href: "/sharp", label: "The Sharp", icon: IconSharp, group: "top", mobile: false, tone: "#FDA4AF" },
   { href: "/simulator", label: "Simulator", icon: IconSim, group: "top", mobile: false, tone: "#67E8F9" },
@@ -105,7 +105,7 @@ function Brand() {
 
 /* Tone opacities: idle label/icon sit at 70% / 55% of the tab's tone; the active
    state is the full tone, and the pill fill, its inset ring and the glow are the
-   same hue at low alpha — so each tab lights up in its own colour, never always pink. */
+   same hue at low alpha — so each tab lights up in its own colour, never always the brand cerulean. */
 const IDLE_LABEL = 0.7;
 const IDLE_ICON = 0.55;
 

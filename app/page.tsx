@@ -118,7 +118,7 @@ const DESKS: { sport: Sport; blurb: string }[] = [
 
 /** each desk's ring (when it is the current desk) and text accent — lime / amber / blue */
 const DESK_TONE: Record<Sport, { ring: string; text: string }> = {
-  mlb: { ring: "shadow-[inset_0_0_0_1px_rgba(255,95,184,0.55)]", text: "text-pos" },
+  mlb: { ring: "shadow-[inset_0_0_0_1px_rgba(58,176,232,0.55)]", text: "text-pos" },
   cfb: { ring: "shadow-[inset_0_0_0_1px_rgba(245,165,36,0.55)]", text: "text-cfb" },
   nfl: { ring: "shadow-[inset_0_0_0_1px_rgba(79,140,255,0.55)]", text: "text-nfl" },
 };
@@ -236,7 +236,7 @@ function Hero() {
               Your paper-money playground for MLB, College Football &amp; the NFL.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Link replace href="/props" className="rounded-full bg-pos px-7 py-4 text-sm font-bold text-[#08090b] transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pos">
+              <Link replace href="/props" className="rounded-full bg-pos px-7 py-4 text-sm font-bold text-bg transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pos">
                 Build a parlay →
               </Link>
               <Link replace href="/board" className="rounded-full border border-white/20 px-7 py-4 text-sm font-semibold text-text transition hover:bg-white/10">

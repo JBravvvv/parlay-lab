@@ -1,6 +1,8 @@
 "use client";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
 import { SplitsChip } from "@/components/ui/SplitsChip";
+import { LeanChip } from "@/components/ui/LeanChip";
+import { mlbLeanIndex } from "@/lib/prop-lean";
 import { mlbLegSplit } from "@/lib/splits";
 import { useSplits } from "@/lib/use-splits";
 import {liveMarketBoard} from "@/lib/mlb/market-board";
@@ -212,6 +214,9 @@ function MlbBoardPage() {
 
   const d = board?.data;
   const browseProps = useBrowseProps(board);
+  /* PROP MARKET LEAN (2026-09-18): the vig-free share of the settlement book's over/under pair on
+     every prop row, keyed `${gkey}|${lkey}` — price-implied, never a bet count (src/lib/prop-lean.ts) */
+  const leanIndex = useMemo(() => mlbLeanIndex(browseProps.rows), [browseProps.rows]);
   const cats = (live ? d?.categoriesLive : d?.categories) ?? {};
   /* TAB PURITY (2026-08-05, operator report: RL under Hits, ML under RL). The engine's arrays
      measured pure on the fixture and this page is key-addressed — but the defensive layer now
@@ -547,6 +552,7 @@ function MlbBoardPage() {
                   <span className="text-live"> → {legSideOf(r.sub)} {q.ln} live</span>
                 ) : null}
                 <SplitsChip split={mlbLegSplit(splitsFeed, r)} className="ml-1.5" />
+                <LeanChip lean={leanIndex.get(`${r.gkey ?? ""}|${r.lkey ?? ""}`)} side={legSideOf(r.sub) === "U" ? "u" : "o"} compact className="ml-1.5" />
               </div>
               {r.susp && (
                 <div
@@ -592,6 +598,7 @@ function MlbBoardPage() {
       {
         key: "grade",
         header: "Grade",
+        fit: true,
         /* grades the SAME EV the mode displays — czEv at Caesars, bsEv under dk_fd — EXCEPT on a
            leg the live boxscore has already decided (INSTRUCTION 50 item 2). A tally past the
            line means the Over is won and the Under lost, at any point in any game: the stored EV
@@ -806,7 +813,7 @@ function MlbBoardPage() {
           ]),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut, mine, splitsFeed],
+    [selectedBookName, bankroll, basisMode, legLive, rowSettled, rowQuote, liveAmOf, livePricedAt, cz.hidden, rowOut, mine, splitsFeed, leanIndex],
   );
 
   /* INSTRUCTION 29 (2026-09-04, Josh: "I should be able to sort each tab on the 'Board'
@@ -876,6 +883,7 @@ function MlbBoardPage() {
       {
         key: "grade",
         header: "Grade",
+        fit: true,
         sortValue: (p) => {
           const q = pickQuote(p);
           const v = q ? mlbLiveView(q, legSideOf(p.side)) : null;
@@ -922,6 +930,9 @@ function MlbBoardPage() {
                   window={hitWindow}
                   stat={hitRate(pickHits.logs.get(hitKey(parseBoardLabel(p.player)?.name ?? p.player)), p.market ?? cat, p.line, p.side, hitWindow)}
                 />
+              )}
+              {p.player && (p.side === "o" || p.side === "u") && (
+                <LeanChip lean={leanIndex.get(`${p.gkey ?? ""}|${p.lkey ?? ""}`)} side={p.side} compact className="ml-1.5 align-middle" />
               )}
               <CzInfo pickKey={pk} offered={!cz.isHidden(pk)} onToggle={cz.toggle} />
               {pickOut(p) && <OutTag />}
@@ -981,7 +992,7 @@ function MlbBoardPage() {
       },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine, pickHits.logs, hitWindow]);
+  }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine, pickHits.logs, hitWindow, leanIndex]);
   const visiblePicksAll = useMemo(
     () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
     [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
@@ -1564,6 +1575,13 @@ function SettledGrade({ read }: { read: LegSettledRead }) {
      that has in fact just lost (INSTRUCTION 50 fix pass). */
   const txt = `${read.why} — the price shown is the pregame lock, not a live market`;
   const tone = read.side === "U" ? "text-neg" : "text-pos";
+  /* COMPACT BY DEFAULT (2026-09-18, Josh: "shrink the grade column horizontally so everything in
+     the box fits on one screen … If theres explanations, make them individually expandable").
+     The sentence used to sit in the cell on every settled row, and with the table's nowrap cells it
+     alone pushed the Grade column past 400px. It now lives in the tooltip and behind a per-row
+     "why" toggle; when open it wraps inside the cell instead of widening the column. Nothing is
+     lost: the tag, the tooltip and the toggled text all carry the module's own words. */
+  const [open, setOpen] = useState(false);
   return (
     <span className="inline-flex flex-col items-start gap-0.5" title={txt}>
       <span className="inline-flex items-center gap-1.5">
@@ -1571,8 +1589,22 @@ function SettledGrade({ read }: { read: LegSettledRead }) {
         <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold">
           SETTLED
         </span>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={open ? "Hide why this leg is settled" : "Show why this leg is settled"}
+          onClick={() => setOpen((o) => !o)}
+          data-testid="settled-why-toggle"
+          className="rounded-full border border-line-2 bg-white/[0.04] px-1.5 py-px text-[9px] font-semibold text-muted hover:text-text"
+        >
+          why {open ? "▴" : "▾"}
+        </button>
       </span>
-      <span className={`text-[9.5px] leading-tight ${tone}`}>{txt}</span>
+      {open && (
+        <span className={`max-w-[240px] whitespace-normal text-[9.5px] leading-tight ${tone}`} data-testid="settled-why">
+          {txt}
+        </span>
+      )}
     </span>
   );
 }
@@ -1670,11 +1702,13 @@ function LiveGrade({ view, pricedAt }: { view: MlbLiveView; pricedAt: string | n
         <GradeChip grade={gradeFromEv(view.ev)} basis={`EV at the live selected-book line (${view.side} ${view.ln}), this quote taken ${age}`} />
       ) : (
         <span
-          className="num text-[11px] text-muted"
+          className="num inline-flex items-baseline gap-1 text-[11px] text-muted"
           data-testid="mlb-live-market-grade"
-          title={`The de-vigged consensus at the live ${view.side} ${view.ln} — the market's own price, not a model read. No letter grade is shown because none was computed: a market fair has no edge over the market it came from.`}
+          title={`${view.ev == null ? "—" : `${view.ev > 0 ? "+" : ""}${view.ev.toFixed(1)}% vs market`}: the de-vigged consensus at the live ${view.side} ${view.ln} — the market's own price, not a model read. No letter grade is shown because none was computed: a market fair has no edge over the market it came from.`}
         >
-          {view.ev == null ? "—" : `${view.ev > 0 ? "+" : ""}${view.ev.toFixed(1)}% vs market`}
+          {/* compact (2026-09-18): the figure, then "vs market" at 9px — the same words, half the width */}
+          <span>{view.ev == null ? "—" : `${view.ev > 0 ? "+" : ""}${view.ev.toFixed(1)}%`}</span>
+          <span className="text-[9px] text-faint">vs market</span>
         </span>
       )}
       <span

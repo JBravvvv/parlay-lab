@@ -201,11 +201,11 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
     // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab); 11 → 12 on 2026-09-17 (INSTRUCTION 68, Ballpark Factor)
     expect(nav.length).toBe(12);
   });
-  it("tones are the agreed palette (Board keeps the lime brand green)", () => {
+  it("tones are the agreed palette (Board is periwinkle since the 2026-09-18 cerulean retheme)", () => {
     expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
       Games: "#7DD3FC",
       Stats: "#C4B5FD",
-      Board: "#FF5FB8",
+      Board: "#A5B4FC",
       Builder: "#FCD34D",
       "The Sharp": "#FDA4AF",
       Simulator: "#67E8F9",
