@@ -11,6 +11,7 @@ import { SplitsChip } from "@/components/ui/SplitsChip";
 import { findGameSplits, sideSplit } from "@/lib/splits";
 import { useSplits } from "@/lib/use-splits";
 import { WonPaid } from "@/components/ui/WonPaid";
+import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import type { CfbBoard, CfbGame, CfbGrade, CfbLedgerEntry, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import { playerSlug } from "@/lib/cfb/props";
 import { fmtAmerican } from "@/lib/format";
@@ -104,8 +105,8 @@ const LEG_DOT: Record<string, string> = {
 
 /** "Ohio State -6.5" → "OS", "Indiana ML" → "IND", "Over 56.5" → "O" */
 function fallbackAbbr(leg: CfbTicketLeg): string {
-  if (leg.market === "total") return leg.side === "over" ? "O" : "U";
-  const name = leg.label.replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim();
+  if (baseMarketOf(leg.market) === "total") return leg.side === "over" ? "O" : "U";
+  const name = leg.label.replace(/^1H\s+/, "").replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim();
   const words = name.split(/\s+/).filter(Boolean);
   if (words.length >= 2) return words.map((w) => w[0]).join("").slice(0, 3).toUpperCase();
   return name.slice(0, 3).toUpperCase() || "—";
@@ -116,10 +117,10 @@ function LegMark({ leg, game, abbrCls }: { leg: CfbTicketLeg; game: LegGame | un
   /* INSTRUCTION 46: a player leg is the player + HIS team — with or without the slate loaded, never the pair */
   if (leg.player) return <PlayerMark teamIds={game ? [game.home.id, game.away.id].filter((id): id is string => !!id) : []} player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
   if (game) {
-    if (leg.market === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
+    if (baseMarketOf(leg.market) === "total") return <PairMark away={game.away} home={game.home} size="sm" />;
     if (team) return <TeamMark team={team} size="sm" showRank showAbbr={false} />;
   }
-  const tone = leg.market === "total" ? "border-line-2 bg-surface-2 text-muted" : abbrCls;
+  const tone = baseMarketOf(leg.market) === "total" ? "border-line-2 bg-surface-2 text-muted" : abbrCls;
   return (
     <span
       className={`num inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border px-1 text-[9px] font-bold ${tone}`}
@@ -138,8 +139,8 @@ export type CfbLegLink = { href: string | null; title: string };
 /** "Ohio State -6.5" → "ohio-state" — the team slug a side leg carries in `player=` */
 export function cfbLegSlug(leg: Pick<CfbTicketLeg, "label" | "player" | "market" | "side">): string {
   if (leg.player) return playerSlug(leg.player);
-  if (leg.market === "total") return leg.side;
-  return playerSlug(leg.label.replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim());
+  if (baseMarketOf(leg.market) === "total") return leg.side;
+  return playerSlug(leg.label.replace(/^1H\s+/, "").replace(/\s+(ML|[+-]?\d+(\.\d+)?|PK)$/i, "").trim());
 }
 
 /** the Builder deep link: day + game + market + player slug — never the line ("even if the line has changed").
@@ -262,7 +263,7 @@ export function CfbTicketCard({
             // INSTRUCTION 46 fix round (2026-09-08): a player leg prints the matchup under the name
             // (his own team's logo is the mark; the other team is still named here)
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
-            const split = !leg.player && game ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
+            const split = !leg.player && game && !isH1Market(leg.market) ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
             return (
               <li key={leg.lkey} className="flex items-center gap-1.5 text-[11px] leading-tight" title={v?.detail}>
                 <LegMark leg={leg} game={game} abbrCls={accent.abbr} />

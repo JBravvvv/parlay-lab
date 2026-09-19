@@ -1,7 +1,8 @@
+import { attachH1 } from "@/lib/cfb/h1";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { espnDateParam, nextDate } from "@/lib/cfb/dates";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
-import type { CfbFinals, CfbGame, CfbSlate } from "@/lib/cfb/types";
+import type { CfbFinals, CfbGame, CfbH1Game, CfbSlate } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
 
 /**
@@ -97,7 +98,8 @@ export async function fpiPayload(): Promise<unknown | null> {
 
 /** A forced pull (2026-09-19, the Board's Refresh Board tap with the sync phrase): the game lines are fetched with
     the Next data cache bypassed, so the answer is this instant's prices and not up to ODDS_TTL seconds old. */
-export type OddsPullOpts = { fresh?: boolean };
+/** `h1`: the date's stored first-half lines (props-store readH1) to attach onto the board's games (2026-09-19) */
+export type OddsPullOpts = { fresh?: boolean; h1?: readonly CfbH1Game[] | null };
 
 /** The one game-lines Odds API call of a football desk. The key never leaves this function: it is
     not echoed in any error, header or body, and the URL it was appended to is never logged. */
@@ -131,6 +133,8 @@ export function finalsOf(games: CfbGame[]): CfbFinals {
     const final = g.status === "final";
     if (final && (g.homeScore == null || g.awayScore == null)) continue;
     out[g.id] = { home: g.homeScore ?? 0, away: g.awayScore ?? 0, final, status: g.status };
+    // 2026-09-19: the first-half score beside it, once ESPN posted both halves' quarters — the 1H legs settle on it
+    if (g.homeH1 != null && g.awayH1 != null) out[g.id].h1 = { home: g.homeH1, away: g.awayH1, final: g.h1Final === true };
   }
   return out;
 }
@@ -150,6 +154,7 @@ export function finalsFromEspn(date: string, espn: unknown[], now: number, bankr
 export async function slateFromEspnOf(cfg: LeagueConfig, date: string, espn: unknown[], now: number, bankroll: number, opts?: OddsPullOpts): Promise<CfbSlate> {
   const [fpi, odds] = await Promise.all([fpiPayloadOf(cfg), oddsPayloadOf(cfg, opts)]);
   const board = buildCfbBoard({ date, espnEvents: espn, oddsEvents: odds.events, fpi, now, bankroll, league: cfg });
+  attachH1(board.games, opts?.h1, { now, bankroll, league: cfg });
   return { ...board, finals: finalsOf(board.games), quota: odds.quota, oddsMissing: odds.missing };
 }
 

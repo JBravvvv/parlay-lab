@@ -26,6 +26,7 @@ import { useLeague } from "@/components/football/LeagueContext";
 import type { DeskClient, LeagueRules } from "@/lib/football/league";
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, loadCfbProps } from "@/lib/cfb/client";
 import { kickoffLabel } from "@/lib/cfb/dates";
+import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
 import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
@@ -139,7 +140,7 @@ function sideEv(row: CfbRow, mode: PriceMode): number | null {
 /** the slip leg for a row at a quote — probability re-read at the quote's own line */
 function legOf(game: CfbGame, row: CfbRow, q: CfbQuote): CfbSlipLeg {
   const p = rowProbAt(game.model, row.market, row.side, q.line) ?? { win: row.fair, push: row.push };
-  const label = row.market === "ml" || q.line === row.line ? row.label : sideLabel(game, row.market, row.side, q.line);
+  const label = baseMarketOf(row.market) === "ml" || q.line === row.line ? row.label : sideLabel(game, row.market, row.side, q.line);
   return {
     kind: "side",
     key: row.key,
@@ -151,15 +152,16 @@ function legOf(game: CfbGame, row: CfbRow, q: CfbQuote): CfbSlipLeg {
     book: bookTag(q),
     prob: p.win * 100,
     // INSTRUCTION 46: the side's own team for the slip mark; a total carries the pair instead
-    team: row.market === "total" ? null : row.side === "home" ? game.home : game.away,
-    pair: row.market === "total" ? { away: game.away, home: game.home } : null,
+    team: baseMarketOf(row.market) === "total" ? null : row.side === "home" ? game.home : game.away,
+    pair: baseMarketOf(row.market) === "total" ? { away: game.away, home: game.home } : null,
   };
 }
 
 /** the small line above a price: "+40.5" / "O 56.5" / nothing for a moneyline */
 function lineText(market: CfbMarketKey, side: CfbSideKey, line: number | null): string | null {
-  if (market === "ml") return null;
-  if (market === "total") return `${side === "over" ? "O" : "U"} ${line ?? "—"}`;
+  const base = baseMarketOf(market);
+  if (base === "ml") return null;
+  if (base === "total") return `${side === "over" ? "O" : "U"} ${line ?? "—"}`;
   return line == null ? "—" : fmtLine(line);
 }
 
@@ -182,7 +184,7 @@ function priceTone(price: number, ev: number | null, rules: Pick<LeagueRules, "m
 function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: PriceMode, picked: string | null, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES, splits: GameSplits | null = null): OddsGridCell {
   const row = rowFor(game, market, side);
   if (!row) return {};
-  const split = sideSplit(splits, market, side);
+  const split = isH1Market(market) ? null : sideSplit(splits, market, side);
   const q = quoteFor(row, mode);
   if (!q) return { line: lineText(market, side, row.line) ?? undefined, price: "—", tone: "muted", split };
   const tag = bookTag(q);
@@ -200,6 +202,17 @@ function sideCell(game: CfbGame, market: CfbMarketKey, side: CfbSideKey, mode: P
     grade: closed ? null : gradeFromEv(sideEv(row, mode)),
     split,
   };
+}
+
+/** the first-half row's team column: a "1H" tag, the abbreviation, and the half-time score once ESPN posts it */
+function H1Block({ team, score, live }: { team: CfbTeam; score: number | null; live: boolean }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 rounded border border-line-2 px-1 py-0.5 text-[9px] font-bold tracking-[0.12em] text-faint">1H</span>
+      <span className="truncate text-[12px] font-bold text-muted">{team.abbr}</span>
+      {score != null && <span className={`num text-[12px] font-bold ${live ? "text-live" : "text-muted"}`}>{score}</span>}
+    </div>
+  );
 }
 
 /** the team block in the grid's first column: mark + rank, abbreviation, record or live score */
@@ -273,6 +286,10 @@ function SlipGameCard({
   const score = game.homeScore != null && game.awayScore != null ? `${game.awayScore}–${game.homeScore}` : null;
   const cells = (side: "away" | "home"): OddsGridCell[] =>
     GRID_COLUMNS.map((c) => sideCell(game, c.key, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick, L.rules, splits));
+  // 2026-09-19: the first-half lines as two more rows of the same grid, only when a book posted the half
+  const hasH1 = game.rows.some((r) => isH1Market(r.market));
+  const cells1h = (side: "away" | "home"): OddsGridCell[] =>
+    GRID_COLUMNS.map((c) => sideCell(game, `${c.key}_1h` as CfbMarketKey, c.key === "total" ? (side === "away" ? "over" : "under") : side, mode, picked, onPick, L.rules, splits));
   const pickedRing = L.id === "nfl" ? "ring-1 ring-nfl/40" : "ring-1 ring-cfb/40";
   return (
     <article className={`glass card-lift px-3 pb-2.5 pt-2 ${picked ? pickedRing : ""}`}>
@@ -293,6 +310,12 @@ function SlipGameCard({
         rows={[
           { key: `${game.id}|away`, team: <TeamBlock team={game.away} score={game.awayScore} live={live} />, cells: cells("away") },
           { key: `${game.id}|home`, team: <TeamBlock team={game.home} score={game.homeScore} live={live} />, cells: cells("home") },
+          ...(hasH1
+            ? [
+                { key: `${game.id}|away|1h`, team: <H1Block team={game.away} score={game.awayH1 ?? null} live={live} />, cells: cells1h("away") },
+                { key: `${game.id}|home|1h`, team: <H1Block team={game.home} score={game.homeH1 ?? null} live={live} />, cells: cells1h("home") },
+              ]
+            : []),
         ]}
       />
     </article>
@@ -693,6 +716,9 @@ const RANKED_FILTERS: RankedFilter[] = [
   { key: "ml", label: "ML" },
   { key: "spread", label: "Spread" },
   { key: "total", label: "Total" },
+  { key: "ml_1h", label: "1H ML" },
+  { key: "spread_1h", label: "1H Spread" },
+  { key: "total_1h", label: "1H Total" },
   ...FOOTBALL_GEN_MARKETS.map((m) => ({ key: m.key, label: m.label })),
 ];
 const GEN_SPEC_DEFAULT: GenSpec = {
@@ -942,7 +968,7 @@ export function CfbProps() {
           started: g.status === "live",
           leg,
           mark: leg.pair ? <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" /> : leg.team ? <TeamMark team={leg.team} size="sm" showAbbr={false} /> : null,
-          splits: <SplitsChip split={sideSplit(gs, row.market, row.side)} compact />,
+          splits: <SplitsChip split={isH1Market(row.market) ? null : sideSplit(gs, row.market, row.side)} compact />,
         });
       }
     }

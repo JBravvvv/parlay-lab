@@ -289,7 +289,7 @@ export const NFL_LEAGUE: LeagueConfig = {
     oddsSportKey: "americanfootball_nfl",
     oddsUrl: NFL_ODDS_URL,
     oddsEventBase: "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events",
-    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds",
+    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1",
     espnScoreboard: NFL_ESPN_SCOREBOARD,
     espnScoreboardQuery: "limit=100",
     espnFpi: NFL_ESPN_FPI,

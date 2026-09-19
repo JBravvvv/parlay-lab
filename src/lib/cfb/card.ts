@@ -1,6 +1,7 @@
 import { decFromAmerican } from "@/engine2/devig";
 import { decToAm } from "@/lib/ticket-math";
 import { CFB_RULES } from "@/lib/cfb/rules";
+import { baseMarketOf, isH1Market, marketWord } from "@/lib/cfb/markets";
 import { rowProbAt, sideLabel } from "@/lib/cfb/model";
 import type { CfbBoard, CfbCard, CfbCardOpts, CfbGame, CfbRow, CfbTicket, CfbTicketLeg } from "@/lib/cfb/types";
 import { isFullPaper } from "@/lib/football/sunday-paper";
@@ -87,12 +88,13 @@ const round = (v: number, dp: number) => {
 /** INSTRUCTION 46 fix round (2026-09-08): exported so the identity copy below is pinned directly. */
 export function legOf(row: CfbRow, game: CfbGame): CfbTicketLeg | null {
   if (!row.cz) return null;
-  const line = row.market === "ml" ? null : row.cz.line;
-  const p = rowProbAt(game.model, row.market, row.side, row.market === "ml" ? null : line);
+  const base = baseMarketOf(row.market);
+  const line = base === "ml" ? null : row.cz.line;
+  const p = rowProbAt(game.model, row.market, row.side, base === "ml" ? null : line);
   if (!p) return null;
   const leg: CfbTicketLeg = {
     label: sideLabel(game, row.market, row.side, line),
-    prop: row.market === "ml" ? "ML" : row.market === "spread" ? "Spread" : "Total",
+    prop: marketWord(row.market),
     cz: row.cz.price,
     gkey: row.gameId,
     lkey: row.key,
@@ -214,7 +216,9 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
   const benched: CfbCard["benched"] = [];
   const games = new Map(board.games.map((g) => [g.id, g]));
   const kicked = (g: CfbGame) => !(Date.parse(g.start) > opts.now);
-  const playable = board.games.flatMap((g) => (kicked(g) ? [] : g.rows.filter((r) => r.playable && r.cz != null && r.evCz != null)));
+  // 2026-09-19: the auto paper card stays a FULL-GAME card — the first-half rows (1H ML / spread / total) are
+  // Josh's to pick on the board and in the builder, never drafted onto the locked card unasked
+  const playable = board.games.flatMap((g) => (kicked(g) ? [] : g.rows.filter((r) => r.playable && r.cz != null && r.evCz != null && !isH1Market(r.market))));
 
   /* ---------- CORE ---------- */
   const cands = playable.filter((r) => (r.evCz ?? -Infinity) >= R.minEvPct && (r.cz?.dec ?? Infinity) <= R.maxDec);
@@ -314,7 +318,7 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
   const funRows = playable.filter((r) => (r.evCz ?? -Infinity) >= R.fun.minEvPct);
   type FunPick = { row: CfbRow; p: number };
   const funBest = new Map<string, FunPick>();
-  const prefer = (r: CfbRow) => (r.market === "total" ? 0 : 1);
+  const prefer = (r: CfbRow) => (baseMarketOf(r.market) === "total" ? 0 : 1);
   for (const r of funRows) {
     const g = games.get(r.gameId);
     const leg = g ? legOf(r, g) : null;

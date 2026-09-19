@@ -4,6 +4,7 @@ import { CFB_LEAGUE, CFB_RULES } from "@/lib/cfb/rules";
 import { kickoffLabel, ptDateOf } from "@/lib/cfb/dates";
 import { matchOddsEvent, normTeam, toOddsEvent, type OddsEvent } from "@/lib/cfb/names";
 import { normCdf, normInv } from "@/lib/cfb/normal";
+import { baseMarketOf, isH1Market, type CfbFullMarketKey } from "@/lib/cfb/markets";
 import type { LeagueConfig, LeagueModel, LeagueRules } from "@/lib/football/league";
 import type {
   CfbBoard,
@@ -87,6 +88,17 @@ export function coverProb(mu: number, sigma: number, line: number): { win: numbe
  * that market (no expected margin / total / win probability).
  */
 export function rowProbAt(model: CfbModel, market: CfbMarketKey, side: CfbSideKey, line: number | null): { win: number; push: number } | null {
+  // 2026-09-19: a first-half market reads the game's 1H model (null until a props pull carried the half's lines)
+  if (isH1Market(market)) {
+    const h = model.h1;
+    if (!h) return null;
+    return probAt(h, baseMarketOf(market), side, line);
+  }
+  return probAt(model, market, side, line);
+}
+
+type ProbModel = Pick<CfbModel, "muMargin" | "muTotal" | "sigma" | "sigmaTotal" | "pHome">;
+function probAt(model: ProbModel, market: CfbFullMarketKey, side: CfbSideKey, line: number | null): { win: number; push: number } | null {
   if (market === "ml") {
     if (model.pHome == null) return null;
     return { win: side === "home" ? model.pHome : 1 - model.pHome, push: 0 };
@@ -126,6 +138,8 @@ export function fmtLine(line: number): string {
 
 /** The row label for a side at a given line ("Indiana ML" · "Indiana -40.5" · "Over 56.5"). */
 export function sideLabel(game: Pick<CfbGame, "home" | "away">, market: CfbMarketKey, side: CfbSideKey, line: number | null): string {
+  // 2026-09-19: a first-half side is the full-game label under a "1H " prefix ("1H Indiana -3.5" · "1H Over 27.5")
+  if (isH1Market(market)) return `1H ${sideLabel(game, baseMarketOf(market), side, line)}`;
   if (market === "total") return `${side === "over" ? "Over" : "Under"} ${line ?? "—"}`;
   const team = side === "home" ? game.home : game.away;
   if (market === "ml") return `${team.short} ML`;
@@ -234,6 +248,17 @@ const EMPTY_MODEL = (M: LeagueModel): CfbModel => ({
   books: { ml: 0, spread: 0, total: 0 },
 });
 
+/** a competitor's first-half points off ESPN's `linescores` (one entry per period; periods 1 and 2 by their `period` field, else the first two), null unless BOTH quarters are posted */
+function h1PointsOf(competitor: Rec): number | null {
+  const ls = arr(competitor.linescores).map(rec).filter((l): l is Rec => !!l);
+  if (ls.length < 2) return null;
+  const byPeriod = (p: number) => ls.find((l) => num(l.period) === p) ?? ls[p - 1];
+  const q1 = num(byPeriod(1)?.value);
+  const q2 = num(byPeriod(2)?.value);
+  if (q1 == null || q2 == null) return null;
+  return q1 + q2;
+}
+
 function shapeGame(raw: unknown, fpi: FpiIndex, M: LeagueModel): CfbGame | null {
   const ev = rec(raw);
   if (!ev) return null;
@@ -257,6 +282,11 @@ function shapeGame(raw: unknown, fpi: FpiIndex, M: LeagueModel): CfbGame | null 
   const period = num(st?.period);
   const clock = status === "live" ? str(st?.displayClock) : null;
   const scored = status === "live" || status === "final";
+  // 2026-09-19 (1H bets): the first-half score, once both quarters are on the linescores — final at halftime / end of the 2nd period, in any later period, or at final
+  const homeH1 = scored ? h1PointsOf(homeC) : null;
+  const awayH1 = scored ? h1PointsOf(awayC) : null;
+  const typeName = (str(type?.name) ?? "").toUpperCase();
+  const h1Final = status === "final" || (period != null && (period >= 3 || (period === 2 && (typeName.includes("HALFTIME") || typeName.includes("END_PERIOD")))));
 
   const broadcasts = arr(comp.broadcasts).map(rec).filter((b): b is Rec => !!b);
   const tv = broadcasts.map((b) => str(arr(b.names)[0])).find((n): n is string => !!n) ?? null;
@@ -280,6 +310,7 @@ function shapeGame(raw: unknown, fpi: FpiIndex, M: LeagueModel): CfbGame | null 
     away,
     homeScore: scored ? num(homeC.score) : null,
     awayScore: scored ? num(awayC.score) : null,
+    ...(homeH1 != null && awayH1 != null ? { homeH1, awayH1, h1Final } : {}),
     espnLine,
     oddsEventId: null,
     model: EMPTY_MODEL(M),
@@ -296,7 +327,16 @@ type BookTotal = { key: string; title: string; T: number; priceO: number; priceU
 const validPrice = (p: number) => Number.isFinite(p) && Math.abs(p) >= 100;
 const weightOf = (key: string, M: LeagueModel) => (key === "pinnacle" ? M.pinnacleWeight : 1);
 
+/** the per-event market keys of the full game — h1.ts passes the first-half keys (h2h_h1 / spreads_h1 / totals_h1) */
+export type OddsMarketKeys = { ml: string; spread: string; total: string };
+const FULL_ODDS_KEYS: OddsMarketKeys = { ml: "h2h", spread: "spreads", total: "totals" };
+
 function readBooks(ev: OddsEvent, M: LeagueModel) {
+  return readBooksOf(ev, M, FULL_ODDS_KEYS, M.sigma, M.sigmaTotal);
+}
+
+/** every book's de-vigged reading of the three side markets under `keys`, the margin / total implied through `sigma` / `sigmaTotal` (2026-09-19: exported for the first-half lines, which read the same event under their own keys and σ) */
+export function readBooksOf(ev: OddsEvent, M: LeagueModel, keys: OddsMarketKeys, sigma: number, sigmaTotal: number) {
   const homeN = normTeam(ev.home_team);
   const awayN = normTeam(ev.away_team);
   const mls: BookMl[] = [];
@@ -305,28 +345,28 @@ function readBooks(ev: OddsEvent, M: LeagueModel) {
   for (const b of ev.bookmakers) {
     const w = weightOf(b.key, M);
     for (const m of b.markets) {
-      if (m.key === "h2h") {
+      if (m.key === keys.ml) {
         const h = m.outcomes.find((o) => normTeam(o.name) === homeN);
         const a = m.outcomes.find((o) => normTeam(o.name) === awayN);
         if (!h || !a || !validPrice(h.price) || !validPrice(a.price)) continue;
         const [ph] = devigProportional([impliedFromAmerican(h.price), impliedFromAmerican(a.price)]);
         if (!(ph > 0 && ph < 1)) continue;
         mls.push({ key: b.key, title: b.title, pHome: ph, priceH: h.price, priceA: a.price, w });
-      } else if (m.key === "spreads") {
+      } else if (m.key === keys.spread) {
         const h = m.outcomes.find((o) => normTeam(o.name) === homeN);
         const a = m.outcomes.find((o) => normTeam(o.name) === awayN);
         if (!h || !a || h.point == null || !validPrice(h.price) || !validPrice(a.price)) continue;
         const [pc] = devigProportional([impliedFromAmerican(h.price), impliedFromAmerican(a.price)]);
         if (!(pc > 0 && pc < 1)) continue;
-        const mu = -h.point + M.sigma * normInv(pc);
+        const mu = -h.point + sigma * normInv(pc);
         spreads.push({ key: b.key, title: b.title, s: h.point, priceH: h.price, priceA: a.price, mu, w });
-      } else if (m.key === "totals") {
+      } else if (m.key === keys.total) {
         const o = m.outcomes.find((x) => x.name.toLowerCase() === "over");
         const u = m.outcomes.find((x) => x.name.toLowerCase() === "under");
         if (!o || !u || o.point == null || !validPrice(o.price) || !validPrice(u.price)) continue;
         const [po] = devigProportional([impliedFromAmerican(o.price), impliedFromAmerican(u.price)]);
         if (!(po > 0 && po < 1)) continue;
-        const muT = o.point + M.sigmaTotal * normInv(po);
+        const muT = o.point + sigmaTotal * normInv(po);
         totals.push({ key: b.key, title: b.title, T: o.point, priceO: o.price, priceU: u.price, muT, w });
       }
     }
@@ -334,6 +374,9 @@ function readBooks(ev: OddsEvent, M: LeagueModel) {
   return { mls, spreads, totals };
 }
 
+export function consensusMedian<T>(items: T[], value: (t: T) => number, weight: (t: T) => number, minBooks: number): number | null {
+  return median(items, value, weight, minBooks);
+}
 function median<T>(items: T[], value: (t: T) => number, weight: (t: T) => number, minBooks: number): number | null {
   if (items.length < minBooks) return null;
   return weightedMedian(items.map(value), items.map(weight));
@@ -344,6 +387,8 @@ function median<T>(items: T[], value: (t: T) => number, weight: (t: T) => number
 function quote(key: string, title: string, price: number, line: number | null): CfbQuote {
   return { book: key, title, price, line, dec: decFromAmerican(price) };
 }
+/** a book's quote as the row carries it (2026-09-19: exported for h1.ts) */
+export const bookQuote = quote;
 
 type SideQuotes = { all: CfbQuote[]; cz: CfbQuote | null; dk: CfbQuote | null; fd: CfbQuote | null; pin: CfbQuote | null };
 
@@ -423,59 +468,8 @@ function priceGame(game: CfbGame, ev: OddsEvent | null, now: number, bankroll: n
   const rows: CfbRow[] = [];
 
   const push = (market: CfbMarketKey, side: CfbSideKey, line: number | null, mktProb: number | null, nBooks: number, quotes: CfbQuote[]) => {
-    const fairAt = rowProbAt(model, market, side, line);
-    if (!fairAt) return;
-    const sq = collect(quotes, M.settleBook);
-    const best = bestOf(sq.all, market === "ml" ? null : line);
-    const evAt = (q: CfbQuote | null): number | null => {
-      if (!q) return null;
-      const p = market === "ml" ? fairAt : rowProbAt(model, market, side, q.line);
-      if (!p) return null;
-      return round(evPct(p.win, p.push, q.dec), 2);
-    };
-    const evCz = evAt(sq.cz);
-    const evBest = evAt(best);
-    const playable = !!sq.cz && upcoming;
-    let kelly = 0;
-    if (playable && sq.cz) {
-      const p = market === "ml" ? fairAt : rowProbAt(model, market, side, sq.cz.line);
-      if (p) kelly = kellyStake(p.win, p.push, sq.cz.dec, bankroll, L.rules);
-    }
-    const noPush = fairAt.win / Math.max(1e-9, 1 - fairAt.push);
-    const clamped = Math.min(1 - 1e-6, Math.max(1e-6, noPush));
-    const team = side === "home" ? game.home : side === "away" ? game.away : null;
-    const sub =
-      market === "total"
-        ? `${game.away.abbr} @ ${game.home.abbr} · ${when}`
-        : side === "home"
-          ? `vs ${game.away.short} · ${when}`
-          : `@ ${game.home.short} · ${when}`;
-    rows.push({
-      key: `${game.id}|${market}|${side}|${line ?? ""}`,
-      gameId: game.id,
-      market,
-      side,
-      label: sideLabel(game, market, side, line),
-      sub,
-      teamId: team?.id ?? null,
-      line,
-      fair: fairAt.win,
-      push: fairAt.push,
-      fairAm: americanFromProb(clamped),
-      mkt: mktProb,
-      books: nBooks,
-      quotes: Object.fromEntries(quotes.map(q => [q.book, q])),
-      cz: sq.cz,
-      best,
-      dk: sq.dk,
-      fd: sq.fd,
-      pin: sq.pin,
-      evCz,
-      evBest,
-      grade: gradeFromEv(evCz),
-      kelly,
-      playable,
-    });
+    const row = sideRow({ game, model, upcoming, when, bankroll, league: L }, market, side, line, mktProb, nBooks, quotes);
+    if (row) rows.push(row);
   };
 
   if (mkt != null && pHome != null) {
@@ -495,6 +489,73 @@ function priceGame(game: CfbGame, ev: OddsEvent | null, now: number, bankroll: n
     push("total", "under", totalLine, underMkt, books.totals.length, books.totals.map((b) => quote(b.key, b.title, b.priceU, b.T)));
   }
   game.rows = rows;
+}
+
+/** what one priced side needs from its game: the model its fair price reads, whether the game is still ahead, the kickoff label, the bankroll and the league's rules / settle book */
+export type SideRowCtx = { game: CfbGame; model: CfbModel; upcoming: boolean; when: string; bankroll: number; league: LeagueConfig };
+
+/**
+ * ONE PRICED SIDE (the body of priceGame's push, lifted out 2026-09-19 so the first-half rows are
+ * built by the very same code — h1.ts attachH1). Null when the model has no fair price for the
+ * side at that line. A 1H market's ML / line handling follows its full-game twin (baseMarketOf).
+ */
+export function sideRow(ctx: SideRowCtx, market: CfbMarketKey, side: CfbSideKey, line: number | null, mktProb: number | null, nBooks: number, quotes: CfbQuote[]): CfbRow | null {
+  const { game, model, upcoming, when, bankroll } = ctx;
+  const M = ctx.league.model;
+  const base = baseMarketOf(market);
+  const fairAt = rowProbAt(model, market, side, line);
+  if (!fairAt) return null;
+  const sq = collect(quotes, M.settleBook);
+  const best = bestOf(sq.all, base === "ml" ? null : line);
+  const evAt = (q: CfbQuote | null): number | null => {
+    if (!q) return null;
+    const p = base === "ml" ? fairAt : rowProbAt(model, market, side, q.line);
+    if (!p) return null;
+    return round(evPct(p.win, p.push, q.dec), 2);
+  };
+  const evCz = evAt(sq.cz);
+  const evBest = evAt(best);
+  const playable = !!sq.cz && upcoming;
+  let kelly = 0;
+  if (playable && sq.cz) {
+    const p = base === "ml" ? fairAt : rowProbAt(model, market, side, sq.cz.line);
+    if (p) kelly = kellyStake(p.win, p.push, sq.cz.dec, bankroll, ctx.league.rules);
+  }
+  const noPush = fairAt.win / Math.max(1e-9, 1 - fairAt.push);
+  const clamped = Math.min(1 - 1e-6, Math.max(1e-6, noPush));
+  const team = side === "home" ? game.home : side === "away" ? game.away : null;
+  const sub =
+    base === "total"
+      ? `${game.away.abbr} @ ${game.home.abbr} · ${when}`
+      : side === "home"
+        ? `vs ${game.away.short} · ${when}`
+        : `@ ${game.home.short} · ${when}`;
+  return {
+    key: `${game.id}|${market}|${side}|${line ?? ""}`,
+    gameId: game.id,
+    market,
+    side,
+    label: sideLabel(game, market, side, line),
+    sub,
+    teamId: team?.id ?? null,
+    line,
+    fair: fairAt.win,
+    push: fairAt.push,
+    fairAm: americanFromProb(clamped),
+    mkt: mktProb,
+    books: nBooks,
+    quotes: Object.fromEntries(quotes.map((q) => [q.book, q])),
+    cz: sq.cz,
+    best,
+    dk: sq.dk,
+    fd: sq.fd,
+    pin: sq.pin,
+    evCz,
+    evBest,
+    grade: gradeFromEv(evCz),
+    kelly,
+    playable,
+  };
 }
 
 /* ---------- the board ---------- */

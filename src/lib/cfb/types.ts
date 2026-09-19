@@ -19,7 +19,8 @@ import type { League, LeagueConfig, LeagueRules } from "@/lib/football/league";
  * FPI figure, a score is ESPN's own score. A missing feed value is null and renders "—".
  */
 
-export type CfbMarketKey = "ml" | "spread" | "total";
+/** the six side markets: the full game and its first half (markets.ts owns the vocabulary — 2026-09-19, "1H bets should be included on NFL & CFB") */
+export type CfbMarketKey = "ml" | "spread" | "total" | "ml_1h" | "spread_1h" | "total_1h";
 export type CfbSideKey = "home" | "away" | "over" | "under";
 export type CfbStatus = "upcoming" | "live" | "final" | "postponed";
 
@@ -50,6 +51,21 @@ export type CfbTeam = {
     for over/under); null for moneylines. `dec` is the decimal form of `price`. */
 export type CfbQuote = { book: string; title: string; price: number; line: number | null; dec: number };
 
+/** The FIRST-HALF model behind a game's 1H rows (2026-09-19): consensus-only (no FPI blend — FPI
+    rates the full game), the half's own σ (model.sigma × H1_SIGMA_SCALE), books behind each 1H
+    market, and when the per-event pull priced it. Absent (undefined / null) until a props pull
+    carried the half's lines. */
+export type CfbH1Model = {
+  muMargin: number | null;
+  muTotal: number | null;
+  sigma: number;
+  sigmaTotal: number;
+  pHome: number | null;
+  books: { ml: number; spread: number; total: number };
+  /** ISO instant of the per-event pull these 1H lines came from */
+  pricedAt: string;
+};
+
 /** The margin model behind a game — every number the row EV is derived from, for The Sharp
     to explain. Margins are HOME − AWAY. `parts` are the inputs that existed for this game. */
 export type CfbModel = {
@@ -75,6 +91,8 @@ export type CfbModel = {
   };
   /** books behind the consensus per market */
   books: { ml: number; spread: number; total: number };
+  /** the first-half model, once a props pull carried the 1H lines (h1.ts attachH1) */
+  h1?: CfbH1Model | null;
 };
 
 /** One bettable side. `key` doubles as the ledger leg's `lkey`. */
@@ -150,6 +168,11 @@ export type CfbGame = {
   away: CfbTeam;
   homeScore: number | null;
   awayScore: number | null;
+  /** first-half points (ESPN's quarter linescores, periods 1 + 2) — present only once ESPN posts both halves' quarters (2026-09-19, 1H bets) */
+  homeH1?: number | null;
+  awayH1?: number | null;
+  /** the first half is over: ESPN says halftime / end of the 2nd period, a later period, or final */
+  h1Final?: boolean;
   /** ESPN's embedded DraftKings line — CONTEXT ONLY (rendered when the odds feed has no match) */
   espnLine: { spread: number | null; total: number | null; details: string | null } | null;
   /** the matched Odds API event id, null when the feed had no event for this game */
@@ -406,7 +429,17 @@ export type CfbCard = {
 };
 
 /** Final scores keyed by ESPN event id, for grading. */
-export type CfbFinals = Record<string, { home: number; away: number; final: boolean; status: CfbStatus }>;
+export type CfbFinals = Record<string, { home: number; away: number; final: boolean; status: CfbStatus; h1?: CfbH1Final }>;
+/** the first-half score of a game, for grading its 1H legs — present only when ESPN posted both halves' quarters */
+export type CfbH1Final = { home: number; away: number; final: boolean };
+
+/* ---------- the first-half lines a props pull carried (2026-09-19) ---------- */
+
+/** one priced 1H side, exactly the inputs priceGame's own push takes: the consensus line, the de-vigged market P(side), the book count and every book's quote */
+export type CfbH1Side = { market: "ml_1h" | "spread_1h" | "total_1h"; side: CfbSideKey; line: number | null; mkt: number | null; books: number; quotes: CfbQuote[] };
+export type CfbH1Game = { gameId: string; oddsEventId: string | null; model: CfbH1Model; sides: CfbH1Side[] };
+/** the per-date 1H set the props route persists (pl:<league>:props:v1:<date>:h1) and the slate routes attach */
+export type CfbH1Store = { generatedAt: string; games: CfbH1Game[] };
 
 /* ---------- module contracts (pinned so owners can build in parallel) ---------- */
 

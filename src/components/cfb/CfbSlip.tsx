@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PairMark, PlayerMark, TeamMark, type TeamMarkTeam } from "@/components/cfb/TeamMark";
 import { useLeague } from "@/components/football/LeagueContext";
+import { isH1Market, marketWord } from "@/lib/cfb/markets";
 import type { CfbPropMarket } from "@/lib/cfb/props-types";
 import type { CfbMarketKey } from "@/lib/cfb/types";
 import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
@@ -182,7 +183,7 @@ export function CfbSlip({
                         <span className="block truncate text-text">
                           {l.label}{" "}
                           <span className="text-[9.5px] uppercase text-faint">
-                            {l.kind === "prop" ? l.marketLabel ?? l.market : l.market === "ml" ? "ML" : l.market}
+                            {l.kind === "prop" ? l.marketLabel ?? l.market : isH1Market(l.market) ? marketWord(l.market) : l.market === "ml" ? "ML" : l.market}
                           </span>
                         </span>
                         <span className="block truncate text-[9.5px] text-faint">{l.sub}</span>

@@ -2,6 +2,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { redis, storeEnv } from "@/lib/server/store";
 import { CFB_PROPS } from "./rules";
 import type { CfbPropRow, CfbPropsBoard } from "./props-types";
+import type { CfbH1Store } from "./types";
 import type { LeagueProps } from "@/lib/football/league";
 
 /**
@@ -61,6 +62,8 @@ export type PropsStoreKeys = { board: string; spend: string };
 
 export const propsBoardKey = (date: string, keys: PropsStoreKeys = CFB_PROPS_REDIS) => `${keys.board}${date}`;
 export const propsSpendKey = (ptDate: string, keys: PropsStoreKeys = CFB_PROPS_REDIS) => `${keys.spend}${ptDate}`;
+/** the date's first-half lines (2026-09-19): one gzip+base64 value beside the board index, same retention */
+export const propsH1Key = (date: string, keys: PropsStoreKeys = CFB_PROPS_REDIS) => `${keys.board}${date}:h1`;
 
 /** rows per stored chunk: 400 rows ≈ 380 KB of JSON ≈ 50 KB gzip+base64 — far under Upstash's 1 MB request cap */
 export const CFB_PROPS_CHUNK_ROWS = 400;
@@ -68,6 +71,23 @@ export const CFB_PROPS_CHUNK_ROWS = 400;
 export const UPSTASH_MAX_REQUEST_BYTES = 1_000_000;
 
 type StoredIndex = { __chunks: string[]; board: CfbPropsBoard };
+
+export const encodeH1 = (h1: CfbH1Store): string => gzipSync(Buffer.from(JSON.stringify(h1), "utf8")).toString("base64");
+/** the stored 1H set, or null when unreadable / not the shape the slate seam relies on */
+export const decodeH1 = (raw: string | null): CfbH1Store | null => {
+  if (!raw) return null;
+  try {
+    const j = JSON.parse(gunzipSync(Buffer.from(raw, "base64")).toString("utf8")) as Partial<CfbH1Store>;
+    if (!j || typeof j !== "object" || typeof j.generatedAt !== "string" || !Array.isArray(j.games)) return null;
+    if (!Number.isFinite(Date.parse(j.generatedAt))) return null;
+    for (const g of j.games) {
+      if (!g || typeof g !== "object" || typeof g.gameId !== "string" || !g.model || typeof g.model !== "object" || !Array.isArray(g.sides)) return null;
+    }
+    return { generatedAt: j.generatedAt, games: j.games };
+  } catch {
+    return null;
+  }
+};
 
 const utf8Len = (s: string) => Buffer.byteLength(s, "utf8");
 export const encodeRows = (rows: CfbPropRow[]): string => gzipSync(Buffer.from(JSON.stringify(rows), "utf8")).toString("base64");
@@ -207,6 +227,10 @@ export type CfbPropsStore = {
   readSpend(ptDate: string): Promise<number>;
   /** add `credits` to the day's tally; resolves to the new total */
   addSpend(ptDate: string, credits: number): Promise<number>;
+  /** the date's stored first-half lines (2026-09-19), or null when absent / unreadable */
+  readH1(date: string): Promise<CfbH1Store | null>;
+  /** persist the date's first-half lines, retained like the board */
+  writeH1(date: string, h1: CfbH1Store): Promise<void>;
 };
 
 /** The store for one league's `keys` (CFB_PROPS_REDIS by default), or null when the Upstash env is not configured (the route then runs data-cache only). */
@@ -237,6 +261,15 @@ export function propsStore(keys: PropsStoreKeys = CFB_PROPS_REDIS): CfbPropsStor
       const total = (await redis(["INCRBY", propsSpendKey(ptDate, keys), n])) as number;
       await redis(["EXPIRE", propsSpendKey(ptDate, keys), CFB_PROPS_SPEND_TTL_SEC]);
       return Number.isFinite(Number(total)) ? Number(total) : n;
+    },
+    async readH1(date) {
+      const raw = (await redis(["GET", propsH1Key(date, keys)])) as string | null;
+      return decodeH1(typeof raw === "string" ? raw : null);
+    },
+    async writeH1(date, h1) {
+      const value = encodeH1(h1);
+      if (utf8Len(value) > UPSTASH_MAX_REQUEST_BYTES) throw new Error("h1 store over 1 MB");
+      await redis(["SET", propsH1Key(date, keys), value, "EX", CFB_PROPS.boardRetainSec]);
     },
   };
 }

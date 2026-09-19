@@ -190,7 +190,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
     expect(cats).toMatch(/mixed: \{[^\n]*live: true/);
     expect(cats).toMatch(/\n  live: \{[^\n]*live: true/);
-    expect(cats.match(/live: false/g)?.length).toBe(10);
+    expect(cats.match(/live: false/g)?.length).toBe(13);
     expect(board).toMatch(/const PREGAME_CATS = CFB_PARLAY_CATEGORIES\.filter\(\(k\) => !PARLAY_CATS\[k\]\.live\);/);
   });
   it("the default category is the first non-empty pregame set (never opens on an empty set while another has tickets)", () => {
@@ -401,7 +401,7 @@ describe("CFB Board — INSTRUCTION 44 (2026-09-05): in-game legs in the categor
     expect(cats).not.toMatch(/upcoming games only|haven't kicked off|distinct upcoming games/);
     // MIXED / LIVE keep their own copy and their live flag; the flag count is untouched (10 pregame categories)
     expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
-    expect(cats.match(/live: false/g)?.length).toBe(10);
+    expect(cats.match(/live: false/g)?.length).toBe(13);
     // the empty state no longer demands a game that hasn't kicked off
     expect(section).toMatch(/a selected-book price \(pregame or in play\) and grade D or better/);
     expect(section).not.toMatch(/on a game that hasn't kicked off/);

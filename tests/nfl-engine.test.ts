@@ -337,8 +337,8 @@ describe("gradeCfbEntry on the 2026-08-22 finals (real capture) — every leg se
 
   it("finalsFromEspnOf(NFL_LEAGUE) reads all 10 finals with ESPN's own scores (Lions 17–13 Commanders)", () => {
     expect(Object.keys(finals)).toHaveLength(10);
-    expect(finals["401873601"]).toEqual({ home: 17, away: 13, final: true, status: "final" });
-    expect(finals["401873293"]).toEqual({ home: 24, away: 21, final: true, status: "final" });
+    expect(finals["401873601"]).toEqual({ home: 17, away: 13, final: true, status: "final", h1: { home: 7, away: 7, final: true } });
+    expect(finals["401873293"]).toEqual({ home: 24, away: 21, final: true, status: "final", h1: { home: 10, away: 14, final: true } });
     // finalsOf over the same shaped games is the same map (one derivation, two entry points)
     const direct = buildCfbBoard({ date: DATE_0822, espnEvents: FINALS_0822.events, oddsEvents: [], fpi: null, now: NOW_0822, bankroll: 2500, league: NFL_LEAGUE });
     expect(finalsOf(direct.games)).toEqual(finals);

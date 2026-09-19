@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
 import { syncAuthed } from "@/lib/server/store";
 import { NFL_BANK_BASE, NFL_LEAGUE } from "@/lib/nfl/rules";
+import { propsStore } from "@/lib/cfb/props-store";
 import { espnEventsOf, finalsFromEspnOf, slateFromEspnOf } from "@/lib/cfb/slate-server";
 import type { CfbSlate } from "@/lib/cfb/types";
 
@@ -57,7 +58,9 @@ export async function GET(req: NextRequest) {
 
   let slate: CfbSlate;
   try {
-    slate = await slateFromEspnOf(NFL_LEAGUE, date, espn, now, bankroll, { fresh: refresh });
+    // 2026-09-19 (1H bets): the date's stored first-half lines (written by the NFL props pull, under the NFL keys) ride onto the board
+    const h1 = (await propsStore({ board: NFL_LEAGUE.redis.propsBoard, spend: NFL_LEAGUE.redis.propsSpend })?.readH1(date).catch(() => null)) ?? null;
+    slate = await slateFromEspnOf(NFL_LEAGUE, date, espn, now, bankroll, h1 ? { fresh: refresh, h1: h1.games } : { fresh: refresh });
   } catch (e) {
     return NextResponse.json({ error: `board failed: ${(e as Error).message}` }, { status: 502 });
   }

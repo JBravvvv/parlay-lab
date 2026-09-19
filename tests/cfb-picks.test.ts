@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { buildCfbBoard, evPct } from "@/lib/cfb/model";
+import { isH1Market } from "@/lib/cfb/markets";
 import { buildCfbPicks, CFB_PICK_CATEGORIES, legFits, rankPicks, setBandOf } from "@/lib/cfb/picks";
 import { CFB_PARLAY_CATEGORIES, type CfbParlayCategory, type CfbPickRow } from "@/lib/cfb/props-types";
 import { CFB_PARLAYS } from "@/lib/cfb/rules";
@@ -738,6 +739,11 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
   it("every category set stays within its exposure-limited capacity with a spread of leg counts and distinct tickets", () => {
     for (const k of CFB_PARLAY_CATEGORIES) {
       const list = big.sets[k];
+      // 2026-09-19: the synthetic slate carries no first-half lines, so the three 1H sets are empty here (tests/cfb-h1.test.ts builds them)
+      if (isH1Market(k)) {
+        expect(list, k).toEqual([]);
+        continue;
+      }
       expect(list.length, k).toBeGreaterThan(0);
       expect(list.length, k).toBeLessThanOrEqual(CFB_PARLAYS.perCategory);
       const exposure = new Map<string, number>();

@@ -273,6 +273,11 @@ export function CfbSharp() {
                 <span className="num inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-white/[0.03] px-2.5 py-1 text-[11px] text-muted">
                   consensus books · ML {sumBooks(slate.games, "ml")} · Spread {sumBooks(slate.games, "spread")} · Total {sumBooks(slate.games, "total")}
                 </span>
+                {slate.games.some((g) => !!g.model.h1) && (
+                  <span className="num inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-white/[0.03] px-2.5 py-1 text-[11px] text-muted">
+                    1H lines · {slate.games.filter((g) => !!g.model.h1).length} games
+                  </span>
+                )}
               </div>
               <p className="mt-2 text-[10.5px] leading-relaxed text-faint">
                 Games each book prices on this slate. Paper tickets retain their recorded settlement book; Pinnacle counts ×{L.model.pinnacleWeight} in the consensus median; a

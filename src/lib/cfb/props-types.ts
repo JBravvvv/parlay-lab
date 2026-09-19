@@ -5,6 +5,7 @@
  * the book's own number, a missing value is null and renders "—".
  */
 import type { Grade } from "@/lib/grade";
+import { H1_ODDS_MARKET_KEYS } from "./markets";
 import type { CfbQuote, CfbStatus } from "./types";
 
 export type CfbPropMarket = "anytime_td" | "pass_tds" | "pass_yds" | "receptions" | "rush_yds" | "rec_yds";
@@ -28,7 +29,9 @@ export const CFB_PROP_MARKETS: readonly {
 ] as const;
 
 /** the six Odds API market keys, comma-joined for the `markets=` query */
-export const CFB_PROPS_ODDS_MARKETS: string = CFB_PROP_MARKETS.map((m) => m.odds).join(",");
+/** the per-event market list both leagues pull: the six player markets, then the three first-half game lines
+    (2026-09-19, "1H bets should be included on NFL & CFB" — the first half rides the props call, no new pull) */
+export const CFB_PROPS_ODDS_MARKETS: string = [...CFB_PROP_MARKETS.map((m) => m.odds), ...H1_ODDS_MARKET_KEYS].join(",");
 
 export type CfbPropSide = "over" | "under" | "yes";
 
@@ -129,6 +132,8 @@ export type CfbPropsBoard = {
   czMissing: number;
   /** priced games on this answer with ZERO rows — no two-sided quote on a tracked market at the books we price (the small games) */
   noProps: number;
+  /** games whose first-half lines this answer carries (fresh or carried) — the slate routes attach them (2026-09-19) */
+  h1Games?: number;
 };
 
 export type CfbParlayTier = "SAFER" | "LONGSHOT" | "MIX";
@@ -139,7 +144,7 @@ export type CfbParlayView = "parlays" | "mixed" | "live";
     (a live leg beside pregame legs) and LIVE (in-play legs only). INSTRUCTION 44 (2026-09-05):
     the single-market sets and COMBOS draw from pregame AND in-game legs. Up to CFB_PARLAYS.perCategory
     ranked tickets each. */
-export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
+export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
 export type CfbParlayCategory = (typeof CFB_PARLAY_CATEGORIES)[number];
 
 export type CfbParlayLeg = {

@@ -1,6 +1,7 @@
 import { decToAm } from "@/lib/ticket-math";
 import { gradeRank } from "@/lib/grade";
 import { CFB_PARLAYS } from "@/lib/cfb/rules";
+import { baseMarketOf } from "@/lib/cfb/markets";
 import { kellyStake, rowProbAt } from "@/lib/cfb/model";
 import type { CfbBoard, CfbGame, CfbRow } from "@/lib/cfb/types";
 import { CFB_PARLAY_CATEGORIES } from "@/lib/cfb/props-types";
@@ -11,7 +12,8 @@ import type { League, LeagueParlays, LeagueRules } from "@/lib/football/league";
  * THE CFB PICKS + PARLAYS ENGINE (2026-09-05, Josh: "what should be on the 'Board' tab is all
  * of the prop parlay options like MLB has with live, mixed, safe. Longshots, etc").
  * `buildCfbPicks` is pure: a priced board (sides) plus the props board (player rows, null
- * while they load) → ranked pick categories, the legacy tiered view and twelve category sets.
+ * while they load) → ranked pick categories, the legacy tiered view and fifteen category sets
+ * (2026-09-19: the three first-half markets — ml_1h / spread_1h / total_1h — are sides like any other).
  * Every number comes from the rows handed in — a leg's price is Caesars' posted price, its
  * probability the model's own figure at Caesars' line — nothing here is estimated in the
  * feed's place.
@@ -99,7 +101,7 @@ import type { League, LeagueParlays, LeagueRules } from "@/lib/football/league";
  */
 
 export const CFB_PROP_CATEGORIES = ["anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds"] as const;
-export const CFB_PICK_CATEGORIES = ["all", "ml", "spread", "total", ...CFB_PROP_CATEGORIES] as const;
+export const CFB_PICK_CATEGORIES = ["all", "ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", ...CFB_PROP_CATEGORIES] as const;
 
 type Leg = CfbParlayLeg & { evCz: number; live: boolean };
 type Draft = { legs: Leg[]; dec: number; prob: number; ev: number; key: string; gated: boolean };
@@ -138,7 +140,7 @@ function sidePick(row: CfbRow, game: CfbGame, live: boolean): CfbPickRow {
     push: row.push,
     // INSTRUCTION 46 (2026-09-08): a side pick is marked with the team it is on; a total has none
     player: null,
-    teamId: row.market === "total" ? null : row.teamId,
+    teamId: baseMarketOf(row.market) === "total" ? null : row.teamId,
     headshot: null,
     pos: null,
   };
@@ -201,7 +203,7 @@ export function rankPicks(rows: CfbPickRow[]): CfbPickRow[] {
 /** `floor` is the EV gate: minLegEvPct (tier 1) everywhere except the single-market sets' tier-2 pool (setFloorEvPct); the builder gathers at the floor and filters tier 1 from it */
 function sideLeg(row: CfbRow, game: CfbGame, live: boolean, floor: number = CFB_PARLAYS.minLegEvPct): Leg | null {
   if (!row.cz || row.evCz == null || row.evCz < floor) return null;
-  const line = row.market === "ml" ? null : row.cz.line;
+  const line = baseMarketOf(row.market) === "ml" ? null : row.cz.line;
   const p = rowProbAt(game.model, row.market, row.side, line) ?? { win: row.fair, push: row.push };
   const prob = p.win / Math.max(1e-9, 1 - p.push);
   if (!(prob > 0) || !(prob < 1)) return null;
@@ -264,7 +266,8 @@ export function legFits(leg: Leg, legs: Leg[], maxPerGame: number = CFB_PARLAYS.
     if (l.rowKey === leg.rowKey) return false;
     if (l.gameId === leg.gameId) {
       perGame++;
-      if (l.market === leg.market) return false;
+      // 2026-09-19: one leg per market per game counts the half with the full game (no FG spread + 1H spread stack)
+      if (baseMarketOf(l.market) === baseMarketOf(leg.market)) return false;
     }
     if (leg.player && l.player && playerKey(l.player) === playerKey(leg.player)) return false;
   }
@@ -513,6 +516,9 @@ const SET_LABEL: Record<CfbParlayCategory, string> = {
   ml: "ML",
   spread: "SPREAD",
   total: "TOTAL",
+  ml_1h: "1H ML",
+  spread_1h: "1H SPREAD",
+  total_1h: "1H TOTAL",
   anytime_td: "ANYTIME TD",
   pass_tds: "PASS TDS",
   pass_yds: "PASS YDS",
@@ -706,7 +712,7 @@ export function buildCfbPicks(
   }
   push(distinct(mixDrafts.sort(draftByEv), R.perView), "MIX", "parlays", parlays);
 
-  /* ----- INSTRUCTION 42: the twelve category sets ----- */
+  /* ----- INSTRUCTION 42: the twelve category sets (fifteen since the 2026-09-19 first-half markets) ----- */
   const sets = {} as Record<CfbParlayCategory, CfbParlay[]>;
   /** INSTRUCTION 44 review fix: since the single-market sets and combo draw in-game legs too, one
       leg set could be built by a single-market set AND by LIVE, or by combo AND by MIXED / LIVE.

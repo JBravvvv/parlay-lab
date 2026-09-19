@@ -6,6 +6,7 @@ import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { KellyChip } from "@/components/ui/KellyChip";
 import { OddsGrid, type OddsGridCell, type OddsGridRow } from "@/components/ui/OddsGrid";
+import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { fmtLine } from "@/lib/cfb/model";
 import { useLeague } from "@/components/football/LeagueContext";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow } from "@/lib/cfb/types";
@@ -73,6 +74,10 @@ export type MarketSides = {
   ml: { away: CfbRow | null; home: CfbRow | null };
   spread: { away: CfbRow | null; home: CfbRow | null };
   total: { over: CfbRow | null; under: CfbRow | null };
+  /** the first-half lines (2026-09-19) — null cells when no book posted the half */
+  ml_1h: { away: CfbRow | null; home: CfbRow | null };
+  spread_1h: { away: CfbRow | null; home: CfbRow | null };
+  total_1h: { over: CfbRow | null; under: CfbRow | null };
 };
 
 /** The game's rows keyed by market and side (null where the market has no consensus). */
@@ -82,28 +87,36 @@ export function marketSides(game: CfbGame): MarketSides {
     ml: { away: find("ml", "away"), home: find("ml", "home") },
     spread: { away: find("spread", "away"), home: find("spread", "home") },
     total: { over: find("total", "over"), under: find("total", "under") },
+    ml_1h: { away: find("ml_1h", "away"), home: find("ml_1h", "home") },
+    spread_1h: { away: find("spread_1h", "away"), home: find("spread_1h", "home") },
+    total_1h: { over: find("total_1h", "over"), under: find("total_1h", "under") },
   };
 }
 
-/** The rows in display order: ML away/home, spread away/home, total over/under. */
+/** The rows in display order: ML away/home, spread away/home, total over/under, then the same six for the first half. */
 export function orderedRows(game: CfbGame): CfbRow[] {
   const s = marketSides(game);
-  return [s.ml.away, s.ml.home, s.spread.away, s.spread.home, s.total.over, s.total.under].filter((r): r is CfbRow => !!r);
+  return [s.ml.away, s.ml.home, s.spread.away, s.spread.home, s.total.over, s.total.under, s.ml_1h.away, s.ml_1h.home, s.spread_1h.away, s.spread_1h.home, s.total_1h.over, s.total_1h.under].filter(
+    (r): r is CfbRow => !!r,
+  );
 }
 
 /** "UNT +40.5" · "IU ML" · "O 56.5" — the compact cell label (abbreviations, not names). */
 export function cellLabel(row: CfbRow, game: CfbGame): string {
-  if (row.market === "total") return `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}`;
+  const base = baseMarketOf(row.market);
+  const pre = isH1Market(row.market) ? "1H " : "";
+  if (base === "total") return `${pre}${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}`;
   const team = row.side === "home" ? game.home : game.away;
-  if (row.market === "ml") return `${team.abbr} ML`;
-  return `${team.abbr} ${row.line == null ? "—" : fmtLine(row.line)}`;
+  if (base === "ml") return `${pre}${team.abbr} ML`;
+  return `${pre}${team.abbr} ${row.line == null ? "—" : fmtLine(row.line)}`;
 }
 
 /** A book's quote as text: the price, plus its own line when it differs from the row's consensus line. */
 export function quoteText(q: CfbQuote | null, row: CfbRow): string {
   if (!q) return "—";
-  const differs = row.market !== "ml" && q.line != null && row.line != null && Math.abs(q.line - row.line) > 1e-9;
-  return differs ? `${fmtAmerican(q.price)} @ ${row.market === "spread" ? fmtLine(q.line!) : q.line}` : fmtAmerican(q.price);
+  const base = baseMarketOf(row.market);
+  const differs = base !== "ml" && q.line != null && row.line != null && Math.abs(q.line - row.line) > 1e-9;
+  return differs ? `${fmtAmerican(q.price)} @ ${base === "spread" ? fmtLine(q.line!) : q.line}` : fmtAmerican(q.price);
 }
 
 /** The header's status block: kickoff, live clock, FINAL, or PPD. */
@@ -144,11 +157,13 @@ export function sideCell(
 ): OddsGridCell {
   if (!row) return { aria: "no line" };
   // 2026-09-18: the row's own grade rides every cell, and the consensus bet%/money% for this side when the page carries the game
-  const split = sideSplit(opts.splits, row.market, row.side);
-  const line = row.market === "ml" ? undefined : row.market === "total" ? `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}` : row.line == null ? "—" : fmtLine(row.line);
+  // (a first-half row has no public split — the feed carries full-game sides only)
+  const base = baseMarketOf(row.market);
+  const split = isH1Market(row.market) ? null : sideSplit(opts.splits, row.market, row.side);
+  const line = base === "ml" ? undefined : base === "total" ? `${row.side === "over" ? "O" : "U"} ${row.line ?? "—"}` : row.line == null ? "—" : fmtLine(row.line);
   if (!row.cz) return { line, price: "—", tone: "muted", onClick: opts.onClick, selected: opts.picked, aria: `${row.label} — no selected-book price`, split };
-  const czDiffers = row.market !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
-  const czLine = czDiffers ? (row.market === "spread" ? fmtLine(row.cz.line!) : `${row.side === "over" ? "O" : "U"} ${row.cz.line}`) : line;
+  const czDiffers = base !== "ml" && row.cz.line != null && row.line != null && Math.abs(row.cz.line - row.line) > 1e-9;
+  const czLine = czDiffers ? (base === "spread" ? fmtLine(row.cz.line!) : `${row.side === "over" ? "O" : "U"} ${row.cz.line}`) : line;
   const closed = !row.playable && opts.game.status !== "upcoming";
   const tone: OddsGridCell["tone"] = closed ? "muted" : (row.evCz ?? -1) > 0 ? "ev" : row.cz.price > 0 ? "plus" : "minus";
   return {
@@ -219,6 +234,13 @@ export function CfbGameCard({
       cells: [cell(sides.spread.home), cell(sides.ml.home), cell(sides.total.under)],
     },
   ];
+  // 2026-09-19: the first-half lines as two more rows of the same grid, only when a book posted the half
+  if (game.rows.some((r) => isH1Market(r.market))) {
+    rows.push(
+      { key: `${game.id}-away-1h`, team: <H1Block team={game.away} score={scored ? game.awayH1 ?? null : null} />, cells: [cell(sides.spread_1h.away), cell(sides.ml_1h.away), cell(sides.total_1h.over)] },
+      { key: `${game.id}-home-1h`, team: <H1Block team={game.home} score={scored ? game.homeH1 ?? null : null} />, cells: [cell(sides.spread_1h.home), cell(sides.ml_1h.home), cell(sides.total_1h.under)] },
+    );
+  }
 
   /* the +EV sides at the selected book, best first — the everyday bettor's "what's the play here" */
   const edges = orderedRows(game)
@@ -350,6 +372,17 @@ function TeamBlock({
         <div className="num truncate text-[10px] text-faint">{sub ?? team.short}</div>
       </div>
       {scored && <span className={`num shrink-0 pr-1 text-[18px] font-bold leading-none ${winner ? "text-text" : "text-muted"}`}>{score ?? "—"}</span>}
+    </div>
+  );
+}
+
+/** the first-half row's team column: a "1H" tag, the abbreviation, and the half-time score once ESPN posts it */
+function H1Block({ team, score }: { team: CfbGame["home"]; score: number | null }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="shrink-0 rounded border border-line-2 px-1 py-0.5 text-[9px] font-bold tracking-[0.12em] text-faint">1H</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-muted">{team.abbr}</span>
+      {score != null && <span className="num shrink-0 pr-1 text-[13px] font-bold leading-none text-muted">{score}</span>}
     </div>
   );
 }

@@ -183,7 +183,7 @@ describe("the NFL props rules", () => {
   });
   it("the six NFL prop markets are the six CFB market keys, in the same order", () => {
     expect(NFL_LEAGUE.feeds.oddsPropMarkets).toBe(CFB_PROPS_ODDS_MARKETS);
-    expect(NFL_LEAGUE.feeds.oddsPropMarkets.split(",")).toEqual(CFB_PROP_MARKETS.map((m) => m.odds));
+    expect(NFL_LEAGUE.feeds.oddsPropMarkets.split(",")).toEqual([...CFB_PROP_MARKETS.map((m) => m.odds), "h2h_h1", "spreads_h1", "totals_h1"]);
     expect(NFL_LEAGUE.feeds.oddsEventBase).toBe("https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events");
   });
   it("affordableEvents on the NFL budget: 1000 / 31 buys at most 32 events", () => {
@@ -250,7 +250,7 @@ describe("GET /api/nfl/props — a fresh pull", () => {
     expect(fetchMock).toHaveBeenCalledTimes(13);
     for (const [url, init] of fetchMock.mock.calls) {
       expect(String(url)).toMatch(
-        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds&oddsFormat=american$/,
+        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1&oddsFormat=american$/,
       );
       expect(String(url)).not.toContain("ncaaf");
       expect(init).toEqual({ next: { revalidate: NFL_PROPS.revalidateSec } });

@@ -601,7 +601,7 @@ export const CFB_LEAGUE: LeagueConfig = {
     oddsSportKey: "americanfootball_ncaaf",
     oddsUrl: CFB_ODDS_URL,
     oddsEventBase: "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events",
-    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds",
+    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1",
     espnScoreboard: CFB_ESPN_SCOREBOARD,
     espnScoreboardQuery: "groups=80&limit=400",
     espnFpi: CFB_ESPN_FPI,

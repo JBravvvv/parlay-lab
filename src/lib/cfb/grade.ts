@@ -1,4 +1,5 @@
 import { decFromAmerican } from "@/engine2/devig";
+import { baseMarketOf, isH1Market, type CfbFullMarketKey } from "@/lib/cfb/markets";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
 import type { CfbFinals, CfbGrade, CfbLedgerEntry, CfbTicketLeg } from "@/lib/cfb/types";
 import type { LeagueConfig } from "@/lib/football/league";
@@ -106,20 +107,36 @@ function readScore(v: unknown): number | null {
 
 export function gradeCfbLeg(leg: CfbTicketLeg, f: CfbFinals[string] | undefined): CfbLegResult {
   if (!f) return { result: "pending", detail: "no final yet" };
+  // 2026-09-19 (1H bets): a first-half leg settles on the HALF-TIME score (ESPN's periods 1 + 2), the
+  // moment the half is over — it never waits for the final, and a game without both quarters posted
+  // stays pending (the honest state; the ungradable window voids it in time, never a guess)
+  if (isH1Market(leg.market)) {
+    if (f.status === "postponed") return { result: "pending", detail: "postponed" };
+    const h = f.h1;
+    if (!h) return { result: "pending", detail: f.final ? "first-half score unavailable" : "no first-half score yet" };
+    if (!h.final) return { result: "pending", detail: "first half in progress" };
+    const home = readScore(h.home);
+    const away = readScore(h.away);
+    if (home === null || away === null) return { result: "pending", detail: "first-half score unavailable" };
+    return gradeSides(baseMarketOf(leg.market), leg, home, away, `1H ${home}-${away}`);
+  }
   if (!f.final) return { result: "pending", detail: f.status === "postponed" ? "postponed" : "not final" };
   const home = readScore(f.home);
   const away = readScore(f.away);
   if (home === null || away === null) return { result: "pending", detail: "score unavailable" };
-  const score = `${home}-${away}`;
+  return gradeSides(baseMarketOf(leg.market), leg, home, away, `${home}-${away}`);
+}
 
-  if (leg.market === "ml") {
+/** the side settlement on a (home, away) score — the full game's final or the first half's half-time score, `score` the label the detail opens with */
+function gradeSides(market: CfbFullMarketKey, leg: Pick<CfbTicketLeg, "side" | "line">, home: number, away: number, score: string): CfbLegResult {
+  if (market === "ml") {
     const margin = leg.side === "home" ? home - away : away - home;
     if (margin > 0) return { result: "won", detail: `${score} · won by ${margin}` };
     if (margin < 0) return { result: "lost", detail: `${score} · lost by ${-margin}` };
     return { result: "push", detail: `${score} · tie` };
   }
 
-  if (leg.market === "spread") {
+  if (market === "spread") {
     if (leg.line == null) return { result: "ungradable", detail: `${score} · spread leg has no line` };
     const margin = leg.side === "home" ? home - away : away - home;
     const v = margin + leg.line;

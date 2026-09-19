@@ -25,6 +25,7 @@ import { EmptyState, ErrorState, Skeleton, SkeletonRows } from "@/components/ui/
 import { useLeague } from "@/components/football/LeagueContext";
 import type { DeskClient, DeskHandles } from "@/lib/football/league";
 import { CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps } from "@/lib/cfb/client";
+import { baseMarketOf, isH1Market, MARKET_WORDS, SIDE_MARKETS } from "@/lib/cfb/markets";
 import { fmtLine } from "@/lib/cfb/model";
 import { buildCfbPicks, CFB_PICK_CATEGORIES, setBandOf } from "@/lib/cfb/picks";
 import { CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory, type CfbParlayLeg, type CfbPickRow, type CfbPicks, type CfbPropsBoard } from "@/lib/cfb/props-types";
@@ -113,6 +114,9 @@ const CATS: readonly { key: (typeof CFB_PICK_CATEGORIES)[number]; label: string;
   { key: "ml", label: "ML", prop: false },
   { key: "spread", label: "SPREAD", prop: false },
   { key: "total", label: "TOTAL", prop: false },
+  { key: "ml_1h", label: "1H ML", prop: false },
+  { key: "spread_1h", label: "1H SPREAD", prop: false },
+  { key: "total_1h", label: "1H TOTAL", prop: false },
   { key: "anytime_td", label: "ANYTIME TD", prop: true },
   { key: "pass_tds", label: "PASS TDS", prop: true },
   { key: "pass_yds", label: "PASS YDS", prop: true },
@@ -131,7 +135,9 @@ const TOP_N = 50;
 /** featured cards in the TOP EDGES carousel */
 const FEATURED_N = 8;
 
-const MARKET_WORD: Record<string, string> = { ml: "ML", spread: "Spread", total: "Total" };
+const MARKET_WORD: Record<string, string> = { ...MARKET_WORDS };
+/** the side (game-line) categories, full game and first half — the ones that never wait on the props pull */
+const SIDE_CAT: ReadonlySet<string> = new Set(SIDE_MARKETS);
 for (const m of CFB_PROP_MARKETS) MARKET_WORD[m.id] = m.label;
 
 /* ---------- the one refresh control (INSTRUCTION 40, 2026-09-05) ----------
@@ -478,7 +484,7 @@ export function CfbPicksBoard() {
         sortValue: (r) => r.label,
         cell: (r) => (
           <div className="flex max-w-[176px] items-center gap-2 md:max-w-[280px]">
-            <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} player={r.player} headshot={r.headshot} pos={r.pos} />
+            <Mark games={games} gameId={r.gameId} teamId={r.kind === "side" ? (baseMarketOf(r.market) === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows)} kind={r.kind} player={r.player} headshot={r.headshot} pos={r.pos} />
             <div className="min-w-0">
               <div className="truncate font-medium text-text">{r.label}</div>
               <div className="truncate text-[10.5px] text-faint">
@@ -519,9 +525,9 @@ export function CfbPicksBoard() {
           r.cz ? (
             <span className="inline-flex items-baseline gap-1">
               <OddsCell odds={r.cz.price} book="caesars" />
-              {r.market !== "ml" && r.cz.line != null && r.line != null && Math.abs(r.cz.line - r.line) > 1e-9 && (
+              {baseMarketOf(r.market) !== "ml" && r.cz.line != null && r.line != null && Math.abs(r.cz.line - r.line) > 1e-9 && (
                 <span className={`num text-[9.5px] ${accentText}`} title="The selected sportsbook line differs from the consensus line">
-                  @{r.market === "spread" ? fmtLine(r.cz.line) : r.cz.line}
+                  @{baseMarketOf(r.market) === "spread" ? fmtLine(r.cz.line) : r.cz.line}
                 </span>
               )}
             </span>
@@ -748,7 +754,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
   const L = useLeague();
   const nfl = L.id === "nfl";
   const cz = r.cz!;
-  const teamId = r.kind === "side" ? (r.market === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows);
+  const teamId = r.kind === "side" ? (baseMarketOf(r.market) === "total" ? null : sideTeamId(r, games)) : propTeamId(r, propRows);
   const s = r.grade === "S";
   const splitsFeed = useSplits(L.id);
   const split = sideSplitOf(r, games, splitsFeed);
@@ -783,9 +789,9 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         <div className="flex min-w-0 items-baseline gap-1.5">
           <div className={nfl ? "hero-price is-nfl num mt-0.5" : "hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
           <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-faint">{bookName(cz.book)}</div>
-          {r.market !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
+          {baseMarketOf(r.market) !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
             <div className={`num text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="The selected sportsbook line differs from the consensus line">
-              at {r.market === "spread" ? fmtLine(cz.line) : cz.line}
+              at {baseMarketOf(r.market) === "spread" ? fmtLine(cz.line) : cz.line}
             </div>
           )}
         </div>
@@ -817,6 +823,8 @@ function sideSplitOf(r: CfbPickRow, games: Map<string, CfbGame>, feed: SplitsFee
   if (!g) return null;
   const row = g.rows.find((x) => x.key === r.key);
   if (!row) return null;
+  // the public splits feed carries full-game sides only — a first-half row has no split
+  if (isH1Market(row.market)) return null;
   return sideSplit(findGameSplits(feed, g.away, g.home, g.date), row.market, row.side);
 }
 
@@ -854,6 +862,9 @@ const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blu
   ml: { label: "ML", blurb: `Moneyline-only tickets, ${legsOf("ml")} legs on distinct games, at the selected book' pregame and in-game prices.`, live: false },
   spread: { label: "SPREAD", blurb: `Spread-only tickets, ${legsOf("spread")} legs on distinct games, at the selected book' pregame and in-game lines.`, live: false },
   total: { label: "TOTAL", blurb: `Totals-only tickets, ${legsOf("total")} legs on distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  ml_1h: { label: "1H ML", blurb: `First-half moneyline tickets, ${legsOf("ml_1h")} legs on distinct games, at the selected book' first-half prices (2026-09-19).`, live: false },
+  spread_1h: { label: "1H SPREAD", blurb: `First-half spread tickets, ${legsOf("spread_1h")} legs on distinct games, at the selected book' first-half lines.`, live: false },
+  total_1h: { label: "1H TOTAL", blurb: `First-half totals tickets, ${legsOf("total_1h")} legs on distinct games, at the selected book' first-half lines.`, live: false },
   anytime_td: { label: "ANYTIME TD", blurb: `Anytime-touchdown scorer tickets, ${legsOf("anytime_td")} players from distinct games at the selected book' pregame and in-game lines, priced ${priceRangeOf("anytime_td")}.`, live: false },
   pass_tds: { label: "PASS TDS", blurb: `Passing-touchdown tickets, ${legsOf("pass_tds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
   pass_yds: { label: "PASS YDS", blurb: `Passing-yards tickets, ${legsOf("pass_yds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
@@ -976,7 +987,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
         ? liveGames === 0
           ? { title: "No games in progress right now", body: "Mixed tickets need a live game beside the upcoming ones — they appear the moment a kickoff goes live." }
           : { title: "No mixed tickets yet", body: `A live leg and an upcoming leg each need a selected-book price and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%).` }
-        : propsPending && cat !== "ml" && cat !== "spread" && cat !== "total"
+        : propsPending && !SIDE_CAT.has(cat)
           ? { title: "Building parlays…", body: `${meta.label} tickets fill in as player props finish pricing at the selected book.` }
           : { title: `No ${meta.label} parlays yet`, body: `Not enough qualifying legs — a leg needs a selected-book price (pregame or in play) and grade D or better (EV ≥ ${CFB_PARLAYS.minLegEvPct}%), and no two legs may share a game.${cat === "combo" ? "" : ` When fewer than ${CFB_PARLAYS.perCategory} tickets clear that gate, the set extends to selected-book-priced legs down to EV ≥ ${CFB_PARLAYS.setFloorEvPct}% (tagged EDGE −); none reached even that here.`}` };
 
@@ -1008,7 +1019,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
                 {c.live && <span className="pulse-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-live align-middle" aria-hidden />}
                 {c.label}
                 {c.hint && <span className="ml-1 text-[9px] font-medium normal-case tracking-normal opacity-70">{c.hint}</span>}
-                <span className="num ml-1 text-[9.5px] opacity-70">{!c.live && k !== "ml" && k !== "spread" && k !== "total" && propsPending && n === 0 ? "…" : n}</span>
+                <span className="num ml-1 text-[9.5px] opacity-70">{!c.live && !SIDE_CAT.has(k) && propsPending && n === 0 ? "…" : n}</span>
               </FilterPill>
             );
           })}
@@ -1223,7 +1234,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
         <ul className="mt-3 space-y-1.5">
           {t.legs.map((leg: CfbParlayLeg) => (
             <li key={leg.rowKey} className="flex items-center gap-2 text-[11.5px]">
-              <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && leg.market === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
+              <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && baseMarketOf(leg.market) === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
               <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
               {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>

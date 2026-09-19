@@ -4,6 +4,8 @@ import { syncAuthed } from "@/lib/server/store";
 import { ctxLookup, loadPropsContext } from "@/lib/cfb/props-context";
 import { czMissingGameIds, parseEventProps, propsCoverage, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
 import { affordableEvents, boardFresh, czMissingDue, liveReserveCredits, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
+import { parseH1 } from "@/lib/cfb/h1";
+import type { CfbH1Game } from "@/lib/cfb/types";
 import type { CfbPropRow, CfbPropsBoard } from "@/lib/cfb/props-types";
 import { espnEventsOf, quotaOf, slateFromEspnOf, type CfbQuota } from "@/lib/cfb/slate-server";
 import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
@@ -463,6 +465,10 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   // ESPN season context is only fetched once we know there is a key, an odds feed and budget —
   // a keyless/oddsMissing/budgeted-out call must not pull three season tables for an empty board.
   const lookup = ctxLookup(await loadPropsContext(cfg));
+  // 2026-09-19 (1H bets): the first-half game lines ride this same per-event call; the stored 1H set
+  // carries for every game this pass does not re-pull, exactly as the stored prop rows do
+  const storedH1 = store ? await quiet(store.readH1(date), null) : null;
+  const h1Fresh: CfbH1Game[] = [];
   // the pull's window: 10 min once any event being priced is in play, else the 2 h default
   const pullSec = propsWindowSec(toFetch, cfg.props);
   // THE DATA CACHE ON A RE-PULL: a Caesars-missing re-check, or a live game already on the board, is
@@ -493,6 +499,12 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
     if (r.quota.remaining != null) quota = r.quota;
     if (r.quota.used != null) usedReadings.push(r.quota.used);
     try {
+      const h = parseH1(r.json, game, cfg, now);
+      if (h) h1Fresh.push(h);
+    } catch {
+      /* a malformed first-half market never costs the props */
+    }
+    try {
       return parseEventProps(r.json, game, { now, bankroll, ctx: lookup, props: cfg.props, rules: cfg.rules });
     } catch {
       return [];
@@ -500,6 +512,10 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   });
   // fresh rows first (live games lead the selection), then the carried upcoming rows
   const rows = [...perEvent.flat(), ...carriedRows];
+  // the 1H set: fresh from this pull, then the stored lines of the games carried or kept (a re-pull that
+  // answered without a first-half market drops that game's — the books stopped posting it)
+  const h1Carried = (storedH1?.games ?? []).filter((e) => carriedNow.some((g) => g.id === e.gameId) || kept.some((g) => g.id === e.gameId));
+  const h1Games: CfbH1Game[] = [...h1Fresh, ...h1Carried];
   const live = events.filter((g) => g.status === "live" && (fetchIds.has(g.id) || carriedNow.some((c) => c.id === g.id))).length;
   // a live game whose re-pull failed rides rows older than the live window — honestly flagged
   const stale = staleCarried || kept.some((g) => g.status === "live");
@@ -527,10 +543,13 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
     ...coverage,
     ...(budgetNote ? { note: budgetNote } : {}),
     ...(refresh ? { refreshed: true } : {}),
+    ...(h1Games.length > 0 ? { h1Games: h1Games.length } : {}),
   };
   // INSTRUCTION 42 (2026-09-05, review fix): a failed board write is no longer swallowed silently —
   // the answer says so, because the next request then has no carried rows or pricedAt to lean on
   if (store && fetched > 0 && !(await quiet(store.writeBoard(date, body).then(() => true), false))) body.storeWriteFailed = true;
+  // the first-half lines beside the board (their own key; nothing written when no book posted a half)
+  if (store && fetched > 0 && h1Games.length > 0) await quiet(store.writeH1(date, { generatedAt: nowIso, games: h1Games }).then(() => true), false);
   const res = NextResponse.json(body, { headers });
   if (quota?.remaining != null) res.headers.set("x-requests-remaining", String(quota.remaining));
   if (quota?.used != null) res.headers.set("x-requests-used", String(quota.used));
