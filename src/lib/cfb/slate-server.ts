@@ -95,13 +95,17 @@ export async function fpiPayload(): Promise<unknown | null> {
   return fpiPayloadOf(CFB_LEAGUE);
 }
 
+/** A forced pull (2026-09-19, the Board's Refresh Board tap with the sync phrase): the game lines are fetched with
+    the Next data cache bypassed, so the answer is this instant's prices and not up to ODDS_TTL seconds old. */
+export type OddsPullOpts = { fresh?: boolean };
+
 /** The one game-lines Odds API call of a football desk. The key never leaves this function: it is
     not echoed in any error, header or body, and the URL it was appended to is never logged. */
-export async function oddsPayloadOf(cfg: LeagueConfig): Promise<{ events: unknown[]; missing: boolean; quota: CfbQuota }> {
+export async function oddsPayloadOf(cfg: LeagueConfig, opts?: OddsPullOpts): Promise<{ events: unknown[]; missing: boolean; quota: CfbQuota }> {
   const key = process.env.ODDS_API_KEY;
   if (!key) return { events: [], missing: true, quota: NO_QUOTA };
   try {
-    const r = await fetch(`${cfg.feeds.oddsUrl}&apiKey=${encodeURIComponent(key)}`, { next: { revalidate: ODDS_TTL } });
+    const r = await fetch(`${cfg.feeds.oddsUrl}&apiKey=${encodeURIComponent(key)}`, opts?.fresh ? { cache: "no-store" } : { next: { revalidate: ODDS_TTL } });
     const quota = quotaOf(r);
     if (!r.ok) return { events: [], missing: true, quota };
     const j = (await r.json().catch(() => null)) as unknown;
@@ -143,13 +147,13 @@ export function finalsFromEspn(date: string, espn: unknown[], now: number, bankr
 }
 
 /** The full slate: FPI and the game lines in parallel, then the pure model over all three feeds. */
-export async function slateFromEspnOf(cfg: LeagueConfig, date: string, espn: unknown[], now: number, bankroll: number): Promise<CfbSlate> {
-  const [fpi, odds] = await Promise.all([fpiPayloadOf(cfg), oddsPayloadOf(cfg)]);
+export async function slateFromEspnOf(cfg: LeagueConfig, date: string, espn: unknown[], now: number, bankroll: number, opts?: OddsPullOpts): Promise<CfbSlate> {
+  const [fpi, odds] = await Promise.all([fpiPayloadOf(cfg), oddsPayloadOf(cfg, opts)]);
   const board = buildCfbBoard({ date, espnEvents: espn, oddsEvents: odds.events, fpi, now, bankroll, league: cfg });
   return { ...board, finals: finalsOf(board.games), quota: odds.quota, oddsMissing: odds.missing };
 }
 
 /** CFB-bound: `slateFromEspnOf(CFB_LEAGUE, …)`. */
-export async function slateFromEspn(date: string, espn: unknown[], now: number, bankroll: number): Promise<CfbSlate> {
-  return slateFromEspnOf(CFB_LEAGUE, date, espn, now, bankroll);
+export async function slateFromEspn(date: string, espn: unknown[], now: number, bankroll: number, opts?: OddsPullOpts): Promise<CfbSlate> {
+  return slateFromEspnOf(CFB_LEAGUE, date, espn, now, bankroll, opts);
 }

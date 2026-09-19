@@ -20,7 +20,7 @@ const BLUR = /backdrop-filter|backdrop-blur/;
 
 describe("CFB Board — the one green Refresh Board control", () => {
   it("the page's CFB branch mounts CfbRefreshPill as the PageHeader action", () => {
-    expect(page).toMatch(/import \{ CfbPicksBoard, CfbRefreshPill \} from "@\/components\/cfb\/CfbPicksBoard"/);
+    expect(page).toMatch(/import \{ CfbBoardStamp, CfbPicksBoard, CfbRefreshPill \} from "@\/components\/cfb\/CfbPicksBoard"/);
     const cfb = page.slice(page.indexOf('if (CFB_ENABLED && desk === "cfb")'), page.indexOf("<CfbPicksBoard />"));
     expect(cfb.length).toBeGreaterThan(0);
     expect(cfb).toMatch(/eyebrow="College Football"/);
@@ -38,7 +38,7 @@ describe("CFB Board — the one green Refresh Board control", () => {
      instead of looking inert while the refill is in flight. Placement and variant unchanged. */
   it("the MLB header action is untouched (Refresh MLB stays a primary Pill)", () => {
     expect(page).toMatch(
-      /\{regen\.isPending \|\| refill\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/,
+      /\{regen\.isPending \|\| refill\.isPending \|\| liveBoard\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/,
     );
   });
   it("the small ↻ Refresh pill is gone — one refresh control on the desk", () => {

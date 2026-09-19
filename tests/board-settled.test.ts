@@ -395,7 +395,7 @@ describe("INSTRUCTION 50 item 2 — all three grade cells sit behind the guard (
     /* and the module that now owns the spend reaches the budgeted server route and nothing else */
     const live = stripComments(read("src/lib/mlb/live-board-client.ts"));
     expect(live.match(/\bfetch\(/g)?.length ?? 0).toBe(1);
-    expect(live).toMatch(/fetch\("\/api\/generate\?live=1"/);
+    expect(live).toMatch(/fetch\("\/api\/generate\?live=1&force=1"/); // force=1 since 2026-09-19: a FULL re-price on every tap
     expect(live).not.toMatch(/odds-api|the-odds-api|statsapi|\/api\/refill/);
     expect(live).not.toMatch(/setInterval|refetchInterval/);
   });

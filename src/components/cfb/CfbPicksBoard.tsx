@@ -53,7 +53,7 @@ function boardStaleMs(board: CfbPropsBoard | undefined, client?: DeskClient): nu
   if (board) return (client?.propsStaleMs ?? cfbPropsStaleMs)(board);
   return client ? client.PROPS_STALE_MS : CFB_PROPS_STALE_MS;
 }
-import type { CfbGame } from "@/lib/cfb/types";
+import type { CfbGame, CfbSlate } from "@/lib/cfb/types";
 import { quotaRemaining } from "@/lib/fetcher";
 import { fmtAmerican, fmtMoney, fmtPct } from "@/lib/format";
 import { railLabel } from "@/lib/games";
@@ -163,6 +163,106 @@ export function refreshLeagueBoard(qc: QueryClient, L: Pick<DeskHandles, "client
   ]).then(() => undefined);
 }
 
+/** JOSH'S REFRESH (2026-09-19, verbatim): "The CFB & NFL boards should function the same way as the MLB one does."
+    The forced re-pull: every ACTIVE slate and props query of this desk (whatever date / bankroll is on screen) is
+    fetched again with `refresh: true`, so the routes bypass the odds cache and the stored board, re-price every selected
+    game with rows under the day's budget, and store the answer — the football twin of the MLB pill's stored server
+    re-price. The sync phrase travels in the request header (never the URL); without one stored the loaders send no
+    flag and this is an ordinary re-read. Nothing on screen yet → today's default keys. */
+export async function forceRefreshLeagueBoard(
+  qc: QueryClient,
+  L: Pick<DeskHandles, "client" | "bankBase">,
+): Promise<{ slates: CfbSlate[]; boards: CfbPropsBoard[] }> {
+  const cache = qc.getQueryCache();
+  const activeKeys = (prefix: readonly unknown[], fallback: readonly unknown[]): (readonly unknown[])[] => {
+    const keys = cache.findAll({ queryKey: prefix as unknown[], type: "active" }).map((q) => q.queryKey as readonly unknown[]);
+    return keys.length ? keys : [fallback];
+  };
+  /* the key builders' own shape: [league, feed, date | "today", bankroll] */
+  const dateOf = (k: readonly unknown[]): string | undefined => (typeof k[2] === "string" && k[2] !== "today" ? k[2] : undefined);
+  const bankOf = (k: readonly unknown[]): number => (typeof k[3] === "number" && k[3] > 0 ? k[3] : L.bankBase);
+  const pull = async <T,>(key: readonly unknown[], fn: () => Promise<T>): Promise<T> => {
+    await qc.cancelQueries({ queryKey: key as unknown[], exact: true });
+    return qc.fetchQuery<T>({ queryKey: key as unknown[], queryFn: fn, staleTime: 0 });
+  };
+  const [slates, boards] = await Promise.all([
+    Promise.all(
+      activeKeys(L.client.queryKey(null, L.bankBase).slice(0, 2), L.client.queryKey(null, L.bankBase)).map((k) =>
+        pull<CfbSlate>(k, () => L.client.loadSlate(dateOf(k), { bankroll: bankOf(k), refresh: true })),
+      ),
+    ),
+    Promise.all(
+      activeKeys(L.client.propsQueryKey(null, L.bankBase).slice(0, 2), L.client.propsQueryKey(null, L.bankBase)).map((k) =>
+        pull<CfbPropsBoard>(k, () => L.client.loadProps(dateOf(k), { bankroll: bankOf(k), refresh: true })),
+      ),
+    ),
+  ]);
+  return { slates, boards };
+}
+
+/** JOSH (2026-09-19): "It should show the time of last board refresh." The stamp of the newest ACTIVE board of this
+    desk — the props board's own `generatedAt` (the honest pull stamp: the moment its rows were priced, unmoved by a
+    cache-served re-read), else the slate's. Active queries only, so a lingering board of another date never wins. */
+export type BoardStamp = { at: number; feed: "props" | "slate"; games: number; rows: number; live: number };
+
+export function boardStampOf(qc: QueryClient, slatePrefix: readonly unknown[], propsPrefix: readonly unknown[]): BoardStamp | null {
+  const cache = qc.getQueryCache();
+  const newest = <T,>(prefix: readonly unknown[], atOf: (d: T) => number): { data: T; at: number } | null => {
+    let best: { data: T; at: number } | null = null;
+    for (const q of cache.findAll({ queryKey: prefix as unknown[], type: "active" })) {
+      const d = q.state.data as T | undefined;
+      if (!d) continue;
+      const at = atOf(d);
+      if (!Number.isFinite(at) || at <= 0) continue;
+      if (!best || at > best.at) best = { data: d, at };
+    }
+    return best;
+  };
+  const slate = newest<CfbSlate>(slatePrefix, (s) => Number(s.generatedAt));
+  const props = newest<CfbPropsBoard>(propsPrefix, (b) => Date.parse(b.generatedAt));
+  const games = slate?.data.games.length ?? 0;
+  if (props) return { at: props.at, feed: "props", games, rows: props.data.rows.length, live: Number(props.data.live ?? 0) || 0 };
+  if (slate) return { at: slate.at, feed: "slate", games, rows: 0, live: 0 };
+  return null;
+}
+
+/** The header's "updated h:mm" — app/board/page.tsx mounts it in the football PageHeader's sub (desktop, appended to
+    the sentence) and as the whole phone sub (`phone`: "N games · N prop rows · updated h:mm", the MLB header's shape).
+    It reads the query cache directly and re-reads on every cache event, so it follows whatever date the board below
+    is showing without owning any state of its own. */
+export function CfbBoardStamp({ phone = false }: { phone?: boolean }) {
+  const qc = useQueryClient();
+  const L = useLeague();
+  const [stamp, setStamp] = useState<BoardStamp | null>(null);
+  useEffect(() => {
+    const slatePrefix = L.id === "cfb" ? CFB_SLATE_KEY_PREFIX : L.client.queryKey(null, L.bankBase).slice(0, 2);
+    const propsPrefix = L.id === "cfb" ? CFB_PROPS_KEY_PREFIX : L.client.propsQueryKey(null, L.bankBase).slice(0, 2);
+    const read = () => {
+      const next = boardStampOf(qc, slatePrefix, propsPrefix);
+      setStamp((prev) =>
+        prev?.at === next?.at && prev?.games === next?.games && prev?.rows === next?.rows && prev?.feed === next?.feed && prev?.live === next?.live
+          ? prev
+          : next,
+      );
+    };
+    read();
+    return qc.getQueryCache().subscribe(read);
+  }, [qc, L]);
+  const time = stamp ? new Date(stamp.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
+  if (phone) {
+    return (
+      <span data-testid="cfb-board-updated" data-feed={stamp?.feed}>
+        {stamp && time ? `${stamp.games} games · ${stamp.rows} prop rows${stamp.live ? ` · ${stamp.live} live` : ""} · updated ${time}` : "loading the board…"}
+      </span>
+    );
+  }
+  return (
+    <span data-testid="cfb-board-updated" data-feed={stamp?.feed}>
+      {time ? ` · updated ${time}` : ""}
+    </span>
+  );
+}
+
 /** The header's green "Refresh Board" pill — app/board/page.tsx mounts it as the CFB PageHeader action
     (the NFL page mounts it under the NFL provider through NflRefreshPill). */
 export function CfbRefreshPill() {
@@ -184,12 +284,25 @@ export function CfbRefreshPill() {
      (POST /api/refill — the same server pass the five slots run) and print its one-line answer */
   const [note, setNote] = useState<string | null>(null);
   const onClick = async () => {
-    await (L.id === "cfb" ? refreshCfbBoard(qc) : refreshLeagueBoard(qc, L));
-    if (!getSyncKey()) return;
+    /* JOSH'S REFRESH (2026-09-19, verbatim): "The CFB & NFL boards should function the same way as the MLB one does."
+       Without the sync phrase the tap is what it was — the two feeds re-read, served from their caches inside the
+       windows. WITH it, the desk's slate and props board are RE-PULLED (forceRefreshLeagueBoard: odds cache and
+       stored board bypassed, every selected game with rows re-priced under the day's budget, the answer stored),
+       then the refill pass as before, and the note names the time. Cost, Josh's call in those words: up to
+       maxEvents × ~31 credits on a full CFB Saturday (60 events under the 2,500 rail, 372 held for live), 16 events
+       under the NFL rail — the routes' budget rails are not lifted, and a board's note says what they refused. */
+    if (!getSyncKey()) {
+      await (L.id === "cfb" ? refreshCfbBoard(qc) : refreshLeagueBoard(qc, L));
+      return;
+    }
     setRefilling(true);
     try {
+      const pulled = await forceRefreshLeagueBoard(qc, L);
       const r = await refillDesk(L.id);
-      setNote(refillReason(r.body));
+      const at = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      setNote(
+        [`board re-pulled ${at}`, pulled.boards.find((b) => b.note)?.note ?? null, refillReason(r.body)].filter(Boolean).join(" · "),
+      );
       void L.sync.syncNow();
     } catch (e) {
       setNote(e instanceof Error ? e.message : String(e));
@@ -203,7 +316,7 @@ export function CfbRefreshPill() {
         variant="primary"
         onClick={() => void onClick()}
         disabled={fetching}
-        title={`Re-pulls the slate and the player props. Sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play — a refresh inside the window spends no Odds API quota. With your sync phrase stored it then runs the desk's refill pass (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run).`}
+        title={`With your sync phrase stored: a FULL re-pull — the slate's lines and every priced player-prop game are re-priced now and stored (under the day's Odds API budget), then the desk's refill pass runs (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run). Without it: re-reads the two feeds — sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play, and a re-read inside the window spends no quota.`}
         data-testid="cfb-refresh-board"
       >
         {fetching ? "Pulling…" : "Refresh Board"}

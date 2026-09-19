@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { todayStr } from "@/lib/engine-client";
+import { adoptServerBoard, serverBoard, todayStr } from "@/lib/engine-client";
 import { getSyncKey } from "@/lib/ledgerSync";
 import { MLB_LIVE_QUERY_PREFIX } from "@/lib/mlb/live-client";
 
@@ -67,30 +67,41 @@ export function useLiveBoardReprice(opts: { onFallback: () => void }) {
     mutationFn: async (): Promise<Record<string, unknown>> => {
       const key = getSyncKey();
       if (!key) throw new Error("sync phrase required");
-      const r = await fetch("/api/generate?live=1", { headers: { "x-pl-sync": key }, cache: "no-store" });
+      /* JOSH (2026-09-19, verbatim): "MLB should also do a FULL refresh every single time i refresh."
+         `force=1` beside `live=1`: the route lifts its 45-minute limiter and its per-date run cap for this
+         board-only pass alone (it is tallied under its own key, never against the card ladder's runs), so
+         every tap buys a full stored re-price of the board and its live pool. The card is still untouched
+         by construction. Cost: one full generate, 114-150 Odds credits measured, per tap. */
+      const r = await fetch("/api/generate?live=1&force=1", { headers: { "x-pl-sync": key }, cache: "no-store" });
       const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
       if (!r.ok) throw new Error(typeof body.error === "string" ? body.error : `generate ${r.status}`);
-      /* A 200 can still be a free refusal — "ran recently" (the 45-minute limiter, deliberately
-         still in force) or the per-date run cap. That is not a success to report as a re-price. */
+      /* A 200 can still be a free refusal (no odds key, a block already locked). That is not a success
+         to report as a re-price. */
       if (typeof body.skipped === "string") throw new Error(`the server skipped it: ${body.skipped}`);
       return body;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       noteServerReprice();
+      /* ADOPT THE BOARD THIS PASS STORED BEFORE THE INVALIDATION (2026-09-19). bestBoard() never takes fewer
+         priced games, and a board bought after first pitch prices fewer PREGAME games than the morning's
+         cached one — so without this the older board stayed in front, the header's "updated" never moved,
+         and the tap looked like it did nothing. The server board is newer by construction: take it. */
+      const fresh = await serverBoard();
+      if (fresh) {
+        adoptServerBoard(fresh);
+        qc.setQueryData(["board"], fresh);
+      }
       void qc.invalidateQueries({ queryKey: ["board"] });
       void qc.invalidateQueries({ queryKey: ["picks"] });
       void qc.invalidateQueries({ queryKey: MLB_LIVE_QUERY_PREFIX });
     },
     onError: () => {
-      /* EVERY FAILURE FALLS BACK — INCLUDING "ran recently" (review round, 2026-09-12). The first
-         cut returned early on the 45-minute limiter, which re-created the exact defect INSTRUCTION
-         50 item 1 exists to kill: a Refresh tap that buys nothing, stores nothing and re-prices
-         nothing, on the one slate Josh is actually watching. The limiter is the SERVER's pacing on
-         the STORED board and it still holds — no second server generate is bought inside the window.
-         What it must not do is cancel the device re-price the tap has always produced: the browser
-         pass is the one engine-client deliberately never gates ("this counter exists to make the
-         spend VISIBLE, never to block it ... nothing should stop a bet"). So the server declines to
-         re-buy, the note says exactly that, and Josh still gets fresh numbers in front of him. */
+      /* EVERY FAILURE FALLS BACK (review round, 2026-09-12; the limiter no longer applies to this tap
+         since 2026-09-19, so the failures left are real ones — no odds key, the store down, offline).
+         A Refresh tap that buys nothing, stores nothing and re-prices nothing, on the one slate Josh
+         is actually watching, is the defect INSTRUCTION 50 item 1 exists to kill. So the browser pass —
+         the one engine-client deliberately never gates ("this counter exists to make the spend VISIBLE,
+         never to block it ... nothing should stop a bet") — runs instead, and the note says which. */
       onFallback();
     },
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { decideSlotTick, GRADE_SLOT_WINDOW_MIN, manualHeadroomRefusal, REFILL_SLOTS_PT, slotsAheadPT, unstampedSlotsAhead } from "@/lib/server/grading-progress";
 import { forwardMlbRefill } from "@/lib/server/refill";
-import { refillReason } from "@/lib/refill-client";
+import { refillReason, refillRepricedBoard } from "@/lib/refill-client";
 
 /**
  * INSTRUCTION 49 (2026-09-09) — the shared slot helper and the MLB forward, pure.
@@ -96,5 +96,26 @@ describe("refillReason — every click prints one line (fix round 2026-09-09)", 
   it("a bare error body prints its error; an empty body prints nothing", () => {
     expect(refillReason({ ok: false, error: "sync phrase required" })).toBe("sync phrase required");
     expect(refillReason({})).toBeNull();
+  });
+});
+
+describe("refillRepricedBoard — did the refill's OWN pass re-price and store the board? (Josh, 2026-09-19)", () => {
+  /* "MLB should also do a FULL refresh every single time i refresh." The Board's tap returns early only when
+     this says true; every other refill answer goes on to the forced board-only pass. */
+  it("true only for a fired top-up whose generate ran clean", () => {
+    expect(refillRepricedBoard({ fired: true, generateStatus: 200, generate: { ok: true, lock: { tickets: 2 } } })).toBe(true);
+    expect(refillRepricedBoard({ fired: true, generate: { ok: true } })).toBe(true);
+  });
+  it("false for a refused refill, whatever else the body says", () => {
+    expect(refillRepricedBoard({ fired: false, topup: { skipped: "no slot due" }, generate: { ok: true } })).toBe(false);
+    expect(refillRepricedBoard({})).toBe(false);
+    expect(refillRepricedBoard({ ok: false, error: "sync phrase required" })).toBe(false);
+  });
+  it("false when the generate was skipped, errored, not ok, missing, or non-2xx", () => {
+    expect(refillRepricedBoard({ fired: true, generateStatus: 200, generate: { ok: true, skipped: "ran recently" } })).toBe(false);
+    expect(refillRepricedBoard({ fired: true, generateStatus: 200, generate: { ok: false, error: "no odds key" } })).toBe(false);
+    expect(refillRepricedBoard({ fired: true, generateStatus: 429, generate: { error: "run cap reached for this date" } })).toBe(false);
+    expect(refillRepricedBoard({ fired: true, generateStatus: 502 })).toBe(false);
+    expect(refillRepricedBoard({ fired: true, generateStatus: 200, generate: "ok" })).toBe(false);
   });
 });

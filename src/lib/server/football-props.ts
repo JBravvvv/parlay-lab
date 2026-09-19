@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
+import { syncAuthed } from "@/lib/server/store";
 import { ctxLookup, loadPropsContext } from "@/lib/cfb/props-context";
 import { czMissingGameIds, parseEventProps, propsCoverage, propsWindowSec, selectPropEvents } from "@/lib/cfb/props";
 import { affordableEvents, boardFresh, czMissingDue, liveReserveCredits, pricedAgeMs, propsStore, pullCredits, type CfbPropsStore } from "@/lib/cfb/props-store";
@@ -170,6 +171,15 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   if (!DATE_RE.test(date)) return NextResponse.json({ error: "bad date" }, { status: 400 });
   const bankRaw = Number(q.get("bankroll"));
   const bankroll = Number.isFinite(bankRaw) && bankRaw > 0 ? bankRaw : cfg.bankBase;
+  /* JOSH'S REFRESH (2026-09-19, verbatim: "The CFB & NFL boards should function the same way as the MLB one does").
+     `?refresh=1` WITH the sync phrase in `x-pl-sync` is the Board's Refresh Board tap — a FULL re-pull, the football
+     twin of the MLB pill's stored server re-price: rail 1 (a fresh stored board) is skipped, every selected game
+     that has rows is re-priced now whatever its 2 h / 10 min window, the per-event data cache is bypassed, and the
+     slate's game lines are pulled fresh too. Without the phrase the flag is ignored — a public GET can never force
+     a spend. THE BUDGET RAILS BELOW ARE NOT LIFTED: a refresh buys what the day's budget still allows, in the same
+     live-first order, and the note names what it could not. The one carry that survives a refresh is the
+     EMPTY-EVENT RULE — a game whose last pull returned zero rows inside its own window has nothing to refresh. */
+  const refresh = q.get("refresh") === "1" && syncAuthed(req);
   const now = Date.now();
   const headers = { "cache-control": "no-store" };
 
@@ -182,7 +192,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
 
   let slate: CfbSlate;
   try {
-    slate = await slateFromEspnOf(cfg, date, espn, now, bankroll);
+    slate = await slateFromEspnOf(cfg, date, espn, now, bankroll, { fresh: refresh });
   } catch (e) {
     return NextResponse.json({ error: `board failed: ${(e as Error).message}` }, { status: 502 });
   }
@@ -239,7 +249,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
 
   // Rail 1 answers only when the board is fresh AND no game is due under the Caesars-missing rule —
   // a fresh 2 h board would otherwise hide the 30-min re-check
-  if (stored && boardFresh(stored, now, windowSec) && czDueIds.size === 0) {
+  if (!refresh && stored && boardFresh(stored, now, windowSec) && czDueIds.size === 0) {
     const spentToday = await quiet(store!.readSpend(ptDate), null);
     const coverage = propsCoverage(events, stored.rows, stored.priced ?? stored.rows.map((r) => r.gameId));
     const body: CfbPropsBoard = {
@@ -274,10 +284,18 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   // why a game is fetched — and the order the budget buys them in: live games first (lines moving),
   // then games never priced (nothing to show at all), then the Caesars-missing re-checks, then the
   // games whose 2 h carry simply expired (they still carry last-priced lines meanwhile)
-  type Why = "live" | "unpriced" | "czMissing" | "expired";
-  const WHY_RANK: Record<Why, number> = { live: 0, unpriced: 1, czMissing: 2, expired: 3 };
+  type Why = "live" | "unpriced" | "czMissing" | "expired" | "refresh";
+  const WHY_RANK: Record<Why, number> = { live: 0, unpriced: 1, czMissing: 2, expired: 3, refresh: 3 };
   const why = (g: CfbGame): Why | null => {
     if (!stored || !storedIds.has(g.id)) return "unpriced";
+    if (refresh) {
+      // a forced re-pull: every game with rows is re-priced now, in play or not — the zero-row hold is the one carry kept
+      if ((storedRowCount.get(g.id) ?? 0) === 0 && insideOwnWindow(g)) {
+        if (g.status === "live") liveCarried.add(g.id);
+        return null;
+      }
+      return g.status === "live" ? "live" : "refresh";
+    }
     if (g.status === "live") {
       if (!insideOwnWindow(g)) return "live";
       const age = ownAgeMs(g) ?? Number.POSITIVE_INFINITY;
@@ -453,7 +471,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   // pull's window (Redis + pricedAt bound the re-pull cadence, so the cache buys nothing there)
   const cacheFor = (g: CfbGame): EventCache => {
     const w = whyOf.get(g.id);
-    return w === "czMissing" || (w === "live" && storedIds.has(g.id)) ? { cache: "no-store" } : { next: { revalidate: pullSec } };
+    return refresh || w === "czMissing" || (w === "live" && storedIds.has(g.id)) ? { cache: "no-store" } : { next: { revalidate: pullSec } };
   };
   // a re-pull that fails keeps the game's stored rows (re-stamped with the current status) — never dropped
   const keptRows = (g: CfbGame): CfbPropRow[] =>
@@ -508,6 +526,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
     pricedAt: pricedAt(pricedIds, fetchedIds),
     ...coverage,
     ...(budgetNote ? { note: budgetNote } : {}),
+    ...(refresh ? { refreshed: true } : {}),
   };
   // INSTRUCTION 42 (2026-09-05, review fix): a failed board write is no longer swallowed silently —
   // the answer says so, because the next request then has no carried rows or pricedAt to lean on

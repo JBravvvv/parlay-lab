@@ -31,6 +31,20 @@ const str = (v: unknown): string | null => (typeof v === "string" && v ? v : nul
     MLB `topup.reason` (or the generate body's `skipped` / `error`); football `result.topUp.reason`,
     else the lock route's not-yet-locked shapes (`waiting — locks at …`, `locked <date> — n tickets`,
     `no-slate`, `odds-missing`, a `note`), else `result.error`; a bare error body prints its `error` */
+/** JOSH (2026-09-19, "MLB should also do a FULL refresh every single time i refresh"): did this refill's OWN pass
+    re-price and store the whole board? Only when it FIRED a top-up generate that ran — `fired: true`, a 2xx
+    `generateStatus`, and a generate body that is `ok` with no `skipped` / `error`. Anything else — refused, skipped,
+    failed, a bare error body — and the Board's Refresh tap goes on to buy the full stored re-price itself. */
+export function refillRepricedBoard(b: Record<string, unknown>): boolean {
+  if (b.fired !== true) return false;
+  const st = b.generateStatus;
+  if (typeof st === "number" && (st < 200 || st > 299)) return false;
+  const gen = b.generate;
+  if (!gen || typeof gen !== "object") return false;
+  const g = gen as { ok?: unknown; skipped?: unknown; error?: unknown };
+  return g.ok === true && !str(g.skipped) && !str(g.error);
+}
+
 export function refillReason(b: Record<string, unknown>): string | null {
   const mlb = reasonOf(b.topup);
   if (mlb) return mlb;

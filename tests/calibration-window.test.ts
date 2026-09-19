@@ -62,8 +62,9 @@ describe("the calibration window declares itself, and the exit reading is not th
       for (const line of src.split("\n")) {
         if (!/"DEL"|"SREM"|"EXPIRE"/.test(line)) continue;
         seen++;
-        // the only expiring keys are the BOARD ones (3-day TTL, hence the board archive)
-        expect(/BOARD_|runsKey/.test(line), `${f} expires or deletes a non-board key: ${line.trim()}`).toBe(true);
+        // the only expiring keys are the BOARD ones (3-day TTL, hence the board archive) and the two per-date
+        // run tallies beside them (runsKey; manualKey — Josh's forced Refresh taps, 2026-09-19, same 3-day TTL)
+        expect(/BOARD_|runsKey|manualKey/.test(line), `${f} expires or deletes a non-board key: ${line.trim()}`).toBe(true);
       }
       // and the day blob is written with a bare SET
       expect(src.includes('redisSetJson(dayKey(date)') || !src.includes("dayKey(date)")).toBe(true);

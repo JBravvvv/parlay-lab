@@ -118,6 +118,9 @@ export type CfbPropsBoard = {
   /** INSTRUCTION 42 (2026-09-05, review fix): true when this answer's board could not be persisted to
       the store (the write threw) — the next request then has no carried rows / pricedAt to lean on */
   storeWriteFailed?: boolean;
+  /** JOSH'S REFRESH (2026-09-19): true when this answer was a forced re-pull — the Board's Refresh Board tap with the
+      sync phrase (`?refresh=1`), which skips the fresh-board rail and re-prices every selected game with rows now */
+  refreshed?: boolean;
   /** THE CAESARS-MISSING RULE (2026-09-05): priced UPCOMING games on this answer that carry rows and, on
       some market with rows, no Caesars quote (other books posted, Caesars not yet — `czMissingGameIds`) —
       re-asked every CFB_PROPS.czMissingRevalidateSec inside czMissingWindowSec of kickoff, and while > 0

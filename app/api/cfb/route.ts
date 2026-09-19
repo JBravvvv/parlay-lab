@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
+import { syncAuthed } from "@/lib/server/store";
 import { CFB_BANK_BASE } from "@/lib/cfb/rules";
 import { espnEvents, finalsFromEspn, slateFromEspn } from "@/lib/cfb/slate-server";
 import type { CfbSlate } from "@/lib/cfb/types";
@@ -32,6 +33,10 @@ export async function GET(req: NextRequest) {
   const bankRaw = Number(q.get("bankroll"));
   const bankroll = Number.isFinite(bankRaw) && bankRaw > 0 ? bankRaw : CFB_BANK_BASE;
   const now = Date.now();
+  /* JOSH'S REFRESH (2026-09-19, "The CFB & NFL boards should function the same way as the MLB one does"):
+     `?refresh=1` WITH the sync phrase in `x-pl-sync` — the Board's Refresh Board tap — pulls the game lines with the
+     240 s odds cache bypassed. Without the phrase the flag is ignored: a public GET can never force a spend. */
+  const refresh = q.get("refresh") === "1" && syncAuthed(req);
 
   let espn: unknown[];
   try {
@@ -50,7 +55,7 @@ export async function GET(req: NextRequest) {
 
   let slate: CfbSlate;
   try {
-    slate = await slateFromEspn(date, espn, now, bankroll);
+    slate = await slateFromEspn(date, espn, now, bankroll, { fresh: refresh });
   } catch (e) {
     return NextResponse.json({ error: `board failed: ${(e as Error).message}` }, { status: 502 });
   }

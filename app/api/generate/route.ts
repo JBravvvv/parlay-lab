@@ -59,6 +59,8 @@ const K_RUNS = "pl:gen:runs:";
    start-blocks/day at the derived 90-min partition (§12Z.15) — the cap = blocks-observed,
    and partitionBlocks coalesces beyond it so the cap keeps meaning */
 const MAX_RUNS_PER_DATE = 4;
+/** per-date tally of Josh's forced board-only re-prices (2026-09-19) — outside the run cap, on record */
+const K_MANUAL = "pl:gen:manual:";
 const DAYS_SET = "pl:pred:days";
 const dayKey = (d: string) => `pl:pred:${d}`;
 const MAX_BYTES = 3_000_000;
@@ -188,6 +190,16 @@ export async function GET(req: NextRequest) {
        evening board-only pass is 114-150 NEW credits a day and that is Josh's decision to make, not
        ours. See the task report's decisionsLeftToJosh. */
     const boardOnly = !blockKey && !topup && req.nextUrl.searchParams.get("live") === "1";
+    /* JOSH'S FULL REFRESH (2026-09-19, verbatim: "MLB should also do a FULL refresh every single time i refresh").
+       `?live=1&force=1` with the sync phrase — the Board's Refresh tap (src/lib/mlb/live-board-client.ts) — is a
+       full stored re-price on EVERY tap: `force` already lifts the 45-minute limiter, and this flag lifts the
+       per-date run cap for the board-only pass alone. It is NOT counted in the shared `runs` key and does NOT set
+       K_LASTGEN — counting it there would spend the card ladder's headroom and pace the scheduled fires off
+       Josh's thumb — so it is tallied under its own per-date key (K_MANUAL) and returned as `manualRuns`, for the
+       day's bill to be on record. It is still `boardOnly`: it cannot reach blocks.ts, so the locked card is
+       untouched by construction. Cost: one full generate, 114-150 Odds credits measured, per tap — Josh's call,
+       made in those words. */
+    const manualReprice = force && boardOnly;
     const slotRaw = req.nextUrl.searchParams.get("slot");
     const slot: string | undefined = slotRaw ?? undefined;
     if (topup && slot !== undefined && slot !== "manual" && !(REFILL_SLOTS_PT as readonly string[]).includes(slot)) {
@@ -286,8 +298,8 @@ export async function GET(req: NextRequest) {
        really does spend a full generate. The honest consequence: on a day that has already used all
        four runs this tap cannot buy a stored re-price at all. Giving the mode its own headroom would
        raise the day's credit ceiling, which is Josh's money call and not ours — it is in the report. */
-    const runsUsed = boardOnly ? Number(await redis(["GET", runsKey])) || 0 : 0;
-    if (boardOnly && runsUsed >= MAX_RUNS_PER_DATE) {
+    const runsUsed = boardOnly && !manualReprice ? Number(await redis(["GET", runsKey])) || 0 : 0;
+    if (boardOnly && !manualReprice && runsUsed >= MAX_RUNS_PER_DATE) {
       return NextResponse.json({
         ok: true,
         skipped: `today's ${MAX_RUNS_PER_DATE} server board runs are already used`,
@@ -308,6 +320,13 @@ export async function GET(req: NextRequest) {
        throws. Incrementing afterwards would count zero for every such run and leave the
        ceiling unbounded exactly when it is needed. `K_LASTGEN` (the 45-minute limiter)
        is set on the same line for the same reason — both are pessimistic on purpose. */
+    let manualRuns = 0;
+    if (manualReprice) {
+      /* Josh's forced tap: its own tally, no shared INCR, no K_LASTGEN — see manualReprice above */
+      const manualKey = `${K_MANUAL}${dateNow}`;
+      manualRuns = Number(await redis(["INCR", manualKey])) || 0;
+      if (manualRuns === 1) await redis(["EXPIRE", manualKey, String(3 * 86_400)]);
+    } else {
     const runs = Number(await redis(["INCR", runsKey])) || 0;
     if (runs === 1) await redis(["EXPIRE", runsKey, String(3 * 86_400)]);
     /* top-up fires get TOPUP_MAX headroom above the cap (the block fires can lawfully
@@ -323,6 +342,7 @@ export async function GET(req: NextRequest) {
       );
     }
     await redis(["SET", K_LASTGEN, String(now)]);
+    }
 
     // arm the same v2 stack the app arms (armV2 in engine-client)
     const base = selfBase();
@@ -700,7 +720,7 @@ export async function GET(req: NextRequest) {
         note: boardOnly
           ? "board re-priced and stored (including its live pool); no pregame rows to log — every game has started"
           : "no pregame picks (off day or slate underway)",
-        lock, reading, ...(boardOnly ? { boardOnly: true } : {}),
+        lock, reading, ...(boardOnly ? { boardOnly: true } : {}), ...(manualReprice ? { forced: true, manualRuns } : {}),
       });
     }
 
@@ -736,6 +756,8 @@ export async function GET(req: NextRequest) {
       /* board-only (2026-09-12): the caller — the Board's Refresh tap — needs to be able to say in
          plain English that it re-priced the board and did not touch the card */
       ...(boardOnly ? { boardOnly: true } : {}),
+      /* Josh's forced full refresh (2026-09-19): on record in the answer — which tap of the day this was */
+      ...(manualReprice ? { forced: true, manualRuns } : {}),
     });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 });

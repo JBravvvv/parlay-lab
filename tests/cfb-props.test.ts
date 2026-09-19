@@ -575,10 +575,11 @@ describe("app/api/cfb/props/route.ts + src/lib/server/football-props.ts + client
     expect(route).toMatch(/const pullSec = propsWindowSec\(toFetch, cfg\.props\)/);
     // THE CAESARS-MISSING RULE (2026-09-05, review fix): Next's data cache is stale-while-revalidate, so a re-pull
     // (a Caesars-missing re-check, or a live game already on the board) bypasses it with cache: "no-store";
-    // a first pull or an expired carry keeps next.revalidate at the pull's window
+    // a first pull or an expired carry keeps next.revalidate at the pull's window; Josh's forced refresh
+    // (2026-09-19, ?refresh=1 with the sync phrase) bypasses it for every event it re-asks
     expect(route).toMatch(/type EventCache = \{ next: \{ revalidate: number \} \} \| \{ cache: "no-store" \}/);
     expect(route).toMatch(
-      /const cacheFor = \(g: CfbGame\): EventCache => \{\s*const w = whyOf\.get\(g\.id\);\s*return w === "czMissing" \|\| \(w === "live" && storedIds\.has\(g\.id\)\) \? \{ cache: "no-store" \} : \{ next: \{ revalidate: pullSec \} \};/,
+      /const cacheFor = \(g: CfbGame\): EventCache => \{\s*const w = whyOf\.get\(g\.id\);\s*return refresh \|\| w === "czMissing" \|\| \(w === "live" && storedIds\.has\(g\.id\)\) \? \{ cache: "no-store" \} : \{ next: \{ revalidate: pullSec \} \};/,
     );
     expect(route).toMatch(/eventOdds\(game\.oddsEventId as string, key, cacheFor\(game\)\)/);
     expect(route).not.toMatch(/const ttlFor = \(g: CfbGame\): number/);

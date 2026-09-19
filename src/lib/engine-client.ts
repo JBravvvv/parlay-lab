@@ -262,6 +262,19 @@ export async function serverBoard(): Promise<Board | null> {
   }
 }
 
+/** Adopt a server board on this device — localStorage (so the next open is instant and offline-safe) and the
+    engine singleton. The Board's forced server re-price (2026-09-19) calls this with the board it just bought:
+    that board is newer than anything cached by construction, and bestBoard()'s "never take fewer priced games"
+    rule must not keep an older cached board in front of it. */
+export function adoptServerBoard(b: Board): void {
+  try {
+    localStorage.setItem(BOARD_KEY, JSON.stringify(b));
+  } catch {
+    /* storage full — it will be re-fetched next open */
+  }
+  syncEngineBoard(b);
+}
+
 /**
  * Today's board, cheapest acceptable source first.
  *

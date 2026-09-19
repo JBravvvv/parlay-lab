@@ -1,7 +1,7 @@
 "use client";
 
 import { LeagueProvider } from "@/components/football/LeagueContext";
-import { CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
+import { CfbBoardStamp, CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
 import { NFL_DESK } from "@/lib/nfl/desk";
 
 /**
@@ -20,6 +20,15 @@ export function NflPicksBoard() {
 }
 
 /** the header's "Refresh Board" pill on the NFL desk — invalidates the NFL slate + props prefixes */
+/** the header's "updated h:mm" on the NFL desk handles (2026-09-19) */
+export function NflBoardStamp(props: { phone?: boolean }) {
+  return (
+    <LeagueProvider desk={NFL_DESK}>
+      <CfbBoardStamp {...props} />
+    </LeagueProvider>
+  );
+}
+
 export function NflRefreshPill() {
   return (
     <LeagueProvider desk={NFL_DESK}>

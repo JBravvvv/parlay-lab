@@ -3,6 +3,7 @@
 import type { DeskClient, LeagueConfig } from "@/lib/football/league";
 import type { CfbPropsBoard } from "@/lib/cfb/props-types";
 import type { CfbFinals, CfbSlate } from "@/lib/cfb/types";
+import { getSyncKey } from "@/lib/ledgerSync";
 
 /**
  * THE FOOTBALL FEED CLIENT FACTORY (2026-09-08, the NFL build) — the browser side of a desk's
@@ -35,8 +36,14 @@ function rememberQuota(res: Response, body: { quota?: { remaining: number | null
   }
 }
 
-async function getJson<T extends object>(url: string, feed: string): Promise<{ res: Response; body: T }> {
-  const res = await fetch(url, { cache: "no-store" });
+/** the one request header a forced refresh adds — the sync phrase, in the header and never in the URL */
+function refreshHeaders(refresh: boolean | undefined): Record<string, string> | undefined {
+  const key = refresh ? getSyncKey() : null;
+  return key ? { "x-pl-sync": key } : undefined;
+}
+
+async function getJson<T extends object>(url: string, feed: string, headers?: Record<string, string>): Promise<{ res: Response; body: T }> {
+  const res = await fetch(url, headers ? { cache: "no-store", headers } : { cache: "no-store" });
   const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
   if (!res.ok || body == null) {
     throw new Error(body?.error ?? `${feed} feed ${res.status}`);
@@ -88,13 +95,16 @@ export function makeClient(cfg: ClientConfig): DeskClient {
   }
 
   /** The full slate for a Pacific date (today when omitted): board + finals + quota. */
-  async function loadSlate(date?: string, opts?: { bankroll?: number }): Promise<CfbSlate> {
+  async function loadSlate(date?: string, opts?: { bankroll?: number; refresh?: boolean }): Promise<CfbSlate> {
     const p = new URLSearchParams();
     if (date) p.set("date", date);
     const bankroll = opts?.bankroll;
     if (bankroll != null && Number.isFinite(bankroll) && bankroll > 0) p.set("bankroll", String(Math.round(bankroll)));
+    /* JOSH'S REFRESH (2026-09-19): `refresh` = this instant's game lines, the odds cache bypassed — sync phrase in the header */
+    const headers = refreshHeaders(opts?.refresh);
+    if (headers) p.set("refresh", "1");
     const qs = p.toString();
-    const { res, body } = await getJson<CfbSlate>(`${cfg.routes.slate}${qs ? `?${qs}` : ""}`, prefix);
+    const { res, body } = await getJson<CfbSlate>(`${cfg.routes.slate}${qs ? `?${qs}` : ""}`, prefix, headers);
     rememberQuota(res, body);
     return body;
   }
@@ -111,13 +121,16 @@ export function makeClient(cfg: ClientConfig): DeskClient {
       (`props.revalidateSec` pre-kick, `props.liveRevalidateSec` while live), so `staleTime` mirrors
       that value (PROPS_STALE_MS is only the fallback before a board loads) and there is NO
       refetchInterval anywhere — the route holds a daily budget it will not spend past. */
-  async function loadProps(date?: string, opts?: { bankroll?: number }): Promise<CfbPropsBoard> {
+  async function loadProps(date?: string, opts?: { bankroll?: number; refresh?: boolean }): Promise<CfbPropsBoard> {
     const p = new URLSearchParams();
     if (date) p.set("date", date);
     const bankroll = opts?.bankroll;
     if (bankroll != null && Number.isFinite(bankroll) && bankroll > 0) p.set("bankroll", String(Math.round(bankroll)));
+    /* JOSH'S REFRESH (2026-09-19): `refresh` = the Refresh Board tap, every selected game with rows re-priced under the daily budget */
+    const headers = refreshHeaders(opts?.refresh);
+    if (headers) p.set("refresh", "1");
     const qs = p.toString();
-    const { res, body } = await getJson<CfbPropsBoard>(`${cfg.routes.props}${qs ? `?${qs}` : ""}`, prefix);
+    const { res, body } = await getJson<CfbPropsBoard>(`${cfg.routes.props}${qs ? `?${qs}` : ""}`, prefix, headers);
     rememberQuota(res, body);
     return body;
   }

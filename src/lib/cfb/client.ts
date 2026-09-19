@@ -3,6 +3,7 @@
 import type { CfbPropsBoard } from "./props-types";
 import { CFB_PROPS, CFB_ROUTES } from "./rules";
 import type { CfbFinals, CfbSlate } from "./types";
+import { getSyncKey } from "@/lib/ledgerSync";
 
 /**
  * Browser side of the CFB slate feed. One GET to /api/cfb per (date, bankroll) — the route
@@ -67,8 +68,14 @@ function rememberQuota(res: Response, body: { quota?: { remaining: number | null
   }
 }
 
-async function getJson<T extends object>(url: string): Promise<{ res: Response; body: T }> {
-  const res = await fetch(url, { cache: "no-store" });
+/** the one request header a forced refresh adds — the sync phrase, in the header and never in the URL */
+function refreshHeaders(refresh: boolean | undefined): Record<string, string> | undefined {
+  const key = refresh ? getSyncKey() : null;
+  return key ? { "x-pl-sync": key } : undefined;
+}
+
+async function getJson<T extends object>(url: string, headers?: Record<string, string>): Promise<{ res: Response; body: T }> {
+  const res = await fetch(url, headers ? { cache: "no-store", headers } : { cache: "no-store" });
   const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
   if (!res.ok || body == null) {
     throw new Error(body?.error ?? `cfb feed ${res.status}`);
@@ -77,13 +84,17 @@ async function getJson<T extends object>(url: string): Promise<{ res: Response; 
 }
 
 /** The full slate for a Pacific date (today when omitted): board + finals + quota. */
-export async function loadCfbSlate(date?: string, opts?: { bankroll?: number }): Promise<CfbSlate> {
+export async function loadCfbSlate(date?: string, opts?: { bankroll?: number; refresh?: boolean }): Promise<CfbSlate> {
   const p = new URLSearchParams();
   if (date) p.set("date", date);
   const bankroll = opts?.bankroll;
   if (bankroll != null && Number.isFinite(bankroll) && bankroll > 0) p.set("bankroll", String(Math.round(bankroll)));
+  /* JOSH'S REFRESH (2026-09-19): `refresh` asks the route for this instant's game lines (the odds cache bypassed) —
+     honoured only with the sync phrase stored, which travels in the header; without it the flag is not sent */
+  const headers = refreshHeaders(opts?.refresh);
+  if (headers) p.set("refresh", "1");
   const qs = p.toString();
-  const { res, body } = await getJson<CfbSlate>(`/api/cfb${qs ? `?${qs}` : ""}`);
+  const { res, body } = await getJson<CfbSlate>(`/api/cfb${qs ? `?${qs}` : ""}`, headers);
   rememberQuota(res, body);
   return body;
 }
@@ -100,13 +111,17 @@ export async function loadCfbFinals(date: string): Promise<{ date: string; final
     (CFB_PROPS.revalidateSec pre-kick, liveRevalidateSec while live), so `staleTime` mirrors
     that value (CFB_PROPS_STALE_MS is only the fallback before a board loads) and there is NO refetchInterval anywhere — a fresh pull was measured at ~31 credits
     per event (2026-09-05), and the route holds a daily budget it will not spend past. */
-export async function loadCfbProps(date?: string, opts?: { bankroll?: number }): Promise<CfbPropsBoard> {
+export async function loadCfbProps(date?: string, opts?: { bankroll?: number; refresh?: boolean }): Promise<CfbPropsBoard> {
   const p = new URLSearchParams();
   if (date) p.set("date", date);
   const bankroll = opts?.bankroll;
   if (bankroll != null && Number.isFinite(bankroll) && bankroll > 0) p.set("bankroll", String(Math.round(bankroll)));
+  /* JOSH'S REFRESH (2026-09-19): `refresh` is the Refresh Board tap — the route re-prices every selected game with rows
+     now, under its daily budget; sync phrase in the header, never the URL, and without one the flag is not sent */
+  const headers = refreshHeaders(opts?.refresh);
+  if (headers) p.set("refresh", "1");
   const qs = p.toString();
-  const { res, body } = await getJson<CfbPropsBoard>(`${CFB_ROUTES.props}${qs ? `?${qs}` : ""}`);
+  const { res, body } = await getJson<CfbPropsBoard>(`${CFB_ROUTES.props}${qs ? `?${qs}` : ""}`, headers);
   rememberQuota(res, body);
   return body;
 }

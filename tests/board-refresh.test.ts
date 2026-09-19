@@ -58,9 +58,13 @@ describe("INSTRUCTION 50 item 1 — a tap always re-prices something", () => {
     expect(handler).not.toEqual(reverted);
   });
 
-  it("any refusal falls back to the browser re-price", () => {
+  it("any refusal goes to the server's forced FULL re-price (Josh, 2026-09-19), whose own failure falls back to the browser", () => {
+    /* "MLB should also do a FULL refresh every single time i refresh." — the only early return is a
+       refill whose own pass already re-priced and stored the board; the browser re-price is now
+       liveBoard's onFallback, so a tap still never resolves with nothing re-priced. */
     expect(handler).toMatch(/const refused = r\.body\.fired === false;/);
-    expect(handler).toMatch(/if \(refused \|\| httpFail\) regen\.mutate\(\);/);
+    expect(handler).toMatch(/if \(!httpFail && !refused && refillRepricedBoard\(r\.body\)\) return;\s*liveBoard\.mutate\(\);/);
+    expect(handler).not.toMatch(/if \(refused \|\| httpFail\) regen\.mutate\(\);/);
   });
 
   it("a non-2xx answer falls back too — refillDesk resolves 401/502/503 as a success", () => {
@@ -71,7 +75,7 @@ describe("INSTRUCTION 50 item 1 — a tap always re-prices something", () => {
   });
 
   it("a thrown mutation falls back too", () => {
-    expect(handler).toMatch(/onError: \(\) => regen\.mutate\(\),/);
+    expect(handler).toMatch(/onError: \(\) => liveBoard\.mutate\(\),/);
   });
 
   it("with no board or no sync phrase the pill still generates (the pre-49 path)", () => {
@@ -81,15 +85,15 @@ describe("INSTRUCTION 50 item 1 — a tap always re-prices something", () => {
   it("no blocking cooldown was added — the spend counter is visibility, never a gate", () => {
     expect(page).not.toMatch(/cooldown/i);
     // the only thing that disables the pill is work already in flight
-    expect(page).toMatch(/disabled=\{regen\.isPending \|\| refill\.isPending \|\| isPending\}/);
+    expect(page).toMatch(/disabled=\{regen\.isPending \|\| refill\.isPending \|\| liveBoard\.isPending \|\| isPending\}/);
     const engine = read("src/lib/engine-client.ts");
     expect(engine).toMatch(/export const GEN_CREDITS_EST = 172;/);
   });
 });
 
 describe("INSTRUCTION 50 item 1 — the pill says what it is doing", () => {
-  it("the label watches BOTH mutations", () => {
-    expect(page).toMatch(/\{regen\.isPending \|\| refill\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/);
+  it("the label watches all THREE mutations", () => {
+    expect(page).toMatch(/\{regen\.isPending \|\| refill\.isPending \|\| liveBoard\.isPending \? "Scanning slate…" : d \? "Refresh MLB" : "Generate board"\}/);
   });
 
   it("every tap prints a note — including a plain success and a plain re-price", () => {

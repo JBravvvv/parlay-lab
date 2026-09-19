@@ -29,13 +29,13 @@ import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
 import { usePricedBoard as useBoard, useRegenerateBoard } from "@/lib/useBoard";
 import { getSyncKey } from "@/lib/ledgerSync";
-import { refillReason, useRefillDesk } from "@/lib/refill-client";
+import { refillReason, refillRepricedBoard, useRefillDesk } from "@/lib/refill-client";
 import { UfcBoard } from "@/components/ufc/UfcBoard";
 import { AsgBoardTab } from "@/components/allstar/AllStarSurfaces";
 import { ASG_ENABLED, CFB_ENABLED, NFL_ENABLED, UFC_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
-import { CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
-import { NflPicksBoard, NflRefreshPill } from "@/components/nfl/NflPicksBoard";
+import { CfbBoardStamp, CfbPicksBoard, CfbRefreshPill } from "@/components/cfb/CfbPicksBoard";
+import { NflBoardStamp, NflPicksBoard, NflRefreshPill } from "@/components/nfl/NflPicksBoard";
 import { ParlaysSection } from "@/components/mlb/ParlaysSection";
 import { MyParlayBar, MyToggle } from "@/components/mlb/MyParlayBar";
 import { useMyParlay } from "@/lib/use-my-parlay";
@@ -116,7 +116,15 @@ export default function BoardPage() {
           title="Board"
           eyebrow="College Football"
           chip={<CfbChip />}
-          sub="Every playable side and player prop on the slate ranked on its EV at your selected sportsbook, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          /* JOSH (2026-09-19): "It should show the time of last board refresh." — the stamp of the board on screen,
+             appended to the sentence on desktop and the whole one-line sub on the phone (the MLB header's shape) */
+          sub={
+            <>
+              Every playable side and player prop on the slate ranked on its EV at your selected sportsbook, and the desk&apos;s parlay sets — safer, longshots, mixed and live. The games list is on Games.
+              <CfbBoardStamp />
+            </>
+          }
+          subMobile={<CfbBoardStamp phone />}
           action={<CfbRefreshPill />}
         />
         <CfbPicksBoard />
@@ -132,7 +140,13 @@ export default function BoardPage() {
           title="Board"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="Every playable side and player prop on the NFL slate ranked on its EV at your selected sportsbook, and the desk's parlay sets — safer, longshots, mixed and live. The games list is on Games."
+          sub={
+            <>
+              Every playable side and player prop on the NFL slate ranked on its EV at your selected sportsbook, and the desk&apos;s parlay sets — safer, longshots, mixed and live. The games list is on Games.
+              <NflBoardStamp />
+            </>
+          }
+          subMobile={<NflBoardStamp phone />}
           action={<NflRefreshPill />}
         />
         <NflPicksBoard />
@@ -1133,27 +1147,23 @@ function MlbBoardPage() {
   /* WHAT THE SERVER'S BOARD-ONLY PASS DID, in plain English, appended to whatever the refill said
      (2026-09-12). A refused refill resolves rather than throwing, so `refill.data` is set on exactly
      the taps that go on to the board-only pass — reporting the refusal and saying nothing about what
-     was done instead is how a refresh ends up looking like it did nothing. "ran recently" is the
-     45-minute limiter, which is a real answer and not a failure: it is named as pacing. */
+     was done instead is how a refresh ends up looking like it did nothing. Since 2026-09-19 the pass
+     is FORCED on every tap (Josh: "a FULL refresh every single time i refresh"), so the limiter's
+     pacing answer no longer exists: a failure here is a real one and is named. */
   const liveBoardNote = liveBoard.isPending
-    ? " · the server is re-pricing the board and the games in play…"
+    ? " · the server is re-pricing the full board and the games in play…"
     : liveBoard.isSuccess
-      ? " · board and live odds re-priced on the server — your locked card was not touched"
+      ? " · full board re-priced and stored on the server — your locked card was not touched"
       : liveBoard.isError
-        ? /ran recently/.test(liveBoard.error.message)
-          ? /* PACING, AND NO LONGER A DEAD END (review round, 2026-09-12). This used to end "so
-               there was nothing new to buy", which became untrue the moment the limiter started
-               falling through to the device re-price: something WAS bought, just in this tab. It
-               now says only what the server did, and the "board re-priced on this device" clause
-               that follows says what the tap actually produced. */
-            " · the server buys a stored re-price at most once every 45 minutes and it ran recently, so it did not buy again"
-          : ` · the server did not re-price the live board: ${liveBoard.error.message}`
+        ? ` · the server did not re-price the board: ${liveBoard.error.message}`
         : "";
   const refreshNote =
     refill.isPending || regen.isPending || liveBoard.isPending
       ? liveBoard.isPending
-        ? "refreshing — the server is re-pricing the board and the games in play (your locked card is not touched)…"
-        : "refreshing — asking the server for a refill, then re-pricing the board on this device…"
+        ? "refreshing — the server is re-pricing the full board and the games in play (your locked card is not touched)…"
+        : regen.isPending
+          ? "refreshing — re-pricing the board on this device…"
+          : "refreshing — asking the server for a refill, then a full stored re-price of the board…"
       : refill.error
         ? /* THE FALLBACK'S ACTUAL OUTCOME, NOT AN ASSERTION (INSTRUCTION 50 fix pass). This
              branch used to say "re-priced in the browser instead" unconditionally — but the
@@ -1164,17 +1174,19 @@ function MlbBoardPage() {
           ? `refill failed: ${refill.error.message}, and the browser re-price also failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was re-priced and nothing was fabricated${spendNote}`
           : regen.isSuccess
             ? `refill failed: ${refill.error.message} — re-priced in the browser instead${spendNote}`
-            : `refill failed: ${refill.error.message} — re-pricing in the browser…`
+            : liveBoard.isSuccess
+              ? `refill failed: ${refill.error.message} — full board re-priced and stored on the server instead${spendNote}`
+              : `refill failed: ${refill.error.message} — re-pricing in the browser…`
         : regen.isError
           ? `re-price failed: ${regen.error?.message ?? "the odds feed didn't answer"} — nothing was fabricated${spendNote}`
           : refill.data
-            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own pass" : "the server had nothing to add")}${liveBoardNote}${
+            ? `${refillReason(refill.data.body) ?? (refill.data.body.fired === true ? "refilled — the server ran its own full pass, board re-priced and stored" : "the server had nothing to add")}${liveBoardNote}${
                 regen.isSuccess ? " · board re-priced on this device" : ""
               }${spendNote}`
             : liveBoard.isSuccess
-              ? `board and live odds re-priced on the server — your locked card was not touched${spendNote}`
+              ? `full board re-priced and stored on the server — your locked card was not touched${spendNote}`
               : liveBoard.isError
-                ? `the server did not re-price the live board: ${liveBoard.error.message}${regen.isSuccess ? " · board re-priced on this device instead" : ""}${spendNote}`
+                ? `the server did not re-price the board: ${liveBoard.error.message}${regen.isSuccess ? " · board re-priced on this device instead" : ""}${spendNote}`
                 : regen.isSuccess
                   ? `board re-priced on this device${spendNote}`
                   : null;
@@ -1255,18 +1267,23 @@ function MlbBoardPage() {
                        to the browser-only path for the rest of the night. On an all-early slate it
                        would never have fired at all. `liveGap.live` is the count the live poll
                        actually reports as in progress, whatever the board's age. */
-                    if (liveGap.live > 0 && (refused || httpFail)) {
-                      liveBoard.mutate();
-                      return;
-                    }
-                    if (refused || httpFail) regen.mutate();
+                    /* JOSH, 2026-09-19 (verbatim): "MLB should also do a FULL refresh every single time i refresh."
+                       The gate above (a game under way, the 45-minute limiter, the four-run cap) is gone: EVERY tap
+                       now ends with the whole board re-priced and STORED on the server. When the refill's own pass
+                       already did that — it fired a top-up generate that ran (refillRepricedBoard) — the tap is done;
+                       on ANY other answer (refused, skipped, failed, non-2xx) the forced board-only pass
+                       (live=1&force=1: outside the limiter and the cap, tallied on its own key, never touching the
+                       card) buys it. The browser-only re-price is now the fallback of that fallback (liveBoard's
+                       onFallback), so a tap still never resolves with nothing re-priced. */
+                    if (!httpFail && !refused && refillRepricedBoard(r.body)) return;
+                    liveBoard.mutate();
                   },
-                  onError: () => regen.mutate(),
+                  onError: () => liveBoard.mutate(),
                 });
               }}
-              disabled={regen.isPending || refill.isPending || isPending}
+              disabled={regen.isPending || refill.isPending || liveBoard.isPending || isPending}
             >
-              {regen.isPending || refill.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
+              {regen.isPending || refill.isPending || liveBoard.isPending ? "Scanning slate…" : d ? "Refresh MLB" : "Generate board"}
             </Pill>
           ) : undefined
         }

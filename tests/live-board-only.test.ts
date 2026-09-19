@@ -84,7 +84,8 @@ describe("FIX 3 — the mode exists, and only Josh's own tap can ask for it", ()
        going through a named, reviewable client. Both ends are still pinned: the fetch literal and
        its single call site here, and the page's hook call below. */
     const client = stripComments(fs.readFileSync(path.join(process.cwd(), "src/lib/mlb/live-board-client.ts"), "utf8"));
-    expect(client).toMatch(/fetch\("\/api\/generate\?live=1", \{ headers: \{ "x-pl-sync": key \}, cache: "no-store" \}\)/);
+    /* JOSH, 2026-09-19: "MLB should also do a FULL refresh every single time i refresh." — `force=1` rides beside `live=1` */
+    expect(client).toMatch(/fetch\("\/api\/generate\?live=1&force=1", \{ headers: \{ "x-pl-sync": key \}, cache: "no-store" \}\)/);
     // only one call site, so there is no second, quieter way to spend this
     expect(client.match(/\/api\/generate\?live=1/g)?.length).toBe(1);
     /* and the page reaches it ONLY through that module — no second, page-local route to the spend */
@@ -94,37 +95,35 @@ describe("FIX 3 — the mode exists, and only Josh's own tap can ask for it", ()
     expect(board.match(/useLiveBoardReprice\(/g)?.length).toBe(1);
   });
 
-  it("only fires in place of a refused refill, and only while a game is under way", () => {
+  it("fires on EVERY tap the refill's own pass did not already re-price — pregame or live (Josh, 2026-09-19)", () => {
     const board = stripComments(fs.readFileSync(path.join(process.cwd(), "app/board/page.tsx"), "utf8"));
-    /* GATED ON `liveGap.live`, NOT `pregameLive` (review round, 2026-09-12). `pregameLive` also
-       requires `board.at <= start` — "is this row older than its game" — and this very pass destroys
-       that: the board it stores is newer than every first pitch, so the SECOND tap of the evening
-       found 0 and fell back to the browser-only path for the rest of the night, and on an all-early
-       slate the server pass never fired at all. `liveGap.live` is what the live poll reports as in
-       progress, whatever the board's age. */
-    expect(board).toMatch(/if \(liveGap\.live > 0 && \(refused \|\| httpFail\)\) \{\s*liveBoard\.mutate\(\);\s*return;\s*\}/);
+    /* JOSH, 2026-09-19 (verbatim): "MLB should also do a FULL refresh every single time i refresh."
+       Until then the stored server re-price was bought only with a game under way (`liveGap.live > 0`),
+       and a pregame tap re-priced in this tab and stored nothing. Now the one early return is a refill
+       whose OWN pass already re-priced and stored the board (refillRepricedBoard); every other answer —
+       refused, skipped, failed, non-2xx, thrown — goes to the forced board-only pass, and the browser
+       re-price is that pass's own fallback (onFallback), so a tap still never ends with nothing re-priced. */
+    expect(board).toMatch(/if \(!httpFail && !refused && refillRepricedBoard\(r\.body\)\) return;\s*liveBoard\.mutate\(\);/);
+    expect(board).toMatch(/onError: \(\) => liveBoard\.mutate\(\),/);
+    expect(board).not.toMatch(/liveGap\.live > 0 && \(refused/);
     expect(board).not.toMatch(/if \(pregameLive > 0 && \(refused/);
-    // the pregame line below it is the pre-2026-09-12 behaviour, kept
-    expect(board).toMatch(/if \(refused \|\| httpFail\) regen\.mutate\(\);/);
+    expect(board).not.toMatch(/if \(refused \|\| httpFail\) regen\.mutate\(\);/);
   });
 
-  it("a tap inside the 45-minute limiter buys no SERVER re-price, and still re-prices on the device", () => {
-    /* CORRECTED IN THE REVIEW ROUND (2026-09-12). This case used to assert the tap bought NOTHING —
-       an early `return` in onError for "ran recently" — which re-created the exact defect
-       INSTRUCTION 50 item 1 exists to kill: a Refresh that buys nothing, stores nothing and
-       re-prices nothing, on the one slate Josh is watching. The server's 45-minute pacing still
-       holds (no second stored generate is bought inside the window); what it may not do is cancel
-       the browser re-price every tap has always produced, the one engine-client deliberately never
-       gates. So: every failure falls through to onFallback, and the note says what the SERVER did. */
+  it("the forced tap is outside the limiter (force) and the run cap (manualReprice), and every failure still re-prices on the device", () => {
+    /* 2026-09-19. The 45-minute limiter is still in the route and `boardOnly` is still not in its bypass
+       list — the tap gets past it the way any manual pass does, with `force`, which the phrase-gated
+       client now sends. The run cap is lifted for `force && boardOnly` ALONE (manualReprice), so the
+       scheduled board-only pass is capped exactly as before. And the review-round rule holds: every
+       failure falls through to onFallback; there is no "ran recently" answer left to read anywhere. */
     const client = stripComments(fs.readFileSync(path.join(process.cwd(), "src/lib/mlb/live-board-client.ts"), "utf8"));
     expect(client).not.toMatch(/ran recently/);
     expect(client).toMatch(/onError: \(\) => \{\s*onFallback\(\);\s*\},/);
-    // the limiter itself is untouched in the route — this mode is still NOT in the bypass list
     expect(SRC).toMatch(/if \(!force && !topup && now - lastRun < 45 \* 60_000\) \{/);
+    expect(SRC).toMatch(/const manualReprice = force && boardOnly;/);
     const board = stripComments(fs.readFileSync(path.join(process.cwd(), "app/board/page.tsx"), "utf8"));
-    expect(board).toMatch(/the server buys a stored re-price at most once every 45 minutes and it ran recently, so it did not buy again/);
-    // and the page still has a branch that reads that refusal, so the wording cannot drift unnoticed
-    expect(board).toMatch(/\/ran recently\/\.test\(liveBoard\.error\.message\)/);
+    expect(board).not.toMatch(/ran recently/);
+    expect(board).toMatch(/the server did not re-price the board: \$\{liveBoard\.error\.message\}/);
   });
 
   it("a REFUSED board-only tap costs the block ladder no run-cap headroom", () => {
@@ -133,14 +132,23 @@ describe("FIX 3 — the mode exists, and only Josh's own tap can ask for it", ()
        could leave INSTRUCTION 48's block lock refused "run cap reached" with no credit spent on it.
        A read-only GET first, and no `if (boardOnly) {` block, which is how the card-region proof
        below still finds the right line. */
-    expect(SRC).toMatch(/const runsUsed = boardOnly \? Number\(await redis\(\["GET", runsKey\]\)\) \|\| 0 : 0;/);
-    expect(SRC).toMatch(/if \(boardOnly && runsUsed >= MAX_RUNS_PER_DATE\) \{/);
+    expect(SRC).toMatch(/const runsUsed = boardOnly && !manualReprice \? Number\(await redis\(\["GET", runsKey\]\)\) \|\| 0 : 0;/);
+    expect(SRC).toMatch(/if \(boardOnly && !manualReprice && runsUsed >= MAX_RUNS_PER_DATE\) \{/);
     // the free refusal is above the INCR, so the counter is never touched by it
-    expect(lineOf(/if \(boardOnly && runsUsed >= MAX_RUNS_PER_DATE\) \{/)).toBeLessThan(
+    expect(lineOf(/if \(boardOnly && !manualReprice && runsUsed >= MAX_RUNS_PER_DATE\) \{/)).toBeLessThan(
       lineOf(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/),
     );
     // and the cap itself is not raised to make room for this mode
     expect(SRC).toMatch(/const MAX_RUNS_PER_DATE = 4;/);
+    /* JOSH'S FORCED TAP (2026-09-19) never touches the shared counter either: it is tallied under its own
+       per-date key and does not set K_LASTGEN — counting it would spend the card ladder's headroom and pace
+       the scheduled fires off Josh's thumb. One SET of K_LASTGEN in the file, inside the non-manual branch. */
+    expect(SRC).toMatch(/const K_MANUAL = "pl:gen:manual:";/);
+    expect(SRC).toMatch(/manualRuns = Number\(await redis\(\["INCR", manualKey\]\)\) \|\| 0;/);
+    expect(SRC.match(/await redis\(\["SET", K_LASTGEN, String\(now\)\]\);/g)?.length).toBe(1);
+    expect(lineOf(/if \(manualReprice\) \{/)).toBeLessThan(lineOf(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/));
+    expect(lineOf(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/)).toBeLessThan(lineOf(/await redis\(\["SET", K_LASTGEN, String\(now\)\]\);/));
+    expect(SRC.match(/\.\.\.\(manualReprice \? \{ forced: true, manualRuns \} : \{\}\)/g)?.length).toBe(2);
   });
 
   it("a 200 carrying `skipped` is NOT reported as a re-price", () => {
