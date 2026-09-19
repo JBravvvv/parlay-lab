@@ -1,3 +1,11 @@
+# Progress — 2026-09-18 (late evening: one leg per team in the parlay generator)
+
+- Josh: "Add filter on parlay generator alongside 'Two legs from one game' that says 'Two legs from one team' so i can prevent a 3 teamer from having 2 players from same team".
+- **Rule** (`GenSpec.onePerTeam`, src/lib/parlay-gen.ts): at most one leg per folded team tag; untagged legs never blocked; undefined = off (recipes and pinned fixtures keep their exact tickets and seeds), both desks default ON, the user relaxes it from the sheet. Enforced in seating, the price lookahead, the mixed/spread checks, payout repair, pinned conflicts (`same-team`), and an exact `capacity` (club = the seat-owning node under R2b; doubleheader lookahead arms on a club spanning two games).
+- **Relax hint**: `same-game` first when the game switch (alone or with the team switch) would fit; `same-team` when it is the one binding. Ticket carries `sameTeam`; the sheet says so.
+- **Sheet**: "Two legs from one team" Toggle under "Two legs from one game" (Advanced); "Allow two legs from one team" one-tap fix; pin-conflict copy for the team.
+- Tests: `tests/parlay-gen-team.test.ts` (new, 17), football-gen +4 (untagged legs never blocked; two tagged clubs), parlay-gen-setup +1. Full serial gate before push (see `tools/handoff-state.env`).
+
 # Progress — 2026-09-18 (evening: live HR parlays, HR line rule, rail-driven ranked list, compact generator)
 
 - Josh: "Why won't it generate parlays right now for HRs? There are a ton of HR live props on the board and just starting… I refreshed the board as well from 5:00pm last refresh to 7:03pm"; the ranked list "not sorting by filter type"; "no HR bets shown EVER should be over 1.5 HR unless its a live bet in which the player already has 1 HR live OR it is a manual filter"; "compact the UI on the parlay generator. If we have to do dropdowns etc … so be it".

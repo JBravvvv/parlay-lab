@@ -400,6 +400,49 @@ describe("one leg per game, on a one-game slate", () => {
   });
 });
 
+/* R2b (2026-09-18), Josh: "Add filter on parlay generator alongside 'Two legs from one game' that
+   says 'Two legs from one team' so i can prevent a 3 teamer from having 2 players from same team".
+   The football adapter tags every leg with `teamOf(row)`, so the core's rule holds here unchanged. */
+describe("one leg per TEAM (R2b, 2026-09-18), on a one-game slate", () => {
+  /* The synthetic fixture resolves no roster, so every row's team is null — and an untagged leg is
+     never blocked by the team rule. For the rule itself the test tags the clubs on its own: Katin
+     Houser and Rahsul Faison as ECU, the other four as ALA. A two-club SHAPE for the generator,
+     not a claim about anyone's real roster. */
+  const two = spec({ market: "anytime_td", sides: "both", legs: 2, onePerGame: false, onePerTeam: true });
+  const ECU = new Set(["Katin Houser", "Rahsul Faison"]);
+  const tagged = (): CfbPropRow[] => clone().map((r) => ({ ...r, teamAbbr: ECU.has(r.player) ? "ECU" : "ALA" }));
+
+  it("the fixture as shipped carries no team tag, and untagged legs are never blocked — 3 legs fill with the rule on", () => {
+    const three = spec({ ...two, legs: 3, pinned: [null, null, null] });
+    const pool = poolFor(three, "cz");
+    expect(pool.legs).toHaveLength(5);
+    for (const l of pool.legs) expect(l.team).toBeNull();
+    const t = ok(generate(pool, three, 1));
+    expect(t.legs).toHaveLength(3);
+    expect(t.sameTeam).toEqual([]);
+  });
+  it("tagged: the pool carries both clubs through teamOf, and a 2-leg ticket takes one from each — on every seed", () => {
+    const pool = poolFor(two, "cz", 0, tagged());
+    expect(pool.legs.map((l) => l.team).sort()).toEqual(["ALA", "ALA", "ALA", "ALA", "ECU"]);
+    for (let seed = 1; seed <= 20; seed++) {
+      const t = ok(generate(pool, two, seed));
+      expect(t.legs.map((l) => l.team).sort()).toEqual(["ALA", "ECU"]);
+      expect(t.legs.some((l) => l.id.includes("rahsul-faison"))).toBe(true); // the one ECU leg is always the second seat
+      expect(t.sameTeam).toEqual([]);
+    }
+  });
+  it("tagged: 3 legs cannot come from two clubs — the failure names the team switch, not the game switch", () => {
+    const three = spec({ ...two, legs: 3, pinned: [null, null, null] });
+    expect(fail(generate(poolFor(three, "cz", 0, tagged()), three, 1))).toEqual({ code: "short-pool", have: 2, want: 3, relax: "same-team" });
+  });
+  it("tagged: with the team rule switched off by the user, 3 legs fill and the ticket says which club is stacked", () => {
+    const three = spec({ ...two, legs: 3, onePerTeam: false, pinned: [null, null, null] });
+    const t = ok(generate(poolFor(three, "cz", 0, tagged()), three, 1));
+    expect(t.legs).toHaveLength(3);
+    expect(t.sameTeam).toEqual(["ALA"]);
+  });
+});
+
 describe("a game under way, and a game that is over", () => {
   it("a started game is dropped by default and admitted only when Josh asks", () => {
     const s = spec({ market: "anytime_td", sides: "both", legs: 2, onePerGame: false });

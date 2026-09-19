@@ -31,10 +31,13 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
     if (s.markets !== undefined && (!Array.isArray(s.markets) || !s.markets.length
       || s.markets.some((m: unknown) => typeof m !== "string" || !markets.includes(m)))) return null;
     if (s.spread !== undefined && typeof s.spread !== "boolean") return null;
+    if (s.onePerTeam !== undefined && typeof s.onePerTeam !== "boolean") return null;
     if (s.minHit !== undefined && s.minHit !== null && (typeof s.minHit !== "number" || !(s.minHit >= 0 && s.minHit <= 1))) return null;
     const mkts = s.markets !== undefined ? [...new Set(s.markets as string[])] : undefined;
     return { ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
       sides: s.sides, onePerGame: s.onePerGame, czOnly: s.czOnly,
+      /* R2b (2026-09-18): a recipe saved before the team rule existed loads with the desks' default, ON */
+      onePerTeam: typeof s.onePerTeam === "boolean" ? s.onePerTeam : true,
       includeStarted: s.includeStarted, modelOnly: s.modelOnly,
       ...(s.positions !== undefined ? { positions: [...new Set(s.positions as string[])].sort() } : {}),
       ...(mkts && mkts.length > 1 ? { markets: [s.market, ...mkts.filter((m) => m !== s.market)] } : {}),

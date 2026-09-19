@@ -114,6 +114,15 @@ export type GenSpec = {
   positions?: readonly string[];
   /** R2: at most one leg per game. Default ON, user-relaxable, never silently relaxed. */
   onePerGame: boolean;
+  /**
+   * R2b (2026-09-18, Josh: "Add filter on parlay generator alongside 'Two legs from one game' that
+   * says 'Two legs from one team' so i can prevent a 3 teamer from having 2 players from same
+   * team"): at most one leg per TEAM, read off the adapter's folded `team` tag — a leg with no
+   * team tag is never blocked by it. Undefined = OFF, so a spec written before the control existed
+   * (saved recipes, the pinned fixtures) still mints its exact ticket; both desks default it ON
+   * and only the user relaxes it, from the sheet, never silently.
+   */
+  onePerTeam?: boolean;
   /** only legs whose price is the settlement book's quote (DraftKings since INSTRUCTION 67; the selected book on display surfaces) */
   czOnly: boolean;
   /** short tag of the book `czOnly` keeps ("DK" by default; the display selector overrides it) */
@@ -220,6 +229,8 @@ export type GenTicket<P = unknown> = {
   marketPriced: number;
   /** game keys carrying more than one leg (only possible with onePerGame off) */
   sameGame: readonly string[];
+  /** team tags carrying more than one leg (only possible with onePerTeam off) */
+  sameTeam: readonly string[];
 };
 
 export type GenFail =
@@ -236,12 +247,12 @@ export type GenFail =
    */
   | { code: "one-sided"; want: GenSide; has: GenSide; rows: number }
   | { code: "band-empty"; rows: number; nearest: { belowAm: number | null; aboveAm: number | null } }
-  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null }
+  | { code: "short-pool"; have: number; want: number; relax: "same-game" | "same-team" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null }
   | { code: "payout-unreachable"; reach: { minAm: number; maxAm: number } }
   | { code: "payout-not-found"; reach: { minAm: number; maxAm: number } }
   | { code: "pin-missing"; ids: readonly string[] }
   | { code: "pin-position"; ids: readonly string[] }
-  | { code: "pin-conflict"; ids: readonly string[]; why: "same-player" | "same-game" };
+  | { code: "pin-conflict"; ids: readonly string[]; why: "same-player" | "same-game" | "same-team" };
 
 export type GenResult<P = unknown> = { ok: true; ticket: GenTicket<P> } | { ok: false; fail: GenFail };
 
@@ -313,6 +324,8 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
   if (spec.phase) parts.push(`phase:${spec.phase}`);
   if (spec.markets?.length) parts.push(`markets:${[...new Set(spec.markets)].sort().join(",")}`);
   if (spec.spread === false) parts.push("spread:off");
+  /* only when ON — a spec without the control keeps the seed (and the ticket) it always had */
+  if (spec.onePerTeam) parts.push("t1");
   if (spec.minHit != null) parts.push(`hit:${spec.minHit}`);
   if (spec.games?.length) parts.push(`games:${[...new Set(spec.games)].sort().join(",")}`);
   if (spec.positions?.length) parts.push(`positions:${[...new Set(spec.positions)].sort().join(",")}`);
@@ -391,12 +404,14 @@ export function ticketOf<P>(legs: readonly GenLeg<P>[], spec: GenSpec, seed: num
   let dec = 1;
   let p = 1;
   const seenGame = new Map<string, number>();
+  const seenTeam = new Map<string, number>();
   const outsideLegBand: string[] = [];
   let marketPriced = 0;
   for (const l of legs) {
     dec *= amToDec(l.am);
     p *= Math.min(1, Math.max(0, l.prob / 100));
     seenGame.set(l.gameKey, (seenGame.get(l.gameKey) ?? 0) + 1);
+    if (l.team != null) seenTeam.set(l.team, (seenTeam.get(l.team) ?? 0) + 1);
     if (!inDec(l.dec, band)) outsideLegBand.push(l.id);
     if (l.src === "market") marketPriced++;
   }
@@ -415,6 +430,7 @@ export function ticketOf<P>(legs: readonly GenLeg<P>[], spec: GenSpec, seed: num
     outsideLegBand,
     marketPriced,
     sameGame: [...seenGame.entries()].filter(([, n]) => n > 1).map(([k]) => k),
+    sameTeam: [...seenTeam.entries()].filter(([, n]) => n > 1).map(([k]) => k),
   };
 }
 
@@ -515,15 +531,23 @@ function spreadTargets<P>(ctx: Ctx<P>): readonly string[] {
 }
 
 /** Exact player-to-game matching. Separate player/game counts can overstate
- * capacity on doubleheaders when several players share their only available game. */
-function capacity<P>(cands: readonly GenLeg<P>[], pins: readonly GenLeg<P>[], onePerGame: boolean): number {
+ * capacity on doubleheaders when several players share their only available game.
+ *
+ * Under R2b (one per team) the unit that owns a seat is the TEAM rather than the player — two
+ * players of one club can never both sit, so the club is one node with the union of its players'
+ * games — and a leg with no team tag stays its own player node. The matching below is then exact
+ * for every combination of the two rules. */
+function capacity<P>(cands: readonly GenLeg<P>[], pins: readonly GenLeg<P>[], onePerGame: boolean, onePerTeam = false): number {
   const usedP = new Set(pins.map((p) => p.playerKey));
   const usedG = new Set(pins.map((p) => p.gameKey));
+  const usedT = new Set(pins.flatMap((p) => (p.team != null ? [p.team] : [])));
   const choices = new Map<string, Set<string>>();
   for (const c of cands) {
     if (usedP.has(c.playerKey) || (onePerGame && usedG.has(c.gameKey))) continue;
-    if (!choices.has(c.playerKey)) choices.set(c.playerKey, new Set());
-    choices.get(c.playerKey)!.add(c.gameKey);
+    if (onePerTeam && c.team != null && usedT.has(c.team)) continue;
+    const node = onePerTeam && c.team != null ? `team:${c.team}` : `player:${c.playerKey}`;
+    if (!choices.has(node)) choices.set(node, new Set());
+    choices.get(node)!.add(c.gameKey);
   }
   if (!onePerGame) return pins.length + choices.size;
   const owner = new Map<string, string>();
@@ -540,11 +564,13 @@ function capacity<P>(cands: readonly GenLeg<P>[], pins: readonly GenLeg<P>[], on
   return pins.length + owner.size;
 }
 
-function crossesGames(legs: readonly GenLeg[]): boolean {
+function crossesGames(legs: readonly GenLeg[], keyOf: (l: GenLeg) => string | null = (l) => l.playerKey): boolean {
   const games = new Map<string, string>();
   for (const l of legs) {
-    if (games.has(l.playerKey) && games.get(l.playerKey) !== l.gameKey) return true;
-    games.set(l.playerKey, l.gameKey);
+    const k = keyOf(l);
+    if (k == null) continue;
+    if (games.has(k) && games.get(k) !== l.gameKey) return true;
+    games.set(k, l.gameKey);
   }
   return false;
 }
@@ -595,30 +621,43 @@ function sampleOrder<P>(cands: readonly GenLeg<P>[], rng: () => number, legs: nu
   return out;
 }
 
-type Slots<P> = { legs: (GenLeg<P> | null)[]; usedP: Set<string>; usedG: Set<string>; ids: Set<string> };
+type Slots<P> = { legs: (GenLeg<P> | null)[]; usedP: Set<string>; usedG: Set<string>; usedT: Set<string>; ids: Set<string> };
+
+/** the rules a seat is checked against — R2 (one per game) and R2b (one per team) */
+type SeatRules = Pick<GenSpec, "onePerGame" | "onePerTeam">;
+
+/** R1 / R2 / R2b in ONE place: would seating `l` beside an already-seated `p` break a rule that is on? */
+const blocks = <P,>(rules: SeatRules, p: GenLeg<P>, l: GenLeg<P>) =>
+  p.playerKey === l.playerKey
+  || (rules.onePerGame && p.gameKey === l.gameKey)
+  || (!!rules.onePerTeam && l.team != null && p.team === l.team);
 
 function seatPins<P>(ctx: Ctx<P>): Slots<P> {
   const legs: (GenLeg<P> | null)[] = new Array(ctx.n).fill(null);
   const usedP = new Set<string>();
   const usedG = new Set<string>();
+  const usedT = new Set<string>();
   const ids = new Set<string>();
   ctx.pins.forEach((p, i) => {
     if (!p) return;
     legs[i] = p;
     usedP.add(p.playerKey);
     usedG.add(p.gameKey);
+    if (p.team != null) usedT.add(p.team);
     ids.add(p.id);
   });
-  return { legs, usedP, usedG, ids };
+  return { legs, usedP, usedG, usedT, ids };
 }
 
-const fits = <P,>(s: Slots<P>, c: GenLeg<P>, onePerGame: boolean) =>
-  !s.ids.has(c.id) && !s.usedP.has(c.playerKey) && !(onePerGame && s.usedG.has(c.gameKey));
+const fits = <P,>(s: Slots<P>, c: GenLeg<P>, rules: SeatRules) =>
+  !s.ids.has(c.id) && !s.usedP.has(c.playerKey) && !(rules.onePerGame && s.usedG.has(c.gameKey))
+  && !(rules.onePerTeam && c.team != null && s.usedT.has(c.team));
 
 function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
   s.legs[i] = c;
   s.usedP.add(c.playerKey);
   s.usedG.add(c.gameKey);
+  if (c.team != null) s.usedT.add(c.team);
   s.ids.add(c.id);
 }
 
@@ -635,15 +674,14 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
   for (const c of order) {
     const i = s.legs.indexOf(null);
     if (i < 0) break;
-    if (!fits(s, c, ctx.spec.onePerGame)) continue;
+    if (!fits(s, c, ctx.spec)) continue;
     if (maxDec != null) {
       let floor = dec * c.dec;
       const remaining = ctx.n - s.ids.size - 1;
       let found = 0;
       for (const next of byPrice) {
         if (found >= remaining) break;
-        if (s.usedP.has(next.playerKey) || next.playerKey === c.playerKey
-          || (ctx.spec.onePerGame && (s.usedG.has(next.gameKey) || next.gameKey === c.gameKey))) continue;
+        if (!fits(s, next, ctx.spec) || blocks(ctx.spec, c, next)) continue;
         floor *= next.dec;
         found++;
       }
@@ -654,11 +692,11 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
     // On a doubleheader, preserve a completion for the other slots. Ordinary
     // slates take the fast path; no matching lookahead is needed there.
     if (ctx.spec.onePerGame && ctx.crossGamePlayers && capacity(ctx.cands,
-      [...s.legs.filter((l): l is GenLeg<P> => l !== null), c], true) < ctx.n) continue;
+      [...s.legs.filter((l): l is GenLeg<P> => l !== null), c], true, ctx.spec.onePerTeam) < ctx.n) continue;
     if (ctx.spec.phase === "mixed") {
       const selected=[...s.legs.filter((l):l is GenLeg<P>=>!!l),c];
       const missing=[false,true].filter(phase=>!selected.some(l=>l.started===phase));
-      if(missing.length && (selected.length===ctx.n || !ctx.cands.some(l=>l.started===missing[0] && !selected.some(p=>p.playerKey===l.playerKey || (ctx.spec.onePerGame && p.gameKey===l.gameKey)))))continue;
+      if(missing.length && (selected.length===ctx.n || !ctx.cands.some(l=>l.started===missing[0] && !selected.some(p=>blocks(ctx.spec,p,l)))))continue;
     }
     /* SPREAD ACROSS CATEGORIES (2026-09-18): with several markets selected, every one of them
        lands on the ticket at least once. The same shape as the mixed-phase rule above — a
@@ -670,7 +708,7 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
       const missing = spread.filter((m) => !covered.has(m));
       const free = ctx.n - selected.length;
       if (missing.length > free) continue;
-      if (missing.some((m) => !ctx.cands.some((l) => l.market === m && !selected.some((p) => p.playerKey === l.playerKey || (ctx.spec.onePerGame && p.gameKey === l.gameKey))))) continue;
+      if (missing.some((m) => !ctx.cands.some((l) => l.market === m && !selected.some((p) => blocks(ctx.spec, p, l))))) continue;
     }
     seat(s, c, i);
     dec *= c.dec;
@@ -722,6 +760,7 @@ function repairPayout<P>(
     const ids = new Set(others.map((l) => l.id));
     const players = new Set(others.map((l) => l.playerKey));
     const games = new Set(others.map((l) => l.gameKey));
+    const teams = new Set(others.flatMap((l) => (l.team != null ? [l.team] : [])));
     let best: GenLeg<P> | null = null;
     let bestGap = Math.abs(Math.log(dec) - Math.log(target));
     let scanned = 0;
@@ -729,6 +768,7 @@ function repairPayout<P>(
       if (scanned >= REPAIR_SCAN) break;
       if (ids.has(c.id) || players.has(c.playerKey)) continue;
       if (ctx.spec.onePerGame && games.has(c.gameKey)) continue;
+      if (ctx.spec.onePerTeam && c.team != null && teams.has(c.team)) continue;
       scanned++;
       const gap = Math.abs(Math.log(base * c.dec) - Math.log(target));
       if (gap < bestGap - 1e-12) {
@@ -756,27 +796,35 @@ function nearestPosted<P>(cands: readonly GenLeg<P>[], band: { lo: number; hi: n
 }
 
 /** Which single relaxation — and only one that is actually engaged — would open the pool up. */
-type Relax = "same-game" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null;
+type Relax = "same-game" | "same-team" | "started" | "cz" | "model" | "positions" | "hit" | "games" | null;
 
 function relaxHint<P>(pool: GenPool<P>, spec: GenSpec, pins: GenLeg<P>[], want: number): Relax {
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
   const pinIds = new Set(pins.map((p) => p.id));
   const cands = (s: GenSpec) =>
-    eligible(pool, s).filter((l) => !pinIds.has(l.id) && inDec(l.dec, band) && !clashes(l, pins, s.onePerGame));
-  if (spec.onePerGame && capacity(cands({ ...spec, onePerGame: false }), pins, false) >= want) return "same-game";
-  if (spec.czOnly && capacity(cands({ ...spec, czOnly: false }), pins, spec.onePerGame) >= want) return "cz";
-  if (spec.modelOnly && capacity(cands({ ...spec, modelOnly: false }), pins, spec.onePerGame) >= want) return "model";
-  if (spec.positions?.length && capacity(cands({ ...spec, positions: [] }), pins, spec.onePerGame) >= want) return "positions";
-  if (spec.minHit != null && capacity(cands({ ...spec, minHit: null }), pins, spec.onePerGame) >= want) return "hit";
-  if (spec.games?.length && capacity(cands({ ...spec, games: [] }), pins, spec.onePerGame) >= want) return "games";
+    eligible(pool, s).filter((l) => !pinIds.has(l.id) && inDec(l.dec, band) && !clashes(l, pins, s));
+  const fitsWith = (s: GenSpec) => capacity(cands(s), pins, s.onePerGame, s.onePerTeam) >= want;
+  /* R2 first, and it is named when the game switch — alone, or together with the team switch
+     behind it — would fit: on an ordinary slate one-per-game already implies one-per-team, so the
+     game switch is always the first step, and the next spin names the team switch if it is still
+     the one binding. R2b on its own is named only when it is the one that actually binds (two
+     legs from one game already on, or a doubleheader). */
+  if (spec.onePerGame && (fitsWith({ ...spec, onePerGame: false })
+    || (spec.onePerTeam && fitsWith({ ...spec, onePerGame: false, onePerTeam: false })))) return "same-game";
+  if (spec.onePerTeam && fitsWith({ ...spec, onePerTeam: false })) return "same-team";
+  if (spec.czOnly && fitsWith({ ...spec, czOnly: false })) return "cz";
+  if (spec.modelOnly && fitsWith({ ...spec, modelOnly: false })) return "model";
+  if (spec.positions?.length && fitsWith({ ...spec, positions: [] })) return "positions";
+  if (spec.minHit != null && fitsWith({ ...spec, minHit: null })) return "hit";
+  if (spec.games?.length && fitsWith({ ...spec, games: [] })) return "games";
   /* started rows were dropped before the pool existed, so this one is a SUGGESTION — the
      caller has to rebuild the pool to find out, and may still land on an honest failure. */
   if (!spec.phase && !spec.includeStarted && pool.startedDropped > 0) return "started";
   return null;
 }
 
-const clashes = <P,>(l: GenLeg<P>, pins: readonly GenLeg<P>[], onePerGame: boolean) =>
-  pins.some((p) => p.playerKey === l.playerKey || (onePerGame && p.gameKey === l.gameKey));
+const clashes = <P,>(l: GenLeg<P>, pins: readonly GenLeg<P>[], rules: SeatRules) =>
+  pins.some((p) => blocks(rules, p, l));
 
 /**
  * Generate one ticket. Honours the leg count EXACTLY, the market, the per-leg band and
@@ -818,6 +866,8 @@ export function generate<P>(
         return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-player" } };
       if (spec.onePerGame && seated[i].gameKey === seated[j].gameKey)
         return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-game" } };
+      if (spec.onePerTeam && seated[i].team != null && seated[i].team === seated[j].team)
+        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-team" } };
     }
   }
 
@@ -848,7 +898,7 @@ export function generate<P>(
     return { ok: false, fail: { code: "no-rows" } };
   }
   const pinIds = new Set(seated.map((p) => p.id));
-  const free = elig.filter((l) => !pinIds.has(l.id) && !clashes(l, seated, spec.onePerGame));
+  const free = elig.filter((l) => !pinIds.has(l.id) && !clashes(l, seated, spec));
   /* the sampling set (pin-independent — see Ctx.cands) and the CAPACITY set (what is actually
      still seatable given the pins) are two different questions and are counted separately */
   const sampleSet = elig.filter((l) => inDec(l.dec, band));
@@ -872,12 +922,15 @@ export function generate<P>(
   if(spec.phase==="mixed" && (![false,true].every(phase=>[...sampleSet,...seated].some(l=>l.started===phase)) || (seated.length===n && ![false,true].every(phase=>seated.some(l=>l.started===phase)))))return {ok:false,fail:phaseEmpty([...sampleSet,...seated])};
 
   /* ---- can the rules even be satisfied? exact, so the message is never a guess */
-  const have = capacity(cands, seated, spec.onePerGame);
+  const have = capacity(cands, seated, spec.onePerGame, spec.onePerTeam);
   if (have < n) {
     return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
   }
 
-  const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet, crossGamePlayers: crossesGames(sampleSet) };
+  /* the doubleheader lookahead also arms when a TEAM has legs in two games and R2b is on — on such
+     a slate a greedy seat can strand the fill even though no single player crosses games */
+  const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet,
+    crossGamePlayers: crossesGames(sampleSet) || (!!spec.onePerTeam && crossesGames(sampleSet, (l) => l.team)) };
   const orderFor = (s: number) => spec.style ? mixOrder(ctx.cands, spec.style, mulberry32(s), recentPlayers) : sampleOrder(ctx.cands, mulberry32(s), n);
   const payoutBand = spec.payout ? bandDec(spec.payout.minAm, spec.payout.maxAm) : null;
 

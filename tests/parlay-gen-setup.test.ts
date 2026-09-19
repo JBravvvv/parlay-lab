@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { decodeSetup, encodeSetup } from "@/lib/parlay-gen-setup";
 import type { GenSpec } from "@/lib/parlay-gen";
 const spec: GenSpec = { market: "anytime_td", legs: 3, legMinAm: -230, legMaxAm: 200,
-  payout: null, sides: "o", onePerGame: true, czOnly: false, modelOnly: false, includeStarted: false,
+  payout: null, sides: "o", onePerGame: true, onePerTeam: true, czOnly: false, modelOnly: false, includeStarted: false,
   pinned: ["old-player", null, null] };
 describe("saved generator setup", () => {
   it("restores supported position filters and rejects positions this desk does not support", () => {
@@ -34,6 +34,14 @@ describe("saved generator setup", () => {
     const v1 = JSON.stringify({ version: 1, settings: { ...spec, style: "safer", pinned: undefined } });
     expect(decodeSetup(v1, ["anytime_td"])).toEqual({ ...spec, pinned: [null, null, null] });
     expect(decodeSetup(JSON.stringify({ version: 1, settings: { ...spec, style: "guaranteed" } }), ["anytime_td"])).toBeNull();
+  });
+  it("R2b (2026-09-18): the team rule round-trips; a recipe saved before it existed loads with it ON; a non-boolean voids the recipe", () => {
+    expect(decodeSetup(encodeSetup({ ...spec, onePerTeam: false }), ["anytime_td"])?.onePerTeam).toBe(false);
+    expect(decodeSetup(encodeSetup(spec), ["anytime_td"])?.onePerTeam).toBe(true);
+    const { onePerTeam: _drop, pinned: _pins, ...legacy } = spec;
+    expect(decodeSetup(JSON.stringify({ version: 2, settings: legacy }), ["anytime_td"])?.onePerTeam).toBe(true);
+    expect(decodeSetup(JSON.stringify({ version: 1, settings: { ...legacy, style: "safer" } }), ["anytime_td"])?.onePerTeam).toBe(true);
+    expect(decodeSetup(JSON.stringify({ version: 2, settings: { ...spec, onePerTeam: "no" } }), ["anytime_td"])).toBeNull();
   });
   it("rejects corruption, unknown sports and invalid odds or leg counts", () => {
     expect(decodeSetup("broken", ["anytime_td"])).toBeNull();

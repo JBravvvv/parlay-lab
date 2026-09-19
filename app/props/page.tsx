@@ -100,6 +100,7 @@ const GEN_SPEC_DEFAULT: GenSpec = {
   payout: null,
   sides: "o",
   onePerGame: true,
+  onePerTeam: true,
   czOnly: false,
   includeStarted: false,
   modelOnly: false,

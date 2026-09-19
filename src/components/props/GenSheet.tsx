@@ -112,6 +112,7 @@ const HIT_FLOORS: readonly { value: number | null; label: string }[] = [
 /** The single control each relax hint names — the button in the failure state sets exactly this. */
 const RELAX_PATCH: Record<string, Partial<GenSpec>> = {
   "same-game": { onePerGame: false },
+  "same-team": { onePerTeam: false },
   started: { includeStarted: true },
   cz: { czOnly: false },
   model: { modelOnly: false },
@@ -122,6 +123,7 @@ const RELAX_PATCH: Record<string, Partial<GenSpec>> = {
 
 const RELAX_BUTTON: Record<string, string> = {
   "same-game": "Allow two legs from one game",
+  "same-team": "Allow two legs from one team",
   started: "Include games already under way",
   cz: "Drop the selected-book-only filter",
   model: "Drop the model-priced-only filter",
@@ -132,6 +134,7 @@ const RELAX_BUTTON: Record<string, string> = {
 
 const RELAX_HINT: Record<string, string> = {
   "same-game": 'turn on "two legs from one game" and it may fit',
+  "same-team": 'turn on "two legs from one team" and it may fit',
   started: 'turn on "include games already under way" and it may fit',
   cz: "drop the selected-book-only filter and it may fit",
   model: "drop the model-priced-only filter and it may fit",
@@ -206,7 +209,9 @@ export function genFailLine(
     case "pin-conflict":
       return fail.why === "same-player"
         ? "Two kept slots are the same player — one parlay can only carry him once, so unpin one of them."
-        : 'Two kept slots are in the same game — turn on "two legs from one game" or unpin one of them.';
+        : fail.why === "same-team"
+          ? 'Two kept slots are on the same team — turn on "two legs from one team" or unpin one of them.'
+          : 'Two kept slots are in the same game — turn on "two legs from one game" or unpin one of them.';
   }
 }
 
@@ -850,6 +855,10 @@ export function GenSheet<P>({
               <Toggle on={!spec.onePerGame} onChange={(v) => onSpec({ onePerGame: !v })}>
                 Two legs from one game
               </Toggle>
+              {/* R2b (2026-09-18, Josh): "so i can prevent a 3 teamer from having 2 players from same team" */}
+              <Toggle on={!spec.onePerTeam} onChange={(v) => onSpec({ onePerTeam: !v })}>
+                Two legs from one team
+              </Toggle>
               {!spec.phase && <Toggle on={spec.includeStarted} onChange={(v) => onSpec({ includeStarted: v })}>
                 Include games already under way
               </Toggle>}
@@ -998,11 +1007,19 @@ export function GenSheet<P>({
                   chose to keep it, and nowhere else does a leg break the band.
                 </div>
               )}
-              {ticket.sameGame.length > 0 && (
+              {(ticket.sameGame.length > 0 || ticket.sameTeam.length > 0) && (
                 <div className="mt-1.5 text-[10px] text-faint">
-                  {ticket.sameGame.length} game{ticket.sameGame.length === 1 ? "" : "s"} carr
-                  {ticket.sameGame.length === 1 ? "ies" : "y"} more than one leg — same-game legs are correlated, and the
-                  combined % below does not model that.
+                  {ticket.sameGame.length > 0 && (<>
+                    {ticket.sameGame.length} game{ticket.sameGame.length === 1 ? "" : "s"} carr
+                    {ticket.sameGame.length === 1 ? "ies" : "y"} more than one leg — same-game legs are correlated, and the
+                    combined % below does not model that.
+                  </>)}
+                  {ticket.sameTeam.length > 0 && (<>
+                    {ticket.sameGame.length > 0 ? " " : ""}
+                    {ticket.sameTeam.length} team{ticket.sameTeam.length === 1 ? "" : "s"} carr
+                    {ticket.sameTeam.length === 1 ? "ies" : "y"} more than one leg
+                    {ticket.sameGame.length > 0 ? "." : " — same-team legs are correlated, and the combined % below does not model that."}
+                  </>)}
                 </div>
               )}
               <div className="gen-ticket-total num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
