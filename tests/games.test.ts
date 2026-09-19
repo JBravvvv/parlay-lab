@@ -352,6 +352,6 @@ describe("games: list card (INSTRUCTION 46)", () => {
     const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
     expect(page).toMatch(/width=\{20\} height=\{20\} className="h-5 w-5 shrink-0 object-contain"/);
     expect(page).toMatch(/hidden text-\[12px\] font-medium text-muted md:inline">\{t\.name\}/);
-    expect(page).toMatch(/className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"/);
+    expect(page).toMatch(/className="grid gap-2 md:grid-cols-2 xl:grid-cols-3"/);
   });
 });

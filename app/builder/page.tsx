@@ -198,7 +198,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
   );
   const hasDetail = true;
   return (
-    <div className={`glass px-3 py-1.5 sm:py-2 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
+    <div className={`glass px-3 py-1.5 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div className="min-w-0 flex-1 truncate text-[12px] font-semibold text-text sm:flex-none sm:text-[12.5px]">
           {t.name}
@@ -722,7 +722,7 @@ function MlbBuilderPage() {
       <PaperBanner />
 
       {(UFC_ENABLED || ASG_ENABLED) && (
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2">
           <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
           {UFC_ENABLED && <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>}
           {ASG_ENABLED && <FilterPill selected={sport === "asg"} onClick={() => pickSport("asg")}>⭐ ASG</FilterPill>}
@@ -735,7 +735,7 @@ function MlbBuilderPage() {
         <AsgBuilderTab />
       ) : (
         <>
-      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-5">
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">
         <MoneyInput label="Daily" value={money.daily} onChange={(n) => updateMoney({ daily: n })} disabled={!!locked} />
         <MoneyInput label="Fun" value={money.fun} onChange={(n) => updateMoney({ fun: n })} disabled={!!locked} />
         {/* Phase 6: bankroll is managed — base + logged deposits/withdrawals + graded P/L; edits live in Settings */}
@@ -773,7 +773,7 @@ function MlbBuilderPage() {
       )}
 
       {locked ? (
-        <div className="space-y-5">
+        <div className="space-y-3">
         <Reveal>
           <Panel
             title={`Today's card — LOCKED${locked.lateLock ? " (after first pitch, flagged)" : ""}${locked.overrode ? " · override day" : ""}`}
@@ -804,13 +804,13 @@ function MlbBuilderPage() {
               <span className="text-[10px] text-faint">the main check — counts in net P/L</span>
             </div>
             {locked.core.length > 0 ? (
-              <div className="grid gap-2 md:grid-cols-2 md:gap-3">{locked.core.map(renderLockedTicket)}</div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{locked.core.map(renderLockedTicket)}</div>
             ) : (
               <div className="text-[12px] text-muted">No core tickets on this lock.</div>
             )}
             {/* FUN — its own block, gold like the dashboard's FUN line (2026-08-19, Josh: core and
                 fun bets on the locked card were "just continuous" — they must read as two buckets) */}
-            <div className="mt-5 border-t border-gold/25 pt-4">
+            <div className="mt-4 border-t border-gold/25 pt-3">
               <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gold">Fun money</span>
                 <span className="num text-[11.5px] text-muted">
@@ -820,7 +820,7 @@ function MlbBuilderPage() {
                 <span className="text-[10px] text-faint">HR longshots — tracked by itself, never in the core net</span>
               </div>
               {locked.funT.length > 0 ? (
-                <div className="grid gap-2 md:grid-cols-2 md:gap-3">{locked.funT.map(renderLockedTicket)}</div>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{locked.funT.map(renderLockedTicket)}</div>
               ) : (
                 <div className="text-[12px] text-muted">{locked.funNote ?? "No fun tickets on today's card."}</div>
               )}
@@ -860,7 +860,7 @@ function MlbBuilderPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {supp.fun.picks.map((p) => (
                       <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
                     ))}
@@ -906,7 +906,7 @@ function MlbBuilderPage() {
                         Core · {fmtMoney(shadow.alloc.sum)} across {shadow.alloc.picks.length} tickets · card EV{" "}
                         <EvBadge ev={(shadow.alloc.ev ?? 0) * 100} />
                       </div>
-                      <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.alloc.picks.map((p) => (
                           <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                         ))}
@@ -916,7 +916,7 @@ function MlbBuilderPage() {
                   {shadow.fun.picks.length > 0 && (
                     <div>
                       <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
-                      <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.fun.picks.map((p) => (
                           <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                         ))}
@@ -941,7 +941,7 @@ function MlbBuilderPage() {
           />
         </Panel>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-3">
           {/* upgrade 01: NO-PLAY is a first-class result — $0 recommended, staking takes an explicit override */}
           {card.alloc.noPlay && money.daily > 0 && (
             <Panel>
@@ -1054,7 +1054,7 @@ function MlbBuilderPage() {
                   not the edge.
                 </div>
               )}
-              <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.alloc.picks.map((p) => (
                   <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                 ))}
@@ -1067,7 +1067,7 @@ function MlbBuilderPage() {
               <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">
                 FUN money · {fmtMoney(card.fun.sum)} — high variance, most days lose, tracked separately
               </h2>
-              <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.fun.picks.map((p) => (
                   <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                 ))}
@@ -1079,7 +1079,7 @@ function MlbBuilderPage() {
 
       {/* ---------- manual slip ---------- */}
       <Reveal>
-        <Panel title="Manual slip — combine any playable picks" className="mt-6">
+        <Panel title="Manual slip — combine any playable picks" className="mt-4">
           {!d ? (
             <div className="text-[12px] text-muted">Generate the board to search picks.</div>
           ) : (
@@ -1197,7 +1197,7 @@ function MlbBuilderPage() {
         </Panel>
       </Reveal>
 
-      <div className="mt-4 text-[10.5px] text-faint">
+      <div className="mt-3 text-[10.5px] text-faint">
         Card discipline is hard-coded: at least 4 tickets whenever the pool allows, no ticket over 25% of the daily or
         4× its ¼-Kelly stake (whichever is smaller — money the pool can&apos;t absorb at disciplined sizing is shown
         unallocated, never forced onto tickets), one prop never rides two tickets, HR props parlay only with HR props

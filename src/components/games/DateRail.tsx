@@ -19,8 +19,8 @@ export function DateRail({ dates, date, today, onPick }: { dates: string[]; date
     first.current = false;
   }, [date]);
   return (
-    <div className="-mx-4 mb-5 overflow-x-auto px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
-      <div className="flex w-max gap-1.5">
+    <div className="-mx-4 mb-5 overflow-x-auto px-4 md:mx-0 md:mb-3 md:overflow-visible md:px-0" style={{ scrollbarWidth: "none" }}>
+      <div className="flex w-max gap-1.5 md:w-auto md:flex-wrap">
         {dates.map((d) => (
           <span key={d} ref={d === date ? selected : undefined} className="inline-flex">
             <FilterPill

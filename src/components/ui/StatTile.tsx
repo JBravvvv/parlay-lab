@@ -48,10 +48,10 @@ export function StatTile({
           </span>
         )}
       </div>
-      <div className={`display num mt-2 text-[22px] leading-none tracking-tight ${tone ? TONE[tone] : "text-text"}`}>
+      <div className={`display num mt-1.5 text-[20px] leading-none tracking-tight ${tone ? TONE[tone] : "text-text"}`}>
         {value}
       </div>
-      {sub != null && <div className="num mt-1.5 text-[10.5px] leading-snug text-faint">{sub}</div>}
+      {sub != null && <div className="num mt-1 text-[10.5px] leading-snug text-faint">{sub}</div>}
     </div>
   );
 }

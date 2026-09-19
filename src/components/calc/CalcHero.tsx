@@ -38,7 +38,7 @@ export function CalcHero({
   return (
     <motion.section
       layout={!reduced}
-      className={`shine relative overflow-hidden rounded-[20px] border px-5 pb-5 pt-4 ${live ? "glow-gold border-gold/35" : "border-white/[0.08]"}`}
+      className={`shine relative overflow-hidden rounded-[20px] border px-4 pb-4 pt-3 ${live ? "glow-gold border-gold/35" : "border-white/[0.08]"}`}
       style={{
         background:
           "linear-gradient(155deg, rgba(199,154,59,0.16), rgba(199,154,59,0.05) 55%, rgba(241,211,138,0.08)), color-mix(in srgb, var(--color-surface) 86%, transparent)",

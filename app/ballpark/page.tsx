@@ -82,7 +82,7 @@ function Card({ c, side }: { c: ParkCard; side: "R" | "L" }) {
         </div>
         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${l.cls}`}>{l.txt}</span>
       </header>
-      <div className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+      <div className="grid gap-3 px-4 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
         <div className="space-y-2">
           {g ? (
             <div className="flex items-center gap-2 text-[12.5px] text-text">

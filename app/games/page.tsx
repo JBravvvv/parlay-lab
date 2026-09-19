@@ -187,7 +187,7 @@ function Section({ title, games, tone = "text-muted", date }: { title: string; g
         {title}
         <span className="num text-faint">{games.length}</span>
       </h2>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {games.map((g) => (
           <GameCard key={g.pk} g={g} date={date} />
         ))}

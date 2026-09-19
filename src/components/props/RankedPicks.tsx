@@ -230,7 +230,7 @@ export function RankedPicks<P>({
           {TIERS.map((t) => (tiers.get(t) ? <span key={t}><b className="text-text">{t}</b> {tiers.get(t)}</span> : null))}
         </div>
       </header>
-      <div role="tablist" aria-label="Pick category" className="mt-2 flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div role="tablist" aria-label="Pick category" className="mt-2 flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible">
         <button type="button" role="tab" aria-selected={filter === "all"} onClick={() => pick("all")}
           className={`press h-7 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold ${filter === "all" ? ON[accent] : "border-white/[0.08] bg-surface-2 text-muted"}`}>
           All <span className="num opacity-70">{ranged.length}</span>

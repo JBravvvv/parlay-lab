@@ -366,7 +366,7 @@ export default function SettingsPage() {
       <PageHeader title="Settings" eyebrow={cfbDesk ? "College Football" : nflDesk ? "National Football League" : undefined} chip={cfbDesk ? <CfbChip /> : nflDesk ? <NflChip /> : undefined} sub="Sizing, ledger sync, device passcode, API status" action={<Pill variant="primary" onClick={save}>Save</Pill>} />
       {saved && <div className="mb-3 text-[12px] text-pos">{saved}</div>}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Panel title="Sizing · MLB bank">
           {/* Phase 6 (Correction 4): bankroll is MANAGED — $2,500 base + logged
               deposits/withdrawals + realized graded P/L. No free edits: hand-editing

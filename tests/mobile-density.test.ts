@@ -81,11 +81,11 @@ describe("PageHeader — title and action share the phone row, one clamped sub u
   it("renders the phone sub once and the desktop sub once, each behind its breakpoint class", () => {
     const out = html(createElement(PageHeader, { title: "Board", sub: "the long desktop sentence", subMobile: "short", action: createElement("button", null, "Go") }));
     expect(out).toMatch(/<h1 class="display text-\[22px\] leading-none text-text sm:text-\(length:--text-display\)">Board<\/h1>/);
-    expect(out).toMatch(/class="mt-2 hidden max-w-xl text-\[13px\] leading-relaxed text-muted sm:block">the long desktop sentence</);
+    expect(out).toMatch(/class="mt-1 hidden max-w-xl text-\[13px\] leading-relaxed text-muted sm:block">the long desktop sentence</);
     expect(out).toMatch(/data-page-sub="phone" class="line-clamp-1 w-full text-\[11px\] leading-snug text-muted sm:hidden">short</);
     // the action is a direct child of the header row, before the phone sub — beside the title on a phone
     expect(out.indexOf("<button>Go</button>")).toBeLessThan(out.indexOf('data-page-sub="phone"'));
-    expect(out).toMatch(/class="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1\.5 sm:mb-6 sm:gap-3"/);
+    expect(out).toMatch(/class="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1\.5 sm:mb-4 sm:gap-3"/);
   });
   it("without subMobile the phone row falls back to the sub; without either there is no phone line", () => {
     expect(html(createElement(PageHeader, { title: "Stats", sub: "one sentence" }))).toMatch(/data-page-sub="phone"[^>]*>one sentence</);
@@ -96,22 +96,22 @@ describe("PageHeader — title and action share the phone row, one clamped sub u
 describe("shared surfaces — Panel, Pill, SportsbookSelector, PaperBanner, DataTable", () => {
   it("Panel pads 12px on the phone and 20px from sm", () => {
     const out = html(createElement(Panel, { title: "T", children: "body" }));
-    expect(out).toMatch(/class="p-3 sm:p-5">body</);
-    expect(out).toMatch(/px-3 py-2 sm:px-5 sm:py-3/);
+    expect(out).toMatch(/class="p-3 sm:p-4">body</);
+    expect(out).toMatch(/px-3 py-2 sm:px-4 sm:py-2/);
   });
   it("Pill is a size down on the phone", () => {
-    expect(read("src/components/ui/Pill.tsx")).toMatch(/rounded-full px-3 py-1\.5 text-\[12px\] font-semibold sm:px-4 sm:py-2 sm:text-\[12\.5px\]/);
+    expect(read("src/components/ui/Pill.tsx")).toMatch(/rounded-full px-3 py-1\.5 text-\[12px\] font-semibold sm:px-3\.5 sm:py-1\.5 sm:text-\[12\.5px\]/);
   });
   it("the sportsbook strip is one slim row on the phone and keeps its min-h-11 select from sm", () => {
     const src = read("src/components/sportsbook/SportsbookSelector.tsx");
-    expect(src).toMatch(/mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-white\/10 bg-\[#111a18\] px-2\.5 py-1\.5 sm:mb-4 sm:px-3 sm:py-2\.5/);
-    expect(src).toMatch(/min-h-9 rounded-lg [^"]*sm:min-h-11/);
+    expect(src).toMatch(/mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-white\/10 bg-\[#111a18\] px-2\.5 py-1\.5 sm:mb-3 sm:px-3 sm:py-1\.5/);
+    expect(src).toMatch(/min-h-9 rounded-lg [^"]*sm:min-h-9/);
   });
   it("PaperBanner is one short line on the phone and the full epoch sentence from sm", () => {
     const out = html(createElement(PaperBanner));
     expect(out).toMatch(/class="text-text\/80 sm:hidden">hypothetical \$\d+\/day \+ \$\d+ fun · nothing is real money</);
     expect(out).toMatch(/class="hidden text-text\/80 sm:inline">hypothetical \$\d+\/day on the card/);
-    expect(out).toMatch(/class="mb-2 flex flex-wrap [^"]*px-3 py-1\.5 text-\[11px\] text-gold sm:mb-4/);
+    expect(out).toMatch(/class="mb-2 flex flex-wrap [^"]*px-3 py-1\.5 text-\[11px\] text-gold sm:mb-3/);
   });
   it("DataTable `hideBelowSm` drops that column's header and cells below 640px, and nothing else", () => {
     type R = { id: string; n: number; name: string };
@@ -128,7 +128,7 @@ describe("shared surfaces — Panel, Pill, SportsbookSelector, PaperBanner, Data
     expect(tds[1]).not.toMatch(/hidden sm:table-cell/);
     // the compact-board literals survive (board-compact.test.ts pins them too)
     const dt = read("src/components/ui/DataTable.tsx");
-    expect(dt).toMatch(/whitespace-nowrap px-2 py-1\.5/);
+    expect(dt).toMatch(/px-2 py-1\.5 md:py-1/);
   });
   it("phone marks: 18px in tables and ticket legs, with the mark's py-1 wrapper squeezed to 1px", () => {
     const css = read("app/globals.css");
@@ -153,7 +153,7 @@ describe("Stats — one chip strip, search + a Filters button, the selects folde
     expect(src).toMatch(/className="min-w-0 flex-1 rounded-full [^"]*sm:min-w-\[180px\] sm:px-4 md:max-w-\[280px\]"/);
   });
   it("the filter panel and the status line lose a step of margin on the phone; the page has a short phone sub", () => {
-    expect(src).toMatch(/<Panel className="mb-3 sm:mb-4">/);
+    expect(src).toMatch(/<Panel className="mb-3">/);
     expect(src).toMatch(/className="num mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-\[10\.5px\] text-faint sm:mt-3"/);
     expect(src).toMatch(/subMobile=\{sport === "ufc" \? "UFC — rankings, pound-for-pound & the active roster" : `\$\{SPORTS\[tableSport\]\.label\} · \$\{season\} · tap a column to sort`\}/);
   });
@@ -203,7 +203,7 @@ describe("Builder — one-line tickets with a ▾ drawer, the refused list folde
   it("legs are one text line on the phone and the hit-odds line follows the drawer", () => {
     expect(card).toMatch(/className="ticket-legs mt-1 space-y-px sm:mt-1\.5 sm:space-y-0\.5"/);
     expect(card).toMatch(/className=\{`num mt-1 text-\[10px\] text-faint \$\{open \? "" : "hidden sm:block"\}`\}/);
-    expect(card).toMatch(/className=\{`glass px-3 py-1\.5 sm:py-2 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
+    expect(card).toMatch(/className=\{`glass px-3 py-1\.5 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
   });
   it("BlockedPanel keeps its summary and folds the list behind Show/Hide on the phone", () => {
     const bp = src.slice(src.indexOf("function BlockedPanel"), src.indexOf("export default function BuilderPage"));
@@ -214,11 +214,11 @@ describe("Builder — one-line tickets with a ▾ drawer, the refused list folde
     expect(bp).toMatch(/Cleared the gate, refused anyway/);
   });
   it("money row, bankroll pill, coverage note and ticket grids are a step tighter on the phone", () => {
-    expect(src).toMatch(/<div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-5">\n\s+<MoneyInput label="Daily"/);
+    expect(src).toMatch(/<div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">\n\s+<MoneyInput label="Daily"/);
     expect(src).toMatch(/rounded-full border border-line-2 bg-surface-2 px-3 py-1\.5 sm:px-4 sm:py-2"\n\s+title="Managed bankroll:/);
     expect(src).toMatch(/<label className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-3 py-1\.5 sm:px-4 sm:py-2">/);
     expect(src).toMatch(/<span className="hidden sm:inline">\n\s+\{" — the rest usually post closer to first pitch/);
-    expect((src.match(/<div className="grid gap-2 md:grid-cols-2 md:gap-3">/g) ?? []).length).toBe(7);
+    expect((src.match(/<div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">/g) ?? []).length).toBe(7);
     expect(src).not.toMatch(/grid gap-3 md:grid-cols-2/);
   });
 });
@@ -226,10 +226,10 @@ describe("Builder — one-line tickets with a ▾ drawer, the refused list folde
 describe("Parlay Builder — 36px generator slots, hero hidden, buttons a size down on the phone", () => {
   const gen = read("src/components/props/GenSheet.tsx");
   it("a slot is min-h-9 on the phone and the 52px card from sm; the lock word hides but stays in markup", () => {
-    expect(gen).toMatch(/gen-player-card flex min-h-9 items-center gap-1\.5 border-t border-white\/\[0\.04\] py-0\.5 sm:min-h-\[52px\] sm:gap-2/);
+    expect(gen).toMatch(/gen-player-card flex min-h-9 items-center gap-1\.5 border-t border-white\/\[0\.04\] py-0\.5 sm:min-h-\[44px\] sm:gap-2/); // 44px from sm since the desktop density pass (2026-09-19); was 52px
     expect(gen).toMatch(/press flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-\[8px\] border text-\[7\.5px\] font-bold uppercase tracking-wide sm:h-9 sm:w-9 sm:rounded-\[10px\]/);
     expect(gen).toMatch(/<span className="mt-\[2px\] hidden leading-none sm:block">\{pinned \? "locked" : "lock in"\}<\/span>/);
-    expect(gen).toMatch(/flex min-h-9 items-center gap-2 border-t border-l-2 border-white\/\[0\.04\] border-l-gold py-1 pl-1\.5 sm:min-h-\[52px\]/);
+    expect(gen).toMatch(/flex min-h-9 items-center gap-2 border-t border-l-2 border-white\/\[0\.04\] border-l-gold py-1 pl-1\.5 sm:min-h-\[44px\]/);
   });
   it("the hit chip rides the sub line on the phone; chip + dots keep their own line from sm", () => {
     expect(gen).toMatch(/<span className="shrink-0 sm:hidden">\n\s+<HitChip stat=\{l\.hit\} window=\{hitWindow\} \/>/);

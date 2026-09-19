@@ -135,7 +135,7 @@ export function CfbGames() {
           <EmptyState title={`No ${L.noun} games`} body={`Nothing on ESPN's ${L.label} scoreboard for ${railLabel(date)}. Use the rail or the arrows to move days.`} />
         </Panel>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* the day at a glance — Caesars-style count chips on one scrolling strip */}
           <div className="chip-row -mx-1 px-1 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
             {counts.live > 0 && (
@@ -178,7 +178,7 @@ export function CfbGames() {
                     <span className="text-faint">PT</span>
                     <span className="num text-faint">{grp.games.length}</span>
                   </h2>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {grp.games.map((g) => (
                       <CfbGameCard key={g.id} game={g} expanded={open.has(g.id)} onToggle={() => toggle(g.id)} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
                     ))}

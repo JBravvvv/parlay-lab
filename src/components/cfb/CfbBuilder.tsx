@@ -208,14 +208,11 @@ export function lockOutcome(
 }
 
 /**
- * The day's tickets. On md+ the Caesars-style "boost card" carousel (INSTRUCTION 40): one snap
- * per card, 340px wide, the .carousel strip from globals.css. On a phone the same element
- * STACKS full-width (INSTRUCTION 46, 2026-09-08): the 82vw slip-and-a-peek plus a "swipe" hint
- * is the likeliest culprit — diagnosis read from the pre-change source; screenshot not seen —
- * and the MLB builder already stacks its tickets on phones. The phone overrides are `max-md:` utilities marked important because
- * globals.css is unlayered (its `.carousel { display:flex; overflow-x:auto; scroll-snap-type }`
- * would otherwise beat any layered Tailwind utility); the bleed (`-mx-5 px-5`) is md+ only so a
- * stacked slip sits inside the panel's own padding. `label` names the list for the screen reader.
+ * The day's tickets. A vertical grid everywhere (desktop density, 2026-09-19 — Josh: "the way you put the
+ * daily board on a horizontal scroll with no scroll is embarrassing & unacceptable. It all goes vertical"):
+ * one column on a phone (INSTRUCTION 46 kept the full-width stack), two from md, three from xl. The
+ * md+ .carousel strip of 340px snap cards (INSTRUCTION 40) is gone — at 1280px it held 3,508px of
+ * tickets in a 1,003px box with the scrollbar hidden. `label` names the list for the screen reader.
  */
 function TicketStack({
   tickets,
@@ -229,9 +226,9 @@ function TicketStack({
   label: string;
 }) {
   return (
-    <div className="carousel max-md:flex-col! max-md:overflow-visible! max-md:snap-none! md:-mx-5 md:px-5" role="list" aria-label={label}>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {tickets.map((t) => (
-        <div key={t.id} role="listitem" className="max-md:w-full md:w-[340px]">
+        <div key={t.id} role="listitem" className="min-w-0">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} />
         </div>
       ))}

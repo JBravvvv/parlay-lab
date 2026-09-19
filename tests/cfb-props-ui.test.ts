@@ -139,7 +139,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
   });
   it("phone tap floors: the market strips are the 30px Segmented with the 44px hit-44 region, the search box is 44px / 16px text (no iOS focus zoom)", () => {
     expect(props).toMatch(/<Segmented options=\{NAV_OPTIONS\}[^>]*size="md"/);
-    expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/min-h-11/);
+    expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/min-h-9/); // 36px from sm (desktop density 2026-09-19); phones already had min-h-9
     expect(props).not.toMatch(/<Segmented[^>]*size="sm"/);
     expect(props).toMatch(/aria-label="Search players"[\s\S]*?className="h-11 [^"]*text-\[16px\]/);
     expect(read("src/components/ui/Segmented.tsx")).toMatch(/press hit-44 relative/);

@@ -575,7 +575,7 @@ function MlbLedgerPage() {
           />
         </Panel>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
               {(["core", "fun"] as const).map((s) => (
@@ -601,30 +601,30 @@ function MlbLedgerPage() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               <Panel className={stats!.pl >= 0 ? "glow-pos" : ""}>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">Net P/L</div>
-                <div className={`display num mt-1 text-[26px] ${stats!.pl >= 0 ? "text-pos" : "text-neg"}`}>
+                <div className={`display num mt-1 text-[22px] ${stats!.pl >= 0 ? "text-pos" : "text-neg"}`}>
                   {fmtMoneyExact(stats!.pl)}
                 </div>
               </Panel>
               <Panel>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">ROI</div>
-                <div className={`display num mt-1 text-[26px] ${(stats!.roi ?? 0) >= 0 ? "text-pos" : "text-neg"}`}>
+                <div className={`display num mt-1 text-[22px] ${(stats!.roi ?? 0) >= 0 ? "text-pos" : "text-neg"}`}>
                   {roiPct(stats!.roi)}
                 </div>
               </Panel>
               <Panel>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">Record</div>
-                <div className="display num mt-1 text-[26px] text-text">
+                <div className="display num mt-1 text-[22px] text-text">
                   {stats!.w}-{stats!.l}
                   {stats!.push ? `-${stats!.push}` : ""}
                 </div>
               </Panel>
               <Panel>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">Max drawdown</div>
-                <div className="display num mt-1 text-[26px] text-text">{fmtMoney(-stats!.dd)}</div>
+                <div className="display num mt-1 text-[22px] text-text">{fmtMoney(-stats!.dd)}</div>
               </Panel>
               <Panel>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">CLV (last-seen)</div>
-                <div className="display num mt-1 text-[26px] text-text">
+                <div className="display num mt-1 text-[22px] text-text">
                   {clv && clv.avg != null ? `${clv.avg >= 0 ? "+" : ""}${(clv.avg * 100).toFixed(2)}%` : "n/a"}
                 </div>
                 {clv && (
@@ -640,9 +640,9 @@ function MlbLedgerPage() {
 
           {equity.length > 0 && (
             <Reveal>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 <Panel title="Equity (cumulative P/L)">
-                  <div className="h-44">
+                  <div className="h-40">
                     <ResponsiveContainer>
                       <LineChart data={equity} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
                         <XAxis dataKey="date" stroke="var(--color-faint)" fontSize={10} tickLine={false} />
@@ -654,7 +654,7 @@ function MlbLedgerPage() {
                   </div>
                 </Panel>
                 <Panel title="Cumulative ROI %">
-                  <div className="h-44">
+                  <div className="h-40">
                     <ResponsiveContainer>
                       <LineChart data={equity} margin={{ top: 6, right: 8, bottom: 0, left: -18 }}>
                         <XAxis dataKey="date" stroke="var(--color-faint)" fontSize={10} tickLine={false} />
@@ -672,7 +672,7 @@ function MlbLedgerPage() {
           {proj && fan.length > 0 && (
             <Reveal>
               <Panel title={`Rest-of-season projection — ${proj.days} days at ${fmtMoney(proj.dayAmt)}/day (2,000 seeded paths)`}>
-                <div className="h-52">
+                <div className="h-44">
                   <ResponsiveContainer>
                     <AreaChart data={fan} margin={{ top: 6, right: 8, bottom: 0, left: -14 }}>
                       <XAxis dataKey="i" hide />

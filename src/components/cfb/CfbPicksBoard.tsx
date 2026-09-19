@@ -562,7 +562,7 @@ export function CfbPicksBoard() {
   const catIsProp = CATS.find((c) => c.key === cat)?.prop ?? false;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -600,7 +600,7 @@ export function CfbPicksBoard() {
             onChange={(e) => setSearch(e.target.value)}
             autoComplete="off"
             data-league={L.id}
-            className="num h-11 w-full rounded-full border border-line-2 bg-white/[0.04] px-4 text-[16px] text-text outline-none placeholder:text-faint focus:border-cfb/60 data-[league=nfl]:focus:border-nfl/60"
+            className="num h-11 w-full rounded-full border border-line-2 bg-white/[0.04] px-4 text-[16px] text-text outline-none placeholder:text-faint focus:border-cfb/60 data-[league=nfl]:focus:border-nfl/60 md:h-9 md:text-[13px]"
           />
         </label>
       </div>
@@ -609,7 +609,7 @@ export function CfbPicksBoard() {
           {CATS.map((c) => {
             const n = picks?.categories[c.key]?.length ?? 0;
             return (
-              <FilterPill key={c.key} role="tab" aria-selected={cat === c.key} selected={cat === c.key} onClick={() => setCat(c.key)} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap">
+              <FilterPill key={c.key} role="tab" aria-selected={cat === c.key} selected={cat === c.key} onClick={() => setCat(c.key)} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]">
                 {c.label}
                 <span className="num ml-1 text-[9.5px] opacity-70">{c.prop && propsPending ? "…" : n}</span>
               </FilterPill>
@@ -754,7 +754,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
   const split = sideSplitOf(r, games, splitsFeed);
   return (
     <article
-      className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[14px] border px-3 pb-2 pt-2 md:w-[280px] ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
+      className={`press card-lift relative w-[78vw] max-w-[320px] rounded-[14px] border px-3 pb-2 pt-2 md:w-[calc(33.333%-8px)] md:max-w-none ${s ? "shine" : ""} ${(r.evCz ?? 0) > 0 ? "ev-glow" : ""}`}
       style={{
         borderColor: nfl ? "color-mix(in srgb, var(--color-nfl) 26%, rgba(255,255,255,0.08))" : "color-mix(in srgb, var(--color-cfb) 26%, rgba(255,255,255,0.08))",
         background: nfl
@@ -982,7 +982,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
 
   return (
     <Reveal>
-      <div className="mt-8" data-testid="cfb-parlays">
+      <div className="mt-5" data-testid="cfb-parlays">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
@@ -998,7 +998,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
                 role="tab"
                 aria-selected={cat === k}
                 selected={cat === k}
-                className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap"
+                className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]"
                 onClick={() => {
                   setPicked(k);
                   setFilter("all");
@@ -1030,8 +1030,8 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           </Panel>
         ) : (
           <>
-            <div className="-mx-4 mb-3 overflow-x-auto px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: "none" }}>
-              <div className="flex w-max items-center gap-1.5">
+            <div className="-mx-4 mb-3 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0" style={{ scrollbarWidth: "none" }}>
+              <div className="flex w-max items-center gap-1.5 md:w-auto md:flex-wrap">
                 {filters.map(([k, label]) => {
                   const n = all.filter((t) => match(t, k)).length;
                   return (
@@ -1043,7 +1043,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
                         setPhoneShown(PHONE_CHUNK);
                       }}
                       disabled={!n}
-                      className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap"
+                      className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]"
                     >
                       {label}
                       {n > 0 && <span className="num ml-1 text-[9.5px] opacity-70">{n}</span>}
@@ -1073,7 +1073,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
               </div>
             )}
             {desktop && (
-              <div className="hidden gap-3 md:grid md:grid-cols-2">
+              <div className="hidden gap-2 md:grid md:grid-cols-2 xl:grid-cols-3">
                 {shown.slice(0, SHOW_CAP).map((t, i) => (
                   <CfbParlayCard key={t.id} t={t} games={games} rank={i + 1} />
                 ))}

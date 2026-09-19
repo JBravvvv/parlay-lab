@@ -150,31 +150,26 @@ describe("cfb-builder-ui — the first screen on a phone", () => {
   });
 });
 
-describe("cfb-builder-ui — tickets stack on a phone, carousel at md+", () => {
-  it("every ticket list is the .carousel strip with the phone stacking overrides marked important", async () => {
+describe("cfb-builder-ui — tickets stack on a phone and fill a wrapping grid at md+ (desktop density, 2026-09-19)", () => {
+  it("every ticket list is a vertical grid — no .carousel strip, nothing scrolls sideways at any width", async () => {
     const html = await render();
     const lists = [...html.matchAll(/<div class="([^"]*)" role="list" aria-label="([^"]+)">/g)];
     expect(lists.map((m) => m[2])).toEqual(expect.arrayContaining(["Core tickets"]));
     for (const m of lists) {
-      expect(m[1], m[2]).toMatch(/^carousel /);
-      expect(m[1], m[2]).toContain("max-md:flex-col!");
-      expect(m[1], m[2]).toContain("max-md:overflow-visible!");
-      expect(m[1], m[2]).toContain("max-md:snap-none!");
-      /* the bleed is md+ only — a stacked slip sits inside the panel's own padding */
-      expect(m[1], m[2]).not.toMatch(/(^| )-mx-5( |$)/);
-      expect(m[1], m[2]).toContain("md:-mx-5");
+      expect(m[1], m[2]).toBe("grid gap-3 md:grid-cols-2 xl:grid-cols-3");
+      expect(m[1], m[2]).not.toMatch(/carousel|overflow-x|-mx-5|snap/);
     }
     const items = [...html.matchAll(/<div role="listitem" class="([^"]*)">/g)];
     expect(items.length).toBe(CARD.core.length + CARD.funT.length);
     for (const m of items) {
-      expect(m[1]).toContain("max-md:w-full");
+      expect(m[1]).toBe("min-w-0");
       expect(m[1]).not.toContain("82vw");
     }
     expect(html).not.toContain("swipe for the next ticket");
   });
-  it("the source keeps the .carousel pin tests/cfb-card-ui.test.ts reads", () => {
-    expect(read(BUILDER)).toMatch(/className="carousel[\s"]/);
-    expect(read(BUILDER)).toMatch(/className="carousel max-md:flex-col! max-md:overflow-visible! max-md:snap-none! md:-mx-5 md:px-5"/);
+  it("the source has no .carousel list (tests/cfb-card-ui.test.ts reads the same pin)", () => {
+    expect(read(BUILDER)).not.toMatch(/className="carousel[\s"]/);
+    expect(read(BUILDER)).toMatch(/className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label=\{label\}/);
   });
 });
 

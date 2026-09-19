@@ -1296,7 +1296,7 @@ function MlbBoardPage() {
       )}
 
       {(UFC_ENABLED || ASG_ENABLED) && (
-        <div className="mb-4 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2">
           <FilterPill selected={sport === "mlb"} onClick={() => pickSport("mlb")}>⚾ MLB</FilterPill>
           {UFC_ENABLED && <FilterPill selected={sport === "ufc"} onClick={() => pickSport("ufc")}>🥊 UFC</FilterPill>}
           {ASG_ENABLED && <FilterPill selected={sport === "asg"} onClick={() => pickSport("asg")}>⭐ ASG</FilterPill>}
@@ -1315,7 +1315,7 @@ function MlbBoardPage() {
           <div
             data-testid="board-overview"
             data-open={overviewOpen ? "1" : "0"}
-            className="mb-4 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-1 text-[12.5px] leading-relaxed text-muted"
+            className="mb-3 rounded-(--radius-panel) border border-white/[0.05] bg-white/[0.02] px-4 py-1 text-[12.5px] leading-relaxed text-muted"
           >
             <button
               type="button"

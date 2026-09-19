@@ -344,7 +344,7 @@ function MlbSharpPage() {
           />
         </Panel>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-3">
           {typeof d.overview === "string" && (
             <Reveal>
               <Panel title="The engine's own overview">
@@ -374,7 +374,7 @@ function MlbSharpPage() {
                 ? "Today's plays — best playable EV at your selected sportsbook"
                 : "Today's plays — best playable EV at selected book"}
             </h2>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2 md:grid-cols-2">
               {shownPlays.map(({ r, s: settled, q: live }, i) => (
                 /* the glow says "bet this one". A settled row loses it (INSTRUCTION 50), and so does
                    a re-anchored live row (INSTRUCTION 51): the pregame rank that earned the halo was
@@ -626,7 +626,7 @@ function MlbSharpPage() {
 
           {passes.length > 0 && (
             <Reveal>
-              <details className="glass px-5 py-4">
+              <details className="glass px-4 py-3">
                 <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                   What the engine passed on ({passes.length}) — and why
                 </summary>
@@ -643,7 +643,7 @@ function MlbSharpPage() {
           )}
 
           <Reveal>
-            <details className="glass px-5 py-4">
+            <details className="glass px-4 py-3">
               <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                 How the engine thinks (the method, in plain language)
               </summary>
@@ -693,7 +693,7 @@ function MlbSharpPage() {
           </Reveal>
 
           <Reveal>
-            <details className="glass px-5 py-4 opacity-80">
+            <details className="glass px-4 py-3 opacity-80">
               <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
                 Optional: AI second opinion (off — needs a server API key, ~$0.50/run)
               </summary>

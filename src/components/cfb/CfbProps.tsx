@@ -1002,7 +1002,7 @@ export function CfbProps() {
       <Suspense fallback={null}>
         <PropsLinkReader onLink={onLink} />
       </Suspense>
-      <p className="mb-3 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the {L.short} ledger.</p>
+      <p className="mb-2 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the {L.short} ledger.</p>
       <DateRail dates={dates} date={date} today={today} onPick={pick} />
 
       {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
@@ -1032,7 +1032,7 @@ export function CfbProps() {
               aria-label="Search players"
               autoCapitalize="off"
               autoCorrect="off"
-              className="h-11 min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[16px] text-text placeholder:text-faint"
+              className="h-11 min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[16px] text-text placeholder:text-faint md:h-9 md:text-[13px]"
             />
             <span className="num shrink-0 text-[10.5px] text-faint">
               {lineCount} line{lineCount === 1 ? "" : "s"} · {groups.length} game{groups.length === 1 ? "" : "s"}

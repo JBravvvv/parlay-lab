@@ -144,7 +144,7 @@ export function ParlaysSection({
 
   return (
     <Reveal>
-      <div className="mt-8">
+      <div className="mt-5">
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
           Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
@@ -184,7 +184,7 @@ export function ParlaysSection({
               })}
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {playable.slice(0, cap).map((t, ti) => {
                 const e = x(t);
                 const toWin = e.czDec && e.stake != null ? Math.round(e.stake * (e.czDec - 1)) : e.toWin;

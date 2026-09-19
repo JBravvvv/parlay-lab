@@ -144,7 +144,7 @@ export default function CalcPage() {
       {/* INSTRUCTION 46: flush left, two columns from lg up, one phone column in the old order */}
       <div
         data-testid="calc-layout"
-        className="flex max-w-[1100px] flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:items-start lg:gap-5"
+        className="flex max-w-[1100px] flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:items-start lg:gap-4"
       >
         {/* the hero leads on a phone; on desktop it tops the right-hand read-out column */}
         <div className="lg:col-start-2 lg:row-start-1">
@@ -161,7 +161,7 @@ export default function CalcPage() {
         </div>
 
         {/* left column — the inputs */}
-        <div className="space-y-4 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+        <div className="space-y-3 lg:col-start-1 lg:row-start-1 lg:row-span-2">
           <Panel title="Stake">
             <StakeInput value={stake} onChange={setStake} valid={stakeOk} />
           </Panel>
@@ -195,7 +195,7 @@ export default function CalcPage() {
         </div>
 
         {/* right column — the read-outs */}
-        <div className="space-y-4 lg:col-start-2 lg:row-start-2">
+        <div className="space-y-3 lg:col-start-2 lg:row-start-2">
           <Panel title="The ticket in numbers">
             <CalcStats
               live={model.live}

@@ -103,7 +103,7 @@ describe("CFB Board — the Caesars grammar", () => {
   });
   it("the parlay section is a snap carousel on phones (tier, legs, hero price, $25 pays, % to hit) and the full slips ≥ md", () => {
     expect(board).toMatch(/className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel"/);
-    expect(board).toMatch(/className="hidden gap-3 md:grid md:grid-cols-2"/);
+    expect(board).toMatch(/className="hidden gap-2 md:grid md:grid-cols-2 xl:grid-cols-3"/);
     const card = board.slice(board.indexOf("export function CfbParlayFeature"), board.indexOf("export function CfbParlayCard"));
     expect(card).toMatch(/<TierTag tier=\{t\.tier\} \/>/);
     expect(card).toMatch(/\{t\.legs\.length\} legs/);
@@ -215,7 +215,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
       expect(board).toMatch(/window\.matchMedia\("\(min-width: 768px\)"\)/);
       expect(section).toMatch(/const desktop = useIsDesktop\(\);/);
       expect(section).toMatch(/\{!desktop && \(\n\s*<div className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel">/);
-      expect(section).toMatch(/\{desktop && \(\n\s*<div className="hidden gap-3 md:grid md:grid-cols-2">/);
+      expect(section).toMatch(/\{desktop && \(\n\s*<div className="hidden gap-2 md:grid md:grid-cols-2 xl:grid-cols-3">/);
     });
     it("phones mount PHONE_CHUNK tickets and a ≥40px Show more control appends up to SHOW_CAP; the count resets with the category and the filter", () => {
       expect(board).toMatch(/const PHONE_CHUNK = 12;/);
@@ -266,7 +266,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(board).not.toMatch(/on a game that has not kicked off\./);
   });
   it("phone rules hold: every new pill ≥ 40px, the row scrolls (chip-row), no blur", () => {
-    expect(section).toMatch(/data-testid="cfb-parlay-cats"[\s\S]*?className="min-h-\[40px\] !px-3 !text-\[11px\] whitespace-nowrap"/);
+    expect(section).toMatch(/data-testid="cfb-parlay-cats"[\s\S]*?className="min-h-\[40px\] !px-3 !text-\[11px\] whitespace-nowrap md:min-h-\[32px\]"/);
     expect(section).not.toMatch(BLUR);
   });
 });

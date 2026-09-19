@@ -242,7 +242,7 @@ function ChipRow({ label, hint, children, wrap = false, title }: { label: ReactN
         <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">{label}</span>
         {hint && <span className="min-w-0 truncate text-[9.5px] text-faint">{hint}</span>}
       </div>
-      <div className={`flex gap-1 ${wrap ? "flex-wrap" : "-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}`}>{children}</div>
+      <div className={`flex gap-1 ${wrap ? "flex-wrap" : "-mx-3 overflow-x-auto px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0"}`}>{children}</div>
     </div>
   );
 }
@@ -410,7 +410,7 @@ function Slot<P>({
       onDragOver={onMove ? (e) => { if (dragFrom != null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } } : undefined}
       onDrop={onMove ? (e) => { e.preventDefault(); if (dragFrom != null && dragFrom !== i) onMove(dragFrom, i); onDragFrom?.(null); } : undefined}
       onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
-      className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[52px] sm:gap-2 ${
+      className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[44px] sm:gap-2 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}`}
     >
@@ -499,7 +499,7 @@ function Slot<P>({
  */
 function LostSlot({ i, id, onTogglePin }: { i: number; id: string; onTogglePin: (slot: number) => void }) {
   return (
-    <div data-gen-slot={i} className="flex min-h-9 items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5 sm:min-h-[52px]">
+    <div data-gen-slot={i} className="flex min-h-9 items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5 sm:min-h-[44px]">
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
       <button
         type="button"

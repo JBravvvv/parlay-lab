@@ -45,7 +45,7 @@
 
   /* extreme type scale — display sizes are statements, not labels */
   --text-display-xl: clamp(2.1rem, 9.6vw, 6.5rem);
-  --text-display: clamp(1.7rem, 5.5vw, 3.75rem);
+  --text-display: clamp(1.5rem, 2.4vw, 2.25rem); /* desktop density 2026-09-19: was clamp(1.7rem, 5.5vw, 3.75rem) */
   --text-title: clamp(1.25rem, 2.6vw, 1.75rem);
 
   /* motion tokens */
@@ -777,6 +777,18 @@ body::after {
      row is ~32px instead of ~44px and a Builder leg is one text line */
   .glass-table [data-player-mark], .ticket-legs [data-player-mark] { width: 18px !important; height: 18px !important; }
   .glass-table span.py-1:has([data-player-mark]), .ticket-legs span.py-1:has([data-player-mark]) { padding-block: 1px; }
+}
+/* DESKTOP DENSITY (2026-09-19, Josh: "On the web version of builder tab & every other tab, boxes need to be shrunk. the way
+   you put the daily board on a horizontal scroll with no scroll is embarrassing & unacceptable. It all goes vertical & every
+   box shrunk vertically"): from 768px no strip scrolls sideways — .chip-row and .carousel wrap into rows and the page flows
+   down — and the stat tiles / generator slots lose their tall padding. Phones keep the snap strips shipped earlier today. */
+@media (min-width: 768px) {
+  .chip-row { flex-wrap: wrap; overflow-x: visible; overflow-y: visible; scroll-snap-type: none; row-gap: 6px; }
+  .chip-row > * { scroll-snap-align: none; }
+  .carousel { flex-wrap: wrap; overflow-x: visible; overflow-y: visible; scroll-snap-type: none; padding: 0; }
+  .carousel > * { scroll-snap-align: none; scroll-snap-stop: normal; }
+  .stat-tile { padding: 8px 12px; border-radius: 14px; }
+  .gen-player-card { min-height: 44px; }
 }
 /* the phone board's market picker (2026-09-19): a native select, dark popup */
 .board-market-select { color-scheme: dark; }

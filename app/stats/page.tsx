@@ -545,7 +545,7 @@ export default function StatsPage() {
       )}
 
       <Reveal>
-        <Panel className="mb-3 sm:mb-4">
+        <Panel className="mb-3">
           {/* one scrolling chip strip on the phone; the wrapping row from sm up */}
           <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0">
             {deskSports.map((s) => (
@@ -688,7 +688,7 @@ export default function StatsPage() {
         </Reveal>
       )}
 
-      <div className="mt-6 text-[10.5px] text-faint">
+      <div className="mt-4 text-[10.5px] text-faint">
         {cfbDesk ? "ESPN college football stats + FPI, live" : nflDesk ? "ESPN NFL stats + FPI, live" : "MLB Stats API, live — the same feeds as the original Stats tab"}. Informational only, not betting advice.
       </div>
     </>

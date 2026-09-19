@@ -348,7 +348,7 @@ function HowItPrices({ L }: { L: DeskHandles }) {
   const r = L.rules;
   const nfl = L.id === "nfl";
   return (
-    <details className="glass px-5 py-4" open>
+    <details className="glass px-4 py-3" open>
       <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">How this desk prices a game</summary>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="space-y-2.5">

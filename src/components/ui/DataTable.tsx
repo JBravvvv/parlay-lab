@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 export type Column<T> = {
   key: string;
@@ -82,8 +82,10 @@ export function DataTable<T>({
 
   return (
     <div
-      className="glass-table overflow-auto rounded-[16px] border border-white/[0.05]"
-      style={{ maxHeight }}
+      // desktop density (2026-09-19): below md the table scrolls inside its box (maxHeight, sideways when it must); from md
+      // the box is open — no height cap, no sideways scroll — text cells wrap and the page itself flows down
+      className="glass-table max-h-(--dt-max-h) overflow-auto rounded-[16px] border border-white/[0.05] md:max-h-none md:overflow-visible"
+      style={{ "--dt-max-h": maxHeight } as CSSProperties}
     >
       <table className="w-full border-collapse text-[12.5px]">
         <thead className="sticky top-0 z-10 bg-surface-2/95">
@@ -103,7 +105,7 @@ export function DataTable<T>({
                           )
                       : undefined
                   }
-                  className={`whitespace-nowrap border-b border-white/[0.06] px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] ${
+                  className={`whitespace-nowrap border-b border-white/[0.06] px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] md:py-1 ${
                     c.numeric ? "text-right" : "text-left"
                   } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""} ${
                     c.stickyLeft != null ? "sticky z-20 bg-surface-2" : ""
@@ -130,7 +132,7 @@ export function DataTable<T>({
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`whitespace-nowrap px-2 py-1.5 ${c.numeric ? "num text-right" : ""} ${
+                  className={`px-2 py-1.5 md:py-1 ${c.fit || c.numeric ? "whitespace-nowrap" : "whitespace-nowrap md:whitespace-normal"} ${c.numeric ? "num text-right" : ""} ${
                     c.stickyLeft != null ? "sticky z-10 bg-bg" : ""
                   } ${c.fit ? "w-px" : ""} ${c.hideBelowSm ? "hidden sm:table-cell" : ""} ${c.className ?? ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}

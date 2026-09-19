@@ -54,9 +54,10 @@ describe("cfb-card-ui — the game card is built on the shared OddsGrid", () => 
   });
 });
 
-describe("cfb-card-ui — the Builder lays its tickets out as a carousel with hero prices", () => {
-  it("CfbBuilder uses the .carousel strip", () => {
-    expect(read(FILES.builder)).toMatch(/className="carousel[\s"]/);
+describe("cfb-card-ui — the Builder lays its tickets out as a grid of hero-price cards", () => {
+  it("CfbBuilder lays tickets in a wrapping grid — the md+ .carousel strip is gone (desktop density, 2026-09-19)", () => {
+    expect(read(FILES.builder)).not.toMatch(/className="carousel[\s"]/);
+    expect(read(FILES.builder)).toMatch(/className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list"/);
   });
   it("CfbTicketCard carries the hero-price and the favorites parlay is the amber card", () => {
     const src = read(FILES.ticket);

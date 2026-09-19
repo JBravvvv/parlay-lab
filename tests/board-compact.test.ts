@@ -37,7 +37,7 @@ describe("DataTable — shrink-to-fit columns and tighter cells", () => {
     const src = read("src/components/ui/DataTable.tsx");
     expect(src).not.toMatch(/px-2\.5/);
     expect(src).toMatch(/border-b border-white\/\[0\.06\] px-2 py-1\.5 text-\[10px\]/);
-    expect(src).toMatch(/whitespace-nowrap px-2 py-1\.5/);
+    expect(src).toMatch(/px-2 py-1\.5 md:py-1/); // desktop density 2026-09-19: rows lose 2px each from md; text cells may wrap there
   });
 });
 

@@ -92,7 +92,7 @@ function MlbSimulator() {
           />
         </Panel>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {keys.map((k) => {
               const t = teamNames(k, info);
@@ -107,7 +107,7 @@ function MlbSimulator() {
           {sim && nm && (
             <>
               <Reveal>
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-3">
                   <Panel className="glow-pos">
                     <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
                       Win probability

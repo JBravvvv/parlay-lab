@@ -165,7 +165,7 @@ export function UfcSharp() {
           </Reveal>
 
           <Reveal>
-            <details className="glass px-5 py-4">
+            <details className="glass px-4 py-3">
               <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                 How the UFC read works (and what it deliberately doesn&apos;t do)
               </summary>
