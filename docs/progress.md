@@ -1,3 +1,12 @@
+# Progress — 2026-09-19 (phone density pass for the home-screen app)
+
+- Josh, with eight iPhone screenshots: "The mobile version that is added to home screen is not optimized for iPhone whatsoever … The top header fades away; the 4 icons other than settings … need to be a dropdown … only 7 players show on main view because filters box is so unbelievably big … Selection for picks is a horizontal scroll bar when it could be a dropdown … the pick boxes are so unbelievably big. They can be shrunk by 70% vertically … & the info can become expandable … It should be stuck in portrait mode at all times."
+- **Rule**: mobile-first Tailwind — the phone shape is the default, `sm:` (640px) restores yesterday's desktop shape; desktop unchanged. Phone-only copy/folds use `sm:hidden` / `hidden sm:inline` spans and `${open ? … : "hidden"} sm:contents` wrappers (server render has no duplicate content).
+- **Header**: four non-tab icons → one ⋯ More `role="menu"` popover (`MORE` derives from `NAV` minus tabs and `/settings`); Settings keeps its gear; ground `bg-bg/92`; popover is absolute so the measured header height is unchanged.
+- **Portrait**: manifest `"orientation": "portrait"` + guarded `screen.orientation.lock("portrait")` in standalone + CSS-only `.rotate-lock` sheet under `(display-mode: standalone) and (orientation: landscape) and (max-height: 500px)`. iOS ignores the manifest and the API — the sheet is the iPhone behaviour; Android locks for real.
+- **Stats**: chips in one strip; selects + Min slider behind a Filters ▾ button. **Board**: market pills → native `<select>` on the phone (shared `marketKeys`/`marketLabel`/`marketCount`); `#` column `hideBelowSm` (new `DataTable` flag). **Builder**: one-line tickets with a ▾ drawer (`ticket-detail-toggle`), refused list folds (`blocked-toggle`), grids `gap-2`. **Generator**: slot 52 → 36px, hero hidden, buttons 40/32px. **Shared**: Panel, Pill, PageHeader (`subMobile`), PaperBanner, SportsbookSelector a size down.
+- Tests: `tests/mobile-density.test.ts` (new, 30); `tests/nav.test.ts` rewritten for the More menu (press count 4). Full serial gate before push (see `tools/handoff-state.env`).
+
 # Progress — 2026-09-18 (late evening: one leg per team in the parlay generator)
 
 - Josh: "Add filter on parlay generator alongside 'Two legs from one game' that says 'Two legs from one team' so i can prevent a 3 teamer from having 2 players from same team".
