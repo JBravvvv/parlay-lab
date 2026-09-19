@@ -40,6 +40,7 @@
  * Sandbox only: nothing here writes anywhere, spends an Odds credit, or enters the ledger.
  */
 
+import { inGameTimeWindow, type GameTimeWindow } from "./game-time-window";
 import { SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { mixOrder, type MixStyle } from "./parlay-gen-mix";
 import { amToDec, decToAm } from "@/lib/ticket-math";
@@ -85,6 +86,9 @@ export const specMarkets = (spec: Pick<GenSpec, "market" | "markets">): readonly
   spec.markets?.length ? spec.markets : [spec.market];
 
 export type GenSpec = {
+  timeWindow?: GameTimeWindow;
+  /** Explicit empty market selection differs from older saved single-market specs. */
+  noMarkets?: boolean;
   phase?: GenPhase;
   /** Category-relative player rotation; omitted retains the historical sampler. */
   style?: MixStyle;
@@ -159,6 +163,7 @@ export type GenLeg<P = unknown> = {
   /** amToDec(am) — the posted price in decimal */
   dec: number;
   gameKey: string;
+  start?: string | null;
   /** accent/punctuation-proof player identity (R1 is enforced on this) */
   playerKey: string;
   /** Verified position from the sport's player data; unknown is never guessed. */
@@ -320,6 +325,8 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
     spec.modelOnly ? "model" : "both",
     String(roll),
   ];
+  if (spec.timeWindow) parts.push(`time:${spec.timeWindow.join(":")}`);
+  if (spec.noMarkets) parts.push("markets:none");
   if (spec.style) parts.push(spec.style);
   if (spec.phase) parts.push(`phase:${spec.phase}`);
   if (spec.markets?.length) parts.push(`markets:${[...new Set(spec.markets)].sort().join(",")}`);
@@ -439,10 +446,7 @@ export function ticketOf<P>(legs: readonly GenLeg<P>[], spec: GenSpec, seed: num
  * games" — so Josh can see WHICH control is binding before he reads a failure. Computed
  * through the same filters `generate` uses, so the line can never disagree with the answer.
  */
-/** the phase-empty failure, counted over the legs the check just looked at */
-function phaseEmpty<P>(legs: readonly GenLeg<P>[]): GenFail {
-  return { code: "phase-empty", pregame: legs.filter((l) => !l.started).length, live: legs.filter((l) => l.started).length };
-}
+
 
 export function poolCounts<P>(
   pool: GenPool<P>,
@@ -504,6 +508,7 @@ export function availableLegBand<P>(pool: GenPool<P>, spec: GenSpec): Pick<GenSp
 function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
   const want = new Set<GenSide>(sidesOf(spec.sides));
   return pool.legs.filter((l) => {
+    if (spec.noMarkets || !inGameTimeWindow(l.start, spec.timeWindow)) return false;
     if (spec.phase === "live" && !l.started) return false;
     if (spec.phase === "pregame" && l.started) return false;
     if (!want.has(l.side)) return false;
@@ -693,13 +698,8 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
     // slates take the fast path; no matching lookahead is needed there.
     if (ctx.spec.onePerGame && ctx.crossGamePlayers && capacity(ctx.cands,
       [...s.legs.filter((l): l is GenLeg<P> => l !== null), c], true, ctx.spec.onePerTeam) < ctx.n) continue;
-    if (ctx.spec.phase === "mixed") {
-      const selected=[...s.legs.filter((l):l is GenLeg<P>=>!!l),c];
-      const missing=[false,true].filter(phase=>!selected.some(l=>l.started===phase));
-      if(missing.length && (selected.length===ctx.n || !ctx.cands.some(l=>l.started===missing[0] && !selected.some(p=>blocks(ctx.spec,p,l)))))continue;
-    }
     /* SPREAD ACROSS CATEGORIES (2026-09-18): with several markets selected, every one of them
-       lands on the ticket at least once. The same shape as the mixed-phase rule above — a
+       lands on the ticket at least once. A completion check — a
        candidate is skipped when seating it would leave more uncovered categories than free
        slots, or would strand a category with no seatable leg left. */
     if (spread.length) {
@@ -713,7 +713,6 @@ function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number |
     seat(s, c, i);
     dec *= c.dec;
   }
-  if(ctx.spec.phase==="mixed" && ![false,true].every(phase=>s.legs.some(l=>l?.started===phase)))return null;
   if (spread.length && !spread.every((m) => s.legs.some((l) => l?.market === m))) return null;
   return s.legs.every((l): l is GenLeg<P> => !!l) ? (s.legs as GenLeg<P>[]) : null;
 }
@@ -842,6 +841,7 @@ export function generate<P>(
   avoid?: ReadonlySet<string>,
   recentPlayers?: ReadonlyMap<string, number>,
 ): GenResult<P> {
+  if (spec.noMarkets) return { ok: false, fail: { code: "no-rows" } };
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
 
@@ -852,7 +852,7 @@ export function generate<P>(
   slotPins.forEach((id, i) => {
     if (!id) return;
     const l = pool.byId.get(id);
-    if (!l || (spec.phase==="pregame" && l.started) || (spec.phase==="live" && !l.started)) missing.push(id);
+    if (!l || !inGameTimeWindow(l.start, spec.timeWindow) || (spec.phase==="pregame" && l.started) || (spec.phase==="live" && !l.started)) missing.push(id);
     else pins[i] = l;
   });
   if (missing.length) return { ok: false, fail: { code: "pin-missing", ids: missing } };
@@ -873,7 +873,6 @@ export function generate<P>(
 
   /* ---- eligibility, then the band */
   const elig = eligible(pool, spec);
-  if(spec.phase==="mixed" && ![false,true].every(phase=>[...elig,...seated].some(l=>l.started===phase)))return {ok:false,fail:phaseEmpty([...elig,...seated])};
   if (!elig.length && seated.length < n) {
     /* WHICH filter emptied it (INSTRUCTION 52 fix pass). `no-rows` reads on the page as "No
        Anytime TD lines on this board", a statement ABOUT THE BOARD — and football made that
@@ -919,7 +918,6 @@ export function generate<P>(
     };
   }
 
-  if(spec.phase==="mixed" && (![false,true].every(phase=>[...sampleSet,...seated].some(l=>l.started===phase)) || (seated.length===n && ![false,true].every(phase=>seated.some(l=>l.started===phase)))))return {ok:false,fail:phaseEmpty([...sampleSet,...seated])};
 
   /* ---- can the rules even be satisfied? exact, so the message is never a guess */
   const have = capacity(cands, seated, spec.onePerGame, spec.onePerTeam);
@@ -955,7 +953,6 @@ export function generate<P>(
       if (!first) continue;
       const fixed = repairPayout(ctx, first, order, payoutBand);
       if (!fixed) continue;
-      if(spec.phase==="mixed" && ![false,true].every(phase=>fixed.legs.some(l=>l.started===phase)))continue;
       const t = ticketOf(fixed.legs, ctx.spec, s);
       const ticket: GenTicket<P> = { ...t, dropped: fixed.dropped };
       if (avoid?.has(ticket.key) && roll < ROLL_RETRIES) continue;

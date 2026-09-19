@@ -160,6 +160,7 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       line: q.line ?? row.line ?? null,
       /* the matchup as the board's own sub prints it ("ALA vs ECU"), for the games filter chips */
       gameLabel: row.sub?.split(" · ")[0] || row.gameId,
+          start: row.kickoff,
       lean: leanIndex.get(row.key)?.lean ?? null,
     });
   }

@@ -1,6 +1,6 @@
 /**
  * R2b — ONE LEG PER TEAM (2026-09-18). Josh, verbatim: "Add filter on parlay generator alongside
- * 'Two legs from one game' that says 'Two legs from one team' so i can prevent a 3 teamer from
+ * 'Allow legs from the same game' that says 'Allow legs from the same team' so i can prevent a 3 teamer from
  * having 2 players from same team".
  *
  * The rule reads the adapter's folded `team` tag on every leg; a leg without one is never blocked
@@ -193,15 +193,15 @@ const sheet = (over: Record<string, unknown> = {}) =>
     open: true, onOpen: () => {}, boardAt: null, ...over,
   } as Parameters<typeof GenSheet>[0]));
 
-describe("the sheet: the toggle sits beside 'Two legs from one game', and the failure names the switch", () => {
+describe("the sheet: the toggle sits beside 'Allow legs from the same game', and the failure names the switch", () => {
   it("renders the toggle, OFF under the rule and ON when relaxed, after the game toggle", () => {
     const out = sheet();
-    expect(out).toMatch(/aria-pressed="false"[^>]*>[^<]*<span[^>]*>Two legs from one team</);
-    expect(out.indexOf("Two legs from one game")).toBeLessThan(out.indexOf("Two legs from one team"));
-    expect(sheet({ spec: { ...SPEC, onePerTeam: false } })).toMatch(/aria-pressed="true"[^>]*>[^<]*<span[^>]*>Two legs from one team</);
+    expect(out).toMatch(/aria-pressed="false"[^>]*>[^<]*<span[^>]*>Allow legs from the same team</);
+    expect(out.indexOf("Allow legs from the same game")).toBeLessThan(out.indexOf("Allow legs from the same team"));
+    expect(sheet({ spec: { ...SPEC, onePerTeam: false } })).toMatch(/aria-pressed="true"[^>]*>[^<]*<span[^>]*>Allow legs from the same team</);
     /* a spec without the control renders it as ON — undefined is OFF for the rule, so "allowed" */
     const { onePerTeam: _drop, ...absent } = SPEC;
-    expect(sheet({ spec: absent })).toMatch(/aria-pressed="true"[^>]*>[^<]*<span[^>]*>Two legs from one team</);
+    expect(sheet({ spec: absent })).toMatch(/aria-pressed="true"[^>]*>[^<]*<span[^>]*>Allow legs from the same team</);
   });
   it("the short-pool failure offers 'Allow two legs from one team' as the one-tap fix, and only sets that switch", () => {
     const out = sheet();

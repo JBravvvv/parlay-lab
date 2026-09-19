@@ -349,6 +349,8 @@ function PropsDesk() {
       const id = legId(r);
       out.push({
         id,
+        start: r.gkey ? d?.gameInfo?.[r.gkey]?.start : undefined,
+        started: !!r.live,
         market,
         label,
         sub: game ? `${sub} · ${game}` : sub,
@@ -367,6 +369,7 @@ function PropsDesk() {
       const team = parsed?.team ?? l.team;
       out.push({
         id: l.id,
+        start: l.start,
         market: l.market ?? spec.market,
         label: name,
         sub: l.gameLabel ? `${l.sub} · ${l.gameLabel}` : l.sub,

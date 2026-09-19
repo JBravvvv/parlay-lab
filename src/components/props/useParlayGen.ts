@@ -293,6 +293,7 @@ export function useParlayGen<P>({
         else if (!nextMarkets.length) next.markets = undefined;
         if (setKey(next.markets ?? [next.market]) !== setKey(sp.markets ?? [sp.market])) next.pinned = blankPins(next.legs);
       }
+      if (patch.timeWindow !== undefined || patch.noMarkets) next.pinned = blankPins(next.legs);
       if (patch.phase != null && patch.phase !== sp.phase) next.pinned = blankPins(next.legs);
       if (patch.legs != null && patch.legs !== sp.legs) next.pinned = blankPins(patch.legs);
       return next;

@@ -269,12 +269,12 @@ describe("odds range + price sort (2026-09-19)", () => {
     expect(l).toContain("Longest price first");
     expect(l).toMatch(/<option[^>]*selected[^>]*>Longest price first<\/option>/);
   });
-  it("the controls render on the default open range: -200 / +250 placeholders, three sorts, no clear button, nothing narrowed", () => {
+  it("the controls render on the default open range: -200 / +250 placeholders, four sorts, no clear button, nothing narrowed", () => {
     const out = renderP();
     expect(out).toContain('data-testid="ranked-odds-row"');
     expect(out).toMatch(/placeholder="-200"/);
     expect(out).toMatch(/placeholder="\+250"/);
-    expect(count(out, /<option /g)).toBe(3);
+    expect(count(out, /<option /g)).toBe(4);
     expect(out).not.toContain("Clear odds range");
     expect(out).toMatch(/All <span[^>]*>6</);
     expect(order(out)).toHaveLength(6);

@@ -772,3 +772,29 @@ describe("MLB's answer did not move when the generator went to CFB & NFL (INSTRU
     expect(t.sameGame).toEqual([]);
   });
 });
+
+
+describe("September 19 flexible timing and game windows", () => {
+  it.each([false, true])("Mixed accepts an entirely started=%s pool, including locked slots", started => {
+    const sp = spec({ legMinAm: -1000, legMaxAm: 1000, phase: "mixed", includeStarted: true });
+    const base = poolFor(spec());
+    const pool = poolOf(base.legs.map(l => ({ ...l, started })), base);
+    const first = ok(generate(pool, sp, 12));
+    expect(first.legs).toHaveLength(4);
+    const locked = { ...sp, pinned: first.legs.slice(0, 3).map(l => l.id) as (string | null)[] };
+    locked.pinned.push(null);
+    const next = ok(generate(pool, locked, 17));
+    expect(next.legs.slice(0, 3).map(l => l.id)).toEqual(locked.pinned.slice(0, 3));
+    expect(next.legs.every(l => l.started === started)).toBe(true);
+  });
+  it("the time window binds locked legs and Clear markets cannot produce a ticket", () => {
+    const wide = (patch: Partial<GenSpec> = {}) => spec({ legMinAm: -1000, legMaxAm: 1000, ...patch });
+    const base = poolFor(wide());
+    const pool = poolOf(base.legs.map(l => ({ ...l, start: "2026-09-19T17:30:00Z" })), base);
+    const first = ok(generate(pool, wide(), 12));
+    const pinned = first.legs.map(l => l.id);
+    expect(generate(pool, wide({ pinned, noMarkets: true }), 1).ok).toBe(false);
+    expect(generate(pool, wide({ pinned, timeWindow: [11, 12] }), 1).ok).toBe(false);
+    expect(ok(generate(pool, wide({ timeWindow: [10, 11] }), 1)).legs).toHaveLength(4);
+  });
+});

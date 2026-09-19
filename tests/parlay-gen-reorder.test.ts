@@ -113,7 +113,7 @@ describe("the sheet — numbered, draggable, lock-in slots", () => {
     const out = sheet({ onMove: () => {} });
     expect(count(out, /aria-label="Lock in slot \d: /g)).toBe(4);
     expect(out).not.toMatch(/aria-label="Unlock slot/);
-    expect(out).toContain(">lock in<");
+    expect(out).toContain("🔓");
   });
 
   it("a locked slot says so", () => {

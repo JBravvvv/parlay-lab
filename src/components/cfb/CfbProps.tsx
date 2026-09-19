@@ -958,6 +958,7 @@ export function CfbProps() {
         const leg = legOf(g, row, q);
         out.push({
           id: row.key,
+          start: g.start,
           market: row.market,
           label: leg.label,
           sub: leg.sub,
@@ -975,6 +976,7 @@ export function CfbProps() {
     for (const l of rankedPool.legs) {
       out.push({
         id: l.id,
+        start: l.start,
         market: l.market ?? gen.spec.market,
         label: l.leg.player ?? l.label,
         sub: `${l.sub} · ${l.leg.sub}`,

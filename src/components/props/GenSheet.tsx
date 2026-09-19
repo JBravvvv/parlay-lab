@@ -1,5 +1,8 @@
 "use client";
 
+import { GameTimeRange } from "./GameTimeRange";
+import { MultiSelect } from "./MultiSelect";
+import { gameTimeLabel } from "@/lib/game-time-window";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
 import { amFmt, amToDec, combineTicket } from "@/lib/ticket-math";
@@ -98,15 +101,12 @@ function mlbName<P>({ name, team }: { leg: P; gen: GenLeg<P>; name: string; team
 
 /* every count the generator will actually honour — the hint under this row quotes
    LEG_MIN..LEG_MAX, so offering fewer would leave unreachable numbers on the page */
-const LEG_CHOICES = [2, 3, 4, 5, 6, 7, 8] as const;
+
 
 /** the hit-rate floors on offer: "he cleared this line in at least this share of his recent games" */
 const HIT_FLOORS: readonly { value: number | null; label: string }[] = [
   { value: null, label: "Any" },
-  { value: 0.5, label: "50%+" },
-  { value: 0.6, label: "60%+" },
-  { value: 0.7, label: "70%+" },
-  { value: 0.8, label: "80%+" },
+  ...Array.from({ length: 17 }, (_, i) => ({ value: i / 20, label: `${i * 5}%+` })),
 ];
 
 /** The single control each relax hint names — the button in the failure state sets exactly this. */
@@ -153,18 +153,8 @@ export function genFailLine(
   ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean; phase?: GenSpec["phase"]; boardAt?: string | null },
 ): string {
   switch (fail.code) {
-    case "phase-empty": {
-      /* WHICH side is missing (2026-09-18, Josh: "Why won't it generate parlays right now for HRs?
-         There are a ton of HR live props on the board"). In-play prices come from the board's own
-         live rows and from the live re-quote, and either counts for 30 minutes — so the honest
-         remedy names the refresh, never a price. */
-      const stamp = ctx.boardAt ? ` (last board refresh ${ctx.boardAt})` : "";
-      if (fail.live === 0 && fail.pregame > 0)
-        return `Mixed needs one live leg too, and no in-play ${ctx.marketLabel} quote is fresh right now — in-play prices count for 30 minutes after the board refresh${stamp}. Refresh MLB, or switch to Pregame.`;
-      if (fail.pregame === 0 && fail.live > 0)
-        return `Mixed needs one pregame leg too, and every ${ctx.marketLabel} game in this pool has started — switch to Live.`;
-      return `Mixed needs a pregame leg and a live leg, and no ${ctx.marketLabel} quote qualifies on either side right now${stamp}. Refresh MLB, or try Pregame or Live.`;
-    }
+    case "phase-empty":
+      return `No ${ctx.marketLabel} quote qualifies under the current timing filters. Mixed permits pregame, live, or any combination.`;
     case "no-rows":
       if(ctx.phase==="live") return `No current live ${ctx.marketLabel} quotes qualify. Check the selected sportsbook, Refresh MLB, or switch to Pregame.`;
       /* EVERY GAME IS OVER is a different fact from "the board has no lines", and on a past date
@@ -294,7 +284,7 @@ function AmInput({
           if (n != null) onCommit(n);
         }}
         onBlur={() => setTxt(amFmt(value))}
-        inputMode="numeric"
+        inputMode="text"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
@@ -345,14 +335,14 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
       type="button"
       aria-pressed={on}
       onClick={() => onChange(!on)}
-      className={`${CTRL} flex w-full items-center justify-between gap-2 px-3 text-left ${on ? ON : OFF}`}
+      className={`press flex min-h-7 w-full items-center justify-between gap-2 rounded-md border px-2 text-left text-[10px] ${on ? ON : OFF}`}
     >
       <span className="min-w-0 flex-1">{children}</span>
       <span
         aria-hidden
-        className={`flex h-5 w-9 shrink-0 items-center rounded-full border px-0.5 ${on ? "border-pos/60 bg-pos/20" : "border-white/[0.12] bg-white/[0.06]"}`}
+        className={`flex h-4 w-7 shrink-0 items-center rounded-full border px-0.5 ${on ? "border-pos/60 bg-pos/20" : "border-white/[0.12] bg-white/[0.06]"}`}
       >
-        <span className={`h-4 w-4 rounded-full transition-transform duration-(--dur-fast) ${on ? "translate-x-4 bg-pos" : "bg-white/40"}`} />
+        <span className={`h-3 w-3 rounded-full transition-transform duration-(--dur-fast) ${on ? "translate-x-3 bg-pos" : "bg-white/40"}`} />
       </span>
     </button>
   );
@@ -417,22 +407,6 @@ function Slot<P>({
       {/* the slot number (2026-09-18, Josh: "numbers next to the picks generated so its easy to see
           how many picks if someone is looking over your shoulder") */}
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
-      {/* "hit the 'lock it in' button on the pick then regenerate the ones below it" */}
-      <button
-        type="button"
-        aria-pressed={pinned}
-        aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}
-        onClick={() => onTogglePin(i)}
-        className={`press flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-[8px] border text-[7.5px] font-bold uppercase tracking-wide sm:h-9 sm:w-9 sm:rounded-[10px] ${
-          pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
-        }`}
-      >
-        <span aria-hidden className="text-[12px] leading-none">
-          {pinned ? "🔒" : "🔓"}
-        </span>
-        {/* the word rides under the padlock from sm up; the phone slot is one 36px line (2026-09-19) */}
-        <span className="mt-[2px] hidden leading-none sm:block">{pinned ? "locked" : "lock in"}</span>
-      </button>
       {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
         {renderName({ leg: l.leg, gen: l, name, team })}
@@ -447,6 +421,10 @@ function Slot<P>({
               <HitChip stat={l.hit} window={hitWindow} />
             </span>
           )}
+        </div>
+        {l.gameLabel && <div className="mt-1 truncate text-[9px] text-muted">{l.gameLabel} · {gameTimeLabel(l.start)}</div>}
+        <div className="mt-1 text-[9px] text-text" title="Estimated chance of this leg winning. A grade measures value at the posted price, not certainty.">
+          {l.src === "market" ? "Market estimate" : "Model probability"} <strong className="num">{l.prob.toFixed(1)}%</strong>
         </div>
         {l.hit && hitWindow != null && (
           <div className="mt-[3px] hidden items-center gap-1.5 sm:flex">
@@ -471,6 +449,21 @@ function Slot<P>({
             className="press flex h-4 w-6 items-center justify-center rounded-[5px] border border-white/[0.08] bg-white/[0.03] text-[8px] leading-none text-faint hover:text-text disabled:opacity-25">▼</button>
         </span>
       )}
+      <div className="flex shrink-0 flex-col gap-0.5">
+      {/* "hit the 'lock it in' button on the pick then regenerate the ones below it" */}
+      <button
+        type="button"
+        aria-pressed={pinned}
+        aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}
+        onClick={() => onTogglePin(i)}
+        className={`press flex h-6 w-6 shrink-0 flex-col items-center justify-center rounded-[8px] border text-[7.5px] font-bold uppercase tracking-wide ${
+          pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
+        }`}
+      >
+        <span aria-hidden className="text-[12px] leading-none">
+          {pinned ? "🔒" : "🔓"}
+        </span>
+      </button>
       {/* THE EXCLUDE CONTROL IS A 24px GHOST "✕" (2026-09-18: "The exclude player button is way too
           big and visible it looks atrocious"). Excluded → a small "↺" that restores him. */}
       {onExclude && (
@@ -486,6 +479,7 @@ function Slot<P>({
           <span aria-hidden>{excluded ? "↺" : "✕"}</span>
         </button>
       )}
+      </div>
     </div>
   );
 }
@@ -771,8 +765,14 @@ export function GenSheet<P>({
           <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-2 @3xl:grid @3xl:grid-cols-2 @3xl:gap-x-5 @3xl:gap-y-2 @3xl:space-y-0`}>
           {/* legs · sides · timing — one row of selects */}
           <div className="flex items-end gap-2">
-            <Select label="Legs" value={String(spec.legs)} onChange={(v) => onSpec({ legs: Number(v) })} title={`${LEG_MIN} to ${LEG_MAX} legs`}
-              options={LEG_CHOICES.map((n) => ({ value: String(n), label: `${n} legs` }))} />
+            <div className="min-w-0 flex-1">
+              <span className="text-[9px] uppercase text-faint">Legs</span>
+              <div className="flex h-9 items-center rounded-lg border border-white/10 bg-surface-2">
+                <button type="button" aria-label="Remove one leg" disabled={spec.legs <= LEG_MIN} onClick={() => onSpec({ legs: spec.legs - 1 })} className="h-full flex-1 disabled:opacity-30">−</button>
+                <output aria-label="Leg count" className="num font-bold">{spec.legs}</output>
+                <button type="button" aria-label="Add one leg" disabled={spec.legs >= LEG_MAX} onClick={() => onSpec({ legs: spec.legs + 1 })} className="h-full flex-1 disabled:opacity-30">+</button>
+              </div>
+            </div>
             {/* sides — not offered on a yes-only market (INSTRUCTION 52 fix pass) */}
             {oneSided ? (
               <div data-testid="gen-one-sided" className="min-w-0 flex-1 self-center text-[9.5px] leading-snug text-faint">
@@ -790,14 +790,8 @@ export function GenSheet<P>({
             )}
           </div>
 
-          {/* categories — MULTI-select; the rail above follows the one tapped last */}
-          <ChipRow label="Categories" hint={selectedMarkets.length > 1 ? `${selectedMarkets.length} on the ticket` : "tap more to mix"} wrap title={typeof categoryNote === "string" ? categoryNote : undefined}>
-            {markets.map((m) => (
-              <Chip key={m.key} on={selectedMarkets.includes(m.key)} onClick={() => toggleMarket(m.key)}>
-                {m.label}
-              </Chip>
-            ))}
-          </ChipRow>
+          <MultiSelect title={typeof categoryNote === "string" ? categoryNote : undefined} label="Markets" options={markets} value={spec.noMarkets ? [] : selectedMarkets} onChange={values => onSpec({ markets: values, noMarkets: values.length === 0 })} />
+          <GameTimeRange value={spec.timeWindow} onChange={timeWindow => onSpec({ timeWindow })} />
 
           {/* per-leg odds band */}
           <div>
@@ -825,14 +819,14 @@ export function GenSheet<P>({
 
           {/* games */}
           {games.length > 1 && (
-            <ChipRow label="Games" hint={spec.games?.length ? `${spec.games.length} of ${games.length}` : `all ${games.length}`}>
+            <details className="rounded-lg border border-white/10 px-2 py-1"><summary className="cursor-pointer text-[11px] text-muted">Games · {spec.games?.length ? `${spec.games.length} selected` : "All"}</summary><ChipRow label="Games" hint={spec.games?.length ? `${spec.games.length} of ${games.length}` : `all ${games.length}`}>
               <Chip on={!spec.games?.length} onClick={() => onSpec({ games: [] })}>All</Chip>
               {games.map((g) => (
                 <Chip key={g.key} on={!!spec.games?.includes(g.key)} onClick={() => toggleGame(g.key)}>
                   {g.label}
                 </Chip>
               ))}
-            </ChipRow>
+            </ChipRow></details>
           )}
 
           {/* positions — football */}
@@ -860,11 +854,11 @@ export function GenSheet<P>({
             </summary>
             <div className="mt-1 space-y-1.5 pb-1.5 @3xl:grid @3xl:grid-cols-2 @3xl:gap-x-3 @3xl:gap-y-1.5 @3xl:space-y-0">
               <Toggle on={!spec.onePerGame} onChange={(v) => onSpec({ onePerGame: !v })}>
-                Two legs from one game
+                Allow legs from the same game
               </Toggle>
               {/* R2b (2026-09-18, Josh): "so i can prevent a 3 teamer from having 2 players from same team" */}
               <Toggle on={!spec.onePerTeam} onChange={(v) => onSpec({ onePerTeam: !v })}>
-                Two legs from one team
+                Allow legs from the same team
               </Toggle>
               {!spec.phase && <Toggle on={spec.includeStarted} onChange={(v) => onSpec({ includeStarted: v })}>
                 Include games already under way
@@ -915,30 +909,6 @@ export function GenSheet<P>({
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-pos">Your ticket</span>
             {ticket && <span className="num min-w-0 truncate text-[9.5px] text-faint">{ticket.legs.length} picks{onMove ? " · drag or ▲▼ to reorder · lock what you like, then regenerate" : ""}</span>}
-          </div>
-          {/* generate */}
-          <div className="flex gap-2">
-            {(
-              <button
-                type="button"
-                onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
-                disabled={loading}
-                className="gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12"
-              >
-                <svg aria-hidden className="mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
-                {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onAdd}
-              disabled={!ticket}
-              className={`press min-h-10 shrink-0 rounded-[12px] border px-3 text-[12px] font-semibold sm:min-h-12 ${
-                ticket ? "border-white/[0.12] bg-surface-2 text-text" : "border-white/[0.06] bg-surface-2/50 text-faint"
-              }`}
-            >
-              Add to slip
-            </button>
           </div>
           {onBack && <div className="flex items-center gap-2">
             <button type="button" onClick={onBack} disabled={!canBack || loading} className="press h-8 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35 sm:h-9">← Previous parlay</button>
@@ -1091,7 +1061,7 @@ export function GenSheet<P>({
                   ? /* the board is still fetching — "no lines on this board" would be a false
                        statement about the board, not a report on it */
                     "Waiting for today's board…"
-                  : genFailLine(result.ok ? { code: "no-rows" } : result.fail, {
+                  : spec.noMarkets ? "Select at least one market to generate a parlay." : genFailLine(result.ok ? { code: "no-rows" } : result.fail, {
                       marketLabel: selectedMarkets.length > 1 ? `${selectedMarkets.length}-category` : marketLabel,
                       phase: spec.phase,
                       boardAt,
@@ -1106,6 +1076,30 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
+          {/* generate */}
+          <div className="flex gap-2">
+            {(
+              <button
+                type="button"
+                onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
+                disabled={loading}
+                className="gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12"
+              >
+                <svg aria-hidden className="mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
+                {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onAdd}
+              disabled={!ticket}
+              className={`press min-h-10 shrink-0 rounded-[12px] border px-3 text-[12px] font-semibold sm:min-h-12 ${
+                ticket ? "border-white/[0.12] bg-surface-2 text-text" : "border-white/[0.06] bg-surface-2/50 text-faint"
+              }`}
+            >
+              Add to slip
+            </button>
+          </div>
           </div>
           </div>
         </div>

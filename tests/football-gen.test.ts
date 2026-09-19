@@ -605,7 +605,7 @@ describe("the sheet renders for the FOOTBALL market list", () => {
     /* the controls that DO apply are still there */
     /* 2026-09-18: the board is priced at the settlement book already, so the book-only toggle is gone */
     expect(sheet()).not.toContain("priced legs only");
-    expect(sheet()).toContain("Two legs from one game");
+    expect(sheet()).toContain("Allow legs from the same game");
   });
 
   it("on the Sides rail it is the stub, not an empty generator", () => {

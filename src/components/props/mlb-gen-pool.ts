@@ -127,6 +127,7 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
           market,
           line: r.ln,
           gameLabel: g.game,
+          start: g.start,
           ...(hits ? { hit: hit ? { n: hit.n, hits: hit.hits, rate: hit.rate, dots: hitDots(log, market, r.ln, side) } : null } : {}),
           lean: mlbPropLean(r),
         });

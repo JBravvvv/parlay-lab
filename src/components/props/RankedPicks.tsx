@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { inGameTimeWindow, type GameTimeWindow } from "@/lib/game-time-window";
+import { GameTimeRange } from "./GameTimeRange";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { gradeFromEv, gradeRank, type Grade } from "@/lib/grade";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -38,6 +40,7 @@ export type RankedPick<P> = {
   book?: string | null;
   src?: "model" | "market";
   started?: boolean;
+  start?: string | null;
   alt?: boolean;
   /** the desk's own slip leg — handed to `onToggle` untouched */
   leg: P;
@@ -65,8 +68,9 @@ export type RankedAccent = "pos" | "cfb" | "nfl";
  */
 export type OddsRange = { min: number | null; max: number | null };
 export const OPEN_RANGE: OddsRange = { min: null, max: null };
-export type RankedSort = "grade" | "shortest" | "longest";
+export type RankedSort = "grade" | "shortest" | "longest" | "probability";
 export const RANKED_SORTS: readonly { key: RankedSort; label: string }[] = [
+  { key: "probability", label: "Highest probability first" },
   { key: "grade", label: "Grade S → F" },
   { key: "shortest", label: "Shortest price first" },
   { key: "longest", label: "Longest price first" },
@@ -81,11 +85,12 @@ export function rangeText(r: OddsRange): string | null {
   return r.min != null ? `${amFmt(r.min)} or longer` : `${amFmt(r.max as number)} or shorter`;
 }
 /** grade: S first, then EV, then name (the list's default); shortest / longest: the posted price, ties by grade */
-export function sortRanked<T extends { grade: Grade | null; ev: number; am: number; label: string }>(rows: readonly T[], sort: RankedSort): T[] {
+export function sortRanked<T extends { grade: Grade | null; ev: number; am: number; label: string; prob?: number }>(rows: readonly T[], sort: RankedSort): T[] {
   const byGrade = (a: T, b: T) => gradeRank(b.grade) - gradeRank(a.grade) || b.ev - a.ev || a.label.localeCompare(b.label);
   const out = [...rows];
   if (sort === "shortest") return out.sort((a, b) => a.am - b.am || byGrade(a, b));
   if (sort === "longest") return out.sort((a, b) => b.am - a.am || byGrade(a, b));
+  if (sort === "probability") return out.sort((a, b) => (b.prob ?? -1) - (a.prob ?? -1) || byGrade(a, b));
   return out.sort(byGrade);
 }
 
@@ -108,7 +113,7 @@ function AmField({ value, onCommit, placeholder, label, testId }: { value: numbe
         if (n != null) onCommit(n);
       }}
       onBlur={() => setTxt(value == null ? "" : amFmt(value))}
-      inputMode="numeric"
+      inputMode="text"
       autoCorrect="off"
       autoCapitalize="off"
       spellCheck={false}
@@ -175,6 +180,7 @@ export function RankedPicks<P>({
   const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
   const range = rangeProp ?? ownRange;
   const [ownSort, setOwnSort] = useState<RankedSort>("grade");
+  const [timeWindow, setTimeWindow] = useState<GameTimeWindow>([0, 24]);
   const sort = sortProp ?? ownSort;
   const [limit, setLimit] = useState(RANKED_PAGE);
   const graded = useMemo(
@@ -185,7 +191,7 @@ export function RankedPicks<P>({
     [picks],
   );
   /* the odds range first: the chips count what is inside it, so a category's number is what the range would show */
-  const ranged = useMemo(() => (range.min == null && range.max == null ? graded : graded.filter((p) => inOddsRange(p.am, range))), [graded, range]);
+  const ranged = useMemo(() => graded.filter(p => inOddsRange(p.am, range) && inGameTimeWindow(p.start, timeWindow)), [graded, range, timeWindow]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of ranged) m.set(p.market, (m.get(p.market) ?? 0) + 1);
@@ -221,7 +227,7 @@ export function RankedPicks<P>({
         <div className="min-w-0">
           <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-faint">Every pick today</div>
           <div className="text-[13px] font-bold tracking-tight text-text">
-            {sort === "grade" ? "Ranked S → F" : sort === "shortest" ? "Shortest price first" : "Longest price first"}
+            {sort === "grade" ? "Ranked S → F" : sort === "shortest" ? "Shortest price first" : sort === "probability" ? "Highest probability first" : "Longest price first"}
             {filter !== "all" && <span className="text-muted"> · {labelOf(filter)}</span>}
             {rangeLabel && <span className="num text-muted"> · {rangeLabel}</span>}
           </div>
@@ -242,6 +248,7 @@ export function RankedPicks<P>({
           </button>
         ))}
       </div>
+      <GameTimeRange value={timeWindow} onChange={setTimeWindow} />
       {/* the odds range and the price sort — one thin row under the chips, thumb-sized on the phone */}
       <div data-testid="ranked-odds-row" className="flex items-center gap-1.5 px-3 pb-2 text-[10px] text-faint">
         <span className="shrink-0 font-bold uppercase tracking-[0.12em]">Odds</span>
@@ -296,8 +303,8 @@ export function RankedPicks<P>({
                   </div>
                   {p.hit && <div className="mt-[3px]">{p.hit}</div>}
                 </div>
-                <span className="num hidden shrink-0 flex-col items-end text-[9.5px] leading-none text-muted sm:flex" title="win % at the posted price · EV at that price">
-                  <span>{p.prob.toFixed(1)}%</span>
+                <span className="num flex shrink-0 flex-col items-end text-[9.5px] leading-none text-muted" title="win % at the posted price · EV at that price">
+                  <span>{p.prob.toFixed(1)}%</span><span className="mt-1 text-[8px]">{p.src === "market" ? "Market estimate" : "Model probability"}</span>
                   <span className={`mt-[3px] ${p.ev >= 0 ? "text-pos" : "text-neg"}`}>{p.ev >= 0 ? "+" : ""}{p.ev.toFixed(1)}% EV</span>
                 </span>
                 <GradeChip grade={p.grade} basis="EV at the posted price" />

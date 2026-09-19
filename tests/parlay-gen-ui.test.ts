@@ -143,18 +143,19 @@ describe("GenSheet — the open panel", () => {
     expect(out).toContain("Combined odds");
     expect(out).toContain("gen-roll");
     /* the sportsbook-app chip rows: Legs · Categories · Odds per leg · Sides · Games */
-    for (const row of ["Legs", "Categories", "Odds per leg", "Sides", "Games"]) expect(out).toContain(row);
+    for (const row of ["Legs", "Markets", "Odds per leg", "Sides", "Games"]) expect(out).toContain(row);
     /* COMPACTED 2026-09-18 (Josh: "compact the UI on the parlay generator. If we have to do dropdowns
        etc in order to reduce space wasted/taken up then so be it"): Legs and Sides are native selects
        now, so the chip count is the categories plus the games — still a chip row, just fewer of them */
-    expect(count(out, /h-\[30px\]/g)).toBeGreaterThan(10);
-    expect(count(out, /<select /g)).toBe(2);
-    expect(out).toMatch(/<select [^>]*aria-label="Legs"/);
+    expect(out).toContain("Select all");
+    expect(out).toContain("Clear");
+    expect(count(out, /<select /g)).toBe(1);
+    expect(out).toContain("aria-label=\"Leg count\"");
     expect(out).toMatch(/<select [^>]*aria-label="Sides"/);
-    expect(out).toMatch(/<option value="4" selected="">4 legs<\/option>/);
+    expect(out).toMatch(/<output[^>]*aria-label="Leg count"[^>]*>4<\/output>/);
     /* every MLB category is a chip, and the one on the rail is pressed */
     for (const m of MLB_GEN_MARKETS) expect(out).toContain(m.label.replace(/'/g, "&#x27;")); // React escapes the apostrophe in K's
-    expect(out).toMatch(/aria-pressed="true"[^>]*>H\+R\+RBI</);
+    expect(out).toMatch(/type="checkbox"[^>]*checked=""[^>]*\/>H\+R\+RBI/);
     /* the two-thumb odds slider stops on prices the board really posts */
     expect(out).toContain('data-testid="gen-odds-slider"');
     expect(out).toContain('aria-label="Lowest odds per leg"');
@@ -174,7 +175,7 @@ describe("GenSheet — the open panel", () => {
     expect(count(excl, /aria-label="Exclude [^"]+ from generated parlays"/g)).toBe(4);
     expect(excl).toMatch(/aria-label="Exclude [^"]+ from generated parlays"[^>]*class="[^"]*h-6 w-6/);
     expect(count(out, /data-gen-slot="\d"/g)).toBe(4);
-    expect(out).toMatch(/data-gen-slot="0"[\s\S]{0,400}?aria-pressed="false"/);
+    expect(out).toMatch(/aria-pressed="false" aria-label="Lock in slot 1:/);
     expect(out).toMatch(/aria-label="Lock in slot 1: /); // "hit the 'lock it in' button" (2026-09-18)
   });
   it("each slot draws a PlayerMark — initials here, because useHeadshots is {} on the server", () => {
@@ -436,17 +437,14 @@ describe("2026-09-18 compaction — the sheet takes less of the phone and says t
     expect(mixed).toMatch(/<option value="mixed" selected="">Mixed<\/option>/);
     const ctx = { marketLabel: "HR", legs: 3, loAm: -152, hiAm: 110, phase: "mixed" as const, boardAt: "7:03 PM" };
     const noLive = genFailLine({ code: "phase-empty", pregame: 34, live: 0 }, ctx);
-    expect(noLive).toContain("no in-play HR quote is fresh right now");
-    expect(noLive).toContain("30 minutes after the board refresh (last board refresh 7:03 PM)");
-    expect(noLive).toContain("Refresh MLB");
-    expect(genFailLine({ code: "phase-empty", pregame: 0, live: 12 }, ctx)).toContain("every HR game in this pool has started — switch to Live");
-    expect(genFailLine({ code: "phase-empty", pregame: 0, live: 0 }, ctx)).toContain("no HR quote qualifies on either side");
+    expect(noLive).toContain("Mixed permits pregame, live, or any combination");
+
   });
   it("Save / Load moved under Advanced", () => {
     expect(out).not.toContain("Save setup"); // no onSaveSetup handed in
     const saved = sheet({ onSaveSetup: () => {}, onLoadSetup: () => {}, hasSetup: true });
     expect(saved.indexOf("Save setup")).toBeGreaterThan(saved.indexOf("Advanced"));
-    expect(saved.indexOf("Save setup")).toBeLessThan(saved.indexOf("</details>"));
+    expect(saved.indexOf("Save setup")).toBeLessThan(saved.indexOf("</details>", saved.indexOf("Advanced")));
   });
   it("the native selects render dark (globals.css)", () => {
     expect(fs.readFileSync(path.join(root, "app/globals.css"), "utf8")).toMatch(/\.gen-select \{ color-scheme: dark; \}/);

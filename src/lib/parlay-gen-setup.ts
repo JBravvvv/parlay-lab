@@ -33,8 +33,14 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
     if (s.spread !== undefined && typeof s.spread !== "boolean") return null;
     if (s.onePerTeam !== undefined && typeof s.onePerTeam !== "boolean") return null;
     if (s.minHit !== undefined && s.minHit !== null && (typeof s.minHit !== "number" || !(s.minHit >= 0 && s.minHit <= 1))) return null;
+    if (s.noMarkets !== undefined && typeof s.noMarkets !== "boolean") return null;
+    if (s.timeWindow !== undefined && (!Array.isArray(s.timeWindow) || s.timeWindow.length !== 2
+      || !s.timeWindow.every((v: unknown) => Number.isInteger(v)) || s.timeWindow[0] < 0
+      || s.timeWindow[1] > 24 || s.timeWindow[1] - s.timeWindow[0] < 1)) return null;
     const mkts = s.markets !== undefined ? [...new Set(s.markets as string[])] : undefined;
     return { ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
+      ...(s.timeWindow ? { timeWindow: [s.timeWindow[0], s.timeWindow[1]] as const } : {}),
+      ...(s.noMarkets !== undefined ? { noMarkets: s.noMarkets } : {}),
       sides: s.sides, onePerGame: s.onePerGame, czOnly: s.czOnly,
       /* R2b (2026-09-18): a recipe saved before the team rule existed loads with the desks' default, ON */
       onePerTeam: typeof s.onePerTeam === "boolean" ? s.onePerTeam : true,

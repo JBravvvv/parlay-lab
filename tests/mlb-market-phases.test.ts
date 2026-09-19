@@ -32,13 +32,13 @@ describe("actual live quote pool",()=>{
   const o=structuredClone(overlay);Object.assign(Object.values(o.rows)[0],{czAm:null,oppAm:null});
   expect(buildPool(read(o),{market:"batter_hits",phase:"live",includeStarted:true},now).legs).toEqual([]);
  });
- it("keeps pregame/live separate and mixed requires both, across many seeds",()=>{
+ it("keeps pregame/live separate and mixed permits both, across many seeds",()=>{
   const pre={...game,gkey:"pre",live:false,start:new Date(now+3600000).toISOString(),markets:{batter_hits:[{...row,p:"Other Hitter",lkey:"otherhitter|batter_hits|0.5"}]}};
   const live=read();const all=marketPhaseBoard([pre,game],live,"mixed",now);
   expect(marketPhaseBoard([pre,game],live,"pregame",now)).toEqual([pre]);
   const pool=buildPool(all,spec,now);
   for(let seed=0;seed<40;seed++){const result=generate(pool,spec,seed);expect(result.ok).toBe(true);if(result.ok)expect(new Set(result.ticket.legs.map(l=>l.started)).size).toBe(2);}
-  const only=buildPool([pre],spec,now);expect(generate(only,spec,1)).toEqual({ok:false,fail:{code:"phase-empty",pregame:1,live:0}});
+  const only=buildPool([pre],spec,now);expect(generate(only,spec,1)).toMatchObject({ok:false,fail:{code:"short-pool",have:1,want:2}});
  });
  it("rejects old started prices even when includeStarted is true",()=>{
   expect(buildPool([game],{market:"batter_hits",phase:"live",includeStarted:true},now).legs).toEqual([]);
@@ -113,8 +113,8 @@ describe("the board's own in-play rows feed the live pool",()=>{
   expect(result.ok).toBe(true);
   if(result.ok)expect(result.ticket.legs.map(l=>l.started).sort()).toEqual([false,true]);
  });
- it("phase-empty says which side is missing",()=>{
+ it("a one-game live pool still respects the requested two-game capacity",()=>{
   const live=liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},quiet,now,1_800_000);
-  expect(generate(buildPool(live,spec,now),spec,1)).toEqual({ok:false,fail:{code:"phase-empty",pregame:0,live:1}});
+  expect(generate(buildPool(live,spec,now),spec,1)).toMatchObject({ok:false,fail:{code:"short-pool",have:1,want:2}});
  });
 });
