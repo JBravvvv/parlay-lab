@@ -426,7 +426,9 @@ describe("source pins", () => {
   const body = readSrc("src/lib/server/football-props.ts");
   it("the NFL shell: force-dynamic, its own literal keys, the shared body on NFL_LEAGUE, nothing else exported", () => {
     expect(shell).toMatch(/export const dynamic = "force-dynamic"/);
-    expect(shell.match(/^export const /gm)).toEqual(["export const "]);
+    /* two exports since 2026-09-19: force-dynamic and the 300 s duration ceiling (tests/football-props-duration.test.ts) */
+    expect(shell.match(/^export const /gm)).toEqual(["export const ", "export const "]);
+    expect(shell).toMatch(/export const maxDuration = 300;/);
     expect(shell).toMatch(/"pl:nfl:props:v1:"/);
     expect(shell).toMatch(/"pl:nfl:props:spend:v1:"/);
     expect(shell).toMatch(/footballPropsGet\(NFL_LEAGUE, req, /);

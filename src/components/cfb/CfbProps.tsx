@@ -1101,6 +1101,17 @@ export function CfbProps() {
       <RankedViewTabs view={view} onView={setView} accent={L.id === "nfl" ? "nfl" : "cfb"} />
       {view === "ranked" ? (
         <div className={legs.length ? "pb-20" : "pb-6"}>
+          {/* JOSH (2026-09-19): "Prop bets are not loading" — the ranked view used to swallow a failed props pull:
+              sides came up, props never did, and nothing said why. The per-game view already shows the error;
+              now the ranked view does too, with the same Retry. */}
+          {propsQ.isError && (
+            <div role="status" data-testid="ranked-props-error" className="mb-2 flex items-center justify-between gap-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">
+              <span className="min-w-0 truncate">Player props did not load — {propsQ.error instanceof Error ? propsQ.error.message : String(propsQ.error)}</span>
+              <button type="button" onClick={() => void propsQ.refetch()} className="press shrink-0 rounded-full border border-gold/40 px-2 py-0.5 font-semibold">
+                Retry
+              </button>
+            </div>
+          )}
           <RankedPicks
             picks={rankedPicks}
             filters={RANKED_FILTERS}

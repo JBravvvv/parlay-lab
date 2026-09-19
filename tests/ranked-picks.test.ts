@@ -4,8 +4,8 @@ import path from "node:path";
 import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { stripComments } from "./helpers/source";
-import { RANKED_PAGE, RankedPicks, RankedViewTabs, type RankedPick } from "@/components/props/RankedPicks";
-import { GRADE_CUTS } from "@/lib/grade";
+import { OPEN_RANGE, RANKED_PAGE, RankedPicks, RankedViewTabs, inOddsRange, rangeText, sortRanked, type RankedPick } from "@/components/props/RankedPicks";
+import { GRADE_CUTS, gradeFromEv } from "@/lib/grade";
 
 /**
  * 2026-09-18, Josh's word, verbatim: "Below the Parlay Generator, the default view should be every
@@ -192,5 +192,109 @@ describe("controlled category (2026-09-18 later)", () => {
     expect(order(render())).toHaveLength(7);
     const cfb = readSrc("src/components/cfb/CfbProps.tsx");
     expect(cfb).not.toMatch(/onFilter=/);
+  });
+});
+
+/**
+ * ODDS RANGE + PRICE SORT — 2026-09-19, Josh, verbatim: "Need to be able to sort 'Every pick today'
+ * underneath parlay builder by odds for example I should be able to go in under the CFB Anytime TD
+ * filter and then filter between -200 to +250 for players or whatever other odds I want".
+ * Synthetic rows again: the prices here are inputs to a filter and a sorter, not claims about a board.
+ */
+describe("odds range + price sort (2026-09-19)", () => {
+  const PRICED: RankedPick<L>[] = [
+    row("td-short", "anytime_td", GRADE_CUTS.A + 0.5, { am: -260 }),
+    row("td-fav", "anytime_td", GRADE_CUTS.B + 0.5, { am: -200 }),
+    row("td-even", "anytime_td", GRADE_CUTS.S + 0.5, { am: 105 }),
+    row("td-edge", "anytime_td", GRADE_CUTS.C + 0.5, { am: 250 }),
+    row("td-long", "anytime_td", GRADE_CUTS.S + 1, { am: 400 }),
+    row("ml-mid", "ml", GRADE_CUTS.A + 0.1, { am: -150 }),
+  ];
+  const TD_FILTERS = [
+    { key: "ml", label: "ML" },
+    { key: "anytime_td", label: "Anytime TD" },
+  ];
+  const renderP = (over: Record<string, unknown> = {}) =>
+    renderToStaticMarkup(
+      createElement(RankedPicks<L>, {
+        picks: PRICED,
+        filters: TD_FILTERS,
+        isSel: () => false,
+        onToggle: () => {},
+        ...over,
+      } as Parameters<typeof RankedPicks<L>>[0]),
+    );
+
+  it("inOddsRange reads American prices numerically — shorter is smaller — and an open bound is no bound", () => {
+    const r = { min: -200, max: 250 };
+    expect(inOddsRange(-200, r)).toBe(true);
+    expect(inOddsRange(-150, r)).toBe(true);
+    expect(inOddsRange(105, r)).toBe(true);
+    expect(inOddsRange(250, r)).toBe(true);
+    expect(inOddsRange(-260, r)).toBe(false);
+    expect(inOddsRange(400, r)).toBe(false);
+    expect(inOddsRange(400, { min: -200, max: null })).toBe(true);
+    expect(inOddsRange(-260, { min: null, max: 250 })).toBe(true);
+    expect(inOddsRange(NaN, OPEN_RANGE)).toBe(false);
+  });
+  it("rangeText names the range in the book's own notation", () => {
+    expect(rangeText(OPEN_RANGE)).toBeNull();
+    expect(rangeText({ min: -200, max: 250 })).toBe("-200 to +250");
+    expect(rangeText({ min: -200, max: null })).toBe("-200 or longer");
+    expect(rangeText({ min: null, max: 250 })).toBe("+250 or shorter");
+  });
+  it("sortRanked: grade is the S-down order; shortest / longest sort on the posted price, ties by grade", () => {
+    const rows = PRICED.map((p) => ({ ...p, grade: gradeFromEv(p.ev) }));
+    expect(sortRanked(rows, "grade").map((r) => r.id)).toEqual(["td-long", "td-even", "td-short", "ml-mid", "td-fav", "td-edge"]);
+    expect(sortRanked(rows, "shortest").map((r) => r.am)).toEqual([-260, -200, -150, 105, 250, 400]);
+    expect(sortRanked(rows, "longest").map((r) => r.am)).toEqual([400, 250, 105, -150, -200, -260]);
+  });
+  it("Anytime TD between -200 and +250: the range narrows the rows AND the chip counts, the header names it, S down inside it", () => {
+    const out = renderP({ range: { min: -200, max: 250 }, onRange: () => {}, filter: "anytime_td", onFilter: () => {} });
+    expect(order(out)).toEqual(["td-even", "td-fav", "td-edge"]);
+    expect(out).toMatch(/Anytime TD <span[^>]*>3</);
+    expect(out).toMatch(/All <span[^>]*>4</);
+    expect(out).toContain("· -200 to +250");
+    expect(out).toMatch(/data-testid="ranked-odds-min"[^>]*value="-200"/);
+    expect(out).toMatch(/data-testid="ranked-odds-max"[^>]*value="\+250"/);
+    expect(out).toContain('aria-label="Clear odds range"');
+  });
+  it("shortest / longest re-order the shown rows by price and retitle the header", () => {
+    const s = renderP({ sort: "shortest", onSort: () => {} });
+    expect(order(s)).toEqual(["td-short", "td-fav", "ml-mid", "td-even", "td-edge", "td-long"]);
+    expect(s).toContain("Shortest price first");
+    expect(s).not.toContain("Ranked S → F");
+    const l = renderP({ sort: "longest", onSort: () => {} });
+    expect(order(l)).toEqual(["td-long", "td-edge", "td-even", "ml-mid", "td-fav", "td-short"]);
+    expect(l).toContain("Longest price first");
+    expect(l).toMatch(/<option[^>]*selected[^>]*>Longest price first<\/option>/);
+  });
+  it("the controls render on the default open range: -200 / +250 placeholders, three sorts, no clear button, nothing narrowed", () => {
+    const out = renderP();
+    expect(out).toContain('data-testid="ranked-odds-row"');
+    expect(out).toMatch(/placeholder="-200"/);
+    expect(out).toMatch(/placeholder="\+250"/);
+    expect(count(out, /<option /g)).toBe(3);
+    expect(out).not.toContain("Clear odds range");
+    expect(out).toMatch(/All <span[^>]*>6</);
+    expect(order(out)).toHaveLength(6);
+    expect(out).toContain("Ranked S → F");
+  });
+  it("a range that excludes every pick says so instead of the desk's empty text", () => {
+    const out = renderP({ range: { min: 1000, max: null }, onRange: () => {} });
+    expect(out).toContain("No pick is priced +1000 or longer — widen the odds range.");
+    expect(out).not.toContain("No priced picks on this board yet.");
+  });
+  it("while the feed is still pricing behind rows already shown, the list says so (a cold Saturday pull is up to 60 event calls)", () => {
+    expect(renderP({ loading: true })).toContain("Still pricing this slate");
+    expect(renderP({ loading: false })).not.toContain("Still pricing this slate");
+    expect(renderP({ loading: true, picks: [] })).toContain("Loading the board…");
+  });
+  it("wiring: the football ranked view shows a failed props pull with Retry (2026-09-19, 'Prop bets are not loading'); the desks still keep their own state", () => {
+    const cfb = readSrc("src/components/cfb/CfbProps.tsx");
+    expect(cfb).toMatch(/propsQ\.isError && \([\s\S]*?ranked-props-error[\s\S]*?Player props did not load[\s\S]*?propsQ\.refetch\(\)[\s\S]*?<RankedPicks/);
+    expect(cfb).not.toMatch(/onFilter=/);
+    expect(cfb).not.toMatch(/onRange=/);
+    expect(readSrc("app/props/page.tsx")).not.toMatch(/onRange=/);
   });
 });

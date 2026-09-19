@@ -608,7 +608,9 @@ describe("app/api/cfb/props/route.ts + src/lib/server/football-props.ts + client
     expect(shell).toMatch(/footballPropsGet\(CFB_LEAGUE, req, \{ storeKeys: CFB_PROPS_REDIS \}\)/);
     expect(shell).not.toMatch(/\bfetch\(/);
     expect(shell).not.toMatch(/ODDS_API_KEY/);
-    expect(shell.match(/^export const /gm) ?? []).toEqual(["export const "]); // only route config is exported (Vercel build rule)
+    /* two exports since 2026-09-19: force-dynamic and the 300 s duration ceiling (tests/football-props-duration.test.ts); only route config is exported (Vercel build rule) */
+    expect(shell.match(/^export const /gm) ?? []).toEqual(["export const ", "export const "]);
+    expect(shell).toMatch(/export const maxDuration = 300;/);
   });
   it("the client has no refetchInterval anywhere and mirrors the 2-hour window (was 30 min until 2026-09-05)", () => {
     expect(client).not.toMatch(/refetchInterval/);

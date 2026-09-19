@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { gradeFromEv, gradeRank, type Grade } from "@/lib/grade";
+import { parseAmerican } from "@/lib/parlay-calc";
 import { amFmt } from "@/lib/ticket-math";
 
 /**
@@ -51,6 +52,77 @@ export type RankedPick<P> = {
 export type RankedFilter = { key: string; label: string };
 export type RankedAccent = "pos" | "cfb" | "nfl";
 
+/**
+ * ODDS RANGE + PRICE SORT (2026-09-19, Josh, verbatim: "Need to be able to sort 'Every pick today'
+ * underneath parlay builder by odds for example I should be able to go in under the CFB Anytime TD
+ * filter and then filter between -200 to +250 for players or whatever other odds I want").
+ *
+ * American prices order numerically the way a bettor reads them: -200 is shorter than -150, which
+ * is shorter than +100, which is shorter than +250. So a range is two bounds on the posted price
+ * (an open bound, null, is no bound) and a price sort is a numeric sort on it — no conversion, no
+ * second scale. The range narrows the chips' counts too, so "Anytime TD 41" is the count inside
+ * the range. Nothing here prices anything: the rows arrive priced from the page.
+ */
+export type OddsRange = { min: number | null; max: number | null };
+export const OPEN_RANGE: OddsRange = { min: null, max: null };
+export type RankedSort = "grade" | "shortest" | "longest";
+export const RANKED_SORTS: readonly { key: RankedSort; label: string }[] = [
+  { key: "grade", label: "Grade S → F" },
+  { key: "shortest", label: "Shortest price first" },
+  { key: "longest", label: "Longest price first" },
+];
+export function inOddsRange(am: number, r: OddsRange): boolean {
+  if (!Number.isFinite(am)) return false;
+  return (r.min == null || am >= r.min) && (r.max == null || am <= r.max);
+}
+export function rangeText(r: OddsRange): string | null {
+  if (r.min == null && r.max == null) return null;
+  if (r.min != null && r.max != null) return `${amFmt(r.min)} to ${amFmt(r.max)}`;
+  return r.min != null ? `${amFmt(r.min)} or longer` : `${amFmt(r.max as number)} or shorter`;
+}
+/** grade: S first, then EV, then name (the list's default); shortest / longest: the posted price, ties by grade */
+export function sortRanked<T extends { grade: Grade | null; ev: number; am: number; label: string }>(rows: readonly T[], sort: RankedSort): T[] {
+  const byGrade = (a: T, b: T) => gradeRank(b.grade) - gradeRank(a.grade) || b.ev - a.ev || a.label.localeCompare(b.label);
+  const out = [...rows];
+  if (sort === "shortest") return out.sort((a, b) => a.am - b.am || byGrade(a, b));
+  if (sort === "longest") return out.sort((a, b) => b.am - a.am || byGrade(a, b));
+  return out.sort(byGrade);
+}
+
+/** one bound of the range: an American price or empty; commits on every valid keystroke, snaps back on blur */
+function AmField({ value, onCommit, placeholder, label, testId }: { value: number | null; onCommit: (v: number | null) => void; placeholder: string; label: string; testId: string }) {
+  const [txt, setTxt] = useState(value == null ? "" : amFmt(value));
+  useEffect(() => setTxt(value == null ? "" : amFmt(value)), [value]);
+  const bad = txt.trim() !== "" && parseAmerican(txt) == null;
+  return (
+    <input
+      value={txt}
+      onChange={(e) => {
+        const t = e.target.value;
+        setTxt(t);
+        if (t.trim() === "") {
+          onCommit(null);
+          return;
+        }
+        const n = parseAmerican(t);
+        if (n != null) onCommit(n);
+      }}
+      onBlur={() => setTxt(value == null ? "" : amFmt(value))}
+      inputMode="numeric"
+      autoCorrect="off"
+      autoCapitalize="off"
+      spellCheck={false}
+      placeholder={placeholder}
+      aria-label={label}
+      aria-invalid={bad}
+      data-testid={testId}
+      className={`num h-8 w-[66px] shrink-0 rounded-[8px] border bg-surface-2 px-1.5 text-center text-[12px] font-semibold text-text outline-none placeholder:text-faint ${
+        bad ? "border-gold/60" : "border-white/[0.08] focus:border-pos/50"
+      }`}
+    />
+  );
+}
+
 const ON: Record<RankedAccent, string> = {
   pos: "border-pos/60 bg-pos/15 text-pos",
   cfb: "border-cfb/60 bg-cfb/15 text-cfb",
@@ -72,6 +144,10 @@ export function RankedPicks<P>({
   emptyBody = "No priced picks on this board yet.",
   filter: filterProp,
   onFilter,
+  range: rangeProp,
+  onRange,
+  sort: sortProp,
+  onSort,
 }: {
   picks: readonly RankedPick<P>[];
   /** the category chips, in rail order; "All" is added first */
@@ -88,9 +164,18 @@ export function RankedPicks<P>({
       this list. Omit both and the list keeps its own state, as the football desks do. */
   filter?: string;
   onFilter?: (key: string) => void;
+  /** the odds range and the price sort (2026-09-19) — controlled the same way, or the list keeps its own */
+  range?: OddsRange;
+  onRange?: (r: OddsRange) => void;
+  sort?: RankedSort;
+  onSort?: (s: RankedSort) => void;
 }) {
   const [own, setOwn] = useState<string>("all");
   const filter = filterProp ?? own;
+  const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
+  const range = rangeProp ?? ownRange;
+  const [ownSort, setOwnSort] = useState<RankedSort>("grade");
+  const sort = sortProp ?? ownSort;
   const [limit, setLimit] = useState(RANKED_PAGE);
   const graded = useMemo(
     () =>
@@ -99,12 +184,14 @@ export function RankedPicks<P>({
         .sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || b.ev - a.ev || a.label.localeCompare(b.label)),
     [picks],
   );
+  /* the odds range first: the chips count what is inside it, so a category's number is what the range would show */
+  const ranged = useMemo(() => (range.min == null && range.max == null ? graded : graded.filter((p) => inOddsRange(p.am, range))), [graded, range]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
-    for (const p of graded) m.set(p.market, (m.get(p.market) ?? 0) + 1);
+    for (const p of ranged) m.set(p.market, (m.get(p.market) ?? 0) + 1);
     return m;
-  }, [graded]);
-  const shown = useMemo(() => (filter === "all" ? graded : graded.filter((p) => p.market === filter)), [graded, filter]);
+  }, [ranged]);
+  const shown = useMemo(() => sortRanked(filter === "all" ? ranged : ranged.filter((p) => p.market === filter), sort), [ranged, filter, sort]);
   const tiers = useMemo(() => {
     const m = new Map<Grade, number>();
     for (const p of shown) if (p.grade) m.set(p.grade, (m.get(p.grade) ?? 0) + 1);
@@ -116,13 +203,28 @@ export function RankedPicks<P>({
     onFilter?.(key);
     setLimit(RANKED_PAGE);
   };
+  const setRange = (r: OddsRange) => {
+    setOwnRange(r);
+    onRange?.(r);
+    setLimit(RANKED_PAGE);
+  };
+  const setSort = (s: RankedSort) => {
+    setOwnSort(s);
+    onSort?.(s);
+    setLimit(RANKED_PAGE);
+  };
+  const rangeLabel = rangeText(range);
   const visible = shown.slice(0, limit);
   return (
     <section data-testid="ranked-picks" className="glass overflow-hidden">
       <header className="flex items-center justify-between gap-2 px-3 pt-2.5">
         <div className="min-w-0">
           <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-faint">Every pick today</div>
-          <div className="text-[13px] font-bold tracking-tight text-text">Ranked S → F{filter !== "all" && <span className="text-muted"> · {labelOf(filter)}</span>}</div>
+          <div className="text-[13px] font-bold tracking-tight text-text">
+            {sort === "grade" ? "Ranked S → F" : sort === "shortest" ? "Shortest price first" : "Longest price first"}
+            {filter !== "all" && <span className="text-muted"> · {labelOf(filter)}</span>}
+            {rangeLabel && <span className="num text-muted"> · {rangeLabel}</span>}
+          </div>
         </div>
         <div className="num flex shrink-0 flex-wrap justify-end gap-x-2 text-[9.5px] text-faint" aria-label="Picks per tier">
           {TIERS.map((t) => (tiers.get(t) ? <span key={t}><b className="text-text">{t}</b> {tiers.get(t)}</span> : null))}
@@ -131,7 +233,7 @@ export function RankedPicks<P>({
       <div role="tablist" aria-label="Pick category" className="mt-2 flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <button type="button" role="tab" aria-selected={filter === "all"} onClick={() => pick("all")}
           className={`press h-7 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold ${filter === "all" ? ON[accent] : "border-white/[0.08] bg-surface-2 text-muted"}`}>
-          All <span className="num opacity-70">{graded.length}</span>
+          All <span className="num opacity-70">{ranged.length}</span>
         </button>
         {filters.map((f) => (
           <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} onClick={() => pick(f.key)}
@@ -140,10 +242,41 @@ export function RankedPicks<P>({
           </button>
         ))}
       </div>
+      {/* the odds range and the price sort — one thin row under the chips, thumb-sized on the phone */}
+      <div data-testid="ranked-odds-row" className="flex items-center gap-1.5 px-3 pb-2 text-[10px] text-faint">
+        <span className="shrink-0 font-bold uppercase tracking-[0.12em]">Odds</span>
+        <AmField value={range.min} onCommit={(v) => setRange({ ...range, min: v })} placeholder="-200" label="Shortest price to show" testId="ranked-odds-min" />
+        <span className="shrink-0">to</span>
+        <AmField value={range.max} onCommit={(v) => setRange({ ...range, max: v })} placeholder="+250" label="Longest price to show" testId="ranked-odds-max" />
+        {rangeLabel && (
+          <button type="button" onClick={() => setRange(OPEN_RANGE)} aria-label="Clear odds range" className="press flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-surface-2 text-[13px] text-muted">
+            ×
+          </button>
+        )}
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as RankedSort)}
+          aria-label="Sort picks"
+          data-testid="ranked-sort"
+          className="num ml-auto h-8 min-w-0 max-w-[46%] rounded-[8px] border border-white/[0.08] bg-surface-2 px-2 text-[11px] font-semibold text-text outline-none"
+        >
+          {RANKED_SORTS.map((s) => (
+            <option key={s.key} value={s.key}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+      {/* a slate still pricing behind rows already on the page (a cold Saturday pull is up to 60 event calls): say so, instead of a list that looks finished */}
+      {loading && graded.length > 0 && (
+        <div role="status" data-testid="ranked-still-pricing" className="px-3 pb-2 text-[10.5px] text-muted">
+          Still pricing this slate — more picks land as the feed answers.
+        </div>
+      )}
       {loading && graded.length === 0 ? (
         <div className="px-3 pb-3 text-[11px] text-muted">Loading the board…</div>
       ) : shown.length === 0 ? (
-        <div className="px-3 pb-3 text-[11px] text-muted">{emptyBody}</div>
+        <div className="px-3 pb-3 text-[11px] text-muted">
+          {ranged.length === 0 && graded.length > 0 && rangeLabel ? `No pick is priced ${rangeLabel} — widen the odds range.` : emptyBody}
+        </div>
       ) : (
         <div className="px-2 pb-1">
           {visible.map((p, idx) => {
