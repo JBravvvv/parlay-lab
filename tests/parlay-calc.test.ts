@@ -73,9 +73,11 @@ describe("wired — the tab and the page match the instruction", () => {
   });
   it("the tab is in the shell nav as 'Parlay Calc' (renamed 2026-09-04 from Parlay Calculator), reachable on mobile, and the bottom bar sizes itself", () => {
     expect(shell).toMatch(/href: "\/calc", label: "Parlay Calc"/);
-    // not a bottom tab (six already fill 375px) — it rides the mobile top-bar icon row instead
+    // not a bottom tab (six already fill 375px) — it rides the phone header's ⋯ More menu instead
+    // (2026-09-19: the top-bar icon row became one More menu; MORE derives from the same NAV table)
     expect(shell).toMatch(/href: "\/calc".*mobile: false/);
-    expect(shell).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
+    expect(shell).toMatch(/const MORE = NAV\.filter\(\(n\) => !n\.mobile && n\.href !== "\/settings"\);/);
+    expect(shell).toMatch(/\{MORE\.map\(/);
     expect(shell).toMatch(/gridTemplateColumns: `repeat\(\$\{NAV\.filter\(\(n\) => n\.mobile\)\.length\}/);
     // the hardcoded count that was wrapping tab 7 — comment-stripped, the fix's own comment names it
     expect(stripComments(shell)).not.toMatch(/grid-cols-6/);

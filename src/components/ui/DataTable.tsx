@@ -18,6 +18,8 @@ export type Column<T> = {
   fit?: boolean;
   /** hover text on the header — lets a short header ("Book") keep its long meaning */
   headerTitle?: string;
+  /** drop the column below 640px (2026-09-19: the phone board "can only see Pick, Grade and Fair") */
+  hideBelowSm?: boolean;
 };
 
 /**
@@ -105,7 +107,7 @@ export function DataTable<T>({
                     c.numeric ? "text-right" : "text-left"
                   } ${active ? "text-pos" : "text-muted"} ${c.sortValue ? "cursor-pointer select-none hover:text-text" : ""} ${
                     c.stickyLeft != null ? "sticky z-20 bg-surface-2" : ""
-                  } ${c.fit ? "w-px" : ""}`}
+                  } ${c.fit ? "w-px" : ""} ${c.hideBelowSm ? "hidden sm:table-cell" : ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
                   title={c.headerTitle}
                 >
@@ -130,7 +132,7 @@ export function DataTable<T>({
                   key={c.key}
                   className={`whitespace-nowrap px-2 py-1.5 ${c.numeric ? "num text-right" : ""} ${
                     c.stickyLeft != null ? "sticky z-10 bg-bg" : ""
-                  } ${c.fit ? "w-px" : ""} ${c.className ?? ""}`}
+                  } ${c.fit ? "w-px" : ""} ${c.hideBelowSm ? "hidden sm:table-cell" : ""} ${c.className ?? ""}`}
                   style={c.stickyLeft != null ? { left: c.stickyLeft } : undefined}
                 >
                   {c.cell(r)}

@@ -134,3 +134,15 @@ export function IconPark({ className = "" }: P) {
     </svg>
   );
 }
+
+/** More — the phone header's overflow menu (2026-09-19, Josh: "the 4 icons other than settings in top right
+ *  of header need to be a dropdown"). Three dots, filled, same 20px box as every other glyph. */
+export function IconMore({ className = "" }: P) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={`${base} ${className}`}>
+      <circle cx="5" cy="12" r="2.1" />
+      <circle cx="12" cy="12" r="2.1" />
+      <circle cx="19" cy="12" r="2.1" />
+    </svg>
+  );
+}

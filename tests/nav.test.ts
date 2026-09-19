@@ -147,12 +147,34 @@ describe("nav — mobile (375px)", () => {
   });
   // 2026-09-08 (INSTRUCTION 46): /season rides the top-bar icon row — 11 pages now
   // 2026-09-17 (INSTRUCTION 68): /ballpark rides the top-bar icon row too — 12 pages
-  it("every route not in the bottom bar is an icon in the mobile top bar (all 12 pages reachable on a phone)", () => {
+  // 2026-09-19 (Josh: "the 4 icons other than settings in top right of header need to be a dropdown or added as a
+  // 'more' selection tab in footer"): the icon row became one ⋯ More menu; Settings keeps its own gear beside it
+  it("every route not in the bottom bar is reachable from the phone header: Settings as its gear, the rest inside the ⋯ More menu (all 12 pages reachable on a phone)", () => {
     expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/season", "/ballpark", "/settings"]);
-    // the header row derives from the same table, so nothing can fall off
+    // the menu derives from the same table, so nothing can fall off
+    expect(shell).toMatch(/const MORE = NAV\.filter\(\(n\) => !n\.mobile && n\.href !== "\/settings"\);/);
+    expect(shell).toMatch(/const SETTINGS = NAV\.find\(\(n\) => n\.href === "\/settings"\)!;/);
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"));
-    expect(header).toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
-    expect(header).toMatch(/aria-label=\{label\}/);
+    expect(header).toMatch(/aria-label="More pages"/);
+    expect(header).toMatch(/aria-haspopup="menu"/);
+    expect(header).toMatch(/aria-expanded=\{more\}/);
+    expect(header).toMatch(/aria-controls="shell-more-menu"/);
+    expect(header).toMatch(/id="shell-more-menu"/);
+    expect(header).toMatch(/role="menu"/);
+    expect(header).toMatch(/\{MORE\.map\(\(\{ href, label, icon: Icon, tone, cfbOnly, mlbOnly \}\) =>/);
+    expect(header).toMatch(/role="menuitem"/);
+    // the gear is its own link, outside the menu, wearing the Settings tone
+    expect(header).toMatch(/href=\{SETTINGS\.href\}/);
+    expect(header).toMatch(/aria-label=\{SETTINGS\.label\}/);
+    expect(header).toMatch(/<IconSettings \/>/);
+    // no bare icon row survives — the old per-route icon links are gone from the header
+    expect(header).not.toMatch(/NAV\.filter\(\(n\) => !n\.mobile\)\.map/);
+    // the menu closes on every navigation and on a tap outside
+    expect(shell).toMatch(/useEffect\(\(\) => setMore\(false\), \[pathname\]\);/);
+    expect(header).toMatch(/aria-label="Close menu"/);
+    // the bar reads as a bar again: 92% ground, not the 70% that "fades away"
+    expect(header).toMatch(/bg-bg\/92/);
+    expect(header).not.toMatch(/bg-bg\/70/);
   });
   it("isActive semantics are unchanged", () => {
     expect(shell).toMatch(/return href === "\/" \? pathname === "\/" : pathname\.startsWith\(href\);/);
@@ -250,7 +272,8 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
   });
   it("press affordance and reduced-motion (INSTANT transition) survive", () => {
     expect(shell).toMatch(/const slide = reduced \? INSTANT : SLIDE;/);
-    expect((shell.match(/className="press |className=\{`press /g) ?? []).length).toBe(3);
+    // rail link · the ⋯ More button (2026-09-19) · the Settings gear · the bottom-bar tab
+    expect((shell.match(/className="press |className=\{`press /g) ?? []).length).toBe(4);
   });
 });
 

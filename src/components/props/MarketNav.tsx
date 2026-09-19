@@ -39,7 +39,7 @@ export function MarketNav({
 }) {
   return (
     <div
-      className="sticky z-20 -mx-4 mb-2 border-b border-white/[0.06] bg-bg/85 px-4 pb-2 pt-1 backdrop-blur-xl md:mx-0 md:rounded-b-[16px] md:px-0"
+      className="sticky z-20 -mx-4 mb-2 border-b border-white/[0.06] bg-bg/85 px-4 pb-1.5 pt-1 backdrop-blur-xl md:mx-0 md:rounded-b-[16px] md:px-0"
       style={{ top }}
     >
       <Segmented tab={tab} onTab={onTab} />

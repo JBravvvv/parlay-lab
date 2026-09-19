@@ -755,6 +755,32 @@ body::after {
 @keyframes parlay-reveal { from { opacity:.3; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion:reduce) { .gen-ticket-reveal { animation:none; } .gen-roll { transition:none; } .gen-roll:hover:not(:disabled),.gen-roll:active:not(:disabled) { transform:none; } }
 
+/* PORTRAIT LOCK (2026-09-19, Josh: "It should not be able to rotate into landscape mode while using the app").
+   The manifest asks for portrait and AppShell calls screen.orientation.lock() where a browser honours it; iOS
+   does neither, so the installed app shows this rotate-back sheet whenever a phone is turned sideways. Gated to
+   the home-screen app (display-mode: standalone) and phone heights — an iPad in landscape is 768px+ tall and
+   stays usable, and the desktop site is untouched. */
+.rotate-lock { display: none; }
+@media (display-mode: standalone) and (orientation: landscape) and (max-height: 500px) {
+  .rotate-lock { display: flex; }
+}
+
+/* PHONE DENSITY (2026-09-19, Josh: the pick boxes "can be shrunk by 70% vertically"): below 640px a generated
+   slot is one 36px line with a 22px mark; the 52px card with a 32px mark is the desktop shape. */
+@media (max-width: 639.98px) {
+  .gen-player-card { min-height: 36px; padding: 3px 6px; border-radius: 10px; }
+  .gen-player-card [data-player-mark] { width: 22px !important; height: 22px !important; }
+  .gen-slot-no { width: 16px; height: 16px; font-size: 9px; }
+  .gen-ticket-total { padding: 8px 2px 2px; }
+  .gen-combined-odds { font-size: 20px; }
+  /* table and ticket-leg marks: 18px instead of 24px, and the mark's own py-1 wrapper goes to 1px, so a board
+     row is ~32px instead of ~44px and a Builder leg is one text line */
+  .glass-table [data-player-mark], .ticket-legs [data-player-mark] { width: 18px !important; height: 18px !important; }
+  .glass-table span.py-1:has([data-player-mark]), .ticket-legs span.py-1:has([data-player-mark]) { padding-block: 1px; }
+}
+/* the phone board's market picker (2026-09-19): a native select, dark popup */
+.board-market-select { color-scheme: dark; }
+
 /* NFL typography: bright neutral text; blue remains the border/selection accent. */
 .text-nfl, .hero-price.is-nfl, .odds-grid.is-nfl .odds-cell-price { color: #edf4ff; }
 [class~="text-nfl/70"], [class~="text-nfl/80"] { color: #edf4ff; }

@@ -127,7 +127,7 @@ function MoneyInput({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-4 py-2">
+    <label className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 sm:px-4 sm:py-2">
       <span className="text-[10px] font-bold uppercase tracking-widest text-muted">{label}</span>
       <span className="num text-[13px] text-muted">$</span>
       <input
@@ -154,10 +154,53 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
   const kellyGap = kelly != null && (stake > 2 * kelly || kelly > 2 * stake);
   /* bet % / money % on a club leg (2026-09-18); a prop leg has no public split */
   const splitsFeed = useSplits("mlb");
+  /* PHONE (2026-09-19, Josh: "can only see half of a pick on the main view … the pick boxes are so unbelievably
+     big. They can be shrunk by 70% vertically … & the info can become expandable"): below 640px the header is
+     name · stake · price · EV · result, the legs are one line each, and the rest of the chips (wins/pays,
+     naive→joint, Kelly, basis, CZ tax, hit odds) live behind a ▾. From sm up every chip is inline as before. */
+  const [open, setOpen] = useState(false);
+  const detail = (
+    <>
+      <WonPaid t={{ stake, czDec: (t as { czDec?: number | null }).czDec ?? null, czOdds: t.czOdds ?? null, confirmed: t.confirmed ?? null }} grade={grade} />
+      {t.simJoint && t.probNaive != null && Number(t.probNaive) !== Number(t.prob) && (
+        <span
+          className="num rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10.5px] font-bold text-pos"
+          title="Same-game legs priced from joint sim paths, not multiplied marginals"
+        >
+          naive {String(t.probNaive)}% → joint {String(t.prob)}%
+        </span>
+      )}
+      {kellyGap && (
+        <span
+          className="num rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
+          title="¼-Kelly stake at this ticket's probability and DraftKings price (2%-of-bankroll cap) — the bankroll-growth-consistent size"
+        >
+          Kelly {fmtMoney(kelly)}
+        </span>
+      )}
+      {basisMode && t.bsOdds != null && (
+        <span
+          className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-text"
+          title="DK/FD selection basis — the better of DraftKings/FanDuel, the price that picked and sized this ticket"
+        >
+          basis {String(t.bsOdds)}
+        </span>
+      )}
+    </>
+  );
+  const tax = czTax != null && (
+    <span
+      className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[10.5px] text-muted"
+      title="Informational: EV at the DraftKings price, and the tax vs the DK/FD basis — you settle at DK, selection never sees it"
+    >
+      @CZ {Number(t.czEv) >= 0 ? "+" : ""}{Number(t.czEv).toFixed(1)}% · tax {czTax >= 0 ? "+" : ""}{czTax.toFixed(1)}%
+    </span>
+  );
+  const hasDetail = true;
   return (
-    <div className={`glass px-3 py-2 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
+    <div className={`glass px-3 py-1.5 sm:py-2 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-        <div className="text-[12.5px] font-semibold text-text">
+        <div className="min-w-0 flex-1 truncate text-[12px] font-semibold text-text sm:flex-none sm:text-[12.5px]">
           {t.name}
           {tag && (
             <span className="ml-2 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gold">
@@ -165,45 +208,15 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="num rounded-full border border-pos/50 bg-pos/10 px-2.5 py-0.5 text-[12px] font-bold text-pos">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="num rounded-full border border-pos/50 bg-pos/10 px-2 py-0.5 text-[11.5px] font-bold text-pos sm:px-2.5 sm:text-[12px]">
             {fmtMoney(stake)}
           </span>
-          <WonPaid t={{ stake, czDec: (t as { czDec?: number | null }).czDec ?? null, czOdds: t.czOdds ?? null, confirmed: t.confirmed ?? null }} grade={grade} />
-          {t.simJoint && t.probNaive != null && Number(t.probNaive) !== Number(t.prob) && (
-            <span
-              className="num rounded-full border border-pos/40 bg-pos/10 px-2 py-0.5 text-[10.5px] font-bold text-pos"
-              title="Same-game legs priced from joint sim paths, not multiplied marginals"
-            >
-              naive {String(t.probNaive)}% → joint {String(t.prob)}%
-            </span>
-          )}
-          {kellyGap && (
-            <span
-              className="num rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[11px] font-bold text-gold"
-              title="¼-Kelly stake at this ticket's probability and DraftKings price (2%-of-bankroll cap) — the bankroll-growth-consistent size"
-            >
-              Kelly {fmtMoney(kelly)}
-            </span>
-          )}
-          {basisMode && t.bsOdds != null && (
-            <span
-              className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-text"
-              title="DK/FD selection basis — the better of DraftKings/FanDuel, the price that picked and sized this ticket"
-            >
-              basis {String(t.bsOdds)}
-            </span>
-          )}
+          {/* inline from sm up; on the phone these move into the ▾ drawer below */}
+          <span className="hidden sm:contents">{detail}</span>
           <OddsCell odds={(t.czOdds ?? "") as never} book="caesars" />
           {primaryEv != null && <EvBadge ev={primaryEv} />}
-          {czTax != null && (
-            <span
-              className="num rounded-full border border-line-2 bg-surface-2 px-2 py-0.5 text-[10.5px] text-muted"
-              title="Informational: EV at the DraftKings price, and the tax vs the DK/FD basis — you settle at DK, selection never sees it"
-            >
-              @CZ {Number(t.czEv) >= 0 ? "+" : ""}{Number(t.czEv).toFixed(1)}% · tax {czTax >= 0 ? "+" : ""}{czTax.toFixed(1)}%
-            </span>
-          )}
+          <span className="hidden sm:contents">{tax}</span>
           {grade && (
             <span
               className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -217,15 +230,34 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
               {grade.result}
             </span>
           )}
+          {hasDetail && (
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={open ? "Hide ticket details" : "Show ticket details"}
+              data-testid="ticket-detail-toggle"
+              onClick={() => setOpen((v) => !v)}
+              className="press flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.03] text-[9px] leading-none text-muted sm:hidden"
+            >
+              <span aria-hidden>{open ? "▴" : "▾"}</span>
+            </button>
+          )}
         </div>
       </div>
+      {/* the phone drawer — the chips the wide header shows inline */}
+      {open && (
+        <div data-testid="ticket-detail" className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
+          {detail}
+          {tax}
+        </div>
+      )}
       {/* fix-file Phase 3: soft warning at the 3-leg ceiling (4+ is hard-blocked upstream) */}
       {legWarn && (
         <div className="mt-1 text-[10.5px] text-gold">
           ⚠ 3 legs — the graded record's ceiling: 2-leg tickets ran −0.7% ROI; 3+ legs went 1-25.
         </div>
       )}
-      <div className="mt-1.5 space-y-0.5">
+      <div className="ticket-legs mt-1 space-y-px sm:mt-1.5 sm:space-y-0.5">
         {t.legs.map((l, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
             <span className="text-muted">
@@ -264,7 +296,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
         ))}
       </div>
       {t.prob != null && (
-        <div className="num mt-1 text-[10px] text-faint">
+        <div className={`num mt-1 text-[10px] text-faint ${open ? "" : "hidden sm:block"}`}>
           {Number(t.prob).toFixed(1)}% to hit ≈ 1 in {Math.max(1, Math.round(100 / Math.max(Number(t.prob), 0.01)))} slates
         </div>
       )}
@@ -296,6 +328,9 @@ const BLOCK_LABEL: Record<string, string> = {
 
 function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
   const rows = props.rows;
+  /* PHONE (2026-09-19): the summary line stays; the per-ticket list and the consensus paragraph fold behind
+     a Show/Hide button below 640px so the card's own tickets are not a page-scroll away */
+  const [open, setOpen] = useState(false);
   if (rows.length === 0) return null;
 
   const counts: Record<string, number> = {};
@@ -310,20 +345,32 @@ function BlockedPanel(props: { rows: BlockedRow[]; basisMode: boolean }) {
 
   return (
     <Panel>
-      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Cleared the gate, refused anyway</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">Cleared the gate, refused anyway</div>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="blocked-list"
+          data-testid="blocked-toggle"
+          onClick={() => setOpen((v) => !v)}
+          className="press shrink-0 rounded-full border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold text-muted sm:hidden"
+        >
+          {open ? "Hide" : "Show"}
+        </button>
+      </div>
       <div className="num mt-1 text-[12px] text-text">
         <b>{rows.length}</b> {rows.length === 1 ? "ticket" : "tickets"} had your edge and were stopped
         {order.map((r) => ` · ${counts[r]} ${BLOCK_LABEL[r] || r}`).join("")}
         {best !== null ? <span className="text-muted"> (best refused: +{best}% EV at DraftKings)</span> : null}
       </div>
       {counts.consensus ? (
-        <div className="mt-1 text-[10.5px] leading-relaxed text-faint">
+        <div className={`mt-1 text-[10.5px] leading-relaxed text-faint ${open ? "" : "hidden sm:block"}`}>
           The consensus gate applies to every market under 100 graded legs. That counter restarted at CAL_START, so it
           is strict everywhere right now — see the calibration banner. Safe direction and temporary, but it is why the
           card is thin.
         </div>
       ) : null}
-      <div className="mt-2 space-y-1.5">
+      <div id="blocked-list" className={`mt-2 space-y-1.5 ${open ? "" : "hidden sm:block"}`}>
         {sorted.map((b, i) => (
           <div key={i} className="flex flex-wrap items-baseline gap-x-2 text-[12px]">
             <span className="font-semibold text-text">{b.name}</span>
@@ -688,12 +735,12 @@ function MlbBuilderPage() {
         <AsgBuilderTab />
       ) : (
         <>
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-5">
         <MoneyInput label="Daily" value={money.daily} onChange={(n) => updateMoney({ daily: n })} disabled={!!locked} />
         <MoneyInput label="Fun" value={money.fun} onChange={(n) => updateMoney({ fun: n })} disabled={!!locked} />
         {/* Phase 6: bankroll is managed — base + logged deposits/withdrawals + graded P/L; edits live in Settings */}
         <span
-          className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-4 py-2"
+          className="flex items-center gap-2 rounded-full border border-line-2 bg-surface-2 px-3 py-1.5 sm:px-4 sm:py-2"
           title="Managed bankroll: $2,500 base + logged deposits/withdrawals + realized graded P/L. Deposits and withdrawals are logged in Settings — the number itself is never hand-edited."
         >
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted">Bankroll</span>
@@ -715,10 +762,13 @@ function MlbBuilderPage() {
         </div>
       )}
       {!locked && czCover && (
-        <div className={`num mb-4 text-[11.5px] ${czCover.have < czCover.total ? "text-gold" : "text-muted"}`}>
+        <div className={`num mb-3 text-[11px] sm:mb-4 sm:text-[11.5px] ${czCover.have < czCover.total ? "text-gold" : "text-muted"}`}>
           DraftKings props live for {czCover.have} of {czCover.total} games right now
-          {czCover.have < czCover.total &&
-            " — the rest usually post closer to first pitch. If you're generating early, regenerate right before locking so the card can cover the whole day."}
+          {czCover.have < czCover.total && (
+            <span className="hidden sm:inline">
+              {" — the rest usually post closer to first pitch. If you're generating early, regenerate right before locking so the card can cover the whole day."}
+            </span>
+          )}
         </div>
       )}
 
@@ -754,7 +804,7 @@ function MlbBuilderPage() {
               <span className="text-[10px] text-faint">the main check — counts in net P/L</span>
             </div>
             {locked.core.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">{locked.core.map(renderLockedTicket)}</div>
+              <div className="grid gap-2 md:grid-cols-2 md:gap-3">{locked.core.map(renderLockedTicket)}</div>
             ) : (
               <div className="text-[12px] text-muted">No core tickets on this lock.</div>
             )}
@@ -770,7 +820,7 @@ function MlbBuilderPage() {
                 <span className="text-[10px] text-faint">HR longshots — tracked by itself, never in the core net</span>
               </div>
               {locked.funT.length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-2">{locked.funT.map(renderLockedTicket)}</div>
+                <div className="grid gap-2 md:grid-cols-2 md:gap-3">{locked.funT.map(renderLockedTicket)}</div>
               ) : (
                 <div className="text-[12px] text-muted">{locked.funNote ?? "No fun tickets on today's card."}</div>
               )}
@@ -810,7 +860,7 @@ function MlbBuilderPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-2 md:grid-cols-2 md:gap-3">
                     {supp.fun.picks.map((p) => (
                       <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
                     ))}
@@ -856,7 +906,7 @@ function MlbBuilderPage() {
                         Core · {fmtMoney(shadow.alloc.sum)} across {shadow.alloc.picks.length} tickets · card EV{" "}
                         <EvBadge ev={(shadow.alloc.ev ?? 0) * 100} />
                       </div>
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-2 md:grid-cols-2 md:gap-3">
                         {shadow.alloc.picks.map((p) => (
                           <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                         ))}
@@ -866,7 +916,7 @@ function MlbBuilderPage() {
                   {shadow.fun.picks.length > 0 && (
                     <div>
                       <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
-                      <div className="grid gap-3 md:grid-cols-2">
+                      <div className="grid gap-2 md:grid-cols-2 md:gap-3">
                         {shadow.fun.picks.map((p) => (
                           <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                         ))}
@@ -966,7 +1016,7 @@ function MlbBuilderPage() {
                 <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
                   Today&apos;s card · {fmtMoney(card.alloc.sum)} across {card.alloc.picks.length} tickets
                 </h2>
-                <span className="num flex items-center gap-3 text-[11px] text-muted">
+                <span className="num flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted">
                   <span>entered {fmtMoney(card.enteredDaily)}</span>
                   <span title="Sum of each ticket's ¼-Kelly stake (2%-of-bankroll cap per ticket) — the bankroll-math-consistent daily">
                     Kelly-consistent <b className="text-text">{fmtMoney(card.kellyDaily)}</b>
@@ -1004,7 +1054,7 @@ function MlbBuilderPage() {
                   not the edge.
                 </div>
               )}
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2 md:gap-3">
                 {card.alloc.picks.map((p) => (
                   <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                 ))}
@@ -1017,7 +1067,7 @@ function MlbBuilderPage() {
               <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-gold">
                 FUN money · {fmtMoney(card.fun.sum)} — high variance, most days lose, tracked separately
               </h2>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 md:grid-cols-2 md:gap-3">
                 {card.fun.picks.map((p) => (
                   <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                 ))}

@@ -4,13 +4,14 @@ import { SportsbookSelector } from "@/components/sportsbook/SportsbookSelector";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion, type Transition } from "motion/react";
-import type { ComponentType, CSSProperties, ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import {
   IconBoard,
   IconBuilder,
   IconCalc,
   IconGames,
   IconLedger,
+  IconMore,
   IconParlay,
   IconPark,
   IconSeason,
@@ -32,7 +33,8 @@ type NavItem = {
   icon: ComponentType<{ className?: string }>;
   /** desktop side rail: "top" sits under the brand, "bottom" is pinned above the footer */
   group: "top" | "bottom";
-  /** shows in the mobile bottom tab bar; everything else lands in the mobile top-bar icon row */
+  /** shows in the mobile bottom tab bar; everything else lands in the phone header — Settings as its own
+   *  gear, the rest inside the ⋯ More menu (2026-09-19) */
   mobile: boolean;
   /** shorter label for the 9.5px bottom-bar type (six tabs at 375px) */
   mobileLabel?: string;
@@ -79,6 +81,11 @@ const NAV: readonly NavItem[] = [
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
 ];
 
+/** the phone header's ⋯ More menu: every route that is neither a bottom tab nor Settings (Settings keeps its own
+ *  gear beside the menu). Derived from the table, so a new page can never fall off the phone. 2026-09-19, Josh:
+ *  "the 4 icons other than settings in top right of header need to be a dropdown or added as a 'more' selection tab". */
+const MORE = NAV.filter((n) => !n.mobile && n.href !== "/settings");
+const SETTINGS = NAV.find((n) => n.href === "/settings")!;
 
 // "/" is the landing and is never a rail entry, so it is never highlighted.
 function isActive(pathname: string, href: string) {
@@ -168,17 +175,37 @@ export function AppShell({ children }: { children: ReactNode }) {
   // side rail, no mobile top bar, no content gutters. Bottom tabs stay (PWA nav).
   const landing = pathname === "/";
   const slide = reduced ? INSTANT : SLIDE;
+  // the phone header's ⋯ menu — closes on every navigation (the pathname flips) and on a tap outside
+  const [more, setMore] = useState(false);
+  useEffect(() => setMore(false), [pathname]);
+  // PORTRAIT LOCK (2026-09-19, Josh: "It should be stuck in portrait mode at all times"). Where the browser
+  // honours it (Android Chrome, installed) this pins the home-screen app upright; iOS has no lock API and
+  // ignores the manifest's orientation, so there the .rotate-lock sheet in globals.css covers a sideways phone.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia?.("(display-mode: standalone)").matches) return;
+    const o = window.screen?.orientation as unknown as { lock?: (t: string) => Promise<void> } | undefined;
+    o?.lock?.("portrait")?.catch(() => {});
+  }, []);
   const cfb = sport === "cfb";
   const nfl = sport === "nfl";
   /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB or NFL
    *  (NFL Season Lab is cut for the 2026-09-08 ship; the NFL desk adds no nav entry of its own) */
   const shown = (n: Pick<NavItem, "cfbOnly" | "mlbOnly">) => (!n.cfbOnly || cfb) && (!n.mlbOnly || sport === "mlb");
+  /** the ⋯ button wears the tone of whichever More page is open, so the header still shows where you are */
+  const moreTone = MORE.find((n) => isActive(pathname, n.href))?.tone;
 
   return (
     <div className="min-h-dvh">
       {/* the looping video plays behind every page (mounted once — survives
           navigation); data pages get a dark scrim, the landing runs it raw */}
       <VideoBackdrop fixed scrim={!landing} />
+
+      {/* portrait lock, the iOS half: shown by globals.css only in the installed app, sideways, at phone heights */}
+      <div className="rotate-lock fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-bg px-8 text-center" role="status" aria-live="polite">
+        <span aria-hidden className="text-[32px] leading-none">📱</span>
+        <p className="text-[15px] font-semibold text-text">Parlay Lab runs in portrait</p>
+        <p className="text-[12.5px] text-muted">Turn your phone back upright to keep going.</p>
+      </div>
 
       {/* desktop side rail — two groups: the work tabs under the brand, the
           bookkeeping/tools tabs pinned above the footer. The eyebrow and the
@@ -215,33 +242,67 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* mobile top bar — reserves the iOS status-bar inset (the app draws
           edge-to-edge under it); max() keeps the normal padding in browsers.
-          One row at 375px: brand · SportSwitch · every route that is not a
-          bottom tab as an icon, so all eleven pages stay reachable on a phone (Season Lab joined 2026-09-08).
-          Measured with Geist at 375px (2026-09-08, three desks): brand 95px + the dense label-only
-          switch 101px + five 26px icons (20px glyph, p-[3px]) 138px + two 6px gaps + the 24px gutter
-          = 370px on the CFB desk (Season Lab is its fifth icon), 342px on MLB / NFL with four; at
-          p-[5px] the five icons were 158px and the CFB row overflowed even before the third pill. */}
+          One row at 375px: brand · SportSwitch · the ⋯ More menu · the Settings gear.
+          2026-09-19 (Josh: "The top header fades away; the 4 icons other than settings in top right of
+          header need to be a dropdown"): the icon row (five 26px glyphs on CFB, 370px measured) became one
+          ⋯ button whose popover lists those pages by name, and the bar's ground went from 70% to 92% so
+          it reads as a bar over scrolling content instead of dissolving into it. The popover is absolute,
+          so the header keeps its measured height (useShellInsets reads header.sticky). */}
       <header
-        className={`sticky top-0 z-30 items-center justify-between gap-1.5 border-b border-white/[0.05] bg-bg/70 px-3 pb-2.5 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
-        style={{ paddingTop: "max(env(safe-area-inset-top), 0.625rem)" }}
+        className={`sticky top-0 z-30 items-center justify-between gap-1.5 border-b border-white/[0.06] bg-bg/92 px-3 pb-2 backdrop-blur-xl md:hidden ${landing ? "hidden" : "flex"}`}
+        style={{ paddingTop: "max(env(safe-area-inset-top), 0.5rem)" }}
       >
         <Brand />
         <SportSwitch size="sm" className="shrink-0" />
-        <div className="flex shrink-0 items-center gap-0.5">
-          {NAV.filter((n) => !n.mobile).map(({ href, label, icon: Icon, tone, cfbOnly, mlbOnly }) =>
-            shown({ cfbOnly, mlbOnly }) ? (
-              <Link
-                key={href}
-                href={href}
-                replace
-                aria-label={label}
-                title={label}
-                className="press rounded-lg p-[3px]"
-                style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
+        <div className="relative flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            aria-label="More pages"
+            aria-haspopup="menu"
+            aria-expanded={more}
+            aria-controls="shell-more-menu"
+            onClick={() => setMore((v) => !v)}
+            className={`press rounded-lg p-[3px] ${more ? "bg-white/[0.08] text-text" : "text-muted"}`}
+            style={moreTone ? { color: moreTone } : undefined}
+          >
+            <IconMore />
+          </button>
+          <Link
+            href={SETTINGS.href}
+            replace
+            aria-label={SETTINGS.label}
+            title={SETTINGS.label}
+            className="press rounded-lg p-[3px]"
+            style={{ color: isActive(pathname, SETTINGS.href) ? SETTINGS.tone : tint(SETTINGS.tone, IDLE_LABEL) }}
+          >
+            <IconSettings />
+          </Link>
+          {more && (
+            <>
+              {/* tap-away backdrop: a full-screen button under the popover, over the page */}
+              <button type="button" aria-label="Close menu" onClick={() => setMore(false)} className="fixed inset-0 z-30 cursor-default bg-black/35" />
+              <div
+                id="shell-more-menu"
+                role="menu"
+                className="absolute right-0 top-[calc(100%+8px)] z-40 min-w-[196px] overflow-hidden rounded-2xl border border-white/10 bg-surface/95 p-1.5 shadow-[0_18px_50px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl"
               >
-                <Icon />
-              </Link>
-            ) : null,
+                {MORE.map(({ href, label, icon: Icon, tone, cfbOnly, mlbOnly }) =>
+                  shown({ cfbOnly, mlbOnly }) ? (
+                    <Link
+                      key={href}
+                      href={href}
+                      replace
+                      role="menuitem"
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-medium active:bg-white/[0.06]"
+                      style={{ color: isActive(pathname, href) ? tone : tint(tone, IDLE_LABEL) }}
+                    >
+                      <Icon />
+                      {label}
+                    </Link>
+                  ) : null,
+                )}
+              </div>
+            </>
           )}
         </div>
       </header>

@@ -410,7 +410,7 @@ function Slot<P>({
       onDragOver={onMove ? (e) => { if (dragFrom != null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } } : undefined}
       onDrop={onMove ? (e) => { e.preventDefault(); if (dragFrom != null && dragFrom !== i) onMove(dragFrom, i); onDragFrom?.(null); } : undefined}
       onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
-      className={`gen-player-card flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-0.5 ${
+      className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[52px] sm:gap-2 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}`}
     >
@@ -423,14 +423,15 @@ function Slot<P>({
         aria-pressed={pinned}
         aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}
         onClick={() => onTogglePin(i)}
-        className={`press flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-[10px] border text-[7.5px] font-bold uppercase tracking-wide ${
+        className={`press flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-[8px] border text-[7.5px] font-bold uppercase tracking-wide sm:h-9 sm:w-9 sm:rounded-[10px] ${
           pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
         }`}
       >
         <span aria-hidden className="text-[12px] leading-none">
           {pinned ? "🔒" : "🔓"}
         </span>
-        <span className="mt-[2px] leading-none">{pinned ? "locked" : "lock in"}</span>
+        {/* the word rides under the padlock from sm up; the phone slot is one 36px line (2026-09-19) */}
+        <span className="mt-[2px] hidden leading-none sm:block">{pinned ? "locked" : "lock in"}</span>
       </button>
       {renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
@@ -440,9 +441,15 @@ function Slot<P>({
           {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
           {l.started && <span className="shrink-0 text-live">{l.quoteAt ? "live quote" : "started"}</span>}
+          {/* phone: the hit chip rides the sub line so the slot stays two lines (2026-09-19) */}
+          {l.hit && hitWindow != null && (
+            <span className="shrink-0 sm:hidden">
+              <HitChip stat={l.hit} window={hitWindow} />
+            </span>
+          )}
         </div>
         {l.hit && hitWindow != null && (
-          <div className="mt-[3px] flex items-center gap-1.5">
+          <div className="mt-[3px] hidden items-center gap-1.5 sm:flex">
             <HitChip stat={l.hit} window={hitWindow} />
             <HitDots dots={l.hit.dots} />
           </div>
@@ -492,7 +499,7 @@ function Slot<P>({
  */
 function LostSlot({ i, id, onTogglePin }: { i: number; id: string; onTogglePin: (slot: number) => void }) {
   return (
-    <div data-gen-slot={i} className="flex min-h-[52px] items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5">
+    <div data-gen-slot={i} className="flex min-h-9 items-center gap-2 border-t border-l-2 border-white/[0.04] border-l-gold py-1 pl-1.5 sm:min-h-[52px]">
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
       <button
         type="button"
@@ -743,7 +750,7 @@ export function GenSheet<P>({
               native selects; the explanatory paragraphs are tooltips; Save / Load sit under
               Advanced. Nothing here changes what the generator DOES — only how much of the screen
               it takes. */}
-          <div className="gen-studio-hero -mx-3 -mt-2.5 flex items-center justify-between gap-2 px-3 py-2">
+          <div className="gen-studio-hero -mx-3 -mt-2.5 hidden items-center justify-between gap-2 px-3 py-2 sm:flex">
             <div className="min-w-0 truncate text-[15px] font-black tracking-tight text-white">Build your parlay<span className="text-pos">.</span></div>
             <div className="num flex shrink-0 items-center gap-x-2 text-[10px] text-muted">
               <span title="distinct players with a leg that passes every filter"><b className="text-text">{distinctPlayers}</b> players</span>
@@ -916,7 +923,7 @@ export function GenSheet<P>({
                 type="button"
                 onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
                 disabled={loading}
-                className="gen-roll press flex min-h-12 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg"
+                className="gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12"
               >
                 <svg aria-hidden className="mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
                 {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
@@ -926,7 +933,7 @@ export function GenSheet<P>({
               type="button"
               onClick={onAdd}
               disabled={!ticket}
-              className={`press min-h-12 shrink-0 rounded-[12px] border px-3 text-[12px] font-semibold ${
+              className={`press min-h-10 shrink-0 rounded-[12px] border px-3 text-[12px] font-semibold sm:min-h-12 ${
                 ticket ? "border-white/[0.12] bg-surface-2 text-text" : "border-white/[0.06] bg-surface-2/50 text-faint"
               }`}
             >
@@ -934,8 +941,8 @@ export function GenSheet<P>({
             </button>
           </div>
           {onBack && <div className="flex items-center gap-2">
-            <button type="button" onClick={onBack} disabled={!canBack || loading} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35">← Previous parlay</button>
-            <button type="button" onClick={onForward} disabled={!canForward || loading} className="press h-9 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35">Next parlay →</button>
+            <button type="button" onClick={onBack} disabled={!canBack || loading} className="press h-8 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35 sm:h-9">← Previous parlay</button>
+            <button type="button" onClick={onForward} disabled={!canForward || loading} className="press h-8 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35 sm:h-9">Next parlay →</button>
           </div>}
           {historyNotice && <p role="status" className="text-[10px] text-muted">{historyNotice}</p>}
           {!loading && relax && (
@@ -980,7 +987,7 @@ export function GenSheet<P>({
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
             <div key={ticket.key} className="gen-ticket-reveal">
-              <div className="space-y-1.5">
+              <div className="space-y-1 sm:space-y-1.5">
                 {ticket.legs.map((l, i) => (
                   <Slot
                     key={l.id}
@@ -1039,7 +1046,7 @@ export function GenSheet<P>({
                 )}
               </div>
               <details className="mt-1.5 text-[9.5px] leading-snug text-faint">
-                <summary className="cursor-pointer py-2">Estimates & price details · paper only</summary>
+                <summary className="cursor-pointer py-1 sm:py-2">Estimates & price details · paper only</summary>
                 Estimated hit chance multiplies the leg estimates. Same-game correlation is not modeled; this is not a sportsbook parlay quote.
                 {anyMarketProb && <> {marketNote}</>}{" "}
                 {showHitRate && <>Hit rates count games already played and are not a forecast. </>}

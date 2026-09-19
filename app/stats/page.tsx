@@ -311,6 +311,9 @@ export default function StatsPage() {
   // calibration spec 3C: the reliability view lives under Stats as its own tab
   const [calView, setCalView] = useState(false);
   const [pvtOpen, setPvtOpen] = useState(false);
+  /* PHONE (2026-09-19, Josh: "only 7 players show on main view because filters box is so unbelievably big"):
+     the selects and the min slider fold behind a Filters button below 640px; from sm up they are always out */
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   /* ufc has no stat table — everything below tableSport only drives the table sports */
   const tableSport: TableSportId = sport === "ufc" ? "mlb" : sport;
@@ -473,6 +476,7 @@ export default function StatsPage() {
             ? "UFC — official divisional rankings, pound-for-pound & the full active roster"
             : `${SPORTS[tableSport].label} · ${season} — every ${scope === "team" ? "team" : "player"}, live on open · tap any column to sort`
         }
+        subMobile={sport === "ufc" ? "UFC — rankings, pound-for-pound & the active roster" : `${SPORTS[tableSport].label} · ${season} · tap a column to sort`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             {(cfbDesk || nflDesk) && (
@@ -541,8 +545,9 @@ export default function StatsPage() {
       )}
 
       <Reveal>
-        <Panel className="mb-4">
-          <div className="flex flex-wrap items-center gap-2">
+        <Panel className="mb-3 sm:mb-4">
+          {/* one scrolling chip strip on the phone; the wrapping row from sm up */}
+          <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:gap-2 sm:overflow-visible sm:px-0 sm:pb-0">
             {deskSports.map((s) => (
               <FilterPill key={s} selected={sport === s && !calView} onClick={() => { setCalView(false); pickSport(s); }}>
                 {s === "mlb" ? "⚾ MLB" : s === "nfl" ? "🏈 NFL" : s === "cfb" ? "🏈 NCAAF" : "🥊 UFC"}
@@ -552,10 +557,10 @@ export default function StatsPage() {
               <FilterPill selected={calView} onClick={() => setCalView(true)}>📐 CALIBRATION</FilterPill>
             )}
             {sport !== "ufc" && !calView && (<>
-            <span className="mx-1 h-5 w-px bg-line-2" />
+            <span className="mx-1 h-5 w-px shrink-0 bg-line-2" />
             <FilterPill selected={scope === "ind"} onClick={() => setScope("ind")}>INDIVIDUAL</FilterPill>
             <FilterPill selected={scope === "team"} onClick={() => setScope("team")}>TEAM</FilterPill>
-            <span className="mx-1 h-5 w-px bg-line-2" />
+            <span className="mx-1 h-5 w-px shrink-0 bg-line-2" />
             {SPORTS[tableSport].groups.map(([g, label]) => (
               <FilterPill key={g} selected={group === g} onClick={() => pickGroup(g)}>{label}</FilterPill>
             ))}
@@ -563,13 +568,23 @@ export default function StatsPage() {
           </div>
 
           {sport !== "ufc" && !calView && (<>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 sm:mt-3">
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`⌕ Filter ${scope === "team" ? "team" : "player / team"}…`}
-              className="min-w-[180px] flex-1 rounded-full border border-line-2 bg-white/[0.03] px-4 py-1.5 text-[12.5px] text-text outline-none transition-colors placeholder:text-faint focus:border-pos/60 md:max-w-[280px]"
+              className="min-w-0 flex-1 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[12.5px] text-text outline-none transition-colors placeholder:text-faint focus:border-pos/60 sm:min-w-[180px] sm:px-4 md:max-w-[280px]"
             />
+            <button
+              type="button"
+              aria-expanded={filtersOpen}
+              aria-controls="stats-filters"
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={`${selectCls} shrink-0 sm:hidden`}
+            >
+              Filters {filtersOpen ? "▴" : "▾"}
+            </button>
+            <div id="stats-filters" className={`${filtersOpen ? "flex" : "hidden"} w-full flex-wrap items-center gap-2 sm:contents`}>
             <select className={selectCls} value={team} onChange={(e) => setTeam(e.target.value)}>
               <option value="ALL">All teams</option>
               {teams.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -601,9 +616,10 @@ export default function StatsPage() {
                 </label>
               </>
             )}
+            </div>
           </div>
 
-          <div className="num mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-faint">
+          <div className="num mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-faint sm:mt-3">
             <span className={`inline-block h-[7px] w-[7px] rounded-full ${q.isFetching ? "animate-pulse bg-gold" : q.data ? "bg-pos" : "bg-neg"}`} />
             {q.isFetching
               ? windowN && scope === "ind" ? `Cutting every ${group === "hitting" ? "hitter" : "pitcher"}'s last ${windowN} games…` : "Loading live data…"

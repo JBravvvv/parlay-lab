@@ -863,7 +863,7 @@ function MlbBoardPage() {
     const now = Date.now();
     const statusRank: Record<string, number> = { won: 0, live: 1, upcoming: 2, lost: 3, void: 4, ungradable: 5 };
     return [
-      { key: "rank", header: "#", numeric: true, sortValue: (p) => p.rank, cell: (p) => <span className="text-faint">{p.rank}</span> },
+      { key: "rank", header: "#", numeric: true, hideBelowSm: true, sortValue: (p) => p.rank, cell: (p) => <span className="text-faint">{p.rank}</span> },
       {
         key: "mine",
         header: "+",
@@ -1183,10 +1183,30 @@ function MlbBoardPage() {
      board. Every hook above has already run, so this early return is hooks-safe. */
 
 
+  /* PHONE MARKET PICKER (2026-09-19, Josh: "Selection for picks is a horizontal scroll bar when it could be a
+     dropdown or something that saves more space"): one list of market keys feeds a native <select> below 640px
+     and the pill row from sm up — same keys, same labels, same counts. */
+  const marketKeys = [...new Set(live ? ["all", ...Object.keys(MLB_BROWSE_MARKETS)] : ["all", "ml", "rl", ...Object.keys(MLB_BROWSE_MARKETS), ...Object.keys(cats)])]
+    .sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : 0));
+  const marketLabel = (k: string) => (scope === "all" && k === "all" ? "EVERY MARKET" : CAT_LABELS[k] ?? k.toUpperCase());
+  const marketCount = (k: string): number | null =>
+    scope === "top"
+      ? live
+        ? liveMarkets.reduce((n, g) => n + (k === "all" ? Object.values(g.markets).flat().length : (g.markets[k]?.length ?? 0)), 0)
+        : PROP_TABS.has(k)
+          ? picksData?.picks?.[k]?.length || Math.min(50, browseProps.rows.reduce((n, g) => n + (g.markets[k]?.length ?? 0), 0))
+          : (cats[k] ?? []).length
+      : null;
+
   return (
     <>
       <PageHeader
         title="Board"
+        subMobile={
+          sport === "ufc" || sport === "asg" || !d
+            ? undefined
+            : `${gameCount} games · ${pickCount} rows · ${selectedBookName} prices · updated ${new Date(board!.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+        }
         sub={
           sport === "ufc"
             ? "UFC — de-vigged market consensus vs your selected sportsbook, records live from ESPN"
@@ -1324,16 +1344,34 @@ function MlbBoardPage() {
             </button>
           ))}
         </div>
-        {[...new Set(live ? ["all", ...Object.keys(MLB_BROWSE_MARKETS)] : ["all", "ml", "rl", ...Object.keys(MLB_BROWSE_MARKETS), ...Object.keys(cats)])]
-          .sort((a, b) => (a === "all" ? -1 : b === "all" ? 1 : 0))
-          .map((k) => (
+        {/* phone: the market is a dropdown beside the scope switch */}
+        <select
+          aria-label="Market"
+          data-testid="board-market-select"
+          value={marketKeys.includes(cat) ? cat : "all"}
+          onChange={(e) => setCat(e.target.value)}
+          className="board-market-select min-w-0 flex-1 rounded-full border border-white/[0.08] bg-surface-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-text outline-none sm:hidden"
+        >
+          {marketKeys.map((k) => {
+            const n = marketCount(k);
+            return (
+              <option key={k} value={k}>
+                {marketLabel(k)}{n != null ? ` (${n})` : ""}
+              </option>
+            );
+          })}
+        </select>
+        {/* sm and up: the pill row */}
+        <div className="hidden flex-wrap items-center gap-2 sm:flex" data-testid="board-market-pills">
+          {marketKeys.map((k) => (
             <FilterPill key={k} selected={cat === k} onClick={() => setCat(k)}>
-              {scope === "all" && k === "all" ? "EVERY MARKET" : CAT_LABELS[k] ?? k.toUpperCase()}
-              {scope === "top" && <span className="num ml-1 text-[10px] opacity-70">{live ? liveMarkets.reduce((n,g)=>n+(k==="all"?Object.values(g.markets).flat().length:(g.markets[k]?.length??0)),0) : PROP_TABS.has(k) ? (picksData?.picks?.[k]?.length || Math.min(50,browseProps.rows.reduce((n,g)=>n+(g.markets[k]?.length??0),0))) : (cats[k] ?? []).length}</span>}
+              {marketLabel(k)}
+              {marketCount(k) != null && <span className="num ml-1 text-[10px] opacity-70">{marketCount(k)}</span>}
             </FilterPill>
           ))}
+        </div>
       </div>
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2 sm:mb-4">
         {(
           <FilterPill
             selected={live}
