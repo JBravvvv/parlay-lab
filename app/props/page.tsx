@@ -29,7 +29,7 @@ import { LeanChip } from "@/components/ui/LeanChip";
 import { bookName } from "@/lib/sportsbook/books";
 import { Slip } from "@/components/props/Slip";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
-import {liveMarketBoard,marketPhaseBoard} from "@/lib/mlb/market-board";
+import {HR_MARKET,liveMarketBoard,marketPhaseBoard} from "@/lib/mlb/market-board";
 import {useMlbLiveQuotes,MLB_LIVE_CLIENT} from "@/lib/mlb/live-client";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 import {useLiveNow} from "@/lib/liveNow";
@@ -152,6 +152,14 @@ function PropsDesk() {
   const [legs, setLegs] = useState<SandboxLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [search, setSearch] = useState("");
+  /* the ranked list's category, driven by the rail (2026-09-18): "All" until Josh taps a market */
+  const [rankedFilter, setRankedFilter] = useState<string>("all");
+  const rankedKeyOf = (t: TabKey, key: string) => {
+    const c = MARKETS[t].find((m) => m.key === key)?.cat;
+    return c && RANKED_FILTERS.some((f) => f.key === c) ? c : "all";
+  };
+  /* the manual pregame O1.5 HR filter — browse view only, never the generator or the ranked list */
+  const [altHr, setAltHr] = useState(false);
   const linkOn = !!link && link.tab === tab && link.mkt === mktKey;
 
   const d = q.data?.data;
@@ -202,6 +210,7 @@ function PropsDesk() {
       if (!hit) continue;
       setTab(t);
       setMktKey(hit.key);
+      setRankedFilter(rankedKeyOf(t, hit.key));
       return;
     }
   };
@@ -249,14 +258,16 @@ function PropsDesk() {
   const shownPropBoard = useMemo(() => {
     const at=gen.nowMs ? Date.now() : 0;
     const live=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
-    return marketPhaseBoard(propBoard,live,spec.phase??"pregame",at);
-  },[propBoard,liveOverlay,d,liveNow,spec.phase,gen.nowMs]);
+    return marketPhaseBoard(propBoard,live,spec.phase??"pregame",at,{altHr:altHr && cat===HR_MARKET});
+  },[propBoard,liveOverlay,d,liveNow,spec.phase,gen.nowMs,altHr,cat]);
   /* EVERY PICK TODAY (2026-09-18 item 8): the prop legs are the generator's own pool over EVERY
      category — same rows, same prices, same win % — and ML/RL are the engine's categories, both
      sides, exactly as the game cards list them. Nothing here is a new price. */
+  /* EVERY pick that is priced right now — upcoming games AND fresh in-play rows (2026-09-18): once
+     every game has started, a pregame-only list read "HR 0 · Hits 0" while the board was full. */
   const rankedPool = useMemo(
-    () => buildGenPool({ market: GEN_MARKETS[0], markets: GEN_MARKETS, includeStarted: false, phase: spec.phase ?? "pregame" }, gen.nowMs),
-    [buildGenPool, spec.phase, gen.nowMs],
+    () => buildGenPool({ market: GEN_MARKETS[0], markets: GEN_MARKETS, includeStarted: true, phase: "mixed" }, gen.nowMs),
+    [buildGenPool, gen.nowMs],
   );
   const rankedGameRows = useMemo(() => {
     if (!d) return [] as { market: string; row: PickRow }[];
@@ -436,8 +447,12 @@ function PropsDesk() {
         onTab={(t) => {
           setTab(t);
           setMktKey(MARKETS[t][0].key);
+          setRankedFilter(rankedKeyOf(t, MARKETS[t][0].key));
         }}
-        onMarket={setMktKey}
+        onMarket={(k) => {
+          setMktKey(k);
+          setRankedFilter(rankedKeyOf(tab, k));
+        }}
         top={ins.top}
         search={!gameTab && cat != null ? search : null}
         onSearch={setSearch}
@@ -506,11 +521,25 @@ function PropsDesk() {
       )}
       {/* 2026-09-18 item 8: the ranked list is the default; the per-game book is one tap away */}
       <RankedViewTabs view={view} onView={setView} />
+      {view === "games" && !gameTab && cat === HR_MARKET && (
+        /* THE HOME-RUN LINE RULE (2026-09-18, Josh: "no HR bets shown EVER should be over 1.5 HR unless
+           its a live bet in which the player already has 1 HR live OR it is a manual filter by myself
+           to just look at grades on over 1.5 HRs pre game for funsies") — this is that manual filter */
+        <div data-testid="hr-alt-filter" className="mb-2 flex items-center justify-between gap-2 text-[10.5px] text-faint">
+          <span className="min-w-0 truncate">{altHr ? "Every posted HR line, O1.5 and up included — grades only, for a look." : "HR lines above 0.5 stay hidden unless the batter already has one in a live game."}</span>
+          <button type="button" aria-pressed={altHr} onClick={() => setAltHr((v) => !v)}
+            className={`press h-7 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold ${altHr ? "border-pos/60 bg-pos/15 text-pos" : "border-white/[0.1] bg-white/[0.04] text-muted"}`}>
+            Show O1.5 HR
+          </button>
+        </div>
+      )}
       {view === "ranked" ? (
         <div className={legs.length ? "pb-20" : "pb-6"}>
           <RankedPicks
             picks={rankedPicks}
             filters={RANKED_FILTERS}
+            filter={rankedFilter}
+            onFilter={setRankedFilter}
             isSel={isSel}
             onToggle={toggle}
             loading={q.isPending || browseProps.loading}

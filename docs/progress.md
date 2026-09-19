@@ -1,3 +1,13 @@
+# Progress — 2026-09-18 (evening: live HR parlays, HR line rule, rail-driven ranked list, compact generator)
+
+- Josh: "Why won't it generate parlays right now for HRs? There are a ton of HR live props on the board and just starting… I refreshed the board as well from 5:00pm last refresh to 7:03pm"; the ranked list "not sorting by filter type"; "no HR bets shown EVER should be over 1.5 HR unless its a live bet in which the player already has 1 HR live OR it is a manual filter"; "compact the UI on the parlay generator. If we have to do dropdowns etc … so be it".
+- **Why**: only the authenticated live-props overlay ever produced a live leg; the board's own `live:true` rows (9 games, 81 HR rows at 7:02pm) were dropped by `marketPhaseBoard` + the pool builder's `quoteAt` gate. Mixed saw one upcoming game and zero live legs → `phase-empty`.
+- **Live fallback** (`src/lib/mlb/market-board.ts`): a `live:true` row with a settle-book `bookQuotes[*].at` inside the 30-minute gate is a live leg (`quoteAt` stamped, `pO` nulled, `fO` kept); overlay wins when present; `live:false` started games stay out. `phase-empty` carries `{pregame, live}` and the sheet names the missing side + last refresh time.
+- **Ranked list**: chips verified working on prod (DOM-only CDP: NFL Spread 28 rows, MLB RL 33); the rail and the generator's category taps now drive the list (`RankedPicks` controlled `filter`/`onFilter`, `rankedKeyOf`); ranked pool over "mixed" so a started slate is not "HR 0".
+- **HR line rule**: `hrLineAllowed` / `pruneHrLines` — O1.5+ only live with the homer in the book (statsapi tally) or under the browse-only "Show O1.5 HR" chip (`hr-alt-filter`); Board ALL scope filtered too.
+- **Generator compaction**: one-line hero, Legs/Sides/Timing selects, hit floor + window selects, tooltips instead of paragraphs, Save/Load under Advanced.
+- Tests: `tests/hr-line-rule.test.ts` (new); `mlb-market-phases`, `parlay-gen-ui`, `ranked-picks` extended/re-pinned. Full serial gate before push (see `tools/handoff-state.env`).
+
 # Progress — 2026-09-18 (cerulean on graphite, compact Board grade column, prop market lean)
 
 - Josh's three items: bet % / money % on player props "somehow"; the Board grade column must not force a horizontal scroll, explanations individually expandable; theme to Cerulean Blue on a greyer-than-black background ("less like a cosmic bowling screen").

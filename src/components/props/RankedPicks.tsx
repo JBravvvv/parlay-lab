@@ -70,6 +70,8 @@ export function RankedPicks<P>({
   loading = false,
   accent = "pos",
   emptyBody = "No priced picks on this board yet.",
+  filter: filterProp,
+  onFilter,
 }: {
   picks: readonly RankedPick<P>[];
   /** the category chips, in rail order; "All" is added first */
@@ -79,8 +81,16 @@ export function RankedPicks<P>({
   loading?: boolean;
   accent?: RankedAccent;
   emptyBody?: string;
+  /** CONTROLLED category (2026-09-18, Josh: "when I click a filter like 'H+R+RBI' it still shows
+      washington nationals ML, anytime HR props etc"): the chips here worked, but the market rail at
+      the top of the desk and the generator's category chips carry the same labels and left this
+      list alone. The page now hands the rail's market down, so every "H+R+RBI" on the desk narrows
+      this list. Omit both and the list keeps its own state, as the football desks do. */
+  filter?: string;
+  onFilter?: (key: string) => void;
 }) {
-  const [filter, setFilter] = useState<string>("all");
+  const [own, setOwn] = useState<string>("all");
+  const filter = filterProp ?? own;
   const [limit, setLimit] = useState(RANKED_PAGE);
   const graded = useMemo(
     () =>
@@ -102,7 +112,8 @@ export function RankedPicks<P>({
   }, [shown]);
   const labelOf = (key: string) => filters.find((f) => f.key === key)?.label ?? key;
   const pick = (key: string) => {
-    setFilter(key);
+    setOwn(key);
+    onFilter?.(key);
     setLimit(RANKED_PAGE);
   };
   const visible = shown.slice(0, limit);

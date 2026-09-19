@@ -223,7 +223,8 @@ export type GenTicket<P = unknown> = {
 };
 
 export type GenFail =
-  | { code: "phase-empty" }
+  /** Mixed has no leg on one side of the fence; `pregame` / `live` are the eligible counts per phase, so the sheet can say WHICH is missing */
+  | { code: "phase-empty"; pregame: number; live: number }
   | { code: "no-rows" }
   /**
    * The market HAS legs, and every one of them is on the other side from the one asked for —
@@ -422,6 +423,11 @@ export function ticketOf<P>(legs: readonly GenLeg<P>[], spec: GenSpec, seed: num
  * games" — so Josh can see WHICH control is binding before he reads a failure. Computed
  * through the same filters `generate` uses, so the line can never disagree with the answer.
  */
+/** the phase-empty failure, counted over the legs the check just looked at */
+function phaseEmpty<P>(legs: readonly GenLeg<P>[]): GenFail {
+  return { code: "phase-empty", pregame: legs.filter((l) => !l.started).length, live: legs.filter((l) => l.started).length };
+}
+
 export function poolCounts<P>(
   pool: GenPool<P>,
   spec: GenSpec,
@@ -817,7 +823,7 @@ export function generate<P>(
 
   /* ---- eligibility, then the band */
   const elig = eligible(pool, spec);
-  if(spec.phase==="mixed" && ![false,true].every(phase=>[...elig,...seated].some(l=>l.started===phase)))return {ok:false,fail:{code:"phase-empty"}};
+  if(spec.phase==="mixed" && ![false,true].every(phase=>[...elig,...seated].some(l=>l.started===phase)))return {ok:false,fail:phaseEmpty([...elig,...seated])};
   if (!elig.length && seated.length < n) {
     /* WHICH filter emptied it (INSTRUCTION 52 fix pass). `no-rows` reads on the page as "No
        Anytime TD lines on this board", a statement ABOUT THE BOARD — and football made that
@@ -863,7 +869,7 @@ export function generate<P>(
     };
   }
 
-  if(spec.phase==="mixed" && (![false,true].every(phase=>[...sampleSet,...seated].some(l=>l.started===phase)) || (seated.length===n && ![false,true].every(phase=>seated.some(l=>l.started===phase)))))return {ok:false,fail:{code:"phase-empty"}};
+  if(spec.phase==="mixed" && (![false,true].every(phase=>[...sampleSet,...seated].some(l=>l.started===phase)) || (seated.length===n && ![false,true].every(phase=>seated.some(l=>l.started===phase)))))return {ok:false,fail:phaseEmpty([...sampleSet,...seated])};
 
   /* ---- can the rules even be satisfied? exact, so the message is never a guess */
   const have = capacity(cands, seated, spec.onePerGame);

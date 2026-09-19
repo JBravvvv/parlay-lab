@@ -5,7 +5,7 @@ import { LeanChip } from "@/components/ui/LeanChip";
 import { mlbLeanIndex } from "@/lib/prop-lean";
 import { mlbLegSplit } from "@/lib/splits";
 import { useSplits } from "@/lib/use-splits";
-import {liveMarketBoard} from "@/lib/mlb/market-board";
+import {hrLineAllowed,liveMarketBoard} from "@/lib/mlb/market-board";
 import {LiveOpportunities} from "@/components/mlb/LiveOpportunities";
 import {MLB_BROWSE_MARKETS} from "@/lib/mlb/browse-markets";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
@@ -374,6 +374,7 @@ function MlbBoardPage() {
     for (const g of pb) {
       for (const m of mkts) {
         for (const r of g.markets?.[m] ?? []) {
+          if (!hrLineAllowed(m, r.ln, { live: false })) continue; // the HR line rule (2026-09-18): O1.5+ only live with a homer in the book
           if (r.cz?.o == null) {
             noCz++;
             continue;

@@ -154,7 +154,13 @@ describe("wiring — the ranked list is the default view under the generator on 
     expect(props).toMatch(/useState<"ranked" \| "games">\(link \? "games" : "ranked"\)/);
     expect(props).toMatch(/RANKED_FILTERS[\s\S]*?\{ key: "ml", label: "ML" \},\s*\{ key: "rl", label: "RL" \}/);
     expect(props).toMatch(/MLB_GEN_MARKETS\.map\(/);
-    expect(props).toMatch(/markets: GEN_MARKETS, includeStarted: false/);
+    /* 2026-09-18 later: every pick that is priced NOW — upcoming games and fresh in-play rows */
+    expect(props).toMatch(/markets: GEN_MARKETS, includeStarted: true, phase: "mixed"/);
+    /* the rail drives the chips (Josh: "when I click a filter like 'H+R+RBI' it still shows washington
+       nationals ML, anytime HR props etc" — he tapped the rail, and the list did not follow) */
+    expect(props).toMatch(/<RankedPicks[\s\S]*?filter=\{rankedFilter\}\s+onFilter=\{setRankedFilter\}/);
+    expect(props).toMatch(/onMarket=\{\(k\) => \{\s*setMktKey\(k\);\s*setRankedFilter\(rankedKeyOf\(tab, k\)\);/);
+    expect(props).toMatch(/setMktKey\(hit\.key\);\s*setRankedFilter\(rankedKeyOf\(t, hit\.key\)\);/); // the generator's category taps move the rail, and now the list
     expect(props).toMatch(/view === "ranked" \?/);
     expect(props).toMatch(/<RankedPicks/);
     expect(props).toMatch(/<RankedViewTabs view=\{view\} onView=\{setView\}/);
@@ -171,5 +177,20 @@ describe("wiring — the ranked list is the default view under the generator on 
     const src = readSrc("src/components/props/RankedPicks.tsx");
     expect(src).toMatch(/gradeFromEv\(p\.ev\)/);
     expect(src).not.toMatch(/ev >= \d+ \? "S"/);
+  });
+});
+
+describe("controlled category (2026-09-18 later)", () => {
+  it("a filter handed in from the page selects that chip and narrows the rows; the header names it", () => {
+    const out = render({ filter: "batter_hits", onFilter: () => {} });
+    expect(order(out)).toEqual(["s-hits", "d-hits"]);
+    expect(out).toMatch(/role="tab" aria-selected="true"[^>]*>Hits <span/);
+    expect(count(out, /aria-selected="true"/g)).toBe(1);
+    expect(out).toContain("· Hits");
+  });
+  it("without the props the list keeps its own state — the football desks are untouched", () => {
+    expect(order(render())).toHaveLength(7);
+    const cfb = readSrc("src/components/cfb/CfbProps.tsx");
+    expect(cfb).not.toMatch(/onFilter=/);
   });
 });

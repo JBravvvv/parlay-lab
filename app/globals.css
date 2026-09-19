@@ -738,6 +738,8 @@ body::after {
 .gen-studio-toggle { background: #ffffff03; }
 .gen-studio-hero { background: radial-gradient(ellipse at 90% 0%, #3ab0e830, transparent 62%), linear-gradient(120deg, #15304870, #171c22); border-bottom: 1px solid #bbe3f818; }
 .gen-studio-emblem { display:flex; align-items:center; justify-content:center; width:56px; height:56px; flex-shrink:0; color:#8fd3f5; border:1px solid #6fc6ef55; border-radius:17px; background:linear-gradient(145deg,#3ab0e830,#3ab0e805); transform:rotate(-10deg); box-shadow:0 6px 25px #3ab0e820; }
+/* the generator's native selects (2026-09-18 compaction): dark popups, no OS chrome bleeding through */
+.gen-select { color-scheme: dark; }
 .gen-ticket { background:linear-gradient(160deg,#1b2733,#151a20); border-color:#bde3f72b; box-shadow:0 8px 24px #0003; }
 .gen-roll { gap:2px; background:linear-gradient(110deg,#8fd3f5,#3ab0e8); border-color:#b3e0f7; box-shadow:0 3px 18px #3ab0e82c,inset 0 1px #fff7; color:#0b1b26; transition:transform .15s,box-shadow .15s; }
 .gen-roll:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 5px 23px #3ab0e845; }

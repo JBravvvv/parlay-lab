@@ -7,6 +7,7 @@ import {buildPool} from "@/components/props/mlb-gen-pool";
 import {generate,type GenSpec} from "@/lib/parlay-gen";
 import type {MlbLiveQuoteBoard} from "@/lib/mlb/live-quote-types";
 import type {LiveNowRead} from "@/lib/liveNow";
+import {SETTLE_BOOK} from "@/lib/sportsbook/books";
 const now=Date.parse("2026-09-16T23:00:00Z"), at=new Date(now-60_000).toISOString();
 const row:PropBoardRow={p:"Test Hitter",tm:"NYY",ln:.5,lkey:"testhitter|batter_hits|0.5",o:-120,u:100,oBook:"Caesars",uBook:"Caesars",cz:{o:-120,u:100},pO:70,fO:55,books:2};
 const game:PropBoardGame={game:"NYY @ BOS",gkey:"g",start:new Date(now-3_600_000).toISOString(),live:true,markets:{batter_hits:[row]}};
@@ -37,7 +38,7 @@ describe("actual live quote pool",()=>{
   expect(marketPhaseBoard([pre,game],live,"pregame",now)).toEqual([pre]);
   const pool=buildPool(all,spec,now);
   for(let seed=0;seed<40;seed++){const result=generate(pool,spec,seed);expect(result.ok).toBe(true);if(result.ok)expect(new Set(result.ticket.legs.map(l=>l.started)).size).toBe(2);}
-  const only=buildPool([pre],spec,now);expect(generate(only,spec,1)).toEqual({ok:false,fail:{code:"phase-empty"}});
+  const only=buildPool([pre],spec,now);expect(generate(only,spec,1)).toEqual({ok:false,fail:{code:"phase-empty",pregame:1,live:0}});
  });
  it("rejects old started prices even when includeStarted is true",()=>{
   expect(buildPool([game],{market:"batter_hits",phase:"live",includeStarted:true},now).legs).toEqual([]);
@@ -60,5 +61,60 @@ describe("RBI and Runs browse quotes",()=>{
    expect(priceMlbBoard(captured,"draftkings").propBoard![0].markets[market][0].cz?.o).toBe(130);
   }
   expect(data.propBoard![0].markets.batter_rbis).toBeUndefined();
+ });
+});
+
+/**
+ * THE BOARD'S OWN IN-PLAY ROWS (2026-09-18, Josh, verbatim: "Why won't it generate parlays right
+ * now for HRs? There are a ton of HR live props on the board and just starting… I refreshed the
+ * board as well from 5:00pm last refresh to 7:03pm"). Nine of the ten games were `live:true`
+ * with 81 HR rows priced at the 7:02pm refresh, and the builder saw none of them: only the
+ * authenticated re-quote overlay ever produced a live leg. Now a `live:true` row's own book
+ * timestamp is a live quote, under the same 30-minute gate — and a started game the board still
+ * lists as `live:false` stays out, because its prices are pregame prices.
+ */
+describe("the board's own in-play rows feed the live pool",()=>{
+ const quiet={...state,legNow:()=>null} as unknown as LiveNowRead;
+ const stored=(over:Partial<PropBoardRow>={}):PropBoardRow=>({...row,bookQuotes:{o:{[SETTLE_BOOK]:{am:-120,line:.5,book:SETTLE_BOOK,at}},u:{[SETTLE_BOOK]:{am:100,line:.5,book:SETTLE_BOOK,at}}},...over});
+ const liveGame=(r:PropBoardRow,market="batter_hits"):PropBoardGame=>({...game,markets:{[market]:[r]}});
+ it("a live:true row with a fresh settle-book timestamp becomes a live leg, priced at the row's own quote and with no pregame model %",()=>{
+  const out=liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},quiet,now,1_800_000);
+  expect(out).toHaveLength(1);
+  const r=out[0].markets.batter_hits[0];
+  expect(r).toMatchObject({ln:.5,lkey:row.lkey,o:-120,u:100,quoteAt:at,pO:null,fO:55});
+  const pool=buildPool(out,{market:"batter_hits",phase:"live",includeStarted:true},now);
+  expect(pool.legs.find(l=>l.side==="o")).toMatchObject({am:-120,prob:55,src:"market",quoteAt:at,started:true});
+ });
+ it("the overlay wins when it has the row; the stored quote is only the fallback",()=>{
+  const out=liveMarketBoard([liveGame(stored())],overlay,{g:{pk:1}},quiet,now,1_800_000);
+  expect(out[0].markets.batter_hits[0]).toMatchObject({ln:1.5,o:150,u:-170});
+ });
+ it("a stale, future or missing timestamp is not a live quote",()=>{
+  for(const t of [new Date(now-1_800_001).toISOString(),new Date(now+1).toISOString(),"broken"]){
+   const r=stored({bookQuotes:{o:{[SETTLE_BOOK]:{am:-120,line:.5,book:SETTLE_BOOK,at:t}},u:{}}});
+   expect(liveMarketBoard([liveGame(r)],null,{g:{pk:1}},quiet,now,1_800_000)).toEqual([]);
+  }
+  expect(liveMarketBoard([liveGame({...row})],null,{g:{pk:1}},quiet,now,1_800_000)).toEqual([]);
+ });
+ it("a game that started AFTER the refresh (live:false, start in the past) never gets its pregame prices re-badged as live",()=>{
+  const g={...liveGame(stored()),live:false,start:new Date(now-600_000).toISOString()};
+  expect(liveMarketBoard([g],null,{g:{pk:1}},quiet,now,1_800_000)).toEqual([]);
+  expect(marketPhaseBoard([g],[],"mixed",now)).toEqual([]);
+ });
+ it("a line the boxscore already decided is dropped, and a game statsapi says is not priceable gets nothing",()=>{
+  expect(liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},{...quiet,legNow:()=>({val:1,txt:"1 H",inning:null})} as unknown as LiveNowRead,now,1_800_000)).toEqual([]);
+  expect(liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},{...quiet,games:{1:{priceable:false,live:true}}} as unknown as LiveNowRead,now,1_800_000)).toEqual([]);
+ });
+ it("mixed builds from one upcoming game plus the board's own live rows",()=>{
+  const pre={...game,gkey:"pre",live:false,start:new Date(now+3600000).toISOString(),markets:{batter_hits:[{...row,p:"Other Hitter",lkey:"otherhitter|batter_hits|0.5"}]}};
+  const live=liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},quiet,now,1_800_000);
+  const pool=buildPool(marketPhaseBoard([pre,liveGame(stored())],live,"mixed",now),spec,now);
+  const result=generate(pool,spec,3);
+  expect(result.ok).toBe(true);
+  if(result.ok)expect(result.ticket.legs.map(l=>l.started).sort()).toEqual([false,true]);
+ });
+ it("phase-empty says which side is missing",()=>{
+  const live=liveMarketBoard([liveGame(stored())],null,{g:{pk:1}},quiet,now,1_800_000);
+  expect(generate(buildPool(live,spec,now),spec,1)).toEqual({ok:false,fail:{code:"phase-empty",pregame:0,live:1}});
  });
 });
