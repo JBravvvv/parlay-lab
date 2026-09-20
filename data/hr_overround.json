@@ -1,18 +1,18 @@
 {
-  "days": 48,
-  "games": 318,
-  "rows": 5686,
+  "days": 55,
+  "games": 367,
+  "rows": 6567,
   "rows_without_price": 1671,
-  "games_unmatched_or_unfinal": 2,
+  "games_unmatched_or_unfinal": 4,
   "appeared": {
-    "sum_implied": 832.71,
-    "realized_hr_hitters": 704,
-    "overround": 1.1828
+    "sum_implied": 949.18,
+    "realized_hr_hitters": 818,
+    "overround": 1.1604
   },
   "all_listed": {
-    "sum_implied": 842.43,
-    "realized_hr_hitters": 704,
-    "overround": 1.1966
+    "sum_implied": 959.33,
+    "realized_hr_hitters": 818,
+    "overround": 1.1728
   },
-  "verdict": "overround 1.183 vs the hardcoded 1.06 -> czEV overstated ~7.5pp (0.65 x relative bias, price-independent)"
+  "verdict": "overround 1.160 vs the hardcoded 1.06 -> czEV overstated ~6.2pp (0.65 x relative bias, price-independent)"
 }
