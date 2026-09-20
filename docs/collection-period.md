@@ -8907,3 +8907,10 @@ is off-disk (phrase-gated). Carried as contradiction #9 in the handoff.
 ### CROSSING 82 — Roberto Ortiz, 2026-09-14 UTC (September 13 PT)
 
 The automated refresh at 00:17:29Z (`ff04212`) moved Ortiz from g=4, k=80 to g=5, k=100: 20 strikeouts per game. Detected during the September 14 sportsbook release re-gate. This crossed the count threshold but did not reach model boards: `umpKFrozen:true` and the early return remain present, and `public/model/context.json` is unchanged since July 29 (`64c42ad`). Appended the dated crossing and raised the completeness floor to 82; no model parameter or freeze was changed.
+
+
+### CROSSING 83 — Jeremie Rehak, 2026-09-20 UTC (September 19 PT)
+
+The automated context refresh `9ad05028494a9670281e79009c2f65a092ae9832` at 00:11:22Z changed Rehak from 4 games / 66 strikeouts to 5 games / 87 strikeouts (17.4 K per game), adding September 19 to the collected days. The discovery release push found this concurrent update; its post-rebase self-arm check correctly failed until this crossing was recorded. CROSSINGS now includes entry 83 and FLOOR rises to 83.
+
+The crossing reached no board: `SH_CFG.umpKFrozen:true` and the `shUmpKf` early return remain present; `public/model/context.json` last changed in `64c42adb87acf005898b6dad0f61465d096a34c6` on July 29. No freeze or engine behavior was changed. The collected league totals are 677 games / 11,150 strikeouts; these are collection facts, not a new model signal.
