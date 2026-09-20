@@ -204,18 +204,15 @@ export async function forceRefreshLeagueBoard(
     await qc.cancelQueries({ queryKey: key as unknown[], exact: true });
     return qc.fetchQuery<T>({ queryKey: key as unknown[], queryFn: fn, staleTime: 0 });
   };
-  const [slates, boards] = await Promise.all([
-    Promise.all(
-      activeKeys(L.client.queryKey(null, L.bankBase).slice(0, 2), L.client.queryKey(null, L.bankBase)).map((k) =>
-        pull<CfbSlate>(k, () => L.client.loadSlate(dateOf(k), { bankroll: bankOf(k), refresh: true })),
-      ),
-    ),
-    Promise.all(
-      activeKeys(L.client.propsQueryKey(null, L.bankBase).slice(0, 2), L.client.propsQueryKey(null, L.bankBase)).map((k) =>
-        pull<CfbPropsBoard>(k, () => L.client.loadProps(dateOf(k), { bankroll: bankOf(k), refresh: true })),
-      ),
-    ),
-  ]);
+  // Props also refresh first-half lines. Read the slate afterward so those prices are current too.
+  const boards = await Promise.all(
+    activeKeys(L.client.propsQueryKey(null, L.bankBase).slice(0, 2), L.client.propsQueryKey(null, L.bankBase)).map(k =>
+      pull<CfbPropsBoard>(k, () => L.client.loadProps(dateOf(k), { bankroll: bankOf(k), refresh: true }))),
+  );
+  const slates = await Promise.all(
+    activeKeys(L.client.queryKey(null, L.bankBase).slice(0, 2), L.client.queryKey(null, L.bankBase)).map(k =>
+      pull<CfbSlate>(k, () => L.client.loadSlate(dateOf(k), { bankroll: bankOf(k), refresh: true }))),
+  );
   return { slates, boards };
 }
 
@@ -338,7 +335,7 @@ export function CfbRefreshPill() {
         title={`With your sync phrase stored: a FULL re-pull — the slate's lines and every priced player-prop game are re-priced now and stored (no daily odds-credit cap), then the desk's refill pass runs (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run). Without it: re-reads the two feeds — sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play, and a re-read inside the window spends no quota.`}
         data-testid="cfb-refresh-board"
       >
-        {fetching ? "Pulling…" : "Refresh Board"}
+        {fetching ? "Pulling…" : "Generate Board"}
       </Pill>
       {note && <span className="ml-2 text-xs text-muted" data-testid="cfb-refill-note">{note}</span>}
     </>
@@ -733,7 +730,7 @@ export function CfbPicksBoard() {
               </>
             )}
             Sides cache up to 4 min per date, player props {propsQ.data ? cfbCacheLabel(propsQ.data) : `${PROPS_CACHE_H} h`}
-            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — ordinary reads can reuse cached quotes; authenticated Refresh Board requests fresh prices. Displayed prices follow your selected sportsbook. Locked paper cards retain their recorded prices. Parlays multiply each leg&apos;s own probability
+            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — ordinary reads can reuse cached quotes; authenticated Generate Board requests fresh prices. Displayed prices follow your selected sportsbook. Locked paper cards retain their recorded prices. Parlays multiply each leg&apos;s own probability
             (legs on different games are treated as independent). Setups that match criteria, not predictions. Informational only, not
             betting advice.
           </div>

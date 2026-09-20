@@ -579,8 +579,8 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
       rows: c.rows,
       tallies,
       legP,
-      // Manual refresh bypasses quote age, while preserving empty-market holds.
-      overlay: manual && prev ? {...prev, pricedAt: {}} : prev,
+      // Manual refresh retries every live event, including previously empty markets.
+      overlay: manual && prev ? {...prev, pricedAt: {}, emptyAt: {}} : prev,
     }));
 
   const pre = selectLiveEvents(gateWith(() => PENDING_ID), now, cfg);

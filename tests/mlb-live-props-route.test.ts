@@ -520,6 +520,10 @@ describe("the pull", () => {
     expect(idsPulled()).not.toContain(E3);
     expect(MLB_LIVE_PROPS.emptyHoldSec).toBe(7200);
     expect(second.noLive).toBe(0);
+    fetchMock.mockClear();
+    await call("&manual=1");
+    expect(idsPulled()).toContain(E3); // explicit tap retries previously empty markets immediately
+
   });
 
   it("a quote never outlives its game", async () => {

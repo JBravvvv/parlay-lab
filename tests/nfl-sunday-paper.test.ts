@@ -39,3 +39,8 @@ describe('Sunday full paper allocation',()=>{
   delete c.core[0].paperPolicy;expect(()=>assertCardMoney(cfg,c)).toThrow(/MONEY GUARD/);
  });
 });
+
+it('Sunday lock has Vercel backup pokes for daylight and standard-time kickoff windows',()=>{
+ const config=JSON.parse(fs.readFileSync('vercel.json','utf8'));
+ expect(config.crons).toEqual(expect.arrayContaining([expect.objectContaining({path:'/api/nfl/lock?poke=sunday-early',schedule:'0 16 * * 0'}),expect.objectContaining({path:'/api/nfl/lock?poke=sunday-standard',schedule:'0 17 * * 0'})]));
+});

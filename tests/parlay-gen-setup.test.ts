@@ -51,3 +51,8 @@ describe("saved generator setup", () => {
     }
   });
 });
+
+it("saved The Model mode survives reload without stale player pins",()=>{
+ const back=decodeSetup(encodeSetup({...spec,betType:"model"}),["anytime_td"]);
+ expect(back?.betType).toBe("model");expect(back?.pinned).toEqual([null,null,null]);
+});

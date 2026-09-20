@@ -11,7 +11,7 @@ export function FootballModelExplorer() {
  const L=useLeague(); const {date,pick,rail,q,slate}=L.useDesk();
  const games=slate?.games.filter(g=>g.status==='upcoming')??[];
  return <>
-  <PageHeader title="Simulator" eyebrow={L.label} sub={`${L.short} pregame model explorer · consensus lines + ESPN ratings. Football uses a margin model; the baseball Monte Carlo simulator is separate.`} action={<Pill variant="primary" onClick={()=>void q.refetch()} disabled={q.isFetching}>{q.isFetching?'Refreshing…':`Refresh ${L.short} model`}</Pill>} />
+  <PageHeader title="Simulator" eyebrow={L.label} sub={`${L.short} pregame Model explorer · consensus lines + ESPN ratings. Football uses a margin model; the baseball Monte Carlo simulator is separate.`} action={<Pill variant="primary" onClick={()=>void q.refetch()} disabled={q.isFetching}>{q.isFetching?'Refreshing…':`Refresh ${L.short} Model`}</Pill>} />
   <div className="mb-4 flex flex-wrap gap-2">{rail.map(d=><FilterPill key={d} selected={d===date} onClick={()=>pick(d)}>{d}</FilterPill>)}</div>
   {q.isError&&<Panel>Could not load the {L.short} model. Please retry.</Panel>}
   {!q.isError&&!games.length&&<Panel>{q.isPending?'Loading games…':`No upcoming ${L.short} games on this date. Started games are excluded from this pregame model.`}</Panel>}

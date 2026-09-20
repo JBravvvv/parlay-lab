@@ -1,3 +1,7 @@
+## September 20, 2026 — NFL Sunday Vercel backups
+
+`vercel.json` now also schedules `/api/nfl/lock?poke=sunday-early` at 16:00 UTC Sundays and `/api/nfl/lock?poke=sunday-standard` at 17:00 UTC Sundays. These use the existing Vercel-injected CRON_SECRET Bearer header and idempotent NFL lock route. The first covers the normal daylight-saving 17:00Z kickoff; the second covers standard-time 18:00Z kickoff. They supplement the external scheduler, whose account configuration was not inspected. Early international games remain subject to the existing scheduler/window coverage. September 20 has 14 games, first 17:00Z, lock opens 16:00Z. Verified production pipeline is waiting before that window; $350/$25 preview is ready, not yet staked.
+
 # External scheduler entries — cron-job.org (2026-07-26)
 
 > ## 🔴 THE ENTRIES BELOW WERE NEVER CREATED — 2026-08-06, ground truth from Josh's dashboard

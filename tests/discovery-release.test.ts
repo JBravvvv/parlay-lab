@@ -135,3 +135,22 @@ describe("side markets in mixed tickets",()=>{
  expect(ticketMatches([strong,weak],{...filter,strategies:["safe","aggressive"]})).toBe(true);
  expect(ticketMatches([strong],{...filter,strategies:[]})).toBe(false);
  });
+
+describe("The Model custom recommendation mode",()=>{
+ it("honors four-leg odds filters even when every candidate is negative EV and styles would reject them",()=>{
+  const p=poolOf(Array.from({length:12},(_,i)=>leg(i,{am:i%2?-150:130,dec:i%2?1+100/150:2.3,prob:30,ev:-.3})),pool);
+  const s=spec({betType:"model",strategies:["edge"],legs:4,legMinAm:-200,legMaxAm:150});
+  const a=generate(p,s,19);expect(a.ok).toBe(true);if(!a.ok)return;
+  expect(a.ticket.legs).toHaveLength(4);expect(a.ticket.legs.every(l=>l.ev<0&&l.am>=-200&&l.am<=150)).toBe(true);
+  const b=generate(p,s,20,new Set([a.ticket.key]));expect(b.ok).toBe(true);if(b.ok)expect(b.ticket.key).not.toBe(a.ticket.key);
+  const pinned=generate(p,{...s,pinned:[a.ticket.legs[0].id,null,null,null]},21);expect(pinned.ok).toBe(true);if(pinned.ok)expect(pinned.ticket.legs.some(l=>l.id===a.ticket.legs[0].id)).toBe(true);
+ });
+ it("can favor a longer price with better value over the shortest price",()=>{
+  const p=poolOf([leg(0,{am:-200,dec:1.5,prob:65,ev:-.025}),leg(1,{am:150,dec:2.5,prob:60,ev:.5}),leg(2,{am:140,dec:2.4,prob:60,ev:.44})],pool);
+  const a=generate(p,spec({betType:"model",legs:2,legMinAm:-200,legMaxAm:150}),19);expect(a.ok).toBe(true);if(a.ok)expect(a.ticket.legs.every(l=>l.am>0)).toBe(true);
+ });
+ it("does not override timing or empty user filters",()=>{
+  expect(generate(pool,spec({betType:"model",timing:[]}),19).ok).toBe(false);
+  expect(generate(pool,spec({betType:"model",phase:"live"}),19).ok).toBe(false);
+ });
+});

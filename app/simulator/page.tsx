@@ -72,7 +72,7 @@ function MlbSimulator() {
         sub={`The engine's Monte Carlo game sims — ${SIM_PATHS_TXT} seeded paths per game, per-PA base-out machine, real lineups only; live games resume from the real state`}
         action={
           <Pill variant="primary" onClick={() => regen.mutate()} disabled={regen.isPending}>
-            {regen.isPending ? "Simulating…" : "Run fresh sims"}
+            {regen.isPending ? "Simulating…" : "Refresh MLB Model"}
           </Pill>
         }
       />
@@ -81,11 +81,11 @@ function MlbSimulator() {
         <Panel>
           <EmptyState
             title={regen.isPending ? "Running the slate…" : "No sims in memory"}
-            body="Sims are produced during a fresh board run for pregame games with confirmed lineups. Run fresh sims to populate this page — no lineup, no sim, never a made-up one."
+            body="Sims are produced during a fresh board run for pregame games with confirmed lineups. Refresh MLB Model to populate this page — no lineup, no sim, never a made-up one."
             action={
               !regen.isPending ? (
                 <Pill variant="primary" onClick={() => regen.mutate()}>
-                  Run fresh sims
+                  Refresh MLB Model
                 </Pill>
               ) : undefined
             }

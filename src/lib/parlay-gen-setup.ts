@@ -42,7 +42,7 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
       if (s[key] !== undefined && (!Array.isArray(s[key]) || s[key].some((v: unknown) => !options.some(o => o.key === v)))) return null;
     }
     const mkts = s.markets !== undefined ? [...new Set(s.markets as string[])] : undefined;
-    return { ...(s.strategies ? { strategies: s.strategies } : {}), ...(s.sports ? { sports: s.sports } : {}), ...(s.timing ? { timing: s.timing } : {}), ...(typeof s.preferDiversity === "boolean" ? {preferDiversity:s.preferDiversity} : {}), ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
+    return { ...(s.betType === "model" || s.betType === "styles" ? {betType:s.betType} : {}), ...(s.strategies ? { strategies: s.strategies } : {}), ...(s.sports ? { sports: s.sports } : {}), ...(s.timing ? { timing: s.timing } : {}), ...(typeof s.preferDiversity === "boolean" ? {preferDiversity:s.preferDiversity} : {}), ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
       ...(s.timeWindow ? { timeWindow: [s.timeWindow[0], s.timeWindow[1]] as const } : {}),
       ...(s.noMarkets !== undefined ? { noMarkets: s.noMarkets } : {}),
       sides: s.sides, onePerGame: s.onePerGame, czOnly: s.czOnly,

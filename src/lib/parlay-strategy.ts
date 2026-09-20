@@ -3,15 +3,16 @@ import { mixCandidates, poolOf, type GenPool, type GenSpec, type GenResult, type
 type Run = <P>(pool:GenPool<P>,spec:GenSpec,seed:number,avoid?:ReadonlySet<string>,recent?:ReadonlyMap<string,number>)=>GenResult<P>;
 /** Bounded strategy search over posted legs only. No forecast or quote is altered. */
 export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avoid:ReadonlySet<string>|undefined,recent:ReadonlyMap<string,number>|undefined,run:Run):GenResult<P>{
- const styles=spec.strategies;
+ const model=spec.betType==="model";
+ const styles=model?undefined:spec.strategies;
  if(styles?.length===0 || spec.sports?.length===0 || spec.timing?.length===0) return {ok:false,fail:{code:"no-rows"}};
- const chosen=styles && styles.length<STRATEGIES.length ? styles[seed%styles.length] : undefined;
+ const chosen=model?"model":styles && styles.length<STRATEGIES.length ? styles[seed%styles.length] : undefined;
  const bands=new Map<string,string>();
  const eligible=mixCandidates(pool,spec);
  for(const m of new Set(eligible.map(l=>l.market))) { const peers=eligible.filter(l=>l.market===m); const ranked=probabilityRanks(peers,l=>l.playerKey,l=>l.prob); for(const l of peers) bands.set(l.id,ranked.get(l)!>=2/3?"anchor":ranked.get(l)!<=1/3?"upside":"middle"); }
  const candidates=pool.legs.filter(l=>chosen==="edge"?l.ev>0:chosen==="safe"?bands.get(l.id)!=="upside"&&l.ev>=-.05:true);
  const p=poolOf(candidates,pool);
- const clean:GenSpec={...spec,strategies:undefined,preferDiversity:undefined,style:chosen==="safe"?"safer":chosen?"balanced":spec.style};
+ const clean:GenSpec={...spec,betType:undefined,strategies:undefined,preferDiversity:undefined,style:model?undefined:chosen==="safe"?"safer":chosen?"balanced":spec.style};
  if(chosen==="longshot" && spec.payout && spec.payout.maxAm<7500) return {ok:false,fail:{code:"payout-unreachable",reach:{minAm:7500,maxAm:1_000_000}}};
  if(chosen==="longshot") clean.payout={minAm:Math.max(7500,spec.payout?.minAm??7500),maxAm:spec.payout?.maxAm??1_000_000};
  let best:GenResult<P>|null=null,bestScore=-Infinity;
@@ -23,6 +24,8 @@ export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avo
   const span=starts.length===ls.length?(starts.at(-1)!-starts[0])/3600000:0;
   const repeats=ls.reduce((s,l)=>s+(recent?.get(l.playerKey)??0),0);
   let v=games.size*2+teams.size*.5-repeats*2+ls.reduce((s,l)=>s+Math.max(-1,Math.min(1,l.ev)),0);
+  // Rank available estimates and price together; never manufacture a positive edge.
+  if(model)v=ls.reduce((s,l)=>s+Math.log(Math.max(.000001,1+l.ev)),0)*12+avg*2+games.size*.15+teams.size*.05-repeats*.4;
   if(chosen==="safe")v+=avg*12;
   if(chosen==="balanced")v+=ls.filter(l=>bands.get(l.id)!=="upside").length;
   if(chosen==="aggressive")v+=ls.filter(l=>bands.get(l.id)==="upside"&&l.ev>=0).length*2;
@@ -31,7 +34,7 @@ export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avo
   if(chosen==="hedge")v+=Math.min(span,12)*3;
   return v;
  };
- for(let i=0;i<32;i++){
+ for(let i=0;i<(model?64:32);i++){
   const r=run(p,clean,(seed+i*997)>>>0,avoid,recent); if(!r.ok){best??=r;continue;}
   const ls=r.ticket.legs;
   if(chosen==="hedge" && (ls.some(l=>!l.start||!Number.isFinite(Date.parse(l.start))) || Math.max(...ls.map(l=>Date.parse(l.start!)))-Math.min(...ls.map(l=>Date.parse(l.start!)))<3*3600000))continue;

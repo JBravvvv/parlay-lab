@@ -788,8 +788,15 @@ export function GenSheet<P>({
                 options={[{ value: "o", label: "Overs" }, { value: "u", label: "Unders" }, { value: "both", label: "Both" }]} />
             )}
           </div>
-          <div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div>
-          <p className="text-[9px] text-faint">Styles use probability and value within each market. Stacks need same-game permission; shared-game probabilities are not a joint forecast. Hedge-Friendly favors later starts; hedging is never guaranteed.</p>
+          <label className="flex items-center gap-2 text-[11px] font-bold">
+            Bet Type
+            <select aria-label="Bet Type" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={spec.betType??"styles"} onChange={e=>onSpec({betType:e.target.value as "styles"|"model",...(e.target.value==="model"?{modelOnly:false}:{})})}>
+              <option value="styles">Parlay Styles</option><option value="model">The Model</option>
+            </select>
+          </label>
+          {spec.betType==="model"&&<p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p>}
+          <div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div>
+          {spec.betType!=="model"&&<p className="text-[9px] text-faint">Styles use probability and value within each market. Stacks need same-game permission; shared-game probabilities are not a joint forecast. Hedge-Friendly favors later starts; hedging is never guaranteed.</p>}
 
           {/* per-leg odds band */}
           <div>

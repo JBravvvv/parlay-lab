@@ -149,7 +149,9 @@ describe("GenSheet — the open panel", () => {
        now, so the chip count is the categories plus the games — still a chip row, just fewer of them */
     expect(out).toContain("Select All");
     expect(out).toContain("Clear");
-    expect(count(out, /<select /g)).toBe(1);
+    expect(count(out, /<select /g)).toBe(2);
+    expect(out).toContain('aria-label="Bet Type"');
+    expect(out).toContain("The Model");
     expect(out).toContain("aria-label=\"Leg count\"");
     expect(out).toMatch(/<select [^>]*aria-label="Sides"/);
     expect(out).toMatch(/<output[^>]*aria-label="Leg count"[^>]*>4<\/output>/);

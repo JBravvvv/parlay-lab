@@ -87,6 +87,8 @@ export const specMarkets = (spec: Pick<GenSpec, "market" | "markets">): readonly
   spec.markets?.length ? spec.markets : [spec.market];
 
 export type GenSpec = {
+  /** User-filtered engine recommendations; no grade or positive-EV floor. */
+  betType?: "styles" | "model";
   strategies?: readonly string[];
   sports?: readonly string[];
   timing?: readonly string[];
@@ -334,6 +336,7 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
     spec.modelOnly ? "model" : "both",
     String(roll),
   ];
+  if (spec.betType === "model") parts.push("betType:model");
   if (spec.strategies) parts.push(`strategies:${spec.strategies.join(",")}`);
   if (spec.sports) parts.push(`sports:${spec.sports.join(",")}`);
   if (spec.timing) parts.push(`timing:${spec.timing.join(",")}`);
@@ -858,7 +861,7 @@ export function generate<P>(
   avoid?: ReadonlySet<string>,
   recentPlayers?: ReadonlyMap<string, number>,
 ): GenResult<P> {
-  if (spec.strategies || spec.preferDiversity) return strategyGenerate(pool, spec, seed, avoid, recentPlayers, generate);
+  if (spec.betType === "model" || spec.strategies || spec.preferDiversity) return strategyGenerate(pool, spec, seed, avoid, recentPlayers, generate);
   if (spec.noMarkets) return { ok: false, fail: { code: "no-rows" } };
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);

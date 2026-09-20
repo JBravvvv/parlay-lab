@@ -6,7 +6,21 @@
     }
   },
   "crons": [
-    { "path": "/api/scheduler?poke=evening", "schedule": "45 21 * * *" },
-    { "path": "/api/scheduler?poke=night", "schedule": "0 0 * * *" }
+    {
+      "path": "/api/scheduler?poke=evening",
+      "schedule": "45 21 * * *"
+    },
+    {
+      "path": "/api/scheduler?poke=night",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/nfl/lock?poke=sunday-early",
+      "schedule": "0 16 * * 0"
+    },
+    {
+      "path": "/api/nfl/lock?poke=sunday-standard",
+      "schedule": "0 17 * * 0"
+    }
   ]
 }

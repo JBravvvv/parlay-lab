@@ -195,7 +195,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   }
 
   const key = process.env.ODDS_API_KEY;
-  const { events, capped } = selectPropEvents(slate, now, cfg.props.maxEvents, cfg.props.liveMaxEvents);
+  const { events, capped } = selectPropEvents(slate, now, refresh ? slate.games.length : cfg.props.maxEvents, refresh ? slate.games.length : cfg.props.liveMaxEvents);
   const liveEvents = events.filter((g) => g.status === "live").length;
   // the window the CURRENT slate calls for: 10 min once any selected event is in play, else 2 h
   const windowSec = propsWindowSec(events, cfg.props);
