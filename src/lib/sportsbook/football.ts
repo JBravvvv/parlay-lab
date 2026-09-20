@@ -26,8 +26,10 @@ export function priceFootballProp(row:CfbPropRow,book:string,bankroll=2500,rules
  const q=quoteOf<CfbPropQuote>(row,book);
  // Old cache records have no line-specific probabilities: only reuse a fair at the SAME line.
  const p=q?(row.probabilities&&Object.hasOwn(row.probabilities,book)?row.probabilities[book]:q.line===row.line?row.fair:null):null;
- const ev=q?valueAt(p,q.price).ev:null;
- return {...row,displayBook:book,cz:q,evCz:ev,grade:gradeFromEv(ev),fair:p,fairAm:p==null?null:americanFromProb(Math.min(.999999,Math.max(.000001,p))),line:q?.line??row.line,kelly:q&&p!=null&&row.status==='upcoming'&&Date.parse(row.kickoff)>Date.now()?kellyStake(p,0,q.dec,bankroll,rules):null,
+ const firstTdClosed=row.market==='first_td'&&(row.status!=='upcoming'||Date.parse(row.kickoff)<=Date.now());
+ const fair=firstTdClosed?null:p;
+ const ev=q?valueAt(fair,q.price).ev:null;
+ return {...row,displayBook:book,cz:q,evCz:ev,grade:gradeFromEv(ev),fair,fairAm:fair==null?null:americanFromProb(Math.min(.999999,Math.max(.000001,fair))),line:q?.line??row.line,kelly:q&&fair!=null&&row.status==='upcoming'&&Date.parse(row.kickoff)>Date.now()?kellyStake(fair!,0,q.dec,bankroll,rules):null,
  label:q?propLabel(row.player,row.market,row.side,q.line):row.label,
- playable:!!q&&p!=null&&row.status==='upcoming'&&Date.parse(row.kickoff)>Date.now()};
+ playable:!!q&&fair!=null&&row.status==='upcoming'&&Date.parse(row.kickoff)>Date.now()};
 }

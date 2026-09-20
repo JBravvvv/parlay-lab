@@ -67,3 +67,10 @@ it('rejects mutually exclusive first scorers even when same-game picks are allow
  for(let seed=0;seed<30;seed++){const result=generate(pool,spec,seed);expect(result.ok).toBe(true);if(result.ok)expect(new Set(result.ticket.legs.map(l=>l.gameKey)).size).toBe(2);}
  expect(generate(pool,{...spec,pinned:['a','b']},1)).toMatchObject({ok:false,fail:{code:'pin-conflict'}});
 });
+
+it('never offers a possibly settled First TD after kickoff, even from a stale pregame cache',()=>{
+ const p=payload('player_1st_td',[0]);p.bookmakers.forEach(b=>{b.markets[0].outcomes[0].name='Yes';});
+ expect(parseEventProps(p,{...game,status:'live'},{now:0,bankroll:2500})).toEqual([]);
+ const row=parse(p)[0];
+ for(const book of books){expect(priceFootballProp({...row,kickoff:'2000-01-01'},book).grade).toBeNull();expect(priceFootballProp({...row,status:'live'},book).fair).toBeNull();}
+});

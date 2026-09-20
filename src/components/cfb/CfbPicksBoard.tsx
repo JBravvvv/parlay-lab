@@ -892,7 +892,7 @@ const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blu
   rec_yds: { label: "REC YDS", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
   receptions_alt: { label: "Receptions X+", blurb: "Posted alternate reception thresholds, priced separately at each rung.", live: false },
   pass_tds_alt: { label: "Pass TDs X+", blurb: "Posted alternate passing touchdown thresholds, priced separately at each rung.", live: false },
-  first_td: { label: "First TD", blurb: "First touchdown scorer, using posted prices and market probability estimates.", live: false },
+  first_td: { label: "First TD", blurb: "Pregame first touchdown scorer, using posted prices and market probability estimates.", live: false },
   tds_over: { label: "2+ TDs / TD ladders", blurb: "Two or more scoring touchdowns and higher posted thresholds; passing TDs excluded.", live: false },
   combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, at the selected book' pregame and in-game lines.", live: false },
   mixed: { label: "MIXED", hint: "live+pregame", blurb: "Cross-game tickets pairing a game in progress (in-play price) with games still to kick off.", live: true },

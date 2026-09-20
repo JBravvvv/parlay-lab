@@ -1,3 +1,9 @@
+## September 19 — manual refresh follow-through
+
+Follow-up to the three-book refresh request: authenticated NFL/CFB manual refresh now also retries events that previously returned zero props. They may have newly posted markets or prices at any of the three sportsbooks; a cached empty result must not hide those on a manual refresh. Passive page loads retain their empty-event cache. Integration test now asserts every selected event is fetched, including previously empty games. Application release 9a6551fb9171f5ff82dbe4b72c35e805702de870 was Vercel Ready; final follow-up receipt will identify the new HEAD. Follow-up validation: 159/159 tests across six pricing/refresh suites PASS; production build including TypeScript PASS; git diff --check PASS.
+
+Production refresh at 9a6551f: NFL 2026-09-20 fetched 14/14 events, 4,012 rows, all ten markets; quote counts DK 3,577 / Caesars 1,547 / FD 3,100. Confirmed actual Ja'Marr Chase 6+–10+ (and wider) reception ladder prices. CFB 2026-09-19 fetched 8/8 live games and 356 rows including the four new markets; quote counts DK 317 / Caesars 2 / FD 69 (coverage differences are genuine feed availability). This exposed retained First TD quotes in already-live games: final follow-up restricts First TD to pregame and suppresses cached First TD grading after kickoff, since boxscore totals cannot establish scoring order. Other added ladders retain live support. No live First TD availability claimed.
+
 ## September 19 — football ladders, scorer markets, pick borders, and three-book refresh
 
 Owner requested Receptions → Receptions O/U, alternate receptions (6+, 7+, etc.), alternate passing TDs (2+, 3+, etc.), First TD and 2+ scoring TDs; clearer compact pick borders; every refresh must support DraftKings, Caesars and FanDuel grading without fetching again when switching books.

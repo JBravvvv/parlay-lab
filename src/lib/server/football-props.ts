@@ -173,14 +173,9 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   if (!DATE_RE.test(date)) return NextResponse.json({ error: "bad date" }, { status: 400 });
   const bankRaw = Number(q.get("bankroll"));
   const bankroll = Number.isFinite(bankRaw) && bankRaw > 0 ? bankRaw : cfg.bankBase;
-  /* JOSH'S REFRESH (2026-09-19, verbatim: "The CFB & NFL boards should function the same way as the MLB one does").
-     `?refresh=1` WITH the sync phrase in `x-pl-sync` is the Board's Refresh Board tap — a FULL re-pull, the football
-     twin of the MLB pill's stored server re-price: rail 1 (a fresh stored board) is skipped, every selected game
-     that has rows is re-priced now whatever its 2 h / 10 min window, the per-event data cache is bypassed, and the
-     slate's game lines are pulled fresh too. Without the phrase the flag is ignored — a public GET can never force
-     a spend. THE BUDGET RAILS BELOW ARE NOT LIFTED: a refresh buys what the day's budget still allows, in the same
-     live-first order, and the note names what it could not. The one carry that survives a refresh is the
-     EMPTY-EVENT RULE — a game whose last pull returned zero rows inside its own window has nothing to refresh. */
+  /* Manual Refresh Board, authenticated with x-pl-sync, re-pulls every selected event,
+     including previously empty events, plus fresh slate odds. All US-book quotes are retained
+     for instant book switching. Passive reads retain their existing cache/empty-event rules. */
   const refresh = q.get("refresh") === "1" && syncAuthed(req);
   const now = Date.now();
   const headers = { "cache-control": "no-store" };
@@ -291,11 +286,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   const why = (g: CfbGame): Why | null => {
     if (!stored || !storedIds.has(g.id)) return "unpriced";
     if (refresh) {
-      // a forced re-pull: every game with rows is re-priced now, in play or not — the zero-row hold is the one carry kept
-      if ((storedRowCount.get(g.id) ?? 0) === 0 && insideOwnWindow(g)) {
-        if (g.status === "live") liveCarried.add(g.id);
-        return null;
-      }
+      // Manual refresh retries even previously empty events: any book may have posted new props.
       return g.status === "live" ? "live" : "refresh";
     }
     if (g.status === "live") {

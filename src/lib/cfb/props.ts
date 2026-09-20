@@ -254,6 +254,9 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
   const rows: CfbPropRow[] = [];
 
   for (const g of readEvent(eventJson)) {
+    // A fresh feed response can retain settled scorer odds. Without scoring-order evidence,
+    // First TD is pregame-only; never offer a possibly decided first scorer in play.
+    if (g.market.id === "first_td" && !upcoming) continue;
     if (!g.reads.length) continue;
     // the row's line must be a line some book POSTED (a fair exists only there), so the line median
     // is engine2's lower-middle weightedMedian, never an average of two posted lines

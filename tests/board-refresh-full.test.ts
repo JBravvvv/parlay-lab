@@ -198,14 +198,14 @@ describe("1. the football props route — ?refresh=1 is a FULL re-pull, with the
     expect(JSON.stringify(body)).not.toContain("test-key-never-logged");
   });
 
-  it("the EMPTY-EVENT RULE survives a refresh — a zero-row game inside its own window is not re-asked", async () => {
+  it("manual refresh retries zero-row games so newly posted sportsbook props are discovered", async () => {
     const first = pricedGames()[0];
     fakeRedis({ [BOARD_KEY]: JSON.stringify(storedBoard({ noRowsFor: [first.id] })) });
     const { body } = await call("&refresh=1", { "x-pl-sync": "test-phrase" });
     expect(body.source).toBe("fetch");
     expect(body.refreshed).toBe(true);
-    expect(fetchedUrls().some((u) => u.includes(String(first.oddsEventId)))).toBe(false);
-    expect(fetchMock).toHaveBeenCalledTimes(body.events - 1);
+    expect(fetchedUrls().some((u) => u.includes(String(first.oddsEventId)))).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(body.events);
   });
 
   it("the upgraded plan allows refresh after the former daily budget is spent", async () => {
