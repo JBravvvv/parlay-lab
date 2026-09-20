@@ -3,7 +3,7 @@
 - Completed the second-session implementation requested by Josh: shared multiselect discovery, cross-sport stored-board candidates and slip payloads, market-relative parlay strategies, live quote freshness and stat progress, restored Stats splits, ballpark grade/order/evidence/pick previews, signed mobile price fields and density choices.
 - Browser validation used a clearly labeled temporary captured-fixture page, removed before release. At phone size, locks, seven-level history, forward, exclusions and slip Add passed; no horizontal overflow at phone/desktop widths. Exact vertical option halves the same content from 3,745.65625 to 1,872.828125 pixels with width unchanged. Compact preserves normal text/portrait proportions and is the default.
 - No new odds purchases, automated-paper policy changes, ledger writes or simulation changes. Live suggestions require posted recent quotes; missing data is not fabricated. Park explanations use actual environmental factors, without invented pitch-zone claims. Same-game estimates remain labeled as unmodeled correlation.
-- TypeScript and the full serial suite passed: 3,621 tests across 235 files. Deployment evidence follows after production verification. Implementation details and limits: `september-19-phases.md`.
+- TypeScript and the full serial suite passed: 3,621 tests across 235 files. Production verified: e041774b682752c289ad4c4f3cfceeae86cf68a7, Vercel parlay-kok17lxiu Ready/production, exact public version match. Concurrent context update preserved; new umpire crossing recorded with freeze intact. Post-rebase audit/docs 23 passed; final wording/UI checks 83 passed. Implementation details and limits: `september-19-phases.md`.
 
 ## 2026-09-19 — phased generator update, Phase 1 (deployed)
 

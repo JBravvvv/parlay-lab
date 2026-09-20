@@ -746,15 +746,12 @@ const GEN_SPEC_DEFAULT: GenSpec = {
 
 /** the line under the category pills, and the sheet's stand-in on the Sides rail */
 const GEN_CATEGORY_NOTE =
-  "Tap several categories to mix them on one ticket. Sides, totals and moneylines are game markets, not player slots — the generator leaves them alone for now.";
+  "Choose player props and game markets to mix them on one ticket. Each pick retains its own probability source and selected-book price.";
 const GEN_STUB_NOTE =
   "The parlay generator builds PLAYER-prop parlays — pick a player market above and it appears here. Sides, totals and moneylines are game markets and have no player slots yet.";
-/* EVERY football leg is market-priced: the win % is the de-vigged consensus of the books that
-   posted the line (src/lib/cfb/props.ts), so the MLB sentence — "their EV is ~0 by construction"
-   — would be plainly false here. The EV beside a football leg is measured against the ONE price
-   being taken, which is the whole point of the Caesars / best-price toggle. */
+/* Mixed tickets retain the native probability source for each market. */
 const GEN_MARKET_NOTE =
-  "Every win % here is the de-vigged consensus of the books that posted the line; the EV beside it is measured against the one price you would take.";
+  "Player props use de-vigged market estimates; game bets use the model probability at the selected line. Each pick labels its source. EV uses the selected-book price and includes push refunds where modeled.";
 
 /**
  * "ADD TO SLIP" ADDS (INSTRUCTION 52 fix pass). The generator used to hand `setLegs` the four

@@ -60,3 +60,9 @@ The owner asked to finish the rest in this second session. Phases 2–4 are impl
 - Final mixed-market review normalized club identities across props and side bets, recomputed cross-sport side probabilities at the selected quote line, and included push refunds in independent sandbox EV. Full-win probability remains the probability every leg wins; no same-game joint model was introduced.
 
 - Production build passed (`npm run build:local`, exit 0, /private/tmp/pl-release-build.log). Temporary browser fixture routes were removed and the diff passed whitespace checks before the release commit.
+
+### Follow-up production release
+- Application commit `7cfd1b79095e223aea9d5667a656fa94b12cf3ef`, with audit record `e041774b682752c289ad4c4f3cfceeae86cf68a7`, deployed as `parlay-kok17lxiu` (Ready, production). The public `/api/version` returned the exact audit commit and Vercel listed the production alias.
+- A concurrent automated context refresh was preserved by rebase. The targeted check caught Jeremie Rehak reaching five games; CROSSING 83 records it and the engine freeze remained active. The environmental/pricing tests passed (22 tests); the corrected audit/document suite passed (23 tests).
+- Production NFL mobile: 1,171 ranked picks, generated props plus game sides, source-labeled probabilities, all eight strategy options and Select all/Clear, four shared dropdowns, density options, and no horizontal overflow (375px viewport, 364px scroll width). The stored-only discovery route returned 1,323 NFL prop rows and 14 games for September 20; other sports had no stored snapshot for that date, correctly returning no invented rows.
+- Live verification found two stale football help sentences. The follow-up corrects them to explain mixed markets and per-pick probability sources; its generator/UI regression run passed 83 tests. This wording/document follow-up does not change calculation behavior.
