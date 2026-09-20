@@ -1,0 +1,1343 @@
+{
+  "date": "2026-09-20",
+  "capturedAt": "2026-09-20T08:53:22.719Z",
+  "source": "Caesars public market: 267 selections captured 2026-09-20T08:53:22.719Z. Snapshot, not a live feed.",
+  "url": "https://sportsbook.caesars.com/americanfootball?id=007d7c61-07a7-4e18-bb40-15104b6eac92",
+  "rows": [
+    {
+      "player": "D'Andre Swift",
+      "team": "Chicago Bears",
+      "odds": 2200
+    },
+    {
+      "player": "Derrick Henry",
+      "team": "Baltimore Ravens",
+      "odds": 2300
+    },
+    {
+      "player": "David Montgomery",
+      "team": "Houston Texans",
+      "odds": 2500
+    },
+    {
+      "player": "Chase Brown",
+      "team": "Cincinnati Bengals",
+      "odds": 2500
+    },
+    {
+      "player": "Bijan Robinson",
+      "team": "Atlanta Falcons",
+      "odds": 2800
+    },
+    {
+      "player": "Travis Etienne",
+      "team": "New Orleans Saints",
+      "odds": 2800
+    },
+    {
+      "player": "Bucky Irving",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 3000
+    },
+    {
+      "player": "Saquon Barkley",
+      "team": "Philadelphia Eagles",
+      "odds": 3000
+    },
+    {
+      "player": "Breece Hall",
+      "team": "New York Jets",
+      "odds": 3000
+    },
+    {
+      "player": "Chuba Hubbard",
+      "team": "Carolina Panthers",
+      "odds": 3500
+    },
+    {
+      "player": "Rhamondre Stevenson",
+      "team": "New England Patriots",
+      "odds": 3500
+    },
+    {
+      "player": "Jaylen Warren",
+      "team": "Pittsburgh Steelers",
+      "odds": 4000
+    },
+    {
+      "player": "Aaron Jones",
+      "team": "Minnesota Vikings",
+      "odds": 4000
+    },
+    {
+      "player": "Emeka Egbuka",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 4500
+    },
+    {
+      "player": "Colston Loveland",
+      "team": "Chicago Bears",
+      "odds": 4500
+    },
+    {
+      "player": "MarShawn Lloyd",
+      "team": "Green Bay Packers",
+      "odds": 4500
+    },
+    {
+      "player": "Kenneth Gainwell",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 4500
+    },
+    {
+      "player": "Justin Jefferson",
+      "team": "Minnesota Vikings",
+      "odds": 4500
+    },
+    {
+      "player": "Drake London",
+      "team": "Atlanta Falcons",
+      "odds": 4500
+    },
+    {
+      "player": "Chris Olave",
+      "team": "New Orleans Saints",
+      "odds": 4500
+    },
+    {
+      "player": "Ja'Marr Chase",
+      "team": "Cincinnati Bengals",
+      "odds": 4500
+    },
+    {
+      "player": "Quinshon Judkins",
+      "team": "Cleveland Browns",
+      "odds": 4500
+    },
+    {
+      "player": "Mark Andrews",
+      "team": "Baltimore Ravens",
+      "odds": 4500
+    },
+    {
+      "player": "Rico Dowdle",
+      "team": "Pittsburgh Steelers",
+      "odds": 5000
+    },
+    {
+      "player": "Luther Burden III",
+      "team": "Chicago Bears",
+      "odds": 5000
+    },
+    {
+      "player": "Kalif Raymond",
+      "team": "Chicago Bears",
+      "odds": 5500
+    },
+    {
+      "player": "Samaje Perine",
+      "team": "Cincinnati Bengals",
+      "odds": 5500
+    },
+    {
+      "player": "DK Metcalf",
+      "team": "Pittsburgh Steelers",
+      "odds": 6000
+    },
+    {
+      "player": "Carnell Tate",
+      "team": "Tennessee Titans",
+      "odds": 6000
+    },
+    {
+      "player": "Woody Marks",
+      "team": "Houston Texans",
+      "odds": 6000
+    },
+    {
+      "player": "Mack Hollins",
+      "team": "New England Patriots",
+      "odds": 6000
+    },
+    {
+      "player": "Chimere Dike",
+      "team": "Tennessee Titans",
+      "odds": 6000
+    },
+    {
+      "player": "Jalen Coker",
+      "team": "Carolina Panthers",
+      "odds": 6000
+    },
+    {
+      "player": "Adonai Mitchell",
+      "team": "New York Jets",
+      "odds": 6000
+    },
+    {
+      "player": "DeVonta Smith",
+      "team": "Philadelphia Eagles",
+      "odds": 6000
+    },
+    {
+      "player": "Garrett Wilson",
+      "team": "New York Jets",
+      "odds": 6000
+    },
+    {
+      "player": "Lamar Jackson",
+      "team": "Baltimore Ravens",
+      "odds": 6000
+    },
+    {
+      "player": "Christian Watson",
+      "team": "Green Bay Packers",
+      "odds": 6000
+    },
+    {
+      "player": "Rome Odunze",
+      "team": "Chicago Bears",
+      "odds": 6000
+    },
+    {
+      "player": "Tee Higgins",
+      "team": "Cincinnati Bengals",
+      "odds": 6500
+    },
+    {
+      "player": "Dalton Schultz",
+      "team": "Houston Texans",
+      "odds": 6500
+    },
+    {
+      "player": "Tony Pollard",
+      "team": "Tennessee Titans",
+      "odds": 7000
+    },
+    {
+      "player": "Minnesota Vikings Defense",
+      "team": "Minnesota Vikings",
+      "odds": 7500
+    },
+    {
+      "player": "Kyle Monangai",
+      "team": "Chicago Bears",
+      "odds": 7500
+    },
+    {
+      "player": "Jalen Hurts",
+      "team": "Philadelphia Eagles",
+      "odds": 7500
+    },
+    {
+      "player": "Wan'Dale Robinson",
+      "team": "Tennessee Titans",
+      "odds": 7500
+    },
+    {
+      "player": "Jonathon Brooks",
+      "team": "Carolina Panthers",
+      "odds": 7500
+    },
+    {
+      "player": "Devaughn Vele",
+      "team": "New Orleans Saints",
+      "odds": 7500
+    },
+    {
+      "player": "TreVeyon Henderson",
+      "team": "New England Patriots",
+      "odds": 7500
+    },
+    {
+      "player": "Tetairoa McMillan",
+      "team": "Carolina Panthers",
+      "odds": 7500
+    },
+    {
+      "player": "Jaylin Noel",
+      "team": "Houston Texans",
+      "odds": 7500
+    },
+    {
+      "player": "Kayshon Boutte",
+      "team": "Houston Texans",
+      "odds": 7500
+    },
+    {
+      "player": "Dallas Goedert",
+      "team": "Philadelphia Eagles",
+      "odds": 7500
+    },
+    {
+      "player": "Juwan Johnson",
+      "team": "New Orleans Saints",
+      "odds": 8000
+    },
+    {
+      "player": "Jordan Mason",
+      "team": "Minnesota Vikings",
+      "odds": 8000
+    },
+    {
+      "player": "Kyle Pitts",
+      "team": "Atlanta Falcons",
+      "odds": 8000
+    },
+    {
+      "player": "Chris Godwin",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 8000
+    },
+    {
+      "player": "Hunter Henry",
+      "team": "New England Patriots",
+      "odds": 8000
+    },
+    {
+      "player": "Rashod Bateman",
+      "team": "Baltimore Ravens",
+      "odds": 8000
+    },
+    {
+      "player": "New England Patriots Defense",
+      "team": "New England Patriots",
+      "odds": 9000
+    },
+    {
+      "player": "New York Jets Defense",
+      "team": "New York Jets",
+      "odds": 9000
+    },
+    {
+      "player": "Chris Brooks",
+      "team": "Green Bay Packers",
+      "odds": 9000
+    },
+    {
+      "player": "Cincinnati Bengals Defense",
+      "team": "Cincinnati Bengals",
+      "odds": 9000
+    },
+    {
+      "player": "Jayden Reed",
+      "team": "Green Bay Packers",
+      "odds": 9000
+    },
+    {
+      "player": "Kenyon Sadiq",
+      "team": "New York Jets",
+      "odds": 9000
+    },
+    {
+      "player": "Harold Fannin Jr.",
+      "team": "Cleveland Browns",
+      "odds": 9000
+    },
+    {
+      "player": "Romeo Doubs",
+      "team": "New England Patriots",
+      "odds": 9000
+    },
+    {
+      "player": "Tennessee Titans Defense",
+      "team": "Tennessee Titans",
+      "odds": 9000
+    },
+    {
+      "player": "Braelon Allen",
+      "team": "New York Jets",
+      "odds": 9000
+    },
+    {
+      "player": "Brian Robinson Jr.",
+      "team": "Atlanta Falcons",
+      "odds": 9000
+    },
+    {
+      "player": "Carolina Panthers Defense",
+      "team": "Carolina Panthers",
+      "odds": 9000
+    },
+    {
+      "player": "Justice Hill",
+      "team": "Baltimore Ravens",
+      "odds": 9000
+    },
+    {
+      "player": "Zavion Thomas",
+      "team": "Chicago Bears",
+      "odds": 9000
+    },
+    {
+      "player": "Matthew Golden",
+      "team": "Green Bay Packers",
+      "odds": 9000
+    },
+    {
+      "player": "Jahan Dotson",
+      "team": "Atlanta Falcons",
+      "odds": 10000
+    },
+    {
+      "player": "Jauan Jennings",
+      "team": "Minnesota Vikings",
+      "odds": 10000
+    },
+    {
+      "player": "DeMario Douglas",
+      "team": "New England Patriots",
+      "odds": 10000
+    },
+    {
+      "player": "Tyler Shough",
+      "team": "New Orleans Saints",
+      "odds": 10000
+    },
+    {
+      "player": "Houston Texans Defense",
+      "team": "Houston Texans",
+      "odds": 10000
+    },
+    {
+      "player": "Isaiah Williams",
+      "team": "New York Jets",
+      "odds": 10000
+    },
+    {
+      "player": "Jordan Addison",
+      "team": "Minnesota Vikings",
+      "odds": 10000
+    },
+    {
+      "player": "Cam Ward",
+      "team": "Tennessee Titans",
+      "odds": 10000
+    },
+    {
+      "player": "Atlanta Falcons Defense",
+      "team": "Atlanta Falcons",
+      "odds": 10000
+    },
+    {
+      "player": "Tucker Kraft",
+      "team": "Green Bay Packers",
+      "odds": 10000
+    },
+    {
+      "player": "Kaden Wetjen",
+      "team": "Pittsburgh Steelers",
+      "odds": 10000
+    },
+    {
+      "player": "Baltimore Ravens Defense",
+      "team": "Baltimore Ravens",
+      "odds": 10000
+    },
+    {
+      "player": "Tyjae Spears",
+      "team": "Tennessee Titans",
+      "odds": 10000
+    },
+    {
+      "player": "Denzel Boston",
+      "team": "Cleveland Browns",
+      "odds": 10000
+    },
+    {
+      "player": "Drake Maye",
+      "team": "New England Patriots",
+      "odds": 10000
+    },
+    {
+      "player": "Barion Brown",
+      "team": "New Orleans Saints",
+      "odds": 10000
+    },
+    {
+      "player": "Zay Flowers",
+      "team": "Baltimore Ravens",
+      "odds": 10000
+    },
+    {
+      "player": "Xavier Hutchinson",
+      "team": "Houston Texans",
+      "odds": 10000
+    },
+    {
+      "player": "Chicago Bears Defense",
+      "team": "Chicago Bears",
+      "odds": 10000
+    },
+    {
+      "player": "Dontayvion Wicks",
+      "team": "Philadelphia Eagles",
+      "odds": 10000
+    },
+    {
+      "player": "Green Bay Packers Defense",
+      "team": "Green Bay Packers",
+      "odds": 10000
+    },
+    {
+      "player": "Kyle Williams",
+      "team": "New England Patriots",
+      "odds": 10000
+    },
+    {
+      "player": "Darren Waller",
+      "team": "Carolina Panthers",
+      "odds": 10000
+    },
+    {
+      "player": "Michael Pittman Jr.",
+      "team": "Pittsburgh Steelers",
+      "odds": 10000
+    },
+    {
+      "player": "New Orleans Saints Defense",
+      "team": "New Orleans Saints",
+      "odds": 10000
+    },
+    {
+      "player": "Cole Kmet",
+      "team": "Chicago Bears",
+      "odds": 10000
+    },
+    {
+      "player": "Pat Freiermuth",
+      "team": "Pittsburgh Steelers",
+      "odds": 10000
+    },
+    {
+      "player": "Bryce Young",
+      "team": "Carolina Panthers",
+      "odds": 10000
+    },
+    {
+      "player": "Philadelphia Eagles Defense",
+      "team": "Philadelphia Eagles",
+      "odds": 10000
+    },
+    {
+      "player": "Gunnar Helm",
+      "team": "Tennessee Titans",
+      "odds": 10000
+    },
+    {
+      "player": "Kyler Murray",
+      "team": "Minnesota Vikings",
+      "odds": 12500
+    },
+    {
+      "player": "Tyler Goodson",
+      "team": "Atlanta Falcons",
+      "odds": 12500
+    },
+    {
+      "player": "Cleveland Browns Defense",
+      "team": "Cleveland Browns",
+      "odds": 12500
+    },
+    {
+      "player": "Zachariah Branch",
+      "team": "Atlanta Falcons",
+      "odds": 12500
+    },
+    {
+      "player": "Jerry Jeudy",
+      "team": "Cleveland Browns",
+      "odds": 12500
+    },
+    {
+      "player": "Germie Bernard",
+      "team": "Pittsburgh Steelers",
+      "odds": 12500
+    },
+    {
+      "player": "Sean Tucker",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 12500
+    },
+    {
+      "player": "Cade Otton",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 12500
+    },
+    {
+      "player": "Olamide Zaccheaus",
+      "team": "Atlanta Falcons",
+      "odds": 12500
+    },
+    {
+      "player": "KC Concepcion",
+      "team": "Cleveland Browns",
+      "odds": 12500
+    },
+    {
+      "player": "Jalen McMillan",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 12500
+    },
+    {
+      "player": "Caleb Williams",
+      "team": "Chicago Bears",
+      "odds": 12500
+    },
+    {
+      "player": "Mike Gesicki",
+      "team": "Cincinnati Bengals",
+      "odds": 12500
+    },
+    {
+      "player": "Pittsburgh Steelers Defense",
+      "team": "Pittsburgh Steelers",
+      "odds": 15000
+    },
+    {
+      "player": "Calvin Ridley",
+      "team": "Tennessee Titans",
+      "odds": 15000
+    },
+    {
+      "player": "Tampa Bay Buccaneers Defense",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 15000
+    },
+    {
+      "player": "Tank Bigsby",
+      "team": "Philadelphia Eagles",
+      "odds": 15000
+    },
+    {
+      "player": "Tommy Tremble",
+      "team": "Carolina Panthers",
+      "odds": 15000
+    },
+    {
+      "player": "Brittain Brown",
+      "team": "Chicago Bears",
+      "odds": 15000
+    },
+    {
+      "player": "Kene Nwangwu",
+      "team": "New York Jets",
+      "odds": 15000
+    },
+    {
+      "player": "Alvin Kamara",
+      "team": "New Orleans Saints",
+      "odds": 15000
+    },
+    {
+      "player": "Makai Lemon",
+      "team": "Philadelphia Eagles",
+      "odds": 15000
+    },
+    {
+      "player": "Devontez Walker",
+      "team": "Baltimore Ravens",
+      "odds": 15000
+    },
+    {
+      "player": "Isaiah Davis",
+      "team": "New York Jets",
+      "odds": 15000
+    },
+    {
+      "player": "Malachi Corley",
+      "team": "Cleveland Browns",
+      "odds": 15000
+    },
+    {
+      "player": "Chris Brazzell II",
+      "team": "Carolina Panthers",
+      "odds": 15000
+    },
+    {
+      "player": "T.J. Hockenson",
+      "team": "Minnesota Vikings",
+      "odds": 17500
+    },
+    {
+      "player": "Eli Raridon",
+      "team": "New England Patriots",
+      "odds": 17500
+    },
+    {
+      "player": "Darnell Washington",
+      "team": "Pittsburgh Steelers",
+      "odds": 17500
+    },
+    {
+      "player": "Josh Cuevas",
+      "team": "Baltimore Ravens",
+      "odds": 17500
+    },
+    {
+      "player": "Omar Cooper Jr.",
+      "team": "New York Jets",
+      "odds": 17500
+    },
+    {
+      "player": "Tahj Brooks",
+      "team": "Cincinnati Bengals",
+      "odds": 17500
+    },
+    {
+      "player": "Xavier Legette",
+      "team": "Carolina Panthers",
+      "odds": 17500
+    },
+    {
+      "player": "Kendre Miller",
+      "team": "New Orleans Saints",
+      "odds": 17500
+    },
+    {
+      "player": "Nate Carter",
+      "team": "Atlanta Falcons",
+      "odds": 17500
+    },
+    {
+      "player": "Roman Wilson",
+      "team": "Pittsburgh Steelers",
+      "odds": 17500
+    },
+    {
+      "player": "Tez Johnson",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 20000
+    },
+    {
+      "player": "Elic Ayomanor",
+      "team": "Tennessee Titans",
+      "odds": 20000
+    },
+    {
+      "player": "Jimmy Horn Jr.",
+      "team": "Carolina Panthers",
+      "odds": 20000
+    },
+    {
+      "player": "Jonnu Smith",
+      "team": "Pittsburgh Steelers",
+      "odds": 20000
+    },
+    {
+      "player": "Tanner Hudson",
+      "team": "Cincinnati Bengals",
+      "odds": 20000
+    },
+    {
+      "player": "Ke'Shawn Williams",
+      "team": "Cincinnati Bengals",
+      "odds": 20000
+    },
+    {
+      "player": "Mitchell Evans",
+      "team": "Carolina Panthers",
+      "odds": 20000
+    },
+    {
+      "player": "Joe Burrow",
+      "team": "Cincinnati Bengals",
+      "odds": 20000
+    },
+    {
+      "player": "John Metchie III",
+      "team": "Carolina Panthers",
+      "odds": 20000
+    },
+    {
+      "player": "Salvon Ahmed",
+      "team": "Chicago Bears",
+      "odds": 20000
+    },
+    {
+      "player": "Myles Price",
+      "team": "Minnesota Vikings",
+      "odds": 20000
+    },
+    {
+      "player": "Skyy Moore",
+      "team": "San Francisco 49ers",
+      "odds": 20000
+    },
+    {
+      "player": "Rasheen Ali",
+      "team": "Baltimore Ravens",
+      "odds": 22500
+    },
+    {
+      "player": "Lan Larison",
+      "team": "New England Patriots",
+      "odds": 22500
+    },
+    {
+      "player": "Geno Smith",
+      "team": "New York Jets",
+      "odds": 22500
+    },
+    {
+      "player": "Kameron Johnson",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 22500
+    },
+    {
+      "player": "Ja'Kobi Lane",
+      "team": "Baltimore Ravens",
+      "odds": 22500
+    },
+    {
+      "player": "AJ Dillon",
+      "team": "Philadelphia Eagles",
+      "odds": 22500
+    },
+    {
+      "player": "Devin Neal",
+      "team": "New Orleans Saints",
+      "odds": 22500
+    },
+    {
+      "player": "Ted Hurst",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 22500
+    },
+    {
+      "player": "Will Shipley",
+      "team": "Philadelphia Eagles",
+      "odds": 22500
+    },
+    {
+      "player": "Zavier Scott",
+      "team": "Minnesota Vikings",
+      "odds": 22500
+    },
+    {
+      "player": "Bryce Lance",
+      "team": "New Orleans Saints",
+      "odds": 25000
+    },
+    {
+      "player": "Jahdae Walker",
+      "team": "Chicago Bears",
+      "odds": 25000
+    },
+    {
+      "player": "Elijah Sarratt",
+      "team": "Baltimore Ravens",
+      "odds": 25000
+    },
+    {
+      "player": "Matthew Hibner",
+      "team": "Baltimore Ravens",
+      "odds": 25000
+    },
+    {
+      "player": "Kaleb Johnson",
+      "team": "Pittsburgh Steelers",
+      "odds": 25000
+    },
+    {
+      "player": "Jordan Love",
+      "team": "Green Bay Packers",
+      "odds": 25000
+    },
+    {
+      "player": "C.J. Stroud",
+      "team": "Houston Texans",
+      "odds": 25000
+    },
+    {
+      "player": "Mason Tipton",
+      "team": "New Orleans Saints",
+      "odds": 25000
+    },
+    {
+      "player": "Mason Taylor",
+      "team": "New York Jets",
+      "odds": 25000
+    },
+    {
+      "player": "Aaron Rodgers",
+      "team": "Pittsburgh Steelers",
+      "odds": 25000
+    },
+    {
+      "player": "Foster Moreau",
+      "team": "Houston Texans",
+      "odds": 25000
+    },
+    {
+      "player": "Nicholas Singleton",
+      "team": "Tennessee Titans",
+      "odds": 25000
+    },
+    {
+      "player": "Josh Oliver",
+      "team": "Minnesota Vikings",
+      "odds": 25000
+    },
+    {
+      "player": "Durham Smythe",
+      "team": "Baltimore Ravens",
+      "odds": 25000
+    },
+    {
+      "player": "Raheim Sanders",
+      "team": "Cleveland Browns",
+      "odds": 30000
+    },
+    {
+      "player": "Deshaun Watson",
+      "team": "Cleveland Browns",
+      "odds": 30000
+    },
+    {
+      "player": "Erick All Jr.",
+      "team": "Cincinnati Bengals",
+      "odds": 30000
+    },
+    {
+      "player": "Demond Claiborne",
+      "team": "Minnesota Vikings",
+      "odds": 30000
+    },
+    {
+      "player": "Cedric Tillman",
+      "team": "Cleveland Browns",
+      "odds": 30000
+    },
+    {
+      "player": "Julian Hill",
+      "team": "New England Patriots",
+      "odds": 30000
+    },
+    {
+      "player": "Jeremy Ruckert",
+      "team": "New York Jets",
+      "odds": 30000
+    },
+    {
+      "player": "Efton Chism III",
+      "team": "New England Patriots",
+      "odds": 30000
+    },
+    {
+      "player": "Baker Mayfield",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 30000
+    },
+    {
+      "player": "Marquise Brown",
+      "team": "Philadelphia Eagles",
+      "odds": 30000
+    },
+    {
+      "player": "Julius Chestnut",
+      "team": "Tennessee Titans",
+      "odds": 30000
+    },
+    {
+      "player": "Andrei Iosivas",
+      "team": "Cincinnati Bengals",
+      "odds": 30000
+    },
+    {
+      "player": "Daniel Bellinger",
+      "team": "Tennessee Titans",
+      "odds": 30000
+    },
+    {
+      "player": "Riley Nowakowski",
+      "team": "Pittsburgh Steelers",
+      "odds": 30000
+    },
+    {
+      "player": "Cade Stover",
+      "team": "Houston Texans",
+      "odds": 30000
+    },
+    {
+      "player": "Noah Fant",
+      "team": "New Orleans Saints",
+      "odds": 30000
+    },
+    {
+      "player": "Jawhar Jordan",
+      "team": "Houston Texans",
+      "odds": 30000
+    },
+    {
+      "player": "Dylan Drummond",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Oscar Delp",
+      "team": "New Orleans Saints",
+      "odds": 50000
+    },
+    {
+      "player": "Johnny Mundt",
+      "team": "Philadelphia Eagles",
+      "odds": 50000
+    },
+    {
+      "player": "Mason Kinsey",
+      "team": "Tennessee Titans",
+      "odds": 50000
+    },
+    {
+      "player": "Kalel Mullings",
+      "team": "Tennessee Titans",
+      "odds": 50000
+    },
+    {
+      "player": "Zaire Mitchell-Paden",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Marlin Klein",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Scotty Miller",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "JP Richardson",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "Blake Whiteheart",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Josh Whyle",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "Stephen Carlson",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "Jack Westover",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "CJ Dippre",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "Ty Chandler",
+      "team": "New Orleans Saints",
+      "odds": 50000
+    },
+    {
+      "player": "Dameon Pierce",
+      "team": "Philadelphia Eagles",
+      "odds": 50000
+    },
+    {
+      "player": "Ja'Tavion Sanders",
+      "team": "Carolina Panthers",
+      "odds": 50000
+    },
+    {
+      "player": "Bo Melton",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "Jack Stoll",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Pierre Strong Jr.",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "Feleipe Franks",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Drake Dabney",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "Jam Miller",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "Jared Wayne",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Tylan Wallace",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Gavin Bartholomew",
+      "team": "Minnesota Vikings",
+      "odds": 50000
+    },
+    {
+      "player": "Tai Felton",
+      "team": "Minnesota Vikings",
+      "odds": 50000
+    },
+    {
+      "player": "Josh Blackwell",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "A.T. Perry",
+      "team": "Pittsburgh Steelers",
+      "odds": 50000
+    },
+    {
+      "player": "Ben Skowronek",
+      "team": "Pittsburgh Steelers",
+      "odds": 50000
+    },
+    {
+      "player": "Joe Royer",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Darius Cooper",
+      "team": "Philadelphia Eagles",
+      "odds": 50000
+    },
+    {
+      "player": "Colbie Young",
+      "team": "Cincinnati Bengals",
+      "odds": 50000
+    },
+    {
+      "player": "Jayden Price",
+      "team": "New Orleans Saints",
+      "odds": 50000
+    },
+    {
+      "player": "Devin Culp",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 50000
+    },
+    {
+      "player": "Brenden Bates",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Jelani Woods",
+      "team": "New York Jets",
+      "odds": 50000
+    },
+    {
+      "player": "Andrew Beck",
+      "team": "New York Jets",
+      "odds": 50000
+    },
+    {
+      "player": "Tremon Smith",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Roschon Johnson",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "Reggie Gilliam",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "Luke Musgrave",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "Elijah Moore",
+      "team": "Philadelphia Eagles",
+      "odds": 50000
+    },
+    {
+      "player": "British Brooks",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Kylen Granson",
+      "team": "Tennessee Titans",
+      "odds": 50000
+    },
+    {
+      "player": "Drew Sample",
+      "team": "Cincinnati Bengals",
+      "odds": 50000
+    },
+    {
+      "player": "Casey Washington",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Max Bredeson",
+      "team": "Minnesota Vikings",
+      "odds": 50000
+    },
+    {
+      "player": "Joshua Simon",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Ja'Lynn Polk",
+      "team": "New Orleans Saints",
+      "odds": 50000
+    },
+    {
+      "player": "Charlie Woerner",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Kevin Austin Jr.",
+      "team": "New Orleans Saints",
+      "odds": 50000
+    },
+    {
+      "player": "Cameron Latu",
+      "team": "Philadelphia Eagles",
+      "odds": 50000
+    },
+    {
+      "player": "Cam Grandy",
+      "team": "Cincinnati Bengals",
+      "odds": 50000
+    },
+    {
+      "player": "Terrell Jennings",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "Mitchell Tinsley",
+      "team": "Cincinnati Bengals",
+      "odds": 50000
+    },
+    {
+      "player": "Arian Smith",
+      "team": "New York Jets",
+      "odds": 50000
+    },
+    {
+      "player": "Isaiah Bond",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Austin Hooper",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Marcus Jones",
+      "team": "New England Patriots",
+      "odds": 50000
+    },
+    {
+      "player": "Sam Roush",
+      "team": "Chicago Bears",
+      "odds": 50000
+    },
+    {
+      "player": "Justin Watson",
+      "team": "Houston Texans",
+      "odds": 50000
+    },
+    {
+      "player": "Michael Burton",
+      "team": "Cleveland Browns",
+      "odds": 50000
+    },
+    {
+      "player": "Michael Carter",
+      "team": "Arizona Cardinals",
+      "odds": 50000
+    },
+    {
+      "player": "Tua Tagovailoa",
+      "team": "Atlanta Falcons",
+      "odds": 50000
+    },
+    {
+      "player": "Eli Heidenreich",
+      "team": "Pittsburgh Steelers",
+      "odds": 50000
+    },
+    {
+      "player": "David Martin-Robinson",
+      "team": "Tennessee Titans",
+      "odds": 50000
+    },
+    {
+      "player": "Chris Moore",
+      "team": "Baltimore Ravens",
+      "odds": 50000
+    },
+    {
+      "player": "JJ Galbreath",
+      "team": "Indianapolis Colts",
+      "odds": 50000
+    },
+    {
+      "player": "Travis Homer",
+      "team": "Pittsburgh Steelers",
+      "odds": 50000
+    },
+    {
+      "player": "Payne Durham",
+      "team": "Tampa Bay Buccaneers",
+      "odds": 50000
+    },
+    {
+      "player": "Messiah Swinson",
+      "team": "Green Bay Packers",
+      "odds": 50000
+    },
+    {
+      "player": "LaJohntay Wester",
+      "team": "Baltimore Ravens",
+      "odds": 50000
+    },
+    {
+      "player": "Dohnte Meyers",
+      "team": "Cincinnati Bengals",
+      "odds": 50000
+    }
+  ]
+}

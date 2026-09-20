@@ -1,3 +1,7 @@
+## September 20 — First Sunday Six (current work)
+
+Added NFL Board Caesars-only First Sunday Six section, 267 prices captured from public Caesars DOM (not live feed), historical archive and conservative timing model. See docs/first-sunday-six.md for full provenance, methodology, coverage, holdout failure, limitations and reproducible pipeline. 2,778 completed games / 2,761 scorers, 2016 through completed 2026 Week 2 (source ends Sep 17); 175 early slates, one tie. No missing game/scorer/end-clock entries. Historical prices unavailable; no ROI/player calibration asserted. Total-band timing candidate failed held-out baseline comparison, so retain pooled clocks. Owner supplied promotion pool/token details, full terms unverified. No bets placed, no paper allocation changes. Validation: 57/57 tests across First Sunday Six, NFL desk and football Board UI PASS; one additional temporary actual Sunday fixture test PASS (removed). Real snapshot: 8 eligible games, 209 of 267 selections graded; remaining entries withheld, covered probability mass .95017. Production build, TypeScript and 3/3 legacy engine parity tests PASS. Six handoff currency guards PASS after updating a stale prior-release claim. Local browser verified price search and historical evidence/download controls; local odds are unavailable, so graded calculations verified against downloaded production fixtures. Deployment receipt will be recorded after verification. Browser public market successfully read without sign-in; do not repeat prior Chrome-unavailable claims for this release.
+
 ## September 20 — Sunday NFL readiness and The Model generator mode
 
 Owner requests: verify upcoming Sunday NFL pricing/full paper allocation; generate custom engine-ranked parlays with arbitrary prop/odds/legs/timing filters even if every pick grades F; rename football Board action Generate Board; refresh every eligible game/all supported book quotes on every authenticated tap; rename simulator action Refresh MLB Model and capitalize football Model.
@@ -69,7 +73,7 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-19:** `origin/frontend-rebuild` = `e041774b682752c289ad4c4f3cfceeae86cf68a7` (verified after the follow-up push; production /api/version returned this release, deployed as parlay-kok17lxiu; the next commit carries wording and this verification record).
+> - **STATE-CLAIM 2026-09-20 (pre-release):** `origin/frontend-rebuild` = `d0032840ef6039e177e9e1dc165fd26174095eef` (verified after the follow-up push; production /api/version returned this release, deployed as parlay-kok17lxiu; the next commit carries wording and this verification record).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >

@@ -29,7 +29,7 @@ describe("CFB Board — the one green Refresh Board control", () => {
   it("the pill is a green primary Pill reading Refresh Board / Pulling… while fetching", () => {
     const pill = board.slice(board.indexOf("export function CfbRefreshPill"), board.indexOf("function winsOn"));
     expect(pill).toMatch(/<Pill\s+variant="primary"/);
-    expect(pill).toMatch(/"Pulling…" : "Refresh Board"/);
+    expect(pill).toMatch(/"Pulling…" : "Generate Board"/);
     expect(pill).toMatch(/disabled=\{fetching\}/);
   });
   /* INSTRUCTION 50 (2026-09-11, Josh item 1: "Refresh button not working on 'Board' tab"): the
@@ -45,7 +45,7 @@ describe("CFB Board — the one green Refresh Board control", () => {
     expect(board).not.toMatch(/↻ Refresh/);
     expect(page).not.toMatch(/↻ Refresh/);
     // exactly one JSX label — the pill (the docblock quotes Josh in single quotes)
-    expect(board.match(/: "Refresh Board"\}/g)?.length).toBe(1);
+    expect(board.match(/: "Generate Board"\}/g)?.length).toBe(1);
   });
   it("the refresh handler invalidates BOTH the slate and the props queries via the key builders' own prefixes", () => {
     expect(board).toMatch(/import \{ CFB_PROPS_STALE_MS, cfbCacheLabel, cfbPricedAtLabel, cfbPropsQueryKey, cfbPropsStaleMs, cfbQueryKey, loadCfbProps \} from "@\/lib\/cfb\/client"/);

@@ -1,4 +1,5 @@
 "use client";
+import {FirstSundaySix} from "@/components/nfl/FirstSundaySix";
 import { useLiveClock } from "@/lib/use-live-clock";
 import { footballQuoteCurrent } from "@/lib/football/gen-pool";
 import { gameTimeLabel } from "@/lib/game-time-window";
@@ -584,6 +585,7 @@ export function CfbPicksBoard() {
   return (
     <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
+      {L.id==="nfl"&&<FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()}/>}
       <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
       {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
 
