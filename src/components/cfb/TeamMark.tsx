@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import {defenseClub} from "@/lib/football/defense";
 import { usePlayerImage } from "@/lib/use-player-image";
 import { useLeagueTone } from "@/components/football/LeagueContext";
 import type { CfbTeam } from "@/lib/cfb/types";
@@ -161,6 +162,7 @@ export function PlayerMark({
   player,
   headshot: suppliedHeadshot,
   team: suppliedTeam,
+  league: suppliedLeague,
   teamIds = [],
   pos,
   size = "sm",
@@ -170,6 +172,7 @@ export function PlayerMark({
   player: string | null | undefined;
   headshot: string | null | undefined;
   team: TeamMarkTeam | null | undefined;
+  league?: "nfl" | "cfb";
   teamIds?: readonly string[];
   /** ESPN position abbreviation for the title ("QB"), or null */
   pos?: string | null;
@@ -177,7 +180,8 @@ export function PlayerMark({
   className?: string;
   style?: CSSProperties;
 }) {
-  const league = useLeagueTone();
+  const contextLeague = useLeagueTone();
+  const league = suppliedLeague ?? contextLeague;
   const identity = usePlayerImage(league, player, suppliedTeam?.id ?? suppliedTeam?.abbr, suppliedTeam?.id ? [suppliedTeam.id] : teamIds);
   const team = suppliedTeam ?? identity?.team;
   const sources = [...new Set([...(identity?.srcs ?? []), suppliedHeadshot].filter((s): s is string => !!s))];
@@ -186,8 +190,8 @@ export function PlayerMark({
   const [badgeBroken, setBadgeBroken] = useState<string | null>(null);
   const px = PX[size];
   const name = (player ?? "").trim();
-  if (!name) {
-    if (!team) return null;
+  if (!name || defenseClub(name) || pos === "D/ST") {
+    if (!team) return name ? <span className="inline-flex h-6 w-6 items-center justify-center text-[9px] font-bold" aria-label={name}>D/ST</span> : null;
     return <TeamMark team={team} size={size} showAbbr={false} className={className} style={style} />;
   }
   const hex = teamHex(team?.color);

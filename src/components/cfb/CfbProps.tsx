@@ -1007,7 +1007,7 @@ export function CfbProps() {
         src: l.src,
         started: l.started,
         leg: l.leg,
-        mark: <PlayerMark player={l.leg.player ?? null} headshot={l.leg.headshot ?? null} team={l.leg.team ?? null} pos={l.leg.pos ?? null} size="sm" />,
+        mark: <PlayerMark teamIds={l.leg.imageTeamIds} player={l.leg.player ?? null} headshot={l.leg.headshot ?? null} team={l.leg.team ?? null} pos={l.leg.pos ?? null} size="sm" />,
         /* the pool stamps the row's price-implied lean (never a bet count) — the pick's own side */
         splits: l.lean ? <LeanChip lean={l.lean} side={l.side} compact /> : undefined,
       });
@@ -1062,7 +1062,8 @@ export function CfbProps() {
         positionsLoading={loadRosterPositions && !!rosterTeams && positionsQ.isPending}
         pool={gen.pool}
         renderMark={({ leg }) => (
-          <PlayerMark
+          leg.pair ? <PairMark {...leg.pair} size="md" /> : <PlayerMark
+            teamIds={leg.imageTeamIds}
             player={leg.player ?? null}
             headshot={leg.headshot ?? null}
             team={leg.team ?? null}

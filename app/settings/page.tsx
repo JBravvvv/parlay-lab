@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {useVerticalDensity} from "@/lib/vertical-density";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Pill } from "@/components/ui/Pill";
@@ -12,6 +13,11 @@ import { CFB_ENABLED, NFL_ENABLED } from "@/lib/features";
 import { useSport } from "@/lib/sport";
 import { CfbBankPanel } from "@/components/cfb/CfbBankPanel";
 import { NflBankPanel } from "@/components/nfl/NflBankPanel";
+
+function DisplaySettings(){
+ const [mode,choose]=useVerticalDensity();
+ return <Panel title="Display"><Row label="Page density"><select aria-label="Vertical density" value={mode} onChange={e=>choose(e.target.value)} className="min-h-9 rounded-lg border border-white/10 bg-surface-2 px-3 text-[13px] font-bold text-text"><option value="compact">Compact</option><option value="half">50% height</option><option value="full">100% height</option></select><p className="mt-1 text-[11px] text-muted">Saves automatically for all sports on this device.</p></Row></Panel>;
+}
 
 /* Selection mode + calibration kill switch (calibration spec Update 1 / 3D) */
 function SelectionCalibrationPanel() {
@@ -367,6 +373,7 @@ export default function SettingsPage() {
       {saved && <div className="mb-3 text-[12px] text-pos">{saved}</div>}
 
       <div className="space-y-3">
+        <DisplaySettings />
         <Panel title="Sizing · MLB bank">
           {/* Phase 6 (Correction 4): bankroll is MANAGED — $2,500 base + logged
               deposits/withdrawals + realized graded P/L. No free edits: hand-editing

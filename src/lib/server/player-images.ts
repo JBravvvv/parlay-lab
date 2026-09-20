@@ -17,12 +17,13 @@ export const imageCatalog = unstable_cache(async (league: ImageLeague, ids: stri
   if (!teams.length || teams.length > 32) throw new Error("No matching image roster");
   const players = [];
   for (let i=0;i<teams.length;i+=8) {
-    const batch = await Promise.all(teams.slice(i,i+8).map(async team=>parseImageRoster(await json(`${root}/teams/${team.id}/roster`),team,league)));
-    players.push(...batch.flat());
+    const batch = await Promise.allSettled(teams.slice(i,i+8).map(async team=>parseImageRoster(await json(`${root}/teams/${team.id}/roster`),team,league)));
+    players.push(...batch.flatMap(result=>result.status==="fulfilled"?result.value:[]));
   }
+  if (!players.length) throw new Error("Image rosters unavailable");
   if (league === "nfl") {
     try { return addSleeperFallback(players, await json("https://api.sleeper.app/v1/players/nfl")); }
     catch { /* ESPN portraits remain usable if Sleeper is unavailable. */ }
   }
   return players;
-},["roster-lab-player-imagery-v1"],{revalidate:3600});
+},["roster-lab-player-imagery-v2"],{revalidate:3600});

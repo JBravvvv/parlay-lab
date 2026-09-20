@@ -1,3 +1,4 @@
+import {defenseClub,canonicalFootballPlayer} from "@/lib/football/defense";
 import { americanFromProb, decFromAmerican, devigProportional, impliedFromAmerican, weightedMedian } from "@/engine2/devig";
 import { gradeFromEv } from "@/lib/grade";
 import { kickoffLabel } from "@/lib/cfb/dates";
@@ -146,7 +147,8 @@ function readEvent(eventJson: unknown): Group[] {
       for (const o of arr(mk.outcomes)) {
         const oc = rec(o);
         if (!oc) continue;
-        const player = str(oc.description);
+        const rawPlayer = str(oc.description);
+        const player = rawPlayer ? canonicalFootballPlayer(rawPlayer) : null;
         const name = (str(oc.name) ?? "").toLowerCase();
         const price = num(oc.price);
         if (!player || price == null || !validPrice(price)) continue;
@@ -277,7 +279,9 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
     // the team, so the row draws initials rather than the wrong face.
     const trusted = found != null && (espnId == null || byEspn != null) && (byName == null || byEspn == null || byName === byEspn);
     const meta = trusted ? found : null;
-    const teamObj = byName ?? byEspn;
+    const defense=defenseClub(g.player);
+    const defenseTeam=defense?[game.home,game.away].find(t=>[t.name,t.short,t.abbr].some(n=>normTeam(n)===normTeam(defense))):null;
+    const teamObj = defenseTeam ?? byName ?? byEspn;
     const opp = teamObj ? (teamObj === game.home ? game.away.short : game.home.short) : null;
     const sides: CfbPropSide[] = g.market.kind === "yes" ? ["yes"] : ["over", "under"];
 
@@ -321,8 +325,8 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
         team: teamObj?.name ?? g.team ?? null,
         teamId: teamObj?.id ?? null,
         teamAbbr: teamObj?.abbr ?? null,
-        headshot: meta?.headshot ?? null,
-        pos: meta?.pos ?? null,
+        headshot: defense ? null : meta?.headshot ?? null,
+        pos: defense ? "D/ST" : meta?.pos ?? null,
         opp,
         kickoff: game.start,
         status: game.status,

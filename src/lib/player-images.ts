@@ -1,3 +1,4 @@
+import {defenseClub} from "./football/defense";
 /** Public identity/imagery only; no fantasy accounts or betting data. */
 export type ImageLeague = "mlb" | "nfl" | "cfb";
 export type ImageTeam = { id: string; abbr: string; name: string; logo: string | null; color: string | null; rank: null };
@@ -8,6 +9,11 @@ export const imageTeamKey = (team: string) => ({ WAS:"WSH", JAC:"JAX", LA:"LAR",
 const nameIndexes = new WeakMap<readonly PlayerImage[], Map<string, PlayerImage[]>>();
 
 export function matchPlayerImage(players: readonly PlayerImage[], name: string, team?: string | null, teamIds: readonly string[] = []): PlayerImage | null {
+  const club=defenseClub(name);
+  if(club){
+    const teams=[...new Map(players.map(p=>[p.team.id,p.team])).values()].filter(t=>(!teamIds.length||teamIds.includes(t.id))&&(!team||imageTeamKey(t.abbr)===imageTeamKey(team)||t.id===team||imageNameKey(t.name)===imageNameKey(team))&&[t.name,t.abbr].some(n=>imageNameKey(n)===imageNameKey(club)));
+    return teams.length===1?{id:`defense:${teams[0].id}`,name:`${teams[0].name} D/ST`,position:"D/ST",team:teams[0],srcs:[]}:null;
+  }
   let index = nameIndexes.get(players);
   if (!index) {
     index = new Map();
@@ -27,7 +33,7 @@ export function parseImageRoster(data: unknown, team: ImageTeam, league: ImageLe
     const p = value as {id?:string; displayName?:string; position?:{abbreviation?:string}; headshot?:{href?:string}};
     if (!/^\d+$/.test(String(p.id)) || typeof p.displayName !== "string") return [];
     const photo = `https://a.espncdn.com/combiner/i?img=/i/headshots/${sport}/players/full/${p.id}.png&w=96&h=96`;
-    return [{id:String(p.id),name:p.displayName,position:p.position?.abbreviation ?? null,team,srcs:[league === "cfb" && p.headshot?.href?.startsWith("https://a.espncdn.com/") ? p.headshot.href : photo]}];
+    return [{id:String(p.id),name:p.displayName,position:p.position?.abbreviation ?? null,team,srcs:[...new Set([...(league === "cfb" && p.headshot?.href?.startsWith("https://a.espncdn.com/") ? [p.headshot.href] : []), photo, ...(p.headshot?.href?.startsWith("https://a.espncdn.com/") ? [p.headshot.href] : [])])]}];
   });
 }
 
