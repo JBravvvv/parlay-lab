@@ -113,8 +113,8 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(card).toMatch(/\{pct\.toFixed\(1\)\}% to hit/);
     expect(card).toMatch(/pulse-dot/);
   });
-  it("the category strip is a chip-row and the stat tiles, search and sortable table stay", () => {
-    expect(board).toMatch(/className="chip-row -mx-4 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Pick category"/);
+  it("the category selector is a dropdown and the stat tiles, search and sortable table stay", () => {
+    expect(board).toContain('<MultiSelect single label="Pick category"');
     expect(board.match(/<StatTile/g)?.length).toBe(4);
     expect(board).toMatch(/aria-label="Search picks"/);
     expect(board).toMatch(/<DataTable columns=\{columns\} rows=\{rows\}/);
@@ -145,13 +145,13 @@ describe("CFB Board — the Caesars grammar", () => {
   });
   it("phone tap floors: chips ≥ 40px, the scope Segmented at md, the search box 44px with 16px text", () => {
     // 4 since the INSTRUCTION 42 review fix (2026-09-05): the two category strips, the tier pills, and the parlay carousel's Show-more control
-    expect(board.match(/min-h-\[40px\]/g)?.length).toBe(2);
+    expect(board.match(/min-h-\[40px\]/g)?.length).toBe(1);
     expect(board).not.toMatch(/!py-1 /);
     expect(board).toMatch(/<Segmented options=\{SCOPES\}[^>]*size="md"/);
     expect(board).toMatch(/aria-label="Search picks"[\s\S]*?className="num h-11 [^"]*text-\[16px\]/);
   });
   it("every count on the strips comes from the data, never a literal", () => {
-    expect(board).toMatch(/const n = picks\?\.categories\[c\.key\]\?\.length \?\? 0;/);
+    expect(board).toContain("picks?.categories[c.key]?.length ?? 0");
     // INSTRUCTION 42 (2026-09-05): the three VIEWS pills became the twelve-category chip-row — each count is its set's length
     expect(board).toContain("{sets[k]?.length??0}");
     expect(board).not.toMatch(/\{lists\[v\]\.length\}/);
@@ -175,9 +175,9 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
 
   it("the parlay section has a category dropdown with All sets and data counts", () => {
     expect(board).toMatch(/import \{ CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory,/);
-    expect(section).toContain('<select aria-label="Parlay category"');
-    expect(section).toContain('<option value="all">All sets</option>');
-    expect(section).toContain("CFB_PARLAY_CATEGORIES.map(k=><option");
+    expect(section).toContain('<MultiSelect single label="Parlay category"');
+    expect(section).toContain('{key:"all",label:"All sets"}');
+    expect(section).toContain("CFB_PARLAY_CATEGORIES.map(k=>({key:k");
     expect(section).toMatch(/const sets = picks\.sets;/);
     expect(section).toContain("Object.values(sets).flat()");
     // the legacy three-view strip is gone
@@ -199,7 +199,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
   });
   it("the tier filter (ALL / SAFER / LONGSHOTS / MIXED) still sits under the category row", () => {
     expect(board).toMatch(/\["LONGSHOT", "LONGSHOTS"\],\n  \["MIX", "MIXED"\],/);
-    expect(section.indexOf('data-testid="cfb-parlay-cats"')).toBeLessThan(section.indexOf('aria-label="Ticket tier"'));
+    expect(section.indexOf('data-testid="cfb-parlay-cats"')).toBeLessThan(section.indexOf('label="Ticket tier"'));
     expect(section).toContain("match(t, active) && ticketMatches");
   });
   it("SHOW_CAP is 50 — the whole category set can show on phones (rank badges, PHONE_CHUNK at a time) and in the desktop grid", () => {
@@ -263,12 +263,12 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(board).toMatch(/data-testid="cfb-live-tag"/);
     expect(board).toMatch(/cell: \(r\) => \(r\.status === "live" \? <LiveTag \/> : r\.kelly != null \? <KellyChip stake=\{r\.kelly\} \/> : <span className="text-faint">—<\/span>\),/);
     // the pick-category pills keep counting off the data (live rows now included by the engine)
-    expect(board).toMatch(/const n = picks\?\.categories\[c\.key\]\?\.length \?\? 0;/);
+    expect(board).toContain("picks?.categories[c.key]?.length ?? 0");
     expect(board).not.toMatch(/on a game that has not kicked off\./);
   });
-  it("compact native dropdowns replace parlay pills without blur", () => {
-    expect(section).toContain('<select aria-label="Parlay category" className="min-h-8');
-    expect(section).toContain('<select aria-label="Ticket tier" className="min-h-8');
+  it("compact styled dropdowns replace parlay pills without blur", () => {
+    expect(section).toContain('<MultiSelect single label="Parlay category"');
+    expect(section).toContain('<MultiSelect single label="Ticket tier"');
     expect(section).not.toMatch(BLUR);
   });
 });

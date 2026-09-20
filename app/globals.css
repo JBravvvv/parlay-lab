@@ -963,3 +963,30 @@ body::after {
 .desk-content :is(.gen-player-card, [data-ranked-pick], .football-prop-row):hover {
   border-color: rgb(184 203 227 / 43%);
 }
+
+/* Compact, high-contrast filter menus shared by Board picks and generated parlays. */
+.discovery-select { border:1px solid rgba(255,255,255,.16); border-radius:10px; background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,.025)); }
+.discovery-select[open] { z-index:45; border-color:rgba(231,189,104,.7); box-shadow:0 0 0 2px rgba(231,189,104,.08); }
+.discovery-select > .discovery-trigger { display:flex; align-items:center; gap:8px; min-height:34px; padding:6px 10px; font-size:11px; }
+.discovery-trigger-label { color:#b7bdc8; font-size:10px; flex-shrink:0; }
+.discovery-trigger-value { color:#f7f8fa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.discovery-chevron { flex-shrink:0; color:#e7bd68; transition:transform .15s ease; }
+.discovery-select[open] .discovery-chevron { transform:rotate(180deg); }
+.discovery-select > .discovery-menu { width:max(100%,250px); max-width:calc(100vw - 40px); border:1px solid rgba(231,189,104,.35); border-radius:13px; background:#171d27; box-shadow:0 16px 44px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.06); overflow:hidden; padding:0; }
+.discovery-menu-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; color:#fff; font-size:12px; font-weight:800; background:linear-gradient(110deg,rgba(231,189,104,.14),transparent); border-bottom:1px solid rgba(255,255,255,.08); }
+.discovery-count { border:1px solid rgba(231,189,104,.25); border-radius:20px; padding:2px 7px; color:#e7bd68; font-size:9px; white-space:nowrap; }
+.discovery-actions { padding:6px 10px; border-bottom:1px solid rgba(255,255,255,.08); }
+.discovery-actions button { padding:4px 7px; border-radius:6px; }
+.discovery-actions button:hover { background:rgba(255,255,255,.09); }
+.discovery-options { max-height:288px; overflow-y:auto; overscroll-behavior:contain; padding:5px; }
+.discovery-option { min-height:34px; padding:7px 9px; border:1px solid transparent; border-radius:7px; margin:2px 0; transition:background .12s ease; }
+.discovery-option[data-selected="true"] { background:rgba(231,189,104,.1); border-color:rgba(231,189,104,.2); }
+.discovery-option:hover, .discovery-option:focus-within { background:rgba(255,255,255,.1); }
+.discovery-option input { width:14px; height:14px; accent-color:#e7bd68; }
+.discovery-trigger:focus-visible, .discovery-actions button:focus-visible { outline:2px solid #e7bd68; outline-offset:2px; }
+@media(max-width:640px) { .discovery-select > .discovery-trigger { min-height:40px; } .discovery-option { min-height:40px; } .discovery-trigger-label { max-width:70px; overflow:hidden; text-overflow:ellipsis; } }
+@media(prefers-reduced-motion:reduce) { .discovery-chevron,.discovery-option { transition:none; } }
+
+@media(max-width:640px) { .discovery-filters > div > .discovery-select { flex-basis:calc(50% - 4px); } }
+
+.discovery-select[data-side="above"] > .discovery-menu { top:auto; bottom:100%; margin-top:0; margin-bottom:8px; }

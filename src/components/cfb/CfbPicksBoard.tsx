@@ -1,4 +1,5 @@
 "use client";
+import { MultiSelect } from "@/components/props/MultiSelect";
 import {FirstSundaySix} from "@/components/nfl/FirstSundaySix";
 import { useLiveClock } from "@/lib/use-live-clock";
 import { footballQuoteCurrent } from "@/lib/football/gen-pool";
@@ -629,16 +630,8 @@ export function CfbPicksBoard() {
         </label>
       </div>
 
-      <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Pick category" data-testid="cfb-board-cats">
-          {CATS.map((c) => {
-            const n = picks?.categories[c.key]?.length ?? 0;
-            return (
-              <FilterPill key={c.key} role="tab" aria-selected={cat === c.key} selected={cat === c.key} onClick={() => setCat(c.key)} className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]">
-                {c.label}
-                <span className="num ml-1 text-[9.5px] opacity-70">{c.prop && propsPending ? "…" : n}</span>
-              </FilterPill>
-            );
-          })}
+      <div className="max-w-md" data-testid="cfb-board-cats">
+        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,label:`${c.label} · ${c.prop && propsPending ? '…' : picks?.categories[c.key]?.length ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
       </div>
 
       {loading ? (
@@ -1026,13 +1019,9 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
 
         <DiscoveryFilters parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
         {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
-        <label className="mb-2 flex items-center gap-2 text-[11px] font-bold" data-testid="cfb-parlay-cats">
-          Ticket set
-          <select aria-label="Parlay category" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={picked??"all"} onChange={e=>{setPicked(e.target.value==="all"?null:e.target.value as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}>
-            <option value="all">All sets</option>
-            {CFB_PARLAY_CATEGORIES.map(k=><option key={k} value={k}>{PARLAY_CATS[k].label} · {sets[k]?.length??0}</option>)}
-          </select>
-        </label>
+        <div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
+          <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
+        </div>
         <div className="mb-3 text-[11px] text-muted">
           {picked?meta.blurb:"All stored ticket sets. Timing and markets are optional filters; mixed does not require both phases."} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
           {openN > 0 && (
@@ -1050,12 +1039,9 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           </Panel>
         ) : (
           <>
-            <label className="mb-3 flex items-center gap-2 text-[11px] font-bold">
-              Ticket tier
-              <select aria-label="Ticket tier" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={active} onChange={e=>{setFilter(e.target.value);setPhoneShown(PHONE_CHUNK);}}>
-                {filters.map(([k,label])=><option key={k} value={k}>{label} · {all.filter(t=>match(t,k)).length}</option>)}
-              </select>
-            </label>
+            <div className="mb-3 max-w-md">
+              <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>
+            </div>
 
             {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid.
                 Only the active layout mounts (review fix) — the display classes stay for the first paint before the effect runs. */}

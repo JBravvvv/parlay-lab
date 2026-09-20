@@ -23,6 +23,7 @@ import {priceMlbRow,type QuoteIndex} from "@/lib/sportsbook/mlb";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { MultiSelect } from "@/components/props/MultiSelect";
 import { Pill, FilterPill } from "@/components/ui/Pill";
 import { OddsCell } from "@/components/ui/OddsCell";
 import { EvBadge } from "@/components/ui/EvBadge";
@@ -1370,31 +1371,8 @@ function MlbBoardPage() {
             </button>
           ))}
         </div>
-        {/* phone: the market is a dropdown beside the scope switch */}
-        <select
-          aria-label="Market"
-          data-testid="board-market-select"
-          value={marketKeys.includes(cat) ? cat : "all"}
-          onChange={(e) => setCat(e.target.value)}
-          className="board-market-select min-w-0 flex-1 rounded-full border border-white/[0.08] bg-surface-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-text outline-none sm:hidden"
-        >
-          {marketKeys.map((k) => {
-            const n = marketCount(k);
-            return (
-              <option key={k} value={k}>
-                {marketLabel(k)}{n != null ? ` (${n})` : ""}
-              </option>
-            );
-          })}
-        </select>
-        {/* sm and up: the pill row */}
-        <div className="hidden flex-wrap items-center gap-2 sm:flex" data-testid="board-market-pills">
-          {marketKeys.map((k) => (
-            <FilterPill key={k} selected={cat === k} onClick={() => setCat(k)}>
-              {marketLabel(k)}
-              {marketCount(k) != null && <span className="num ml-1 text-[10px] opacity-70">{marketCount(k)}</span>}
-            </FilterPill>
-          ))}
+        <div className="min-w-0 flex-1 max-w-md" data-testid="board-market-select">
+          <MultiSelect single label="Market" value={[marketKeys.includes(cat)?cat:"all"]} options={marketKeys.map(k=>({key:k,label:`${marketLabel(k)}${marketCount(k)!=null?` · ${marketCount(k)}`:""}`}))} onChange={v=>setCat(v[0])}/>
         </div>
       </div>
       <div className="mb-3 flex items-center gap-2 sm:mb-4">
