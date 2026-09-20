@@ -1,4 +1,5 @@
 "use client";
+import { MLB_SPLITS, mlbSplitUrl } from "@/lib/stats-splits";
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -303,6 +304,7 @@ export default function StatsPage() {
   const [scope, setScope] = useState<"ind" | "team">("ind");
   const [group, setGroup] = useState<GroupId>("hitting");
   const [season, setSeason] = useState(2026);
+  const [statSplit, setStatSplit] = useState("all");
   const [timeframe, setTimeframe] = useState("season");
   const [team, setTeam] = useState("ALL");
   const [position, setPosition] = useState("ALL");
@@ -383,7 +385,7 @@ export default function StatsPage() {
   }
   const windowN = tableSport === "mlb" ? parseWindowValue(timeframe) : null;
 
-  const url = apiUrl(tableSport, scope, group, season, tableSport === "mlb" ? timeframe : "season");
+  const url = (tableSport === "mlb" ? mlbSplitUrl(scope,group,season,statSplit) : null) ?? apiUrl(tableSport, scope, group, season, tableSport === "mlb" ? timeframe : "season");
   const q = useQuery({
     queryKey: ["stats", url],
     queryFn: async (): Promise<StatRow[]> => {
@@ -593,13 +595,14 @@ export default function StatsPage() {
               {SPORTS[tableSport].seasons.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
             {tableSport === "mlb" && (
-              <select className={selectCls} value={timeframe} onChange={(e) => setTimeframe(e.target.value)} aria-label="Timeframe">
+              <select className={selectCls} value={timeframe} onChange={(e) => {setTimeframe(e.target.value);setStatSplit("all");}} aria-label="Timeframe">
                 {(isWindowGroup(group) ? WINDOW_GAMES[group] : WINDOW_GAMES.hitting).map((n) => (
                   <option key={n} value={windowValue(n)}>Last {n} Games</option>
                 ))}
                 <option value="season">{season} Season</option>
               </select>
             )}
+            {tableSport === "mlb" && <select aria-label="Statistical split" className={selectCls} value={statSplit} onChange={e=>{setStatSplit(e.target.value);setTimeframe("season");}}>{MLB_SPLITS.map(s=><option key={s.key} value={s.key}>{s.key==="vl"?(group==="hitting"?"vs LHP":"vs LHB"):s.key==="vr"?(group==="hitting"?"vs RHP":"vs RHB"):s.label}</option>)}</select>}
             {scope !== "team" && (
               <>
                 <select className={selectCls} value={position} onChange={(e) => setPosition(e.target.value)}>
@@ -626,6 +629,7 @@ export default function StatsPage() {
               : q.data
                 ? `Live · ${new Date(q.dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${all.length.toLocaleString()} ${scope === "team" ? "teams" : "players"}`
                 : "No data"}
+            {tableSport === "mlb" && statSplit!=="all" && <span>· Season split: {MLB_SPLITS.find(s=>s.key===statSplit)?.label}</span>}
             {windowN && isWindowGroup(group) && (
               <span className="text-muted" data-testid="window-note">
                 · {scope === "team" ? `Each team's last ${windowN} games` : windowNote(group, windowN)}

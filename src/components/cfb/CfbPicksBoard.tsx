@@ -1,4 +1,13 @@
 "use client";
+import { useLiveClock } from "@/lib/use-live-clock";
+import { footballQuoteCurrent } from "@/lib/football/gen-pool";
+import { gameTimeLabel } from "@/lib/game-time-window";
+import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
+import { CrossBoardResults } from "@/components/props/CrossBoardResults";
+import { ALL_MARKETS } from "@/lib/cross-sport";
+import { STRATEGIES,marketRanksBy,discoveryMatches,type DiscoveryFilter } from "@/lib/discovery";
+import { ticketMatches } from "@/lib/ticket-discovery";
+import { PickContext } from "@/components/props/PickContext";
 import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {bookName} from "@/lib/sportsbook/books";
@@ -411,6 +420,7 @@ export function CfbPicksBoard() {
   const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
@@ -432,21 +442,23 @@ export function CfbPicksBoard() {
     enabled: propsOn,
   });
   const pricedProps=useFootballPropsPrices(propsQ.data,bankroll??L.bankBase,L.rules);
-  const propRows = pricedProps?.rows ?? null;
+  const liveClock=useLiveClock();
+  const propRows = useMemo(()=>pricedProps?.rows.filter(r=>footballQuoteCurrent(r,pricedProps.pricedAt,liveClock||Date.now(),L.props.liveRevalidateSec*1000))??null,[pricedProps,liveClock,L.props.liveRevalidateSec]);
   const propsPending = propsOn && propsQ.isPending;
 
   const games = useMemo(() => new Map((current?.games ?? []).map((g) => [g.id, g])), [current]);
   const picks: CfbPicks | null = useMemo(
-    () => (current ? buildCfbPicks(current, propRows, { now: Date.now(), bankroll: bankroll ?? L.bankBase, parlays: L.parlays, idPrefix: L.idPrefix, rules: L.rules }) : null),
+    () => (current ? buildCfbPicks({...current,games:current.games.map(g=>g.status==="live"?{...g,rows:[]}:g)}, propRows, { now: Date.now(), bankroll: bankroll ?? L.bankBase, parlays: L.parlays, idPrefix: L.idPrefix, rules: L.rules }) : null),
     [current, propRows, bankroll, L.bankBase, L.parlays, L.idPrefix, L.rules],
   );
 
   const needle = search.trim().toLowerCase();
   const catRows = picks?.categories[cat] ?? [];
+  const chanceRanks=useMemo(()=>marketRanksBy(picks?.categories.all??[],r=>r.market,r=>r.player??r.label,r=>(r.fair??0)*100),[picks]);
   const rows = useMemo(() => {
-    const hit = catRows.filter((r) => rowMatches(r, needle));
+    const hit = catRows.filter((r) => rowMatches(r, needle) && discoveryMatches({chanceRank:chanceRanks.get(r),market:r.market,am:r.cz?.price??NaN,prob:(r.fair??0)*100,ev:r.evCz??-Infinity,start:games.get(r.gameId)?.start,started:r.status==="live",sport:L.id},discovery));
     return scope === "top" ? hit.slice(0, TOP_N) : hit;
-  }, [catRows, needle, scope]);
+  }, [catRows, needle, scope, discovery, games, L.id]);
 
   const all = picks?.categories.all ?? [];
   const sides = all.filter((r) => r.kind === "side").length;
@@ -490,6 +502,7 @@ export function CfbPicksBoard() {
               <div className="truncate text-[10.5px] text-faint">
                 {r.kind === "prop" && <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${marketChip}`}>{MARKET_WORD[r.market] ?? r.market}</span>}
                 {r.sub}
+                <PickContext pick={{sport:L.id,game:r.gameId,player:r.player??undefined,market:r.market,line:propRows?.find(p=>p.key===r.key)?.line,side:propRows?.find(p=>p.key===r.key)?.side==="under"?"u":"o",start:games.get(r.gameId)?.start}}/>
                 {r.kind === "side" && <SplitsChip split={sideSplitOf(r, games, splitsFeed)} className="ml-1.5" />}
                 {r.kind === "prop" && leanIndex.get(r.key) && <LeanChip lean={leanIndex.get(r.key)!.lean} side={leanIndex.get(r.key)!.side} compact className="ml-1.5" />}
               </div>
@@ -570,6 +583,8 @@ export function CfbPicksBoard() {
   return (
     <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
+      <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
+      {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatTile
@@ -929,7 +944,8 @@ function InGameTag({ n }: { n: number }) {
 
 /** INSTRUCTION 43: a ticket built past the −3 leg gate (some leg sits in (setFloorEvPct, minLegEvPct)) — worn beside the tier chip, never hidden */
 function OpenTag() {
-  const { parlays: CFB_PARLAYS } = useLeague();
+  const L = useLeague();
+  const { parlays: CFB_PARLAYS } = L;
   return (
     <span
       className="inline-flex shrink-0 items-center rounded-full border border-line-2 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-muted"
@@ -950,8 +966,10 @@ function TierTag({ tier }: { tier: CfbParlay["tier"] }) {
 
 export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { picks: CfbPicks; games: Map<string, CfbGame>; propsPending: boolean; liveGames: number }) {
   /* the league's parlay table under the pinned CFB name (NFL_PARLAYS under the NFL provider — perCategory 25 there) */
-  const { parlays: CFB_PARLAYS } = useLeague();
+  const L = useLeague();
+  const { parlays: CFB_PARLAYS } = L;
   /** the user's tap, else the first non-empty pregame category (falls back to ML) — so the strip never opens on an empty set while another has tickets */
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
   const [picked, setPicked] = useState<CfbParlayCategory | null>(null);
   const [filter, setFilter] = useState("all");
   /** tickets mounted in the phone carousel (grows by PHONE_CHUNK per tap, resets with the category / filter) */
@@ -959,7 +977,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const desktop = useIsDesktop();
   const sets = picks.sets;
   const cat: CfbParlayCategory = picked ?? PREGAME_CATS.find((k) => (sets[k]?.length ?? 0) > 0) ?? "ml";
-  const all: CfbParlay[] = sets[cat] ?? [];
+  const all: CfbParlay[] = picked ? sets[cat] ?? [] : [...new Map(Object.values(sets).flat().map(t=>[t.id,t])).values()];
   const meta = PARLAY_CATS[cat];
 
   const filters = useMemo(() => {
@@ -968,7 +986,8 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   }, [all]);
   const match = (t: CfbParlay, f: string) => (f === "all" ? true : f === "SAFER" || f === "LONGSHOT" || f === "MIX" ? t.tier === f : t.type === f);
   const active = filters.some(([k]) => k === filter) ? filter : "all";
-  const shown = all.filter((t) => match(t, active));
+  const legRanks=marketRanksBy(all.flatMap(t=>t.legs),l=>l.market,l=>l.player??l.label,l=>l.prob);
+  const shown = all.filter((t) => match(t, active) && ticketMatches(t.legs.map(l=>({chanceRank:legRanks.get(l),market:l.market,prob:l.prob*100,ev:(l.prob*l.dec-1)*100,am:l.cz,start:games.get(l.gameId)?.start,started:l.live,sport:L.id,game:l.gameId})),discovery));
   const playerExposure = new Map<string, { name: string; count: number }>();
   for (const ticket of shown) for (const name of new Set(ticket.legs.map((l) => l.player).filter((p): p is string => !!p))) {
     const key = name.trim().toLowerCase();
@@ -998,6 +1017,8 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
+        <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");}} markets={ALL_MARKETS}/>
+        {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
         {/* INSTRUCTION 42: one pill per category set, up to CFB_PARLAYS.perCategory tickets each; the row scrolls, the page never does */}
         <div className="chip-row -mx-4 mb-2 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Parlay category" data-testid="cfb-parlay-cats">
           {CFB_PARLAY_CATEGORIES.map((k) => {
@@ -1025,7 +1046,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           })}
         </div>
         <div className="mb-3 text-[11px] text-muted">
-          {meta.blurb} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
+          {picked?meta.blurb:"All stored ticket sets. Timing and markets are optional filters; mixed does not require both phases."} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
           {openN > 0 && (
             <span className="text-faint" data-testid="cfb-parlay-open-note">
               {" "}
@@ -1233,14 +1254,14 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
 
         <ul className="mt-3 space-y-1.5">
           {t.legs.map((leg: CfbParlayLeg) => (
-            <li key={leg.rowKey} className="flex items-center gap-2 text-[11.5px]">
+            <li key={leg.rowKey}><div className="flex items-center gap-2 text-[11.5px]">
               <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && baseMarketOf(leg.market) === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
               <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
               {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
               <span className="num shrink-0 text-[10px] text-muted">{fmtPct(leg.prob, 0)}</span>
               <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
-            </li>
+            </div>{games.get(leg.gameId)&&<div className="ml-7 text-[9px] text-muted">{games.get(leg.gameId)!.away.abbr} @ {games.get(leg.gameId)!.home.abbr} · {gameTimeLabel(games.get(leg.gameId)!.start)}<PickContext pick={{sport:nfl?"nfl":"cfb",game:leg.gameId,player:leg.player??undefined,market:leg.market,line:/^[0-9]+(?:\.[0-9]+)?$/.test(leg.rowKey.split("|").at(-1)??"")?Number(leg.rowKey.split("|").at(-1)):null,side:leg.rowKey.includes("|under|")?"u":"o",start:games.get(leg.gameId)!.start}}/></div>}</li>
           ))}
         </ul>
 

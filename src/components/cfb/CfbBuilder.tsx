@@ -1,4 +1,6 @@
 "use client";
+import { GameTimeRange } from "@/components/props/GameTimeRange";
+import { inGameTimeWindow,type GameTimeWindow } from "@/lib/game-time-window";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
@@ -225,14 +227,17 @@ function TicketStack({
   grading?: CfbGradingView | null;
   label: string;
 }) {
+  const [timeWindow,setTimeWindow]=useState<readonly [number,number]>([0,24]);
+  const games=new Map(board?.games.map(g=>[g.id,g])??[]);
+  const shown=tickets.filter(t=>t.legs.every(l=>inGameTimeWindow(games.get(l.gkey)?.start,timeWindow)));
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
-      {tickets.map((t) => (
+    <div><GameTimeRange value={timeWindow} onChange={setTimeWindow}/><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
+      {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} />
         </div>
       ))}
-    </div>
+    </div>{!shown.length&&<p className="text-xs text-muted">No tickets in this game-time window.</p>}</div>
   );
 }
 

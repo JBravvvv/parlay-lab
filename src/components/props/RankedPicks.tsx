@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { inGameTimeWindow, type GameTimeWindow } from "@/lib/game-time-window";
-import { GameTimeRange } from "./GameTimeRange";
+import { type GameTimeWindow } from "@/lib/game-time-window";
+import { PickContext, type PickContextRef } from "./PickContext";
+import { CrossMark } from "./CrossMark";
+import { useCrossSports } from "./useCrossSports";
+import { ALL_MARKETS, type CrossLeg } from "@/lib/cross-sport";
+import { DiscoveryFilters } from "./DiscoveryFilters";
+import { STRATEGIES, marketRanks, discoveryMatches, type DiscoveryFilter } from "@/lib/discovery";
+import { useSport } from "@/lib/sport";
+import { gameTimeLabel } from "@/lib/game-time-window";
 import { GradeChip } from "@/components/ui/GradeChip";
 import { gradeFromEv, gradeRank, type Grade } from "@/lib/grade";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -39,6 +46,8 @@ export type RankedPick<P> = {
   ev: number;
   book?: string | null;
   src?: "model" | "market";
+  context?: PickContextRef;
+  sport?: "mlb" | "nfl" | "cfb";
   started?: boolean;
   start?: string | null;
   alt?: boolean;
@@ -141,6 +150,8 @@ const TIERS: readonly Grade[] = ["S", "A", "B", "C", "D", "F"];
 
 export function RankedPicks<P>({
   picks,
+  convertCross,
+  date = "",
   filters,
   isSel,
   onToggle,
@@ -154,6 +165,8 @@ export function RankedPicks<P>({
   sort: sortProp,
   onSort,
 }: {
+  convertCross?: (leg:CrossLeg)=>P;
+  date?: string;
   picks: readonly RankedPick<P>[];
   /** the category chips, in rail order; "All" is added first */
   filters: readonly RankedFilter[];
@@ -175,6 +188,14 @@ export function RankedPicks<P>({
   sort?: RankedSort;
   onSort?: (s: RankedSort) => void;
 }) {
+  const sport = useSport();
+  const [discovery, setDiscovery] = useState<DiscoveryFilter>({timing:["pregame","live"],markets:filterProp && filterProp!=="all"?[filterProp]:filters.map(f=>f.key),strategies:STRATEGIES.map(s=>s.key),sports:[sport],timeWindow:[0,24]});
+  useEffect(()=>setDiscovery(d=>({...d,sports:[sport]})),[sport]);
+  const filterKeys=filters.map(f=>f.key).join(",");
+  useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:filterKeys.split(",")}));},[filterProp,filterKeys]);
+  const foreign = useCrossSports(date,convertCross?discovery.sports.filter(s=>s!==sport):[]);
+  const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
+  const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks],[picks,crossPicks,discovery.sports,sport]);
   const [own, setOwn] = useState<string>("all");
   const filter = filterProp ?? own;
   const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
@@ -185,25 +206,26 @@ export function RankedPicks<P>({
   const [limit, setLimit] = useState(RANKED_PAGE);
   const graded = useMemo(
     () =>
-      picks
+      allPicks
         .map((p) => ({ ...p, grade: gradeFromEv(p.ev) }))
         .sort((a, b) => gradeRank(b.grade) - gradeRank(a.grade) || b.ev - a.ev || a.label.localeCompare(b.label)),
-    [picks],
+    [allPicks],
   );
   /* the odds range first: the chips count what is inside it, so a category's number is what the range would show */
-  const ranged = useMemo(() => graded.filter(p => inOddsRange(p.am, range) && inGameTimeWindow(p.start, timeWindow)), [graded, range, timeWindow]);
+  const rankedChances=useMemo(()=>marketRanks(graded),[graded]);
+  const ranged = useMemo(() => graded.filter(p => inOddsRange(p.am, range) && discoveryMatches({...p,chanceRank:rankedChances.get(p)},{...discovery,timeWindow})), [graded, range, timeWindow, discovery]);
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of ranged) m.set(p.market, (m.get(p.market) ?? 0) + 1);
     return m;
   }, [ranged]);
-  const shown = useMemo(() => sortRanked(filter === "all" ? ranged : ranged.filter((p) => p.market === filter), sort), [ranged, filter, sort]);
+  const shown = useMemo(() => sortRanked(ranged, sort), [ranged, filter, sort]);
   const tiers = useMemo(() => {
     const m = new Map<Grade, number>();
     for (const p of shown) if (p.grade) m.set(p.grade, (m.get(p.grade) ?? 0) + 1);
     return m;
   }, [shown]);
-  const labelOf = (key: string) => filters.find((f) => f.key === key)?.label ?? key;
+  const labelOf = (key: string) => filters.find((f) => f.key === key)?.label ?? ALL_MARKETS.find(f=>f.key===key)?.label ?? key;
   const pick = (key: string) => {
     setOwn(key);
     onFilter?.(key);
@@ -228,7 +250,7 @@ export function RankedPicks<P>({
           <div className="text-[9px] font-bold uppercase tracking-[0.22em] text-faint">Every pick today</div>
           <div className="text-[13px] font-bold tracking-tight text-text">
             {sort === "grade" ? "Ranked S → F" : sort === "shortest" ? "Shortest price first" : sort === "probability" ? "Highest probability first" : "Longest price first"}
-            {filter !== "all" && <span className="text-muted"> · {labelOf(filter)}</span>}
+            {discovery.markets.length===1 && <span className="text-muted"> · {labelOf(discovery.markets[0])}</span>}
             {rangeLabel && <span className="num text-muted"> · {rangeLabel}</span>}
           </div>
         </div>
@@ -236,19 +258,7 @@ export function RankedPicks<P>({
           {TIERS.map((t) => (tiers.get(t) ? <span key={t}><b className="text-text">{t}</b> {tiers.get(t)}</span> : null))}
         </div>
       </header>
-      <div role="tablist" aria-label="Pick category" className="mt-2 flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible">
-        <button type="button" role="tab" aria-selected={filter === "all"} onClick={() => pick("all")}
-          className={`press h-7 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold ${filter === "all" ? ON[accent] : "border-white/[0.08] bg-surface-2 text-muted"}`}>
-          All <span className="num opacity-70">{ranged.length}</span>
-        </button>
-        {filters.map((f) => (
-          <button key={f.key} type="button" role="tab" aria-selected={filter === f.key} onClick={() => pick(f.key)}
-            className={`press h-7 shrink-0 rounded-full border px-2.5 text-[10.5px] font-semibold ${filter === f.key ? ON[accent] : "border-white/[0.08] bg-surface-2 text-muted"} ${counts.get(f.key) ? "" : "opacity-40"}`}>
-            {f.label} <span className="num opacity-70">{counts.get(f.key) ?? 0}</span>
-          </button>
-        ))}
-      </div>
-      <GameTimeRange value={timeWindow} onChange={setTimeWindow} />
+      <DiscoveryFilters showSports={!!convertCross} markets={convertCross&&discovery.sports.some(s=>s!==sport)?ALL_MARKETS:filters} value={{...discovery,timeWindow}} onChange={v=>{setDiscovery(v);setTimeWindow(v.timeWindow);setLimit(RANKED_PAGE);}} />
       {/* the odds range and the price sort — one thin row under the chips, thumb-sized on the phone */}
       <div data-testid="ranked-odds-row" className="flex items-center gap-1.5 px-3 pb-2 text-[10px] text-faint">
         <span className="shrink-0 font-bold uppercase tracking-[0.12em]">Odds</span>
@@ -298,9 +308,11 @@ export function RankedPicks<P>({
                     <span className="shrink-0 rounded-sm bg-white/[0.06] px-1 text-[8.5px] font-bold uppercase tracking-wide text-muted">{labelOf(p.market)}</span>
                     <span className="truncate">{p.sub}</span>
                     {p.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
-                    {p.started && <span className="shrink-0 text-live">started</span>}
+                    {p.started && <span className="shrink-0 text-live">LIVE</span>}
                     {p.splits}
                   </div>
+                  <div className="mt-1 text-[9px] text-muted">{gameTimeLabel(p.start)}</div>
+                  {p.context && <PickContext pick={p.context}/>}
                   {p.hit && <div className="mt-[3px]">{p.hit}</div>}
                 </div>
                 <span className="num flex shrink-0 flex-col items-end text-[9.5px] leading-none text-muted" title="win % at the posted price · EV at that price">

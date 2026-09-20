@@ -1,7 +1,9 @@
 "use client";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
 import { useState } from "react";
 import { amFmt, decToAm, type SandboxLeg, type TicketCalc } from "@/lib/ticket-math";
+import { CrossMark } from "./CrossMark";
 import { BoardLabel } from "@/components/player/PlayerName";
 
 /**
@@ -37,7 +39,7 @@ export function Slip({
   const anyMarketProb = legs.some((l) => l.src === "market");
   const fairAm = calc.trueProb > 0 ? decToAm(1 / calc.trueProb) : null;
 
-  return (
+  return (<ViewportPortal>
     <div className="pointer-events-none fixed left-0 right-0 z-40 md:left-[calc(200px+2rem)] md:right-8" style={{ bottom }}>
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="pointer-events-auto flex max-h-[45vh] max-w-[720px] flex-col px-3 pb-2 md:px-0 md:pb-4">
@@ -87,7 +89,7 @@ export function Slip({
                   <div key={l.id} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-text">
-                        <BoardLabel label={l.label} /> <span className="text-muted">{l.sub}</span>
+                        {l.cross?<span className="inline-flex items-center gap-1"><CrossMark leg={l.cross}/>{l.label}</span>:<BoardLabel label={l.label} />} <span className="text-muted">{l.sub}</span>
                         {l.phase==="live" && <span className="ml-1 text-[10px] text-live" title={l.quoteAt}>Live quote</span>}
                       </span>
                       <span className="block truncate text-[9.5px] text-faint">{l.game.split(" · ")[0]}</span>
@@ -155,7 +157,7 @@ export function Slip({
         </div>
       </div>
     </div>
-  );
+  </ViewportPortal>);
 }
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: "pos" | "neg" | "text" }) {

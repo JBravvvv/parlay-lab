@@ -121,7 +121,7 @@ export function LegCard({
           <input
             value={value.odds}
             onChange={(e) => set({ odds: e.target.value })}
-            inputMode="decimal"
+            inputMode="text"
             type="text"
             autoComplete="off"
             autoFocus={autoFocus}

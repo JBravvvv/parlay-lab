@@ -1,5 +1,8 @@
 "use client";
 
+import { useCrossSports } from "./useCrossSports";
+import { ALL_MARKETS, type CrossLeg } from "@/lib/cross-sport";
+import { poolOf } from "@/lib/parlay-gen";
 import { moveParlayHistory } from "@/lib/parlay-history";
 import { decodeSetup, encodeSetup } from "@/lib/parlay-gen-setup";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -87,6 +90,8 @@ export type UseParlayGen<P> = {
 
 export function useParlayGen<P>({
   storageKey,
+  sport,
+  convertCross,
   defaultSpec,
   marketKeys,
   positions = NO_POSITIONS,
@@ -99,6 +104,8 @@ export function useParlayGen<P>({
   addLegs,
 }: {
   /** where the open/closed state is remembered — derive it from the league, never a literal */
+  sport?: "mlb" | "nfl" | "cfb";
+  convertCross?: (leg:CrossLeg)=>P;
   storageKey: string;
   defaultSpec: GenSpec;
   /** the market keys this desk's generator understands — the rail sync ignores anything else */
@@ -147,7 +154,7 @@ export function useParlayGen<P>({
     [storageKey],
   );
 
-  const [spec, setSpec] = useState<GenSpec>(defaultSpec);
+  const [spec, setSpec] = useState<GenSpec>({...defaultSpec,...(sport?{sports:[sport]}:{})});
   /* INSTRUCTION 67 (2026-09-17): "settle-book only" keeps legs priced at the selected sportsbook — DraftKings by default */
   const selectedBook = useSportsbook();
   const pricingBook = BOOKS.find((b) => b.key === selectedBook)?.short ?? SETTLE_BOOK_SHORT;
@@ -160,25 +167,25 @@ export function useParlayGen<P>({
   const [savedSetup, setSavedSetup] = useState<GenSpec | null>(null);
   const [setupNotice, setSetupNotice] = useState<string | null>(null);
   useEffect(() => {
-    try { setSavedSetup(decodeSetup(localStorage.getItem(`${storageKey}:setup`), marketKeys, positions)); }
+    try { setSavedSetup(decodeSetup(localStorage.getItem(`${storageKey}:setup`), sport ? ALL_MARKETS.map(m=>m.key) : marketKeys, positions)); }
     catch { setSavedSetup(null); }
   }, [storageKey, marketKeys, positions]);
   const saveSetup = () => {
     try {
       const raw = encodeSetup(spec);
       localStorage.setItem(`${storageKey}:setup`, raw);
-      setSavedSetup(decodeSetup(raw, marketKeys, positions));
+      setSavedSetup(decodeSetup(raw, sport ? ALL_MARKETS.map(m=>m.key) : marketKeys, positions));
       setSetupNotice("Setup saved on this device. Players will rotate from the current board.");
     } catch { setSetupNotice("This browser could not save the setup. You can keep building."); }
   };
   const loadSetup = () => {
     if (!savedSetup) return;
     leaveRecall();
-    onMarket(savedSetup.market);
+    if (marketKeys.includes(savedSetup.market)) onMarket(savedSetup.market);
     setSpec({...savedSetup,...(defaultSpec.phase?{phase:savedSetup.phase??"pregame"}:{})});
     setSetupNotice("Saved setup loaded. Pins cleared; picks use the current board.");
   };
-  type Snapshot = { spec: GenSpec; result: GenResult<P> };
+  type Snapshot = { spec: GenSpec; result: GenResult<P>; historical?:boolean };
   const past = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
   const [, refreshHistory] = useState(0);
@@ -204,7 +211,14 @@ export function useParlayGen<P>({
      dependency change. A closed sheet gets the empty pool, which the generator answers with
      `no-rows` at no cost. */
   const poolSpec = useMemo(() => ({ market: spec.market, markets: spec.markets, includeStarted: spec.includeStarted, phase: spec.phase }), [spec.market, spec.markets, spec.includeStarted, spec.phase]);
-  const pool = useMemo(() => (open ? excludePlayers(build(poolSpec, nowMs), excludedKeys) : emptyPool<P>()), [open, build, poolSpec, nowMs, excludedKeys]);
+  const foreign = useCrossSports(boardKey,open && sport ? (spec.sports??[sport]).filter(s=>s!==sport) : []);
+  const pool = useMemo(() => {
+    if(!open)return emptyPool<P>();
+    const local=build(poolSpec,nowMs);
+    const localLegs=(!sport || (spec.sports??[sport]).includes(sport))?local.legs.map(l=>({...l,sport:sport??l.sport,context:l.context??(sport?{sport,game:l.gameKey,player:l.label,market:l.market,line:l.line,side:l.side,start:l.start}:undefined)})):[];
+    const cross=convertCross?foreign.legs.filter(l=>(spec.markets?.length?spec.markets:[spec.market]).includes(l.market??"")).map(l=>({...l,leg:convertCross(l.leg)})):[];
+    return excludePlayers(poolOf([...localLegs,...cross],local),excludedKeys);
+  },[open,build,poolSpec,nowMs,excludedKeys,spec.sports,sport,foreign.legs,convertCross,spec.markets,spec.market]);
   const generated = useMemo<GenResult<P>>(
     () =>
       open
@@ -247,8 +261,8 @@ export function useParlayGen<P>({
     const snapshot = moveParlayHistory(from, to, { spec, result });
     if (!snapshot) return;
     setSpec(snapshot.spec);
-    onMarket(snapshot.spec.market);
-    setRecalled(snapshot);
+    if(marketKeys.includes(snapshot.spec.market))onMarket(snapshot.spec.market);
+    setRecalled({...snapshot,historical:true});
     setSetupNotice(null);
   };
   useEffect(() => {
@@ -283,7 +297,7 @@ export function useParlayGen<P>({
     }
     /* a category-set edit (2026-09-18): the rail must keep showing a category that is ON the
        ticket, so dropping the rail's own category moves the rail to the first one left */
-    const nextMarkets = patch.markets === undefined ? undefined : [...new Set(patch.markets)].filter((m) => marketKeys.includes(m));
+    const nextMarkets = patch.markets === undefined ? undefined : [...new Set(patch.markets)].filter((m) => (sport ? ALL_MARKETS.map(x=>x.key) : marketKeys).includes(m));
     const railMove = nextMarkets?.length && !nextMarkets.includes(spec.market) ? nextMarkets[0] : null;
     setSpec((sp) => {
       const next: GenSpec = { ...sp, ...patch };
@@ -293,12 +307,12 @@ export function useParlayGen<P>({
         else if (!nextMarkets.length) next.markets = undefined;
         if (setKey(next.markets ?? [next.market]) !== setKey(sp.markets ?? [sp.market])) next.pinned = blankPins(next.legs);
       }
-      if (patch.timeWindow !== undefined || patch.noMarkets) next.pinned = blankPins(next.legs);
+      if (patch.timeWindow !== undefined || patch.noMarkets || patch.timing || patch.sports || patch.strategies) next.pinned = blankPins(next.legs);
       if (patch.phase != null && patch.phase !== sp.phase) next.pinned = blankPins(next.legs);
       if (patch.legs != null && patch.legs !== sp.legs) next.pinned = blankPins(patch.legs);
       return next;
     });
-    if (railMove) onMarket(railMove);
+    if (railMove && marketKeys.includes(railMove)) onMarket(railMove);
   };
 
   /* UNPINNING ALWAYS WORKS (INSTRUCTION 50 fix pass). This used to open with `if (!gen.ok)
@@ -307,20 +321,12 @@ export function useParlayGen<P>({
      Clearing a pin reads the id from the SPEC, which is always available; only SETTING a new
      pin needs a ticket. */
   const togglePin = (slot: number) => {
-    leaveRecall();
-    setSetupNotice(null);
-    setSpec((sp) => {
-      const pinned = Array.from({ length: sp.legs }, (_, k) => sp.pinned[k] ?? null);
-      if (pinned[slot]) {
-        pinned[slot] = null;
-        return { ...sp, pinned };
-      }
-      if (!result.ok) return sp;
-      const id = result.ticket.legs[slot]?.id;
-      if (!id) return sp;
-      pinned[slot] = id;
-      return { ...sp, pinned };
-    });
+    if(slot<0||slot>=spec.legs)return;
+    const pinned=Array.from({length:spec.legs},(_,k)=>spec.pinned[k]??null);
+    if(pinned[slot])pinned[slot]=null;
+    else if(result.ok&&result.ticket.legs[slot])pinned[slot]=result.ticket.legs[slot].id;
+    else return;
+    const next={...spec,pinned};setSpec(next);setRecalled({spec:next,result});setSetupNotice(null);
   };
 
   const excludePlayer = (slot: number) => {
@@ -374,7 +380,7 @@ export function useParlayGen<P>({
     }
     if(spec.phase){
       const current=build(poolSpec,Date.now());
-      if(result.ticket.legs.some(l=>{const fresh=current.byId.get(l.id);return !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||fresh.quoteAt!==l.quoteAt;})){
+      if(result.ticket.legs.some(l=>{const fresh=l.sport && sport && l.sport!==sport ? pool.byId.get(l.id) : current.byId.get(l.id);return (!l.started && !!l.start && Date.parse(l.start)<=Date.now()) || (l.started && (!l.quoteAt || Date.now()-Date.parse(l.quoteAt)>(l.sport==="mlb"||sport==="mlb"&&!l.sport?1_800_000:600_000))) || !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||(fresh.push??0)!==(l.push??0)||fresh.quoteAt!==l.quoteAt;})){
         setSetupNotice("These quotes changed or are no longer available. Regenerate before adding to the slip.");return;
       }
     }
@@ -402,7 +408,7 @@ export function useParlayGen<P>({
     spin,
     back: () => navigate("back"), forward: () => navigate("forward"),
     canBack: past.current.length > 0, canForward: future.current.length > 0,
-    historyNotice: recalled ? "Previous ticket · saved quotes, not refreshed. Regenerate to use the current board." : null,
+    historyNotice: recalled?.historical ? "Previous ticket · saved quotes, not refreshed. Regenerate to use the current board." : null,
     add,
     undo,
     canUndo: added && prevLegs.current != null,

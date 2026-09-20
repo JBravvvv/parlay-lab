@@ -178,7 +178,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(section).toMatch(/className="chip-row -mx-4 mb-2 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Parlay category" data-testid="cfb-parlay-cats"/);
     expect(section).toMatch(/\{CFB_PARLAY_CATEGORIES\.map\(\(k\) => \{/);
     expect(section).toMatch(/const sets = picks\.sets;/);
-    expect(section).toMatch(/const all: CfbParlay\[\] = sets\[cat\] \?\? \[\];/);
+    expect(section).toContain("Object.values(sets).flat()");
     // the legacy three-view strip is gone
     expect(board).not.toMatch(/const VIEWS/);
     expect(board).not.toMatch(/"MIXED PARLAYS"/);
@@ -199,7 +199,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
   it("the tier filter (ALL / SAFER / LONGSHOTS / MIXED) still sits under the category row", () => {
     expect(board).toMatch(/\["LONGSHOT", "LONGSHOTS"\],\n  \["MIX", "MIXED"\],/);
     expect(section.indexOf('data-testid="cfb-parlay-cats"')).toBeLessThan(section.indexOf("{filters.map(([k, label]) => {"));
-    expect(section).toMatch(/const shown = all\.filter\(\(t\) => match\(t, active\)\);/);
+    expect(section).toContain("match(t, active) && ticketMatches");
   });
   it("SHOW_CAP is 50 — the whole category set can show on phones (rank badges, PHONE_CHUNK at a time) and in the desktop grid", () => {
     expect(board).toMatch(/const SHOW_CAP = 50;/);

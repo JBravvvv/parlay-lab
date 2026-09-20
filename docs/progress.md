@@ -1,3 +1,10 @@
+# Progress — 2026-09-19 (remaining discovery, live context and research release)
+
+- Completed the second-session implementation requested by Josh: shared multiselect discovery, cross-sport stored-board candidates and slip payloads, market-relative parlay strategies, live quote freshness and stat progress, restored Stats splits, ballpark grade/order/evidence/pick previews, signed mobile price fields and density choices.
+- Browser validation used a clearly labeled temporary captured-fixture page, removed before release. At phone size, locks, seven-level history, forward, exclusions and slip Add passed; no horizontal overflow at phone/desktop widths. Exact vertical option halves the same content from 3,745.65625 to 1,872.828125 pixels with width unchanged. Compact preserves normal text/portrait proportions and is the default.
+- No new odds purchases, automated-paper policy changes, ledger writes or simulation changes. Live suggestions require posted recent quotes; missing data is not fabricated. Park explanations use actual environmental factors, without invented pitch-zone claims. Same-game estimates remain labeled as unmodeled correlation.
+- TypeScript and the full serial suite passed: 3,621 tests across 235 files. Deployment evidence follows after production verification. Implementation details and limits: `september-19-phases.md`.
+
 ## 2026-09-19 — phased generator update, Phase 1 (deployed)
 
 Probability visibility and sort, player matchup/time, compact leg/lock/game controls, actions below picks, mixed timing as an allowed union, 0–80% MLB historical hit floor, signed-keyboard odds entry, multi-select markets and hourly Pacific start windows on generator/Every Pick Today. No auto-card pricing, paper-budget or fetch-budget changes. Remaining phase map and validation boundaries: `docs/september-19-phases.md`. TypeScript passed; full serial suite 3598/3598 across 234 files passed; production build passed. Deployed: 7ee44f2 → parlay-yzb99bcwj, Ready/production; public /api/version confirmed the exact commit. Populated NFL mobile ticket, lock/regenerate, probability sort and no horizontal overflow verified on production.

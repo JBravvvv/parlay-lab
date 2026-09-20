@@ -433,8 +433,8 @@ describe("2026-09-18 compaction — the sheet takes less of the phone and says t
   });
   it("Timing is a select when the spec has a phase, and the mixed rule is spelled out per side", () => {
     const mixed = sheet({ spec: { ...SPEC, phase: "mixed" } });
-    expect(mixed).toMatch(/<select [^>]*aria-label="Timing"/);
-    expect(mixed).toMatch(/<option value="mixed" selected="">Mixed<\/option>/);
+    expect(mixed).toMatch(/<summary [^>]*aria-label="Timing"/);
+    expect(mixed).toContain("Timing: All");expect(mixed).toContain("Pre-Game");expect(mixed).toContain("Live");
     const ctx = { marketLabel: "HR", legs: 3, loAm: -152, hiAm: 110, phase: "mixed" as const, boardAt: "7:03 PM" };
     const noLive = genFailLine({ code: "phase-empty", pregame: 34, live: 0 }, ctx);
     expect(noLive).toContain("Mixed permits pregame, live, or any combination");

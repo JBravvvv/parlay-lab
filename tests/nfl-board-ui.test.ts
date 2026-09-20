@@ -162,7 +162,8 @@ describe("nfl-board-ui — NflPicksBoard renders the NFL desk's copy", () => {
     expect(html).toContain("No NFL games");
     expect(html).toContain("No NFL games on ");
     expect(html).not.toContain("FBS");
-    expect(html).not.toContain("CFB");
+    expect(html).not.toContain("No CFB games");
+    expect(html).toContain("Sports: NFL");
     expect(html).not.toContain("College Football");
     /* the NFL tone reaches the widgets: the Segmented scope control and the stat tiles carry the nfl accent, never cfb */
     expect(html).not.toMatch(/\bis-cfb\b/);

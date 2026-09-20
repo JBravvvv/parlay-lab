@@ -1,5 +1,10 @@
 "use client";
 
+import { PickContext } from "./PickContext";
+import { CrossMark } from "./CrossMark";
+import type { CrossLeg } from "@/lib/cross-sport";
+import { DiscoveryFilters } from "./DiscoveryFilters";
+import { STRATEGIES } from "@/lib/discovery";
 import { GameTimeRange } from "./GameTimeRange";
 import { MultiSelect } from "./MultiSelect";
 import { gameTimeLabel } from "@/lib/game-time-window";
@@ -407,9 +412,9 @@ function Slot<P>({
       {/* the slot number (2026-09-18, Josh: "numbers next to the picks generated so its easy to see
           how many picks if someone is looking over your shoulder") */}
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
-      {renderMark({ leg: l.leg, gen: l, name, team })}
+      {(l.leg as {cross?:CrossLeg}).cross ? <CrossMark leg={(l.leg as {cross:CrossLeg}).cross}/> : renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
-        {renderName({ leg: l.leg, gen: l, name, team })}
+        {(l.leg as {cross?:CrossLeg}).cross ? <span className="text-[12px] font-semibold">{name}</span> : renderName({ leg: l.leg, gen: l, name, team })}
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
           <span className="truncate text-muted">{l.sub}</span>
           {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
@@ -426,6 +431,7 @@ function Slot<P>({
         <div className="mt-1 text-[9px] text-text" title="Estimated chance of this leg winning. A grade measures value at the posted price, not certainty.">
           {l.src === "market" ? "Market estimate" : "Model probability"} <strong className="num">{l.prob.toFixed(1)}%</strong>
         </div>
+        {l.context && <PickContext pick={l.context}/>}
         {l.hit && hitWindow != null && (
           <div className="mt-[3px] hidden items-center gap-1.5 sm:flex">
             <HitChip stat={l.hit} window={hitWindow} />
@@ -642,13 +648,13 @@ export function GenSheet<P>({
   const ticket = result.ok ? result.ticket : null;
   /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
      the headline here still cannot disagree with the slip the legs are handed to */
-  const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob }))) : null;
+  const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob, push: l.push }))) : null;
   const outside = new Set(ticket?.outsideLegBand ?? []);
   const anyMarketProb = !!ticket?.legs.some((l) => l.src === "market");
   const mkt = markets.find((m) => m.key === market);
   const suspended = !!mkt?.suspended;
   /* a yes-only market (anytime TD) has no under to pick, so the side control is not offered on it */
-  const oneSided = !!mkt?.oneSided;
+  const oneSided = selectedMarkets.length > 0 && selectedMarkets.every(key => markets.find(m=>m.key===key)?.oneSided);
   const fail = result.ok ? null : result.fail;
   // A bounded payout search can succeed on another seed. Keep Generate usable and
   // offer explicit filter repairs separately, without silently changing the request.
@@ -783,15 +789,9 @@ export function GenSheet<P>({
               <Select label="Sides" value={spec.sides} onChange={(v) => onSpec({ sides: v as GenSpec["sides"] })}
                 options={[{ value: "o", label: "Overs" }, { value: "u", label: "Unders" }, { value: "both", label: "Both" }]} />
             )}
-            {spec.phase && (
-              <Select label="Timing" value={spec.phase} title={spec.phase === "pregame" ? "upcoming games only" : spec.phase === "live" ? "in-play prices only" : "upcoming + in-play"}
-                onChange={(v) => { const phase = v as NonNullable<GenSpec["phase"]>; onSpec({ phase, includeStarted: phase !== "pregame" }); }}
-                options={[{ value: "pregame", label: "Pregame" }, { value: "live", label: "Live" }, { value: "mixed", label: "Mixed" }]} />
-            )}
           </div>
-
-          <MultiSelect title={typeof categoryNote === "string" ? categoryNote : undefined} label="Markets" options={markets} value={spec.noMarkets ? [] : selectedMarkets} onChange={values => onSpec({ markets: values, noMarkets: values.length === 0 })} />
-          <GameTimeRange value={spec.timeWindow} onChange={timeWindow => onSpec({ timeWindow })} />
+          <div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div>
+          <p className="text-[9px] text-faint">Styles use probability and value within each market. Stacks need same-game permission; shared-game probabilities are not a joint forecast. Hedge-Friendly favors later starts; hedging is never guaranteed.</p>
 
           {/* per-leg odds band */}
           <div>

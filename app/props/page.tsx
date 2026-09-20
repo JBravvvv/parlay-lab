@@ -1,4 +1,7 @@
 "use client";
+import { crossToMlb } from "@/lib/cross-adapters";
+import { poolOf, type GenLeg } from "@/lib/parlay-gen";
+import { ALL_MARKETS } from "@/lib/cross-sport";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -18,7 +21,7 @@ import { CfbProps } from "@/components/cfb/CfbProps";
 import { NflProps } from "@/components/nfl/NflProps";
 import type { PickRow, PropBoardGame } from "@/engine";
 import { amToDec, combineTicket, type SandboxLeg } from "@/lib/ticket-math";
-import { useHeadshots } from "@/lib/mlb-visuals";
+import { clubFromLabel, useHeadshots } from "@/lib/mlb-visuals";
 import { parseBoardLabel } from "@/lib/player-card";
 import { MarketNav } from "@/components/props/MarketNav";
 import { PropGameCard } from "@/components/props/PlayerRow";
@@ -26,7 +29,7 @@ import { GameMarketCard, TeamAvatar } from "@/components/props/GameCard";
 import { RankedPicks, RankedViewTabs, type RankedFilter, type RankedPick } from "@/components/props/RankedPicks";
 import { HitChip } from "@/components/props/HitChip";
 import { LeanChip } from "@/components/ui/LeanChip";
-import { bookName } from "@/lib/sportsbook/books";
+import { BOOKS, bookName } from "@/lib/sportsbook/books";
 import { Slip } from "@/components/props/Slip";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
 import {HR_MARKET,liveMarketBoard,marketPhaseBoard} from "@/lib/mlb/market-board";
@@ -42,6 +45,7 @@ import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { useShellInsets } from "@/components/props/useShellInsets";
 import {
+  teamTag,
   MARKETS,
   MKT_LABEL,
   bothSides,
@@ -234,13 +238,23 @@ function PropsDesk() {
     (sp: GenPoolSpec, at: number) => {
       at = at ? Date.now() : 0;
       const currentLive=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
-      return buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at,hitSource);
+      const pool=buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at,hitSource);
+      const legs=pool.legs.map(l=>({...l,context:{sport:"mlb" as const,game:String(d?.gameInfo?.[l.gameKey]?.pk??l.gameKey),player:l.label,market:l.market,line:l.line,side:l.side,start:l.start}}));
+      const wanted=sp.markets?.length?sp.markets:[sp.market];
+      const sideLegs:GenLeg<SandboxLeg>[]=[];
+      for(const market of ["ml","rl"])if(wanted.includes(market))for(const r of bothSides((d?.categories?.[market]??[]) as PickRow[])){
+       const start=r.gkey?d?.gameInfo?.[r.gkey]?.start:undefined;if(!start||Date.parse(start)<=at||typeof r.cz!=="number"||typeof r.prob!=="number")continue;
+       const id=legId(r),label=String(r.label??""),sub=String(r.sub??""),game=String(r.game??""),book=BOOKS.find(b=>b.key===r.displayBook)?.short??"DK";
+       sideLegs.push({id,am:r.cz,dec:amToDec(r.cz),prob:r.prob,ev:r.prob/100*amToDec(r.cz)-1,src:"model",side:"o",label,sub,market,gameKey:String(r.gkey??game),playerKey:`side:${r.gkey}`,team:clubFromLabel(label)?teamTag(clubFromLabel(label)!):null,started:false,alt:false,book,start,gameLabel:game,leg:{id,label,sub,game,cz:r.cz,prob:r.prob,market,book,src:"model"}});
+      }
+      return poolOf([...legs,...sideLegs],pool);
     },
     [propBoard,liveOverlay,d,liveNow,hitSource],
   );
   const gen = useParlayGen<SandboxLeg>({
+    sport:"mlb",convertCross:crossToMlb,
     storageKey: GEN_OPEN_KEY,
-    defaultSpec: {...GEN_SPEC_DEFAULT,phase:params.get("phase")==="live"?"live":params.get("phase")==="mixed"?"mixed":"pregame"},
+    defaultSpec: {...GEN_SPEC_DEFAULT,markets:["ml","rl",...GEN_MARKETS],sides:"both",preferDiversity:true,spread:false,phase:params.get("phase")==="live"?"live":params.get("phase")==="mixed"?"mixed":"pregame"},
     marketKeys: GEN_MARKETS,
     railMarket: cat,
     boardKey: q.data?.date ?? "",
@@ -369,6 +383,7 @@ function PropsDesk() {
       const team = parsed?.team ?? l.team;
       out.push({
         id: l.id,
+        context:{sport:"mlb",game:String(d?.gameInfo?.[l.gameKey]?.pk??l.gameKey),player:l.label,market:l.market,line:l.line,side:l.side,start:l.start},
         start: l.start,
         market: l.market ?? spec.market,
         label: name,
@@ -468,7 +483,7 @@ function PropsDesk() {
       <GenSheet
         market={spec.market}
         marketLabel={MKT_LABEL[spec.market] ?? spec.market}
-        markets={MLB_GEN_MARKETS}
+        markets={spec.sports && spec.sports.some(s=>s!=="mlb") ? ALL_MARKETS : [{key:"ml",label:"ML"},{key:"rl",label:"Run Line"},...MLB_GEN_MARKETS]}
         pool={pool}
         renderMark={({ name, team }) => (
           <PlayerMark player={name} team={team} headshot={headshots[name] ?? null} size="sm" />
@@ -495,7 +510,7 @@ function PropsDesk() {
         onOpen={gen.setOpen}
         boardAt={boardAtLabel}
         loading={q.isPending || browseProps.loading}
-        gameMarket={gameTab}
+        gameMarket={false}
         showHitRate
         hitWindow={hitWindow}
         onHitWindow={setHitWindow}
@@ -540,6 +555,7 @@ function PropsDesk() {
       {view === "ranked" ? (
         <div className={legs.length ? "pb-20" : "pb-6"}>
           <RankedPicks
+            convertCross={crossToMlb} date={q.data?.date ?? ""}
             picks={rankedPicks}
             filters={RANKED_FILTERS}
             filter={rankedFilter}

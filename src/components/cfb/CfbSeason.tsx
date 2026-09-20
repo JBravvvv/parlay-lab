@@ -322,9 +322,8 @@ export function CfbSeason() {
                   <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                     Price
                     <input
-                      type="number"
-                      inputMode="numeric"
-                      step="5"
+                      type="text"
+                      inputMode="text"
                       value={priceText}
                       onChange={(e) => setPriceText(e.target.value)}
                       aria-label="Book price (American)"

@@ -1,4 +1,10 @@
 "use client";
+import { amToDec } from "@/lib/ticket-math";
+import { PickContext } from "@/components/props/PickContext";
+import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
+import { CrossBoardResults } from "@/components/props/CrossBoardResults";
+import { ALL_MARKETS } from "@/lib/cross-sport";
+import { STRATEGIES,marketRanksBy,discoveryMatches,type DiscoveryFilter } from "@/lib/discovery";
 import {useBrowseProps} from "@/lib/mlb/useBrowseProps";
 import { SplitsChip } from "@/components/ui/SplitsChip";
 import { LeanChip } from "@/components/ui/LeanChip";
@@ -169,6 +175,7 @@ function MlbBoardPage() {
      without going through a named client. `onFallback` is the browser re-price, which runs on every
      failure EXCEPT the 45-minute limiter refusing — see that module. */
   const liveBoard = useLiveBoardReprice({ onFallback: () => regen.mutate() });
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
   const [scope, setScope] = useState<Scope>("top");
@@ -269,9 +276,10 @@ function MlbBoardPage() {
     [pkOf, lineups.data],
   );
   const rowOut = useCallback((r: PickRow) => isOut(r.label, marketOfLkey(r.lkey), r.gkey), [isOut]);
+  const rowRanks=useMemo(()=>marketRanksBy(rows,r=>String(r.market??marketOfLkey(r.lkey)??cat),r=>r.label??"",r=>Number(r.prob??0)),[rows,cat]);
   const visibleRows = useMemo(
-    () => rows.filter((r) => nameHit(r.label) && !cz.isHidden(`${r.label}|${r.sub}`) && (showScratched || !rowOut(r))),
-    [rows, cz, showScratched, rowOut, nameHit],
+    () => rows.filter((r) => nameHit(r.label) && discoveryMatches({chanceRank:rowRanks.get(r),market:String(r.market??marketOfLkey(r.lkey)??cat),prob:Number(r.prob??0),am:Number(r.cz??NaN),ev:Number(r.czEv??-Infinity),start:r.gkey?d?.gameInfo?.[r.gkey]?.start:undefined,started:!!r.live,sport:"mlb"},discovery) && !cz.isHidden(`${r.label}|${r.sub}`) && (showScratched || !rowOut(r))),
+    [rows, cz, showScratched, rowOut, nameHit, discovery, d, cat],
   );
   const scratchedHere = useMemo(() => new Set(rows.filter(rowOut).map((r) => `${r.label}|${r.sub}`)).size, [rows, rowOut]);
   // distinct PICKS, not hidden row occurrences — one pick can sit in this list
@@ -935,7 +943,7 @@ function MlbBoardPage() {
             <div className={pickOut(p) ? "opacity-50" : undefined}>
               {/* INSTRUCTION 70 (2026-09-17): headshot + his team's logo on every player pick, the club's
                   logo on a team pick — BoardLabel draws whichever the label names, never a guess */}
-              {p.player ? <BoardLabel label={p.player} /> : null}{" "}
+              {p.player ? <BoardLabel label={p.player} /> : null}<PickContext pick={{sport:"mlb",game:String(pkOf(p.gkey)??""),player:p.player??undefined,market:p.market??cat,line:p.line,side:p.side==="u"?"u":"o",start:p.start}}/>{" "}
               <span className="text-muted">
                 {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>
@@ -1008,9 +1016,10 @@ function MlbBoardPage() {
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cat, cz.hidden, pickOut, pickKey, pickSettled, pickQuote, livePricedAt, mine, pickHits.logs, hitWindow, leanIndex]);
+  const pickRanks=useMemo(()=>marketRanksBy(pickRows??[],p=>p.market??cat,p=>p.player??"",p=>p.prob??0),[pickRows,cat]);
   const visiblePicksAll = useMemo(
-    () => (pickRows ?? []).filter((p) => nameHit(p.player) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
-    [pickRows, cz, pickKey, showScratched, pickOut, nameHit],
+    () => (pickRows ?? []).filter((p) => nameHit(p.player) && discoveryMatches({chanceRank:pickRanks.get(p),market:p.market??cat,am:p.cz??NaN,prob:p.prob??0,ev:p.cz!=null&&p.prob!=null?(p.prob/100*amToDec(p.cz)-1)*100:-Infinity,start:p.start,started:false,sport:"mlb"},discovery) && !cz.isHidden(pickKey(p)) && (showScratched || !pickOut(p))),
+    [pickRows, cz, pickKey, showScratched, pickOut, nameHit, discovery, cat],
   );
   // the every-market ALL view is thousands of lines — cap the render, search narrows it
   const capped = allRows != null && visiblePicksAll.length > ALL_SCOPE_CAP;
@@ -1461,6 +1470,8 @@ function MlbBoardPage() {
         </div>
       )}
 
+      <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");setScope("all");setLive(v.timing.length===1&&v.timing[0]==="live");}} markets={ALL_MARKETS}/>
+      {discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={board?.date??""} filter={discovery}/>}
       {isPending || regen.isPending ? (
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>
           <div className="mb-3 text-[12px] text-muted">
@@ -1477,7 +1488,7 @@ function MlbBoardPage() {
           onRetry={() => refetch()}
         />
       ) : live ? (
-        <LiveOpportunities games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError} />
+        <LiveOpportunities filter={discovery} info={d?.gameInfo} games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError} />
       ) : pickRows && pickRows.length > 0 ? (
         /* THE DAY'S PICKS (2026-08-08): stamped top-N from the stored board — the same
            cohort /api/picks serves and the grading records. Never empty by clock. */
@@ -1546,8 +1557,11 @@ function MlbBoardPage() {
         </>
       )}
 
-      {d && !live && (
+      {!live&&discovery.timing.includes("live")&&liveMarkets.length>0&&<LiveOpportunities filter={discovery} info={d?.gameInfo} games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError}/> }
+      {d && (
         <ParlaysSection
+          date={board?.date}
+          gameInfo={d?.gameInfo}
           parlays={d.parlays ?? []}
           mixed={d.parlaysMixed ?? []}
           live={d.parlaysLive ?? []}

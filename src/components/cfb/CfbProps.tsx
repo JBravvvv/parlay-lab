@@ -1,4 +1,11 @@
 "use client";
+import { footballTeamKey } from "@/lib/football/team-key";
+import { useLiveClock } from "@/lib/use-live-clock";
+import { crossToFootball } from "@/lib/cross-adapters";
+import { amToDec } from "@/lib/ticket-math";
+import { marketWord } from "@/lib/cfb/markets";
+import { poolOf, type GenLeg } from "@/lib/parlay-gen";
+import { ALL_MARKETS } from "@/lib/cross-sport";
 import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFootballPrices";
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {bookName} from "@/lib/sportsbook/books";
@@ -151,6 +158,7 @@ function legOf(game: CfbGame, row: CfbRow, q: CfbQuote): CfbSlipLeg {
     cz: q.price,
     book: bookTag(q),
     prob: p.win * 100,
+    push: (p.push ?? 0) * 100,
     // INSTRUCTION 46: the side's own team for the slip mark; a total carries the pair instead
     team: baseMarketOf(row.market) === "total" ? null : row.side === "home" ? game.home : game.away,
     pair: baseMarketOf(row.market) === "total" ? { away: game.away, home: game.home } : null,
@@ -822,7 +830,7 @@ export function CfbProps() {
     retry: 1,
   });
 
-  const calc = useMemo(() => combineTicket(legs.map((l) => ({ cz: l.cz, prob: l.prob }))), [legs]);
+  const calc = useMemo(() => combineTicket(legs.map((l) => ({ cz: l.cz, prob: l.prob, push: l.push }))), [legs]);
   const pickedByGame = useMemo(
     () => new Map(legs.filter((l) => l.kind === "side").map((l) => [l.gameId, l.key])),
     [legs],
@@ -886,13 +894,16 @@ export function CfbProps() {
 
      A PURE READER: no fetch, no extra market on any pull, not one Odds credit, no money seated
      and no ledger row. The rows are the board that is already on the device. */
+  const liveClock=useLiveClock();
   const buildGenPool = useCallback(
-    (sp: GenPoolSpec, at: number) =>
-      footballGenPool<CfbSlipLeg>(board?.rows ?? [], sp, {
+    (sp: GenPoolSpec, at: number) => {
+      const props=footballGenPool<CfbSlipLeg>(board?.rows ?? [], sp, {
         mode,
-        nowMs: at,
+        nowMs: at ? Date.now() : 0,
+        pricedAt: board?.pricedAt,
+        liveMaxAgeMs: L.props.liveRevalidateSec * 1000,
         /* the row's own team tag, folded to one spelling per club — never guessed */
-        teamOf: (row) => row.teamAbbr ?? row.team,
+        teamOf: (row) => footballTeamKey(row, gameById.get(row.gameId)),
         positionOf,
         quoteOf: propQuote,
         legOf: (row, q) => {
@@ -906,20 +917,28 @@ export function CfbProps() {
           const team = g && teamId ? (teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null) : null;
           return { ...leg, team, imageTeamIds: g ? [g.home.id, g.away.id] : [], headshot: row.headshot ?? player?.headshot ?? null, pos: positionOf(row) };
         },
-      }),
-    [board, mode, gameById, positionOf, rosterPlayer],
+      });
+      const wanted=sp.markets?.length?sp.markets:[sp.market];const sideLegs:GenLeg<CfbSlipLeg>[]=[];
+      for(const g of gameById.values())if(g.status==="upcoming"&&Date.parse(g.start)>at)for(const r of g.rows){
+       if(!wanted.includes(r.market))continue;const q=quoteFor(r,mode);if(!q)continue;const leg=legOf(g,r,q);if(!(leg.prob>0))continue;
+       sideLegs.push({id:r.key,am:q.price,dec:amToDec(q.price),prob:leg.prob,push:leg.push,ev:leg.prob/100*amToDec(q.price)+(leg.push??0)/100-1,src:"model",side:r.side==="under"?"u":"o",label:leg.label,sub:marketWord(r.market),leg,gameKey:g.id,playerKey:`side:${g.id}`,team:footballTeamKey(r,g),started:false,alt:false,book:leg.book,market:r.market,start:g.start,gameLabel:`${g.away.abbr} @ ${g.home.abbr}`});
+      }
+      return poolOf([...props.legs,...sideLegs],props);
+    },
+    [board, mode, gameById, positionOf, rosterPlayer, L.props.liveRevalidateSec,liveClock],
   );
   const gen = useParlayGen<CfbSlipLeg>({
     /* derived from the league, never a literal: one desk's remembered state must not be the
        other's, and a hardcoded league key here is exactly what the separation tests forbid */
+    sport:L.id,convertCross:crossToFootball,
     storageKey: `pl:${L.id}:props:gen-open`,
-    defaultSpec: GEN_SPEC_DEFAULT,
+    defaultSpec: {...GEN_SPEC_DEFAULT,markets:ALL_MARKETS.filter(m=>!m.key.startsWith("batter_")&&!m.key.startsWith("pitcher_")&&m.key!=="rl").map(m=>m.key),sides:"both",phase:"mixed",includeStarted:true,preferDiversity:true,spread:false},
     marketKeys: GEN_MARKET_KEYS,
     positions: FOOTBALL_POSITIONS,
     railMarket: nav === "sides" ? null : nav,
     boardKey: date,
     build: buildGenPool,
-    onMarket: (m) => setNav(m as CfbPropMarket),
+    onMarket: (m) => setNav(GEN_MARKET_KEYS.includes(m)?m as CfbPropMarket:"sides"),
     legs,
     setLegs,
     /* "Add to slip" ADDS, through the desk's OWN adder (INSTRUCTION 52 fix pass) — see addCfbLegs
@@ -943,13 +962,13 @@ export function CfbProps() {
      quote (the very leg a tap on the card mints), props off the generator's pool over every
      category. Same rows, same prices, same win %; nothing new is priced here. */
   const rankedPool = useMemo(
-    () => buildGenPool({ market: GEN_MARKET_KEYS[0], markets: GEN_MARKET_KEYS, includeStarted: false }, gen.nowMs),
+    () => buildGenPool({ market: GEN_MARKET_KEYS[0], markets: GEN_MARKET_KEYS, includeStarted: true, phase: "mixed" }, gen.nowMs),
     [buildGenPool, gen.nowMs],
   );
   const rankedPicks = useMemo<RankedPick<CfbSlipLeg>[]>(() => {
     const out: RankedPick<CfbSlipLeg>[] = [];
     for (const g of games) {
-      if (g.status === "final") continue;
+      if (g.status !== "upcoming" || Date.parse(g.start)<=Date.now()) continue;
       const gs = findGameSplits(splitsFeed, g.away, g.home, g.date);
       for (const row of g.rows) {
         const q = quoteFor(row, mode);
@@ -966,7 +985,7 @@ export function CfbProps() {
           prob: leg.prob,
           ev,
           book: leg.book,
-          started: g.status === "live",
+          started: false,
           leg,
           mark: leg.pair ? <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" /> : leg.team ? <TeamMark team={leg.team} size="sm" showAbbr={false} /> : null,
           splits: <SplitsChip split={isH1Market(row.market) ? null : sideSplit(gs, row.market, row.side)} compact />,
@@ -976,6 +995,7 @@ export function CfbProps() {
     for (const l of rankedPool.legs) {
       out.push({
         id: l.id,
+        context:{sport:L.id,game:l.gameKey,player:l.label,market:l.market,line:l.line,side:l.side,start:l.start},
         start: l.start,
         market: l.market ?? gen.spec.market,
         label: l.leg.player ?? l.label,
@@ -1072,7 +1092,7 @@ export function CfbProps() {
       <GenSheet
         market={gen.spec.market}
         marketLabel={genMarketLabel}
-        markets={FOOTBALL_GEN_MARKETS}
+        markets={gen.spec.sports && gen.spec.sports.some(s=>s!==L.id) ? ALL_MARKETS : ALL_MARKETS.filter(m=>!m.key.startsWith("batter_")&&!m.key.startsWith("pitcher_")&&m.key!=="rl")}
         positions={FOOTBALL_POSITIONS}
         positionsLoading={loadRosterPositions && !!rosterTeams && positionsQ.isPending}
         pool={gen.pool}
@@ -1112,7 +1132,7 @@ export function CfbProps() {
         onOpen={gen.setOpen}
         boardAt={genBoardAt}
         loading={propsQ.isPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
-        gameMarket={nav === "sides"}
+        gameMarket={false}
         showModelOnly={false}
         categoryNote={GEN_CATEGORY_NOTE}
         stubNote={GEN_STUB_NOTE}
@@ -1141,6 +1161,7 @@ export function CfbProps() {
             </div>
           )}
           <RankedPicks
+            convertCross={crossToFootball} date={date}
             picks={rankedPicks}
             filters={RANKED_FILTERS}
             isSel={(id) => pickedKeys.has(id)}

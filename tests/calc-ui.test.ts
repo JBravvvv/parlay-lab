@@ -154,14 +154,14 @@ describe("calc-ui — phone rules (375px, 44px targets, numeric keypad, no blur,
       for (const m of src.matchAll(/(?<![\w-])(?:w|min-w)-\[(\d+)px\]/g)) expect(Number(m[1]), m[0]).toBeLessThanOrEqual(343);
     });
   }
-  it("every <input> carries inputMode decimal/numeric and a ≥44px height", () => {
+  it("odds inputs allow signs, numeric fields use numeric keyboards, all have a ≥44px height", () => {
     const inputs: string[] = [];
     for (const f of ALL) {
       for (const t of openingTags(stripComments(read(f)), "input")) inputs.push(`${f}: ${t}`);
     }
     expect(inputs.length).toBeGreaterThanOrEqual(3);
     for (const tag of inputs) {
-      expect(tag).toMatch(/inputMode="(decimal|numeric)"/);
+      expect(tag).toMatch(/aria-label=\{`Leg .* odds`\}/.test(tag) ? /inputMode="text"/ : /inputMode="(decimal|numeric)"/);
       const h = /\bh-\[(\d+)px\]/.exec(tag);
       expect(h, `${tag.slice(0, 80)} has an explicit h-[Npx]`).not.toBeNull();
       expect(Number(h![1])).toBeGreaterThanOrEqual(44);

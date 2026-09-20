@@ -623,7 +623,7 @@ describe("the sheet renders for the FOOTBALL market list", () => {
     expect(atd).not.toContain(">Overs<");
     expect(atd).toContain("Anytime TD has one side only");
     /* …and it is still there on a real over/under market */
-    const pass = sheet({ market: "pass_yds", marketLabel: "Pass Yds" });
+    const pass = sheet({ market: "pass_yds", marketLabel: "Pass Yds", spec:{...SPEC,market:"pass_yds"} });
     expect(pass).toContain(">Unders<");
     expect(pass).toContain(">Overs<");
     expect(pass).not.toContain("has one side only");
@@ -715,9 +715,9 @@ describe("the football desk is wired to the shared generator, and the NFL inheri
     expect(cfb).toContain('import { GenSheet } from "@/components/props/GenSheet"');
     expect(cfb).toContain('import { useParlayGen, blankPins } from "@/components/props/useParlayGen"');
     expect(cfb).toContain('import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool"');
-    expect(cfb).toContain("markets={FOOTBALL_GEN_MARKETS}");
+    expect(cfb).toContain("ALL_MARKETS"); expect(cfb).toContain("convertCross:crossToFootball");
     expect(cfb).toContain("showModelOnly={false}");
-    expect(cfb).toContain('gameMarket={nav === "sides"}');
+    expect(cfb).toContain("gameMarket={false}");
     expect(cfb).toContain("quoteOf: propQuote");
     expect(cfb).toContain("footballGenPool<CfbSlipLeg>(board?.rows ?? [], sp, {");
     /* the remembered open/closed state is derived from the LEAGUE — one desk's state must not

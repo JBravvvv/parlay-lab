@@ -72,6 +72,8 @@ export const footballSide = (side: CfbPropRow["side"]): GenSide => (side === "un
 export type FootballGenOpts<P> = {
   /** the board's price column: Caesars only, or the best posted price */
   mode: FootballPriceMode;
+  pricedAt?: Readonly<Record<string,string>>;
+  liveMaxAgeMs?: number;
   /** set once after mount by the caller; SSR passes 0, which marks nothing started */
   nowMs: number;
   /** the row's team tag, folded to ONE spelling per club ("ALA") */
@@ -120,6 +122,11 @@ export function footballGenPool<P extends { prob: number; book: string }>(
     /* Date.parse of an unparseable kickoff is NaN, and NaN <= nowMs is false — an unknown
        kickoff is never guessed into "started". */
     const started = row.status === "live" || (!!row.kickoff && Date.parse(row.kickoff) <= opts.nowMs);
+    if ((spec.phase === "pregame" && started) || (spec.phase === "live" && !started)) continue;
+    const quotedAt = opts.pricedAt?.[row.gameId];
+    if (started && spec.phase) {
+      if (!footballQuoteCurrent(row,opts.pricedAt,opts.nowMs,opts.liveMaxAgeMs)) { startedDropped++; continue; }
+    }
     if (started && !spec.includeStarted) {
       startedDropped++;
       continue;
@@ -152,6 +159,7 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       team: opts.teamOf(row),
       position: footballPosition(opts.positionOf?.(row) ?? row.pos),
       started,
+      quoteAt: quotedAt,
       /* the football board carries no alternate ladders — every row is the book's own line */
       alt: false,
       book: leg.book,
@@ -171,4 +179,12 @@ export function footballGenPool<P extends { prob: number; book: string }>(
   /* the football board carries no book-side parlay restriction flag, so `noParlayDropped` is 0
      here and stays 0 — that counter means one thing and only the book can set it */
   return poolOf(legs, { rows: scanned, startedDropped, noParlayDropped: 0, finishedDropped });
+}
+
+/** A kickoff alone never proves an in-play quote. These timestamps are per-game pulls. */
+export function footballQuoteCurrent(row:Pick<CfbPropRow,"gameId"|"kickoff"|"status">,pricedAt:Readonly<Record<string,string>>|undefined,now:number,maxAge=600_000):boolean{
+ if(row.status==="final"||row.status==="postponed")return false;
+ const kickoff=Date.parse(row.kickoff),started=row.status==="live"||kickoff<=now;
+ if(!started)return true;const at=Date.parse(pricedAt?.[row.gameId]??"");
+ return row.status==="live"&&Number.isFinite(kickoff)&&Number.isFinite(at)&&at>=kickoff&&at<=now&&now-at<=maxAge;
 }

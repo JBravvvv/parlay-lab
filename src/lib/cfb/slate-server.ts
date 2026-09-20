@@ -1,3 +1,4 @@
+import { redis, storeEnv } from "@/lib/server/store";
 import { attachH1 } from "@/lib/cfb/h1";
 import { buildCfbBoard } from "@/lib/cfb/model";
 import { espnDateParam, nextDate } from "@/lib/cfb/dates";
@@ -155,7 +156,9 @@ export async function slateFromEspnOf(cfg: LeagueConfig, date: string, espn: unk
   const [fpi, odds] = await Promise.all([fpiPayloadOf(cfg), oddsPayloadOf(cfg, opts)]);
   const board = buildCfbBoard({ date, espnEvents: espn, oddsEvents: odds.events, fpi, now, bankroll, league: cfg });
   attachH1(board.games, opts?.h1, { now, bankroll, league: cfg });
-  return { ...board, finals: finalsOf(board.games), quota: odds.quota, oddsMissing: odds.missing };
+  const slate = { ...board, finals: finalsOf(board.games), quota: odds.quota, oddsMissing: odds.missing };
+  if (storeEnv()) await redis(["SET", `pl:discovery:${cfg.id}:${date}`, JSON.stringify(slate), "EX", 129600]).catch(() => null);
+  return slate;
 }
 
 /** CFB-bound: `slateFromEspnOf(CFB_LEAGUE, …)`. */

@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
+import { GameTimeRange } from "@/components/props/GameTimeRange";
+import { inGameTimeWindow } from "@/lib/game-time-window";
 import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaperBanner } from "@/components/ui/PaperBanner";
@@ -143,7 +146,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { t: Ticket & { tier?: string; confirmed?: number | null }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
+function TicketCard({ gameInfo, timeWindow, t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { gameInfo?:MlbGameInfo; timeWindow?:readonly [number,number]; t: Ticket & { tier?: string; confirmed?: number | null }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
   /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
      CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
   const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
@@ -197,6 +200,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
     </span>
   );
   const hasDetail = true;
+  if(timeWindow&&!t.legs.every(l=>inGameTimeWindow(gameInfo?.[String(l.gkey)]?.start,timeWindow)))return null;
   return (
     <div className={`glass px-3 py-1.5 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
@@ -261,7 +265,7 @@ function TicketCard({ t, stake, kelly, grade, tag, basisMode, legNow, legWarn }:
         {t.legs.map((l, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
             <span className="text-muted">
-              <span className="text-text"><BoardLabel label={l.label} /></span> {l.prop}
+              <span className="text-text"><BoardLabel label={l.label} /></span> {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
               {(l as { lu?: string }).lu === "projected" && (
                 <span
                   className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold text-gold"
@@ -426,6 +430,7 @@ export default function BuilderPage() {
   return <MlbBuilderPage />;
 }
 function MlbBuilderPage() {
+  const [timeWindow,setTimeWindow]=useState<readonly [number,number]>([0,24]);
   const { data: board } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -488,6 +493,7 @@ function MlbBuilderPage() {
     [locked],
   );
   const liveNow = useLiveNow(liveReqs);
+  const ticketGameInfo: MlbGameInfo | undefined = d?.gameInfo ?? locked?.games;
   const lockedLegNow = useCallback(
     (l: { gkey?: string | null; lkey?: string | null }): LegNow | null =>
       locked?.games && l.gkey ? liveNow.legNow(locked.games[l.gkey]?.pk ?? null, l.lkey) : null,
@@ -608,7 +614,7 @@ function MlbBuilderPage() {
     });
     return (
       <div key={t.id}>
-        <TicketCard
+        <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow}
           t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob, confirmed: t.confirmed ?? null } as never}
           stake={t.stake}
           grade={locked.grading?.tickets?.[t.id]}
@@ -719,7 +725,7 @@ function MlbBuilderPage() {
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at DraftKings"
         }
       />
-      <PaperBanner />
+      <PaperBanner /><GameTimeRange value={timeWindow} onChange={setTimeWindow}/>
 
       {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-3 flex items-center gap-2">
@@ -862,7 +868,7 @@ function MlbBuilderPage() {
                 <div className="space-y-3">
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {supp.fun.picks.map((p) => (
-                      <TicketCard key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
+                      <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -908,7 +914,7 @@ function MlbBuilderPage() {
                       </div>
                       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.alloc.picks.map((p) => (
-                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
+                          <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                         ))}
                       </div>
                     </div>
@@ -918,7 +924,7 @@ function MlbBuilderPage() {
                       <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
                       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.fun.picks.map((p) => (
-                          <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
+                          <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                         ))}
                       </div>
                     </div>
@@ -1056,7 +1062,7 @@ function MlbBuilderPage() {
               )}
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.alloc.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
+                  <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                 ))}
               </div>
             </Reveal>
@@ -1069,7 +1075,7 @@ function MlbBuilderPage() {
               </h2>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.fun.picks.map((p) => (
-                  <TicketCard key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
+                  <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                 ))}
               </div>
             </Reveal>

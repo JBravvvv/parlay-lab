@@ -1,4 +1,5 @@
 "use client";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 /**
  * INSTRUCTION 71 (2026-09-17): the Board's "My parlay" bar. Tap "+" on any board row or on any
  * generated-ticket leg and the bar prices the ticket the way the engine prices its own — the
@@ -39,7 +40,7 @@ export function MyParlayBar({
   const read = readMyParlay(legs, PARLAY_VARIETY.parlayGameCap);
   const c = read.calc;
   if (legs.length === 0) return null;
-  return (
+  return (<ViewportPortal>
     <div
       className="pointer-events-none fixed left-0 right-0 z-40 md:left-[calc(200px+2rem)] md:right-8"
       style={{ bottom: bottom ?? ins.bottom }}
@@ -133,7 +134,7 @@ export function MyParlayBar({
         </div>
       </div>
     </div>
-  );
+  </ViewportPortal>);
 }
 
 /** the "+" cell every board row and ticket leg carries — one component so the two look identical */

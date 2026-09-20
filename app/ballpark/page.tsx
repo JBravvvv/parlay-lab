@@ -1,5 +1,7 @@
 "use client";
 
+import { parkSide, parkGrade, parkEvidence } from "@/lib/mlb/park-display";
+import { ParkPickPreview } from "@/components/props/ParkPickPreview";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -62,13 +64,13 @@ function leanLabel(lean: number): { txt: string; cls: string } {
   return { txt: "Neutral", cls: "border-line-2 bg-white/[0.03] text-muted" };
 }
 
-function Card({ c, side }: { c: ParkCard; side: "R" | "L" }) {
-  const m = c[side];
+function Card({ c, side, date }: { c: ParkCard; side: "R" | "L" | "ALL"; date:string }) {
+  const m = parkSide(c,side);
   const g = c.game;
   const l = leanLabel(c.lean);
   const posted = c.env.weatherPosted;
   return (
-    <section className="glass overflow-hidden">
+    <section className="glass park-card overflow-hidden">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-white/[0.05] px-4 py-3">
         {c.park && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -80,9 +82,10 @@ function Card({ c, side }: { c: ParkCard; side: "R" | "L" }) {
             {c.park ? `${c.park.city} · ${c.park.elevationFt.toLocaleString("en-US")} ft · ${c.park.roof === "dome" ? "dome" : c.park.roof === "retractable" ? "retractable roof" : "open air"}` : "not in the stadium table"}
           </div>
         </div>
+        <span title="Environmental hitter advantage; not a betting-value grade" className="font-black text-pos">{parkGrade(m)}</span>
         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${l.cls}`}>{l.txt}</span>
       </header>
-      <div className="grid gap-3 px-4 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
+      <details className="park-evidence"><summary className="cursor-pointer px-4 py-1 text-[10px] text-muted">Conditions & engine factors · HR ×{m.hr.toFixed(2)} · H+R+RBI ×{m.hrr.toFixed(2)}</summary><div className="grid gap-3 px-4 py-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)]">
         <div className="space-y-2">
           {g ? (
             <div className="flex items-center gap-2 text-[12.5px] text-text">
@@ -156,13 +159,17 @@ function Card({ c, side }: { c: ParkCard; side: "R" | "L" }) {
           ))}
         </div>
       </div>
+      <ul className="px-4 pb-2 text-[11px] text-muted">{parkEvidence(c,m).map(t=><li key={t} className="mb-1">{t}</li>)}</ul></details>
+      {g && <ParkPickPreview pk={g.pk} date={date} away={g.awayAbbr??g.away} home={g.homeAbbr??g.home} />}
     </section>
   );
 }
 
 export default function BallparkPage() {
   const sport = useSport();
-  const [side, setSide] = useState<"R" | "L">("R");
+  const [side, setSide] = useState<"R" | "L" | "ALL">("ALL");
+  const [order, setOrder] = useState("best");
+  const [advantage,setAdvantage]=useState("hr");
   const [scope, setScope] = useState<"today" | "all">("today");
   const q = useQuery<BallparkPayload>({
     queryKey: ["mlb-ballpark"],
@@ -177,8 +184,9 @@ export default function BallparkPage() {
   });
   const cards = useMemo(() => {
     const all = q.data?.cards ?? [];
-    return scope === "today" ? all.filter((c) => c.game) : all;
-  }, [q.data, scope]);
+    const rows=scope === "today" ? all.filter((c) => c.game) : [...all];
+    return rows.sort((a,b)=>(order==="best"?-1:1)*((advantage==="hr"?parkSide(a,side).hr:(parkSide(a,side).hits+parkSide(a,side).tb+parkSide(a,side).hrr)/3)-(advantage==="hr"?parkSide(b,side).hr:(parkSide(b,side).hits+parkSide(b,side).tb+parkSide(b,side).hrr)/3)));
+  }, [q.data, scope, side, order, advantage]);
   const posted = useMemo(() => (q.data?.cards ?? []).filter((c) => c.game && c.env.weatherPosted).length, [q.data]);
 
   if (sport !== "mlb") {
@@ -205,6 +213,8 @@ export default function BallparkPage() {
             <FilterPill selected={scope === "today"} onClick={() => setScope("today")}>Today&apos;s parks</FilterPill>
             <FilterPill selected={scope === "all"} onClick={() => setScope("all")}>All 30</FilterPill>
             <span className="mx-1 h-4 w-px bg-white/10" aria-hidden />
+            <select aria-label="Ballpark advantage metric" value={advantage} onChange={e=>setAdvantage(e.target.value)} className="rounded bg-surface-2 text-[11px]"><option value="hr">Home runs</option><option value="hitting">Overall hitting</option></select><select aria-label="Ballpark advantage order" value={order} onChange={e=>setOrder(e.target.value)} className="rounded bg-surface-2 text-[11px]"><option value="best">Most advantage</option><option value="worst">Least advantage</option></select>
+            <FilterPill selected={side === "ALL"} onClick={() => setSide("ALL")}>All</FilterPill>
             <FilterPill selected={side === "R"} onClick={() => setSide("R")}>RHB</FilterPill>
             <FilterPill selected={side === "L"} onClick={() => setSide("L")}>LHB</FilterPill>
           </div>
@@ -221,7 +231,7 @@ export default function BallparkPage() {
       <div className="grid gap-3">
         {cards.map((c, i) => (
           <Reveal key={c.venue} delay={Math.min(i, 8) * 0.03}>
-            <Card c={c} side={side} />
+            <Card c={c} side={side} date={q.data?.date??""} />
           </Reveal>
         ))}
       </div>

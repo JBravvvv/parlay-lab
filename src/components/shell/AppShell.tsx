@@ -2,6 +2,7 @@
 
 import { SportsbookSelector } from "@/components/sportsbook/SportsbookSelector";
 import Link from "next/link";
+import { VerticalDensity } from "./VerticalDensity";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion, type Transition } from "motion/react";
 import { useEffect, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
@@ -312,7 +313,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main>{children}</main>
       ) : (
         <main className="px-4 pb-24 pt-4 md:ml-[200px] md:px-8 md:pb-8 md:pt-4">
-          <div className="mx-auto w-full max-w-[1280px]"><SportsbookSelector />{children}</div>
+          <div className="mx-auto w-full max-w-[1280px]"><SportsbookSelector /><VerticalDensity enabled={["/games","/board","/builder","/props","/sharp","/simulator","/ballpark","/stats"].includes(pathname)}>{children}</VerticalDensity></div>
         </main>
       )}
 

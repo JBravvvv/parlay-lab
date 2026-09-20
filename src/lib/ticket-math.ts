@@ -1,6 +1,6 @@
 /**
  * Parlay Builder sandbox (2026-07-24) — pure ticket math for the "mess around"
- * builder. Prices are the engine board's captured Caesars quotes; probabilities
+ * builder. Prices are the engine board's captured selected-book quotes; probabilities
  * are the engine's blended true win % per leg. The combined true % is the
  * NAIVE product (legs treated independent — same-game correlation is NOT
  * modeled here; the real Builder's sim-joint pricing stays the honest one).
@@ -8,6 +8,7 @@
  */
 
 export type SandboxLeg = {
+  cross?: import("./cross-sport").CrossLeg;
   quoteAt?: string;
   phase?: "pregame" | "live";
   id: string; // gkey|lkey|side — dedupe key
@@ -15,7 +16,9 @@ export type SandboxLeg = {
   sub: string;
   game: string;
   cz: number; // american — the Caesars price when posted, else the best price in the feed
-  prob: number; // percent
+  prob: number;
+  /** Push probability in percentage points; a push returns this leg’s stake. */
+  push?: number; // percent
   market: string;
   susp?: boolean;
   /** which book the price came from — "CZ" whenever Caesars posts it */
@@ -37,17 +40,21 @@ export type TicketCalc = {
   am: number; // combined american
   trueProb: number; // 0–1, naive product of leg probs
   impProb: number; // 0–1, what the combined price implies
-  ev: number; // fraction: trueProb × dec − 1
+  ev: number; // independent expected return minus stake, including push refunds
   payout: (stake: number) => number; // total return incl. stake
 };
 
-export function combineTicket(legs: { cz: number; prob: number }[]): TicketCalc | null {
+export function combineTicket(legs: { cz: number; prob: number; push?: number }[]): TicketCalc | null {
   if (!legs.length) return null;
   let dec = 1;
   let p = 1;
+  let expectedReturn = 1;
+  const hasPush = legs.some(l => (l.push ?? 0) > 0);
   for (const l of legs) {
     dec *= amToDec(l.cz);
-    p *= Math.min(1, Math.max(0, l.prob / 100));
+    const win = Math.min(1, Math.max(0, l.prob / 100));
+    p *= win;
+    expectedReturn *= win * amToDec(l.cz) + Math.min(1 - win, Math.max(0, (l.push ?? 0) / 100));
   }
   return {
     n: legs.length,
@@ -55,7 +62,7 @@ export function combineTicket(legs: { cz: number; prob: number }[]): TicketCalc 
     am: decToAm(dec),
     trueProb: p,
     impProb: 1 / dec,
-    ev: p * dec - 1,
+    ev: (hasPush ? expectedReturn : p * dec) - 1,
     payout: (stake: number) => stake * dec,
   };
 }

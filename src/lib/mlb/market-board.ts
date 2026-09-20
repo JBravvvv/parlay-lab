@@ -34,6 +34,7 @@ export function pruneHrLines(board: readonly PropBoardGame[], altHr=false): Prop
 
 /** the freshest book timestamp a stored row carries — the settlement book's first, else the newest */
 export function rowQuoteAt(row:PropBoardRow):string|null{
+ if(row.displayBook){const book=row.displayBook;const dates=[row.bookQuotes?.o?.[book]?.at,row.bookQuotes?.u?.[book]?.at].filter((s):s is string=>!!s&&Number.isFinite(Date.parse(s)));return dates.length?dates.sort((a,b)=>Date.parse(a)-Date.parse(b))[0]:null;}
  const settle=row.bookQuotes?.o?.[SETTLE_BOOK]?.at ?? row.bookQuotes?.u?.[SETTLE_BOOK]?.at;
  if(settle)return settle;
  let best:string|null=null, bestMs=-Infinity;

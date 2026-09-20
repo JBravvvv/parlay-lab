@@ -40,6 +40,7 @@
  * Sandbox only: nothing here writes anywhere, spends an Odds credit, or enters the ledger.
  */
 
+import { strategyGenerate } from "./parlay-strategy";
 import { inGameTimeWindow, type GameTimeWindow } from "./game-time-window";
 import { SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { mixOrder, type MixStyle } from "./parlay-gen-mix";
@@ -86,6 +87,10 @@ export const specMarkets = (spec: Pick<GenSpec, "market" | "markets">): readonly
   spec.markets?.length ? spec.markets : [spec.market];
 
 export type GenSpec = {
+  strategies?: readonly string[];
+  sports?: readonly string[];
+  timing?: readonly string[];
+  preferDiversity?: boolean;
   timeWindow?: GameTimeWindow;
   /** Explicit empty market selection differs from older saved single-market specs. */
   noMarkets?: boolean;
@@ -150,6 +155,8 @@ export type GenLeg<P = unknown> = {
   am: number;
   /** win % (0..100) at that price */
   prob: number;
+  /** Push probability in percentage points; a push returns this leg’s stake. */
+  push?: number;
   /** where `prob` came from: the engine's model, or the de-vigged market fair */
   src?: "model" | "market";
   /** over or under ("yes" markets are overs) — the side filter reads THIS, never a string suffix */
@@ -172,6 +179,8 @@ export type GenLeg<P = unknown> = {
   team: string | null;
   /** its game had started at the nowMs the pool was built with */
   started: boolean;
+  context?: import("@/components/props/PickContext").PickContextRef;
+  sport?: "mlb" | "nfl" | "cfb";
   quoteAt?: string;
   /** an alternate/milestone-ladder line ("2+ hits") rather than a standard O/U */
   alt: boolean;
@@ -325,6 +334,9 @@ export function specSeed(spec: GenSpec, boardKey: string, roll: number): number 
     spec.modelOnly ? "model" : "both",
     String(roll),
   ];
+  if (spec.strategies) parts.push(`strategies:${spec.strategies.join(",")}`);
+  if (spec.sports) parts.push(`sports:${spec.sports.join(",")}`);
+  if (spec.timing) parts.push(`timing:${spec.timing.join(",")}`);
   if (spec.timeWindow) parts.push(`time:${spec.timeWindow.join(":")}`);
   if (spec.noMarkets) parts.push("markets:none");
   if (spec.style) parts.push(spec.style);
@@ -508,6 +520,8 @@ export function availableLegBand<P>(pool: GenPool<P>, spec: GenSpec): Pick<GenSp
 function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
   const want = new Set<GenSide>(sidesOf(spec.sides));
   return pool.legs.filter((l) => {
+    if (spec.timing && !spec.timing.includes(l.started ? "live" : "pregame")) return false;
+    if (spec.sports && l.sport && !spec.sports.includes(l.sport)) return false;
     if (spec.noMarkets || !inGameTimeWindow(l.start, spec.timeWindow)) return false;
     if (spec.phase === "live" && !l.started) return false;
     if (spec.phase === "pregame" && l.started) return false;
@@ -841,6 +855,7 @@ export function generate<P>(
   avoid?: ReadonlySet<string>,
   recentPlayers?: ReadonlyMap<string, number>,
 ): GenResult<P> {
+  if (spec.strategies || spec.preferDiversity) return strategyGenerate(pool, spec, seed, avoid, recentPlayers, generate);
   if (spec.noMarkets) return { ok: false, fail: { code: "no-rows" } };
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
@@ -852,7 +867,7 @@ export function generate<P>(
   slotPins.forEach((id, i) => {
     if (!id) return;
     const l = pool.byId.get(id);
-    if (!l || !inGameTimeWindow(l.start, spec.timeWindow) || (spec.phase==="pregame" && l.started) || (spec.phase==="live" && !l.started)) missing.push(id);
+    if (!l || (spec.sports && l.sport && !spec.sports.includes(l.sport)) || (spec.timing && !spec.timing.includes(l.started ? "live" : "pregame")) || !inGameTimeWindow(l.start, spec.timeWindow) || (spec.phase==="pregame" && l.started) || (spec.phase==="live" && !l.started)) missing.push(id);
     else pins[i] = l;
   });
   if (missing.length) return { ok: false, fail: { code: "pin-missing", ids: missing } };

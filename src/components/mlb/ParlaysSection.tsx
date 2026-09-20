@@ -1,5 +1,12 @@
 "use client";
 
+import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
+import { CrossBoardResults } from "@/components/props/CrossBoardResults";
+import { marketOf } from "@/lib/ledger-segments";
+import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
+import { ALL_MARKETS } from "@/lib/cross-sport";
+import { STRATEGIES,marketRanksBy,type DiscoveryFilter } from "@/lib/discovery";
+import { ticketMatches } from "@/lib/ticket-discovery";
 import { useEffect, useMemo, useState } from "react";
 import { getSelectionMode, type SelectionMode } from "@/lib/engine-client";
 import { MODE_LABEL, orderByMode } from "@/lib/board-order";
@@ -62,6 +69,8 @@ function TierTag({ tier }: { tier?: string }) {
 }
 
 export function ParlaysSection({
+  gameInfo,
+  date = "",
   parlays,
   mixed,
   live,
@@ -69,6 +78,8 @@ export function ParlaysSection({
   legOut,
   mine,
 }: {
+  date?:string;
+  gameInfo?:MlbGameInfo;
   parlays: Ticket[];
   mixed: Ticket[];
   live: Ticket[];
@@ -80,7 +91,8 @@ export function ParlaysSection({
   /** INSTRUCTION 71: the Board's "My parlay" — tap a leg or take a whole ticket into it */
   mine?: { has: (key: string) => boolean; toggle: (leg: MyLeg) => void; addAll: (legs: MyLeg[]) => void };
 }) {
-  const [view, setView] = useState<View>("parlays");
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
+  const [view, setView] = useState<View | "all">("all");
   const [pfilter, setPfilter] = useState("all");
   // ONE SELECTION MODE SITE-WIDE (2026-08-15, Josh: "The parlays and tickets
   // should follow the selection mode too"). Full mode read, mounted-gated
@@ -93,7 +105,7 @@ export function ParlaysSection({
   // badges EV at the settling book — probability drives the ORDER)
   const modeEv = (t: Ticket) => (basisMode ? (t.bsEv == null ? null : Number(t.bsEv)) : t.czEv == null ? null : Number(t.czEv));
 
-  const lists: Record<View, Ticket[]> = { parlays, mixed, live };
+  const lists: Record<View | "all", Ticket[]> = { parlays, mixed, live, all:[...new Map([...parlays,...mixed,...live].map(t=>[t.legs.map(l=>`${l.gkey}|${l.lkey}|${l.prop}`).sort().join(";"),t])).values()] };
 
   /* INSTRUCTION 50 (2026-09-11, Josh's word, verbatim: "Need player headshots for Parlay Builder
      etc or need team logo next to name"): every leg that names a player gets his headshot with HIS
@@ -123,7 +135,8 @@ export function ParlaysSection({
 
   const match = (t: Ticket, f: string) =>
     f === "all" ? true : f === "SAFER" || f === "LONGSHOT" ? x(t).tier === f : t.type === f;
-  const shown = all.filter((t) => match(t, filters.some(([k]) => k === pfilter) ? pfilter : "all"));
+  const legRanks=marketRanksBy(all.flatMap(t=>t.legs),l=>String(l.market??marketOf(l.lkey??"")),l=>l.label??"",l=>Number(l.prob??l.est??0));
+  const shown = all.filter((t) => match(t, filters.some(([k]) => k === pfilter) ? pfilter : "all") && ticketMatches(t.legs.map(l=>({chanceRank:legRanks.get(l),market:String(l.market??(l.lkey?marketOf(l.lkey):t.type)??""),prob:Number(l.prob??l.est??0),ev:Number(l.prob??l.est??0)/100*(parseAm(l.cz)!>0?1+parseAm(l.cz)!/100:1+100/-parseAm(l.cz)!)*100-100,am:parseAm(l.cz)??NaN,start:gameInfo?.[String(l.gkey)]?.start,started:!!l.live||!!gameInfo?.[String(l.gkey)]?.start&&Date.parse(gameInfo[String(l.gkey)].start!)<=Date.now(),sport:"mlb",game:String(l.gkey)})),discovery));
   const playable = shown.filter((t) => t.czOdds != null);
   const [cap, setCap] = useState(SHOW_CAP);
   const capKey = `${view}|${pfilter}`;
@@ -149,6 +162,7 @@ export function ParlaysSection({
           Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
 
+        <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setView("all");setPfilter("all");}} markets={ALL_MARKETS}/>{discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={date} filter={discovery}/>}
         <div className="mb-2 flex flex-wrap items-center gap-2">
           {VIEWS.map(([v, label]) => (
             <FilterPill key={v} selected={view === v} onClick={() => { setView(v); setPfilter("all"); }}>
@@ -157,7 +171,7 @@ export function ParlaysSection({
             </FilterPill>
           ))}
         </div>
-        <div className="mb-3 text-[11px] text-muted">{VIEWS.find(([v]) => v === view)![2]}</div>
+        <div className="mb-3 text-[11px] text-muted">{view==="all"?"All timing and market sets — narrow with the dropdowns above.":VIEWS.find(([v]) => v === view)![2]}</div>
 
         {all.length === 0 ? (
           <Panel>
@@ -285,7 +299,7 @@ export function ParlaysSection({
                             ) : club ? (
                               <PlayerMark player={null} team={club} headshot={null} size="xs" className="mr-1 align-text-bottom" />
                             ) : null}
-                            <span className="text-text"><BoardLabel showMark={false} label={l.label} /></span> · {l.prop}
+                            <span className="text-text"><BoardLabel showMark={false} label={l.label} /></span> · {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
                             {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
                             {n && (

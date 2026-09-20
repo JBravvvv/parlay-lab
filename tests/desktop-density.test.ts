@@ -85,7 +85,8 @@ describe("no sideways scroll from md — strips wrap, the table box opens, the f
   it("every other desktop-visible strip wraps from md: the date rail, the generator's game chips, the ranked-list tabs", () => {
     expect(read("src/components/games/DateRail.tsx")).toMatch(/className="-mx-4 mb-5 overflow-x-auto px-4 md:mx-0 md:mb-3 md:overflow-visible md:px-0" style=\{\{ scrollbarWidth: "none" \}\}>\n\s+<div className="flex w-max gap-1\.5 md:w-auto md:flex-wrap">/);
     expect(read("src/components/props/GenSheet.tsx")).toMatch(/"-mx-3 overflow-x-auto px-3 \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden md:mx-0 md:flex-wrap md:overflow-visible md:px-0"/);
-    expect(read("src/components/props/RankedPicks.tsx")).toMatch(/overflow-x-auto px-3 pb-2 \[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden md:flex-wrap md:overflow-visible"/);
+    expect(read("src/components/props/RankedPicks.tsx")).toContain("<DiscoveryFilters");
+    expect(read("src/components/props/DiscoveryFilters.tsx")).toContain("flex flex-wrap gap-1");
     // no `w-max` strip is left without an md wrap override in the app's page-level UI
     for (const f of ["src/components/games/DateRail.tsx", "src/components/cfb/CfbPicksBoard.tsx"]) {
       const s = read(f);

@@ -1,5 +1,7 @@
 "use client";
 
+import { PickContext } from "@/components/props/PickContext";
+import { gameTimeLabel } from "@/lib/game-time-window";
 import Link from "next/link";
 import { useMemo } from "react";
 import { PairMark, PlayerMark, TeamMark } from "@/components/cfb/TeamMark";
@@ -73,7 +75,7 @@ const FUN_ACCENT: Record<League, { bucket: string; rim: string; text: string; un
 export type CfbLegVerdict = { result: string; detail?: string };
 /** an entry's grading block, narrowed off the SyncEntry intersection */
 export type CfbGradingView = { tickets: Record<string, CfbGrade>; legs: Record<string, CfbLegVerdict>; done: boolean };
-type LegGame = Pick<CfbGame, "id" | "home" | "away">;
+type LegGame = Pick<CfbGame, "id" | "home" | "away" | "start">;
 
 /**
  * `CfbLedgerEntry` intersects `SyncEntry`, whose `SyncTicket[]` wins the array-method
@@ -265,7 +267,7 @@ export function CfbTicketCard({
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
             const split = !leg.player && game && !isH1Market(leg.market) ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
             return (
-              <li key={leg.lkey} className="flex items-center gap-1.5 text-[11px] leading-tight" title={v?.detail}>
+              <li key={leg.lkey} title={v?.detail}><div className="flex items-center gap-1.5 text-[11px] leading-tight">
                 <LegMark leg={leg} game={game} abbrCls={accent.abbr} />
                 <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
                 {link?.href ? (
@@ -295,7 +297,7 @@ export function CfbTicketCard({
                     aria-label={`leg ${v.result}`}
                   />
                 )}
-              </li>
+              </div>{game&&<div className="ml-8 text-[9px] text-muted">{game.away.abbr} @ {game.home.abbr} · {gameTimeLabel(game.start)}<PickContext pick={{sport:league,game:game.id,player:leg.player??undefined,market:leg.market,line:leg.line,side:leg.side==="under"?"u":"o",start:game.start}}/></div>}</li>
             );
           })}
         </ul>

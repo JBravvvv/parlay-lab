@@ -91,16 +91,11 @@ describe("RankedPicks — every pick today, S down", () => {
     expect(out).toContain(">ML</span>");
   });
 
-  it('the category chips: "All" first (selected by default) then each filter with its count — empty ones dimmed', () => {
-    const out = render();
-    expect(out).toMatch(/role="tablist" aria-label="Pick category"/);
-    expect(out).toMatch(/role="tab" aria-selected="true"[^>]*>All <span class="num opacity-70">7<\/span>/);
-    expect(out).toMatch(/>ML <span class="num opacity-70">3<\/span>/);
-    expect(out).toMatch(/>RL <span class="num opacity-70">0<\/span>/);
-    expect(out).toMatch(/>Hits <span class="num opacity-70">2<\/span>/);
-    expect(out).toMatch(/>H\+R\+RBI <span class="num opacity-70">2<\/span>/);
-    expect(out).toMatch(/opacity-40"[^>]*>RL <span/);
-    expect(count(out, /aria-selected="true"/g)).toBe(1);
+  it("market dropdown has select all, clear, and checked options",()=>{
+    const out=render();expect(out).toContain('aria-label="Markets"');expect(out).toContain("Markets: All");
+    expect(out).toContain("Select all");expect(out).toContain(">Clear</button>");
+    for(const f of FILTERS)expect(out).toContain(f.label.replace(/&/g,"&amp;"));
+    expect(order(out)).toHaveLength(7);
   });
 
   it("the header counts picks per tier", () => {
@@ -132,9 +127,9 @@ describe("RankedPicks — every pick today, S down", () => {
   });
 
   it("the accent follows the desk (cfb amber / nfl blue) on the selected chip and the price", () => {
-    expect(render({ accent: "nfl" })).toMatch(/aria-selected="true" class="[^"]*text-nfl/);
-    expect(render({ accent: "cfb" })).toMatch(/aria-selected="true" class="[^"]*text-cfb/);
-    expect(render()).toMatch(/aria-selected="true" class="[^"]*text-pos/);
+    expect(render({ accent: "nfl" })).toMatch(/class="[^"]*text-nfl/);
+    expect(render({ accent: "cfb" })).toMatch(/class="[^"]*text-cfb/);
+    expect(render()).toMatch(/class="[^"]*text-pos/);
   });
 });
 
@@ -184,8 +179,8 @@ describe("controlled category (2026-09-18 later)", () => {
   it("a filter handed in from the page selects that chip and narrows the rows; the header names it", () => {
     const out = render({ filter: "batter_hits", onFilter: () => {} });
     expect(order(out)).toEqual(["s-hits", "d-hits"]);
-    expect(out).toMatch(/role="tab" aria-selected="true"[^>]*>Hits <span/);
-    expect(count(out, /aria-selected="true"/g)).toBe(1);
+    expect(out).toContain("Markets: Hits");
+    expect(out).toContain('type="checkbox" checked=""/>Hits');
     expect(out).toContain("· Hits");
   });
   it("without the props the list keeps its own state — the football desks are untouched", () => {
@@ -252,8 +247,8 @@ describe("odds range + price sort (2026-09-19)", () => {
   it("Anytime TD between -200 and +250: the range narrows the rows AND the chip counts, the header names it, S down inside it", () => {
     const out = renderP({ range: { min: -200, max: 250 }, onRange: () => {}, filter: "anytime_td", onFilter: () => {} });
     expect(order(out)).toEqual(["td-even", "td-fav", "td-edge"]);
-    expect(out).toMatch(/Anytime TD <span[^>]*>3</);
-    expect(out).toMatch(/All <span[^>]*>4</);
+    expect(out).toContain("Markets: Anytime TD");
+    expect(order(out)).toHaveLength(3);
     expect(out).toContain("· -200 to +250");
     expect(out).toMatch(/data-testid="ranked-odds-min"[^>]*value="-200"/);
     expect(out).toMatch(/data-testid="ranked-odds-max"[^>]*value="\+250"/);
@@ -276,7 +271,7 @@ describe("odds range + price sort (2026-09-19)", () => {
     expect(out).toMatch(/placeholder="\+250"/);
     expect(count(out, /<option /g)).toBe(4);
     expect(out).not.toContain("Clear odds range");
-    expect(out).toMatch(/All <span[^>]*>6</);
+    expect(out).toContain("Markets: All");
     expect(order(out)).toHaveLength(6);
     expect(out).toContain("Ranked S → F");
   });

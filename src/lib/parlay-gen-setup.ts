@@ -1,3 +1,4 @@
+import { STRATEGIES, SPORT_OPTIONS, TIMING_OPTIONS } from "./discovery";
 import type { GenSpec } from "./parlay-gen";
 
 /**
@@ -28,7 +29,7 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
       || (s.payout !== null && (!isPrice(s.payout?.minAm) || !isPrice(s.payout?.maxAm)))) return null;
     if (s.phase !== undefined && !["pregame", "live", "mixed"].includes(s.phase)) return null;
     if (saved.version === 1 && !["safer", "balanced"].includes(s.style)) return null;
-    if (s.markets !== undefined && (!Array.isArray(s.markets) || !s.markets.length
+    if (s.markets !== undefined && (!Array.isArray(s.markets) || (!s.markets.length && !s.noMarkets)
       || s.markets.some((m: unknown) => typeof m !== "string" || !markets.includes(m)))) return null;
     if (s.spread !== undefined && typeof s.spread !== "boolean") return null;
     if (s.onePerTeam !== undefined && typeof s.onePerTeam !== "boolean") return null;
@@ -37,8 +38,11 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
     if (s.timeWindow !== undefined && (!Array.isArray(s.timeWindow) || s.timeWindow.length !== 2
       || !s.timeWindow.every((v: unknown) => Number.isInteger(v)) || s.timeWindow[0] < 0
       || s.timeWindow[1] > 24 || s.timeWindow[1] - s.timeWindow[0] < 1)) return null;
+    for (const [key, options] of [["strategies", STRATEGIES], ["sports", SPORT_OPTIONS], ["timing", TIMING_OPTIONS]] as const) {
+      if (s[key] !== undefined && (!Array.isArray(s[key]) || s[key].some((v: unknown) => !options.some(o => o.key === v)))) return null;
+    }
     const mkts = s.markets !== undefined ? [...new Set(s.markets as string[])] : undefined;
-    return { ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
+    return { ...(s.strategies ? { strategies: s.strategies } : {}), ...(s.sports ? { sports: s.sports } : {}), ...(s.timing ? { timing: s.timing } : {}), ...(typeof s.preferDiversity === "boolean" ? {preferDiversity:s.preferDiversity} : {}), ...(s.phase ? {phase:s.phase} : {}), market: s.market, legs: s.legs, legMinAm: s.legMinAm, legMaxAm: s.legMaxAm,
       ...(s.timeWindow ? { timeWindow: [s.timeWindow[0], s.timeWindow[1]] as const } : {}),
       ...(s.noMarkets !== undefined ? { noMarkets: s.noMarkets } : {}),
       sides: s.sides, onePerGame: s.onePerGame, czOnly: s.czOnly,

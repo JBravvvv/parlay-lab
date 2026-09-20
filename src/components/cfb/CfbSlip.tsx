@@ -1,5 +1,7 @@
 "use client";
+import { ViewportPortal } from "@/components/ui/ViewportPortal";
 
+import { CrossMark } from "@/components/props/CrossMark";
 import { useEffect, useRef, useState } from "react";
 import { PairMark, PlayerMark, TeamMark, type TeamMarkTeam } from "@/components/cfb/TeamMark";
 import { useLeague } from "@/components/football/LeagueContext";
@@ -22,6 +24,7 @@ import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
  */
 
 export type CfbSlipLeg = {
+  cross?: import("@/lib/cross-sport").CrossLeg;
   /** "side" = a game row (ML / spread / total); "prop" = a player prop (INSTRUCTION 39) */
   kind: "side" | "prop";
   /** the board row's key — sides clash on `gameId` (one side per game), props on `player` (one leg per player) */
@@ -32,13 +35,15 @@ export type CfbSlipLeg = {
   /** "IND @ OSU · Sat 9:00 AM" */
   sub: string;
   /** the game market key for sides ("ml" / "spread" / "total"); the prop market id for props */
-  market: CfbMarketKey | CfbPropMarket;
+  market: CfbMarketKey | CfbPropMarket | import("@/lib/cross-sport").CrossLeg["market"];
   /** the American price the slip is priced at */
   cz: number;
   /** "CZ" for Caesars, else the book's short tag */
   book: string;
   /** model win probability at the priced line, PERCENT (0..100) */
   prob: number;
+  /** Push probability in percentage points; a push returns this leg’s stake. */
+  push?: number;
   /** prop legs only: the player's name */
   player?: string | null;
   /** prop legs only: "Pass Yds" / "Anytime TD" — the market's display label */
@@ -84,6 +89,7 @@ export function addCfbLeg(prev: CfbSlipLeg[], leg: CfbSlipLeg): CfbSlipAdd {
 
 /** INSTRUCTION 46: player → PlayerMark; side → TeamMark; total → PairMark; nothing known → no mark */
 function SlipLegMark({ leg }: { leg: CfbSlipLeg }) {
+  if(leg.cross)return <CrossMark leg={leg.cross}/>;
   if (leg.kind === "prop" && leg.player) return <PlayerMark teamIds={leg.imageTeamIds} player={leg.player} headshot={leg.headshot ?? null} team={leg.team ?? null} pos={leg.pos ?? null} size="sm" />;
   if (leg.pair) return <PairMark away={leg.pair.away} home={leg.pair.home} size="sm" />;
   if (leg.team) return <TeamMark team={leg.team} size="sm" showAbbr={false} />;
@@ -133,7 +139,7 @@ export function CfbSlip({
     timer.current = window.setTimeout(() => setCopied(null), 1800);
   };
 
-  return (
+  return (<ViewportPortal>
     <div className="pointer-events-none fixed left-0 right-0 z-40 md:left-[calc(200px+2rem)] md:right-8" style={{ bottom }}>
       <div className="mx-auto w-full max-w-[1280px]">
         <div className="pointer-events-auto flex max-h-[45vh] max-w-[720px] flex-col px-3 pb-2 md:px-0 md:pb-4">
@@ -252,7 +258,7 @@ export function CfbSlip({
         </div>
       </div>
     </div>
-  );
+  </ViewportPortal>);
 }
 
 function Stat({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone: "pos" | "neg" | "cfb" | "nfl" | "text" }) {
