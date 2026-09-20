@@ -154,7 +154,7 @@ export function PlayerMark({
             decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setFailed(prev => [...prev, headshot!])}
-            className="h-full w-full rounded-full object-cover object-top"
+            className="player-portrait h-full w-full rounded-full object-cover object-top"
           />
         ) : logo && badgeBroken !== logo ? (
           // eslint-disable-next-line @next/next/no-img-element

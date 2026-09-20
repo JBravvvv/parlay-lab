@@ -296,10 +296,9 @@ describe("/props renders the sheet, collapsed, above the cards (the first render
     expect(out).toMatch(/aria-expanded="false"/);
     expect(out).not.toContain(`aria-controls="${GEN_PANEL_ID}"`);
     expect(out).not.toContain(`id="${GEN_PANEL_ID}"`);
-    // it sits between the market nav and the cards
-    /* the rail is above it, the game cards are below it */
+    // The generator comes first; browsing controls and cards follow.
     expect(out).toContain('role="tablist"');
-    expect(out.indexOf('role="tablist"')).toBeLessThan(out.indexOf('data-testid="props-gen"'));
+    expect(out.indexOf('data-testid="props-gen"')).toBeLessThan(out.indexOf('role="tablist"'));
     expect(out.indexOf("How to read this")).toBeGreaterThan(-1);
     expect(out.indexOf('data-testid="props-gen"')).toBeLessThan(out.indexOf("How to read this"));
     /* and the real board rows are there — this is the fixture's own H+R+RBI market */

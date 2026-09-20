@@ -139,13 +139,13 @@ function MlbSimulator() {
                     </div>
                     <div className="mt-2 flex items-end gap-6">
                       <div>
-                        <div className="display num text-[34px] leading-none text-text">
+                        <div className="display num text-[22px] leading-none text-text">
                           <CountUp value={sim.avgHome} format={(n) => n.toFixed(2)} />
                         </div>
                         <div className="text-[11px] text-muted">{nm.home}</div>
                       </div>
                       <div>
-                        <div className="display num text-[34px] leading-none text-text">
+                        <div className="display num text-[22px] leading-none text-text">
                           <CountUp value={sim.avgAway} format={(n) => n.toFixed(2)} />
                         </div>
                         <div className="text-[11px] text-muted">{nm.away}</div>
@@ -158,7 +158,7 @@ function MlbSimulator() {
                     <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
                       Run line cover (±1.5)
                     </div>
-                    <div className="mt-2 h-36">
+                    <div className="mt-2 h-24">
                       <ResponsiveContainer>
                         <BarChart
                           data={[

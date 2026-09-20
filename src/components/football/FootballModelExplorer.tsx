@@ -15,14 +15,15 @@ export function FootballModelExplorer() {
   <div className="mb-4 flex flex-wrap gap-2">{rail.map(d=><FilterPill key={d} selected={d===date} onClick={()=>pick(d)}>{d}</FilterPill>)}</div>
   {q.isError&&<Panel>Could not load the {L.short} model. Please retry.</Panel>}
   {!q.isError&&!games.length&&<Panel>{q.isPending?'Loading games…':`No upcoming ${L.short} games on this date. Started games are excluded from this pregame model.`}</Panel>}
-  <div className="grid gap-4 md:grid-cols-2">{games.map(g=><Panel key={g.id} title={`${g.away.abbr} @ ${g.home.abbr}`}>
-   <p className="mb-3 text-sm">{g.away.name} at {g.home.name}</p>
+  <div className="sim-game-grid grid gap-2 md:grid-cols-2 xl:grid-cols-3">{games.map(g=><Panel className="sim-game-card" key={g.id} title={`${g.away.abbr} @ ${g.home.abbr}`}>
+   <p className="mb-1 text-[11px] font-semibold">{g.away.name} at {g.home.name}</p>
    <p className="text-xs text-muted">{g.home.short} win probability</p>
-   <div className="my-2 text-2xl font-bold">{g.model.pHome==null?'—':`${(g.model.pHome*100).toFixed(1)}%`}</div>
+   <div className="my-1 text-[18px] font-bold">{g.model.pHome==null?'—':`${(g.model.pHome*100).toFixed(1)}%`}</div>
    {g.model.pHome!=null&&<ProbBar p={g.model.pHome}/>}
-   <div className="mt-4 flex gap-5 text-xs"><span>Home margin <strong>{g.model.muMargin?.toFixed(1)??'—'}</strong></span><span>Total points <strong>{g.model.muTotal?.toFixed(1)??'—'}</strong></span></div>
-   <p className="mt-3 text-xs text-muted">Pregame estimates, not a live score forecast.</p>
+   <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]"><span>Home margin <strong>{g.model.muMargin?.toFixed(1)??'—'}</strong></span><span>Total points <strong>{g.model.muTotal?.toFixed(1)??'—'}</strong></span></div>
+
   </Panel>)}</div>
+  <p className="mt-2 text-[10px] text-muted">Pregame estimates, not a live score forecast.</p>
  </>;
 }
 export function FootballDashboard() {

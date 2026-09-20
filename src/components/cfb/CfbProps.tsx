@@ -1047,44 +1047,9 @@ export function CfbProps() {
       <Suspense fallback={null}>
         <PropsLinkReader onLink={onLink} />
       </Suspense>
-      <p className="mb-2 text-[11.5px] text-muted">Sandbox · nothing here is tracked or enters the {L.short} ledger.</p>
+      <p className="mb-1 text-[10px] font-semibold text-muted">Paper sandbox · untracked</p>
       <DateRail dates={dates} date={date} today={today} onPick={pick} />
 
-      {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
-      <div className="sticky z-20 -mx-4 mb-3 border-b border-white/[0.06] bg-bg/95 px-4 py-2 md:mx-0 md:px-0" style={{ top }}>
-        <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
-          <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
-        </div>
-        <div className={nav === "sides" ? "mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1" : "hidden"}>
-          <span className="text-sm font-semibold">{selectedBook} lines</span>
-          <span className="num flex items-center gap-2 text-[10.5px] text-faint">
-            {liveGames > 0 && nav === "sides" && (
-              <span className="inline-flex items-center gap-1 text-live">
-                <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
-                {liveGames} live
-              </span>
-            )}
-
-          </span>
-        </div>
-        {nav !== "sides" && (
-          <div className="mt-1 flex items-center gap-2 pb-1">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search players"
-              aria-label="Search players"
-              autoCapitalize="off"
-              autoCorrect="off"
-              className="h-11 min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[16px] text-text placeholder:text-faint md:h-9 md:text-[13px]"
-            />
-            <span className="num shrink-0 text-[10.5px] text-faint">
-              {lineCount} line{lineCount === 1 ? "" : "s"} · {groups.length} game{groups.length === 1 ? "" : "s"}
-            </span>
-          </div>
-        )}
-      </div>
 
       <GenSheet
         market={gen.spec.market}
@@ -1135,6 +1100,42 @@ export function CfbProps() {
         stubNote={GEN_STUB_NOTE}
         marketNote={GEN_MARKET_NOTE}
       />
+      {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
+      <div className="sticky z-20 -mx-4 mb-3 border-b border-white/[0.06] bg-bg/95 px-4 py-2 md:mx-0 md:px-0" style={{ top }}>
+        <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
+          <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
+        </div>
+        <div className={nav === "sides" ? "mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1" : "hidden"}>
+          <span className="text-sm font-semibold">{selectedBook} lines</span>
+          <span className="num flex items-center gap-2 text-[10.5px] text-faint">
+            {liveGames > 0 && nav === "sides" && (
+              <span className="inline-flex items-center gap-1 text-live">
+                <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" aria-hidden />
+                {liveGames} live
+              </span>
+            )}
+
+          </span>
+        </div>
+        {nav !== "sides" && (
+          <div className="mt-1 flex items-center gap-2 pb-1">
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search players"
+              aria-label="Search players"
+              autoCapitalize="off"
+              autoCorrect="off"
+              className="h-11 min-w-0 flex-1 rounded-[10px] border border-white/[0.08] bg-surface-2 px-3 text-[16px] text-text placeholder:text-faint md:h-9 md:text-[13px]"
+            />
+            <span className="num shrink-0 text-[10.5px] text-faint">
+              {lineCount} line{lineCount === 1 ? "" : "s"} · {groups.length} game{groups.length === 1 ? "" : "s"}
+            </span>
+          </div>
+        )}
+      </div>
+
 
       {note && (
         <div role="status" className="mb-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">

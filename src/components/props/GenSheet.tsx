@@ -750,7 +750,7 @@ export function GenSheet<P>({
               native selects; the explanatory paragraphs are tooltips; Save / Load sit under
               Advanced. Nothing here changes what the generator DOES — only how much of the screen
               it takes. */}
-          <div className="gen-studio-hero -mx-3 -mt-2.5 hidden items-center justify-between gap-2 px-3 py-2 sm:flex">
+          <div className="gen-studio-hero -mx-3 -mt-2.5 hidden items-center justify-between gap-2 px-3 py-2">
             <div className="min-w-0 truncate text-[15px] font-black tracking-tight text-white">Build your parlay<span className="text-pos">.</span></div>
             <div className="num flex shrink-0 items-center gap-x-2 text-[10px] text-muted">
               <span title="distinct players with a leg that passes every filter"><b className="text-text">{distinctPlayers}</b> players</span>
@@ -764,11 +764,9 @@ export function GenSheet<P>({
             <span className="min-w-0 truncate"><b>{customizeOpen ? "Hide settings" : "Customize"}</b><span className="num ml-2 text-muted">{summary}</span></span><span aria-hidden className="shrink-0 text-pos">{customizeOpen ? "−" : "+"}</span>
           </button>
 
-          {/* STACKED (2026-09-18, Josh: "header/filters on top & the picks/generate button below so
-              they are stacked top/bottom instead of … filters/picks stacked left/right"). On a wide
-              panel the filters run two-up so the ticket stays close under them. */}
-          <div className="space-y-2">
-          <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-2 @3xl:grid @3xl:grid-cols-2 @3xl:gap-x-5 @3xl:gap-y-2 @3xl:space-y-0`}>
+          {/* Desktop: settings beside the ticket; mobile: optional settings above picks. */}
+          <div className="gen-workspace">
+          <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-2 @3xl:block`}>
           {/* legs · sides · timing — one row of selects */}
           <div className="flex items-end gap-2">
             <div className="min-w-0 flex-1">
@@ -1076,8 +1074,9 @@ export function GenSheet<P>({
               </div>
             </div>
           )}
-          {/* generate */}
-          <div className="flex gap-2">
+          </div>
+          {/* Actions span both desktop columns, beneath the picks. */}
+          <div className="gen-actions flex gap-2">
             {(
               <button
                 type="button"
@@ -1099,7 +1098,6 @@ export function GenSheet<P>({
             >
               Add to slip
             </button>
-          </div>
           </div>
           </div>
         </div>

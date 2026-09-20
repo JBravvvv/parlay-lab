@@ -1,3 +1,11 @@
+## September 19 — requested desktop/mobile layout refinement
+
+Owner requested eight visual fixes after viewing Chrome on MacBook: smaller football card boxes and prices; shorter page headers; smaller simulator cards; desktop generator settings beside ticket with actions below; minimal mobile preamble; MLB Stats portraits zoomed out 30%; other portraits zoomed in 30%; bolder readable typography.
+
+Implemented shared compact headers with collapsed descriptions and visible supplied freshness status; 20px featured odds; 16px stat tile figures; compact locked-card status; three-column wide football simulator, 22px MLB run figures and 96px chart; generator two columns at 768px container width, full-width actions below, browsing controls after generator; stronger weights/contrast and scoped photo crops preserving logos/fallbacks. No pricing, simulation, probability, stake, generation, history, or filter calculations changed.
+
+Chrome browser control unavailable in this session; no browser visual verification claimed. Requested optional permission for in-app browser. TypeScript and production build passed. Affected layout/portrait suites: 170/170 PASS after updating six old layout assertions. Generator/history/setup/stats suites: 67/67 PASS after updating the obsolete navigation-order assertion. Total affected suites: 237/237 PASS across 11 files. Production build passed. Deployment verification pending. Prior intermittent production hydration warning remains unresolved.
+
 # SESSION HANDOFF — rewritten from disk 2026-08-01, immediately before compaction
 
 Every line below was re-read and re-derived from disk THIS TURN. Sections 1–5 are carried

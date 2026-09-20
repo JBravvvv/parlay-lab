@@ -29,7 +29,7 @@ export function Avatar({ src, label, size = "h-7 w-7" }: { src: string | null; l
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={() => setBroken(true)}
-        className={`${size} shrink-0 rounded-full border border-white/[0.08] bg-surface-2 object-cover`}
+        className={`player-portrait ${size} shrink-0 rounded-full border border-white/[0.08] bg-surface-2 object-cover`}
       />
     );
   }

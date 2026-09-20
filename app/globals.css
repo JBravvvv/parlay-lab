@@ -907,3 +907,42 @@ body::after {
 .density-compact :where(.p-8) {padding-top:16px;padding-bottom:16px;}
 .density-compact :where(.gap-8) {row-gap:16px;}
 .density-compact :where(.space-y-8) > :not(:last-child) {margin-block-start:0;margin-block-end:16px;}
+
+/* September 19 desktop/mobile refinement: compact actual components, not scaled glyphs. */
+.desk-content { font-weight: 600; --color-faint: #9ba7b7; --color-muted: #bbc5d2; }
+.desk-content .display { font-weight: 800; }
+.desk-content :is(.font-normal,.font-medium) { font-weight: 600; }
+.desk-content :is(h1,h2,h3,.font-semibold) { font-weight: 700; }
+.desk-content .page-description > summary { width: fit-content; font-size: 10px; }
+.desk-content .stat-tile { padding-top: 6px; padding-bottom: 6px; }
+.desk-content .stat-tile .display { font-size: 16px; margin-top: 3px; }
+[data-testid="cfb-featured-pick"] .hero-price,
+[data-testid="cfb-ticket"] .hero-price,
+.desk-content .hero-price { font-size: 20px; line-height: 1.1; text-shadow: none; }
+[data-testid="cfb-featured-pick"] { padding-block: 6px; }
+.gen-workspace { display: grid; grid-template-columns: minmax(0,1fr); gap: 8px; align-items: start; }
+.gen-workspace > * { min-width: 0; }
+.gen-actions { grid-column: 1 / -1; }
+@container (min-width: 768px) {
+  .gen-workspace { grid-template-columns: minmax(0,0.85fr) minmax(0,1.15fr); gap: 12px; }
+  #props-gen-settings { display: block; padding-right: 12px; border-right: 1px solid #ffffff12; }
+  #props-gen-ticket { margin: 0; padding: 8px; }
+}
+.desk-content .sim-game-card > header { padding-block: 5px; }
+.desk-content .sim-game-card > div { padding-block: 7px; }
+[data-desk-page="/simulator"] .glass > div { padding-block: 8px; }
+.player-portrait, [data-portrait-zoom="in"] { object-fit: cover; object-position: center top; clip-path: circle(38.46% at 50% 38.46%); transform: scale(1.3); transform-origin: center top; }
+[data-portrait-zoom="out"] { object-fit: contain; transform: scale(.7); transform-origin: center; }
+@media (max-width: 767px) {
+  [data-desk-page="/props"] [data-page-header] { margin-bottom: 4px; }
+  [data-desk-page="/props"] .page-description { display: none; }
+  .gen-studio { border-radius: 14px; }
+  .gen-studio-toggle { min-height: 36px; }
+}
+
+/* Keep paper-card status compact without hiding its allocation or outcome. */
+[data-testid="cfb-locked-summary"] { padding-block: 6px; }
+[data-testid="cfb-locked-summary"] > .grid { margin-top: 4px; }
+[data-testid="cfb-locked-summary"] > .grid > div { padding-block: 4px; }
+[data-testid="cfb-ticket"] article { padding-top: 6px; }
+[data-desk-page="/stats"][data-desk-sport="mlb"] .player-portrait { clip-path: none; transform: scale(.7); transform-origin: center; object-fit: contain; }

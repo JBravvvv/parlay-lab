@@ -77,19 +77,22 @@ describe("phone header — ⋯ More menu, Settings gear, a bar that reads as a b
   });
 });
 
-describe("PageHeader — title and action share the phone row, one clamped sub under them", () => {
-  it("renders the phone sub once and the desktop sub once, each behind its breakpoint class", () => {
+describe("PageHeader — compact title/action with optional status and expandable help", () => {
+  it("keeps the title, action and short status visible, with the long explanation collapsed", () => {
     const out = html(createElement(PageHeader, { title: "Board", sub: "the long desktop sentence", subMobile: "short", action: createElement("button", null, "Go") }));
-    expect(out).toMatch(/<h1 class="display text-\[22px\] leading-none text-text sm:text-\(length:--text-display\)">Board<\/h1>/);
-    expect(out).toMatch(/class="mt-1 hidden max-w-xl text-\[13px\] leading-relaxed text-muted sm:block">the long desktop sentence</);
-    expect(out).toMatch(/data-page-sub="phone" class="line-clamp-1 w-full text-\[11px\] leading-snug text-muted sm:hidden">short</);
-    // the action is a direct child of the header row, before the phone sub — beside the title on a phone
+    expect(out).toContain('sm:text-[24px]');
+    expect(out).toContain('>Board</h1>');
+    expect(out).toContain('<details class="page-description');
+    expect(out).not.toContain('<details open');
+    expect(out).toContain('the long desktop sentence');
+    expect(out).toMatch(/data-page-sub="phone"[^>]*>short</);
     expect(out.indexOf("<button>Go</button>")).toBeLessThan(out.indexOf('data-page-sub="phone"'));
-    expect(out).toMatch(/class="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1\.5 sm:mb-4 sm:gap-3"/);
   });
-  it("without subMobile the phone row falls back to the sub; without either there is no phone line", () => {
-    expect(html(createElement(PageHeader, { title: "Stats", sub: "one sentence" }))).toMatch(/data-page-sub="phone"[^>]*>one sentence</);
-    expect(html(createElement(PageHeader, { title: "Stats" }))).not.toMatch(/data-page-sub/);
+  it("does not repeat the explanation as a second header line", () => {
+    const out = html(createElement(PageHeader, { title: "Stats", sub: "one sentence" }));
+    expect(out.split('one sentence')).toHaveLength(2);
+    expect(out).not.toMatch(/data-page-sub/);
+    expect(html(createElement(PageHeader, { title: "Stats" }))).not.toMatch(/<details/);
   });
 });
 
@@ -235,8 +238,8 @@ describe("Parlay Builder — 36px generator slots, hero hidden, buttons a size d
     expect(gen).toMatch(/<span className="shrink-0 sm:hidden">\n\s+<HitChip stat=\{l\.hit\} window=\{hitWindow\} \/>/);
     expect(gen).toMatch(/<div className="mt-\[3px\] hidden items-center gap-1\.5 sm:flex">\n\s+<HitChip stat=\{l\.hit\} window=\{hitWindow\} \/>\n\s+<HitDots dots=\{l\.hit\.dots\} \/>/);
   });
-  it("the hero band is sm-only; Regenerate / Add to slip are 40px on the phone, 48px from sm; Prev/Next 32px", () => {
-    expect(gen).toMatch(/gen-studio-hero -mx-3 -mt-2\.5 hidden items-center justify-between gap-2 px-3 py-2 sm:flex/);
+  it("the redundant hero band stays hidden; Regenerate / Add to slip are 40px on the phone, 48px from sm; Prev/Next 32px", () => {
+    expect(gen).toMatch(/gen-studio-hero -mx-3 -mt-2\.5 hidden items-center justify-between gap-2 px-3 py-2/);
     expect(gen).toMatch(/gen-roll press flex min-h-10 flex-1 [^"]*sm:min-h-12/);
     expect(gen).toMatch(/press min-h-10 shrink-0 rounded-\[12px\] border px-3 text-\[12px\] font-semibold sm:min-h-12/);
     expect((gen.match(/press h-8 flex-1 rounded-full border border-white\/10 text-\[11px\] font-semibold disabled:opacity-35 sm:h-9/g) ?? []).length).toBe(2);

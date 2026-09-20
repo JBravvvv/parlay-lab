@@ -460,25 +460,6 @@ function PropsDesk() {
         <span className="truncate text-[10px] text-faint">Sandbox · nothing here is tracked or enters the ledger</span>
       </div>
 
-      <MarketNav
-        tab={tab}
-        mktKey={mktKey}
-        onTab={(t) => {
-          setTab(t);
-          setMktKey(MARKETS[t][0].key);
-          setRankedFilter(rankedKeyOf(t, MARKETS[t][0].key));
-        }}
-        onMarket={(k) => {
-          setMktKey(k);
-          setRankedFilter(rankedKeyOf(tab, k));
-        }}
-        top={ins.top}
-        search={!gameTab && cat != null ? search : null}
-        onSearch={setSearch}
-        count={{ lines: totalRows, games: propGames.length }}
-        hitWindow={hitWindow}
-        onHitWindow={setHitWindow}
-      />
 
       <GenSheet
         market={spec.market}
@@ -516,6 +497,26 @@ function PropsDesk() {
         onHitWindow={setHitWindow}
         hitLoading={hitRates.loading}
       />
+      <MarketNav
+        tab={tab}
+        mktKey={mktKey}
+        onTab={(t) => {
+          setTab(t);
+          setMktKey(MARKETS[t][0].key);
+          setRankedFilter(rankedKeyOf(t, MARKETS[t][0].key));
+        }}
+        onMarket={(k) => {
+          setMktKey(k);
+          setRankedFilter(rankedKeyOf(tab, k));
+        }}
+        top={ins.top}
+        search={!gameTab && cat != null ? search : null}
+        onSearch={setSearch}
+        count={{ lines: totalRows, games: propGames.length }}
+        hitWindow={hitWindow}
+        onHitWindow={setHitWindow}
+      />
+
 
       {fromServer && !gameTab && (
         <div className="mb-2 rounded-[10px] border border-gold/30 bg-gold/[0.07] px-3 py-1.5 text-[10.5px] text-gold">

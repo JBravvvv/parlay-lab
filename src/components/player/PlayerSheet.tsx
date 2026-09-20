@@ -369,7 +369,7 @@ function PlayerPhoto({ id, name, size }: { id: number; name: string; size: numbe
       height={size}
       loading="lazy"
       onError={() => setBroken(true)}
-      className="shrink-0 rounded-full bg-surface-3 object-cover"
+      className="player-portrait shrink-0 rounded-full bg-surface-3 object-cover"
       style={{ width: size, height: size }}
     />
   );

@@ -102,12 +102,12 @@ describe("every box shrunk vertically from sm/md — the shared surfaces", () =>
     expect(out).toMatch(/px-3 py-2 sm:px-4 sm:py-2/);
     expect(out).not.toMatch(/sm:p-5|sm:py-3/);
   });
-  it("PageHeader: mb-4 from sm, the sub one step under the title, and the display size capped at 36px", () => {
+  it("PageHeader uses a 24px desktop title and collapses long introductory copy", () => {
     const out = html(createElement(PageHeader, { title: "Board", sub: "sub" }));
-    expect(out).toMatch(/class="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1\.5 sm:mb-4 sm:gap-3"/);
-    expect(out).toMatch(/class="mt-1 hidden max-w-xl text-\[13px\] leading-relaxed text-muted sm:block">sub</);
-    expect(css).toMatch(/--text-display: clamp\(1\.5rem, 2\.4vw, 2\.25rem\);/);
-    expect(css).not.toMatch(/--text-display: clamp\(1\.7rem, 5\.5vw, 3\.75rem\);/);
+    expect(out).toContain('sm:text-[24px]');
+    expect(out).toContain('mb-2 flex flex-wrap items-center');
+    expect(out).toContain('<details class="page-description');
+    expect(out).not.toContain('<details open');
   });
   it("StatTile: 20px figure one step under the label, 8px×12px tile padding from md", () => {
     const out = html(createElement(StatTile, { label: "Core", value: "$250", sub: "per slate day" }));
@@ -121,7 +121,7 @@ describe("every box shrunk vertically from sm/md — the shared surfaces", () =>
     expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/min-h-9 rounded-lg [^"]*sm:min-h-9 sm:px-3 sm:text-sm/);
     expect(read("src/components/ui/PaperBanner.tsx")).toMatch(/sm:mb-3 sm:rounded-\(--radius-panel\) sm:px-4 sm:py-1\.5 sm:text-\[12px\]/);
     expect(read("src/components/ui/Pill.tsx")).toMatch(/rounded-full px-3 py-1\.5 text-\[12px\] font-semibold sm:px-3\.5 sm:py-1\.5 sm:text-\[12\.5px\]/);
-    expect(read("src/components/shell/AppShell.tsx")).toMatch(/<main className="px-4 pb-24 pt-4 md:ml-\[200px\] md:px-8 md:pb-8 md:pt-4">/);
+    expect(read("src/components/shell/AppShell.tsx")).toContain('className="desk-content px-4 pb-24 pt-2 md:ml-[200px] md:px-8 md:pb-8 md:pt-2"');
     expect(desktopBlock).toMatch(/\.gen-player-card \{ min-height: 44px; \}/);
     expect((read("src/components/props/GenSheet.tsx").match(/sm:min-h-\[44px\]/g) ?? []).length).toBe(2);
     expect(read("src/components/props/GenSheet.tsx")).not.toMatch(/sm:min-h-\[52px\]/);
@@ -153,7 +153,7 @@ describe("every box shrunk vertically — per tab", () => {
   });
   it("Football desk: the sandbox line mb-2 and a 36px search from md", () => {
     const src = read("src/components/cfb/CfbProps.tsx");
-    expect(src).toMatch(/<p className="mb-2 text-\[11\.5px\] text-muted">Sandbox/);
+    expect(src).toContain('Paper sandbox · untracked');
     expect(src).toMatch(/bg-surface-2 px-3 text-\[16px\] text-text placeholder:text-faint md:h-9 md:text-\[13px\]"/);
   });
   it("Games, Stats, Ledger, Sharp, Simulator, Settings, Calc, Ballpark: tighter grids and section gaps", () => {

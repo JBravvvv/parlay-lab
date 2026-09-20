@@ -1,3 +1,5 @@
+**September 19 current layout policy:** desktop Parlay Generator settings and ticket are side by side at 768px container width, actions below both (supersedes older stacked-only instruction). Mobile keeps optional settings above ticket. Page explanations collapse by default. Featured odds are compact 20px; portraits zoom in 30% except MLB Stats zooms out 30%. Stronger typography across desks.
+
 # CLAUDE.md — Parlay Lab
 
 **Current owner policy, September 19, 2026:** the Odds API plan is 100,000 credits/month. No application daily odds-credit budgets or server generation count ceiling on MLB, NFL or CFB. Manual MLB live refresh bypasses quote-age reuse, the measurement probe cap, and prior-429 retry limits. Keep usage telemetry, authentication, overlapping-request leases, stale-price eligibility, and paper bankroll rules. Historical daily-credit ceilings elsewhere are superseded.

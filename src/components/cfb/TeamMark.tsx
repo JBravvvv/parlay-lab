@@ -216,7 +216,7 @@ export function PlayerMark({
             loading="lazy"
             decoding="async"
             onError={() => setFailed(prev => [...prev, headshot!])}
-            className="h-full w-full rounded-full object-cover object-top"
+            className="player-portrait h-full w-full rounded-full object-cover object-top"
           />
         ) : team?.logo && useBadgeLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
