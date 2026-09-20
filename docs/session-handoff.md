@@ -71,8 +71,8 @@ Compact now halves vertical all-axis card padding and grid/stack gaps. Sportsboo
 share one row; mobile hides repeated league eyebrows and the redundant props book label.
 Font size, portraits, horizontal width and explicit tap-target heights are unchanged.
 Production sweep checked NFL Games/Builder/Board/Parlays/Simulator, CFB Sharp/Stats/Simulator,
-and MLB Stats split controls/Ballpark/Parlays. One initial production hydration warning was
-observed; repeated MLB/NFL Parlay Builder reloads did not reproduce it. Final release evidence
+and MLB Stats split controls/Ballpark/Parlays. An intermittent production hydration warning recurred after deployment; pages recovered,
+but local production/development reloads did not reproduce it. Its cause remains unresolved. Final release evidence
 is recorded in progress.md and tools/handoff-state.env; do not claim a deployed release until
 its exact production version has been verified. Sync this handoff after updates and before compaction.
 

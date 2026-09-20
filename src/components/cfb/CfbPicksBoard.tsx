@@ -331,7 +331,7 @@ export function CfbRefreshPill() {
         variant="primary"
         onClick={() => void onClick()}
         disabled={fetching}
-        title={`With your sync phrase stored: a FULL re-pull — the slate's lines and every priced player-prop game are re-priced now and stored (under the day's Odds API budget), then the desk's refill pass runs (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run). Without it: re-reads the two feeds — sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play, and a re-read inside the window spends no quota.`}
+        title={`With your sync phrase stored: a FULL re-pull — the slate's lines and every priced player-prop game are re-priced now and stored (no daily odds-credit cap), then the desk's refill pass runs (the same one the 08:00/09:30/12:00/15:00/16:45 PT slots run). Without it: re-reads the two feeds — sides cache up to 4 minutes per date, player props ${PROPS_CACHE_H} h pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play, and a re-read inside the window spends no quota.`}
         data-testid="cfb-refresh-board"
       >
         {fetching ? "Pulling…" : "Refresh Board"}
@@ -729,7 +729,7 @@ export function CfbPicksBoard() {
               </>
             )}
             Sides cache up to 4 min per date, player props {propsQ.data ? cfbCacheLabel(propsQ.data) : `${PROPS_CACHE_H} h`}
-            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — a refresh inside the window spends no quota. Displayed prices follow your selected sportsbook. Locked paper cards retain their recorded prices. Parlays multiply each leg&apos;s own probability
+            {propsQ.data?.live ? " while a game is in play" : ` pre-kick / ${LIVE_CACHE_MIN} min while a priced game is in play`} — ordinary reads can reuse cached quotes; authenticated Refresh Board requests fresh prices. Displayed prices follow your selected sportsbook. Locked paper cards retain their recorded prices. Parlays multiply each leg&apos;s own probability
             (legs on different games are treated as independent). Setups that match criteria, not predictions. Informational only, not
             betting advice.
           </div>
