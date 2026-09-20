@@ -1030,8 +1030,7 @@ export function GenSheet<P>({
                     {marketLabel} is suspended from the engine&apos;s own auto-built tickets; this sandbox spins it anyway.{" "}
                   </>
                 )}
-                {historyNotice ? "Prices are saved with this ticket" : spec.phase && spec.phase!=="pregame" ? "Live legs use their individual in-play quote times; pregame legs use the stored board" : <>Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""}</>} — tap Regenerate for another
-                spin, not for a fresher price. Sandbox · not tracked, never enters the ledger.
+                {historyNotice ? "Prices are saved with this ticket" : spec.phase && spec.phase!=="pregame" ? "Live legs use their individual in-play quote times; pregame legs use the stored board" : <>Prices are the board&apos;s posted quotes{boardAt ? ` as of ${boardAt}` : ""}</>} — Regenerate builds another ticket. Football Live/Mixed generation refreshes prop prices first. Sandbox · not tracked, never enters the ledger.
               </details>
             </div>
           ) : (
