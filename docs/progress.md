@@ -1,3 +1,7 @@
+## September 19 — Every Pick Today filter/readability update
+
+Owner request: checkboxes on the right, white bold "Select All" (capital A), close dropdowns when clicking anywhere outside, and bolder text across the page. Shared MultiSelect now puts labels left and checkboxes right, keeps multi-selection open, and closes on outside pointer/touch, focus leaving, or Escape (restoring summary focus when appropriate). Event listeners clean up on unmount. Parlay Builder / Every Pick Today uses 700-weight text and brighter muted/matchup/time text. Selection, odds, grading, and generator math are unchanged. Validation: production build (including TypeScript) PASS, 80/80 tests across ranked picks, generator UI, and discovery release suites PASS; git diff --check PASS. Existing checkbox/capitalization assertions updated to the requested design. Production deployment receipt is written to the handoff folder release-verification.json after push; no browser interaction verification claimed (Chrome unavailable in the preceding session).
+
 ## September 19 — requested desktop/mobile layout refinement
 
 Owner requested eight visual fixes after viewing Chrome on MacBook: smaller football card boxes and prices; shorter page headers; smaller simulator cards; desktop generator settings beside ticket with actions below; minimal mobile preamble; MLB Stats portraits zoomed out 30%; other portraits zoomed in 30%; bolder readable typography.

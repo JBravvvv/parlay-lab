@@ -946,3 +946,7 @@ body::after {
 [data-testid="cfb-locked-summary"] > .grid > div { padding-block: 4px; }
 [data-testid="cfb-ticket"] article { padding-top: 6px; }
 [data-desk-page="/stats"][data-desk-sport="mlb"] .player-portrait { clip-path: none; transform: scale(.7); transform-origin: center; object-fit: contain; }
+
+/* Every Pick Today / Parlay Builder: bold, readable text including matchup/time and filters. */
+.desk-content[data-desk-page="/props"] { font-weight: 700; --color-faint: #b6c2d2; --color-muted: #d2dbe8; }
+.desk-content[data-desk-page="/props"] :where(*:not(.font-black):not(.font-extrabold):not(.display)) { font-weight: 700; }

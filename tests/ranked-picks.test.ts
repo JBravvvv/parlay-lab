@@ -93,7 +93,7 @@ describe("RankedPicks — every pick today, S down", () => {
 
   it("market dropdown has select all, clear, and checked options",()=>{
     const out=render();expect(out).toContain('aria-label="Markets"');expect(out).toContain("Markets: All");
-    expect(out).toContain("Select all");expect(out).toContain(">Clear</button>");
+    expect(out).toContain("Select All");expect(out).toContain(">Clear</button>");
     for(const f of FILTERS)expect(out).toContain(f.label.replace(/&/g,"&amp;"));
     expect(order(out)).toHaveLength(7);
   });
@@ -180,7 +180,7 @@ describe("controlled category (2026-09-18 later)", () => {
     const out = render({ filter: "batter_hits", onFilter: () => {} });
     expect(order(out)).toEqual(["s-hits", "d-hits"]);
     expect(out).toContain("Markets: Hits");
-    expect(out).toContain('type="checkbox" checked=""/>Hits');
+    expect(out).toMatch(/>Hits<\/span><input type="checkbox"[^>]*checked=""[^>]*\/>/);
     expect(out).toContain("· Hits");
   });
   it("without the props the list keeps its own state — the football desks are untouched", () => {

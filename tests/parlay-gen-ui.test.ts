@@ -147,7 +147,7 @@ describe("GenSheet — the open panel", () => {
     /* COMPACTED 2026-09-18 (Josh: "compact the UI on the parlay generator. If we have to do dropdowns
        etc in order to reduce space wasted/taken up then so be it"): Legs and Sides are native selects
        now, so the chip count is the categories plus the games — still a chip row, just fewer of them */
-    expect(out).toContain("Select all");
+    expect(out).toContain("Select All");
     expect(out).toContain("Clear");
     expect(count(out, /<select /g)).toBe(1);
     expect(out).toContain("aria-label=\"Leg count\"");
@@ -155,7 +155,7 @@ describe("GenSheet — the open panel", () => {
     expect(out).toMatch(/<output[^>]*aria-label="Leg count"[^>]*>4<\/output>/);
     /* every MLB category is a chip, and the one on the rail is pressed */
     for (const m of MLB_GEN_MARKETS) expect(out).toContain(m.label.replace(/'/g, "&#x27;")); // React escapes the apostrophe in K's
-    expect(out).toMatch(/type="checkbox"[^>]*checked=""[^>]*\/>H\+R\+RBI/);
+    expect(out).toMatch(/>H\+R\+RBI<\/span><input type="checkbox"[^>]*checked=""[^>]*\/>/);
     /* the two-thumb odds slider stops on prices the board really posts */
     expect(out).toContain('data-testid="gen-odds-slider"');
     expect(out).toContain('aria-label="Lowest odds per leg"');
