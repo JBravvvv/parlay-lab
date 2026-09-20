@@ -10,7 +10,7 @@ import {useFootballPrices,useFootballPropsPrices} from "@/lib/sportsbook/useFoot
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {bookName} from "@/lib/sportsbook/books";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCfbDesk } from "@/components/cfb/CfbBuilder";
@@ -821,12 +821,20 @@ export function CfbProps() {
     setFocus({ gameId: link.game as string, market: cfbPropsLinkNav(link.mkt), player: link.player });
   };
 
+  const queryClient = useQueryClient();
+  const [refreshingLive,setRefreshingLive] = useState(false);
+  const [liveRefreshError,setLiveRefreshError] = useState<string|null>(null);
+  const [pendingLiveSpin,setPendingLiveSpin] = useState<{date:string;board:CfbPropsBoard}|null>(null);
+  const refreshInFlight = useRef(false);
   const propsQ = useQuery({
     queryKey: cfbPropsQueryKey(date, bankroll),
     queryFn: () => loadCfbProps(date, { bankroll }),
     /* the ranked view lists every prop too, so it needs the props board on any rail */
     enabled: (nav !== "sides" || view === "ranked") && !!date,
     staleTime: (q) => propsStaleMs(q.state.data, L.client),
+    // Re-read while visible; server per-event TTLs prevent needless upstream pulls.
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: 1,
   });
 
@@ -949,6 +957,28 @@ export function CfbProps() {
       return r.legs;
     },
   });
+  // Spin only after React has rebuilt the pool from the returned quote snapshot.
+  useEffect(()=>{
+    if(!pendingLiveSpin)return;
+    if(pendingLiveSpin.date!==date){setPendingLiveSpin(null);return;}
+    if(propsQ.data!==pendingLiveSpin.board)return;
+    setPendingLiveSpin(null);
+    gen.spin();
+  },[pendingLiveSpin,date,propsQ.data,gen.spin]);
+  const generateWithCurrentQuotes=async()=>{
+    const liveEnabled=gen.spec.phase==='live'||gen.spec.phase==='mixed'||gen.spec.includeStarted;
+    if(!liveEnabled){gen.spin();return;}
+    if(refreshInFlight.current||!date)return;
+    refreshInFlight.current=true;setRefreshingLive(true);setLiveRefreshError(null);
+    const requestedDate=date;
+    try{
+      await queryClient.cancelQueries({queryKey:cfbPropsQueryKey(requestedDate,bankroll),exact:true});
+      const fresh=await loadCfbProps(requestedDate,{bankroll,refresh:true});
+      const cached=queryClient.setQueryData<CfbPropsBoard>(cfbPropsQueryKey(requestedDate,bankroll),fresh);
+      if(cached)setPendingLiveSpin({date:requestedDate,board:cached});
+    }catch(e){setLiveRefreshError(e instanceof Error?e.message:'Live odds refresh failed. Try again.');}
+    finally{refreshInFlight.current=false;setRefreshingLive(false);}
+  };
   const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
   useEffect(() => setLoadRosterPositions(gen.open), [gen.open]);
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
@@ -1054,6 +1084,8 @@ export function CfbProps() {
       <DateRail dates={dates} date={date} today={today} onPick={pick} />
 
 
+      {liveRefreshError&&<p role="alert" className="my-1 text-sm font-bold text-neg">{L.short} live refresh: {liveRefreshError}</p>}
+      {refreshingLive&&<p role="status" className="my-1 text-xs font-bold text-gold">Refreshing {L.short} live prop prices before generating…</p>}
       <GenSheet
         market={gen.spec.market}
         marketLabel={genMarketLabel}
@@ -1079,7 +1111,7 @@ export function CfbProps() {
         spec={gen.spec}
         onSpec={gen.patchSpec}
         result={gen.result}
-        onGenerate={gen.spin}
+        onGenerate={()=>void generateWithCurrentQuotes()}
         onTogglePin={gen.togglePin}
         onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
@@ -1097,7 +1129,7 @@ export function CfbProps() {
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={genBoardAt}
-        loading={propsQ.isPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
+        loading={refreshingLive || !!pendingLiveSpin || propsQ.isPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
         gameMarket={false}
         showModelOnly={false}
         categoryNote={GEN_CATEGORY_NOTE}

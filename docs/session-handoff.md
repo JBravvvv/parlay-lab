@@ -1,3 +1,11 @@
+## September 20 11:44 PT — urgent live football generator fix
+
+Owner screenshot: NFL The Model / Live / Anytime TD / four legs / -215 to +5000 yielded 0 rows, 218 dropped, erroneous Refresh MLB copy. Root cause: generator only spun a cached device snapshot; props query did not poll, so per-game live quotes aged beyond the ten-minute eligibility limit. Production GET returned 217 live Anytime TD rows across eight games at 18:40:48Z. Keep freshness protections; do not treat stale pregame prices as live.
+
+Live/Mixed generation now requests fresh league props (authenticated refresh when device sync phrase exists), installs response in React Query, then spins only after the pool rerenders against that cached response. Uses QueryClient returned object to respect structural sharing, prevents duplicate requests, checks requested date, surfaces refresh errors and loading state. Visible props page re-reads every 60 seconds with server TTLs; background polling off. Shared NFL/CFB implementation. Corrected Refresh MLB copy and ambiguous dropped-as-started diagnostic. No stale-price bypass, no fabricated quotes, no ledger write.
+
+Validation: 131/131 football generator/core/UI tests PASS; TypeScript and production build PASS. Exact live market reproduction generated four live DK Anytime TD legs with original odds/leg filters; stale version produced zero. Captured public-quote subset regression fixture and test committed. Final production receipt follows in external handoff release-verification.json.
+
 ## September 20 — Board filter dropdown refinement
 
 Owner steering: replace excessive prop-category boxes above Top Edges with a dropdown and make expanded Board/Generated Parlays menus more appealing. MLB market pills and NFL/CFB prop tabs now use one compact single-choice dropdown; generated-parlay category/tier selectors use the same styled component. Shared discovery menus now have gold accents, high-contrast headers, selection counts, highlighted rows, right-side controls and readable full-label tooltips. Single choice closes on selection; multi-select keeps Select All/Clear, outside-click/focus and Escape dismissal. Menus flip above when viewport space is constrained; mobile shared filter rows use two columns. No ranking, odds or generator math changes.

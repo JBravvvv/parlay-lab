@@ -161,7 +161,7 @@ export function genFailLine(
     case "phase-empty":
       return `No ${ctx.marketLabel} quote qualifies under the current timing filters. Mixed permits pregame, live, or any combination.`;
     case "no-rows":
-      if(ctx.phase==="live") return `No current live ${ctx.marketLabel} quotes qualify. Check the selected sportsbook, Refresh MLB, or switch to Pregame.`;
+      if(ctx.phase==="live") return `No current live ${ctx.marketLabel} quotes qualify. Regenerate to refresh live prices, or check the selected sportsbook and filters.`;
       /* EVERY GAME IS OVER is a different fact from "the board has no lines", and on a past date
          the football board is full of grey final rows (INSTRUCTION 52 fix pass). The caller sets
          the flag only when every row this market has is in a finished game. */
@@ -942,7 +942,7 @@ export function GenSheet<P>({
           <div data-testid="gen-diagnostic" className="num hidden text-[9.5px] text-faint @3xl:block">
             pool {pool.rows} rows → eligible {counts.eligible} → after band {counts.inBand} → {counts.games} game
             {counts.games === 1 ? "" : "s"}
-            {pool.startedDropped > 0 && <> · {pool.startedDropped} dropped as already started</>}
+            {pool.startedDropped > 0 && <> · {pool.startedDropped} excluded: started games or expired live quotes</>}
             {/* two different sentences, because they are two different facts: the book refusing a
                 leg on a parlay, and a game that is simply over (INSTRUCTION 52 fix pass) */}
             {pool.noParlayDropped > 0 && <> · {pool.noParlayDropped} the book bars from parlays</>}
