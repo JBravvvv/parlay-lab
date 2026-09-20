@@ -1,3 +1,9 @@
+## September 20 — Board Generated Parlays dropdowns
+
+Owner requested safer-parlay filtering and dropdowns for the list of parlay types. MLB and shared NFL/CFB Generated Parlays now explicitly label the eight-style selector “Parlay type,” with “Safe / Safer,” Balanced, Aggressive, Longshot, Edge / +EV, Correlated / Stacks, Anchor + Kicker and Hedge-Friendly. Existing multi-select Select All/Clear behavior remains. The old ticket-set/category and tier pill strips are native compact dropdowns, including an explicit All sets option for football and SAFER tier access. Style filtering still uses market-relative estimated probability/value through ticketMatches; tier filtering preserves stored engine classifications. No odds, staking or generation math changed. Changing discovery filters resets pagination. Empty matching sets remain empty rather than relabeled as safe.
+
+Validation: 106/106 affected discovery, football Board UI and density tests PASS across four suites; production build including TypeScript PASS. Added a behavior regression proving Safe rejects lower-ranked/overpriced ingredients, accepts market-relative stronger TD legs below 50% and supports multi-style unions/Clear. Obsolete pill-layout assertions updated. No browser visual verification claimed; previous Chrome-control limitation and intermittent hydration warning remain unresolved. Production and handoff archive verification recorded externally in release-verification.json after deployment.
+
 ## September 19 — density in Settings and consistent pick imagery
 
 Moved the header density dropdown to Settings → Display → Page density. Preserves the existing local preference and Compact default; same-tab custom event applies changes immediately, storage events synchronize other tabs. Sportsbook selector remains in the header.

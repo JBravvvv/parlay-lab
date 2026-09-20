@@ -75,11 +75,11 @@ describe("no sideways scroll from md — strips wrap, the table box opens, the f
   it("the football Board: featured cards fill thirds of the row from md, the parlay filter strip wraps, the desktop parlay grid runs three-up at xl", () => {
     const src = read("src/components/cfb/CfbPicksBoard.tsx");
     expect(src).toMatch(/w-\[78vw\] max-w-\[320px\] rounded-\[14px\] border px-3 pb-2 pt-2 md:w-\[calc\(33\.333%-8px\)\] md:max-w-none/);
-    expect(src).toMatch(/<div className="-mx-4 mb-3 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0" style=\{\{ scrollbarWidth: "none" \}\}>\n\s+<div className="flex w-max items-center gap-1\.5 md:w-auto md:flex-wrap">/);
+    expect(src).toContain('<select aria-label="Ticket tier"');
     expect(src).toMatch(/<div className="hidden gap-2 md:grid md:grid-cols-2 xl:grid-cols-3">/);
     expect(src).toMatch(/<div className="space-y-3">/);
     expect(src).toMatch(/<div className="mt-5" data-testid="cfb-parlays">/);
-    expect((src.match(/className="min-h-\[40px\] !px-3 !text-\[11px\] whitespace-nowrap md:min-h-\[32px\]"/g) ?? []).length).toBe(3);
+    expect((src.match(/className="min-h-\[40px\] !px-3 !text-\[11px\] whitespace-nowrap md:min-h-\[32px\]"/g) ?? []).length).toBe(1);
     expect(src).toMatch(/text-\[16px\] text-text outline-none placeholder:text-faint focus:border-cfb\/60 data-\[league=nfl\]:focus:border-nfl\/60 md:h-9 md:text-\[13px\]"/);
   });
   it("every other desktop-visible strip wraps from md: the date rail, the generator's game chips, the ranked-list tabs", () => {

@@ -1025,34 +1025,15 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
-        <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");}} markets={ALL_MARKETS}/>
+        <DiscoveryFilters parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
         {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
-        {/* INSTRUCTION 42: one pill per category set, up to CFB_PARLAYS.perCategory tickets each; the row scrolls, the page never does */}
-        <div className="chip-row -mx-4 mb-2 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Parlay category" data-testid="cfb-parlay-cats">
-          {CFB_PARLAY_CATEGORIES.map((k) => {
-            const n = sets[k]?.length ?? 0;
-            const c = PARLAY_CATS[k];
-            return (
-              <FilterPill
-                key={k}
-                role="tab"
-                aria-selected={cat === k}
-                selected={cat === k}
-                className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]"
-                onClick={() => {
-                  setPicked(k);
-                  setFilter("all");
-                  setPhoneShown(PHONE_CHUNK);
-                }}
-              >
-                {c.live && <span className="pulse-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-live align-middle" aria-hidden />}
-                {c.label}
-                {c.hint && <span className="ml-1 text-[9px] font-medium normal-case tracking-normal opacity-70">{c.hint}</span>}
-                <span className="num ml-1 text-[9.5px] opacity-70">{!c.live && !SIDE_CAT.has(k) && propsPending && n === 0 ? "…" : n}</span>
-              </FilterPill>
-            );
-          })}
-        </div>
+        <label className="mb-2 flex items-center gap-2 text-[11px] font-bold" data-testid="cfb-parlay-cats">
+          Ticket set
+          <select aria-label="Parlay category" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={picked??"all"} onChange={e=>{setPicked(e.target.value==="all"?null:e.target.value as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}>
+            <option value="all">All sets</option>
+            {CFB_PARLAY_CATEGORIES.map(k=><option key={k} value={k}>{PARLAY_CATS[k].label} · {sets[k]?.length??0}</option>)}
+          </select>
+        </label>
         <div className="mb-3 text-[11px] text-muted">
           {picked?meta.blurb:"All stored ticket sets. Timing and markets are optional filters; mixed does not require both phases."} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
           {openN > 0 && (
@@ -1070,28 +1051,12 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           </Panel>
         ) : (
           <>
-            <div className="-mx-4 mb-3 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0" style={{ scrollbarWidth: "none" }}>
-              <div className="flex w-max items-center gap-1.5 md:w-auto md:flex-wrap">
-                {filters.map(([k, label]) => {
-                  const n = all.filter((t) => match(t, k)).length;
-                  return (
-                    <FilterPill
-                      key={k}
-                      selected={active === k}
-                      onClick={() => {
-                        setFilter(k);
-                        setPhoneShown(PHONE_CHUNK);
-                      }}
-                      disabled={!n}
-                      className="min-h-[40px] !px-3 !text-[11px] whitespace-nowrap md:min-h-[32px]"
-                    >
-                      {label}
-                      {n > 0 && <span className="num ml-1 text-[9.5px] opacity-70">{n}</span>}
-                    </FilterPill>
-                  );
-                })}
-              </div>
-            </div>
+            <label className="mb-3 flex items-center gap-2 text-[11px] font-bold">
+              Ticket tier
+              <select aria-label="Ticket tier" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={active} onChange={e=>{setFilter(e.target.value);setPhoneShown(PHONE_CHUNK);}}>
+                {filters.map(([k,label])=><option key={k} value={k}>{label} · {all.filter(t=>match(t,k)).length}</option>)}
+              </select>
+            </label>
 
             {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid.
                 Only the active layout mounts (review fix) — the display classes stay for the first paint before the effect runs. */}

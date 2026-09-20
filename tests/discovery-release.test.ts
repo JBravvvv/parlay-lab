@@ -1,3 +1,4 @@
+import {ticketMatches} from "@/lib/ticket-discovery";
 import {footballTeamKey} from "@/lib/football/team-key";
 import {combineTicket} from "@/lib/ticket-math";
 import {describe,it,expect} from "vitest";
@@ -124,3 +125,13 @@ describe("side markets in mixed tickets",()=>{
   expect(crossToFootball(l).push).toBe(20);expect(crossToMlb(l).push).toBe(20);
  });
 });
+
+ it("Board Safe / Safer filters by market-relative probability and value, with styles combined as a union",()=>{
+ const strong={market:"anytime_td",sport:"nfl",prob:40,ev:4,am:200,chanceRank:.8};
+ const weak={...strong,prob:20,chanceRank:.2};
+ expect(ticketMatches([strong,strong],{...filter,strategies:["safe"]})).toBe(true);
+ expect(ticketMatches([strong,weak],{...filter,strategies:["safe"]})).toBe(false);
+ expect(ticketMatches([{...strong,ev:-15}],{...filter,strategies:["safe"]})).toBe(false);
+ expect(ticketMatches([strong,weak],{...filter,strategies:["safe","aggressive"]})).toBe(true);
+ expect(ticketMatches([strong],{...filter,strategies:[]})).toBe(false);
+ });

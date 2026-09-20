@@ -145,7 +145,7 @@ describe("CFB Board — the Caesars grammar", () => {
   });
   it("phone tap floors: chips ≥ 40px, the scope Segmented at md, the search box 44px with 16px text", () => {
     // 4 since the INSTRUCTION 42 review fix (2026-09-05): the two category strips, the tier pills, and the parlay carousel's Show-more control
-    expect(board.match(/min-h-\[40px\]/g)?.length).toBe(4);
+    expect(board.match(/min-h-\[40px\]/g)?.length).toBe(2);
     expect(board).not.toMatch(/!py-1 /);
     expect(board).toMatch(/<Segmented options=\{SCOPES\}[^>]*size="md"/);
     expect(board).toMatch(/aria-label="Search picks"[\s\S]*?className="num h-11 [^"]*text-\[16px\]/);
@@ -153,9 +153,9 @@ describe("CFB Board — the Caesars grammar", () => {
   it("every count on the strips comes from the data, never a literal", () => {
     expect(board).toMatch(/const n = picks\?\.categories\[c\.key\]\?\.length \?\? 0;/);
     // INSTRUCTION 42 (2026-09-05): the three VIEWS pills became the twelve-category chip-row — each count is its set's length
-    expect(board).toMatch(/const n = sets\[k\]\?\.length \?\? 0;/);
+    expect(board).toContain("{sets[k]?.length??0}");
     expect(board).not.toMatch(/\{lists\[v\]\.length\}/);
-    expect(board).toMatch(/const n = all\.filter\(\(t\) => match\(t, k\)\)\.length;/);
+    expect(board).toContain("all.filter(t=>match(t,k)).length");
   });
 });
 
@@ -173,10 +173,11 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
   const section = board.slice(board.indexOf("export function CfbParlaysSection"), board.indexOf("const REF_STAKE"));
   const KEYS = ["ml", "spread", "total", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
 
-  it("the parlay section is a chip-row of category pills over CFB_PARLAY_CATEGORIES, counts off picks.sets", () => {
+  it("the parlay section has a category dropdown with All sets and data counts", () => {
     expect(board).toMatch(/import \{ CFB_PARLAY_CATEGORIES, CFB_PROP_MARKETS, type CfbParlay, type CfbParlayCategory,/);
-    expect(section).toMatch(/className="chip-row -mx-4 mb-2 px-4 md:mx-0 md:px-0" role="tablist" aria-label="Parlay category" data-testid="cfb-parlay-cats"/);
-    expect(section).toMatch(/\{CFB_PARLAY_CATEGORIES\.map\(\(k\) => \{/);
+    expect(section).toContain('<select aria-label="Parlay category"');
+    expect(section).toContain('<option value="all">All sets</option>');
+    expect(section).toContain("CFB_PARLAY_CATEGORIES.map(k=><option");
     expect(section).toMatch(/const sets = picks\.sets;/);
     expect(section).toContain("Object.values(sets).flat()");
     // the legacy three-view strip is gone
@@ -198,7 +199,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
   });
   it("the tier filter (ALL / SAFER / LONGSHOTS / MIXED) still sits under the category row", () => {
     expect(board).toMatch(/\["LONGSHOT", "LONGSHOTS"\],\n  \["MIX", "MIXED"\],/);
-    expect(section.indexOf('data-testid="cfb-parlay-cats"')).toBeLessThan(section.indexOf("{filters.map(([k, label]) => {"));
+    expect(section.indexOf('data-testid="cfb-parlay-cats"')).toBeLessThan(section.indexOf('aria-label="Ticket tier"'));
     expect(section).toContain("match(t, active) && ticketMatches");
   });
   it("SHOW_CAP is 50 — the whole category set can show on phones (rank badges, PHONE_CHUNK at a time) and in the desktop grid", () => {
@@ -224,7 +225,7 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
       expect(section).toMatch(/data-testid="cfb-parlay-more"/);
       expect(section).toMatch(/onClick=\{\(\) => setPhoneShown\(\(n\) => Math\.min\(SHOW_CAP, n \+ PHONE_CHUNK\)\)\}/);
       expect(section).toMatch(/className="press flex min-h-\[40px\][^"]*"\n\s*onClick=\{\(\) => setPhoneShown/);
-      expect(section.match(/setPhoneShown\(PHONE_CHUNK\);/g)?.length).toBe(2);
+      expect(section.match(/setPhoneShown\(PHONE_CHUNK\);/g)?.length).toBe(3);
     });
     it("the S-grade sheen runs on the top SHINE_TOP ranks only, on both cards", () => {
       expect(board).toMatch(/const SHINE_TOP = 3;/);
@@ -265,8 +266,9 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
     expect(board).toMatch(/const n = picks\?\.categories\[c\.key\]\?\.length \?\? 0;/);
     expect(board).not.toMatch(/on a game that has not kicked off\./);
   });
-  it("phone rules hold: every new pill ≥ 40px, the row scrolls (chip-row), no blur", () => {
-    expect(section).toMatch(/data-testid="cfb-parlay-cats"[\s\S]*?className="min-h-\[40px\] !px-3 !text-\[11px\] whitespace-nowrap md:min-h-\[32px\]"/);
+  it("compact native dropdowns replace parlay pills without blur", () => {
+    expect(section).toContain('<select aria-label="Parlay category" className="min-h-8');
+    expect(section).toContain('<select aria-label="Ticket tier" className="min-h-8');
     expect(section).not.toMatch(BLUR);
   });
 });

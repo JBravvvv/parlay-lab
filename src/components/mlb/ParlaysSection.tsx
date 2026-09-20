@@ -11,7 +11,6 @@ import { useEffect, useMemo, useState } from "react";
 import { getSelectionMode, type SelectionMode } from "@/lib/engine-client";
 import { MODE_LABEL, orderByMode } from "@/lib/board-order";
 import { Panel } from "@/components/ui/Panel";
-import { FilterPill } from "@/components/ui/Pill";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { EmptyState } from "@/components/ui/states";
 import { Reveal } from "@/components/motion/Reveal";
@@ -139,7 +138,7 @@ export function ParlaysSection({
   const shown = all.filter((t) => match(t, filters.some(([k]) => k === pfilter) ? pfilter : "all") && ticketMatches(t.legs.map(l=>({chanceRank:legRanks.get(l),market:String(l.market??(l.lkey?marketOf(l.lkey):t.type)??""),prob:Number(l.prob??l.est??0),ev:Number(l.prob??l.est??0)/100*(parseAm(l.cz)!>0?1+parseAm(l.cz)!/100:1+100/-parseAm(l.cz)!)*100-100,am:parseAm(l.cz)??NaN,start:gameInfo?.[String(l.gkey)]?.start,started:!!l.live||!!gameInfo?.[String(l.gkey)]?.start&&Date.parse(gameInfo[String(l.gkey)].start!)<=Date.now(),sport:"mlb",game:String(l.gkey)})),discovery));
   const playable = shown.filter((t) => t.czOdds != null);
   const [cap, setCap] = useState(SHOW_CAP);
-  const capKey = `${view}|${pfilter}`;
+  const capKey = `${view}|${pfilter}|${JSON.stringify(discovery)}`;
   const [seenCap, setSeenCap] = useState(capKey);
   if (seenCap !== capKey) {
     setSeenCap(capKey);
@@ -162,15 +161,13 @@ export function ParlaysSection({
           Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
 
-        <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setView("all");setPfilter("all");}} markets={ALL_MARKETS}/>{discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={date} filter={discovery}/>}
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {VIEWS.map(([v, label]) => (
-            <FilterPill key={v} selected={view === v} onClick={() => { setView(v); setPfilter("all"); }}>
-              {label}
-              <span className="num ml-1 text-[10px] opacity-70">{(lists[v] ?? []).length}</span>
-            </FilterPill>
-          ))}
-        </div>
+        <DiscoveryFilters parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setView("all");setPfilter("all");}} markets={ALL_MARKETS}/>{discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={date} filter={discovery}/>}
+        <label className="mb-2 flex items-center gap-2 text-[11px] font-bold">
+          Ticket set
+          <select aria-label="Parlay set" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={view} onChange={e=>{setView(e.target.value as typeof view);setPfilter("all");}}>
+            {VIEWS.map(([v,label])=><option key={v} value={v}>{label} · {(lists[v]??[]).length}</option>)}
+          </select>
+        </label>
         <div className="mb-3 text-[11px] text-muted">{view==="all"?"All timing and market sets — narrow with the dropdowns above.":VIEWS.find(([v]) => v === view)![2]}</div>
 
         {all.length === 0 ? (
@@ -186,17 +183,12 @@ export function ParlaysSection({
           </Panel>
         ) : (
           <>
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              {filters.map(([k, label]) => {
-                const n = all.filter((t) => match(t, k)).length;
-                return (
-                  <FilterPill key={k} selected={pfilter === k} onClick={() => setPfilter(k)} disabled={!n} className="!px-2.5 !py-1 !text-[10.5px]">
-                    {label}
-                    {n > 0 && <span className="num ml-1 text-[9.5px] opacity-70">{n}</span>}
-                  </FilterPill>
-                );
-              })}
-            </div>
+            <label className="mb-3 flex items-center gap-2 text-[11px] font-bold">
+              Ticket tier
+              <select aria-label="Ticket tier" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={filters.some(([k])=>k===pfilter)?pfilter:"all"} onChange={e=>setPfilter(e.target.value)}>
+                {filters.map(([k,label])=><option key={k} value={k}>{label} · {all.filter(t=>match(t,k)).length}</option>)}
+              </select>
+            </label>
 
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {playable.slice(0, cap).map((t, ti) => {
