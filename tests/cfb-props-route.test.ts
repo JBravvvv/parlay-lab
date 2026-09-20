@@ -86,7 +86,7 @@ const PER = CFB_PROPS.measuredCreditsPerEvent;
    Every `spent` precondition below that governs PRE-KICK games is written against this rail, so each
    test still proves exactly the property it was written to prove; the live-slate tests keep using
    `dailyBudget`, which is itself the proof that a live pass may still draw the entire budget. */
-const RAIL = CFB_PROPS.dailyBudget - CFB_PROPS.liveReserveCredits;
+const RAIL = 2500 - CFB_PROPS.liveReserveCredits;
 
 const root = path.join(__dirname, "..");
 const readSrc = (p: string) => stripComments(fs.readFileSync(path.join(root, p), "utf8"));
@@ -1342,4 +1342,20 @@ describe("source pins", () => {
     expect(shell).toMatch(/storeKeys: CFB_PROPS_REDIS/);
     expect(shell).toMatch(/footballPropsGet\(CFB_LEAGUE, /);
   });
+});
+
+// Historical finite-budget profile: retain regression coverage for the reusable allowance math.
+// Current unlimited production behavior is tested separately below and in odds-credit-unlimited.
+const currentCFB_PROPSBudget = CFB_PROPS.dailyBudget;
+beforeEach(() => Object.assign(CFB_PROPS, {dailyBudget: 2500}));
+afterEach(() => Object.assign(CFB_PROPS, {dailyBudget: currentCFB_PROPSBudget}));
+
+it("CURRENT POLICY: CFB prices events after 100,000 daily credits and still records usage", async () => {
+ Object.assign(CFB_PROPS,{dailyBudget:currentCFB_PROPSBudget});
+ expect(CFB_PROPS.dailyBudget).toBe(Infinity);
+ fakeRedis({[`pl:cfb:props:spend:v1:${DATE}`]:"100000"});
+ fetchMock.mockImplementation(async () => eventResponse(null));
+ const {body}=await call();
+ expect(body.fetched).toBe(body.events);expect(body.fetched).toBeGreaterThan(0);
+ expect(body.budgeted).toBe(false);expect(body.spentToday).toBeGreaterThan(100000);
 });

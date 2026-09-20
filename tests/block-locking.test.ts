@@ -165,6 +165,6 @@ describe("wired — source scans, comment-stripped", () => {
     const src = read("app/api/generate/route.ts");
     expect(src).toMatch(/searchParams\.get\("block"\)/);
     expect(src).toMatch(/block-already-locked/);
-    expect(src).toMatch(/MAX_RUNS_PER_DATE = 4/);
+    expect(src).toMatch(/MAX_RUNS_PER_DATE = Number\.POSITIVE_INFINITY/);
   });
 });

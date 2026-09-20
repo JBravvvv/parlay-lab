@@ -425,7 +425,7 @@ describe("INSTRUCTION 51 — the header and footnote say what was bought (render
     expect(html).toContain("1 game under way");
     expect(html).toContain("1 priced live");
     expect(html).toContain("0 priced pregame");
-    expect(html).toContain("214/600 live-odds credits");
+    expect(html).toContain("214 live-odds credits used");
   });
 
   it("the footnote counts real games and states the budget out loud", async () => {
@@ -433,7 +433,7 @@ describe("INSTRUCTION 51 — the header and footnote say what was bought (render
     expect(html).toContain('data-testid="mlb-live-footnote"');
     expect(html).toContain("live lines priced");
     expect(html).toContain("post no in-play market");
-    expect(html).toContain("today&#x27;s live-odds budget is ");
+    expect(html).toContain("no daily odds-credit cap");
     expect(html).toContain("prices are posted quotes, never invented");
   });
 
@@ -480,11 +480,11 @@ describe("INSTRUCTION 51 — the guard itself (source pins)", () => {
     // and the spec's own values, so editing BOTH objects in step still trips a pin. s §8: this pull
     // is ADDITIVE — 600 new credits, no existing budget lowered.
     expect(MLB_LIVE_CLIENT.quoteMaxAgeSec).toBe(1800);
-    expect(MLB_LIVE_CLIENT.dailyBudget).toBe(600);
+    expect(MLB_LIVE_CLIENT.dailyBudget).toBe(Infinity);
     // the source still carries the render-time-drop comment that explains why 1800 is a hard cap
     const client = stripComments(read("src/lib/mlb/live-client.ts"));
     expect(client).toMatch(/quoteMaxAgeSec: 1800/);
-    expect(client).toMatch(/dailyBudget: 600/);
+    expect(client).toMatch(/dailyBudget: Number\.POSITIVE_INFINITY/);
   });
 
   it("PLANT: tearing the quoteMaxAgeSec drop out of rowLive is detected", () => {

@@ -1,3 +1,5 @@
+/* Current policy, September 19: no application daily odds-credit/run cap (100k/month plan).
+ * Finite-budget discussion below is historical; current constants override it. */
 import type { LeagueConfig } from "@/lib/football/league";
 import { ALIASES } from "./aliases";
 
@@ -473,7 +475,8 @@ export const CFB_PROPS = {
   minBooks: 2,
   settleBook: "draftkings",
   /** credits the props route may spend per Pacific day (INSTRUCTION 42, 2026-09-05: was 1200) */
-  dailyBudget: 2500,
+  // Josh, September 19: 100k/month plan; no application daily credit ceiling.
+  dailyBudget: Number.POSITIVE_INFINITY,
   /** measured 2026-09-05 (~753 credits / 24 events); the budget estimate's per-event cost */
   measuredCreditsPerEvent: 31,
   /**

@@ -1,5 +1,7 @@
 # CLAUDE.md — Parlay Lab
 
+**Current owner policy, September 19, 2026:** the Odds API plan is 100,000 credits/month. No application daily odds-credit budgets or server generation count ceiling on MLB, NFL or CFB. Manual MLB live refresh bypasses quote-age reuse, the measurement probe cap, and prior-429 retry limits. Keep usage telemetry, authentication, overlapping-request leases, stale-price eligibility, and paper bankroll rules. Historical daily-credit ceilings elsewhere are superseded.
+
 Context for continuing development of **PARLAY//LAB**, a single-file multi-sport stat desk + parlay/bet-slip tool (MLB · NFL · NCAAF).
 
 > ## ⚠️ THIS BRANCH (`frontend-rebuild`): full frontend rebuild in progress

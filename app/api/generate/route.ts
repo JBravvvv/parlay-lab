@@ -1,3 +1,5 @@
+/* Current policy, September 19: no application daily odds-credit/run cap (100k/month plan).
+ * Finite-budget discussion below is historical; current constants override it. */
 import {SETTLE_BOOK} from "@/lib/sportsbook/books";
 import {browseOddsUrl} from "@/lib/mlb/browse-markets";
 import { NextRequest, NextResponse } from "next/server";
@@ -58,7 +60,8 @@ const K_RUNS = "pl:gen:runs:";
 /* raised 3 → 4 (2026-08-08, per-block locking): the season's observed maximum is 4
    start-blocks/day at the derived 90-min partition (§12Z.15) — the cap = blocks-observed,
    and partitionBlocks coalesces beyond it so the cap keeps meaning */
-const MAX_RUNS_PER_DATE = 4;
+// Daily credit/run ceiling removed by Josh after upgrading to 100k credits/month.
+const MAX_RUNS_PER_DATE = Number.POSITIVE_INFINITY;
 /** per-date tally of Josh's forced board-only re-prices (2026-09-19) — outside the run cap, on record */
 const K_MANUAL = "pl:gen:manual:";
 const DAYS_SET = "pl:pred:days";

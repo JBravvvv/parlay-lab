@@ -110,7 +110,7 @@ describe("FIX 2 — what six passes actually cost, inside the live pull's OWN 60
   it("every pass is capped at probeEvents until a real credit reading lands", () => {
     expect(MLB_LIVE_PROPS.rateMeasured).toBe(false);
     const q = read("src/lib/server/mlb-live-quote.ts");
-    expect(q).toMatch(/const probing = !cfg\.rateMeasured \|\| spentNow === 0;/);
+    expect(q).toMatch(/const probing = !manual && \(!cfg\.rateMeasured \|\| spentNow === 0\);/);
     expect(q).toMatch(/const allowed = probing \? Math\.min\(affordable, cfg\.probeEvents\) : affordable;/);
     expect(MLB_LIVE_PROPS.probeEvents).toBe(3);
     expect(MLB_LIVE_PROPS.probeEvents).toBeLessThan(MLB_LIVE_PROPS.liveMaxEvents);
@@ -139,7 +139,7 @@ describe("FIX 2 — what six passes actually cost, inside the live pull's OWN 60
     expect(EVENING.length * worst).toBe(564);
     expect(EVENING.length * worst).toBeLessThanOrEqual(MLB_LIVE_PROPS.dailyBudget);
     // and the rail refuses rather than overspending once it IS at the line
-    expect(mlbAffordableEvents(MLB_LIVE_PROPS.probeEvents, 600)).toBe(0);
+    expect(mlbAffordableEvents(MLB_LIVE_PROPS.probeEvents, 600)).toBe(MLB_LIVE_PROPS.probeEvents);
   });
 
   it("WHAT THE RAIL DOES NOT DO: it sizes a pass once, on the ASSUMED rate, and cannot stop one part-way", () => {
@@ -157,7 +157,7 @@ describe("FIX 2 — what six passes actually cost, inside the live pull's OWN 60
   });
 
   it("NO BUDGET OR CAP WAS LOWERED — every MLB live number Josh set is unchanged", () => {
-    expect(MLB_LIVE_PROPS.dailyBudget).toBe(600);
+    expect(MLB_LIVE_PROPS.dailyBudget).toBe(Infinity);
     expect(MLB_LIVE_PROPS.liveMaxEvents).toBe(12);
     expect(MLB_LIVE_PROPS.liveRevalidateSec).toBe(1800);
     expect(MLB_LIVE_PROPS.quoteMaxAgeSec).toBe(1800);

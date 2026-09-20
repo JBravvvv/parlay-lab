@@ -139,7 +139,7 @@ describe("FIX 3 — the mode exists, and only Josh's own tap can ask for it", ()
       lineOf(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/),
     );
     // and the cap itself is not raised to make room for this mode
-    expect(SRC).toMatch(/const MAX_RUNS_PER_DATE = 4;/);
+    expect(SRC).toMatch(/const MAX_RUNS_PER_DATE = Number\.POSITIVE_INFINITY;/);
     /* JOSH'S FORCED TAP (2026-09-19) never touches the shared counter either: it is tallied under its own
        per-date key and does not set K_LASTGEN — counting it would spend the card ladder's headroom and pace
        the scheduled fires off Josh's thumb. One SET of K_LASTGEN in the file, inside the non-manual branch. */

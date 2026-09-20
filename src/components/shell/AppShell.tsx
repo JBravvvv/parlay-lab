@@ -313,7 +313,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main>{children}</main>
       ) : (
         <main className="px-4 pb-24 pt-4 md:ml-[200px] md:px-8 md:pb-8 md:pt-4">
-          <div className="mx-auto w-full max-w-[1280px]"><SportsbookSelector /><VerticalDensity enabled={["/games","/board","/builder","/props","/sharp","/simulator","/ballpark","/stats"].includes(pathname)}>{children}</VerticalDensity></div>
+          <div className="mx-auto w-full max-w-[1280px]"><VerticalDensity toolbar={<SportsbookSelector />} enabled={["/games","/board","/builder","/props","/sharp","/simulator","/ballpark","/stats"].includes(pathname)}>{children}</VerticalDensity></div>
         </main>
       )}
 

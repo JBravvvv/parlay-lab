@@ -569,7 +569,7 @@ function MlbSharpPage() {
                 {liveOverlay.capped ? ` · capped at ${liveOverlay.fetched} per pull` : ""}
                 {liveOverlay.stale ? " · showing stored quotes — the current window was not re-pulled" : ""}
                 {liveOverlay.oddsMissing ? " · the odds feed did not answer — nothing was fabricated" : ""}
-                {` · today's live-odds budget is ${MLB_LIVE_CLIENT.dailyBudget} credits`}
+                {" · no daily odds-credit cap"}
                 {liveOverlay.spentToday != null ? ` · ${liveOverlay.spentToday} spent today` : ""}
                 {liveOverlay.note ? ` · ${liveOverlay.note}` : ""}
                 {" · a live row carries no ¼-Kelly stake · prices are posted quotes, never invented"}

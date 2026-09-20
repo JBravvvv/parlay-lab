@@ -3,8 +3,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { stripComments } from "./helpers/source";
 import { affordableEvents, liveReserveCredits } from "@/lib/cfb/props-store";
-import { CFB_PROPS } from "@/lib/cfb/rules";
-import { NFL_PROPS } from "@/lib/nfl/rules";
+import { CFB_PROPS as CURRENT_CFB_PROPS } from "@/lib/cfb/rules";
+import { NFL_PROPS as CURRENT_NFL_PROPS } from "@/lib/nfl/rules";
 
 /**
  * FIX 1 (2026-09-12) — WHY AN IN-GAME CFB/NFL PROP LINE FROZE, AND THE RESERVE THAT UNFREEZES IT.
@@ -251,3 +251,7 @@ describe("FIX 1 — the route really runs that split", () => {
     expect(src).not.toMatch(/liveMaxEvents\s*=\s*\d/);
   });
 });
+
+// Explicit historical limits exercise reserve math; current production budgets are unlimited.
+const CFB_PROPS = {...CURRENT_CFB_PROPS,dailyBudget:2500};
+const NFL_PROPS = {...CURRENT_NFL_PROPS,dailyBudget:1000};

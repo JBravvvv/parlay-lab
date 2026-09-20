@@ -36,7 +36,7 @@ export function PageHeader({
     <div className="mb-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1.5 sm:mb-4 sm:gap-3">
       <div className="min-w-0 flex-1 sm:flex-none">
         {eyebrow && (
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.22em] text-muted sm:mb-1.5">{eyebrow}</div>
+          <div className="mb-1 hidden text-[10px] font-bold uppercase tracking-[0.22em] text-muted sm:mb-1.5 sm:block">{eyebrow}</div>
         )}
         {chip ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">

@@ -125,7 +125,7 @@ describe("CFB Board — the Caesars grammar", () => {
     expect(board).toMatch(/propsQ\.data\.live \? ` · \$\{propsQ\.data\.live\} in play` : ""/);
     expect(board).toMatch(/propsQ\.data\.stale[\s\S]*?lines as priced at \$\{cfbPricedAtLabel\(propsQ\.data\)\}/);
     // 2026-09-05 (same-day follow-up): the budget is blamed only when it actually refused the pull
-    expect(board).toMatch(/\$\{propsQ\.data\.budgeted \? " — today's props budget is used up" : ""\}/);
+    expect(board).toMatch(/\$\{propsQ\.data\.budgeted \? " — refresh for current odds" : ""\}/);
     expect(board).not.toMatch(/cached \{PROPS_CACHE_H\} h/);
     // THE CAESARS-MISSING RULE (2026-09-05, review-fixed copy): the lead counts only games WITH rows (fetched − noProps —
     // "props for 46 of 46" beside "29 have none" read as a contradiction); the Caesars-missing count says "other books",

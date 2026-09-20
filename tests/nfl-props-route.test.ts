@@ -69,7 +69,7 @@ const PER = NFL_PROPS.measuredCreditsPerEvent;
    when the 2 h carry lapses across the 13:25/17:20 ET windows was refused outright. At 248 the rail
    is 24 event-pulls — the 16-game board plus 8 — and the live half is still sized against the whole
    1000. NOTHING WAS LOWERED: `dailyBudget` is 1000 either way, and the pre-kick allowance went UP. */
-const RAIL = NFL_PROPS.dailyBudget - NFL_PROPS.liveReserveCredits;
+const RAIL = 1000 - NFL_PROPS.liveReserveCredits;
 const KEYS = NFL_PROPS_REDIS;
 
 function slate(oddsMissing = false): CfbSlate {
@@ -455,4 +455,23 @@ describe("source pins", () => {
     expect(body).not.toMatch(/status: 500/);
     expect(body.match(/^export const /gm)).toBeNull();
   });
+});
+
+// Historical finite-budget profile: retain regression coverage for the reusable allowance math.
+// Current unlimited production behavior is tested separately below and in odds-credit-unlimited.
+const currentCFB_PROPSBudget = CFB_PROPS.dailyBudget;
+beforeEach(() => Object.assign(CFB_PROPS, {dailyBudget: 2500}));
+afterEach(() => Object.assign(CFB_PROPS, {dailyBudget: currentCFB_PROPSBudget}));
+const currentNFL_PROPSBudget = NFL_PROPS.dailyBudget;
+beforeEach(() => Object.assign(NFL_PROPS, {dailyBudget: 1000}));
+afterEach(() => Object.assign(NFL_PROPS, {dailyBudget: currentNFL_PROPSBudget}));
+
+it("CURRENT POLICY: NFL prices events after 100,000 daily credits and still records usage", async () => {
+ Object.assign(NFL_PROPS,{dailyBudget:currentNFL_PROPSBudget});
+ expect(NFL_PROPS.dailyBudget).toBe(Infinity);
+ fakeRedis({[`pl:nfl:props:spend:v1:${DATE}`]:"100000"});
+ fetchMock.mockImplementation(async () => eventResponse(null));
+ const {body}=await call();
+ expect(body.fetched).toBe(body.events);expect(body.fetched).toBeGreaterThan(0);
+ expect(body.budgeted).toBe(false);expect(body.spentToday).toBeGreaterThan(100000);
 });

@@ -135,7 +135,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(props).not.toMatch(/PROPS_CACHE_H/);
     // a stale board says WHEN its lines were priced, never pretends they are fresh — and (2026-09-05
     // same-day follow-up, read on prod) blames the budget ONLY when the budget refused the pull
-    expect(props).toMatch(/board\.stale \? ` · \$\{board\.live \|\| "some"\} in-play game[\s\S]*?show lines as priced at \$\{cfbPricedAtLabel\(board\)\}\$\{board\.budgeted \? " — today's props budget is used up" : ""\}`/);
+    expect(props).toMatch(/board\.stale \? ` · \$\{board\.live \|\| "some"\} in-play game[\s\S]*?show lines as priced at \$\{cfbPricedAtLabel\(board\)\}\$\{board\.budgeted \? " — refresh for current odds" : ""\}`/);
   });
   it("phone tap floors: the market strips are the 30px Segmented with the 44px hit-44 region, the search box is 44px / 16px text (no iOS focus zoom)", () => {
     expect(props).toMatch(/<Segmented options=\{NAV_OPTIONS\}[^>]*size="md"/);

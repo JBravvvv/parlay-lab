@@ -117,7 +117,7 @@ describe("every box shrunk vertically from sm/md — the shared surfaces", () =>
     expect(css).toMatch(/\n\.stat-tile \{[^}]*padding: 12px 14px;/); // the phone tile is unchanged
   });
   it("SportsbookSelector, PaperBanner, Pill and the shell's main lose a step each from sm/md", () => {
-    expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/px-2\.5 py-1\.5 sm:mb-3 sm:px-3 sm:py-1\.5">/);
+    expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/flex min-w-0 items-center gap-2/);
     expect(read("src/components/sportsbook/SportsbookSelector.tsx")).toMatch(/min-h-9 rounded-lg [^"]*sm:min-h-9 sm:px-3 sm:text-sm/);
     expect(read("src/components/ui/PaperBanner.tsx")).toMatch(/sm:mb-3 sm:rounded-\(--radius-panel\) sm:px-4 sm:py-1\.5 sm:text-\[12px\]/);
     expect(read("src/components/ui/Pill.tsx")).toMatch(/rounded-full px-3 py-1\.5 text-\[12px\] font-semibold sm:px-3\.5 sm:py-1\.5 sm:text-\[12\.5px\]/);

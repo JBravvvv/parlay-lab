@@ -208,11 +208,11 @@ describe("1. the football props route — ?refresh=1 is a FULL re-pull, with the
     expect(fetchMock).toHaveBeenCalledTimes(body.events - 1);
   });
 
-  it("the budget rails are NOT lifted by a refresh — a spent day buys nothing and says so", async () => {
-    fakeRedis({ [BOARD_KEY]: JSON.stringify(storedBoard()), [`pl:cfb:props:spend:v1:${DATE}`]: String(CFB_PROPS.dailyBudget) });
+  it("the upgraded plan allows refresh after the former daily budget is spent", async () => {
+    fakeRedis({ [BOARD_KEY]: JSON.stringify(storedBoard()), [`pl:cfb:props:spend:v1:${DATE}`]: "100000" });
     const { body } = await call("&refresh=1", { "x-pl-sync": "test-phrase" });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(body.budgeted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(body.events);
+    expect(body.budgeted).toBe(false);
   });
 
   it("the source: the flag short-circuits on the query BEFORE syncAuthed, the phrase is read from the header, and the rail is gated on it", () => {
@@ -339,7 +339,7 @@ describe("3. the MLB pill — a FULL stored re-price on every tap", () => {
     expect(src).toMatch(/if \(boardOnly && !manualReprice && runsUsed >= MAX_RUNS_PER_DATE\) \{/);
     expect(src).toMatch(/if \(manualReprice\) \{\s*const manualKey = `\$\{K_MANUAL\}\$\{dateNow\}`;\s*manualRuns = Number\(await redis\(\["INCR", manualKey\]\)\) \|\| 0;/);
     // the scheduled board-only pass is untouched: same cap, same limiter line, same INCR
-    expect(src).toMatch(/const MAX_RUNS_PER_DATE = 4;/);
+    expect(src).toMatch(/const MAX_RUNS_PER_DATE = Number\.POSITIVE_INFINITY;/);
     expect(src).toMatch(/if \(!force && !topup && now - lastRun < 45 \* 60_000\) \{/);
     expect(src).toMatch(/const runs = Number\(await redis\(\["INCR", runsKey\]\)\) \|\| 0;/);
     // the forced pass is still board-only: the two pre-existing `if (boardOnly) {` blocks (the lock skip and the

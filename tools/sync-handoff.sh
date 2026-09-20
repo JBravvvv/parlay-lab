@@ -784,7 +784,17 @@ Page routes: `/`, `/board`, `/builder`, `/calc`, `/design`, `/games`,
 `/games/[gamePk]`, `/ledger`, `/props`, `/season`, `/settings`, `/sharp`,
 `/simulator`, `/stats`.
 
-## Credit constants — the numbers that decide what gets priced
+## Credit constants — current policy (September 19)
+
+Josh upgraded to 100,000 credits/month and explicitly removed application daily credit
+budgets/limits. CFB_PROPS.dailyBudget, NFL_PROPS.dailyBudget, MLB_LIVE_PROPS.dailyBudget,
+MLB_LIVE_CLIENT.dailyBudget and MAX_RUNS_PER_DATE are now Number.POSITIVE_INFINITY.
+Finite tables below are historical and superseded. Usage remains counted. Authenticated
+manual MLB refresh retries after a prior 429, bypasses quote-age reuse and the 3-event
+measurement probe, while retaining empty-market holds and the 12-event execution bound.
+Automatic cadence, auth/leases, stale quote eligibility and paper allocation are unchanged.
+
+### Historical credit constants — superseded
 
 ### Football (CFB / NFL), `src/lib/cfb/rules.ts`, `src/lib/nfl/rules.ts`
 | | CFB | NFL |

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { stripComments } from "./helpers/source";
@@ -344,3 +344,15 @@ describe("the overlay store — encoding, the cooldown clock, and no-Redis-no-sp
     }
   });
 });
+
+// Historical finite-budget profile: retain regression coverage for the reusable allowance math.
+// Current unlimited production behavior is tested separately below and in odds-credit-unlimited.
+const currentCFB_PROPSBudget = CFB_PROPS.dailyBudget;
+beforeEach(() => Object.assign(CFB_PROPS, {dailyBudget: 2500}));
+afterEach(() => Object.assign(CFB_PROPS, {dailyBudget: currentCFB_PROPSBudget}));
+const currentNFL_PROPSBudget = NFL_PROPS.dailyBudget;
+beforeEach(() => Object.assign(NFL_PROPS, {dailyBudget: 1000}));
+afterEach(() => Object.assign(NFL_PROPS, {dailyBudget: currentNFL_PROPSBudget}));
+const currentMLB_LIVE_PROPSBudget = MLB_LIVE_PROPS.dailyBudget;
+beforeEach(() => Object.assign(MLB_LIVE_PROPS, {dailyBudget: 600}));
+afterEach(() => Object.assign(MLB_LIVE_PROPS, {dailyBudget: currentMLB_LIVE_PROPSBudget}));

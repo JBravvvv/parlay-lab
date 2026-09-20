@@ -121,9 +121,9 @@ const DK = "draftkings";
 const FD = "fanduel";
 
 /**
- * The cooldown key's value once Josh's one manual override has been spent for the Pacific day.
+ * Historical cooldown marker: a manual retry happened. It no longer limits retries.
  * `setCooldown` writes "1" (`src/lib/mlb/live-props-store.ts:147`); ANY value means armed, and this
- * distinct one means the single manual bypass is used up too.
+ * distinct one records a manual retry; both values pause automatic requests only.
  */
 const MANUAL_USED = "manual-used";
 
@@ -518,7 +518,7 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
      `decideSlotTick` re-fires the same slot for the whole GRADE_SLOT_WINDOW_MIN window, so a slot
      could be bought twice; /api/refill and a vercel poke can land on the same slot too. An NX stamp
      against the Pacific day makes the second pass free and says so. Refused BEFORE the 429 check so
-     a duplicate never consumes Josh's one manual override — and `manual` never de-duplicates at
+     a duplicate never spends again — and `manual` never de-duplicates at
      all, because a tap is his own act. A Redis failure returns null here and the pass proceeds:
      this rail saves credits, it must never be the thing that blocks a pull. */
   if (slot && !manual) {
@@ -533,18 +533,16 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
 
   /* RAIL 2 — the 429 circuit breaker. An Odds 429 means the plan is dry, and hammering it takes
      /api/clv (the scoreboard) down with it, so the fast cadence is suspended for the rest of the
-     Pacific day. Josh's own manual refresh is still allowed through ONCE — his explicit act, not an
-     automatic one — and the key is then marked so a second tap the same day is refused too. */
+     Pacific day. Since Josh's September 19 plan upgrade, authenticated manual refreshes may
+     retry each time. The historical marker is telemetry only and never blocks another tap. */
   const cooldownKey = mlbLiveCooldownKey(ptDate, deps.storeKeys);
   const cooldown = (await quiet(redis(["GET", cooldownKey]), null)) as string | null;
   if (cooldown != null) {
-    if (!manual || cooldown === MANUAL_USED) {
+    if (!manual) {
       return NextResponse.json(
         base({
           stale: true,
-          note: manual
-            ? "the Odds API returned 429 today and your one manual override is already used — live pricing resumes tomorrow (Pacific)"
-            : "the Odds API returned 429 today — live pricing is suspended for the rest of the Pacific day",
+          note: "the Odds API returned 429 today — automatic live pricing is paused; manual refresh can retry",
         }),
       );
     }
@@ -581,7 +579,8 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
       rows: c.rows,
       tallies,
       legP,
-      overlay: prev,
+      // Manual refresh bypasses quote age, while preserving empty-market holds.
+      overlay: manual && prev ? {...prev, pricedAt: {}} : prev,
     }));
 
   const pre = selectLiveEvents(gateWith(() => PENDING_ID), now, cfg);
@@ -657,7 +656,8 @@ export async function mlbLivePropsGet(req: NextRequest, deps: MlbLivePropsDeps):
      docs/credit-budget.md and `rateMeasured` is flipped, EVERY pass is capped at `probeEvents`, not
      just the day's first: CFB measures 31 on the same nominal shape and nothing in this tree
      explains the 5.3x gap, so a mistaken pass must cost ~93, never ~372. */
-  const probing = !cfg.rateMeasured || spentNow === 0;
+  // An authenticated manual refresh may price the whole selected live slate.
+  const probing = !manual && (!cfg.rateMeasured || spentNow === 0);
   const allowed = probing ? Math.min(affordable, cfg.probeEvents) : affordable;
   /* WHICH RAIL BOUND THIS PASS — reported separately, because they are different facts and the old
      single `!probing` gate silenced the budget note entirely once `rateMeasured` made every pass a

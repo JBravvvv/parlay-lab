@@ -1125,7 +1125,7 @@ function MlbBoardPage() {
      configured, and in that case the route refuses to fetch at all, so there is nothing to report. */
   const liveSpendNote =
     liveOverlay && liveOverlay.spentToday != null
-      ? ` · ${liveOverlay.spentToday}/${MLB_LIVE_CLIENT.dailyBudget} live-odds credits`
+      ? ` · ${liveOverlay.spentToday} live-odds credits used · no daily cap`
       : "";
   /* With no overlay this is byte-identical to INSTRUCTION 50's clause. With one it names how many
      of the games under way carry a live line, when those lines were taken, and what today's live
@@ -1615,7 +1615,7 @@ function MlbBoardPage() {
           {liveOverlay.capped ? ` · capped at ${MLB_LIVE_CLIENT.liveMaxEvents} games per pull` : ""}
           {liveOverlay.stale ? " · showing stored quotes — the current window was not re-pulled" : ""}
           {liveOverlay.oddsMissing ? " · the odds feed did not answer — nothing was fabricated" : ""}
-          {` · today's live-odds budget is ${MLB_LIVE_CLIENT.dailyBudget} credits`}
+          {" · no daily odds-credit cap"}
           {liveOverlay.spentToday != null ? ` · ${liveOverlay.spentToday} spent today` : ""}
           {liveOverlay.note ? ` · ${liveOverlay.note}` : ""}
           {" · prices are posted quotes, never invented"}

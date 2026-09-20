@@ -1,3 +1,5 @@
+/* Current policy, September 19: no application daily odds-credit/run cap (100k/month plan).
+ * Finite-budget discussion below is historical; current constants override it. */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -54,7 +56,8 @@ export const MLB_LIVE_CLIENT = {
   /** a stored quote past this age is DISCARDED AT RENDER (s) */
   quoteMaxAgeSec: 1800,
   /** the live pull's own daily credit budget — additive, it lowers no existing budget (s §8) */
-  dailyBudget: 600,
+  // Josh, September 19: 100k/month plan; no application daily credit ceiling.
+  dailyBudget: Number.POSITIVE_INFINITY,
   /**
    * the per-pass event ceiling. Mirrored (fix pass, 2026-09-11) because the Board's footnote used
    * to print `capped at ${liveOverlay.fetched}` — the number of games this pass HAPPENED to buy,

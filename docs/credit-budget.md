@@ -1,3 +1,9 @@
+# Current credit policy — September 19, 100,000-credit monthly plan
+
+Josh explicitly removed application daily credit budgets/limits across all sports. CFB, NFL and MLB live-prop daily budgets, and MLB server daily generation count, are unlimited. Usage counters remain active. Authenticated MLB manual refresh bypasses the three-game measurement probe and can retry a previous provider 429 more than once; automatic 429 protection, execution/concurrency limits, freshness checks and authentication remain. This does not change paper wagering allocations or purchase credits.
+
+The historical budget analysis below describes superseded daily caps; it is retained as measurement history, not current authorization.
+
 # Odds API credit budget (2026-07-25)
 
 > ## ⚠️ RE-DERIVED FROM THE FIRING BRANCH — 2026-07-31 (owner's item 5)

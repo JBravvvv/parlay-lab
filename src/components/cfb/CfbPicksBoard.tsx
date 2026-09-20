@@ -702,9 +702,9 @@ export function CfbPicksBoard() {
                 {propsQ.data.live ? ` · ${propsQ.data.live} in play` : ""} · cached {cfbCacheLabel(propsQ.data)}
                 {propsQ.data.capped ? ` · capped at ${CFB_PROPS.maxEvents} priced games per slate` : ""}
                 {propsQ.data.stale
-                  ? ` · ${propsQ.data.live || "some"} in-play game${propsQ.data.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(propsQ.data)}${propsQ.data.budgeted ? " — today's props budget is used up" : ""}`
+                  ? ` · ${propsQ.data.live || "some"} in-play game${propsQ.data.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(propsQ.data)}${propsQ.data.budgeted ? " — refresh for current odds" : ""}`
                   : propsQ.data.budgeted
-                    ? " · today's props budget is used up — more games price again tomorrow"
+                    ? " · stored prices — refresh for current odds"
                     : ""}
                 {selectedBook === "DraftKings" && propsQ.data.czMissing
                   ? ` · ${propsQ.data.czMissing} game${propsQ.data.czMissing === 1 ? "" : "s"} post player props at other books but no DraftKings line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff`

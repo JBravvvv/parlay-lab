@@ -1,3 +1,5 @@
+/* Current policy, September 19: no application daily odds-credit/run cap (100k/month plan).
+ * Finite-budget discussion below is historical; current constants override it. */
 import { REFILL_SLOTS_PT } from "@/lib/server/grading-progress";
 
 /**
@@ -147,7 +149,8 @@ export const MLB_LIVE_PROPS = {
   minBooks: 2,
   settleBook: "draftkings",
   /** credits this route may spend per Pacific day — NEW, its own counter, lowers nothing */
-  dailyBudget: 600,
+  // Josh, September 19: 100k/month plan; no application daily credit ceiling.
+  dailyBudget: Number.POSITIVE_INFINITY,
   /** the MLB band 5.114-5.845 rounded UP. NOT CFB's 31. */
   measuredCreditsPerEvent: 6,
   /**

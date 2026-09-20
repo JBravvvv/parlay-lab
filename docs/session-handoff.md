@@ -58,6 +58,24 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 
 ---
 
+## September 19 — daily credit ceilings removed and UI density sweep
+
+Latest owner request: remove all daily odds-credit budgets after upgrading to 100,000
+credits/month, then sweep the website and fit more useful information on screen.
+CFB, NFL, MLB live props/client and server generation now have no daily credit/run ceiling.
+Usage telemetry stays intact. Authenticated MLB manual refresh can retry after a prior 429,
+ignores the quote-age cache, and bypasses the 3-event measurement probe. Empty-market holds,
+execution bounds, auth/leases and paper money policy remain intact.
+
+Compact now halves vertical all-axis card padding and grid/stack gaps. Sportsbook and density
+share one row; mobile hides repeated league eyebrows and the redundant props book label.
+Font size, portraits, horizontal width and explicit tap-target heights are unchanged.
+Production sweep checked NFL Games/Builder/Board/Parlays/Simulator, CFB Sharp/Stats/Simulator,
+and MLB Stats split controls/Ballpark/Parlays. One initial production hydration warning was
+observed; repeated MLB/NFL Parlay Builder reloads did not reproduce it. Final release evidence
+is recorded in progress.md and tools/handoff-state.env; do not claim a deployed release until
+its exact production version has been verified. Sync this handoff after updates and before compaction.
+
 ## 0.000004 🎯 THE JOSH BLOCK, CURRENT — THE PAPER ERA IS FULLY CONFIGURED AND RUNNING (2026-08-18, pre-compaction)
 
 **WHAT IS TRUE NOW — every line from this session's own reads and pushed commits. This

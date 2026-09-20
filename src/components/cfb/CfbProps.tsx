@@ -1055,7 +1055,7 @@ export function CfbProps() {
         <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
           <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1">
+        <div className={nav === "sides" ? "mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1" : "hidden"}>
           <span className="text-sm font-semibold">{selectedBook} lines</span>
           <span className="num flex items-center gap-2 text-[10.5px] text-faint">
             {liveGames > 0 && nav === "sides" && (
@@ -1202,7 +1202,7 @@ export function CfbProps() {
           title="The selected book hasn't posted player props for this slate yet"
           body={
             board
-              ? `${navLabel} · ${board.fetched} of ${board.events} event${board.events === 1 ? "" : "s"} priced${board.capped ? " (capped)" : ""}${board.oddsMissing ? " · odds feed missing" : ""}${board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""} · ${label}`
+              ? `${navLabel} · ${board.fetched} of ${board.events} event${board.events === 1 ? "" : "s"} priced${board.capped ? " (capped)" : ""}${board.oddsMissing ? " · odds feed missing" : ""}${board.budgeted ? " · stored prices — refresh for current odds" : ""} · ${label}`
               : label
           }
         />
@@ -1221,7 +1221,7 @@ export function CfbProps() {
           <p className="px-1 text-[9.5px] leading-snug text-faint">
             priced {board.fetched - board.noProps} of {board.events} game{board.events === 1 ? "" : "s"}
             {board.live ? ` · ${board.live} in play` : ""} · cached {cacheLabel(board)}{board.capped ? ` · capped at ${CFB_PROPS.maxEvents}` : ""}
-            {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — today's props budget is used up" : ""}` : board.budgeted ? " · today's props budget is used up — more games price again tomorrow" : ""}
+            {board.stale ? ` · ${board.live || "some"} in-play game${board.live === 1 ? "" : "s"} show lines as priced at ${cfbPricedAtLabel(board)}${board.budgeted ? " — refresh for current odds" : ""}` : board.budgeted ? " · stored prices — refresh for current odds" : ""}
             {selectedBook === "DraftKings" && board.czMissing ? ` · ${board.czMissing} game${board.czMissing === 1 ? "" : "s"} post player props at other books but no DraftKings line yet — re-checked every ${CFB_PROPS.czMissingRevalidateSec / 60} min inside ${CFB_PROPS.czMissingWindowSec / 3600} h of kickoff` : ""}
             {board.noProps ? ` · ${board.noProps} game${board.noProps === 1 ? "" : "s"} on the slate ha${board.noProps === 1 ? "s" : "ve"} no player props posted at the books we price` : ""} ·
             prices are posted quotes, never invented · the % on a leg is the model&apos;s number for that line.

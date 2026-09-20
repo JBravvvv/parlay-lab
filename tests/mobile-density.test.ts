@@ -102,9 +102,9 @@ describe("shared surfaces — Panel, Pill, SportsbookSelector, PaperBanner, Data
   it("Pill is a size down on the phone", () => {
     expect(read("src/components/ui/Pill.tsx")).toMatch(/rounded-full px-3 py-1\.5 text-\[12px\] font-semibold sm:px-3\.5 sm:py-1\.5 sm:text-\[12\.5px\]/);
   });
-  it("the sportsbook strip is one slim row on the phone and keeps its min-h-11 select from sm", () => {
+  it("the sportsbook shares a slim toolbar row and keeps a 36px select", () => {
     const src = read("src/components/sportsbook/SportsbookSelector.tsx");
-    expect(src).toMatch(/mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-white\/10 bg-\[#111a18\] px-2\.5 py-1\.5 sm:mb-3 sm:px-3 sm:py-1\.5/);
+    expect(src).toMatch(/flex min-w-0 items-center gap-2/);
     expect(src).toMatch(/min-h-9 rounded-lg [^"]*sm:min-h-9/);
   });
   it("PaperBanner is one short line on the phone and the full epoch sentence from sm", () => {

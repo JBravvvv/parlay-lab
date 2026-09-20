@@ -68,7 +68,7 @@ describe("the contract", () => {
       regions: "us",
       minBooks: 2,
       settleBook: "draftkings",
-      dailyBudget: 2500,
+      dailyBudget: Infinity,
       measuredCreditsPerEvent: 31,
       /* INSTRUCTION 52 (2026-09-12, Josh verbatim: "I've always had in game live lines. It has live
          lines; they just went away this week"). 60 pre-kick events x 31 = 1,860 of 2,500 left 640,
@@ -85,7 +85,7 @@ describe("the contract", () => {
     expect(CFB_PROPS.liveReserveCredits).toBe((CFB_PROPS.liveMaxEvents / 2) * CFB_PROPS.measuredCreditsPerEvent);
     // and it leaves the pre-kick rail able to price ALL 60 on the first pull, with 8 pulls to spare
     const prekickPulls = Math.floor((CFB_PROPS.dailyBudget - CFB_PROPS.liveReserveCredits) / CFB_PROPS.measuredCreditsPerEvent);
-    expect(prekickPulls).toBe(68);
+    expect(prekickPulls).toBe(Infinity);
     expect(prekickPulls).toBeGreaterThanOrEqual(CFB_PROPS.maxEvents + 8);
     expect(CFB_PROPS.liveRevalidateSec).toBeLessThan(CFB_PROPS.revalidateSec);
   });

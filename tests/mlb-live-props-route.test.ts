@@ -397,12 +397,12 @@ describe("the rails that cost nothing", () => {
     expect(b.rows[liveQuoteKey(G_NYY, JUDGE_HRR)]?.ln).toBe(3.5);
   });
 
-  it("a 429 cooldown suspends the day, and lets Josh's own manual refresh through exactly once", async () => {
+  it("a 429 cooldown pauses automation while repeated authenticated manual retries remain available", async () => {
     const r = fakeRedis({ [BOARD_KEY(DATE)]: storedBoard(ALL_GAMES), [mlbLiveCooldownKey(PT)]: "1" });
     const auto = await call();
     expect(upstream()).toEqual([]);
     expect(auto.stale).toBe(true);
-    expect(auto.note).toMatch(/suspended for the rest of the Pacific day/);
+    expect(auto.note).toMatch(/automatic live pricing is paused/);
 
     const manual = await call("&manual=1");
     expect(eventPulls().length).toBeGreaterThan(0); // the one override spends
@@ -411,8 +411,8 @@ describe("the rails that cost nothing", () => {
 
     fetchMock.mockClear();
     const second = await call("&manual=1");
-    expect(upstream()).toEqual([]);
-    expect(second.note).toMatch(/manual override is already used/);
+    expect(eventPulls().length).toBeGreaterThan(0);
+    expect(second.fetched).toBeGreaterThan(0);
   });
 
   it("a final game and a game still to come are never priced", async () => {
@@ -975,4 +975,18 @@ describe("INSTRUCTION 51 fix pass — a bridge-empty game is held, and dead stam
     expect(b.pricedAt[G_BOS]).toBeUndefined(); // BOS is final in the fixture
     expect(b.emptyAt[G_BOS]).toBeUndefined();
   });
+});
+
+// Historical finite-budget profile: retain regression coverage for the reusable allowance math.
+// Current unlimited production behavior is tested separately below and in odds-credit-unlimited.
+const currentMLB_LIVE_PROPSBudget = MLB_LIVE_PROPS.dailyBudget;
+beforeEach(() => Object.assign(MLB_LIVE_PROPS, {dailyBudget: 600}));
+afterEach(() => Object.assign(MLB_LIVE_PROPS, {dailyBudget: currentMLB_LIVE_PROPSBudget}));
+
+it("CURRENT POLICY: manual MLB refresh prices every selected game after the old daily ceiling", async () => {
+ Object.assign(MLB_LIVE_PROPS,{dailyBudget:currentMLB_LIVE_PROPSBudget});
+ plan.events=widenedEventsList();
+ fakeRedis({[BOARD_KEY(DATE)]:storedBoard(ALL_GAMES),[mlbLiveSpendKey(PT)]:"100000"});
+ const b=await call("&manual=1");
+ expect(b.budgeted).toBe(false);expect(b.fetched).toBe(4);expect(b.spentToday).toBeGreaterThan(100000);
 });

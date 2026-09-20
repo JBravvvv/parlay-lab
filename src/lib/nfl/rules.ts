@@ -1,3 +1,5 @@
+/* Current policy, September 19: no application daily odds-credit/run cap (100k/month plan).
+ * Finite-budget discussion below is historical; current constants override it. */
 /**
  * THE NFL DESK'S CONSTANTS — one copy, imported everywhere (2026-09-08, Josh, verbatim:
  * "2. NFL needs to be built NOW  3. Allocation should be set to $350").
@@ -192,7 +194,8 @@ export const NFL_PROPS = {
   regions: "us",
   minBooks: 2,
   settleBook: "draftkings",
-  dailyBudget: 1000,
+  // Josh, September 19: 100k/month plan; no application daily credit ceiling.
+  dailyBudget: Number.POSITIVE_INFINITY,
   measuredCreditsPerEvent: 31,
   /**
    * THE LIVE-ONLY RESERVE (2026-09-12) — 248 = half of liveMaxEvents 16 x measuredCreditsPerEvent
