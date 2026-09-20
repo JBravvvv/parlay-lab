@@ -145,7 +145,9 @@ TRACKED_N="$(git ls-files | wc -l | tr -d ' ')"
 TEST_N="$(git ls-files 'tests/*.test.ts' | wc -l | tr -d ' ')"
 
 # ------------------------------------------------------- change fingerprint
-FP_NEW="$( { printf '%s\n' "HEAD=$HEAD_FULL" "DIRTY=$DIRTY";
+# Detect content changes even when git status, file size and timestamps stay the same.
+SOURCE_FP="$(python3 tools/handoff-inventory.py fingerprint)" || die "cannot fingerprint source"
+FP_NEW="$( { printf '%s\n' "HEAD=$HEAD_FULL" "DIRTY=$DIRTY" "SOURCE=$SOURCE_FP";
              printf '%s\n' "$DIRTY_LIST";
              find docs -type f \( -name '*.md' -o -name '*.diff' \) -exec stat -f '%m %z %N' {} + 2>/dev/null | sort;
              stat -f '%m %z %N' CLAUDE.md ENGINE2.md PARLAY_LAB_QUANT_ENGINE.md package.json \
@@ -179,6 +181,7 @@ done
 mkdir -p "$OUT/repo/.github/workflows"
 cp -p .github/workflows/*.yml "$OUT/repo/.github/workflows/" 2>/dev/null
 cp -p "$REPO/tools/sync-handoff.sh" "$OUT/sync-handoff.sh" 2>/dev/null
+cp -p "$REPO/tools/handoff-inventory.py" "$OUT/repo/handoff-inventory.py" 2>/dev/null
 chmod +x "$OUT/sync-handoff.sh" 2>/dev/null
 [ -f "$REPO/tools/handoff-state.env" ] && cp -p "$REPO/tools/handoff-state.env" "$OUT/repo/handoff-state.env" 2>/dev/null
 
@@ -194,13 +197,13 @@ fi
 
 # ------------------------------------------------------------ code snapshots
 SRC_TGZ="$OUT/code/parlay-lab-source-at-HEAD.tar.gz"
-git archive --format=tar HEAD 2>/dev/null | gzip > "$SRC_TGZ.tmp" && mv -f "$SRC_TGZ.tmp" "$SRC_TGZ" || rm -f "$SRC_TGZ.tmp"
+(set -o pipefail; git archive --format=tar HEAD | gzip > "$SRC_TGZ.tmp") && mv -f "$SRC_TGZ.tmp" "$SRC_TGZ" || die "source archive failed"
 
 WT_TGZ="$OUT/code/parlay-lab-worktree-UNCOMMITTED.tar.gz"
 if [ "$DIRTY" = "DIRTY" ]; then
   LIST="$(mktemp)"
-  git ls-files > "$LIST"
-  tar -c -z -f "$WT_TGZ.tmp" -T "$LIST" 2>/dev/null && mv -f "$WT_TGZ.tmp" "$WT_TGZ" || rm -f "$WT_TGZ.tmp"
+  python3 tools/handoff-inventory.py files > "$LIST" || die "cannot inventory worktree"
+  tar -c -z -f "$WT_TGZ.tmp" --null -T "$LIST" && mv -f "$WT_TGZ.tmp" "$WT_TGZ" || die "worktree archive failed"
   rm -f "$LIST"
 else
   rm -f "$WT_TGZ"
@@ -212,10 +215,11 @@ BUNDLE="$OUT/code/parlay-lab-full-history.bundle"
 NEED_BUNDLE=1
 if [ "$FORCE" = 0 ] && [ -f "$BUNDLE" ]; then
   B_AGE=$(( $(date +%s) - $(stat -f '%m' "$BUNDLE") ))
-  [ "$B_AGE" -lt 86400 ] && NEED_BUNDLE=0
+  B_HEAD="$(git bundle list-heads "$BUNDLE" "refs/heads/$BRANCH" 2>/dev/null | cut -d' ' -f1)"
+  [ "$B_AGE" -lt 86400 ] && [ "$B_HEAD" = "$HEAD_FULL" ] && NEED_BUNDLE=0
 fi
 if [ "$NEED_BUNDLE" = 1 ]; then
-  git bundle create "$BUNDLE.tmp" --all >/dev/null 2>&1 && mv -f "$BUNDLE.tmp" "$BUNDLE" || rm -f "$BUNDLE.tmp"
+  git bundle create "$BUNDLE.tmp" --all >/dev/null 2>&1 && mv -f "$BUNDLE.tmp" "$BUNDLE" || die "history bundle failed"
 fi
 
 # ==========================================================================
@@ -249,12 +253,14 @@ and its own daily allocation:
 
 | Desk | Daily core | Daily fun | Prices from |
 |---|---|---|---|
-| **MLB** (baseball) | $150 | $25 | Caesars NV (`williamhill_us`) via The Odds API + free MLB statsapi |
-| **CFB** (college football) | $250 | $25 | Caesars NV via The Odds API |
-| **NFL** | $350 | $25 | Caesars NV via The Odds API |
+| **MLB** (baseball) | $350 (since September 18) | $25 | DraftKings via The Odds API + free MLB statsapi |
+| **CFB** (college football) | $250 | $25 | DraftKings via The Odds API |
+| **NFL** | $350 | $25 | DraftKings via The Odds API |
 
 Managed bankroll **$10,000**. Staking is ¼-Kelly, capped at Kelly — never ride a
-full slot. Selection is EV-gated at the Caesars price. A locked card is
+full slot where the active policy uses Kelly. Current paper-action policies use daily
+allocation rules documented in the desk files; the old EV-gated-only summary is obsolete.
+DraftKings is the default and settlement book; browsing can select another sportsbook. A locked card is
 **append-only**: it can lock many times a day and add picks up to the daily
 allocation, but it can never remove one.
 
@@ -317,7 +323,7 @@ sync-handoff.sh           the script that regenerates all of the above
 ## 6. Hard rules, from Josh, that survive every session
 
 - **Never fabricate a price, a stat, a grade, or a level.** The feeds mirror a
-  subset of Caesars. Say that; never say "not available at Caesars".
+  subset of each sportsbook. Missing from the feed does not mean unavailable at the book.
 - **The ledger is append-only once locked.** Corrections are addenda. A locked
   card can only be added to.
 - **Never weaken a shipped protection** without Josh's explicit sign-off.
@@ -349,6 +355,11 @@ nothing has changed costs nothing. It fires automatically from:
 - **Every session that touches the project**, as a standing rule in
   `repo/CLAUDE.md`: after any change, run the script. That is what covers edits
   that are never staged.
+- **Before every requested compaction and every session handoff:** force a sync, wait
+  for completion, then verify `01-STATE.md`, the source archive and bundle against
+  the current Git HEAD. A queued sync is not a completed checkpoint. Preserve current
+  changes, validation, deployment evidence, open work and the latest user instructions
+  in the canonical repo documents before syncing. Repeat after any subsequent edit.
 
 **There is deliberately NO timer, and this is a measured finding, not an
 oversight.** A LaunchAgent on a 15-minute interval was installed and fired, and
@@ -597,7 +608,7 @@ automatically.
   spend is counted.
 - CFB/NFL prop pulls cost **≈31 credits per event**. MLB is cheaper.
 - "Refresh MLB" on production **SPENDS QUOTA**. Only press it when Josh asks.
-- The settlement book stays **Caesars** (`williamhill_us`).
+- The default and settlement book is **DraftKings** (`draftkings`); browse filters may select another book.
 - ESPN and the MLB statsapi are **free** — prefer them.
 - Read `repo/docs/credit-budget.md` before causing any pull.
 
@@ -944,6 +955,7 @@ cat <<'EOF'
 |---|---|
 | every commit / merge / checkout / rewrite | `/Users/josh/Documents/Parlay-Lab/.git/hooks/` — 4 hooks |
 | every session that changes the project | standing rule in `repo/CLAUDE.md` |
+| before compaction or handoff | force sync, wait, verify HEAD and archive contents |
 | on demand | `/Users/josh/Documents/Parlay-Lab/tools/sync-handoff.sh --force` |
 
 No timer: macOS TCC denies a launchd agent all access to `~/Documents`, measured

@@ -869,6 +869,15 @@ checkouts and rewrites — nothing else. `git add` is deliberately NOT covered (
 fifth hook), so a staged-but-uncommitted tree and a session's unstaged edits are covered only by the
 session running the script.
 
+**Compaction checkpoint (Josh, 2026-09-19):** after every update, and immediately before
+any requested compaction or handoff, write the current state, changes, validation, deploy
+evidence, remaining work and latest user instructions into the canonical repo documents.
+Run `tools/sync-handoff.sh --force`, wait for actual completion, then verify the mirrored
+HEAD, archive contents and full-history bundle. A queued/background hook is not proof of
+completion. Capture uncommitted and new nonignored files too; exclude secrets. If any edit
+happens after that checkpoint, sync and verify again before yielding. Do not claim the
+conversation itself was compacted unless the host actually did so.
+
 **The rule for every future session:** a fact that lives in the PROSE of 00/02/03/04/06 is edited in
 the heredocs inside `tools/sync-handoff.sh`, in this repo. Deploy and gate facts are edited in
 `tools/handoff-state.env`. Editing the published file directly is pointless — the next sync overwrites

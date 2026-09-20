@@ -1,3 +1,7 @@
+# Progress — 2026-09-19 (verified handoff before compaction)
+
+Josh requires a complete handoff after every update and especially before compaction. Added a forced-sync/wait/verify checkpoint to canonical session instructions and the generated orientation. Fixed content fingerprinting, new-file inclusion in dirty snapshots, history-bundle currency and archive failure reporting. Corrected stale orientation facts to the current DraftKings default and MLB $350 daily core. Application remains the verified September 19 release; no app or betting behavior changed in this checkpoint. Validation: shell syntax and diff checks passed; three persisted Python backup tests passed (new/deleted/ignored files, same-size/restored-time edits, tar and symlink preservation), and 21 documentation/reference checks passed.
+
 # Progress — 2026-09-19 (remaining discovery, live context and research release)
 
 - Completed the second-session implementation requested by Josh: shared multiselect discovery, cross-sport stored-board candidates and slip payloads, market-relative parlay strategies, live quote freshness and stat progress, restored Stats splits, ballpark grade/order/evidence/pick previews, signed mobile price fields and density choices.
