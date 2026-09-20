@@ -1,4 +1,5 @@
 import type {PropBoardGame,PropBoardRow} from "@/engine";
+import {priceMlbProp} from "@/lib/sportsbook/mlb";
 import {SETTLE_BOOK,bookName} from "@/lib/sportsbook/books";
 import type {MlbLiveQuoteBoard} from "./live-quote-types";
 import type {LiveNowRead} from "@/lib/liveNow";
@@ -83,13 +84,13 @@ export function liveMarketBoard(board: readonly PropBoardGame[], overlay: MlbLiv
     const lkey=`${row.lkey.split("|")[0]}|${market}|${q.ln}`;
     if(seen.has(lkey))continue;
     seen.add(lkey);
-    (markets[market]??=[]).push({...row,lkey,ln:q.ln,alt:false,quoteAt:q.at,
+    (markets[market]??=[]).push(priceMlbProp({...row,lkey,ln:q.ln,alt:false,quoteAt:q.at,
      o:q.czAm,u:q.oppAm,settlementBook:SETTLE_BOOK,oBook:row.displayBook??bookName(SETTLE_BOOK),uBook:row.displayBook??bookName(SETTLE_BOOK),
      bookQuotes:{
        o:Object.fromEntries(Object.entries(q.quotes??{}).flatMap(([book,v])=>v.o==null?[]:[[book,{am:v.o,line:q.ln,book,at:q.at}]])),
        u:Object.fromEntries(Object.entries(q.quotes??{}).flatMap(([book,v])=>v.u==null?[]:[[book,{am:v.u,line:q.ln,book,at:q.at}]]))},
      cz:{o:q.czAm,u:q.oppAm},pO:q.pSrc==="sim"&&q.pLive!=null?q.pLive*100:null,
-     fO:q.pLive==null?null:q.pLive*100,books:q.books});
+     fO:q.pLive==null?null:q.pLive*100,books:q.books}, row.displayBook ?? SETTLE_BOOK));
     continue;
    }
    /* source 2: the board's own in-play row */

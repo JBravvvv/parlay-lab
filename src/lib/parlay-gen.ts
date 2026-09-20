@@ -646,8 +646,11 @@ type Slots<P> = { legs: (GenLeg<P> | null)[]; usedP: Set<string>; usedG: Set<str
 type SeatRules = Pick<GenSpec, "onePerGame" | "onePerTeam">;
 
 /** R1 / R2 / R2b in ONE place: would seating `l` beside an already-seated `p` break a rule that is on? */
+const exclusiveScorers = <P,>(a: GenLeg<P>, b: GenLeg<P>) =>
+  a.gameKey === b.gameKey && a.market === "first_td" && b.market === "first_td";
 const blocks = <P,>(rules: SeatRules, p: GenLeg<P>, l: GenLeg<P>) =>
   p.playerKey === l.playerKey
+  || exclusiveScorers(p, l)
   || (rules.onePerGame && p.gameKey === l.gameKey)
   || (!!rules.onePerTeam && l.team != null && p.team === l.team);
 
@@ -669,7 +672,7 @@ function seatPins<P>(ctx: Ctx<P>): Slots<P> {
 }
 
 const fits = <P,>(s: Slots<P>, c: GenLeg<P>, rules: SeatRules) =>
-  !s.ids.has(c.id) && !s.usedP.has(c.playerKey) && !(rules.onePerGame && s.usedG.has(c.gameKey))
+  !s.legs.some(l => l != null && exclusiveScorers(l, c)) && !s.ids.has(c.id) && !s.usedP.has(c.playerKey) && !(rules.onePerGame && s.usedG.has(c.gameKey))
   && !(rules.onePerTeam && c.team != null && s.usedT.has(c.team));
 
 function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
@@ -779,7 +782,7 @@ function repairPayout<P>(
     let scanned = 0;
     for (const c of order) {
       if (scanned >= REPAIR_SCAN) break;
-      if (ids.has(c.id) || players.has(c.playerKey)) continue;
+      if (ids.has(c.id) || players.has(c.playerKey) || others.some(l => exclusiveScorers(l, c))) continue;
       if (ctx.spec.onePerGame && games.has(c.gameKey)) continue;
       if (ctx.spec.onePerTeam && c.team != null && teams.has(c.team)) continue;
       scanned++;
@@ -879,7 +882,7 @@ export function generate<P>(
     for (let j = i + 1; j < seated.length; j++) {
       if (seated[i].playerKey === seated[j].playerKey)
         return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-player" } };
-      if (spec.onePerGame && seated[i].gameKey === seated[j].gameKey)
+      if (exclusiveScorers(seated[i], seated[j]) || (spec.onePerGame && seated[i].gameKey === seated[j].gameKey))
         return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-game" } };
       if (spec.onePerTeam && seated[i].team != null && seated[i].team === seated[j].team)
         return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-team" } };

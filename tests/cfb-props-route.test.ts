@@ -1110,7 +1110,7 @@ describe("THE CAESARS-MISSING RULE (2026-09-05) — a 30-min re-check inside 4 h
     fetchMock.mockImplementation(async () => eventResponse(null));
     const again = await call();
     expect(again.body.source).toBe("fetch");
-    expect(urlsFetched()).toContain(`https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events/${oddsIdOf(G)}/odds?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1&oddsFormat=american`);
+    expect(urlsFetched()).toContain(`https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/events/${oddsIdOf(G)}/odds?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1&oddsFormat=american`);
     expect(again.body.noProps).toBe(0);
   });
 

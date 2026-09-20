@@ -81,11 +81,12 @@ function knownPrice(r:PickRow,book:string,index:QuoteIndex):number|null{
 }
 export function priceMlbRow(r:PickRow,book:string,index:QuoteIndex={}):PickRow{
  if(book===(r.settlementBook??'williamhill_us'))return r;const am=knownPrice(r,book,index);const p=r.prob==null?null:r.prob/100;const v=valueAt(p,am);
+ const kelly=p!=null&&am!=null?Math.round(Math.min(.02,Math.max(0,.25*(p*decimal(am)-1)/(decimal(am)-1)))*10000)/10000:null;
  const opp=r.opp as {lkey?:string;sub?:string;prob?:number;cz?:unknown;label?:string}|undefined;
  const oppAm=opp?.lkey?index[`${r.gkey}|${opp.lkey}|o`]?.[book]?.am??null:null;
- return {...r,displayBook:book,bestDisplayOdds:r.odds,bestDisplayBook:r.book,...(opp?{opp:{...opp,cz:oppAm}}:{}),odds:am??undefined,book:bookName(book),ev:v.ev,edge:v.edge,czOdds:am,czEv:v.ev,czEdge:v.edge,cz:am as PickRow['cz'],czBadge:am!=null&&v.ev!=null&&v.ev>0,czKellyF:null,
+ return {...r,displayBook:book,bestDisplayOdds:r.odds,bestDisplayBook:r.book,...(opp?{opp:{...opp,cz:oppAm}}:{}),odds:am??undefined,book:bookName(book),ev:v.ev,edge:v.edge,czOdds:am,czEv:v.ev,czEdge:v.edge,cz:am as PickRow['cz'],czBadge:am!=null&&v.ev!=null&&v.ev>0,czKellyF:kelly,
  // The named sportsbook overrides the legacy DK/FD basis toggle on display surfaces.
- bs:am,bsOdds:am==null?null:String(am),bsBook:bookName(book),bsEv:v.ev,bsKellyF:null,bsBadge:am!=null&&v.ev!=null&&v.ev>0};
+ bs:am,bsOdds:am==null?null:String(am),bsBook:bookName(book),bsEv:v.ev,bsKellyF:kelly,bsBadge:am!=null&&v.ev!=null&&v.ev>0};
 }
 export function priceMlbProp(r:PropBoardRow,book:string):PropBoardRow{
  if(book===(r.settlementBook??'williamhill_us'))return {...r,displayBook:book,o:r.cz?.o??null,u:r.cz?.u??null,oBook:r.cz?.o!=null?bookName(book):null,uBook:r.cz?.u!=null?bookName(book):null};

@@ -216,7 +216,7 @@ describe("the week-1 slate through the pure model", () => {
     expect(game.home.name).toBe("Cincinnati Bengals");
     const rows = parseEventProps(EVENT, game, { now: NOW, bankroll: NFL_BANK_BASE, props: NFL_PROPS, rules: NFL_RULES });
     expect(rows.length).toBeGreaterThan(0);
-    expect(new Set(rows.map((r) => r.market))).toEqual(new Set(CFB_PROP_MARKETS.map((m) => m.id)));
+    expect(new Set(rows.map((r) => r.market))).toEqual(new Set(CFB_PROP_MARKETS.slice(0,6).map((m) => m.id)));
     expect(rows.every((r) => r.gameId === CIN && r.oddsEventId === EVENT.id)).toBe(true);
     // Caesars is on the payload, so rows are playable pre-kick and sized at ¼-Kelly of the bankroll, capped at 2 % = $50
     const playable = rows.filter((r) => r.playable);
@@ -250,7 +250,7 @@ describe("GET /api/nfl/props — a fresh pull", () => {
     expect(fetchMock).toHaveBeenCalledTimes(13);
     for (const [url, init] of fetchMock.mock.calls) {
       expect(String(url)).toMatch(
-        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1&oddsFormat=american$/,
+        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1&oddsFormat=american$/,
       );
       expect(String(url)).not.toContain("ncaaf");
       expect(init).toEqual({ next: { revalidate: NFL_PROPS.revalidateSec } });

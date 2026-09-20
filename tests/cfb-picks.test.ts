@@ -740,7 +740,7 @@ describe("INSTRUCTION 42 — a 68-game Saturday (fixture-scaled benchmark)", () 
     for (const k of CFB_PARLAY_CATEGORIES) {
       const list = big.sets[k];
       // 2026-09-19: the synthetic slate carries no first-half lines, so the three 1H sets are empty here (tests/cfb-h1.test.ts builds them)
-      if (isH1Market(k)) {
+      if (isH1Market(k) || ["receptions_alt", "pass_tds_alt", "first_td", "tds_over"].includes(k)) {
         expect(list, k).toEqual([]);
         continue;
       }

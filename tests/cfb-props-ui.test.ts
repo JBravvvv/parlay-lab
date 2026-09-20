@@ -26,7 +26,7 @@ describe("CfbProps — wiring", () => {
     expect(props).toMatch(/label: "SIDES"/);
     /* the nav renders m.label.toUpperCase() for each entry — the six labels the contract names */
     const labels = CFB_PROP_MARKETS.map((m) => m.label);
-    expect(labels).toEqual(["Anytime TD", "Pass TDs", "Pass Yds", "Receptions", "Rush Yds", "Rec Yds"]);
+    expect(labels).toEqual(["Anytime TD", "Pass TDs", "Pass Yds", "Receptions O/U", "Rush Yds", "Rec Yds", "Receptions X+", "Pass TDs X+", "First TD", "2+ TDs / TD ladders"]);
     expect(CFB_PROP_MARKETS.map((m) => m.odds)).toEqual([
       "player_anytime_td",
       "player_pass_tds",
@@ -34,6 +34,10 @@ describe("CfbProps — wiring", () => {
       "player_receptions",
       "player_rush_yds",
       "player_reception_yds",
+      "player_receptions_alternate",
+      "player_pass_tds_alternate",
+      "player_1st_td",
+      "player_tds_over",
     ]);
     /* the prop leg's market label and the empty state's market name both read the same table */
     expect(props).toMatch(/marketLabel: marketMeta\(row\.market\)\.label/);

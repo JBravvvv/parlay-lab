@@ -44,6 +44,13 @@ import type { LeagueProps, LeagueRules } from "@/lib/football/league";
  * Nothing here is a prediction. A row's `fair` is what the books, de-vigged, say the side is
  * worth at that line; the EV is that fair against a posted price. Missing values are null.
  *
+ * September 19 expansion: reception/pass-TD alternate lines and scoring-TD ladders are
+ * separate rows per threshold; First TD is its own yes/no contract. One-sided lines use
+ * the same disclosed 1.08 assumed overround, require minBooks, and carry assumedHold.
+ * This is a market estimate, not a calibrated player distribution. Never infer a First TD
+ * quote from Anytime TD, or a ladder rung from another line. Explicit X+ outcomes normalize
+ * to X-.5; literal Over points remain literal (no guessed integer-milestone convention).
+ *
  * TWO LEAGUES, ONE PRICER (2026-09-08, the NFL build): the module is shared by the College
  * Football and NFL desks. `parseEventProps` reads its knobs (`minBooks`, `settleBook`, the Kelly
  * fraction and cap) from `opts.props` / `opts.rules` — a LeagueProps / LeagueRules — and defaults
@@ -116,7 +123,7 @@ export function playerSlug(name: string): string {
 const MARKET_BY_ODDS = new Map(CFB_PROP_MARKETS.map((m) => [m.odds, m] as const));
 
 /** one book's de-vigged reading of one (market, player) */
-type BookRead = { book: string; title: string; line: number | null; pOver: number; priceOver: number; priceUnder: number | null };
+type BookRead = { book: string; title: string; line: number | null; pOver: number; priceOver: number; priceUnder: number | null; assumedHold: boolean };
 
 type Group = { market: (typeof CFB_PROP_MARKETS)[number]; player: string; team: string | null; reads: BookRead[] };
 
@@ -143,14 +150,17 @@ function readEvent(eventJson: unknown): Group[] {
         const name = (str(oc.name) ?? "").toLowerCase();
         const price = num(oc.price);
         if (!player || price == null || !validPrice(price)) continue;
-        const line = market.kind === "ou" ? num(oc.point) : null;
-        if (market.kind === "ou" && line == null) continue;
+        // An explicit X+ outcome means at least X; ordinary Over points retain the feed's threshold.
+        const milestone = /^(\d+)\+$/.exec(name);
+        const line = market.kind === "yes" ? null : milestone ? Number(milestone[1]) - .5 : num(oc.point);
+        if (market.kind !== "yes" && (line == null || line < 0)) continue;
+        if (market.id === "tds_over" && line != null && line < 1) continue;
         const team = str(oc.team);
         const entry = perPlayer.get(player) ?? { team: null, byLine: new Map() };
         if (team && !entry.team) entry.team = team;
         const lk = line == null ? "" : String(line);
         const slot = entry.byLine.get(lk) ?? { a: null, b: null, line };
-        if (name === "over" || name === "yes") slot.a = price;
+        if (name === "over" || name === "yes" || milestone != null) slot.a = price;
         else if (name === "under" || name === "no") slot.b = price;
         entry.byLine.set(lk, slot);
         perPlayer.set(player, entry);
@@ -164,19 +174,22 @@ function readEvent(eventJson: unknown): Group[] {
           let pOver: number;
           if (slot.b != null) {
             [pOver] = devigProportional([impliedFromAmerican(slot.a), impliedFromAmerican(slot.b)]);
-          } else if (market.kind === "yes") {
+          } else if (market.kind !== "ou") {
             pOver = impliedFromAmerican(slot.a) / ATD_YES_ONLY_OVERROUND;
           } else continue; // an Over with no Under at the same line is not a pair
           if (!(pOver > 0 && pOver < 1)) continue;
           // one reading per book per line (a duplicated outcome keeps the first)
           if (g.reads.some((r) => r.book === key && sameLine(r.line, slot.line))) continue;
-          g.reads.push({ book: key, title, line: slot.line, pOver, priceOver: slot.a, priceUnder: slot.b });
+          g.reads.push({ book: key, title, line: slot.line, pOver, priceOver: slot.a, priceUnder: slot.b, assumedHold: slot.b == null });
         }
         groups.set(gk, g);
       }
     }
   }
-  return [...groups.values()];
+  // Ladder rungs are separate contracts, never a median line or one quote overwriting another.
+  return [...groups.values()].flatMap(g => g.market.kind !== "ladder" ? [g] :
+    [...new Set(g.reads.map(r => r.line))].sort((a,b) => (a ?? 0)-(b ?? 0))
+      .map(line => ({...g, reads: g.reads.filter(r => sameLine(r.line, line))})));
 }
 
 /**
@@ -208,12 +221,18 @@ const SHORT: Record<CfbPropMarket, string> = {
   pass_tds: "Pass TDs",
   pass_yds: "Pass Yds",
   receptions: "Receptions",
+  receptions_alt: "Receptions",
+  pass_tds_alt: "Pass TDs",
+  first_td: "First TD",
+  tds_over: "TDs",
   rush_yds: "Rush Yds",
   rec_yds: "Rec Yds",
 };
 
 /** "Ty Simpson O 245.5 Pass Yds" · "Ty Simpson U 1.5 Pass TDs" · "Ryan Williams Anytime TD" */
 export function propLabel(player: string, market: CfbPropMarket, side: CfbPropSide, line: number | null): string {
+  if (["receptions_alt", "pass_tds_alt", "tds_over"].includes(market) && side === "over" && line != null && line % 1 === .5)
+    return `${player} ${Math.floor(line) + 1}+ ${SHORT[market]}`;
   if (side === "yes") return `${player} ${SHORT[market]}`;
   return `${player} ${side === "over" ? "O" : "U"} ${line ?? "—"} ${SHORT[market]}`;
 }
@@ -238,7 +257,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
     if (!g.reads.length) continue;
     // the row's line must be a line some book POSTED (a fair exists only there), so the line median
     // is engine2's lower-middle weightedMedian, never an average of two posted lines
-    const line = g.market.kind === "ou" ? weightedMedian(g.reads.map((r) => r.line as number), g.reads.map(() => 1)) : null;
+    const line = g.market.kind !== "yes" ? weightedMedian(g.reads.map((r) => r.line as number), g.reads.map(() => 1)) : null;
     const consensus = fairAt(g.reads, line, P.minBooks);
     const teamN = g.team ? normTeam(g.team) : null;
     // INSTRUCTION 46 (2026-09-08): the odds feed rarely names a prop's team; ESPN's season table
@@ -268,6 +287,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
           quotes.push(quote(r.book, r.title, r.priceUnder, r.line));
         } else quotes.push(quote(r.book, r.title, r.priceOver, r.line));
       }
+      if (!quotes.length) continue;
       const find = (k: string) => quotes.find((q) => q.book === k) ?? null;
       const cz = find(P.settleBook);
       let best: CfbPropQuote | null = null;
@@ -309,6 +329,7 @@ export function parseEventProps(eventJson: unknown, game: CfbGame, opts: ParsePr
         fair,
         fairAm: clamped == null ? null : americanFromProb(clamped),
         books: consensus?.n ?? 0,
+        assumedHold: g.reads.some(r => r.assumedHold),
         quotes: Object.fromEntries(quotes.map(q => [q.book, q])),
         probabilities: Object.fromEntries(quotes.map(q => [q.book, evAt(q)?.p ?? null])),
         cz,

@@ -1016,7 +1016,7 @@ export function GenSheet<P>({
               <details className="mt-1.5 text-[9.5px] leading-snug text-faint">
                 <summary className="cursor-pointer py-1 sm:py-2">Estimates & price details · paper only</summary>
                 Estimated hit chance multiplies the leg estimates. Same-game correlation is not modeled; this is not a sportsbook parlay quote.
-                {anyMarketProb && <> {marketNote}</>}{" "}
+                {anyMarketProb && <> {marketNote} Football one-sided scorer and ladder prices use an assumed 8% overround; estimates are not measured true probabilities.</>}{" "}
                 {showHitRate && <>Hit rates count games already played and are not a forecast. </>}
                 {suspended && (
                   <>

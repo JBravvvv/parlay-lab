@@ -40,6 +40,7 @@ import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
 import { FOOTBALL_POSITIONS, footballPosition, positionLookup, rosterLookup } from "@/lib/football/positions";
 import { loadPositionFeed } from "@/lib/football/positions-client";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
+import { propLabel } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
 import { CFB_RULES } from "@/lib/cfb/rules";
 import type { CfbGame, CfbMarketKey, CfbQuote, CfbRow, CfbSideKey, CfbTeam } from "@/lib/cfb/types";
@@ -384,6 +385,7 @@ function sideTag(side: CfbPropRow["side"]): string {
 
 /** "Ty Simpson O 245.5" / "R. Williams Anytime TD" — at the quote's OWN line */
 function propLegLabel(row: CfbPropRow, line: number | null): string {
+  if (["receptions_alt", "pass_tds_alt", "tds_over"].includes(row.market)) return propLabel(row.player, row.market, row.side, line ?? row.line);
   if (row.side === "yes") return `${row.player} ${marketMeta(row.market).label}`;
   return `${row.player} ${sideTag(row.side)} ${line ?? row.line ?? "—"}`;
 }
@@ -497,11 +499,12 @@ function ctxLine(row: CfbPropRow): string | null {
 function propCell(row: CfbPropRow, mode: PriceMode, selected: boolean, onPick: (leg: CfbSlipLeg) => void, rules: Pick<LeagueRules, "minEvPct"> = CFB_RULES): OddsGridCell {
   const q = propQuote(row, mode);
   const yes = row.side === "yes";
+  const lineTag = (line: number | null) => ["receptions_alt", "pass_tds_alt", "tds_over"].includes(row.market) && row.side === "over" && line != null && line % 1 === .5 ? `${Math.floor(line)+1}+` : yes ? "YES" : `${sideTag(row.side)} ${line ?? "—"}`;
   const closed = row.status === "final" || row.status === "postponed";
-  if (!q) return { line: yes ? "YES" : `${sideTag(row.side)} ${row.line ?? "—"}`, price: "—", tone: "muted" };
+  if (!q) return { line: lineTag(row.line), price: "—", tone: "muted" };
   const leg = propLegOf(row, q);
   const tag = bookTag(q);
-  const line = [yes ? "YES" : `${sideTag(row.side)} ${q.line ?? row.line ?? "—"}`, tag !== "CZ" ? tag : null].filter(Boolean).join(" · ");
+  const line = [lineTag(q.line ?? row.line), tag !== "CZ" ? tag : null].filter(Boolean).join(" · ");
   if (!leg) return { line, price: "—", tone: "muted", aria: `${row.player} ${line} — no fair at this line` };
   return {
     line,
@@ -559,7 +562,7 @@ function PropRow({
     <div
       data-prop-game={gameId}
       data-prop-player={playerSlug(pl.player)}
-      className={`flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? focusRing(L.id) : ""}`}
+      className={`football-prop-row flex min-h-[52px] items-center gap-2 border-t border-white/[0.04] py-1.5 first:border-t-0 ${focused ? focusRing(L.id) : ""}`}
     >
       <PlayerMark teamIds={teamIds} player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
       <div className="min-w-0 flex-1 leading-tight">
@@ -568,7 +571,7 @@ function PropRow({
           {pl.team && <span className="ml-1 text-[9.5px] font-semibold uppercase text-faint">{pl.team}</span>}
         </div>
         <div className="num mt-0.5 truncate text-[9.5px] text-faint">
-          {ctx ?? "no season ctx"}
+          {ctx ?? "no season ctx"}{lead.assumedHold && <span title="One-sided quotes use an assumed 8% overround; probability and grade are market estimates, not a fitted player forecast."> · estimated hold</span>}
           <span className="mx-1 text-line-2">·</span>
           <span className={ev == null ? "" : ev >= 0 ? "text-pos" : "text-neg/80"}>
             EV {ev == null ? "—" : `${ev >= 0 ? "+" : ""}${ev.toFixed(1)}%`}

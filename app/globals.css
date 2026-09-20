@@ -950,3 +950,16 @@ body::after {
 /* Every Pick Today / Parlay Builder: bold, readable text including matchup/time and filters. */
 .desk-content[data-desk-page="/props"] { font-weight: 700; --color-faint: #b6c2d2; --color-muted: #d2dbe8; }
 .desk-content[data-desk-page="/props"] :where(*:not(.font-black):not(.font-extrabold):not(.display)) { font-weight: 700; }
+
+/* September 19: clearer pick boundaries, preserving the compact spacing. */
+.desk-content :is(.gen-player-card, [data-ranked-pick], .football-prop-row) {
+  border: 1px solid rgb(184 203 227 / 27%);
+  border-radius: 8px;
+  background-color: rgb(255 255 255 / 2%);
+}
+.desk-content :is(.glass-table, .ticket-legs) tr:has([data-player-mark]) > td {
+  border-bottom: 1px solid rgb(184 203 227 / 24%);
+}
+.desk-content :is(.gen-player-card, [data-ranked-pick], .football-prop-row):hover {
+  border-color: rgb(184 203 227 / 43%);
+}

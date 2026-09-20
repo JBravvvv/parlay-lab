@@ -118,3 +118,13 @@ describe("the board's own in-play rows feed the live pool",()=>{
   expect(generate(buildPool(live,spec,now),spec,1)).toMatchObject({ok:false,fail:{code:"short-pool",have:1,want:2}});
  });
 });
+
+it('keeps all three fresh live book prices distinct when the user switches books',()=>{
+ const quotes={draftkings:{o:150,u:-170},williamhill_us:{o:180,u:-200},fanduel:{o:120,u:-140}};
+ for(const book of Object.keys(quotes) as (keyof typeof quotes)[]){
+  const g={...game,markets:{batter_hits:[{...row,displayBook:book}]}};
+  const o={...overlay,rows:{['g|'+row.lkey]:{...overlay.rows['g|'+row.lkey],quotes}}};
+  const r=liveMarketBoard([g],o,{g:{pk:1}},state,now,1_800_000)[0].markets.batter_hits[0];
+  expect(r.cz).toEqual(quotes[book]);expect(r.o).toBe(quotes[book].o);expect(r.ln).toBe(1.5);expect(r.fO).toBe(40);
+ }
+});

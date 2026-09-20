@@ -355,7 +355,7 @@ describe("picks / card / categories", () => {
   it("the pick categories and parlay categories carry the three 1H markets right after the full-game three", () => {
     expect(CFB_PICK_CATEGORIES.slice(0, 7)).toEqual(["all", "ml", "spread", "total", "ml_1h", "spread_1h", "total_1h"]);
     expect(CFB_PARLAY_CATEGORIES.slice(0, 6)).toEqual(["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h"]);
-    expect(CFB_PARLAY_CATEGORIES).toHaveLength(15);
+    expect(CFB_PARLAY_CATEGORIES).toHaveLength(19);
   });
   it("buildCfbPicks lists the 1H rows under their own categories and in `all`, labelled 1H", () => {
     const b = board();
@@ -433,7 +433,7 @@ describe("the store value and the feed", () => {
   });
   it("the per-event market list carries the three 1H markets after the six player markets, on both leagues", () => {
     expect(CFB_PROPS_ODDS_MARKETS.endsWith(",h2h_h1,spreads_h1,totals_h1")).toBe(true);
-    expect(CFB_PROPS_ODDS_MARKETS.split(",")).toHaveLength(9);
+    expect(CFB_PROPS_ODDS_MARKETS.split(",")).toHaveLength(13);
     expect(CFB_LEAGUE.feeds.oddsPropMarkets).toBe(CFB_PROPS_ODDS_MARKETS);
     expect(NFL_LEAGUE.feeds.oddsPropMarkets).toBe(CFB_PROPS_ODDS_MARKETS);
   });

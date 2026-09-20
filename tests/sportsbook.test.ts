@@ -55,3 +55,11 @@ it("Games moneylines use the chosen book, including Caesars, without a best-book
 });
 
 it("selected price retains the original all-books comparison quote",()=>{const row=priceMlbRow({label:"Player",sub:"Over 0.5",prob:50,odds:"+120",book:"FanDuel",bs:-110,bsBook:"DK"} as never,"draftkings");expect(row.czOdds).toBe(-110);expect(row.bestDisplayOdds).toBe("+120");expect(row.bestDisplayBook).toBe("FanDuel");});
+
+it('MLB book changes recompute capped quarter-Kelly along with EV',()=>{
+ const row={prob:50,settlementBook:'draftkings',gkey:'g',lkey:'p',sub:'Over 0.5'};
+ const index={'g|p|o':{fanduel:{am:120,line:.5,book:'fanduel'},williamhill_us:{am:-130,line:.5,book:'williamhill_us'}}};
+ expect(priceMlbRow(row,'fanduel',index).czKellyF).toBe(.02);
+ expect(priceMlbRow(row,'williamhill_us',index).czKellyF).toBe(0);
+ expect(priceMlbRow(row,'betmgm',index).czKellyF).toBeNull();
+});

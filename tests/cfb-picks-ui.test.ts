@@ -186,11 +186,11 @@ describe("CFB Board — INSTRUCTION 42 (2026-09-05): every pick graded, 50 parla
   it("PARLAY_CATS carries all twelve keys with the contract's labels (MIXED reads live+pregame)", () => {
     const cats = board.slice(board.indexOf("const PARLAY_CATS"), board.indexOf("const PREGAME_CATS"));
     for (const k of KEYS) expect(cats, k).toMatch(new RegExp(`\\n  ${k}: \\{ label: "`));
-    for (const label of ["ML", "SPREAD", "TOTAL", "ANYTIME TD", "PASS TDS", "PASS YDS", "RECEPTIONS", "RUSH YDS", "REC YDS", "COMBOS", "MIXED", "LIVE"]) expect(cats, label).toMatch(new RegExp(`label: "${label}"`));
+    for (const label of ["ML", "SPREAD", "TOTAL", "ANYTIME TD", "PASS TDS", "PASS YDS", "Receptions O/U", "RUSH YDS", "REC YDS", "COMBOS", "MIXED", "LIVE"]) expect(cats, label).toMatch(new RegExp(`label: "${label}"`));
     expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
     expect(cats).toMatch(/mixed: \{[^\n]*live: true/);
     expect(cats).toMatch(/\n  live: \{[^\n]*live: true/);
-    expect(cats.match(/live: false/g)?.length).toBe(13);
+    expect(cats.match(/live: false/g)?.length).toBe(17);
     expect(board).toMatch(/const PREGAME_CATS = CFB_PARLAY_CATEGORIES\.filter\(\(k\) => !PARLAY_CATS\[k\]\.live\);/);
   });
   it("the default category is the first non-empty pregame set (never opens on an empty set while another has tickets)", () => {
@@ -401,7 +401,7 @@ describe("CFB Board — INSTRUCTION 44 (2026-09-05): in-game legs in the categor
     expect(cats).not.toMatch(/upcoming games only|haven't kicked off|distinct upcoming games/);
     // MIXED / LIVE keep their own copy and their live flag; the flag count is untouched (10 pregame categories)
     expect(cats).toMatch(/mixed: \{ label: "MIXED", hint: "live\+pregame"/);
-    expect(cats.match(/live: false/g)?.length).toBe(13);
+    expect(cats.match(/live: false/g)?.length).toBe(17);
     // the empty state no longer demands a game that hasn't kicked off
     expect(section).toMatch(/a selected-book price \(pregame or in play\) and grade D or better/);
     expect(section).not.toMatch(/on a game that hasn't kicked off/);

@@ -26,10 +26,10 @@ export function footballContext(raw:unknown,at:string):LiveContext{
    const values=arr(p.stats);keys.forEach((k,i)=>{const n=num(values[i]);if(n!=null)row[k]=n;});
   }
  }
- const map:Record<string,string>={pass_yds:"passingYards",pass_tds:"passingTouchdowns",rush_yds:"rushingYards",rec_yds:"receivingYards",receptions:"receptions"};
+ const map:Record<string,string>={pass_yds:"passingYards",pass_tds:"passingTouchdowns",pass_tds_alt:"passingTouchdowns",receptions_alt:"receptions",rush_yds:"rushingYards",rec_yds:"receivingYards",receptions:"receptions"};
  for(const p of Object.values(players)){for(const [m,k]of Object.entries(map))if(p[k]!=null)p[m]=p[k];
   const td=["rushingTouchdowns","receivingTouchdowns","kickReturnTouchdowns","puntReturnTouchdowns","interceptionTouchdowns","defensiveTouchdowns"].filter(k=>p[k]!=null);
-  if(td.length)p.anytime_td=td.reduce((s,k)=>s+p[k],0);
+  if(td.length)p.tds_over=p.anytime_td=td.reduce((s,k)=>s+p[k],0);
  }
  const score=away&&home&&num(away.score)!=null&&num(home.score)!=null?`${String(obj(away.team).abbreviation??"Away")} ${away.score} @ ${String(obj(home.team).abbreviation??"Home")} ${home.score}`:null;
  return {status:/postpon|cancel/i.test(String(status.name))?"void":status.completed===true?"final":state==="in"?"live":"pre",score,detail:typeof status.shortDetail==="string"?status.shortDetail:null,players,at};

@@ -8,7 +8,7 @@ import type { Grade } from "@/lib/grade";
 import { H1_ODDS_MARKET_KEYS } from "./markets";
 import type { CfbQuote, CfbStatus } from "./types";
 
-export type CfbPropMarket = "anytime_td" | "pass_tds" | "pass_yds" | "receptions" | "rush_yds" | "rec_yds";
+export type CfbPropMarket = "anytime_td" | "pass_tds" | "pass_yds" | "receptions" | "rush_yds" | "rec_yds" | "receptions_alt" | "pass_tds_alt" | "first_td" | "tds_over";
 
 export const CFB_PROP_MARKETS: readonly {
   id: CfbPropMarket;
@@ -17,15 +17,19 @@ export const CFB_PROP_MARKETS: readonly {
   label: string;
   short: string;
   /** "ou" = over/under on a line; "yes" = a yes-only market (anytime TD) */
-  kind: "ou" | "yes";
+  kind: "ou" | "yes" | "ladder";
   stat: "passing" | "rushing" | "receiving" | "td";
 }[] = [
   { id: "anytime_td", odds: "player_anytime_td", label: "Anytime TD", short: "ATD", kind: "yes", stat: "td" },
   { id: "pass_tds", odds: "player_pass_tds", label: "Pass TDs", short: "PTD", kind: "ou", stat: "passing" },
   { id: "pass_yds", odds: "player_pass_yds", label: "Pass Yds", short: "PYD", kind: "ou", stat: "passing" },
-  { id: "receptions", odds: "player_receptions", label: "Receptions", short: "REC", kind: "ou", stat: "receiving" },
+  { id: "receptions", odds: "player_receptions", label: "Receptions O/U", short: "REC", kind: "ou", stat: "receiving" },
   { id: "rush_yds", odds: "player_rush_yds", label: "Rush Yds", short: "RYD", kind: "ou", stat: "rushing" },
   { id: "rec_yds", odds: "player_reception_yds", label: "Rec Yds", short: "RCY", kind: "ou", stat: "receiving" },
+  { id: "receptions_alt", odds: "player_receptions_alternate", label: "Receptions X+", short: "REC+", kind: "ladder", stat: "receiving" },
+  { id: "pass_tds_alt", odds: "player_pass_tds_alternate", label: "Pass TDs X+", short: "PTD+", kind: "ladder", stat: "passing" },
+  { id: "first_td", odds: "player_1st_td", label: "First TD", short: "1TD", kind: "yes", stat: "td" },
+  { id: "tds_over", odds: "player_tds_over", label: "2+ TDs / TD ladders", short: "TD+", kind: "ladder", stat: "td" },
 ] as const;
 
 /** the six Odds API market keys, comma-joined for the `markets=` query */
@@ -68,6 +72,8 @@ export type CfbPropRow = {
   fairAm: number | null;
   /** books behind the consensus */
   books: number;
+  /** At least one consensus input uses the disclosed assumed one-sided hold. */
+  assumedHold?: boolean;
   quotes?: Record<string, CfbPropQuote>;
   probabilities?: Record<string, number | null>;
   displayBook?: string;
@@ -144,7 +150,7 @@ export type CfbParlayView = "parlays" | "mixed" | "live";
     (a live leg beside pregame legs) and LIVE (in-play legs only). INSTRUCTION 44 (2026-09-05):
     the single-market sets and COMBOS draw from pregame AND in-game legs. Up to CFB_PARLAYS.perCategory
     ranked tickets each. */
-export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "combo", "mixed", "live"] as const;
+export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "receptions_alt", "pass_tds_alt", "first_td", "tds_over", "combo", "mixed", "live"] as const;
 export type CfbParlayCategory = (typeof CFB_PARLAY_CATEGORIES)[number];
 
 export type CfbParlayLeg = {

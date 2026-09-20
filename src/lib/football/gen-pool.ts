@@ -31,6 +31,7 @@ import { amToDec } from "@/lib/ticket-math";
 import { footballLeanIndex } from "@/lib/prop-lean";
 import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type GenSide, type GenPoolSpec } from "@/lib/parlay-gen";
 import { playerSlug } from "@/lib/cfb/props";
+import { propLabel } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropQuote, type CfbPropRow } from "@/lib/cfb/props-types";
 import { footballPosition } from "./positions";
 
@@ -55,6 +56,8 @@ const MARKET_LABEL = new Map(CFB_PROP_MARKETS.map((m) => [m.id as string, m.labe
  * of an MLB table and come back empty.
  */
 function subOf(row: CfbPropRow, line: number | null): string {
+  if (["receptions_alt", "pass_tds_alt", "tds_over"].includes(row.market))
+    return propLabel("", row.market, row.side, line ?? row.line).trim();
   const label = MARKET_LABEL.get(row.market) ?? row.market;
   if (row.side === "yes") return label;
   return `${label} ${row.side === "under" ? "U" : "O"} ${line ?? row.line ?? "—"}`;
@@ -160,8 +163,8 @@ export function footballGenPool<P extends { prob: number; book: string }>(
       position: footballPosition(opts.positionOf?.(row) ?? row.pos),
       started,
       quoteAt: quotedAt,
-      /* the football board carries no alternate ladders — every row is the book's own line */
-      alt: false,
+      /* Each ladder row retains its own posted threshold and price. */
+      alt: ["receptions_alt", "pass_tds_alt", "tds_over"].includes(row.market),
       book: leg.book,
       ev: (leg.prob / 100) * dec - 1,
       market: row.market,

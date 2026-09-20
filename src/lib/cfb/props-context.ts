@@ -136,18 +136,23 @@ export function ctxFor(line: CfbSeasonLine | undefined, market: CfbPropMarket): 
     case "pass_yds":
       season = line.passYds;
       break;
+    case "pass_tds_alt":
     case "pass_tds":
       season = line.passTds;
       break;
     case "rush_yds":
       season = line.rushYds;
       break;
+    case "receptions_alt":
     case "receptions":
       season = line.rec;
       break;
     case "rec_yds":
       season = line.recYds;
       break;
+    case "first_td":
+      return null; // Scoring order cannot be inferred from season TD totals.
+    case "tds_over":
     case "anytime_td":
       season = line.rushTds == null && line.recTds == null ? null : (line.rushTds ?? 0) + (line.recTds ?? 0);
       break;

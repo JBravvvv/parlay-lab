@@ -41,10 +41,10 @@ const root = path.join(__dirname, "..");
 const readSrc = (p: string) => stripComments(fs.readFileSync(path.join(root, p), "utf8"));
 
 describe("the contract", () => {
-  it("six markets, six odds keys, anytime TD the only yes-kind", () => {
-    expect(CFB_PROP_MARKETS).toHaveLength(6);
-    expect(CFB_PROPS_ODDS_MARKETS).toBe("player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,h2h_h1,spreads_h1,totals_h1");
-    expect(CFB_PROP_MARKETS.filter((m) => m.kind === "yes").map((m) => m.id)).toEqual(["anytime_td"]);
+  it("ten markets including reception/pass-TD ladders and scorer markets", () => {
+    expect(CFB_PROP_MARKETS).toHaveLength(10);
+    expect(CFB_PROPS_ODDS_MARKETS).toBe("player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1");
+    expect(CFB_PROP_MARKETS.filter((m) => m.kind === "yes").map((m) => m.id)).toEqual(["anytime_td", "first_td"]);
     /* 2026-09-05: was { maxEvents: 24, revalidateSec: 1800 } — a fresh 24-event pull MEASURED ~753 credits on prod
        (~31 credits/event, not 6), and the data cache is per deployment; halved, doubled, and budgeted. */
     /* 2026-09-05 (INSTRUCTION 40): + liveRevalidateSec 600 — the window once any priced event is in play */
