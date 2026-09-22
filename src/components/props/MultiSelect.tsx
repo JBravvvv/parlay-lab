@@ -35,7 +35,7 @@ export function MultiSelect({ label, options, value, onChange, title, single = f
   }, []);
 
   return (
-    <details ref={detailsRef} onToggle={e=>{const d=e.currentTarget;if(d.open){const rect=d.getBoundingClientRect();d.dataset.side=window.innerHeight-rect.bottom<320 && rect.top>window.innerHeight-rect.bottom?"above":"below";}}} className="discovery-select relative min-w-0 flex-1">
+    <details data-filter={label} ref={detailsRef} onToggle={e=>{const d=e.currentTarget;if(d.open){const rect=d.getBoundingClientRect();d.dataset.align=rect.left+Math.max(rect.width,250)>window.innerWidth-12?"right":"left";d.dataset.side=window.innerHeight-rect.bottom<320 && rect.top>window.innerHeight-rect.bottom?"above":"below";}}} className="discovery-select relative min-w-0 flex-1">
       <summary title={title ?? `${label}: ${selection}`} className="discovery-trigger cursor-pointer text-[11px] font-bold text-text" aria-label={label}>
         <span className="discovery-trigger-label">{label}</span>
         <span className="discovery-trigger-value">{selection}</span>

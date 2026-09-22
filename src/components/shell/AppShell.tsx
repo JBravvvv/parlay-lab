@@ -179,14 +179,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // the phone header's ⋯ menu — closes on every navigation (the pathname flips) and on a tap outside
   const [more, setMore] = useState(false);
   useEffect(() => setMore(false), [pathname]);
-  // PORTRAIT LOCK (2026-09-19, Josh: "It should be stuck in portrait mode at all times"). Where the browser
-  // honours it (Android Chrome, installed) this pins the home-screen app upright; iOS has no lock API and
-  // ignores the manifest's orientation, so there the .rotate-lock sheet in globals.css covers a sideways phone.
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia?.("(display-mode: standalone)").matches) return;
-    const o = window.screen?.orientation as unknown as { lock?: (t: string) => Promise<void> } | undefined;
-    o?.lock?.("portrait")?.catch(() => {});
-  }, []);
   const cfb = sport === "cfb";
   const nfl = sport === "nfl";
   /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB or NFL
@@ -200,13 +192,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* the looping video plays behind every page (mounted once — survives
           navigation); data pages get a dark scrim, the landing runs it raw */}
       <VideoBackdrop fixed scrim={!landing} />
-
-      {/* portrait lock, the iOS half: shown by globals.css only in the installed app, sideways, at phone heights */}
-      <div className="rotate-lock fixed inset-0 z-[100] flex-col items-center justify-center gap-2 bg-bg px-8 text-center" role="status" aria-live="polite">
-        <span aria-hidden className="text-[32px] leading-none">📱</span>
-        <p className="text-[15px] font-semibold text-text">Parlay Lab runs in portrait</p>
-        <p className="text-[12.5px] text-muted">Turn your phone back upright to keep going.</p>
-      </div>
 
       {/* desktop side rail — two groups: the work tabs under the brand, the
           bookkeeping/tools tabs pinned above the footer. The eyebrow and the
@@ -313,7 +298,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main>{children}</main>
       ) : (
         <main data-desk-page={pathname} data-desk-sport={sport} className="desk-content px-4 pb-24 pt-2 md:ml-[200px] md:px-8 md:pb-8 md:pt-2">
-          <div className="mx-auto w-full max-w-[1280px]"><VerticalDensity toolbar={<SportsbookSelector />} enabled={["/games","/board","/builder","/props","/sharp","/simulator","/ballpark","/stats"].includes(pathname)}>{children}</VerticalDensity></div>
+          <div className="mx-auto w-full max-w-[1280px]"><VerticalDensity toolbar={<SportsbookSelector />} enabled={["/games","/board","/builder","/props","/sharp","/simulator","/ballpark","/stats"].includes(pathname)}>{children}</VerticalDensity><div id="page-help" className="mt-4 border-t border-white/10 pt-3" /></div>
         </main>
       )}
 

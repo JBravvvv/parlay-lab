@@ -4,7 +4,7 @@ import { MultiSelect } from "./MultiSelect";
 import { GameTimeRange } from "./GameTimeRange";
 import { SPORT_OPTIONS, TIMING_OPTIONS, STRATEGIES, type DiscoveryFilter } from "@/lib/discovery";
 export function DiscoveryFilters({value,onChange,markets,showSports=true,parlayTypes=false,hideStyles=false}:{value:DiscoveryFilter;onChange:(v:DiscoveryFilter)=>void;markets:readonly {key:string;label:string}[];showSports?:boolean;parlayTypes?:boolean;hideStyles?:boolean}) {
- return <div className="discovery-filters space-y-1 px-2 py-1"><div className="flex flex-wrap gap-1">
+ return <div className="discovery-filters space-y-1 px-2 py-1"><div className="filter-toolbar-title">Customize your picks <span>Open a filter to choose</span></div><div className="flex flex-wrap gap-1">
  <MultiSelect label="Timing" options={TIMING_OPTIONS} value={value.timing} onChange={timing=>onChange({...value,timing})}/>
  <MultiSelect label="Markets" options={markets} value={value.markets} onChange={markets=>onChange({...value,markets})}/>
  {!hideStyles&&<MultiSelect label={parlayTypes?"Parlay type":"Style"} options={parlayTypes?STRATEGIES.map(s=>({...s,label:s.key==="safe"?"Safe / Safer":s.label})):STRATEGIES} value={value.strategies} onChange={strategies=>onChange({...value,strategies})}/>}

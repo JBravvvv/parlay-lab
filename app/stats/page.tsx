@@ -430,33 +430,16 @@ export default function StatsPage() {
     const statCols = tableSport !== "mlb" ? FB_COLS[group] || [] : group === "hitting" ? HIT_COLS : PIT_COLS;
     return [
       {
-        key: "rank", header: "#", stickyLeft: 0,
-        cell: (r) => <span className="text-[11px] text-faint">{r.rank}</span>,
-        className: "w-[34px] pr-0", numeric: false,
-      },
-      {
-        key: "name", header: scope === "team" ? "Team" : "Player", stickyLeft: 34,
+        key: "name", header: scope === "team" ? "Team" : "Player", stickyLeft: 0,
         sortValue: (r) => r.name,
-        cell: (r) => {
-          const lg = logoUrl(tableSport, r.team);
-          const hs = scope === "ind" ? headshotFor(tableSport, r.id) : null;
-          return (
-            <span className="flex max-w-[168px] items-center gap-1.5 truncate font-medium text-text md:max-w-[240px]">
-              {scope === "ind" && <StatHeadshot src={hs} name={r.name} sport={tableSport} />}
-              {lg && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={lg} alt="" className="h-[16px] w-[16px] shrink-0 object-contain" loading="lazy" />
-              )}
-              {tableSport === "mlb" && scope === "ind" ? (
-                <PlayerName id={Number(r.id)} name={r.name} team={r.team} className="truncate" />
-              ) : (
-                <span className="truncate">{r.name}</span>
-              )}
-            </span>
-          );
-        },
+        className: "stats-identity-cell",
+        cell: (r) => <div className="stats-identity">
+          <span className="stats-rank">{r.rank}</span>
+          {scope === "ind" && <StatHeadshot src={headshotFor(tableSport,r.id)} name={r.name} sport={tableSport} />}
+          <div className="stats-person"><div className="stats-name">{tableSport === "mlb" && scope === "ind" ? <PlayerName id={Number(r.id)} name={r.name} team={r.team} /> : r.name}</div>
+          <span className="stats-team">{logoUrl(tableSport,r.team)&&<img src={logoUrl(tableSport,r.team)!} alt="" loading="lazy" />} {r.team}</span></div>
+        </div>,
       },
-      { key: "team", header: "TM", sortValue: (r) => r.team, cell: (r) => <span className="text-[11px] text-muted">{r.team}</span> },
       ...statCols.map((c) => ({
         key: c.k, header: c.l, numeric: true,
         sortValue: (r: StatRow) => statNum(r.stat[c.k]),

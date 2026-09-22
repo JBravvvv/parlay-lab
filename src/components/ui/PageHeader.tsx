@@ -1,3 +1,6 @@
+"use client";
+import {useEffect,useState} from "react";
+import {createPortal} from "react-dom";
 import type { ReactNode } from "react";
 
 /** Compact title/action row. Long page explanations are available on demand;
@@ -18,6 +21,8 @@ export function PageHeader({
   eyebrow?: ReactNode;
   chip?: ReactNode;
 }) {
+  const [helpTarget,setHelpTarget]=useState<HTMLElement|null>(null);
+  useEffect(()=>{setHelpTarget(document.getElementById("page-help"));},[]);
   const heading = <h1 className="display text-[20px] leading-tight text-text sm:text-[24px]">{title}</h1>;
   const phoneSub = subMobile ?? sub;
   return (
@@ -26,10 +31,10 @@ export function PageHeader({
         {heading}{chip}
       </div>
       {action}
-      {sub && <details className="page-description w-full text-[11px] leading-snug text-muted">
+      {sub && helpTarget && createPortal(<details className="page-description w-full text-[11px] leading-snug text-muted">
         <summary className="cursor-pointer font-semibold">About this page</summary>
         <div className="pt-1">{sub}</div>
-      </details>}
+      </details>,helpTarget)}
       {subMobile && <div data-page-sub="phone" className="w-full text-[11px] font-semibold text-muted">{phoneSub}</div>}
     </div>
   );

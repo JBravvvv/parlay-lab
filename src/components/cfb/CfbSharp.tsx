@@ -161,9 +161,6 @@ export function CfbSharp() {
         </Pill>
       </div>
 
-      <Reveal>
-        <HowItPrices L={L} />
-      </Reveal>
 
       {loading ? (
         <Panel>
@@ -179,14 +176,7 @@ export function CfbSharp() {
         </Panel>
       ) : (
         <>
-          <Reveal>
-            <Panel title="The desk's overview">
-              <p className="text-[13px] leading-relaxed text-muted">{overview}</p>
-              {slate.oddsMissing && (
-                <p className="mt-2 text-[12px] text-neg">Scores only this load — the server had no odds feed, so nothing is priced or graded.</p>
-              )}
-            </Panel>
-          </Reveal>
+
 
           {value.length > 0 && (
             <Reveal>
@@ -298,6 +288,15 @@ export function CfbSharp() {
           </div>
         </>
       )}
+      <HowItPrices L={L} />
+                <Reveal>
+            <details className="glass px-4 py-3"><summary className="cursor-pointer font-bold text-muted">The desk's overview</summary>
+              <p className="text-[13px] leading-relaxed text-muted">{overview}</p>
+              {slate?.oddsMissing && (
+                <p className="mt-2 text-[12px] text-neg">Scores only this load — the server had no odds feed, so nothing is priced or graded.</p>
+              )}
+            </details>
+          </Reveal>
     </div>
   );
 }
@@ -353,7 +352,7 @@ function HowItPrices({ L }: { L: DeskHandles }) {
   const r = L.rules;
   const nfl = L.id === "nfl";
   return (
-    <details className="glass px-4 py-3" open>
+    <details className="glass px-4 py-3">
       <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">How this desk prices a game</summary>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div className="space-y-2.5">

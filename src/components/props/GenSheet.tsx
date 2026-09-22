@@ -427,7 +427,7 @@ function Slot<P>({
             </span>
           )}
         </div>
-        {l.gameLabel && <div className="mt-1 truncate text-[9px] text-muted">{l.gameLabel} · {gameTimeLabel(l.start)}</div>}
+        {l.gameLabel && <div className="pick-matchup mt-1 truncate text-[9px] text-muted">{l.gameLabel} · {gameTimeLabel(l.start)}</div>}
         <div className="mt-1 text-[9px] text-text" title="Estimated chance of this leg winning. A grade measures value at the posted price, not certainty.">
           {l.src === "market" ? "Market estimate" : "Model probability"} <strong className="num">{l.prob.toFixed(1)}%</strong>
         </div>
@@ -440,7 +440,7 @@ function Slot<P>({
         )}
       </div>
       <div className="flex shrink-0 flex-col items-end leading-none">
-        <span className="num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
+        <span className="pick-price num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
         <span className="mt-[3px] flex items-center gap-1 text-[9px] text-faint">
           {l.src === "market" && <span className="italic">mkt</span>}
           {l.book && l.book !== "CZ" && <span className="uppercase">{l.book}</span>}
@@ -794,9 +794,9 @@ export function GenSheet<P>({
               <option value="styles">Parlay Styles</option><option value="model">The Model</option>
             </select>
           </label>
-          {spec.betType==="model"&&<p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p>}
+
           <div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div>
-          {spec.betType!=="model"&&<p className="text-[9px] text-faint">Styles use probability and value within each market. Stacks need same-game permission; shared-game probabilities are not a joint forecast. Hedge-Friendly favors later starts; hedging is never guaranteed.</p>}
+
 
           {/* per-leg odds band */}
           <div>
@@ -1082,6 +1082,8 @@ export function GenSheet<P>({
           )}
           </div>
           {/* Actions span both desktop columns, beneath the picks. */}
+          {spec.betType==="model"&&<details className="mt-2 text-[10px] text-muted"><summary className="cursor-pointer font-bold">How The Model chooses</summary><p className="text-[10px] text-muted">Engine-ranked combinations within your filters, including F grades and negative EV. Uses model or market estimates as labeled, price, and player diversity—not just shortest odds. Regenerate explores another combination. Shared-game correlation is not modeled.</p></details>}
+          {spec.betType!=="model"&&<details className="mt-2 text-[10px] text-muted"><summary className="cursor-pointer font-bold">About parlay styles</summary><p className="text-[9px] text-faint">Styles use probability and value within each market. Stacks need same-game permission; shared-game probabilities are not a joint forecast. Hedge-Friendly favors later starts; hedging is never guaranteed.</p></details>}
           <div className="gen-actions flex gap-2">
             {(
               <button

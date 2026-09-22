@@ -305,8 +305,8 @@ export function RankedPicks<P>({
                 <div className="min-w-0 flex-1 leading-none">
                   <div className="truncate text-[12px] font-medium text-text">{p.label}</div>
                   <div className="mt-[3px] flex items-center gap-1.5 truncate text-[9.5px] text-faint">
-                    <span className="shrink-0 rounded-sm bg-white/[0.06] px-1 text-[8.5px] font-bold uppercase tracking-wide text-muted">{labelOf(p.market)}</span>
-                    <span className="truncate">{p.sub}</span>
+                    <span className="pick-market shrink-0 rounded-sm bg-white/[0.06] px-1 text-[8.5px] font-bold uppercase tracking-wide text-muted">{labelOf(p.market)}</span>
+                    <span className="pick-matchup truncate">{p.sub}</span>
                     {p.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
                     {p.started && <span className="shrink-0 text-live">LIVE</span>}
                     {p.splits}

@@ -1,3 +1,15 @@
+# September 22 UI release — implementation complete, deployment pending
+
+Owner requested more meaningful color and discoverable controls, separate First Sunday Six page, still forward-facing llama, bottom/collapsed explanations, compact iPhone Stats with full names, landscape safe areas, Games launch, and matching Roster Lab polish retaining green.
+
+Implemented: root redirects to /games and manifest starts there; orientation any and prior portrait blocker removed; 162KB JPEG extracted from existing video at 2 seconds replaces playback. Shared filter toolbar now labeled/color-coded with inward-aligned popups. First Sunday Six lives at /first-sunday-six (Board link), shares existing league queries and defaults upcoming Sunday; no promotion/model changes. Stats combines rank/headshot/full name/team logo/team in one sticky opaque cell. PageHeader help portals to shell footer; Sharp overview/method collapsed below picks; generator help collapsed below ticket. Accent colors distinguish markets, odds and matchup details.
+
+Verification so far: production build passes; 141 focused tests pass (7 files), including live quote regression. Browser: fresh local origin 127.0.0.1:3600, Games redirect; 390x844 Stats shows 13 full rows without name truncation, dropdown fits x107..357 in width390 with Select All/Clear/checkboxes visible. Desktop generator reviewed. A previously registered localhost service worker served old development chunks; use 127.0.0.1 for clean local QA. Production static assets are content hashed. Real iPhone safe-area values cannot be emulated by viewport alone; CSS uses env safe-area insets.
+
+Roster changes are on /Users/josh/Documents/roster-lab-football feat/football, not production pointer yet: emerald gradient panels, semantic filter borders, full-name compact Stats and notch-safe shell. Full 1330 tests pass, build passes, engine drift guard clean. Stage then fast-forward /Users/josh/Documents/Roster-Lab audit/engine-fixes and run scripts/deploy.sh. Handoffs for both must be updated after live checks. No actual betting transactions or pricing model edits.
+
+--- Previous session record ---
+
 ## September 20 11:44 PT — urgent live football generator fix
 
 Owner screenshot: NFL The Model / Live / Anytime TD / four legs / -215 to +5000 yielded 0 rows, 218 dropped, erroneous Refresh MLB copy. Root cause: generator only spun a cached device snapshot; props query did not poll, so per-game live quotes aged beyond the ten-minute eligibility limit. Production GET returned 217 live Anytime TD rows across eight games at 18:40:48Z. Keep freshness protections; do not treat stale pregame prices as live.

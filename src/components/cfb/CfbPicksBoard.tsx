@@ -1,5 +1,6 @@
 "use client";
 import { MultiSelect } from "@/components/props/MultiSelect";
+import Link from "next/link";
 import {FirstSundaySix} from "@/components/nfl/FirstSundaySix";
 import { useLiveClock } from "@/lib/use-live-clock";
 import { footballQuoteCurrent } from "@/lib/football/gen-pool";
@@ -412,7 +413,7 @@ function Mark({
 
 /* ---------- the desk ---------- */
 
-export function CfbPicksBoard() {
+export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={}) {
   const L = useLeague();
   /* the league's own tables and client under the pinned CFB names (see the seam note above) */
   const { props: CFB_PROPS, parlays: CFB_PARLAYS } = L;
@@ -421,6 +422,13 @@ export function CfbPicksBoard() {
   const LIVE_CACHE_MIN = CFB_PROPS.liveRevalidateSec / 60;
   const propsBoardStaleMs = (board: CfbPropsBoard | undefined) => boardStaleMs(board, L.client);
   const { today, date, pick, rail, bankroll, q, slate: rawSlate } = L.useDesk();
+  useEffect(()=>{
+    if(!promotionOnly) return;
+    const sunday=new Date(`${today}T12:00:00Z`);
+    sunday.setUTCDate(sunday.getUTCDate()+(7-sunday.getUTCDay())%7);
+    pick(sunday.toISOString().slice(0,10));
+  },[promotionOnly,today]);
+
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
   const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
@@ -483,7 +491,7 @@ export function CfbPicksBoard() {
   const liveGames = current?.games.filter((g) => g.status === "live").length ?? 0;
   const quota = quotaRemaining();
   /* the desk's accent on the table's market chip and Caesars-line note (both literal class strings) */
-  const marketChip = L.id === "nfl" ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb";
+  const marketChip = "pick-market";
   const accentText = L.id === "nfl" ? "text-nfl" : "text-cfb";
 
   /* PROP MARKET LEAN (2026-09-18): the vig-free share of the settlement book's over/under pair on
@@ -582,11 +590,20 @@ export function CfbPicksBoard() {
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);
   const catIsProp = CATS.find((c) => c.key === cat)?.prop ?? false;
+  if(promotionOnly) return <div className="sunday-six-page space-y-3">
+    <Link replace href="/board" className="board-mode-link">← Back to NFL Board</Link>
+    <div className="sunday-six-hero"><span className="text-gold text-xs font-bold uppercase tracking-widest">Caesars exclusive · weekly promotion</span><h1 className="display text-2xl font-bold">First Sunday Six</h1><p className="text-sm text-muted">Explore the early-slate touchdown race, compare estimated chances and review the weekly bonus-pool scenario.</p></div>
+    <label className="flex items-center gap-3 text-sm font-bold text-gold">Slate date <input aria-label="First Sunday Six slate date" type="date" value={date} onChange={e=>{if(e.target.value)pick(e.target.value);}} className="rounded-lg border border-gold/40 bg-surface px-3 py-2 text-text" /></label>
+    {loading&&<p role="status">Loading NFL slate…</p>}
+    {q.isError&&<p role="alert" className="text-neg">The NFL slate could not be loaded. Try again shortly.</p>}
+    <FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()}/>
+  </div>;
+
 
   return (
     <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
-      {L.id==="nfl"&&<FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()}/>}
+      {L.id==="nfl"&&<Link replace href="/first-sunday-six" className="board-mode-link">★ First Sunday Six <span>Weekly Caesars TD race →</span></Link>}
       <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
       {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
 
@@ -786,7 +803,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12.5px] font-bold leading-tight text-text">{r.label}</div>
           <div className="truncate text-[10px] leading-tight text-faint">
-            <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
+            <span className={`pick-market mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
             {r.sub}
             <SplitsChip split={split} className="ml-1.5" compact />
           </div>
@@ -798,7 +815,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <div className={nfl ? "hero-price is-nfl num mt-0.5" : "hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
+          <div className={nfl ? "pick-price hero-price is-nfl num mt-0.5" : "pick-price hero-price is-cfb num mt-0.5"}>{fmtAmerican(cz.price)}</div>
           <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-faint">{bookName(cz.book)}</div>
           {baseMarketOf(r.market) !== "ml" && cz.line != null && r.line != null && Math.abs(cz.line - r.line) > 1e-9 && (
             <div className={`num text-[9.5px] ${nfl ? "text-nfl" : "text-cfb"}`} title="The selected sportsbook line differs from the consensus line">

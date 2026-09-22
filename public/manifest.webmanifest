@@ -2,9 +2,9 @@
   "name": "Parlay Lab",
   "short_name": "Parlay Lab",
   "description": "MLB betting analytics terminal \u2014 informational only, not betting advice.",
-  "start_url": "/",
+  "start_url": "/games",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#1e2126",
   "theme_color": "#1e2126",
   "icons": [

@@ -345,18 +345,7 @@ function MlbSharpPage() {
         </Panel>
       ) : (
         <div className="space-y-3">
-          {typeof d.overview === "string" && (
-            <Reveal>
-              <Panel title="The engine's own overview">
-                <p className="text-[13px] leading-relaxed text-muted">{d.overview}</p>
-                <div className="num mt-2 border-t border-white/[0.05] pt-2 text-[10.5px] text-faint">
-                  Engine setting: Monte Carlo {SIM_PATHS_TXT} paths per game (live games resume from the real
-                  score/inning/base-out state). The paragraph above is frozen at generation time — refresh for a
-                  current read.
-                </div>
-              </Panel>
-            </Reveal>
-          )}
+
 
           {cal.line && (
             <Reveal>
@@ -692,6 +681,18 @@ function MlbSharpPage() {
             </details>
           </Reveal>
 
+          {typeof d.overview === "string" && (
+            <Reveal>
+              <details className="glass px-4 py-3"><summary className="cursor-pointer font-bold text-muted">The engine's own overview</summary>
+                <p className="text-[13px] leading-relaxed text-muted">{d.overview}</p>
+                <div className="num mt-2 border-t border-white/[0.05] pt-2 text-[10.5px] text-faint">
+                  Engine setting: Monte Carlo {SIM_PATHS_TXT} paths per game (live games resume from the real
+                  score/inning/base-out state). The paragraph above is frozen at generation time — refresh for a
+                  current read.
+                </div>
+              </details>
+            </Reveal>
+          )}
           <Reveal>
             <details className="glass px-4 py-3 opacity-80">
               <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.16em] text-faint">
