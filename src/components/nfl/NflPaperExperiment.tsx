@@ -22,8 +22,8 @@ export function NflPaperExperiment({entries}:{entries:CfbLedgerEntry[]}) {
   const e=replay?.entry; const g=e?cfbGradingOf(e):null;
   return <section className="rounded-2xl border border-nfl/40 bg-nfl/5 p-4 space-y-3">
     <h2 className="font-bold text-sm">Sunday paper experiment · $350 core</h2>
-    <p className="text-xs text-muted">From September 20: full allocation across up to 10 distinct games, ranked by estimated EV. Negative-EV selections are allowed. Game sides and totals only; player props remain in the sandbox. Thin slates use larger equal stakes.</p>
-    <p className="text-xs text-muted">Prospective record: {tickets.length} tickets · {settled.length} settled · ${stake} settled stake · ${pl.toFixed(2)} P/L · Brier {brier===null?'pending':brier.toFixed(3)}. Lower Brier means better probability accuracy. This records evidence; it does not automatically retrain NFL probabilities.</p>
+    <p className="text-xs text-muted">From September 20: full allocation across up to 10 distinct games, ranked by estimated EV. Negative-EV selections are allowed. The September 20 cohort used game sides/totals and equal stakes. Starting September 23, new NFL drafts can include fresh passing, rushing and receiving O/U props, with varied stakes and distinct games. Missing final player stats remain pending before the existing void window; they are never assumed zero.</p>
+    <p className="text-xs text-muted">Original sides-only cohort record: {tickets.length} tickets · {settled.length} settled · ${stake} settled stake · ${pl.toFixed(2)} P/L · Brier {brier===null?'pending':brier.toFixed(3)}. Lower Brier means better probability accuracy. This records evidence; it does not automatically retrain NFL probabilities.</p>
     {error&&<p className="text-xs text-gold">Week 1 replay is temporarily unavailable. Reconnecting automatically.</p>}
     {e&&<details className="rounded-xl border border-line-2 p-3">
       <summary className="cursor-pointer font-bold text-sm">Week 1 replay · $350 core · 10 × $35</summary>

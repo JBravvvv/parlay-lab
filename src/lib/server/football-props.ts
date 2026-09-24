@@ -162,7 +162,7 @@ async function quiet<T>(p: Promise<T>, fallback: T): Promise<T> {
 }
 
 /** the store keys one thin route hands the body — its own literal prefixes */
-export type PropsRouteDeps = { storeKeys: { board: string; spend: string } };
+export type PropsRouteDeps = { forceFresh?: boolean; storeKeys: { board: string; spend: string } };
 
 /** The GET body for one league. `cfg` is required on purpose: a forgotten league is a type error, never a CFB board on the NFL route. */
 export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps: PropsRouteDeps): Promise<NextResponse> {
@@ -176,7 +176,7 @@ export async function footballPropsGet(cfg: LeagueConfig, req: NextRequest, deps
   /* Manual Refresh Board, authenticated with x-pl-sync, re-pulls every selected event,
      including previously empty events, plus fresh slate odds. All US-book quotes are retained
      for instant book switching. Passive reads retain their existing cache/empty-event rules. */
-  const refresh = q.get("refresh") === "1" && syncAuthed(req);
+  const refresh = deps.forceFresh === true || (q.get("refresh") === "1" && syncAuthed(req));
   const now = Date.now();
   const headers = { "cache-control": "no-store" };
 

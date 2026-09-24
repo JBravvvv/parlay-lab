@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useId } from "react";
+import { Fragment, useEffect, useRef, useId } from "react";
 
-export function MultiSelect({ label, options, value, onChange, title, single = false }: { single?: boolean; title?: string; label: string; options: readonly { key: string; label: string }[]; value: readonly string[]; onChange: (value: string[]) => void }) {
+export function MultiSelect({ label, options, value, onChange, title, single = false }: { single?: boolean; title?: string; label: string; options: readonly { key: string; label: string; group?: string }[]; value: readonly string[]; onChange: (value: string[]) => void }) {
   const groupId = useId();
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const all = options.length > 0 && options.every(o => value.includes(o.key));
@@ -48,11 +48,14 @@ export function MultiSelect({ label, options, value, onChange, title, single = f
           <button type="button" className="font-bold text-text" onClick={() => onChange([])}>Clear</button>
         </div>}
         <div className="discovery-options" role={single ? "radiogroup" : "group"} aria-label={`${label} options`}>
-        {options.map(o => (
+        {options.map((o, i) => (
+          <Fragment key={o.key}>
+          {o.group && o.group !== options[i-1]?.group && <div className="px-2 pb-1 pt-3 text-[11px] font-black uppercase tracking-wider text-violet-300">{o.group}</div>}
           <label key={o.key} data-selected={value.includes(o.key)} className="discovery-option flex cursor-pointer items-center justify-between gap-3 text-[11px] font-bold text-text">
             <span className="min-w-0 flex-1">{o.label}</span>
             <input type={single ? "radio" : "checkbox"} name={single ? groupId : undefined} className="ml-auto shrink-0" checked={value.includes(o.key)} onChange={() => {onChange(single ? [o.key] : value.includes(o.key) ? value.filter(v => v !== o.key) : [...value, o.key]); if(single && detailsRef.current){detailsRef.current.open=false;detailsRef.current.querySelector('summary')?.focus();}}} />
           </label>
+          </Fragment>
         ))}
         </div>
       </div>

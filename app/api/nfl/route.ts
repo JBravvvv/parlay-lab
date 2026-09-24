@@ -1,3 +1,4 @@
+import { attachNflPropFinals } from "@/lib/server/football-prop-finals";
 import { NextRequest, NextResponse } from "next/server";
 import { ptToday } from "@/lib/server/pt-date";
 import { syncAuthed } from "@/lib/server/store";
@@ -50,7 +51,9 @@ export async function GET(req: NextRequest) {
 
   if (mode === "finals") {
     try {
-      return NextResponse.json(finalsFromEspnOf(NFL_LEAGUE, date, espn, now, bankroll), { headers: { "cache-control": "no-store" } });
+      const result=finalsFromEspnOf(NFL_LEAGUE, date, espn, now, bankroll);
+      if(q.get("playerStats")==="1" && date>="2026-09-23") await attachNflPropFinals(result.finals);
+      return NextResponse.json(result, { headers: { "cache-control": "no-store" } });
     } catch (e) {
       return NextResponse.json({ error: `finals failed: ${(e as Error).message}` }, { status: 502 });
     }

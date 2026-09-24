@@ -8,7 +8,7 @@ import type { Grade } from "@/lib/grade";
 import { H1_ODDS_MARKET_KEYS } from "./markets";
 import type { CfbQuote, CfbStatus } from "./types";
 
-export type CfbPropMarket = "anytime_td" | "pass_tds" | "pass_yds" | "receptions" | "rush_yds" | "rec_yds" | "receptions_alt" | "pass_tds_alt" | "first_td" | "tds_over";
+export type CfbPropMarket = "anytime_td" | "pass_tds" | "pass_yds" | "receptions" | "rush_yds" | "rec_yds" | "receptions_alt" | "pass_tds_alt" | "rush_yds_alt" | "rec_yds_alt" | "first_td" | "tds_over";
 
 export const CFB_PROP_MARKETS: readonly {
   id: CfbPropMarket;
@@ -28,6 +28,8 @@ export const CFB_PROP_MARKETS: readonly {
   { id: "rec_yds", odds: "player_reception_yds", label: "Rec Yds", short: "RCY", kind: "ou", stat: "receiving" },
   { id: "receptions_alt", odds: "player_receptions_alternate", label: "Receptions X+", short: "REC+", kind: "ladder", stat: "receiving" },
   { id: "pass_tds_alt", odds: "player_pass_tds_alternate", label: "Pass TDs X+", short: "PTD+", kind: "ladder", stat: "passing" },
+  { id: "rush_yds_alt", odds: "player_rush_yds_alternate", label: "Rush YDs X+", short: "RYD+", kind: "ladder", stat: "rushing" },
+  { id: "rec_yds_alt", odds: "player_reception_yds_alternate", label: "Rec YDs X+", short: "RCY+", kind: "ladder", stat: "receiving" },
   { id: "first_td", odds: "player_1st_td", label: "First TD", short: "1TD", kind: "yes", stat: "td" },
   { id: "tds_over", odds: "player_tds_over", label: "2+ TDs / TD ladders", short: "TD+", kind: "ladder", stat: "td" },
 ] as const;
@@ -150,7 +152,7 @@ export type CfbParlayView = "parlays" | "mixed" | "live";
     (a live leg beside pregame legs) and LIVE (in-play legs only). INSTRUCTION 44 (2026-09-05):
     the single-market sets and COMBOS draw from pregame AND in-game legs. Up to CFB_PARLAYS.perCategory
     ranked tickets each. */
-export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "receptions_alt", "pass_tds_alt", "first_td", "tds_over", "combo", "mixed", "live"] as const;
+export const CFB_PARLAY_CATEGORIES = ["ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", "anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "receptions_alt", "pass_tds_alt", "rush_yds_alt", "rec_yds_alt", "first_td", "tds_over", "combo", "mixed", "live"] as const;
 export type CfbParlayCategory = (typeof CFB_PARLAY_CATEGORIES)[number];
 
 export type CfbParlayLeg = {

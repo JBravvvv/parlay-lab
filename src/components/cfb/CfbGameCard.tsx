@@ -1,4 +1,6 @@
 "use client";
+import { GameSuggestedPicks } from "./GameSuggestedPicks";
+import { Overlay } from "@/components/ui/Overlay";
 
 import type { KeyboardEvent, ReactNode } from "react";
 import { EdgeMeter } from "@/components/ui/EdgeMeter";
@@ -244,7 +246,7 @@ export function CfbGameCard({
 
   /* the +EV sides at the selected book, best first — the everyday bettor's "what's the play here" */
   const edges = orderedRows(game)
-    .filter((r) => (r.evCz ?? -1) > 0)
+    .filter((r) => !isH1Market(r.market) && (r.evCz ?? -1) > 0)
     .sort((a, b) => (b.evCz ?? 0) - (a.evCz ?? 0));
 
   const meta: ReactNode[] = [];
@@ -289,7 +291,7 @@ export function CfbGameCard({
           )}
           {game.tv && !isLive && <span className="truncate text-[9.5px] font-medium normal-case tracking-normal text-faint">{game.tv}</span>}
         </div>
-        <span className="shrink-0 text-[9.5px] font-medium text-faint">{expanded ? "Less ▴" : "Model ▾"}</span>
+        <span className="shrink-0 text-[9.5px] font-medium text-faint">{"Game details ↗"}</span>
       </div>
 
       <div className="px-3 pb-3">
@@ -307,7 +309,7 @@ export function CfbGameCard({
             </div>
           </>
         ) : (
-          <OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} />
+          <OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows.slice(0, 2)} />
         )}
 
         {!isFinal && edges.length > 0 && (
@@ -337,7 +339,7 @@ export function CfbGameCard({
         )}
       </div>
 
-      {expanded && <Expanded game={game} />}
+      <Overlay open={expanded} onClose={onToggle} title={`${game.away.abbr} @ ${game.home.abbr} · Game details`} size="full" tone={L.id}><OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} /><GameSuggestedPicks game={game}/><Expanded game={game} /></Overlay>
     </article>
   );
 }

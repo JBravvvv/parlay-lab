@@ -1065,3 +1065,38 @@ body::after {
  .desk-content { margin-left:calc(200px + env(safe-area-inset-left)); }
 }
 .discovery-select { flex:1 1 140px; }
+
+/* iPhone/PWA presentation is independent of the desktop desk. */
+@media (max-width: 767px) {
+  .phone-header { background: #171e28 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; border-bottom: 1px solid #53657c; isolation: isolate; }
+  .phone-header-action { display:flex; align-items:center; justify-content:center; min-width:36px; min-height:40px; color:#f3f7ff !important; background:#293544; border:1px solid #60718a; }
+  .phone-header .segmented { background:#283548; border-color:#60718a; }
+  .phone-header .segmented button { min-height:36px; color:#f3f7ff; font-weight:800; }
+  [data-desk-page^="/board"] .carousel { margin-left:0 !important; margin-right:0 !important; padding-left:0 !important; padding-right:0 !important; width:100%; }
+  [data-desk-page="/builder"] .ticket { padding:10px; }
+  [data-desk-page="/builder"] .ticket .hero-price { font-size:20px; }
+  .board-nav-choices { animation: fade-up .16s ease-out; }
+}
+
+@media (max-width:767px) {
+ .phone-board-overview { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); gap:8px; align-items:start; }
+ .phone-board-overview > * { min-width:0; }
+ .phone-board-overview .board-summary { grid-template-columns:minmax(0,1fr); gap:4px; }
+ .phone-board-overview .board-summary > * { padding:6px !important; }
+ .phone-board-overview .board-summary p { font-size:9px; line-height:1.2; }
+ .phone-board-overview .discovery-trigger { padding:8px; min-height:42px; gap:4px; }
+ .phone-board-overview .discovery-trigger-label { font-size:9px; }
+ .phone-board-overview .discovery-select { flex-basis:100%; }
+ .phone-board-overview .discovery-menu { width:min(300px,calc(100vw - 36px)); }
+}
+
+@media(max-width:767px){
+ .phone-board-overview .discovery-filters > .flex { display:flex !important; flex-direction:column; }
+ .phone-board-overview .discovery-select { flex:0 0 auto !important; width:100%; }
+ .phone-board-overview .board-summary > * > :last-child { display:none; }
+ .phone-board-overview .board-summary { align-self:stretch; }
+ [data-desk-page="/builder"] [data-testid="cfb-ticket"] .ticket > header { display:none; }
+ [data-desk-page="/builder"] [data-testid="cfb-ticket"] .ticket-tear { margin:4px 0; }
+}
+
+@media(min-width:768px){ .phone-board-overview > .board-summary { margin-top:8px; } }

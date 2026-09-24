@@ -48,6 +48,8 @@ export function Overlay({ open, onClose, title, children, size = "sixty", tone =
   const reduced = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<Element | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = useId();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -57,23 +59,33 @@ export function Overlay({ open, onClose, title, children, size = "sixty", tone =
     if (!open) return;
     openerRef.current = document.activeElement;
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Tab") {
+        const nodes = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button, a[href], input, select, textarea, summary, [tabindex="0"]') ?? []).filter(el => el.getClientRects().length && !el.hasAttribute("disabled"));
+        const first=nodes[0], last=nodes[nodes.length-1];
+        if (!first) { e.preventDefault(); return; }
+        if (e.shiftKey && (document.activeElement===first || document.activeElement===panelRef.current)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement===last) { e.preventDefault(); first.focus(); }
+      }
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const savedY=window.scrollY;
+    const body=document.body;
+    const previous={overflow:body.style.overflow,position:body.style.position,top:body.style.top,left:body.style.left,right:body.style.right,width:body.style.width};
+    Object.assign(body.style,{overflow:"hidden",position:"fixed",top:`-${savedY}px`,left:"0",right:"0",width:"100%"});
     const raf = requestAnimationFrame(() => panelRef.current?.focus({ preventScroll: true }));
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      Object.assign(body.style,previous);
+      if(previous.position!=="fixed") window.scrollTo(0,savedY);
       cancelAnimationFrame(raf);
       const opener = openerRef.current;
       if (opener instanceof HTMLElement) opener.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!mounted) return null;
 

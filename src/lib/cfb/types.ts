@@ -1,3 +1,4 @@
+import type { CfbPropMarket, CfbPropsBoard } from "./props-types";
 import type { Grade } from "@/lib/grade";
 import type { SyncEntry, SyncTicket } from "@/lib/ledger-merge";
 import type { League, LeagueConfig, LeagueRules } from "@/lib/football/league";
@@ -183,6 +184,7 @@ export type CfbGame = {
 };
 
 export type CfbBoard = {
+  paperProps?: CfbPropsBoard | null;
   /** the Pacific date the slate is for */
   date: string;
   /** every Pacific date with an upcoming event in the odds feed, ascending (the date rail) */
@@ -208,7 +210,7 @@ export type CfbTicketLeg = {
   gkey: string;
   /** row.key */
   lkey: string;
-  market: CfbMarketKey;
+  market: CfbMarketKey | CfbPropMarket;
   side: CfbSideKey;
   line: number | null;
   teamId: string | null;
@@ -429,7 +431,7 @@ export type CfbCard = {
 };
 
 /** Final scores keyed by ESPN event id, for grading. */
-export type CfbFinals = Record<string, { home: number; away: number; final: boolean; status: CfbStatus; h1?: CfbH1Final }>;
+export type CfbFinals = Record<string, { home: number; away: number; final: boolean; status: CfbStatus; h1?: CfbH1Final; playerStats?: Record<string, Record<string, number>> }>;
 /** the first-half score of a game, for grading its 1H legs — present only when ESPN posted both halves' quarters */
 export type CfbH1Final = { home: number; away: number; final: boolean };
 

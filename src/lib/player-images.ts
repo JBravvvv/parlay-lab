@@ -3,7 +3,8 @@ import {defenseClub} from "./football/defense";
 export type ImageLeague = "mlb" | "nfl" | "cfb";
 export type ImageTeam = { id: string; abbr: string; name: string; logo: string | null; color: string | null; rank: null };
 export type PlayerImage = { id: string; name: string; position: string | null; team: ImageTeam; srcs: string[] };
-export const imageNameKey = (name: string) => name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\.?$/g, "").replace(/[^a-z0-9]/g, "");
+const imageAlias = (name:string) => /^zonovan\s+knight$/i.test(name.trim()) ? "Bam Knight" : name;
+export const imageNameKey = (name: string) => imageAlias(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\.?$/g, "").replace(/[^a-z0-9]/g, "");
 export const imageTeamKey = (team: string) => ({ WAS:"WSH", JAC:"JAX", LA:"LAR", ATH:"OAK", CWS:"CHW" }[team.toUpperCase()] ?? team.toUpperCase());
 
 const nameIndexes = new WeakMap<readonly PlayerImage[], Map<string, PlayerImage[]>>();

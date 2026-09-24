@@ -250,7 +250,7 @@ describe("GET /api/nfl/props — a fresh pull", () => {
     expect(fetchMock).toHaveBeenCalledTimes(13);
     for (const [url, init] of fetchMock.mock.calls) {
       expect(String(url)).toMatch(
-        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1&oddsFormat=american$/,
+        /^https:\/\/api\.the-odds-api\.com\/v4\/sports\/americanfootball_nfl\/events\/[^/]+\/odds\?apiKey=test-key-never-logged&regions=us&markets=player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_rush_yds_alternate,player_reception_yds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1&oddsFormat=american$/,
       );
       expect(String(url)).not.toContain("ncaaf");
       expect(init).toEqual({ next: { revalidate: NFL_PROPS.revalidateSec } });
@@ -443,7 +443,7 @@ describe("source pins", () => {
     expect(body).toMatch(/cfg\.feeds\.oddsEventBase/);
     expect(body).toMatch(/cfg\.feeds\.oddsPropMarkets/);
     expect(body).toMatch(/cfg\.props\.regions/);
-    expect(body).toMatch(/cfg\.props\.maxEvents, cfg\.props\.liveMaxEvents/);
+    expect(body).toMatch(/refresh \? slate\.games\.length : cfg\.props\.maxEvents, refresh \? slate\.games\.length : cfg\.props\.liveMaxEvents/);
     expect(body).toMatch(/propsStore\(deps\.storeKeys\)/);
     expect(body).toMatch(/loadPropsContext\(cfg\)/);
     expect(body).toMatch(/props: cfg\.props, rules: cfg\.rules/);

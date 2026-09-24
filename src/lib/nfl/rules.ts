@@ -33,6 +33,7 @@ export const NFL_PAPER = {
 
 export const NFL_RULES = {
   sundayPaperSince: "2026-09-20",
+  variedPaperSince: "2026-09-23",
   /** a core leg needs this % EV at Caesars */
   minEvPct: 2,
   maxLegs: 2,
@@ -292,7 +293,7 @@ export const NFL_LEAGUE: LeagueConfig = {
     oddsSportKey: "americanfootball_nfl",
     oddsUrl: NFL_ODDS_URL,
     oddsEventBase: "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/events",
-    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1",
+    oddsPropMarkets: "player_anytime_td,player_pass_tds,player_pass_yds,player_receptions,player_rush_yds,player_reception_yds,player_receptions_alternate,player_pass_tds_alternate,player_rush_yds_alternate,player_reception_yds_alternate,player_1st_td,player_tds_over,h2h_h1,spreads_h1,totals_h1",
     espnScoreboard: NFL_ESPN_SCOREBOARD,
     espnScoreboardQuery: "limit=100",
     espnFpi: NFL_ESPN_FPI,

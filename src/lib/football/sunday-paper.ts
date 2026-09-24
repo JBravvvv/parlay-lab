@@ -5,5 +5,5 @@ export function isSundayPaper(rules: LeagueRules, date: string): boolean {
 }
 
 export function isFullPaper(rules: LeagueRules, date: string): boolean {
-  return (!!rules.fullPaperSince && date >= rules.fullPaperSince) || isSundayPaper(rules, date);
+  return (!!rules.variedPaperSince && date >= rules.variedPaperSince) || (!!rules.fullPaperSince && date >= rules.fullPaperSince) || isSundayPaper(rules, date);
 }

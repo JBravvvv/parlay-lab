@@ -26,4 +26,4 @@ export const imageCatalog = unstable_cache(async (league: ImageLeague, ids: stri
     catch { /* ESPN portraits remain usable if Sleeper is unavailable. */ }
   }
   return players;
-},["roster-lab-player-imagery-v2"],{revalidate:3600});
+},["roster-lab-player-imagery-v3"],{revalidate:3600});

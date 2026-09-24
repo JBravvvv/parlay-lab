@@ -110,8 +110,8 @@ export function makeClient(cfg: ClientConfig): DeskClient {
   }
 
   /** Scores only — the grader's feed. Never touches the odds quota. */
-  async function loadFinals(date: string): Promise<{ date: string; finals: CfbFinals }> {
-    const p = new URLSearchParams({ date, mode: "finals" });
+  async function loadFinals(date: string, includePlayerStats = false): Promise<{ date: string; finals: CfbFinals }> {
+    const p = new URLSearchParams({ date, mode: "finals", ...(includePlayerStats ? { playerStats: "1" } : {}) });
     const { body } = await getJson<{ date: string; finals: CfbFinals }>(`${cfg.routes.slate}?${p.toString()}`, prefix);
     return body;
   }

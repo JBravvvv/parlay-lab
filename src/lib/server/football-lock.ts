@@ -1,3 +1,4 @@
+import { attachNflPropFinals } from "./football-prop-finals";
 import { assertAppendOnly } from "@/lib/append-only";
 import { MAX_BYTES, mergeLedgers, type SyncEntry } from "@/lib/ledger-merge";
 import { validateBankStore, type BankStore } from "@/lib/bankroll";
@@ -307,6 +308,7 @@ export async function settlePass(cfg: LeagueConfig, keys: LockKeys, args: Settle
       attemptedDates.add(e.date);
       const espn = await args.feeds.espnEvents(e.date);
       const { finals } = args.feeds.finalsFromEspn(e.date, espn, args.now, args.bankroll);
+      if(cfg.id==="nfl") await attachNflPropFinals(finals,[...e.core,...e.funT].flatMap(t=>t.legs.filter(l=>l.player).map(l=>l.gkey)));
       const inc = gradeCfbEntry(e, finals, args.now, cfg);
       const merged = overlayCfbGrading(e.grading, inc, e);
       if (!merged) {

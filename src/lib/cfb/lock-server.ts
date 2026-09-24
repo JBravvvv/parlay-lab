@@ -182,7 +182,7 @@ export function assertCardMoney(cfg: LeagueConfig, card: CfbCard): void {
     throw new Error(`${cfg.short} MONEY GUARD: the card carries ${card.core.length} core tickets but ${cfg.short}_RULES.tickets.max is ${rules.tickets.max}. Nothing written. STOP.`);
   }
   for (const t of card.core) {
-    const maxStake = isFullPaper(rules, card.date) && (t.paperPolicy === "sunday-full-v1" || t.paperPolicy === "full-core-v1")
+    const maxStake = isFullPaper(rules, card.date) && (t.paperPolicy === "sunday-full-v1" || t.paperPolicy === "full-core-v1" || t.paperPolicy === "nfl-variety-v2")
       ? Math.max(rules.maxStake, Math.ceil(paper.daily / Math.max(1, card.core.length))) : rules.maxStake;
     if (!Number.isFinite(t.stake) || t.stake < rules.minStake - MONEY_EPS || t.stake > maxStake + MONEY_EPS) {
       throw new Error(

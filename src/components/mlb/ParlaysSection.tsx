@@ -168,7 +168,6 @@ export function ParlaysSection({
             {VIEWS.map(([v,label])=><option key={v} value={v}>{label} · {(lists[v]??[]).length}</option>)}
           </select>
         </label>
-        <div className="mb-3 text-[11px] text-muted">{view==="all"?"All timing and market sets — narrow with the dropdowns above.":VIEWS.find(([v]) => v === view)![2]}</div>
 
         {all.length === 0 ? (
           <Panel>

@@ -48,7 +48,7 @@ describe("nfl-board-ui — the NFL wrappers are thin", () => {
   }
   it("NflPicksBoard also exports the header's NflRefreshPill; NflFpiPanel forwards every prop", () => {
     const board = stripComments(read(path.join(NFL_DIR, "NflPicksBoard.tsx")));
-    expect(board).toMatch(/export function NflPicksBoard\(\)/);
+    expect(board).toMatch(/export function NflPicksBoard\(/);
     expect(board).toMatch(/export function NflRefreshPill\(\)/);
     expect(board).toMatch(/<CfbRefreshPill \/>/);
     const fpi = stripComments(read(path.join(NFL_DIR, "NflFpiPanel.tsx")));
@@ -94,8 +94,8 @@ describe("nfl-board-ui — the shared surfaces read the league off useLeague()",
       expect(src, f).toContain(cfbClass);
     }
     const board = stripComments(read(path.join(CFB_DIR, "CfbPicksBoard.tsx")));
-    expect(board).toContain('"hero-price is-nfl num mt-0.5"');
-    expect(board).toContain('"hero-price is-cfb num mt-0.5"');
+    expect(board).toContain('"pick-price hero-price is-nfl num mt-0.5"');
+    expect(board).toContain('"pick-price hero-price is-cfb num mt-0.5"');
     const props = stripComments(read(path.join(CFB_DIR, "CfbProps.tsx")));
     expect(props).toContain('"odds-grid is-nfl"');
     expect(props).toContain('"odds-grid is-cfb"');
@@ -169,7 +169,7 @@ describe("nfl-board-ui — NflPicksBoard renders the NFL desk's copy", () => {
     expect(html).not.toMatch(/\bis-cfb\b/);
     expect(html).not.toMatch(/\btext-cfb\b/);
     const pill = withQuery(createElement(NflRefreshPill));
-    expect(pill).toContain("Refresh Board");
+    expect(pill).toContain("Generate Board");
     expect(pill).toContain('data-testid="cfb-refresh-board"');
   });
 });

@@ -1,3 +1,6 @@
+import { imageNameKey } from "@/lib/player-images";
+import { priceFootballProp } from "@/lib/sportsbook/football";
+import { CFB_PROP_MARKETS } from "./props-types";
 import { decFromAmerican } from "@/engine2/devig";
 import { decToAm } from "@/lib/ticket-math";
 import { CFB_RULES } from "@/lib/cfb/rules";
@@ -232,18 +235,38 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
      it is the core body byte for byte. See the docblock above `buildCfbCard` for why the core's
      verdict may not be applied to the fun bucket's money. */
   const sundayPaper = isFullPaper(R, board.date);
-  const policy = R.fullPaperSince ? "full-core-v1" : "sunday-full-v1";
-  const policyLabel = R.fullPaperSince ? "Full core" : "Sunday";
+  const varied = !!R.variedPaperSince && board.date >= R.variedPaperSince;
+  const policy = varied ? "nfl-variety-v2" : R.fullPaperSince ? "full-core-v1" : "sunday-full-v1";
+  const policyLabel = varied ? "NFL variety" : R.fullPaperSince ? "Full core" : "Sunday";
   if (sundayPaper) {
     // A fixed-budget paper cohort: rank real, pregame single bets by estimated EV,
     // diversify across games, then equal-weight. No outcome or current score is read.
     const eligible = playable.filter(r => Number.isFinite(r.evCz) && r.cz!.dec > 1 && r.cz!.dec <= R.maxDec);
-    const singles = drafts([...bestPerGame(eligible, [], () => "").values()], games, R.maxDec, 1)
+    let singles = drafts([...bestPerGame(eligible, [], () => "").values()], games, R.maxDec, 1)
       .sort((a, b) => byEv(a, b) || a.rows[0].key.localeCompare(b.rows[0].key));
+    if (varied) {
+      const props = (board.paperProps?.rows ?? []).map(r => priceFootballProp(r, "draftkings", opts.bankroll, R)).filter(r => {
+        const g=games.get(r.gameId); const stamp=Date.parse(board.paperProps?.pricedAt?.[r.gameId] ?? "");
+        return board.paperProps?.date===board.date && r.teamId && g && [g.home.id,g.away.id].includes(r.teamId) && g.status==="upcoming" && !kicked(g) && ["pass_yds","pass_tds","rush_yds","receptions","rec_yds"].includes(r.market) && r.side!=="yes" && r.line!=null && r.line%1===0.5 && r.cz && r.cz.line===r.line && r.cz.dec<=R.maxDec && r.cz.dec>1 && r.fair!=null && r.fair>0 && r.fair<1 && Number.isFinite(r.evCz) && Number.isFinite(stamp) && stamp<=opts.now && opts.now-stamp<=30*60_000;
+      }).sort((a,b)=>(b.evCz??-Infinity)-(a.evCz??-Infinity)||a.key.localeCompare(b.key));
+      const propDrafts: Draft[] = props.map(r=>({legs:[{label:r.label,prop:CFB_PROP_MARKETS.find(m=>m.id===r.market)!.label,cz:r.cz!.price,gkey:r.gameId,lkey:r.key,market:r.market,side:r.side as "over"|"under",line:r.line,teamId:r.teamId,player:r.player,headshot:r.headshot,pos:r.pos,teamAbbr:r.teamAbbr,prob:r.fair!,push:0}],games:[r.gameId],dec:r.cz!.dec,prob:r.fair!,ev:r.evCz!,rows:[]}));
+      const selected:Draft[]=[];const used=new Set<string>();const players=new Set<string>();
+      const add=(d:Draft)=>{const player=d.legs[0].player; if(used.has(d.games[0]) || (player && players.has(imageNameKey(player)))) return; selected.push(d);used.add(d.games[0]);if(player)players.add(imageNameKey(player));};
+      // Reserve up to three distinct games for supported, fresh O/U props; remaining slots compete on EV.
+      for(const d of propDrafts){if(selected.length>=Math.min(3,R.tickets.max))break;add(d);}
+      for(const d of [...singles,...propDrafts].sort(byEv)){if(selected.length>=R.tickets.max)break;add(d);}
+      singles=selected.sort(byEv);
+      notes.push(`Variety v2: ${selected.filter(d=>d.legs[0].player).length} fresh O/U prop singles; distinct games and players. Props use market-consensus estimates. Missing or older-than-30-minute quotes stay out; sides fill available slots.`);
+    }
     const n = Math.min(singles.length, R.tickets.max, Math.floor(opts.daily / R.minStake));
     if (n) {
       const base = Math.floor(opts.daily / n);
-      for (let i = 0; i < n; i++) picked.push({ d: singles[i], stake: base + (i < opts.daily - base * n ? 1 : 0) });
+      const stakes=Array(n).fill(varied ? Math.min(R.minStake,base) : base) as number[];
+      if(varied){let left=opts.daily-stakes.reduce((a,b)=>a+b,0); const cap=Math.max(R.maxStake,Math.ceil(opts.daily/n)); const weights=singles.slice(0,n).map((d,i)=>Math.max(1,n-i)*Math.max(.1,d.prob)); const total=weights.reduce((a,b)=>a+b,0);
+        const target=weights.map(w=>opts.daily*w/total);
+        while(left>0){let best=-1;for(let i=0;i<n;i++)if(stakes[i]<cap && (best<0 || target[i]-stakes[i]>target[best]-stakes[best]))best=i;if(best<0)break;stakes[best]++;left--;}
+      }else for(let i=0;i<opts.daily-base*n;i++)stakes[i]++;
+      for (let i = 0; i < n; i++) picked.push({ d: singles[i], stake: stakes[i] });
       notes.push(`${policyLabel} paper allocation: $${opts.daily} across ${n} distinct games. Ranked by estimated EV; full allocation can include negative-EV picks. This cohort is an experiment, not a positive-edge claim.`);
       if (Math.ceil(opts.daily / n) > R.maxStake) notes.push(`Thin slate: equal-weight stakes exceed the usual $${R.maxStake} cap to meet the requested ${policyLabel.toLowerCase()} paper budget.`);
     } else notes.push(`${policyLabel} paper allocation blocked: no verified pregame single under ${R.maxDec} decimal. Missing prices and started games are never invented or backdated.`);

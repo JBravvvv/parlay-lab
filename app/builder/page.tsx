@@ -403,7 +403,7 @@ export default function BuilderPage() {
     return (
       <>
         <PageHeader
-          title="Builder"
+          title="The Card"
           eyebrow="College Football"
           chip={<CfbChip />}
           sub="A CFB paper card with full core allocation from September 14, including forced selections — its own bank and its own ledger, never mixed with MLB."
@@ -418,10 +418,10 @@ export default function BuilderPage() {
     return (
       <>
         <PageHeader
-          title="Builder"
+          title="The Card"
           eyebrow="National Football League"
           chip={<NflChip />}
-          sub="An NFL paper card with full Sunday allocation from September 20, including forced selections — its own bank and its own ledger, never mixed with MLB or CFB."
+          sub="An NFL paper card with full Sunday allocation, varied stakes and fresh O/U props alongside game picks — its own bank and its own ledger, never mixed with MLB or CFB."
         />
         <NflBuilder />
       </>
@@ -716,7 +716,7 @@ function MlbBuilderPage() {
   return (
     <>
       <PageHeader
-        title="Builder"
+        title="The Card"
         sub={
           sport === "ufc"
             ? "UFC — build any parlay from the card's DraftKings moneylines, priced against market consensus"

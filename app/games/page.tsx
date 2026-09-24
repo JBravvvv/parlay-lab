@@ -1,4 +1,6 @@
 "use client";
+import { Overlay } from "@/components/ui/Overlay";
+import { GameDetail } from "@/components/games/GameDetail";
 import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -258,6 +260,7 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
         <span className="flex min-w-0 items-center truncate">{header}{dh}</span>
         <Link
           href={`/games/${g.pk}?date=${date}`}
+          onClick={e=>{e.preventDefault();setOpen(true);}}
           replace
           className="inline-flex min-h-[32px] shrink-0 items-center rounded-full border border-line-2 bg-white/[0.04] px-3 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-muted transition-[transform,background,color] duration-(--dur-fast) hover:bg-white/[0.08] hover:text-text active:scale-[0.96]"
         >
@@ -279,26 +282,7 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
           ⌄
         </span>
       </button>
-      {open && (
-        <div id={panelId} className="space-y-2 border-t border-white/[0.06] px-3 py-2.5 text-[11px] leading-snug text-muted">
-          {ex.linescore && g.linescore && (
-            <LinescoreTable
-              ls={{ ...g.linescore, xBottom: xBottomOf(g.linescore, g.status) }}
-              away={g.away.abbr}
-              home={g.home.abbr}
-              winner={g.status === "final" ? ((g.away.score ?? 0) > (g.home.score ?? 0) ? "away" : (g.home.score ?? 0) > (g.away.score ?? 0) ? "home" : null) : null}
-            />
-          )}
-          {sub && <div className="num">{sub}</div>}
-          {ex.venue && (
-            <div className="text-faint">
-              {g.broadcasts.join(", ")}
-              {g.broadcasts.length > 0 && g.venue ? " · " : ""}
-              {g.venue}
-            </div>
-          )}
-        </div>
-      )}
+      <Overlay open={open} onClose={()=>setOpen(false)} title={`${g.away.abbr} @ ${g.home.abbr} · ${cardLinkLabel(g.status)}`} size="full">{open && <GameDetail pk={String(g.pk)} qDate={date} embedded/>}</Overlay>
     </article>
   );
 }

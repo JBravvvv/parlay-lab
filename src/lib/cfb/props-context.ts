@@ -140,6 +140,7 @@ export function ctxFor(line: CfbSeasonLine | undefined, market: CfbPropMarket): 
     case "pass_tds":
       season = line.passTds;
       break;
+    case "rush_yds_alt":
     case "rush_yds":
       season = line.rushYds;
       break;
@@ -147,6 +148,7 @@ export function ctxFor(line: CfbSeasonLine | undefined, market: CfbPropMarket): 
     case "receptions":
       season = line.rec;
       break;
+    case "rec_yds_alt":
     case "rec_yds":
       season = line.recYds;
       break;

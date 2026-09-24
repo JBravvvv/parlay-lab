@@ -112,11 +112,11 @@ describe("RankedPicks — every pick today, S down", () => {
     expect(out).toMatch(/data-ranked-pick="a-ml"[\s\S]*?aria-pressed="true"/);
   });
 
-  it("pages at RANKED_PAGE rows with a 'Show N more · M left' button", () => {
+  it("starts with 10 rows and offers Load 10 More", () => {
     const many = Array.from({ length: RANKED_PAGE + 25 }, (_, i) => row(`p${i}`, "ml", 1 + (i % 9)));
     const out = render({ picks: many });
     expect(count(out, /data-ranked-pick="/g)).toBe(RANKED_PAGE);
-    expect(out).toContain(`Show 25 more · 25 left`);
+    expect(out).toContain(`Load 10 More.. · 25 left`);
     expect(render()).not.toContain("more ·");
   });
 

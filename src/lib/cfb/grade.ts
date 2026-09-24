@@ -1,3 +1,5 @@
+import { imageNameKey } from "@/lib/player-images";
+import { PAPER_PROP_STATS } from "@/lib/football/prop-settlement";
 import { decFromAmerican } from "@/engine2/devig";
 import { baseMarketOf, isH1Market, type CfbFullMarketKey } from "@/lib/cfb/markets";
 import { CFB_LEAGUE } from "@/lib/cfb/rules";
@@ -121,10 +123,17 @@ export function gradeCfbLeg(leg: CfbTicketLeg, f: CfbFinals[string] | undefined)
     return gradeSides(baseMarketOf(leg.market), leg, home, away, `1H ${home}-${away}`);
   }
   if (!f.final) return { result: "pending", detail: f.status === "postponed" ? "postponed" : "not final" };
+  if(leg.market in PAPER_PROP_STATS){
+    const stat=leg.player && leg.teamId ? f.playerStats?.[`${leg.teamId}|${imageNameKey(leg.player)}`]?.[PAPER_PROP_STATS[leg.market]] : undefined;
+    if(stat==null || !Number.isFinite(stat) || leg.line==null)return {result:"pending",detail:"final player statistic unavailable"};
+    const delta=leg.side==="under"?leg.line-stat:stat-leg.line;
+    return {result:delta>0?"won":delta<0?"lost":"push",detail:`${leg.player} ${stat} · ${leg.side} ${leg.line}`};
+  }
+  if(!["ml","spread","total"].includes(leg.market)) return {result:"pending",detail:"unsupported prop settlement"};
   const home = readScore(f.home);
   const away = readScore(f.away);
   if (home === null || away === null) return { result: "pending", detail: "score unavailable" };
-  return gradeSides(baseMarketOf(leg.market), leg, home, away, `${home}-${away}`);
+  return gradeSides(leg.market as CfbFullMarketKey, leg, home, away, `${home}-${away}`);
 }
 
 /** the side settlement on a (home, away) score — the full game's final or the first half's half-time score, `score` the label the detail opens with */

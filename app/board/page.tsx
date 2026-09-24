@@ -1,4 +1,5 @@
 "use client";
+import { usePathname } from "next/navigation";
 import { amToDec } from "@/lib/ticket-math";
 import { PickContext } from "@/components/props/PickContext";
 import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
@@ -115,12 +116,13 @@ const CAT_LABELS: Record<string, string> = {
 };
 
 export default function BoardPage() {
+  const parlaysOnly = usePathname().endsWith("/parlays");
   const desk = useSport();
   if (CFB_ENABLED && desk === "cfb") {
     return (
       <>
         <PageHeader
-          title="Board"
+          title={parlaysOnly ? "Generated Parlays" : "Board"}
           eyebrow="College Football"
           chip={<CfbChip />}
           /* JOSH (2026-09-19): "It should show the time of last board refresh." — the stamp of the board on screen,
@@ -134,7 +136,7 @@ export default function BoardPage() {
           subMobile={<CfbBoardStamp phone />}
           action={<CfbRefreshPill />}
         />
-        <CfbPicksBoard />
+        <CfbPicksBoard parlaysOnly={parlaysOnly}/>
       </>
     );
   }
@@ -144,7 +146,7 @@ export default function BoardPage() {
     return (
       <>
         <PageHeader
-          title="Board"
+          title={parlaysOnly ? "Generated Parlays" : "Board"}
           eyebrow="National Football League"
           chip={<NflChip />}
           sub={
@@ -156,13 +158,13 @@ export default function BoardPage() {
           subMobile={<NflBoardStamp phone />}
           action={<NflRefreshPill />}
         />
-        <NflPicksBoard />
+        <NflPicksBoard parlaysOnly={parlaysOnly}/>
       </>
     );
   }
-  return <MlbBoardPage />;
+  return <MlbBoardPage parlaysOnly={parlaysOnly}/>;
 }
-function MlbBoardPage() {
+function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   const { data: board, isPending, isError, refetch } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -1220,10 +1222,11 @@ function MlbBoardPage() {
           : (cats[k] ?? []).length
       : null;
 
+  if (parlaysOnly) return <><PageHeader title="Generated Parlays"/><a href="/board" className="board-mode-link">← Board picks</a>{d ? <ParlaysSection date={board?.date} gameInfo={d.gameInfo} parlays={d.parlays??[]} mixed={d.parlaysMixed??[]} live={d.parlaysLive??[]} legNow={legLive} legOut={l=>isOut(l.label,marketOfLkey(l.lkey),l.gkey)} mine={mine}/> : isError ? <ErrorState title="Could not load parlays" body="Retry the Board request." onRetry={()=>void refetch()}/> : isPending ? <SkeletonRows rows={5}/> : <EmptyState title="No priced parlays yet" body="Generate the Board to load ticket sets."/>}<MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear}/></>;
   return (
     <>
       <PageHeader
-        title="Board"
+        title={parlaysOnly ? "Generated Parlays" : "Board"}
         subMobile={
           sport === "ufc" || sport === "asg" || !d
             ? undefined
@@ -1536,18 +1539,7 @@ function MlbBoardPage() {
       )}
 
       {!live&&discovery.timing.includes("live")&&liveMarkets.length>0&&<LiveOpportunities filter={discovery} info={d?.gameInfo} games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError}/> }
-      {d && (
-        <ParlaysSection
-          date={board?.date}
-          gameInfo={d?.gameInfo}
-          parlays={d.parlays ?? []}
-          mixed={d.parlaysMixed ?? []}
-          live={d.parlaysLive ?? []}
-          legNow={legLive}
-          legOut={(l) => isOut(l.label, marketOfLkey(l.lkey), l.gkey)}
-          mine={mine}
-        />
-      )}
+      <a href="/board/parlays" className="board-mode-link">Generated Parlays →</a>
 
       <MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear} />
 

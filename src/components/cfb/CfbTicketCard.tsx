@@ -114,7 +114,7 @@ function fallbackAbbr(leg: CfbTicketLeg): string {
   return name.slice(0, 3).toUpperCase() || "—";
 }
 
-function LegMark({ leg, game, abbrCls }: { leg: CfbTicketLeg; game: LegGame | undefined; abbrCls: string }) {
+export function LegMark({ leg, game, abbrCls }: { leg: CfbTicketLeg; game: LegGame | undefined; abbrCls: string }) {
   const team = game ? (leg.teamId === game.home.id ? game.home : leg.teamId === game.away.id ? game.away : null) : null;
   /* INSTRUCTION 46: a player leg is the player + HIS team — with or without the slate loaded, never the pair */
   if (leg.player) return <PlayerMark teamIds={game ? [game.home.id, game.away.id].filter((id): id is string => !!id) : []} player={leg.player} headshot={leg.headshot ?? null} team={team} pos={leg.pos ?? null} size="sm" />;
@@ -265,7 +265,7 @@ export function CfbTicketCard({
             // INSTRUCTION 46 fix round (2026-09-08): a player leg prints the matchup under the name
             // (his own team's logo is the mark; the other team is still named here)
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
-            const split = !leg.player && game && !isH1Market(leg.market) ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
+            const split = !leg.player && game && (leg.market === "ml" || leg.market === "spread" || leg.market === "total") ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
             return (
               <li key={leg.lkey} title={v?.detail}><div className="flex items-center gap-1.5 text-[11px] leading-tight">
                 <LegMark leg={leg} game={game} abbrCls={accent.abbr} />

@@ -122,7 +122,7 @@ import { PairMark, PlayerMark, TeamMark } from "./TeamMark";
  */
 
 const CATS: readonly { key: (typeof CFB_PICK_CATEGORIES)[number]; label: string; prop: boolean }[] = [
-  { key: "all", label: "ALL", prop: false },
+  { key: "all", label: "Sides & Props", prop: false },
   { key: "ml", label: "ML", prop: false },
   { key: "spread", label: "SPREAD", prop: false },
   { key: "total", label: "TOTAL", prop: false },
@@ -133,10 +133,12 @@ const CATS: readonly { key: (typeof CFB_PICK_CATEGORIES)[number]; label: string;
   { key: "pass_tds", label: "PASS TDS", prop: true },
   { key: "pass_yds", label: "PASS YDS", prop: true },
   { key: "receptions", label: "Receptions O/U", prop: true },
-  { key: "rush_yds", label: "RUSH YDS", prop: true },
-  { key: "rec_yds", label: "REC YDS", prop: true },
+  { key: "rush_yds", label: "Rush YDs O/U", prop: true },
+  { key: "rec_yds", label: "Rec YDs O/U", prop: true },
   { key: "receptions_alt", label: "Receptions X+", prop: true },
   { key: "pass_tds_alt", label: "Pass TDs X+", prop: true },
+  { key: "rush_yds_alt", label: "Rush YDs X+", prop: true },
+  { key: "rec_yds_alt", label: "Rec YDs X+", prop: true },
   { key: "first_td", label: "First TD", prop: true },
   { key: "tds_over", label: "2+ TDs / TD ladders", prop: true },
 ];
@@ -413,7 +415,7 @@ function Mark({
 
 /* ---------- the desk ---------- */
 
-export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={}) {
+export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotionOnly?:boolean;parlaysOnly?:boolean}={}) {
   const L = useLeague();
   /* the league's own tables and client under the pinned CFB names (see the seam note above) */
   const { props: CFB_PROPS, parlays: CFB_PARLAYS } = L;
@@ -464,14 +466,16 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
   );
 
   const needle = search.trim().toLowerCase();
-  const catRows = picks?.categories[cat] ?? [];
+  const isAlternate = (market: string) => market.endsWith("_alt") || market === "first_td" || market === "tds_over";
+  const catRows = (picks?.categories[cat] ?? []).filter(r => cat !== "all" || !isAlternate(r.market));
   const chanceRanks=useMemo(()=>marketRanksBy(picks?.categories.all??[],r=>r.market,r=>r.player??r.label,r=>(r.fair??0)*100),[picks]);
-  const rows = useMemo(() => {
+  const matchingRows = useMemo(() => {
     const hit = catRows.filter((r) => rowMatches(r, needle) && discoveryMatches({chanceRank:chanceRanks.get(r),market:r.market,am:r.cz?.price??NaN,prob:(r.fair??0)*100,ev:r.evCz??-Infinity,start:games.get(r.gameId)?.start,started:r.status==="live",sport:L.id},discovery));
-    return scope === "top" ? hit.slice(0, TOP_N) : hit;
+    return hit;
   }, [catRows, needle, scope, discovery, games, L.id]);
 
-  const all = picks?.categories.all ?? [];
+  const rows = scope === "top" ? matchingRows.slice(0, TOP_N) : matchingRows;
+  const all = matchingRows;
   const sides = all.filter((r) => r.kind === "side").length;
   const propsN = all.length - sides;
   const plusEv = all.filter((r) => (r.evCz ?? -1) > 0);
@@ -590,6 +594,7 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);
   const catIsProp = CATS.find((c) => c.key === cat)?.prop ?? false;
+  if(parlaysOnly) return <div className="space-y-3"><DateRail dates={rail} date={date} today={today} onPick={pick} /><Link href="/board" className="board-mode-link">← Board picks</Link>{loading ? <SkeletonRows rows={5}/> : q.isError ? <ErrorState title="Could not load parlays" body={(q.error as Error).message} onRetry={()=>void q.refetch()}/> : picks ? <CfbParlaysSection picks={picks} games={games} propsPending={propsPending} liveGames={liveGames}/> : <EmptyState title="No priced parlays yet" body="Choose another slate date or generate the Board."/>}</div>;
   if(promotionOnly) return <div className="sunday-six-page space-y-3">
     <Link replace href="/board" className="board-mode-link">← Back to NFL Board</Link>
     <div className="sunday-six-hero"><span className="text-gold text-xs font-bold uppercase tracking-widest">Caesars exclusive · weekly promotion</span><h1 className="display text-2xl font-bold">First Sunday Six</h1><p className="text-sm text-muted">Explore the early-slate touchdown race, compare estimated chances and review the weekly bonus-pool scenario.</p></div>
@@ -604,10 +609,12 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
     <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
       {L.id==="nfl"&&<Link replace href="/first-sunday-six" className="board-mode-link">★ First Sunday Six <span>Weekly Caesars TD race →</span></Link>}
+      <Link href="/board/parlays" className="board-mode-link">Generated Parlays <span>View ticket sets →</span></Link>
+      <div className="phone-board-overview">
       <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
       {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
 
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="board-summary grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatTile
           label="Picks"
           value={picks ? String(all.length) : "—"}
@@ -630,6 +637,7 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
         />
       </div>
 
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Scope" />
         <label className="relative min-w-0 flex-1 basis-[160px]">
@@ -648,7 +656,7 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
       </div>
 
       <div className="max-w-md" data-testid="cfb-board-cats">
-        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,label:`${c.label} · ${c.prop && propsPending ? '…' : picks?.categories[c.key]?.length ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
+        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>!isAlternate(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
       </div>
 
       {loading ? (
@@ -733,7 +741,7 @@ export function CfbPicksBoard({promotionOnly=false}:{promotionOnly?:boolean}={})
             )}
           </div>
 
-          {picks && <CfbParlaysSection picks={picks} games={games} propsPending={propsPending} liveGames={liveGames} />}
+
 
           <div className="text-[10.5px] leading-relaxed text-faint">
             {quota && (
@@ -897,10 +905,12 @@ const PARLAY_CATS: Record<CfbParlayCategory, { label: string; hint?: string; blu
   pass_tds: { label: "PASS TDS", blurb: `Passing-touchdown tickets, ${legsOf("pass_tds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
   pass_yds: { label: "PASS YDS", blurb: `Passing-yards tickets, ${legsOf("pass_yds")} quarterbacks from distinct games, at the selected book' pregame and in-game lines.`, live: false },
   receptions: { label: "Receptions O/U", blurb: `Receptions tickets, ${legsOf("receptions")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
-  rush_yds: { label: "RUSH YDS", blurb: `Rushing-yards tickets, ${legsOf("rush_yds")} rushers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
-  rec_yds: { label: "REC YDS", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  rush_yds: { label: "Rush YDs O/U", blurb: `Rushing-yards tickets, ${legsOf("rush_yds")} rushers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
+  rec_yds: { label: "Rec YDs O/U", blurb: `Receiving-yards tickets, ${legsOf("rec_yds")} pass-catchers from distinct games, at the selected book' pregame and in-game lines.`, live: false },
   receptions_alt: { label: "Receptions X+", blurb: "Posted alternate reception thresholds, priced separately at each rung.", live: false },
   pass_tds_alt: { label: "Pass TDs X+", blurb: "Posted alternate passing touchdown thresholds, priced separately at each rung.", live: false },
+  rush_yds_alt: { label: "Rush YDs X+", blurb: "Posted alternate rushing yards", live: false },
+  rec_yds_alt: { label: "Rec YDs X+", blurb: "Posted alternate receiving yards", live: false },
   first_td: { label: "First TD", blurb: "Pregame first touchdown scorer, using posted prices and market probability estimates.", live: false },
   tds_over: { label: "2+ TDs / TD ladders", blurb: "Two or more scoring touchdowns and higher posted thresholds; passing TDs excluded.", live: false },
   combo: { label: "COMBOS", blurb: "Sides + props on one ticket — at least one side and one player prop, 3–6 legs, at the selected book' pregame and in-game lines.", live: false },
@@ -1039,17 +1049,6 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
         <div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
           <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
         </div>
-        <div className="mb-3 text-[11px] text-muted">
-          {picked?meta.blurb:"All stored ticket sets. Timing and markets are optional filters; mixed does not require both phases."} <span className="text-faint">Up to {CFB_PARLAYS.perCategory} ranked by EV, with player exposure limits. Thin pools may return fewer tickets.</span>
-          {openN > 0 && (
-            <span className="text-faint" data-testid="cfb-parlay-open-note">
-              {" "}
-              Fewer than {CFB_PARLAYS.perCategory} tickets clear the {CFB_PARLAYS.minLegEvPct}% leg gate, so {openN} tagged EDGE − use selected-book-priced legs down to EV ≥ {CFB_PARLAYS.setFloorEvPct}% — ranked after the gated ones.
-            </span>
-          )}
-        </div>
-
-        {mostRepeated && <p className="mb-3 text-[11px] text-muted" role="status">Most repeated: {mostRepeated.name} · {mostRepeated.count}/{shown.length} displayed tickets. Shared players can lose several tickets together.</p>}
         {all.length === 0 ? (
           <Panel>
             <EmptyState title={empty.title} body={empty.body} />
@@ -1063,9 +1062,9 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
             {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid.
                 Only the active layout mounts (review fix) — the display classes stay for the first paint before the effect runs. */}
             {!desktop && (
-              <div className="carousel -mx-4 px-4 md:hidden" data-testid="cfb-parlay-carousel">
+              <div className="grid gap-2 md:hidden" data-testid="cfb-parlay-carousel">
                 {shown.slice(0, Math.min(phoneShown, SHOW_CAP)).map((t, i) => (
-                  <CfbParlayFeature key={t.id} t={t} rank={i + 1} live={cat === "live"} />
+                  <CfbParlayCard key={t.id} t={t} games={games} rank={i + 1} />
                 ))}
                 {phoneShown < Math.min(shown.length, SHOW_CAP) && (
                   <button

@@ -1,0 +1,23 @@
+import {describe,it,expect} from "vitest";
+import fs from "node:fs";
+import {buildCfbBoard} from "@/lib/cfb/model";
+import {buildCfbCard} from "@/lib/cfb/card";
+import {assertCardMoney} from "@/lib/cfb/lock-server";
+import {NFL_LEAGUE,NFL_RULES} from "@/lib/nfl/rules";
+import {gradeCfbLeg} from "@/lib/cfb/grade";
+import {parseFinalPlayerStats} from "@/lib/football/prop-settlement";
+import {matchPlayerImage} from "@/lib/player-images";
+import type {CfbPropsBoard,CfbPropRow} from "@/lib/cfb/props-types";
+const read=(n:string)=>JSON.parse(fs.readFileSync(`tests/fixtures/nfl/${n}.json`,"utf8"));
+const now=Date.parse("2026-09-13T16:00Z");
+const rules={...NFL_RULES,sundayPaperSince:"2026-09-13",variedPaperSince:"2026-09-13"};
+const board=buildCfbBoard({date:"2026-09-13",espnEvents:read("espn-scoreboard-2026-09-13").events,oddsEvents:read("odds-2026-09-13"),fpi:read("espn-fpi"),now,bankroll:2500,league:NFL_LEAGUE});
+const rows=board.games.slice(0,5).map((g,i)=>({key:`${g.id}|rec|player${i}`,gameId:g.id,market:"receptions",side:"over",player:`Player ${i}`,label:`Player ${i} O 4.5 Receptions`,teamId:g.home.id,line:4.5,fair:.53,evCz:6,cz:{book:"draftkings",price:100,line:4.5,dec:2}} as CfbPropRow));
+const props={date:board.date,rows,pricedAt:Object.fromEntries(rows.map(r=>[r.gameId,new Date(now-60000).toISOString()]))} as CfbPropsBoard;
+const build=(p=props)=>buildCfbCard({...board,paperProps:p},{now,bankroll:2500,daily:350,fun:25,rules,idPrefix:"nfl"});
+describe("NFL variety paper policy",()=>{
+ it("mixes props and sides, varies stakes and fully allocates across distinct games",()=>{const c=build();expect(c.coreSum).toBe(350);expect(c.core.some(t=>t.legs[0].player)).toBe(true);expect(c.core.some(t=>!t.legs[0].player)).toBe(true);expect(new Set(c.core.map(t=>t.stake)).size).toBeGreaterThan(1);expect(new Set(c.core.flatMap(t=>t.legs.map(l=>l.gkey))).size).toBe(c.core.length);expect(()=>assertCardMoney({...NFL_LEAGUE,rules},c)).not.toThrow();expect(build()).toEqual(c);});
+ it("rejects stale props, mismatched dates, unknown teams and missing quotes",()=>{for(const p of [{...props,pricedAt:{}},{...props,date:"2026-09-12"},{...props,rows:rows.map(r=>({...r,teamId:null}))},{...props,rows:rows.map(r=>({...r,cz:null}))}]){const c=build(p);expect(c.coreSum).toBe(350);expect(c.core.every(t=>!t.legs[0].player)).toBe(true);}});
+ it("settles from explicit player stats, never from a game total",()=>{const leg=build().core.flatMap(t=>t.legs).find(l=>l.player)!;const f={home:28,away:14,final:true,status:"final" as const};expect(gradeCfbLeg(leg,f).result).toBe("pending");const key=`${leg.teamId}|${leg.player!.toLowerCase().replace(/[^a-z0-9]/g,"")}`;expect(gradeCfbLeg(leg,{...f,playerStats:{[key]:{receptions:5}}}).result).toBe("won");expect(gradeCfbLeg(leg,{...f,playerStats:{[key]:{receptions:0}}}).result).toBe("lost");expect(gradeCfbLeg(leg,{...f,final:false,playerStats:{[key]:{receptions:5}}}).result).toBe("pending");});
+ it("parses only final, matching event stat cells and resolves the verified Knight alias",()=>{const d={header:{id:"123",competitions:[{status:{type:{completed:true}}}]},boxscore:{players:[{team:{id:"22"},statistics:[{keys:["receptions","receivingYards"],athletes:[{athlete:{displayName:"Bam Knight"},stats:["0",""]}]}]}]}};expect(parseFinalPlayerStats(d,"123")).toEqual({"22|bamknight":{receptions:0}});expect(parseFinalPlayerStats(d,"124")).toEqual({});expect(matchPlayerImage([{id:"4427728",name:"Bam Knight",position:"RB",team:{id:"22",abbr:"ARI",name:"Arizona Cardinals",logo:null,color:null,rank:null},srcs:[]}],"Zonovan Knight")?.id).toBe("4427728");});
+});

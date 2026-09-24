@@ -44,6 +44,7 @@ export type LeaguePaper = { since: string; daily: number; fun: number };
 export type LeagueRules = {
   /** Full-allocation Sunday paper experiment, effective on this Pacific slate date. */
   sundayPaperSince?: string;
+  variedPaperSince?: string;
   fullPaperSince?: string;
   minEvPct: number;
   maxLegs: number;
@@ -217,7 +218,7 @@ export type DeskClient = {
   queryKey: (date: string | null | undefined, bankroll: number) => readonly [League, "slate", string, number];
   propsQueryKey: (date: string | null | undefined, bankroll: number) => readonly [League, "props", string, number];
   loadSlate: typeof loadCfbSlate;
-  loadFinals: typeof loadCfbFinals;
+  loadFinals: (date: string, includePlayerStats?: boolean) => ReturnType<typeof loadCfbFinals>;
   loadProps: typeof loadCfbProps;
   propsStaleMs: typeof cfbPropsStaleMs;
   cacheLabel: typeof cfbCacheLabel;

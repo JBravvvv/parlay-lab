@@ -575,7 +575,7 @@ export function gradePending(L: Pick<DeskHandles, "id" | "store" | "client">): P
     let n = 0;
     for (const e of due) {
       try {
-        const { finals } = await L.client.loadFinals(e.date);
+        const { finals } = await L.client.loadFinals(e.date, L.id === "nfl" && cfbTicketsOf(e as CfbLedgerEntry, "core").some(t=>t.legs.some(l=>l.player)));
         if (L.store.grade(e.date, finals)) n++;
       } catch {
         /* offline or the feed hiccupped — the next view retries */
@@ -904,7 +904,6 @@ export function CfbLedger() {
   return (
     <div className="space-y-4">
       <CfbSyncChip />
-      {L.id === "nfl" && <NflPaperExperiment entries={entries} />}
 
       {(open || importMsg) && (
         <Panel title={`Import a ${L.short} ledger backup`} action={<span className="text-[10.5px] text-faint">merges — never erases a locked day</span>}>
@@ -990,6 +989,7 @@ export function CfbLedger() {
           ))}
         </div>
       )}
+      {L.id === "nfl" && <details className="rounded-xl border border-white/15 p-3"><summary className="cursor-pointer font-bold">Sunday paper experiment · history & methodology</summary><NflPaperExperiment entries={entries} /></details>}
     </div>
   );
 }

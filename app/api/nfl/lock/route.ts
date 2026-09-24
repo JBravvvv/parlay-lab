@@ -1,3 +1,4 @@
+import { footballPropsGet } from "@/lib/server/football-props";
 import { NextRequest, NextResponse } from "next/server";
 import { MAX_BYTES, mergeLedgers } from "@/lib/ledger-merge";
 import type { BankStore } from "@/lib/bankroll";
@@ -233,7 +234,10 @@ export async function GET(req: NextRequest) {
   const cause: CfbMissCause = d.ahead === 0 ? await missCauseOf(KEYS, date) : "no-lock";
   let entry: CfbLedgerEntry;
   try {
-    entry = buildLockEntry(NFL_LEAGUE, slate, { now, bankroll, ahead: d.ahead, total: d.total, firstKickoff: d.firstKickoff, cause }).entry;
+    if(date>="2026-09-23" && d.ahead>0){
+      try { const url=new URL(req.url);url.searchParams.set("date",date);url.searchParams.set("bankroll",String(bankroll));const response=await footballPropsGet(NFL_LEAGUE,new NextRequest(url,{headers:req.headers}),{forceFresh:true,storeKeys:{board:NFL_LEAGUE.redis.propsBoard,spend:NFL_LEAGUE.redis.propsSpend}});if(response.ok)slate.paperProps=await response.json(); } catch { /* Side picks remain available if props fail. */ }
+    }
+    entry = buildLockEntry(NFL_LEAGUE, slate, { now: Date.now(), bankroll, ahead: d.ahead, total: d.total, firstKickoff: d.firstKickoff, cause }).entry;
   } catch (e) {
     return say({ error: `lock build failed: ${(e as Error).message}` }, { status: 502 });
   }

@@ -225,6 +225,8 @@ const SHORT: Record<CfbPropMarket, string> = {
   receptions: "Receptions",
   receptions_alt: "Receptions",
   pass_tds_alt: "Pass TDs",
+  rush_yds_alt: "Rush Yds",
+  rec_yds_alt: "Rec Yds",
   first_td: "First TD",
   tds_over: "TDs",
   rush_yds: "Rush Yds",
@@ -233,7 +235,7 @@ const SHORT: Record<CfbPropMarket, string> = {
 
 /** "Ty Simpson O 245.5 Pass Yds" · "Ty Simpson U 1.5 Pass TDs" · "Ryan Williams Anytime TD" */
 export function propLabel(player: string, market: CfbPropMarket, side: CfbPropSide, line: number | null): string {
-  if (["receptions_alt", "pass_tds_alt", "tds_over"].includes(market) && side === "over" && line != null && line % 1 === .5)
+  if (["receptions_alt", "pass_tds_alt", "rush_yds_alt", "rec_yds_alt", "tds_over"].includes(market) && side === "over" && line != null && line % 1 === .5)
     return `${player} ${Math.floor(line) + 1}+ ${SHORT[market]}`;
   if (side === "yes") return `${player} ${SHORT[market]}`;
   return `${player} ${side === "over" ? "O" : "U"} ${line ?? "—"} ${SHORT[market]}`;

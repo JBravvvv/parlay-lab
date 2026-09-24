@@ -145,7 +145,7 @@ const ON: Record<RankedAccent, string> = {
 const PRICE: Record<RankedAccent, string> = { pos: "text-pos", cfb: "text-cfb", nfl: "text-nfl" };
 
 /** rows per page — "every single prop" can run past a thousand rows; the rest is one tap away */
-export const RANKED_PAGE = 60;
+export const RANKED_PAGE = 10;
 const TIERS: readonly Grade[] = ["S", "A", "B", "C", "D", "F"];
 
 export function RankedPicks<P>({
@@ -338,9 +338,13 @@ export function RankedPicks<P>({
           })}
           {shown.length > limit && (
             <button type="button" onClick={() => setLimit((n) => n + RANKED_PAGE)} className="press mt-1 flex min-h-11 w-full items-center justify-center rounded-[10px] border border-white/[0.08] text-[11px] font-semibold text-muted">
-              Show {Math.min(RANKED_PAGE, shown.length - limit)} more · {shown.length - limit} left
+              Load 10 More.. · {shown.length - limit} left
             </button>
           )}
+          {limit > RANKED_PAGE && <div className="flex gap-2">
+            <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit(n => Math.max(RANKED_PAGE, n - RANKED_PAGE))}>Undo</button>
+            <button type="button" className="press min-h-11 flex-1 rounded-xl border border-white/20 font-bold" onClick={() => setLimit(RANKED_PAGE)}>Clear</button>
+          </div>}
         </div>
       )}
     </section>

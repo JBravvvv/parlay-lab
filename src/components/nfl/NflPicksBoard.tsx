@@ -11,10 +11,10 @@ import { NFL_DESK } from "@/lib/nfl/desk";
  * ["nfl","props"]), NFL_PARLAYS (25 per category), the blue accent, "No NFL games" copy.
  * Nothing here is a second copy of the surface; app/board/page.tsx mounts this on the NFL desk.
  */
-export function NflPicksBoard() {
+export function NflPicksBoard({parlaysOnly=false}:{parlaysOnly?:boolean}={}) {
   return (
     <LeagueProvider desk={NFL_DESK}>
-      <CfbPicksBoard />
+      <CfbPicksBoard parlaysOnly={parlaysOnly}/>
     </LeagueProvider>
   );
 }

@@ -100,7 +100,7 @@ import type { League, LeagueParlays, LeagueRules } from "@/lib/football/league";
  *   `-${category}-${i}`; `opts.rules` (Kelly) sizes a prop pick's stake for the league.
  */
 
-export const CFB_PROP_CATEGORIES = ["anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "receptions_alt", "pass_tds_alt", "first_td", "tds_over"] as const;
+export const CFB_PROP_CATEGORIES = ["anytime_td", "pass_tds", "pass_yds", "receptions", "rush_yds", "rec_yds", "receptions_alt", "pass_tds_alt", "rush_yds_alt", "rec_yds_alt", "first_td", "tds_over"] as const;
 export const CFB_PICK_CATEGORIES = ["all", "ml", "spread", "total", "ml_1h", "spread_1h", "total_1h", ...CFB_PROP_CATEGORIES] as const;
 
 type Leg = CfbParlayLeg & { evCz: number; live: boolean };
@@ -525,6 +525,8 @@ const SET_LABEL: Record<CfbParlayCategory, string> = {
   receptions: "RECEPTIONS O/U",
   receptions_alt: "RECEPTIONS X+",
   pass_tds_alt: "PASS TDS X+",
+  rush_yds_alt: "Rush YDs X+",
+  rec_yds_alt: "Rec YDs X+",
   first_td: "FIRST TD",
   tds_over: "2+ TDS / TD LADDERS",
   rush_yds: "RUSH YDS",

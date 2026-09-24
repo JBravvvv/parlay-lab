@@ -1,10 +1,11 @@
 "use client";
+import { useQuery } from "@tanstack/react-query";
 import { GameTimeRange } from "@/components/props/GameTimeRange";
 import { inGameTimeWindow,type GameTimeWindow } from "@/lib/game-time-window";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
-import { CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
+import { LegMark, CfbTicketCard, cfbGradingOf, cfbTicketsOf, type CfbGradingView } from "@/components/cfb/CfbTicketCard";
 import { useLeague } from "@/components/football/LeagueContext";
 import { DateRail } from "@/components/games/DateRail";
 import { Reveal } from "@/components/motion/Reveal";
@@ -18,7 +19,7 @@ import { ptDateOf } from "@/lib/cfb/dates";
 import { cfbExposureOn } from "@/lib/cfb/ledger";
 import type { CfbCard, CfbLedgerEntry, CfbSlate, CfbTicket } from "@/lib/cfb/types";
 import type { DeskHandles, League } from "@/lib/football/league";
-import { fmtEv } from "@/lib/format";
+import { fmtAmerican, fmtEv } from "@/lib/format";
 import { railLabel } from "@/lib/games";
 
 /**
@@ -234,7 +235,15 @@ function TicketStack({
     <div><GameTimeRange value={timeWindow} onChange={setTimeWindow}/><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
-          <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} />
+          <details className="card-phone-ticket rounded-xl border border-sky-300/30 bg-slate-900/80 md:hidden">
+            <summary className="flex min-h-16 cursor-pointer items-center gap-2 p-2">
+              {t.legs[0] && <LegMark leg={t.legs[0]} game={games.get(t.legs[0].gkey)} abbrCls="text-sky-200"/>}
+              <span className="min-w-0 flex-1"><span className="block text-xs font-bold">{t.legs.length===1?t.legs[0].label:t.name}</span><span className="block text-[10px] text-slate-300">{t.legs.length} leg{t.legs.length===1?"":"s"} · {t.prob.toFixed(1)}% · {fmtEv(t.czEv)} EV · Details ▾</span></span>
+              <span className="shrink-0 text-right"><b className="block text-sm text-amber-200">{fmtAmerican(t.czOdds)}</b><span className="text-xs font-bold text-sky-200">${t.stake}</span></span>
+            </summary>
+            <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board}/>
+          </details>
+          <div className="hidden md:block"><CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board}/></div>
         </div>
       ))}
     </div>{!shown.length&&<p className="text-xs text-muted">No tickets in this game-time window.</p>}</div>
@@ -352,6 +361,7 @@ export function CfbBuilder() {
   const c = ACCENT[L.id];
   const { today, date, dates, pick, slate, bankroll, loading, fetching, error, refetch } = useCfbDesk();
   const { entries, lock } = L.store.useLedger();
+  const paperProps=useQuery({queryKey:L.client.propsQueryKey(date,bankroll),queryFn:()=>L.client.loadProps(date,{bankroll}),enabled:L.id==="nfl" && date>="2026-09-23" && !!slate?.games.length,staleTime:60_000,retry:0});
   const [status, setStatus] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -410,8 +420,8 @@ export function CfbBuilder() {
   const lockedMarks = locked ? cfbDayMarks(locked) : null;
   const exposure = cfbExposureOn(entries, date);
   const card = useMemo(
-    () => (slate ? buildCfbCard(slate, { bankroll, daily: L.paper.daily, fun: L.paper.fun, now, rules: L.rules, idPrefix: L.idPrefix }) : null),
-    [slate, bankroll, now, L],
+    () => (slate ? buildCfbCard({...slate,paperProps:paperProps.data??slate.paperProps}, { bankroll, daily: L.paper.daily, fun: L.paper.fun, now: Date.now(), rules: L.rules, idPrefix: L.idPrefix }) : null),
+    [slate, bankroll, now, L, paperProps.data],
   );
 
   const onPick = (d: string) => {
@@ -607,7 +617,7 @@ export function CfbBuilder() {
                   variant="gold"
                   className="min-h-[48px] w-full justify-center text-[14px] md:min-h-0 md:w-auto md:text-[12.5px]"
                   onClick={doLock}
-                  disabled={locking}
+                  disabled={locking || (paperProps.isPending && paperProps.fetchStatus === "fetching")}
                   aria-label={card.noPlay ? "Record NO-PLAY" : "Lock card"}
                 >
                   {card.noPlay ? "Record NO-PLAY" : "🔒 Lock card"}
