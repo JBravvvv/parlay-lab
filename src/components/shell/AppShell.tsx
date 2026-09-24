@@ -179,9 +179,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const slide = reduced ? INSTANT : SLIDE;
   // the phone header's ⋯ menu — closes on every navigation (the pathname flips) and on a tap outside
   const [more, setMore] = useState(false);
-  const [boardMenu, setBoardMenu] = useState(false);
-  useEffect(() => { setBoardMenu(false); }, [pathname]);
-  useEffect(() => { const close = (e: KeyboardEvent) => { if (e.key === "Escape") setBoardMenu(false); }; window.addEventListener("keydown", close); return () => window.removeEventListener("keydown", close); }, []);
   useEffect(() => setMore(false), [pathname]);
   const cfb = sport === "cfb";
   const nfl = sport === "nfl";
@@ -306,13 +303,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       )}
 
-      {boardMenu && <div className="fixed inset-0 z-40 md:hidden">
-        <button type="button" aria-label="Close Board choices" className="absolute inset-0 bg-black/30" onClick={() => setBoardMenu(false)} />
-        <div className="board-nav-choices absolute bottom-[calc(env(safe-area-inset-bottom)+64px)] left-[16.67%] right-3 flex gap-2 rounded-2xl border border-indigo-300/50 bg-slate-900 p-2 shadow-xl" role="group" aria-label="Board pages">
-          <Link replace href="/board" onClick={() => setBoardMenu(false)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-400/20 px-2 py-3 text-xs font-bold"><IconBoard />Board</Link>
-          <Link replace href="/board/parlays" onClick={() => setBoardMenu(false)} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-400/20 px-2 py-3 text-xs font-bold"><IconParlay />Generated Parlays</Link>
-        </div>
-      </div>}
       {/* mobile bottom tab bar — columns computed from the mobile entries (a hardcoded
           six-column grid was already wrapping the 7th tab onto a second row). The
           active tab carries a raised pill that slides between tabs. */}
@@ -331,8 +321,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               href={href}
               replace
               aria-label={label}
-              onClick={href === "/board" ? (e) => { e.preventDefault(); setBoardMenu(v => !v); } : undefined}
-              aria-expanded={href === "/board" ? boardMenu : undefined}
               className="press relative flex flex-col items-center gap-0.5 py-2 text-[9.5px] font-semibold"
               style={{ color: active ? tone : tint(tone, IDLE_LABEL) }}
             >

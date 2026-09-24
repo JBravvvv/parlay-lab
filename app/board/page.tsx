@@ -1,8 +1,9 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { BoardModeToggle } from "@/components/board/BoardModeToggle";
+import { BoardFilters } from "@/components/board/BoardFilters";
 import { amToDec } from "@/lib/ticket-math";
 import { PickContext } from "@/components/props/PickContext";
-import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
 import { CrossBoardResults } from "@/components/props/CrossBoardResults";
 import { ALL_MARKETS } from "@/lib/cross-sport";
 import { STRATEGIES,marketRanksBy,discoveryMatches,type DiscoveryFilter } from "@/lib/discovery";
@@ -17,7 +18,7 @@ import {LiveOpportunities} from "@/components/mlb/LiveOpportunities";
 import {MLB_BROWSE_MARKETS} from "@/lib/mlb/browse-markets";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {useSportsbook} from "@/lib/sportsbook/store";
 import {bookName,DEFAULT_BOOK,SETTLE_BOOK,valueAt,decimal} from "@/lib/sportsbook/books";
 import {priceMlbRow,type QuoteIndex} from "@/lib/sportsbook/mlb";
@@ -116,7 +117,10 @@ const CAT_LABELS: Record<string, string> = {
 };
 
 export default function BoardPage() {
-  const parlaysOnly = usePathname().endsWith("/parlays");
+  return <Suspense fallback={<SkeletonRows rows={5}/>}><BoardWorkspace/></Suspense>;
+}
+function BoardWorkspace() {
+  const parlaysOnly = useSearchParams().get("view") === "parlays";
   const desk = useSport();
   if (CFB_ENABLED && desk === "cfb") {
     return (
@@ -136,6 +140,7 @@ export default function BoardPage() {
           subMobile={<CfbBoardStamp phone />}
           action={<CfbRefreshPill />}
         />
+        <BoardModeToggle parlays={parlaysOnly}/>
         <CfbPicksBoard parlaysOnly={parlaysOnly}/>
       </>
     );
@@ -158,6 +163,7 @@ export default function BoardPage() {
           subMobile={<NflBoardStamp phone />}
           action={<NflRefreshPill />}
         />
+        <BoardModeToggle parlays={parlaysOnly}/>
         <NflPicksBoard parlaysOnly={parlaysOnly}/>
       </>
     );
@@ -1222,7 +1228,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
           : (cats[k] ?? []).length
       : null;
 
-  if (parlaysOnly) return <><PageHeader title="Generated Parlays"/><a href="/board" className="board-mode-link">← Board picks</a>{d ? <ParlaysSection date={board?.date} gameInfo={d.gameInfo} parlays={d.parlays??[]} mixed={d.parlaysMixed??[]} live={d.parlaysLive??[]} legNow={legLive} legOut={l=>isOut(l.label,marketOfLkey(l.lkey),l.gkey)} mine={mine}/> : isError ? <ErrorState title="Could not load parlays" body="Retry the Board request." onRetry={()=>void refetch()}/> : isPending ? <SkeletonRows rows={5}/> : <EmptyState title="No priced parlays yet" body="Generate the Board to load ticket sets."/>}<MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear}/></>;
+  if (parlaysOnly) return <><PageHeader title="Generated Parlays"/><BoardModeToggle parlays/>{d ? <ParlaysSection date={board?.date} gameInfo={d.gameInfo} parlays={d.parlays??[]} mixed={d.parlaysMixed??[]} live={d.parlaysLive??[]} legNow={legLive} legOut={l=>isOut(l.label,marketOfLkey(l.lkey),l.gkey)} mine={mine}/> : isError ? <ErrorState title="Could not load parlays" body="Retry the Board request." onRetry={()=>void refetch()}/> : isPending ? <SkeletonRows rows={5}/> : <EmptyState title="No priced parlays yet" body="Generate the Board to load ticket sets."/>}<MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear}/></>;
   return (
     <>
       <PageHeader
@@ -1302,6 +1308,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
         }
       />
 
+      <BoardModeToggle parlays={false}/>
       {sport === "mlb" && refreshNote && (
         <p className="mb-3 text-xs text-muted" data-testid="mlb-refill-note">
           {refreshNote}
@@ -1451,7 +1458,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
         </div>
       )}
 
-      <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");setScope("all");setLive(v.timing.length===1&&v.timing[0]==="live");}} markets={ALL_MARKETS}/>
+      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");setScope("all");setLive(v.timing.length===1&&v.timing[0]==="live");}} markets={ALL_MARKETS}/>
       {discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={board?.date??""} filter={discovery}/>}
       {isPending || regen.isPending ? (
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>
@@ -1539,7 +1546,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
       )}
 
       {!live&&discovery.timing.includes("live")&&liveMarkets.length>0&&<LiveOpportunities filter={discovery} info={d?.gameInfo} games={liveMarkets} market={cat} search={search} loading={liveQuotes.isFetching} syncReady={!!liveSyncReady} error={liveError}/> }
-      <a href="/board/parlays" className="board-mode-link">Generated Parlays →</a>
+
 
       <MyParlayBar legs={mine.legs} onRemove={mine.remove} onClear={mine.clear} />
 

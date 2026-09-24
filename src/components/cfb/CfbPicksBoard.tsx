@@ -1,4 +1,5 @@
 "use client";
+import { BoardFilters } from "@/components/board/BoardFilters";
 import { MultiSelect } from "@/components/props/MultiSelect";
 import Link from "next/link";
 import {FirstSundaySix} from "@/components/nfl/FirstSundaySix";
@@ -594,7 +595,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
   const loading = bankroll == null || q.isPending || (slate != null && current == null && !q.isError);
   const catIsProp = CATS.find((c) => c.key === cat)?.prop ?? false;
-  if(parlaysOnly) return <div className="space-y-3"><DateRail dates={rail} date={date} today={today} onPick={pick} /><Link href="/board" className="board-mode-link">← Board picks</Link>{loading ? <SkeletonRows rows={5}/> : q.isError ? <ErrorState title="Could not load parlays" body={(q.error as Error).message} onRetry={()=>void q.refetch()}/> : picks ? <CfbParlaysSection picks={picks} games={games} propsPending={propsPending} liveGames={liveGames}/> : <EmptyState title="No priced parlays yet" body="Choose another slate date or generate the Board."/>}</div>;
+  if(parlaysOnly) return <div className="space-y-3"><DateRail dates={rail} date={date} today={today} onPick={pick} />{loading ? <SkeletonRows rows={5}/> : q.isError ? <ErrorState title="Could not load parlays" body={(q.error as Error).message} onRetry={()=>void q.refetch()}/> : picks ? <CfbParlaysSection picks={picks} games={games} propsPending={propsPending} liveGames={liveGames}/> : <EmptyState title="No priced parlays yet" body="Choose another slate date or generate the Board."/>}</div>;
   if(promotionOnly) return <div className="sunday-six-page space-y-3">
     <Link replace href="/board" className="board-mode-link">← Back to NFL Board</Link>
     <div className="sunday-six-hero"><span className="text-gold text-xs font-bold uppercase tracking-widest">Caesars exclusive · weekly promotion</span><h1 className="display text-2xl font-bold">First Sunday Six</h1><p className="text-sm text-muted">Explore the early-slate touchdown race, compare estimated chances and review the weekly bonus-pool scenario.</p></div>
@@ -608,12 +609,13 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
   return (
     <div className="space-y-3">
       <DateRail dates={rail} date={date} today={today} onPick={pick} />
-      {L.id==="nfl"&&<Link replace href="/first-sunday-six" className="board-mode-link">★ First Sunday Six <span>Weekly Caesars TD race →</span></Link>}
-      <Link href="/board/parlays" className="board-mode-link">Generated Parlays <span>View ticket sets →</span></Link>
-      <div className="phone-board-overview">
-      <DiscoveryFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
-      {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
-
+      <div className="board-pulse md:hidden" aria-label="Board summary">
+        <span><b>{picks ? all.length : "—"}</b> picks</span>
+        <span className="text-pos"><b>{picks ? plusEv.length : "—"}</b> +EV</span>
+        {L.id === "nfl" && <Link replace href="/first-sunday-six">★ First Sunday Six <span aria-hidden>↗</span></Link>}
+      </div>
+      <div className="hidden md:block">
+        {L.id === "nfl" && <Link replace href="/first-sunday-six" className="board-promo-link">★ First Sunday Six →</Link>}
       <div className="board-summary grid grid-cols-2 gap-2 md:grid-cols-4">
         <StatTile
           label="Picks"
@@ -638,7 +640,13 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
       </div>
 
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="board-category" data-testid="cfb-board-cats">
+        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>!isAlternate(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
+      </div>
+
+      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
+      {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
+      <div className="board-search-row flex flex-wrap items-center gap-2">
         <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Scope" />
         <label className="relative min-w-0 flex-1 basis-[160px]">
           <span className="sr-only">Search picks</span>
@@ -655,9 +663,6 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
         </label>
       </div>
 
-      <div className="max-w-md" data-testid="cfb-board-cats">
-        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>!isAlternate(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
-      </div>
 
       {loading ? (
         <Panel>
@@ -772,9 +777,10 @@ function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total:
       <section aria-label="Top edges" data-testid="cfb-top-edges">
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
-            Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="text-faint">+EV at the selected book</span>
+            Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="hidden md:inline text-faint">+EV at the selected book</span>
           </h2>
-          {total > rows.length && <span className="num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
+          <span className="text-[10px] text-muted md:hidden">Swipe to compare →</span>
+          {total > rows.length && <span className="hidden md:inline num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
         </div>
         <div className="carousel -mx-4 px-4 md:mx-0 md:px-0">
           {rows.map((r, i) => (
