@@ -90,7 +90,9 @@ describe("the sheet — numbered, draggable, lock-in slots", () => {
 
   it("with onMove every slot is draggable and has ▲/▼ — slot 1 cannot go up, slot 4 cannot go down", () => {
     const out = sheet({ onMove: () => {} });
-    expect(count(out, /draggable="true"/g)).toBe(4);
+    /* hold-and-drag since 2026-09-26 (pointer events — the HTML5 draggable API never fires on a thumb) */
+    expect(count(out, /data-drag-slot=""/g)).toBe(4);
+    expect(out).not.toMatch(/draggable="true"/);
     for (const n of [1, 2, 3, 4]) {
       expect(out).toContain(`aria-label="Move slot ${n} up"`);
       expect(out).toContain(`aria-label="Move slot ${n} down"`);
@@ -99,12 +101,13 @@ describe("the sheet — numbered, draggable, lock-in slots", () => {
     expect(out).toMatch(/aria-label="Move slot 4 down" disabled=""/);
     expect(out).not.toMatch(/aria-label="Move slot 2 up" disabled=""/);
     expect(out).not.toMatch(/aria-label="Move slot 3 down" disabled=""/);
-    expect(out).toContain("drag or ▲▼ to reorder · lock what you like, then regenerate");
+    expect(out).toContain("hold and drag to reorder · lock what you like, then regenerate");
   });
 
   it("without onMove nothing is draggable and no arrows render (the numbers stay)", () => {
     const out = sheet();
     expect(out).not.toMatch(/draggable="true"/);
+    expect(out).not.toMatch(/data-drag-slot/);
     expect(out).not.toMatch(/aria-label="Move slot/);
     expect(count(out, /class="gen-slot-no num"/g)).toBe(4);
   });
@@ -157,7 +160,8 @@ describe("wiring — the hook exposes reorder and both desks hand it to the shee
   it("useParlayGen returns reorder(from, to) and applies the order to the recalled or generated result", () => {
     expect(hook).toMatch(/reorder: \(from: number, to: number\) => void;/);
     expect(hook).toMatch(/const reorder = \(from: number, to: number\) => \{/);
-    expect(hook).toMatch(/applyOrder\(baseResult, order\)/);
+    /* the held ticket's game-log chips are refreshed first (2026-09-26); the order overlay still applies last */
+    expect(hook).toMatch(/applyOrder\(withBoard\(baseResult, pool\), order\)/);
     expect(hook).toMatch(/\breorder,\n/);
   });
   it("reorder moves the pin with the leg only when something is locked (no spec churn otherwise)", () => {

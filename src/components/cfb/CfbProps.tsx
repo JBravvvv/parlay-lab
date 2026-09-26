@@ -829,7 +829,7 @@ export function CfbProps() {
   const queryClient = useQueryClient();
   const [refreshingLive,setRefreshingLive] = useState(false);
   const [liveRefreshError,setLiveRefreshError] = useState<string|null>(null);
-  const [pendingLiveSpin,setPendingLiveSpin] = useState<{date:string;board:CfbPropsBoard}|null>(null);
+  const [pendingLiveSpin,setPendingLiveSpin] = useState<{date:string;board:CfbPropsBoard;at:number}|null>(null);
   const refreshInFlight = useRef(false);
   const propsQ = useQuery({
     queryKey: cfbPropsQueryKey(date, bankroll),
@@ -961,15 +961,26 @@ export function CfbProps() {
       if (r.note) showNote(r.note);
       return r.legs;
     },
+    /* the ticket holds once the slate (the side legs, the teams) and the prop board have landed (2026-09-26) — before
+       this, the live clock's tick rebuilt the pool and re-rolled the ticket on screen. isLoading, not isPending: a props
+       query switched off (the Sides view) is not "still loading" */
+    ready: !loading && !propsQ.isLoading,
+    frozen: refreshingLive || !!pendingLiveSpin,
   });
   // Spin only after React has rebuilt the pool from the returned quote snapshot.
   useEffect(()=>{
     if(!pendingLiveSpin)return;
     if(pendingLiveSpin.date!==date){setPendingLiveSpin(null);return;}
-    if(propsQ.data!==pendingLiveSpin.board)return;
+    /* the sheet was collapsed while the prices refreshed: that cancels the press — reopening shows the ticket untouched
+       (never deferred: a 60s refetch would replace propsQ.data and the pending spin could then never match) */
+    if(!gen.open){setPendingLiveSpin(null);return;}
+    /* the refreshed quotes are in the cache — or a background refetch landed on top of them since; either way the pool
+       this render built is at least as new as the press (2026-09-26 review: matching the exact object could wait forever
+       once a 60s refetch replaced it, with the reels held spinning and Generate disabled) */
+    if(propsQ.data!==pendingLiveSpin.board&&propsQ.dataUpdatedAt<pendingLiveSpin.at)return;
     setPendingLiveSpin(null);
     gen.spin();
-  },[pendingLiveSpin,date,propsQ.data,gen.spin]);
+  },[pendingLiveSpin,date,propsQ.data,propsQ.dataUpdatedAt,gen.spin,gen.open]);
   const generateWithCurrentQuotes=async()=>{
     const liveEnabled=gen.spec.phase==='live'||gen.spec.phase==='mixed'||gen.spec.includeStarted;
     if(!liveEnabled){gen.spin();return;}
@@ -979,8 +990,9 @@ export function CfbProps() {
     try{
       await queryClient.cancelQueries({queryKey:cfbPropsQueryKey(requestedDate,bankroll),exact:true});
       const fresh=await loadCfbProps(requestedDate,{bankroll,refresh:true});
+      const at=Date.now();
       const cached=queryClient.setQueryData<CfbPropsBoard>(cfbPropsQueryKey(requestedDate,bankroll),fresh);
-      if(cached)setPendingLiveSpin({date:requestedDate,board:cached});
+      if(cached)setPendingLiveSpin({date:requestedDate,board:cached,at});
     }catch(e){setLiveRefreshError(e instanceof Error?e.message:'Live odds refresh failed. Try again.');}
     finally{refreshInFlight.current=false;setRefreshingLive(false);}
   };
@@ -1117,6 +1129,8 @@ export function CfbProps() {
         onSpec={gen.patchSpec}
         result={gen.result}
         onGenerate={()=>void generateWithCurrentQuotes()}
+        spinKey={gen.spinKey}
+        moved={gen.moved}
         onTogglePin={gen.togglePin}
         onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
@@ -1134,7 +1148,7 @@ export function CfbProps() {
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={genBoardAt}
-        loading={refreshingLive || !!pendingLiveSpin || propsQ.isPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
+        loading={refreshingLive || !!pendingLiveSpin || propsQ.isPending || loading || gen.crossPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
         gameMarket={false}
         showModelOnly={false}
         categoryNote={GEN_CATEGORY_NOTE}

@@ -560,8 +560,12 @@ describe("leg count", () => {
       const s = spec({ market: HITS, sides: "both", legs: n, onePerGame: false });
       expect(ok(generate(pool, s, 31)).legs).toHaveLength(n);
     }
+    /* LEG_MAX is 20 since 2026-09-26 — more players than this fixture's HITS market carries, so the clamp shows as
+       the want in the honest short-pool answer (a 20-leg ticket is built on a bigger pool in tests/gen-hold-drag.test.ts) */
     const tooMany = spec({ market: HITS, sides: "both", legs: 99, onePerGame: false, pinned: [] });
-    expect(ok(generate(pool, tooMany, 31)).legs).toHaveLength(LEG_MAX);
+    const clamped = generate(pool, tooMany, 31);
+    expect(LEG_MAX).toBe(20);
+    expect(clamped.ok ? clamped.ticket.legs.length : clamped.fail.code === "short-pool" ? clamped.fail.want : -1).toBe(LEG_MAX);
     const tooFew = spec({ market: HITS, sides: "both", legs: 1, onePerGame: false, pinned: [] });
     expect(ok(generate(pool, tooFew, 31)).legs).toHaveLength(LEG_MIN);
   });

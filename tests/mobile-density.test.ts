@@ -230,7 +230,8 @@ describe("Parlay Builder — 36px generator slots, hero hidden, buttons a size d
   const gen = read("src/components/props/GenSheet.tsx");
   it("slots retain their minimum height and the right-side lock is compact with an accessible label", () => {
     expect(gen).toMatch(/gen-player-card flex min-h-9 items-center gap-1\.5 border-t border-white\/\[0\.04\] py-0\.5 sm:min-h-\[44px\] sm:gap-2/); // 44px from sm since the desktop density pass (2026-09-19); was 52px
-    expect(gen).toMatch(/press flex h-6 w-6 shrink-0 flex-col items-center justify-center rounded-\[8px\] border text-\[7\.5px\] font-bold uppercase tracking-wide/);
+    /* 28px since 2026-09-26: the lock sits alone on the right edge now that the exclude ✕ moved to the far left */
+    expect(gen).toMatch(/press relative flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-\[8px\] border text-\[7\.5px\] font-bold uppercase tracking-wide before:absolute before:-inset-2 before:content-\[''\]/);
     expect(gen).toContain('aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}');
     expect(gen).toMatch(/flex min-h-9 items-center gap-2 border-t border-l-2 border-white\/\[0\.04\] border-l-gold py-1 pl-1\.5 sm:min-h-\[44px\]/);
   });

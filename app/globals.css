@@ -769,6 +769,12 @@ body::after {
 .gen-roll.is-rolling .gen-dice { animation:gen-dice .55s cubic-bezier(.3,.7,.4,1) infinite; }
 @keyframes gen-dice { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion:reduce) { .gen-reel { display:none; } .gen-slot-reeling,.gen-rolling .gen-ticket-total,.gen-rolling .gen-ticket-total > span,.gen-roll.is-rolling .gen-dice { animation:none; } }
+/* HOLD-AND-DRAG (2026-09-26, Josh: "Should be able to press on pick in parlay generator and drag it to wherever on list")
+   — src/components/props/useSlotDrag.ts moves the cards with inline transforms; the lifted one rides above the list with a
+   cerulean edge and the others slide apart to open its gap. Specificity beats the pick-card shadow rule below. */
+.desk-content .gen-player-card[data-lifted] { position:relative; z-index:30; cursor:grabbing; box-shadow:0 16px 32px -12px #000e,0 0 0 1.5px #3ab0e8cc; }
+[data-slots-dragging] > .gen-player-card:not([data-lifted]) { transition:transform .16s cubic-bezier(.2,.8,.2,1); }
+@media (prefers-reduced-motion:reduce) { [data-slots-dragging] > .gen-player-card:not([data-lifted]) { transition:none; } }
 
 
 /* PORTRAIT LOCK (2026-09-19, Josh: "It should not be able to rotate into landscape mode while using the app").

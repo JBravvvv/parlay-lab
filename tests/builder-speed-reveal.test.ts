@@ -97,7 +97,10 @@ describe("the reveal — a slot machine over real legs", () => {
   it("the reel faces come from the pool's own legs and the Generate press starts the reveal", () => {
     const sheet = read("src/components/props/GenSheet.tsx");
     expect(sheet).toMatch(/<ReelOverlay/);
-    expect(sheet).toMatch(/setReveal\(startReveal\(next,/);
+    /* 2026-09-26 follow-up: the press HOLDS the reels; they land from the render where the spin's own ticket exists
+       (spinKey moved), never from the press — see tests/gen-hold-drag.test.ts */
+    expect(sheet).toMatch(/setHeld\(\{ reveal: holdReveal\(-next, performance\.now\(\)\) \}\)/);
+    expect(sheet).toMatch(/setReveal\(startReveal\(spinKey,/);
     expect(sheet).not.toMatch(/Math\.random/);
     const css = fs.readFileSync(path.join(process.cwd(), "app/globals.css"), "utf8");
     expect(css).toMatch(/\.gen-reel\s*\{\s*display:\s*none/);

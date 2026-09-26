@@ -14,7 +14,13 @@ export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avo
  const p=poolOf(candidates,pool);
  const clean:GenSpec={...spec,betType:undefined,strategies:undefined,preferDiversity:undefined,style:model?undefined:chosen==="safe"?"safer":chosen?"balanced":spec.style};
  if(chosen==="longshot" && spec.payout && spec.payout.maxAm<7500) return {ok:false,fail:{code:"payout-unreachable",reach:{minAm:7500,maxAm:1_000_000}}};
- if(chosen==="longshot") clean.payout={minAm:Math.max(7500,spec.payout?.minAm??7500),maxAm:spec.payout?.maxAm??1_000_000};
+ /* Longshot's own band when Josh set none: +7,500 or longer. Up to 8 legs it keeps the +1,000,000 ceiling it always had,
+    so every ticket up to 8 legs draws exactly as before; from 9 legs it is floor-only (2026-09-26) — the cheapest 19-20
+    leg ticket on an ordinary band already sits above +1,000,000, so that ceiling made the style impossible there. The
+    ceiling stays finite because the payout repair steers toward the band's geometric middle. */
+ if(chosen==="longshot") clean.payout={minAm:Math.max(7500,spec.payout?.minAm??7500),maxAm:spec.payout?.maxAm??(spec.legs<=8?1_000_000:1e300)};
+ /* Correlated / Stacks pairs two legs from one game — under one-leg-per-game no draw can ever fit, so name the switch */
+ if(chosen==="stacks" && spec.onePerGame) return {ok:false,fail:{code:"style-shape",style:"stacks",legs:spec.legs,why:"same-game"}};
  let best:GenResult<P>|null=null,bestScore=-Infinity;
  const score=(ls:readonly GenLeg<P>[])=>{
   const games=new Map<string,number>(); for(const l of ls)games.set(l.gameKey,(games.get(l.gameKey)??0)+1);
@@ -47,5 +53,10 @@ export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avo
   if(chosen==="stacks"&&!ls.some((l,j)=>ls.some((x,k)=>j!==k&&x.gameKey===l.gameKey)))continue;
   const s=score(ls)-(avoid?.has(r.ticket.key)?1000:0); if(s>bestScore){best=r;bestScore=s;}
  }
- return best?.ok?best:best??{ok:false,fail:{code:"short-pool",have:0,want:spec.legs,relax:null}};
+ // best is null only when every run built a ticket and the chosen style's shape rule refused each one — say which rule
+ // could never be met on this pool when that is knowable, so the sheet points at the real control
+ if(best) return best;
+ const starts=eligible.map(l=>Date.parse(l.start??"")).filter(Number.isFinite);
+ const why=chosen==="anchor"&&!eligible.some(l=>l.am>0)?"no-plus":chosen==="hedge"&&(starts.length<2||Math.max(...starts)-Math.min(...starts)<3*3600000)?"one-window":null;
+ return {ok:false,fail:{code:"style-shape",style:chosen??"",legs:spec.legs,why}};
 }

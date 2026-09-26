@@ -8,8 +8,9 @@ import { DiscoveryFilters } from "./DiscoveryFilters";
 import { STRATEGIES } from "@/lib/discovery";
 import { MultiSelect } from "./MultiSelect";
 import { gameTimeLabel, slateTimeBounds } from "@/lib/game-time-window";
-import { landAtMs, ODDS_COUNT_MS, OddsTicker, ReelOverlay, startReveal, type ReelFace, type Reveal } from "./ParlayReveal";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { holdReveal, landAtMs, ODDS_COUNT_MS, OddsTicker, ReelOverlay, startReveal, type ReelFace, type Reveal } from "./ParlayReveal";
+import { useSlotDrag } from "./useSlotDrag";
+import { useEffect, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
 import { amFmt, amToDec, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -156,7 +157,11 @@ const RELAX_HINT: Record<string, string> = {
  */
 export function genFailLine(
   fail: GenFail,
-  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean; phase?: GenSpec["phase"]; boardAt?: string | null },
+  ctx: { marketLabel: string; legs: number; loAm: number; hiAm: number; allFinished?: boolean; phase?: GenSpec["phase"]; boardAt?: string | null;
+    /** Josh set no combined payout — so a payout failure is the Longshot style's own +7,500 floor (2026-09-26) */
+    styleBand?: boolean;
+    /** how many parlay styles are selected (a Regenerate draws another of them) */
+    styles?: number },
 ): string {
   switch (fail.code) {
     case "phase-empty":
@@ -195,9 +200,21 @@ export function genFailLine(
       return `Only ${fail.have} leg${fail.have === 1 ? "" : "s"} clears these filters and you asked for ${fail.want} — ${hint}.`;
     }
     case "payout-unreachable":
-      return `A ${ctx.legs}-leg ${ctx.marketLabel} parlay from this pool pays about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)} — your target payout sits outside that, so nothing here can reach it.`;
+      return ctx.styleBand
+        ? `The Longshot style needs +7500 or longer combined, and a ${ctx.legs}-leg ${ctx.marketLabel} parlay from this pool pays about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)} — add legs or raise the odds per leg.`
+        : `A ${ctx.legs}-leg ${ctx.marketLabel} parlay from this pool pays about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)} — your target payout sits outside that, so nothing here can reach it.`;
     case "payout-not-found":
-      return `Could not land inside your target payout in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}, try Generate again or widen the target.`;
+      return ctx.styleBand
+        ? `Could not reach the Longshot style's +7500 floor in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}; Regenerate, add legs or raise the odds per leg.`
+        : `Could not land inside your target payout in ${REPAIR_TRIES} tries — this pool reaches about ${amFmt(fail.reach.minAm)} to ${amFmt(fail.reach.maxAm)}, try Generate again or widen the target.`;
+    case "style-shape": {
+      const style = STRATEGIES.find((s) => s.key === fail.style)?.label ?? "chosen";
+      if (fail.why === "same-game") return `The ${style} style pairs two legs from one game, and one leg per game is on — allow legs from the same game and it can build.`;
+      if (fail.why === "no-plus") return `The ${style} style needs a plus-money kicker, and no leg in your odds band is plus money — raise the max odds above +100.`;
+      if (fail.why === "one-window") return `The ${style} style needs games at least 3 hours apart, and every game in this pool starts inside one window.`;
+      const tries = [fail.legs > LEG_MIN ? "try fewer legs" : null, (ctx.styles ?? 1) > 1 ? "Regenerate to draw another of your styles" : "add another style"].filter(Boolean);
+      return `No ${fail.legs}-leg ticket on this board fits the ${style} style's shape — ${tries.join(" or ")}.`;
+    }
     case "pin-missing":
       return `${fail.ids.length} kept slot${fail.ids.length === 1 ? " is" : "s are"} no longer posted on this board — unpin the gold slot${fail.ids.length === 1 ? "" : "s"} and spin again.`;
     case "pin-position":
@@ -369,8 +386,7 @@ function Slot<P>({
   onExclude,
   excluded = false,
   onMove,
-  dragFrom = null,
-  onDragFrom,
+  onGrab,
   reel,
   landMs,
 }: {
@@ -386,11 +402,11 @@ function Slot<P>({
   onTogglePin: (slot: number) => void;
   onExclude?: (slot: number) => void;
   excluded?: boolean;
-  /** move this slot to another position (2026-09-18) — drag on a pointer, ▲/▼ on a thumb */
+  /** move this slot to another position — the keyboard ▲/▼ pair calls it directly */
   onMove?: (from: number, to: number) => void;
-  dragFrom?: number | null;
-  onDragFrom?: (slot: number | null) => void;
-  /** the reveal's reel over this slot while it spins (2026-09-26), and when it lands */
+  /** hold-and-drag (2026-09-26): the pointer-down that may lift this card — absent while the reels spin */
+  onGrab?: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  /** the reveal's reel over this slot while it spins (2026-09-26), and when it lands (absent while a reveal is held) */
   reel?: ReactNode;
   landMs?: number;
 }) {
@@ -401,22 +417,47 @@ function Slot<P>({
   const parsed = parseBoardLabel(l.label);
   const name = parsed?.name ?? l.label;
   const team = parsed?.team ?? l.team;
-  const dragging = dragFrom === i;
-  const dropTarget = dragFrom != null && dragFrom !== i;
+  /* ▲/▼ are the keyboard path: the card keeps its React identity through the move, so the very button pressed is still
+     in the DOM — hand focus back to it (or to its partner at the end of the list) so the pair stays up for the next step */
+  const keyStep = (btn: HTMLButtonElement, to: number) => {
+    onMove?.(i, to);
+    requestAnimationFrame(() => {
+      if (btn.isConnected && !btn.disabled) btn.focus();
+      else btn.parentElement?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    });
+  };
   return (
     <div
       data-gen-slot={i}
-      draggable={!!onMove}
-      onDragStart={onMove ? (e) => { e.dataTransfer.effectAllowed = "move"; onDragFrom?.(i); } : undefined}
-      onDragOver={onMove ? (e) => { if (dragFrom != null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } } : undefined}
-      onDrop={onMove ? (e) => { e.preventDefault(); if (dragFrom != null && dragFrom !== i) onMove(dragFrom, i); onDragFrom?.(null); } : undefined}
-      onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
+      data-drag-slot={onGrab ? "" : undefined}
+      onPointerDown={onGrab}
+      /* no native image/text drag may fight the hold-and-drag (a headshot is an <img>, draggable by default) */
+      onDragStart={onGrab ? (e) => e.preventDefault() : undefined}
       data-pick-market={l.market} className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[44px] sm:gap-2 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
-      }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}${landMs != null ? " gen-slot-reeling relative" : ""}`}
+      }${onGrab ? " cursor-grab select-none [-webkit-touch-callout:none]" : ""}${reel ? " relative" : ""}${landMs != null ? " gen-slot-reeling" : ""}`}
       style={landMs != null ? ({ "--land": `${landMs}ms` } as CSSProperties) : undefined}
     >
       {reel}
+      {/* THE EXCLUDE ✕ SITS AT THE FAR LEFT (2026-09-26, Josh: "Need to move 'x' button from right below 'lock' now
+          that everything is smaller so you don't accidentally press 'x' instead of locking player in parlay"). It used
+          to stack 2px under the lock; now the card's two ends hold the two opposite actions — drop him on the left,
+          keep him on the right — the way a sportsbook slip puts its remove ✕ on the left of each leg. Still the 24px
+          ghost from 2026-09-18 ("The exclude player button is way too big"); excluded → "↺" restores him. */}
+      {onExclude && (
+        <button
+          type="button"
+          data-no-drag
+          onClick={() => onExclude(i)}
+          aria-label={excluded ? `Restore ${name}` : `Exclude ${name} from generated parlays`}
+          title={excluded ? "Restore this player" : "Exclude this player from spins"}
+          className={`press flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none ${
+            excluded ? "border-gold/50 bg-gold/10 text-gold" : "border-white/[0.08] bg-white/[0.03] text-faint hover:border-neg/50 hover:text-neg"
+          }`}
+        >
+          <span aria-hidden>{excluded ? "↺" : "✕"}</span>
+        </button>
+      )}
       {/* the slot number (2026-09-18, Josh: "numbers next to the picks generated so its easy to see
           how many picks if someone is looking over your shoulder") */}
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
@@ -453,46 +494,34 @@ function Slot<P>({
         </span>
         <span className="mt-1 text-[8px] text-muted" title="Estimated chance of this leg winning; not certainty">{l.src === "market" ? "Mkt est." : "Model"} <strong className="num text-text">{l.prob.toFixed(1)}%</strong></span>
       </div>
-      {/* ▲/▼ for thumbs and keyboards; the whole card drags with a pointer (2026-09-18) */}
+      {/* ▲/▼ are the KEYBOARD path now (2026-09-26): a thumb or a mouse holds the card and drags it, so the pair is
+          visually hidden until a key focuses it — two 16px buttons beside the lock were one more thing to mis-tap */}
       {onMove && (
-        <span className="flex shrink-0 flex-col gap-px">
-          <button type="button" aria-label={`Move slot ${i + 1} up`} disabled={i === 0} onClick={() => onMove(i, i - 1)}
+        <span data-no-drag className="sr-only flex shrink-0 flex-col gap-px focus-within:not-sr-only">
+          <button type="button" aria-label={`Move slot ${i + 1} up`} disabled={i === 0} onClick={(e) => keyStep(e.currentTarget, i - 1)}
             className="press flex h-4 w-6 items-center justify-center rounded-[5px] border border-white/[0.08] bg-white/[0.03] text-[8px] leading-none text-faint hover:text-text disabled:opacity-25">▲</button>
-          <button type="button" aria-label={`Move slot ${i + 1} down`} disabled={i >= count - 1} onClick={() => onMove(i, i + 1)}
+          <button type="button" aria-label={`Move slot ${i + 1} down`} disabled={i >= count - 1} onClick={(e) => keyStep(e.currentTarget, i + 1)}
             className="press flex h-4 w-6 items-center justify-center rounded-[5px] border border-white/[0.08] bg-white/[0.03] text-[8px] leading-none text-faint hover:text-text disabled:opacity-25">▼</button>
         </span>
       )}
-      <div className="flex shrink-0 flex-col gap-0.5">
-      {/* "hit the 'lock it in' button on the pick then regenerate the ones below it" */}
+      {/* "hit the 'lock it in' button on the pick then regenerate the ones below it" — alone on the right edge now,
+          28px, with nothing stacked under it to hit by mistake */}
       <button
         type="button"
+        data-no-drag
         aria-pressed={pinned}
         aria-label={`${pinned ? "Unlock" : "Lock in"} slot ${i + 1}: ${name}`}
         onClick={() => onTogglePin(i)}
-        className={`press flex h-6 w-6 shrink-0 flex-col items-center justify-center rounded-[8px] border text-[7.5px] font-bold uppercase tracking-wide ${
+        className={`press relative flex h-7 w-7 shrink-0 flex-col items-center justify-center rounded-[8px] border text-[7.5px] font-bold uppercase tracking-wide before:absolute before:-inset-2 before:content-[''] ${
           pinned ? "border-pos/60 bg-pos/10 text-pos ring-1 ring-pos/50" : "border-white/[0.08] bg-surface-2 text-faint"
         }`}
       >
-        <span aria-hidden className="text-[12px] leading-none">
+        {/* the ::before reaches 8px past the box on every side: the phone's 0.7 content zoom draws this 28px lock at
+            about 20px, so the thumb gets a 44px target around it with nothing else to hit on the card's right edge */}
+        <span aria-hidden className="text-[13px] leading-none">
           {pinned ? "🔒" : "🔓"}
         </span>
       </button>
-      {/* THE EXCLUDE CONTROL IS A 24px GHOST "✕" (2026-09-18: "The exclude player button is way too
-          big and visible it looks atrocious"). Excluded → a small "↺" that restores him. */}
-      {onExclude && (
-        <button
-          type="button"
-          onClick={() => onExclude(i)}
-          aria-label={excluded ? `Restore ${name}` : `Exclude ${name} from generated parlays`}
-          title={excluded ? "Restore this player" : "Exclude this player from spins"}
-          className={`press flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[10px] leading-none ${
-            excluded ? "border-gold/50 bg-gold/10 text-gold" : "border-white/[0.08] bg-white/[0.03] text-faint hover:border-neg/50 hover:text-neg"
-          }`}
-        >
-          <span aria-hidden>{excluded ? "↺" : "✕"}</span>
-        </button>
-      )}
-      </div>
     </div>
   );
 }
@@ -543,6 +572,8 @@ export function GenSheet<P>({
   onSpec,
   result,
   onGenerate,
+  spinKey = 0,
+  moved = 0,
   onBack, onForward, canBack = false, canForward = false, historyNotice,
   onTogglePin,
   onMove,
@@ -584,6 +615,11 @@ export function GenSheet<P>({
   onSpec: (patch: Partial<GenSpec>) => void;
   result: GenResult<P>;
   onGenerate: () => void;
+  /** the desk's spin counter (useParlayGen's `spinKey`): it moves only when a spin has produced its ticket, and THAT is
+      when the reels start landing — never at the press, which on football comes seconds before the fresh quotes */
+  spinKey?: number;
+  /** legs of the ticket on screen whose price moved, or that left the board, since it was spun */
+  moved?: number;
   onBack?: () => void;
   onForward?: () => void;
   canBack?: boolean;
@@ -632,10 +668,25 @@ export function GenSheet<P>({
   void band;
   const [attempt, setAttempt] = useState(0);
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  /* the slot being dragged, for the drop highlight (2026-09-18) */
-  const [dragFrom, setDragFrom] = useState<number | null>(null);
-  /* the slot-machine reveal (2026-09-26) — set by the Generate press itself, so the new ticket never flashes first */
+  /* THE REVEAL LANDS ON THE SPIN'S OWN TICKET (2026-09-26 follow-up, Josh: "After parlay generator spins and rolls
+     out the picks, it waits to finish loading 'the board' I guess? And then it changes the picks. It shouldn't change
+     anything after it rolls them out one by one"). The first cut started landing at the PRESS. On football a Live or
+     Mixed press first re-pulls the prop prices and only spins once they are back, so the reels landed on the OLD
+     ticket and the new one replaced it seconds later. Now a press HOLDS the reels spinning (`held`) and they start
+     landing only when `spinKey` moves — the render in which the spin's ticket exists. On MLB the spin is synchronous,
+     so the hold never shows; a refresh that fails, or a press that spins nothing, releases the hold and the ticket
+     on screen stands untouched. */
   const [reveal, setReveal] = useState<Reveal | null>(null);
+  const [held, setHeld] = useState<{ reveal: Reveal | null } | null>(null);
+  const [spinSeen, setSpinSeen] = useState(spinKey);
+  const pinnedNow = spec.pinned.slice(0, spec.legs).filter(Boolean).length;
+  if (spinKey !== spinSeen) {
+    setSpinSeen(spinKey);
+    setHeld(null);
+    setReveal(startReveal(spinKey, spec.legs - pinnedNow));
+  } else if (held && !loading) {
+    setHeld(null);
+  }
   useEffect(() => {
     if (!reveal) return;
     const t = setTimeout(() => setReveal((r) => (r === reveal ? null : r)), reveal.end + ODDS_COUNT_MS + 650);
@@ -672,10 +723,24 @@ export function GenSheet<P>({
   }, [pool]);
   const selectedMarkets = specMarkets(spec);
   const ticket = result.ok ? result.ticket : null;
-  const rolling = !!reveal && !!ticket;
-  /* each unlocked slot lands in turn, top to bottom; a locked slot never spins */
+  /* a press still waiting on fresh quotes shows the HELD reels; otherwise the landing reveal, if one is running */
+  const holding = !!held && loading;
+  const shown = holding ? held!.reveal : reveal;
+  const rolling = !!shown && !!ticket;
+  /* each unlocked slot lands in turn, top to bottom (Infinity while held); a locked slot never spins */
   const landTimes: (number | undefined)[] = [];
-  if (ticket && rolling) { let k = 0; for (let i = 0; i < ticket.legs.length; i++) landTimes.push(spec.pinned[i] === ticket.legs[i].id ? undefined : landAtMs(k++)); }
+  if (ticket && rolling) {
+    const spinning = ticket.legs.filter((l, i) => spec.pinned[i] !== l.id).length;
+    let k = 0;
+    for (let i = 0; i < ticket.legs.length; i++) landTimes.push(spec.pinned[i] === ticket.legs[i].id ? undefined : holding ? Infinity : landAtMs(k++, spinning));
+  }
+  /* hold-and-drag reorder (2026-09-26) — only while a ticket is on screen and resting: off while the reels spin, and
+     off with the sheet shut or on the Games stub, so the scroll gate it registers never outlives a draggable list */
+  const drag = useSlotDrag(onMove, open && !gameMarket && !!ticket && !rolling, ticket?.key ?? null);
+
+  /* a tap skips a LANDING reveal; a held one keeps masking the old ticket until the spin lands (2026-09-26 review:
+     skipping the hold exposed the pre-press legs, and the spin then replaced them — the very change Josh reported) */
+  const skipReveal = () => { if (!holding) setReveal(null); };
   /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
      the headline here still cannot disagree with the slip the legs are handed to */
   const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob, push: l.push }))) : null;
@@ -702,9 +767,11 @@ export function GenSheet<P>({
           ? { label: `Use available odds ${amFmt(availableBand.legMinAm)} to ${amFmt(availableBand.legMaxAm)}`, patch: availableBand }
           : fail?.code === "short-pool" && fail.have >= LEG_MIN && !spec.pinned.some(Boolean)
             ? { label: `Build ${fail.have} legs instead`, patch: { legs: fail.have } }
-            : fail?.code === "payout-unreachable"
+            : fail?.code === "payout-unreachable" && spec.payout != null
               ? { label: "Remove combined payout target", patch: { payout: null } }
-              : null;
+              : fail?.code === "style-shape" && fail.why === "same-game"
+                ? { label: RELAX_BUTTON["same-game"], patch: RELAX_PATCH["same-game"] }
+                : null;
   /* the kept slots, resolved against the pool — rendered in EVERY state, success or failure,
      so the unpin button the failure copy tells Josh to press is always on screen */
   const pinRows = spec.pinned
@@ -804,7 +871,14 @@ export function GenSheet<P>({
               <span className="text-[9px] uppercase text-faint">Legs</span>
               <div className="flex h-9 items-center rounded-lg border border-white/10 bg-surface-2">
                 <button type="button" aria-label="Remove one leg" disabled={spec.legs <= LEG_MIN} onClick={() => onSpec({ legs: spec.legs - 1 })} className="h-full flex-1 disabled:opacity-30">−</button>
-                <output aria-label="Leg count" className="num font-bold">{spec.legs}</output>
+                {/* tap the number for a native picker (2026-09-26: the stepper now reaches 20, eighteen taps from 2) */}
+                <span className="relative flex h-full min-w-9 items-center justify-center">
+                  <output aria-label="Leg count" className="num font-bold">{spec.legs}</output>
+                  <select aria-label="Choose leg count" value={spec.legs} onChange={(e) => onSpec({ legs: Number(e.target.value) })}
+                    className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0">
+                    {Array.from({ length: LEG_MAX - LEG_MIN + 1 }, (_, k) => LEG_MIN + k).map((n) => <option key={n} value={n}>{n} legs</option>)}
+                  </select>
+                </span>
                 <button type="button" aria-label="Add one leg" disabled={spec.legs >= LEG_MAX} onClick={() => onSpec({ legs: spec.legs + 1 })} className="h-full flex-1 disabled:opacity-30">+</button>
               </div>
             </div>
@@ -947,7 +1021,7 @@ export function GenSheet<P>({
           <div id="props-gen-ticket" className="gen-ticket space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:space-y-2.5 @3xl:p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-pos">Your ticket</span>
-            {ticket && <span className="num min-w-0 truncate text-[9.5px] text-faint">{ticket.legs.length} picks{onMove ? " · drag or ▲▼ to reorder · lock what you like, then regenerate" : ""}</span>}
+            {ticket && <span className="num min-w-0 truncate text-[9.5px] text-faint">{ticket.legs.length} picks{onMove ? " · hold and drag to reorder · lock what you like, then regenerate" : ""}</span>}
           </div>
           {onBack && <div className="flex items-center gap-2">
             <button type="button" onClick={onBack} disabled={!canBack || loading} className="press h-8 flex-1 rounded-full border border-white/10 text-[11px] font-semibold disabled:opacity-35 sm:h-9">← Previous parlay</button>
@@ -995,16 +1069,22 @@ export function GenSheet<P>({
           </div>}
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
-            <div key={ticket.key} aria-busy={rolling} className={`gen-ticket-reveal${rolling ? " gen-rolling" : ""}`} style={rolling ? ({ "--reveal-end": `${reveal!.end}ms` } as CSSProperties) : undefined}>
-              <div className="space-y-1 sm:space-y-1.5">
+            <div key={ticket.key} aria-busy={rolling} className={`gen-ticket-reveal${rolling && !holding ? " gen-rolling" : ""}`} style={rolling && !holding ? ({ "--reveal-end": `${shown!.end}ms` } as CSSProperties) : undefined}>
+              {/* the ticket on screen holds until Josh asks for another (useParlayGen); when the board under it has
+                  moved since the spin, say so — never swap the legs, never quietly re-price them */}
+              {moved > 0 && !rolling && !holding && !historyNotice && (
+                <p role="status" data-testid="gen-moved" className="mb-1 text-[10px] text-gold">
+                  {moved} leg{moved === 1 ? "" : "s"} moved or came off the board since this spin — Regenerate for current prices.
+                </p>
+              )}
+              <div ref={drag.listRef} className="space-y-1 sm:space-y-1.5">
                 {ticket.legs.map((l, i) => (
                   <Slot
                     key={l.id}
                     i={i}
                     count={ticket.legs.length}
                     onMove={onMove}
-                    dragFrom={dragFrom}
-                    onDragFrom={setDragFrom}
+                    onGrab={drag.grab?.(i)}
                     l={l}
                     pinned={spec.pinned[i] === l.id}
                     outOfBand={outside.has(l.id)}
@@ -1014,8 +1094,8 @@ export function GenSheet<P>({
                     onTogglePin={onTogglePin}
                     excluded={excludedPlayers.some(p => p.key === exclusionKey(l))}
                     onExclude={excludedPlayers.some(p => p.key === exclusionKey(l)) ? () => onRestorePlayer?.(exclusionKey(l)) : onExcludePlayer}
-                    landMs={landTimes[i]}
-                    reel={landTimes[i] != null ? <ReelOverlay key={reveal!.spin} reveal={reveal!} landAt={landTimes[i]!} faces={faces} offset={i * 7} onSkip={() => setReveal(null)} /> : undefined}
+                    landMs={landTimes[i] != null && Number.isFinite(landTimes[i]) ? landTimes[i] : undefined}
+                    reel={landTimes[i] != null ? <ReelOverlay key={shown!.spin} reveal={shown!} landAt={landTimes[i]!} faces={faces} offset={i * 7} onSkip={skipReveal} /> : undefined}
                   />
                 ))}
               </div>
@@ -1041,7 +1121,7 @@ export function GenSheet<P>({
                 </div>
               )}
               <div className="gen-ticket-total num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
-                <span className="gen-combined-odds text-[14px] font-bold text-pos"><span className="block text-[8px] font-semibold uppercase tracking-[0.16em] text-muted">Combined odds</span><OddsTicker key={rolling ? reveal!.spin : "shown"} am={calc.am} reveal={rolling ? reveal : null} /></span>
+                <span className="gen-combined-odds text-[14px] font-bold text-pos"><span className="block text-[8px] font-semibold uppercase tracking-[0.16em] text-muted">Combined odds</span><OddsTicker key={rolling ? shown!.spin : "shown"} am={calc.am} reveal={rolling ? shown : null} /></span>
                 <span className="text-muted">
                   estimated <b className="text-text">{(calc.trueProb * 100).toFixed(1)}%</b>
                 </span>
@@ -1108,6 +1188,8 @@ export function GenSheet<P>({
                       legs: spec.legs,
                       loAm: spec.legMinAm,
                       hiAm: spec.legMaxAm,
+                      styleBand: spec.payout == null,
+                      styles: spec.strategies?.length ?? STRATEGIES.length,
                       /* `rows` counts only the rows that were still bettable, so rows 0 with
                          nothing dropped for being under way and something dropped for being over
                          means exactly one thing: every game in this market has finished */
@@ -1124,18 +1206,18 @@ export function GenSheet<P>({
             {(
               <button
                 type="button"
-                onClick={() => { const next = attempt + 1; setAttempt(next); setReveal(startReveal(next, spec.legs - spec.pinned.slice(0, spec.legs).filter(Boolean).length)); onGenerate(); }}
+                onClick={() => { const next = attempt + 1; setAttempt(next); setHeld({ reveal: holdReveal(-next, performance.now()) }); onGenerate(); }}
                 disabled={loading}
-                className={`gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12${rolling ? " is-rolling" : ""}`}
+                className={`gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12${rolling || holding ? " is-rolling" : ""}`}
               >
                 <svg aria-hidden className="gen-dice mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
-                {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
+                {holding ? "Getting fresh prices…" : loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
               </button>
             )}
             <button
               type="button"
               onClick={onAdd}
-              disabled={!ticket}
+              disabled={!ticket || holding}
               className={`press min-h-10 shrink-0 rounded-[12px] border px-3 text-[12px] font-semibold sm:min-h-12 ${
                 ticket ? "border-white/[0.12] bg-surface-2 text-text" : "border-white/[0.06] bg-surface-2/50 text-faint"
               }`}

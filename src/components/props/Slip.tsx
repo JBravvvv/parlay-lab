@@ -165,8 +165,9 @@ function Stat({ label, value, sub, tone }: { label: string; value: string; sub?:
   return (
     <div className="rounded-[8px] bg-white/[0.03] px-1 py-1.5 leading-none">
       <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-faint">{label}</div>
-      <div className={`mt-1 text-[13px] font-bold ${color}`}>{value}</div>
-      {sub && <div className="mt-1 text-[8.5px] text-faint">{sub}</div>}
+      {/* a 20-leg price can run to 13 digits (2026-09-26): it steps down a size and wraps, never clips */}
+      <div className={`mt-1 min-w-0 font-bold [overflow-wrap:anywhere] ${value.length > 8 ? "text-[10.5px] leading-tight" : "text-[13px]"} ${color}`}>{value}</div>
+      {sub && <div className="mt-1 min-w-0 text-[8.5px] text-faint [overflow-wrap:anywhere]">{sub}</div>}
     </div>
   );
 }

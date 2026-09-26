@@ -266,6 +266,10 @@ function PropsDesk() {
        the spin produced that is already there is kept once, not doubled and not toggled off.
        This slip's only rule is leg identity — `toggle` below dedupes on the same `l.id`. */
     addLegs: (prev, add) => [...prev.filter((l) => !add.some((a) => a.id === l.id)), ...add],
+    /* the ticket holds once the board and its prop rows have landed (2026-09-26); the hit-rate window is Josh's own
+       setting, so with a hit-rate floor on, moving it is a new request */
+    ready: !q.isPending && !browseProps.loading,
+    inputsKey: String(hitWindow),
   });
   const { pool, spec } = gen;
   useEffect(()=>{if(params.has("phase"))gen.setOpen(true);},[]);
@@ -473,6 +477,8 @@ function PropsDesk() {
         onSpec={gen.patchSpec}
         result={gen.result}
         onGenerate={gen.spin}
+        spinKey={gen.spinKey}
+        moved={gen.moved}
         onTogglePin={gen.togglePin}
         onMove={gen.reorder}
         onExcludePlayer={gen.excludePlayer}
@@ -490,7 +496,7 @@ function PropsDesk() {
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={boardAtLabel}
-        loading={q.isPending || browseProps.loading}
+        loading={q.isPending || browseProps.loading || gen.crossPending}
         gameMarket={false}
         showHitRate
         hitWindow={hitWindow}

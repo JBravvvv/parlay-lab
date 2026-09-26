@@ -1,5 +1,5 @@
 import { STRATEGIES, SPORT_OPTIONS, TIMING_OPTIONS } from "./discovery";
-import type { GenSpec } from "./parlay-gen";
+import { LEG_MAX, LEG_MIN, type GenSpec } from "./parlay-gen";
 
 /**
  * A recipe stores preferences only: never quoted legs, forecasts or tickets.
@@ -21,7 +21,7 @@ export function decodeSetup(raw: string | null, markets: readonly string[], posi
     const saved = JSON.parse(raw ?? "null");
     if (saved?.version !== 1 && saved?.version !== 2) return null;
     const s = saved.settings;
-    if (!s || !markets.includes(s.market) || !Number.isInteger(s.legs) || s.legs < 2 || s.legs > 8
+    if (!s || !markets.includes(s.market) || !Number.isInteger(s.legs) || s.legs < LEG_MIN || s.legs > LEG_MAX
       || !isPrice(s.legMinAm) || !isPrice(s.legMaxAm) || !["o", "u", "both"].includes(s.sides)
       || (s.positions !== undefined && (!Array.isArray(s.positions) || s.positions.length > positions.length
         || s.positions.some((p: unknown) => typeof p !== "string" || !positions.includes(p))))

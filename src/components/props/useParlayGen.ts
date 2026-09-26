@@ -17,6 +17,7 @@ import {
   type GenPoolSpec,
 } from "@/lib/parlay-gen";
 import { excludePlayers, exclusionKey, exclusionFilterKey } from "@/lib/parlay-exclusions";
+import { holdTicket, movedLegs, withBoard, type HeldTicket } from "@/lib/parlay-hold";
 import { BOOKS, SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
 import { useSportsbook } from "@/lib/sportsbook/store";
 const NO_POSITIONS: readonly string[] = [];
@@ -35,6 +36,8 @@ const NO_POSITIONS: readonly string[] = [];
  *    render must mark no game as started, or hydration mismatches.
  *  - `nowMs` is set once on mount and NEVER on a timer: a ticket Josh is looking at must not
  *    reshuffle itself under him.
+ *  - THE TICKET ON SCREEN HOLDS (2026-09-26): a new pool alone never replaces a ticket — only a
+ *    request does (a spin, a setting, an exclusion, the board's date). See `generated` below.
  *  - changing the leg count or the market CLEARS the pins, because a pin is a leg id and a leg
  *    id is market-specific — keeping them would only ever come back as "pin-missing".
  *  - UNPINNING ALWAYS WORKS: clearing a pin reads the id from the SPEC (always available), not
@@ -71,6 +74,12 @@ export type UseParlayGen<P> = {
   clearExclusions: () => void;
   /** Regenerate — remembers this ticket so the next spin moves */
   spin: () => void;
+  /** moves once per spin, in the render where that spin's ticket exists — the sheet's reveal lands on it (2026-09-26) */
+  spinKey: number;
+  /** legs of the ticket on screen whose price moved, or that left the board, since it was spun (2026-09-26) */
+  moved: number;
+  /** another sport's legs are still loading — the desk counts it as loading, so Generate waits for them */
+  crossPending: boolean;
   back: () => void;
   forward: () => void;
   canBack: boolean;
@@ -102,6 +111,9 @@ export function useParlayGen<P>({
   legs,
   setLegs,
   addLegs,
+  ready = true,
+  inputsKey = "",
+  frozen = false,
 }: {
   /** where the open/closed state is remembered — derive it from the league, never a literal */
   sport?: "mlb" | "nfl" | "cfb";
@@ -132,6 +144,16 @@ export function useParlayGen<P>({
    * or toggled back off.
    */
   addLegs: (prev: readonly P[], add: readonly P[]) => P[];
+  /** the board has finished its FIRST load. Until then a ticket still follows the pool as it fills; from then on the
+      ticket on screen holds (2026-09-26). Omitted = ready. */
+  ready?: boolean;
+  /** anything the desk's pool reads that Josh sets himself OUTSIDE the spec — the MLB hit-rate window. It joins the
+      request only while a hit-rate floor is set, because only then does it change which legs may be drawn; without a
+      floor it only moves the chips, which follow the pool on the held ticket anyway (withHits). */
+  inputsKey?: string;
+  /** a refresh-then-spin is pending (football Live/Mixed): draw nothing until that spin, so no stand-in ticket is ever
+      drawn against the fresh quotes for the OLD spin — and none is filed in history or the avoid list (2026-09-26) */
+  frozen?: boolean;
 }): UseParlayGen<P> {
   /* `open` is read from localStorage only AFTER mount — the hydration rule (the same one
      app/board/page.tsx:123-135 states): an initializer read would render one tree on the
@@ -155,10 +177,16 @@ export function useParlayGen<P>({
   );
 
   const [spec, setSpec] = useState<GenSpec>({...defaultSpec,...(sport?{sports:[sport]}:{})});
+  /* THE BOARD'S DATE, held through a moment with no board (2026-09-26 review): the MLB desk's board query reads undefined
+     while the sport switch sits on football, and that '' used to wipe the held ticket, the exclusions and the history —
+     a round trip MLB → NFL → MLB came back to a redrawn ticket. Only a different date is a new board. */
+  const lastBoard = useRef(boardKey);
+  if (boardKey) lastBoard.current = boardKey;
+  const board = lastBoard.current;
   /* INSTRUCTION 67 (2026-09-17): "settle-book only" keeps legs priced at the selected sportsbook — DraftKings by default */
   const selectedBook = useSportsbook();
   const pricingBook = BOOKS.find((b) => b.key === selectedBook)?.short ?? SETTLE_BOOK_SHORT;
-  const filterKey = `${storageKey}:${boardKey}:${exclusionFilterKey(spec)}`;
+  const filterKey = `${storageKey}:${board}:${exclusionFilterKey(spec)}`;
   const [exclusions, setExclusions] = useState<{ filter: string; players: {key: string; label: string}[] }>({ filter: "", players: [] });
   const excludedPlayers = useMemo(() => exclusions.filter === filterKey ? exclusions.players : [], [exclusions, filterKey]);
   const excludedKeys = useMemo(() => new Set(excludedPlayers.map(p => p.key)), [excludedPlayers]);
@@ -211,7 +239,10 @@ export function useParlayGen<P>({
      dependency change. A closed sheet gets the empty pool, which the generator answers with
      `no-rows` at no cost. */
   const poolSpec = useMemo(() => ({ market: spec.market, markets: spec.markets, includeStarted: spec.includeStarted, phase: spec.phase }), [spec.market, spec.markets, spec.includeStarted, spec.phase]);
-  const foreign = useCrossSports(boardKey,open && sport ? (spec.sports??[sport]).filter(s=>s!==sport) : []);
+  const foreignSports = open && sport ? (spec.sports??[sport]).filter(s=>s!==sport) : [];
+  const foreign = useCrossSports(boardKey,foreignSports);
+  /* another sport's legs are still on their way: a ticket drawn now would hold without them (2026-09-26 review) */
+  const crossPending = foreignSports.length > 0 && foreign.isLoading;
   const pool = useMemo(() => {
     if(!open)return emptyPool<P>();
     const local=build(poolSpec,nowMs);
@@ -219,13 +250,33 @@ export function useParlayGen<P>({
     const cross=convertCross?foreign.legs.filter(l=>(spec.markets?.length?spec.markets:[spec.market]).includes(l.market??"")).map(l=>({...l,leg:convertCross(l.leg)})):[];
     return excludePlayers(poolOf([...localLegs,...cross],local),excludedKeys);
   },[open,build,poolSpec,nowMs,excludedKeys,spec.sports,sport,foreign.legs,convertCross,spec.markets,spec.market]);
-  const generated = useMemo<GenResult<P>>(
-    () =>
-      open
-        ? generate(pool, { ...spec, pricingBook }, specSeed(spec, boardKey, roll), new Set(history.current), playerExposure(recentPlayers.current))
-        : { ok: false, fail: { code: "no-rows" } },
-    [open, pool, spec, pricingBook, roll, boardKey],
-  );
+  /* THE TICKET ON SCREEN HOLDS (2026-09-26, Josh, verbatim: "After parlay generator spins and rolls out the picks,
+     it waits to finish loading 'the board' I guess? And then it changes the picks. It shouldn't change anything after
+     it rolls them out one by one").
+
+     The pool rebuilds by itself whenever the board under it moves — on MLB the live-price poll, the in-game clock and
+     the game logs landing after the board (each rebuild reads the clock afresh), on football the quote refresh a
+     Live/Mixed press runs before its spin — and this memo re-ran generate() on every one of those, so a ticket
+     re-rolled under Josh with no press at all. Now a ticket is computed for a REQUEST: the settings, the pricing book,
+     the spin counter, the board's date and the exclusions. A new pool alone never replaces a ticket that is showing,
+     and closing the sheet builds nothing and forgets nothing — reopening it shows the same ticket. Pins are left out of the request on purpose — locking a slot or dragging a locked leg to another
+     seat only re-seats pins, and the next spin honours them. A failure (or the empty board while it loads) is not a
+     ticket, so it still follows the pool: the board arriving turns "Waiting for today's board" into a ticket. Prices on
+     a held ticket can go stale, so `moved` counts them for the sheet and "Add to slip" refuses a moved ticket. */
+  const exclusionSig = useMemo(() => [...excludedKeys].sort().join("|"), [excludedKeys]);
+  /* the rail's category is display only while several categories are on the ticket — the pool is their union — so a
+     browse tap inside the set is not a request (2026-09-26 review: it re-seeded and swapped every unlocked leg) */
+  const requestKey = JSON.stringify([{ ...spec, pinned: null, market: (spec.markets?.length ?? 0) > 1 ? null : spec.market }, pricingBook, roll, board, exclusionSig, spec.minHit != null ? inputsKey : ""]);
+  const held = useRef<HeldTicket<P>>(null);
+  const generated = useMemo<GenResult<P>>(() => {
+    if (!open || !boardKey) return { ok: false, fail: { code: "no-rows" } };
+    if (frozen && held.current) return held.current.result;
+    /* a ticket drawn while the board is still on its first load is provisional — it follows the pool until it is full */
+    const next = holdTicket(held.current, requestKey, ready && !crossPending, () =>
+      generate(pool, { ...spec, pricingBook }, specSeed(spec, board, roll), new Set(history.current), playerExposure(recentPlayers.current)));
+    held.current = next.held;
+    return next.result;
+  }, [open, pool, spec, pricingBook, roll, board, boardKey, requestKey, ready, frozen, crossPending]);
 
   /* DISPLAY ORDER (2026-09-18, Josh: "ability to reorder/drag the picks so if im keeping the bottom
      pick i can drag it to top, hit the 'lock it in' button on the pick then regenerate the ones
@@ -233,11 +284,16 @@ export function useParlayGen<P>({
      is an overlay keyed by that ticket: it applies while the same legs are on screen and falls
      away the moment a spin produces a different set. A pin travels with its leg: the spec's slot
      pins are permuted by the same move, so "drag to the top, lock it, regenerate" seats the kept
-     leg in slot 1 of the next ticket. Pins alone do not change which legs the walk seats
-     (tests/parlay-gen-reorder.test.ts), so the permuted spec re-rolls to the same set. */
+     leg in slot 1 of the next ticket. Pins are not part of the request above (2026-09-26), so a
+     drag never re-rolls the ticket on screen; and pins alone do not change which legs the walk
+     seats (tests/parlay-gen-reorder.test.ts), so the next spin keeps the locked legs where he put them. */
   const [order, setOrder] = useState<{ key: string; ids: readonly string[] } | null>(null);
   const baseResult = recalled?.result ?? generated;
-  const result = useMemo(() => applyOrder(baseResult, order), [baseResult, order]);
+  /* a held ticket keeps its legs and prices; a leg still posted at the very same price is DRAWN as the board draws it
+     now — the game-log chip that landed after the spin, a new hit-rate window, a headshot or position the roster filled
+     in — never a price, never a different leg (withBoard) */
+  const result = useMemo(() => applyOrder(withBoard(baseResult, pool), order), [baseResult, pool, order]);
+  const moved = useMemo(() => (result.ok && !recalled?.historical ? movedLegs(result.ticket.legs, pool) : 0), [result, pool, recalled]);
   const reorder = (from: number, to: number) => {
     if (!result.ok) return;
     const legs = result.ticket.legs;
@@ -268,7 +324,7 @@ export function useParlayGen<P>({
   useEffect(() => {
     past.current = []; future.current = []; setRecalled(null);
     refreshHistory((revision) => revision + 1);
-  }, [boardKey, storageKey]);
+  }, [board, storageKey]);
 
   /* ONE market state: the RAIL owns it. A category tap inside the sheet moves the rail, and
      this effect copies the rail's market back into the spec, so the two cannot disagree.
@@ -276,7 +332,8 @@ export function useParlayGen<P>({
      than leaving pins that could only ever come back as "pin-missing". */
   useEffect(() => {
     if (!railMarket || !marketKeys.includes(railMarket)) return;
-    if (railMarket !== spec.market) leaveRecall();
+    /* a browse tap INSIDE the ticket's category set is display only — it keeps a recalled/pinned view too (2026-09-26 review) */
+    if (railMarket !== spec.market && !spec.markets?.includes(railMarket)) leaveRecall();
     /* several categories (2026-09-18): a rail move INSIDE the selected set just changes which one
        the rail shows — the pool is the same union, so the pins stay. A rail move OUTSIDE it
        collapses the set to the rail's category, the way a single-category sheet always behaved. */
@@ -378,6 +435,10 @@ export function useParlayGen<P>({
     if (result.ticket.legs.some(l => excludedKeys.has(exclusionKey(l)))) {
       setSetupNotice("This saved ticket includes an excluded player. Regenerate or restore that player before adding."); return;
     }
+    /* a held ticket whose price moved never reaches the slip at the old price (2026-09-26) */
+    if (moved > 0) {
+      setSetupNotice("These quotes changed or are no longer available. Regenerate before adding to the slip.");return;
+    }
     if(spec.phase){
       const current=build(poolSpec,Date.now());
       if(result.ticket.legs.some(l=>{const fresh=l.sport && sport && l.sport!==sport ? pool.byId.get(l.id) : current.byId.get(l.id);return (!l.started && !!l.start && Date.parse(l.start)<=Date.now()) || (l.started && (!l.quoteAt || Date.now()-Date.parse(l.quoteAt)>(l.sport==="mlb"||sport==="mlb"&&!l.sport?1_800_000:600_000))) || !fresh||fresh.am!==l.am||fresh.book!==l.book||fresh.prob!==l.prob||(fresh.push??0)!==(l.push??0)||fresh.quoteAt!==l.quoteAt;})){
@@ -406,6 +467,9 @@ export function useParlayGen<P>({
     reorder,
     excludedPlayers, excludePlayer, restorePlayer, clearExclusions,
     spin,
+    spinKey: roll,
+    moved,
+    crossPending,
     back: () => navigate("back"), forward: () => navigate("forward"),
     canBack: past.current.length > 0, canForward: future.current.length > 0,
     historyNotice: recalled?.historical ? "Previous ticket · saved quotes, not refreshed. Regenerate to use the current board." : null,

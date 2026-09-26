@@ -17,21 +17,39 @@ import { amFmt, amToDec, decToAm } from "@/lib/ticket-math";
  */
 export const REEL_BASE_MS = 560;
 export const REEL_STAGGER_MS = 170;
+/** the last reel lands at most this long after the first — a 20-leg ticket (2026-09-26) would otherwise take 3.8s */
+export const REEL_WINDOW_MS = 1600;
 export const ODDS_COUNT_MS = 480;
 
+/** `end` is Infinity while a reveal is HELD — the reels keep spinning until the spin's ticket exists */
 export type Reveal = { spin: number; at: number; end: number };
 export type ReelFace = { name: string; sub: string; price: string };
 
 export const prefersReducedMotion = (): boolean =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** when the k-th unlocked slot lands, in ms after the press */
-export const landAtMs = (k: number): number => REEL_BASE_MS + k * REEL_STAGGER_MS;
+/** the gap between two landings: 170ms up to ten reels, tighter above that so the whole ticket lands inside REEL_WINDOW_MS */
+export const staggerMs = (spinning: number): number =>
+  spinning > 1 ? Math.min(REEL_STAGGER_MS, Math.floor(REEL_WINDOW_MS / (spinning - 1))) : REEL_STAGGER_MS;
+
+/** when the k-th of `spinning` unlocked slots lands, in ms after the reveal starts */
+export const landAtMs = (k: number, spinning = 1): number => REEL_BASE_MS + k * staggerMs(spinning);
 
 /** A reveal for `spinning` unlocked slots, or null when there is nothing to spin or motion is reduced. */
 export function startReveal(spin: number, spinning: number): Reveal | null {
   if (spinning <= 0 || prefersReducedMotion()) return null;
-  return { spin, at: performance.now(), end: landAtMs(spinning - 1) };
+  return { spin, at: performance.now(), end: landAtMs(spinning - 1, spinning) };
+}
+
+/**
+ * A HELD reveal: the reels spin with no landing while the desk is still fetching the quotes the spin will use (the
+ * football Live/Mixed path refreshes prices first, then spins). The reels only ever land on the ticket that spin
+ * produced — never on the old one that is about to be replaced (2026-09-26, Josh: "It shouldn't change anything
+ * after it rolls them out one by one").
+ */
+export function holdReveal(spin: number, at: number): Reveal | null {
+  if (prefersReducedMotion()) return null;
+  return { spin, at, end: Infinity };
 }
 
 /** One reel over one slot. Unmounts itself once it has landed. */
@@ -57,8 +75,8 @@ export function ReelOverlay({ reveal, landAt, faces, offset, onSkip }: { reveal:
     const tick = () => {
       const t = performance.now() - reveal.at;
       if (t >= landAt) return land();
-      /* fast at the start, slowing into the landing — the reel "catches" */
-      const p = Math.max(0, t) / landAt;
+      /* fast at the start, slowing into the landing — the reel "catches". A held reel (landAt Infinity) stays fast. */
+      const p = Number.isFinite(landAt) ? Math.max(0, t) / landAt : 0;
       const gap = 42 + 190 * p * p;
       if (t - last >= gap) {
         last = t;
@@ -85,7 +103,7 @@ export function ReelOverlay({ reveal, landAt, faces, offset, onSkip }: { reveal:
   );
 }
 
-/** The combined odds: "···" while the reels spin, then a count up to the ticket's price. */
+/** The combined odds: "···" while the reels spin (and while a reveal is held), then a count up to the ticket's price. */
 export function OddsTicker({ am, reveal }: { am: number; reveal: Reveal | null }) {
   const [done, setDone] = useState(!reveal);
   const ref = useRef<HTMLSpanElement>(null);

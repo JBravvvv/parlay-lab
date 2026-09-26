@@ -113,7 +113,7 @@ export type GenSpec = {
   minHit?: number | null;
   /** restrict to these game keys; empty/omitted = every game on the board */
   games?: readonly string[];
-  /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI only offers 2..8) */
+  /** EXACT number of legs, clamped to LEG_MIN..LEG_MAX (the UI offers 2..20 since 2026-09-26) */
   legs: number;
   /** PER-LEG band in American odds, either order (-152 … +110) */
   legMinAm: number;
@@ -267,13 +267,19 @@ export type GenFail =
   | { code: "payout-unreachable"; reach: { minAm: number; maxAm: number } }
   | { code: "payout-not-found"; reach: { minAm: number; maxAm: number } }
   | { code: "pin-missing"; ids: readonly string[] }
+  /* every draw built a ticket and the one chosen style's own shape rule refused them all (Anchor + Kicker, Hedge-Friendly,
+     Stacks) — far likelier at 12-20 legs (2026-09-26); it used to surface as "Only 0 legs clear these filters" */
+  | { code: "style-shape"; style: string; legs: number; why?: "same-game" | "no-plus" | "one-window" | null }
   | { code: "pin-position"; ids: readonly string[] }
   | { code: "pin-conflict"; ids: readonly string[]; why: "same-player" | "same-game" | "same-team" };
 
 export type GenResult<P = unknown> = { ok: true; ticket: GenTicket<P> } | { ok: false; fail: GenFail };
 
 export const LEG_MIN = 2;
-export const LEG_MAX = 8;
+/* 20 since 2026-09-26 (Josh: "Parlay Generator should go up as high as 20 picks"). Every count up to 8
+   walks exactly as before — sampleOrder's weighted head is max(40, 8 * legs), so only tickets above 5
+   legs ever saw a longer head, and those counts are unchanged; 9..20 are simply newly reachable. */
+export const LEG_MAX = 20;
 /** bounded payout repair: at most this many swaps, scanning at most this many candidates each */
 export const REPAIR_TRIES = 240;
 export const REPAIR_SCAN = 400;
