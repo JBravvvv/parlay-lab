@@ -799,7 +799,7 @@ function DayCard({ e, scope, open, today, league }: { e: CfbLedgerEntry; scope: 
   const breach = dayMarks?.breaches.find((b) => b.bucket === scope) ?? null;
   return (
     <details
-      className="glass cursor-pointer px-4 py-3"
+      className="ledger-day glass cursor-pointer px-4 py-3"
       open={isOpen}
       onToggle={(ev) => setIsOpen(ev.currentTarget.open)}
       onClick={(ev) => {
@@ -902,7 +902,7 @@ export function CfbLedger() {
   const record = `${s.w}-${s.l}${s.push ? `-${s.push}` : ""}`;
 
   return (
-    <div className="space-y-4">
+    <div className="ledger-workspace space-y-4">
       <CfbSyncChip />
 
       {(open || importMsg) && (
@@ -949,7 +949,7 @@ export function CfbLedger() {
       </div>
 
       <Reveal>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="ledger-metrics grid grid-cols-2 gap-3 md:grid-cols-5">
           <StatTile label="Net P/L" value={fmtMoneyExact(s.pl)} sub={`$${s.ret.toFixed(2)} returned`} tone={plTone} />
           <StatTile label="ROI" value={roiPct(s.roi)} sub="on settled stakes" tone={s.roi == null ? "muted" : s.roi >= 0 ? "pos" : "neg"} />
           <StatTile label="Record" value={record} sub={`${s.pending} pending · ${s.ungradable} void`} tone={L.id} />
@@ -965,7 +965,7 @@ export function CfbLedger() {
       </Reveal>
 
       <Reveal delay={0.05}>
-        <Panel
+        <details className="ledger-equity"><summary>Equity chart · {s.days.length} settled days</summary><Panel
           title={`Equity · ${scope}`}
           action={<span className="num text-[10.5px] text-faint">{s.days.length} settled day{s.days.length === 1 ? "" : "s"}</span>}
         >
@@ -975,7 +975,7 @@ export function CfbLedger() {
               Biggest hit · {s.bigHit.name} · ${s.bigHit.payout.toFixed(2)} on {railLabel(s.bigHit.date)}
             </p>
           )}
-        </Panel>
+        </Panel></details>
       </Reveal>
 
       {days.length === 0 ? (

@@ -199,7 +199,7 @@ function TicketRow({
   const pkOf = (gkey?: string | null) => (gkey && e.games ? e.games[gkey]?.pk ?? null : null);
   const dayDone = !!e.grading?.done;
   return (
-    <div data-testid="ticket-row" data-open={open ? "1" : "0"} onClick={toggle} className="cursor-pointer select-none border-t border-white/[0.04] pt-2">
+    <div data-testid="ticket-row" data-open={open ? "1" : "0"} onClick={toggle} className="pick-ticket ledger-ticket-row cursor-pointer select-none p-2">
       <button
         type="button"
         aria-expanded={open}
@@ -598,7 +598,7 @@ function MlbLedgerPage() {
           </div>
 
           <Reveal>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div className="mlb-ledger-metrics grid grid-cols-2 gap-2 md:grid-cols-5">
               <Panel className={stats!.pl >= 0 ? "glow-pos" : ""}>
                 <div className="text-[9.5px] font-bold uppercase tracking-[0.18em] text-muted">Net P/L</div>
                 <div className={`display num mt-1 text-[22px] ${stats!.pl >= 0 ? "text-pos" : "text-neg"}`}>
@@ -640,7 +640,7 @@ function MlbLedgerPage() {
 
           {equity.length > 0 && (
             <Reveal>
-              <div className="grid gap-3 md:grid-cols-2">
+              <details className="ledger-equity"><summary>Performance charts</summary><div className="grid gap-3 md:grid-cols-2">
                 <Panel title="Equity (cumulative P/L)">
                   <div className="h-40">
                     <ResponsiveContainer>
@@ -665,7 +665,7 @@ function MlbLedgerPage() {
                     </ResponsiveContainer>
                   </div>
                 </Panel>
-              </div>
+              </div></details>
             </Reveal>
           )}
 

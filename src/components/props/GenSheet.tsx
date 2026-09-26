@@ -405,7 +405,7 @@ function Slot<P>({
       onDragOver={onMove ? (e) => { if (dragFrom != null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } } : undefined}
       onDrop={onMove ? (e) => { e.preventDefault(); if (dragFrom != null && dragFrom !== i) onMove(dragFrom, i); onDragFrom?.(null); } : undefined}
       onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
-      className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[44px] sm:gap-2 ${
+      data-pick-market={l.market} className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[44px] sm:gap-2 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
       }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}`}
     >
@@ -428,9 +428,7 @@ function Slot<P>({
           )}
         </div>
         {l.gameLabel && <div className="pick-matchup mt-1 truncate text-[9px] text-muted">{l.gameLabel} · {gameTimeLabel(l.start)}</div>}
-        <div className="mt-1 text-[9px] text-text" title="Estimated chance of this leg winning. A grade measures value at the posted price, not certainty.">
-          {l.src === "market" ? "Market estimate" : "Model probability"} <strong className="num">{l.prob.toFixed(1)}%</strong>
-        </div>
+
         {l.context && <PickContext pick={l.context}/>}
         {l.hit && hitWindow != null && (
           <div className="mt-[3px] hidden items-center gap-1.5 sm:flex">
@@ -439,12 +437,13 @@ function Slot<P>({
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col items-end leading-none">
+      <div className="gen-leg-price flex shrink-0 flex-col items-end leading-none">
         <span className="pick-price num text-[13px] font-semibold text-pos">{amFmt(l.am)}</span>
         <span className="mt-[3px] flex items-center gap-1 text-[9px] text-faint">
           {l.src === "market" && <span className="italic">mkt</span>}
           {l.book && l.book !== "CZ" && <span className="uppercase">{l.book}</span>}
         </span>
+        <span className="mt-1 text-[8px] text-muted" title="Estimated chance of this leg winning; not certainty">{l.src === "market" ? "Mkt est." : "Model"} <strong className="num text-text">{l.prob.toFixed(1)}%</strong></span>
       </div>
       {/* ▲/▼ for thumbs and keyboards; the whole card drags with a pointer (2026-09-18) */}
       {onMove && (
@@ -557,7 +556,7 @@ export function GenSheet<P>({
   hitWindow,
   onHitWindow,
   hitLoading = false,
-  categoryNote = "Tap several categories to mix them on one ticket — the rail above shows the one you tapped last.",
+  categoryNote = "Open Markets to choose which categories can appear on your ticket.",
   stubNote = "The parlay generator builds PLAYER-prop parlays — pick a batter or pitcher market above and it appears here. Moneyline and run line are game markets and have no player slots yet.",
   marketNote = "Italic legs use market estimates; differences from the selected book price are not independent evidence of a model edge.",
 }: {
@@ -767,8 +766,9 @@ export function GenSheet<P>({
           {/* Desktop: settings beside the ticket; mobile: optional settings above picks. */}
           <div className="gen-workspace">
           <div id="props-gen-settings" className={`${customizeOpen ? "block" : "hidden"} space-y-2 @3xl:block`}>
-          {/* legs · sides · timing — one row of selects */}
-          <div className="flex items-end gap-2">
+          <div className="gen-controls-grid"><div className="gen-primary-controls">
+          {/* legs and sides */}
+          <div className="gen-leg-side-controls">
             <div className="min-w-0 flex-1">
               <span className="text-[9px] uppercase text-faint">Legs</span>
               <div className="flex h-9 items-center rounded-lg border border-white/10 bg-surface-2">
@@ -779,27 +779,26 @@ export function GenSheet<P>({
             </div>
             {/* sides — not offered on a yes-only market (INSTRUCTION 52 fix pass) */}
             {oneSided ? (
-              <div data-testid="gen-one-sided" className="min-w-0 flex-1 self-center text-[9.5px] leading-snug text-faint">
-                {marketLabel} has one side only — the price is on it happening, so there is no over or under to pick
-                here.
+              <div data-testid="gen-one-sided" className="gen-one-side min-w-0 text-[10px] text-muted" title={`${marketLabel} has one side only — the price is on it happening, so there is no over or under to pick here.`}>
+                <span>Sides</span><b>Yes only</b>
               </div>
             ) : (
               <Select label="Sides" value={spec.sides} onChange={(v) => onSpec({ sides: v as GenSpec["sides"] })}
                 options={[{ value: "o", label: "Overs" }, { value: "u", label: "Unders" }, { value: "both", label: "Both" }]} />
             )}
           </div>
-          <label className="flex items-center gap-2 text-[11px] font-bold">
+          <label className="gen-bet-type text-[11px] font-bold">
             Bet Type
             <select aria-label="Bet Type" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={spec.betType??"styles"} onChange={e=>onSpec({betType:e.target.value as "styles"|"model",...(e.target.value==="model"?{modelOnly:false}:{})})}>
               <option value="styles">Parlay Styles</option><option value="model">The Model</option>
             </select>
           </label>
 
-          <div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div>
+
 
 
           {/* per-leg odds band */}
-          <div>
+          <div className="gen-odds-controls">
             <div className="mb-1 flex items-baseline justify-between gap-2">
               <span className="text-[9.5px] font-bold uppercase tracking-[0.14em] text-faint">Odds per leg</span>
               <span className="num text-[9.5px] text-faint">{counts.inBand} of {counts.eligible} legs in band</span>
@@ -810,6 +809,8 @@ export function GenSheet<P>({
             </div>
             <OddsSlider prices={prices} lo={spec.legMinAm} hi={spec.legMaxAm} onChange={(lo, hi) => onSpec({ legMinAm: lo, legMaxAm: hi })} />
           </div>
+
+          </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters stacked hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>
 
           {/* hit-rate floor + window — MLB only, two selects on one row */}
           {showHitRate && hitWindow != null && (
@@ -822,6 +823,7 @@ export function GenSheet<P>({
             </div>
           )}
 
+          <div className="gen-extra-controls">
           {/* games */}
           {games.length > 1 && (
             <details className="rounded-lg border border-white/10 px-2 py-1"><summary className="cursor-pointer text-[11px] text-muted">Games · {spec.games?.length ? `${spec.games.length} selected` : "All"}</summary><ChipRow label="Games" hint={spec.games?.length ? `${spec.games.length} of ${games.length}` : `all ${games.length}`}>
@@ -836,7 +838,7 @@ export function GenSheet<P>({
 
           {/* positions — football */}
           {positions && (
-            <fieldset className="min-w-0" aria-label="Player positions">
+            <details className="gen-position-settings"><summary>Positions · {spec.positions?.length?spec.positions.join(" / "):"All"}</summary><fieldset className="min-w-0" aria-label="Player positions">
               <ChipRow label="Positions" hint={`${distinctPlayers} eligible players`}>
                 <Chip on={!spec.positions?.length} onClick={() => onSpec({ positions: [] })}>All</Chip>
                 {positions.map((position) => {
@@ -849,7 +851,7 @@ export function GenSheet<P>({
                 })}
               </ChipRow>
               {positionsLoading ? <Faint>Checking roster positions…</Faint> : !!spec.positions?.length && unknownPositions > 0 && <Faint>{unknownPositions} players with unverified positions excluded.</Faint>}
-            </fieldset>
+            </fieldset></details>
           )}
 
           {/* advanced — the rare switches, and the saved setup */}
@@ -908,6 +910,7 @@ export function GenSheet<P>({
               )}
             </div>
           </details>
+          </div>
 
           </div>
           <div id="props-gen-ticket" className="gen-ticket space-y-1.5 rounded-xl border border-white/10 bg-bg/40 p-2 @3xl:space-y-2.5 @3xl:p-3">

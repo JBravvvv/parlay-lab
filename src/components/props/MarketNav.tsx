@@ -22,7 +22,9 @@ export function MarketNav({
   count,
   hitWindow,
   onHitWindow,
+  showCategories = true,
 }: {
+  showCategories?: boolean;
   tab: TabKey;
   mktKey: string;
   onTab: (t: TabKey) => void;
@@ -39,11 +41,10 @@ export function MarketNav({
 }) {
   return (
     <div
-      className="sticky z-20 -mx-4 mb-2 border-b border-white/[0.06] bg-bg/85 px-4 pb-1.5 pt-1 backdrop-blur-xl md:mx-0 md:rounded-b-[16px] md:px-0"
-      style={{ top }}
+      className={`${showCategories ? "sticky z-20" : "relative"} -mx-4 mb-2 border-b border-white/[0.06] bg-bg/85 px-4 pb-1.5 pt-1 md:mx-0 md:rounded-b-[16px] md:px-0`}
+      style={showCategories ? { top } : undefined}
     >
-      <Segmented tab={tab} onTab={onTab} />
-      <MarketRail tab={tab} mktKey={mktKey} onMarket={onMarket} />
+      {showCategories && <><Segmented tab={tab} onTab={onTab} /><MarketRail tab={tab} mktKey={mktKey} onMarket={onMarket} /></>}
       {search != null && (
         <SearchBox value={search} onChange={onSearch} lines={count.lines} games={count.games} hitWindow={hitWindow} onHitWindow={onHitWindow} />
       )}

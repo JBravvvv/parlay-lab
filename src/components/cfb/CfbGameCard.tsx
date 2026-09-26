@@ -266,7 +266,7 @@ export function CfbGameCard({
   }
 
   return (
-    <article className={`glass card-lift min-w-0 overflow-hidden ${isLive ? "ring-1 ring-live/25" : ""} ${className}`}>
+    <article className={`football-game-card glass card-lift min-w-0 overflow-hidden ${isLive ? "ring-1 ring-live/25" : ""} ${className}`}>
       {/* header: status left (live pill · kickoff · FINAL), neutral tag + model toggle right */}
       <div
         role="button"
@@ -291,7 +291,7 @@ export function CfbGameCard({
           )}
           {game.tv && !isLive && <span className="truncate text-[9.5px] font-medium normal-case tracking-normal text-faint">{game.tv}</span>}
         </div>
-        <span className="shrink-0 text-[9.5px] font-medium text-faint">{"Game details ↗"}</span>
+        <span className="shrink-0 text-[9.5px] font-medium text-faint">{edges.length>0&&<b className="text-pos">{edges.length} edges · </b>}Game details ↗</span>
       </div>
 
       <div className="px-3 pb-3">
@@ -313,7 +313,7 @@ export function CfbGameCard({
         )}
 
         {!isFinal && edges.length > 0 && (
-          <ul className="mt-2 space-y-1" aria-label="Edges at selected book">
+          <ul className="game-edges mt-2 space-y-1" aria-label="Edges at selected book">
             {edges.map((r) => (
               <li key={r.key} className={`flex items-center gap-2 rounded-[10px] border px-2 py-1 text-[11px] ${nfl ? "border-nfl/25 bg-nfl/[0.06]" : "border-cfb/25 bg-cfb/[0.06]"}`}>
                 <GradeChip grade={r.grade} basis="EV @ selected book" />
@@ -327,7 +327,7 @@ export function CfbGameCard({
         )}
 
         {(meta.length > 0 || unmatched) && (
-          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-snug text-faint">
+          <div className="game-meta mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] leading-snug text-faint">
             {unmatched && <span className={accentText}>No odds-feed match</span>}
             {meta.map((m, i) => (
               <span key={i} className="inline-flex items-center gap-2">
@@ -339,7 +339,7 @@ export function CfbGameCard({
         )}
       </div>
 
-      <Overlay open={expanded} onClose={onToggle} title={`${game.away.abbr} @ ${game.home.abbr} · Game details`} size="full" tone={L.id}><OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} /><GameSuggestedPicks game={game}/><Expanded game={game} /></Overlay>
+      <Overlay open={expanded} onClose={onToggle} title={`${game.away.abbr} @ ${game.home.abbr} · Game details`} size="full" tone={L.id}><OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} /><div className="my-3 flex flex-wrap gap-2 text-[11px] text-muted">{meta.map((m,i)=><span key={i}>{m}</span>)}</div><GameSuggestedPicks game={game}/><Expanded game={game} /></Overlay>
     </article>
   );
 }

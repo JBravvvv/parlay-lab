@@ -221,9 +221,10 @@ export function CfbTicketCard({
   const rim = fun ? accent.rim : "";
   const heroTone = fun ? (league === "nfl" ? "is-nfl" : "is-cfb") : "";
   const settled = !!payout?.settled;
+  const single = t.legs.length === 1;
 
   return (
-    <div className={`rounded-[16px] ${glow} ${dimmed ? "opacity-55" : ""} ${className}`} data-testid="cfb-ticket">
+    <div className={`rounded-[16px] ${glow} ${dimmed ? "opacity-55" : ""} ${className}`} data-testid="cfb-ticket" data-pick-market={t.legs[0]?.market} data-result={grade?.result??"pending"} data-single={single || undefined}>
       {/* COMPACT since 2026-09-18 (Josh, verbatim: "The boxes for the picks on 'Board' and 'Builder' screens are way too big. They could easily be shrunk by 50% vertically") — tighter paddings, one-line legs, pays/EV/grade on one footer row */}
       <article className={`ticket ${shine} ${rim} px-3 pt-2`}>
         <header className="flex items-start justify-between gap-2">
@@ -242,12 +243,10 @@ export function CfbTicketCard({
               </span>
             )}
           </div>
-          <span className="num shrink-0 text-[10.5px] text-faint">
-            {t.legs.length} leg{t.legs.length === 1 ? "" : "s"}
-          </span>
+          {single ? <span className={`single-ticket-price hero-price ${heroTone}`} aria-label={`DraftKings price ${fmtAmerican(t.czOdds)}`}>{fmtAmerican(t.czOdds)}</span> : <span className="num shrink-0 text-[10.5px] text-faint">{t.legs.length} legs</span>}
         </header>
 
-        <div className="mt-1 flex items-center justify-between gap-3">
+        {!single && <div className="mt-1 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-baseline gap-1.5">
             <div className="truncate text-[12.5px] font-bold text-text">{t.name}</div>
             <div className="num shrink-0 text-[9.5px] text-faint">{t.czDec.toFixed(2)}× DK</div>
@@ -255,7 +254,7 @@ export function CfbTicketCard({
           <span className={`hero-price ${heroTone} shrink-0`} aria-label={`DraftKings price ${fmtAmerican(t.czOdds)}`}>
             {fmtAmerican(t.czOdds)}
           </span>
-        </div>
+        </div>}
 
         <ul className="mt-1.5 space-y-0.5">
           {t.legs.map((leg) => {
@@ -267,7 +266,7 @@ export function CfbTicketCard({
             const matchup = leg.player && game ? `${game.away.abbr} @ ${game.home.abbr}` : null;
             const split = !leg.player && game && (leg.market === "ml" || leg.market === "spread" || leg.market === "total") ? sideSplit(findGameSplits(splitsFeed, game.away, game.home), leg.market, leg.side) : null;
             return (
-              <li key={leg.lkey} title={v?.detail}><div className="flex items-center gap-1.5 text-[11px] leading-tight">
+              <li key={leg.lkey} title={v?.detail} data-pick-market={leg.market}><div className="flex items-center gap-1.5 text-[11px] leading-tight">
                 <LegMark leg={leg} game={game} abbrCls={accent.abbr} />
                 <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
                 {link?.href ? (
@@ -285,11 +284,11 @@ export function CfbTicketCard({
                 ) : (
                   <span className="min-w-0 flex-1 truncate text-text" title={link?.title}>{leg.label}</span>
                 )}
-                {matchup && <span className="shrink-0 text-[9px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
+                {!single && matchup && <span className="shrink-0 text-[9px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
                 </span>
-                <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{leg.prop}</span>
+                {!single && <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{leg.prop}</span>}
                 <SplitsChip split={split} compact />
-                <span className={`num shrink-0 font-semibold ${leg.cz > 0 ? "text-pos" : "text-text"}`}>{fmtAmerican(leg.cz)}</span>
+                {!single && <span className={`num shrink-0 font-semibold ${leg.cz > 0 ? "text-pos" : "text-text"}`}>{fmtAmerican(leg.cz)}</span>}
                 {v && (
                   <span
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${LEG_DOT[v.result] ?? "bg-muted"}`}

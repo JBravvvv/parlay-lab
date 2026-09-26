@@ -498,6 +498,7 @@ function PropsDesk() {
         hitLoading={hitRates.loading}
       />
       <MarketNav
+        showCategories={view !== "ranked"}
         tab={tab}
         mktKey={mktKey}
         onTab={(t) => {

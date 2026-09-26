@@ -161,13 +161,18 @@ export function ParlaysSection({
           Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
 
-        <DiscoveryFilters parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setView("all");setPfilter("all");}} markets={ALL_MARKETS}/>{discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={date} filter={discovery}/>}
-        <label className="mb-2 flex items-center gap-2 text-[11px] font-bold">
+        <DiscoveryFilters extraControls={<><label className="mb-2 flex items-center gap-2 text-[11px] font-bold">
           Ticket set
           <select aria-label="Parlay set" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={view} onChange={e=>{setView(e.target.value as typeof view);setPfilter("all");}}>
             {VIEWS.map(([v,label])=><option key={v} value={v}>{label} · {(lists[v]??[]).length}</option>)}
           </select>
-        </label>
+        </label><label className="mb-3 flex items-center gap-2 text-[11px] font-bold">
+              Ticket tier
+              <select aria-label="Ticket tier" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={filters.some(([k])=>k===pfilter)?pfilter:"all"} onChange={e=>setPfilter(e.target.value)}>
+                {filters.map(([k,label])=><option key={k} value={k}>{label} · {all.filter(t=>match(t,k)).length}</option>)}
+              </select>
+            </label></>} parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setView("all");setPfilter("all");}} markets={ALL_MARKETS}/>{discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={date} filter={discovery}/>}
+
 
         {all.length === 0 ? (
           <Panel>
@@ -182,12 +187,7 @@ export function ParlaysSection({
           </Panel>
         ) : (
           <>
-            <label className="mb-3 flex items-center gap-2 text-[11px] font-bold">
-              Ticket tier
-              <select aria-label="Ticket tier" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={filters.some(([k])=>k===pfilter)?pfilter:"all"} onChange={e=>setPfilter(e.target.value)}>
-                {filters.map(([k,label])=><option key={k} value={k}>{label} · {all.filter(t=>match(t,k)).length}</option>)}
-              </select>
-            </label>
+
 
             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {playable.slice(0, cap).map((t, ti) => {
@@ -195,7 +195,7 @@ export function ParlaysSection({
                 const toWin = e.czDec && e.stake != null ? Math.round(e.stake * (e.czDec - 1)) : e.toWin;
                 const outLeg = legOut ? t.legs.some((l) => legOut(l as { label?: string | null; gkey?: string | null; lkey?: string | null })) : false;
                 return (
-                  <Panel key={`${view}|${ti}`} className={outLeg ? "opacity-60" : (modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}>
+                  <Panel key={`${view}|${ti}`} className={`pick-ticket generated-ticket ${outLeg ? "opacity-60" : (modeEv(t) ?? -1) >= 0 ? "glow-pos" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="display text-[14px] text-text">{t.name}</div>
                       <span className="num flex shrink-0 items-center gap-2 text-[13.5px] font-bold text-gold">

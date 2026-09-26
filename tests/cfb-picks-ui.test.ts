@@ -71,15 +71,18 @@ describe("CFB Board — the one green Refresh Board control", () => {
 });
 
 describe("CFB Board — the Caesars grammar", () => {
-  it("TOP EDGES is a snap carousel of featured +EV picks with a selected-book price, above the table", () => {
+  it("TOP EDGES retains all priced edges and displays them ten at a time above the table", () => {
     expect(board).toMatch(/function TopEdges\(/);
     expect(board).toMatch(/data-testid="cfb-top-edges"/);
     expect(board.indexOf("<TopEdges rows=")).toBeLessThan(board.indexOf("<DataTable"));
     // the data decides the strip: only +EV rows with a Caesars quote, count off plusEv
-    expect(board).toMatch(/const featured = useMemo\(\(\) => plusEv\.filter\(\(r\) => r\.cz != null\)\.slice\(0, FEATURED_N\), \[plusEv\]\);/);
+    expect(board).toMatch(/const featured = useMemo\(\(\) => plusEv\.filter\(\(r\) => r\.cz != null\), \[plusEv\]\);/);
     expect(board).toMatch(/\{featured\.length > 0 && <TopEdges rows=\{featured\} total=\{plusEv\.length\}/);
     const strip = board.slice(board.indexOf("function TopEdges("), board.indexOf("function FeaturedPick("));
-    expect(strip).toMatch(/className="carousel /);
+    expect(strip).toContain('className="top-edge-grid"');
+    expect(strip).toContain("rows.slice(0,limit)");
+    expect(board).toContain("FEATURED_N=10");
+    for (const label of ["Load 10 More", ">Undo</button>", ">Clear</button>"]) expect(strip).toContain(label);
     expect(strip).toMatch(/\{total\}/);
   });
   it("a featured card shows the hero price, grade, EV and $10 wins $X off Caesars' own decimal", () => {

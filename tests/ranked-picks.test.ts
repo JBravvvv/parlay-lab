@@ -108,7 +108,8 @@ describe("RankedPicks — every pick today, S down", () => {
 
   it("the selected leg's price button is pressed; the others are not", () => {
     const out = render();
-    expect(count(out, /aria-pressed="true"/g)).toBe(1);
+    const pickRows = out.slice(out.indexOf('data-ranked-pick='));
+    expect(count(pickRows, /aria-pressed="true"/g)).toBe(1);
     expect(out).toMatch(/data-ranked-pick="a-ml"[\s\S]*?aria-pressed="true"/);
   });
 

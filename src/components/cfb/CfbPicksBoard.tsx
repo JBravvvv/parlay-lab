@@ -152,7 +152,7 @@ const SCOPES = [
 type Scope = (typeof SCOPES)[number]["key"];
 const TOP_N = 50;
 /** featured cards in the TOP EDGES carousel */
-const FEATURED_N = 8;
+export const FEATURED_N = 10;
 
 const MARKET_WORD: Record<string, string> = { ...MARKET_WORDS };
 /** the side (game-line) categories, full game and first half — the ones that never wait on the props pull */
@@ -482,7 +482,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
   const plusEv = all.filter((r) => (r.evCz ?? -1) > 0);
   const top = plusEv[0] ?? null;
   /** the featured strip: the ranked +EV picks that carry a selected-book price (S → F, EV, fair) */
-  const featured = useMemo(() => plusEv.filter((r) => r.cz != null).slice(0, FEATURED_N), [plusEv]);
+  const featured = useMemo(() => plusEv.filter((r) => r.cz != null), [plusEv]);
   /** every ticket across the twelve category sets (INSTRUCTION 42) — the engine emits each leg set under one category only, so the sets are disjoint */
   const setTickets = useMemo(() => (picks ? CFB_PARLAY_CATEGORIES.flatMap((k) => picks.sets[k] ?? []) : []), [picks]);
   const parlayCount = setTickets.length;
@@ -770,8 +770,11 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
    grade + EV, and "$10 wins $X" off Caesars' own decimal. A horizontal snap carousel — the
    strip scrolls, the page never does. Every figure is the row's own; nothing is estimated. */
 
-function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
+export function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
   const L = useLeague();
+  const [limit,setLimit]=useState(FEATURED_N);
+  const rowKey=rows.map(r=>r.key).join("|");
+  useEffect(()=>setLimit(FEATURED_N),[rowKey]);
   return (
     <Reveal>
       <section aria-label="Top edges" data-testid="cfb-top-edges">
@@ -779,13 +782,18 @@ function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total:
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="hidden md:inline text-faint">+EV at the selected book</span>
           </h2>
-          <span className="text-[10px] text-muted md:hidden">Swipe to compare →</span>
+          <span className="text-[10px] text-muted md:hidden">Ranked picks</span>
           {total > rows.length && <span className="hidden md:inline num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
         </div>
-        <div className="carousel -mx-4 px-4 md:mx-0 md:px-0">
-          {rows.map((r, i) => (
+        <div className="top-edge-grid">
+          {rows.slice(0,limit).map((r, i) => (
             <FeaturedPick key={r.key} r={r} rank={i + 1} games={games} propRows={propRows} />
           ))}
+        </div>
+        <div className="pick-pagination" aria-label="Top edges pagination">
+          {rows.length>limit&&<button onClick={()=>setLimit(n=>n+FEATURED_N)}>Load 10 More · {rows.length-limit} left</button>}
+          <button disabled={limit<=FEATURED_N} onClick={()=>setLimit(n=>Math.max(FEATURED_N,n-FEATURED_N))}>Undo</button>
+          <button disabled={limit<=FEATURED_N} onClick={()=>setLimit(FEATURED_N)}>Clear</button>
         </div>
       </section>
     </Reveal>
@@ -809,7 +817,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
           ? "linear-gradient(160deg, color-mix(in srgb, var(--color-nfl) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)"
           : "linear-gradient(160deg, color-mix(in srgb, var(--color-cfb) 12%, transparent), transparent 55%, color-mix(in srgb, var(--color-pos) 6%, transparent)), color-mix(in srgb, var(--color-surface) 94%, transparent)",
       }}
-      data-testid="cfb-featured-pick"
+      data-testid="cfb-featured-pick" data-pick-market={r.market}
     >
       {/* COMPACT since 2026-09-18 (Josh: "The boxes for the picks on 'Board' and 'Builder' screens are way too big … shrunk by 50% vertically"): the mark + pick on one row, price/EV/grade/$10-wins on the next, no tear */}
       <header className="flex items-center gap-2">
@@ -1050,20 +1058,19 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
-        <DiscoveryFilters parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
-        {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
-        <div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
+        <DiscoveryFilters extraControls={<><div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
           <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
-        </div>
+        </div><div className="mb-3 max-w-md">
+              <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>
+            </div></>} parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>
+        {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={[...games.values()][0]?.date??""} filter={discovery}/>}
         {all.length === 0 ? (
           <Panel>
             <EmptyState title={empty.title} body={empty.body} />
           </Panel>
         ) : (
           <>
-            <div className="mb-3 max-w-md">
-              <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>
-            </div>
+
 
             {/* phones: one snap carousel of compact tickets (the Caesars "boost" strip); ≥768px: the full slips in a grid.
                 Only the active layout mounts (review fix) — the display classes stay for the first paint before the effect runs. */}
@@ -1131,7 +1138,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
           ? "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-nfl) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)"
           : "linear-gradient(160deg, color-mix(in srgb, var(--color-gold) 12%, transparent), color-mix(in srgb, var(--color-cfb) 6%, transparent) 60%, transparent), color-mix(in srgb, var(--color-surface) 94%, transparent)",
       }}
-      data-testid="cfb-parlay-feature"
+      data-testid="cfb-parlay-feature" data-pick-market={t.legs[0]?.market}
     >
       <header className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
@@ -1199,7 +1206,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
   const oneIn = pct > 0 ? Math.round(100 / pct) : null;
   const pays = payout(REF_STAKE, t.dec);
   return (
-    <div className={`rounded-[16px] ${t.ev > 0 ? "ev-glow" : ""}`} data-testid="cfb-parlay">
+    <div className={`rounded-[16px] ${t.ev > 0 ? "ev-glow" : ""}`} data-testid="cfb-parlay" data-pick-market={t.legs[0]?.market}>
       <article
         className={`relative rounded-[16px] border px-4 pb-3 pt-3 ${grade === "S" && (rank ?? 1) <= SHINE_TOP ? "shine" : ""}`}
         style={{

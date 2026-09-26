@@ -1,3 +1,7 @@
+# 2026-09-25 — mobile pick presentation
+
+Implemented the eight screenshot requests in Parlay Lab: smaller Games cards, Top Edges paging, compact generator and generated-parlay controls, relocated category rail, stronger individual pick colors, tighter Ledger, restored full Card tickets, and solid safe-area header. See the September 25 session-handoff entry for scope and populated preview results. Full gate and deployment verification are being completed; final receipt is recorded externally so the deployed SHA can be checked without a self-referential commit.
+
 ## September 19 — manual refresh follow-through
 
 Follow-up to the three-book refresh request: authenticated NFL/CFB manual refresh now also retries events that previously returned zero props. They may have newly posted markets or prices at any of the three sportsbooks; a cached empty result must not hide those on a manual refresh. Passive page loads retain their empty-event cache. Integration test now asserts every selected event is fetched, including previously empty games. Application release 9a6551fb9171f5ff82dbe4b72c35e805702de870 was Vercel Ready; final follow-up receipt will identify the new HEAD. Follow-up validation: 159/159 tests across six pricing/refresh suites PASS; production build including TypeScript PASS; git diff --check PASS.

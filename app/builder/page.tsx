@@ -202,7 +202,7 @@ function TicketCard({ gameInfo, timeWindow, t, stake, kelly, grade, tag, basisMo
   const hasDetail = true;
   if(timeWindow&&!t.legs.every(l=>inGameTimeWindow(gameInfo?.[String(l.gkey)]?.start,timeWindow)))return null;
   return (
-    <div className={`glass px-3 py-1.5 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
+    <div className={`pick-ticket glass px-3 py-1.5 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <div className="min-w-0 flex-1 truncate text-[12px] font-semibold text-text sm:flex-none sm:text-[12.5px]">
           {t.name}

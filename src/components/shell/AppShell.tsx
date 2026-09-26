@@ -237,7 +237,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           so the header keeps its measured height (useShellInsets reads header.sticky). */}
       <header
         className={`phone-header sticky top-0 z-30 items-center justify-between gap-1.5 border-b border-white/[0.06] bg-bg px-3 pb-2 md:hidden ${landing ? "hidden" : "flex"}`}
-        style={{ paddingTop: "max(env(safe-area-inset-top), 0.5rem)" }}
+
       >
         <Brand />
         <SportSwitch size="sm" className="shrink-0" />
@@ -293,6 +293,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </div>
       </header>
+
+      {!landing && <div className="phone-header-spacer md:hidden" aria-hidden="true" />}
 
       {/* content */}
       {landing ? (

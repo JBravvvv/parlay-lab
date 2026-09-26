@@ -235,15 +235,7 @@ function TicketStack({
     <div><GameTimeRange value={timeWindow} onChange={setTimeWindow}/><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
-          <details className="card-phone-ticket rounded-xl border border-sky-300/30 bg-slate-900/80 md:hidden">
-            <summary className="flex min-h-16 cursor-pointer items-center gap-2 p-2">
-              {t.legs[0] && <LegMark leg={t.legs[0]} game={games.get(t.legs[0].gkey)} abbrCls="text-sky-200"/>}
-              <span className="min-w-0 flex-1"><span className="block text-xs font-bold">{t.legs.length===1?t.legs[0].label:t.name}</span><span className="block text-[10px] text-slate-300">{t.legs.length} leg{t.legs.length===1?"":"s"} · {t.prob.toFixed(1)}% · {fmtEv(t.czEv)} EV · Details ▾</span></span>
-              <span className="shrink-0 text-right"><b className="block text-sm text-amber-200">{fmtAmerican(t.czOdds)}</b><span className="text-xs font-bold text-sky-200">${t.stake}</span></span>
-            </summary>
-            <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board}/>
-          </details>
-          <div className="hidden md:block"><CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board}/></div>
+          <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} className="paper-card-ticket"/>
         </div>
       ))}
     </div>{!shown.length&&<p className="text-xs text-muted">No tickets in this game-time window.</p>}</div>
