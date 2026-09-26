@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
-import { GameTimeRange } from "@/components/props/GameTimeRange";
+import { BoardFilters } from "@/components/board/BoardFilters";
+import { ALL_MARKETS } from "@/lib/cross-sport";
+import { defaultMarkets } from "@/lib/market-scope";
+import { inOddsRange } from "@/lib/odds-range";
+import { STRATEGIES, type DiscoveryFilter } from "@/lib/discovery";
 import { inGameTimeWindow } from "@/lib/game-time-window";
 import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -146,7 +150,7 @@ function MoneyInput({
   );
 }
 
-function TicketCard({ gameInfo, timeWindow, t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { gameInfo?:MlbGameInfo; timeWindow?:readonly [number,number]; t: Ticket & { tier?: string; confirmed?: number | null }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
+function TicketCard({ gameInfo, filter, timeWindow, t, stake, kelly, grade, tag, basisMode, legNow, legWarn }: { gameInfo?:MlbGameInfo; filter?:DiscoveryFilter; timeWindow?:readonly [number,number]; t: Ticket & { tier?: string; confirmed?: number | null }; stake: number; kelly?: number | null; grade?: { result: string; payout: number }; tag?: string; basisMode?: boolean; legNow?: (l: { gkey?: string | null; lkey?: string | null }) => LegNow | null; legWarn?: boolean }) {
   /* dk_fd: the primary EV badge is the SELECTION number (basis price); Caesars EV and the
      CZ-tax gap stay visible but informational — settlement is still at CZ/confirmed */
   const primaryEv = basisMode && t.bsEv != null ? Number(t.bsEv) : t.czEv != null ? Number(t.czEv) : null;
@@ -200,6 +204,7 @@ function TicketCard({ gameInfo, timeWindow, t, stake, kelly, grade, tag, basisMo
     </span>
   );
   const hasDetail = true;
+  if (filter && !t.legs.every(l => (filter.markets.length === defaultMarkets(ALL_MARKETS,["mlb"]).length || filter.markets.includes(String(l.market ?? marketOf(l.lkey ?? "")))) && inOddsRange(l.cz == null ? NaN : Number(l.cz), filter.odds ?? {min:null,max:null}))) return null;
   if(timeWindow&&!t.legs.every(l=>inGameTimeWindow(gameInfo?.[String(l.gkey)]?.start,timeWindow)))return null;
   return (
     <div className={`pick-ticket glass px-3 py-1.5 ${Number(t.czEv) > 0 ? "ev-glow" : ""}`}>
@@ -430,7 +435,8 @@ export default function BuilderPage() {
   return <MlbBuilderPage />;
 }
 function MlbBuilderPage() {
-  const [timeWindow,setTimeWindow]=useState<readonly [number,number]>([0,24]);
+  const [ticketFilter,setTicketFilter]=useState<DiscoveryFilter>({markets:defaultMarkets(ALL_MARKETS,["mlb"]),sports:["mlb"],timing:["pregame","live"],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]});
+  const timeWindow=ticketFilter.timeWindow;
   const { data: board } = useBoard();
   // the global SportSwitch (🏈 CFB); the `sport` state below is the MLB desk's own ufc/asg sub-switch
   const desk = useSport();
@@ -614,7 +620,7 @@ function MlbBuilderPage() {
     });
     return (
       <div key={t.id}>
-        <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow}
+        <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow}
           t={{ name: t.name, legs: t.legs, czOdds: t.czOdds, czEv: t.czEv ?? null, bsOdds: t.bsOdds ?? null, bsEv: t.bsEv ?? null, prob: t.prob, confirmed: t.confirmed ?? null } as never}
           stake={t.stake}
           grade={locked.grading?.tickets?.[t.id]}
@@ -643,7 +649,7 @@ function MlbBuilderPage() {
     const seen = new Set<string>();
     return Object.entries(d.categories)
       .filter(([k]) => k !== "all")
-      .flatMap(([, v]) => v)
+      .flatMap(([market, v]) => v.map(r=>({...r,market:r.market??market})))
       .filter((r) => {
         const k = `${r.label}|${r.sub}`;
         // Phase 2: suspended lines can't enter a slip — visible on the Board only
@@ -657,9 +663,10 @@ function MlbBuilderPage() {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
     return playable
+      .filter((r) => ticketFilter.markets.includes(String(r.market ?? marketOf(r.lkey ?? ""))) && inOddsRange(Number(r.czOdds ?? r.cz),ticketFilter.odds??{min:null,max:null}))
       .filter((r) => `${r.label} ${r.sub}`.toLowerCase().includes(q) && !slip.some((s) => s.label === r.label && s.sub === r.sub))
       .slice(0, 6);
-  }, [query, playable, slip]);
+  }, [query, playable, slip, ticketFilter]);
 
   const slipCalc = useMemo(() => {
     if (slip.length < 1) return null;
@@ -725,7 +732,8 @@ function MlbBuilderPage() {
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at DraftKings"
         }
       />
-      <PaperBanner /><GameTimeRange value={timeWindow} onChange={setTimeWindow}/>
+      <PaperBanner /><BoardFilters value={ticketFilter} onChange={setTicketFilter} markets={ALL_MARKETS} showSports={false} hideStyles hideTiming/>
+      <p className="mb-2 text-[10px] text-muted">Filters change visible picks only; card allocations stay the same.</p>
 
       {(UFC_ENABLED || ASG_ENABLED) && (
         <div className="mb-3 flex items-center gap-2">
@@ -868,7 +876,7 @@ function MlbBuilderPage() {
                 <div className="space-y-3">
                   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {supp.fun.picks.map((p) => (
-                      <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
+                      <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} tag="supplemental" basisMode={basisMode} />
                     ))}
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -914,7 +922,7 @@ function MlbBuilderPage() {
                       </div>
                       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.alloc.picks.map((p) => (
-                          <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
+                          <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                         ))}
                       </div>
                     </div>
@@ -924,7 +932,7 @@ function MlbBuilderPage() {
                       <div className="num mb-2 text-[11px] text-gold">FUN · {fmtMoney(shadow.fun.sum)}</div>
                       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                         {shadow.fun.picks.map((p) => (
-                          <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
+                          <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                         ))}
                       </div>
                     </div>
@@ -1062,7 +1070,7 @@ function MlbBuilderPage() {
               )}
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.alloc.picks.map((p) => (
-                  <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
+                  <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} kelly={p.kelly} basisMode={basisMode} legWarn={p.w.pl.legs.length >= 3} />
                 ))}
               </div>
             </Reveal>
@@ -1075,7 +1083,7 @@ function MlbBuilderPage() {
               </h2>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {card.fun.picks.map((p) => (
-                  <TicketCard gameInfo={ticketGameInfo} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
+                  <TicketCard gameInfo={ticketGameInfo} filter={ticketFilter} timeWindow={timeWindow} key={p.id} t={p.w.pl} stake={p.stake} basisMode={basisMode} />
                 ))}
               </div>
             </Reveal>

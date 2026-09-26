@@ -1,4 +1,5 @@
 "use client";
+import { defaultMarkets, scopedMarkets } from "@/lib/market-scope";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { type GameTimeWindow } from "@/lib/game-time-window";
@@ -196,10 +197,10 @@ export function RankedPicks<P>({
   onSort?: (s: RankedSort) => void;
 }) {
   const sport = useSport();
-  const [discovery, setDiscovery] = useState<DiscoveryFilter>({timing:["pregame","live"],markets:filterProp && filterProp!=="all"?[filterProp]:filters.map(f=>f.key),strategies:STRATEGIES.map(s=>s.key),sports:[sport],timeWindow:[0,24]});
+  const [discovery, setDiscovery] = useState<DiscoveryFilter>({timing:["pregame","live"],markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(filters,[sport]),strategies:STRATEGIES.map(s=>s.key),sports:[sport],timeWindow:[0,24]});
   useEffect(()=>setDiscovery(d=>({...d,sports:[sport]})),[sport]);
   const filterKeys=filters.map(f=>f.key).join(",");
-  useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:d.sports.some(s=>s!==sport)?ALL_MARKETS.map(m=>m.key):filterKeys.split(",")}));},[filterProp,filterKeys]);
+  useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(d.sports.some(s=>s!==sport)?ALL_MARKETS:filterKeys.split(",").map(key=>({key})),d.sports)}));},[filterProp,filterKeys]);
   const foreign = useCrossSports(date,convertCross?discovery.sports.filter(s=>s!==sport):[]);
   const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
   const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks].filter(p=>matchesPickSearch(p,search)),[picks,crossPicks,discovery.sports,sport,search]);
@@ -249,7 +250,7 @@ export function RankedPicks<P>({
     onSort?.(s);
     setLimit(RANKED_PAGE);
   };
-  const availableMarkets = convertCross && discovery.sports.some(s=>s!==sport) ? ALL_MARKETS : filters;
+  const availableMarkets = scopedMarkets(convertCross && discovery.sports.some(s=>s!==sport) ? ALL_MARKETS : filters,discovery.sports);
   const rangeLabel = rangeText(range);
   const visible = shown.slice(0, limit);
   return (
@@ -267,7 +268,7 @@ export function RankedPicks<P>({
           {TIERS.map((t) => (tiers.get(t) ? <span key={t}><b className="text-text">{t}</b> {tiers.get(t)}</span> : null))}
         </div>
       </header>
-      <DiscoveryFilters categoryRail={<div className="ranked-market-rail" role="group" aria-label="Pick categories">
+      <DiscoveryFilters hideOdds categoryRail={<div className="ranked-market-rail" role="group" aria-label="Pick categories">
         {[{key:"all",label:"All"},...availableMarkets].map(f=><button key={f.key} type="button" aria-pressed={f.key==="all"?availableMarkets.every(m=>discovery.markets.includes(m.key)):discovery.markets.length===1&&discovery.markets[0]===f.key} onClick={()=>{pick(f.key);setDiscovery(d=>({...d,markets:f.key==="all"?availableMarkets.map(x=>x.key):[f.key]}));}}>{f.label}</button>)}
       </div>} showSports={!!convertCross} markets={availableMarkets} value={{...discovery,timeWindow}} onChange={v=>{setDiscovery(v);setTimeWindow(v.timeWindow);setLimit(RANKED_PAGE);}} />
       {/* the odds range and the price sort — one thin row under the chips, thumb-sized on the phone */}

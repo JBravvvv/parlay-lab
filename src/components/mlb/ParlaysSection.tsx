@@ -1,4 +1,5 @@
 "use client";
+import { defaultMarkets } from "@/lib/market-scope";
 
 import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
 import { CrossBoardResults } from "@/components/props/CrossBoardResults";
@@ -90,7 +91,7 @@ export function ParlaysSection({
   /** INSTRUCTION 71: the Board's "My parlay" — tap a leg or take a whole ticket into it */
   mine?: { has: (key: string) => boolean; toggle: (leg: MyLeg) => void; addAll: (legs: MyLeg[]) => void };
 }) {
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
   const [view, setView] = useState<View | "all">("all");
   const [pfilter, setPfilter] = useState("all");
   // ONE SELECTION MODE SITE-WIDE (2026-08-15, Josh: "The parlays and tickets

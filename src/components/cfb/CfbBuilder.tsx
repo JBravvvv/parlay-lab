@@ -1,7 +1,9 @@
 "use client";
+import { BoardFilters } from "@/components/board/BoardFilters";
+import { ALL_MARKETS } from "@/lib/cross-sport";
+import { defaultMarkets } from "@/lib/market-scope";
+import { discoveryMatches, STRATEGIES, type DiscoveryFilter } from "@/lib/discovery";
 import { useQuery } from "@tanstack/react-query";
-import { GameTimeRange } from "@/components/props/GameTimeRange";
-import { inGameTimeWindow,type GameTimeWindow } from "@/lib/game-time-window";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CfbDayMarksNote, cfbDayMarks } from "@/components/cfb/CfbLedger";
@@ -228,17 +230,18 @@ function TicketStack({
   grading?: CfbGradingView | null;
   label: string;
 }) {
-  const [timeWindow,setTimeWindow]=useState<readonly [number,number]>([0,24]);
+  const L=useLeague();
+  const [filter,setFilter]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),sports:[L.id],strategies:STRATEGIES.map(s=>s.key),timeWindow:[0,24]});
   const games=new Map(board?.games.map(g=>[g.id,g])??[]);
-  const shown=tickets.filter(t=>t.legs.every(l=>inGameTimeWindow(games.get(l.gkey)?.start,timeWindow)));
+  const shown=tickets.filter(t=>t.legs.every(l=>discoveryMatches({market:l.market,am:l.cz,prob:l.prob*100,ev:0,sport:L.id,start:games.get(l.gkey)?.start,started:games.get(l.gkey)?.status==="live"},filter)));
   return (
-    <div><GameTimeRange value={timeWindow} onChange={setTimeWindow}/><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
+    <div><BoardFilters value={filter} onChange={setFilter} markets={ALL_MARKETS} showSports={false} hideStyles/><p className="mb-2 text-[11px] text-muted">Showing {shown.length} of {tickets.length} tickets · filters do not change allocation.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} className="paper-card-ticket"/>
         </div>
       ))}
-    </div>{!shown.length&&<p className="text-xs text-muted">No tickets in this game-time window.</p>}</div>
+    </div>{!shown.length&&<p className="text-xs text-muted">No tickets match these category, odds and time filters.</p>}</div>
   );
 }
 

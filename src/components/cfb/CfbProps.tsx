@@ -1,4 +1,7 @@
 "use client";
+import { OddsRangeFilter } from "@/components/props/OddsRangeFilter";
+import { inOddsRange, OPEN_RANGE, type OddsRange } from "@/lib/odds-range";
+import { defaultMarkets, scopedMarkets } from "@/lib/market-scope";
 import { footballTeamKey } from "@/lib/football/team-key";
 import { useLiveClock } from "@/lib/use-live-clock";
 import { crossToFootball } from "@/lib/cross-adapters";
@@ -800,6 +803,7 @@ export function CfbProps() {
   /* bet % / money % per side on the SIDES cards (2026-09-18) */
   const splitsFeed = useSplits(L.id);
   const [nav, setNav] = useState<NavKey>("anytime_td");
+  const [browseOdds,setBrowseOdds]=useState<OddsRange>(OPEN_RANGE);
   /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
   const [view, setView] = useState<"ranked" | "games">("ranked");
   const [search, setSearch] = useState("");
@@ -885,8 +889,8 @@ export function CfbProps() {
     return footballPosition(row.pos) ?? (game ? rosterPosition(row.player, [game.home.id, game.away.id]) : null);
   }, [gameById, rosterPosition]);
   const groups = useMemo(
-    () => (nav === "sides" || !board ? [] : groupProps(board.rows, nav, mode, normName(search.trim()))),
-    [board, nav, mode, search],
+    () => (nav === "sides" || !board ? [] : groupProps(board.rows.filter(r=>inOddsRange(propQuote(r,mode)?.price??NaN,browseOdds)), nav, mode, normName(search.trim()))),
+    [board, nav, mode, search, browseOdds],
   );
   const marketRows = useMemo(
     () => (nav === "sides" || !board ? 0 : board.rows.filter((r) => r.market === nav).length),
@@ -941,7 +945,7 @@ export function CfbProps() {
        other's, and a hardcoded league key here is exactly what the separation tests forbid */
     sport:L.id,convertCross:crossToFootball,
     storageKey: `pl:${L.id}:props:gen-open`,
-    defaultSpec: {...GEN_SPEC_DEFAULT,markets:ALL_MARKETS.filter(m=>!m.key.startsWith("batter_")&&!m.key.startsWith("pitcher_")&&m.key!=="rl").map(m=>m.key),sides:"both",phase:"mixed",includeStarted:true,preferDiversity:true,spread:false},
+    defaultSpec: {...GEN_SPEC_DEFAULT,markets:defaultMarkets(ALL_MARKETS,[L.id]),sides:"both",phase:"mixed",includeStarted:true,preferDiversity:true,spread:false},
     marketKeys: GEN_MARKET_KEYS,
     positions: FOOTBALL_POSITIONS,
     railMarket: nav === "sides" ? null : nav,
@@ -1090,7 +1094,7 @@ export function CfbProps() {
       <GenSheet
         market={gen.spec.market}
         marketLabel={genMarketLabel}
-        markets={gen.spec.sports && gen.spec.sports.some(s=>s!==L.id) ? ALL_MARKETS : ALL_MARKETS.filter(m=>!m.key.startsWith("batter_")&&!m.key.startsWith("pitcher_")&&m.key!=="rl")}
+        markets={scopedMarkets(ALL_MARKETS,gen.spec.sports??[L.id])}
         positions={FOOTBALL_POSITIONS}
         positionsLoading={loadRosterPositions && !!rosterTeams && positionsQ.isPending}
         pool={gen.pool}
@@ -1138,6 +1142,7 @@ export function CfbProps() {
         marketNote={GEN_MARKET_NOTE}
       />
       {/* market nav — sticky under the phone header; the segmented track scrolls sideways on 375px */}
+      {view === "games" && <OddsRangeFilter value={browseOdds} onChange={setBrowseOdds}/>}
       <div className="props-browse-search mb-2" style={view==="games"?{position:"sticky",top,zIndex:20}:undefined}>
         {view === "games" && <div className="chip-row -mx-4 px-4 md:mx-0 md:px-0">
           <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
@@ -1219,7 +1224,7 @@ export function CfbProps() {
             {slate?.oddsMissing && (
               <p className="text-[11px] text-gold">selected-book prices are missing for this slate — sides without a price are greyed out.</p>
             )}
-            {games.map((g, i) => (
+            {games.map(g=>({...g,rows:g.rows.filter(r=>inOddsRange(quoteFor(r,mode)?.price??NaN,browseOdds))})).filter(g=>g.rows.length>0).map((g, i) => (
               <Reveal key={g.id} delay={Math.min(i, 8) * 0.03} y={10}>
                 <div data-cfb-game={g.id} className={focus?.market === "sides" && focus.gameId === g.id ? focusRing(L.id) : undefined}>
                   <SlipGameCard game={g} mode={mode} picked={pickedByGame.get(g.id) ?? null} onPick={toggle} splits={findGameSplits(splitsFeed, g.away, g.home, g.date)} />
@@ -1248,7 +1253,7 @@ export function CfbProps() {
       ) : groups.length === 0 ? (
         <EmptyState
           title="No player matches that search"
-          body={`${marketRows} ${navLabel} line${marketRows === 1 ? "" : "s"} across ${board.fetched} priced event${board.fetched === 1 ? "" : "s"} — clear the search to see them.`}
+          body={`${marketRows} ${navLabel} line${marketRows === 1 ? "" : "s"} across ${board.fetched} priced event${board.fetched === 1 ? "" : "s"} — clear the search or widen the odds range to see them.`}
         />
       ) : (
         <div className="space-y-2">

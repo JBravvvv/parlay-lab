@@ -44,6 +44,7 @@ export function DataTable<T>({
   rowClassName,
   defaultSort = null,
   resetKey,
+  pageSize,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -56,8 +57,14 @@ export function DataTable<T>({
   /** when this changes (a different view: scope, tab, book) the sort goes back to `defaultSort` —
       one view's ▲ never silently rides into the next (INSTRUCTION 69) */
   resetKey?: string;
+  pageSize?: number;
 }) {
+  const [limit,setLimit]=useState(pageSize??Infinity);
   const [sort, setSort] = useState<SortState | null>(defaultSort);
+  const pageIdentity=`${resetKey}|${sort?.key}|${sort?.dir}`;
+  const [pageReset,setPageReset]=useState(pageIdentity);
+  if(pageReset!==pageIdentity){setPageReset(pageIdentity);setLimit(pageSize??Infinity);}
+
   const [seenReset, setSeenReset] = useState(resetKey);
   if (seenReset !== resetKey) {
     setSeenReset(resetKey);
@@ -81,6 +88,7 @@ export function DataTable<T>({
   }, [rows, sort, columns]);
 
   return (
+    <>
     <div
       // desktop density (2026-09-19): below md the table scrolls inside its box (maxHeight, sideways when it must); from md
       // the box is open — no height cap, no sideways scroll — text cells wrap and the page itself flows down
@@ -121,7 +129,7 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r, i) => (
+          {sorted.slice(0,limit).map((r, i) => (
             <tr
               key={rowKey(r)}
               className={`border-b border-white/[0.04] transition-colors duration-(--dur-fast) last:border-0 hover:bg-white/[0.04] ${
@@ -145,5 +153,7 @@ export function DataTable<T>({
         </tbody>
       </table>
     </div>
+    {pageSize && <div className="pick-pagination" aria-label="Pick table pagination"><span>{Math.min(limit,rows.length)} of {rows.length} picks</span>{rows.length>limit&&<button type="button" onClick={()=>setLimit(n=>n+pageSize)}>Load {pageSize} More..</button>}{limit>pageSize&&<><button type="button" onClick={()=>setLimit(n=>Math.max(pageSize,n-pageSize))}>Undo</button><button type="button" onClick={()=>setLimit(pageSize)}>Clear</button></>}</div>}
+    </>
   );
 }

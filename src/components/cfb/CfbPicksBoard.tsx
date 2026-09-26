@@ -1,4 +1,5 @@
 "use client";
+import { defaultMarkets } from "@/lib/market-scope";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { MultiSelect } from "@/components/props/MultiSelect";
 import Link from "next/link";
@@ -152,7 +153,7 @@ const SCOPES = [
 type Scope = (typeof SCOPES)[number]["key"];
 const TOP_N = 50;
 /** featured cards in the TOP EDGES carousel */
-export const FEATURED_N = 10;
+export const FEATURED_N = 4;
 
 const MARKET_WORD: Record<string, string> = { ...MARKET_WORDS };
 /** the side (game-line) categories, full game and first half — the ones that never wait on the props pull */
@@ -434,7 +435,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
   const slate=useFootballPrices(rawSlate,bankroll??L.bankBase,L.rules);
   const selectedBook=bookName(useSportsbook());
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
   const [cat, setCat] = useState<Cat>("all");
   const [scope, setScope] = useState<Scope>("top");
   const [search, setSearch] = useState("");
@@ -468,7 +469,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
   const needle = search.trim().toLowerCase();
   const isAlternate = (market: string) => market.endsWith("_alt") || market === "first_td" || market === "tds_over";
-  const catRows = (picks?.categories[cat] ?? []).filter(r => cat !== "all" || !isAlternate(r.market));
+  const catRows = picks?.categories[cat] ?? [];
   const chanceRanks=useMemo(()=>marketRanksBy(picks?.categories.all??[],r=>r.market,r=>r.player??r.label,r=>(r.fair??0)*100),[picks]);
   const matchingRows = useMemo(() => {
     const hit = catRows.filter((r) => rowMatches(r, needle) && discoveryMatches({chanceRank:chanceRanks.get(r),market:r.market,am:r.cz?.price??NaN,prob:(r.fair??0)*100,ev:r.evCz??-Infinity,start:games.get(r.gameId)?.start,started:r.status==="live",sport:L.id},discovery));
@@ -641,7 +642,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
       </div>
       <div className="board-category" data-testid="cfb-board-cats">
-        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>!isAlternate(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>setCat(v[0] as typeof cat)}/>
+        <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>defaultMarkets(ALL_MARKETS,[L.id]).includes(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>{const next=v[0] as typeof cat;setCat(next);setDiscovery(d=>({...d,markets:next==="all"?defaultMarkets(ALL_MARKETS,d.sports):[next]}));}}/>
       </div>
 
       <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
@@ -709,7 +710,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
                 )}
               </Panel>
             ) : (
-              <DataTable columns={columns} rows={rows} rowKey={(r) => r.key} maxHeight="62vh" stagger={scope === "top"} rowClassName={(r) => ((r.evCz ?? -1) > 0 ? "ev-glow" : "")} defaultSort={{ key: "grade", dir: -1 }} resetKey={`${scope}|${cat}`} />
+              <DataTable pageSize={10} columns={columns} rows={rows} rowKey={(r) => r.key} maxHeight="62vh" stagger={scope === "top"} rowClassName={(r) => ((r.evCz ?? -1) > 0 ? "ev-glow" : "")} defaultSort={{ key: "grade", dir: -1 }} resetKey={`${date}|${scope}|${cat}|${search}|${JSON.stringify(discovery)}`} />
             )}
           </Reveal>
 
@@ -772,9 +773,8 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
 
 export function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[]; total: number; games: Map<string, CfbGame>; propRows: CfbPropsBoard["rows"] | null }) {
   const L = useLeague();
-  const [limit,setLimit]=useState(FEATURED_N);
-  const rowKey=rows.map(r=>r.key).join("|");
-  useEffect(()=>setLimit(FEATURED_N),[rowKey]);
+  const desktop = useIsDesktop();
+  const featuredCount = desktop ? 10 : FEATURED_N;
   return (
     <Reveal>
       <section aria-label="Top edges" data-testid="cfb-top-edges">
@@ -782,18 +782,13 @@ export function TopEdges({ rows, total, games, propRows }: { rows: CfbPickRow[];
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             Top edges <span className={`num ml-1 ${L.id === "nfl" ? "text-nfl" : "text-cfb"}`}>{total}</span> <span className="hidden md:inline text-faint">+EV at the selected book</span>
           </h2>
-          <span className="text-[10px] text-muted md:hidden">Ranked picks</span>
-          {total > rows.length && <span className="hidden md:inline num text-[10px] text-faint">top {rows.length} · the table has all {total}</span>}
+          <span className="text-[10px] text-muted md:hidden">Top 4 · full list below</span>
+          {total > featuredCount && <span className="hidden md:inline num text-[10px] text-faint">top {featuredCount} · full list below</span>}
         </div>
         <div className="top-edge-grid">
-          {rows.slice(0,limit).map((r, i) => (
+          {rows.slice(0,featuredCount).map((r, i) => (
             <FeaturedPick key={r.key} r={r} rank={i + 1} games={games} propRows={propRows} />
           ))}
-        </div>
-        <div className="pick-pagination" aria-label="Top edges pagination">
-          {rows.length>limit&&<button onClick={()=>setLimit(n=>n+FEATURED_N)}>Load 10 More · {rows.length-limit} left</button>}
-          <button disabled={limit<=FEATURED_N} onClick={()=>setLimit(n=>Math.max(FEATURED_N,n-FEATURED_N))}>Undo</button>
-          <button disabled={limit<=FEATURED_N} onClick={()=>setLimit(FEATURED_N)}>Clear</button>
         </div>
       </section>
     </Reveal>
@@ -1010,7 +1005,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
   const L = useLeague();
   const { parlays: CFB_PARLAYS } = L;
   /** the user's tap, else the first non-empty pregame category (falls back to ML) — so the strip never opens on an empty set while another has tickets */
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,[L.id]),strategies:STRATEGIES.map(s=>s.key),sports:[L.id],timeWindow:[0,24]});
   const [picked, setPicked] = useState<CfbParlayCategory | null>(null);
   const [filter, setFilter] = useState("all");
   /** tickets mounted in the phone carousel (grows by PHONE_CHUNK per tap, resets with the category / filter) */
@@ -1059,7 +1054,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
         </h2>
 
         <DiscoveryFilters extraControls={<><div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
-          <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
+          <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setDiscovery(d=>({...d,markets:ALL_MARKETS.some(m=>m.key===v[0])?[v[0]]:defaultMarkets(ALL_MARKETS,d.sports)}));setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
         </div><div className="mb-3 max-w-md">
               <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>
             </div></>} parlayTypes value={discovery} onChange={v=>{setDiscovery(v);setPicked(null);setFilter("all");setPhoneShown(PHONE_CHUNK);}} markets={ALL_MARKETS}/>

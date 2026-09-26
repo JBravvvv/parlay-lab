@@ -1341,3 +1341,25 @@ body::after {
 .gen-one-side { display:flex; min-height:32px; align-items:center; gap:5px; }
 .gen-one-side span { width:30px; font-size:8px; text-transform:uppercase; }
 .gen-one-side b { flex:1; border:1px solid #a6bdd337; border-radius:8px; padding:6px; color:#e0eafa; background:#263348; }
+
+/* September 26: actual 70% content scale on phones; fixed navigation stays full size. */
+.pick-odds-filter { display:flex; align-items:center; gap:6px; min-width:0; padding:4px 6px; border:1px solid #8cabc43d; border-radius:8px; font-size:10px; }
+.pick-odds-filter legend { color:#c7d8e8; font-size:9px; font-weight:700; }
+.pick-odds-filter input { width:0; flex:1; min-width:0; min-height:30px; padding:4px 7px; border:1px solid #92a9c247; border-radius:6px; background:#101d2f; color:#f1f7ff; font-size:12px; }
+.pick-odds-filter input[aria-invalid="true"] { border-color:#ee876d; }
+.pick-odds-filter button { color:#a3d5ff; min-height:30px; }
+.pick-pagination > span { align-self:center; color:#a9bfd5; font-size:11px; margin-right:auto; }
+@media(max-width:767px) {
+ .desk-content { zoom:0.7; padding-bottom:calc((90px + env(safe-area-inset-bottom)) / .7)!important; }
+ .desk-content .gen-actions { position:static; }
+ .desk-content .discovery-menu { max-width:calc((100vw - 32px) / .7); }
+ .desk-content .discovery-trigger { min-height:38px; }
+ .desk-content input[type="search"],.desk-content input[type="text"],.desk-content input[type="number"],.desk-content select { font-size:16px!important; }
+ .desk-content .pick-pagination button { min-height:40px; }
+ .desk-content .top-edge-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+ .desk-content .top-edge-grid [data-testid="cfb-featured-pick"] { min-width:0; padding:7px; }
+ .desk-content [data-testid="cfb-featured-pick"] header { gap:5px; }
+ .desk-content [data-testid="cfb-featured-pick"] header > .min-w-0 > :first-child { font-size:13px; }
+ .desk-content [data-testid="cfb-featured-pick"] > div:nth-of-type(1) { flex-wrap:wrap; gap:4px; }
+ .desk-content [data-testid="cfb-featured-pick"] footer { flex-wrap:wrap; }
+}

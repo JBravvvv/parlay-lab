@@ -1,4 +1,5 @@
 "use client";
+import { ALL_MARKETS } from "@/lib/cross-sport";
 
 import { PickContext } from "./PickContext";
 import { CrossMark } from "./CrossMark";
@@ -810,7 +811,7 @@ export function GenSheet<P>({
             <OddsSlider prices={prices} lo={spec.legMinAm} hi={spec.legMaxAm} onChange={(lo, hi) => onSpec({ legMinAm: lo, legMaxAm: hi })} />
           </div>
 
-          </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters stacked hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>
+          </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideOdds stacked hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={spec.sports ? ALL_MARKETS : markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>
 
           {/* hit-rate floor + window — MLB only, two selects on one row */}
           {showHitRate && hitWindow != null && (

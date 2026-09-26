@@ -72,7 +72,7 @@ describe("Board wiring — both tables open on Grade ▼ and reset per view; the
   const src = read("app/board/page.tsx");
   it("the stamped / ALL-scope table and the live board table both pass defaultSort + resetKey (scope, tab, live, book)", () => {
     expect((src.match(/defaultSort=\{\{ key: "grade", dir: -1 \}\}/g) ?? []).length).toBe(2);
-    expect((src.match(/resetKey=\{`\$\{scope\}\|\$\{cat\}\|\$\{live\}\|\$\{selectedBook\}`\}/g) ?? []).length).toBe(2);
+    expect(src.split('resetKey={`${scope}|${cat}|${live}|${selectedBook}|${search}|${JSON.stringify(discovery)}`}').length - 1).toBe(2);
   });
   it("the live-board Grade key: settled sinks by SETTLED_SINK, a live row keys on its live EV, a pregame row on the EV the mode displays", () => {
     const col = src.slice(src.indexOf('key: "grade",'), src.indexOf('key: "prob",'));
@@ -89,6 +89,6 @@ describe("Board wiring — both tables open on Grade ▼ and reset per view; the
   it("the CFB picks board (\"or any other page\") sorts Grade on the same composite key and resets per scope / tab", () => {
     const cfb = read("src/components/cfb/CfbPicksBoard.tsx");
     expect(cfb).toMatch(/sortValue: \(r\) => gradeSortKey\(gradeRank\(r\.grade\), r\.evCz\)/);
-    expect(cfb).toMatch(/defaultSort=\{\{ key: "grade", dir: -1 \}\} resetKey=\{`\$\{scope\}\|\$\{cat\}`\}/);
+    expect(cfb).toContain('defaultSort={{ key: "grade", dir: -1 }} resetKey={`${date}|${scope}|${cat}|${search}|${JSON.stringify(discovery)}`}');
   });
 });

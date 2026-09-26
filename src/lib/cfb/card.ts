@@ -1,3 +1,4 @@
+import { chooseFunRows } from "@/lib/football/fun-parlay";
 import { imageNameKey } from "@/lib/player-images";
 import { priceFootballProp } from "@/lib/sportsbook/football";
 import { CFB_PROP_MARKETS } from "./props-types";
@@ -25,9 +26,9 @@ import type { LeagueRules } from "@/lib/football/league";
  *   top-up      the $150 must deploy: raise stakes (likeliest first) to maxStake; then add
  *               tickets by probability from the forced pool (dec ≤ forcedMaxDec, EV ≥ 0);
  *               what still cannot deploy is written into `notes`, never forced past the rules.
- *   fun         one parlay of the likeliest sides across distinct games (ML / spread preferred,
- *               grade D or better at Caesars), added until it pays ≥ fun.minDec, 3–5 legs; none
- *               under 3. Named FAVORITES PARLAY when the legs mostly are favorites, else FUN PARLAY.
+ *   fun         one 3–5 leg parlay across distinct games, searching probability and payout bands
+ *               among grade D-or-better sides. Enforce fun.minDec ≤ payout ≤ fun.maxDec;
+ *               leave the fun allocation unspent when no qualifying combination exists. Named FAVORITES PARLAY when the legs mostly are favorites, else FUN PARLAY.
  *   noPlay      nothing staked at all — no core ticket AND no fun parlay — and the note says so.
  *
  * ONE CARD BUILDER, TWO LEAGUES (2026-09-08, the NFL build). The rules object `R` is
@@ -339,39 +340,21 @@ export function buildCfbCard(board: CfbBoard, opts: CfbCardOpts): CfbCard {
   // grade D or better at Caesars: a favorites parlay is priced by the book, so a strict ≥ 0% gate
   // left the 9/5 fixture's fun ticket with three underdogs (the only fair-or-better sides)
   const funRows = playable.filter((r) => (r.evCz ?? -Infinity) >= R.fun.minEvPct);
-  type FunPick = { row: CfbRow; p: number };
-  const funBest = new Map<string, FunPick>();
-  const prefer = (r: CfbRow) => (baseMarketOf(r.market) === "total" ? 0 : 1);
-  for (const r of funRows) {
-    const g = games.get(r.gameId);
-    const leg = g ? legOf(r, g) : null;
-    if (!leg) continue;
-    const p = leg.prob / Math.max(1e-9, 1 - leg.push); // the leg's own no-push probability at Caesars' line
-    const cur = funBest.get(r.gameId);
-    if (!cur || prefer(r) - prefer(cur.row) > 0 || (prefer(r) === prefer(cur.row) && p > cur.p)) funBest.set(r.gameId, { row: r, p });
-  }
-  const funOrder = [...funBest.values()].sort((a, b) => b.p - a.p).map((x) => x.row);
-  const legs: CfbRow[] = [];
-  let dec = 1;
-  for (const r of funOrder) {
-    if (legs.length >= R.fun.legs.max) break;
-    if (legs.length >= R.fun.legs.min && dec >= R.fun.minDec) break;
-    const d = r.cz?.dec ?? 1;
-    if (legs.length >= R.fun.legs.min && dec * d > R.fun.maxDec) break;
-    legs.push(r);
-    dec *= d;
-  }
+  const legs = chooseFunRows(funRows.flatMap(row => {
+    const game=games.get(row.gameId), leg=game?legOf(row,game):null;
+    return leg ? [{row,dec:row.cz!.dec,prob:leg.prob / Math.max(1e-9,1-leg.push)}] : [];
+  }),R.fun);
   if (legs.length >= R.fun.legs.min) {
     const d = draftOf(legs, games);
-    if (d) {
+    if (d && d.dec >= R.fun.minDec && d.dec <= R.fun.maxDec) {
       // "FAVORITES" only when the legs mostly are favorites (no-push probability ≥ ½ at Caesars' line)
       const favs = d.legs.filter((l) => l.prob / Math.max(1e-9, 1 - l.push) >= 0.5).length;
       const name = favs * 2 >= d.legs.length ? "FAVORITES PARLAY" : "FUN PARLAY";
       funT.push(finish(`${idPrefix}-${board.date}-fun-1`, "fun", name, d, opts.fun));
-      if (d.dec < R.fun.minDec) notes.push(`Fun: the ${name.toLowerCase()} pays ${d.dec.toFixed(2)} — under the ${R.fun.minDec}× target with the slate's ${legs.length} likeliest grade-D-or-better sides.`);
+
     }
   } else {
-    notes.push(`Fun: no fun parlay — only ${legs.length} playable side${legs.length === 1 ? "" : "s"} grade D or better at DraftKings (need ${R.fun.legs.min}).`);
+    notes.push(`Fun: no qualifying ${R.fun.legs.min}–${R.fun.legs.max} leg ticket in the ${R.fun.minDec}×–${R.fun.maxDec}× payout band. The $${opts.fun} fun allocation stays unspent.`);
   }
 
   /* ---------- THE VERDICT ---------- */

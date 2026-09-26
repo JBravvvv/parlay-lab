@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import React, { createElement } from "react";
@@ -18,6 +18,9 @@ import { GRADE_CUTS, gradeFromEv } from "@/lib/grade";
  * The component is fed synthetic rows here (prices and EVs are inputs to a sorter, not claims about
  * any board) — the point is the ORDER, the chips, the counts, and the default view on both desks.
  */
+const sportFixture = vi.hoisted(() => ({ value: "mlb" }));
+vi.mock("@/lib/sport", async importOriginal => ({ ...await importOriginal<typeof import("@/lib/sport")>(), useSport: () => sportFixture.value }));
+beforeEach(() => { sportFixture.value = "mlb"; });
 vi.stubGlobal("React", React);
 (globalThis as { React?: typeof React }).React = React;
 
@@ -225,8 +228,9 @@ describe("odds range + price sort (2026-09-19)", () => {
     { key: "ml", label: "ML" },
     { key: "anytime_td", label: "Anytime TD" },
   ];
-  const renderP = (over: Record<string, unknown> = {}) =>
-    renderToStaticMarkup(
+  const renderP = (over: Record<string, unknown> = {}) => {
+    sportFixture.value = "nfl";
+    return renderToStaticMarkup(
       createElement(RankedPicks<L>, {
         picks: PRICED,
         filters: TD_FILTERS,
@@ -235,6 +239,8 @@ describe("odds range + price sort (2026-09-19)", () => {
         ...over,
       } as Parameters<typeof RankedPicks<L>>[0]),
     );
+
+  };
 
   it("inOddsRange reads American prices numerically — shorter is smaller — and an open bound is no bound", () => {
     const r = { min: -200, max: 250 };

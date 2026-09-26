@@ -1,11 +1,13 @@
+import { inOddsRange, type OddsRange } from "./odds-range";
 import { inGameTimeWindow, type GameTimeWindow } from "./game-time-window";
 export type DiscoverySport = "mlb" | "nfl" | "cfb";
 export const SPORT_OPTIONS = [{key:"nfl",label:"NFL"},{key:"cfb",label:"CFB"},{key:"mlb",label:"MLB"}] as const;
 export const TIMING_OPTIONS = [{key:"pregame",label:"Pre-Game"},{key:"live",label:"Live"}] as const;
 export const STRATEGIES = [{key:"safe",label:"Safe"},{key:"balanced",label:"Balanced"},{key:"aggressive",label:"Aggressive"},{key:"longshot",label:"Longshot"},{key:"edge",label:"Edge / +EV"},{key:"stacks",label:"Correlated / Stacks"},{key:"anchor",label:"Anchor + Kicker"},{key:"hedge",label:"Hedge-Friendly"}] as const;
 export type Strategy = typeof STRATEGIES[number]["key"];
-export type DiscoveryFilter = { timing: readonly string[]; markets: readonly string[]; strategies: readonly string[]; sports: readonly string[]; timeWindow: GameTimeWindow };
+export type DiscoveryFilter = { timing: readonly string[]; markets: readonly string[]; strategies: readonly string[]; sports: readonly string[]; timeWindow: GameTimeWindow; odds?: OddsRange };
 export function discoveryMatches(p: {market:string; started?:boolean; sport?:string; start?:string|null; prob:number; ev:number; am:number; chanceRank?:number}, f:DiscoveryFilter):boolean {
+ if (f.odds && !inOddsRange(p.am,f.odds)) return false;
  if (!f.timing.includes(p.started?"live":"pregame") || !f.markets.includes(p.market) || (p.sport && !f.sports.includes(p.sport)) || !inGameTimeWindow(p.start,f.timeWindow)) return false;
  if (!f.strategies.length) return false;
  if(f.strategies.length===STRATEGIES.length) return true;

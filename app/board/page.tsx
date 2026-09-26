@@ -1,4 +1,5 @@
 "use client";
+import { defaultMarkets } from "@/lib/market-scope";
 import { useSearchParams } from "next/navigation";
 import { BoardModeToggle } from "@/components/board/BoardModeToggle";
 import { BoardFilters } from "@/components/board/BoardFilters";
@@ -184,7 +185,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
      without going through a named client. `onFallback` is the browser re-price, which runs on every
      failure EXCEPT the 45-minute limiter refusing — see that module. */
   const liveBoard = useLiveBoardReprice({ onFallback: () => regen.mutate() });
-  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:ALL_MARKETS.map(m=>m.key),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
+  const [discovery,setDiscovery]=useState<DiscoveryFilter>({timing:["pregame","live"],markets:defaultMarkets(ALL_MARKETS,["mlb"]),strategies:STRATEGIES.map(s=>s.key),sports:["mlb"],timeWindow:[0,24]});
   const [cat, setCat] = useState("all");
   const [live, setLive] = useState(false);
   const [scope, setScope] = useState<Scope>("top");
@@ -1491,13 +1492,13 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
           {visiblePicks.length === 0 && needle ? (
             <EmptyState title="No player matches that search" body="Clear the search to see every line in this view." />
           ) : (
-            <DataTable
+            <DataTable pageSize={10}
               columns={pickColumns}
               rows={visiblePicks}
               rowKey={(p) => `${p.market ?? cat}|${p.rank}|${p.player}|${p.line}`}
               /* INSTRUCTION 69: opens on Grade ▼ (highest → lowest) and returns there on every view change */
               defaultSort={{ key: "grade", dir: -1 }}
-              resetKey={`${scope}|${cat}|${live}|${selectedBook}`}
+              resetKey={`${scope}|${cat}|${live}|${selectedBook}|${search}|${JSON.stringify(discovery)}`}
             />
           )}
           {scratchedPicks > 0 && <ScratchedNote n={scratchedPicks} shown={showScratched} onToggle={() => setShowScratched((v) => !v)} />}
@@ -1519,12 +1520,12 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
         </Panel>
       ) : (
         <>
-          <DataTable
+          <DataTable pageSize={10}
             columns={columns}
             rows={visibleRows}
             rowKey={(r) => `${r.label}|${r.sub}`}
             defaultSort={{ key: "grade", dir: -1 }}
-            resetKey={`${scope}|${cat}|${live}|${selectedBook}`}
+            resetKey={`${scope}|${cat}|${live}|${selectedBook}|${search}|${JSON.stringify(discovery)}`}
             stagger
             /* a settled row never glows green: the glow is "this is a live edge" (INSTRUCTION 50) */
             /* ...and neither does a re-anchored one: ev-glow signals a MODEL edge, and a live
