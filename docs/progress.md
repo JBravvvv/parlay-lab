@@ -1,3 +1,13 @@
+# 2026-09-26 — generator follow-up: ticket holds, ✕ moved, hold-and-drag, 20 picks
+
+Josh's four-point follow-up shipped as 0a6693c → parlay-80p1b6hq7.
+- A rolled-out ticket no longer changes by itself. It is drawn per request and held while the board rebuilds under it. The reveal lands on the spin's own ticket, and moved prices are flagged rather than swapped.
+- The exclude ✕ moved to the far left of each pick, and the lock sits alone at the far right.
+- A pick can be held and dragged anywhere on the list, on the phone (under its 0.7 zoom) and with a mouse.
+- The generator builds up to 20 legs.
+
+Zero new test failures against the 102-name baseline. See the September 26 session-handoff entry for the production measurements.
+
 # 2026-09-26 — Parlay Builder speed, half-hour slider, slot-machine reveal
 
 Josh's six-point request shipped as 56fd656 → parlay-bn6dxv8rk. The builder's slowness was a date formatter rebuilt per leg across the 32–64 strategy runs. It is now cached, and the seed-independent generator setup runs once per pool and spec, with output proven identical on 300 seeded cases. The game-start slider drags locally, commits on release, steps 30 minutes and starts at 9am PT unless the slate has an earlier game. It is also shorter. The Customize Your Picks category rail is gone because the Markets dropdown covers it. Season Lab is off the side list. Generate now spins a reel per unlocked slot through real pool legs and lands on the ticket, then counts the combined odds up to the real price. See the September 26 session-handoff entry for measurements.

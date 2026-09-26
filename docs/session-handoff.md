@@ -1,3 +1,61 @@
+# September 26 — generator follow-up (ticket hold, ✕ move, hold-and-drag, 20 picks)
+
+Josh, verbatim: "1. After parlay generator spins and rolls out the picks, it waits to finish loading 'the board' I guess? And then it changes the picks. It shouldn't change anything after it rolls them out one by one 2. Need to move 'x' button from right below 'lock' now that everything is smaller so you don't accidentally press 'x' instead of locking player in parlay 3. Should be able to press on pick in parlay generator and drag it to wherever on list 4. Parlay Generator should go up as high as 20 picks". Shipped 0a6693c → parlay-80p1b6hq7 (READY, /api/version answered 0a6693c).
+
+- **Why the picks changed.** The `generated` memo depended on the pool, and the pool rebuilds by itself:
+  - MLB: the live-price poll, the in-game clock, and the game logs landing after the board. Each rebuild reads the clock afresh.
+  - Football: a Live/Mixed press first refreshes quotes, then spins. The default phase is Mixed.
+  
+  The old reveal also started at the press, so it landed on the OLD ticket, and the ticket was then replaced underneath.
+- **Ticket hold** (`src/lib/parlay-hold.ts`, `useParlayGen`).
+  - A ticket is drawn per REQUEST: spec with pins nulled (and the rail market nulled while several markets are on), pricing book, spin counter, the sticky board date, exclusions, and the hit window only when a hit floor is set.
+  - Only a firm OK ticket is held. A failure still follows the pool. A ticket drawn before `ready`, or while another sport's legs are loading (`crossPending`), is provisional.
+  - A closed sheet, or a moment with no board, draws nothing and forgets nothing. `frozen` (a football refresh-then-spin pending) returns the held ticket untouched.
+  - `withBoard` shows the pool's copy of a leg only when am, book, prob, push and quoteAt are all identical, so hit chips, headshots and positions refresh and prices never change.
+  - `movedLegs` counts legs whose price or book moved, or that are gone. The sheet says so, and Add to slip refuses.
+- **Reveal on the right ticket.**
+  - The press sets HELD reels ("Getting fresh prices…", combined odds "···"). The landing starts only when `spinKey` (the roll) changes. The hold is released if loading ends with no spin.
+  - Add is disabled and tap-to-skip is a no-op while held.
+  - `staggerMs` compresses so 20 legs land inside a 1.6 s window. Four legs land exactly as before.
+- **✕ away from the lock.** The ✕ is first on the card, before the slot number. The lock is alone at the far right: 28px, with an extra 8px of invisible hit area around it. ▲/▼ are `sr-only` until focused (keyboard and screen readers), and focus stays on the pressed button through a move.
+- **Hold-and-drag** (`src/components/props/useSlotDrag.ts`).
+  - Pointer events. Touch lifts after a 260 ms hold with 8 px of slop; moving first is a scroll. Mouse lifts after 4 px.
+  - The card follows the finger with DOM transforms (no React render per frame), and the cards between open the gap live. Drop commits once via `flushSync(onMove)`, then a settle animation runs.
+  - iOS: a non-passive window touchmove gate is registered BEFORE the touch begins (WebKit 184250), active only while a card is lifted.
+  - The phone's `zoom:0.7` is measured with a 100px test translate, so the card tracks 1:1 under both the standardized and the old WebKit rect models.
+  - The release click is swallowed, and disarmed by the next press or 400 ms.
+  - A new ticket (`listKey`) ends the gesture in a layout effect. A lift is refused unless the pressed card is still in that seat, and the move commits only for a card still in the list.
+  - Controls carry `data-no-drag`. HTML5 `draggable` is gone.
+- **20 picks.**
+  - `LEG_MAX = 20`. A transparent select over the leg count offers 2–20, and saved setups decode up to 20.
+  - Counts ≤ 8 draw unchanged (the fingerprint is identical except the Stacks message).
+  - Longshot keeps its +1,000,000 ceiling to 8 legs and 1e300 beyond (never Infinity; `repairPayout` takes a log midpoint).
+  - New failure `style-shape` (why: same-game / no-plus / one-window / null) replaces the misleading "Only 0 legs clear these filters". Stacks with one-leg-per-game offers the same-game relax. The old "Use every parlay style" button is gone.
+  - Longshot misses name the +7500 floor, and "Remove combined payout target" appears only when Josh set a target.
+  - The slip's stat tiles step long figures down a size and wrap.
+- **Validation.**
+  - tsc PASS. `next build` PASS.
+  - Full suite: 3,768 tests, 3,666 pass, 102 fail = the same 102 baseline names. Zero new, zero fixed.
+  - New `tests/gen-hold-drag.test.ts` (hold, withBoard, moved, reveal, card order, dropIndex/shiftOf exhaustive at n=20, zoom factors, drag source pins, 20-leg generation incl. strategies, style-shape whys, Longshot 20, slip tiles). Pins updated in builder-speed-reveal, mobile-density, parlay-gen-reorder, parlay-gen-ui and parlay-gen.
+  - A seeded 300-case engine fingerprint differs from the pre-change engine ONLY on the stacks+onePerGame failure code.
+  - An 8-agent adversarial review ran: 16 findings, 15 confirmed and fixed, 1 refuted.
+- **Production, DOM-only headless Chrome on /props (MLB only; football, generate, refill, live-props and calibrate blocked, and none were requested). Phone 390×844 with touch at 4× CPU, then desktop:**
+
+  | Check | Result |
+  |---|---|
+  | Label changes in 14 s after landing, while the game logs finished | 0 |
+  | Reel landing | 2.3 s phone / 1.9 s desktop |
+  | ✕ left, lock right, gap | 310 px phone / 572 px desktop |
+  | Touch hold-drag | lifted; card centre = finger y (234/234) under zoom 0.7; page scrolled 0 px; card 3 → slot 1; same set; no leftover transforms |
+  | Tap | no reorder |
+  | Swipe | scrolled 263 px, no lift, no reorder |
+  | Mouse drag | card 2 → last; 0 dialogs opened |
+  | Picker | 19 options |
+  | 20 legs on today's slate | honest "Only 11 legs … two legs from one game"; after relax 20 slots |
+  | 20-leg spin | 20 reels, landed at about 2.7 s |
+
+  Football Generate was not exercised on production because it can spend Odds credits. Physical iPhone not tested.
+
 # September 26 — Parlay Builder speed, half-hour game-start slider, slot-machine reveal
 
 Josh, verbatim: "1. Parlay Builder is moving EXTREMELY SLOW 2. Game start slider is very glitchy, not responding for 5-10 seconds, needs to have immediate response and drag with cursor as I drag it not delayed. Should go in 30 minute increments. For MLB, NFL & CFB, unless there is a random off game international etc the game start slider should start at 9am 3. 'Customize Your Picks' categories dont need to be listed left to right as they are already included in 'Markets' dropdown 4. Game Start slider doesn't need to be that long 5. Don't know what 'Season Lab' is but remove it from the left side list 6. Make the parlay generation more interactive like some kind of spinnings wheel, reveal, etc whatever you think makes the most sense and is the most fun". Shipped 56fd656 → parlay-bn6dxv8rk (READY, aliased, /api/version answered 56fd656).
