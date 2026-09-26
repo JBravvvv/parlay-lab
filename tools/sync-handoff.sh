@@ -390,6 +390,33 @@ PROD_URL=""; PROD_ALIAS_DEPLOY=""; PROD_ALIAS_VERIFIED=""
 GATE_TSC=""; GATE_TESTS=""; GATE_VERIFIED=""; KNOWN_RED=""; LAST_SHIPPED=""
 [ -f "$REPO/tools/handoff-state.env" ] && . "$REPO/tools/handoff-state.env"
 
+# The external receipt avoids a self-referential deploy-SHA commit. Never apply
+# an older release or an unverified alias to the current exported source.
+RECEIPT_FACTS="$(python3 - "$OUT/release-verification.json" "$HEAD_FULL" <<'PYRECEIPT'
+import json, sys
+from urllib.parse import urlparse
+try:
+    with open(sys.argv[1]) as source:
+        receipt = json.load(source)
+    deploy = receipt.get("deploymentUrl", "")
+    stamp = receipt.get("verifiedAt", "")
+    url = urlparse(deploy)
+    if (receipt.get("sha") == sys.argv[2]
+            and receipt.get("deploymentStatus") == "READY"
+            and receipt.get("versionMatches") is True
+            and url.scheme == "https" and (url.hostname or "").endswith(".vercel.app")
+            and isinstance(stamp, str) and stamp and "\n" not in deploy + stamp):
+        print(deploy)
+        print(stamp)
+except (OSError, ValueError, TypeError, AttributeError):
+    pass
+PYRECEIPT
+)"
+if [ -n "$RECEIPT_FACTS" ]; then
+  PROD_ALIAS_DEPLOY="${RECEIPT_FACTS%%$'\n'*}"
+  PROD_ALIAS_VERIFIED="${RECEIPT_FACTS#*$'\n'}"
+fi
+
 {
 printf '%s\n' "$SENTINEL"
 cat <<'EOF'
@@ -427,7 +454,8 @@ cat <<'EOF'
 
 These cannot be read from the repo, so they are carried in
 `/Users/josh/Documents/Parlay-Lab/tools/handoff-state.env` and updated by the
-session that verified them. If the date below is older than the HEAD date above,
+session that verified them. A matching, verified external `release-verification.json`
+provides the exact alias target and timestamp for this HEAD. If the date below is older than the HEAD date above,
 **the tip has not been verified on production yet.**
 
 EOF
