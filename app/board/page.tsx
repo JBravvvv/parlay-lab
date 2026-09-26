@@ -1,4 +1,5 @@
 "use client";
+import { slateTimeBounds } from "@/lib/game-time-window";
 import { defaultMarkets } from "@/lib/market-scope";
 import { useSearchParams } from "next/navigation";
 import { BoardModeToggle } from "@/components/board/BoardModeToggle";
@@ -1459,7 +1460,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
         </div>
       )}
 
-      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");setScope("all");setLive(v.timing.length===1&&v.timing[0]==="live");}} markets={ALL_MARKETS}/>
+      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");setScope("all");setLive(v.timing.length===1&&v.timing[0]==="live");}} markets={ALL_MARKETS} timeBounds={slateTimeBounds(Object.values(d?.gameInfo ?? {}).map(g=>g?.start))}/>
       {discovery.sports.some(s=>s!=="mlb")&&<CrossBoardResults date={board?.date??""} filter={discovery}/>}
       {isPending || regen.isPending ? (
         <Panel title={regen.isPending ? "Scanning today's slate" : "Loading board"}>

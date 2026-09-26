@@ -2,7 +2,7 @@
 import { defaultMarkets, scopedMarkets } from "@/lib/market-scope";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { type GameTimeWindow } from "@/lib/game-time-window";
+import { ALL_DAY, slateTimeBounds, type GameTimeWindow } from "@/lib/game-time-window";
 import { PickContext, type PickContextRef } from "./PickContext";
 import { CrossMark } from "./CrossMark";
 import { useCrossSports } from "./useCrossSports";
@@ -209,7 +209,9 @@ export function RankedPicks<P>({
   const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
   const range = rangeProp ?? ownRange;
   const [ownSort, setOwnSort] = useState<RankedSort>("grade");
-  const [timeWindow, setTimeWindow] = useState<GameTimeWindow>([0, 24]);
+  const [timeWindow, setTimeWindow] = useState<GameTimeWindow>(ALL_DAY);
+  /* the slider opens at 9am PT, earlier only when a game on this slate starts earlier */
+  const timeBounds = useMemo(() => slateTimeBounds([...picks, ...crossPicks].map((p) => p.start)), [picks, crossPicks]);
   const sort = sortProp ?? ownSort;
   const [limit, setLimit] = useState(RANKED_PAGE);
   useEffect(()=>setLimit(RANKED_PAGE),[search]);
@@ -268,9 +270,10 @@ export function RankedPicks<P>({
           {TIERS.map((t) => (tiers.get(t) ? <span key={t}><b className="text-text">{t}</b> {tiers.get(t)}</span> : null))}
         </div>
       </header>
-      <DiscoveryFilters hideOdds categoryRail={<div className="ranked-market-rail" role="group" aria-label="Pick categories">
-        {[{key:"all",label:"All"},...availableMarkets].map(f=><button key={f.key} type="button" aria-pressed={f.key==="all"?availableMarkets.every(m=>discovery.markets.includes(m.key)):discovery.markets.length===1&&discovery.markets[0]===f.key} onClick={()=>{pick(f.key);setDiscovery(d=>({...d,markets:f.key==="all"?availableMarkets.map(x=>x.key):[f.key]}));}}>{f.label}</button>)}
-      </div>} showSports={!!convertCross} markets={availableMarkets} value={{...discovery,timeWindow}} onChange={v=>{setDiscovery(v);setTimeWindow(v.timeWindow);setLimit(RANKED_PAGE);}} />
+      {/* 2026-09-26, Josh: "'Customize Your Picks' categories dont need to be listed left to right as they are already
+          included in 'Markets' dropdown" — the chip rail is gone; the Markets dropdown drives the list, and a single-market
+          (or every-market) choice still reaches the desk's controlled filter the rail used to set */}
+      <DiscoveryFilters hideOdds showSports={!!convertCross} markets={availableMarkets} timeBounds={timeBounds} value={{...discovery,timeWindow}} onChange={v=>{if(v.markets!==discovery.markets){if(v.markets.length===1)pick(v.markets[0]);else if(availableMarkets.length>1&&availableMarkets.every(m=>v.markets.includes(m.key)))pick("all");}setDiscovery(v);setTimeWindow(v.timeWindow);setLimit(RANKED_PAGE);}} />
       {/* the odds range and the price sort — one thin row under the chips, thumb-sized on the phone */}
       <div data-testid="ranked-odds-row" className="flex items-center gap-1.5 px-3 pb-2 text-[10px] text-faint">
         <span className="shrink-0 font-bold uppercase tracking-[0.12em]">Odds</span>

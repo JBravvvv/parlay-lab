@@ -754,6 +754,22 @@ body::after {
 .gen-ticket-reveal { animation:parlay-reveal .28s ease-out both; }
 @keyframes parlay-reveal { from { opacity:.3; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
 @media (prefers-reduced-motion:reduce) { .gen-ticket-reveal { animation:none; } .gen-roll { transition:none; } .gen-roll:hover:not(:disabled),.gen-roll:active:not(:disabled) { transform:none; } }
+/* THE REVEAL (2026-09-26, Josh: "Make the parlay generation more interactive like some kind of spinnings wheel, reveal")
+   — a reel over each unlocked slot spins through real pool legs, lands top to bottom with a bump and a glow, then the
+   combined odds count up and the total flashes. The JS never starts it under reduced motion; these rules also stand down. */
+.gen-reel { background:linear-gradient(100deg,#1f2d3f,#172231); box-shadow:inset 0 0 0 1px #3ab0e85c,inset 0 12px 12px -12px #000d,inset 0 -12px 12px -12px #000d; }
+.gen-reel::after { content:""; position:absolute; inset-inline:8px; top:50%; height:1px; background:linear-gradient(90deg,transparent,#3ab0e840,transparent); pointer-events:none; }
+.gen-reel-strip { will-change:transform; }
+.gen-slot-reeling { animation:gen-land .5s cubic-bezier(.18,1.5,.4,1) var(--land) backwards; }
+@keyframes gen-land { 0% { transform:scale(.975); box-shadow:0 0 0 0 #3ab0e800; } 40% { transform:scale(1.018); box-shadow:0 0 0 2px #3ab0e8b0,0 0 24px #3ab0e860; } 100% { transform:scale(1); box-shadow:0 0 0 0 #3ab0e800; } }
+.gen-rolling .gen-ticket-total > span:not(.gen-combined-odds) { animation:gen-fade-in .3s ease-out calc(var(--reveal-end) + 200ms) backwards; }
+.gen-rolling .gen-ticket-total { animation:gen-jackpot .6s ease-out calc(var(--reveal-end) + 440ms) backwards; }
+@keyframes gen-fade-in { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+@keyframes gen-jackpot { 0% { box-shadow:0 0 0 0 #3ab0e800; } 30% { box-shadow:0 -2px 0 0 #3ab0e8,0 0 34px #3ab0e84d; } 100% { box-shadow:0 0 0 0 #3ab0e800; } }
+.gen-roll.is-rolling .gen-dice { animation:gen-dice .55s cubic-bezier(.3,.7,.4,1) infinite; }
+@keyframes gen-dice { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .gen-reel { display:none; } .gen-slot-reeling,.gen-rolling .gen-ticket-total,.gen-rolling .gen-ticket-total > span,.gen-roll.is-rolling .gen-dice { animation:none; } }
+
 
 /* PORTRAIT LOCK (2026-09-19, Josh: "It should not be able to rotate into landscape mode while using the app").
    The manifest asks for portrait and AppShell calls screen.orientation.lock() where a browser honours it; iOS
@@ -1145,9 +1161,6 @@ body::after {
 .gen-player-card { min-width:0; }
 .gen-ticket > div:first-child > span:last-child { max-width:68%; }
 .gen-actions { position:relative; }
-.ranked-market-rail { display:flex; gap:4px; overflow-x:auto; scrollbar-width:thin; scrollbar-color:#7799bf #172231; padding:2px 0 4px; touch-action:pan-x; }
-.ranked-market-rail button { flex:0 0 auto; min-height:30px; border:1px solid #778aab66; border-radius:7px; padding:3px 9px; font-size:10px; color:#c7d7ed; background:#1b293d; white-space:nowrap; }
-.ranked-market-rail button[aria-pressed="true"] { color:#111b2a; background:#a9d9ff; border-color:#cdeaff; font-weight:850; }
 .top-edge-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
 .top-edge-grid [data-testid="cfb-featured-pick"] { width:100%; max-width:none; }
 .pick-pagination { display:flex; gap:6px; margin-block:7px; }
@@ -1322,8 +1335,6 @@ body::after {
 .gen-discovery-controls fieldset { line-height:12px; }
 .gen-discovery-controls legend { line-height:12px; }
 .gen-odds-controls > div:first-child > span:last-child { display:block; width:100%; text-align:right; font-size:7px; }
-.ranked-market-rail { scrollbar-width:none; padding-bottom:2px; }
-.ranked-market-rail::-webkit-scrollbar { display:none; }
 @media(max-width:767px) {
  .gen-ticket-total { font-size:10px; gap:4px 8px; padding-top:5px; margin-top:5px; }
  .gen-ticket-total .gen-combined-odds { font-size:18px; }

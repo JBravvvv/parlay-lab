@@ -15,7 +15,6 @@ import {
   IconMore,
   IconParlay,
   IconPark,
-  IconSeason,
   IconSettings,
   IconSharp,
   IconSim,
@@ -72,11 +71,10 @@ const NAV: readonly NavItem[] = [
   { href: "/simulator", label: "Simulator", icon: IconSim, group: "top", mobile: false, tone: "#67E8F9" },
   { href: "/props", label: "Parlay Builder", icon: IconParlay, group: "top", mobile: true,  tone: "#FDBA74" },
   { href: "/calc", label: "Parlay Calc", icon: IconCalc, group: "top", mobile: false, tone: "#5EEAD4" },
-  // INSTRUCTION 46 (2026-09-08): Season Lab — season-long CFB props / win totals / parlays on typed lines. Desktop rail + the
-  // phone's top-bar icon row (a 7th bottom tab does not fit at 375px); the tone is the CFB amber (--color-cfb) since the page is CFB-only.
-  { href: "/season", label: "Season Lab", icon: IconSeason, group: "top", mobile: false, tone: "#F5A524", cfbOnly: true },
+  // 2026-09-26, Josh: "Don't know what 'Season Lab' is but remove it from the left side list" — the /season page stays
+  // reachable by URL; it is simply no longer a nav entry (INSTRUCTION 46 had added it on 2026-09-08).
   // INSTRUCTION 68 (2026-09-17, Josh: "a tab titled 'Ballpark Factor' that shows daily ballpark factor for every stadium") — MLB-only,
-  // desktop rail + the phone's top-bar icon row (its fifth icon on the MLB desk, the width Season Lab already proved on CFB).
+  // desktop rail + the phone's ⋯ More menu.
   { href: "/ballpark", label: "Ballpark Factor", icon: IconPark, group: "top", mobile: false, tone: "#F9A8D4", mlbOnly: true },
   { href: "/ledger", label: "Ledger", icon: IconLedger, group: "bottom", mobile: true, tone: "#FDE68A" },
   { href: "/settings", label: "Settings", icon: IconSettings, group: "bottom", mobile: false, tone: "#D4D4D8" },
@@ -182,8 +180,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => setMore(false), [pathname]);
   const cfb = sport === "cfb";
   const nfl = sport === "nfl";
-  /** the entries this desk shows — CFB-only pages (Season Lab) drop out while the switch is on MLB or NFL
-   *  (NFL Season Lab is cut for the 2026-09-08 ship; the NFL desk adds no nav entry of its own) */
+  /** the entries this desk shows — a CFB-only page drops out while the switch is on MLB or NFL, an MLB-only page
+   *  (Ballpark Factor) off MLB. No entry is CFB-only since Season Lab left the nav (2026-09-26); the gate stays. */
   const shown = (n: Pick<NavItem, "cfbOnly" | "mlbOnly">) => (!n.cfbOnly || cfb) && (!n.mlbOnly || sport === "mlb");
   /** the ⋯ button wears the tone of whichever More page is open, so the header still shows where you are */
   const moreTone = MORE.find((n) => isActive(pathname, n.href))?.tone;

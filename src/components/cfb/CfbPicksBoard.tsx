@@ -6,7 +6,7 @@ import Link from "next/link";
 import {FirstSundaySix} from "@/components/nfl/FirstSundaySix";
 import { useLiveClock } from "@/lib/use-live-clock";
 import { footballQuoteCurrent } from "@/lib/football/gen-pool";
-import { gameTimeLabel } from "@/lib/game-time-window";
+import { gameTimeLabel, slateTimeBounds } from "@/lib/game-time-window";
 import { DiscoveryFilters } from "@/components/props/DiscoveryFilters";
 import { CrossBoardResults } from "@/components/props/CrossBoardResults";
 import { ALL_MARKETS } from "@/lib/cross-sport";
@@ -645,7 +645,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
         <MultiSelect single label="Pick category" value={[cat]} options={CATS.map(c=>({key:c.key,group:c.key==="all"?undefined:!c.prop?"Sides":isAlternate(c.key)?"Alt Props":"Props",label:`${c.label} · ${c.prop && propsPending ? '…' : (c.key==="all"?picks?.categories.all.filter(r=>defaultMarkets(ALL_MARKETS,[L.id]).includes(r.market)).length:picks?.categories[c.key]?.length) ?? 0}`}))} onChange={v=>{const next=v[0] as typeof cat;setCat(next);setDiscovery(d=>({...d,markets:next==="all"?defaultMarkets(ALL_MARKETS,d.sports):[next]}));}}/>
       </div>
 
-      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS}/>
+      <BoardFilters value={discovery} onChange={v=>{setDiscovery(v);setCat("all");}} markets={ALL_MARKETS} timeBounds={slateTimeBounds((current?.games ?? []).map(g=>g.start))}/>
       {discovery.sports.some(s=>s!==L.id)&&<CrossBoardResults date={date} filter={discovery}/>}
       <div className="board-search-row flex flex-wrap items-center gap-2">
         <Segmented options={SCOPES} value={scope} onChange={setScope} size="md" tone={L.id} label="Scope" />
@@ -1053,7 +1053,7 @@ export function CfbParlaysSection({ picks, games, propsPending, liveGames }: { p
           Generated parlays — the desk&apos;s ticket sets at the selected book <span className="num ml-1 text-gold">{CFB_PARLAY_CATEGORIES.reduce((n, k) => n + (sets[k]?.length ?? 0), 0)}</span>
         </h2>
 
-        <DiscoveryFilters extraControls={<><div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
+        <DiscoveryFilters timeBounds={slateTimeBounds([...games.values()].map(g=>g.start))} extraControls={<><div className="mb-2 max-w-md" data-testid="cfb-parlay-cats">
           <MultiSelect single label="Parlay category" value={[picked??"all"]} options={[{key:"all",label:"All sets"},...CFB_PARLAY_CATEGORIES.map(k=>({key:k,label:`${PARLAY_CATS[k].label} · ${sets[k]?.length??0}`}))]} onChange={v=>{setPicked(v[0]==="all"?null:v[0] as CfbParlayCategory);setDiscovery(d=>({...d,markets:ALL_MARKETS.some(m=>m.key===v[0])?[v[0]]:defaultMarkets(ALL_MARKETS,d.sports)}));setFilter("all");setPhoneShown(PHONE_CHUNK);}}/>
         </div><div className="mb-3 max-w-md">
               <MultiSelect single label="Ticket tier" value={[active]} options={filters.map(([k,label])=>({key:k,label:`${label} · ${all.filter(t=>match(t,k)).length}`}))} onChange={v=>{setFilter(v[0]);setPhoneShown(PHONE_CHUNK);}}/>

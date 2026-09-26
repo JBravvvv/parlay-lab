@@ -43,7 +43,7 @@
 import { strategyGenerate } from "./parlay-strategy";
 import { inGameTimeWindow, type GameTimeWindow } from "./game-time-window";
 import { SETTLE_BOOK_SHORT } from "@/lib/sportsbook/books";
-import { mixOrder, type MixStyle } from "./parlay-gen-mix";
+import { mixBands, mixOrder, type MixBand, type MixStyle } from "./parlay-gen-mix";
 import { amToDec, decToAm } from "@/lib/ticket-math";
 import type { PropLean } from "@/lib/prop-lean";
 
@@ -541,7 +541,16 @@ function eligible<P>(pool: GenPool<P>, spec: GenSpec): GenLeg<P>[] {
 }
 
 /** the categories the spread rule must cover: every selected market that has a candidate at all */
+/* A Ctx is built once per Prep and never mutated, so these per-ctx derivations are computed once
+   and read by every seeded fill that shares it (2026-09-26 perf pass). */
+const spreadMemo = new WeakMap<object, readonly string[]>();
+const byPriceMemo = new WeakMap<object, readonly GenLeg<unknown>[]>();
 function spreadTargets<P>(ctx: Ctx<P>): readonly string[] {
+  let hit = spreadMemo.get(ctx);
+  if (!hit) spreadMemo.set(ctx, (hit = spreadTargetsOf(ctx)));
+  return hit;
+}
+function spreadTargetsOf<P>(ctx: Ctx<P>): readonly string[] {
   const wanted = specMarkets(ctx.spec);
   if (wanted.length < 2 || ctx.spec.spread === false) return [];
   const present = new Set(ctx.cands.map((l) => l.market).filter((m): m is string => !!m));
@@ -618,9 +627,13 @@ function shuffled<T>(xs: readonly T[], rng: () => number): T[] {
  * de-vigged fair) sit at EV ≈ 0 by construction and are weighted accordingly — not dressed
  * up, not hidden.
  */
-function sampleOrder<P>(cands: readonly GenLeg<P>[], rng: () => number, legs: number): GenLeg<P>[] {
+const byEvOrder = <P,>(cands: readonly GenLeg<P>[]): GenLeg<P>[] =>
+  cands.slice().sort((a, b) => b.ev - a.ev || (a.id < b.id ? -1 : 1));
+
+/* `byEv` is seed-independent, so a caller that walks one candidate set under many seeds sorts it
+   once (see Prep); it is only read here, never mutated. */
+function sampleOrder<P>(cands: readonly GenLeg<P>[], rng: () => number, legs: number, byEv: readonly GenLeg<P>[] = byEvOrder(cands)): GenLeg<P>[] {
   const topN = Math.max(40, 8 * legs);
-  const byEv = cands.slice().sort((a, b) => b.ev - a.ev || (a.id < b.id ? -1 : 1));
   const head = byEv.slice(0, topN);
   const tail = byEv.slice(topN);
   const out: GenLeg<P>[] = [];
@@ -694,7 +707,8 @@ function seat<P>(s: Slots<P>, c: GenLeg<P>, i: number) {
 function fillSlots<P>(ctx: Ctx<P>, order: readonly GenLeg<P>[], maxDec: number | null): GenLeg<P>[] | null {
   const s = seatPins(ctx);
   const spread = spreadTargets(ctx);
-  const byPrice = maxDec == null ? [] : ctx.cands.slice().sort((a, b) => a.dec - b.dec);
+  let byPrice = (maxDec == null ? [] : byPriceMemo.get(ctx)) as readonly GenLeg<P>[] | undefined;
+  if (!byPrice) byPriceMemo.set(ctx, (byPrice = ctx.cands.slice().sort((a, b) => a.dec - b.dec)));
   let dec = s.legs.reduce((d, l) => (l ? d * l.dec : d), 1);
   for (const c of order) {
     const i = s.legs.indexOf(null);
@@ -860,9 +874,74 @@ export function generate<P>(
   seed: number,
   avoid?: ReadonlySet<string>,
   recentPlayers?: ReadonlyMap<string, number>,
+  memo?: GenMemo,
 ): GenResult<P> {
   if (spec.betType === "model" || spec.strategies || spec.preferDiversity) return strategyGenerate(pool, spec, seed, avoid, recentPlayers, generate);
-  if (spec.noMarkets) return { ok: false, fail: { code: "no-rows" } };
+  const prep = (memo?.prep as Prep<P> | undefined) ?? prepare(pool, spec);
+  if (memo) memo.prep = prep;
+  if (prep.done) return prep.done;
+  const { n, seated, have, ctx, payoutBand, reachAm } = prep;
+  const orderFor = (s: number) => spec.style
+    ? mixOrder(ctx.cands, spec.style, mulberry32(s), recentPlayers, (prep.tiers ??= mixBands(ctx.cands)))
+    : sampleOrder(ctx.cands, mulberry32(s), n, (prep.byEv ??= byEvOrder(ctx.cands)));
+
+  if (payoutBand) {
+    for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
+      const s = (seed + roll) >>> 0;
+      const order = orderFor(s);
+      const first = fillSlots(ctx, order, payoutBand.hi) ?? fillSlots(ctx, order, null);
+      if (!first) continue;
+      const fixed = repairPayout(ctx, first, order, payoutBand);
+      if (!fixed) continue;
+      const t = ticketOf(fixed.legs, ctx.spec, s);
+      const ticket: GenTicket<P> = { ...t, dropped: fixed.dropped };
+      if (avoid?.has(ticket.key) && roll < ROLL_RETRIES) continue;
+      return { ok: true, ticket };
+    }
+    return { ok: false, fail: { code: "payout-not-found", reach: reachAm! } };
+  }
+
+  let last: GenTicket<P> | null = null;
+  for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
+    const s = (seed + roll) >>> 0;
+    const legs = fillSlots(ctx, orderFor(s), null);
+    if (!legs) break; // capacity said this cannot happen; if it ever does, fail honestly below
+    const ticket = ticketOf(legs, ctx.spec, s);
+    last = ticket;
+    if (!avoid?.has(ticket.key)) return { ok: true, ticket };
+  }
+  if (last) return { ok: true, ticket: last }; // a small pool may only have one answer — say it by repeating it
+  return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
+}
+
+/**
+ * Handed from `strategyGenerate` to its 32-64 `generate` runs, which share ONE pool and ONE spec
+ * and differ only by seed. The first run fills it with the seed-independent setup; the rest reuse
+ * it. 2026-09-26 perf pass (Josh: "Parlay Builder is moving EXTREMELY SLOW") — a single-strategy
+ * spec re-derived eligibility, capacity, the mix bands and the payout reach 32 times per render.
+ * Output is unchanged: seed, `avoid` and `recentPlayers` all enter after this point.
+ */
+export type GenMemo = { prep?: unknown };
+
+type Prep<P> =
+  | { done: GenResult<P> }
+  | {
+      done: null;
+      n: number;
+      seated: GenLeg<P>[];
+      have: number;
+      ctx: Ctx<P>;
+      payoutBand: { lo: number; hi: number } | null;
+      reachAm: { minAm: number; maxAm: number } | null;
+      byEv?: GenLeg<P>[];
+      tiers?: Map<string, MixBand>;
+    };
+
+/** Everything in `generate` that is a pure function of (pool, spec): rule checks, eligibility,
+ * the band, capacity and — with a payout band — its reach. A failure is carried as `done`. */
+function prepare<P>(pool: GenPool<P>, spec: GenSpec): Prep<P> {
+  const fail = (f: GenFail): Prep<P> => ({ done: { ok: false, fail: f } });
+  if (spec.noMarkets) return fail({ code: "no-rows" });
   const n = clampLegs(spec.legs);
   const band = bandDec(spec.legMinAm, spec.legMaxAm);
 
@@ -876,19 +955,19 @@ export function generate<P>(
     if (!l || (spec.sports && l.sport && !spec.sports.includes(l.sport)) || (spec.timing && !spec.timing.includes(l.started ? "live" : "pregame")) || !inGameTimeWindow(l.start, spec.timeWindow) || (spec.phase==="pregame" && l.started) || (spec.phase==="live" && !l.started)) missing.push(id);
     else pins[i] = l;
   });
-  if (missing.length) return { ok: false, fail: { code: "pin-missing", ids: missing } };
+  if (missing.length) return fail({ code: "pin-missing", ids: missing });
 
   const seated = pins.filter((p): p is GenLeg<P> => !!p);
   const wrongPosition = seated.filter((p) => spec.positions?.length && (!p.position || !spec.positions.includes(p.position)));
-  if (wrongPosition.length) return { ok: false, fail: { code: "pin-position", ids: wrongPosition.map((p) => p.id) } };
+  if (wrongPosition.length) return fail({ code: "pin-position", ids: wrongPosition.map((p) => p.id) });
   for (let i = 0; i < seated.length; i++) {
     for (let j = i + 1; j < seated.length; j++) {
       if (seated[i].playerKey === seated[j].playerKey)
-        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-player" } };
+        return fail({ code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-player" });
       if (exclusiveScorers(seated[i], seated[j]) || (spec.onePerGame && seated[i].gameKey === seated[j].gameKey))
-        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-game" } };
+        return fail({ code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-game" });
       if (spec.onePerTeam && seated[i].team != null && seated[i].team === seated[j].team)
-        return { ok: false, fail: { code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-team" } };
+        return fail({ code: "pin-conflict", ids: [seated[i].id, seated[j].id], why: "same-team" });
     }
   }
 
@@ -908,14 +987,11 @@ export function generate<P>(
       if (want !== "both") {
         const has: GenSide = want === "u" ? "o" : "u";
         const other = eligible(pool, { ...spec, sides: has });
-        if (other.length) return { ok: false, fail: { code: "one-sided", want, has, rows: other.length } };
+        if (other.length) return fail({ code: "one-sided", want, has, rows: other.length });
       }
-      return {
-        ok: false,
-        fail: { code: "short-pool", have: seated.length, want: n, relax: relaxHint(pool, spec, seated, n) },
-      };
+      return fail({ code: "short-pool", have: seated.length, want: n, relax: relaxHint(pool, spec, seated, n) });
     }
-    return { ok: false, fail: { code: "no-rows" } };
+    return fail({ code: "no-rows" });
   }
   const pinIds = new Set(seated.map((p) => p.id));
   const free = elig.filter((l) => !pinIds.has(l.id) && !clashes(l, seated, spec));
@@ -933,30 +1009,27 @@ export function generate<P>(
      below, which says short-pool and names the relaxation that would actually open it up. */
   const inBandAll = elig.filter((l) => !pinIds.has(l.id) && inDec(l.dec, band));
   if (!inBandAll.length && seated.length < n) {
-    return {
-      ok: false,
-      fail: { code: "band-empty", rows: elig.length, nearest: nearestPosted(free, band) },
-    };
+    return fail({ code: "band-empty", rows: elig.length, nearest: nearestPosted(free, band) });
   }
 
 
   /* ---- can the rules even be satisfied? exact, so the message is never a guess */
   const have = capacity(cands, seated, spec.onePerGame, spec.onePerTeam);
   if (have < n) {
-    return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
+    return fail({ code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) });
   }
 
   /* the doubleheader lookahead also arms when a TEAM has legs in two games and R2b is on — on such
      a slate a greedy seat can strand the fill even though no single player crosses games */
   const ctx: Ctx<P> = { spec: { ...spec, legs: n }, n, band, pins, cands: sampleSet,
     crossGamePlayers: crossesGames(sampleSet) || (!!spec.onePerTeam && crossesGames(sampleSet, (l) => l.team)) };
-  const orderFor = (s: number) => spec.style ? mixOrder(ctx.cands, spec.style, mulberry32(s), recentPlayers) : sampleOrder(ctx.cands, mulberry32(s), n);
   const payoutBand = spec.payout ? bandDec(spec.payout.minAm, spec.payout.maxAm) : null;
 
+  let reachAm: { minAm: number; maxAm: number } | null = null;
   if (payoutBand) {
     const reach = reachOf(ctx);
-    if (!reach) return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
-    const reachAm = { minAm: decToAm(reach.minDec), maxAm: decToAm(reach.maxDec) };
+    if (!reach) return fail({ code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) });
+    reachAm = { minAm: decToAm(reach.minDec), maxAm: decToAm(reach.maxDec) };
     // Greedy feasible examples are not mathematical bounds. Ignore conflicts to
     // obtain safe outer bounds before declaring a payout impossible.
     const freeSlots = n - seated.length;
@@ -965,32 +1038,8 @@ export function generate<P>(
     const lower = base * loose.slice(0, freeSlots).reduce((d, price) => d * price, 1);
     const upper = base * (freeSlots ? loose.slice(-freeSlots).reduce((d, price) => d * price, 1) : 1);
     if (upper < payoutBand.lo || lower > payoutBand.hi) {
-      return { ok: false, fail: { code: "payout-unreachable", reach: reachAm } };
+      return fail({ code: "payout-unreachable", reach: reachAm });
     }
-    for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
-      const s = (seed + roll) >>> 0;
-      const order = orderFor(s);
-      const first = fillSlots(ctx, order, payoutBand.hi) ?? fillSlots(ctx, order, null);
-      if (!first) continue;
-      const fixed = repairPayout(ctx, first, order, payoutBand);
-      if (!fixed) continue;
-      const t = ticketOf(fixed.legs, ctx.spec, s);
-      const ticket: GenTicket<P> = { ...t, dropped: fixed.dropped };
-      if (avoid?.has(ticket.key) && roll < ROLL_RETRIES) continue;
-      return { ok: true, ticket };
-    }
-    return { ok: false, fail: { code: "payout-not-found", reach: reachAm } };
   }
-
-  let last: GenTicket<P> | null = null;
-  for (let roll = 0; roll <= ROLL_RETRIES; roll++) {
-    const s = (seed + roll) >>> 0;
-    const legs = fillSlots(ctx, orderFor(s), null);
-    if (!legs) break; // capacity said this cannot happen; if it ever does, fail honestly below
-    const ticket = ticketOf(legs, ctx.spec, s);
-    last = ticket;
-    if (!avoid?.has(ticket.key)) return { ok: true, ticket };
-  }
-  if (last) return { ok: true, ticket: last }; // a small pool may only have one answer — say it by repeating it
-  return { ok: false, fail: { code: "short-pool", have, want: n, relax: relaxHint(pool, spec, seated, n) } };
+  return { done: null, n, seated, have, ctx, payoutBand, reachAm };
 }

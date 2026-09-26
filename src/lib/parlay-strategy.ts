@@ -1,6 +1,6 @@
 import { probabilityRanks, STRATEGIES } from "./discovery";
-import { mixCandidates, poolOf, type GenPool, type GenSpec, type GenResult, type GenLeg } from "./parlay-gen";
-type Run = <P>(pool:GenPool<P>,spec:GenSpec,seed:number,avoid?:ReadonlySet<string>,recent?:ReadonlyMap<string,number>)=>GenResult<P>;
+import { mixCandidates, poolOf, type GenMemo, type GenPool, type GenSpec, type GenResult, type GenLeg } from "./parlay-gen";
+type Run = <P>(pool:GenPool<P>,spec:GenSpec,seed:number,avoid?:ReadonlySet<string>,recent?:ReadonlyMap<string,number>,memo?:GenMemo)=>GenResult<P>;
 /** Bounded strategy search over posted legs only. No forecast or quote is altered. */
 export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avoid:ReadonlySet<string>|undefined,recent:ReadonlyMap<string,number>|undefined,run:Run):GenResult<P>{
  const model=spec.betType==="model";
@@ -34,8 +34,10 @@ export function strategyGenerate<P>(pool:GenPool<P>,spec:GenSpec,seed:number,avo
   if(chosen==="hedge")v+=Math.min(span,12)*3;
   return v;
  };
+ // every run below shares p and clean, so the seed-independent setup is done once (2026-09-26 perf pass)
+ const memo:GenMemo={};
  for(let i=0;i<(model?64:32);i++){
-  const r=run(p,clean,(seed+i*997)>>>0,avoid,recent); if(!r.ok){best??=r;continue;}
+  const r=run(p,clean,(seed+i*997)>>>0,avoid,recent,memo); if(!r.ok){best??=r;continue;}
   const ls=r.ticket.legs;
   if(chosen==="hedge" && (ls.some(l=>!l.start||!Number.isFinite(Date.parse(l.start))) || Math.max(...ls.map(l=>Date.parse(l.start!)))-Math.min(...ls.map(l=>Date.parse(l.start!)))<3*3600000))continue;
   if(chosen==="anchor"){

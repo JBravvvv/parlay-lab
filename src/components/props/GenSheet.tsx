@@ -6,10 +6,10 @@ import { CrossMark } from "./CrossMark";
 import type { CrossLeg } from "@/lib/cross-sport";
 import { DiscoveryFilters } from "./DiscoveryFilters";
 import { STRATEGIES } from "@/lib/discovery";
-import { GameTimeRange } from "./GameTimeRange";
 import { MultiSelect } from "./MultiSelect";
-import { gameTimeLabel } from "@/lib/game-time-window";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { gameTimeLabel, slateTimeBounds } from "@/lib/game-time-window";
+import { landAtMs, ODDS_COUNT_MS, OddsTicker, ReelOverlay, startReveal, type ReelFace, type Reveal } from "./ParlayReveal";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { exclusionKey } from "@/lib/parlay-exclusions";
 import { amFmt, amToDec, combineTicket } from "@/lib/ticket-math";
 import { parseAmerican } from "@/lib/parlay-calc";
@@ -371,6 +371,8 @@ function Slot<P>({
   onMove,
   dragFrom = null,
   onDragFrom,
+  reel,
+  landMs,
 }: {
   i: number;
   /** how many slots the ticket has — the ▲/▼ bounds read it */
@@ -388,6 +390,9 @@ function Slot<P>({
   onMove?: (from: number, to: number) => void;
   dragFrom?: number | null;
   onDragFrom?: (slot: number | null) => void;
+  /** the reveal's reel over this slot while it spins (2026-09-26), and when it lands */
+  reel?: ReactNode;
+  landMs?: number;
 }) {
   /* An MLB board label prints "Name (TEAM)"; a football label is the name on its own and the
      team rides in `l.team`. parseBoardLabel returns null for anything it does not recognise — it
@@ -408,8 +413,10 @@ function Slot<P>({
       onDragEnd={onMove ? () => onDragFrom?.(null) : undefined}
       data-pick-market={l.market} className={`gen-player-card flex min-h-9 items-center gap-1.5 border-t border-white/[0.04] py-0.5 sm:min-h-[44px] sm:gap-2 ${
         outOfBand ? "border-l-2 border-l-gold pl-1.5" : ""
-      }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}`}
+      }${dragging ? " opacity-40" : ""}${dropTarget ? " ring-1 ring-pos/40" : ""}${onMove ? " cursor-grab active:cursor-grabbing" : ""}${landMs != null ? " gen-slot-reeling relative" : ""}`}
+      style={landMs != null ? ({ "--land": `${landMs}ms` } as CSSProperties) : undefined}
     >
+      {reel}
       {/* the slot number (2026-09-18, Josh: "numbers next to the picks generated so its easy to see
           how many picks if someone is looking over your shoulder") */}
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
@@ -627,12 +634,31 @@ export function GenSheet<P>({
   const [customizeOpen, setCustomizeOpen] = useState(false);
   /* the slot being dragged, for the drop highlight (2026-09-18) */
   const [dragFrom, setDragFrom] = useState<number | null>(null);
+  /* the slot-machine reveal (2026-09-26) — set by the Generate press itself, so the new ticket never flashes first */
+  const [reveal, setReveal] = useState<Reveal | null>(null);
+  useEffect(() => {
+    if (!reveal) return;
+    const t = setTimeout(() => setReveal((r) => (r === reveal ? null : r)), reveal.end + ODDS_COUNT_MS + 650);
+    return () => clearTimeout(t);
+  }, [reveal]);
+  /* the slider's track opens at 9am PT, earlier only for a slate with an earlier game */
+  const timeBounds = useMemo(() => slateTimeBounds(pool.legs.map((l) => l.start)), [pool]);
   /* THE SAME FILTERS `generate` USES (INSTRUCTION 50 fix pass). poolCounts exists precisely so
      the diagnostic can never contradict the verdict. */
-  const counts = poolCounts(pool, spec);
+  const counts = useMemo(() => poolCounts(pool, spec), [pool, spec]);
   const candidates = useMemo(() => mixCandidates(pool, spec), [pool, spec]);
-  const distinctPlayers = new Set(candidates.map((l) => l.playerKey)).size;
-  const unknownPositions = positions ? new Set(mixCandidates(pool, { ...spec, positions: [] }).filter((l) => !l.position).map((l) => l.playerKey)).size : 0;
+  const distinctPlayers = useMemo(() => new Set(candidates.map((l) => l.playerKey)).size, [candidates]);
+  /* what the reels spin through: real legs from the pool the ticket is drawn from, spread across it */
+  const faces = useMemo<ReelFace[]>(() => {
+    const src = candidates.length >= 3 ? candidates : pool.legs;
+    const step = Math.max(1, Math.floor(src.length / 48));
+    const out: ReelFace[] = [];
+    for (let i = 0; i < src.length && out.length < 48; i += step) out.push({ name: parseBoardLabel(src[i].label)?.name ?? src[i].label, sub: src[i].sub, price: amFmt(src[i].am) });
+    return out;
+  }, [candidates, pool]);
+  /* PERF (2026-09-26): these three passes each filter the whole pool, and they ran on EVERY render of the sheet —
+     every hover of a drag, every keystroke. They depend on the pool and the spec only. */
+  const unknownPositions = useMemo(() => positions ? new Set(mixCandidates(pool, { ...spec, positions: [] }).filter((l) => !l.position).map((l) => l.playerKey)).size : 0, [positions, pool, spec]);
   /* how many legs carry a game log at all, before the floor — so the floor row can say "N of M have data" */
   const withLog = useMemo(() => (showHitRate ? mixCandidates(pool, { ...spec, minHit: null }) : []), [pool, spec, showHitRate]);
   const withLogCount = withLog.filter((l) => l.hit).length;
@@ -646,6 +672,10 @@ export function GenSheet<P>({
   }, [pool]);
   const selectedMarkets = specMarkets(spec);
   const ticket = result.ok ? result.ticket : null;
+  const rolling = !!reveal && !!ticket;
+  /* each unlocked slot lands in turn, top to bottom; a locked slot never spins */
+  const landTimes: (number | undefined)[] = [];
+  if (ticket && rolling) { let k = 0; for (let i = 0; i < ticket.legs.length; i++) landTimes.push(spec.pinned[i] === ticket.legs[i].id ? undefined : landAtMs(k++)); }
   /* priced off the HOISTED price and win % — the same two numbers the desk's own leg carries, so
      the headline here still cannot disagree with the slip the legs are handed to */
   const calc = ticket ? combineTicket(ticket.legs.map((l) => ({ cz: l.am, prob: l.prob, push: l.push }))) : null;
@@ -658,7 +688,7 @@ export function GenSheet<P>({
   const fail = result.ok ? null : result.fail;
   // A bounded payout search can succeed on another seed. Keep Generate usable and
   // offer explicit filter repairs separately, without silently changing the request.
-  const availableBand = availableLegBand(pool, spec);
+  const availableBand = useMemo(() => availableLegBand(pool, spec), [pool, spec]);
   /* A market that posts one side only (anytime TD) gets the same one-tap escape: the side it
      really does post. Without it the Unders button was a trap — the Generate button went dead,
      the banner called the board empty, and nothing on screen pointed at the control Josh had
@@ -811,7 +841,7 @@ export function GenSheet<P>({
             <OddsSlider prices={prices} lo={spec.legMinAm} hi={spec.legMaxAm} onChange={(lo, hi) => onSpec({ legMinAm: lo, legMaxAm: hi })} />
           </div>
 
-          </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideOdds stacked hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={spec.sports ? ALL_MARKETS : markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>
+          </div><div className="gen-discovery-controls"><div title={typeof categoryNote==="string"?categoryNote:undefined}><DiscoveryFilters hideOdds stacked timeBounds={timeBounds} hideStyles={spec.betType==="model"} showSports={!!spec.sports} markets={spec.sports ? ALL_MARKETS : markets} value={{timing:spec.timing??(spec.phase==="live"?["live"]:spec.phase==="pregame"?["pregame"]:["pregame","live"]),markets:spec.noMarkets?[]:[...selectedMarkets],strategies:spec.strategies??STRATEGIES.map(s=>s.key),sports:spec.sports??[],timeWindow:spec.timeWindow??[0,24]}} onChange={v=>onSpec({timing:v.timing,phase:v.timing.length===1?v.timing[0] as "live"|"pregame":"mixed",includeStarted:v.timing.includes("live"),markets:v.markets,noMarkets:v.markets.length===0,strategies:v.strategies,timeWindow:v.timeWindow,...(spec.sports?{sports:v.sports}:{})})}/></div></div></div>
 
           {/* hit-rate floor + window — MLB only, two selects on one row */}
           {showHitRate && hitWindow != null && (
@@ -965,7 +995,7 @@ export function GenSheet<P>({
           </div>}
           {/* the ticket, or the one honest reason there isn't one */}
           {ticket && calc ? (
-            <div key={ticket.key} className="gen-ticket-reveal">
+            <div key={ticket.key} aria-busy={rolling} className={`gen-ticket-reveal${rolling ? " gen-rolling" : ""}`} style={rolling ? ({ "--reveal-end": `${reveal!.end}ms` } as CSSProperties) : undefined}>
               <div className="space-y-1 sm:space-y-1.5">
                 {ticket.legs.map((l, i) => (
                   <Slot
@@ -984,6 +1014,8 @@ export function GenSheet<P>({
                     onTogglePin={onTogglePin}
                     excluded={excludedPlayers.some(p => p.key === exclusionKey(l))}
                     onExclude={excludedPlayers.some(p => p.key === exclusionKey(l)) ? () => onRestorePlayer?.(exclusionKey(l)) : onExcludePlayer}
+                    landMs={landTimes[i]}
+                    reel={landTimes[i] != null ? <ReelOverlay key={reveal!.spin} reveal={reveal!} landAt={landTimes[i]!} faces={faces} offset={i * 7} onSkip={() => setReveal(null)} /> : undefined}
                   />
                 ))}
               </div>
@@ -1009,7 +1041,7 @@ export function GenSheet<P>({
                 </div>
               )}
               <div className="gen-ticket-total num mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/[0.06] pt-2 text-[12px]">
-                <span className="gen-combined-odds text-[14px] font-bold text-pos"><span className="block text-[8px] font-semibold uppercase tracking-[0.16em] text-muted">Combined odds</span>{amFmt(calc.am)}</span>
+                <span className="gen-combined-odds text-[14px] font-bold text-pos"><span className="block text-[8px] font-semibold uppercase tracking-[0.16em] text-muted">Combined odds</span><OddsTicker key={rolling ? reveal!.spin : "shown"} am={calc.am} reveal={rolling ? reveal : null} /></span>
                 <span className="text-muted">
                   estimated <b className="text-text">{(calc.trueProb * 100).toFixed(1)}%</b>
                 </span>
@@ -1092,11 +1124,11 @@ export function GenSheet<P>({
             {(
               <button
                 type="button"
-                onClick={() => { setAttempt((n) => n + 1); onGenerate(); }}
+                onClick={() => { const next = attempt + 1; setAttempt(next); setReveal(startReveal(next, spec.legs - spec.pinned.slice(0, spec.legs).filter(Boolean).length)); onGenerate(); }}
                 disabled={loading}
-                className="gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12"
+                className={`gen-roll press flex min-h-10 flex-1 items-center justify-center rounded-[12px] border border-pos bg-pos text-[13px] font-bold text-bg sm:min-h-12${rolling ? " is-rolling" : ""}`}
               >
-                <svg aria-hidden className="mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
+                <svg aria-hidden className="gen-dice mr-2 shrink-0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="16" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="8" cy="16" r="1"/></svg>
                 {loading ? "Loading board…" : ticket ? "Regenerate" : "Generate parlay"}
               </button>
             )}

@@ -318,9 +318,14 @@ describe("source pins — the honesty guard extended to the newest price surface
   it("no hand-typed american price in JSX text in either new file", () => {
     /* tests/props-ui.test.ts:28 joins only six files, so the two files added by INSTRUCTION 50
        would otherwise render prices with nothing guarding them. */
-    expect([gen, mark].join("\n")).not.toMatch(/>\s*[+-]\d{3}\s*</);
+    const reveal = readSrc("src/components/props/ParlayReveal.tsx");
+    expect([gen, mark, reveal].join("\n")).not.toMatch(/>\s*[+-]\d{3}\s*</);
     expect(gen).toMatch(/amFmt\(l\.am\)/);
-    expect(gen).toMatch(/amFmt\(calc\.am\)/);
+    /* 2026-09-26 reveal pass: the combined price counts up through OddsTicker, which is handed the
+       ticket's own calc.am and settles on amFmt(am) — the count-up is decimal odds climbing TO the
+       real price, never a price of its own */
+    expect(gen).toMatch(/<OddsTicker[^>]*am=\{calc\.am\}/);
+    expect(reveal).toMatch(/\{amFmt\(am\)\}/);
   });
   it("the sheet is a dumb view — no fetch, no hook of its own, no ledger or credit path", () => {
     for (const bad of [/fetch\(/, /useHeadshots/, /\/api\//, /localStorage/, /Math\.random/]) {

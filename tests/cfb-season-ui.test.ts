@@ -60,10 +60,13 @@ describe("Season Lab — source pins", () => {
     expect(stripComments(read(PAGE))).toMatch(/CFB_ENABLED && CFB_SEASON_ENABLED/);
     expect(stripComments(read("src/lib/features.ts"))).toMatch(/export const CFB_SEASON_ENABLED = true;/);
   });
-  it("the nav carries Season Lab at /season in the CFB amber family", () => {
+  /* 2026-09-26, Josh, verbatim: "Don't know what 'Season Lab' is but remove it from the left side list" —
+     the nav entry is gone; the page stays reachable by URL and keeps every pin below */
+  it("the nav no longer lists Season Lab, and the /season page still exists", () => {
     const src = stripComments(read(SHELL));
-    expect(src).toMatch(/href: "\/season", label: "Season Lab"/);
-    expect(src).toMatch(/"\/season".*tone: "#F5A524"/);
+    expect(src).not.toMatch(/href: "\/season"/);
+    expect(src).not.toMatch(/label: "Season Lab"/);
+    expect(fs.existsSync(path.join(process.cwd(), PAGE))).toBe(true);
   });
   it("every builder input is a ≥44px box (h-11) and the stake is clamped to the fun-money cap", () => {
     const src = stripComments(read(COMP));

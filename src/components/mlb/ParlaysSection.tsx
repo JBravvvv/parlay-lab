@@ -1,4 +1,5 @@
 "use client";
+import { slateTimeBounds } from "@/lib/game-time-window";
 import { defaultMarkets } from "@/lib/market-scope";
 
 import { MlbLegContext, type MlbGameInfo } from "@/components/props/MlbLegContext";
@@ -162,7 +163,7 @@ export function ParlaysSection({
           Generated parlays — the engine&apos;s ticket sets · selected sportsbook prices
         </h2>
 
-        <DiscoveryFilters extraControls={<><label className="mb-2 flex items-center gap-2 text-[11px] font-bold">
+        <DiscoveryFilters timeBounds={slateTimeBounds(Object.values(gameInfo ?? {}).map(g=>g?.start))} extraControls={<><label className="mb-2 flex items-center gap-2 text-[11px] font-bold">
           Ticket set
           <select aria-label="Parlay set" className="min-h-8 rounded-lg border border-white/20 bg-surface-2 px-2 text-text" value={view} onChange={e=>{setView(e.target.value as typeof view);setPfilter("all");}}>
             {VIEWS.map(([v,label])=><option key={v} value={v}>{label} · {(lists[v]??[]).length}</option>)}

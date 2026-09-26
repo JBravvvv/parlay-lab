@@ -1,4 +1,5 @@
 "use client";
+import { slateTimeBounds } from "@/lib/game-time-window";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { ALL_MARKETS } from "@/lib/cross-sport";
 import { defaultMarkets } from "@/lib/market-scope";
@@ -235,7 +236,7 @@ function TicketStack({
   const games=new Map(board?.games.map(g=>[g.id,g])??[]);
   const shown=tickets.filter(t=>t.legs.every(l=>discoveryMatches({market:l.market,am:l.cz,prob:l.prob*100,ev:0,sport:L.id,start:games.get(l.gkey)?.start,started:games.get(l.gkey)?.status==="live"},filter)));
   return (
-    <div><BoardFilters value={filter} onChange={setFilter} markets={ALL_MARKETS} showSports={false} hideStyles/><p className="mb-2 text-[11px] text-muted">Showing {shown.length} of {tickets.length} tickets · filters do not change allocation.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
+    <div><BoardFilters value={filter} onChange={setFilter} markets={ALL_MARKETS} showSports={false} hideStyles timeBounds={slateTimeBounds([...games.values()].map(g=>g.start))}/><p className="mb-2 text-[11px] text-muted">Showing {shown.length} of {tickets.length} tickets · filters do not change allocation.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" role="list" aria-label={label}>
       {shown.map((t) => (
         <div key={t.id} role="listitem" className="min-w-0">
           <CfbTicketCard t={t} grade={grading?.tickets[t.id]} legResults={grading?.legs} board={board} className="paper-card-ticket"/>

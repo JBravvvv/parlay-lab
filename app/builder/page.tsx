@@ -7,7 +7,7 @@ import { ALL_MARKETS } from "@/lib/cross-sport";
 import { defaultMarkets } from "@/lib/market-scope";
 import { inOddsRange } from "@/lib/odds-range";
 import { STRATEGIES, type DiscoveryFilter } from "@/lib/discovery";
-import { inGameTimeWindow } from "@/lib/game-time-window";
+import { inGameTimeWindow, slateTimeBounds } from "@/lib/game-time-window";
 import { WonPaid } from "@/components/ui/WonPaid";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PaperBanner } from "@/components/ui/PaperBanner";
@@ -732,7 +732,7 @@ function MlbBuilderPage() {
             : "Exact-sum daily card from the engine's allocator, the FUN bucket, and a manual slip — all priced at DraftKings"
         }
       />
-      <PaperBanner /><BoardFilters value={ticketFilter} onChange={setTicketFilter} markets={ALL_MARKETS} showSports={false} hideStyles hideTiming/>
+      <PaperBanner /><BoardFilters value={ticketFilter} onChange={setTicketFilter} markets={ALL_MARKETS} showSports={false} hideStyles hideTiming timeBounds={slateTimeBounds(Object.values(ticketGameInfo ?? {}).map(g=>g?.start))}/>
       <p className="mb-2 text-[10px] text-muted">Filters change visible picks only; card allocations stay the same.</p>
 
       {(UFC_ENABLED || ASG_ENABLED) && (

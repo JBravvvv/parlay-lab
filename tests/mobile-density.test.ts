@@ -53,7 +53,7 @@ describe("phone header — ⋯ More menu, Settings gear, a bar that reads as a b
   it("the More menu is derived from the NAV table minus the bottom tabs and Settings", () => {
     expect(shell).toMatch(/const MORE = NAV\.filter\(\(n\) => !n\.mobile && n\.href !== "\/settings"\);/);
     expect(header).toMatch(/\{MORE\.map\(/);
-    // desk gating still applies inside the menu (Season Lab on CFB only, Ballpark Factor on MLB only)
+    // desk gating still applies inside the menu (Ballpark Factor on MLB only; Season Lab left the nav 2026-09-26)
     expect(header).toMatch(/shown\(\{ cfbOnly, mlbOnly \}\) \? \(/);
   });
   it("the ⋯ button is a real menu button and the popover is absolute (the header keeps its measured height)", () => {

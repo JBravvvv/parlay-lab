@@ -22,6 +22,9 @@ import { describe, expect, it } from "vitest";
  * parlays"): Season Lab (/season) joins the END of the top group, desktop rail + phone top-bar icon
  * (not a bottom tab — a 7th does not fit at 375px), tone #F5A524 (the CFB amber). Eleven entries.
  *
+ * 2026-09-26, Josh, verbatim: "Don't know what 'Season Lab' is but remove it from the left side list".
+ * The /season entry left the NAV table (the page itself stays reachable by URL). Eleven entries.
+ *
  * Source-scan pins on the NAV table in AppShell.tsx so a later edit cannot quietly reshuffle it.
  */
 
@@ -55,7 +58,8 @@ describe("nav — desktop side rail", () => {
   // the bottom group, see the next pin)
   // 2026-09-08 (INSTRUCTION 46): Season Lab appended after Parlay Calc — the eight-entry order above is unchanged ahead of it
   // 2026-09-17 (INSTRUCTION 68): Ballpark Factor appended after Season Lab — MLB-only, so on the MLB desk it follows Parlay Calc
-  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc, Season Lab, Ballpark Factor — in that order", () => {
+  // 2026-09-26 (Josh: "remove it from the left side list"): Season Lab is out; Ballpark Factor now follows Parlay Calc on every desk
+  it("top group is Games, Stats, Board, Builder, The Sharp, Simulator, Parlay Builder, Parlay Calc, Ballpark Factor — in that order", () => {
     expect(nav.filter((n) => n.group === "top").map((n) => n.label)).toEqual([
       "Games",
       "Stats",
@@ -65,7 +69,6 @@ describe("nav — desktop side rail", () => {
       "Simulator",
       "Parlay Builder",
       "Parlay Calc",
-      "Season Lab",
       "Ballpark Factor",
     ]);
     expect(nav.filter((n) => n.group === "top").map((n) => n.href)).toEqual([
@@ -77,7 +80,6 @@ describe("nav — desktop side rail", () => {
       "/simulator",
       "/props",
       "/calc",
-      "/season",
       "/ballpark",
     ]);
   });
@@ -149,8 +151,9 @@ describe("nav — mobile (375px)", () => {
   // 2026-09-17 (INSTRUCTION 68): /ballpark rides the top-bar icon row too — 12 pages
   // 2026-09-19 (Josh: "the 4 icons other than settings in top right of header need to be a dropdown or added as a
   // 'more' selection tab in footer"): the icon row became one ⋯ More menu; Settings keeps its own gear beside it
-  it("every route not in the bottom bar is reachable from the phone header: Settings as its gear, the rest inside the ⋯ More menu (all 12 pages reachable on a phone)", () => {
-    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/season", "/ballpark", "/settings"]);
+  // 2026-09-26: /season left the NAV table (Josh: "remove it from the left side list") — 11 pages
+  it("every route not in the bottom bar is reachable from the phone header: Settings as its gear, the rest inside the ⋯ More menu (all 11 nav pages reachable on a phone)", () => {
+    expect(nav.filter((n) => !n.mobile).map((n) => n.href)).toEqual(["/sharp", "/simulator", "/calc", "/ballpark", "/settings"]);
     // the menu derives from the same table, so nothing can fall off
     expect(shell).toMatch(/const MORE = NAV\.filter\(\(n\) => !n\.mobile && n\.href !== "\/settings"\);/);
     expect(shell).toMatch(/const SETTINGS = NAV\.find\(\(n\) => n\.href === "\/settings"\)!;/);
@@ -183,28 +186,32 @@ describe("nav — mobile (375px)", () => {
 
 describe("nav — Ballpark Factor (INSTRUCTION 68, 2026-09-17)", () => {
   const nav = navEntries();
-  it("is an MLB-only rail entry with its own glyph, not a bottom tab, after Season Lab", () => {
+  it("is an MLB-only rail entry with its own glyph, not a bottom tab, right after Parlay Calc (Season Lab left the rail 2026-09-26)", () => {
     const bp = nav.find((n) => n.href === "/ballpark")!;
     expect(bp.label).toBe("Ballpark Factor");
     expect(bp.icon).toBe("IconPark");
     expect(bp.mobile).toBe(false);
     expect(bp.mlbOnly).toBe(true);
     expect(bp.cfbOnly).toBe(false);
-    expect(nav.indexOf(bp)).toBe(nav.findIndex((n) => n.href === "/season") + 1);
+    expect(nav.indexOf(bp)).toBe(nav.findIndex((n) => n.href === "/calc") + 1);
     expect(fs.readFileSync(path.join(process.cwd(), "src/components/shell/icons.tsx"), "utf8")).toMatch(/export function IconPark\(/);
     expect(fs.existsSync(path.join(process.cwd(), "app/ballpark/page.tsx"))).toBe(true);
   });
 });
 
-describe("nav — Season Lab (INSTRUCTION 46 fix round, 2026-09-08)", () => {
+describe("nav — Season Lab (INSTRUCTION 46 fix round, 2026-09-08; removed from the rail 2026-09-26)", () => {
   const nav = navEntries();
-  it("every entry has its own glyph — Season Lab wears IconSeason, not the Ledger's", () => {
-    expect(nav.find((n) => n.href === "/season")!.icon).toBe("IconSeason");
-    expect(new Set(nav.map((n) => n.icon)).size).toBe(nav.length);
-    expect(fs.readFileSync(path.join(process.cwd(), "src/components/shell/icons.tsx"), "utf8")).toMatch(/export function IconSeason\(/);
+  /* 2026-09-26, Josh, verbatim: "Don't know what 'Season Lab' is but remove it from the left side list" */
+  it("Season Lab is off the nav (rail and ⋯ More menu both derive from NAV), while /season stays reachable by URL", () => {
+    expect(nav.some((n) => n.href === "/season" || n.label === "Season Lab")).toBe(false);
+    expect(shell).not.toMatch(/IconSeason/);
+    expect(fs.existsSync(path.join(process.cwd(), "app/season/page.tsx"))).toBe(true);
   });
-  it("Season Lab is the only CFB-only entry, and both nav surfaces drop CFB-only entries while the switch is on MLB", () => {
-    expect(nav.filter((n) => n.cfbOnly).map((n) => n.href)).toEqual(["/season"]);
+  it("every entry still has its own glyph", () => {
+    expect(new Set(nav.map((n) => n.icon)).size).toBe(nav.length);
+  });
+  it("no entry is CFB-only now, and the desk gate stays wired on both nav surfaces for the MLB-only entry", () => {
+    expect(nav.filter((n) => n.cfbOnly).map((n) => n.href)).toEqual([]);
     // 2026-09-17 (INSTRUCTION 68): Ballpark Factor is the only MLB-only entry; `shown` gates both
     expect(nav.filter((n) => n.mlbOnly).map((n) => n.href)).toEqual(["/ballpark"]);
     expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly" \| "mlbOnly">\) => \(!n\.cfbOnly \|\| cfb\) && \(!n\.mlbOnly \|\| sport === "mlb"\);/);
@@ -220,8 +227,9 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
   it("every tab carries a tone hex, and every tone is distinct", () => {
     for (const n of nav) expect(n.tone, n.label).toMatch(/^#[0-9A-F]{6}$/);
     expect(new Set(nav.map((n) => n.tone)).size).toBe(nav.length);
-    // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab); 11 → 12 on 2026-09-17 (INSTRUCTION 68, Ballpark Factor)
-    expect(nav.length).toBe(12);
+    // 10 → 11 on 2026-09-08 (INSTRUCTION 46, Season Lab); 11 → 12 on 2026-09-17 (INSTRUCTION 68, Ballpark Factor);
+    // 12 → 11 on 2026-09-26 (Season Lab removed from the list)
+    expect(nav.length).toBe(11);
   });
   it("tones are the agreed palette (Board is periwinkle since the 2026-09-18 cerulean retheme)", () => {
     expect(Object.fromEntries(nav.map((n) => [n.label, n.tone]))).toEqual({
@@ -233,8 +241,6 @@ describe("nav — tab-title colour (2026-09-05, Josh: \"Add color to the Tab tit
       Simulator: "#67E8F9",
       "Parlay Builder": "#FDBA74",
       "Parlay Calc": "#5EEAD4",
-      // 2026-09-08 (INSTRUCTION 46): the CFB amber, --color-cfb — Season Lab is a CFB-only page
-      "Season Lab": "#F5A524",
       // 2026-09-17 (INSTRUCTION 68): a mint, distinct from the Board's lime — an MLB-only page
       "Ballpark Factor": "#F9A8D4",
       Ledger: "#FDE68A",
@@ -322,9 +328,9 @@ describe("nav — the NFL desk joins the shell (2026-09-08: three desks, one swi
     expect(shell).toMatch(/\$\{cfb \? "text-cfb\/80" : nfl \? "text-nfl\/80" : "text-faint"\}/);
     expect(shell).toMatch(/MLB, CFB & NFL · informational only, not betting advice/);
   });
-  it("the NFL desk adds no nav entry, and CFB-only entries stay CFB-only (Season Lab is cut for NFL this ship)", () => {
+  it("the NFL desk adds no nav entry (Season Lab, once the only CFB-only entry, left the nav 2026-09-26)", () => {
     const nav = navEntries();
-    expect(nav.length).toBe(12);
+    expect(nav.length).toBe(11);
     expect(nav.some((n) => /nfl/i.test(n.href) || /nfl/i.test(n.label))).toBe(false);
     expect(shell).not.toMatch(/nflOnly/);
     expect(shell).toMatch(/const shown = \(n: Pick<NavItem, "cfbOnly" \| "mlbOnly">\) => \(!n\.cfbOnly \|\| cfb\) && \(!n\.mlbOnly \|\| sport === "mlb"\);/);

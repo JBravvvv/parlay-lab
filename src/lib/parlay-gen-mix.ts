@@ -39,8 +39,9 @@ export function mixBands(legs: readonly GenLeg[]): Map<string, MixBand> {
 export function mixOrder<P>(
   legs: readonly GenLeg<P>[], style: MixStyle, rng: () => number,
   recent: ReadonlyMap<string, number> = new Map(),
+  /* seed-independent: a caller walking one leg set under many seeds passes it in once */
+  tiers: ReadonlyMap<string, MixBand> = mixBands(legs),
 ): GenLeg<P>[] {
-  const tiers = mixBands(legs);
   const groups: Record<MixBand, GenLeg<P>[]> = { anchor: [], middle: [], upside: [] };
   for (const l of legs) groups[tiers.get(l.id)!].push(l);
   const used = new Set<string>();
