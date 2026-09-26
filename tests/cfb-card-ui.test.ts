@@ -229,7 +229,7 @@ describe("cfb-card-ui — the markers are rendered where the day's money is, and
     for (const frag of [
       // INSTRUCTION 46, point 9 (2026-09-08): the day box is controlled (`open={isOpen}`) so a tap
       // anywhere inside it toggles — the opening tag is now multi-line; its class and the summary are pinned
-      `className="glass cursor-pointer px-4 py-3"`,
+      `className="ledger-day glass cursor-pointer px-4 py-3"`,
       `open={isOpen}`,
       `<summary className="flex cursor-pointer list-none items-center justify-between gap-2">`,
       `<span className="min-w-0">`,

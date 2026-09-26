@@ -151,7 +151,7 @@ describe("CfbProps — the Caesars-grammar cards (INSTRUCTION 40)", () => {
     expect(css).toMatch(/\.hit-44::before \{[^}]*height: 44px/);
   });
   it("phone-first: the market strip is the shared chip-row (no page-level sideways scroll); every price is an .odds-cell (≥ 44 px by CSS)", () => {
-    expect(props).toMatch(/className="chip-row -mx-4 px-4 md:mx-0 md:px-0"/);
+    expect(props).toContain('className={`chip-row -mx-4 px-4 md:mx-0 md:px-0 ${view==="ranked"?"hidden":""}`}');
     expect(props).not.toMatch(/overflow-x-auto/);
     const css = read("app/globals.css");
     expect(css).toMatch(/\.odds-cell \{[^}]*min-height: 44px/);

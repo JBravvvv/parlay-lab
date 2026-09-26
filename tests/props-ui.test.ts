@@ -93,7 +93,8 @@ describe("two-row market nav — segmented control + scrolling snap rail", () =>
     expect(nav).toMatch(/scrollLeft \+ el\.clientWidth < el\.scrollWidth/);
   });
   it("the nav is sticky and the segmented control has the three tabs", () => {
-    expect(nav).toMatch(/className="sticky z-20/);
+    expect(nav).toContain('showCategories ? "sticky z-20" : "relative"');
+    expect(nav).toContain("style={showCategories ? { top } : undefined}");
     expect(nav).toMatch(/grid h-\[34px\] grid-cols-3/);
     expect(nav).toMatch(/role="tablist"/);
   });

@@ -81,7 +81,7 @@ describe("CFB Board — the Caesars grammar", () => {
     const strip = board.slice(board.indexOf("function TopEdges("), board.indexOf("function FeaturedPick("));
     expect(strip).toContain('className="top-edge-grid"');
     expect(strip).toContain("rows.slice(0,limit)");
-    expect(board).toContain("FEATURED_N=10");
+    expect(board).toMatch(/FEATURED_N\s*=\s*10/);
     for (const label of ["Load 10 More", ">Undo</button>", ">Clear</button>"]) expect(strip).toContain(label);
     expect(strip).toMatch(/\{total\}/);
   });

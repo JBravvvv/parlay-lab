@@ -423,8 +423,8 @@ describe("2026-09-18 compaction — the sheet takes less of the phone and says t
     expect(out).toMatch(/<b class="text-text">\d+<\/b> players/);
   });
   it("the explanatory paragraphs became tooltips (attributes, never text)", () => {
-    expect(out).not.toMatch(/>Tap several categories/);
-    expect(out).toMatch(/title="Tap several categories to mix them/);
+    expect(out).not.toMatch(/>Open Markets to choose/);
+    expect(out).toMatch(/title="Open Markets to choose which categories/);
     const hits = sheet({ showHitRate: true, hitWindow: 30, onHitWindow: () => {} });
     expect(hits).not.toMatch(/>How often the player has cleared/);
     expect(hits).toMatch(/title="How often the player has cleared/);

@@ -296,7 +296,7 @@ export function CfbTicketCard({
                     aria-label={`leg ${v.result}`}
                   />
                 )}
-              </div>{game&&<div className="ml-8 text-[9px] text-muted">{game.away.abbr} @ {game.home.abbr} · {gameTimeLabel(game.start)}<PickContext pick={{sport:league,game:game.id,player:leg.player??undefined,market:leg.market,line:leg.line,side:leg.side==="under"?"u":"o",start:game.start}}/></div>}</li>
+              </div>{game&&<div data-cfb-leg-matchup={single && !!matchup || undefined} className="ml-8 text-[9px] text-muted">{game.away.abbr} @ {game.home.abbr} · {gameTimeLabel(game.start)}<PickContext pick={{sport:league,game:game.id,player:leg.player??undefined,market:leg.market,line:leg.line,side:leg.side==="under"?"u":"o",start:game.start}}/></div>}</li>
             );
           })}
         </ul>

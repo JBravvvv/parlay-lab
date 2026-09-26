@@ -511,7 +511,7 @@ function PropsDesk() {
           setRankedFilter(rankedKeyOf(tab, k));
         }}
         top={ins.top}
-        search={!gameTab && cat != null ? search : null}
+        search={view === "ranked" || (!gameTab && cat != null) ? search : null}
         onSearch={setSearch}
         count={{ lines: totalRows, games: propGames.length }}
         hitWindow={hitWindow}
@@ -558,6 +558,7 @@ function PropsDesk() {
         <div className={legs.length ? "pb-20" : "pb-6"}>
           <RankedPicks
             convertCross={crossToMlb} date={q.data?.date ?? ""}
+            search={search}
             picks={rankedPicks}
             filters={RANKED_FILTERS}
             filter={rankedFilter}

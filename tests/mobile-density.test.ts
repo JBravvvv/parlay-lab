@@ -206,7 +206,7 @@ describe("Builder — one-line tickets with a ▾ drawer, the refused list folde
   it("legs are one text line on the phone and the hit-odds line follows the drawer", () => {
     expect(card).toMatch(/className="ticket-legs mt-1 space-y-px sm:mt-1\.5 sm:space-y-0\.5"/);
     expect(card).toMatch(/className=\{`num mt-1 text-\[10px\] text-faint \$\{open \? "" : "hidden sm:block"\}`\}/);
-    expect(card).toMatch(/className=\{`glass px-3 py-1\.5 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
+    expect(card).toMatch(/className=\{`pick-ticket glass px-3 py-1\.5 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
   });
   it("BlockedPanel keeps its summary and folds the list behind Show/Hide on the phone", () => {
     const bp = src.slice(src.indexOf("function BlockedPanel"), src.indexOf("export default function BuilderPage"));

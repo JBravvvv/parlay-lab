@@ -148,7 +148,7 @@ describe("every box shrunk vertically — per tab", () => {
     expect(src).toMatch(/<div className="mt-4 border-t border-gold\/25 pt-3">/);
     expect(src).toMatch(/<Panel title="Manual slip — combine any playable picks" className="mt-4">/);
     expect(src).toMatch(/<div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-4">/);
-    expect(src).toMatch(/className=\{`glass px-3 py-1\.5 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
+    expect(src).toMatch(/className=\{`pick-ticket glass px-3 py-1\.5 \$\{Number\(t\.czEv\) > 0 \? "ev-glow" : ""\}`\}/);
     expect(src).toMatch(/<div className="mt-3 text-\[10\.5px\] text-faint">/);
   });
   it("Football desk: the sandbox line mb-2 and a 36px search from md", () => {

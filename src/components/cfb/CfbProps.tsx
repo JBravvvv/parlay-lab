@@ -1142,7 +1142,7 @@ export function CfbProps() {
         <div className={`chip-row -mx-4 px-4 md:mx-0 md:px-0 ${view==="ranked"?"hidden":""}`}>
           <Segmented options={NAV_OPTIONS} value={nav} onChange={setNav} size="md" tone={L.id} label="Market" className="w-max" />
         </div>
-        <div className={nav === "sides" ? "mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1" : "hidden"}>
+        <div className={view !== "ranked" && nav === "sides" ? "mt-1.5 flex flex-wrap items-center justify-between gap-2 pb-1" : "hidden"}>
           <span className="text-sm font-semibold">{selectedBook} lines</span>
           <span className="num flex items-center gap-2 text-[10.5px] text-faint">
             {liveGames > 0 && nav === "sides" && (
@@ -1154,7 +1154,7 @@ export function CfbProps() {
 
           </span>
         </div>
-        {nav !== "sides" && (
+        {(view === "ranked" || nav !== "sides") && (
           <div className="mt-1 flex items-center gap-2 pb-1">
             <input
               type="search"
@@ -1197,6 +1197,7 @@ export function CfbProps() {
           )}
           <RankedPicks
             convertCross={crossToFootball} date={date}
+            search={search}
             picks={rankedPicks}
             filters={RANKED_FILTERS}
             isSel={(id) => pickedKeys.has(id)}

@@ -148,10 +148,16 @@ const PRICE: Record<RankedAccent, string> = { pos: "text-pos", cfb: "text-cfb", 
 export const RANKED_PAGE = 10;
 const TIERS: readonly Grade[] = ["S", "A", "B", "C", "D", "F"];
 
+export function matchesPickSearch(pick: {label:string;sub:string}, query: string): boolean {
+  const normalize=(text:string)=>text.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+  return normalize(`${pick.label} ${pick.sub}`).includes(normalize(query));
+}
+
 export function RankedPicks<P>({
   picks,
   convertCross,
   date = "",
+  search = "",
   filters,
   isSel,
   onToggle,
@@ -167,6 +173,7 @@ export function RankedPicks<P>({
 }: {
   convertCross?: (leg:CrossLeg)=>P;
   date?: string;
+  search?: string;
   picks: readonly RankedPick<P>[];
   /** the category chips, in rail order; "All" is added first */
   filters: readonly RankedFilter[];
@@ -195,7 +202,7 @@ export function RankedPicks<P>({
   useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:d.sports.some(s=>s!==sport)?ALL_MARKETS.map(m=>m.key):filterKeys.split(",")}));},[filterProp,filterKeys]);
   const foreign = useCrossSports(date,convertCross?discovery.sports.filter(s=>s!==sport):[]);
   const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
-  const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks],[picks,crossPicks,discovery.sports,sport]);
+  const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks].filter(p=>matchesPickSearch(p,search)),[picks,crossPicks,discovery.sports,sport,search]);
   const [own, setOwn] = useState<string>("all");
   const filter = filterProp ?? own;
   const [ownRange, setOwnRange] = useState<OddsRange>(OPEN_RANGE);
@@ -204,6 +211,7 @@ export function RankedPicks<P>({
   const [timeWindow, setTimeWindow] = useState<GameTimeWindow>([0, 24]);
   const sort = sortProp ?? ownSort;
   const [limit, setLimit] = useState(RANKED_PAGE);
+  useEffect(()=>setLimit(RANKED_PAGE),[search]);
   const graded = useMemo(
     () =>
       allPicks

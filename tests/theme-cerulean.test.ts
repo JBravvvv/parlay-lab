@@ -62,8 +62,8 @@ describe("theme — the tokens are cerulean on graphite", () => {
 
 describe("theme — the surfaces around the stylesheet follow", () => {
   it("manifest + layout theme colour are the graphite ground", () => {
-    expect(read("public/manifest.webmanifest")).toMatch(/"background_color": "#1e2126",\n\s+"theme_color": "#1e2126"/);
-    expect(read("app/layout.tsx")).toMatch(/themeColor: "#1e2126"/);
+    expect(read("public/manifest.webmanifest")).toMatch(/"background_color": "#1e2126",\n\s+"theme_color": "#171e28"/);
+    expect(read("app/layout.tsx")).toMatch(/themeColor: "#171e28"/);
   });
   it("the llama footage is hue-rotated to cerulean under a heavier scrim (the mp4 itself is untouched)", () => {
     const vb = read("src/components/shell/VideoBackdrop.tsx");

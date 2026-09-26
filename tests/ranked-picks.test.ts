@@ -113,6 +113,21 @@ describe("RankedPicks — every pick today, S down", () => {
     expect(out).toMatch(/data-ranked-pick="a-ml"[\s\S]*?aria-pressed="true"/);
   });
 
+  it("searches across the entire ranked list without changing prices or selection", () => {
+    const out = render({ search: "a-ml" });
+    expect(order(out)).toEqual(["a-ml"]);
+    expect(out).toContain('aria-pressed="true"');
+    expect(out).toContain("-110");
+    expect(order(render({ search: "missing player" }))).toEqual([]);
+    expect(order(render({ search: "  " }))).toHaveLength(PICKS.length);
+  });
+
+  it("matches accented player names and matchup text", () => {
+    const p = row("accented", "ml", 3, { label: "José Altuve", sub: "HOU @ SEA" });
+    expect(order(render({ picks: [p], search: "jose" }))).toEqual(["accented"]);
+    expect(order(render({ picks: [p], search: "SEA" }))).toEqual(["accented"]);
+  });
+
   it("starts with 10 rows and offers Load 10 More", () => {
     const many = Array.from({ length: RANKED_PAGE + 25 }, (_, i) => row(`p${i}`, "ml", 1 + (i % 9)));
     const out = render({ picks: many });

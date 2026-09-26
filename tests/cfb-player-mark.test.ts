@@ -106,7 +106,7 @@ describe("CfbTicketCard legs — one mark grammar", () => {
   });
   it("a player leg prints the matchup under the name (INSTRUCTION 46 fix round); a side leg does not", () => {
     const prop = html(createElement(CfbTicketCard, { t: ticket([PROP]), board }));
-    expect(prop).toContain('data-cfb-leg-matchup="true">FSU @ ALA<');
+    expect(prop).toMatch(/data-cfb-leg-matchup="true"[^>]*>FSU @ ALA · /);
     const side = html(createElement(CfbTicketCard, { t: ticket([SIDE]), board }));
     expect(side).not.toContain("data-cfb-leg-matchup");
     // no slate → no matchup, and still one headshot with no second logo
