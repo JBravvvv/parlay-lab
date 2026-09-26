@@ -17,10 +17,10 @@ const read = (rel: string) => stripComments(fs.readFileSync(path.join(process.cw
 /** every `<th …>…</th>` text in a file */
 const headerCells = (src: string) => [...src.matchAll(/<th(?:\s[^>]*)?>([\s\S]*?)<\/th>/g)].map((m) => m[1].replace(/\s+/g, " ").trim());
 
-describe("Game Preview page — app/games/[gamePk]/page.tsx", () => {
-  const page = read("app/games/[gamePk]/page.tsx");
-  it("is titled 'Game Preview' until first pitch and 'Box Score' after", () => {
-    expect(page).toMatch(/const pageTitle = g \? \(pregame \? "Game Preview" : "Box Score"\) : null;/);
+describe("Game Preview — shared GameDetail component", () => {
+  const page = read("src/components/games/GameDetail.tsx");
+  it("is titled 'Game Preview' until first pitch and labels live or final coverage afterward", () => {
+    expect(page).toMatch(/const pageTitle = g \? \(pregame \? "Game Preview" : g\.status === "live" \? "Live game" : "Game coverage"\) : null;/);
     expect(page).toMatch(/<h1 [^>]*>\{pageTitle\}<\/h1>/);
   });
   it("pregame renders the PreviewBox (season AVG / OPS), otherwise the full BattingBox", () => {

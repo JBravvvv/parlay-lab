@@ -1,6 +1,8 @@
 "use client";
 import { Overlay } from "@/components/ui/Overlay";
 import { GameDetail } from "@/components/games/GameDetail";
+import { TeamProfileExplorer } from "@/components/games/TeamProfileExplorer";
+import { isGameCardBackground } from "@/lib/game-card-interaction";
 import {useSportsbook} from "@/lib/sportsbook/store";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
@@ -204,6 +206,7 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
   const gameSplits: GameSplits | null = findGameSplits(splitsFeed, { abbr: g.away.abbr, name: g.away.name }, { abbr: g.home.abbr, name: g.home.name });
   // INSTRUCTION 46: collapsed by default; the body toggles, the top-right button navigates
   const [open, setOpen] = useState(false);
+  const [profileTeam, setProfileTeam] = useState<GameTeam | null>(null);
   const upcoming = g.status === "upcoming";
   const showScore = g.status === "live" || g.status === "final";
   const ex = cardExpansion(g);
@@ -253,9 +256,8 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
     <span>Probables TBD</span>
   ) : null;
 
-  const panelId = `game-${g.pk}-detail`;
   return (
-    <article className="glass min-w-0">
+    <article className="glass min-w-0 cursor-pointer" onClick={(e) => { if (isGameCardBackground(e.target, e.currentTarget)) setOpen(true); }}>
       <div className="flex items-center justify-between gap-2 px-3 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.12em]">
         <span className="flex min-w-0 items-center truncate">{header}{dh}</span>
         <Link
@@ -267,38 +269,36 @@ function GameCard({ g, date }: { g: ShapedGame; date: string }) {
           {cardLinkLabel(g.status)} ›
         </Link>
       </div>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((o) => !o)}
+      <div
         className="flex w-full items-center gap-2 px-3 pb-2.5 pt-1.5 text-left transition-[background] duration-(--dur-fast) hover:bg-white/[0.03] active:bg-white/[0.05]"
       >
         <div className="min-w-0 flex-1 space-y-1">
-          <TeamRow t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} split={sideSplit(gameSplits, "ml", "away")} />
-          <TeamRow t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} split={sideSplit(gameSplits, "ml", "home")} />
+          <TeamRow onTeam={() => setProfileTeam(g.away)} t={g.away} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.away.score ?? 0) > (g.home.score ?? 0)} split={sideSplit(gameSplits, "ml", "away")} />
+          <TeamRow onTeam={() => setProfileTeam(g.home)} t={g.home} score={showScore} upcoming={upcoming} winner={g.status === "final" && (g.home.score ?? 0) > (g.away.score ?? 0)} split={sideSplit(gameSplits, "ml", "home")} />
         </div>
         <span aria-hidden className={`shrink-0 text-[12px] leading-none text-faint transition-transform duration-(--dur-fast) ${open ? "rotate-180" : ""}`}>
           ⌄
         </span>
-      </button>
-      <Overlay open={open} onClose={()=>setOpen(false)} title={`${g.away.abbr} @ ${g.home.abbr} · ${cardLinkLabel(g.status)}`} size="full">{open && <GameDetail pk={String(g.pk)} qDate={date} embedded/>}</Overlay>
+      </div>
+      <Overlay open={open || !!profileTeam} onClose={() => { setOpen(false); setProfileTeam(null); }} title={profileTeam?.name ?? `${g.away.abbr} @ ${g.home.abbr} · ${cardLinkLabel(g.status)}`} size="full">
+        {profileTeam ? <TeamProfileExplorer key={profileTeam.id} sport="mlb" teamId={String(profileTeam.id)} /> : open && <GameDetail pk={String(g.pk)} qDate={date} embedded/>}
+      </Overlay>
     </article>
   );
 }
 
 /** one compact line per club: logo, abbr (full name from md up), record, then the score or the ML */
 /** `split` (2026-09-18): the consensus bet%/money% on this club's moneyline; the ML grade rides beside the price (Josh: "grades next to every pick on the games page") */
-function TeamRow({ t, score, upcoming, winner, split = null }: { t: GameTeam; score: boolean; upcoming: boolean; winner: boolean; split?: import("@/lib/splits").SideSplit | null }) {
+function TeamRow({ t, score, upcoming, winner, split = null, onTeam }: { onTeam: () => void; t: GameTeam; score: boolean; upcoming: boolean; winner: boolean; split?: import("@/lib/splits").SideSplit | null }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logoFor(t.abbr)} alt="" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" loading="lazy" />
       <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
-        <span className={`truncate text-[13px] font-semibold ${winner ? "text-text" : score ? "text-muted" : "text-text"}`}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); onTeam(); }} aria-label={`Open ${t.name} team page`} className={`min-h-8 rounded text-left underline decoration-current/30 underline-offset-4 hover:decoration-current focus-visible:outline focus-visible:outline-2 truncate text-[13px] font-semibold ${winner ? "text-text" : score ? "text-muted" : "text-text"}`}>
           {t.abbr}
           <span className="ml-1.5 hidden text-[12px] font-medium text-muted md:inline">{t.name}</span>
-        </span>
+        </button>
         <span className="num shrink-0 text-[10px] text-faint">{t.record}</span>
       </div>
       {score ? (

@@ -326,26 +326,24 @@ describe("games: list card (INSTRUCTION 46)", () => {
     expect(xBottomOf(null, "final")).toBeNull();
   });
 
-  it("the card renders collapsed (useState(false)), toggles on the body button, and only mounts the detail panel when open", () => {
+  it("whole-card taps open one sheet while team names open their own profile", () => {
     const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
-    expect(page).toMatch(/const \[open, setOpen\] = useState\(false\);/);
-    expect(page).toMatch(/<button\s+type="button"\s+aria-expanded=\{open\}\s+aria-controls=\{panelId\}\s+onClick=\{\(\) => setOpen\(\(o\) => !o\)\}/);
-    expect(page).toMatch(/\{open && \(\s*<div id=\{panelId\}/);
-    // the expansion is decided by the pure helper and prints the linescore through the box page's own table
-    expect(page).toMatch(/const ex = cardExpansion\(g\);/);
-    expect(page).toMatch(/import \{ LinescoreTable \} from "@\/components\/games\/LinescoreTable"/);
-    expect(page).toMatch(/\{ex\.linescore && g\.linescore && \(\s*<LinescoreTable/);
+    expect(page).toContain('const [open, setOpen] = useState(false);');
+    expect(page).toContain('isGameCardBackground(e.target, e.currentTarget)');
+    expect(page).toContain('open={open || !!profileTeam}');
+    expect(page).toContain('open && <GameDetail');
+    expect(page).toContain('e.stopPropagation(); onTeam();');
+    expect(page).toContain('<TeamProfileExplorer');
+    expect(page).not.toContain('aria-controls={panelId}');
   });
 
-  it("the top-right Link is the only navigation and carries the per-status label; the card is no longer one big Link", () => {
+  it("the labelled game action is keyboard accessible and opens coverage in place", () => {
     const page = stripComments(fs.readFileSync(path.join(process.cwd(), "app/games/page.tsx"), "utf8"));
-    expect(page).toMatch(/<Link\s+href=\{`\/games\/\$\{g\.pk\}\?date=\$\{date\}`\}\s+replace[\s\S]*?\{cardLinkLabel\(g\.status\)\} ›\s*<\/Link>/);
+    expect(page).toContain('e.preventDefault();setOpen(true);');
+    expect(page).toContain('{cardLinkLabel(g.status)} ›');
     expect(page.match(/<Link\b/g)?.length).toBe(1);
-    // 2026-09-08 fix round: the pill is a thumb target — at least 32px tall, inline-flex centred, px-3 py-1.5
-    const link = page.match(/<Link\s+href=\{`\/games\/\$\{g\.pk\}\?date=\$\{date\}`\}[\s\S]*?className="([^"]+)"/)?.[1] ?? "";
+    const link = page.match(/<Link[\s\S]*?className="([^"]+)"/)?.[1] ?? "";
     for (const cls of ["inline-flex", "items-center", "min-h-[32px]", "px-3", "py-1.5"]) expect(link.split(/\s+/), cls).toContain(cls);
-    // 2026-09-08: the old footer caption "Preview ›" / "Box score ›" is gone with the full-card Link
-    expect(page).not.toMatch(/"Preview ›"/);
   });
 
   it("compact rows: a 20px logo, the abbreviation on the phone with the club name only from md up", () => {

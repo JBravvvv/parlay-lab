@@ -1,8 +1,11 @@
 "use client";
 import { GameSuggestedPicks } from "./GameSuggestedPicks";
 import { Overlay } from "@/components/ui/Overlay";
+import { TeamProfileExplorer } from "@/components/games/TeamProfileExplorer";
+import { FootballGameDetail } from "@/components/games/FootballGameDetail";
+import { isGameCardBackground } from "@/lib/game-card-interaction";
 
-import type { KeyboardEvent, ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { EdgeMeter } from "@/components/ui/EdgeMeter";
 import { EvBadge } from "@/components/ui/EvBadge";
 import { GradeChip } from "@/components/ui/GradeChip";
@@ -157,7 +160,7 @@ export function sideCell(
   row: CfbRow | null,
   opts: { picked?: boolean; onClick?: () => void; game: CfbGame; splits?: GameSplits | null },
 ): OddsGridCell {
-  if (!row) return { aria: "no line" };
+  if (!row) return opts.onClick ? { price: "—", tone: "muted", onClick: opts.onClick, aria: "No line · open game details" } : { aria: "no line" };
   // 2026-09-18: the row's own grade rides every cell, and the consensus bet%/money% for this side when the page carries the game
   // (a first-half row has no public split — the feed carries full-game sides only)
   const base = baseMarketOf(row.market);
@@ -203,6 +206,9 @@ export function CfbGameCard({
   /* the league seam (2026-09-08): the accent classes come off useLeague() — both class strings literal */
   const L = useLeague();
   const nfl = L.id === "nfl";
+  const [profileTeam, setProfileTeam] = useState<CfbGame["home"] | null>(null);
+  const closeDetails = () => { setProfileTeam(null); if (expanded) onToggle(); };
+  const openGame = () => { if (!expanded) onToggle(); };
   const accentText = nfl ? "text-nfl" : "text-cfb";
   const sides = marketSides(game);
   const scored = game.status === "live" || game.status === "final";
@@ -213,34 +219,34 @@ export function CfbGameCard({
   const unmatched = game.oddsEventId == null;
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      onToggle();
+      openGame();
     }
   };
 
   /* a price tap: pick the side in the sandbox, else open the model (what the card did before) */
-  const tap = (row: CfbRow | null) => (row && onPick ? () => onPick(row) : onToggle);
+  const tap = (row: CfbRow | null) => (row && onPick ? () => onPick(row) : openGame);
   const picked = (row: CfbRow | null) => (row != null && !!isPicked?.(row));
   const cell = (row: CfbRow | null) => sideCell(row, { picked: picked(row), onClick: tap(row), game, splits });
 
   const rows: OddsGridRow[] = [
     {
       key: `${game.id}-away`,
-      team: <TeamBlock team={game.away} score={scored ? game.awayScore : null} scored={scored} winner={awayWon} loser={homeWon} />,
+      team: <TeamBlock team={game.away} onTeam={() => setProfileTeam(game.away)} score={scored ? game.awayScore : null} scored={scored} winner={awayWon} loser={homeWon} />,
       cells: [cell(sides.spread.away), cell(sides.ml.away), cell(sides.total.over)],
     },
     {
       key: `${game.id}-home`,
-      team: <TeamBlock team={game.home} score={scored ? game.homeScore : null} scored={scored} winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />,
+      team: <TeamBlock team={game.home} onTeam={() => setProfileTeam(game.home)} score={scored ? game.homeScore : null} scored={scored} winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />,
       cells: [cell(sides.spread.home), cell(sides.ml.home), cell(sides.total.under)],
     },
   ];
   // 2026-09-19: the first-half lines as two more rows of the same grid, only when a book posted the half
   if (game.rows.some((r) => isH1Market(r.market))) {
     rows.push(
-      { key: `${game.id}-away-1h`, team: <H1Block team={game.away} score={scored ? game.awayH1 ?? null : null} />, cells: [cell(sides.spread_1h.away), cell(sides.ml_1h.away), cell(sides.total_1h.over)] },
-      { key: `${game.id}-home-1h`, team: <H1Block team={game.home} score={scored ? game.homeH1 ?? null : null} />, cells: [cell(sides.spread_1h.home), cell(sides.ml_1h.home), cell(sides.total_1h.under)] },
+      { key: `${game.id}-away-1h`, team: <H1Block team={game.away} onTeam={() => setProfileTeam(game.away)} score={scored ? game.awayH1 ?? null : null} />, cells: [cell(sides.spread_1h.away), cell(sides.ml_1h.away), cell(sides.total_1h.over)] },
+      { key: `${game.id}-home-1h`, team: <H1Block team={game.home} onTeam={() => setProfileTeam(game.home)} score={scored ? game.homeH1 ?? null : null} />, cells: [cell(sides.spread_1h.home), cell(sides.ml_1h.home), cell(sides.total_1h.under)] },
     );
   }
 
@@ -266,13 +272,13 @@ export function CfbGameCard({
   }
 
   return (
-    <article className={`football-game-card glass card-lift min-w-0 overflow-hidden ${isLive ? "ring-1 ring-live/25" : ""} ${className}`}>
+    <article onClick={(e) => { if (isGameCardBackground(e.target, e.currentTarget)) openGame(); }} className={`football-game-card cursor-pointer glass card-lift min-w-0 overflow-hidden ${isLive ? "ring-1 ring-live/25" : ""} ${className}`}>
       {/* header: status left (live pill · kickoff · FINAL), neutral tag + model toggle right */}
       <div
         role="button"
         tabIndex={0}
         aria-expanded={expanded}
-        onClick={onToggle}
+        onClick={openGame}
         onKeyDown={onKey}
         className={`press flex cursor-pointer select-none items-center justify-between gap-3 px-3.5 pb-1.5 pt-3 outline-none focus-visible:ring-2 ${nfl ? "focus-visible:ring-nfl/60" : "focus-visible:ring-cfb/60"}`}
       >
@@ -291,12 +297,12 @@ export function CfbGameCard({
           )}
           {game.tv && !isLive && <span className="truncate text-[9.5px] font-medium normal-case tracking-normal text-faint">{game.tv}</span>}
         </div>
-        <span className="shrink-0 text-[9.5px] font-medium text-faint">{edges.length>0&&<b className="text-pos">{edges.length} edges · </b>}Game details ↗</span>
+        <span className="shrink-0 text-[9.5px] font-medium text-faint">{edges.length>0&&<b className="text-pos">{edges.length} edges · </b>}{isLive ? "Live coverage" : isFinal ? "Box score" : "Game details"} ↗</span>
       </div>
 
       <div className="px-3 pb-3">
         {isFinal ? (
-          <FinalLine game={game} homeWon={homeWon} awayWon={awayWon} />
+          <FinalLine game={game} homeWon={homeWon} awayWon={awayWon} onTeam={setProfileTeam} />
         ) : game.rows.length === 0 ? (
           <>
             <div className="space-y-2 py-1">
@@ -339,7 +345,18 @@ export function CfbGameCard({
         )}
       </div>
 
-      <Overlay open={expanded} onClose={onToggle} title={`${game.away.abbr} @ ${game.home.abbr} · Game details`} size="full" tone={L.id}><OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} /><div className="my-3 flex flex-wrap gap-2 text-[11px] text-muted">{meta.map((m,i)=><span key={i}>{m}</span>)}</div><GameSuggestedPicks game={game}/><Expanded game={game} /></Overlay>
+      <Overlay open={expanded || !!profileTeam} onClose={closeDetails} title={profileTeam?.name ?? `${game.away.abbr} @ ${game.home.abbr} · ${isLive ? "Live coverage" : isFinal ? "Box score" : "Game details"}`} size="full" tone={L.id}>
+        {profileTeam ? <>
+          {expanded && <button type="button" onClick={() => setProfileTeam(null)} className="mb-3 min-h-11 text-sm font-semibold text-muted">‹ Back to game</button>}
+          <TeamProfileExplorer key={profileTeam.id} sport={L.id} teamId={profileTeam.id} />
+        </> : expanded && <>
+          {scored ? <FootballGameDetail sport={L.id} gameId={game.id} /> : <>
+            <OddsGrid tone={L.id} columns={["Spread", "Money", "Total"]} rows={rows} />
+            <div className="my-3 flex flex-wrap gap-2 text-[11px] text-muted">{meta.map((m,i)=><span key={i}>{m}</span>)}</div>
+            <GameSuggestedPicks game={game}/><Expanded game={game} />
+          </>}
+        </>}
+      </Overlay>
     </article>
   );
 }
@@ -352,6 +369,7 @@ function TeamBlock({
   winner,
   loser,
   prefix,
+  onTeam,
 }: {
   team: CfbGame["home"];
   score: number | null;
@@ -359,6 +377,7 @@ function TeamBlock({
   winner: boolean;
   loser: boolean;
   prefix?: string;
+  onTeam?: () => void;
 }) {
   const rankText = useLeague().id === "nfl" ? "text-nfl" : "text-cfb";
   const sub = team.record ?? (team.fpiRank != null ? `FPI #${team.fpiRank}` : team.fpi != null ? `FPI ${fmtSigned(team.fpi)}` : null);
@@ -369,7 +388,7 @@ function TeamBlock({
         <div className={`flex items-baseline gap-1 truncate text-[13px] font-bold ${loser ? "text-muted" : "text-text"}`}>
           {prefix && <span className="text-[9px] font-bold text-faint">{prefix}</span>}
           {team.rank != null && <span className={`num text-[10px] font-bold ${rankText}`}>#{team.rank}</span>}
-          <span className="truncate">{team.abbr}</span>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onTeam?.(); }} aria-label={`Open ${team.name} team page`} className="min-h-8 truncate rounded px-1 -ml-1 text-left underline decoration-current/30 underline-offset-4 hover:decoration-current focus-visible:outline focus-visible:outline-2">{team.abbr}</button>
         </div>
         <div className="num truncate text-[10px] text-faint">{sub ?? team.short}</div>
       </div>
@@ -379,22 +398,22 @@ function TeamBlock({
 }
 
 /** the first-half row's team column: a "1H" tag, the abbreviation, and the half-time score once ESPN posts it */
-function H1Block({ team, score }: { team: CfbGame["home"]; score: number | null }) {
+function H1Block({ team, score, onTeam }: { team: CfbGame["home"]; score: number | null; onTeam: () => void }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span className="shrink-0 rounded border border-line-2 px-1 py-0.5 text-[9px] font-bold tracking-[0.12em] text-faint">1H</span>
-      <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-muted">{team.abbr}</span>
+      <button type="button" onClick={(e) => { e.stopPropagation(); onTeam(); }} aria-label={`Open ${team.name} team page`} className="min-h-8 min-w-0 flex-1 truncate rounded text-left text-[12px] font-bold text-muted underline decoration-current/30 underline-offset-4">{team.abbr}</button>
       {score != null && <span className="num shrink-0 pr-1 text-[13px] font-bold leading-none text-muted">{score}</span>}
     </div>
   );
 }
 
 /** a final: the two teams and the score, the winner lit — no grid (it closed at kickoff) */
-function FinalLine({ game, homeWon, awayWon }: { game: CfbGame; homeWon: boolean; awayWon: boolean }) {
+function FinalLine({ game, homeWon, awayWon, onTeam }: { game: CfbGame; homeWon: boolean; awayWon: boolean; onTeam: (team: CfbGame["home"]) => void }) {
   return (
     <div className="space-y-1.5 py-0.5">
-      <TeamBlock team={game.away} score={game.awayScore} scored winner={awayWon} loser={homeWon} />
-      <TeamBlock team={game.home} score={game.homeScore} scored winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />
+      <TeamBlock team={game.away} onTeam={() => onTeam(game.away)} score={game.awayScore} scored winner={awayWon} loser={homeWon} />
+      <TeamBlock team={game.home} onTeam={() => onTeam(game.home)} score={game.homeScore} scored winner={homeWon} loser={awayWon} prefix={game.neutral ? "vs" : "@"} />
     </div>
   );
 }

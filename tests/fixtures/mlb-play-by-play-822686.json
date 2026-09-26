@@ -1,0 +1,664 @@
+{
+  "_source": "Public MLB Stats API https://statsapi.mlb.com/api/v1/game/822686/playByPlay, fetched 2026-09-26. ATL 9 at WSH 0, September 2, 2026. Three actual plate appearances trimmed to consumed fields.",
+  "allPlays": [
+    {
+      "result": {
+        "event": "Strikeout",
+        "description": "Drake Baldwin strikes out on a foul tip.",
+        "awayScore": 0,
+        "homeScore": 0
+      },
+      "about": {
+        "atBatIndex": 0,
+        "halfInning": "top",
+        "inning": 1,
+        "isComplete": true,
+        "isScoringPlay": false
+      },
+      "count": {
+        "balls": 1,
+        "strikes": 3,
+        "outs": 1
+      },
+      "matchup": {
+        "batter": {
+          "fullName": "Drake Baldwin"
+        },
+        "pitcher": {
+          "fullName": "Brad Lord"
+        }
+      },
+      "playEvents": [
+        {
+          "index": 0,
+          "isPitch": false,
+          "type": "action",
+          "count": {
+            "balls": 0,
+            "strikes": 0,
+            "outs": 0
+          },
+          "details": {
+            "description": "Status Change - Pre-Game"
+          }
+        },
+        {
+          "index": 1,
+          "isPitch": false,
+          "type": "action",
+          "count": {
+            "balls": 0,
+            "strikes": 0,
+            "outs": 0
+          },
+          "details": {
+            "description": "Status Change - Warmup"
+          }
+        },
+        {
+          "index": 2,
+          "isPitch": false,
+          "type": "action",
+          "count": {
+            "balls": 0,
+            "strikes": 0,
+            "outs": 0
+          },
+          "details": {
+            "description": "Status Change - In Progress"
+          }
+        },
+        {
+          "index": 3,
+          "playId": "abe117d2-0046-3873-a4f7-d91c3f7fff5c",
+          "pitchNumber": 1,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 1,
+            "outs": 0
+          },
+          "details": {
+            "description": "Foul",
+            "type": {
+              "code": "FF",
+              "description": "Four-Seam Fastball"
+            },
+            "call": {
+              "code": "F",
+              "description": "Foul"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 93.4
+          }
+        },
+        {
+          "index": 4,
+          "playId": "441e5ce3-2c33-313d-b084-fc96d82a7946",
+          "pitchNumber": 2,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 2,
+            "outs": 0
+          },
+          "details": {
+            "description": "Swinging Strike",
+            "type": {
+              "code": "SL",
+              "description": "Slider"
+            },
+            "call": {
+              "code": "S",
+              "description": "Swinging Strike"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 84.7
+          }
+        },
+        {
+          "index": 5,
+          "isPitch": false,
+          "type": "action",
+          "count": {
+            "balls": 0,
+            "strikes": 2,
+            "outs": 0
+          },
+          "details": {
+            "description": "Batter Timeout."
+          }
+        },
+        {
+          "index": 6,
+          "playId": "945039f3-7eca-32c5-9f65-aa1e47dc8d27",
+          "pitchNumber": 3,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 2,
+            "outs": 0
+          },
+          "details": {
+            "description": "Foul",
+            "type": {
+              "code": "FF",
+              "description": "Four-Seam Fastball"
+            },
+            "call": {
+              "code": "F",
+              "description": "Foul"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 95.0
+          }
+        },
+        {
+          "index": 7,
+          "playId": "9c7974b1-8786-3874-9238-7eb35fb33d0f",
+          "pitchNumber": 4,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 2,
+            "outs": 0
+          },
+          "details": {
+            "description": "Ball",
+            "type": {
+              "code": "SL",
+              "description": "Slider"
+            },
+            "call": {
+              "code": "B",
+              "description": "Ball"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 85.3
+          }
+        },
+        {
+          "index": 8,
+          "playId": "c47e4080-a45e-3191-b97f-21d3e7d2bf79",
+          "pitchNumber": 5,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 3,
+            "outs": 0
+          },
+          "details": {
+            "description": "Foul Tip",
+            "type": {
+              "code": "FF",
+              "description": "Four-Seam Fastball"
+            },
+            "call": {
+              "code": "T",
+              "description": "Foul Tip"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 94.7
+          }
+        }
+      ]
+    },
+    {
+      "result": {
+        "event": "Home Run",
+        "description": "Sean Murphy homers (3) on a fly ball to left field. Ronald Acu\u00f1a Jr. scores. Michael Harris II scores.",
+        "awayScore": 3,
+        "homeScore": 0
+      },
+      "about": {
+        "atBatIndex": 40,
+        "halfInning": "top",
+        "inning": 6,
+        "isComplete": true,
+        "isScoringPlay": true
+      },
+      "count": {
+        "balls": 1,
+        "strikes": 1,
+        "outs": 2
+      },
+      "matchup": {
+        "batter": {
+          "fullName": "Sean Murphy"
+        },
+        "pitcher": {
+          "fullName": "Riley Cornelio"
+        }
+      },
+      "playEvents": [
+        {
+          "index": 0,
+          "isPitch": false,
+          "type": "action",
+          "count": {
+            "balls": 0,
+            "strikes": 0,
+            "outs": 2
+          },
+          "details": {
+            "description": "Batter Timeout."
+          }
+        },
+        {
+          "index": 1,
+          "playId": "27ba4f03-ef4b-3004-b6ca-7a24207d352b",
+          "pitchNumber": 1,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 0,
+            "outs": 2
+          },
+          "details": {
+            "description": "Ball In Dirt",
+            "type": {
+              "code": "SL",
+              "description": "Slider"
+            },
+            "call": {
+              "code": "*B",
+              "description": "Ball In Dirt"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 85.8
+          }
+        },
+        {
+          "index": 2,
+          "playId": "fec089c1-3c66-3423-b7ec-cc5dc6bb08b1",
+          "pitchNumber": 2,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 1,
+            "outs": 2
+          },
+          "details": {
+            "description": "Swinging Strike (Blocked)",
+            "type": {
+              "code": "SL",
+              "description": "Slider"
+            },
+            "call": {
+              "code": "W",
+              "description": "Swinging Strike (Blocked)"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 85.9
+          }
+        },
+        {
+          "index": 3,
+          "playId": "f2e8464d-06fd-34da-a085-c8453ef5f586",
+          "pitchNumber": 3,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 1,
+            "outs": 2
+          },
+          "details": {
+            "description": "In play, run(s)",
+            "type": {
+              "code": "SL",
+              "description": "Slider"
+            },
+            "call": {
+              "code": "E",
+              "description": "In play, run(s)"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 86.3
+          }
+        }
+      ]
+    },
+    {
+      "result": {
+        "event": "Strikeout",
+        "description": "CJ Abrams strikes out swinging.",
+        "awayScore": 9,
+        "homeScore": 0
+      },
+      "about": {
+        "atBatIndex": 74,
+        "halfInning": "bottom",
+        "inning": 9,
+        "isComplete": true,
+        "isScoringPlay": false
+      },
+      "count": {
+        "balls": 1,
+        "strikes": 3,
+        "outs": 3
+      },
+      "matchup": {
+        "batter": {
+          "fullName": "CJ Abrams"
+        },
+        "pitcher": {
+          "fullName": "Victor Mederos"
+        }
+      },
+      "playEvents": [
+        {
+          "index": 0,
+          "playId": "ec5efa43-bdca-3782-a300-31a20f609673",
+          "pitchNumber": 1,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 1,
+            "outs": 2
+          },
+          "details": {
+            "description": "Foul",
+            "type": {
+              "code": "ST",
+              "description": "Sweeper"
+            },
+            "call": {
+              "code": "F",
+              "description": "Foul"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 83.3
+          }
+        },
+        {
+          "index": 1,
+          "playId": "a9533fbb-9455-3faf-972b-fd15e7cde54a",
+          "pitchNumber": 2,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 2,
+            "outs": 2
+          },
+          "details": {
+            "description": "Swinging Strike",
+            "type": {
+              "code": "FS",
+              "description": "Splitter"
+            },
+            "call": {
+              "code": "S",
+              "description": "Swinging Strike"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 91.8
+          }
+        },
+        {
+          "index": 2,
+          "playId": "7ef80d24-4ac8-38bf-b3d8-1a453f82384c",
+          "pitchNumber": 3,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 0,
+            "strikes": 2,
+            "outs": 2
+          },
+          "details": {
+            "description": "Foul",
+            "type": {
+              "code": "FS",
+              "description": "Splitter"
+            },
+            "call": {
+              "code": "F",
+              "description": "Foul"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 92.3
+          }
+        },
+        {
+          "index": 3,
+          "playId": "30f8e6d6-eae6-3b8e-906a-126b724bb94e",
+          "pitchNumber": 4,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 2,
+            "outs": 2
+          },
+          "details": {
+            "description": "Ball",
+            "type": {
+              "code": "FF",
+              "description": "Four-Seam Fastball"
+            },
+            "call": {
+              "code": "B",
+              "description": "Ball"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 97.8
+          }
+        },
+        {
+          "index": 4,
+          "playId": "5861965a-9de9-31b2-bf37-18f0b63c1f61",
+          "pitchNumber": 5,
+          "isPitch": true,
+          "type": "pitch",
+          "count": {
+            "balls": 1,
+            "strikes": 3,
+            "outs": 2
+          },
+          "details": {
+            "description": "Swinging Strike",
+            "type": {
+              "code": "FS",
+              "description": "Splitter"
+            },
+            "call": {
+              "code": "S",
+              "description": "Swinging Strike"
+            }
+          },
+          "pitchData": {
+            "startSpeed": 93.3
+          }
+        }
+      ]
+    }
+  ],
+  "currentPlay": {
+    "result": {
+      "event": "Strikeout",
+      "description": "CJ Abrams strikes out swinging.",
+      "awayScore": 9,
+      "homeScore": 0
+    },
+    "about": {
+      "atBatIndex": 74,
+      "halfInning": "bottom",
+      "inning": 9,
+      "isComplete": true,
+      "isScoringPlay": false
+    },
+    "count": {
+      "balls": 1,
+      "strikes": 3,
+      "outs": 3
+    },
+    "matchup": {
+      "batter": {
+        "fullName": "CJ Abrams"
+      },
+      "pitcher": {
+        "fullName": "Victor Mederos"
+      }
+    },
+    "playEvents": [
+      {
+        "index": 0,
+        "playId": "ec5efa43-bdca-3782-a300-31a20f609673",
+        "pitchNumber": 1,
+        "isPitch": true,
+        "type": "pitch",
+        "count": {
+          "balls": 0,
+          "strikes": 1,
+          "outs": 2
+        },
+        "details": {
+          "description": "Foul",
+          "type": {
+            "code": "ST",
+            "description": "Sweeper"
+          },
+          "call": {
+            "code": "F",
+            "description": "Foul"
+          }
+        },
+        "pitchData": {
+          "startSpeed": 83.3
+        }
+      },
+      {
+        "index": 1,
+        "playId": "a9533fbb-9455-3faf-972b-fd15e7cde54a",
+        "pitchNumber": 2,
+        "isPitch": true,
+        "type": "pitch",
+        "count": {
+          "balls": 0,
+          "strikes": 2,
+          "outs": 2
+        },
+        "details": {
+          "description": "Swinging Strike",
+          "type": {
+            "code": "FS",
+            "description": "Splitter"
+          },
+          "call": {
+            "code": "S",
+            "description": "Swinging Strike"
+          }
+        },
+        "pitchData": {
+          "startSpeed": 91.8
+        }
+      },
+      {
+        "index": 2,
+        "playId": "7ef80d24-4ac8-38bf-b3d8-1a453f82384c",
+        "pitchNumber": 3,
+        "isPitch": true,
+        "type": "pitch",
+        "count": {
+          "balls": 0,
+          "strikes": 2,
+          "outs": 2
+        },
+        "details": {
+          "description": "Foul",
+          "type": {
+            "code": "FS",
+            "description": "Splitter"
+          },
+          "call": {
+            "code": "F",
+            "description": "Foul"
+          }
+        },
+        "pitchData": {
+          "startSpeed": 92.3
+        }
+      },
+      {
+        "index": 3,
+        "playId": "30f8e6d6-eae6-3b8e-906a-126b724bb94e",
+        "pitchNumber": 4,
+        "isPitch": true,
+        "type": "pitch",
+        "count": {
+          "balls": 1,
+          "strikes": 2,
+          "outs": 2
+        },
+        "details": {
+          "description": "Ball",
+          "type": {
+            "code": "FF",
+            "description": "Four-Seam Fastball"
+          },
+          "call": {
+            "code": "B",
+            "description": "Ball"
+          }
+        },
+        "pitchData": {
+          "startSpeed": 97.8
+        }
+      },
+      {
+        "index": 4,
+        "playId": "5861965a-9de9-31b2-bf37-18f0b63c1f61",
+        "pitchNumber": 5,
+        "isPitch": true,
+        "type": "pitch",
+        "count": {
+          "balls": 1,
+          "strikes": 3,
+          "outs": 2
+        },
+        "details": {
+          "description": "Swinging Strike",
+          "type": {
+            "code": "FS",
+            "description": "Splitter"
+          },
+          "call": {
+            "code": "S",
+            "description": "Swinging Strike"
+          }
+        },
+        "pitchData": {
+          "startSpeed": 93.3
+        }
+      }
+    ]
+  },
+  "scoringPlays": [
+    40,
+    49,
+    59,
+    70
+  ]
+}
