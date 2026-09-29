@@ -1,3 +1,10 @@
+# 2026-09-28 (evening) — the (null) bug and a sixteen-finding bug pass
+
+Josh's request shipped as 1c480ad → parlay-5rt8i8766.
+- The Board no longer prints "Name (null)". A player whose book spelling misses the stats pull shows his bare name, hides Josh saved under the old name still apply, and nicknames like "Leonardo" / "Leo" Bernal no longer read as scratched.
+- Sixteen more bugs from a four-lens hunt are fixed: game sheets that closed themselves, postponed games shown as finals, a generator tap that wiped exclusions, a held ticket that went stale silently, the slider thumb stuck on the left, the NFL Builder hiding Receptions tickets, and the phone's sticky bars and counts.
+- A review round found 8 more (7 confirmed, 1 plausible), all fixed. Zero new test failures (102 baseline), and two long-red checks pass again. See the September 28 (evening) session-handoff entry.
+
 # 2026-09-28 — player positions on every pick
 
 Josh's request shipped as f7b38de → parlay-191z6mx33. Every player pick on all three desks now shows the player's position right after the name:

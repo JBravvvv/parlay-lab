@@ -1,3 +1,67 @@
+# September 28 (evening) — the (null) bug and a sixteen-finding bug pass
+
+Josh, verbatim: "Fix the (null) bug & any others then deploy". Shipped `1c480ad` → parlay-5rt8i8766 (GitHub deployment 6727203701, `/api/version` answered `1c480ad`). The same push carried `105b53a` and `5c15095` (a peer session's first cut of the bare-name fix and the hit-rate chips) and `27b5ead` (crossing 84).
+
+- **The (null) bug.**
+  - Cause: the engine names a player "Name (TEAM)" from the stats pull. When the book's spelling misses that pull (DraftKings' "Leonardo Bernal" is statsapi's "Leo Bernal"), the row has no team, and the Board's ALL scope printed "Leonardo Bernal (null)".
+  - Fix: a team-less row prints and keys the bare name (`propRowLabel`). A sportsbook hide saved under the old "Name (null)" key migrates to the bare key once, on load (`migrateCzHidden`), so nothing Josh hid comes back.
+  - Follow-through: the bare name then read OUT against the posted lineup, which spells them "Leo Bernal" and "Joshua Kuroda-Grauer" (both batting on 9/27). A bare label now gets `resolvePlayer`'s initial rule against that game's nine (`labelLineupStatus`): same last name and first initial, exactly one = IN, several = unknown, none = OUT. A label with a team stays strict. Proved on the real 9/27 lineups (`tests/fixtures/lineups-2026-09-27.json`).
+  - Hit-rate chips ask about every player on the prop board, team-less ones by name (`5c15095`).
+- **Sixteen more, from a four-lens bug hunt. All fixed.**
+  - Games:
+    - The MLB game sheet closed itself when its game went Live → Final. It is one `Overlay` now; a desk switch closes it.
+    - A football game or team sheet closed when a ledger sync changed the bankroll. The slate is held for the SAME date only (`heldSlate`), its stakes re-sized at today's bankroll (`resizeFootballStakes`, sizing only, never a price), and the open team page is held in `CfbGames`. A failed refresh says so, with Retry.
+    - A postponed or canceled football game showed a played 0–0 and "Final game.". ESPN's postponed/canceled status is now read before `state: "post"`.
+    - Neutral-site games read "@"; they read "vs" now.
+    - A team's Upcoming list repeated rained-out games and months-old postponements (`isUpcomingTeamGame`; a moved-up makeup dedupes kind-first).
+    - The team page painted wins and live games green, with accent classes that generate no CSS. Theme tokens only now (pos / neg / live).
+  - Generator:
+    - A market tap on the rail wiped the ✕ exclusions and re-rolled the held ticket. While several markets are on, the exclusions' filter key (`exclusionFilterKey`) now ignores the rail's market, as `requestKey` already did.
+    - The football ticket stayed provisional until the rosters answered and re-rolled after its reveal, and a Live/Mixed spin could land provisional and re-draw. Only a draw THROUGH a position filter waits for the rosters now (`drawIsFirm`, `positionsPending`); a Live/Mixed spin with a position filter waits before it spins.
+    - A held ticket's win % went stale with no "moved" note, then Add to slip refused it. The note now counts exactly what Add refuses (`movedLegs` with `legExpired`).
+    - The game-time slider's earliest thumb always sat over the latest, so a one-step window at the left end could never be widened. It is lifted only past the track's midpoint.
+  - Phone:
+    - The NFL Builder hid the Receptions O/U paper tickets. Its Markets filter starts with every market checked and is a plain subset test.
+    - The 0.7 phone zoom scaled the measured sticky offsets (the By-game bar tucked 18 px up under the header). Offsets are divided by `useContentZoom()`.
+    - The football Board's category read "All" over a one-market list, and All could not undo it. It reads "Custom markets · N" (`boardCategoryValue`), and "Sides & Props" restores the default board.
+    - The By-game sticky bar lost its background.
+    - The ranked view showed the By-game line/game count.
+- **Review round.** A four-lens adversarial review of the fixes (workflow `wf_2f61de0e-c8e`) found 9 issues: 7 confirmed and 1 plausible, all 8 fixed; 1 refuted (its small follow-up applied anyway). The eight:
+  - the nickname lineup OUT above;
+  - held football stakes at the old bankroll;
+  - a desk switch leaving the MLB sheet open;
+  - the makeup dedupe order;
+  - the Builder's Markets filter hiding every Receptions ticket on an unrelated tap;
+  - "Custom markets" for a multi-market category;
+  - a football re-pull restamping every quote, so a pregame leg read "moved" at the same price and Add refused it (only an in-play leg carries `quoteAt` now);
+  - the moved note ignoring the clock.
+- **Records (`27b5ead`).**
+  - Crossing 84: a bot refresh took umpire Austin Jones from 4 games / 68 K to 5 games / 90 K. Recorded in `docs/collection-period.md`; it reached no board (the umpire K factor stays frozen). `self-arm-stamp` COMPLETENESS passes again.
+  - `sha-references` allowlists two tokens that are not Parlay Lab commits (a Roster Lab commit, a Caesars URL segment), clearing its long-standing red.
+  - `tsconfig.json` excludes iCloud conflict copies (`* ?.ts`, `* ??.tsx` …), which had broken local tsc and `next build`. The copies themselves were not touched.
+- **Validation.**
+  - tsc PASS; `next build` PASS; doc-structure 10/10; sha-references 2/2.
+  - Full suite: 3,934 tests, 3,832 pass, 102 fail = the baseline names, 0 new. `self-arm-stamp` COMPLETENESS, `sha-references` and `sha-currency` pass.
+  - New: `tests/board-category-sync.test.tsx` (9), `tests/games-sheet-hold.test.tsx` (24), `tests/gen-moved-note.test.ts` (5), `tests/sep28-ui-fixes.test.ts` (6), `tests/ticketstack-markets.test.tsx` (2). Pins updated in board-teamless-row, builder-speed-reveal, cfb-builder-ui, games, gen-hold-drag, parlay-exclusions, props-ui and theme-cerulean.
+- **Production** (`1c480ad`). DOM-only headless Chrome, MLB pages only. Monday 9/28 has no MLB slate, so the harness served this browser's own board request with the real stored 2026-09-27 board, re-dated. Every non-GET was refused, and paid endpoints were blocked; 0 paid requests. The "before" column is the same harness on `b763994`.
+
+  | Check | Phone 390×844 | Desktop 1440 | Before |
+  |---|---|---|---|
+  | "(null)" anywhere on the Board | none | none | — |
+  | Old "Leonardo Bernal (null)" hide | migrated to the bare key, still hidden | same | — |
+  | Bare "Josh Kuroda-Grauer" hide | hidden | hidden | — |
+  | Bernal / Kuroda-Grauer rows | 6 / 6 shown, tagged C / 3B | same | — |
+  | Ranked view's line/game count | absent | absent | "317 lines 15 games" |
+  | Slider earliest thumb z-index, left end | none | none | 1 |
+  | By-game sticky bar top, scrolled | 61 = header bottom | 0 (no sticky header) | 42.7 vs 61 |
+  | MLB game sheet through Live → Final | stays open, 1 dialog | — | closed |
+  | Horizontal overflow | none | none | — |
+
+- **Not verified.**
+  - Football on production (it can spend Odds credits).
+  - The nickname IN rule on production: 9/28 had no posted MLB lineup to check against. It is proved in tests on the real 9/27 lineups.
+  - A physical iPhone / WebKit's `zoom`.
+
 # September 28 — player positions on every pick
 
 Josh, verbatim: "Add players position to every pick on parlay lab"
@@ -18,12 +82,12 @@ Josh, verbatim: "Add players position to every pick on parlay lab"
   - The feed now also lists non-offensive rostered names with no position (and no headshot). A name shared with an ATH / LB / K on either side therefore stays unknown instead of borrowing the namesake's position.
   - A grown team list keeps the rosters already in hand (same league only — ESPN NFL and CFB team ids collide). Final games stay in the list, so a settled leg keeps its tag.
 - **Never in a label or key.** No label string, lkey, ticket id, ledger key or copied ticket text changed.
-  - The Board ALL scope's `Name (null)` player string for a team-less row is untouched: it keys the sportsbook hides and the scratched check. Only the display drops the literal ` (null)`, on the Board and in the My parlay bar.
+  - The Board ALL scope's `Name (null)` player string for a team-less row is untouched: it keys the sportsbook hides and the scratched check. Only the display drops the literal ` (null)`, on the Board and in the My parlay bar. *(Superseded the same evening: a team-less row is keyed and shown by the bare name, and old hides migrate. See September 28 (evening).)*
   - `MyLeg` gained a display-only `market` (page state, never stored).
 - **No generated ticket changes.**
   - `buildPool` stamps `position` on MLB legs only when the index is present. The same seed draws the same ticket either way (tested).
   - Other sports' legs get their position display-only (`leg.position`), never `GenLeg.position`, which the position filter reads.
-  - The football desk's first held ticket now waits for the rosters (`ready` includes `!roster.pending`). Without a position filter the draw is identical either way.
+  - The football desk's first held ticket now waits for the rosters (`ready` includes `!roster.pending`). Without a position filter the draw is identical either way. *(Superseded the same evening: `ready` no longer waits; only a draw through a position filter stays provisional (`drawIsFirm`). See September 28 (evening).)*
   - The roster load is no longer gated on the Sides view. HEAD's generator could sit on "Checking roster positions…" there with a position filter set.
 - **Layout.**
   - The football Board's width-capped single-line cells (the phone Pick cell at 176px, the featured pick, the best-edge tile) carry the badge on line two, before the market chip. A reviewer measured 3,410 real NFL labels: a badge seated mid-label would have pushed the line being bet into the ellipsis on 1,130 (33%) at phone width.
@@ -273,11 +337,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-28 (player positions release):** `origin/frontend-rebuild` = `f7b38de57412dcf57da8d8ecfd8a904fcd3e1556` (fresh `git fetch`; the player-positions code commit, pushed and serving on production).
+> - **STATE-CLAIM 2026-09-28 (September 28 bug pass):** `origin/frontend-rebuild` = `1c480ad181769ba2bf6567ac8a346b924661e00a` (fresh `git fetch`; the bug-pass code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `f7b38de…` the player-positions release (2026-09-28),
 >   `98a5b68…` the 2026-09-25 UI release baseline (12 commits behind when `sha-currency` caught it on 2026-09-28),
 >   `8dc38de…` the INSTRUCTION 53 ship (2026-09-12),
 >   `f6e996be…` the INSTRUCTION 52 review-round tip (2026-09-12), `f2e9bf77…` INSTRUCTION 51
