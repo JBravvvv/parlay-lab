@@ -65,7 +65,8 @@ import { splitPure } from "@/lib/tab-purity";
 import { BoardLabel } from "@/components/player/PlayerName";
 import { normalizeName, parseBoardLabel, propRowLabel } from "@/lib/player-card";
 import { useHitRates, useHitWindow } from "@/lib/mlb/useHitRates";
-import { hitKey, hitRate } from "@/lib/prop-hit-rate";
+import { hitLogKey, hitPlayersOf } from "@/lib/mlb/hit-players";
+import { hitRate } from "@/lib/prop-hit-rate";
 import { HitChip } from "@/components/props/HitChip";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
@@ -351,16 +352,14 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   });
   const picksData = picksQuery.data ?? null;
   /* HIT RATES on the Picks tabs (2026-09-18): the same free game-log read the Builder shows, so a
-     pick's row says how often he has cleared THIS line lately. Same window as the Builder. */
+     pick's row says how often he has cleared THIS line lately. Same window as the Builder. Asked
+     for every player on the prop board since 2026-09-28 (hitPlayersOf): the stamped picks alone
+     left every team-less player, and every ALL-scope row outside them, without a chip. */
   const [hitWindow] = useHitWindow();
-  const pickPlayers = useMemo(() => {
-    const seen = new Map<string, { name: string; team: string | null }>();
-    for (const list of Object.values(picksData?.picks ?? {})) for (const p of list ?? []) {
-      const parsed = p.player ? parseBoardLabel(p.player) : null;
-      if (parsed && !seen.has(parsed.name)) seen.set(parsed.name, { name: parsed.name, team: parsed.team });
-    }
-    return [...seen.values()];
-  }, [picksData]);
+  const pickPlayers = useMemo(
+    () => hitPlayersOf(browseProps.rows.length ? browseProps.rows : ((d?.propBoard ?? []) as PropBoardGame[]), Object.keys(MARKET_SHORT), picksData?.picks),
+    [browseProps.rows, d, picksData],
+  );
   const pickHits = useHitRates(pickPlayers, pickPlayers.length > 0);
   /* INSTRUCTION 51 (2026-09-11), Josh's order verbatim: "Authorize the live in-play odds pull for
      MLB". THE SECOND HALF of INSTRUCTION 50 item 2. Item 2 could only suppress a dead row, because
@@ -966,7 +965,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
                 <HitChip
                   className="ml-1.5 align-middle"
                   window={hitWindow}
-                  stat={hitRate(pickHits.logs.get(hitKey(parseBoardLabel(p.player)?.name ?? p.player)), p.market ?? cat, p.line, p.side, hitWindow)}
+                  stat={hitRate(pickHits.logs.get(hitLogKey(p.player)), p.market ?? cat, p.line, p.side, hitWindow)}
                 />
               )}
               {p.player && (p.side === "o" || p.side === "u") && (
