@@ -1,3 +1,11 @@
+# 2026-09-28 — player positions on every pick
+
+Josh's request shipped as f7b38de → parlay-191z6mx33. Every player pick on all three desks now shows the player's position right after the name:
+- MLB from MLB's own player index.
+- Football from ESPN, with ESPN's team rosters filling the players its stats tables miss.
+
+Team picks and defenses show none, and an unknown or shared name shows none. No label, key or copied ticket changed, and the generator draws the same tickets. Zero new test failures beyond two reds that also fail on a clean HEAD. See the September 28 session-handoff entry.
+
 # 2026-09-26 — generator follow-up: ticket holds, ✕ moved, hold-and-drag, 20 picks
 
 Josh's four-point follow-up shipped as 0a6693c → parlay-80p1b6hq7.

@@ -1,3 +1,58 @@
+# September 28 — player positions on every pick
+
+Josh, verbatim: "Add players position to every pick on parlay lab"
+
+- **What shows.** A small badge right after the player's name ("RF", "QB") on every player pick, on all three desks:
+  - generator slots, the ranked list, the cross-sport results and park previews;
+  - MLB: the Board (table, stamped and ALL scopes), The Card (tickets and the manual slip), The Sharp (picks, trap, passes), the slip, the My parlay bar, the Ledger (collapsed and expanded), the Simulator's per-leg rates, Live Opportunities and the /props player rows;
+  - football: the Parlay Builder rows, slip and ticket cards, the Board (table, featured picks, best-edge tile, parlay cards), game-page suggested picks, First Sunday Six, Season Lab and the Ledger.
+
+  Team picks (ML / spread / total) and defenses get none. An unknown or shared name gets none, never a guess.
+- **MLB source.** MLB's season player index (statsapi `primaryPosition`) through the new `/api/mlb/positions` (free, 6 h edge cache), one GET per session via `useMlbPositions`.
+  - Resolved exactly like `resolvePlayer`: exact name, then team-disambiguated, then last name + first initial. Ambiguous → nothing.
+  - Proven equal on the live index: 47,272 checks, 0 differences.
+  - Two-way players (Ohtani, `TWP`): P on a `pitcher_*` market, DH on any other player market, TWP when the market is unknown.
+- **Football source.** ESPN's athlete position on the stored prop row. When it is missing, ESPN's current roster for that game's two teams via `/api/football/positions` (free, 1 h edge cache).
+  - Measured on the stored 2026-09-27 NFL board: 187 of 341 players had no ESPN position, and none of them had a team id.
+  - The roster load (`useRosterPositions`) now runs whenever a board has player rows, not only with the generator open. It is scoped to the pick's own team when the row names one of the game's teams; otherwise both teams, and only once both rosters answered.
+  - The feed now also lists non-offensive rostered names with no position (and no headshot). A name shared with an ATH / LB / K on either side therefore stays unknown instead of borrowing the namesake's position.
+  - A grown team list keeps the rosters already in hand (same league only — ESPN NFL and CFB team ids collide). Final games stay in the list, so a settled leg keeps its tag.
+- **Never in a label or key.** No label string, lkey, ticket id, ledger key or copied ticket text changed.
+  - The Board ALL scope's `Name (null)` player string for a team-less row is untouched: it keys the sportsbook hides and the scratched check. Only the display drops the literal ` (null)`, on the Board and in the My parlay bar.
+  - `MyLeg` gained a display-only `market` (page state, never stored).
+- **No generated ticket changes.**
+  - `buildPool` stamps `position` on MLB legs only when the index is present. The same seed draws the same ticket either way (tested).
+  - Other sports' legs get their position display-only (`leg.position`), never `GenLeg.position`, which the position filter reads.
+  - The football desk's first held ticket now waits for the rosters (`ready` includes `!roster.pending`). Without a position filter the draw is identical either way.
+  - The roster load is no longer gated on the Sides view. HEAD's generator could sit on "Checking roster positions…" there with a position filter set.
+- **Layout.**
+  - The football Board's width-capped single-line cells (the phone Pick cell at 176px, the featured pick, the best-edge tile) carry the badge on line two, before the market chip. A reviewer measured 3,410 real NFL labels: a badge seated mid-label would have pushed the line being bet into the ellipsis on 1,130 (33%) at phone width.
+  - The MLB Ledger shares ONE index observer through a context instead of one per leg; TanStack tears observers down in quadratic time.
+- **Not tagged, on purpose.**
+  - Reel faces while spinning, "Sitting out" chips, deep-link banners, copied text, the hidden All-Star surfaces, and the off-book / skipped-leg notices.
+  - **Football Ledger legs locked without a position.** The automatic daily cards store the row's ESPN position. The Ledger has no game data to look a roster up without fetching a past slate, which is not free. The Card still shows them while the game is on today's slate.
+- **Validation.**
+  - tsc PASS. `next build` PASS (`/api/mlb/positions` 250 B).
+  - Full suite: 3,849 tests, 3,745 pass, 104 fail = the 102-name baseline plus two reds that also fail on a clean HEAD copy:
+    - `self-arm-stamp` COMPLETENESS: umpire Austin Jones crossed a count-armed parameter on bot data and needs a dated record in `docs/collection-period.md`. That is Josh's call; not touched.
+    - `sha-currency`: this file's STATE-CLAIM was 12 behind. Refreshed by this record.
+  - New `tests/pick-positions.test.ts` (80): resolver equivalence, TWP, tag markup, BoardLabel with the index in the query cache, identical generator draws, slot placement (stamped and unstamped), own-team roster scope, the hook itself with a seeded client, the simulator's key format on real engine output, and every-surface pins.
+  - Pins updated in cfb-player-mark, pick-marks, player-wiring, football-positions and gen-hold-drag.
+  - An 8-agent adversarial review ran (MLB, football, runtime and coverage lenses, each verified): 17 findings, 16 confirmed and 1 refuted; 14 unique. 13 fixed; 1 documented (the football Ledger, above).
+- **Production** (code `f7b38de` → parlay-191z6mx33, GitHub deployment 6724362472). DOM-only headless Chrome, MLB pages only.
+  - Monday 9/28 has no MLB slate, so the harness answered this browser's own request for today's board with the real stored 2026-09-27 board: 15 games, 2,681 prop rows, re-dated, starts moved two days on.
+  - Every non-GET request was refused, and football, generate, refill, live-props and calibrate were blocked; 0 paid requests.
+
+  | Check | Phone 390×844 | Desktop 1440 |
+  |---|---|---|
+  | `/api/mlb/positions` | 200, public edge cache, 1,474 players, Judge NYY RF, Ohtani LAD TWP | same |
+  | Generator slots tagged | 4 / 4 | 4 / 4 |
+  | Ranked list: player rows tagged / team rows tagged | 10 / 10 · 0 | 10 / 10 · 0 |
+  | Board / The Card / The Sharp names tagged | 10/10 · 3/3 · 8/8 | 10/10 · 3/3 · 8/8 |
+  | Tags clipped or off-screen, horizontal overflow | 0, 0, none | 0, 0, none |
+
+  Football was not exercised on production (it can spend Odds credits), and tonight's Monday game was live with no fresh cross legs. Physical iPhone not tested.
+
 # September 26 — generator follow-up (ticket hold, ✕ move, hold-and-drag, 20 picks)
 
 Josh, verbatim: "1. After parlay generator spins and rolls out the picks, it waits to finish loading 'the board' I guess? And then it changes the picks. It shouldn't change anything after it rolls them out one by one 2. Need to move 'x' button from right below 'lock' now that everything is smaller so you don't accidentally press 'x' instead of locking player in parlay 3. Should be able to press on pick in parlay generator and drag it to wherever on list 4. Parlay Generator should go up as high as 20 picks". Shipped 0a6693c → parlay-80p1b6hq7 (READY, /api/version answered 0a6693c).
@@ -218,11 +273,12 @@ are marked **IN-CONTEXT-ONLY-UNVERIFIED** with what resolves them. Supersedes th
 > origin` (`FETCH_EXIT=0`, full fetch, no `--depth=1`) — one claim per line, each carrying the
 > marker that `tests/sha-currency.test.ts` scores:**
 >
-> - **STATE-CLAIM 2026-09-25 (UI release baseline):** `origin/frontend-rebuild` = `98a5b68c0182e3f8d88394c138ab2bb651220980` (fresh GitHub fetch; two automated context commits preserved before the UI release).
+> - **STATE-CLAIM 2026-09-28 (player positions release):** `origin/frontend-rebuild` = `f7b38de57412dcf57da8d8ecfd8a904fcd3e1556` (fresh `git fetch`; the player-positions code commit, pushed and serving on production).
 >   (read by `git rev-parse` this write)
 >   (read by `git rev-parse` this write, per the 08-19 fabricated-tail lesson)
 >
 > *(SUPERSEDED CLAIMS — kept as history and DELIBERATELY MOVED OFF THE MARKED LINE, 2026-09-12:
+>   `98a5b68…` the 2026-09-25 UI release baseline (12 commits behind when `sha-currency` caught it on 2026-09-28),
 >   `8dc38de…` the INSTRUCTION 53 ship (2026-09-12),
 >   `f6e996be…` the INSTRUCTION 52 review-round tip (2026-09-12), `f2e9bf77…` INSTRUCTION 51
 >   (2026-09-12), `46f68df9…` INSTRUCTION 50 (2026-09-11). **`sha-currency` fired on the last of
