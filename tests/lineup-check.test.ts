@@ -55,7 +55,8 @@ describe("Board page wiring (source scan)", () => {
   const src = fs.readFileSync(path.join(process.cwd(), "app/board/page.tsx"), "utf8");
   it("reads posted lineups and hides OUT rows on both the live-board table and the stamped picks", () => {
     expect(src).toMatch(/useLineups\(/);
-    expect(src).toMatch(/lineupStatus\(/);
+    // through the label-level read since 2026-09-28: a team-less row's bare label is the name itself
+    expect(src).toMatch(/\blabelLineupStatus\(label, market, pkOf\(gkey\), lineups\.data\) === "out"/);
     expect(src).toMatch(/showScratched/);
   });
   it("the Board's parlay cards get the same verdict per leg (a Caballero leg on a stored 3-leg ticket was the live case)", () => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   CZ_MAX_BYTES,
   mergeCzHidden,
+  migrateCzHidden,
   pruneCzHidden,
   validateCzHidden,
   type CzHiddenMap,
@@ -34,11 +35,13 @@ function gate(req: NextRequest): NextResponse | null {
   return null;
 }
 
+/* Team-less keys (2026-09-28, see migrateCzHidden): the stored copy is read in the bare form, so
+   GET serves it that way and the next PUT writes it back that way. */
 async function readStore(): Promise<Stored | null> {
   const s = await redisGetJson<Stored>(STORE_KEY);
   if (!s?.czHidden) return null;
   const v = validateCzHidden(s.czHidden);
-  return v.ok ? { czHidden: v.map, at: s.at } : null;
+  return v.ok ? { czHidden: migrateCzHidden(v.map), at: s.at } : null;
 }
 
 export async function GET(req: NextRequest) {
@@ -65,7 +68,8 @@ export async function PUT(req: NextRequest) {
   if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
   try {
     const cur = await readStore();
-    const merged = pruneCzHidden(mergeCzHidden(cur?.czHidden ?? {}, v.map), Date.now());
+    // an older bundle still sends team-less "(null)" keys — migrated before the merge and the prune
+    const merged = pruneCzHidden(mergeCzHidden(cur?.czHidden ?? {}, migrateCzHidden(v.map)), Date.now());
     if (JSON.stringify(merged).length > CZ_MAX_BYTES) {
       return NextResponse.json({ error: "merged prefs too large" }, { status: 413 });
     }

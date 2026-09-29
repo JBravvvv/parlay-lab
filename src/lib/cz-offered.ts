@@ -4,7 +4,7 @@ import {DEFAULT_BOOK} from "@/lib/sportsbook/books";
 
 import { useCallback, useEffect, useState } from "react";
 import { getSyncKey } from "./ledgerSync";
-import { mergeCzHidden, pruneCzHidden, validateCzHidden, type CzHiddenMap } from "./cz-hidden-merge";
+import { mergeCzHidden, migrateCzHidden, pruneCzHidden, validateCzHidden, type CzHiddenMap } from "./cz-hidden-merge";
 
 /**
  * "IS THIS PICK OFFERED AT CAESARS RIGHT NOW?" (2026-08-09, Josh's call.)
@@ -24,6 +24,11 @@ import { mergeCzHidden, pruneCzHidden, validateCzHidden, type CzHiddenMap } from
  * so they out-vote stale hides on other devices; see cz-hidden-merge.ts.
  * v1 (bare key→true) migrates on first load and is left in place so a stale
  * cached bundle still finds its own key.
+ *
+ * Team-less keys (2026-09-28): a Board ALL-scope row with no team was keyed
+ * "Name (null)" and is now the bare name. migrateCzHidden rewrites those keys
+ * on the device copy (saved back once) and on every pulled cloud copy, so a
+ * hide made on the old label keeps hiding the same pick.
  */
 
 const KEY_V1 = "pl_cz_hidden_v1";
@@ -31,18 +36,23 @@ const KEY = "pl_cz_hidden_v2";
 const PULL_MIN_MS = 30_000; // remounts within this window reuse the last pull
 const PUSH_DEBOUNCE_MS = 1_200; // rapid toggles coalesce into one PUT
 
-function load(): CzHiddenMap {
+/** The device copy, team-less keys migrated. Exported for tests/board-teamless-row.test.ts. */
+export function loadCzHidden(): CzHiddenMap {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const v = validateCzHidden(JSON.parse(raw));
-      if (v.ok) return v.map;
+      if (v.ok) {
+        const map = migrateCzHidden(v.map);
+        if (map !== v.map) save(map);
+        return map;
+      }
     }
     const old = JSON.parse(localStorage.getItem(KEY_V1) ?? "{}") as Record<string, unknown>;
     const at = Date.now();
     const map: CzHiddenMap = {};
     for (const k of Object.keys(old)) if (old[k] === true) map[k] = { hidden: true, at };
-    return map;
+    return migrateCzHidden(map);
   } catch {
     return {};
   }
@@ -60,8 +70,9 @@ let lastPullAt = 0;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Pull the cloud map and merge it over `local`. Null = no phrase on this
-    device, pulled too recently, or offline — in every case local stands. */
-async function pullMerge(local: CzHiddenMap): Promise<CzHiddenMap | null> {
+    device, pulled too recently, or offline — in every case local stands.
+    Exported for tests/board-teamless-row.test.ts. */
+export async function pullMergeCzHidden(local: CzHiddenMap): Promise<CzHiddenMap | null> {
   const key = getSyncKey();
   if (!key || Date.now() - lastPullAt < PULL_MIN_MS) return null;
   lastPullAt = Date.now();
@@ -70,7 +81,8 @@ async function pullMerge(local: CzHiddenMap): Promise<CzHiddenMap | null> {
     if (!res.ok) return null;
     const j = (await res.json()) as { czHidden?: unknown };
     const v = j.czHidden != null ? validateCzHidden(j.czHidden) : null;
-    const remote = v?.ok ? v.map : {};
+    // a copy pushed by another device or an older bundle can still hold team-less "(null)" keys
+    const remote = v?.ok ? migrateCzHidden(v.map) : {};
     const merged = pruneCzHidden(mergeCzHidden(local, remote), Date.now());
     // this device knew something the cloud didn't (first sync, offline toggles) — push it up
     if (JSON.stringify(merged) !== JSON.stringify(remote)) schedulePush(merged);
@@ -106,9 +118,9 @@ export function useCzHidden(): {
 } {
   const [hidden, setHidden] = useState<CzHiddenMap>({});
   useEffect(() => {
-    const local = load();
+    const local = loadCzHidden();
     setHidden(local);
-    void pullMerge(local).then((merged) => {
+    void pullMergeCzHidden(local).then((merged) => {
       if (merged) {
         save(merged);
         setHidden(merged);

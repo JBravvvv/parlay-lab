@@ -60,6 +60,17 @@ export function parseBoardLabel(label: string): { name: string; team: string } |
   return { name, team: canonicalAbbr(m[2])! };
 }
 
+/**
+ * A prop-board row's printed label — the engine's own pick label (`row.p+(tmAb?" ("+tmAb+")":"")`):
+ * "Name (TEAM)", or the bare name when the book's spelling found no team in the stats pull
+ * (`tm: lookupTeam[pnorm(row.p)]||null` — accents, "Jr.", bench bats). A bare label parses to null
+ * above, and every reader then uses the label itself as the name. Until 2026-09-28 the Board's ALL
+ * scope printed `${r.p} (${r.tm})`, so a team-less row read "Name (null)" and was judged OUT.
+ */
+export function propRowLabel(r: { p: string; tm?: string | null }): string {
+  return r.tm ? `${r.p} (${r.tm})` : r.p;
+}
+
 export type IndexEntry = { id: number; fullName: string; teamId: number | null; team: string | null; pos: string | null };
 
 type PlayersDoc = {

@@ -20,7 +20,7 @@
  * PITCHERS ARE EXEMPT: statsapi lineups carry the nine batters only, so a pitcher row can
  * never be judged by them (status "unknown", never "out"). Unposted games are "unknown" too.
  */
-import { normalizeName } from "./player-card";
+import { normalizeName, parseBoardLabel } from "./player-card";
 
 export type PostedLineup = { posted: boolean; names: Set<string> };
 export type PostedLineups = Record<number, PostedLineup>;
@@ -69,6 +69,20 @@ export function lineupStatus(
   const lu = lineups[pk];
   if (!lu || !lu.posted) return "unknown";
   return lu.names.has(normalizeName(name)) ? "in" : "out";
+}
+
+/**
+ * The verdict for a printed Board label: "Name (TEAM)" drops its suffix, and a label with none (the
+ * engine's bare name for a team-less row, 2026-09-28) is the name itself. The Board's isOut reads
+ * every row, stamped pick, ALL-scope row and parlay leg through here.
+ */
+export function labelLineupStatus(
+  label: string | null | undefined,
+  market: string | null | undefined,
+  pk: number | null | undefined,
+  lineups: PostedLineups | null | undefined,
+): LineupStatus {
+  return lineupStatus(label ? parseBoardLabel(label)?.name ?? label : null, market, pk, lineups);
 }
 
 /** market from an lkey "player|market|line" */

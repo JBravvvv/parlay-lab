@@ -50,18 +50,52 @@ export function validateCzHidden(v: unknown): { ok: true; map: CzHiddenMap } | {
   return { ok: true, map };
 }
 
+/** Two entries for one pick: the newer `at` wins; a tie goes to hidden, from either side. */
+function newer(ea: CzPrefEntry, eb: CzPrefEntry): CzPrefEntry {
+  if (eb.at > ea.at) return eb;
+  if (ea.at > eb.at) return ea;
+  return ea.hidden ? ea : eb;
+}
+
 export function mergeCzHidden(a: CzHiddenMap, b: CzHiddenMap): CzHiddenMap {
   const out: CzHiddenMap = {};
   const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
   for (const k of keys) {
     const ea = a[k];
     const eb = b[k];
-    if (!ea) out[k] = eb;
-    else if (!eb) out[k] = ea;
-    else if (eb.at > ea.at) out[k] = eb;
-    else if (ea.at > eb.at) out[k] = ea;
-    else out[k] = ea.hidden ? ea : eb; // tie → hidden wins, from either side
+    out[k] = !ea ? eb : !eb ? ea : newer(ea, eb);
   }
+  return out;
+}
+
+/** The player segment a team-less Board ALL-scope row carried until 2026-09-28, with its closing "|". */
+export const CZ_NULL_TEAM = " (null)|";
+
+/**
+ * THE TEAM-LESS KEY MIGRATION (2026-09-28). The Board's ALL scope printed a prop row with no team
+ * as "Name (null)" (the engine sets `tm` null when the book's spelling is missing from the stats
+ * pull), and that string is the player segment of the key (`${market}|${player}|${line}|${side}`,
+ * book-scoped as `book:<key>:…`). The row now prints the bare name, the engine's own label, so a
+ * stored key holding " (null)|" is rewritten to the bare form.
+ *
+ * Two keys landing on one pick collide by the merge's own rule (`newer`), and a tombstone is an
+ * entry like any other: nothing hidden comes back, nothing unhidden is re-hidden, and no orphan
+ * stays in the hidden count. Idempotent and commutes with mergeCzHidden, so it runs at every door
+ * (the device copy, every pull, both /api/prefs verbs) and only ever changes a map once. Run it
+ * BEFORE pruneCzHidden: an old tombstone must out-vote its pair before the prune can drop it.
+ * Returns the same object when no key holds the suffix; otherwise keys come out sorted.
+ */
+export function migrateCzHidden(map: CzHiddenMap): CzHiddenMap {
+  const keys = Object.keys(map);
+  if (!keys.some((k) => k.includes(CZ_NULL_TEAM))) return map;
+  const byKey = new Map<string, CzPrefEntry>();
+  for (const k of keys) {
+    const bare = k.split(CZ_NULL_TEAM).join("|");
+    const had = byKey.get(bare);
+    byKey.set(bare, had ? newer(had, map[k]) : map[k]);
+  }
+  const out: CzHiddenMap = {};
+  for (const k of [...byKey.keys()].sort()) out[k] = byKey.get(k)!;
   return out;
 }
 

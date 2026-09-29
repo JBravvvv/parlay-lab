@@ -63,13 +63,13 @@ import { quotaRemaining } from "@/lib/fetcher";
 import type { PickRow } from "@/engine";
 import { splitPure } from "@/lib/tab-purity";
 import { BoardLabel } from "@/components/player/PlayerName";
-import { normalizeName, parseBoardLabel } from "@/lib/player-card";
+import { normalizeName, parseBoardLabel, propRowLabel } from "@/lib/player-card";
 import { useHitRates, useHitWindow } from "@/lib/mlb/useHitRates";
 import { hitKey, hitRate } from "@/lib/prop-hit-rate";
 import { HitChip } from "@/components/props/HitChip";
 import type { PropBoardGame } from "@/engine";
 import { useLineups } from "@/lib/useLineups";
-import { lineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
+import { labelLineupStatus, marketOfLkey, SCRATCHED_LABEL } from "@/lib/lineup-check";
 import { legSideOf, settledRead, type LegSettledRead } from "@/lib/leg-settled";
 import { lineOf } from "@/lib/pred-serialize";
 import { fmtAmerican } from "@/lib/format";
@@ -283,7 +283,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   const pkOf = useCallback((gkey: string | null | undefined) => (gkey ? d?.gameInfo?.[gkey]?.pk ?? null : null), [d]);
   const isOut = useCallback(
     (label: string | null | undefined, market: string | null, gkey: string | null | undefined) =>
-      lineupStatus(label ? parseBoardLabel(label)?.name ?? label : null, market, pkOf(gkey), lineups.data) === "out",
+      labelLineupStatus(label, market, pkOf(gkey), lineups.data) === "out",
     [pkOf, lineups.data],
   );
   const rowOut = useCallback((r: PickRow) => isOut(r.label, marketOfLkey(r.lkey), r.gkey), [isOut]);
@@ -397,7 +397,9 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
   /* ALL scope: every priced OVER line on the prop board for this market (or every market),
      graded on pO − fO (the engine's model % minus the de-vigged fair — the same "edge" the
      stamped picks grade on), ordered S → F then by edge. Rows the engine did not price
-     (pO null: bench bats, tiny samples) carry no grade and sink to the bottom. */
+     (pO null: bench bats, tiny samples) carry no grade and sink to the bottom. The player
+     string is the engine's own label (propRowLabel): a row with no team is the bare name —
+     until 2026-09-28 it read "Name (null)", which the lineup check judged OUT. */
   const [allRows, allNoCz] = useMemo<[ApiPick[] | null, number]>(() => {
     if ((scope !== "all" && !(PROP_TABS.has(cat) && !propRows?.length)) || live || !(PROP_TABS.has(cat) || cat === "all")) return [null, 0];
     const pb = browseProps.rows.length ? browseProps.rows : (d?.propBoard ?? []) as PropBoardGame[];
@@ -415,7 +417,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
           const edge = valueAt(r.pO==null?null:r.pO/100,r.cz?.o).edge;
           const odds = r.o ?? r.cz?.o ?? null;
           out.push({
-            rank: 0, player: `${r.p} (${r.tm})`, side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
+            rank: 0, player: propRowLabel(r), side: "o", line: r.ln, prob: r.pO, implied: r.fO, edge,
             cz: r.cz?.o ?? null, odds, book: r.o != null ? r.oBook : odds != null ? bookName(SETTLE_BOOK) : null,
             gkey: g.gkey, start: g.start, res: null, market: m, lkey: r.lkey ?? null,
           });
@@ -956,7 +958,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
             <div className={pickOut(p) ? "opacity-50" : undefined}>
               {/* INSTRUCTION 70 (2026-09-17): headshot + his team's logo on every player pick, the club's
                   logo on a team pick — BoardLabel draws whichever the label names, never a guess */}
-              {p.player ? <BoardLabel label={p.player.replace(/ \(null\)$/, "")} market={p.market ?? cat} /> : null}<PickContext pick={{sport:"mlb",game:String(pkOf(p.gkey)??""),player:p.player??undefined,market:p.market??cat,line:p.line,side:p.side==="u"?"u":"o",start:p.start}}/>{" "}
+              {p.player ? <BoardLabel label={p.player} market={p.market ?? cat} /> : null}<PickContext pick={{sport:"mlb",game:String(pkOf(p.gkey)??""),player:p.player??undefined,market:p.market??cat,line:p.line,side:p.side==="u"?"u":"o",start:p.start}}/>{" "}
               <span className="text-muted">
                 {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>

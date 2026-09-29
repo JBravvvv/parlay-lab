@@ -5,7 +5,7 @@ import React, { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { stripComments } from "./helpers/source";
-import { buildIndex, resolvePlayer } from "@/lib/player-card";
+import { buildIndex, propRowLabel, resolvePlayer } from "@/lib/player-card";
 import { mlbLabelPosition, mlbLeadingName, mlbPickPosition, positionResolver, type PositionRow } from "@/lib/mlb/positions";
 import { LabelWithPos, PosTag, cleanPos } from "@/components/player/PosTag";
 import { MlbLeadText, MlbPosTag } from "@/components/player/MlbPosTag";
@@ -135,12 +135,12 @@ describe("MLB — the tag on a printed label", () => {
     /* an lkey that names no player market is dropped, never read as a hitter */
     expect(withIndex(createElement(BoardLabel, { label: "Shohei Ohtani (LAD)", market: "other" }))).toContain('data-pos-tag="TWP"');
   });
-  it("the Board's team-less row keeps its keyed \"(null)\" string; only the display drops it, and then it is tagged", () => {
-    const keyed = "Tarik Skubal (null)";
-    /* the raw string never resolves — it is why the display strips it */
-    expect(withIndex(createElement(BoardLabel, { label: keyed, market: "pitcher_strikeouts" }))).not.toContain("data-pos-tag");
-    const shown = withIndex(createElement(BoardLabel, { label: keyed.replace(/ \(null\)$/, ""), market: "pitcher_strikeouts" }));
-    expect(shown).toMatch(/^Tarik Skubal<span data-pos-tag="P"/);
+  it("the Board's team-less row is the bare name (the engine's own label since 2026-09-28), and it is tagged as it is", () => {
+    const label = propRowLabel({ p: "Tarik Skubal", tm: null });
+    expect(label).toBe("Tarik Skubal");
+    expect(withIndex(createElement(BoardLabel, { label, market: "pitcher_strikeouts" }))).toMatch(/^Tarik Skubal<span data-pos-tag="P"/);
+    /* the old "Name (null)" string never resolved — which is why the label is bare now rather than stripped for display */
+    expect(withIndex(createElement(BoardLabel, { label: "Tarik Skubal (null)", market: "pitcher_strikeouts" }))).not.toContain("data-pos-tag");
     /* a leg with no market (an old My parlay leg) still tags a "Name (TEAM)" label, with MLB's own label for the two-way player */
     expect(withIndex(createElement(BoardLabel, { label: "Shohei Ohtani (LAD)" }))).toContain('data-pos-tag="TWP"');
   });
@@ -373,17 +373,17 @@ describe("every pick surface draws the tag", () => {
     ["src/components/props/useCrossSports.ts", /const nfl=useRosterPositions\("nfl",nflRows,q\.data\?\.data\.nfl\?\.slate\?\.games\?\?NO_GAMES,nflRows\.length>0\);/],
     ["src/components/props/useCrossSports.ts", /const cfb=useRosterPositions\("cfb",cfbRows,q\.data\?\.data\.cfb\?\.slate\?\.games\?\?NO_GAMES,cfbRows\.length>0\);/],
     ["src/components/mlb/ParlaysSection.tsx", /<BoardLabel showMark=\{false\} label=\{l\.label\} market=/],
-    /* a team-less ALL-scope leg keeps its keyed "Name (null)" label; the bar only DISPLAYS it without the " (null)" */
-    ["src/components/mlb/MyParlayBar.tsx", /<BoardLabel label=\{l\.label\.replace\(\/ \\\(null\\\)\$\/, ""\)\} market=\{l\.market\} \/>/],
+    /* a team-less ALL-scope leg is the bare name since 2026-09-28, so the bar draws its label as it is */
+    ["src/components/mlb/MyParlayBar.tsx", /<BoardLabel label=\{l\.label\} market=\{l\.market\} \/>/],
     ["src/components/mlb/ParlaysSection.tsx", /market: l\.market != null \? String\(l\.market\) : l\.lkey \? marketOf\(l\.lkey\) : null,/],
     ["app/board/page.tsx", /market: marketOfLkey\(r\.lkey\),\n\s*odds: liveAmOf\(r\)/],
     ["app/board/page.tsx", /market: p\.market \?\? cat,\n\s*odds: parseAm\(p\.odds\)/],
     ["src/components/mlb/LiveOpportunities.tsx", /<MlbPosTag name=\{r\.p\} team=\{r\.tm\} market=\{m\}\/>/],
     ["app/board/page.tsx", /<BoardLabel label=\{r\.label\} market=\{marketOfLkey\(r\.lkey\)\} \/>/],
-    /* the ALL-scope player string is exactly what it was — it keys the sportsbook hides and the scratched check — and
-       only the DISPLAY drops a literal " (null)" so a team-less row still gets its tag */
-    ["app/board/page.tsx", /<BoardLabel label=\{p\.player\.replace\(\/ \\\(null\\\)\$\/, ""\)\} market=\{p\.market \?\? cat\} \/>/],
-    ["app/board/page.tsx", /rank: 0, player: `\$\{r\.p\} \(\$\{r\.tm\}\)`, side: "o",/],
+    /* the ALL-scope player string is the engine's own label — a team-less row is the bare name since 2026-09-28 (its
+       sportsbook-hide keys migrated by migrateCzHidden) — so the Pick cell draws it as it is and it gets its tag */
+    ["app/board/page.tsx", /\{p\.player \? <BoardLabel label=\{p\.player\} market=\{p\.market \?\? cat\} \/> : null\}/],
+    ["app/board/page.tsx", /rank: 0, player: propRowLabel\(r\), side: "o",/],
     ["app/builder/page.tsx", /<BoardLabel label=\{l\.label\} market=\{l\.lkey \? marketOf\(l\.lkey\) : null\} \/>/],
     ["app/builder/page.tsx", /\{r\.label\}<MlbPosTag label=\{r\.label\}/],
     ["app/builder/page.tsx", /<span className="text-text"><BoardLabel label=\{r\.label\} market=\{r\.lkey \? marketOf\(r\.lkey\) : null\} \/><\/span> <span className="text-muted">\{r\.sub\}<\/span>/],

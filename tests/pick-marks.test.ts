@@ -80,9 +80,9 @@ describe("BoardLabel — a player pick draws headshot + his team's logo; a club 
 describe("every pick surface reaches a mark", () => {
   it("Board: the stamped / ALL-scope Pick cell draws through BoardLabel (mark + name), not a bare name", () => {
     const src = read("app/board/page.tsx");
-    /* + the market, so the position tag can read a two-way player's role, and a display-only strip of a team-less
-       row's literal " (null)" (its keyed string is untouched) (2026-09-28) */
-    expect(src).toMatch(/\{p\.player \? <BoardLabel label=\{p\.player\.replace\(\/ \\\(null\\\)\$\/, ""\)\} market=\{p\.market \?\? cat\} \/> : null\}/);
+    /* + the market, so the position tag can read a two-way player's role (2026-09-28). A team-less row's label is the
+       bare name since the ALL-scope fix the same day, so the cell draws the label as it is — no display strip */
+    expect(src).toMatch(/\{p\.player \? <BoardLabel label=\{p\.player\} market=\{p\.market \?\? cat\} \/> : null\}/);
     expect(src).not.toMatch(/<PlayerName name=\{parseBoardLabel\(p\.player\)/);
     // the live board's Pick cell already went through BoardLabel
     expect(src).toMatch(/<BoardLabel label=\{r\.label\}( market=\{[^}]+\})? \/>/);
