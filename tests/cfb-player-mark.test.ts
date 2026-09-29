@@ -151,11 +151,12 @@ describe("ledger leg links (INSTRUCTION 46, point 9)", () => {
     const open = html(createElement(CfbTicketCard, { t: ticket([PROP]), board: { games: [GAME] }, legLink: (l) => cfbLegLink(l, { date: today, today, verdict: { result: "pending" } }) }));
     expect(open).toContain('href="/props?cfb=1&amp;date=2026-09-06&amp;game=g1&amp;mkt=spread&amp;player=ty-simpson"');
     expect(open).toContain("data-cfb-leg-link");
-    expect(open).toContain(">Ty Simpson O 245.5</a>");
+    /* the position tag rides right after the name (2026-09-28, tests/pick-positions.test.ts) */
+    expect(open).toMatch(/>Ty Simpson<span data-pos-tag="QB"[^>]*>QB<\/span> O 245\.5<\/a>/);
     const closed = html(createElement(CfbTicketCard, { t: ticket([PROP]), board: { games: [GAME] }, legLink: (l) => cfbLegLink(l, { date: today, today, verdict: { result: "lost" } }) }));
     expect(closed).not.toContain("<a ");
     expect(closed).toContain(`title="${CFB_LEG_CLOSED_TITLE}"`);
-    expect(closed).toContain("Ty Simpson O 245.5");
+    expect(closed).toMatch(/Ty Simpson<span data-pos-tag="QB"[^>]*>QB<\/span> O 245\.5/);
   });
   it("the ticket's Link is replace-only and stops the tap reaching the box", () => {
     const src = readSrc("src/components/cfb/CfbTicketCard.tsx");

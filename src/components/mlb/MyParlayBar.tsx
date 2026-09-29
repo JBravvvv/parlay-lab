@@ -112,7 +112,7 @@ export function MyParlayBar({
                   {legs.map((l) => (
                     <li key={l.key} className="flex items-center gap-2" data-testid="my-parlay-leg">
                       <span className="min-w-0 flex-1 truncate text-text">
-                        <BoardLabel label={l.label} /> <span className="text-muted">· {l.sub}</span>
+                        <BoardLabel label={l.label.replace(/ \(null\)$/, "")} market={l.market} /> <span className="text-muted">· {l.sub}</span>
                       </span>
                       <span className="num shrink-0 text-[11px] text-muted">
                         {l.odds != null ? amFmt(l.odds) : "no price"} · {l.prob != null ? `${l.prob.toFixed(1)}%` : "—"}

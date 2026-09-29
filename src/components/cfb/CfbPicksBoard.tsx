@@ -1,4 +1,6 @@
 "use client";
+import { LabelWithPos, PosTag } from "@/components/player/PosTag";
+import { shownFootballPosition, useRosterPositions } from "@/lib/football/useRosterPositions";
 import { defaultMarkets } from "@/lib/market-scope";
 import { BoardFilters } from "@/components/board/BoardFilters";
 import { MultiSelect } from "@/components/props/MultiSelect";
@@ -417,6 +419,8 @@ function Mark({
 
 /* ---------- the desk ---------- */
 
+const NO_GAMES: never[] = [];
+
 export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotionOnly?:boolean;parlaysOnly?:boolean}={}) {
   const L = useLeague();
   /* the league's own tables and client under the pinned CFB names (see the seam note above) */
@@ -458,7 +462,10 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
   });
   const pricedProps=useFootballPropsPrices(propsQ.data,bankroll??L.bankBase,L.rules);
   const liveClock=useLiveClock();
-  const propRows = useMemo(()=>pricedProps?.rows.filter(r=>footballQuoteCurrent(r,pricedProps.pricedAt,liveClock||Date.now(),L.props.liveRevalidateSec*1000))??null,[pricedProps,liveClock,L.props.liveRevalidateSec]);
+  /* a position on every pick (2026-09-28): ESPN rosters fill the rows the props context could not join — the same
+     shared, keyless fetch the Parlay Builder reads — and each row carries the position it shows */
+  const roster = useRosterPositions(L.id, pricedProps?.rows, current?.games ?? NO_GAMES, propsOn);
+  const propRows = useMemo(()=>pricedProps?.rows.filter(r=>footballQuoteCurrent(r,pricedProps.pricedAt,liveClock||Date.now(),L.props.liveRevalidateSec*1000)).map(r=>{const pos=shownFootballPosition(roster.positionOf(r),r.pos);return pos===r.pos?r:{...r,pos};})??null,[pricedProps,liveClock,L.props.liveRevalidateSec,roster.positionOf]);
   const propsPending = propsOn && propsQ.isPending;
 
   const games = useMemo(() => new Map((current?.games ?? []).map((g) => [g.id, g])), [current]);
@@ -517,6 +524,9 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
             <div className="min-w-0">
               <div className="truncate font-medium text-text">{r.label}</div>
               <div className="truncate text-[10.5px] text-faint">
+                {/* the position rides line two (2026-09-28): line one is capped at 176px on a phone, and a tag seated
+                    after the name pushed the line being bet into the ellipsis */}
+                {r.kind === "prop" && <PosTag pos={r.pos} className="mr-1" />}
                 {r.kind === "prop" && <span className={`mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${marketChip}`}>{MARKET_WORD[r.market] ?? r.market}</span>}
                 {r.sub}
                 <PickContext pick={{sport:L.id,game:r.gameId,player:r.player??undefined,market:r.market,line:propRows?.find(p=>p.key===r.key)?.line,side:propRows?.find(p=>p.key===r.key)?.side==="under"?"u":"o",start:games.get(r.gameId)?.start}}/>
@@ -603,7 +613,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
     <label className="flex items-center gap-3 text-sm font-bold text-gold">Slate date <input aria-label="First Sunday Six slate date" type="date" value={date} onChange={e=>{if(e.target.value)pick(e.target.value);}} className="rounded-lg border border-gold/40 bg-surface px-3 py-2 text-text" /></label>
     {loading&&<p role="status">Loading NFL slate…</p>}
     {q.isError&&<p role="alert" className="text-neg">The NFL slate could not be loaded. Try again shortly.</p>}
-    <FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()}/>
+    <FirstSundaySix date={date} games={current?.games??[]} board={propsQ.data} now={liveClock||Date.now()} positionOf={roster.positionOf}/>
   </div>;
 
 
@@ -629,7 +639,7 @@ export function CfbPicksBoard({promotionOnly=false,parlaysOnly=false}:{promotion
         <StatTile
           label="Best edge"
           value={top ? <span className="block truncate text-[16px]">{top.label}</span> : "—"}
-          sub={top && top.evCz != null && top.cz ? `${fmtAmerican(top.cz.price)} · ${top.evCz > 0 ? "+" : ""}${top.evCz.toFixed(1)}%${top.kelly != null ? ` · ¼K ${fmtMoney(top.kelly)}` : ""}` : "no +EV pick yet"}
+          sub={top && top.evCz != null && top.cz ? <><PosTag pos={top.kind === "prop" ? top.pos : null} className="mr-1" />{`${fmtAmerican(top.cz.price)} · ${top.evCz > 0 ? "+" : ""}${top.evCz.toFixed(1)}%${top.kelly != null ? ` · ¼K ${fmtMoney(top.kelly)}` : ""}`}</> : "no +EV pick yet"}
           tone={top ? "pos" : "muted"}
         />
         <StatTile
@@ -820,6 +830,7 @@ function FeaturedPick({ r, rank, games, propRows }: { r: CfbPickRow; rank: numbe
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12.5px] font-bold leading-tight text-text">{r.label}</div>
           <div className="truncate text-[10px] leading-tight text-faint">
+            {r.kind === "prop" && <PosTag pos={r.pos} className="mr-1" />}
             <span className={`pick-market mr-1 rounded-sm px-1 text-[9px] font-bold uppercase tracking-wide ${nfl ? "bg-nfl/15 text-nfl" : "bg-cfb/15 text-cfb"}`}>{MARKET_WORD[r.market] ?? r.market}</span>
             {r.sub}
             <SplitsChip split={split} className="ml-1.5" compact />
@@ -1177,7 +1188,7 @@ export function CfbParlayFeature({ t, rank, live }: { t: CfbParlay; rank: number
       <ul className="space-y-1">
         {t.legs.map((leg: CfbParlayLeg) => (
           <li key={leg.rowKey} className="flex items-center gap-2 text-[11px]">
-            <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+            <span className="min-w-0 flex-1 truncate text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
             {leg.live && !live && <LiveLegTag />}
             <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
             <span className="num shrink-0 font-semibold text-gold">{fmtAmerican(leg.cz)}</span>
@@ -1238,7 +1249,7 @@ export function CfbParlayCard({ t, games, rank }: { t: CfbParlay; games: Map<str
           {t.legs.map((leg: CfbParlayLeg) => (
             <li key={leg.rowKey}><div className="flex items-center gap-2 text-[11.5px]">
               <Mark games={games} gameId={leg.gameId} teamId={leg.kind === "side" && baseMarketOf(leg.market) === "total" ? null : leg.teamId} kind={leg.kind} size="xs" player={leg.player} headshot={leg.headshot} pos={leg.pos} />
-              <span className="min-w-0 flex-1 truncate text-text">{leg.label}</span>
+              <span className="min-w-0 flex-1 truncate text-text"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
               {leg.live && t.category !== "live" && <LiveLegTag />}
               <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide text-faint">{MARKET_WORD[leg.market] ?? leg.market}</span>
               <span className="num shrink-0 text-[10px] text-muted">{fmtPct(leg.prob, 0)}</span>

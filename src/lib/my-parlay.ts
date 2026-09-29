@@ -20,6 +20,8 @@ export type MyLeg = {
   label: string;
   sub: string;
   gkey?: string | null;
+  /** the leg's market ("batter_hits", "ml"…) — display only: the position tag reads it (2026-09-28) */
+  market?: string | null;
   /** American price at the selected sportsbook; null when the book doesn't post the leg */
   odds: number | null;
   /** the engine's blended true win %, in percent; null when the row carries none */

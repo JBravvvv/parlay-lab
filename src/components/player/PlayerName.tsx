@@ -6,6 +6,7 @@ import { clubFromLabel } from "@/lib/mlb-visuals";
 import type { ReactNode } from "react";
 import { usePlayerSheet } from "@/components/player/PlayerSheet";
 import { parseBoardLabel } from "@/lib/player-card";
+import { MlbPosTag, isMlbPlayerMarket } from "./MlbPosTag";
 
 /**
  * A player's printed name, made tappable: same font as its surroundings,
@@ -60,9 +61,14 @@ export function PlayerName({
  * Engine labels: player rows print "Name (TEAM)", ML/RL rows print a club
  * name. The former gets the tappable name (suffix kept); the latter renders
  * as plain text — a club is not a player.
+ *
+ * A player label ends with his position (2026-09-28, Josh: "Add players position to every pick on parlay lab") —
+ * MLB's own, matched on the name AND the team the label prints; `market` lets the two-way player read P or DH.
  */
-export function BoardLabel({ label, className = "", showMark = true }: { label: string; className?: string; showMark?: boolean }) {
+export function BoardLabel({ label, className = "", showMark = true, market }: { label: string; className?: string; showMark?: boolean; market?: string | null }) {
   const parsed = parseBoardLabel(label);
+  /* a bare player name on a player market (the engine dropped the team suffix): tag it, matched on the name alone */
+  if (!parsed && isMlbPlayerMarket(market)) return <>{label}<MlbPosTag name={label} market={market} /></>;
   if (!parsed) {
     /* INSTRUCTION 70 (2026-09-17): a club leg ("Detroit Tigers", "Tigers ML") carries the club's own
        logo — a team pick "only needs a team logo". No club named, no mark: the label stands alone. */
@@ -81,6 +87,8 @@ export function BoardLabel({ label, className = "", showMark = true }: { label: 
       {showMark && <span className="mr-2 inline-flex py-1 align-middle"><PlayerMark player={parsed.name} team={parsed.team} headshot={null} size="sm" /></span>}
       <PlayerName name={parsed.name} team={parsed.team} className={className} />
       {label.slice(label.indexOf(parsed.name) + parsed.name.length)}
+      {/* a parsed "Name (TEAM)" is a player; the market only refines the two-way player, so an unknown one is dropped */}
+      <MlbPosTag name={parsed.name} team={parsed.team} market={isMlbPlayerMarket(market) ? market : null} />
     </>
   );
 }

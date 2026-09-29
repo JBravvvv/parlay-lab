@@ -46,6 +46,6 @@ describe("player sheet wiring: Parlay Builder + Games", () => {
 
   it("Parlay Builder: the player row passes name + team (propBoard rows carry no MLB id); slip legs use BoardLabel", () => {
     expect(read("src/components/props/PlayerRow.tsx")).toMatch(/<PlayerName name=\{r\.p\} team=\{r\.tm\}/);
-    expect(read("src/components/props/Slip.tsx")).toMatch(/<BoardLabel label=\{l\.label\} \/>/);
+    expect(read("src/components/props/Slip.tsx")).toMatch(/<BoardLabel label=\{l\.label\}( market=\{[^}]+\})? \/>/);
   });
 });

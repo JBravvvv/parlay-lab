@@ -24,7 +24,7 @@ describe("verified football positions", () => {
     expect(new Set(seen)).toEqual(new Set(teams));
     expect(seen).toHaveLength(80);
     expect(request).toHaveBeenCalledTimes(3);
-    expect(result.players).toHaveLength(80);
+    expect(result.players).toHaveLength(160); /* each roster's receiver + its name-only ATH */
   });
   it("preserves successful batches and reports the failed batch's teams", async () => {
     const teams = Array.from({length:40}, (_, i) => String(i + 1));
@@ -34,10 +34,14 @@ describe("verified football positions", () => {
     });
     const result = await loadPositionFeed("nfl", teams, undefined, request);
     expect(result.missingTeams).toHaveLength(32);
-    expect(result.players).toHaveLength(8);
+    expect(result.players).toHaveLength(16);
   });
   it("reads positions from the matching roster and normalizes known running-back labels", () => {
-    expect(rosterPositions(roster("1"), "1")).toEqual([{ athleteId: "1-1", player: "Demo Receiver", teamId: "1", position: "WR" }]);
+    /* the ATH comes back name-only (no position, no headshot): it can make a name ambiguous, never answer */
+    expect(rosterPositions(roster("1"), "1")).toEqual([
+      { athleteId: "1-1", player: "Demo Receiver", teamId: "1", position: "WR" },
+      { athleteId: "1-2", player: "Demo Mystery", teamId: "1", position: null },
+    ]);
     expect(rosterPositions(roster("2"), "1")).toEqual([]);
     expect(footballPosition("hb")).toBe("RB");
     expect(footballPosition("ATH")).toBeNull();
@@ -47,6 +51,18 @@ describe("verified football positions", () => {
     expect(lookup("Demo Receiver", ["1", "3"])).toBe("WR");
     expect(lookup("Demo Receiver", ["3", "4"])).toBeNull();
     expect(lookup("Demo Receiver", ["1", "2"])).toBeNull();
+    /* a name-only listing never answers, alone or against itself */
+    expect(lookup("Demo Mystery", ["1", "3"])).toBeNull();
+  });
+  it("an own-roster ATH makes the other side's same-named receiver ambiguous — never the one match (2026-09-28)", () => {
+    const withAth = { team: { id: "7" }, athletes: [{ items: [{ id: "7-1", displayName: "Jordan Davis", position: { abbreviation: "ATH" } }] }] };
+    const withWr = { team: { id: "8" }, athletes: [{ items: [{ id: "8-1", displayName: "Jordan Davis", position: { abbreviation: "WR" }, headshot: { href: "https://a.espncdn.com/x.png" } }] }] };
+    const players = [...rosterPositions(withAth, "7"), ...rosterPositions(withWr, "8")];
+    expect(players.find((p) => p.teamId === "7")).toEqual({ athleteId: "7-1", player: "Jordan Davis", teamId: "7", position: null });
+    const lookup = positionLookup(players);
+    expect(lookup("Jordan Davis", ["7", "8"])).toBeNull();
+    expect(lookup("Jordan Davis", ["8"])).toBe("WR");
+    expect(lookup("Jordan Davis", ["7"])).toBeNull();
   });
   it("rejects unknown leagues, malformed team IDs and excessive requests before fetching", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);

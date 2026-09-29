@@ -1,4 +1,5 @@
 "use client";
+import { MlbPosTag } from "@/components/player/MlbPosTag";
 import {discoveryMatches,type DiscoveryFilter} from "@/lib/discovery";
 import {MlbLegContext,type MlbGameInfo} from "@/components/props/MlbLegContext";
 import {useHeadshots} from "@/lib/mlb-visuals";
@@ -27,7 +28,7 @@ export function LiveOpportunities({games,market,search,loading,syncReady,error,f
    const deep=legDeepLink({label:leg.label,lkey:r.lkey,gkey:g.gkey});
    return <Link replace key={leg.id} href={deep?deepLinkHref(deep)+"&phase=live":"/props?phase=live"} className="flex items-center gap-3 rounded-xl border border-live/20 bg-live/5 p-3">
     <PlayerMark player={r.p} headshot={headshots[r.p]??null} team={r.tm} size="sm"/>
-    <div className="min-w-0 flex-1"><div className="truncate text-sm font-semibold text-text">{r.p}</div><div className="text-xs text-muted">{MLB_BROWSE_MARKETS[m as keyof typeof MLB_BROWSE_MARKETS]} Over {r.ln}</div><MlbLegContext leg={{gkey:g.gkey,lkey:r.lkey,label:leg.label,prop:leg.sub}} info={info}/><div className="mt-1 text-[10px] text-live">Live quote · {r.quoteAt?new Date(r.quoteAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):""}</div><div className="text-[10px] text-muted">{leg.prob?`${leg.prob.toFixed(1)}% ${leg.src==="model"?"model":"market estimate"}`:"No probability estimate"}</div></div>
+    <div className="min-w-0 flex-1"><div className="flex min-w-0 items-center text-sm font-semibold text-text"><span className="truncate">{r.p}</span><MlbPosTag name={r.p} team={r.tm} market={m}/></div><div className="text-xs text-muted">{MLB_BROWSE_MARKETS[m as keyof typeof MLB_BROWSE_MARKETS]} Over {r.ln}</div><MlbLegContext leg={{gkey:g.gkey,lkey:r.lkey,label:leg.label,prop:leg.sub}} info={info}/><div className="mt-1 text-[10px] text-live">Live quote · {r.quoteAt?new Date(r.quoteAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}):""}</div><div className="text-[10px] text-muted">{leg.prob?`${leg.prob.toFixed(1)}% ${leg.src==="model"?"model":"market estimate"}`:"No probability estimate"}</div></div>
     <div className="text-right"><div className="num font-bold text-pos">{amFmt(leg.cz)}</div>{ev!=null?<GradeChip grade={gradeFromEv(ev)} basis="Model EV at the live quote"/>:<span className="text-[10px] text-muted">{leg.book}</span>}</div>
    </Link>;
   })}</div>}

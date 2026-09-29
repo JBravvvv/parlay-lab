@@ -38,6 +38,15 @@ import {
   type SeasonTicket,
 } from "@/lib/cfb/season";
 import { clampSeasonStake, rehydrateSeasonStore, useSeasonStore } from "@/lib/cfb/season-store";
+import { PosTag } from "@/components/player/PosTag";
+
+/** a season pick's player position (2026-09-28): the feed's own ESPN position for his slug; team legs have none */
+const seasonPos = (feed: Pick<SeasonFeed, "players"> | null | undefined, slug: string) => feed?.players.find((p) => p.slug === slug)?.pos ?? null;
+function SeasonLegLabel({ leg, feed }: { leg: Pick<SeasonLeg, "id" | "kind" | "label">; feed: Pick<SeasonFeed, "players"> | null }) {
+  const pos = leg.kind === "player" ? seasonPos(feed, leg.id.split("|")[0]) : null;
+  const name = pos ? feed?.players.find((p) => p.slug === leg.id.split("|")[0])?.name : null;
+  return name && leg.label.startsWith(name) ? <>{name}<PosTag pos={pos} />{leg.label.slice(name.length)}</> : <>{leg.label}<PosTag pos={pos} /></>;
+}
 
 /**
  * SEASON LAB (INSTRUCTION 46, 2026-09-08, Josh's word, verbatim: "Should be evaluating season long
@@ -286,7 +295,7 @@ export function CfbSeason() {
               <div className="space-y-3">
                 <div>
                   <div className="text-[13.5px] font-semibold text-text">
-                    {proj.kind === "player" ? `${proj.name} · ${proj.statLabel}` : `${proj.name} · season wins`}
+                    {proj.kind === "player" ? <>{proj.name}<PosTag pos={seasonPos(data, proj.slug)} /> · {proj.statLabel}</> : `${proj.name} · season wins`}
                   </div>
                   <div className="num mt-0.5 text-[10.5px] text-faint" data-testid="season-inputs">
                     {projectionInputs(proj)}
@@ -383,7 +392,7 @@ export function CfbSeason() {
                   {legs.map((l) => (
                     <li key={l.id} className="flex items-center justify-between gap-2 py-2">
                       <div className="min-w-0">
-                        <div className="truncate text-[12.5px] font-semibold text-text">{l.label}</div>
+                        <div className="truncate text-[12.5px] font-semibold text-text"><SeasonLegLabel leg={l} feed={data ?? null} /></div>
                         <div className="num truncate text-[10px] text-faint">
                           {l.sub} · {fmtAmerican(l.price)} {l.book} · fair {fmtPct(l.prob)}
                         </div>
@@ -569,7 +578,7 @@ function TicketCard({ t, feed, onSettle, onRemove }: { t: SeasonTicket; feed: Se
           return (
             <li key={l.id} className="flex items-center justify-between gap-2 py-1.5">
               <div className="min-w-0">
-                <div className="truncate text-[12px] font-semibold text-text">{l.label}</div>
+                <div className="truncate text-[12px] font-semibold text-text"><SeasonLegLabel leg={l} feed={feed} /></div>
                 <div className="num truncate text-[9.5px] text-faint">
                   {fmtAmerican(l.price)} {l.book} · fair {fmtPct(l.prob)} at lock · {l.inputs}
                 </div>

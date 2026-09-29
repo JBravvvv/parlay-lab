@@ -31,6 +31,7 @@ import { useCalibration } from "@/lib/useCalibration";
 import { gateRebuild, rebuildCounts, type RebuildRow } from "@/lib/gate-rebuild";
 import { CAL_START } from "@/engine2/calibration";
 import { marketOf } from "@/lib/ledger-segments";
+import { MlbPosTag } from "@/components/player/MlbPosTag";
 import { fmtMoney, fmtAmerican, fmtPct } from "@/lib/format";
 import type { PickRow, Ticket } from "@/engine";
 import { BoardLabel } from "@/components/player/PlayerName";
@@ -270,7 +271,7 @@ function TicketCard({ gameInfo, filter, timeWindow, t, stake, kelly, grade, tag,
         {t.legs.map((l, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2 text-[11px] leading-tight">
             <span className="text-muted">
-              <span className="text-text"><BoardLabel label={l.label} /></span> {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
+              <span className="text-text"><BoardLabel label={l.label} market={l.lkey ? marketOf(l.lkey) : null} /></span> {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
               {(l as { lu?: string }).lu === "projected" && (
                 <span
                   className="ml-1.5 rounded-full border border-gold/40 bg-gold/10 px-1.5 py-px text-[8.5px] font-bold text-gold"
@@ -1116,7 +1117,7 @@ function MlbBuilderPage() {
                       className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[12.5px] hover:bg-white/[0.05]"
                     >
                       <span>
-                        <span className="text-text">{r.label}</span> <span className="text-muted">{r.sub}</span>
+                        <span className="text-text">{r.label}<MlbPosTag label={r.label} market={r.lkey ? marketOf(r.lkey) : null} /></span> <span className="text-muted">{r.sub}</span>
                       </span>
                       <span className="num text-gold">{String(r.czOdds)}</span>
                     </button>
@@ -1131,7 +1132,7 @@ function MlbBuilderPage() {
                     return (
                       <div key={`${r.label}|${r.sub}`} className="flex items-center justify-between gap-2 text-[12.5px]">
                         <span>
-                          <span className="text-text"><BoardLabel label={r.label} /></span> <span className="text-muted">{r.sub}</span>
+                          <span className="text-text"><BoardLabel label={r.label} market={r.lkey ? marketOf(r.lkey) : null} /></span> <span className="text-muted">{r.sub}</span>
                           {worst && (
                             <span className="ml-2 rounded-full border border-neg/40 bg-neg/10 px-2 py-0.5 text-[9.5px] font-bold text-neg">
                               WORST PRICE VS FAIR

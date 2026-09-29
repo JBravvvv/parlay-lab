@@ -80,10 +80,12 @@ describe("BoardLabel — a player pick draws headshot + his team's logo; a club 
 describe("every pick surface reaches a mark", () => {
   it("Board: the stamped / ALL-scope Pick cell draws through BoardLabel (mark + name), not a bare name", () => {
     const src = read("app/board/page.tsx");
-    expect(src).toMatch(/\{p\.player \? <BoardLabel label=\{p\.player\} \/> : null\}/);
+    /* + the market, so the position tag can read a two-way player's role, and a display-only strip of a team-less
+       row's literal " (null)" (its keyed string is untouched) (2026-09-28) */
+    expect(src).toMatch(/\{p\.player \? <BoardLabel label=\{p\.player\.replace\(\/ \\\(null\\\)\$\/, ""\)\} market=\{p\.market \?\? cat\} \/> : null\}/);
     expect(src).not.toMatch(/<PlayerName name=\{parseBoardLabel\(p\.player\)/);
     // the live board's Pick cell already went through BoardLabel
-    expect(src).toMatch(/<BoardLabel label=\{r\.label\} \/>/);
+    expect(src).toMatch(/<BoardLabel label=\{r\.label\}( market=\{[^}]+\})? \/>/);
   });
   it("generated parlays: a player leg keeps its headshot mark, a club leg gets the club logo", () => {
     const src = read("src/components/mlb/ParlaysSection.tsx");
@@ -101,7 +103,7 @@ describe("every pick surface reaches a mark", () => {
   });
   it("Builder, The Sharp and the slip print picks through BoardLabel, so the club branch reaches them too", () => {
     for (const p of ["app/builder/page.tsx", "app/sharp/page.tsx", "src/components/props/Slip.tsx"]) {
-      expect(read(p), p).toMatch(/<BoardLabel label=\{(l|r)\.label\} \/>/);
+      expect(read(p), p).toMatch(/<BoardLabel label=\{(l|r)\.label\}( market=\{[^}]+\})? \/>/);
     }
   });
 });

@@ -18,6 +18,8 @@ import { parseBoardLabel } from "@/lib/player-card";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { clubFromLabel } from "@/lib/mlb-visuals";
 import { PlayerName } from "@/components/player/PlayerName";
+import { PosTag } from "@/components/player/PosTag";
+import { MlbPosTag, isMlbPlayerMarket } from "@/components/player/MlbPosTag";
 import { HIT_WINDOWS, windowLabel, type HitWindow } from "@/lib/prop-hit-rate";
 import { HitChip, HitDots } from "./HitChip";
 import {
@@ -88,6 +90,17 @@ export const GEN_PANEL_ID = "props-gen-panel";
  * anything generic.
  */
 type SlotPart<P> = (a: { leg: P; gen: GenLeg<P>; name: string; team: string | null }) => ReactNode;
+
+/**
+ * A slot's position tag (2026-09-28): the leg's own (the MLB pool stamps the index's, football the verified ESPN or
+ * roster one), else the shown one another sport's pick carries, else an MLB pick resolves its printed "Name (TEAM)"
+ * on the device — a ticket spun before the index landed, or a held leg whose price moved, still shows it.
+ */
+function SlotPos<P>({ gen }: { gen: GenLeg<P> }) {
+  const leg = gen.leg as { pos?: string | null; cross?: CrossLeg };
+  const shown = gen.position ?? leg.pos ?? leg.cross?.position;
+  return !shown && isMlbPlayerMarket(gen.market) ? <MlbPosTag label={leg.cross?.label ?? gen.label} market={gen.market} /> : <PosTag pos={shown} />;
+}
 
 /** the default disc — today's MLB path. The page overrides it to pass its resolved headshot.
     A club leg (no "(TEAM)" suffix, no team of its own) draws the club's logo alone — INSTRUCTION 70. */
@@ -463,10 +476,14 @@ function Slot<P>({
       <span aria-hidden className="gen-slot-no num">{i + 1}</span>
       {(l.leg as {cross?:CrossLeg}).cross ? <CrossMark leg={(l.leg as {cross:CrossLeg}).cross}/> : renderMark({ leg: l.leg, gen: l, name, team })}
       <div className="min-w-0 flex-1 leading-none">
-        {(l.leg as {cross?:CrossLeg}).cross ? <span className="text-[12px] font-semibold">{name}</span> : renderName({ leg: l.leg, gen: l, name, team })}
+        {/* the player's position rides right after his name on every slot (2026-09-28, Josh: "Add players position to
+            every pick on parlay lab") — the name truncates, the tag never does */}
+        <div className="flex min-w-0 items-center">
+          {(l.leg as {cross?:CrossLeg}).cross ? <span className="truncate text-[12px] font-semibold">{name}</span> : renderName({ leg: l.leg, gen: l, name, team })}
+          <SlotPos gen={l} />
+        </div>
         <div className="mt-[3px] flex items-center gap-1 truncate text-[9.5px] text-faint">
           <span className="truncate text-muted">{l.sub}</span>
-          {l.position && <span className="shrink-0 rounded border border-white/10 px-1 text-[8px] text-text">{l.position}</span>}
           {l.alt && <span className="shrink-0 rounded-[4px] border border-line-2 bg-surface-2 px-1 text-[8px] font-bold uppercase">alt</span>}
           {l.started && <span className="shrink-0 text-live">{l.quoteAt ? "live quote" : "started"}</span>}
           {/* phone: the hit chip rides the sub line so the slot stays two lines (2026-09-19) */}

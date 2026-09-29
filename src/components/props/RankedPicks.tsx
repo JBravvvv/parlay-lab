@@ -15,6 +15,7 @@ import { GradeChip } from "@/components/ui/GradeChip";
 import { gradeFromEv, gradeRank, type Grade } from "@/lib/grade";
 import { parseAmerican } from "@/lib/parlay-calc";
 import { amFmt } from "@/lib/ticket-math";
+import { PosTag } from "@/components/player/PosTag";
 
 /**
  * EVERY PICK TODAY, S DOWN (2026-09-18, Josh's word, verbatim: "Below the Parlay Generator, the
@@ -37,6 +38,8 @@ export type RankedPick<P> = {
   market: string;
   /** the name line: player or club */
   label: string;
+  /** the player's position, drawn right after the name (2026-09-28) — the sport's own data; null/absent = no tag */
+  position?: string | null;
   /** the bet + game line */
   sub: string;
   /** the posted American price */
@@ -202,7 +205,8 @@ export function RankedPicks<P>({
   const filterKeys=filters.map(f=>f.key).join(",");
   useEffect(()=>{setDiscovery(d=>({...d,markets:filterProp && filterProp!=="all"?[filterProp]:defaultMarkets(d.sports.some(s=>s!==sport)?ALL_MARKETS:filterKeys.split(",").map(key=>({key})),d.sports)}));},[filterProp,filterKeys]);
   const foreign = useCrossSports(date,convertCross?discovery.sports.filter(s=>s!==sport):[]);
-  const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
+  /* another sport's legs arrive with the position their tag shows (useCrossSports, 2026-09-28) */
+  const crossPicks:RankedPick<P>[] = useMemo(()=>convertCross?foreign.legs.map(l=>({id:l.id,sport:l.sport,market:l.market!,label:l.label,position:l.leg.position??l.position??null,sub:`${l.sub} · ${l.gameLabel}`,am:l.am,prob:l.prob,ev:l.ev*100,book:l.book,src:l.src,context:l.context,started:l.started,start:l.start,leg:convertCross(l.leg),mark:<CrossMark leg={l.leg}/>})):[],[foreign.legs,convertCross]);
   const allPicks=useMemo(()=>[...(discovery.sports.includes(sport)?picks:[]),...crossPicks].filter(p=>matchesPickSearch(p,search)),[picks,crossPicks,discovery.sports,sport,search]);
   const [own, setOwn] = useState<string>("all");
   const filter = filterProp ?? own;
@@ -318,7 +322,10 @@ export function RankedPicks<P>({
                 <span className="num w-5 shrink-0 text-right text-[9.5px] text-faint">{idx + 1}</span>
                 {p.mark}
                 <div className="min-w-0 flex-1 leading-none">
-                  <div className="truncate text-[12px] font-medium text-text">{p.label}</div>
+                  <div className="flex min-w-0 items-center text-[12px] font-medium text-text">
+                    <span className="truncate">{p.label}</span>
+                    <PosTag pos={p.position} />
+                  </div>
                   <div className="mt-[3px] flex items-center gap-1.5 truncate text-[9.5px] text-faint">
                     <span className="pick-market shrink-0 rounded-sm bg-white/[0.06] px-1 text-[8.5px] font-bold uppercase tracking-wide text-muted">{labelOf(p.market)}</span>
                     <span className="pick-matchup truncate">{p.sub}</span>

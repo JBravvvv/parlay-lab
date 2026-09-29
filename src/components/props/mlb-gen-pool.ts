@@ -23,6 +23,7 @@ import { poolOf, specMarkets, type GenLeg, type GenMarket, type GenPool, type Ge
 import { MKT_LABEL, nameKey, playerLeg, teamTag, type Side } from "./props-model";
 import type { SandboxLeg } from "@/lib/ticket-math";
 import { hitDots, hitRate, type HitWindow, type PlayerLog } from "@/lib/prop-hit-rate";
+import { mlbPickPosition, type PositionResolver } from "@/lib/mlb/positions";
 
 /**
  * Hit-rate stamping (2026-09-18): the page hands the pool builder the board's game logs and the
@@ -68,7 +69,7 @@ export type MlbGenPool = GenPool<SandboxLeg>;
  * `nowMs` is passed in rather than read from the clock so this stays pure — the caller
  * sets it in a post-mount effect and SSR passes 0, which marks nothing started.
  */
-export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, nowMs: number, hits?: MlbHitSource): MlbGenPool {
+export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, nowMs: number, hits?: MlbHitSource, positions?: PositionResolver | null): MlbGenPool {
   const legs: GenLeg<SandboxLeg>[] = [];
   let rows = 0;
   let startedDropped = 0;
@@ -129,6 +130,8 @@ export function buildPool(board: readonly PropBoardGame[], spec: GenPoolSpec, no
           gameLabel: g.game,
           start: g.start,
           ...(hits ? { hit: hit ? { n: hit.n, hits: hit.hits, rate: hit.rate, dots: hitDots(log, market, r.ln, side) } : null } : {}),
+          /* the player's position (2026-09-28): MLB's own, matched by name + team; absent until the index lands */
+          ...(positions ? { position: mlbPickPosition(positions(r.p, r.tm ? teamTag(r.tm) : null), market) } : {}),
           lean: mlbPropLean(r),
         });
       }

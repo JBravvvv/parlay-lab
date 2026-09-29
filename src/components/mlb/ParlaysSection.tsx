@@ -151,6 +151,7 @@ export function ParlaysSection({
     label: String(l.label ?? ""),
     sub: String(l.prop ?? ""),
     gkey: l.gkey ?? null,
+    market: l.market != null ? String(l.market) : l.lkey ? marketOf(l.lkey) : null,
     odds: parseAm(l.cz),
     prob: typeof l.prob === "number" && Number.isFinite(l.prob) ? l.prob : null,
   });
@@ -292,7 +293,7 @@ export function ParlaysSection({
                             ) : club ? (
                               <PlayerMark player={null} team={club} headshot={null} size="xs" className="mr-1 align-text-bottom" />
                             ) : null}
-                            <span className="text-text"><BoardLabel showMark={false} label={l.label} /></span> · {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
+                            <span className="text-text"><BoardLabel showMark={false} label={l.label} market={String(l.market ?? (l.lkey ? marketOf(l.lkey) : ""))} /></span> · {l.prop}<MlbLegContext leg={l} info={gameInfo}/>
                             {lo && <span className="ml-1 text-[9.5px] font-bold uppercase text-red-400 no-underline" title="not in the posted lineup">out</span>}
                             {l.cz != null && <span className="num ml-1 text-[10.5px]">({l.cz > 0 ? `+${l.cz}` : l.cz})</span>}
                             {n && (

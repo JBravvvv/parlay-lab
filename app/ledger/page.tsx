@@ -1,10 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { clubFromLabel } from "@/lib/mlb-visuals";
 import { parseBoardLabel } from "@/lib/player-card";
+import { isMlbPlayerMarket } from "@/components/player/MlbPosTag";
+import { PosTag } from "@/components/player/PosTag";
+import { useMlbPositions } from "@/lib/mlb/useMlbPositions";
+import { mlbLabelPosition, type PositionResolver } from "@/lib/mlb/positions";
+import { marketOfLkey } from "@/lib/lineup-check";
+
+/** a ledger leg's player market from its stored lkey — null when the key names none (the label decides then) */
+const legMarket = (lkey: string | null | undefined) => { const m = marketOfLkey(lkey); return isMlbPlayerMarket(m) ? m : null; };
+/* ONE position-index observer for the whole Ledger (2026-09-28): a closed day still mounts its tickets, so a hook per
+   leg meant one query observer per locked leg, and TanStack tears those down in quadratic time on leaving the page */
+const LedgerPositions = createContext<PositionResolver | null>(null);
+function LegPos({ label, market }: { label: string; market: string | null }) {
+  return <PosTag pos={mlbLabelPosition(useContext(LedgerPositions), label, market)} />;
+}
 import {
   Area,
   AreaChart,
@@ -149,7 +163,8 @@ function LegLine({
           </Link>
         ) : (
           <span title={phase === "final" ? "game is final" : undefined}>{l.label}</span>
-        )}{" "}
+        )}
+        <LegPos label={l.label} market={legMarket(l.lkey) ?? (player ? null : "")} />{" "}
         <span className="text-muted">· {l.prop}</span>
       </span>
       <span className="num flex shrink-0 items-center gap-2">
@@ -229,7 +244,13 @@ function TicketRow({
           </div>
           {!open && (
             <div className="text-[10.5px] text-muted">
-              {t.legs.map((l) => l.label).join(" · ")}
+              {t.legs.map((l, i) => (
+                <Fragment key={i}>
+                  {i > 0 && " · "}
+                  {l.label}
+                  <LegPos label={l.label} market={legMarket(l.lkey) ?? (parseBoardLabel(l.label) ? null : "")} />
+                </Fragment>
+              ))}
             </div>
           )}
         </div>
@@ -343,6 +364,7 @@ export default function LedgerPage() {
 }
 function MlbLedgerPage() {
   const { api, refresh } = useLedger();
+  const positions = useMlbPositions();
   /* CORE IS THE MAIN CHECK (2026-08-16, Josh's word): the blended "all" view is gone —
      a combined net is exactly the number he ruled out. Core is the default; FUN is its
      own view, never folded in. */
@@ -488,7 +510,7 @@ function MlbLedgerPage() {
   const empty = api.entries.length === 0;
 
   return (
-    <>
+    <LedgerPositions.Provider value={positions}>
       <PageHeader
         title="Ledger"
         sub={`Locked cards only, since ${api.seed} — append-only, auto-graded from official MLB box scores under DraftKings void rules.`}
@@ -725,7 +747,7 @@ function MlbLedgerPage() {
         CLV compares your locked price to the last DraftKings price seen before first pitch (Caesars for cards locked before 2026-09-17) — the true closing
         line isn&apos;t visible without paid odds history, so coverage is disclosed. Informational only.
       </div>
-    </>
+    </LedgerPositions.Provider>
   );
 }
 

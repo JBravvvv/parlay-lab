@@ -554,6 +554,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
             label: r.label,
             sub: r.sub,
             gkey: r.gkey ?? null,
+            market: marketOfLkey(r.lkey),
             odds: liveAmOf(r) ?? parseAm(r.czOdds),
             prob: Number.isFinite(Number(r.prob)) && r.prob != null ? Number(r.prob) : null,
           };
@@ -570,7 +571,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
           return (
             <div className={r.susp || rowOut(r) ? "opacity-50" : undefined}>
               <div className="font-medium text-text">
-                <BoardLabel label={r.label} />
+                <BoardLabel label={r.label} market={marketOfLkey(r.lkey)} />
                 {rowOut(r) && <OutTag />}
                 <CzInfo pickKey={`${r.label}|${r.sub}`} offered={!cz.isHidden(`${r.label}|${r.sub}`)} onToggle={cz.toggle} />
               </div>
@@ -908,6 +909,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
             label: p.player ?? "",
             sub: `${mk}${p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}`,
             gkey: p.gkey,
+            market: p.market ?? cat,
             odds: parseAm(p.odds),
             prob: p.prob == null || !Number.isFinite(Number(p.prob)) ? null : Number(p.prob),
           };
@@ -954,7 +956,7 @@ function MlbBoardPage({parlaysOnly=false}:{parlaysOnly?:boolean}) {
             <div className={pickOut(p) ? "opacity-50" : undefined}>
               {/* INSTRUCTION 70 (2026-09-17): headshot + his team's logo on every player pick, the club's
                   logo on a team pick — BoardLabel draws whichever the label names, never a guess */}
-              {p.player ? <BoardLabel label={p.player} /> : null}<PickContext pick={{sport:"mlb",game:String(pkOf(p.gkey)??""),player:p.player??undefined,market:p.market??cat,line:p.line,side:p.side==="u"?"u":"o",start:p.start}}/>{" "}
+              {p.player ? <BoardLabel label={p.player.replace(/ \(null\)$/, "")} market={p.market ?? cat} /> : null}<PickContext pick={{sport:"mlb",game:String(pkOf(p.gkey)??""),player:p.player??undefined,market:p.market??cat,line:p.line,side:p.side==="u"?"u":"o",start:p.start}}/>{" "}
               <span className="text-muted">
                 {mk}{p.side === "o" ? `over ${p.line ?? ""}` : p.side === "u" ? `under ${p.line ?? ""}` : p.side ?? ""}
               </span>

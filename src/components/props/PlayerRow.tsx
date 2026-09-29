@@ -8,6 +8,7 @@ import { GameHeader, TeamSidePills } from "./GameCard";
 import { collapseKey, panelIdFor, useGameCollapse, setCollapsed } from "./collapse-store";
 import { PlayerMark } from "@/components/player/PlayerMark";
 import { PlayerName } from "@/components/player/PlayerName";
+import { MlbPosTag } from "@/components/player/MlbPosTag";
 import { MKT_LABEL, filterSide, playerLeg, playerMatches, sidePrice, sideProb, sideShort, type Side, type TeamSide } from "./props-model";
 import { hitDots, hitRate, type HitWindow, type PlayerLog } from "@/lib/prop-hit-rate";
 import type { HitLogMap } from "@/lib/mlb/useHitRates";
@@ -160,8 +161,13 @@ export function PlayerRow({
     >
       <PlayerMark player={r.p} headshot={headshot} team={r.tm} size="md" />
       <div className="min-w-0 flex-1 leading-none">
-        {/* propBoard rows carry no MLB id — the sheet resolves name + team itself */}
-        <PlayerName name={r.p} team={r.tm} className="block truncate text-[12px] font-medium tracking-tight text-text">{r.p}</PlayerName>
+        {/* propBoard rows carry no MLB id — the sheet resolves name + team itself; his position follows the name
+            (2026-09-28) from the same index matched on name + team — never the game log's, which is looked up by name
+            alone and would lend one player's position to a namesake on the same board */}
+        <div className="flex min-w-0 items-center">
+          <PlayerName name={r.p} team={r.tm} className="block truncate text-[12px] font-medium tracking-tight text-text">{r.p}</PlayerName>
+          <MlbPosTag name={r.p} team={r.tm} market={cat} />
+        </div>
         <div className="mt-[3px] flex items-center gap-1 overflow-hidden text-[9.5px] text-faint">
           {r.tm && <span className="shrink-0 text-[9.5px] font-semibold text-muted">{r.tm}</span>}
           {r.tm && <span className="shrink-0 text-faint/60">·</span>}

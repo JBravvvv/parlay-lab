@@ -40,8 +40,9 @@ import { baseMarketOf, isH1Market } from "@/lib/cfb/markets";
 import { fmtLine, rowProbAt, sideLabel } from "@/lib/cfb/model";
 import { playerSlug } from "@/lib/cfb/props";
 import { FOOTBALL_GEN_MARKETS, footballGenPool } from "@/lib/football/gen-pool";
-import { FOOTBALL_POSITIONS, footballPosition, positionLookup, rosterLookup } from "@/lib/football/positions";
-import { loadPositionFeed } from "@/lib/football/positions-client";
+import { FOOTBALL_POSITIONS } from "@/lib/football/positions";
+import { shownFootballPosition, useRosterPositions } from "@/lib/football/useRosterPositions";
+import { PosTag } from "@/components/player/PosTag";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
 import { propLabel } from "@/lib/cfb/props";
 import { CFB_PROP_MARKETS, type CfbPropMarket, type CfbPropQuote, type CfbPropRow, type CfbPropsBoard } from "@/lib/cfb/props-types";
@@ -570,9 +571,12 @@ function PropRow({
     >
       <PlayerMark teamIds={teamIds} player={pl.player} headshot={pl.headshot} team={team} pos={pl.pos} size="md" />
       <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-[12px] font-semibold text-text">
-          {pl.player}
-          {pl.team && <span className="ml-1 text-[9.5px] font-semibold uppercase text-faint">{pl.team}</span>}
+        {/* name · team · position (2026-09-28, Josh: "Add players position to every pick on parlay lab") — the name
+            truncates, the team and the tag never do */}
+        <div className="flex min-w-0 items-center text-[12px] font-semibold text-text">
+          <span className="truncate">{pl.player}</span>
+          {pl.team && <span className="ml-1 shrink-0 text-[9.5px] font-semibold uppercase text-faint">{pl.team}</span>}
+          <PosTag pos={pl.pos} />
         </div>
         <div className="num mt-0.5 truncate text-[9.5px] text-faint">
           {ctx ?? "no season ctx"}{lead.assumedHold && <span title="One-sided quotes use an assumed 8% overround; probability and grade are market estimates, not a fitted player forecast."> · estimated hold</span>}
@@ -807,7 +811,6 @@ export function CfbProps() {
   /* the ranked list is the default view (2026-09-18 item 8); a deep link needs the by-game book */
   const [view, setView] = useState<"ranked" | "games">("ranked");
   const [search, setSearch] = useState("");
-  const [loadRosterPositions, setLoadRosterPositions] = useState(false);
   const [legs, setLegs] = useState<CfbSlipLeg[]>([]);
   const [stake, setStake] = useState(10);
   const [note, setNote] = useState<string | null>(null);
@@ -871,26 +874,24 @@ export function CfbProps() {
   const liveGames = games.filter((g) => g.status === "live").length;
 
   const board = useFootballPropsPrices(propsQ.data,bankroll??L.bankBase,L.rules);
-  const rosterTeams = useMemo(() => {
-    const needsPosition = new Set((board?.rows ?? []).filter((r) => !footballPosition(r.pos) || !r.headshot || !r.teamId).map((r) => r.gameId));
-    return [...new Set(games.filter((g) => needsPosition.has(g.id) && g.status !== "final" && g.status !== "postponed").flatMap((g) => [g.home.id, g.away.id]))].sort().join(",");
-  }, [board, games]);
-  const positionsQ = useQuery({
-    queryKey: [L.id, "roster-positions", rosterTeams],
-    queryFn: ({ signal }) => loadPositionFeed(L.id, rosterTeams.split(","), signal),
-    enabled: loadRosterPositions && nav !== "sides" && !!rosterTeams,
-    staleTime: (q) => q.state.data?.missingTeams.length ? 60_000 : 3_600_000,
-    retry: 1,
-  });
-  const rosterPlayer = useMemo(() => rosterLookup(positionsQ.data?.players ?? []), [positionsQ.data]);
-  const rosterPosition = useMemo(() => positionLookup(positionsQ.data?.players ?? []), [positionsQ.data]);
-  const positionOf = useCallback((row: CfbPropRow) => {
-    const game = gameById.get(row.gameId);
-    return footballPosition(row.pos) ?? (game ? rosterPosition(row.player, [game.home.id, game.away.id]) : null);
-  }, [gameById, rosterPosition]);
+  /* ESPN rosters fill the rows the props context could not join (src/lib/football/useRosterPositions.ts) — loaded
+     whenever the board holds player rows now, not only with the generator open (2026-09-28: a position on every
+     pick). Never gated on the view: the generator draws props from the Sides view too, and its positions wait below
+     must always have a query that can answer */
+  const roster = useRosterPositions(L.id, board?.rows, games);
+  const rosterPlayer = roster.rosterPlayer;
+  const positionOf = roster.positionOf;
+  /* the rows as every pick on this desk draws them: the verified position, else the feed's own abbreviation */
+  const shownRows = useMemo(
+    () => board?.rows.map((r) => { const pos = shownFootballPosition(positionOf(r), r.pos); return pos === r.pos ? r : { ...r, pos }; }),
+    [board, positionOf],
+  );
+  /* the slip reads a prop leg's position off its board row as shown now, so a leg tapped before the roster answer
+     landed still gets its tag; a leg from another board keeps the one it was minted with */
+  const shownPosByKey = useMemo(() => new Map((shownRows ?? []).map((r) => [r.key, r.pos])), [shownRows]);
   const groups = useMemo(
-    () => (nav === "sides" || !board ? [] : groupProps(board.rows.filter(r=>inOddsRange(propQuote(r,mode)?.price??NaN,browseOdds)), nav, mode, normName(search.trim()))),
-    [board, nav, mode, search, browseOdds],
+    () => (nav === "sides" || !shownRows ? [] : groupProps(shownRows.filter(r=>inOddsRange(propQuote(r,mode)?.price??NaN,browseOdds)), nav, mode, normName(search.trim()))),
+    [shownRows, nav, mode, search, browseOdds],
   );
   const marketRows = useMemo(
     () => (nav === "sides" || !board ? 0 : board.rows.filter((r) => r.market === nav).length),
@@ -928,7 +929,7 @@ export function CfbProps() {
           const player = g ? rosterPlayer(row.player, row.teamId ? [row.teamId] : [g.home.id, g.away.id]) : null;
           const teamId = row.teamId ?? player?.teamId;
           const team = g && teamId ? (teamId === g.home.id ? g.home : teamId === g.away.id ? g.away : null) : null;
-          return { ...leg, team, imageTeamIds: g ? [g.home.id, g.away.id] : [], headshot: row.headshot ?? player?.headshot ?? null, pos: positionOf(row) };
+          return { ...leg, team, imageTeamIds: g ? [g.home.id, g.away.id] : [], headshot: row.headshot ?? player?.headshot ?? null, pos: shownFootballPosition(positionOf(row), row.pos) };
         },
       });
       const wanted=sp.markets?.length?sp.markets:[sp.market];const sideLegs:GenLeg<CfbSlipLeg>[]=[];
@@ -963,8 +964,10 @@ export function CfbProps() {
     },
     /* the ticket holds once the slate (the side legs, the teams) and the prop board have landed (2026-09-26) — before
        this, the live clock's tick rebuilt the pool and re-rolled the ticket on screen. isLoading, not isPending: a props
-       query switched off (the Sides view) is not "still loading" */
-    ready: !loading && !propsQ.isLoading,
+       query switched off (the Sides view) is not "still loading". And once ESPN's rosters for the board have answered
+       (2026-09-28): a position filter reads them, so a ticket held before they land could differ load to load — without
+       a filter the draw is identical either way, so this only settles WHEN the first ticket holds */
+    ready: !loading && !propsQ.isLoading && !roster.pending,
     frozen: refreshingLive || !!pendingLiveSpin,
   });
   // Spin only after React has rebuilt the pool from the returned quote snapshot.
@@ -997,7 +1000,6 @@ export function CfbProps() {
     finally{refreshInFlight.current=false;setRefreshingLive(false);}
   };
   const genMarketLabel = FOOTBALL_GEN_MARKETS.find((m) => m.key === gen.spec.market)?.label ?? gen.spec.market;
-  useEffect(() => setLoadRosterPositions(gen.open), [gen.open]);
   /* the board's own generation time, formatted only after mount (gen.nowMs is 0 on the server,
      so SSR prints no clock and hydration cannot mismatch on a locale-rendered time) */
   const genBoardAt =
@@ -1046,6 +1048,7 @@ export function CfbProps() {
         start: l.start,
         market: l.market ?? gen.spec.market,
         label: l.leg.player ?? l.label,
+        position: l.position ?? l.leg.pos ?? null,
         sub: `${l.sub} · ${l.leg.sub}`,
         am: l.am,
         prob: l.prob,
@@ -1108,7 +1111,7 @@ export function CfbProps() {
         marketLabel={genMarketLabel}
         markets={scopedMarkets(ALL_MARKETS,gen.spec.sports??[L.id])}
         positions={FOOTBALL_POSITIONS}
-        positionsLoading={loadRosterPositions && !!rosterTeams && positionsQ.isPending}
+        positionsLoading={roster.pending}
         pool={gen.pool}
         renderMark={({ leg }) => (
           leg.pair ? <PairMark {...leg.pair} size="md" /> : <PlayerMark
@@ -1148,7 +1151,7 @@ export function CfbProps() {
         open={gen.open}
         onOpen={gen.setOpen}
         boardAt={genBoardAt}
-        loading={refreshingLive || !!pendingLiveSpin || propsQ.isPending || loading || gen.crossPending || (!!gen.spec.positions?.length && !!rosterTeams && positionsQ.isPending)}
+        loading={refreshingLive || !!pendingLiveSpin || propsQ.isPending || loading || gen.crossPending || (!!gen.spec.positions?.length && roster.pending)}
         gameMarket={false}
         showModelOnly={false}
         categoryNote={GEN_CATEGORY_NOTE}
@@ -1297,6 +1300,7 @@ export function CfbProps() {
           onClear={() => setLegs([])}
           bottom={bottom}
           copyText={copyText}
+          posOf={(l) => shownPosByKey.get(l.key) ?? l.pos}
         />
       )}
     </div>

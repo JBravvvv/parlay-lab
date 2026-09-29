@@ -135,7 +135,7 @@ describe("1 — a ticket that has been rolled out never changes by itself", () =
   it("both desks say when their board has finished its first load", () => {
     expect(readSrc("app/props/page.tsx")).toMatch(/ready: !q\.isPending && !browseProps\.loading,\s*inputsKey: String\(hitWindow\),/);
     /* football: the slate AND the props board; and while a Live/Mixed press is refreshing quotes the ticket is frozen */
-    expect(readSrc("src/components/cfb/CfbProps.tsx")).toMatch(/ready: !loading && !propsQ\.isLoading,\s*frozen: refreshingLive \|\| !!pendingLiveSpin,/);
+    expect(readSrc("src/components/cfb/CfbProps.tsx")).toMatch(/ready: !loading && !propsQ\.isLoading && !roster\.pending,\s*frozen: refreshingLive \|\| !!pendingLiveSpin,/);
     for (const f of ["app/props/page.tsx", "src/components/cfb/CfbProps.tsx"]) {
       expect(readSrc(f)).toMatch(/spinKey=\{gen\.spinKey\}/);
       expect(readSrc(f)).toMatch(/moved=\{gen\.moved\}/);

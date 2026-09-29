@@ -6,6 +6,7 @@ import { FootballModelExplorer } from "@/components/football/FootballModelExplor
 import { NFL_DESK } from "@/lib/nfl/desk";
 import { CFB_DESK } from "@/lib/cfb/desk";
 import { useMemo, useState } from "react";
+import { MlbPosTag } from "@/components/player/MlbPosTag";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
@@ -55,6 +56,13 @@ function MlbSimulator() {
   const info = board?.data.gameInfo as Record<string, { away: string; home: string }> | undefined;
   const nm = key ? teamNames(key, info) : null;
 
+  /* the sim's keys are the engine's leg keys — the name squashed ("aaronjudge|batter_hits|0.5") — so a leg's position
+     comes from the board row carrying that same key, with the name and team as printed (2026-09-28) */
+  const rowByKey = useMemo(() => {
+    const m = new Map<string, { p: string; tm: string | null }>();
+    for (const g of board?.data.propBoard ?? []) for (const rows of Object.values(g.markets)) for (const r of rows) m.set(r.lkey, r);
+    return m;
+  }, [board]);
   const legRows = useMemo(
     () =>
       sim
@@ -193,7 +201,7 @@ function MlbSimulator() {
                   <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
                     {legRows.map(([k, p]) => (
                       <div key={k} className="flex items-center justify-between gap-3 text-[12px]">
-                        <span className="truncate text-muted">{k}</span>
+                        <span className="flex min-w-0 items-center text-muted"><span className="truncate">{k}</span>{rowByKey.has(k) && <MlbPosTag name={rowByKey.get(k)!.p} team={rowByKey.get(k)!.tm} market={k.split("|")[1]} />}</span>
                         <span className="num shrink-0 text-text">{fmtPct(p)}</span>
                       </div>
                     ))}

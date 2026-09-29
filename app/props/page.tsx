@@ -39,6 +39,7 @@ import {useLiveNow} from "@/lib/liveNow";
 import { GenSheet } from "@/components/props/GenSheet";
 import { GEN_MARKETS, MLB_GEN_MARKETS, buildPool, type MlbHitSource } from "@/components/props/mlb-gen-pool";
 import { useHitRates, useHitWindow } from "@/lib/mlb/useHitRates";
+import { useMlbPositions } from "@/lib/mlb/useMlbPositions";
 import { hitKey } from "@/lib/prop-hit-rate";
 import { blankPins, useParlayGen } from "@/components/props/useParlayGen";
 import type { GenSpec, GenPoolSpec } from "@/lib/parlay-gen";
@@ -233,12 +234,14 @@ function PropsDesk() {
   }, [propBoard]);
   const hitRates = useHitRates(boardPlayers, boardPlayers.length > 0);
   const hitSource = useMemo<MlbHitSource>(() => ({ logs: hitRates.logs, window: hitWindow, keyOf: hitKey }), [hitRates.logs, hitWindow]);
+  /* every player's position (2026-09-28) — MLB's own index, one free GET per session; the generated legs carry it */
+  const mlbPositions = useMlbPositions();
   /* the pool's dependencies are the board and the game logs, so the builder is memoized on them */
   const buildGenPool = useCallback(
     (sp: GenPoolSpec, at: number) => {
       at = at ? Date.now() : 0;
       const currentLive=liveMarketBoard(propBoard,liveOverlay,d?.gameInfo,liveNow,at,MLB_LIVE_CLIENT.quoteMaxAgeSec*1000);
-      const pool=buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at,hitSource);
+      const pool=buildPool(marketPhaseBoard(propBoard,currentLive,sp.phase??"pregame",at),{...sp,phase:sp.phase??"pregame"},at,hitSource,mlbPositions);
       const legs=pool.legs.map(l=>({...l,context:{sport:"mlb" as const,game:String(d?.gameInfo?.[l.gameKey]?.pk??l.gameKey),player:l.label,market:l.market,line:l.line,side:l.side,start:l.start}}));
       const wanted=sp.markets?.length?sp.markets:[sp.market];
       const sideLegs:GenLeg<SandboxLeg>[]=[];
@@ -249,7 +252,7 @@ function PropsDesk() {
       }
       return poolOf([...legs,...sideLegs],pool);
     },
-    [propBoard,liveOverlay,d,liveNow,hitSource],
+    [propBoard,liveOverlay,d,liveNow,hitSource,mlbPositions],
   );
   const gen = useParlayGen<SandboxLeg>({
     sport:"mlb",convertCross:crossToMlb,
@@ -391,6 +394,7 @@ function PropsDesk() {
         start: l.start,
         market: l.market ?? spec.market,
         label: name,
+        position: l.position ?? null,
         sub: l.gameLabel ? `${l.sub} · ${l.gameLabel}` : l.sub,
         am: l.am,
         prob: l.prob,

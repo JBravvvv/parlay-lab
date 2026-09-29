@@ -1,4 +1,6 @@
 "use client";
+import { marketOfLkey } from "@/lib/lineup-check";
+import { MlbLeadText } from "@/components/player/MlbPosTag";
 import {useLivePrices} from "@/lib/sportsbook/useLivePrices";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -371,7 +373,7 @@ function MlbSharpPage() {
                 <Panel key={`${r.label}|${r.sub}`} className={i === 0 && !settled && !live ? "glow-pos" : ""}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="display text-[16px] text-text"><BoardLabel label={r.label} /></div>
+                      <div className="display text-[16px] text-text"><BoardLabel label={r.label} market={marketOfLkey(r.lkey)} /></div>
                       <div className="mt-0.5 text-[12px] text-muted">{r.sub}</div>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -575,7 +577,7 @@ function MlbSharpPage() {
                   {notOffered.map((r) => (
                     <div key={`${r.label}|${r.sub}`} className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
                       <span>
-                        <span className="text-text"><BoardLabel label={r.label} /></span> <span className="text-muted">{r.sub}</span>
+                        <span className="text-text"><BoardLabel label={r.label} market={marketOfLkey(r.lkey)} /></span> <span className="text-muted">{r.sub}</span>
                         {r.lu === "projected" && <span className="ml-1.5 text-[9.5px] font-bold text-gold">PROJ</span>}
                       </span>
                       <span className="num text-[11.5px] text-muted">
@@ -607,7 +609,7 @@ function MlbSharpPage() {
           {trap && (
             <Reveal>
               <Panel title="Trap of the day" className="border-neg/20">
-                <div className="text-[13px] font-semibold text-neg">{trap.prop}</div>
+                <div className="text-[13px] font-semibold text-neg"><MlbLeadText text={trap.prop} /></div>
                 <div className="mt-1 text-[12px] leading-relaxed text-muted">{trap.reason}</div>
               </Panel>
             </Reveal>
@@ -622,7 +624,7 @@ function MlbSharpPage() {
                 <div className="mt-3 space-y-2.5">
                   {passes.map((p) => (
                     <div key={p.prop}>
-                      <div className="text-[12.5px] font-medium text-text">{p.prop}</div>
+                      <div className="text-[12.5px] font-medium text-text"><MlbLeadText text={p.prop} /></div>
                       <div className="text-[11.5px] text-muted">{p.reason}</div>
                     </div>
                   ))}

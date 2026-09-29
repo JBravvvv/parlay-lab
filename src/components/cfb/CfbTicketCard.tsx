@@ -19,6 +19,10 @@ import { playerSlug } from "@/lib/cfb/props";
 import { fmtAmerican } from "@/lib/format";
 import { gradeFromEv } from "@/lib/grade";
 import { ticketPayout, usd } from "@/lib/ticket-payout";
+import { LabelWithPos, cleanPos } from "@/components/player/PosTag";
+import { useRosterPositions } from "@/lib/football/useRosterPositions";
+
+const NO_GAMES: never[] = [];
 
 /**
  * The College Football ticket — a perforated `.ticket` slip (globals.css, owner D) in the
@@ -208,6 +212,15 @@ export function CfbTicketCard({
   }, [board]);
   /* bet % / money % on side legs (2026-09-18); prop legs have no public split */
   const splitsFeed = useSplits(league);
+  /* a position on every pick (2026-09-28): a prop leg locked without one (the props context had not joined the
+     player) reads ESPN's roster for its game — the shared keyless fetch; a leg whose game is not on this slate keeps
+     what was stored */
+  const unplaced = useMemo(
+    () => t.legs.filter((l) => l.player && !cleanPos(l.pos)).map((l) => ({ gameId: l.gkey, player: l.player!, pos: l.pos ?? null, teamId: l.teamId, headshot: l.headshot ?? null })),
+    [t.legs],
+  );
+  const roster = useRosterPositions(league, unplaced, unplaced.length ? board?.games ?? NO_GAMES : NO_GAMES, unplaced.length > 0);
+  const legPos = (leg: CfbTicketLeg) => leg.pos ?? (leg.player ? roster.positionOf({ gameId: leg.gkey, player: leg.player, pos: null, teamId: leg.teamId }) : null);
   const evGrade = gradeFromEv(t.czEv);
   const glow = t.czEv > 0 ? "ev-glow" : "";
   const shine = evGrade === "S" ? "shine" : "";
@@ -279,10 +292,10 @@ export function CfbTicketCard({
                     className={`min-w-0 flex-1 truncate text-text underline ${accent.underline} decoration-dotted underline-offset-2`}
                     data-cfb-leg-link
                   >
-                    {leg.label}
+                    <LabelWithPos label={leg.label} player={leg.player} pos={legPos(leg)} />
                   </Link>
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-text" title={link?.title}>{leg.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-text" title={link?.title}><LabelWithPos label={leg.label} player={leg.player} pos={legPos(leg)} /></span>
                 )}
                 {!single && matchup && <span className="shrink-0 text-[9px] text-faint" data-cfb-leg-matchup>{matchup}</span>}
                 </span>

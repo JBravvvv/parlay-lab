@@ -5,6 +5,7 @@ import { useState } from "react";
 import { amFmt, decToAm, type SandboxLeg, type TicketCalc } from "@/lib/ticket-math";
 import { CrossMark } from "./CrossMark";
 import { BoardLabel } from "@/components/player/PlayerName";
+import { PosTag } from "@/components/player/PosTag";
 
 /**
  * The ticket slip as a bottom sheet. Collapsed by default: a one-line handle
@@ -89,7 +90,7 @@ export function Slip({
                   <div key={l.id} className="flex items-center gap-2 border-b border-white/[0.04] py-1.5 text-[11.5px] last:border-b-0">
                     <span className="min-w-0 flex-1 leading-tight">
                       <span className="block truncate text-text">
-                        {l.cross?<span className="inline-flex items-center gap-1"><CrossMark leg={l.cross}/>{l.label}</span>:<BoardLabel label={l.label} />} <span className="text-muted">{l.sub}</span>
+                        {l.cross?<span className="inline-flex items-center gap-1"><CrossMark leg={l.cross}/>{l.label}<PosTag pos={l.cross.position} className="" /></span>:<BoardLabel label={l.label} market={l.market} />} <span className="text-muted">{l.sub}</span>
                         {l.phase==="live" && <span className="ml-1 text-[10px] text-live" title={l.quoteAt}>Live quote</span>}
                       </span>
                       <span className="block truncate text-[9.5px] text-faint">{l.game.split(" · ")[0]}</span>

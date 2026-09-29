@@ -9,6 +9,7 @@ import { isH1Market, marketWord } from "@/lib/cfb/markets";
 import type { CfbPropMarket } from "@/lib/cfb/props-types";
 import type { CfbMarketKey } from "@/lib/cfb/types";
 import { amFmt, decToAm, type TicketCalc } from "@/lib/ticket-math";
+import { LabelWithPos } from "@/components/player/PosTag";
 
 /**
  * The College Football sandbox slip — the MLB Parlay Builder's bottom sheet on CFB legs.
@@ -105,6 +106,7 @@ export function CfbSlip({
   onClear,
   bottom,
   copyText,
+  posOf,
 }: {
   legs: CfbSlipLeg[];
   calc: TicketCalc;
@@ -116,6 +118,9 @@ export function CfbSlip({
   bottom: number;
   /** the slip as plain text for "Copy slip" */
   copyText: string;
+  /** a prop leg's position as its board row shows it now (2026-09-28) — a leg tapped before ESPN's roster answer
+      landed still gets its tag; absent = the position the leg was minted with */
+  posOf?: (leg: CfbSlipLeg) => string | null | undefined;
 }) {
   const [open, setOpen] = useState(false);
   /* the league seam (2026-09-08): the accent and the ledger's name come off useLeague() (both class strings literal) */
@@ -187,7 +192,7 @@ export function CfbSlip({
                       <SlipLegMark leg={l} />
                       <span className="min-w-0 flex-1 leading-tight">
                         <span className="block truncate text-text">
-                          {l.label}{" "}
+                          {l.kind === "prop" ? <LabelWithPos label={l.label} player={l.player} pos={posOf ? posOf(l) : l.pos} /> : l.label}{" "}
                           <span className="text-[9.5px] uppercase text-faint">
                             {l.kind === "prop" ? l.marketLabel ?? l.market : isH1Market(l.market) ? marketWord(l.market) : l.market === "ml" ? "ML" : l.market}
                           </span>

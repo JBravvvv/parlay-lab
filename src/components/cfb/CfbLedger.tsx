@@ -1,5 +1,6 @@
 "use client";
 
+import { LabelWithPos } from "@/components/player/PosTag";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { CfbTicketCard, cfbGradingOf, cfbLegLink, cfbTicketsOf, type CfbGradingView, type CfbLegVerdict } from "@/components/cfb/CfbTicketCard";
 import { NflPaperExperiment } from "@/components/nfl/NflPaperExperiment";
@@ -705,7 +706,7 @@ function LegResults({ t, legs }: { t: CfbTicket; legs: Record<string, CfbLegVerd
     <ul className="mt-1.5 space-y-0.5 px-1 text-[10.5px]">
       {rows.map(({ leg, v }) => (
         <li key={leg.lkey} className="flex items-baseline justify-between gap-2">
-          <span className="min-w-0 truncate text-muted">{leg.label}</span>
+          <span className="min-w-0 truncate text-muted"><LabelWithPos label={leg.label} player={leg.player} pos={leg.pos} /></span>
           <span className={`num shrink-0 ${RESULT_TONE[v.result] ?? "text-muted"}`}>
             {v.result}
             {v.detail && <span className="text-faint"> · {v.detail}</span>}
